@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import type { NameLines } from '../../src/render/m6-contract';
+import type { NameLines } from '../../src/render/name-lines';
 import * as impl from '../../src/render/name-lines';
 
 // D29 (spec §0, §5.2): in the note preview on an upright phone, a name that does not fit on one
-// text line uses two. Contract `NameLines` (src/render/m6-contract.ts): one text line if
+// text line uses two. Contract `NameLines` (src/render/name-lines.ts): one text line if
 // `measure(name) <= width`; otherwise two, broken at the last space that lets line 1 fit; line 2
 // ends with "…" if it is still too wide; a name with no usable space: line 1 is the widest prefix
 // that fits, line 2 the rest (with "…" if needed). Pure.

@@ -1,5 +1,5 @@
-import type { FamilyGraph } from '../core/derive';
-import type { Rect, TreeLayout } from './model';
+import type { FamilyGraph } from '../src/core/derive';
+import type { Rect, TreeLayout } from '../src/layout/model';
 
 export interface LayoutMetrics {
 	people: number;

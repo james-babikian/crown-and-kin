@@ -1,16 +1,16 @@
+/*
+ * Pure helpers that turn the model into what a card, the legend and the timing Notice show. Used
+ * by the tree view, the scene, the legend, and others. Every string here is plugin text, so it
+ * obeys Simplified Technical English (ASD-STE100) and the project word list.
+ */
 import type { FamilyGraph } from '../core/derive';
 import type { Person } from '../core/types';
 import type { StrokeKind } from '../layout/model';
-import { dateLine } from './svg-string';
-
-/*
- * Pure helpers that turn the model into what a card, the legend and the timing Notice show.
- * Every string here is plugin text, so it obeys Simplified Technical English (ASD-STE100) and the project word list.
- */
 
 /**
- * Start person (spec §5.5): `options.start` if that person exists, else the first person in
- * document order who has no placement parents. The "last edited" rule arrives in milestone 2.
+ * Start person (spec §5.5): `start` if that person exists, else the first person in document
+ * order who has no placement parents. The tree view passes the last edited person as `start`
+ * when there is one, else `options.start`.
  */
 export function startPerson(g: FamilyGraph, start: string | undefined): string | null {
 	if (start !== undefined && g.byId.has(start)) return start;
@@ -35,6 +35,14 @@ export function familyOf(g: FamilyGraph, id: string): { partners: string[]; chil
 	}
 	for (const c of g.soloChildren.get(id) ?? []) children.add(c);
 	return { partners: [...partners], children: [...children] };
+}
+
+/** The dates text line of a card: "born–died", "b. born" or "d. died"; none without dates. */
+export function dateLine(p: Person): string | undefined {
+	if (p.born && p.died) return `${p.born}–${p.died}`;
+	if (p.born) return `b. ${p.born}`;
+	if (p.died) return `d. ${p.died}`;
+	return undefined;
 }
 
 /** What a screen reader says for a card: name, title and dates. */
@@ -64,10 +72,7 @@ export function linkTarget(link: string | undefined): string | null {
 	return s === '' || s === '#' ? null : s;
 }
 
-/**
- * Legend labels for each line style. `STROKES[kind].label` in styles.ts still says "union" in one
- * label; this local table is the STE version until styles.ts takes it over.
- */
+/** Legend labels for each line style; `STROKES[kind].label` in styles.ts reads them from here. */
 export const LEGEND_LABELS: Record<StrokeKind, string> = {
 	marriage: 'Marriage',
 	betrothal: 'Betrothal',
@@ -103,6 +108,7 @@ export const LEGEND_ORDER: StrokeKind[] = [
 	'birth-link',
 ];
 
+/** How long the last render took, for the "Show render timing" command (spec §7.7). */
 export interface RenderTiming {
 	/** Note path of the tree. */
 	path: string;
@@ -125,7 +131,7 @@ export interface RenderTiming {
 
 const ms = (n: number) => `${Math.max(0, Math.round(n))} ms`;
 
-/** The "Show render timing" Notice (spec §7.7, the work plan §3.5). */
+/** The "Show render timing" Notice (spec §7.7). */
 export function timingText(t: RenderTiming | null): string {
 	if (!t) return 'The plugin does not show a tree yet. Open a note with a tree. Then do this command again.';
 	const who = t.of !== undefined && t.of !== t.people ? `the family, ${t.people} of ${t.of} people` : t.people === 1 ? '1 person' : `${t.people} people`;
@@ -135,8 +141,16 @@ export function timingText(t: RenderTiming | null): string {
 	return `The last tree (${where}) was ready for use after ${ms(t.interactiveMs)}. ${parts} Time to make the cards and lines: ${ms(t.drawMs)}. Time to show them on the screen: ${ms(t.interactiveMs - t.totalMs)}.`;
 }
 
-/** Screen-reader text for a far-couple tag; the visible text comes from `farTagText`. */
+/**
+ * The visible text of a far-couple tag after its ⚭ sign (spec §5.3, D10): the partner's name, or
+ * "N partners" for several (STE wording; the spec says spouses). Both renderers draw the sign apart.
+ */
+export function farTagName(g: FamilyGraph, spouses: string[]): string {
+	return spouses.length === 1 ? (g.byId.get(spouses[0])?.name ?? spouses[0]) : `${spouses.length} partners`;
+}
+
+/** Screen-reader text for a far-couple tag; the visible text comes from `farTagName`. */
 export function farTagLabel(g: FamilyGraph, spouses: string[]): string {
-	if (spouses.length === 1) return `Show the partner ${g.byId.get(spouses[0])?.name ?? spouses[0]}.`;
+	if (spouses.length === 1) return `Show the partner ${farTagName(g, spouses)}.`;
 	return `Show a list of ${spouses.length} partners.`;
 }

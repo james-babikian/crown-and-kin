@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { deriveFamilies } from '../src/core/derive';
-import { ancestorsOf, describeDelete, descendantsOf, familyOf, parentKind, pickerExclusions, siblingGroup, writtenParents } from '../src/core/family-query';
+import { ancestorsOf, describeDelete, descendantsOf, familyOf, pickerExclusions, siblingGroup, writtenParents } from '../src/core/family-query';
+import { parentKind } from '../src/core/types';
 import { parseDynasty } from '../src/core/parse';
+import { applyOp } from '../src/core/yaml-edit';
 
 // Unit tests for the family questions (spec §6.3, §6.4, §6.6, §6.7) on cases the acceptance
 // tests do not reach: cycles already in the data, unknown parent types, duplicates, id-less people.
@@ -59,6 +61,28 @@ describe('family questions', () => {
 		expect([...pickerExclusions(g, 'zz', 'add-child')]).toEqual(['zz']);
 		expect(pickerExclusions(g, 'a', 'focus').size).toBe(0);
 		expect(describeDelete(g, 'zz', {})).toEqual({ unions: 0, childLinks: 0, clearsStart: false, clearsFocus: false });
+	});
+
+	it('delete counts every union item that lists the person, as the delete removes them', () => {
+		const src = `people:
+  - id: a
+  - id: b
+unions:
+  - partners: [a, b]
+  - partners: [a, b]
+  - partners: [a, ghost]
+  - partners: [a]
+  - partners: a
+  - {partners: [b, " a "]}
+  - text
+  - partners: [b, c]
+`;
+		const g = graph(src);
+		const removed = applyOp(src, { kind: 'delete-person', id: 'a' });
+		const left = removed.ok ? parseDynasty(removed.body) : null;
+		expect(left?.ok && left.tree.unions.map((u) => u.partners)).toEqual([['b', 'c']]);
+		expect(describeDelete(g, 'a', {}).unions).toBe(6);
+		expect(describeDelete(g, 'b', {}).unions).toBe(4);
 	});
 
 	it('partners: a pair with two unions is listed twice but offered once; start and end come along', () => {

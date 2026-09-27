@@ -8,7 +8,7 @@ import type { Op } from '../../src/core/edit';
 import { applyOp } from '../../src/core/yaml-edit';
 import { FullScreenModal } from '../../src/obsidian/full-screen';
 import { HousesWindow, firstFreeColour, houseOps, loadHouses, rowsOf } from '../../src/obsidian/houses-window';
-import { HOUSE_PALETTE } from '../../src/render/m6-contract';
+import { HOUSE_PALETTE } from '../../src/render/styles';
 import { HOUSES, HOUSE_COLOUR_NAMES, REMOVE, SHEET, WRITE_TEXT } from '../../src/render/ui-text';
 import { FEl, clock, dispatch, fakeDoc, fakeWin, installDom, resetDom, runTimers, settle } from './fake-dom';
 import { noticeList, notices, openModals, resetObsidian } from './fake-obsidian';

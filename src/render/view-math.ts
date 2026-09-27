@@ -1,11 +1,9 @@
-import type { Rect } from '../layout/model';
-import { DOUBLE_TAP_FACTOR, DOUBLE_TAP_MS, DOUBLE_TAP_PX, type DoubleTapView, type IsDoubleTap, type PinchView, type Point, type ResizeView } from './gesture';
-
 /*
  * Pure viewport arithmetic for the DOM renderer: default view (spec §5.5), pan and zoom, level of
- * detail with hysteresis (§5.4), hit-area scaling (§7.5) and text truncation. No DOM here, so all
- * of it runs under vitest.
+ * detail with hysteresis (§5.4), hit-area scaling (§7.5) and text truncation. Used by the tree
+ * view, the scene and pan-zoom, and others; no DOM here, so all of it runs under vitest.
  */
+import type { Rect } from '../layout/model';
 
 /** The layout point shown at the centre of the viewport, and the zoom. */
 export interface View {
@@ -14,11 +12,13 @@ export interface View {
 	cy: number;
 }
 
+/** A width and height in px. */
 export interface Size {
 	w: number;
 	h: number;
 }
 
+/** Level of detail a card is drawn at (spec §5.4): full text, compact, or an overview mark. */
 export type Lod = 'full' | 'compact' | 'overview';
 
 /** Name text on screen, in px, where the default view switches from fit to a readable zoom (§5.5). */
@@ -48,6 +48,7 @@ export const LOD_BANDS = {
 	compactEnter: 4.5,
 } as const;
 
+/** The level of detail to draw at, given the current one (or null at the first draw) and the Full name size on screen. */
 export function chooseLod(current: Lod | null, namePx: number): Lod {
 	const b = LOD_BANDS;
 	if (!Number.isFinite(namePx)) return current ?? 'full';
@@ -86,6 +87,7 @@ export function fitScale(bounds: Rect, size: Size): number {
 	return Math.min(MAX_FIT_SCALE, size.w / bounds.w, size.h / bounds.h);
 }
 
+/** The smallest and largest zoom allowed: half of fit, up to `MAX_NAME_PX` of Full name text. */
 export function scaleLimits(bounds: Rect, size: Size, fontPx: number): { min: number; max: number } {
 	const f = fontPx > 0 ? fontPx : 16;
 	const max = MAX_NAME_PX / f;
@@ -93,6 +95,7 @@ export function scaleLimits(bounds: Rect, size: Size, fontPx: number): { min: nu
 	return { min: Math.max(min, 1e-3), max };
 }
 
+/** `scale`, kept inside `limits`; an invalid scale becomes the minimum. */
 export function clampScale(scale: number, limits: { min: number; max: number }): number {
 	if (!Number.isFinite(scale)) return limits.min;
 	return Math.min(limits.max, Math.max(limits.min, scale));
@@ -272,7 +275,7 @@ export function transformFor(view: View, size: Size): string {
 	const ty = size.h / 2 - view.cy * view.scale;
 	const r = (n: number) => Math.round(n * 1000) / 1000;
 	// The scale keeps 9 significant digits: rounded to 3 decimals, a small scale (0.031 at Fit on a
-	// phone) moved the tree by up to 8 px against the view the gesture wrapper computes from (WP5.3).
+	// phone) moved the tree by up to 8 px against the view the gesture wrapper computes from.
 	return `translate(${r(tx)} ${r(ty)}) scale(${Number(view.scale.toPrecision(9))})`;
 }
 
@@ -287,8 +290,10 @@ export function wheelFactor(deltaY: number, deltaMode: number): number {
 	return Math.exp(-d * WHEEL_ZOOM_PER_PX);
 }
 
+/** How much one wheel px zooms by, in `wheelFactor`'s `exp`. */
 export const WHEEL_ZOOM_PER_PX = 0.002;
 
+/** True once a press has moved further than `PAN_THRESHOLD`, so it counts as a pan, not a tap. */
 export function isPan(dx: number, dy: number): boolean {
 	return Math.hypot(dx, dy) > PAN_THRESHOLD;
 }
@@ -332,16 +337,59 @@ export function embedHeight(optionsHeight: number | undefined, phoneLayout: bool
 	return defaults.desktop;
 }
 
-/** Viewport narrower than this uses the phone layout (spec §7). */
+/**
+ * A window narrower than this lays out the plugin's windows and the full-screen view for a phone.
+ * The tree's own phone rules (D20, D23, D30) use `isPhoneWindow` in focus-mode.ts instead.
+ */
 export const PHONE_MAX_WIDTH = 600;
 
-// ---------- Touch gestures and viewport changes (M4 contract, src/render/gesture.ts) ----------
+// ---------- Touch gestures and viewport changes (spec §7.2, §7.5, §7.6) ----------
+
+/** A screen point in viewport px from the top-left corner. */
+export interface Point {
+	x: number;
+	y: number;
+}
+
+/** The smallest and largest zoom a gesture may reach; same shape as `scaleLimits`'s result. */
+export interface ScaleLimits {
+	min: number;
+	max: number;
+}
+
+/** Double-tap on empty background zooms 2× at that point (§7.2). */
+export const DOUBLE_TAP_FACTOR = 2;
+/** Two taps count as a double-tap when the second starts within this time of the first… */
+export const DOUBLE_TAP_MS = 300;
+/** …and within this distance (screen px) of it. */
+export const DOUBLE_TAP_PX = 24;
+
+/**
+ * Two-finger pinch (§7.2): the tree point under the fingers' midpoint at the start stays under
+ * the midpoint now, and the scale changes by the ratio of the finger distances. Clamped to
+ * `limits`. `start` is the view when the second finger went down.
+ */
+export type PinchView = (start: View, from: [Point, Point], to: [Point, Point], size: Size, limits: ScaleLimits) => View;
+
+/** Zoom `DOUBLE_TAP_FACTOR`× so that the tree point under `at` stays under `at`; clamped. */
+export type DoubleTapView = (view: View, at: Point, size: Size, limits: ScaleLimits) => View;
+
+/** True if a tap at (`t1`, `p1`) completes a double-tap with the tap at (`t0`, `p0`). Times in ms. */
+export type IsDoubleTap = (t0: number, p0: Point, t1: number, p1: Point) => boolean;
+
+/**
+ * Resize or orientation change (§7.5): keep the same tree point at the viewport centre and the
+ * same scale; only the viewport size changes. (The view's centre is already a tree point, so this
+ * is the identity on `cx`/`cy`; the function exists so every caller goes through one rule, and it
+ * re-applies the scale limits for the new size.)
+ */
+export type ResizeView = (view: View, oldSize: Size, newSize: Size, newLimits: ScaleLimits) => View;
 
 function finitePoint(p: Point): boolean {
 	return Number.isFinite(p.x) && Number.isFinite(p.y);
 }
 
-/** Two-finger pinch (spec §7.2): see `PinchView` in gesture.ts. */
+/** Two-finger pinch (spec §7.2): see `PinchView`. */
 export const pinchView: PinchView = (start, from, to, size, limits) => {
 	if (!validSize(size) || !(start.scale > 0) || ![...from, ...to].every(finitePoint)) return start;
 	const d0 = Math.hypot(from[0].x - from[1].x, from[0].y - from[1].y);
@@ -356,18 +404,18 @@ export const pinchView: PinchView = (start, from, to, size, limits) => {
 	return { scale, cx: lx - (m1.x - size.w / 2) / scale, cy: ly - (m1.y - size.h / 2) / scale };
 };
 
-/** Double-tap on empty background (spec §7.2): see `DoubleTapView` in gesture.ts. */
+/** Double-tap on empty background (spec §7.2): see `DoubleTapView`. */
 export const doubleTapView: DoubleTapView = (view, at, size, limits) => {
 	if (!validSize(size) || !(view.scale > 0) || !finitePoint(at)) return view;
 	return zoomAt(view, DOUBLE_TAP_FACTOR, at.x, at.y, size, limits);
 };
 
-/** See `IsDoubleTap` in gesture.ts. */
+/** See `IsDoubleTap`. */
 export const isDoubleTap: IsDoubleTap = (t0, p0, t1, p1) => {
 	const dt = t1 - t0;
 	if (!Number.isFinite(dt) || !finitePoint(p0) || !finitePoint(p1)) return false;
 	return dt >= 0 && dt <= DOUBLE_TAP_MS && Math.hypot(p1.x - p0.x, p1.y - p0.y) <= DOUBLE_TAP_PX;
 };
 
-/** Resize or orientation change (spec §7.5): see `ResizeView` in gesture.ts. */
+/** Resize or orientation change (spec §7.5): see `ResizeView`. */
 export const resizeView: ResizeView = (view, _oldSize, _newSize, newLimits) => ({ scale: clampScale(view.scale, newLimits), cx: view.cx, cy: view.cy });

@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { routeEdges } from '../src/layout/edges';
-import { geometryFor, lineMetrics, sideTagDepth, sidewaysGeometry, tagTop, turnedGeometry } from '../src/layout/geometry';
+import { geometryFor, lineMetrics, MIN_HIT, sideTagDepth, sidewaysGeometry, tagTop, turnedGeometry } from '../src/layout/geometry';
 import { clearLayoutCache, layoutKey, layoutTree } from '../src/layout/index';
-import { MIN_HIT, sideTagHit } from '../src/layout/layout';
-import { measureLayout } from '../src/layout/metrics';
+import { sideTagHit } from '../src/layout/layout';
+import { measureLayout } from '../scripts/metrics';
 import type { FarCoupleRule, LayoutSettings } from '../src/layout/model';
 import { turnPath } from '../src/layout/turn';
 import { build, fixture } from './helpers';

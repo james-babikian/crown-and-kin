@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { PENDING_KEY, normaliseSettings, parseDesktopHeight, readPending, settingsChanges } from '../src/obsidian/settings';
-import { DEFAULT_SETTINGS } from '../src/obsidian/settings-contract';
+import { DEFAULT_SETTINGS, PENDING_KEY, normaliseSettings, parseDesktopHeight, readPending, settingsChanges } from '../src/obsidian/settings';
 
 // WP6.3: stored settings (spec §9, D30, D33). Every missing, wrong-type or out-of-range value becomes its default.
 

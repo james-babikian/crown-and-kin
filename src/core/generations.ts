@@ -1,3 +1,9 @@
+/*
+ * Assigns every person a generation, the row they are drawn in (spec §5.1 step 1). The layout code
+ * calls `computeGenerations` with the family graph from `derive.ts`, before `order.ts` works out
+ * the left-to-right order within each row.
+ */
+
 import { partnerOf, placedChildren, type FamilyGraph } from './derive';
 
 /**

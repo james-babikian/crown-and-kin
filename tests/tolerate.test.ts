@@ -27,8 +27,15 @@ describe('tolerate', () => {
 	it('linkValue: flattens an unquoted [[link]] and keeps a quoted one', () => {
 		expect(linkValue([['Wren of the Marches']])).toBe('[[Wren of the Marches]]');
 		expect(linkValue('[[Wren]]')).toBe('[[Wren]]');
-		expect(linkValue([['a', 'b']])).toBeUndefined();
 		expect(linkValue([[[]]])).toBeUndefined();
+	});
+
+	it('linkValue: a comma in an unquoted [[link]] keeps the text as written', () => {
+		expect(linkValue([['Smith', 'John']], () => '[[Smith,  John]]')).toBe('[[Smith,  John]]');
+		// No usable source text (none, or on two text lines): the items are joined.
+		expect(linkValue([['Smith', 'John']])).toBe('[[Smith, John]]');
+		expect(linkValue([['Smith', 'John']], () => '[[Smith,\n  John]]')).toBe('[[Smith, John]]');
+		expect(linkValue([['a', []]])).toBeUndefined();
 	});
 
 	it('bool and int read the failsafe strings', () => {

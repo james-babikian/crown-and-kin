@@ -64,6 +64,22 @@ describe('createUndoStack', () => {
 		expect(u.undo('x')).toEqual({ ok: false, code: 'changed' });
 		expect(u.size).toBe(1);
 	});
+
+	it('rewrites every entry with map, in order, and still undoes', () => {
+		const u = createUndoStack();
+		u.push('a', 'b');
+		u.push('b', 'c');
+		const seen: string[] = [];
+		u.map((body) => {
+			seen.push(body);
+			return body.toUpperCase();
+		});
+		expect(seen).toEqual(['a', 'b', 'b', 'c']);
+		expect(u.size).toBe(2);
+		expect(u.canUndo('c')).toBe(false);
+		expect(u.undo('C')).toEqual({ ok: true, body: 'B' });
+		expect(u.undo('B')).toEqual({ ok: true, body: 'A' });
+	});
 });
 
 describe('planWrite checks the written note (review F1)', () => {

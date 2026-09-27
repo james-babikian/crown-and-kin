@@ -1,11 +1,3 @@
-import { isAlias, isMap, isScalar, isSeq, parseDocument, Scalar, type Node, type YAMLMap } from 'yaml';
-import type { EditResult, RewriteLinksOp } from './edit';
-import type { LinkTargets, NormaliseTarget } from './link-rewrite-contract';
-import { section } from './relationship-ops';
-import { parseBody, readTree } from './parse';
-import type { Raw, RawMap } from './tolerate';
-import { clone, doubleQuoted, findPair, finish, layoutOf, refuse, renderScalar, setPairValue, type Parsed, type Patch, type Step } from './yaml-patch';
-
 /*
  * Link maintenance (spec §6.9, D6). The core only reads and rewrites link text; the plugin
  * resolves targets against the vault and passes the old → new map. A link is read in the forms
@@ -13,6 +5,13 @@ import { clone, doubleQuoted, findPair, finish, layoutOf, refuse, renderScalar, 
  * `[Alias](Note.md#Heading)`, `[Alias](<Note.md>)` and a bare `Note#Heading`, each with an
  * optional `!`.
  */
+
+import { isAlias, isMap, isScalar, isSeq, parseDocument, Scalar, type Node, type YAMLMap } from 'yaml';
+import type { EditResult, RewriteLinksOp } from './edit';
+import { parseBody, readTree } from './parse';
+import type { Raw, RawMap } from './tolerate';
+import { section } from './yaml-list';
+import { clone, doubleQuoted, findPair, finish, layoutOf, refuse, renderScalar, setPairValue, type Parsed, type Patch, type Step } from './yaml-patch';
 
 /** A link's text split around its target: `head + written target + tail` is the whole text. */
 interface LinkParts {
@@ -31,8 +30,8 @@ function decode(s: string): string {
 	}
 }
 
-/** Percent-encodes what a Markdown link destination cannot hold as written. */
-const encode = (s: string) => s.replace(/%/g, '%25').replace(/ /g, '%20').replace(/\(/g, '%28').replace(/\)/g, '%29');
+/** Percent-encodes what a Markdown link destination cannot hold as written (the rename search looks for this form too). */
+export const encode = (s: string) => s.replace(/%/g, '%25').replace(/ /g, '%20').replace(/\(/g, '%28').replace(/\)/g, '%29');
 
 /** The target is the text up to the first of `cut`; whitespace around it goes to head and tail. */
 function split(head: string, text: string, tail: string, cut: RegExp, kind: LinkParts['kind']): LinkParts | null {
@@ -58,8 +57,24 @@ function parseLink(v: string): LinkParts | null {
 	return split('', v, '', /#/, 'bare');
 }
 
+/**
+ * The form of a link target used for comparison and for `RewriteLinksOp.map` keys: backslashes
+ * become `/`, a trailing `.md` is removed, and the text is lower case.
+ */
+export type NormaliseTarget = (target: string) => string;
+
+/** Implements `NormaliseTarget`. */
 export const normaliseTarget: NormaliseTarget = (target) => (typeof target === 'string' ? target.replace(/\\/g, '/').toLowerCase().replace(/\.md$/, '') : '');
 
+/**
+ * The link targets of every person `link` in a tree body, in document order, without `[[`, `]]`,
+ * `#heading` and `|alias` (for example `folder/Old` or `Old.md`). Every written form counts: a
+ * quoted "[[Old]]", a plain string, and the unquoted [[Old]] that YAML reads as a nested flow
+ * sequence (spec §4.1 tolerate). Returns [] when the body does not parse. Never throws.
+ */
+export type LinkTargets = (body: string) => string[];
+
+/** Implements `LinkTargets`. */
 export const linkTargets: LinkTargets = (body) => {
 	try {
 		if (typeof body !== 'string') return [];
@@ -143,10 +158,11 @@ function linkPatch(p: Parsed, item: YAMLMap, map: Map<string, string>): { patch:
 		inner.type === Scalar.QUOTE_DOUBLE ? `[[${doubleQuoted(newInner)}]]` : inner.type === Scalar.QUOTE_SINGLE ? `[['${newInner.replace(/'/g, "''")}']]` : `[[${newInner}]]`;
 	const range = { start: node.range![0], end: src.nodeEnd(node) };
 	if (nestedReadsBack(nested, newInner, flow)) return { patch: { ...range, text: nested }, raw: [[newInner]] };
-	// The nested form cannot hold the new text (for example a comma): the M2 quoting rule applies.
+	// The nested form cannot hold the new text (for example a comma): the value-quoting rule (spec §3) applies.
 	return { patch: { ...range, text: renderScalar(text, null, { flow, text: false, indent: '' }) }, raw: text };
 }
 
+/** Rewrites every person `link` whose target moved, leaving the rest of the body unchanged (spec §6.9). */
 export function rewriteLinks(first: Parsed, data: RawMap, op: RewriteLinksOp): EditResult {
 	const unchanged: EditResult = { ok: true, body: first.src.text, created: [], changed: 0 };
 	if (!op.map || typeof op.map !== 'object' || Array.isArray(op.map)) return refuse('bad-value', 'The link map is not a map.');

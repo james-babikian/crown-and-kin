@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { deriveFamilies } from '../src/core/derive';
 import { parseDynasty } from '../src/core/parse';
 import { STROKES } from '../src/render/styles';
-import { LEGEND_LABELS, LEGEND_ORDER, cardLabel, familyOf, farTagLabel, linkTarget, startPerson, timingText } from '../src/render/tree-info';
+import { LEGEND_LABELS, LEGEND_ORDER, cardLabel, familyOf, farTagLabel, farTagName, linkTarget, startPerson, timingText } from '../src/render/tree-info';
 import { PROBLEMS_HINT, UI, problemsLabel, problemsTitle } from '../src/render/ui-text';
 
 function graph(yaml: string) {
@@ -78,6 +78,13 @@ describe('card text', () => {
 		const g = graph(TREE);
 		expect(farTagLabel(g, ['b'])).toBe('Show the partner Berthe.');
 		expect(farTagLabel(g, ['b', 'c'])).toBe('Show a list of 2 partners.');
+	});
+
+	it('gives the visible far-tag text after the sign: a name, or the number of partners', () => {
+		const g = graph(TREE);
+		expect(farTagName(g, ['b'])).toBe('Berthe');
+		expect(farTagName(g, ['nobody'])).toBe('nobody');
+		expect(farTagName(g, ['b', 'c', 'd'])).toBe('3 partners');
 	});
 });
 

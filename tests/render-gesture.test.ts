@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DOUBLE_TAP_MS, DOUBLE_TAP_PX } from '../src/render/gesture';
-import { doubleTapView, isDoubleTap, pinchView, resizeView, type Size, type View } from '../src/render/view-math';
+import { DOUBLE_TAP_MS, DOUBLE_TAP_PX, doubleTapView, isDoubleTap, pinchView, resizeView, type Size, type View } from '../src/render/view-math';
 
 const size: Size = { w: 390, h: 844 };
 const limits = { min: 0.1, max: 4 };

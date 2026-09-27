@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { deriveFamilies, type FamilyGraph } from '../../src/core/derive';
-import type { CodedIssue } from '../../src/core/issues';
+import type { CodedIssue } from '../../src/core/messages';
 import { parseDynasty } from '../../src/core/parse';
 
 // Issue codes of src/core/issues.ts that fixture 5 does not cover, on small inline trees (spec §8).

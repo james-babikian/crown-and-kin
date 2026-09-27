@@ -7,6 +7,7 @@ import { routeEdges } from '../src/layout/edges';
 import { NORMAL_GEOMETRY, tagTop } from '../src/layout/geometry';
 import { clearLayoutCache, layoutKey, layoutTree } from '../src/layout/index';
 import { DEFAULT_FAR_RULE, DEFAULT_LAYOUT_SETTINGS, layoutFamilies } from '../src/layout/layout';
+import { addTo } from '../src/layout/lines';
 import type { EdgeDrawing, EdgePath, FarCoupleRule, Rect, TreeLayout } from '../src/layout/model';
 import { build, fixture } from './helpers';
 
@@ -338,5 +339,21 @@ people:
 		// Lisette has no other line leaving her card: her tag may use all but a small margin.
 		const lisette = layout.farTags.get('lisette')!;
 		expect(lisette.hit.w).toBeGreaterThanOrEqual(NORMAL_GEOMETRY.cardW - NORMAL_GEOMETRY.fontPx);
+	});
+});
+
+describe('addTo', () => {
+	it('keeps the order of keys and of the values of each key', () => {
+		const map = new Map<number, string[]>();
+		addTo(map, 2, 'a');
+		addTo(map, 1, 'b');
+		addTo(map, 2, 'c');
+		const first = map.get(2);
+		addTo(map, 2, 'd');
+		expect([...map]).toEqual([
+			[2, ['a', 'c', 'd']],
+			[1, ['b']],
+		]);
+		expect(map.get(2)).toBe(first);
 	});
 });

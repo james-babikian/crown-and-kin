@@ -1,0 +1,58 @@
+/*
+ * Small pieces shared by the sheet-style windows (the edit sheet, the Houses window, the
+ * partnership editor): a labelled form row, the stale check before a write, turning a failed
+ * write into the window's own message, and a safe house colour for CSS.
+ */
+
+import { normBody } from '../core/block-match';
+import type { EditResult } from '../core/edit';
+import type { Handle, HandleWriteOutcome } from './block-handle';
+
+const HEX = /^#[0-9a-f]{6}$/i;
+
+/** A value CSS can draw (a house colour can be any CSS colour, spec §4.1); `#rrggbb` where CSS cannot say. */
+export function drawableColour(c: string | null | undefined): c is string {
+	if (!c) return false;
+	try {
+		return CSS.supports('color', c);
+	} catch {
+		return HEX.test(c);
+	}
+}
+
+/** A labelled row of a sheet form; `id` joins the label to the control that the caller adds to `row`. */
+export function sheetField(parent: HTMLElement, label: string, name: string, idPrefix = 'dynasty-sheet'): { row: HTMLElement; id: string } {
+	const row = parent.createDiv({ cls: 'dynasty-sheet-field', attr: { 'data-field': name } });
+	const id = `${idPrefix}-${name}-${Math.random().toString(36).slice(2, 8)}`;
+	row.createEl('label', { cls: 'dynasty-sheet-label', text: label, attr: { for: id } });
+	return { row, id };
+}
+
+/** True if a window that shows the body `shown` shows the handle's current body; otherwise calls `stale` and returns false (spec §6.1). */
+export function freshOrStale(h: Pick<Handle, 'body'>, shown: string, stale: (body: string) => void): boolean {
+	if (normBody(h.body) === normBody(shown)) return true;
+	stale(h.body);
+	return false;
+}
+
+/** Sends a failed write to the window's reaction for it; the detail of a refusal goes to the console. */
+export function onWriteFailed(
+	out: Exclude<HandleWriteOutcome, { ok: true }>,
+	on: { stale(): void; missing(): void; refused(code: Extract<EditResult, { ok: false }>['code']): void },
+): void {
+	if (out.code !== 'refused') {
+		if (out.code === 'stale') on.stale();
+		else on.missing();
+		return;
+	}
+	if (out.refusal.detail) console.warn('Dynasty Tree: the edit was refused:', out.refusal.detail);
+	on.refused(out.refusal.code);
+}
+
+/** Shows `text` in the error line of a window (a `role="alert"` element) and scrolls it into view. */
+export function showErrorLine(el: HTMLElement | null, text: string): void {
+	if (!el) return;
+	el.setText(text);
+	el.show();
+	el.scrollIntoView?.({ block: 'nearest' });
+}

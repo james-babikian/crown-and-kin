@@ -1,5 +1,103 @@
+/*
+ * Every issue and error the plugin can report about a tree, and the message text for each one
+ * (spec §8). A problem gets a stable code, so `validate.ts`, `parse.ts` and the render code can
+ * find and test problems by code without depending on the wording. `issueText` and `hardErrorText`
+ * turn a code and its parameters into the sentence the user sees. Keep new wording in Simplified
+ * Technical English, using the project word list.
+ */
+
 import { slugify } from './id-gen';
-import type { CodedIssue, HardError, HardErrorCode, HardErrorText, IssueCode, IssueParams, IssueText } from './issues';
+
+/** Tree not rendered (spec §8). */
+export type HardErrorCode =
+	/** params: detail (parser message). `line` is set when known. */
+	| 'yaml-invalid'
+	/** The block body is YAML but not a map. */
+	| 'not-a-map';
+
+/** A hard error, with the parameters `hardErrorText` needs to word it. */
+export interface HardError {
+	code: HardErrorCode;
+	/** 1-based line in the block body. */
+	line?: number;
+	detail?: string;
+}
+
+/** Tree rendered, editing disabled, banner shown (spec §8). */
+export type BlockingCode =
+	/** params: id, name (of the first person with the id) */
+	| 'duplicate-person-id'
+	/** params: id */
+	| 'duplicate-union-id';
+
+/** Tree rendered, warning badge (spec §8, §4.1). */
+export type WarningCode =
+	// Missing references.
+	/** params: person, ref */
+	| 'missing-parent'
+	/** params: union (label), partners (names), ref, absent (the ids that name nobody) */
+	| 'missing-partner'
+	/** params: person, ref */
+	| 'missing-house'
+	/** A person's `union` names no union. params: person, ref */
+	| 'missing-union'
+	/** A person's `union` exists but is not a union of their placement parents. params: person, ref */
+	| 'union-not-of-parents'
+	/** params: ref */
+	| 'missing-start'
+	/** params: ref */
+	| 'missing-focus'
+	// Structure.
+	/** params: person, type, count */
+	| 'too-many-parents'
+	/** params: union (label), partners (names), count */
+	| 'union-partner-count'
+	/** params: union (label), partners (names), person */
+	| 'union-same-partner'
+	/** The people involved, in order. params: people (names, in order), parent and dropped (the names on the dropped link) */
+	| 'cycle'
+	/** params: person */
+	| 'self-parent'
+	/** `placement` names a type the person has no parents of. params: person, placement */
+	| 'placement-without-parents'
+	/** params: house (name), id; value when an unquoted colour was read as a comment */
+	| 'house-color-null'
+	/** params: id, house (name of the first house with the id) */
+	| 'duplicate-house-id'
+	// Unknown values: kept in the YAML, drawn with default styling.
+	/** params: union (label), partners (names), value */
+	| 'unknown-union-type'
+	/** params: person, value */
+	| 'unknown-placement'
+	/** params: person, value, parent (name) */
+	| 'unknown-parent-type'
+	// Shape problems that are not silently tolerated (spec §8 "Tolerated silently" is not reported).
+	/** A person, house, union or parent entry is not a map. params: section, index; person for a parent entry */
+	| 'entry-not-map'
+	/** A person, house or parent entry has no id. params: section, index; name when written; person for a parent entry */
+	| 'missing-id'
+	/** A section that must be a list or map has another shape. params: section */
+	| 'section-wrong-shape';
+
+/** Every issue code the plugin can report: a `BlockingCode` or a `WarningCode`. */
+export type IssueCode = BlockingCode | WarningCode;
+
+/** The named values an issue's message is built from (person names, ids, counts, and so on). */
+export type IssueParams = Record<string, string | number | string[]>;
+
+/** One issue found in a tree: its code, severity, message parameters, and the ids it is about. */
+export interface CodedIssue {
+	code: IssueCode;
+	level: 'blocking' | 'warning';
+	params: IssueParams;
+	/** People (or houses/unions, by id) the issue is about; used to highlight cards. */
+	ids?: string[];
+}
+
+/** One issue; `ids` is left out when there are none. */
+export function codedIssue(code: IssueCode, level: CodedIssue['level'], params: IssueParams, ids?: string[]): CodedIssue {
+	return ids?.length ? { code, level, params, ids } : { code, level, params };
+}
 
 /*
  * Every sentence the plugin shows about a problem in a tree. Simplified Technical English
@@ -162,7 +260,8 @@ const ISSUE_TEXT: { [C in IssueCode]: (p: P) => string } = {
 	'section-wrong-shape': sectionWrongShape,
 };
 
-export const issueText: IssueText = (issue: CodedIssue) => {
+/** The sentence to show the user for one issue. */
+export const issueText = (issue: CodedIssue): string => {
 	const make = ISSUE_TEXT[issue.code] as ((p: P) => string) | undefined;
 	return make ? make(issue.params ?? {}) : 'The tree has a problem.';
 };
@@ -176,7 +275,8 @@ const HARD_ERROR_TEXT: { [C in HardErrorCode]: (e: HardError) => string } = {
 	'not-a-map': () => 'The block does not have sections such as "people:". To show the tree, put each person in a list below "people:".',
 };
 
-export const hardErrorText: HardErrorText = (error: HardError) => {
+/** The sentence to show the user for a hard error (the tree cannot be drawn at all). */
+export const hardErrorText = (error: HardError): string => {
 	const make = HARD_ERROR_TEXT[error.code] as ((e: HardError) => string) | undefined;
 	return make ? make(error) : 'The block has an error. Correct the text to show the tree.';
 };

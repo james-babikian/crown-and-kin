@@ -1,5 +1,5 @@
 /*
- * Pure rules that tie a BlockHandle to one `dynasty` block of a note (spec §6.1, the work plan §3.4):
+ * Pure rules that tie a BlockHandle to one `dynasty` block of a note (spec §6.1):
  * comparing a located body with the body Obsidian rendered, finding the block again after the
  * note changed, and the smallest text change for an editor transaction. No `obsidian` import.
  */
@@ -73,32 +73,45 @@ export function smallestChange(a: string, b: string): { from: number; to: number
 export type Relocation = { kind: 'keep' | 'moved'; ordinal: number } | { kind: 'detached' };
 
 /**
- * Finds a handle's block again in the note's new blocks (supervisor rules, the decision notes):
+ * Finds a handle's block again in the note's new blocks (the decision notes "Handles when blocks move"):
  * - the number of blocks did not change: the block at the ordinal still has `expectedBody` → keep;
  *   else exactly one other block has it → that block (blocks were swapped); else keep the ordinal
  *   (the block was edited in place, an ordinary stale case);
  * - the number changed: the block is the one new block whose body equals `expectedBody`; with no
  *   such block, or several, the handle is detached and must not write.
+ * `previous` is the list of bodies the handle's ordinal refers to (the last one the registry saw).
+ * With it, a copy is not a move: the same number of blocks
+ * moves the handle to block k only if block k did not hold `expectedBody` before; a different
+ * number detaches the handle if another block held `expectedBody` before, because the one left can
+ * be that copy.
  */
-export function relocate(bodies: readonly string[], previousCount: number, ordinal: number, expectedBody: string): Relocation {
+export function relocate(bodies: readonly string[], previousCount: number, ordinal: number, expectedBody: string, previous?: readonly string[]): Relocation {
 	const same: number[] = [];
 	bodies.forEach((b, i) => {
 		if (b === expectedBody) same.push(i);
 	});
+	// A list of another length does not describe the handle's ordinal, so it cannot tell a copy.
+	const before = previous && previous.length === previousCount ? previous : null;
 	if (bodies.length === previousCount) {
 		if (ordinal >= bodies.length) return { kind: 'detached' };
 		if (bodies[ordinal] === expectedBody) return { kind: 'keep', ordinal };
-		return same.length === 1 ? { kind: 'moved', ordinal: same[0] } : { kind: 'keep', ordinal };
+		return same.length === 1 && before?.[same[0]] !== expectedBody ? { kind: 'moved', ordinal: same[0] } : { kind: 'keep', ordinal };
 	}
-	return same.length === 1 ? { kind: same[0] === ordinal ? 'keep' : 'moved', ordinal: same[0] } : { kind: 'detached' };
+	if (same.length !== 1) return { kind: 'detached' };
+	if (before && before.some((b, i) => i !== ordinal && b === expectedBody)) return { kind: 'detached' };
+	return { kind: same[0] === ordinal ? 'keep' : 'moved', ordinal: same[0] };
 }
 
 /**
  * Relocates several handles of one note at once. Two handles that would land on the same block are
- * both detached, so a block never has two handles that disagree about it.
+ * both detached, so a block never has two handles that disagree about it. `previous` as in `relocate`.
  */
-export function relocateAll(bodies: readonly string[], handles: readonly { count: number; ordinal: number; body: string }[]): Relocation[] {
-	const out = handles.map((h) => relocate(bodies, h.count, h.ordinal, h.body));
+export function relocateAll(
+	bodies: readonly string[],
+	handles: readonly { count: number; ordinal: number; body: string }[],
+	previous?: readonly string[],
+): Relocation[] {
+	const out = handles.map((h) => relocate(bodies, h.count, h.ordinal, h.body, previous));
 	const claims = new Map<number, number>();
 	for (const r of out) if (r.kind !== 'detached') claims.set(r.ordinal, (claims.get(r.ordinal) ?? 0) + 1);
 	return out.map((r) => (r.kind !== 'detached' && (claims.get(r.ordinal) ?? 0) > 1 ? { kind: 'detached' } : r));

@@ -1,10 +1,10 @@
+/*
+ * Which focus family a view draws, and its first view (spec §5.6, D18). Pure, so the priority
+ * rules run under vitest; the tree view supplies the facts.
+ */
+
 import type { Orientation, Rect } from '../layout/model';
 import { FIT_MIN_NAME_PX, MIN_HIT_PX, READABLE_NAME_PX, START_TOP_GAP, fitScale, type Size, type View } from '../render/view-math';
-
-/*
- * Which focus family a view draws, and its first view (spec §5.6, D18; the decision notes "M5 — Focus
- * mode and scale"). Pure, so the priority rules run under vitest; the tree view supplies the facts.
- */
 
 /**
  * What the user chose for this block in this session (Focus, Focus here, a `+` badge, Show all
@@ -20,7 +20,7 @@ export const PHONE_FOCUS_MIN_PEOPLE = 100;
 /** Below this width or height (the shorter side of the window), a touch-first device is a phone. */
 export const PHONE_SHORT_SIDE = 600;
 
-/** A phone (the decision notes M5): a coarse pointer and a window whose shorter side is under 600 px. Tablets are not phones. */
+/** A phone: a coarse pointer and a window whose shorter side is under 600 px. Tablets are not phones. */
 export function isPhoneWindow(coarse: boolean, innerWidth: number, innerHeight: number): boolean {
 	return coarse && Math.min(innerWidth, innerHeight) < PHONE_SHORT_SIDE;
 }
@@ -39,6 +39,7 @@ export function orientationFor(coarse: boolean, innerWidth: number, innerHeight:
 	return short > 0 && Math.abs(innerWidth - short) <= 1 && Math.max(screen!.width, screen!.height) > short + 1 ? 'sideways' : 'down';
 }
 
+/** The facts `chooseFocus` needs about one block's tree, supplied by the tree view. */
 export interface FocusFacts {
 	session: SessionFocus | null;
 	/** `options.focus` (the pin, D18). */
@@ -54,6 +55,7 @@ export interface FocusFacts {
 	start(): string | null;
 }
 
+/** What `chooseFocus` decided, and what the caller should remember or forget. */
 export interface FocusChoice {
 	/** The focus person to draw, or null for the whole tree. */
 	id: string | null;
@@ -66,7 +68,7 @@ export interface FocusChoice {
 }
 
 /**
- * Priority (the decision notes M5): the session focus; the pin; on a phone, a large tree opens as the focus
+ * Priority order: the session focus; the pin; on a phone, a large tree opens as the focus
  * family of the start person (D20: more than 100 people); else the whole tree. A reference to a person who is not in the tree
  * counts as absent (the pin's missing reference is one of the tree's problems, spec §8).
  */
@@ -116,7 +118,7 @@ export function focusView(bounds: Rect, size: Size, fontPx: number, focus: Rect 
 }
 
 /**
- * D18 in a low box (G5 fix round): with the focus card centred in a free area `areaH` screen px high,
+ * D18 in a low box: with the focus card centred in a free area `areaH` screen px high,
  * do all its parents show whole above it and a child whole below it? True with no parent or no child
  * (then the centred view loses nothing). If false, the first view uses the D13 rule of a person
  * without parents: the card near the top, the children below, and no card under the toolbar.
@@ -199,7 +201,7 @@ export function clearToolbar(view: View, size: Size, bar: { left: number; right:
 }
 
 /**
- * The `+` badge's tap area in `sideways` (the decision notes WP5.5): the badge sits inside its card's top
+ * The `+` badge's tap area in `sideways` (D24): the badge sits inside its card's top
  * right corner, off the lines in the column gaps, so the tap area is a square in that corner, at
  * least 44 screen px while names are at least 11 px (the card is then at least 44 px high), and
  * always over the whole visible badge (zoomed in, 44 px can be smaller than the badge). At a smaller
@@ -212,19 +214,20 @@ export function badgeHitInCard(mark: Rect, card: Rect, scale: number, fontPx: nu
 	return { x: card.x + card.w - side, y: card.y, w: side, h: side };
 }
 
-/** The smallest gap between two sideways columns of narrow cards, in em (WP5.5a). */
+/** The smallest gap between two sideways columns of narrow cards, in em. */
 export const NARROW_GAP_EM = 3;
-/** Narrow card widths the layout accepts, in em (contract `LayoutSettings.narrowCardW`). */
+/** Narrow card widths the layout accepts, in em; matches `LayoutSettings.narrowCardW`. */
 export const NARROW_MIN_EM = 8;
+/** The widest narrow card width the layout accepts, in em; `narrowCardWidth` clamps to it. */
 export const NARROW_MAX_EM = 10.25;
 /**
  * Screen px kept free right of the children's column: a `+` badge's reach past its card corner at 14 px
- * names (0.9 em), as in the WP5.5c spike, so the column does not touch the box edge.
+ * names (0.9 em), so the column does not touch the box edge.
  */
 const NARROW_RIGHT_ROOM = 0.9 * READABLE_NAME_PX;
 
 /**
- * WP5.5c: the narrow card width (layout px, to 0.5 px) at which the person's column (8 screen px from
+ * The narrow card width (layout px, to 0.5 px) at which the person's column (8 screen px from
  * the left) and the children's column fit whole side by side in a note preview `box` screen px wide,
  * at the first view's 14 px names: (box − 8 − badge room − 3 em gap) / 2. Clamped as the layout
  * clamps it; undefined while the box has no width.
@@ -249,7 +252,7 @@ export interface SidewaysGroup {
 }
 
 /**
- * First view in `sideways` (D24, the decision notes WP5.5): names at 14 px, never a fit. The person's column
+ * First view in `sideways` (D24): names at 14 px, never a fit. The person's column
  * sits at the left edge (8 screen px in) with the children's column beside it; with no children, the
  * parents' column goes at the left if the person still shows whole beside it. The group (the person,
  * partners, children and their partners; with no children, the parents) starts 24 layout px below
@@ -277,7 +280,7 @@ export function sidewaysView(size: Size, fontPx: number, g: SidewaysGroup, top: 
 	const tall = gBottom - t > free;
 	if (tall) {
 		// Too tall: start at the person and the child nearest to them, with that child's partners
-		// (sample tree 6, the decision notes WP5.5). The person always shows whole.
+		// (sample tree 6). The person always shows whole.
 		const near = (kids.length ? kids : g.parents.map((p) => [p])).reduce<Rect[]>((a, b) => (!a.length || Math.abs(b[0].y - me.y) < Math.abs(a[0].y - me.y) ? b : a), []);
 		t = Math.min(me.y, ...near.map((b) => b.y)) - START_TOP_GAP;
 		if (me.y + me.h > t + free) t = me.y + me.h - free;
@@ -305,7 +308,7 @@ export function outsideBox(view: View, size: Size, cards: Iterable<Rect>, top: n
 /**
  * D31: in `down`, a far-couple tag's tap area hangs from its card's bottom edge: at least 44 screen px
  * high and wide at `scale`, and never shorter than the layout's own area below the card. The card
- * keeps all of its own area (cards win where they meet, WP4.3). With no card, the area grows around
+ * keeps all of its own area (cards win where they meet). With no card, the area grows around
  * its centre as before.
  */
 export function tagHitBelow(hit: Rect, card: Rect | undefined, scale: number): Rect {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { FindBlocks, LocateBlock, LocatedBlock, OrdinalForSection, ReplaceBody } from '../../src/core/block';
+import type { FindBlocks, LocateBlock, LocatedBlock, OrdinalForSection, ReplaceBody } from '../../src/core/block-locate';
 import * as impl from '../../src/core/block-locate';
 import { replaceOnce } from './golden';
 import { fixtureNote, topLevelBlocks } from './load';

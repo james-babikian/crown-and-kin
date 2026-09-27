@@ -3,7 +3,7 @@ import type { FamilyGraph } from '../src/core/derive';
 import { routeEdges } from '../src/layout/edges';
 import { NORMAL_GEOMETRY } from '../src/layout/geometry';
 import { DEFAULT_FAR_RULE, layoutFamilies } from '../src/layout/layout';
-import { measureLayout } from '../src/layout/metrics';
+import { measureLayout } from '../scripts/metrics';
 import type { EdgeDrawing, EdgePath, FarCoupleRule } from '../src/layout/model';
 import { soloFamiliesOutside } from '../src/layout/solo-side';
 import { build, fixture } from './helpers';

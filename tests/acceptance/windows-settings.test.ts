@@ -10,7 +10,7 @@ import { parseDynasty } from '../../src/core/parse';
 import { geometryFor } from '../../src/layout/geometry';
 import { FullScreenModal } from '../../src/obsidian/full-screen';
 import DynastyTreePlugin from '../../src/obsidian/main';
-import { DEFAULT_SETTINGS } from '../../src/obsidian/settings-contract';
+import { DEFAULT_SETTINGS } from '../../src/obsidian/settings';
 import { Popover } from '../../src/render/dom/widgets';
 import { ADD_UI, INSERT_UI, RENAME_UI, SETTINGS_UI } from '../../src/render/ui-text';
 import { TreeView } from '../../src/obsidian/tree-view';
@@ -244,7 +244,7 @@ describe('card size, dates and generations (spec §9)', () => {
 	it('a new card size does not reuse a view saved for the other size', async () => {
 		const { host, fake } = await loadPlugin();
 		const t = await tree(TREE, host);
-		const st = (t.view as unknown as { blockState(): { views: Record<string, { viewFor: string }> } }).blockState();
+		const st = (t.view as unknown as { ensureState(): { views: Record<string, { viewFor: string }> } }).ensureState();
 		st.views.down = { view: { scale: 3, cx: -999, cy: -999 }, viewFor: '' } as never;
 		openTab(fake);
 		control<DropdownComponent>(SETTINGS_UI.cardSize).fire('compact');

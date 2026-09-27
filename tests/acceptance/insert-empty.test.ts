@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { LocateBlock, PlanWrite } from '../../src/core/block';
+import type { PlanWrite } from '../../src/core/block-write';
+import type { LocateBlock } from '../../src/core/block-locate';
 import * as locate from '../../src/core/block-locate';
 import * as write from '../../src/core/block-write';
 import type { ApplyOp, EditResult, Op } from '../../src/core/edit';

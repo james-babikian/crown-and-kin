@@ -1,16 +1,16 @@
-import { isAlias, isMap, type Node, type Pair, type YAMLMap } from 'yaml';
-import type { DeleteHouse, EditHouse, EditResult } from './edit';
-import { removeFromSection, section } from './relationship-ops';
-import { str, type Raw, type RawMap } from './tolerate';
-import {
-	addPair, clone, doubleQuoted, findPair, finish, isRefusal, layoutOf, OVERLAP, refuse, removePair, setPairValue, type Parsed, type Patch, type Refusal, type Source, type Step,
-} from './yaml-patch';
-
 /*
  * House ops for the Houses window (spec §6.10, D32). Same machinery as the other ops: the expected
  * data is built first, the text is patched at the parse positions, and `finish` re-parses and
  * compares.
  */
+
+import { isAlias, isMap, type Node, type Pair, type YAMLMap } from 'yaml';
+import type { DeleteHouse, EditHouse, EditResult } from './edit';
+import { str, type Raw, type RawMap } from './tolerate';
+import { removeFromSection, section } from './yaml-list';
+import {
+	addPair, clone, doubleQuoted, findPair, finish, finishTogether, isRefusal, layoutOf, refuse, removePair, setPairValue, type Parsed, type Patch, type Refusal, type Source, type Step,
+} from './yaml-patch';
 
 const HOUSE_ORDER = ['id', 'name', 'color'];
 const COLOUR = /^#[0-9a-fA-F]{6}$/;
@@ -45,11 +45,12 @@ function replaceCommentedColour(src: Source, pair: Pair, text: string): Patch | 
 	return { start, end, text: text + kept, allow: [start, start + 1], writes: comment ? [comment] : undefined };
 }
 
+/** Renames and/or recolours a house (§6.10). */
 export function editHouse(first: Parsed, data: RawMap, op: EditHouse): EditResult {
 	const index = houseIndex(data, op.id);
 	if (index === undefined) return refuse('unknown-house');
 	if (op.name !== undefined && (typeof op.name !== 'string' || op.name.trim() === '')) return refuse('bad-value', 'A house must have a name.');
-	// An empty colour removes the key, as an empty optional field does (M2 rule).
+	// An empty colour removes the key, as an empty optional person field does (`personValue`).
 	const wanted = typeof op.color === 'string' && op.color.trim() === '' ? null : op.color;
 	if (wanted !== undefined && wanted !== null && (typeof wanted !== 'string' || !COLOUR.test(wanted))) return refuse('bad-value', 'A colour must be written as #rrggbb.');
 
@@ -79,19 +80,10 @@ export function editHouse(first: Parsed, data: RawMap, op: EditHouse): EditResul
 		return (!src.hasValue(pair) && replaceCommentedColour(src, pair, raw.raw)) || setPairValue(src, node, pair, raw, layout);
 	};
 	const steps = [...(name !== undefined ? [change('name')] : []), ...(color !== undefined ? [change('color')] : [])];
-	const together: Step = (p) => {
-		const out: Patch[] = [];
-		for (const step of steps) {
-			const r = step(p);
-			if (isRefusal(r)) return r;
-			if (r) out.push(...(Array.isArray(r) ? r : [r]));
-		}
-		return out;
-	};
-	const r = finish(first, [together], expected, []);
-	return !r.ok && r.detail === OVERLAP && steps.length > 1 ? finish(first, steps, expected, []) : r;
+	return finishTogether(first, steps, expected, []);
 }
 
+/** Deletes a house item, clearing or keeping `house:` on its people as `op.people` says (§6.10). */
 export function deleteHouse(first: Parsed, data: RawMap, op: DeleteHouse): EditResult {
 	const index = houseIndex(data, op.id);
 	if (index === undefined) return refuse('unknown-house');

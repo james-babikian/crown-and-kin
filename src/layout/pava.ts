@@ -2,6 +2,7 @@
  * Places items on a line in a fixed order, as close as possible to their target positions
  * (least squares), while keeping each item at least `minGap[i]` after the previous one.
  * `minGap[0]` is ignored. Pool-adjacent-violators on the gap-adjusted targets: O(n).
+ * `layout.ts` calls `placeInOrder` to pack the cards of one row.
  */
 export function placeInOrder(targets: number[], minGap: number[]): number[] {
 	const n = targets.length;

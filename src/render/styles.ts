@@ -1,4 +1,12 @@
+/**
+ * The tree's colours and line styles, as theme roles the plugin's CSS resolves and a fixed
+ * palette the headless renderer and tests use instead. `StrokeKind` (`layout/model.ts`) and
+ * `STROKES` here must list the same kinds; only `svg-string.ts` reads `STROKES` (styles.css holds
+ * the same styles for the DOM). `scene.ts`, `svg-string.ts` and `legend.ts` draw union signs from
+ * `unionShape`, `UNION_MARKS` and `unionMark`.
+ */
 import type { StrokeKind } from '../layout/model';
+import { LEGEND_LABELS } from './tree-info';
 
 /**
  * Colour roles used by the tree. In the plugin every role is an Obsidian CSS variable, or a mix of
@@ -14,14 +22,15 @@ const PLAIN_VARS = {
 	textMuted: '--text-muted',
 	textFaint: '--text-faint',
 	line: '--text-muted',
-	/** D27, WP6.5: plain muted text, so the dates are as strong as the note's own muted text in any theme. */
+	/** D27: plain muted text, so the dates are as strong as the note's own muted text in any theme. */
 	dates: '--text-muted',
-	noHouse:'--background-modifier-border',
+	noHouse: '--background-modifier-border',
 	adoptive: '--color-green',
 	ward: '--color-blue',
 	rumoured: '--color-red',
 } as const;
 
+/** A colour role backed by a single Obsidian CSS variable. */
 export type PlainRole = keyof typeof PLAIN_VARS;
 
 /** `color-mix(in srgb, <first> <percent>%, <second>)` of two plain roles. */
@@ -41,9 +50,12 @@ const MIXED_VARS = {
 	adoptiveLine: { mix: ['adoptive', 70, 'text'] },
 } as const satisfies Record<string, MixedRole>;
 
+/** Every colour role, plain and mixed, keyed by name. */
 export const THEME_VARS: { readonly [K in keyof typeof PLAIN_VARS | keyof typeof MIXED_VARS]: string | MixedRole } = { ...PLAIN_VARS, ...MIXED_VARS };
 
+/** The name of any colour role the tree uses. */
 export type ThemeRole = keyof typeof THEME_VARS;
+/** A resolved colour (a hex string) for every role, as the headless renderer and tests use it. */
 export type Palette = Record<ThemeRole, string>;
 
 /**
@@ -92,6 +104,7 @@ export const DEFAULT_LIGHT: Palette = withMixes({
 	rumoured: '#e93147',
 });
 
+/** Approximations of Obsidian's default dark theme, for headless pictures only. */
 export const DEFAULT_DARK: Palette = withMixes({
 	background: '#1e1e1e',
 	cardFill: '#262626',
@@ -107,6 +120,22 @@ export const DEFAULT_DARK: Palette = withMixes({
 	rumoured: '#fb464c',
 });
 
+/** D32: the 12 house colours offered in the Houses window, in this order. Names are in `ui-text.ts`. */
+export const HOUSE_PALETTE = [
+	'#8c2041',
+	'#c62828',
+	'#d87620',
+	'#af8d22',
+	'#7c8b2a',
+	'#2e7d32',
+	'#00897b',
+	'#3a8fd6',
+	'#1e4f8b',
+	'#6d209c',
+	'#795548',
+	'#78909c',
+] as const;
+
 /** D27: in the dark theme a house strip is its colour moved this far towards the text colour. */
 export const HOUSE_DARK_LIFT = 0.3;
 /** D27: a dead person's house strip (spec §5.2 "slightly muted"). */
@@ -117,6 +146,7 @@ export function stripColour(house: string, p: Palette, dark: boolean): string {
 	return dark ? mixHex(house, 1 - HOUSE_DARK_LIFT, p.text) : house;
 }
 
+/** How one `StrokeKind` is drawn: colour role, width, dash pattern and legend label. */
 export interface StrokeStyle {
 	role: ThemeRole;
 	width: number;
@@ -133,17 +163,17 @@ export interface StrokeStyle {
  * note. D38: the ward line is bold square dots (butt caps), the adoptive line longer, thicker dashes.
  */
 export const STROKES: Record<StrokeKind, StrokeStyle> = {
-	marriage: { role: 'line', width: 2.5, label: 'Marriage' },
-	betrothal: { role: 'line', width: 2.5, dash: '0.1 5', cap: 'round', label: 'Betrothal' },
-	concubinage: { role: 'lineSoft', width: 2, dash: '8 4', label: 'Concubinage' },
-	affair: { role: 'lineSoft', width: 2, dash: '8 3 2 3', label: 'Affair' },
-	implicit: { role: 'lineSoft', width: 1.25, label: 'Parents with no recorded partnership' },
-	descent: { role: 'line', width: 1.5, label: 'Child' },
-	illegitimate: { role: 'line', width: 1.5, dash: '5 4', label: 'Illegitimate child' },
-	'birth-link': { role: 'lineSoft', width: 1.5, dash: '0.1 3.5', cap: 'round', label: 'Birth parent of a child shown under other parents' },
-	adoptive: { role: 'adoptiveLine', width: 3, dash: '20 6', label: 'Adoptive parent' },
-	ward: { role: 'ward', width: 3, dash: '3 5', label: 'Guardian of a ward' },
-	rumoured: { role: 'rumoured', width: 1.5, dash: '4 4', opacity: 0.85, label: 'Rumoured parent' },
+	marriage: { role: 'line', width: 2.5, label: LEGEND_LABELS.marriage },
+	betrothal: { role: 'line', width: 2.5, dash: '0.1 5', cap: 'round', label: LEGEND_LABELS.betrothal },
+	concubinage: { role: 'lineSoft', width: 2, dash: '8 4', label: LEGEND_LABELS.concubinage },
+	affair: { role: 'lineSoft', width: 2, dash: '8 3 2 3', label: LEGEND_LABELS.affair },
+	implicit: { role: 'lineSoft', width: 1.25, label: LEGEND_LABELS.implicit },
+	descent: { role: 'line', width: 1.5, label: LEGEND_LABELS.descent },
+	illegitimate: { role: 'line', width: 1.5, dash: '5 4', label: LEGEND_LABELS.illegitimate },
+	'birth-link': { role: 'lineSoft', width: 1.5, dash: '0.1 3.5', cap: 'round', label: LEGEND_LABELS['birth-link'] },
+	adoptive: { role: 'adoptiveLine', width: 3, dash: '20 6', label: LEGEND_LABELS.adoptive },
+	ward: { role: 'ward', width: 3, dash: '3 5', label: LEGEND_LABELS.ward },
+	rumoured: { role: 'rumoured', width: 1.5, dash: '4 4', opacity: 0.85, label: LEGEND_LABELS.rumoured },
 };
 
 /** D26, D38: the union point tells the kind of partnership. */

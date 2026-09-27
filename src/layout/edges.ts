@@ -1,13 +1,23 @@
-import type { FamilyGraph } from '../core/derive';
+/**
+ * Draws the lines of a finished layout: `routeEdges` is the last step of `layoutTree` (index.ts),
+ * called after `layoutFamilies` has placed every card. It shares `lines.ts`'s plan with the
+ * layout, so the lanes it draws in are exactly the ones the layout reserved room for.
+ * `svg-string.ts` and `render/dom/scene.ts` draw the `EdgeDrawing` this file returns; they do not
+ * compute geometry.
+ */
+import type { FamilyGraph, FamilyUnion } from '../core/derive';
 import { lineMetrics } from './geometry';
-import { planLines, type Leg } from './lines';
+import { addTo, planLines, type Leg } from './lines';
 import type { EdgeDrawing, EdgeMarker, EdgePath, Geometry, StrokeKind, TreeLayout } from './model';
 import { turnBack, turnEdges } from './turn';
 
 const r = (n: number) => Math.round(n * 10) / 10;
 
-function coupleKind(type: string): StrokeKind {
-	return type === 'betrothal' || type === 'concubinage' || type === 'affair' || type === 'implicit' ? type : 'marriage';
+// The thin "implicit" style is only for unions that are not listed; a listed union with an
+// unknown type (even the text `implicit`) draws like a marriage (spec §5.3).
+function coupleKind(fu: FamilyUnion): StrokeKind {
+	if (fu.implicit) return 'implicit';
+	return fu.type === 'betrothal' || fu.type === 'concubinage' || fu.type === 'affair' ? fu.type : 'marriage';
 }
 
 /**
@@ -48,17 +58,24 @@ function route(g: FamilyGraph, layout: TreeLayout, anchors: Map<string, string>,
 
 	// Couples.
 	const legsOf = new Map<string, Leg[]>();
-	for (const leg of plan.legs) legsOf.set(leg.union, [...(legsOf.get(leg.union) ?? []), leg]);
+	for (const leg of plan.legs) addTo(legsOf, leg.union, leg);
+	// One bar for a couple with several unions side by side, in the style of the last one listed
+	// (the latest partnership); each union still has its own dot on it.
+	const pairOf = (fu: FamilyUnion) => [...fu.partners].sort().join('\n');
+	const barKind = new Map<string, StrokeKind>();
+	for (const fu of g.unions) if (layout.unions.get(fu.key)!.bar) barKind.set(pairOf(fu), coupleKind(fu));
 	for (const fu of g.unions) {
 		const u = layout.unions.get(fu.key)!;
-		const kind = coupleKind(fu.type);
+		const kind = coupleKind(fu);
 		const people = [...fu.partners];
 		// A far couple's only line runs from the anchor to the dot; it does not connect the partners.
 		const legPeople = (person: string) => (u.far ? [person] : people);
 		if (u.bar) {
 			const [a, b] = fu.partners.map(box);
 			const [left, right] = a.x < b.x ? [a, b] : [b, a];
-			paths.push({ d: `M${r(left.x + left.w)} ${r(u.y)}H${r(right.x)}`, kind, people });
+			const pair = pairOf(fu);
+			if (barKind.has(pair)) paths.push({ d: `M${r(left.x + left.w)} ${r(u.y)}H${r(right.x)}`, kind: barKind.get(pair)!, people });
+			barKind.delete(pair);
 		} else if (!plan.dots.has(fu.key)) continue;
 		const legs = legsOf.get(fu.key) ?? [];
 		for (const leg of legs) {
@@ -135,10 +152,16 @@ function route(g: FamilyGraph, layout: TreeLayout, anchors: Map<string, string>,
 
 	// The "?" of a rumoured parent goes where no other line and no dot is near it.
 	const segs = paths.map((p) => segmentsOf(p.d));
+	const all = segs.flat();
+	const firstSeg: number[] = [];
+	let count = 0;
+	for (const s of segs) {
+		firstSeg.push(count);
+		count += s.length;
+	}
 	const dots = markers.map((mk) => ({ x: mk.x, y: mk.y }));
 	for (const { path, curve } of rumours) {
-		const others = segs.filter((_, i) => i !== path).flat();
-		const spot = rumourSpot(curve, others, dots, !!side);
+		const spot = rumourSpot(curve, all, [firstSeg[path], firstSeg[path] + segs[path].length], dots, !!side);
 		dots.push(spot);
 		markers.push({ ...spot, kind: 'rumour' });
 	}
@@ -194,13 +217,17 @@ function distance(p: { x: number; y: number }, [x1, y1, x2, y2]: Seg): number {
  * The "?" marker's spot on a rumour curve: its middle, or the nearest point along it clear of
  * other lines and dots. Sideways a curve often crosses only one narrow gap between columns full of
  * lanes; when no point is clear there, it takes the point furthest from the other lines.
+ * `all` holds the segments of every line; `own` is the range of the curve's own segments in it.
  */
-function rumourSpot(curve: Curve, all: Seg[], dots: { x: number; y: number }[], clearest = false): { x: number; y: number } {
+function rumourSpot(curve: Curve, all: Seg[], own: [number, number], dots: { x: number; y: number }[], clearest = false): { x: number; y: number } {
+	const other = (i: number) => i < own[0] || i >= own[1];
 	// Sideways, only lines near the curve are looked at (the curve lies inside the box of its ends).
 	const [sx, sy, , tx, ty] = curve;
 	const box = { x0: Math.min(sx, tx) - 40, x1: Math.max(sx, tx) + 40, y0: Math.min(sy, ty) - 40, y1: Math.max(sy, ty) + 40 };
-	const lines = clearest ? all.filter(([x1, y1, x2, y2]) => Math.max(x1, x2) >= box.x0 && Math.min(x1, x2) <= box.x1 && Math.max(y1, y2) >= box.y0 && Math.min(y1, y2) <= box.y1) : all;
-	const clear = (p: { x: number; y: number }) => lines.every((s) => distance(p, s) > 10) && dots.every((d) => Math.hypot(p.x - d.x, p.y - d.y) > 16);
+	const lines = clearest ? all.filter(([x1, y1, x2, y2], i) => other(i) && Math.max(x1, x2) >= box.x0 && Math.min(x1, x2) <= box.x1 && Math.max(y1, y2) >= box.y0 && Math.min(y1, y2) <= box.y1) : all;
+	// Not sideways, `lines` is every segment, so the curve's own segments are skipped here.
+	const skip = (i: number) => !clearest && !other(i);
+	const clear = (p: { x: number; y: number }) => lines.every((s, i) => skip(i) || distance(p, s) > 10) && dots.every((d) => Math.hypot(p.x - d.x, p.y - d.y) > 16);
 	for (let i = 0; i <= 24; i++) {
 		const t = 0.5 + (i % 2 ? 1 : -1) * Math.ceil(i / 2) * 0.025;
 		const p = bezier(curve, t);

@@ -15,7 +15,7 @@ const NO_OBSIDIAN_IN_CORE = {
 const NO_PLATFORM_IMPORT = {
 	name: 'obsidian',
 	importNames: ['Platform'],
-	message: 'Use Platform only in src/obsidian/defaults.ts (spec §7). Decide behaviour by pointer type and viewport.',
+	message: 'Do not use Platform in src (spec §7). Decide behaviour by pointer type and viewport.',
 };
 
 const NO_DOCUMENT_WRITE = ['write', 'writeln'].map((property) => ({
@@ -42,16 +42,7 @@ const SYNTAX_EMULATE_MOBILE = {
 };
 const SYNTAX_PLATFORM = {
 	selector: "Identifier[name='Platform']:not(ImportSpecifier > Identifier)",
-	message: 'Use Platform only in src/obsidian/defaults.ts (spec §7).',
-};
-// In defaults.ts Platform may only be read as `Platform.x`, so it cannot be passed on or re-exported.
-const SYNTAX_PLATFORM_READ_ONLY = {
-	selector: "Identifier[name='Platform']:not(ImportSpecifier > Identifier):not(MemberExpression[computed=false] > Identifier.object)",
-	message: 'In defaults.ts, only read Platform.<property>. Do not export or pass on Platform (spec §7).',
-};
-const SYNTAX_PLATFORM_ALIAS = {
-	selector: "ImportSpecifier[imported.name='Platform'][local.name!='Platform'], ImportNamespaceSpecifier",
-	message: 'Import Platform by its own name, and do not use import * in defaults.ts, so the Platform rules can be checked (spec §7).',
+	message: 'Do not use Platform in src (spec §7). Decide behaviour by pointer type and viewport.',
 };
 const SYNTAX_REEXPORT_OBSIDIAN = {
 	selector: "ExportAllDeclaration[source.value='obsidian']",
@@ -156,22 +147,6 @@ export default tseslint.config(
 				...SYNTAX_HTML,
 				SYNTAX_EMULATE_MOBILE,
 				SYNTAX_PLATFORM,
-				SYNTAX_REEXPORT_OBSIDIAN,
-				...SYNTAX_ELK,
-				...SYNTAX_DOM_COLOURS,
-			],
-		},
-	},
-	{
-		files: ['src/obsidian/defaults.ts'],
-		rules: {
-			'no-restricted-imports': ['error', { patterns: [ELK] }],
-			'no-restricted-syntax': [
-				'error',
-				...SYNTAX_HTML,
-				SYNTAX_EMULATE_MOBILE,
-				SYNTAX_PLATFORM_READ_ONLY,
-				SYNTAX_PLATFORM_ALIAS,
 				SYNTAX_REEXPORT_OBSIDIAN,
 				...SYNTAX_ELK,
 				...SYNTAX_DOM_COLOURS,

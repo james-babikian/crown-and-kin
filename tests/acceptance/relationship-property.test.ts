@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { deriveFamilies } from '../../src/core/derive';
 import type { ApplyOp, EditRefusal, NewPersonId, Op, ParentKind, UnionKind, UnionRef } from '../../src/core/edit';
-import type { IssueCode } from '../../src/core/issues';
+import type { IssueCode } from '../../src/core/messages';
 import { parseDynasty } from '../../src/core/parse';
 import type { Tree } from '../../src/core/types';
 import * as edit from '../../src/core/yaml-edit';

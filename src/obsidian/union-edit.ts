@@ -1,9 +1,3 @@
-import { Modal, type App } from 'obsidian';
-import { UNION_TYPES } from '../core/types';
-import { SHEET, UNION_EDIT, UNION_TYPE_TEXT } from '../render/ui-text';
-import { ignoreGhostClick, phoneLayout } from './modal-layout';
-import { trackModal } from './plugin-modals';
-
 /*
  * Edit of one partnership: type, start and end (spec §6.3 Partners, Edit). It looks like the
  * edit sheet and has the same commit model: Save writes (through the sheet, with the sheet's
@@ -11,6 +5,14 @@ import { trackModal } from './plugin-modals';
  * other way to close with changes asks "Discard changes?".
  */
 
+import { Modal, type App } from 'obsidian';
+import { UNION_TYPES } from '../core/types';
+import { SHEET, UNION_EDIT, UNION_TYPE_TEXT } from '../render/ui-text';
+import { ignoreGhostClick, phoneLayout } from './modal-layout';
+import { trackModal } from './plugin-modals';
+import { sheetField } from './sheet-parts';
+
+/** The editable fields of one partnership. */
 export interface UnionValues {
 	type: string;
 	start: string;
@@ -56,12 +58,7 @@ class UnionEditModal extends Modal {
 		body.createDiv({ cls: 'dynasty-choice-text', text: this.pair });
 		this.errorEl = body.createDiv({ cls: 'dynasty-sheet-error', attr: { role: 'alert' } });
 		this.errorEl.hide();
-		const field = (label: string, name: string) => {
-			const row = body.createDiv({ cls: 'dynasty-sheet-field', attr: { 'data-field': name } });
-			const id = `dynasty-union-${name}-${Math.random().toString(36).slice(2, 8)}`;
-			row.createEl('label', { cls: 'dynasty-sheet-label', text: label, attr: { for: id } });
-			return { row, id };
-		};
+		const field = (label: string, name: string) => sheetField(body, label, name, 'dynasty-union');
 		const t = field(UNION_EDIT.type, 'union-type');
 		const sel = t.row.createEl('select', { cls: ['dropdown', 'dynasty-sheet-input'], attr: { id: t.id } });
 		const types: string[] = [...UNION_TYPES];

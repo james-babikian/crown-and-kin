@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import type { LocateBlock, PlanWrite } from '../../src/core/block';
+import type { PlanWrite } from '../../src/core/block-write';
+import type { LocateBlock } from '../../src/core/block-locate';
 import * as locate from '../../src/core/block-locate';
 import * as write from '../../src/core/block-write';
 import type { ApplyOp, EditRefusal, EditResult } from '../../src/core/edit';
 import * as impl from '../../src/core/link-rewrite';
-import type { LinkTargets, NormaliseTarget } from '../../src/core/link-rewrite-contract';
+import type { LinkTargets, NormaliseTarget } from '../../src/core/link-rewrite';
 import { parseDynasty } from '../../src/core/parse';
 import type { Tree } from '../../src/core/types';
 import * as edit from '../../src/core/yaml-edit';

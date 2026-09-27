@@ -1,5 +1,13 @@
+/*
+ * Turns the YAML body of a `dynasty` block into a `Tree`: houses, people and unions, plus any
+ * shape issues found while reading (spec §4, §8). `parseDynasty` is the entry point; `tree-view.ts`
+ * and `houses-window.ts` call it. `parseBody` is shared with the edit code in `yaml-patch.ts`, so
+ * both work from the same parsed document. Depends on `tolerate.ts` for lenient reads of raw YAML
+ * values.
+ */
+
 import { isScalar, Lexer, parseDocument, type Document } from 'yaml';
-import type { CodedIssue, HardError } from './issues';
+import { codedIssue, type CodedIssue, type HardError } from './messages';
 import { blankPlainNulls, bool, int, isEmpty, isMap, linkValue, list, str, type Raw, type RawMap } from './tolerate';
 import type { House, ParentRef, ParseResult, Person, Tree, TreeOptions, Union } from './types';
 
@@ -15,7 +23,7 @@ class Reader {
 	) {}
 
 	warn(code: CodedIssue['code'], params: CodedIssue['params'], ids?: string[]) {
-		this.issues.push(ids ? { code, level: 'warning', params, ids } : { code, level: 'warning', params });
+		this.issues.push(codedIssue(code, 'warning', params, ids));
 	}
 
 	/**
@@ -73,6 +81,16 @@ class Reader {
 		}
 	}
 
+	/** A value's text as written, comments after it left out. */
+	private sourceText(path: (string | number)[]): string | undefined {
+		try {
+			const node = this.doc.getIn(path, true) as { range?: [number, number, number] } | undefined;
+			return node?.range ? this.source.slice(node.range[0], node.range[1]) : undefined;
+		} catch {
+			return undefined;
+		}
+	}
+
 	/** `color: #8b1e3f` without quotes: YAML reads the colour as a comment. Recover it for the message. */
 	private commentedColour(path: (string | number)[]): string | undefined {
 		try {
@@ -114,7 +132,7 @@ class Reader {
 				placement: str(p.placement),
 				illegitimate: bool(p.illegitimate),
 				union: str(p.union),
-				link: linkValue(p.link),
+				link: linkValue(p.link, () => this.sourceText(['people', index, 'link'])),
 				notes: str(p.notes),
 				index,
 			});
@@ -212,6 +230,7 @@ function yamlError(e: unknown): HardError {
 	return typeof line === 'number' ? { code: 'yaml-invalid', line, detail } : { code: 'yaml-invalid', detail };
 }
 
+/** The result of `parseBody`: the parsed document and raw data on success, or a `HardError`. */
 export type ParsedBody = { ok: true; doc: Document; data: Raw } | { ok: false; error: HardError };
 
 /**
@@ -227,7 +246,9 @@ export function parseBody(source: string): ParsedBody {
 		const doc = parseDocument(source, { schema: 'failsafe', logLevel: 'error' });
 		if (doc.errors.length) return { ok: false, error: yamlError(doc.errors[0]) };
 		blankPlainNulls(doc);
-		const data: Raw = doc.toJS();
+		// The yaml package refuses more than 100 alias uses by default; a large tree can use one
+		// `house: *h` for every person. The limit still grows only with the text, so it stays safe.
+		const data: Raw = doc.toJS({ maxAliasCount: Math.max(100, source.length) });
 		if (!isEmpty(data) && !isMap(data)) return { ok: false, error: { code: 'not-a-map' } };
 		return { ok: true, doc, data };
 	} catch (e) {

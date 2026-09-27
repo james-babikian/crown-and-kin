@@ -1,5 +1,5 @@
 /**
- * What the tree view reads from the theme as the engine computed it (WP6.5), where one CSS formula
+ * What the tree view reads from the theme as the engine computed it, where one CSS formula
  * cannot follow every theme:
  * - Spec §5.8, §10: the embedded tree is transparent, so a callout's background shows through it; its
  *   toolbar must hide the cards under it, so it is opaque and paints the callout's background itself.
@@ -99,7 +99,7 @@ export function plusFrom(colours: readonly (string | undefined)[], parse: (css: 
 }
 
 /**
- * G5 fix round: a probe element added to the page makes the engine compute the style of every
+ * A probe element added to the page makes the engine compute the style of every
  * element again (Obsidian's `:has()` rules), about 0.35 s for sample tree 7 on a slow phone. So the
  * tree reads the roles from its own computed custom properties, which costs nothing once the page is
  * drawn. Only a value the canvas cannot read (a theme can write a colour as any CSS) falls back to

@@ -6,7 +6,7 @@ import { Transaction } from '@codemirror/state';
 import { MarkdownView, TFile } from 'obsidian';
 import { findBlocks } from '../src/core/block-locate';
 import { HandleRegistry } from '../src/obsidian/block-handle';
-import { LinkUpdater, type LinkHooks, type RenameTiming } from '../src/obsidian/rename-links';
+import { LinkUpdater, nameForms, type LinkHooks, type RenameTiming } from '../src/obsidian/rename-links';
 import { RENAME_UI } from '../src/render/ui-text';
 import { noticeList, notices, resetObsidian } from './acceptance/fake-obsidian';
 
@@ -564,5 +564,37 @@ describe('Rename, fix round after the M6 iPhone test (the decision notes "M6 iPh
 			expect(RENAME_UI.report({ ...base, state: 'stopped' }, true)).toContain('It stopped before the end. The plugin will continue it at the next start.');
 			expect(RENAME_UI.report({ ...base, state: 'failed' }, true)).toContain('An error stopped it before the end.');
 		});
+	});
+});
+
+describe('Rename, review 1.0.1 area E', () => {
+	it('nameForms: as typed, with %20, as the plugin encodes it, as encodeURIComponent does, and fully decoded', () => {
+		expect(nameForms('castle (old)')).toEqual(['castle (old)', 'castle%20(old)', 'castle%20%28old%29']);
+		expect(nameForms('100%25 keep')).toEqual(['100%25 keep', '100%25%20keep', '100%2525%20keep', '100% keep']);
+		// A bad escape has no decoded form; nothing throws.
+		expect(nameForms('50% off')).toEqual(['50% off', '50%%20off', '50%25%20off']);
+	});
+
+	it('a note renamed twice in one batch: links to both old names get the last name', async () => {
+		const s = setup({ 'T.md': tree(person('a', '"[[Old]]"'), person('b', '"[[Mid]]"')), 'Old.md': '' });
+		await s.rename(['Old.md', 'Mid.md'], ['Mid.md', 'New.md']);
+		const body = findBlocks(s.texts.get('T.md')!)[0].body;
+		expect(body).toContain('link: "[[New]]"\n  - id: b');
+		expect(body).toMatch(/id: b\n {4}name: B\n {4}link: "\[\[New\]\]"/);
+	});
+
+	it('the setting is turned off during an update: no write, the report says stopped, and the rename stays stored', async () => {
+		const s = setup({ 'A.md': tree(person('a', '"[[Old]]"')), 'B.md': tree(person('b', '"[[Old]]"')), 'Old.md': '' });
+		// The user turns the setting off when the update reads its first note.
+		const read = s.app.vault.cachedRead;
+		s.app.vault.cachedRead = async (file) => {
+			s.on.value = false;
+			return read(file);
+		};
+		await s.rename(['Old.md', 'New.md']);
+		expect(s.writes).toEqual([]);
+		expect(s.updater.last?.state).toBe('stopped');
+		expect(s.updater.pendingList()).toEqual([{ oldPath: 'Old.md', newPath: 'New.md', others: [] }]);
+		expect(notices).toEqual([]);
 	});
 });

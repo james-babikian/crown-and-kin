@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { deriveFamilies, type FamilyGraph } from '../../src/core/derive';
 import type { ParentKind } from '../../src/core/edit';
-import type { DescribeDelete, FamilyOf, FamilyView, PartnerLink, PickerAction, PickerExclusions } from '../../src/core/family';
+import type { DescribeDelete, FamilyOf, FamilyView, PartnerLink, PickerAction, PickerExclusions } from '../../src/core/family-query';
 import * as fq from '../../src/core/family-query';
 import { parseDynasty } from '../../src/core/parse';
 import type { TreeOptions } from '../../src/core/types';

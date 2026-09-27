@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { LocatedBlock } from '../src/core/block';
+import type { LocatedBlock } from '../src/core/block-locate';
 import { findBlocks, locateBlock, ordinalForSection, replaceBody } from '../src/core/block-locate';
 
 const shape = (b: LocatedBlock) => ({ openLine: b.openLine, closeLine: b.closeLine, prefix: b.prefix, body: b.body });
@@ -165,6 +165,21 @@ describe('list items and indentation', () => {
 		expect(replaceBody(text, b, 'a: 3\n\tb: 2')).toBe('-\titem\n\n\t```dynasty\n\ta: 3\n\t\tb: 2\n\t```\n');
 	});
 
+	it('a tab partly taken by the list marker: its remaining columns are spaces in the body', () => {
+		const text = '- ```dynasty\n\tpeople:\n\t  - id: a\n \tb: 1\n  ```\n';
+		const b = only(text);
+		// The prefix is spaces for the columns taken, so a written line reads back as written.
+		expect(shape(b)).toEqual({ openLine: 0, closeLine: 4, prefix: '  ', body: '  people:\n    - id: a\n  b: 1' });
+		const next = '  people:\n    - id: a\n      name: A\n  b: 1';
+		const out = replaceBody(text, b, next);
+		expect(out).toBe('- ```dynasty\n\tpeople:\n\t  - id: a\n        name: A\n \tb: 1\n  ```\n');
+		expect(only(out).body).toBe(next);
+	});
+
+	it('a tab that ends on the content column is taken whole', () => {
+		expect(shape(only('1.  ```dynasty\n\ta: 1\n    ```'))).toEqual({ openLine: 0, closeLine: 2, prefix: '\t', body: 'a: 1' });
+	});
+
 	it('top-level fences may be indented up to 3 spaces; 4 is indented code', () => {
 		expect(shape(only('   ```dynasty\n   a: 1\n   ```'))).toEqual({ openLine: 0, closeLine: 2, prefix: '   ', body: 'a: 1' });
 		expect(findBlocks('    ```dynasty\n    a: 1\n    ```')).toEqual([]);
@@ -213,6 +228,16 @@ describe('replaceBody', () => {
 		expect(replaceBody(text, b, 'a: 0\n\nb: 2')).toBe('> ```dynasty\n> a: 0\n>\n>b: 2\n> ```\n');
 	});
 
+	it('after a bare ">", a changed line that starts with a space or tab gets one space more', () => {
+		const text = '>```dynasty\n>people:\n>  - id: a\n>    name: A\n>```\n';
+		const b = only(text);
+		expect(b.body).toBe('people:\n - id: a\n   name: A');
+		// The unchanged lines keep their bytes; the new line is written with ">" and one space.
+		expect(replaceBody(text, b, 'people:\n - id: a\n   name: B')).toBe('>```dynasty\n>people:\n>  - id: a\n>    name: B\n>```\n');
+		expect(replaceBody(text, b, 'people:\n - id: a\n\tx: 1\n   name: A')).toBe('>```dynasty\n>people:\n>  - id: a\n> \tx: 1\n>    name: A\n>```\n');
+		expect(replaceBody(text, b, 'x: 1\n - id: a\n   name: A')).toBe('>```dynasty\n>x: 1\n>  - id: a\n>    name: A\n>```\n');
+	});
+
 	it('can add and remove lines', () => {
 		const text = '```dynasty\na\nb\nc\n```';
 		const b = only(text);
@@ -222,7 +247,19 @@ describe('replaceBody', () => {
 	});
 
 	it('the new body is read back as written, in every container', () => {
-		const notes = ['```dynasty\na\n```', '> > ```dynasty\n> > a\n> > ```', '  ~~~dynasty\n  a\n  ~~~', '```dynasty\na', '```dynasty\na\n', '```dynasty', '```dynasty\n```'];
+		const notes = [
+			'```dynasty\na\n```',
+			'> > ```dynasty\n> > a\n> > ```',
+			'  ~~~dynasty\n  a\n  ~~~',
+			'```dynasty\na',
+			'```dynasty\na\n',
+			'```dynasty',
+			'```dynasty\n```',
+			'>```dynasty\n>a\n>```',
+			'>```dynasty\n>```',
+			'> >```dynasty\n> >a\n> >```',
+			'- ```dynasty\n\ta\n  ```',
+		];
 		const next = 'people:\n  - id: x\n\n    name: "X"';
 		for (const text of notes) {
 			const out = replaceBody(text, only(text), next);

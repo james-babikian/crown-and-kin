@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { findBlocks } from '../src/core/block-locate';
 import { parseDynasty } from '../src/core/parse';
-import { containerPrefix, fenceAround, insertTree, planInsert } from '../src/obsidian/insert-tree';
+import { containerPrefix, fenceAround, insertTree, planInsert, propertiesEnd } from '../src/obsidian/insert-tree';
 import { INSERT_UI } from '../src/render/ui-text';
 
 // WP6.3: the command Insert family tree (spec §5.9, D34): an empty tree with a help comment at the
@@ -102,8 +102,16 @@ describe('planInsert', () => {
 
 	it('a code fence in a list item: fenceAround finds it from its content and its fence lines', () => {
 		const lines = ['- Code:', '  ```js', '  x', '  ```', 'After.'];
-		expect([0, 1, 2, 3, 4].map((i) => fenceAround(lines, i))).toEqual([null, { close: 3, prefix: '  ' }, { close: 3, prefix: '  ' }, { close: 3, prefix: '  ' }, null]);
-		expect(fenceAround(['~~~~', '```', 'x'], 2)).toEqual({ close: null, prefix: '' });
+		const inside = { open: 1, openPrefix: '  ', close: 3, prefix: '  ' };
+		expect([0, 1, 2, 3, 4].map((i) => fenceAround(lines, i))).toEqual([null, inside, inside, inside, null]);
+		expect(fenceAround(['~~~~', '```', 'x'], 2)).toEqual({ open: 0, openPrefix: '', close: null, prefix: '' });
+	});
+
+	it('propertiesEnd: the closing line of the note properties, only for a line in them', () => {
+		const lines = ['---', 'title: Valmont', '...', 'Body', '---'];
+		expect([0, 1, 2, 3].map((i) => propertiesEnd(lines, i))).toEqual([2, 2, 2, null]);
+		expect(propertiesEnd(['---', 'title: x'], 1)).toBeNull();
+		expect(propertiesEnd(['text', '---', 'a', '---'], 2)).toBeNull();
 	});
 });
 
@@ -152,6 +160,30 @@ describe('insertTree in an editor', () => {
 		expect(blocks[1].prefix).toBe('> ');
 		expect(blocks[1].body.trimEnd()).toBe(HINT);
 		expect(s.cursor).toEqual({ line: blocks[1].closeLine! + 1, ch: 1 });
+	});
+
+	it('in a code block that never closes: the tree goes above its opening fence (review 1.0.1 E)', () => {
+		const s = run('Intro\n```js\nlet a = 1;', { line: 2, ch: 3 });
+		expect(s.text).toBe(['Intro', '```dynasty', HINT, '```', '', '```js', 'let a = 1;'].join('\n'));
+		const b = expectOneEmptyTree(s.text);
+		expect(s.cursor).toEqual({ line: b.closeLine! + 1, ch: 0 });
+	});
+
+	it('in a code block that never closes, in a callout list item: the same container', () => {
+		const s = run('> - ```js\n>   x', { line: 1, ch: 3 });
+		expect(s.text).toBe(['> - ```dynasty', `>   ${HINT}`, '>   ```', '>', '> - ```js', '>   x'].join('\n'));
+		expect(s.cursor).toEqual({ line: 3, ch: 1 });
+	});
+
+	it('in the note properties: the tree goes after them, and they do not change (review 1.0.1 E)', () => {
+		for (const close of ['---', '...']) {
+			const s = run(`---\ntitle: Valmont\n${close}\nBody`, { line: 1, ch: 3 });
+			expect(s.text).toBe(['---', 'title: Valmont', close, '```dynasty', HINT, '```', '', 'Body'].join('\n'));
+			const b = expectOneEmptyTree(s.text);
+			expect(s.cursor).toEqual({ line: b.closeLine! + 1, ch: 0 });
+		}
+		// On the opening line too.
+		expect(run('---\na: b\n---', { line: 0, ch: 0 }).text).toBe(['---', 'a: b', '---', '```dynasty', HINT, '```', ''].join('\n'));
 	});
 
 	it('a second tree in a note with a tree: the first tree does not change', () => {

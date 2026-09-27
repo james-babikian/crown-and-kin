@@ -1,30 +1,39 @@
-import { Modal, Notice, type App } from 'obsidian';
-import { deriveFamilies, type FamilyGraph } from '../core/derive';
-import type { FieldValue, Op, ParentKind, PersonField, UnionKind, UnionRef } from '../core/edit';
-import type { FamilyView, ParentLink, PartnerLink } from '../core/family';
-import { issueText } from '../core/messages';
-import { newHouseId, newPersonId } from '../core/yaml-edit';
-import { parseBody, readTree } from '../core/parse';
-import { PARENT_TYPES, PLACEMENT_TYPES, UNION_TYPES, type Person, type Tree } from '../core/types';
-import { linkTarget } from '../render/tree-info';
-import { FAMILY, FOCUS_UI, NEW_SHEET, REMOVE, SHEET, UI, UNION_EDIT, UNION_TYPE_TEXT, WRITE_TEXT, deleteText, parentTypeText, partnerDetail, unionTypeText } from '../render/ui-text';
-import { normBody, type Handle, type HandleWriteOutcome, type ViewKind, type Written } from './block-handle';
-import { describeDelete, familyOf } from '../core/family-query';
-import { addChild, addParent, addPartner, autoUnionNotice, unionOp, type FlowHost, type NewRelation } from './family-flows';
-import { ignoreGhostClick, phoneLayout } from './modal-layout';
-import { undoNotice } from './undo-notice';
-import { editUnion } from './union-edit';
-import { trackModal } from './plugin-modals';
-
 /*
  * The edit sheet (spec §6.3 fields, family, actions and commit model; §7.4 phone layout). Field
  * edits are a draft: Save writes once, only the changed fields; Cancel discards; any other way to
  * close asks first. A relationship action writes the draft in the same write. A new person is a
  * draft too: a sheet for them writes the person and the relationship together, on Save only.
  * The sheet reads the block from its handle, never from the rendered view, which the write replaces.
+ *
+ * Reading guide, top to bottom:
+ * - Helpers above the class: loading the sheet's data (`loadSheet`), the draft shape, id and
+ *   partnership lookup helpers used when a write gives a person their first id.
+ * - `EditSheet`: state, then the sections marked with `// ---------- ... ----------` comments:
+ *   building the form (fields, house, family, actions, delete), writes (the write itself, the
+ *   relationship-action write, Save, reload after a write), and the confirm/error messages.
  */
 
-export type { NewRelation } from './family-flows';
+import { Modal, Notice, type App } from 'obsidian';
+import { deriveFamilies, type FamilyGraph } from '../core/derive';
+import type { FieldValue, Op, ParentKind, PersonField, UnionKind, UnionRef } from '../core/edit';
+import { issueText } from '../core/messages';
+import { uniqueId } from '../core/id-gen';
+import { newHouseId } from '../core/yaml-edit';
+import { parseBody, readTree, referencedIds } from '../core/parse';
+import { isMap, str, type Raw } from '../core/tolerate';
+import { PARENT_TYPES, PLACEMENT_TYPES, UNION_TYPES, type Person, type Tree } from '../core/types';
+import { linkTarget } from '../render/tree-info';
+import { FAMILY, FOCUS_UI, NEW_SHEET, REMOVE, SHEET, UI, UNION_EDIT, UNION_TYPE_TEXT, WRITE_TEXT, deleteText, parentTypeText, partnerDetail, unionTypeText } from '../render/ui-text';
+import { normBody } from '../core/block-match';
+import type { Handle, HandleWriteOutcome, Written } from './block-handle';
+import type { ViewKind } from './block-state';
+import { describeDelete, familyOf, type FamilyView, type ParentLink, type PartnerLink } from '../core/family-query';
+import { addChild, addParent, addPartner, autoUnionNotice, unionOp, type FlowHost, type NewRelation } from './family-flows';
+import { ignoreGhostClick, phoneLayout } from './modal-layout';
+import { freshOrStale, onWriteFailed, sheetField, showErrorLine } from './sheet-parts';
+import { undoNotice } from './undo-notice';
+import { editUnion } from './union-edit';
+import { trackModal } from './plugin-modals';
 
 const TEXT_FIELDS = ['name', 'title', 'born', 'died', 'link', 'notes'] as const;
 const NEW_HOUSE = '\u0000new';
@@ -55,8 +64,13 @@ interface Loaded {
 	blocking: string[];
 }
 
+/** The result of `loadSheet`: the loaded data, an unparsable block, or the person is not in the tree. */
 export type SheetLoad = { kind: 'ok'; data: Loaded } | { kind: 'invalid' } | { kind: 'gone' };
 
+/** The new-house fields of a draft before the user types in them. */
+const blankHouse = () => ({ name: '', color: '#888888' });
+
+/** A person with no id and no fields, the starting point for a new-person draft. */
 const blankPerson = (): Person => ({ id: '', name: '', parents: [], illegitimate: false, index: -1 });
 
 /** The sheet's data for a person (or a new person, `id` null), or why there is none. */
@@ -112,12 +126,71 @@ export function findUnion(candidates: UnionRef[], chosen: UnionRef): UnionRef | 
 	return byText[0] ?? null;
 }
 
-export interface SheetOptions {
+/** Keys of an op whose values never name a person. */
+const NOT_IDS = new Set(['kind', 'fields', 'text', 'name', 'color', 'key', 'type', 'from', 'to', 'direction', 'map', 'start', 'end', 'people']);
+
+/** A copy of `v` (ops, a relation) with every string that can name a person mapped by `f`. */
+export function mapIds<T>(v: T, f: (id: string) => string, key = ''): T {
+	if (NOT_IDS.has(key)) return v;
+	if (typeof v === 'string') return f(v) as T;
+	if (Array.isArray(v)) return v.map((x: unknown) => mapIds(x, f)) as T;
+	if (v !== null && typeof v === 'object') return Object.fromEntries(Object.entries(v).map(([k, x]) => [k, mapIds(x, f, k)])) as T;
+	return v;
+}
+
+/** Every string of the ops that can name a person. */
+function namesIn(ops: Op[]): string[] {
+	const out: string[] = [];
+	mapIds(ops, (s) => {
+		out.push(s);
+		return s;
+	});
+	return out;
+}
+
+/** True for a person with no written id (spec §8 warning): the tree names them `~N`, after their place in the list. */
+function unwritten(l: Loaded, id: string): boolean {
+	const p = l.g.byId.get(id);
+	const data = l.data as Raw;
+	if (!p || !isMap(data) || !Array.isArray(data.people)) return false;
+	const raw = data.people[p.index] as Raw;
+	return str(isMap(raw) ? raw.id : undefined) !== id;
+}
+
+/** Every person id and reference written in the block, and `more`: a new id must be none of them. */
+function takenIds(l: Loaded, more: Iterable<string> = []): Set<string> {
+	const data = l.data as Raw;
+	return new Set([...(isMap(data) ? referencedIds(data) : []), ...more]);
+}
+
+/**
+ * New ids for the people in `names` that have no written id, before a write that names them. Their
+ * `~N` follows their place in the list: a move or a new person above changes it, and a `~N` written
+ * as a reference names nobody.
+ */
+function idsFor(l: Loaded, names: Iterable<string>): Map<string, string> {
+	const ids = new Map<string, string>();
+	const used = takenIds(l);
+	for (const id of names) {
+		if (ids.has(id) || !unwritten(l, id)) continue;
+		const next = uniqueId(l.g.byId.get(id)!.name, used);
+		used.add(next);
+		ids.set(id, next);
+	}
+	return ids;
+}
+
+type IdFields = Extract<Op, { kind: 'set-person-fields' }>['fields'] & { id?: string };
+
+/** The ops of one write that first gives each person of `ids` their id, then names them by it. */
+function withIds(ops: Op[], ids: ReadonlyMap<string, string>): Op[] {
+	if (!ids.size) return ops;
+	const give = [...ids].map(([id, next]): Op => ({ kind: 'set-person-fields', id, fields: { id: next } as IdFields }));
+	return [...give, ...mapIds(ops, (s) => ids.get(s) ?? s)];
+}
+
+interface SheetBase {
 	handle: Handle;
-	/** The person to edit. Absent for a new person (`newPerson`). */
-	personId?: string;
-	/** A sheet for a new, unsaved person and how they join the tree (spec §6.3 "New people are drafts"). */
-	newPerson?: NewRelation;
 	/** The name typed in the picker before "Create a new person". */
 	initialName?: string;
 	/** The sheet that started this one: its draft is written with the new person, and it shows the result. */
@@ -135,9 +208,21 @@ export interface SheetOptions {
 	 * pin write, keeping those own focuses.
 	 */
 	focus?: { here(id: string): void; changed(): void; pinning?(): () => void };
-	/** The kind of view that opened the sheet: the saved person is shown there (§5.5, the decision notes WP5.2 fix round 2). */
+	/** The kind of view that opened the sheet: the saved person is shown there (§5.5). */
 	place?: ViewKind;
 }
+
+/** A sheet for a person of the tree. */
+export type PersonSheetOptions = SheetBase & { personId: string; newPerson?: undefined };
+
+/** A sheet for a new, unsaved person and how they join the tree (spec §6.3 "New people are drafts"). */
+export type NewSheetOptions = SheetBase & { newPerson: NewRelation; personId?: undefined };
+
+/** How the sheet was opened: for a person already in the tree, or for a new one. */
+export type SheetOptions = PersonSheetOptions | NewSheetOptions;
+
+/** A write of a relationship action; `withFields`: it also saved field changes of the draft. */
+type DraftWritten = Written & { withFields: boolean };
 
 interface ConfirmSpec {
 	title: string;
@@ -148,15 +233,18 @@ interface ConfirmSpec {
 	onConfirm: () => void;
 }
 
+/** The modal that shows and edits one person's fields, family and relationship actions. */
 export class EditSheet extends Modal {
 	private data: Loaded;
 	private base: Draft;
 	private draft: Draft;
-	private newHouse = { name: '', color: '#888888' };
+	private newHouse = blankHouse();
 	/** Partnership type of a new partner (spec §6.4: default marriage). */
 	private unionType: string = 'marriage';
 	private saving = false;
 	private closing = false;
+	/** The person left the tree while the sheet was open: the sheet shows the draft but cannot save it. */
+	private gone = false;
 	private confirmEl: HTMLElement | null = null;
 	private errorEl: HTMLElement | null = null;
 	private statusEl: HTMLElement | null = null;
@@ -173,19 +261,16 @@ export class EditSheet extends Modal {
 	private relBlocked = false;
 	/** Names of the related people when the sheet opened, for the message if one leaves the tree. */
 	private readonly relNames = new Map<string, string>();
-	/** The last relationship write also saved field changes of the draft. */
-	private withFields = false;
 	private readonly cleanup: (() => void)[] = [];
 
 	/** Returns null if the person is not in the block (the view was out of date). */
-	static create(app: App, o: SheetOptions): EditSheet | null {
-		if (o.personId === undefined) return null;
+	static create(app: App, o: PersonSheetOptions): EditSheet | null {
 		const l = loadSheet(o.handle.body, o.personId);
 		return l.kind === 'ok' ? new EditSheet(app, o, l.data) : null;
 	}
 
 	/** A sheet for a new person; null if the block does not parse. */
-	static createNew(app: App, o: SheetOptions): EditSheet | null {
+	static createNew(app: App, o: NewSheetOptions): EditSheet | null {
 		const l = loadSheet(o.parentSheet?.data.body ?? o.handle.body, null);
 		return l.kind === 'ok' ? new EditSheet(app, o, l.data) : null;
 	}
@@ -204,9 +289,6 @@ export class EditSheet extends Modal {
 		this.checkRelation();
 	}
 
-	/** The person left the tree while the sheet was open: the sheet shows the draft but cannot save it. */
-	private gone = false;
-
 	get isNew(): boolean {
 		return this.o.newPerson !== undefined;
 	}
@@ -219,6 +301,7 @@ export class EditSheet extends Modal {
 		return this.data.g.byId.get(id)?.name || id;
 	}
 
+	/** Builds the form and gives the focus to the name field (a new person) or the modal itself. */
 	override onOpen(): void {
 		this.modalEl.addClass('dynasty-sheet');
 		if (this.isNew) this.modalEl.addClass('is-new');
@@ -236,6 +319,7 @@ export class EditSheet extends Modal {
 		}
 	}
 
+	/** Runs the cleanup functions `onOpen` registered and empties the modal. */
 	override onClose(): void {
 		this.shown = false;
 		for (const c of this.cleanup.splice(0)) c();
@@ -387,7 +471,7 @@ export class EditSheet extends Modal {
 		box.createDiv({ cls: 'dynasty-sheet-relation-text', text });
 		if (rel.kind === 'child') this.partnershipField(box, rel);
 		if (rel.kind !== 'partner') return;
-		const { row, id } = this.field(box, NEW_SHEET.unionType, 'union-type');
+		const { row, id } = sheetField(box, NEW_SHEET.unionType, 'union-type');
 		const sel = row.createEl('select', { cls: ['dropdown', 'dynasty-sheet-input'], attr: { id } });
 		for (const t of UNION_TYPES) sel.createEl('option', { text: UNION_TYPE_TEXT[t], attr: { value: t } });
 		sel.value = this.unionType;
@@ -425,7 +509,7 @@ export class EditSheet extends Modal {
 
 	/**
 	 * Checks that the new person can still join the tree as chosen, after the sheet loaded new data
-	 * (the decision notes "Union references after WP3.3 review"). The chosen partnership is found again
+	 * (the decision notes "Union references"). The chosen partnership is found again
 	 * by its text; if it is gone, the user must choose again. A related person who is gone blocks
 	 * Save; the draft stays.
 	 */
@@ -460,7 +544,7 @@ export class EditSheet extends Modal {
 		const couple = this.couple(rel);
 		if (couple.length < 2 && !(this.relBlocked && couple.length)) return;
 		const fam = familyOf(this.data.g, rel.parent);
-		const { row, id } = this.field(box, NEW_SHEET.partnership, 'partnership');
+		const { row, id } = sheetField(box, NEW_SHEET.partnership, 'partnership');
 		const sel = row.createEl('select', { cls: ['dropdown', 'dynasty-sheet-input'], attr: { id } });
 		if (!rel.union) sel.createEl('option', { text: NEW_SHEET.choosePartnership, attr: { value: '' } });
 		couple.forEach((u, i) => {
@@ -477,15 +561,8 @@ export class EditSheet extends Modal {
 		});
 	}
 
-	private field(parent: HTMLElement, label: string, name: string): { row: HTMLElement; id: string } {
-		const row = parent.createDiv({ cls: 'dynasty-sheet-field', attr: { 'data-field': name } });
-		const id = `dynasty-sheet-${name}-${Math.random().toString(36).slice(2, 8)}`;
-		row.createEl('label', { cls: 'dynasty-sheet-label', text: label, attr: { for: id } });
-		return { row, id };
-	}
-
 	private textField(parent: HTMLElement, key: (typeof TEXT_FIELDS)[number], label: string, o: { autocapitalize?: string; placeholder?: string } = {}, area = false): void {
-		const { row, id } = this.field(parent, label, key);
+		const { row, id } = sheetField(parent, label, key);
 		// Plain attribute names (no spread), so the colour rule of eslint.config.mjs can check them; null writes no attribute.
 		const extra = { autocapitalize: o.autocapitalize ?? null, placeholder: o.placeholder ?? null };
 		// born and died are free text (fictional calendars): never a numeric keyboard (spec §7.4).
@@ -502,7 +579,7 @@ export class EditSheet extends Modal {
 	}
 
 	private select(parent: HTMLElement, key: 'house' | 'sex' | 'placement', label: string, options: [string, string][]): HTMLSelectElement {
-		const { row, id } = this.field(parent, label, key);
+		const { row, id } = sheetField(parent, label, key);
 		const sel = row.createEl('select', { cls: ['dropdown', 'dynasty-sheet-input'], attr: { id } });
 		for (const [value, text] of options) sel.createEl('option', { text, attr: { value } });
 		sel.value = this.draft[key];
@@ -520,14 +597,14 @@ export class EditSheet extends Modal {
 		sel.addEventListener('change', () => (this.draft.house = sel.value));
 		if (this.readOnly) return;
 		const form = parent.createDiv({ cls: 'dynasty-sheet-subform' });
-		const name = this.field(form, SHEET.newHouseName, 'new-house-name');
+		const name = sheetField(form, SHEET.newHouseName, 'new-house-name');
 		const nameInput = name.row.createEl('input', { cls: 'dynasty-sheet-input', attr: { id: name.id, type: 'text', autocomplete: 'off', autocapitalize: 'words' } });
 		nameInput.value = this.newHouse.name;
 		nameInput.addEventListener('input', () => {
 			this.newHouse.name = nameInput.value;
 			this.clearError();
 		});
-		const colour = this.field(form, SHEET.newHouseColour, 'new-house-color');
+		const colour = sheetField(form, SHEET.newHouseColour, 'new-house-color');
 		const colourInput = colour.row.createEl('input', { cls: 'dynasty-sheet-colour', attr: { id: colour.id, type: 'color' } });
 		colourInput.value = this.newHouse.color;
 		colourInput.addEventListener('input', () => (this.newHouse.color = colourInput.value));
@@ -636,7 +713,7 @@ export class EditSheet extends Modal {
 		sel.addEventListener('change', () => {
 			const to = sel.value as ParentKind;
 			if (to === link.type) return;
-			void this.relationship([{ kind: 'set-parent-type', child: this.data.person.id, parent: link.id, from: link.type, to }]).then((out) => {
+			void this.writeWithDraft([{ kind: 'set-parent-type', child: this.data.person.id, parent: link.id, from: link.type, to }]).then((out) => {
 				if (!out) sel.value = link.type;
 			});
 		});
@@ -699,7 +776,7 @@ export class EditSheet extends Modal {
 	/**
 	 * Pin focus here / Remove pin (D18): writes or removes `options.focus`, with the draft in the same
 	 * write like the other actions. Both end the session focus, so every view shows the new pin, or
-	 * after Remove pin the default (the decision notes M5). The sheet stays open and shows the other button.
+	 * after Remove pin the default. The sheet stays open and shows the other button.
 	 */
 	private async pin(on: boolean): Promise<void> {
 		const h = this.o.handle;
@@ -708,7 +785,7 @@ export class EditSheet extends Modal {
 		h.state.focus = null;
 		const restoreOwn = this.o.focus?.pinning?.() ?? (() => undefined);
 		// Not an edit of the person (no highlight, no last edited person): after Remove pin a phone opens on the start person again (D20).
-		const out = await this.relationship([{ kind: 'set-option', key: 'focus', value: on ? this.data.person.id : null }], null);
+		const out = await this.writeWithDraft([{ kind: 'set-option', key: 'focus', value: on ? this.data.person.id : null }], null);
 		if (out) return;
 		// Nothing was written: the views show what they showed before.
 		if (h.state.focus === null) h.state.focus = before;
@@ -731,7 +808,7 @@ export class EditSheet extends Modal {
 			fam,
 			name: (id) => this.name(id),
 			ready: () => this.pendingOps() !== null && this.fresh(),
-			commit: (ops, highlight) => this.relationship(ops, highlight),
+			commit: (ops, highlight) => this.writeWithDraft(ops, highlight),
 			openNew: (rel, name) => this.openNew(rel, name),
 		};
 	}
@@ -749,24 +826,27 @@ export class EditSheet extends Modal {
 	 */
 	pendingOps(): Op[] | null {
 		if (this.readOnly || this.isNew || !this.isDirty()) return [];
-		if (this.draft.name.trim() === '') {
-			this.showError(SHEET.needName);
-			return null;
-		}
-		if (this.draft.house === NEW_HOUSE && this.newHouse.name.trim() === '') {
-			this.showError(SHEET.needHouseName);
-			return null;
-		}
+		if (!this.validate()) return null;
 		const op = this.buildOp();
 		return op ? [op] : [];
 	}
 
+	/** True if the draft has a name, and a name for a new house; otherwise shows what is missing. */
+	private validate(): boolean {
+		if (this.draft.name.trim() === '') {
+			this.showError(SHEET.needName);
+			return false;
+		}
+		if (this.draft.house === NEW_HOUSE && this.newHouse.name.trim() === '') {
+			this.showError(SHEET.needHouseName);
+			return false;
+		}
+		return true;
+	}
+
 	/** True if the sheet shows the handle's current body; otherwise the stale message and false. */
 	private fresh(): boolean {
-		const h = this.o.handle;
-		if (normBody(h.body) === normBody(this.data.body)) return true;
-		this.stale(h.body);
-		return false;
+		return freshOrStale(this.o.handle, this.data.body, (body) => this.stale(body));
 	}
 
 	private buildOp(): Op | null {
@@ -836,6 +916,11 @@ export class EditSheet extends Modal {
 		this.saving = true;
 		this.modalEl.addClass('is-saving');
 		const prev = { lastEdited: h.state.lastEdited, highlight: h.state.highlight, shown: h.state.shown };
+		const restore = () => {
+			h.state.lastEdited = prev.lastEdited;
+			h.state.highlight = prev.highlight;
+			h.state.shown = prev.shown;
+		};
 		// Set before the write: the re-render that follows can run before the write returns.
 		if (highlight) {
 			h.state.lastEdited = highlight;
@@ -846,16 +931,12 @@ export class EditSheet extends Modal {
 			this.o.beforeWrite?.();
 			const out = await h.write(op);
 			if (out.ok) return out;
-			h.state.lastEdited = prev.lastEdited;
-			h.state.highlight = prev.highlight;
-			h.state.shown = prev.shown;
+			restore();
 			this.failed(out);
 			return null;
 		} catch (e) {
 			console.error('Dynasty Tree: cannot save', e);
-			h.state.lastEdited = prev.lastEdited;
-			h.state.highlight = prev.highlight;
-			h.state.shown = prev.shown;
+			restore();
 			this.refused(WRITE_TEXT.failed);
 			return null;
 		} finally {
@@ -866,59 +947,60 @@ export class EditSheet extends Modal {
 
 	private failed(out: Exclude<HandleWriteOutcome, { ok: true }>): void {
 		const h = this.o.handle;
-		if (out.code !== 'refused') {
-			// A failed Save never discards the draft: the user can copy the text or Cancel.
-			if (out.code === 'stale') this.stale(h.body);
-			else this.refused(WRITE_TEXT.missing);
-		} else {
-			const code = out.refusal.code;
-			if (out.refusal.detail) console.warn('Dynasty Tree: the edit was refused:', out.refusal.detail);
-			if (code === 'unknown-person' && !this.isNew) this.markGone();
-			else if (code === 'blocked') {
-				new Notice(WRITE_TEXT.blocked);
-				this.reload(h.body);
-			} else if (code === 'invalid-yaml') this.refused(WRITE_TEXT.invalid);
-			else if (code === 'unknown-union' || code === 'unknown-person') this.stale(h.body);
-			else if (code === 'cycle') this.refused(WRITE_TEXT.cycle);
-			else if (code === 'limit') this.refused(WRITE_TEXT.limit);
-			else if (code === 'no-sibling') this.refused(WRITE_TEXT.noSibling);
-			else this.refused(WRITE_TEXT.refused);
-		}
+		// A failed Save never discards the draft: the user can copy the text or Cancel.
+		onWriteFailed(out, {
+			stale: () => this.stale(h.body),
+			missing: () => this.refused(WRITE_TEXT.missing),
+			refused: (code) => {
+				if (code === 'unknown-person' && !this.isNew) this.markGone();
+				else if (code === 'blocked') {
+					new Notice(WRITE_TEXT.blocked);
+					this.reload(h.body);
+				} else if (code === 'invalid-yaml') this.refused(WRITE_TEXT.invalid);
+				else if (code === 'unknown-union' || code === 'unknown-person') this.stale(h.body);
+				else if (code === 'cycle') this.refused(WRITE_TEXT.cycle);
+				else if (code === 'limit') this.refused(WRITE_TEXT.limit);
+				else if (code === 'no-sibling') this.refused(WRITE_TEXT.noSibling);
+				else this.refused(WRITE_TEXT.refused);
+			},
+		});
 	}
 
-	/** A relationship action with the draft in the same write; the sheet stays open and shows the result. */
-	private async relationship(ops: Op[], highlight: string | null = this.data.person.id): Promise<Written | null> {
+	/**
+	 * A relationship action with the draft in the same write; the sheet stays open and shows the
+	 * result. A person of the write with no written id gets one in it; the sheet's own person always
+	 * does, so the sheet follows them by that id afterwards.
+	 */
+	private async writeWithDraft(ops: Op[], highlight: string | null = this.data.person.id): Promise<DraftWritten | null> {
 		this.lastError = '';
 		const pending = this.pendingOps();
 		if (pending === null) return null;
-		this.withFields = pending.length > 0;
-		const out = await this.write([...pending, ...ops], highlight);
-		if (out) this.afterWrite(out.body);
-		return out;
+		const all = [...pending, ...ops];
+		const ids = idsFor(this.data, [this.data.person.id, ...namesIn(all)]);
+		const out = await this.write(withIds(all, ids), highlight === null ? null : (ids.get(highlight) ?? highlight));
+		if (!out) return null;
+		this.afterWrite(out.body, ids);
+		return { ...out, withFields: pending.length > 0 };
 	}
 
 	/**
 	 * The Notice with Undo after a removal. Undo reverts the whole write, so the Notice says when
-	 * the write also saved field changes; after Undo the open sheet shows the restored data.
+	 * the write also saved field changes; after Undo the open sheet shows the restored data. `was`:
+	 * the person's id before the write, which Undo gives back if the write gave them their first id.
 	 */
-	private removedNotice(text: string, out: Written): void {
+	private removedNotice(text: string, out: DraftWritten, was: string): void {
 		const h = this.o.handle;
-		undoNotice(this.withFields ? `${text} ${REMOVE.undoAlso}` : text, h, out.body, () => {
+		undoNotice(out.withFields ? `${text} ${REMOVE.undoAlso}` : text, h, out.body, () => {
+			if (!this.shown) return;
+			const id = this.data.person.id;
 			// reload, not afterWrite: text typed after the removal stays in the draft.
-			if (this.shown) this.reload(h.body);
+			this.reload(h.body, id !== was && loadSheet(h.body, id).kind === 'gone' ? was : id);
 		});
 	}
 
 	private async save(another = false): Promise<void> {
 		if (this.saving || this.readOnly) return;
-		if (this.draft.name.trim() === '') {
-			this.showError(SHEET.needName);
-			return;
-		}
-		if (this.draft.house === NEW_HOUSE && this.newHouse.name.trim() === '') {
-			this.showError(SHEET.needHouseName);
-			return;
-		}
+		if (!this.validate()) return;
 		if (!this.isNew) {
 			const op = this.buildOp();
 			if (!op) {
@@ -938,24 +1020,34 @@ export class EditSheet extends Modal {
 			this.showError(WRITE_TEXT.needNameFirst);
 			return;
 		}
-		const id = newPersonId(this.data.body, this.draft.name.trim());
-		const taken = pending.flatMap((op) => (op.kind === 'batch' ? op.ops : [op])).filter((op) => op.kind === 'add-house').map((op) => (op.kind === 'add-house' && parent ? newHouseId(parent.data.data, op.name) : ''));
 		const name = this.draft.name.trim();
-		const out = await this.write([...pending, ...this.newPersonOps(id, taken)], id);
+		// The related people and the parent sheet's person get an id if they have none (see `idsFor`).
+		const ids = idsFor(this.data, [...(parent ? [parent.data.person.id] : []), ...this.relIds(), ...namesIn(pending)]);
+		// The id newPersonId gives, also unused by the ids above.
+		const id = uniqueId(name, takenIds(this.data, ids.values()));
+		const taken = pending.flatMap((op) => (op.kind === 'batch' ? op.ops : [op])).filter((op) => op.kind === 'add-house').map((op) => (op.kind === 'add-house' && parent ? newHouseId(parent.data.data, op.name) : ''));
+		const out = await this.write(withIds([...pending, ...this.newPersonOps(id, taken)], ids), id);
 		if (!out) {
 			// The parent sheet shows the same new data as this one after a stale write.
 			if (parent && normBody(parent.data.body) !== normBody(this.o.handle.body)) parent.reload(this.o.handle.body);
 			return;
 		}
-		parent?.afterWrite(out.body);
-		const rel = this.rel!;
-		if (rel.kind === 'parent') {
-			const other = this.data.g.byId.get(rel.child)?.parents.find((l) => l.type === rel.type && l.id !== id)?.id;
+		parent?.afterWrite(out.body, ids);
+		const old = this.rel!;
+		if (old.kind === 'parent') {
+			const other = this.data.g.byId.get(old.child)?.parents.find((l) => l.type === old.type && l.id !== id)?.id;
 			autoUnionNotice(out, name, other && this.name(other));
 		}
 		if (!another) {
 			this.finish();
 			return;
+		}
+		// The next child has the same parents, now under the ids the write gave them.
+		const rel = mapIds(old, (s) => ids.get(s) ?? s);
+		this.rel = rel;
+		for (const [was, now] of ids) {
+			const n = this.relNames.get(was);
+			if (n !== undefined) this.relNames.set(now, n);
 		}
 		// "Save and add another child": a fresh draft with the same parents, from the new body.
 		const r = loadSheet(out.body, null);
@@ -966,7 +1058,7 @@ export class EditSheet extends Modal {
 		this.data = r.data;
 		this.base = this.baseOf(r.data);
 		this.draft = { ...this.base };
-		this.newHouse = { name: '', color: '#888888' };
+		this.newHouse = blankHouse();
 		// The write can give the chosen partnership an id, which changes its text: take the
 		// partnership the new child is under now.
 		if (rel.kind === 'child' && rel.union) {
@@ -980,25 +1072,29 @@ export class EditSheet extends Modal {
 		this.focusName();
 	}
 
-	/** After a write from this sheet (or from a new-person sheet it started): show the new data. */
-	afterWrite(body: string): void {
-		const r = loadSheet(body, this.isNew ? null : this.data.person.id);
+	/**
+	 * After a write from this sheet (or from a new-person sheet it started): show the new data. `ids`:
+	 * the ids the write gave to people with none; the sheet follows its person by the new id.
+	 */
+	afterWrite(body: string, ids?: ReadonlyMap<string, string>): void {
+		const id = ids?.get(this.data.person.id) ?? this.data.person.id;
+		const r = loadSheet(body, this.isNew ? null : id);
 		if (r.kind !== 'ok') {
-			this.reload(body);
+			this.reload(body, id);
 			return;
 		}
 		const top = this.bodyEl?.scrollTop ?? 0;
 		this.data = r.data;
 		this.base = this.baseOf(r.data);
 		this.draft = { ...this.base };
-		this.newHouse = { name: '', color: '#888888' };
+		this.newHouse = blankHouse();
 		this.gone = false;
 		this.build();
 		if (this.bodyEl) this.bodyEl.scrollTop = top;
 	}
 
 	private async moveSibling(direction: 'earlier' | 'later'): Promise<void> {
-		await this.relationship([{ kind: 'move-sibling', id: this.data.person.id, direction }]);
+		await this.writeWithDraft([{ kind: 'move-sibling', id: this.data.person.id, direction }]);
 		// The buttons are rebuilt; keep the keyboard focus on the one the user pressed.
 		this.contentEl.querySelector<HTMLButtonElement>(`.dynasty-move-${direction}:not(:disabled)`)?.focus();
 	}
@@ -1006,8 +1102,8 @@ export class EditSheet extends Modal {
 	private async removeParent(link: ParentLink): Promise<void> {
 		const child = this.data.person;
 		const parentName = this.name(link.id);
-		const out = await this.relationship([{ kind: 'remove-parent', child: child.id, parent: link.id, type: link.type }]);
-		if (out) this.removedNotice(REMOVE.removedParent(parentName, child.name), out);
+		const out = await this.writeWithDraft([{ kind: 'remove-parent', child: child.id, parent: link.id, type: link.type }]);
+		if (out) this.removedNotice(REMOVE.removedParent(parentName, child.name), out, child.id);
 	}
 
 	private editPartnership(link: PartnerLink): void {
@@ -1031,7 +1127,7 @@ export class EditSheet extends Modal {
 			if (next.start !== current.start) fields.start = next.start === '' ? null : next.start;
 			if (next.end !== current.end) fields.end = next.end === '' ? null : next.end;
 			if (!Object.keys(fields).length) return null;
-			const out = await this.relationship([{ kind: 'edit-union', union: now.union, fields }]);
+			const out = await this.writeWithDraft([{ kind: 'edit-union', union: now.union, fields }]);
 			return out ? null : this.lastError || WRITE_TEXT.refused;
 		});
 	}
@@ -1041,6 +1137,7 @@ export class EditSheet extends Modal {
 		if (!u || this.pendingOps() === null || !this.fresh()) return;
 		const a = this.data.person.name;
 		const b = this.name(link.partner);
+		const was = this.data.person.id;
 		this.showConfirm({
 			title: REMOVE.partnershipTitle,
 			text: [REMOVE.partnershipText(unionTypeText((link.type as UnionKind | null) ?? 'marriage'), a, b), REMOVE.canUndo],
@@ -1048,8 +1145,8 @@ export class EditSheet extends Modal {
 			confirmCls: 'dynasty-confirm-remove-union',
 			keep: REMOVE.cancel,
 			onConfirm: () =>
-				void this.relationship([{ kind: 'remove-union', union: u }]).then((out) => {
-					if (out) this.removedNotice(REMOVE.removedPartnership(a, b), out);
+				void this.writeWithDraft([{ kind: 'remove-union', union: u }]).then((out) => {
+					if (out) this.removedNotice(REMOVE.removedPartnership(a, b), out, was);
 				}),
 		});
 	}
@@ -1096,10 +1193,7 @@ export class EditSheet extends Modal {
 
 	private showError(text: string): void {
 		this.lastError = text;
-		if (!this.errorEl) return;
-		this.errorEl.setText(text);
-		this.errorEl.show();
-		this.errorEl.scrollIntoView({ block: 'nearest' });
+		showErrorLine(this.errorEl, text);
 	}
 
 	private clearError(): void {
@@ -1157,10 +1251,11 @@ export class EditSheet extends Modal {
 
 	/**
 	 * Shows the block's new data (spec §6.1 "refresh any open sheet"). Fields the user changed keep
-	 * the user's text; the other fields show the new values.
+	 * the user's text; the other fields show the new values. `id`: the person to show, if their id
+	 * changed with the write.
 	 */
-	reload(body: string): void {
-		const r = loadSheet(body, this.isNew ? null : this.data.person.id);
+	reload(body: string, id = this.data.person.id): void {
+		const r = loadSheet(body, this.isNew ? null : id);
 		if (r.kind === 'invalid') {
 			// The draft stays, editable; a later Save compares with the new body and says so again.
 			this.refused(WRITE_TEXT.invalid);

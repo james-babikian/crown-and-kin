@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { PlanWrite, UndoStack } from '../../src/core/block';
+import type { PlanWrite, UndoStack } from '../../src/core/block-write';
 import * as impl from '../../src/core/block-write';
 import { golden, replaceOnce } from './golden';
 import { fixtureNote, topLevelBlocks } from './load';

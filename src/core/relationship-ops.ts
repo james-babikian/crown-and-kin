@@ -1,30 +1,27 @@
+/*
+ * Relationship ops (spec §6.2–§6.7), on top of the patch-and-check machinery in `yaml-patch.ts`:
+ * every op builds the expected data (old data plus exactly the intended change), patches the text
+ * at the parse positions, and `finish` re-parses and compares. Nothing here re-stringifies a node.
+ * `yaml-edit.ts` dispatches each `Op` to the matching function here through `relationshipOp`.
+ */
+
 import { isAlias, isMap, isScalar, isSeq, type Node, type Pair, type YAMLMap, type YAMLSeq } from 'yaml';
 import { deriveFamilies, type FamilyGraph } from './derive';
 import type {
 	AddParent, AddPerson, AddUnion, DeletePerson, EditResult, EditUnion, MoveSibling, ParentKind, PersonField, Placement, RemoveParent, RemoveUnion, SetParentType, UnionRef,
 } from './edit';
-import { descendantsOf, parentKind, siblingGroup, writtenParents } from './family-query';
-import { uniqueId } from './id-gen';
+import { descendantsOf, siblingGroup, writtenParents } from './family-query';
+import { newIdIn } from './id-gen';
 import { parseBody, readTree, textWithoutComments } from './parse';
 import { isEmpty, isMap as isRawMap, list, str, type Raw, type RawMap } from './tolerate';
-import { PARENT_TYPES, UNION_TYPES, type Tree } from './types';
+import { isParentType, isPlacementType, isUnionType, parentKind, PLACEMENT_TYPES, type Tree } from './types';
+import { dashOf, flowComment, insertItem, itemEnd, itemStart, removeFromSection, removeItems, section, type Where } from './yaml-list';
 import {
-	addPair, addSection, clone, commentsOf, findPair, finish, insertAt, isRefusal, layoutOf, mergeRemovals, OVERLAP, PERSON_FIELDS, PERSON_ORDER, personNode, personValue, refuse,
+	addPair, clone, commentsOf, findPair, finish, finishTogether, insertAt, isRefusal, layoutOf, PERSON_FIELDS, PERSON_ORDER, personNode, personValue, refuse,
 	removePair, renderScalar, setPairValue, TEXT_FIELDS, topMap, type Parsed, type Patch, type Refusal, Source, type Step,
 } from './yaml-patch';
 
-/*
- * Relationship ops (spec §6.2–§6.7), on top of the M2 machinery in `yaml-patch.ts`: every op
- * builds the expected data (old data plus exactly the intended change), patches the text at the
- * parse positions, and `finish` re-parses and compares. Nothing here re-stringifies a node.
- *
- * Lines a list item owns (the decision notes "Relationship-op details"): its own lines with their
- * end-of-line comments, the full-line comments right below it indented deeper than its dash,
- * and the full-line comments directly above it at or left of its dash, up to the previous item or
- * a blank line. In a flow list, an end-of-line comment belongs to the item it follows. A move
- * takes all of them; a removal keeps the comments above the item.
- */
-
+/** The parsed body, its family graph, and other state a relationship op needs to run. */
 export interface OpContext {
 	first: Parsed;
 	data: RawMap;
@@ -35,204 +32,10 @@ export interface OpContext {
 }
 
 const UNION_ORDER = ['id', 'partners', 'type', 'start', 'end'];
-const isParentKind = (t: unknown): t is ParentKind => typeof t === 'string' && (PARENT_TYPES as readonly string[]).includes(t);
-const isUnionKind = (t: unknown): boolean => typeof t === 'string' && (UNION_TYPES as readonly string[]).includes(t);
 const flowText = (v: string) => renderScalar(v, null, { flow: true, text: true, indent: '' });
 
 function done(r: EditResult, effects: 'auto-union'[] = []): EditResult {
 	return r.ok && effects.length ? { ...r, effects } : r;
-}
-
-// ---------------------------------------------------------------------------------------------
-// List items and their text spans
-
-function dashOf(src: Source, node: Node): number {
-	let p = node.range![0] - 1;
-	while (p >= 0 && /\s/.test(src.text[p])) p--;
-	return p >= 0 && src.text[p] === '-' ? p : node.range![0];
-}
-
-const lineAfter = (src: Source, end: number): [number, number] | null => {
-	const nl = src.text.indexOf('\n', end);
-	if (nl === -1) return null;
-	return [nl + 1, src.lineEnd(nl + 1)];
-};
-
-const indentOf = (line: string) => line.length - line.trimStart().length;
-const isCommentLine = (line: string) => line.trimStart().startsWith('#');
-
-/**
- * End of an item's own text, before the line break: its last line with any end-of-line comment,
- * then the full-line comments right below it that are indented deeper than its dash.
- */
-function itemEnd(src: Source, seq: YAMLSeq, i: number): number {
-	const node = seq.items[i] as Node;
-	if (seq.flow) return src.nodeEnd(node);
-	const dashCol = src.column(dashOf(src, node));
-	let end = src.nodeLineEnd(node);
-	for (let next = lineAfter(src, end); next; next = lineAfter(src, end)) {
-		const line = src.text.slice(next[0], next[1]);
-		if (!isCommentLine(line) || indentOf(line) <= dashCol) break;
-		end = next[1];
-	}
-	return end;
-}
-
-/** Start of an item's own lines (from its dash line). */
-function ownStart(src: Source, seq: YAMLSeq, i: number): number {
-	const node = seq.items[i] as Node;
-	return seq.flow ? node.range![0] : src.lineStart(dashOf(src, node));
-}
-
-/** Start of an item's text with the comment lines it owns above it: at or left of its dash, up to the previous item or a blank line. */
-function itemStart(src: Source, seq: YAMLSeq, i: number): number {
-	if (seq.flow) return ownStart(src, seq, i);
-	const dashCol = src.column(dashOf(src, seq.items[i] as Node));
-	const floor = i > 0 ? itemEnd(src, seq, i - 1) : -1;
-	let at = ownStart(src, seq, i);
-	while (at > 0) {
-		const prev = src.lineStart(at - 1);
-		const line = src.text.slice(prev, src.lineEnd(prev));
-		if (prev <= floor || !isCommentLine(line) || indentOf(line) > dashCol) break;
-		at = prev;
-	}
-	return at;
-}
-
-/** The end-of-line comment a flow item owns: after it on its line, with at most a comma between. */
-function flowComment(src: Source, seq: YAMLSeq, i: number): { start: number; end: number; gap: number } | null {
-	const e = src.nodeEnd(seq.items[i] as Node);
-	const m = /^([ \t]*,?)([ \t]*)#/.exec(src.text.slice(e, src.lineEnd(e)));
-	if (!m) return null;
-	return { start: e + m[0].length - 1, end: src.lineEnd(e), gap: m[1].includes(',') ? e + m[1].length : e };
-}
-
-/** Flow items i..j alone on their lines: only spaces before, and at most a comma and a comment after. */
-function flowAlone(src: Source, seq: YAMLSeq, i: number, j: number): boolean {
-	const s = (seq.items[i] as Node).range![0];
-	const e = src.nodeEnd(seq.items[j] as Node);
-	return src.text.slice(src.lineStart(s), s).trim() === '' && /^[ \t]*,?[ \t]*(#.*)?$/.test(src.text.slice(e, src.lineEnd(e)));
-}
-
-/** Removes flow items i..j. Items alone on their lines go with their lines and end-of-line comments. */
-function removeFlowRun(src: Source, seq: YAMLSeq, i: number, j: number): Patch[] {
-	const n = seq.items.length;
-	const own: [number, number] = [(seq.items[i] as Node).range![0], src.nodeEnd(seq.items[j] as Node)];
-	const runItems = Array.from({ length: j - i + 1 }, (_, k) => i + k);
-	const lines = runItems.map((k) => {
-		const s = src.lineStart((seq.items[k] as Node).range![0]);
-		const next = flowAlone(src, seq, k, k) ? lineAfter(src, src.nodeEnd(seq.items[k] as Node)) : null;
-		return next ? ({ start: s, end: next[0], text: '', allow: [s, next[0]] } as Patch) : null;
-	});
-	if (lines.every((l) => l !== null) && (j + 1 < n || i > 0)) {
-		// Each item goes with its own line and end-of-line comment; full-line comments between them stay.
-		if (j + 1 < n) return lines as Patch[];
-		// The last item: the item before it loses its comma.
-		const prevEnd = src.nodeEnd(seq.items[i - 1] as Node);
-		const comma = /^[ \t]*,/.exec(src.text.slice(prevEnd, src.lineEnd(prevEnd)));
-		if (comma) return [...(lines as Patch[]), { start: prevEnd, end: prevEnd + comma[0].length, text: '' }];
-	}
-	// Items that share lines: only comments on a single removed line may go with them.
-	const allow = src.text.slice(own[0], own[1]).includes('\n') ? undefined : own;
-	if (j + 1 < n) return [{ start: own[0], end: (seq.items[j + 1] as Node).range![0], text: '', allow }];
-	if (i > 0) return [{ start: src.nodeEnd(seq.items[i - 1] as Node), end: own[1], text: '', allow }];
-	return [{ start: own[0], end: own[1], text: '', allow }];
-}
-
-const blankLine = (src: Source, start: number) => start < src.text.length && src.text.slice(start, src.lineEnd(start)).trim() === '' && lineAfter(src, start) !== null;
-
-/**
- * Patches that remove some items of a list. The caller removes the whole key instead when no
- * item stays. Flow items take the separator after them (the last one takes the one before).
- */
-function removeItems(src: Source, seq: YAMLSeq, remove: Set<number>): Patch[] {
-	const n = seq.items.length;
-	const patches: Patch[] = [];
-	if (seq.flow) {
-		for (let i = 0; i < n; i++) {
-			if (!remove.has(i)) continue;
-			let j = i;
-			while (j + 1 < n && remove.has(j + 1)) j++;
-			patches.push(...removeFlowRun(src, seq, i, j));
-			i = j;
-		}
-		return patches;
-	}
-	for (const i of [...remove].sort((a, b) => a - b)) {
-		// The comments above a removed item stay (the decision notes "Relationship-op details").
-		const start = ownStart(src, seq, i);
-		const end = itemEnd(src, seq, i);
-		const next = lineAfter(src, end);
-		if (next) {
-			// Between two blank lines, one of them goes too.
-			const after = start > 0 && blankLine(src, src.lineStart(start - 1)) && blankLine(src, next[0]) ? lineAfter(src, next[0])![0] : next[0];
-			patches.push({ start, end: after, text: '', allow: [start, end] });
-		} else {
-			// The last line of the body: take the line break before it instead.
-			const before = start >= 2 && src.text[start - 2] === '\r' ? start - 2 : Math.max(0, start - 1);
-			patches.push({ start: before, end, text: '', allow: [start, end] });
-		}
-	}
-	// Several items removed up to the end of the body: the line break before the first goes too.
-	const merged = mergeRemovals(patches);
-	for (const pt of merged) {
-		if (pt.end === src.text.length && src.text[pt.end - 1] !== '\n' && pt.start > 0 && src.text[pt.start - 1] === '\n') pt.start -= pt.start >= 2 && src.text[pt.start - 2] === '\r' ? 2 : 1;
-	}
-	return merged;
-}
-
-type Where = { after: number } | { before: number } | null;
-
-/** Column of the first key of a block-map item in the list, or two past the dash. */
-function itemColumn(src: Source, seq: YAMLSeq, dashCol: number): number {
-	for (const it of seq.items) {
-		if (isMap(it) && !it.flow && it.items.length) return src.column(((it.items[0] as Pair).key as Node).range![0]);
-	}
-	return dashCol + 2;
-}
-
-/** Inserts a new item into a top-level list section, creating the section if needed. `block` lines are relative to the item's keys. */
-function insertItem(p: Parsed, key: 'people' | 'unions', where: Where, block: string[], flow: string): Patch | Refusal {
-	const top = topMap(p);
-	if (isRefusal(top)) return top;
-	const src = p.src;
-	const layout = layoutOf(src);
-	const pair = top ? findPair(top, key) : undefined;
-	const seq = pair?.value;
-	if (isSeq(seq) && (seq.items.length || seq.flow)) {
-		if (seq.flow) {
-			if (!seq.items.length) return insertAt(src.text.indexOf('[', seq.range![0]) + 1, flow);
-			if (where && 'before' in where) return insertAt((seq.items[where.before] as Node).range![0], `${flow}, `);
-			return insertAt(src.nodeEnd(seq.items[where ? where.after : seq.items.length - 1] as Node), `, ${flow}`);
-		}
-		const dashCol = src.column(dashOf(src, seq.items[0] as Node));
-		const itemCol = itemColumn(src, seq, dashCol);
-		const lines = block.map((l, n) => (n === 0 ? ' '.repeat(dashCol) + '-' + ' '.repeat(Math.max(1, itemCol - dashCol - 1)) + l : ' '.repeat(itemCol) + l));
-		if (where && 'before' in where) return insertAt(itemStart(src, seq, where.before), lines.join('\n') + '\n');
-		return insertAt(itemEnd(src, seq, where ? where.after : seq.items.length - 1), lines.map((l) => '\n' + l).join(''));
-	}
-	if (pair && !isSeq(seq) && !(isScalar(seq) && isEmpty(seq.value)) && seq !== null) return refuse('bad-value', `The ${key} section is not a list.`);
-	const pad = ' '.repeat(layout.seqIndent);
-	const itemPad = ' '.repeat(layout.seqIndent + layout.itemIndent);
-	const value = { block: block.map((l, n) => (n === 0 ? `${pad}- ${l}` : itemPad + l)), flow: `[${flow}]` };
-	if (pair && top) return setPairValue(src, top, pair, value, layout);
-	return addSection(p, key, value);
-}
-
-/** The top-level list and the key that holds it. */
-export function section(p: Parsed, key: 'people' | 'unions' | 'houses'): { top: YAMLMap; pair: Pair; seq: YAMLSeq } | null {
-	const top = topMap(p);
-	if (!top || isRefusal(top)) return null;
-	const pair = findPair(top, key);
-	return pair && isSeq(pair.value) ? { top, pair, seq: pair.value } : null;
-}
-
-/** Removes items from a top-level list, or the whole section when none stays. */
-export function removeFromSection(p: Parsed, key: 'people' | 'unions' | 'houses', remove: Set<number>): Patch[] {
-	const s = section(p, key);
-	if (!s || remove.size === 0) return [];
-	if (remove.size >= s.seq.items.length) return [removePair(p.src, s.top, s.pair)];
-	return removeItems(p.src, s.seq, remove);
 }
 
 function unionNode(p: Parsed, index: number): YAMLMap | Refusal {
@@ -302,12 +105,7 @@ function resolveUnion(ctx: OpContext, ref: UnionRef | undefined): number | Refus
 
 /** The union id `add-union` gives an existing union that needs one (§6.8, union namespace). */
 function newUnionId(ctx: OpContext, partners: string[]): string {
-	const taken = new Set<string>();
-	for (const u of Array.isArray(ctx.data.unions) ? ctx.data.unions : []) {
-		const id = str((u as RawMap | null)?.id);
-		if (id !== undefined) taken.add(id);
-	}
-	return uniqueId(partners.join(' '), taken);
+	return newIdIn(ctx.data.unions, partners.join(' '));
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -329,17 +127,6 @@ function mapPatches(src: Source, map: YAMLMap, changes: FieldChange[], order: st
 		out.push(pair ? setPairValue(src, map, pair, nv, layout) : addPair(src, map, c.key, nv, order, layout));
 	}
 	return out;
-}
-
-/** Map changes as one step, or one step per change if two touch the same text. */
-function mapSteps(first: Parsed, get: (p: Parsed) => YAMLMap | Refusal, changes: FieldChange[], order: string[], expected: RawMap, created: string[] = []): EditResult {
-	const one = (cs: FieldChange[]): Step => (p) => {
-		const map = get(p);
-		return isRefusal(map) ? map : mapPatches(p.src, map, cs, order);
-	};
-	const r = finish(first, [one(changes)], expected, created);
-	if (r.ok || r.detail !== OVERLAP || changes.length < 2) return r;
-	return finish(first, changes.map((c) => one([c])), expected, created);
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -365,7 +152,7 @@ function addPerson(ctx: OpContext, op: AddPerson): EditResult {
 	const seen = new Set<string>();
 	for (const r of parents) {
 		if (!r || refIndex(ctx, r.id) === undefined) return refuse('unknown-person', typeof r?.id === 'string' ? r.id : undefined);
-		if (!isParentKind(r.type)) return refuse('bad-value', 'Unknown parent type.');
+		if (!isParentType(r.type)) return refuse('bad-value', 'Unknown parent type.');
 		if (seen.has(`${r.id}\0${r.type}`)) return refuse('bad-value', 'The same parent is given twice.');
 		seen.add(`${r.id}\0${r.type}`);
 		if (parents.filter((x) => x.type === r.type).length > 2) return refuse('limit');
@@ -376,19 +163,12 @@ function addPerson(ctx: OpContext, op: AddPerson): EditResult {
 
 	const expected = clone(data) as RawMap;
 	// A child for a union that is not the pair's last-listed one names it (§4.3; the decision notes).
-	let unionIndex: number | undefined;
-	let newUnion: string | undefined;
-	if (op.at?.kind === 'after-siblings' && op.at.union !== undefined) {
-		const fu = ctx.g.unionByKey.get(`u${op.at.union.index}`);
-		const listed = fu ? ctx.g.unions.filter((u) => !u.implicit && u.partners.includes(fu.partners[0]) && u.partners.includes(fu.partners[1])) : [];
-		if (fu && fu.unionIndex !== undefined && listed[listed.length - 1] !== fu) {
-			unionIndex = fu.unionIndex;
-			if (fu.id === undefined) {
-				newUnion = newUnionId(ctx, fu.partners);
-				(expected.unions as RawMap[])[unionIndex].id = newUnion;
-			}
-			values.set('union', fu.id ?? newUnion!);
-		}
+	const chosen = op.at?.kind === 'after-siblings' ? op.at.union : undefined;
+	// `placement` checked the ref against the union, so its partners are the union's partners.
+	const named = chosen === undefined ? undefined : unionToName(ctx, chosen.index, chosen.partners);
+	if (named) {
+		if (named.addId) (expected.unions as RawMap[])[chosen!.index].id = named.id;
+		values.set('union', named.id);
 	}
 
 	const person: RawMap = { id: op.id };
@@ -419,9 +199,9 @@ function addPerson(ctx: OpContext, op: AddPerson): EditResult {
 	expected.people = list;
 	const step: Step = (p) => {
 		const item = insertItem(p, 'people', where, block, `{${flowParts.join(', ')}}`);
-		if (isRefusal(item) || newUnion === undefined) return item;
-		const node = unionNode(p, unionIndex!);
-		return isRefusal(node) ? node : [item, ...mapPatches(p.src, node, [{ key: 'id', write: newUnion, text: true }], UNION_ORDER)];
+		if (isRefusal(item) || !named?.addId) return item;
+		const node = unionNode(p, chosen!.index);
+		return isRefusal(node) ? node : [item, ...mapPatches(p.src, node, [{ key: 'id', write: named.id, text: true }], UNION_ORDER)];
 	};
 	return finish(ctx.first, [step], expected, [op.id]);
 }
@@ -460,7 +240,7 @@ function addParent(ctx: OpContext, op: AddParent): EditResult {
 	const { g, data } = ctx;
 	const childIndex = personIndex(ctx, op.child);
 	if (childIndex === undefined || refIndex(ctx, op.parent) === undefined) return refuse('unknown-person');
-	if (!isParentKind(op.type)) return refuse('bad-value', 'Unknown parent type.');
+	if (!isParentType(op.type)) return refuse('bad-value', 'Unknown parent type.');
 	if (op.parent === op.child || descendantsOf(g, op.child).has(op.parent)) return refuse('cycle');
 	const current = writtenParents(g, op.child);
 	const same = current.filter((r) => r.type === op.type);
@@ -569,7 +349,7 @@ function addUnion(ctx: OpContext, op: AddUnion): EditResult {
 	if (a === b) return refuse('bad-value', 'A partnership needs two different people.');
 	// No type given: none is written (marriage is the default, §4.1).
 	const type = op.type;
-	if (type !== undefined && !isUnionKind(type)) return refuse('bad-value', 'Unknown partnership type.');
+	if (type !== undefined && !isUnionType(type)) return refuse('bad-value', 'Unknown partnership type.');
 	const text = (v: unknown) => (typeof v === 'string' && v.trim() !== '' ? v : undefined);
 	if ((op.start !== undefined && typeof op.start !== 'string') || (op.end !== undefined && typeof op.end !== 'string')) return refuse('bad-value');
 	const start = text(op.start);
@@ -639,14 +419,18 @@ function editUnion(ctx: OpContext, op: EditUnion): EditResult {
 		if (v === undefined) continue;
 		if (v !== null && typeof v !== 'string') return refuse('bad-value');
 		const write = v === null || v.trim() === '' ? null : v;
-		if (key === 'type' && write !== null && !isUnionKind(write)) return refuse('bad-value', 'Unknown partnership type.');
+		if (key === 'type' && write !== null && !isUnionType(write)) return refuse('bad-value', 'Unknown partnership type.');
 		if ((write === null && union[key] === undefined) || (write !== null && str(union[key]) === str(write))) continue;
 		if (write === null) delete union[key];
 		else union[key] = write;
 		changes.push({ key, write, text: key !== 'type' });
 	}
 	if (!changes.length) return { ok: true, body: ctx.first.src.text, created: [] };
-	return mapSteps(ctx.first, (p) => unionNode(p, index), changes, UNION_ORDER, expected);
+	const change = (c: FieldChange): Step => (p) => {
+		const node = unionNode(p, index);
+		return isRefusal(node) ? node : mapPatches(p.src, node, [c], UNION_ORDER);
+	};
+	return finishTogether(ctx.first, changes.map(change), expected, []);
 }
 
 /**
@@ -707,9 +491,8 @@ function parentsByType(raw: RawMap, self: string, exists: (id: string | undefine
 
 /** Placement parents from raw data (§4.3): the `placement` type if it has parents, else birth, adoptive, ward. */
 function placedFrom(raw: RawMap, byType: Map<string, string[]>): string[] {
-	const kinds = ['birth', 'adoptive', 'ward'];
 	const named = str(raw.placement);
-	const type = (named !== undefined && kinds.includes(named) && byType.has(named) ? named : undefined) ?? kinds.find((t) => byType.has(t));
+	const type = (isPlacementType(named) && byType.has(named) ? named : undefined) ?? PLACEMENT_TYPES.find((t) => byType.has(t));
 	return type ? byType.get(type)!.slice(0, 2) : [];
 }
 
@@ -825,7 +608,6 @@ function removeUnion(ctx: OpContext, op: RemoveUnion): EditResult {
 	return finish(ctx.first, [step], expected, []);
 }
 
-/** Entries of `child`'s parents that are `parent` with `type`, or a refusal naming the missing link. */
 /** The text of the id as typed in an entry. */
 function idTextOf(src: Source, node: Node): string {
 	const id = isMap(node) ? (node.get('id', true) as Node) : node;
@@ -856,7 +638,7 @@ function matchingEntries(p: Parsed, item: YAMLMap, parent: string, type: ParentK
 function setParentType(ctx: OpContext, op: SetParentType): EditResult {
 	const childIndex = personIndex(ctx, op.child);
 	if (childIndex === undefined || typeof op.parent !== 'string') return refuse('unknown-person');
-	if (!isParentKind(op.from) || !isParentKind(op.to)) return refuse('bad-value', 'Unknown parent type.');
+	if (!isParentType(op.from) || !isParentType(op.to)) return refuse('bad-value', 'Unknown parent type.');
 	const item = personNode(ctx.first, childIndex);
 	if (isRefusal(item)) return item;
 	const { match, seq, pair } = matchingEntries(ctx.first, item, op.parent, op.from);
@@ -900,7 +682,7 @@ function setParentType(ctx: OpContext, op: SetParentType): EditResult {
 function removeParent(ctx: OpContext, op: RemoveParent): EditResult {
 	const childIndex = personIndex(ctx, op.child);
 	if (childIndex === undefined || typeof op.parent !== 'string') return refuse('unknown-person');
-	if (!isParentKind(op.type)) return refuse('bad-value', 'Unknown parent type.');
+	if (!isParentType(op.type)) return refuse('bad-value', 'Unknown parent type.');
 	const item = personNode(ctx.first, childIndex);
 	if (isRefusal(item)) return item;
 	const { match } = matchingEntries(ctx.first, item, op.parent, op.type);
@@ -1084,8 +866,10 @@ function deletePerson(ctx: OpContext, op: DeletePerson): EditResult {
 	return finish(ctx.first, [step], expected, []);
 }
 
+/** The ops this file implements: every `Op` except `batch` and the field, option, house and link-rewrite ops. */
 export type RelationshipOp = AddPerson | AddParent | AddUnion | EditUnion | RemoveUnion | SetParentType | RemoveParent | MoveSibling | DeletePerson;
 
+/** Runs one relationship op by dispatching on its `kind`. */
 export function relationshipOp(ctx: OpContext, op: RelationshipOp): EditResult {
 	switch (op.kind) {
 		case 'add-person':

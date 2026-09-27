@@ -1,3 +1,10 @@
+/*
+ * Finds which cards need two text lines for their name instead of one truncated line (D29, D37).
+ * `tree-view.ts` calls `tallCardsFor` before layout, and passes its answer in as `settings.tallCards`
+ * so the layout makes exactly these cards taller; `sameTall` lets it skip a re-layout when the
+ * answer has not changed.
+ */
+
 import type { FamilyGraph } from '../../core/derive';
 import { cardText } from '../../layout/geometry';
 import type { Geometry } from '../../layout/model';
@@ -5,7 +12,7 @@ import { nameLines } from '../name-lines';
 import { BADGE_TEXT_CUT_EM, type Measure, type SceneFonts } from './scene';
 
 /**
- * D29, D37 (M6 design gate: `tallCardsFor`): the people whose name needs two text lines on their card,
+ * D29, D37: the people whose name needs two text lines on their card,
  * in every layout. `geo` is the geometry the cards are drawn with (`drawnGeometry`); the width is the
  * one `buildScene` gives the name: the card's text width, less the D14 sign, less the badge room of a
  * sideways `+` badge (`hidden`), measured in the note font's bold name font. The layout then makes

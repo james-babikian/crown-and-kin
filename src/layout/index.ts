@@ -1,3 +1,9 @@
+/**
+ * The layout module's entry point. `layoutTree` runs generation and order finding, then
+ * `layoutFamilies` and `routeEdges`, behind a small in-memory cache keyed on everything that could
+ * move a card or change a line (spec §5.1 step 6, D9). Renderers call `layoutTree`; they read the
+ * shared shapes and helpers of `model.ts` and `geometry.ts` directly.
+ */
 import type { FamilyGraph } from '../core/derive';
 import { computeGenerations } from '../core/generations';
 import { computeModelOrder } from '../core/order';

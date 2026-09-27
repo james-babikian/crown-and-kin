@@ -1,3 +1,8 @@
+/**
+ * Finds which people need the D14 "illegitimate" sign drawn on their card, from a finished
+ * `EdgeDrawing`. `render/svg-string.ts` and `render/dom/scene.ts` both call `illegitimateSigns`
+ * so that the sign and the dashed illegitimate line never both appear for the same person.
+ */
 import type { FamilyGraph } from '../core/derive';
 import type { EdgeDrawing } from './model';
 

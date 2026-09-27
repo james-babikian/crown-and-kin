@@ -1,6 +1,15 @@
+/*
+ * The Notice with an Undo button that a removal (a parent, a partnership, a person, a house) shows
+ * after it writes. It is the one place that wires a Notice's button to `Handle.undo`.
+ */
+
 import { Notice } from 'obsidian';
 import { REMOVE, WRITE_TEXT } from '../render/ui-text';
-import { sameBody, type Handle } from './block-handle';
+import { sameBody } from '../core/block-match';
+import type { Handle } from './block-handle';
+import { trackModal } from './plugin-modals';
+
+const UNDO_NOTICE_MS = 10_000;
 
 /**
  * The Notice after a destructive action (spec §6.1, §6.7): the text and an Undo button that uses
@@ -11,17 +20,30 @@ export function undoNotice(text: string, handle: Handle, written: string, onUndo
 	const frag = createFragment((f) => {
 		f.createSpan({ cls: 'dynasty-undo-text', text });
 	});
-	const notice = new Notice(frag, 10_000);
+	const notice = new Notice(frag, UNDO_NOTICE_MS);
 	const el = notice.messageEl ?? notice.noticeEl;
 	el.addClass('dynasty-undo-notice');
 	const button = el.createEl('button', { cls: 'dynasty-undo-button', text: REMOVE.undo, attr: { type: 'button' } });
-	let used = false;
+	// Once the Notice is hidden (Undo, its time, a click, the plugin unload) the button does nothing.
+	let live = true;
+	const hide = notice.hide.bind(notice);
+	const end = (): void => {
+		if (!live) return;
+		live = false;
+		forget();
+		hide();
+	};
+	// Obsidian hides a Notice at its time through `hide`, so this also ends it then.
+	notice.hide = end;
+	// Like a modal: the plugin unload hides it, so its Undo cannot write after that.
+	const forget = trackModal(notice, end);
+	// If Obsidian ends the Notice another way, it must not count as an open window for ever.
+	setTimeout(forget, UNDO_NOTICE_MS + 1_000);
 	button.addEventListener('click', (e) => {
 		// A click on a Notice closes it; the button acts first.
 		e.stopPropagation();
-		if (used) return;
-		used = true;
-		notice.hide();
+		if (!live) return;
+		end();
 		void (async () => {
 			try {
 				// A link update after a rename (a maintenance write) does not count as a change of the tree.

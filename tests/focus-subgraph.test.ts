@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { deriveFamilies } from '../src/core/derive';
-import { DEFAULT_FOCUS_GENERATIONS } from '../src/core/focus';
+import { DEFAULT_FOCUS_GENERATIONS } from '../src/core/focus-subgraph';
 import { focusGenerations, focusGenerationsFor, focusSubgraph } from '../src/core/focus-subgraph';
 import { parseDynasty } from '../src/core/parse';
 import type { Person, Tree, TreeOptions } from '../src/core/types';

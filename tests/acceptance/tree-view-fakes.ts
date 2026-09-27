@@ -1,5 +1,5 @@
 import { expect, vi } from 'vitest';
-import { newBlockState } from '../../src/obsidian/block-handle';
+import { newBlockState } from '../../src/obsidian/block-state';
 import { EditSheet } from '../../src/obsidian/edit-sheet';
 import { FullScreenModal } from '../../src/obsidian/full-screen';
 import DynastyTreePlugin from '../../src/obsidian/main';

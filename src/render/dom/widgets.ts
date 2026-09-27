@@ -1,15 +1,17 @@
-import { setIcon } from 'obsidian';
-
 /*
  * Small DOM pieces of the tree view: Obsidian-style callouts (spec §5.8: warning and error boxes
  * use Obsidian's own callout styles) and a popover that closes on Escape or a press outside it.
  */
 
+import { setIcon } from 'obsidian';
+
+/** The two elements of a built callout: the whole box, and the element to fill with its content. */
 export interface Callout {
 	root: HTMLElement;
 	content: HTMLElement;
 }
 
+/** Builds an Obsidian-style warning or error callout inside `parent`, with an empty content area. */
 export function buildCallout(parent: HTMLElement, type: 'warning' | 'error', title: string, cls: string): Callout {
 	const root = parent.createDiv({ cls: ['callout', cls], attr: { 'data-callout': type } });
 	const head = root.createDiv({ cls: 'callout-title' });
@@ -19,6 +21,7 @@ export function buildCallout(parent: HTMLElement, type: 'warning' | 'error', tit
 	return { root, content };
 }
 
+/** A single popover attached to `host`: one open at a time, closed by Escape or a press outside it. */
 export class Popover {
 	private el: HTMLElement | null = null;
 	private cleanup: (() => void)[] = [];
@@ -26,6 +29,7 @@ export class Popover {
 
 	constructor(private readonly host: HTMLElement) {}
 
+	/** Whether a popover is currently open. */
 	get isOpen(): boolean {
 		return this.el !== null;
 	}
@@ -88,6 +92,7 @@ export class Popover {
 		el.addClass('is-anchored');
 	}
 
+	/** Closes the open popover, if any; with `refocus`, gives the focus back to its opener. */
 	close(refocus = false): void {
 		for (const c of this.cleanup.splice(0)) c();
 		this.el?.remove();

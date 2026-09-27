@@ -1,11 +1,36 @@
-import type { FindBlocks, LocateBlock, LocatedBlock, OrdinalForSection, ReplaceBody } from './block';
-
 /*
  * Finds `dynasty` fenced code blocks the way CommonMark reads fences (spec §6.1), without a
  * full Markdown parser. Containers are blockquotes and callouts (`>` markers) and list items
  * (tracked by their content column). Every fence, whatever its language, is tracked, so a
  * `dynasty` example inside a longer or different fence is content and not a block.
  */
+
+/** One `dynasty` fenced code block found in a note: its position, body and container prefix. */
+export interface LocatedBlock {
+	/** Index of this block among the `dynasty` blocks of the note, from 0, in text order. */
+	ordinal: number;
+	/**
+	 * 0-based line numbers of the opening and closing fence lines. `closeLine` is null for a block
+	 * with no closing fence: it runs to the end of its container (the callout or list item), or to
+	 * the end of the note at the top level (CommonMark).
+	 */
+	openLine: number;
+	closeLine: number | null;
+	/** Offsets into the note text of the first body character and one past the last (the body lines only, without the fence lines). */
+	bodyStart: number;
+	bodyEnd: number;
+	/**
+	 * The container prefix of every body line, for example `"> "`, `">"`, `"> > "`, or the
+	 * indentation of a list item (spaces or tabs, as written; spaces for the columns taken when a list marker splits a tab). The body is parsed with this prefix
+	 * removed. The opening fence line may carry a different prefix (the list marker in a fence
+	 * written on the list-item line); fence lines are never rewritten.
+	 */
+	prefix: string;
+	/** The body with the prefix removed from each line, lines joined with `\n`. */
+	body: string;
+	/** The note's line ending; a write keeps it. */
+	eol: '\n' | '\r\n';
+}
 
 interface Line {
 	start: number;
@@ -63,13 +88,18 @@ function indentation(s: string, from = 0, startCol = 0): { cols: number; chars: 
 	return { cols: col, chars: i };
 }
 
-/** Removes up to `cols` columns of indentation; a tab that would go past them stays. */
+/**
+ * Removes up to `cols` columns of indentation. A tab that goes past them is split, as CommonMark
+ * does: its remaining columns stay as spaces, and `removed` gets spaces for the columns taken, so
+ * a line written as `removed` + text reads back as that text.
+ */
 function stripColumns(s: string, cols: number): { removed: string; rest: string } {
 	let col = 0;
 	let i = 0;
 	for (; i < s.length && col < cols; i++) {
 		const next = s[i] === ' ' ? col + 1 : s[i] === '\t' ? col + 4 - (col % 4) : -1;
-		if (next < 0 || next > cols) break;
+		if (next < 0) break;
+		if (next > cols) return { removed: s.slice(0, i) + ' '.repeat(cols - col), rest: ' '.repeat(next - cols) + s.slice(i + 1) };
 		col = next;
 	}
 	return { removed: s.slice(0, i), rest: s.slice(i) };
@@ -161,6 +191,10 @@ class ListStack {
 	}
 }
 
+/** All `dynasty` blocks of a note in text order. Fences inside longer fences are skipped (§6.1). */
+export type FindBlocks = (text: string) => LocatedBlock[];
+
+/** Implements `FindBlocks`. */
 export const findBlocks: FindBlocks = (text) => {
 	const blocks: LocatedBlock[] = [];
 	if (typeof text !== 'string') return blocks;
@@ -226,10 +260,25 @@ export const findBlocks: FindBlocks = (text) => {
 	return blocks;
 };
 
+/** The block with this ordinal, or null. */
+export type LocateBlock = (text: string, ordinal: number) => LocatedBlock | null;
+
+/** Implements `LocateBlock`. */
 export const locateBlock: LocateBlock = (text, ordinal) => findBlocks(text)[ordinal] ?? null;
 
 const normalise = (s: string) => s.replace(/\r\n?/g, '\n').replace(/\n$/, '');
 
+/**
+ * Ordinal of the block that Obsidian rendered, from `getSectionInfo(el)` (0-based `lineStart` and
+ * `lineEnd`) and the processor's `source`. For a block inside a callout or list, Obsidian may
+ * report the whole container's lines, and one container can hold several blocks: take the blocks
+ * whose opening fence lies in [lineStart, lineEnd]; if there is one, return it; if there are
+ * several, return the one whose `body` equals `source` (line endings normalised, trailing newline
+ * ignored). Null if there is none or the match is ambiguous (the view is then read-only).
+ */
+export type OrdinalForSection = (text: string, lineStart: number, lineEnd: number, source: string) => number | null;
+
+/** Implements `OrdinalForSection`. */
 export const ordinalForSection: OrdinalForSection = (text, lineStart, lineEnd, source) => {
 	const inside = findBlocks(text).filter((b) => b.openLine >= lineStart && b.openLine <= lineEnd);
 	if (inside.length === 1) return inside[0].ordinal;
@@ -248,9 +297,18 @@ function hasNoBodyLines(text: string, block: LocatedBlock): boolean {
 	return block.bodyStart === 0 || !endsWithBreak(text.slice(block.bodyStart - 1, block.bodyStart));
 }
 
+/**
+ * Puts a new body back into the note text: re-adds the prefix on every body line, keeps the
+ * fence lines and the rest of the note byte for byte, and uses the note's line ending.
+ */
+export type ReplaceBody = (text: string, block: LocatedBlock, newBody: string) => string;
+
+/** Implements `ReplaceBody`. */
 export const replaceBody: ReplaceBody = (text, block, newBody) => {
 	const next = newBody.replace(/\r\n?/g, '\n').split('\n');
-	const withPrefix = (l: string) => (l === '' ? block.prefix.trimEnd() : block.prefix + l);
+	// After a bare ">", CommonMark reads a line's first space or tab as part of the marker.
+	const bare = block.prefix.endsWith('>');
+	const withPrefix = (l: string) => (l === '' ? block.prefix.trimEnd() : bare && (l[0] === ' ' || l[0] === '\t') ? `${block.prefix} ${l}` : block.prefix + l);
 	// The fence line's own ending, for new lines with no neighbour (a note can mix endings).
 	const fenceBreak = /(\r\n|\r|\n)$/.exec(text.slice(0, block.bodyStart))?.[1] ?? /^(\r\n|\r|\n)/.exec(text.slice(block.bodyEnd))?.[1] ?? block.eol;
 	if (hasNoBodyLines(text, block)) {

@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import type { CodedIssue, HardError, HardErrorCode, IssueCode, IssueParams } from '../src/core/issues';
-import { hardErrorText, issueText } from '../src/core/messages';
+import type { CodedIssue, HardError, HardErrorCode, IssueCode, IssueParams } from '../src/core/messages';
+import { codedIssue, hardErrorText, issueText } from '../src/core/messages';
 
-// Typed as a full record, so a new code in issues.ts fails the typecheck until it gets a sample here.
+// Typed as a full record, so a new code in messages.ts fails the typecheck until it gets a sample here.
 const SAMPLES: Record<IssueCode, IssueParams> = {
 	'duplicate-person-id': { id: 'hal', name: 'Hal Ashford' },
 	'duplicate-union-id': { id: 'spring-wedding' },
@@ -111,5 +111,13 @@ describe('hardErrorText', () => {
 			'The block has an error on text line 3. Correct this text line to show the tree. Details: Nested mappings are not allowed',
 		);
 		expect(hardErrorText({ code: 'yaml-invalid' })).toBe('The block has an error. Correct the text to show the tree.');
+	});
+});
+
+describe('codedIssue', () => {
+	it('keeps ids only when there are some', () => {
+		expect(codedIssue('self-parent', 'warning', { person: 'A' }, ['a'])).toEqual({ code: 'self-parent', level: 'warning', params: { person: 'A' }, ids: ['a'] });
+		expect('ids' in codedIssue('duplicate-union-id', 'blocking', { id: 'u' }, [])).toBe(false);
+		expect('ids' in codedIssue('missing-start', 'warning', { ref: 'x' })).toBe(false);
 	});
 });

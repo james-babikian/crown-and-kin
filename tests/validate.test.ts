@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { deriveFamilies } from '../src/core/derive';
 import { parseDynasty } from '../src/core/parse';
-import type { Tree } from '../src/core/types';
-import { validateTree } from '../src/core/validate';
+import { isParentType, isPlacementType, isUnionType, parentKind, type Tree } from '../src/core/types';
+import { cleanParents, push, validateTree } from '../src/core/validate';
 
 function tree(src: string): Tree {
 	const r = parseDynasty(src);
@@ -174,5 +174,53 @@ describe('deriveFamilies: couple keys (review F1)', () => {
 		);
 		expect(g.primaryUnion.get('k1')).not.toBe(g.primaryUnion.get('k2'));
 		expect(g.unions.map((u) => u.children)).toEqual([['k1'], ['k2']]);
+	});
+});
+
+describe('push (shared list-map helper)', () => {
+	it('creates the list on the first value and appends after that, in order', () => {
+		const m = new Map<string, number[]>();
+		push(m, 'a', 1);
+		push(m, 'b', 2);
+		push(m, 'a', 3);
+		expect([...m]).toEqual([
+			['a', [1, 3]],
+			['b', [2]],
+		]);
+	});
+});
+
+describe('type guards (types.ts)', () => {
+	it('know the written types and nothing else', () => {
+		expect(['birth', 'adoptive', 'ward', 'rumoured', 'foster', '', undefined, 3].map(isParentType)).toEqual([true, true, true, true, false, false, false, false]);
+		expect(['birth', 'adoptive', 'ward', 'rumoured', undefined].map(isPlacementType)).toEqual([true, true, true, false, false]);
+		expect(['marriage', 'betrothal', 'concubinage', 'affair', 'implicit', null].map(isUnionType)).toEqual([true, true, true, true, false, false]);
+	});
+
+	it('parentKind keeps a known type and reads anything else as birth', () => {
+		expect(parentKind('ward')).toBe('ward');
+		expect(parentKind('Ward')).toBe('birth');
+		expect(parentKind(undefined)).toBe('birth');
+	});
+});
+
+describe('cleanParents (shared by validation and the family queries)', () => {
+	it('drops self and missing links, reads unknown types as birth, keeps each id and type once, and reports in written order', () => {
+		const heard: string[] = [];
+		const parents = [
+			{ id: 'me', type: 'birth' },
+			{ id: 'a', type: 'foster' },
+			{ id: 'ghost', type: 'birth' },
+			{ id: 'a', type: 'birth' },
+			{ id: 'b', type: 'ward' },
+			{ id: 'b', type: 'adoptive' },
+		];
+		const out = cleanParents('me', parents, (id) => id === 'a' || id === 'b' || id === 'me', (why, r) => heard.push(`${why}:${r.id}`));
+		expect(out).toEqual([
+			{ id: 'a', type: 'birth' },
+			{ id: 'b', type: 'ward' },
+			{ id: 'b', type: 'adoptive' },
+		]);
+		expect(heard).toEqual(['self:me', 'unknown-type:a', 'missing:ghost']);
 	});
 });

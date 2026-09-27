@@ -1,11 +1,8 @@
 /**
- * Milestone 2 contract (frozen by the supervisor; change only through the supervisor).
- *
  * Edits of a block body through the `yaml` Document API (spec §3, §6.2). Pure: no `obsidian`
- * import. `yaml-edit.ts` implements `applyOp` (WP2.3). Milestone 3 adds relationship ops to
- * the `Op` union.
+ * import. `yaml-edit.ts` implements `applyOp`.
  *
- * Formatting rules for a written value (supervisor decision, see the decision notes):
+ * Formatting rules for a written value (see the decision notes):
  * - Untouched nodes keep their comments, key order, quoting and flow style (§6.2).
  * - A changed value keeps its existing scalar style if that style can hold the new text;
  *   otherwise it is written plain if plain YAML reads it back as the same string, else in
@@ -15,18 +12,25 @@
  * - Setting a field to null removes the key (and only that key's lines).
  */
 
-/** Person fields the edit sheet can set in milestone 2 (§6.3 "Fields"). */
+/** Person fields the edit sheet can set (§6.3 "Fields"). */
 export type PersonField = 'name' | 'title' | 'house' | 'sex' | 'born' | 'died' | 'illegitimate' | 'link' | 'notes' | 'placement';
 
+/** A value an edit can write for a person field: text, a boolean (`illegitimate` only), or `null` to remove the key. */
 export type FieldValue = string | boolean | null;
 
+/** Sets or clears one or more fields of an existing person (§6.3 "Fields"). */
 export interface SetPersonFields {
 	kind: 'set-person-fields';
 	id: string;
-	/** Only the fields that changed. `null` removes the key. `illegitimate: false` removes the key. */
-	fields: Partial<Record<PersonField, FieldValue>>;
+	/**
+	 * Only the fields that changed. `null` removes the key. `illegitimate: false` removes the key.
+	 * `id` gives a person with no written id that id: refused with `id-taken` if a person or a
+	 * reference uses it, `bad-value` if the person has a written id.
+	 */
+	fields: Partial<Record<PersonField, FieldValue>> & { id?: string };
 }
 
+/** Sets or clears one tree option (`start`, `focus`, `generations` or `height`). */
 export interface SetOption {
 	kind: 'set-option';
 	key: 'start' | 'focus' | 'generations' | 'height';
@@ -47,9 +51,11 @@ export interface Batch {
 	ops: Op[];
 }
 
-// ---- Milestone 3: relationship ops (frozen by the supervisor) ----
+// ---- Relationship ops ----
 
+/** The parent types a parent entry can have (spec §4.2). */
 export type ParentKind = 'birth' | 'adoptive' | 'ward' | 'rumoured';
+/** The partnership types a union can have (spec §4.1). */
 export type UnionKind = 'marriage' | 'betrothal' | 'concubinage' | 'affair';
 
 /**
@@ -124,6 +130,7 @@ export interface AddUnion {
 	end?: string;
 }
 
+/** Sets or clears the type, start or end of an existing union. */
 export interface EditUnion {
 	kind: 'edit-union';
 	union: UnionRef;
@@ -167,7 +174,7 @@ export interface DeletePerson {
 	id: string;
 }
 
-// ---- Milestone 6: houses (frozen by the supervisor) ----
+// ---- Houses ----
 
 /**
  * Houses window (§6.10, D32): rename and/or recolour a house. Only given fields change;
@@ -194,11 +201,11 @@ export interface DeleteHouse {
 }
 
 /**
- * Link maintenance (§6.9, D6; WP6.1). For each person `link` whose target (normalised with
- * `NormaliseTarget` from `link-rewrite-contract.ts`) is a key of `map`, write the new target
+ * Link maintenance (§6.9, D6). For each person `link` whose target (normalised with
+ * `NormaliseTarget` from `link-rewrite.ts`) is a key of `map`, write the new target
  * `map[key]`, keeping `#heading`, `|alias` and a trailing `.md` if the old text had it. A value
  * keeps its written style (quotes, the unquoted nested form) only if that style can hold the new
- * text; otherwise the M2 value-quoting rule applies. Nothing else in the body changes. Allowed on
+ * text; otherwise the value-quoting rule (spec §3) applies. Nothing else in the body changes. Allowed on
  * a tree with blocking issues (it touches only `link` values). `EditResult.changed` gives the
  * number of links changed (0 = the body is unchanged).
  */
@@ -207,6 +214,7 @@ export interface RewriteLinksOp {
 	map: Record<string, string>;
 }
 
+/** Every edit operation `applyOp` accepts. */
 export type Op =
 	| SetPersonFields
 	| SetOption
@@ -228,6 +236,7 @@ export type Op =
 /** Picks an unused person id from a name (§6.8); `yaml-edit.ts` exports it. */
 export type NewPersonId = (body: string, name: string) => string;
 
+/** Why `applyOp` refused an edit, instead of throwing (spec §8). */
 export type EditRefusal =
 	/** The body does not parse, or the top level is not a map. */
 	| 'invalid-yaml'
@@ -237,30 +246,32 @@ export type EditRefusal =
 	| 'unknown-person'
 	/** A value is not allowed (for example an empty name). */
 	| 'bad-value'
-	/** M3: a `UnionRef` does not match the union at that index. */
+	/** A `UnionRef` does not match the union at that index. */
 	| 'unknown-union'
-	/** M3: the new person's id already exists. */
+	/** The new person's id already exists. */
 	| 'id-taken'
-	/** M3: the person already has 2 parents of that type (§4.2). */
+	/** The person already has 2 parents of that type (§4.2). */
 	| 'limit'
-	/** M3: the link would make someone their own ancestor (§6.6). */
+	/** The link would make someone their own ancestor (§6.6). */
 	| 'cycle'
-	/** M3: `move-sibling` at the start or end of the group. */
+	/** `move-sibling` at the start or end of the group. */
 	| 'no-sibling'
-	/** M6: `edit-house` / `delete-house` name a house that is not in the block. */
+	/** `edit-house` / `delete-house` name a house that is not in the block. */
 	| 'unknown-house';
 
+/** The result of `applyOp`: the new body and any created ids or effects, or a refusal code and detail. */
 export type EditResult =
 	| {
 			ok: true;
 			body: string;
 			/** Ids created by this op, in order (for example the new house id). */
 			created: string[];
-			/** M6: for `rewrite-links`, the number of links changed (0 = the body is unchanged). */
+			/** For `rewrite-links`, the number of links changed (0 = the body is unchanged). */
 			changed?: number;
-			/** M3: side effects the UI must mention (`auto-union`: a marriage was added, §6.4). */
+			/** Side effects the UI must mention (`auto-union`: a marriage was added, §6.4). */
 			effects?: ('auto-union')[];
 	  }
 	| { ok: false; code: EditRefusal; detail?: string };
 
+/** Applies one edit operation to a block body; returns the new body, or a refusal (spec §8: never throws). */
 export type ApplyOp = (body: string, op: Op) => EditResult;

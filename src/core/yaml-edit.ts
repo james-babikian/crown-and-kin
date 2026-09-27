@@ -1,21 +1,46 @@
+/*
+ * Dispatches one `Op` (spec §6.2–§6.10) to the code that carries it out: the relationship ops in
+ * `relationship-ops.ts`, the house ops in `house-ops.ts`, the link rewrite in `link-rewrite.ts`, or
+ * the field and option writes below. `applyOp` is the plugin's single entry point for editing a
+ * block body; `block-handle.ts` calls it for every write, `rename-links.ts` calls it for link
+ * rewrites.
+ */
+
 import { isMap, isSeq, type Node } from 'yaml';
 import { deriveFamilies } from './derive';
 import type { AddHouse, ApplyOp, EditResult, FieldValue, NewPersonId, Op, PersonField, SetOption, SetPersonFields } from './edit';
 import { deleteHouse, editHouse } from './house-ops';
-import { uniqueId } from './id-gen';
+import { newIdIn, uniqueId } from './id-gen';
 import { rewriteLinks } from './link-rewrite';
 import { parseBody, readTree, referencedIds } from './parse';
 import { relationshipOp, removeStaleKeys } from './relationship-ops';
 import { isEmpty, isMap as isRawMap, str, type Raw, type RawMap } from './tolerate';
+import { itemEnd } from './yaml-list';
 import {
-	addPair, addSection, appendItem, clone, findPair, finish, isRefusal, layoutOf, OPTION_ORDER, OVERLAP, PERSON_FIELDS, PERSON_ORDER, personNode, personValue,
-	refuse, removePair, renderScalar, sameValue, setPairValue, Source, TEXT_FIELDS, topMap, type NewValue, type Parsed, type Patch, type Step,
+	addPair, addSection, appendItem, clone, findPair, finish, finishTogether, isRefusal, layoutOf, OPTION_ORDER, PERSON_FIELDS, PERSON_ORDER, personNode, personValue,
+	refuse, removePair, renderScalar, sameValue, setPairValue, Source, TEXT_FIELDS, topMap, type NewValue, type Parsed, type Step,
 } from './yaml-patch';
 
 function setPersonFields(first: Parsed, op: SetPersonFields, data: RawMap, index: number): EditResult {
 	const expected = clone(data) as RawMap;
 	const person = (expected.people as RawMap[])[index];
 	const steps: Step[] = [];
+	// `id`: a person with no written id gets one, so a later op of the batch can name them.
+	const newId: unknown = op.fields && Object.prototype.hasOwnProperty.call(op.fields, 'id') ? op.fields.id : undefined;
+	if (newId !== undefined) {
+		if (typeof newId !== 'string' || newId.trim() === '' || newId !== newId.trim()) return refuse('bad-value', 'An id must be text.');
+		if (str(person.id) !== undefined) return refuse('bad-value', 'The person has an id already.');
+		if (referencedIds(data).has(newId)) return refuse('id-taken');
+		person.id = newId;
+		steps.push((p) => {
+			const item = personNode(p, index);
+			if (isRefusal(item)) return item;
+			const pair = findPair(item, 'id');
+			const layout = layoutOf(p.src);
+			const nv: NewValue = { scalar: newId, old: pair?.value as Node | null, text: true };
+			return pair ? setPairValue(p.src, item, pair, nv, layout) : addPair(p.src, item, 'id', nv, PERSON_ORDER, layout);
+		});
+	}
 	// §4.1 order, so new keys that land on the same spot come out in that order.
 	for (const field of PERSON_ORDER.filter((f): f is PersonField => (PERSON_FIELDS as readonly string[]).includes(f))) {
 		if (!op.fields || !Object.prototype.hasOwnProperty.call(op.fields, field)) continue;
@@ -36,19 +61,7 @@ function setPersonFields(first: Parsed, op: SetPersonFields, data: RawMap, index
 			return pair ? setPairValue(p.src, item, pair, nv, layout) : addPair(p.src, item, field, nv, PERSON_ORDER, layout);
 		});
 	}
-	if (steps.length < 2) return finish(first, steps, expected, []);
-	// All fields from one parse; if two changes touch the same text, one field at a time.
-	const together: Step = (p) => {
-		const patches: Patch[] = [];
-		for (const step of steps) {
-			const r = step(p);
-			if (isRefusal(r)) return r;
-			if (r) patches.push(...(Array.isArray(r) ? r : [r]));
-		}
-		return patches;
-	};
-	const r = finish(first, [together], expected, []);
-	return !r.ok && r.detail === OVERLAP ? finish(first, steps, expected, []) : r;
+	return finishTogether(first, steps, expected, []);
 }
 
 function setOption(first: Parsed, op: SetOption, data: RawMap): EditResult {
@@ -76,8 +89,7 @@ function setOption(first: Parsed, op: SetOption, data: RawMap): EditResult {
 	else expected.options = opts;
 
 	const key = op.key;
-	// Ids are text and the two numbers are meant as numbers: all four are written plain when they can be.
-	const text = true;
+	// Ids are text and the two numbers are meant as numbers: all four are written plain when they can be (`text: true`).
 	const step: Step = (p) => {
 		const top = topMap(p);
 		if (isRefusal(top)) return top;
@@ -86,8 +98,8 @@ function setOption(first: Parsed, op: SetOption, data: RawMap): EditResult {
 		const node = optionsPair?.value;
 		if (!optionsPair || !isMap(node)) {
 			if (write === null) return null;
-			const line = `${key}: ${renderScalar(write, null, { flow: false, text, indent: '' })}`;
-			const value: NewValue = { block: [' '.repeat(layout.mapIndent) + line], flow: `{${key}: ${renderScalar(write, null, { flow: true, text, indent: '' })}}` };
+			const line = `${key}: ${renderScalar(write, null, { flow: false, text: true, indent: '' })}`;
+			const value: NewValue = { block: [' '.repeat(layout.mapIndent) + line], flow: `{${key}: ${renderScalar(write, null, { flow: true, text: true, indent: '' })}}` };
 			if (optionsPair && top) return setPairValue(p.src, top, optionsPair, value, layout);
 			return addSection(p, 'options', value);
 		}
@@ -97,7 +109,7 @@ function setOption(first: Parsed, op: SetOption, data: RawMap): EditResult {
 			if (node.items.length === 1 && top) return removePair(p.src, top, optionsPair);
 			return removePair(p.src, node, pair);
 		}
-		const nv: NewValue = { scalar: write, old: pair?.value as Node | null, text };
+		const nv: NewValue = { scalar: write, old: pair?.value as Node | null, text: true };
 		return pair ? setPairValue(p.src, node, pair, nv, layout) : addPair(p.src, node, key, nv, OPTION_ORDER, layout);
 	};
 	return finish(first, [step], expected, []);
@@ -105,13 +117,7 @@ function setOption(first: Parsed, op: SetOption, data: RawMap): EditResult {
 
 /** The id `add-house` would give a new house with this name in this body (§6.8, house namespace). */
 export function newHouseId(data: Raw, name: string): string {
-	const taken = new Set<string>();
-	const houses = (data as RawMap | null)?.houses;
-	if (Array.isArray(houses)) for (const h of houses) {
-		const id = str((h as RawMap | null)?.id);
-		if (id !== undefined) taken.add(id);
-	}
-	return uniqueId(name, taken);
+	return newIdIn((data as RawMap | null)?.houses, name);
 }
 
 function addHouse(first: Parsed, op: AddHouse, data: RawMap): EditResult {
@@ -138,7 +144,8 @@ function addHouse(first: Parsed, op: AddHouse, data: RawMap): EditResult {
 		const flow = `{${entries.map(([k, v, text]) => `${k}: ${renderScalar(v, null, { flow: true, text, indent: '' })}`).join(', ')}}`;
 		const housesPair = top ? findPair(top, 'houses') : undefined;
 		const node = housesPair?.value;
-		if (isSeq(node) && (node.items.length || node.flow)) return appendItem(p.src, node, block, flow);
+		// Like add-person, the new house goes after the comments the last house owns.
+		if (isSeq(node) && (node.items.length || node.flow)) return appendItem(p.src, node, block, flow, node.flow ? undefined : itemEnd(p.src, node, node.items.length - 1));
 		const pad = ' '.repeat(layout.seqIndent);
 		const itemPad = ' '.repeat(layout.seqIndent + layout.itemIndent);
 		const value: NewValue = { block: block.map((l, n) => (n === 0 ? `${pad}- ${l}` : itemPad + l)), flow: `[${flow}]` };
@@ -226,6 +233,7 @@ function applyOne(body: string, op: Op, keepStale = false): EditResult {
 	}
 }
 
+/** Implements `ApplyOp`. */
 export const applyOp: ApplyOp = (body, op) => {
 	try {
 		if (typeof body !== 'string') return refuse('invalid-yaml');

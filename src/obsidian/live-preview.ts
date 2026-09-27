@@ -1,7 +1,3 @@
-import { forceParsing, syntaxTree } from '@codemirror/language';
-import { ViewPlugin, type EditorView, type ViewUpdate } from '@codemirror/view';
-import { findBlocks } from '../core/block-locate';
-
 /*
  * Live Preview draws a code block only after the editor's Markdown parser has read the block's
  * closing fence, and the parser stops a little below the visible part of the note. A tall tree
@@ -9,6 +5,10 @@ import { findBlocks } from '../core/block-locate';
  * (the decision notes). When a dynasty block is visible but not yet parsed to its end, this asks the
  * parser to read to the end of the block, and the block is drawn at once.
  */
+
+import { forceParsing, syntaxTree } from '@codemirror/language';
+import { ViewPlugin, type EditorView, type ViewUpdate } from '@codemirror/view';
+import { findBlocks } from '../core/block-locate';
 
 const PARSE_BUDGET_MS = 150;
 const MAX_TRIES = 40;
@@ -79,4 +79,5 @@ class TallBlockParser {
 	}
 }
 
+/** The CodeMirror view plugin, registered by `main.ts`, that forces tall dynasty blocks to parse fully. */
 export const tallBlockParser = ViewPlugin.fromClass(TallBlockParser);

@@ -1,16 +1,16 @@
-import type { FamilyGraph } from '../core/derive';
-import { barClear, lineMetrics, sideTagDepth, tagTop, type LineMetrics } from './geometry';
-import type { Geometry, PersonBox, UnionPoint } from './model';
-
 /**
- * Where every couple leg and sibling bar runs, decided from card x positions and generations
- * only. Placement uses the plan to size each gap between rows; edge routing uses the same plan
- * to draw. Nothing here depends on y, so both get the same answer.
+ * `planLines` decides where every couple leg and sibling bar runs, from card x positions and
+ * generations only. `layout.ts` calls it to size each gap between rows before y is known;
+ * `edges.ts` calls it again on the finished layout to draw the same lines. Nothing here depends on
+ * y, so both callers get the same answer.
  *
  * No two families share a stretch of line: every vertical line in a gap (a trunk from a union
  * dot or a single parent, a leg, a drop to a child) has its own x, and every sideways run has its
  * own lane.
  */
+import type { FamilyGraph } from '../core/derive';
+import { barClear, lineMetrics, sideTagDepth, tagTop, type LineMetrics } from './geometry';
+import type { Geometry, PersonBox, UnionPoint } from './model';
 
 /** A sideways run inside gap `gap` (below row `gap`) at couple lane `lane`, ending at `x`. */
 export interface Hop {
@@ -30,6 +30,7 @@ export interface Leg {
 	entryX: number;
 }
 
+/** One family's sibling bar: its trunk, its drops to each child, and the lane it is drawn in. */
 export interface FamilyLine {
 	parents: string[];
 	kids: string[];
@@ -45,6 +46,7 @@ export interface FamilyLine {
 	lane: number;
 }
 
+/** The part of a card's bottom edge (or, sideways, its real bottom edge) a far-couple tag may use. */
 export interface TagZone {
 	x: number;
 	w: number;
@@ -52,6 +54,7 @@ export interface TagZone {
 	hit?: { x: number; w: number };
 }
 
+/** Everything `planLines` decided: legs, sibling bars, dot positions and tag zones for one tree. */
 export interface LinePlan {
 	legs: Leg[];
 	/** Union key → gap and couple lane of its dot. Absent for side-by-side couples and dot-less far couples. */
@@ -70,6 +73,7 @@ export interface LinePlan {
 	maxX: number;
 }
 
+/** What `planLines` needs: the graph, the cards placed so far, and (sideways) the turned geometry. */
 export interface PlanInput {
 	g: FamilyGraph;
 	persons: Map<string, PersonBox>;
@@ -86,6 +90,7 @@ export interface PlanInput {
 	side?: Geometry;
 }
 
+/** Plans every leg, sibling bar, dot position and tag zone of a tree: see the file header. */
 export function planLines({ g, persons, rows, unions, anchors, geo, side }: PlanInput): LinePlan {
 	const m = lineMetrics(geo);
 	const box = (id: string) => persons.get(id)!;
@@ -104,7 +109,7 @@ export function planLines({ g, persons, rows, unions, anchors, geo, side }: Plan
 	// x taken by a vertical line in each gap (trunks from dots and single parents).
 	const reserved = new Map<number, number[]>();
 	const isFree = (gap: number, x: number) => !(reserved.get(gap) ?? []).some((t) => Math.abs(t - x) < near);
-	const reserve = (gap: number, x: number) => reserved.set(gap, [...(reserved.get(gap) ?? []), x]);
+	const reserve = (gap: number, x: number) => addTo(reserved, gap, x);
 
 	// 1. Union dots. A dot between side-by-side partners stays in their gap; other dots move
 	//    outwards from their anchor, a step at a time, until no other trunk is there.
@@ -153,7 +158,7 @@ export function planLines({ g, persons, rows, unions, anchors, geo, side }: Plan
 			for (const k of legs) {
 				const x = slot(sideOf(k));
 				legExit.set(`${k}|${p.id}`, x);
-				exitsIn.set(gap, [...(exitsIn.get(gap) ?? []), x]);
+				addTo(exitsIn, gap, x);
 			}
 			for (const s of sides) sideExits.set(`${s.child}|${p.id}`, slot(centre(box(s.child)) >= cx ? 'right' : 'left'));
 			if (tagged.has(p.id)) {
@@ -184,7 +189,7 @@ export function planLines({ g, persons, rows, unions, anchors, geo, side }: Plan
 			for (const k of legs) {
 				const x = slot(sideOf(k));
 				legExit.set(`${k}|${p.id}`, x);
-				exitsIn.set(gap, [...(exitsIn.get(gap) ?? []), x]);
+				addTo(exitsIn, gap, x);
 				if (farAtCorner(k)) {
 					dotX.set(k, x);
 					reserve(gap, x);
@@ -222,7 +227,7 @@ export function planLines({ g, persons, rows, unions, anchors, geo, side }: Plan
 			for (const k of legs) {
 				const x = slot(sideOf(k));
 				legExit.set(`${k}|${p.id}`, x);
-				exitsIn.set(gap, [...(exitsIn.get(gap) ?? []), x]);
+				addTo(exitsIn, gap, x);
 			}
 			for (const s of sides) sideExits.set(`${s.child}|${p.id}`, slot(next.left <= next.right ? 'left' : 'right'));
 		}
@@ -243,7 +248,7 @@ export function planLines({ g, persons, rows, unions, anchors, geo, side }: Plan
 	// Legs leave cards in row k-1 into the same gap as well.
 	const clearOfExits = (gap: number, x: number) => !(exitsIn.get(gap) ?? []).some((t) => Math.abs(t - x) < near);
 	const free = (k: number, x: number) => isFree(k - 1, x) && isFree(k, x) && clearOfExits(k - 1, x) && !hit(k - 1, x) && !hit(k, x) && !hit(k + 1, x);
-	const take = (k: number, x: number) => taken.set(k, [...(taken.get(k) ?? []), x]);
+	const take = (k: number, x: number) => addTo(taken, k, x);
 	// Sideways, a tag and its hit area hang into the gap after its card, and a column crosses that
 	// whole gap: it passes below the hit area, `exitStep / 2` clear of it.
 	const tagFrom = side ? tagTop(side, 0) - m.exitStep / 2 : 0;
@@ -375,7 +380,7 @@ export function planLines({ g, persons, rows, unions, anchors, geo, side }: Plan
 	for (const [parent, kids] of g.soloChildren) addFamily(soloExit.get(parent)!, [parent], kids);
 	const barLanes = new Array<number>(rows.length).fill(0);
 	const byGap = new Map<number, FamilyLine[]>();
-	for (const f of families) byGap.set(f.gap, [...(byGap.get(f.gap) ?? []), f]);
+	for (const f of families) addTo(byGap, f.gap, f);
 	for (const [gap, list] of byGap) {
 		list.sort((a, b) => a.minX - b.minX);
 		const below = orderBars(list);
@@ -396,6 +401,13 @@ export function planLines({ g, persons, rows, unions, anchors, geo, side }: Plan
 	return { legs, dots, dotX, families, sideExits, tagZones, coupleLanes, barLanes, maxX };
 }
 
+/** Adds `value` to the list kept for `key`, in place: a new copy of the list on each add was quadratic. */
+export function addTo<K, V>(map: Map<K, V[]>, key: K, value: V): void {
+	const list = map.get(key);
+	if (list) list.push(value);
+	else map.set(key, [value]);
+}
+
 /**
  * D24: where the lines leave one card's edge when that edge is only a card height long (the real
  * right edge of a sideways card). The first line takes the middle; each next one steps outwards on
@@ -413,7 +425,7 @@ function edgeSlots(b: PersonBox, n: number, m: LineMetrics, near: number, free: 
 		const dir = pref === 'left' ? -1 : 1;
 		const candidates = [cx];
 		for (const d of [dir, -dir]) for (let i = 1; i * step <= half + 1e-6; i++) candidates.push(cx + d * i * step);
-		const x = candidates.find(ok) ?? clearestSpot(b, m, used, trunks(), near);
+		const x = candidates.find(ok) ?? clearestSpot(b, m, used, trunks(), near, step);
 		used.push(x);
 		return x;
 	};
@@ -421,19 +433,25 @@ function edgeSlots(b: PersonBox, n: number, m: LineMetrics, near: number, free: 
 
 /**
  * When every usual place on a sideways card's short edge is taken: the spot (0.5 em clear of the
- * corners) that keeps `near` from every trunk and dot if it can, and is then furthest from the
- * other lines.
+ * corners) that keeps `step` from the lines already leaving this card and `near` from every trunk
+ * and dot if it can, and is then furthest from all of them.
  */
-function clearestSpot(b: PersonBox, m: LineMetrics, lines: number[], trunks: number[], near: number): number {
+function clearestSpot(b: PersonBox, m: LineMetrics, lines: number[], trunks: number[], near: number, step = 0): number {
 	const half = b.w / 2 - m.tagInset;
 	const cx = b.x + b.w / 2;
 	let best = cx;
-	let score = [-1, -1];
+	let score = [-1, -1, -1, -1];
+	// Two lines from one card at one spot lie on top of each other all the way to their gap, so a
+	// spot as close to the card's own lines as to a trunk is worse: first the spot whose clearance
+	// (from both, each against what it needs) is largest, then the card's own lines before trunks.
 	for (let t = -half; t <= half + 1e-6; t += 0.5) {
 		const x = cx + t;
 		const toTrunk = Math.min(Infinity, ...trunks.map((u) => Math.abs(u - x)));
-		const s = [Math.min(toTrunk, near), Math.min(toTrunk, ...lines.map((u) => Math.abs(u - x)))];
-		if (s[0] > score[0] + 1e-9 || (Math.abs(s[0] - score[0]) < 1e-9 && s[1] > score[1] + 1e-9)) {
+		const toLine = Math.min(Infinity, ...lines.map((u) => Math.abs(u - x)));
+		const clear = Math.min(1, toTrunk / near, step > 0 ? toLine / step : Infinity);
+		const s = [clear, Math.min(toLine, step), Math.min(toTrunk, near), Math.min(toTrunk, toLine)];
+		const i = s.findIndex((v, k) => Math.abs(v - score[k]) >= 1e-9);
+		if (i >= 0 && s[i] > score[i]) {
 			best = x;
 			score = s;
 		}
@@ -472,7 +490,7 @@ function orderBars(list: FamilyLine[]): Map<FamilyLine, FamilyLine[]> {
 function pack(runs: { gap: number; lo: number; hi: number; set: (lane: number) => void }[], gaps: number, margin: number): number[] {
 	const used = new Array<number>(gaps).fill(0);
 	const byGap = new Map<number, typeof runs>();
-	for (const r of runs) byGap.set(r.gap, [...(byGap.get(r.gap) ?? []), r]);
+	for (const r of runs) addTo(byGap, r.gap, r);
 	for (const [gap, list] of byGap) {
 		list.sort((a, b) => a.lo - b.lo);
 		const laneEnd: number[] = [];

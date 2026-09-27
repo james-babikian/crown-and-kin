@@ -1,7 +1,3 @@
-import type { Rect } from '../../layout/model';
-import type { Point } from '../gesture';
-import { clampPan, doubleTapView, isDoubleTap, isPan, panFrom, pinchView, scaleLimits, transformFor, wheelFactor, zoomAt, type Size, type View } from '../view-math';
-
 /*
  * Pan and zoom on Pointer Events (spec §7.2, §7.6): one transformed <g>, updates in
  * requestAnimationFrame, never a re-layout. The level of detail changes in `onSettle`, after the
@@ -11,7 +7,7 @@ import { clampPan, doubleTapView, isDoubleTap, isPan, panFrom, pinchView, scaleL
  * During a pinch the <g> keeps the view it had when the pinch began, and a CSS transform on an HTML
  * wrapper around the <svg> scales and moves that picture instead. A change of scale on the <g>, or a
  * CSS transform on the <svg> itself, makes the browser lay out and shape every SVG text again for
- * the new screen size: with 400 cards a phone cannot do that 60 times a second (WP5.3 trace). A
+ * the new screen size: with 400 cards a phone cannot do that 60 times a second. A
  * transform on an HTML parent does not reach the SVG text layout. When the pinch ends, the <g>
  * takes the real view and the wrapper transform goes, in the same frame. While a pinch leaves empty
  * space around the wrapped picture, the real view is drawn about every 250 ms during the pinch, and
@@ -26,6 +22,10 @@ import { clampPan, doubleTapView, isDoubleTap, isPan, panFrom, pinchView, scaleL
  * double-tap on empty background zooms 2×, a plain wheel pans and Ctrl/Cmd+wheel zooms.
  */
 
+import type { Rect } from '../../layout/model';
+import { clampPan, doubleTapView, isDoubleTap, isPan, panFrom, pinchView, scaleLimits, transformFor, wheelFactor, zoomAt, type Point, type Size, type View } from '../view-math';
+
+/** Everything `PanZoom` needs from the tree view to run gestures on one drawn tree. */
 export interface PanZoomOptions {
 	viewport: HTMLElement;
 	scene: SVGGElement;
@@ -142,6 +142,7 @@ interface Pinch {
 	start: View;
 }
 
+/** Runs pan, zoom, pinch and double-tap gestures on one tree, and settles on a `View` for the caller. */
 export class PanZoom {
 	view: View | null = null;
 	size: Size = { w: 0, h: 0 };
@@ -195,11 +196,12 @@ export class PanZoom {
 		this.off.push(() => el.removeEventListener(type, safe, opts));
 	}
 
-	/** The tree was laid out again with other card sizes (the note preview's narrow cards, WP5.5c). */
+	/** The tree was laid out again with other card sizes (the note preview's narrow cards). */
 	setBounds(bounds: Rect): void {
 		this.o.bounds = bounds;
 	}
 
+	/** The current scale limits, from the bounds, viewport size and font size. */
 	get limits() {
 		return scaleLimits(this.o.bounds, this.size, this.o.fontPx);
 	}
@@ -209,6 +211,7 @@ export class PanZoom {
 		return this.drag !== null || this.pinch !== null || this.anim !== null;
 	}
 
+	/** The viewport changed size: re-applies the current view (or animation) to the new size. */
 	resize(size: Size): void {
 		this.size = size;
 		this.schedule();
@@ -372,7 +375,7 @@ export class PanZoom {
 			this.lastTap = null;
 			this.capture(e.pointerId);
 			// Only a mouse or pen shows the grab cursor. The class restyles every element of the tree (the
-			// cursor is inherited): on a phone that cost one long frame at the start of each pan (WP5.3).
+			// cursor is inherited): on a phone that cost one long frame at the start of each pan.
 			if (e.pointerType !== 'touch') this.o.viewport.addClass('dynasty-panning');
 		}
 		e.preventDefault();
@@ -463,6 +466,7 @@ export class PanZoom {
 		}, WHEEL_SETTLE_MS);
 	}
 
+	/** Removes all listeners and timers; called when the tree view tears down its scene. */
 	destroy(): void {
 		for (const f of this.off.splice(0)) f();
 		const win = this.o.viewport.win ?? window;

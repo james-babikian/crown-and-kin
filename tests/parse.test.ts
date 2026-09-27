@@ -26,6 +26,11 @@ describe('parseDynasty', () => {
 		expect(t.people[0].link).toBe('[[Wren of the Marches]]');
 	});
 
+	it('reads an unquoted [[link]] with commas as written, without a comment after it', () => {
+		const t = ok('people:\n  - id: a\n    link: [[Smith, John,Jr]]  # the scribe forgot quotes\n  - {id: b, link: [[Wren, of the Marches]]}\n');
+		expect(t.people.map((p) => p.link)).toEqual(['[[Smith, John,Jr]]', '[[Wren, of the Marches]]']);
+	});
+
 	it('warns about an unquoted #colour', () => {
 		const t = ok('houses:\n  - id: v\n    name: V\n    color: #8b1e3f\n');
 		expect(t.houses[0].color).toBeUndefined();
@@ -138,6 +143,14 @@ describe('parseDynasty: shape issues and hard errors', () => {
 		expect(parseDynasty('houses: *nowhere\n')).toMatchObject({ ok: false, error: { code: 'yaml-invalid' } });
 		const bomb = 'a: &a [x, x, x, x, x, x, x, x, x]\nb: &b [*a, *a, *a, *a, *a, *a, *a, *a, *a]\nc: &c [*b, *b, *b, *b, *b, *b, *b, *b, *b]\nd: [*c, *c, *c, *c, *c, *c, *c, *c, *c]\n';
 		expect(parseDynasty(bomb)).toMatchObject({ ok: false, error: { code: 'yaml-invalid' } });
+	});
+
+	it('allows as many alias uses as the text is long, and no more', () => {
+		const people = (n: number) => ['houses: [{id: &h v}]', 'people:', ...Array.from({ length: n }, (_, i) => `  - {id: p${i}, house: *h}`)].join('\n');
+		expect(ok(people(500)).people.filter((p) => p.house === 'v')).toHaveLength(500);
+		// A use of `*b` counts 60, one for each alias in it: 60 uses (3600) pass the text length (about 700).
+		const wide = `a: &a [${Array(60).fill('x').join(', ')}]\nb: &b [${Array(60).fill('*a').join(', ')}]\nc: [${Array(60).fill('*b').join(', ')}]\n`;
+		expect(parseDynasty(wide)).toMatchObject({ ok: false, error: { code: 'yaml-invalid' } });
 	});
 
 	it('never writes to the console, even when the yaml package has warnings', () => {

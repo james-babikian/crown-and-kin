@@ -1,6 +1,36 @@
+/*
+ * `TreeView` is the plugin's core Obsidian class: one instance draws and runs one `dynasty` code
+ * block, as an embed in a note or inside the full-screen modal. `main.ts` creates an embed's
+ * `TreeView` from the Markdown code block processor; `full-screen.ts` creates a second one, sharing
+ * the same block handle and view state, when the user expands a tree. A `TreeView` parses the
+ * block's text (`core/parse`), derives the family graph (`core/derive`), lays it out
+ * (`layout/index`), and draws it as SVG (`render/dom/scene`), then wires pan and zoom
+ * (`render/dom/pan-zoom`), the toolbar, sheets and popovers on top of it. It never lets an error
+ * escape into Obsidian or blank the note (spec §8): every entry point runs through `guard`.
+ *
+ * Reading guide, in the order the file lays them out:
+ * - Host and view-place types (`TreeHost`, `FullSource`, `FullHost`, `ViewPlace`) that connect a
+ *   `TreeView` to the plugin and to the full-screen modal.
+ * - Small free functions that read fonts and the safe-area inset from probe elements, and hash a
+ *   block's text for its key.
+ * - The `TreeView` class:
+ *   - Fields: everything remembered between renders (the drawn graph, the view, focus, layout cache).
+ *   - Construction and block resolution: finding and keeping the block's `Handle` (spec §6.1),
+ *     across renames, edits from elsewhere and Live Preview's late-resolved blocks.
+ *   - Fonts and theme: reading the note's resolved fonts and theme colours (spec §5.8, §7.7).
+ *   - `render`: the main render pipeline, from parsed text to a drawn scene.
+ *   - Focus mode: choosing and applying the session, pin or phone focus (spec §5.6), and the static
+ *     `focusState`/`redrawState`/`dropOwnFocus` helpers that other views and sheets use to redraw
+ *     every `TreeView` that shares one block's state.
+ *   - Sizing and layout: the note preview's height and narrow-card width, sideways re-layout (D24).
+ *   - First views, pan/zoom wiring, card and tag presses, the D28 hints.
+ *   - The toolbar, its buttons, and the legend and problems popovers.
+ * - Small free functions used only by the class, at the end of the file.
+ */
+
 import { Keymap, MarkdownRenderChild, Notice, getLinkpath, setIcon, type App, type HoverParent, type HoverPopover, type MarkdownPostProcessorContext, type MarkdownSectionInformation } from 'obsidian';
 import { deriveFamilies, type FamilyGraph } from '../core/derive';
-import type { CodedIssue } from '../core/issues';
+import type { CodedIssue } from '../core/messages';
 import { hardErrorText, issueText } from '../core/messages';
 import { findBlocks } from '../core/block-locate';
 import { focusGenerationsFor, focusSubgraph } from '../core/focus-subgraph';
@@ -34,14 +64,16 @@ import {
 	type Size,
 	type View,
 } from '../render/view-math';
-import { focusKey, newBlockState, sameBody, type BlockState, type Handle, type HandleRegistry } from './block-handle';
+import { sameBody } from '../core/block-match';
+import type { Handle, HandleRegistry } from './block-handle';
+import { focusKey, newBlockState, type BlockState } from './block-state';
 import { EditSheet } from './edit-sheet';
 import { NARROW_MAX_EM, PHONE_FOCUS_MIN_PEOPLE, badgeHit, badgeHitInCard, chooseFocus, clearToolbar, focusView, isPhoneWindow, narrowCardWidth, orientationFor, outsideBox, sidewaysView, tagHitBelow } from './focus-mode';
 import { FullScreenModal } from './full-screen';
 import { HousesWindow } from './houses-window';
 import { pickPerson } from './person-picker';
 import { pluginModalOpen } from './plugin-modals';
-import { DEFAULT_SETTINGS, type DynastySettings } from './settings-contract';
+import { DEFAULT_SETTINGS, type DynastySettings } from './settings';
 
 /** What a tree view needs from the plugin. */
 export interface TreeHost {
@@ -52,7 +84,7 @@ export interface TreeHost {
 	looseStates: Map<string, BlockState>;
 	views: Set<TreeView>;
 	recordTiming(t: RenderTiming): void;
-	/** Spec §9 (M6 contract): read on every render; `onSettingsChange` follows a change. */
+	/** Spec §9: read on every render; `onSettingsChange` follows a change. */
 	readonly settings: DynastySettings;
 }
 
@@ -95,6 +127,7 @@ interface Anchor {
 	bandClear: boolean;
 }
 
+/** The page-preview source id for card names: `main.ts` registers it, and the tree view sends it with each hover-link event. */
 export const HOVER_SOURCE = 'dynasty-tree';
 const HIGHLIGHT_MS = 2000;
 /** Height of the D28 hint label in px (styles.css), to put it level with the toolbar. */
@@ -136,14 +169,9 @@ function fontsOf(probe: HTMLElement): FontState {
 	};
 }
 
-/** `env(safe-area-inset-top)` in px, read from a probe element (spec §7.5). */
-function safeTop(el: HTMLElement): number {
-	const probe = el.createDiv({ cls: 'dynasty-safe-probe' });
-	try {
-		return parsePx(getComputedStyle(probe).paddingTop) ?? 0;
-	} finally {
-		probe.remove();
-	}
+/** `env(safe-area-inset-top)` in px, read from the view's probe element (spec §7.5). */
+function safeTop(probe: HTMLElement | null): number {
+	return probe?.isConnected ? (parsePx(getComputedStyle(probe).paddingTop) ?? 0) : 0;
 }
 
 /** Stable, short text hash for a block key when Obsidian cannot say where the block is. */
@@ -151,6 +179,14 @@ function shortHash(s: string): string {
 	let h = 0x811c9dc5;
 	for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 16777619);
 	return (h >>> 0).toString(36);
+}
+
+/** Options of `TreeView.redrawState`. */
+interface RedrawOptions {
+	target?: string[] | null;
+	origin?: TreeView | null;
+	except?: TreeView | null;
+	keepOwn?: boolean;
 }
 
 /**
@@ -186,11 +222,11 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 	private orientation: Orientation = 'down';
 	/** A turn of the phone (D24) waits for the window to report its new size (iOS reports it late). */
 	private turnTimer = 0;
-	/** WP5.5c: the narrow card width for the note preview's box, once the box has a width; the width the layout used. */
+	/** The narrow card width for the note preview's box, once the box has a width; the width the layout used. */
 	private narrowW: number | undefined;
 	private narrowUsed: number | undefined;
-	/** What the last render laid out and drew with, so the note preview can lay out again in place (WP5.5c). */
-	private redo: { geo: Geometry; settings: LayoutSettings; sceneEl: SVGGElement; opts: SceneOptions } | null = null;
+	/** What the last render laid out and drew with, so the note preview can lay out again in place. */
+	private lastLayout: { geo: Geometry; settings: LayoutSettings; sceneEl: SVGGElement; opts: SceneOptions } | null = null;
 	/** A person to centre and highlight in the next first view (Find of a person outside the focus family). */
 	private pendingTarget: string[] | null = null;
 	/** The toolbar at the top of the viewport, in viewport px (null when it is at the bottom). */
@@ -219,13 +255,14 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 	/** `--dynasty-callout-bg` as last read: the toolbar and the D28 hints take it. */
 	private calloutBg: string | null = null;
 	/**
-	 * A font probe that stays in the tree (G5 fix round): a probe added to the page later makes the
+	 * A font probe that stays in the tree: a probe added to the page later makes the
 	 * engine compute the style of every element again, about 0.35 s for sample tree 7 on a slow phone.
 	 */
 	private fontProbe: HTMLElement | null = null;
+	/** The same for `env(safe-area-inset-top)` in the full-screen view. */
+	private safeProbe: HTMLElement | null = null;
 	private lod: Lod | null = null;
 	private bounds: Rect = { x: 0, y: 0, w: 0, h: 0 };
-	private start: string | null = null;
 	private optionsStart: string | undefined;
 	private optionsHeight: number | undefined;
 	private blocked = false;
@@ -327,11 +364,12 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 				this.updateHeight();
 				return;
 			}
-			this.carry = prev.cardSize === now.cardSize ? this.anchor() : null;
+			this.carry = prev.cardSize === now.cardSize ? this.keptAnchor() : null;
 			this.render(this.fonts);
 		});
 	}
 
+	/** Obsidian calls this once the block's container is in the DOM: wires listeners and renders it. */
 	override onload(): void {
 		this.host.views.add(this);
 		for (const type of STOPPED_EVENTS) {
@@ -370,6 +408,7 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 		}
 	}
 
+	/** Obsidian calls this when the block leaves the note: stops timers and tears the scene down. */
 	override onunload(): void {
 		this.unloaded = true;
 		if (this.retryTimer) this.containerEl.win.clearTimeout(this.retryTimer);
@@ -380,11 +419,15 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 		this.teardown();
 	}
 
-	/** Plugin memory for this block (spec §5.5): on the handle, or keyed by text for a read-only block. */
-	private blockState(): BlockState {
+	/** Plugin memory for this block (spec §5.5): on the handle, or keyed by text for a read-only block; null if there is none yet. */
+	private peekState(): BlockState | null {
 		const h = this.handle ?? this.peeked;
-		if (h) return h.state;
-		let st = this.host.looseStates.get(this.key);
+		return h ? h.state : (this.host.looseStates.get(this.key) ?? null);
+	}
+
+	/** The same; a read-only block with none gets a new one (only the newest 500 are kept). */
+	private ensureState(): BlockState {
+		let st = this.peekState();
 		if (!st) {
 			st = newBlockState();
 			this.host.looseStates.set(this.key, st);
@@ -456,8 +499,8 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 	}
 
 	/**
-	 * The handle this view may write through: only one whose body is what this view rendered
-	 * (supervisor rule). A stale view re-reads, then finds its block again, or writes nothing.
+	 * The handle this view may write through: only one whose body is what this view rendered.
+	 * A stale view re-reads, then finds its block again, or writes nothing.
 	 */
 	private async validHandle(): Promise<Handle | null> {
 		let h = await this.ready;
@@ -511,7 +554,7 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 		}
 		this.source = body;
 		this.dragHeight = null;
-		this.carry = this.anchor();
+		this.carry = this.keptAnchor();
 		if (this.carry) this.carry.byUser = true;
 		this.render(this.fonts);
 	}
@@ -574,7 +617,7 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 	}
 
 	/**
-	 * WP6.5: what one CSS rule cannot follow in every theme. The toolbar in a callout shows the
+	 * What one CSS rule cannot follow in every theme. The toolbar in a callout shows the
 	 * callout's own background as the theme paints it (spec §10); the `+` badge takes the text colour
 	 * where the theme's text-on-accent is too weak on its accent.
 	 */
@@ -596,7 +639,7 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 	private paintCalloutBg(): void {
 		const vp = this.viewport;
 		if (!vp) return;
-		for (const el of Array.from(vp.querySelectorAll<HTMLElement>(':scope > .dynasty-toolbar, :scope > .dynasty-hint'))) {
+		for (const el of Array.from(vp.querySelectorAll<HTMLElement>(':scope > .dynasty-toolbar, :scope > .dynasty-hint-slot'))) {
 			const now = calloutBgSet.get(el) ?? null;
 			if (now === this.calloutBg) continue;
 			if (this.calloutBg === null) el.style.removeProperty('--dynasty-callout-bg');
@@ -640,9 +683,14 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 
 	/** Re-lays out with new fonts and keeps the same tree point at the viewport centre (spec §7.5). */
 	private rerender(fonts: FontState): void {
-		this.carry = this.anchor();
+		this.carry = this.keptAnchor();
 		clearMeasureCache();
 		this.render(fonts);
+	}
+
+	/** The anchor a redraw keeps: none in the static touch preview, which shows its first view (D1). */
+	private keptAnchor(): Anchor | null {
+		return this.full || !this.coarse ? this.anchor() : null;
 	}
 
 	private anchor(): Anchor | null {
@@ -659,7 +707,7 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 		if (!best) return null;
 		const f = laid.layout.geometry.fontPx;
 		const bandClear = !this.panZoom || bandShift(v, this.panZoom.size, this.insetTop, laid.layout.persons.values()) === 0;
-		return { person: best.id, dx: (v.cx - best.cx) / f, dy: (v.cy - best.cy) / f, scale: v.scale, byUser: this.blockState().view !== null, bandClear };
+		return { person: best.id, dx: (v.cx - best.cx) / f, dy: (v.cy - best.cy) / f, scale: v.scale, byUser: !!this.peekState()?.view, bandClear };
 	}
 
 	private fromAnchor(a: Anchor): View | null {
@@ -713,6 +761,7 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 		this.emptyEl = null;
 		this.viewport = null;
 		this.fontProbe = null;
+		this.safeProbe = null;
 		// A new PanZoom has no view yet: its first sized resize sets the first view anyway.
 		this.firstDue = false;
 		this.hintOn = false;
@@ -742,22 +791,29 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 		}
 		const fonts = fontsOverride ?? readFonts(el);
 		const geo = geometryFor(fonts.px, this.settings.cardSize);
-		// The static note preview has narrow cards, as wide as its box allows for two whole generations (WP5.5c).
+		// The static note preview has narrow cards, as wide as its box allows for two whole generations.
 		const cards = this.full ? ('normal' as const) : ('narrow' as const);
 		this.narrowUsed = orientation === 'sideways' && cards === 'narrow' ? (this.narrowW ?? narrowCardWidth(el.clientWidth, geo.fontPx)) : undefined;
 		const base: LayoutSettings =
 			orientation === 'sideways'
 				? { sweeps: 4, far: DEFAULT_FAR_RULE, orientation, sidewaysCards: cards, ...(this.narrowUsed !== undefined ? { narrowCardW: this.narrowUsed } : {}) }
 				: { sweeps: 4, far: DEFAULT_FAR_RULE };
-		const focus = this.pickFocus(parsed.tree, whole);
+		const focus = this.updateFocus(parsed.tree, whole);
 		// Focus mode (spec §5.6): only the focus family is laid out and drawn; the whole tree's
-		// problems stay on the badge, and every edit reads the whole block (the decision notes M5). D23: the
+		// problems stay on the badge, and every edit reads the whole block. D23: the
 		// static preview on a phone shows 1 generation up and down, so the children show below.
-		const n = !this.full && this.coarse && isPhoneWindow(true, win.innerWidth, win.innerHeight) ? 1 : focusGenerationsFor(parsed.tree.options, this.settings.focusGenerations);
+		const n = !this.full && this.isPhone() ? 1 : focusGenerationsFor(parsed.tree.options, this.settings.focusGenerations);
 		let sub = focus !== null ? focusSubgraph(parsed.tree, focus, n) : null;
-		// §5.5: a person just saved is shown once, by the first view of the kind that saved them
-		// (the decision notes WP5.2 fix round 2). If its family does not draw them, it shows all people, like Find.
-		const st = this.blockState();
+		// A tag or a problem in the static preview opened this view on a person its family does not draw:
+		// this view shows all people (D21: its own focus), so the person can be centred.
+		const target = this.full?.target;
+		if (this.full && sub && target && whole.byId.has(target) && !sub.tree.people.some((p) => p.id === target)) {
+			this.full.focus = { id: null };
+			sub = null;
+		}
+		// §5.5: a person just saved is shown once, by the first view of the kind that saved them.
+		// If its family does not draw them, it shows all people, like Find.
+		const st = this.ensureState();
 		const saved = st.shown;
 		let sessionChanged = false;
 		if (saved && saved.place === (this.full ? 'full' : 'embed')) {
@@ -811,7 +867,7 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 		const viewport = root.createDiv({ cls: 'dynasty-viewport' });
 		this.viewport = viewport;
 		this.updateHeight();
-		// The HTML wrapper takes the CSS transform during a pinch (PanZoom, WP5.3).
+		// The HTML wrapper takes the CSS transform during a pinch (see PanZoom).
 		const canvas = viewport.createDiv({ cls: 'dynasty-canvas' });
 		const svg = canvas.createSvg('svg', { cls: 'dynasty-svg', attr: { width: '100%', height: '100%' } });
 		this.svg = svg;
@@ -828,7 +884,7 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 			badges: sub ? { hidden: sub.hidden, label: (p, n) => FOCUS_UI.badgeLabel(p.name, n) } : undefined,
 		};
 		this.scene = buildScene(sceneEl, g, laid, opts);
-		this.redo = { geo, settings, sceneEl, opts };
+		this.lastLayout = { geo, settings, sceneEl, opts };
 		this.wireScene(this.scene);
 		// Keyboard focus on a card makes the browser scroll this overflow-hidden box, which would
 		// shift the tree against the pan/zoom transform. Keep it at 0 and pan instead.
@@ -852,11 +908,15 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 			mode: this.full ? 'full' : 'embed',
 			onSettle: (v, byUser) => this.settled(v, byUser),
 			// A D19 fill in a pinch out also takes the level of detail for its zoom: the smaller level has
-			// less text to lay out, so the fills are cheaper (WP5.3: 83–133 ms instead of 133–167 ms at 4×).
+			// less text to lay out, so the fills are cheaper (measured: 83–133 ms instead of 133–167 ms at 4×).
 			onFill: (v) => this.applyLod(v),
 			guard: (fn) => this.guard(fn),
 		});
 		this.fontProbe = root.createDiv({ cls: 'dynasty-font-probe' });
+		// Only the full-screen view reads the safe area (its toolbar can be at the bottom).
+		if (this.full) this.safeProbe = root.createDiv({ cls: 'dynasty-safe-probe' });
+		// D28: the hint labels stay in the tree, hidden until a first view counts children outside the box.
+		if (orientation === 'sideways') for (const dir of ['up', 'down']) viewport.createDiv({ cls: 'dynasty-hint-slot', attr: { 'data-dir': dir } });
 		this.observer = new ResizeObserver(() => this.guard(() => this.resized()));
 		this.observer.observe(viewport);
 		const t3 = performance.now();
@@ -872,7 +932,7 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 		};
 		this.timing = { t0, t: timing };
 		this.host.recordTiming(timing);
-		if (sessionChanged) TreeView.redrawState(this.host, st, null, null, this);
+		if (sessionChanged) TreeView.redrawState(this.host, st, { except: this });
 	}
 
 	/**
@@ -916,30 +976,30 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 	}
 
 	/**
-	 * D30: a phone, upright or on its side, takes the phone height and ignores `options.height`. The
-	 * screen decides, not the window: an on-screen keyboard makes a tablet's window lower than 600 px,
-	 * but not its screen (the decision notes "WP6.3 fix round").
+	 * A phone, upright or on its side: the phone height of D30, the D20 focus family and the D23
+	 * generations. The screen decides, not the window: an on-screen keyboard makes a tablet's window
+	 * lower than 600 px, but not its screen.
 	 */
-	private phoneHeight(): boolean {
+	private isPhone(): boolean {
 		const win = this.containerEl.win;
 		const screen = win.screen;
 		return isPhoneWindow(this.coarse, screen?.width || win.innerWidth, screen?.height || win.innerHeight);
 	}
 
 	/**
-	 * The focus person to draw, or null for the whole tree (the decision notes M5 priority: session focus,
-	 * pin, the phone rule of D20, whole tree).
+	 * The focus person to draw, or null for the whole tree (priority order: session focus,
+	 * pin, the phone rule of D20, whole tree). Also updates the block state: it drops a session
+	 * focus that no longer applies and stores the D20 automatic focus.
 	 */
-	private pickFocus(tree: Tree, whole: FamilyGraph): string | null {
+	private updateFocus(tree: Tree, whole: FamilyGraph): string | null {
 		// D21: a full-screen view opened by a badge tap in a static embed shows that family, until the user chooses another focus there.
 		const own = this.full?.focus;
 		if (own && (own.id === null || whole.byId.has(own.id))) return own.id;
-		const st = this.blockState();
-		const win = this.containerEl.win;
+		const st = this.ensureState();
 		const choice = chooseFocus({
 			session: st.focus,
 			pin: tree.options.focus,
-			phone: isPhoneWindow(this.coarse, win.innerWidth, win.innerHeight),
+			phone: this.isPhone(),
 			auto: st.autoFocus,
 			has: (id) => whole.byId.has(id),
 			large: () => whole.people.length > PHONE_FOCUS_MIN_PEOPLE,
@@ -958,7 +1018,7 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 	 * and draws every view of the block again with it (spec §5.6). Nothing is written.
 	 */
 	focusOn(id: string | null, target: string[] | null = null): void {
-		TreeView.focusState(this.host, this.blockState(), id, target, this);
+		TreeView.focusState(this.host, this.ensureState(), id, target, this);
 	}
 
 	/**
@@ -970,17 +1030,19 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 		st.focus = { id };
 		// A choice of the user replaces a pending "show the saved person".
 		st.shown = null;
-		TreeView.redrawState(host, st, target, origin);
+		TreeView.redrawState(host, st, { target, origin });
 	}
 
 	/**
 	 * Every view whose block state is `st` draws its focus again (a choice of the user replaces a D21
 	 * badge focus). Only `origin`, the view that ran Find or the problem list, gets `target`: the
 	 * others just redraw (a static preview keeps its first view, D1). `except` does not redraw.
+	 * `keepOwn` keeps the D21 own focus of full-screen views.
 	 */
-	static redrawState(host: TreeHost, st: BlockState, target: string[] | null = null, origin: TreeView | null = null, except: TreeView | null = null, keepOwn = false): void {
+	static redrawState(host: TreeHost, st: BlockState, opts: RedrawOptions = {}): void {
+		const { target = null, origin = null, except = null, keepOwn = false } = opts;
 		for (const v of [...host.views]) {
-			if (v.unloaded || v === except || v.blockState() !== st) continue;
+			if (v.unloaded || v === except || v.peekState() !== st) continue;
 			if (v.full && !keepOwn) v.full.focus = null;
 			v.pendingTarget = v === origin ? target : null;
 			v.syncFocus();
@@ -996,7 +1058,7 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 		const dropped: [FullHost, { id: string | null }][] = [];
 		for (const v of host.views) {
 			const own = v.full?.focus;
-			if (v.unloaded || !v.full || !own || v.blockState() !== st) continue;
+			if (v.unloaded || !v.full || !own || v.peekState() !== st) continue;
 			dropped.push([v.full, own]);
 			v.full.focus = null;
 		}
@@ -1028,28 +1090,28 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 		// The full-screen view fills the modal (spec §7.1).
 		if (this.full) return;
 		const s = this.settings;
-		const phone = this.phoneHeight();
+		const phone = this.isPhone();
 		const h = this.dragHeight !== null && !phone ? `${this.dragHeight}px` : embedHeight(this.optionsHeight, phone, { desktop: `${s.embedHeightDesktop}px`, phone: `${s.embedHeightPhone}vh` });
 		this.viewport?.style.setProperty('--dynasty-height', h);
 	}
 
 	/**
-	 * Lays the note preview out again, in place, when its box asks for another narrow card width
-	 * (WP5.5c): only the scene is drawn again, so the viewport, toolbar and observers stay. True when
+	 * Lays the note preview out again, in place, when its box asks for another narrow card width:
+	 * only the scene is drawn again, so the viewport, toolbar and observers stay. True when
 	 * it did; the caller then sets the first view.
 	 */
 	private fitNarrow(box: number): boolean {
-		const redo = this.redo;
+		const last = this.lastLayout;
 		const g = this.g;
-		if (this.orientation !== 'sideways' || this.full || !redo || !g || !this.panZoom || !(box > 0)) return false;
-		const f = redo.geo.fontPx;
+		if (this.orientation !== 'sideways' || this.full || !last || !g || !this.panZoom || !(box > 0)) return false;
+		const f = last.geo.fontPx;
 		const want = narrowCardWidth(box, f);
 		if (want === undefined || want === (this.narrowUsed ?? NARROW_MAX_EM * f)) return false;
 		this.narrowW = want;
 		this.narrowUsed = want;
 		// D29: the names that need two text lines depend on the card width.
-		const next = this.layOut(g, redo.geo, { ...redo.settings, narrowCardW: want }, redo.opts.fonts, redo.opts.badges?.hidden);
-		redo.settings = next.settings;
+		const next = this.layOut(g, last.geo, { ...last.settings, narrowCardW: want }, last.opts.fonts, last.opts.badges?.hidden);
+		last.settings = next.settings;
 		this.redraw(g, next.laid);
 		return true;
 	}
@@ -1074,16 +1136,16 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 		return { laid: layoutTree(g, geo, settings, fonts.text), settings };
 	}
 
-	/** Draws a new layout of the note preview in place (WP5.5c, D29): the viewport, toolbar and observers stay. */
+	/** Draws a new layout of the note preview in place (D29): the viewport, toolbar and observers stay. */
 	private redraw(g: FamilyGraph, laid: LaidOut): void {
-		const redo = this.redo;
-		if (!redo || !this.panZoom) return;
+		const last = this.lastLayout;
+		if (!last || !this.panZoom) return;
 		this.laid = laid;
 		this.bounds = treeBounds(laid.layout.width, laid.layout.height);
 		this.panZoom.setBounds(this.bounds);
 		this.popover?.close();
-		redo.sceneEl.empty();
-		this.scene = buildScene(redo.sceneEl, g, laid, redo.opts);
+		last.sceneEl.empty();
+		this.scene = buildScene(last.sceneEl, g, laid, last.opts);
 		this.wireScene(this.scene);
 		if (this.lod && this.svg) this.svg.removeClass(lodClass(this.lod));
 		this.lod = null;
@@ -1097,18 +1159,18 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 	 * shows its first view (D1); other views keep the same tree point at the centre (spec §7.5).
 	 */
 	private recheckTall(fresh = false): boolean {
-		const redo = this.redo;
+		const last = this.lastLayout;
 		const g = this.g;
-		if (!redo || !g || !this.panZoom) return false;
+		if (!last || !g || !this.panZoom) return false;
 		// css-change: the widths cached for the same font text can belong to the face that was in use before.
 		if (fresh) clearMeasureCache();
-		const next = this.layOut(g, redo.geo, redo.settings, redo.opts.fonts, redo.opts.badges?.hidden);
-		if (sameTall(next.settings.tallCards, redo.settings.tallCards)) {
+		const next = this.layOut(g, last.geo, last.settings, last.opts.fonts, last.opts.badges?.hidden);
+		if (sameTall(next.settings.tallCards, last.settings.tallCards)) {
 			if (fresh) this.scene?.refit();
 			return false;
 		}
-		const keep = this.full || !this.coarse ? this.anchor() : null;
-		redo.settings = next.settings;
+		const keep = this.keptAnchor();
+		last.settings = next.settings;
 		this.redraw(g, next.laid);
 		if (keep) this.carry = keep;
 		this.resized();
@@ -1149,7 +1211,7 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 			this.checkTurn();
 			return;
 		}
-		// WP5.5c: the note preview's narrow cards follow its box (the box has no width before the first
+		// The note preview's narrow cards follow its box (the box has no width before the first
 		// resize). A static preview then shows its first view again.
 		this.fitNarrow(vp.clientWidth);
 		this.updateHeight();
@@ -1187,7 +1249,7 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 		// before, move the view down just enough.
 		if (carried && this.carry?.bandClear) carried = clearBand(carried, size, this.insetTop, [...this.laid.layout.persons.values()]);
 		this.carry = null;
-		const st = this.blockState();
+		const st = this.ensureState();
 		const targets = this.full?.target ? [this.full.target] : (this.pendingTarget ?? []);
 		const targetBox = targets.length ? this.laid.layout.persons.get(targets[0]) : undefined;
 		if (this.full) this.full.target = null;
@@ -1222,7 +1284,7 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 		const bar = vp.querySelector<HTMLElement>('.dynasty-toolbar');
 		const atBottom = !!bar && bar.offsetTop > vp.clientHeight / 2;
 		// With the toolbar at the bottom, the top band is the phone's status bar or notch (safe area).
-		this.insetTop = bar && !atBottom ? bar.offsetTop + bar.offsetHeight + 4 : this.full ? safeTop(vp) : 0;
+		this.insetTop = bar && !atBottom ? bar.offsetTop + bar.offsetHeight + 4 : this.full ? safeTop(this.safeProbe) : 0;
 		this.insetBottom = bar && atBottom ? vp.clientHeight - bar.offsetTop + 4 : 0;
 		this.barBox = bar && !atBottom && Number.isFinite(bar.offsetLeft) && bar.offsetWidth > 0 ? { left: bar.offsetLeft, right: bar.offsetLeft + bar.offsetWidth, top: bar.offsetTop, bottom: bar.offsetTop + bar.offsetHeight + 4 } : null;
 	}
@@ -1243,7 +1305,8 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 		}
 		this.guard(() => {
 			const pz = this.panZoom;
-			const v = this.savedView(this.blockState());
+			const st = this.peekState();
+			const v = st ? this.savedView(st) : null;
 			if (this.full || this.coarse || !pz?.view || !v) return;
 			pz.setView(v);
 		});
@@ -1266,11 +1329,11 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 		if (id === null) return this.defaultViewFor(laid, size);
 		const persons = laid.layout.persons;
 		const me = persons.get(id) ?? null;
-		const children = this.g ? familyOf(this.g, id).children.map((c) => persons.get(c)).filter((b): b is PersonBox => !!b) : [];
+		const children = this.g ? boxesOf(persons, familyOf(this.g, id).children) : [];
 		// D23: with no parent drawn above, the person sits near the top (D13), not in the middle of an empty view.
 		const parentIds = this.g?.placementParents.get(id) ?? [];
 		const atTop = !parentIds.length;
-		const parents = parentIds.map((p) => persons.get(p)).filter((b): b is PersonBox => !!b);
+		const parents = boxesOf(persons, parentIds);
 		const v = this.aboveBottomBar(size, (area) => focusView(this.bounds, area, laid.layout.geometry.fontPx, me, this.insetTop, children, atTop, parents));
 		// Not clearBand (which clears the whole width): only the cards and badges under the toolbar
 		// itself move the view down, and never so far that the focus card leaves the free area.
@@ -1281,7 +1344,7 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 
 	/** Start person (spec §5.5): the person last edited in this block, else options.start, else the first root. */
 	private startId(): string | null {
-		const edited = this.blockState().lastEdited;
+		const edited = this.peekState()?.lastEdited ?? null;
 		return this.g ? startPerson(this.g, edited !== null && this.g.byId.has(edited) ? edited : this.optionsStart) : null;
 	}
 
@@ -1293,7 +1356,6 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 	private sidewaysFirst(laid: LaidOut, size: Size, id: string | null): View {
 		const persons = laid.layout.persons;
 		const g = this.g;
-		const boxes = (ids: Iterable<string>) => [...ids].map((x) => persons.get(x)).filter((b): b is PersonBox => !!b);
 		const fam = id !== null && g ? familyOf(g, id) : null;
 		// Children drawn next to the person: a child placed with other parents is drawn elsewhere.
 		const kids = fam && g ? fam.children.filter((c) => (g.placementParents.get(c) ?? []).includes(id!)) : [];
@@ -1305,15 +1367,15 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 		const top = Math.max(0, Math.min(this.insetTop, size.h - 1));
 		const bottom = Math.max(top + 1, size.h - this.insetBottom);
 		const me = id !== null ? (persons.get(id) ?? null) : null;
-		this.hintKids = boxes(kids);
+		this.hintKids = boxesOf(persons, kids);
 		const view = sidewaysView(
 			size,
 			laid.layout.geometry.fontPx,
 			{
 				me,
-				partners: fam && id !== null ? boxes(near(id, fam.partners)) : [],
-				children: g ? kids.flatMap((c) => boxes([c]).map((card) => ({ card, partners: boxes(near(c, familyOf(g, c).partners)) }))) : [],
-				parents: id !== null && g ? boxes(g.placementParents.get(id) ?? []) : [],
+				partners: fam && id !== null ? boxesOf(persons, near(id, fam.partners)) : [],
+				children: g ? kids.flatMap((c) => boxesOf(persons, [c]).map((card) => ({ card, partners: boxesOf(persons, near(c, familyOf(g, c).partners)) }))) : [],
+				parents: id !== null && g ? boxesOf(persons, g.placementParents.get(id) ?? []) : [],
 			},
 			top,
 			bottom,
@@ -1326,12 +1388,11 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 	}
 
 	private defaultViewFor(laid: LaidOut, size: Size): View {
-		this.start = this.startId();
+		const start = this.startId();
 		const persons = laid.layout.persons;
-		const startBox = this.start ? (persons.get(this.start) ?? null) : null;
-		const fam = this.start && this.g ? familyOf(this.g, this.start) : null;
-		const boxes = (ids: string[]) => ids.map((id) => persons.get(id)).filter((b): b is PersonBox => !!b);
-		const family = fam ? { partners: boxes(fam.partners), children: boxes(fam.children) } : null;
+		const startBox = start ? (persons.get(start) ?? null) : null;
+		const fam = start && this.g ? familyOf(this.g, start) : null;
+		const family = fam ? { partners: boxesOf(persons, fam.partners), children: boxesOf(persons, fam.children) } : null;
 		return this.aboveBottomBar(size, (area) => {
 			const v = defaultView(this.bounds, area, laid.layout.geometry.fontPx, startBox, this.insetTop, family);
 			// A toolbar taller than the gap between rows could still reach the row above the start person.
@@ -1362,7 +1423,7 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 			hit.setAttribute('width', String(r.w));
 			hit.setAttribute('height', String(r.h));
 		};
-		// D31: in `down` the tap area hangs below its card; `sideways` hit areas already do (WP5.5a).
+		// D31: in `down` the tap area hangs below its card; `sideways` hit areas already do.
 		const down = laid.layout.orientation !== 'sideways';
 		for (const t of this.scene?.tags ?? []) place(t.hit, down ? tagHitBelow(t.tag.hit, laid.layout.persons.get(t.tag.person), view.scale) : enlargeHit(t.tag.hit, view.scale));
 		// The same for the `+` badges of focus mode (spec §7.5).
@@ -1392,17 +1453,16 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 			counts = outsideBox(view, size, this.hintKids, top, size.h - this.insetBottom);
 		}
 		for (const dir of ['up', 'down'] as const) {
-			let el = vp.querySelector<HTMLElement>(`:scope > .dynasty-hint-${dir}`);
+			// No element is added after the draw: only the classes of the slot change.
+			const el = vp.querySelector<HTMLElement>(`:scope > .dynasty-hint-slot[data-dir="${dir}"]`);
+			if (!el) continue;
 			const n = counts[dir];
-			if (!n) {
-				el?.remove();
-				continue;
+			const text = n ? HINT_UI[dir](n) : '';
+			if (el.hasClass('dynasty-hint') !== !!n) {
+				el.toggleClass('dynasty-hint', !!n);
+				el.toggleClass(`dynasty-hint-${dir}`, !!n);
 			}
-			if (!el) {
-				el = vp.createDiv({ cls: ['dynasty-hint', `dynasty-hint-${dir}`] });
-				this.paintCalloutBg();
-			}
-			el.setText(HINT_UI[dir](n));
+			if (el.getText() !== text) el.setText(text);
 		}
 		this.placeHints();
 	}
@@ -1428,7 +1488,7 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 	}
 
 	private storeView(view: View): void {
-		const st = this.blockState();
+		const st = this.ensureState();
 		st.view = view;
 		st.viewFor = this.drawnKey ?? '';
 		st.views[this.orientation] = { view, viewFor: st.viewFor };
@@ -1590,7 +1650,7 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 			openNote: (open) => this.openNote(open),
 			focus: {
 				here: (person) => TreeView.focusState(this.host, h.state, person),
-				changed: () => TreeView.redrawState(this.host, h.state, null, null, null, true),
+				changed: () => TreeView.redrawState(this.host, h.state, { keepOwn: true }),
 				pinning: () => TreeView.dropOwnFocus(this.host, h.state),
 			},
 		});
@@ -1644,7 +1704,7 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 	private static refocusHouses(host: TreeHost, st: BlockState, full: boolean, step = 0): void {
 		let button: HTMLElement | null = null;
 		for (const v of host.views) {
-			if (v.unloaded || !!v.full !== full || v.blockState() !== st) continue;
+			if (v.unloaded || !!v.full !== full || v.peekState() !== st) continue;
 			const b = v.viewport?.querySelector<HTMLElement>('.dynasty-houses-button') ?? null;
 			if (b?.isConnected) button = b;
 		}
@@ -1733,7 +1793,7 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 		if (!bar.childElementCount) bar.remove();
 		// The toolbar can be wider now (Add person): the D28 hint stays left of it.
 		this.placeHints();
-		const resizable = !this.full && !readOnly && !this.coarse && !this.blocked && !!this.handle && !this.phoneHeight();
+		const resizable = !this.full && !readOnly && !this.coarse && !this.blocked && !!this.handle && !this.isPhone();
 		let grip = root.querySelector<HTMLElement>(':scope > .dynasty-resize');
 		if (resizable && !grip) grip = this.buildResizeHandle(root, vp);
 		else if (!resizable && grip) grip.remove();
@@ -1772,7 +1832,11 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 			drag = null;
 			root.removeClass('dynasty-resizing');
 			const h = this.dragHeight;
-			if (!d.moved || h === null || h === this.optionsHeight) return;
+			// A press with no real drag writes nothing: the box goes back to its height, and later settings apply.
+			if (!d.moved || h === null || h === this.optionsHeight) {
+				this.resetHeight();
+				return;
+			}
 			this.guard(() => {
 				this.writeHeight(h).catch((e) => {
 					console.error('Dynasty Tree: cannot save the height', e);
@@ -1908,7 +1972,7 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 	/**
 	 * In the full-screen view a person is centred in the free area between the toolbar bands (the
 	 * phone's bottom bar and top safe area, the desktop toolbar), not in the whole viewport, so the
-	 * card and its neighbours do not sit under a toolbar (WP4.3).
+	 * card and its neighbours do not sit under a toolbar.
 	 */
 	private centreFree(v: View): View {
 		if (!this.full || !(v.scale > 0)) return v;
@@ -2004,11 +2068,12 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 		if (issues.length) {
 			const badge = button('alert-triangle', problemsLabel(issues.length), 'dynasty-warning-badge');
 			badge.createSpan({ cls: 'dynasty-warning-count', text: String(issues.length) });
-			badge.addEventListener('click', () => this.guard(() => this.toggleProblems(badge, issues)));
+			// A click that a key makes has no press count (detail 0); a mouse or touch press has 1 or more.
+			badge.addEventListener('click', (e) => this.guard(() => this.toggleProblems(badge, issues, !e.detail)));
 		}
 		if (this.full) this.closeButton(bar);
 		else {
-			// Corner brackets read as "full screen"; Fit uses shrink (the decision notes WP1.4, M4).
+			// Corner brackets read as "full screen"; Fit uses shrink.
 			const expand = button('maximize', FULL_UI.expand, 'dynasty-expand');
 			expand.addEventListener('click', () => this.guard(() => void this.openFull(null)));
 		}
@@ -2053,7 +2118,7 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 		);
 	}
 
-	private toggleProblems(opener: HTMLElement, issues: CodedIssue[]): void {
+	private toggleProblems(opener: HTMLElement, issues: CodedIssue[], keyboard: boolean): void {
 		const pop = this.popover;
 		if (!pop) return;
 		if (pop.kind === 'problems') {
@@ -2080,15 +2145,24 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 					b.addEventListener('click', () => {
 						pop.close();
 						this.guard(() => {
-							if (people.every((id) => persons?.has(id))) this.showPerson(people[0], people.slice(1));
+							// D1: the static touch preview never moves; like a tag tap (D17), the full-screen view opens on the person.
+							if (!this.full && this.coarse) void this.openFull(people[0]);
+							else if (people.every((id) => persons?.has(id))) this.showPerson(people[0], people.slice(1));
 							else this.focusOn(null, people);
 						});
 					});
 				}
+				// Enter or Space on the badge moves the focus into the list: its buttons come last in the Tab order (spec §5.2).
+				if (keyboard) el.querySelector<HTMLElement>('.dynasty-problem-button')?.focus();
 			},
 			opener,
 		);
 	}
+}
+
+/** The drawn cards of `ids`, in the same order; people with no card are left out. */
+function boxesOf(persons: ReadonlyMap<string, PersonBox>, ids: Iterable<string>): PersonBox[] {
+	return [...ids].map((id) => persons.get(id)).filter((b): b is PersonBox => !!b);
 }
 
 /**
@@ -2097,7 +2171,8 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
  */
 function orderFirst(bar: HTMLElement, els: (HTMLElement | null)[]): void {
 	const want = els.filter((e): e is HTMLElement => !!e);
-	const now = Array.from(bar.children).slice(0, want.length);
-	if (want.every((e, i) => now[i] === e)) return;
-	for (let i = want.length - 1; i >= 0; i--) bar.prepend(want[i]);
+	want.forEach((e, i) => {
+		const at = bar.children[i] ?? null;
+		if (at !== e) bar.insertBefore(e, at);
+	});
 }

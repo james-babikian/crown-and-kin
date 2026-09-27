@@ -96,6 +96,38 @@ describe('relocate: finding a handle\'s block after the note changed', () => {
 		expect(relocate([], 0, 0, A)).toEqual({ kind: 'detached' });
 	});
 
+	it('with the previous bodies: a block that already held the text is a copy, not a move (area B (1))', () => {
+		// Block 0 edited in place; block 1 was already a copy.
+		expect(relocate(['X', A], 2, 0, A, [A, A])).toEqual({ kind: 'keep', ordinal: 0 });
+		// Two different blocks swapped: still a move.
+		expect(relocate([B, A], 2, 0, A, [A, B])).toEqual({ kind: 'moved', ordinal: 1 });
+		// The block became a copy of another only in this change: a move, as before.
+		expect(relocate(['X', A], 2, 0, A, [A, B])).toEqual({ kind: 'moved', ordinal: 1 });
+	});
+
+	it('with the previous bodies: the original deleted and its copy left, the handle is detached', () => {
+		expect(relocate([A], 2, 0, A, [A, A])).toEqual({ kind: 'detached' });
+		expect(relocate([B, A], 3, 0, A, [A, B, A])).toEqual({ kind: 'detached' });
+		// With no copy before, a block removed above is still followed.
+		expect(relocate([A], 2, 1, A, [B, A])).toEqual({ kind: 'moved', ordinal: 0 });
+		expect(relocate([A, B], 3, 1, A, [B, A, B])).toEqual({ kind: 'moved', ordinal: 0 });
+	});
+
+	it('previous bodies of another length than the handle knew are not used', () => {
+		expect(relocate(['X', A], 2, 0, A, [A, A, A])).toEqual({ kind: 'moved', ordinal: 1 });
+		expect(relocate([A], 2, 0, A, [A])).toEqual({ kind: 'keep', ordinal: 0 });
+	});
+
+	it('relocateAll passes the previous bodies to every handle', () => {
+		expect(relocateAll(['X', A], [
+			{ count: 2, ordinal: 0, body: A },
+			{ count: 2, ordinal: 1, body: A },
+		], [A, A])).toEqual([
+			{ kind: 'keep', ordinal: 0 },
+			{ kind: 'keep', ordinal: 1 },
+		]);
+	});
+
 	it('two handles that land on one block are both detached', () => {
 		const rel = relocateAll([A, B], [
 			{ count: 3, ordinal: 0, body: A },

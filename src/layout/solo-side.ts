@@ -1,3 +1,8 @@
+/**
+ * Reorders each block's families so a person's single-parent children sit on their own side,
+ * away from their couple children. `layout.ts` calls `soloFamiliesOutside` once, before placing
+ * any card, to get the row order it packs cards in; `core/order.ts`'s walk gives it the blocks.
+ */
 import type { FamilyGraph } from '../core/derive';
 import type { ModelOrder } from '../core/order';
 
@@ -11,7 +16,7 @@ interface Group {
 
 /**
  * The model order's blocks, with each person's single-parent family moved to that person's
- * outer side of the couple families of their block (WP3.4). The model order puts a person's
+ * outer side of the couple families of their block. The model order puts a person's
  * single-parent children after all their couple children, so for the left partner of a couple
  * the line from their card crossed the couple's trunk.
  *

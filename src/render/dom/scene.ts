@@ -1,3 +1,10 @@
+/*
+ * Builds the tree's SVG content with Obsidian's createSvg. Colours and fonts come only from the
+ * dynasty- classes in styles.css; the one value written per card is --dynasty-house-color.
+ * Each card carries all three levels of detail (spec §5.4); a class on the <svg> picks one, so a
+ * level change is a class change, never a rebuild.
+ */
+
 import type { FamilyGraph } from '../../core/derive';
 import type { Person } from '../../core/types';
 import { cardText, isTall, tagTop, type CardText } from '../../layout/geometry';
@@ -6,20 +13,13 @@ import type { FarTag, LaidOut, Rect } from '../../layout/model';
 import { legendRows, unionMarkClass, type LegendPart } from '../legend';
 import { nameLines } from '../name-lines';
 import { UNION_MARKS, unionMark, unionShape } from '../styles';
-import { dateLine } from '../svg-string';
-import { SIGN_CARD_LABEL, cardLabel, farTagLabel } from '../tree-info';
+import { SIGN_CARD_LABEL, cardLabel, dateLine, farTagLabel, farTagName } from '../tree-info';
 import { truncate } from '../view-math';
-
-/*
- * Builds the tree's SVG content with Obsidian's createSvg. Colours and fonts come only from the
- * dynasty- classes in styles.css; the one value written per card is --dynasty-house-color.
- * Each card carries all three levels of detail (spec §5.4); a class on the <svg> picks one, so a
- * level change is a class change, never a rebuild.
- */
 
 /** Text width in px for a CSS font shorthand. */
 export type Measure = (text: string, font: string) => number;
 
+/** The resolved font families and weight the scene measures and draws text with. */
 export interface SceneFonts {
 	/** Resolved `font-family` of the note text (card text). */
 	text: string;
@@ -29,11 +29,13 @@ export interface SceneFonts {
 	bold: string;
 }
 
+/** A card name's internal link, as `buildScene`'s `link` option returns it. */
 export interface CardLink {
 	linktext: string;
 	resolved: boolean;
 }
 
+/** What `buildScene` needs beyond the layout: fonts, a measurer, link resolution and focus badges. */
 export interface SceneOptions {
 	fonts: SceneFonts;
 	measure: Measure;
@@ -43,6 +45,7 @@ export interface SceneOptions {
 	badges?: { hidden: ReadonlyMap<string, number>; label: (p: Person, hidden: number) => string };
 }
 
+/** A drawn far-couple tag, with its element and enlarged tap area. */
 export interface TagRef {
 	tag: FarTag;
 	el: SVGGElement;
@@ -65,6 +68,7 @@ export interface BadgeRef {
 	card?: Rect;
 }
 
+/** The SVG content `buildScene` built: the drawn elements, and a way to re-fit their text. */
 export interface Scene {
 	cards: Map<string, SVGGElement>;
 	tags: TagRef[];
@@ -91,7 +95,7 @@ export const TAG_COMPACT_PILL_EM = 2;
 export const BADGE_RADIUS_EM = 0.6;
 /**
  * `sideways` (D24): the badge sits inside the card's top right corner, this far from both edges, in
- * em. In the column gaps it would sit on the lines (WP5.5a pictures).
+ * em. In the column gaps it would sit on the lines.
  */
 export const BADGE_INSET_EM = 0.25;
 /** How much further left the name and the D14 sign end on a sideways card with a badge, in em. */
@@ -101,6 +105,7 @@ export const RUMOUR_FONT_EM = 0.7;
 // All font sizes are set in styles.css from --dynasty-font-size (spec §5.8: nothing that styles
 // text is written into SVG attributes); these constants are what the measurement assumes.
 
+/** The class name on the `<svg>` that picks one level of detail (spec §5.4). */
 export const lodClass = (lod: string) => `dynasty-lod-${lod}`;
 
 /**
@@ -124,6 +129,7 @@ function isColour(value: string | undefined): value is string {
 	}
 }
 
+/** Draws the whole tree's SVG content (lines, markers, cards, badges, tags) into `parent`. */
 export function buildScene(parent: SVGGElement, g: FamilyGraph, laid: LaidOut, opts: SceneOptions): Scene {
 	const { layout, edges } = laid;
 	const geo = layout.geometry;
@@ -207,7 +213,7 @@ export function buildScene(parent: SVGGElement, g: FamilyGraph, laid: LaidOut, o
 		}
 		cards.set(p.id, card);
 
-		// The second focus and highlight ring, under the card: the accent alone can be too weak in a theme (WP6.5).
+		// The second focus and highlight ring, under the card: the accent alone can be too weak in a theme.
 		card.createSvg('rect', { cls: 'dynasty-card-ring', attr: { x: box.x, y: box.y, width: box.w, height: box.h } });
 		card.createSvg('rect', { cls: 'dynasty-card-bg', attr: { x: box.x, y: box.y, width: box.w, height: box.h } });
 		card.createSvg('rect', { cls: 'dynasty-card-strip', attr: { x: box.x, y: box.y, width: t.stripW, height: box.h } });
@@ -302,7 +308,7 @@ export function buildScene(parent: SVGGElement, g: FamilyGraph, laid: LaidOut, o
 	const bigH = TAG_COMPACT_PILL_EM * f;
 	for (const tag of layout.farTags.values()) {
 		const prefix = '⚭ ';
-		const rest = tag.spouses.length === 1 ? (g.byId.get(tag.spouses[0])?.name ?? tag.spouses[0]) : `${tag.spouses.length} partners`;
+		const rest = farTagName(g, tag.spouses);
 		const top = tagTop(geo, tag.y);
 		const bottom = top + geo.tagH;
 		const el = tagsEl.createSvg('g', {
@@ -310,7 +316,7 @@ export function buildScene(parent: SVGGElement, g: FamilyGraph, laid: LaidOut, o
 			attr: { tabindex: 0, role: 'button', 'aria-label': farTagLabel(g, tag.spouses), 'data-person': tag.person },
 		});
 		const hit = hitsEl.createSvg('rect', { cls: 'dynasty-tag-hit', attr: { x: tag.hit.x, y: tag.hit.y, width: tag.hit.w, height: tag.hit.h, 'data-person': tag.person } });
-		// The pill never grows past its zone (contract FarTag.zoneW): in `sideways` the tap area can be wider than the card's edge.
+		// The pill never grows past its zone (FarTag.zoneW): in `sideways` the tap area can be wider than the card's edge.
 		const zone = tag.zoneW ?? tag.hit.w;
 		// One rendering per level of detail, like the cards; a class on the <svg> shows one.
 		const pill = (cls: string, font: string, fontEm: number, h: number, text: string, fitText: boolean) => {

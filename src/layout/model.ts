@@ -1,19 +1,21 @@
 /**
- * Milestone 1 contract (frozen by the supervisor; change only through the supervisor).
- *
- * The shapes the layout hands to renderers. WP1.3 makes `layout.ts`, `edges.ts` and
- * `geometry.ts` use these types (and removes their local duplicates); WP1.4 renders them.
+ * The shapes the layout hands to renderers: card boxes, union points, far-couple tags, the line
+ * kinds and the finished `TreeLayout` and `EdgeDrawing`. `layout.ts`, `edges.ts` and `geometry.ts`
+ * build these shapes (`layout.ts` places cards, `edges.ts` draws lines, `geometry.ts` sizes cards
+ * and gaps); `src/render` only reads them. `StrokeKind` here and `STROKES` in `render/styles.ts`
+ * list the same line kinds in the same order: add a new kind to both.
  */
 import type { FamilyGraph } from '../core/derive';
 
+/** Card size a tree draws with (spec §9 "Card size"); `compact` is narrower and tighter. */
 export type CardSize = 'normal' | 'compact';
 
 /**
- * M5 contract (WP5.5, D24). `down`: generations are rows from top to bottom (every layout before
- * D24). `sideways`: generations are columns from left to right (ancestors left); siblings and
- * children stack from top to bottom in sibling order (D2); partners stack in the same column,
- * joined by their union point in the gap between the cards. The arranger works in generation /
- * position-in-generation terms; only the mapping to x/y and the gap sizes differ.
+ * D24. `down`: generations are rows from top to bottom (every layout before D24). `sideways`:
+ * generations are columns from left to right (ancestors left); siblings and children stack from
+ * top to bottom in sibling order (D2); partners stack in the same column, joined by their union
+ * point in the gap between the cards. The arranger works in generation / position-in-generation
+ * terms; only the mapping to x/y and the gap sizes differ.
  */
 export type Orientation = 'down' | 'sideways';
 
@@ -33,6 +35,7 @@ export type SidewaysCards = 'normal' | 'narrow';
  * below a tagged card, or a hit area that takes more of its own card, are both acceptable).
  */
 
+/** A rectangle in layout px: `x, y` is the top-left corner. */
 export interface Rect {
 	x: number;
 	y: number;
@@ -40,6 +43,7 @@ export interface Rect {
 	h: number;
 }
 
+/** Card and gap sizes a layout draws with, in layout px, scaled from the note font (spec §5.8). */
 export interface Geometry {
 	/** Resolved note font size in px that the geometry was built for (spec §5.8). */
 	fontPx: number;
@@ -60,11 +64,13 @@ export interface Geometry {
 /** `geometry.ts` exports `geometryFor: GeometryFor`. Card size scales with the font. */
 export type GeometryFor = (fontPx: number, cardSize: CardSize) => Geometry;
 
+/** A person's card: its box, id and generation (row in `down`, column in `sideways`). */
 export interface PersonBox extends Rect {
 	id: string;
 	gen: number;
 }
 
+/** Where a couple's dot is drawn, and how (spec §5.3, D10). */
 export interface UnionPoint {
 	key: string;
 	x: number;
@@ -87,16 +93,17 @@ export interface FarTag {
 	 */
 	x: number;
 	y: number;
-	/** Hit area, at least 44×44 px (spec §7.5). Where it meets a card, the card wins (WP4.3); renderers may enlarge it at settle (D31: in `down` it hangs below the card). */
+	/** Hit area, at least 44×44 px (spec §7.5). Where it meets a card, the card wins; renderers may enlarge it at settle (D31: in `down` it hangs below the card). */
 	hit: Rect;
 	/**
-	 * M5 (WP5.5a): the widest the visible tag may be, centred on `x`. Renderers draw the pill at
-	 * `min(zoneW ?? hit.w, text width)`. Absent = `hit.w` (every `down` layout before WP5.5a).
+	 * The widest the visible tag may be, centred on `x`. Renderers draw the pill at
+	 * `min(zoneW ?? hit.w, text width)`. Both orientations set it: the
+	 * hit area can be wider than the free part of the edge, and a pill that wide would cover lines.
 	 */
 	zoneW?: number;
 }
 
-/** Thresholds for D10; tuned with the owner in milestone 1. */
+/** Thresholds for D11, tuned with the owner. */
 export interface FarCoupleRule {
 	/** Different blocks and more than this many card widths apart horizontally. Spec default 3. */
 	maxCardWidths: number;
@@ -104,6 +111,7 @@ export interface FarCoupleRule {
 	maxGenerations: number;
 }
 
+/** A finished arrangement of one tree: every card and union point placed, ready to route lines through. */
 export interface TreeLayout {
 	persons: Map<string, PersonBox>;
 	unions: Map<string, UnionPoint>;
@@ -115,7 +123,7 @@ export interface TreeLayout {
 	 * column i's cards, `bottom` = the left edge of column i+1's cards.
 	 */
 	rowGaps: { top: number; bottom: number }[];
-	/** M5 (D24): how `persons`, `unions`, `rowGaps`, tags and edges were placed. */
+	/** D24: how `persons`, `unions`, `rowGaps`, tags and edges were placed. */
 	orientation: Orientation;
 	/** Keyed by person id. */
 	farTags: Map<string, FarTag>;
@@ -124,6 +132,7 @@ export interface TreeLayout {
 	geometry: Geometry;
 }
 
+/** Every kind of line the tree draws (spec §5.3). `render/styles.ts` gives each one its `STROKES` style. */
 export type StrokeKind =
 	| 'marriage'
 	| 'betrothal'
@@ -137,6 +146,7 @@ export type StrokeKind =
 	| 'ward'
 	| 'rumoured';
 
+/** One drawn line: its SVG path data, its kind and the people it connects. */
 export interface EdgePath {
 	d: string;
 	kind: StrokeKind;
@@ -144,36 +154,39 @@ export interface EdgePath {
 	people: string[];
 }
 
+/** A dot or "?" mark drawn on top of the lines: a union's sign, or a rumoured parent's mark. */
 export interface EdgeMarker {
 	x: number;
 	y: number;
 	kind: 'union' | 'implicit-union' | 'rumour';
-	/** M6 (D26): for `kind: 'union'`, the partnership type as written (a missing `type` gives `marriage`). Renderers draw the dot's shape from it: marriage dot, betrothal ring, concubinage diamond, affair open diamond; an unknown value is drawn as the marriage dot. `implicit-union` markers are the small ring. Far-couple dots use the same shapes. */
+	/** D26, D38: for `kind: 'union'`, the partnership type as written (a missing `type` gives `marriage`). Renderers draw the dot's shape from it: marriage dot, betrothal ring, concubinage diamond, affair open triangle; an unknown value is drawn as the marriage dot. `implicit-union` markers draw no sign. Far-couple dots use the same shapes. */
 	unionType?: string;
 }
 
+/** All the lines and markers routed for one tree layout. */
 export interface EdgeDrawing {
 	paths: EdgePath[];
 	markers: EdgeMarker[];
 }
 
+/** How a tree is arranged: sweep count, the far-couple rule, orientation and card widths. */
 export interface LayoutSettings {
 	/** Rounds of "centre parents over children, then children under parents". */
 	sweeps: number;
 	far: FarCoupleRule;
-	/** M5 (D24). Absent = `down`. Part of the cache key, with `sidewaysCards`. */
+	/** D24. Absent = `down`. Part of the cache key, with `sidewaysCards`. */
 	orientation?: Orientation;
-	/** M5 (D24). Absent = `normal`. */
+	/** D24. Absent = `normal`. */
 	sidewaysCards?: SidewaysCards;
 	/**
-	 * M5 (WP5.5c): the card width in layout px for `narrow` cards, chosen by the renderer from the
+	 * The card width in layout px for `narrow` cards, chosen by the renderer from the
 	 * note preview's box so two whole generations fit. The layout clamps it to [8 em, 10.25 em];
 	 * absent = 10.25 em. Ignored unless `orientation` is `sideways` and `sidewaysCards` is `narrow`.
 	 * Part of the cache key (rounded to 0.5 px).
 	 */
 	narrowCardW?: number;
 	/**
-	 * M6 (D29, D37): people whose card is one name text line taller (the renderer found with
+	 * D29, D37: people whose card is one name text line taller (the renderer found with
 	 * `nameLines` that the name does not fit on one text line). In every layout: `down` (the cards of
 	 * a row share their top edge; the gap below starts under the row's tallest card) and `sideways`
 	 * (longer along the column), normal, narrow and compact cards. Part of the cache key (sorted).
@@ -184,13 +197,14 @@ export interface LayoutSettings {
 	tallCards?: readonly string[];
 }
 
+/** A tree layout together with its routed lines: what `layoutTree` returns and the cache stores. */
 export interface LaidOut {
 	layout: TreeLayout;
 	edges: EdgeDrawing;
 }
 
 /**
- * The single synchronous entry point renderers call (`src/layout/index.ts`, WP1.3).
+ * The single synchronous entry point renderers call (`src/layout/index.ts`).
  * Goes through the in-memory LRU cache (spec §5.1 step 6); `fontFamily` is part of the key (§5.8).
  */
 export type LayoutTree = (g: FamilyGraph, geo: Geometry, settings: LayoutSettings, fontFamily: string) => LaidOut;

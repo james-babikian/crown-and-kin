@@ -3,9 +3,9 @@ import { deriveFamilies } from '../src/core/derive';
 import { hardErrorText } from '../src/core/messages';
 import { parseDynasty } from '../src/core/parse';
 import { routeEdges } from '../src/layout/edges';
-import { cardText, gapHeight, geometryFor, laneStep, lineMetrics, NORMAL_GEOMETRY, tagTop } from '../src/layout/geometry';
+import { cardText, gapHeight, geometryFor, laneStep, lineMetrics, MIN_HIT, NORMAL_GEOMETRY, tagTop } from '../src/layout/geometry';
 import { clearLayoutCache, LAYOUT_CACHE_SIZE, layoutTree } from '../src/layout/index';
-import { DEFAULT_FAR_RULE, DEFAULT_LAYOUT_SETTINGS, isFarCouple, layoutFamilies, MIN_HIT } from '../src/layout/layout';
+import { DEFAULT_FAR_RULE, DEFAULT_LAYOUT_SETTINGS, isFarCouple, layoutFamilies } from '../src/layout/layout';
 import type { EdgeDrawing, FarCoupleRule, Geometry, LayoutSettings, PersonBox, Rect, TreeLayout } from '../src/layout/model';
 import { build, fixture } from './helpers';
 

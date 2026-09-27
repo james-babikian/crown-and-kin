@@ -1,26 +1,27 @@
-import { Notice, type App } from 'obsidian';
-import type { FamilyGraph } from '../core/derive';
-import type { Op, ParentKind, UnionKind, UnionRef } from '../core/edit';
-import type { FamilyView } from '../core/family';
-import { PARENT_TYPES, UNION_TYPES, type Person } from '../core/types';
-import { FLOW, parentTypeText, partnerDetail, UNION_TYPE_TEXT } from '../render/ui-text';
-import type { Written } from './block-handle';
-import { choose, type Choice } from './choice-modal';
-import { pickerExclusions } from '../core/family-query';
-import { pickPerson } from './person-picker';
-
 /*
  * Add parent, Add child and Add partner (spec §6.4) as a few small steps: choices, then the picker
  * (spec §6.6) or a new-person sheet. The sheet that starts a flow writes the result together with
  * its own unsaved draft (spec §6.3).
  */
 
+import { Notice, type App } from 'obsidian';
+import type { FamilyGraph } from '../core/derive';
+import type { Op, ParentKind, UnionKind, UnionRef } from '../core/edit';
+import { PARENT_TYPES, UNION_TYPES, type Person } from '../core/types';
+import { FLOW, parentTypeText, partnerDetail, UNION_TYPE_TEXT } from '../render/ui-text';
+import type { Written } from './block-handle';
+import { choose, type Choice } from './choice-modal';
+import { pickerExclusions, type FamilyView } from '../core/family-query';
+import { pickPerson } from './person-picker';
+
+/** How a new person joins the tree: alone, as a parent, as a child, or as a partner. */
 export type NewRelation =
 	| { kind: 'person' }
 	| { kind: 'parent'; child: string; type: ParentKind }
 	| { kind: 'child'; parent: string; other: string | null; union?: UnionRef }
 	| { kind: 'partner'; partner: string };
 
+/** What an Add flow needs from the sheet that starts it. */
 export interface FlowHost {
 	app: App;
 	g: FamilyGraph;
@@ -46,6 +47,7 @@ export function autoUnionNotice(out: Written, a: string, b: string | undefined):
 	if (out.effects.includes('auto-union') && b) new Notice(FLOW.autoUnion(a, b), 10_000);
 }
 
+/** First choice of every Add flow: a new person, or one already in the tree. */
 async function newOrExisting(host: FlowHost, what: string, exclude: Set<string>): Promise<'new' | 'existing' | null> {
 	const any = host.g.people.some((p) => !exclude.has(p.id));
 	return choose<'new' | 'existing'>(host.app, {
@@ -59,6 +61,7 @@ async function newOrExisting(host: FlowHost, what: string, exclude: Set<string>)
 	});
 }
 
+/** Add parent (spec §6.4): parent type, then new or existing person, then the write. */
 export async function addParent(host: FlowHost): Promise<void> {
 	if (!host.ready()) return;
 	const p = host.person;
@@ -90,6 +93,7 @@ export async function addParent(host: FlowHost): Promise<void> {
 	if (out) autoUnionNotice(out, host.name(picked.id), other && host.name(other));
 }
 
+/** Add child (spec §6.4): other parent, then new or existing person, then, for an existing child who has birth parents, the parent type, then the write. */
 export async function addChild(host: FlowHost): Promise<void> {
 	if (!host.ready()) return;
 	const p = host.person;
@@ -115,7 +119,7 @@ export async function addChild(host: FlowHost): Promise<void> {
 	}
 	const exclude = pickerExclusions(host.g, p.id, 'add-child');
 	if (other) for (const id of pickerExclusions(host.g, other, 'add-child')) exclude.add(id);
-	// People who have this person as a birth parent are this person's children already (supervisor decision, WP3.3 review).
+	// People who have this person as a birth parent are this person's children already (the decision notes "Union references").
 	for (const q of host.g.people) if (q.parents.some((l) => l.id === p.id && l.type === 'birth')) exclude.add(q.id);
 	const how = await newOrExisting(host, 'child', exclude);
 	if (!how) return;
@@ -162,6 +166,7 @@ export async function addChild(host: FlowHost): Promise<void> {
 	await host.commit(ops, child.id);
 }
 
+/** Add partner (spec §6.4): new or existing person, existing partnerships shown first, then the union type. */
 export async function addPartner(host: FlowHost): Promise<void> {
 	if (!host.ready()) return;
 	const p = host.person;
@@ -198,6 +203,7 @@ export async function addPartner(host: FlowHost): Promise<void> {
 	await host.commit([unionOp(p.id, x, type)], x);
 }
 
+/** Asks which kind of partnership `a` and `b` have; null after Cancel. */
 export function chooseUnionType(app: App, a: string, b: string): Promise<UnionKind | null> {
 	return choose<UnionKind>(app, {
 		name: 'union-type',

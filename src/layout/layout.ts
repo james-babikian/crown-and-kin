@@ -1,20 +1,28 @@
-import { placedChildren, type FamilyGraph } from '../core/derive';
+/**
+ * The arranger: `layoutFamilies` places every card and union point of a tree, in `down` or (D24)
+ * `sideways`. It works from the generations `core/generations` computed and the sibling order
+ * `core/order` computed, using `pava.ts` to pack a row and `lines.ts` to plan where lines will run
+ * and size the gaps between rows. `index.ts` is the only caller in `src/`; `edges.ts` routes the
+ * lines afterwards from the same finished layout.
+ */
+import { placedChildren, type FamilyGraph, type FamilyUnion } from '../core/derive';
 import type { ModelOrder } from '../core/order';
 import type { FarCoupleRule, FarTag, Geometry, LayoutSettings, PersonBox, Rect, TreeLayout, UnionPoint } from './model';
 import { MIN_HIT, barClear, gapHeight, lineMetrics, sideTagDepth, sidewaysGeometry, tagTop, tallExtra, turnedGeometry } from './geometry';
-import { planLines, type LinePlan } from './lines';
+import { addTo, planLines, type LinePlan } from './lines';
 import { placeInOrder } from './pava';
 import { soloFamiliesOutside } from './solo-side';
 import { turnBox, turnUnion } from './turn';
 
-/** Spec D10 defaults: far when more than 3 card widths apart, or more than one generation. */
+/** Spec D11 defaults: far when more than 3 card widths apart, or more than one generation. */
 export const DEFAULT_FAR_RULE: FarCoupleRule = { maxCardWidths: 3, maxGenerations: 1 };
+/** Default layout settings: `down` orientation, 4 sweeps, the D11 far-couple rule. */
 export const DEFAULT_LAYOUT_SETTINGS: LayoutSettings = { sweeps: 4, far: DEFAULT_FAR_RULE };
-export { MIN_HIT } from './geometry';
 
 /**
  * Where each union's dot goes, given final card positions.
- * - Partners side by side: in the gap between them, on a bar.
+ * - Partners side by side: in the gap between them, on a bar. A couple with several unions (a
+ *   betrothal, then a marriage) gets one dot for each, spread along the gap in list order.
  * - Partners in the same block (e.g. a third wife two cards along): below, halfway between.
  * - Partners from different families or generations: below the anchor partner, a quarter-card
  *   towards the other, so the children stay with the family they were drawn under. Far couples
@@ -29,13 +37,26 @@ function placeUnions(
 	geo: Geometry,
 ): Map<string, UnionPoint> {
 	const unions = new Map<string, UnionPoint>();
+	const adjacent = (fu: FamilyUnion) => {
+		const [a, b] = fu.partners.map((p) => persons.get(p)!);
+		return a.gen === b.gen && Math.abs(rowIndex.get(a.id)! - rowIndex.get(b.id)!) === 1;
+	};
+	const leftOf = (fu: FamilyUnion) => fu.partners.map((p) => persons.get(p)!).reduce((l, b) => (b.x < l.x ? b : l)).id;
+	// The left card names the pair: it has only one neighbour on its right.
+	const barsOf = new Map<string, string[]>();
+	for (const fu of g.unions) if (adjacent(fu)) addTo(barsOf, leftOf(fu), fu.key);
 	for (const fu of g.unions) {
 		const [a, b] = fu.partners.map((p) => persons.get(p)!);
-		const adjacent = a.gen === b.gen && Math.abs(rowIndex.get(a.id)! - rowIndex.get(b.id)!) === 1;
 		const y = Math.max(a.y + a.h, b.y + b.h) + geo.rowGap * 0.2;
-		if (adjacent) {
+		if (adjacent(fu)) {
 			const [l, r] = a.x < b.x ? [a, b] : [b, a];
-			unions.set(fu.key, { key: fu.key, x: (l.x + l.w + r.x) / 2, y: l.y + l.h / 2, bar: true, far: false });
+			// Signs on one point would cover each other, and the trunks would share a line: space the
+			// dots two union sizes apart where the gap allows, and never less than one.
+			const keys = barsOf.get(l.id)!;
+			const gap = r.x - l.x - l.w;
+			const step = keys.length > 1 ? Math.min(2 * geo.unionSize, Math.max(geo.unionSize, (gap - geo.unionSize) / (keys.length - 1))) : 0;
+			const x = (l.x + l.w + r.x) / 2 + (keys.indexOf(fu.key) - (keys.length - 1) / 2) * step;
+			unions.set(fu.key, { key: fu.key, x, y: l.y + l.h / 2, bar: true, far: false });
 		} else if (blockOf.get(a.id) === blockOf.get(b.id)) {
 			unions.set(fu.key, { key: fu.key, x: (a.x + a.w / 2 + b.x + b.w / 2) / 2, y, bar: false, far: false });
 		} else {
@@ -229,7 +250,7 @@ export function layoutFamilies(
 			upSweep();
 			downSweep();
 		}
-		// Normalise to start at 0,0.
+		// Normalise x to start at 0.
 		const minX = Math.min(...[...persons.values()].map((p) => p.x));
 		for (const p of persons.values()) p.x -= minX;
 		unions = placeUnions(g, persons, rowIndex, order, blockOf, geo);
@@ -380,15 +401,16 @@ function buildFarTags(g: FamilyGraph, persons: Map<string, PersonBox>, unions: M
 		const box = persons.get(person)!;
 		const zone = plan.tagZones.get(person)!;
 		const y = box.y + box.h;
-		tags.set(person, { person, spouses: list, x: zone.x, y, hit: tagHit(zone, y, geo) });
+		// The hit area can be wider than the free part of the edge (small fonts); the pill keeps to that part, off the lines.
+		tags.set(person, { person, spouses: list, x: zone.x, y, hit: tagHit(zone, y, geo), zoneW: Math.max(0, zone.w) });
 	}
 	return tags;
 }
 
 /**
  * The tag hangs from the card's bottom edge (see `tagTop`), in the part of the edge that no other
- * line leaves from. `hit.w` is also the widest the visible tag may be: renderers truncate the
- * text to fit it. Its hit area is at least 44×44 px and sits mostly below the card, so it takes
+ * line leaves from. The visible tag is never wider than that part (`FarTag.zoneW`): renderers
+ * truncate the text to fit it. Its hit area is at least 44×44 px and sits mostly below the card, so it takes
  * as little of the card's own tap area as possible. Nothing about it depends on names (names are
  * not part of the layout cache key).
  */

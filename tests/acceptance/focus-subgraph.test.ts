@@ -1,7 +1,7 @@
 import { isDeepStrictEqual } from 'node:util';
 import { describe, expect, it } from 'vitest';
 import { deriveFamilies, type FamilyGraph } from '../../src/core/derive';
-import { DEFAULT_FOCUS_GENERATIONS, type FocusGenerationsFor, type FocusSubgraph, type FocusSubgraphResult } from '../../src/core/focus';
+import { DEFAULT_FOCUS_GENERATIONS, type FocusGenerationsFor, type FocusSubgraph, type FocusSubgraphResult } from '../../src/core/focus-subgraph';
 import { focusGenerationsFor, focusSubgraph } from '../../src/core/focus-subgraph';
 import { parseDynasty } from '../../src/core/parse';
 import type { ParentRef, Person, Tree } from '../../src/core/types';

@@ -12,7 +12,8 @@ vi.mock('obsidian', () => {
 });
 
 import { TFile } from 'obsidian';
-import { HandleRegistry, sameBody, smallestChange } from '../src/obsidian/block-handle';
+import { sameBody, smallestChange } from '../src/core/block-match';
+import { HandleRegistry } from '../src/obsidian/block-handle';
 import { findBlocks } from '../src/core/block-locate';
 import { loadSheet } from '../src/obsidian/edit-sheet';
 

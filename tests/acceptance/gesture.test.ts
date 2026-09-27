@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { DOUBLE_TAP_FACTOR, DOUBLE_TAP_MS, DOUBLE_TAP_PX, type DoubleTapView, type IsDoubleTap, type PinchView, type Point, type ResizeView, type ScaleLimits } from '../../src/render/gesture';
+import { DOUBLE_TAP_FACTOR, DOUBLE_TAP_MS, DOUBLE_TAP_PX, type DoubleTapView, type IsDoubleTap, type PinchView, type Point, type ResizeView, type ScaleLimits } from '../../src/render/view-math';
 import { PAN_THRESHOLD, clampScale, isPan, type Size, type View } from '../../src/render/view-math';
 import * as impl from '../../src/render/view-math';
 
 // Spec §7.2 (gestures), §7.5 (resize/orientation), §7.6 (pan/zoom rendering) and the frozen
-// contract `src/render/gesture.ts`. The expected numbers below are worked out by hand from the
+// contract (its gesture types are now in `view-math.ts`). The expected numbers below are worked out by hand from the
 // contract's own wording, not copied from `view-math.ts` (whose new functions do not exist yet:
 // `pinchView`, `doubleTapView`, `isDoubleTap`, `resizeView` are WP4.2's job). Until then every
 // `it` below that calls one of them fails with "... is not a function" — that is expected.

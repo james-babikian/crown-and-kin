@@ -165,6 +165,32 @@ unions:
 		expect(order.anchors.get('u0')).toBe('husband');
 	});
 
+	it('walks depth first: all of one child line before the next sibling, then the next union', () => {
+		const { order } = build(`people:
+  - {id: a}
+  - {id: b}
+  - {id: c}
+  - {id: k1, parents: [a, b]}
+  - {id: k2, parents: [a, b]}
+  - {id: g1, parents: [k1]}
+  - {id: k3, parents: [a, c]}
+  - {id: s1, parents: [a]}
+unions:
+  - partners: [a, b]
+  - partners: [a, c]
+`);
+		const seq = order.items.map((i) => (i.kind === 'person' ? i.id : i.key));
+		expect(seq).toEqual(['b', 'a', 'c', 'u0', 'k1', 'g1', 'k2', 'u1', 'k3', 's1']);
+	});
+
+	it('a line of 20000 generations is ordered without a stack overflow', () => {
+		const lines = ['people:', '  - {id: p0}'];
+		for (let i = 1; i < 20000; i++) lines.push(`  - {id: p${i}, parents: [p${i - 1}]}`);
+		const { order } = build(lines.join('\n'));
+		expect(order.items).toHaveLength(20000);
+		expect(order.items[19999]).toEqual({ kind: 'person', id: 'p19999' });
+	});
+
 	it('emits every person exactly once', () => {
 		for (const f of ['01', '02', '03', '04', '06', '07', '08', '11']) {
 			const { g, order } = build(fixture(f));

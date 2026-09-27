@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { deriveFamilies } from '../../src/core/derive';
-import type { CodedIssue, IssueCode, IssueParams } from '../../src/core/issues';
+import type { CodedIssue, IssueCode, IssueParams } from '../../src/core/messages';
 import { parseDynasty } from '../../src/core/parse';
 import type { Tree } from '../../src/core/types';
 import { allFixtures, fixtureSource } from './load';

@@ -1,7 +1,16 @@
+/*
+ * Works out the left-to-right order of people and unions on each row (spec §5.1 step 2): a
+ * depth-first walk from the founders that keeps spouses beside each other and siblings in the
+ * order of the `people` list (D2). The layout code calls `computeModelOrder` with the family graph
+ * from `derive.ts` and the generations from `generations.ts`.
+ */
+
 import { partnerOf, type FamilyGraph } from './derive';
 
+/** One entry of the left-to-right order: a person card, or a union's dot. */
 export type OrderItem = { kind: 'person'; id: string } | { kind: 'union'; key: string };
 
+/** The left-to-right order of people and unions the layout should try to keep. */
 export interface ModelOrder {
 	/** Every person and union, in the left-to-right order the layout should try to keep. */
 	items: OrderItem[];
@@ -59,7 +68,17 @@ export function computeModelOrder(g: FamilyGraph, gen: Map<string, number>): Mod
 		return out;
 	};
 
-	const visit = (id: string) => {
+	// The walk keeps its own stack: a long line of descent would overflow the call stack. Each task
+	// is looked at only when it is taken from the stack, as the recursive walk would reach it.
+	type Task = { kind: 'visit'; id: string } | { kind: 'family'; id: string } | { kind: 'union'; key: string; from: string } | { kind: 'solo'; id: string };
+	const stack: Task[] = [];
+	/** Puts tasks on the stack so the first of them is done first. */
+	const then = (tasks: Task[]) => {
+		for (let k = tasks.length - 1; k >= 0; k--) stack.push(tasks[k]);
+	};
+	const visits = (ids: readonly string[]): Task[] => ids.map((id) => ({ kind: 'visit', id }));
+
+	const step = (id: string) => {
 		if (visited.has(id)) return;
 		visited.add(id);
 
@@ -92,16 +111,29 @@ export function computeModelOrder(g: FamilyGraph, gen: Map<string, number>): Mod
 		}
 		blocks.push(row);
 
-		const family = (pid: string) => {
-			for (const key of unionsOf(pid)) {
-				if (belongsToOther(key, pid)) continue;
-				emitUnion(key, pid);
-				g.unionByKey.get(key)!.children.forEach(visit);
+		then([id, ...row.filter((p) => p !== id)].map((p) => ({ kind: 'family', id: p })));
+	};
+
+	const visit = (id: string) => {
+		stack.push({ kind: 'visit', id });
+		for (let task = stack.pop(); task; task = stack.pop()) {
+			switch (task.kind) {
+				case 'visit':
+					step(task.id);
+					break;
+				case 'family':
+					then([...unionsOf(task.id).map((key): Task => ({ kind: 'union', key, from: task.id })), { kind: 'solo', id: task.id }]);
+					break;
+				case 'union':
+					if (belongsToOther(task.key, task.from)) break;
+					emitUnion(task.key, task.from);
+					then(visits(g.unionByKey.get(task.key)!.children));
+					break;
+				case 'solo':
+					then(visits(g.soloChildren.get(task.id) ?? []));
+					break;
 			}
-			(g.soloChildren.get(pid) ?? []).forEach(visit);
-		};
-		family(id);
-		for (const p of row) if (p !== id) family(p);
+		}
 	};
 
 	// Founders first (roots not married to someone with parents), then anyone left over.

@@ -1,8 +1,3 @@
-import { Modal, Notice, TFile, type EventRef } from 'obsidian';
-import { FULL_UI } from '../render/ui-text';
-import { PHONE_MAX_WIDTH } from '../render/view-math';
-import { TreeView, type FullHost, type FullSource, type TreeHost } from './tree-view';
-
 /*
  * The full-screen view (spec §7.1): an Obsidian Modal that fills the viewport, on desktop and touch
  * alike, with a second TreeView of the same block. That view shares the embed's BlockHandle and
@@ -11,11 +6,17 @@ import { TreeView, type FullHost, type FullSource, type TreeHost } from './tree-
  * block disappears or cannot be drawn any more (with a Notice).
  */
 
+import { Modal, Notice, TFile, type EventRef } from 'obsidian';
+import { FULL_UI } from '../render/ui-text';
+import { isPhoneWidth } from './modal-layout';
+import { TreeView, type FullHost, type FullSource, type TreeHost } from './tree-view';
+
 let titles = 0;
 
 // Obsidian's sidebar swipe and pull-down gestures listen above the modal; these must not reach them (spec §7.2).
 const STOPPED = ['touchstart', 'touchmove', 'touchend', 'touchcancel', 'pointerdown', 'pointermove', 'pointerup', 'pointercancel'];
 
+/** The full-screen view (spec §7.1): an Obsidian Modal that hosts a second `TreeView` of the same block. */
 export class FullScreenModal extends Modal implements FullHost {
 	/** Open full-screen views; the plugin closes them when it unloads, so none writes to a note after that. */
 	static readonly openViews = new Set<FullScreenModal>();
@@ -55,7 +56,7 @@ export class FullScreenModal extends Modal implements FullHost {
 		modalEl.setAttribute('aria-labelledby', titleId);
 		contentEl.addClass('dynasty-fullscreen-content');
 		const win = modalEl.win ?? window;
-		const layout = () => modalEl.toggleClass('is-phone', win.innerWidth < PHONE_MAX_WIDTH);
+		const layout = () => modalEl.toggleClass('is-phone', isPhoneWidth(win));
 		layout();
 		win.addEventListener('resize', layout);
 		this.cleanup.push(() => win.removeEventListener('resize', layout));

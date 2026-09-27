@@ -1,13 +1,13 @@
 {
   "name": "dynasty-tree",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Obsidian plugin: editable family trees for fictional dynasties",
   "scripts": {
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "build": "node esbuild.config.mjs production",
     "dev": "node esbuild.config.mjs",
-    "lint": "eslint src tests"
+    "lint": "eslint src scripts tests"
   },
   "author": "",
   "license": "GPL-3.0-only",

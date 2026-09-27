@@ -1,12 +1,11 @@
-import { Notice, PluginSettingTab, Setting, SettingGroup, type App, type Plugin } from 'obsidian';
-import { SETTINGS_UI } from '../render/ui-text';
-import { GENERATIONS, PHONE_HEIGHTS, parseDesktopHeight } from './settings';
-import type { DynastySettings } from './settings-contract';
-
 /*
  * The settings page (spec §9, D33): the settings in groups under short headings. Obsidian 1.11 and
  * later draw a group with SettingGroup; older versions get a heading row above the group.
  */
+
+import { Notice, PluginSettingTab, Setting, SettingGroup, debounce, type App, type Plugin } from 'obsidian';
+import { SETTINGS_UI } from '../render/ui-text';
+import { GENERATIONS, PHONE_HEIGHTS, parseDesktopHeight, type DynastySettings } from './settings';
 
 /** What the tab needs from the plugin. */
 export interface SettingsHost extends Plugin {
@@ -19,7 +18,14 @@ export interface SettingsHost extends Plugin {
 
 type Group = (add: (build: (s: Setting) => void) => void) => void;
 
+/** The desktop height is stored this long after the last key press (or at once on blur or Enter). */
+const HEIGHT_TYPING_MS = 400;
+
+/** The plugin's settings page, built fresh each time it is shown. */
 export class DynastySettingTab extends PluginSettingTab {
+	/** Stores a desktop height that still waits for the typing to stop. */
+	private pending: (() => void) | null = null;
+
 	constructor(
 		app: App,
 		private readonly host: SettingsHost,
@@ -40,12 +46,25 @@ export class DynastySettingTab extends PluginSettingTab {
 					text.inputEl.addClass('dynasty-setting-height');
 					text.inputEl.setAttribute('inputmode', 'numeric');
 					text.setValue(String(s.embedHeightDesktop));
-					text.onChange((v) => {
-						const n = parseDesktopHeight(v);
+					// "1200" passes through "120": a value is stored only when the typing stops, not at each key press.
+					const store = () => {
+						const n = parseDesktopHeight(text.getValue());
 						if (n !== null) void this.host.changeSettings({ embedHeightDesktop: n });
+					};
+					const later = debounce(store, HEIGHT_TYPING_MS, true);
+					this.pending = () => later.run?.();
+					// A microtask first, so changes that come in one task count as one.
+					text.onChange(() => void Promise.resolve().then(() => later()));
+					const now = () => {
+						later.cancel?.();
+						store();
+						// A value out of range is not stored: the field shows the stored value again.
+						text.setValue(String(this.host.settings.embedHeightDesktop));
+					};
+					text.inputEl.addEventListener('blur', now);
+					text.inputEl.addEventListener('keydown', (e: KeyboardEvent) => {
+						if (e.key === 'Enter') now();
 					});
-					// A value out of range is not stored: the field shows the stored value again.
-					text.inputEl.addEventListener('blur', () => text.setValue(String(this.host.settings.embedHeightDesktop)));
 				});
 			});
 			add((row) => {
@@ -108,6 +127,12 @@ export class DynastySettingTab extends PluginSettingTab {
 				});
 			});
 		});
+	}
+
+	override hide(): void {
+		this.pending?.();
+		this.pending = null;
+		super.hide();
 	}
 
 	/** One group under a heading (D33). */

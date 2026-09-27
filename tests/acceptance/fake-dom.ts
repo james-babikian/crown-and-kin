@@ -352,6 +352,15 @@ export class FEl {
 		this.children.unshift(c);
 	}
 
+	insertBefore(c: FEl, ref: FEl | null): FEl {
+		c.remove();
+		c.parentElement = this;
+		const i = ref ? this.children.indexOf(ref) : -1;
+		if (i < 0) this.children.push(c);
+		else this.children.splice(i, 0, c);
+		return c;
+	}
+
 	appendChild(c: FEl): FEl {
 		c.remove();
 		c.parentElement = this;

@@ -1,9 +1,10 @@
 /*
- * Fixed text that the tree view and the edit sheet show: toolbar labels, the banner, the lists, the
- * sheet and the Notices. STE rules and
- * The project word list apply. Problem sentences themselves come from `src/core/messages.ts`.
+ * Fixed text that the tree view and the edit sheet show: toolbar labels, the banner, the lists,
+ * the sheet and the Notices. Simplified Technical English (ASD-STE100) and the project word list apply. Problem sentences
+ * themselves come from `src/core/messages.ts`.
  */
 
+/** The error view, the banner for blocking problems (spec §8), the Fit and legend buttons, and the partner list title. */
 export const UI = {
 	errorTitle: 'The plugin cannot show this tree',
 	internalError: 'The plugin cannot show this tree because of an error in the plugin. Close the note. Open it again.',
@@ -15,15 +16,17 @@ export const UI = {
 	spouseListTitle: 'Partners',
 } as const;
 
-/** Toolbar badge label and list title for `count` problems. */
+/** Toolbar badge label for `count` problems. */
 export function problemsLabel(count: number): string {
 	return count === 1 ? 'This tree has 1 problem. Show the problem.' : `This tree has ${count} problems. Show the problems.`;
 }
 
+/** Title of the problem list for `count` problems. */
 export function problemsTitle(count: number): string {
 	return count === 1 ? '1 problem in this tree' : `${count} problems in this tree`;
 }
 
+/** Hint text shown above the problem list. */
 export const PROBLEMS_HINT = 'Select a problem to show the people it is about.';
 
 /** Read-only trees (spec §6.1) and the resize handle (spec §7.5). */
@@ -72,10 +75,12 @@ export const SHEET = {
 	unnamed: 'Person with no name',
 } as const;
 
-/** Names of parent types and partnership types, as the sheet and the flows show them. */
+/** Names of parent types, as the sheet and the flows show them. */
 export const PARENT_TYPE_TEXT: Record<string, string> = { birth: 'Birth parent', adoptive: 'Adoptive parent', ward: 'Guardian', rumoured: 'Rumoured parent' };
+/** Names of partnership types, as the sheet and the flows show them. */
 export const UNION_TYPE_TEXT: Record<string, string> = { marriage: 'Marriage', betrothal: 'Betrothal', concubinage: 'Concubinage', affair: 'Affair' };
 
+/** A parent type's name, or "Other (x)" for a type the plugin does not know. */
 export const parentTypeText = (t: string) => PARENT_TYPE_TEXT[t] ?? `Other (${t})`;
 
 /** "Marriage", or "Other (x)" for a type the plugin does not know; null is an implicit union. */
@@ -327,6 +332,11 @@ export const SETTINGS_UI = {
 export const INSERT_UI = {
 	command: 'Insert family tree',
 	hint: 'To add the first person, select "Add first person" in Reading view or Live Preview.',
+} as const;
+
+/** The command that shows how long the last tree took to draw (spec §7.7). */
+export const TIMING_UI = {
+	command: 'Show render timing',
 } as const;
 
 /** Notices after a note was renamed (spec §6.9, D6, D35). */

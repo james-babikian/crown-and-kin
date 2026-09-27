@@ -1,13 +1,12 @@
-import type { StrokeKind } from '../layout/model';
-import { UNION_MARKS, unionMark, unionShape, type UnionShape } from './styles';
-import { LEGEND_LABELS, LEGEND_ORDER, SIGN_LEGEND_LABEL } from './tree-info';
-
 /*
  * The legend's samples (D25): each line drawn as it looks in the tree, with the same classes as
  * the tree, so styles.css colours both alike. A partnership is a line between two card ends with
  * its union sign (D26, D38: none for no recorded partnership); a child line is a family's bar with two drops; a parent drawn elsewhere
  * is a curve. Pure: the DOM renderer and the headless pictures both build from this.
  */
+import type { StrokeKind } from '../layout/model';
+import { UNION_MARKS, unionMark, unionShape, type UnionShape } from './styles';
+import { LEGEND_LABELS, LEGEND_ORDER, SIGN_LEGEND_LABEL } from './tree-info';
 
 /** One SVG element of a sample; `cls` are dynasty- classes, never colours. */
 export interface LegendPart {
@@ -18,6 +17,7 @@ export interface LegendPart {
 	children?: LegendPart[];
 }
 
+/** One row of the legend: a line kind (or the D14 sign) with its label and sample drawing. */
 export interface LegendRow {
 	/** Line kind, or `sign` for the D14 card sign. */
 	kind: StrokeKind | 'sign';
@@ -28,7 +28,9 @@ export interface LegendRow {
 	parts: LegendPart[];
 }
 
+/** Width in px of one legend sample's viewBox. */
 export const LEGEND_SAMPLE_W = 56;
+/** Height in px of one legend sample's viewBox. */
 export const LEGEND_SAMPLE_H = 22;
 /** Union signs in the legend are drawn for a union size of 9 px (the tree's is 10 px at a 16 px font). */
 const UNION_PX = 9;

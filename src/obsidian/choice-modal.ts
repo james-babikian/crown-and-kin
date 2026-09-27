@@ -1,13 +1,14 @@
-import { Modal, type App } from 'obsidian';
-import { FLOW } from '../render/ui-text';
-import { ignoreGhostClick, phoneLayout } from './modal-layout';
-import { trackModal } from './plugin-modals';
-
 /*
  * One step of an add flow (spec §6.4): a title, a short text, and a list of choices as large
  * buttons. It looks like the edit sheet (same header with Cancel, same phone layout, spec §7.4).
  */
 
+import { Modal, type App } from 'obsidian';
+import { FLOW } from '../render/ui-text';
+import { ignoreGhostClick, phoneLayout } from './modal-layout';
+import { trackModal } from './plugin-modals';
+
+/** One large button in a choice step, and what choosing it returns. */
 export interface Choice<T> {
 	value: T;
 	label: string;
@@ -18,6 +19,7 @@ export interface Choice<T> {
 	warning?: boolean;
 }
 
+/** What one choice step shows: its title, text, an optional list, and its choices. */
 export interface ChoiceSpec<T> {
 	title: string;
 	text?: string[];
@@ -90,12 +92,6 @@ class ChoiceModal<T> extends Modal {
 
 /** Shows the choices; resolves to the chosen value, or null after Cancel, Esc or a press outside. */
 export function choose<T>(app: App, spec: ChoiceSpec<T>): Promise<T | null> {
-	return new Promise((resolve) => {
-		let settled = false;
-		new ChoiceModal(app, spec, (v) => {
-			if (settled) return;
-			settled = true;
-			resolve(v);
-		}).open();
-	});
+	// A promise settles once: the close after a choice cannot turn the choice into null.
+	return new Promise((resolve) => new ChoiceModal(app, spec, resolve).open());
 }

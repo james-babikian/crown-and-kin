@@ -1,14 +1,3 @@
-import { Modal, Notice, setIcon, type App } from 'obsidian';
-import { deriveFamilies } from '../core/derive';
-import type { Op } from '../core/edit';
-import { parseDynasty } from '../core/parse';
-import { HOUSE_PALETTE } from '../render/m6-contract';
-import { HOUSES, HOUSE_COLOUR_NAMES, REMOVE, SHEET, WRITE_TEXT } from '../render/ui-text';
-import { normBody, type Handle, type HandleWriteOutcome } from './block-handle';
-import { phoneLayout } from './modal-layout';
-import { trackModal } from './plugin-modals';
-import { undoNotice } from './undo-notice';
-
 /*
  * The Houses window (spec §6.10, D32, D36): the houses of one tree with their names and colours. Like
  * the edit sheet it is a draft: Save writes every change in one write (one undo step), Cancel
@@ -17,8 +6,21 @@ import { undoNotice } from './undo-notice';
  * whether to remove the house from them or keep it (D32); after Save, a Notice with Undo says so.
  */
 
+import { Modal, Notice, setIcon, type App } from 'obsidian';
+import { deriveFamilies } from '../core/derive';
+import type { Op } from '../core/edit';
+import { parseDynasty } from '../core/parse';
+import { HOUSE_PALETTE } from '../render/styles';
+import { HOUSES, HOUSE_COLOUR_NAMES, REMOVE, SHEET, WRITE_TEXT } from '../render/ui-text';
+import type { Handle, HandleWriteOutcome } from './block-handle';
+import { phoneLayout } from './modal-layout';
+import { trackModal } from './plugin-modals';
+import { drawableColour, freshOrStale, onWriteFailed, showErrorLine } from './sheet-parts';
+import { undoNotice } from './undo-notice';
+
 const HEX = /^#[0-9a-f]{6}$/i;
 
+/** One house as the Houses window shows it: its id, name, colour and the people who have it. */
 export interface LoadedHouse {
 	id: string;
 	name: string;
@@ -28,6 +30,7 @@ export interface LoadedHouse {
 	people: string[];
 }
 
+/** The tree's houses, loaded from one block body. */
 export interface LoadedHouses {
 	body: string;
 	houses: LoadedHouse[];
@@ -55,7 +58,7 @@ export function loadHouses(body: string): { kind: 'ok'; data: LoadedHouses } | {
 	const seen = new Set<string>();
 	const houses: LoadedHouse[] = [];
 	for (const h of tree.houses) {
-		// The first house with an id is the one the tree uses (spec §8, the decision notes WP1.2).
+		// The first house with an id is the one the tree uses (spec §8, the decision notes "Validation rules").
 		if (seen.has(h.id)) continue;
 		seen.add(h.id);
 		const people: string[] = [];
@@ -71,11 +74,10 @@ export function loadHouses(body: string): { kind: 'ok'; data: LoadedHouses } | {
 }
 
 /** The houses as draft rows; `key` names each row in the window (an id can hold any text, a key cannot). */
-export function rowsOf(data: LoadedHouses, key: () => string = (() => {
+export function rowsOf(data: LoadedHouses, key?: () => string): HouseRow[] {
 	let n = 0;
-	return () => `h${n++}`;
-})()): HouseRow[] {
-	return data.houses.map((h) => ({ key: key(), id: h.id, name: h.name, colour: h.colour, base: { name: h.name, colour: h.colour }, deleted: null }));
+	const next = key ?? (() => `h${n++}`);
+	return data.houses.map((h) => ({ key: next(), id: h.id, name: h.name, colour: h.colour, base: { name: h.name, colour: h.colour }, deleted: null }));
 }
 
 const lower = (c: string | null) => (c === null ? null : c.toLowerCase());
@@ -108,16 +110,7 @@ export function houseOps(rows: HouseRow[]): Op[] {
 	return [...edits, ...deletes, ...adds];
 }
 
-/** A value CSS can draw (a house colour can be any CSS colour, spec §4.1). */
-function drawable(c: string | null): c is string {
-	if (!c) return false;
-	try {
-		return CSS.supports('color', c);
-	} catch {
-		return HEX.test(c);
-	}
-}
-
+/** What opens a `HousesWindow`. */
 export interface HousesOptions {
 	handle: Handle;
 	/** Runs just before the write, so the tree view keeps its view (spec §5.5). */
@@ -126,6 +119,7 @@ export interface HousesOptions {
 	onClosed?: () => void;
 }
 
+/** The modal that lists a tree's houses and edits their names and colours (spec §6.10). */
 export class HousesWindow extends Modal {
 	private data: LoadedHouses;
 	private rows: HouseRow[];
@@ -158,6 +152,7 @@ export class HousesWindow extends Modal {
 		this.rows = rowsOf(data, () => this.nextKey());
 	}
 
+	/** Builds the window and gives it the keyboard focus. */
 	override onOpen(): void {
 		this.modalEl.addClass('dynasty-sheet');
 		this.modalEl.addClass('dynasty-houses');
@@ -168,6 +163,7 @@ export class HousesWindow extends Modal {
 		this.modalEl.focus({ preventScroll: true });
 	}
 
+	/** Runs the cleanup functions `onOpen` registered and hands the focus back to the caller. */
 	override onClose(): void {
 		// The focused control goes with the window: let go of it first, so the focus can go back to the Houses button.
 		const active = this.modalEl.doc?.activeElement as HTMLElement | null | undefined;
@@ -216,6 +212,7 @@ export class HousesWindow extends Modal {
 		this.close();
 	}
 
+	/** True if the draft has an unsaved change (an edit, a delete or a new house). */
 	isDirty(): boolean {
 		return houseOps(this.rows).length > 0;
 	}
@@ -266,7 +263,7 @@ export class HousesWindow extends Modal {
 			attr: { type: 'button', 'aria-label': HOUSES.swatchLabel(this.label(r)), 'aria-expanded': String(open), 'data-focus': `swatch:${r.key}` },
 		});
 		// The only colour the plugin writes into the page is a house colour, as a custom property (spec §5.8).
-		if (drawable(r.colour)) swatch.style.setProperty('--dynasty-house-color', r.colour);
+		if (drawableColour(r.colour)) swatch.style.setProperty('--dynasty-house-color', r.colour);
 		else swatch.addClass('is-none');
 		swatch.addEventListener('click', () =>
 			this.guard(() => {
@@ -439,10 +436,7 @@ export class HousesWindow extends Modal {
 
 	/** True if the window shows the handle's current body; otherwise the stale message and false (spec §6.1). */
 	private fresh(): boolean {
-		const h = this.o.handle;
-		if (normBody(h.body) === normBody(this.data.body)) return true;
-		this.stale(h.body);
-		return false;
+		return freshOrStale(this.o.handle, this.data.body, (body) => this.stale(body));
 	}
 
 	private async save(): Promise<void> {
@@ -490,18 +484,17 @@ export class HousesWindow extends Modal {
 
 	private failed(out: Exclude<HandleWriteOutcome, { ok: true }>): void {
 		const h = this.o.handle;
-		if (out.code !== 'refused') {
-			if (out.code === 'stale') this.stale(h.body);
-			else this.refused(HOUSES.missing);
-		} else {
-			const code = out.refusal.code;
-			if (out.refusal.detail) console.warn('Dynasty Tree: the edit was refused:', out.refusal.detail);
-			// A house that is not in the tree now: the tree changed under the window.
-			if (code === 'unknown-house') this.stale(h.body);
-			else if (code === 'blocked') this.refused(WRITE_TEXT.blocked);
-			else if (code === 'invalid-yaml') this.refused(HOUSES.invalid);
-			else this.refused(HOUSES.refused);
-		}
+		onWriteFailed(out, {
+			stale: () => this.stale(h.body),
+			missing: () => this.refused(HOUSES.missing),
+			refused: (code) => {
+				// A house that is not in the tree now: the tree changed under the window.
+				if (code === 'unknown-house') this.stale(h.body);
+				else if (code === 'blocked') this.refused(WRITE_TEXT.blocked);
+				else if (code === 'invalid-yaml') this.refused(HOUSES.invalid);
+				else this.refused(HOUSES.refused);
+			},
+		});
 	}
 
 	/** Spec §6.1 stale write: a Notice, the new data in the window, and the draft kept with a message that says so. */
@@ -547,10 +540,7 @@ export class HousesWindow extends Modal {
 
 	private showError(text: string): void {
 		this.error = text;
-		if (!this.errorEl) return;
-		this.errorEl.setText(text);
-		this.errorEl.show();
-		this.errorEl.scrollIntoView?.({ block: 'nearest' });
+		showErrorLine(this.errorEl, text);
 	}
 
 	private clearError(): void {

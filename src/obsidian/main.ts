@@ -1,21 +1,30 @@
+/*
+ * The plugin's Obsidian entry point. It registers the `dynasty` code block processor, the editor
+ * extension that keeps tall blocks parsed in Live Preview, the commands and the settings tab, and
+ * it owns the state that outlives any one `TreeView`: the block handles, the settings, the loose
+ * (read-only) block states and the render timings the test harness reads. It implements `TreeHost`
+ * and `SettingsHost` so that `TreeView` and the settings tab can call back into it.
+ */
+
 import { Notice, Plugin, TFile, debounce } from 'obsidian';
-import { INSERT_UI, RENAME_UI, UI, WRITE_TEXT } from '../render/ui-text';
+import { INSERT_UI, RENAME_UI, TIMING_UI, UI, WRITE_TEXT } from '../render/ui-text';
 import { clearLayoutCache } from '../layout/index';
 import { clearMeasureCache } from '../render/dom/measure';
 import { themeChanged } from '../render/dom/theme-read';
 import { buildCallout } from '../render/dom/widgets';
 import { timingText, type RenderTiming } from '../render/tree-info';
-import { HandleRegistry, endSessionFocus, type BlockState } from './block-handle';
+import { HandleRegistry } from './block-handle';
+import { endSessionFocus, type BlockState } from './block-state';
 import { FullScreenModal } from './full-screen';
 import { insertTree } from './insert-tree';
 import { closePluginModals } from './plugin-modals';
 import { tallBlockParser } from './live-preview';
 import { LinkUpdater, RENAME_TIMING } from './rename-links';
-import { PENDING_KEY, normaliseSettings, readPending, settingsChanges } from './settings';
-import { DEFAULT_SETTINGS, type DynastySettings } from './settings-contract';
+import { DEFAULT_SETTINGS, PENDING_KEY, normaliseSettings, readPending, settingsChanges, type DynastySettings } from './settings';
 import { DynastySettingTab, type SettingsHost } from './settings-tab';
 import { HOVER_SOURCE, THEME_RECHECK_MS, TreeView, type TreeHost } from './tree-view';
 
+/** The Dynasty Tree plugin: Obsidian loads one instance and calls `onload`/`onunload` on it. */
 export default class DynastyTreePlugin extends Plugin implements TreeHost, SettingsHost {
 	/** Spec §9; the defaults until the stored settings are read. */
 	override settings: DynastySettings = { ...DEFAULT_SETTINGS };
@@ -72,15 +81,10 @@ export default class DynastyTreePlugin extends Plugin implements TreeHost, Setti
 		);
 		this.register(() => recheck.cancel?.());
 		this.watchWebFonts();
-		// The session focus lasts until the note closes (spec §5.6, the decision notes M5).
+		// The session focus lasts until the note closes (spec §5.6).
 		this.registerEvent(this.app.workspace.on('layout-change', () => this.endClosedSessions()));
 		this.registerEvent(this.app.workspace.on('file-open', () => this.endClosedSessions()));
-		this.registerEvent(
-			this.app.vault.on('rename', (file, oldPath) => {
-				this.renamed(oldPath, file.path);
-				this.links.renamed(file, oldPath);
-			}),
-		);
+		this.registerEvent(this.app.vault.on('rename', (file, oldPath) => this.renamed(oldPath, file.path)));
 		this.registerEvent(this.app.vault.on('delete', (file) => this.handles.deleted(file.path)));
 		this.registerEvent(
 			this.app.vault.on('modify', (file) => {
@@ -102,7 +106,7 @@ export default class DynastyTreePlugin extends Plugin implements TreeHost, Setti
 		});
 		this.addCommand({
 			id: 'show-render-timing',
-			name: 'Show render timing',
+			name: TIMING_UI.command,
 			callback: () => new Notice(timingText(this.lastTiming), 15_000),
 		});
 		// Spec §5.9, D34: an empty tree with a help comment at the cursor.
@@ -122,6 +126,9 @@ export default class DynastyTreePlugin extends Plugin implements TreeHost, Setti
 		const stored = await this.loadSettings();
 		// Spec §6.9: a link update that an earlier session did not complete (a phone closed the app) continues.
 		this.links.restore(readPending(stored));
+		// Only now: before, a rename would use the default "Update tree links" and store the default settings.
+		// Registered after the handler above, so the handles follow the rename first.
+		this.registerEvent(this.app.vault.on('rename', (file, oldPath) => this.links.renamed(file, oldPath)));
 		try {
 			this.app.workspace.onLayoutReady(() => this.links.resume());
 		} catch (e) {
@@ -218,7 +225,7 @@ export default class DynastyTreePlugin extends Plugin implements TreeHost, Setti
 	 * Ends the session focus of every block whose note is closed: no note tab shows the note (a tab
 	 * that is not loaded yet still counts) and no tree of it is on screen (a page preview, a Canvas card).
 	 * Only note tabs count: a deferred sidebar tab (Outline, Outgoing links) keeps the note it named
-	 * when Obsidian last saved it, so it would keep a closed note's session alive (D22 review).
+	 * when Obsidian last saved it, so it would keep a closed note's session alive (D22).
 	 */
 	private endClosedSessions(): void {
 		try {
@@ -279,6 +286,7 @@ export default class DynastyTreePlugin extends Plugin implements TreeHost, Setti
 		clearMeasureCache();
 	}
 
+	/** Records a tree's render time for the timing command and the test harness. */
 	recordTiming(t: RenderTiming): void {
 		this.renderCount++;
 		this.lastTiming = t;

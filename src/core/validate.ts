@@ -1,7 +1,12 @@
-import type { CodedIssue, IssueCode, IssueParams } from './issues';
-import { PARENT_TYPES, PLACEMENT_TYPES, UNION_TYPES, type House, type ParentRef, type Person, type Tree, type Union } from './types';
+/*
+ * Checks the references and values of a parsed `Tree` and returns only the parts that are safe to
+ * draw, together with every problem found (spec §8, §4.1). `derive.ts` calls `validateTree` before
+ * building the family graph; anything that needs the derived families (for example a `union` that
+ * does not name a union of the person's own parents) is checked there instead.
+ */
 
-const isOneOf = (list: readonly string[], v: string) => list.includes(v);
+import { codedIssue, type CodedIssue, type IssueCode, type IssueParams } from './messages';
+import { isParentType, isPlacementType, isUnionType, parentKind, type House, type ParentRef, type ParentType, type Person, type Tree, type Union } from './types';
 
 /** The parts of a tree that are safe to draw, and every problem found on the way (spec §8, §4.1). */
 export interface Validated {
@@ -22,21 +27,53 @@ export interface Validated {
 	issues: CodedIssue[];
 }
 
-function push<K, V>(map: Map<K, V[]>, key: K, value: V) {
+/** Adds `value` to the list under `key`, creating the list if needed. */
+export function push<K, V>(map: Map<K, V[]>, key: K, value: V) {
 	const arr = map.get(key);
 	if (arr) arr.push(value);
 	else map.set(key, [value]);
+}
+
+/**
+ * A person's parent links that name someone else who exists, unknown types read as birth, once per
+ * id and type, in written order. `report` hears each entry that is left out or read as birth.
+ */
+export function cleanParents(
+	owner: string,
+	parents: readonly ParentRef[],
+	exists: (id: string) => boolean,
+	report?: (why: 'self' | 'missing' | 'unknown-type', ref: ParentRef) => void,
+): { id: string; type: ParentType }[] {
+	const out: { id: string; type: ParentType }[] = [];
+	const seen = new Set<string>();
+	for (const r of parents) {
+		if (r.id === owner) {
+			report?.('self', r);
+			continue;
+		}
+		if (!exists(r.id)) {
+			report?.('missing', r);
+			continue;
+		}
+		if (!isParentType(r.type)) report?.('unknown-type', r);
+		const type = parentKind(r.type);
+		const key = `${r.id}\0${type}`;
+		if (seen.has(key)) continue;
+		seen.add(key);
+		out.push({ id: r.id, type });
+	}
+	return out;
 }
 
 class Collector {
 	readonly issues: CodedIssue[] = [];
 
 	blocking(code: IssueCode, params: IssueParams, ids?: string[]) {
-		this.issues.push(ids?.length ? { code, level: 'blocking', params, ids } : { code, level: 'blocking', params });
+		this.issues.push(codedIssue(code, 'blocking', params, ids));
 	}
 
 	warn(code: IssueCode, params: IssueParams, ids?: string[]) {
-		this.issues.push(ids?.length ? { code, level: 'warning', params, ids } : { code, level: 'warning', params });
+		this.issues.push(codedIssue(code, 'warning', params, ids));
 	}
 }
 
@@ -145,31 +182,17 @@ export function validateTree(tree: Tree): Validated {
 		if (p.house !== undefined && !houses.has(p.house)) out.warn('missing-house', { ...who, ref: p.house }, [p.id]);
 		if (p.union !== undefined && !unionIds.has(p.union)) out.warn('missing-union', { ...who, ref: p.union }, [p.id]);
 
-		const valid: ParentRef[] = [];
-		const seen = new Set<string>();
 		const missing = new Set<string>();
 		let self = false;
-		for (const r of p.parents) {
-			if (r.id === p.id) {
+		const valid = cleanParents(p.id, p.parents, (id) => byId.has(id), (why, r) => {
+			if (why === 'self') {
 				if (!self) out.warn('self-parent', who, [p.id]);
 				self = true;
-				continue;
-			}
-			if (!byId.has(r.id)) {
+			} else if (why === 'missing') {
 				if (!missing.has(r.id)) out.warn('missing-parent', { ...who, ref: r.id }, [p.id]);
 				missing.add(r.id);
-				continue;
-			}
-			let type = r.type;
-			if (!isOneOf(PARENT_TYPES, type)) {
-				out.warn('unknown-parent-type', { ...who, value: type, parent: name(r.id) }, [p.id, r.id]);
-				type = 'birth';
-			}
-			const key = `${r.id}\0${type}`;
-			if (seen.has(key)) continue;
-			seen.add(key);
-			valid.push({ id: r.id, type });
-		}
+			} else out.warn('unknown-parent-type', { ...who, value: r.type, parent: name(r.id) }, [p.id, r.id]);
+		});
 		refs.set(p.id, valid);
 
 		const byType = new Map<string, number>();
@@ -178,7 +201,7 @@ export function validateTree(tree: Tree): Validated {
 			if (count > 2) out.warn('too-many-parents', { ...who, type, count }, [p.id]);
 		}
 		if (p.placement !== undefined) {
-			if (!isOneOf(PLACEMENT_TYPES, p.placement)) out.warn('unknown-placement', { ...who, value: p.placement }, [p.id]);
+			if (!isPlacementType(p.placement)) out.warn('unknown-placement', { ...who, value: p.placement }, [p.id]);
 			else if (!byType.has(p.placement)) out.warn('placement-without-parents', { ...who, placement: p.placement }, [p.id]);
 		}
 	}
@@ -200,7 +223,7 @@ export function validateTree(tree: Tree): Validated {
 		const absent = u.partners.filter((x) => !byId.has(x));
 		for (const ref of absent) out.warn('missing-partner', { ...label, ref, absent }, known);
 		if (absent.length) continue;
-		if (!isOneOf(UNION_TYPES, u.type)) out.warn('unknown-union-type', { ...label, value: u.type }, known);
+		if (!isUnionType(u.type)) out.warn('unknown-union-type', { ...label, value: u.type }, known);
 		unions.push(u);
 	}
 

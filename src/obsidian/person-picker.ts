@@ -1,29 +1,22 @@
-import { SuggestModal, prepareFuzzySearch, type App } from 'obsidian';
-import type { FamilyGraph } from '../core/derive';
-import type { Person } from '../core/types';
-import { dateLine } from '../render/svg-string';
-import { FLOW } from '../render/ui-text';
-import { ignoreGhostClick, phoneLayout } from './modal-layout';
-import { trackModal } from './plugin-modals';
-
 /*
  * The person picker (spec §6.6): live fuzzy filtering over name, title and dates; each row shows
  * the house colour, name, title and dates; the first row creates a new person with the typed text
  * (not in Find, spec §6.10). People in `exclude` are never offered.
  */
 
+import { SuggestModal, prepareFuzzySearch, type App } from 'obsidian';
+import type { FamilyGraph } from '../core/derive';
+import type { Person } from '../core/types';
+import { dateLine } from '../render/tree-info';
+import { FLOW } from '../render/ui-text';
+import { ignoreGhostClick, phoneLayout } from './modal-layout';
+import { trackModal } from './plugin-modals';
+import { drawableColour } from './sheet-parts';
+
+/** What the picker resolved to: a person already in the tree, or a new one by the typed name. */
 export type Picked = { kind: 'person'; id: string } | { kind: 'new'; name: string };
 
 type Item = { kind: 'new'; text: string } | { kind: 'person'; person: Person };
-
-function isColour(value: string | undefined): value is string {
-	if (!value) return false;
-	try {
-		return CSS.supports('color', value);
-	} catch {
-		return false;
-	}
-}
 
 // Defined on first use: tests that mock `obsidian` without SuggestModal can still load the sheet.
 function definePicker() {
@@ -96,7 +89,7 @@ function definePicker() {
 			el.setAttribute('data-person', p.id);
 			const swatch = el.createSpan({ cls: 'dynasty-picker-swatch' });
 			const colour = p.house ? this.g.houses.get(p.house)?.color : undefined;
-			if (isColour(colour)) swatch.style.setProperty('--dynasty-house-color', colour);
+			if (drawableColour(colour)) swatch.style.setProperty('--dynasty-house-color', colour);
 			else swatch.addClass('is-none');
 			const text = el.createDiv({ cls: 'dynasty-picker-text' });
 			text.createDiv({ cls: 'dynasty-picker-name', text: p.name });
@@ -115,13 +108,9 @@ let Picker: ReturnType<typeof definePicker> | null = null;
 
 /** Opens the picker; resolves to the chosen person, "create new" with the typed text, or null. */
 export function pickPerson(app: App, g: FamilyGraph, exclude: Set<string>, placeholder: string, title: string, allowNew = true): Promise<Picked | null> {
+	// A promise settles once: the close after a choice cannot turn the choice into null.
 	return new Promise((resolve) => {
-		let settled = false;
 		Picker ??= definePicker();
-		new Picker(app, g, exclude, placeholder, title, allowNew, (p) => {
-			if (settled) return;
-			settled = true;
-			resolve(p);
-		}).open();
+		new Picker(app, g, exclude, placeholder, title, allowNew, resolve).open();
 	});
 }

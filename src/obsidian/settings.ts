@@ -1,19 +1,56 @@
-import { DEFAULT_SETTINGS, type DynastySettings, type NormaliseSettings } from './settings-contract';
-
 /*
  * Reads the stored settings (spec §9). Pure and free of `obsidian`, so it has unit tests: stored data
  * can come from an older version, a sync conflict or a hand edit of `data.json`.
  */
 
+/** The plugin settings (spec §9, D33), stored with `Plugin.saveData`. The settings tab and every reader use this shape. */
+export interface DynastySettings {
+	/** Height of a tree in a note on a computer or tablet, in px (spec §7.5), 100–5000. Default 500. `options.height` wins. */
+	embedHeightDesktop: number;
+	/** Height of a tree in a note on a phone, in % of the screen height, 40–80. Default 60 (D30: also on its side). */
+	embedHeightPhone: number;
+	cardSize: 'normal' | 'compact';
+	/** Dates on cards. Changing it does not change the card height (geometry and layout key stay). */
+	showDates: boolean;
+	/** Focus mode default generations (§5.6, §9), a whole number 0–10. Default 3; `options.generations` wins; D23 (n = 1 in the static phone preview) wins over both. */
+	focusGenerations: number;
+	/** Update tree links when a note is renamed (§6.9, D6). Default on. */
+	updateLinks: boolean;
+}
+
+/** The settings a fresh install starts with. */
+export const DEFAULT_SETTINGS: DynastySettings = {
+	embedHeightDesktop: 500,
+	embedHeightPhone: 60,
+	cardSize: 'normal',
+	showDates: true,
+	focusGenerations: 3,
+	updateLinks: true,
+};
+
+/*
+ * How views get the settings: `TreeHost` has `readonly settings: DynastySettings`; when a setting
+ * changes, the plugin calls `onSettingsChange()` on every view (as for `css-change`), and the view
+ * draws again (a card-size change drops the carried view). Embed height rule (D30): on a phone
+ * (`TreeView.isPhone`: `isPhoneWindow` of the screen size, not the window size, because an
+ * on-screen keyboard makes the window lower; portrait or on its side) the height is
+ * `${embedHeightPhone}vh` and `options.height` is ignored; otherwise `options.height`, else
+ * `${embedHeightDesktop}px`.
+ */
+
 /** The phone heights the settings tab offers, in % of the screen height (D30). */
 export const PHONE_HEIGHTS = [40, 50, 60, 70, 80] as const;
+/** Valid range for `embedHeightDesktop`, in px. */
 export const DESKTOP_HEIGHT = { min: 100, max: 5000 } as const;
+/** Valid range for `embedHeightPhone`, in % of the screen height. */
 export const PHONE_HEIGHT = { min: 40, max: 80 } as const;
+/** Valid range for `focusGenerations`. */
 export const GENERATIONS = { min: 0, max: 10 } as const;
 
 const wholeIn = (v: unknown, r: { min: number; max: number }): v is number => typeof v === 'number' && Number.isInteger(v) && v >= r.min && v <= r.max;
 
-export const normaliseSettings: NormaliseSettings = (raw) => {
+/** Reads stored data: every missing, wrong-type or out-of-range value becomes its default. Pure. */
+export const normaliseSettings = (raw: unknown): DynastySettings => {
 	const s = raw !== null && typeof raw === 'object' && !Array.isArray(raw) ? (raw as Record<string, unknown>) : {};
 	const d = DEFAULT_SETTINGS;
 	// A height typed as 480.5 is still a height: round it, then check the range.

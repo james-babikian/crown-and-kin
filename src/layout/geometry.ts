@@ -1,6 +1,13 @@
+/**
+ * Turns a note's font size into the card and gap sizes a tree draws with (spec §5.8), and the line
+ * lane layout of the gaps between rows. `layout.ts` and `lines.ts` call these functions to size
+ * and place cards; `render/dom/scene.ts` and `render/svg-string.ts` call `cardText`, `isTall` and
+ * `tagTop` to draw and measure the same card the layout used, so every level of detail agrees on
+ * where the text sits (spec §5.4). `NORMAL_GEOMETRY` is used only by scripts and tests.
+ */
 import type { CardSize, Geometry, GeometryFor, LayoutSettings, SidewaysCards } from './model';
 
-/** Obsidian's default note font size; the milestone 0 geometry (180×64 cards) was tuned at this size. */
+/** Obsidian's default note font size; the card geometry (180×64 cards) was tuned at this size. */
 export const BASE_FONT_PX = 16;
 
 // Sizes in em of the note font (spec §5.8: geometry follows the font).
@@ -22,7 +29,7 @@ const EMS: Record<CardSize, Ems> = {
 
 // The same for both card sizes: the gap between rows must hold union dots, far-couple tags
 // with the dot below them, and up to 4 sibling-bar lanes (spec §5.3), none of which shrink with
-// the card. Milestone 0 used 5.625 em (90 px); the lowest lane then met a far couple's dot.
+// the card. An earlier, smaller value (5.625 em, 90 px) let the lowest lane meet a far couple's dot.
 const UNION_EM = 0.625;
 const ROW_GAP_EM = 6.25;
 const TAG_EM = 1.125;
@@ -62,6 +69,7 @@ export interface LineMetrics {
 	tagInset: number;
 }
 
+/** The line-lane metrics for `geo`: see `LineMetrics`. */
 export function lineMetrics(geo: Geometry): LineMetrics {
 	const f = geo.fontPx;
 	return {
@@ -89,6 +97,7 @@ function sanitize(fontPx: number): number {
 	return Number.isFinite(fontPx) && fontPx > 0 ? Math.min(Math.max(fontPx, 8), 48) : BASE_FONT_PX;
 }
 
+/** Builds the `down` geometry for a note font size and card size: see `GeometryFor`. */
 export const geometryFor: GeometryFor = (fontPx, cardSize) => {
 	const f = sanitize(fontPx);
 	const size: CardSize = cardSize === 'compact' ? 'compact' : 'normal';
@@ -107,6 +116,7 @@ export const geometryFor: GeometryFor = (fontPx, cardSize) => {
 	};
 };
 
+/** The `normal`-size geometry at the default note font size, for tests and the spike. */
 export const NORMAL_GEOMETRY: Geometry = geometryFor(BASE_FONT_PX, 'normal');
 
 // D24 sideways spacing, in em of the note font (owner's answers to the preview).
@@ -119,7 +129,7 @@ const SIDE_NARROW_CARD_EM = 10.25;
 const SIDE_NARROW_MIN_EM = 8;
 
 /**
- * The width of a `narrow` sideways card (WP5.5c): the renderer's `narrowCardW`, rounded to 0.5 px
+ * The width of a `narrow` sideways card: the renderer's `narrowCardW`, rounded to 0.5 px
  * (the cache key's precision, so one key never stands for two layouts) and clamped to
  * [8 em, 10.25 em]; 10.25 em when it is absent or not a number.
  */
@@ -134,7 +144,7 @@ const TURNED_TAG_EM = 0.375;
 
 /**
  * The geometry a sideways layout (D24) draws with. Cards keep their height and text; `narrow`
- * cards are 10.25 em wide (never wider than `geo`'s). The gaps take their sideways meaning:
+ * cards take `narrowWidth` (8 to 10.25 em, never wider than `geo`'s). The gaps take their sideways meaning:
  * `rowGap` is the smallest gap between generation columns, `nodeGap` the gap between stacked cards,
  * `coupleGap` the gap between stacked partners.
  */

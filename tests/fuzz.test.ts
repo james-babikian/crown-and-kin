@@ -2,7 +2,7 @@ import { describe, it } from 'vitest';
 import { parse as parseYaml, stringify } from 'yaml';
 import { deriveFamilies } from '../src/core/derive';
 import { focusSubgraph } from '../src/core/focus-subgraph';
-import type { IssueCode } from '../src/core/issues';
+import type { IssueCode } from '../src/core/messages';
 import { parseDynasty } from '../src/core/parse';
 import { geometryFor } from '../src/layout/geometry';
 import { layoutTree } from '../src/layout/index';

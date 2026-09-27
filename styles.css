@@ -623,7 +623,13 @@
 }
 
 .dynasty-popover-problems {
-	padding: 0;
+	/*
+	 * Left, right and bottom stay flush so the callout's own border sits at the popover's edge.
+	 * The top keeps clearance: Minimal's outlined callouts (owner's theme) draw the title row on
+	 * and above the callout's top border (a −24px offset in Minimal's theme.css); without room
+	 * above the callout, the popover's `overflow: auto` cuts the title off (1.0.1 iPhone test).
+	 */
+	padding: var(--size-4-6) 0 0 0;
 }
 
 /* A popover that belongs to an element in the tree opens next to it. */
@@ -750,6 +756,11 @@
 	font-size: var(--font-ui-small);
 	white-space: nowrap;
 	pointer-events: none;
+}
+
+/* The hint labels stay in the tree (no element is added after the draw); hidden while they count nobody. */
+.dynasty-hint-slot:not(.dynasty-hint) {
+	display: none;
 }
 
 .dynasty-hint-up {

@@ -1,18 +1,23 @@
-import type { Modal } from 'obsidian';
-import { PHONE_MAX_WIDTH } from '../render/view-math';
-
 /*
  * Phone layout for the plugin's modals (spec §7.4): below 600 px the modal fills the visible
  * area, and follows it when the on-screen keyboard makes it smaller, so a sticky header stays
  * reachable. Every sheet, choice and picker uses this.
  */
 
+import type { Modal } from 'obsidian';
+import { PHONE_MAX_WIDTH } from '../render/view-math';
+
+/** The phone layout of the plugin's modals: a window narrower than 600 px (spec §7.4). */
+export function isPhoneWidth(win: Window): boolean {
+	return win.innerWidth < PHONE_MAX_WIDTH;
+}
+
 /** Keeps the `is-phone` class and the visible-area size up to date; returns the clean-up. */
 export function phoneLayout(modal: Modal, onLayout?: () => void): () => void {
 	const el = modal.modalEl;
 	const win = el.win ?? window;
 	const layout = () => {
-		const phone = win.innerWidth < PHONE_MAX_WIDTH;
+		const phone = isPhoneWidth(win);
 		el.toggleClass('is-phone', phone);
 		const vv = win.visualViewport;
 		if (phone && vv) {

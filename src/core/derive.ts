@@ -1,9 +1,17 @@
-import type { CodedIssue } from './issues';
-import { PLACEMENT_TYPES, type House, type Person, type Tree } from './types';
-import { validateTree } from './validate';
+/*
+ * Builds the family graph a tree is drawn from: each person's placement parents, their primary
+ * union, and every other parent link or partnership (spec §4.3). Calls `validateTree` first, then
+ * works out who is placed under whom. `generations.ts`, `order.ts` and the layout code read the
+ * result; `family-query.ts` answers questions about one person's family from it.
+ */
 
+import { codedIssue, type CodedIssue } from './messages';
+import { isPlacementType, PLACEMENT_TYPES, type House, type Person, type Tree } from './types';
+import { push, validateTree } from './validate';
+
+/** One partnership as it is drawn: a union listed in the block, or one inferred from shared children. */
 export interface FamilyUnion {
-	/** `u<index>` for a union listed in the block, `i:<a>|<b>` for an implicit one. */
+	/** `u<index>` for a union listed in the block, `i:` and the sorted pair as JSON (`i:["a","b"]`) for an implicit one. */
 	key: string;
 	partners: [string, string];
 	type: string;
@@ -29,6 +37,7 @@ export interface SecondaryEdge {
 	unionKey?: string;
 }
 
+/** The derived shape of a whole tree: who is placed under whom, every partnership, and every issue found so far. */
 export interface FamilyGraph {
 	/** Unique people in document order. */
 	people: Person[];
@@ -44,6 +53,8 @@ export interface FamilyGraph {
 	/** Parent → children who have only that one placement parent. */
 	soloChildren: Map<string, string[]>;
 	secondary: SecondaryEdge[];
+	/** Partners of every union item as written, drawable or not, in list order. */
+	writtenUnions: string[][];
 	/** Parse issues, then validation issues, then those found here (spec §8). */
 	issues: CodedIssue[];
 }
@@ -54,14 +65,7 @@ const pairKey = (a: string, b: string) => {
 	return JSON.stringify([x, y]);
 };
 
-function push<K, V>(map: Map<K, V[]>, key: K, value: V) {
-	const arr = map.get(key);
-	if (arr) arr.push(value);
-	else map.set(key, [value]);
-}
-
-const isPlacementType = (t: string): t is (typeof PLACEMENT_TYPES)[number] => (PLACEMENT_TYPES as readonly string[]).includes(t);
-
+/** Validates `tree`, then builds its `FamilyGraph`: placement parents, primary unions and side links (spec §4.3). */
 export function deriveFamilies(tree: Tree): FamilyGraph {
 	const v = validateTree(tree);
 	const { people, byId, houses, refs } = v;
@@ -121,7 +125,7 @@ export function deriveFamilies(tree: Tree): FamilyGraph {
 		}
 		// A `union` that names no union at all was reported by validation as missing.
 		if (p.union !== undefined && v.unionIds.has(p.union) && fu?.id !== p.union) {
-			issues.push({ code: 'union-not-of-parents', level: 'warning', params: { person: p.name, ref: p.union }, ids: [p.id] });
+			issues.push(codedIssue('union-not-of-parents', 'warning', { person: p.name, ref: p.union }, [p.id]));
 		}
 
 		// Everything not used for placement is a side link, grouped per type.
@@ -141,7 +145,8 @@ export function deriveFamilies(tree: Tree): FamilyGraph {
 	const unionsOf = new Map<string, string[]>();
 	for (const fu of unions) for (const partner of fu.partners) push(unionsOf, partner, fu.key);
 
-	return { people, byId, houses, placementParents, placementType, primaryUnion, unions, unionByKey, unionsOf, soloChildren, secondary, issues };
+	const writtenUnions = tree.unions.map((u) => [...u.partners]);
+	return { people, byId, houses, placementParents, placementType, primaryUnion, unions, unionByKey, unionsOf, soloChildren, secondary, writtenUnions, issues };
 }
 
 /** The other partner in a union. */

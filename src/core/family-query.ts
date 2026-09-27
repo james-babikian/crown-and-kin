@@ -1,35 +1,86 @@
-import type { FamilyGraph } from './derive';
-import { partnerOf } from './derive';
-import type { ParentKind, UnionRef } from './edit';
-import type { DeleteSummary, DescribeDelete, FamilyOf, FamilyView, ParentLink, PartnerLink, PickerExclusions } from './family';
-import { PARENT_TYPES, PLACEMENT_TYPES } from './types';
-
 /*
  * Read-only questions about one person's family (spec §6.3, §6.4, §6.6, §6.7), answered from the
  * derived graph. Parent links are read as written, not as drawn: a link that validation dropped to
  * break a cycle still counts, because the ops and the pickers work on what is written.
  */
 
-/** Unknown parent types are read as birth, as validation does (§8). */
-export function parentKind(type: string | undefined): ParentKind {
-	return type !== undefined && (PARENT_TYPES as readonly string[]).includes(type) ? (type as ParentKind) : 'birth';
+import { partnerOf, type FamilyGraph } from './derive';
+import type { ParentKind, UnionKind, UnionRef } from './edit';
+import { PARENT_TYPES, PLACEMENT_TYPES } from './types';
+import { cleanParents, push } from './validate';
+
+/** One parent entry, as `familyOf` reports it for a person. */
+export interface ParentLink {
+	id: string;
+	type: ParentKind;
 }
+
+/** One partnership a person is in, as `familyOf` reports it. */
+export interface PartnerLink {
+	partner: string;
+	/** Null for an implicit union (co-parents with no union recorded). */
+	union: UnionRef | null;
+	type: UnionKind | string | null;
+	start?: string;
+	end?: string;
+}
+
+/** Where a person sits among their siblings, for the sibling-order controls (§6.5). */
+export interface SiblingPosition {
+	/** Siblings in the same group (same primary union, or same single parent), in `people` order, including the person. */
+	group: string[];
+	index: number;
+	canMoveEarlier: boolean;
+	canMoveLater: boolean;
+}
+
+/** What the edit sheet shows about one person's family. */
+export interface FamilyView {
+	/** Every parent entry as written, in order (valid references only). */
+	parents: ParentLink[];
+	/** Listed unions in `unions` order, then implicit co-parents. */
+	partners: PartnerLink[];
+	/** Null when the person has no siblings in their group. */
+	siblings: SiblingPosition | null;
+	/** Placement-eligible parent types the person has (for "Shown under", §6.3). */
+	placementTypes: ParentKind[];
+	/** Parent types already at the limit of 2 (disabled in Add parent, §6.4). */
+	fullTypes: ParentKind[];
+	/** Choices for "other parent" in Add child: partners in union order, then implicit co-parents (§6.4). "No other parent" is added by the UI. */
+	otherParentChoices: string[];
+}
+
+/** Builds the `FamilyView` for one person, or null if no such person exists. */
+export type FamilyOf = (g: FamilyGraph, id: string) => FamilyView | null;
+
+/** The kinds of person picker the plugin shows (§6.6). */
+export type PickerAction = 'add-parent' | 'add-child' | 'add-spouse' | 'focus' | 'find';
+
+/**
+ * People the picker must not offer (§6.6): add-parent → the person, all their descendants
+ * through any parent type, and people already their parent of `parentType`; add-child → the
+ * person and all their ancestors through any parent type; add-spouse → the person; focus and
+ * find → nobody.
+ */
+export type PickerExclusions = (g: FamilyGraph, id: string, action: PickerAction, parentType?: ParentKind) => Set<string>;
+
+/** What "Delete person" changes, for the confirmation (§6.7). */
+export interface DeleteSummary {
+	/** Listed unions the person is a partner in. */
+	unions: number;
+	/** People who list the person as a parent (any type). */
+	childLinks: number;
+	clearsStart: boolean;
+	clearsFocus: boolean;
+}
+
+/** Builds the `DeleteSummary` for deleting one person. */
+export type DescribeDelete = (g: FamilyGraph, id: string, options: { start?: string; focus?: string }) => DeleteSummary;
 
 /** Parent entries that name someone else in the tree, in written order, once per id and type. */
 export function writtenParents(g: FamilyGraph, id: string): ParentLink[] {
 	const person = g.byId.get(id);
-	if (!person) return [];
-	const out: ParentLink[] = [];
-	const seen = new Set<string>();
-	for (const r of person.parents) {
-		if (r.id === id || !g.byId.has(r.id)) continue;
-		const type = parentKind(r.type);
-		const key = `${r.id}\0${type}`;
-		if (seen.has(key)) continue;
-		seen.add(key);
-		out.push({ id: r.id, type });
-	}
-	return out;
+	return person ? cleanParents(id, person.parents, (q) => g.byId.has(q)) : [];
 }
 
 /** Everyone reachable from `id` through parent links of any type, in one direction. */
@@ -38,9 +89,7 @@ function reach(g: FamilyGraph, id: string, down: boolean): Set<string> {
 	for (const p of g.people) {
 		for (const r of writtenParents(g, p.id)) {
 			const [from, to] = down ? [r.id, p.id] : [p.id, r.id];
-			const list = next.get(from);
-			if (list) list.push(to);
-			else next.set(from, [to]);
+			push(next, from, to);
 		}
 	}
 	const found = new Set<string>();
@@ -55,7 +104,9 @@ function reach(g: FamilyGraph, id: string, down: boolean): Set<string> {
 	return found;
 }
 
+/** Everyone reachable from `id` by following parent links downward (children, grandchildren, and so on). */
 export const descendantsOf = (g: FamilyGraph, id: string) => reach(g, id, true);
+/** Everyone reachable from `id` by following parent links upward (parents, grandparents, and so on). */
 export const ancestorsOf = (g: FamilyGraph, id: string) => reach(g, id, false);
 
 /** The person's sibling group (§4.3, §6.5): the children of their primary union, or of their one placement parent. */
@@ -67,6 +118,7 @@ export function siblingGroup(g: FamilyGraph, id: string): string[] | null {
 	return null;
 }
 
+/** Implements `FamilyOf`. */
 export const familyOf: FamilyOf = (g, id) => {
 	if (!g.byId.has(id)) return null;
 	const parents = writtenParents(g, id);
@@ -108,6 +160,7 @@ export const familyOf: FamilyOf = (g, id) => {
 	};
 };
 
+/** Implements `PickerExclusions`. */
 export const pickerExclusions: PickerExclusions = (g, id, action, parentType) => {
 	switch (action) {
 		case 'add-parent': {
@@ -129,9 +182,11 @@ export const pickerExclusions: PickerExclusions = (g, id, action, parentType) =>
 	}
 };
 
+/** Implements `DescribeDelete`. */
 export const describeDelete: DescribeDelete = (g, id, options) => {
 	const summary: DeleteSummary = {
-		unions: g.unions.filter((u) => !u.implicit && u.partners.includes(id)).length,
+		// Every union item that lists the person, as the delete removes them, not only drawable ones.
+		unions: g.writtenUnions.filter((partners) => partners.includes(id)).length,
 		childLinks: g.people.filter((p) => p.id !== id && p.parents.some((r) => r.id === id)).length,
 		clearsStart: options?.start === id,
 		clearsFocus: options?.focus === id,

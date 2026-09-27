@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { EditResult, Op, SetPersonFields } from '../src/core/edit';
 import { parseDynasty } from '../src/core/parse';
 import { applyOp, newHouseId } from '../src/core/yaml-edit';
+import { finishTogether, isRefusal, parse, type Step } from '../src/core/yaml-patch';
 
 const person = (id: string, fields: SetPersonFields['fields']): Op => ({ kind: 'set-person-fields', id, fields });
 
@@ -297,6 +298,19 @@ describe('add-house', () => {
 		expect(edit('houses: []\n', { kind: 'add-house', name: 'Y' })).toBe('houses: [{id: y, name: Y}]\n');
 	});
 
+	it('goes after the comments the last house owns, like add-person (area B (2))', () => {
+		expect(edit('houses:\n  - id: x\n    name: X\n    # about x\n# people next\npeople: []\n', { kind: 'add-house', name: 'Y' })).toBe(
+			'houses:\n  - id: x\n    name: X\n    # about x\n  - id: y\n    name: Y\n# people next\npeople: []\n',
+		);
+		// A comment at the dash column belongs to the next item, so it stays below the new house.
+		expect(edit('houses:\n  - id: x\n    name: X\n  # a note\n', { kind: 'add-house', name: 'Y' })).toBe(
+			'houses:\n  - id: x\n    name: X\n  - id: y\n    name: Y\n  # a note\n',
+		);
+		expect(edit('houses:\n  - {id: x, name: X}  # x\n    # about x\npeople: []\n', { kind: 'add-house', name: 'Y' })).toBe(
+			'houses:\n  - {id: x, name: X}  # x\n    # about x\n  - {id: y, name: Y}\npeople: []\n',
+		);
+	});
+
 	it('fills an empty houses key and refuses a houses key that is not a list', () => {
 		expect(edit('houses:\npeople: []\n', { kind: 'add-house', name: 'Y' })).toBe('houses:\n  - id: y\n    name: Y\npeople: []\n');
 		expect(applyOp('houses: x\n', { kind: 'add-house', name: 'Y' })).toMatchObject({ ok: false, code: 'bad-value' });
@@ -377,5 +391,34 @@ describe('review 2.2 fixes', () => {
 		expect(edit(src, person('a', { title: 'T' }))).toBe('people:\n  - id: a\n    name: A\n    title: T\n');
 		expect(edit(src, person('a', { title: null }))).toBe(src);
 		expect(edit(src, person('a', { title: 'null' }))).toBe('people:\n  - id: a\n    name: A\n    title: "null"\n');
+	});
+});
+
+describe('finishTogether', () => {
+	const src = 'a: 1\nb: 2\n';
+	const first = () => {
+		const p = parse(src);
+		if (isRefusal(p)) throw new Error('parse');
+		return p;
+	};
+	// Each step replaces the value of `a` or `b` at its position in the parse it gets.
+	const set = (key: 'a' | 'b', text: string): Step => (p) => {
+		const at = p.src.text.indexOf(`${key}: `) + 3;
+		return { start: at, end: p.src.text.indexOf('\n', at), text };
+	};
+
+	it('applies changes that do not touch each other in one pass', () => {
+		const r = finishTogether(first(), [set('a', '10'), set('b', '20')], { a: '10', b: '20' }, ['x']);
+		expect(r).toEqual({ ok: true, body: 'a: 10\nb: 20\n', created: ['x'] });
+	});
+
+	it('after an overlap, applies the changes one step at a time', () => {
+		const r = finishTogether(first(), [set('a', '10'), set('a', '100')], { a: '100', b: '2' }, []);
+		expect(r).toEqual({ ok: true, body: 'a: 100\nb: 2\n', created: [] });
+	});
+
+	it('passes a refusal of a step through', () => {
+		const r = finishTogether(first(), [set('a', '10'), () => ({ ok: false, code: 'unknown-person' })], { a: '10', b: '2' }, []);
+		expect(r).toEqual({ ok: false, code: 'unknown-person' });
 	});
 });

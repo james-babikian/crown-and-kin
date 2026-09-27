@@ -1,13 +1,16 @@
+/**
+ * Draws a finished tree layout to a standalone SVG string, for the spike (`npm run spike`) and
+ * test snapshots. This is the only place plugin code may bake colours into SVG attributes: it
+ * takes a fixed `Palette` (`styles.ts`) instead of the CSS variables the DOM renderer uses, since
+ * a headless SVG has no page theme to read from.
+ */
 import type { FamilyGraph } from '../core/derive';
-import type { Person } from '../core/types';
 import { cardText, isTall, tagTop } from '../layout/geometry';
 import { illegitimateSigns } from '../layout/illegitimate-sign';
-import type { EdgeDrawing, FarTag, TreeLayout } from '../layout/model';
+import type { EdgeDrawing, TreeLayout } from '../layout/model';
 import { nameLines } from './name-lines';
 import { DEAD_STRIP_OPACITY, DEFAULT_DARK, DEFAULT_LIGHT, STROKES, UNION_MARKS, stripColour, unionMark, unionShape, type Palette } from './styles';
-
-// Headless SVG output for the layout spike and test snapshots. The plugin renders to the DOM
-// with theme variables instead of a fixed palette (see styles.ts).
+import { dateLine, farTagName } from './tree-info';
 
 const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
@@ -33,18 +36,7 @@ function fit(text: string, px: number, fontSize: number, bold = false): string {
 	return chars.join('') + '…';
 }
 
-/** "⚭ Name" for one far spouse, "⚭ N partners" for several (STE wording; the spec says spouses) (spec §5.3, D10). */
-export function farTagText(g: FamilyGraph, tag: FarTag): string {
-	return tag.spouses.length === 1 ? `⚭ ${g.byId.get(tag.spouses[0])?.name ?? tag.spouses[0]}` : `⚭ ${tag.spouses.length} partners`;
-}
-
-export function dateLine(p: Person): string | undefined {
-	if (p.born && p.died) return `${p.born}–${p.died}`;
-	if (p.born) return `b. ${p.born}`;
-	if (p.died) return `d. ${p.died}`;
-	return undefined;
-}
-
+/** Options for `renderSvg`; all optional. */
 export interface SvgOptions {
 	margin?: number;
 	title?: string;
@@ -54,6 +46,7 @@ export interface SvgOptions {
 	fontFamily?: string;
 }
 
+/** Draws `layout` and `edges` to a complete `<svg>...</svg>` string, with cards, lines, signs and far-couple tags. */
 export function renderSvg(g: FamilyGraph, layout: TreeLayout, edges: EdgeDrawing, opts: SvgOptions = {}): string {
 	const c = opts.palette ?? DEFAULT_LIGHT;
 	const dark = opts.dark ?? c === DEFAULT_DARK;
@@ -91,7 +84,7 @@ export function renderSvg(g: FamilyGraph, layout: TreeLayout, edges: EdgeDrawing
 		const names = tall ? nameLines(p.name, nameW, (s) => textWidth(s, t.nameSize, true)) : [fit(p.name, nameW, t.nameSize, true)];
 		out.push(`<g>`);
 		out.push(`<rect x="${box.x}" y="${box.y}" width="${box.w}" height="${box.h}" rx="6" fill="${c.cardFill}" stroke="${c.cardBorder}"/>`);
-		out.push(`<rect x="${box.x}" y="${box.y}" width="${t.stripW}" height="${box.h}" rx="3" fill="${accent}"${dead ? ` fill-opacity="${DEAD_STRIP_OPACITY}"` : ''}/>`);
+		out.push(`<rect x="${box.x}" y="${box.y}" width="${t.stripW}" height="${box.h}" rx="3" fill="${esc(accent)}"${dead ? ` fill-opacity="${DEAD_STRIP_OPACITY}"` : ''}/>`);
 		names.forEach((line, i) => {
 			const y = box.y + (i ? t.name2Baseline! : t.nameBaseline);
 			out.push(`<text x="${tx}" y="${y}" font-size="${t.nameSize}" font-weight="600" fill="${dead ? c.textMuted : c.text}">${esc(line)}</text>`);
@@ -132,7 +125,7 @@ export function renderSvg(g: FamilyGraph, layout: TreeLayout, edges: EdgeDrawing
 		const sign = tagFont * 1.4;
 		// The widest the tag may be; a sideways hit area can be wider than the part of the edge the tag may use.
 		const room = tag.zoneW ?? tag.hit.w;
-		const label = fit(farTagText(g, tag).slice(2), room - 2 * pad - sign, tagFont);
+		const label = fit(farTagName(g, tag.spouses), room - 2 * pad - sign, tagFont);
 		const w = Math.min(room, textWidth(label, tagFont) + sign + 2 * pad);
 		const left = tag.x - w / 2;
 		const top = tagTop(layout.geometry, tag.y);

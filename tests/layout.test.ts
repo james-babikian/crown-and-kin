@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { NORMAL_GEOMETRY } from '../src/layout/geometry';
 import { DEFAULT_FAR_RULE, layoutFamilies } from '../src/layout/layout';
-import { measureLayout } from '../src/layout/metrics';
+import { measureLayout } from '../scripts/metrics';
 import { placeInOrder } from '../src/layout/pava';
 import { build, fixture } from './helpers';
 

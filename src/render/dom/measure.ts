@@ -32,6 +32,7 @@ function context(): CanvasRenderingContext2D | null {
 	return ctx;
 }
 
+/** The width in px of `text` set in `font`, from the cache if it was measured before. */
 export function measureText(text: string, font: string): number {
 	const key = `${font}\u0000${text}`;
 	const hit = cache.get(key);

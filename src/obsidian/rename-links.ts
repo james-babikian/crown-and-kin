@@ -1,24 +1,24 @@
+/*
+ * Link maintenance (spec §6.9, D6, D35). After a Markdown note is renamed, every tree link that
+ * pointed to it gets the new link text, one `rewrite-links` write per tree, through the tree's
+ * handle (also in closed notes and in trees with blocking problems). The writes are not the user's edits: they are on neither undo stack. Nothing
+ * here throws into Obsidian.
+ */
+
 import { Notice, TFile, type App, type CachedMetadata, type EventRef, type TAbstractFile } from 'obsidian';
 import { findBlocks } from '../core/block-locate';
-import { linkTargets, normaliseTarget } from '../core/link-rewrite';
+import { encode, linkTargets, normaliseTarget } from '../core/link-rewrite';
 import { applyOp } from '../core/yaml-edit';
 import { RENAME_UI, renamedText, type LinkReportText } from '../render/ui-text';
 import type { Handle } from './block-handle';
 import type { PendingRename } from './settings';
 
-/*
- * Link maintenance (spec §6.9, D6, D35; the decision notes "M6 design gate", Rename, and "M6 iPhone test").
- * After a Markdown note is renamed, every tree link that pointed to it gets the new link text, one
- * `rewrite-links` write per tree, through the tree's handle (also in closed notes and in trees with
- * blocking problems). The writes are not the user's edits: they are on neither undo stack. Nothing
- * here throws into Obsidian.
- */
-
-/** What the updater needs from the handle registry (`HandleRegistry.forBlock`, the M6 `ForBlock`). */
+/** What the updater needs from the handle registry (`HandleRegistry.forBlock`). */
 export interface BlockSource {
+	/** The handle of block `ordinal` of the note at `path`, or null if the note or the block is gone. */
 	forBlock(path: string, ordinal: number): Promise<Pick<Handle, 'body' | 'write'> | null>;
-	/** Every handle: their undo entries follow the rename too (the decision notes "WP6.4 fix round"). */
-	all?(): Iterable<Pick<Handle, 'key' | 'mapUndo'>>;
+	/** Every handle: their undo entries follow the rename too. */
+	all(): Iterable<Pick<Handle, 'key' | 'mapUndo'>>;
 }
 
 /** What the plugin gives the updater besides the handles. */
@@ -41,6 +41,7 @@ export interface RenameTiming {
 	progress?: number;
 }
 
+/** The default timing `LinkUpdater` uses outside tests. */
 export const RENAME_TIMING: RenameTiming = { resolved: 2000, quiet: 300, cap: 5000, progress: 2000 };
 
 interface Renamed {
@@ -67,6 +68,18 @@ interface Kept {
 	other: string;
 }
 
+/** One tree after its update: links changed and kept, a failure, no more trees in the note (`gone`), or no link to a renamed note (null). */
+type TreeResult = { changed: number; kept: Kept[] } | { failed: Failure } | 'gone' | null;
+
+/** What the scan of the notes found, for the Notices at the end. */
+interface ScanResult {
+	/** Trees with a changed link. */
+	trees: number;
+	failures: Failure[];
+	/** The first kept link of each tree that has kept links and no changed link. */
+	kept: (Kept & { path: string })[];
+}
+
 /** Where one update is: the progress Notice comes only while it can still lead to a change. */
 interface Progress {
 	found: boolean;
@@ -79,6 +92,23 @@ const pause = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 const baseName = (path: string) => (path.split('/').pop() ?? path).replace(/\.md$/i, '').toLowerCase();
 const shownPath = (path: string) => path.replace(/\.md$/i, '');
 
+/** The report of an update that starts now, for the renames of `batch`. */
+function newReport(batch: Renamed[]): LinkReportText {
+	return {
+		renames: batch.map((r) => ({ from: shownPath(r.oldPath), to: shownPath(r.file.path) })),
+		state: 'running',
+		ms: 0,
+		notes: 0,
+		read: 0,
+		unread: 0,
+		trees: 0,
+		links: 0,
+		changedTrees: 0,
+		skipped: [],
+		failed: [],
+	};
+}
+
 /** The name part of a link as the metadata cache stores it (`Folder/Name#Heading`). */
 function linkBase(link: string): string {
 	let t = link.split('#')[0].split('|')[0];
@@ -90,15 +120,23 @@ function linkBase(link: string): string {
 	return baseName(t.replace(/\\/g, '/'));
 }
 
-/** The forms an old basename can take in note text: as typed, and percent-encoded in a Markdown link. */
-function nameForms(name: string): string[] {
-	let encoded = name;
+/**
+ * The forms an old basename can take in note text: as typed, percent-encoded in a Markdown link (also
+ * as the plugin itself writes one), and fully percent-decoded.
+ */
+export function nameForms(name: string): string[] {
+	const forms = [name, name.replace(/ /g, '%20'), encode(name).toLowerCase()];
 	try {
-		encoded = encodeURIComponent(name).toLowerCase();
+		forms.push(encodeURIComponent(name).toLowerCase());
 	} catch {
-		// A lone surrogate: the typed form is enough.
+		// A lone surrogate: the other forms are enough.
 	}
-	return [...new Set([name, name.replace(/ /g, '%20'), encoded])];
+	try {
+		forms.push(decodeURIComponent(name).toLowerCase());
+	} catch {
+		// A bad escape: the name has no decoded form.
+	}
+	return [...new Set(forms)];
 }
 
 const isRelative = (target: string) => /^\.\.?\//.test(target);
@@ -136,6 +174,7 @@ const TREE_SECTIONS = new Set(['code', 'callout', 'blockquote', 'list']);
 const SLICE_MS = 16;
 const KEPT_NOTICE_MS = 15_000;
 
+/** Queues renamed notes and rewrites the tree links that pointed to them, one update at a time. */
 export class LinkUpdater {
 	private readonly queue: Renamed[] = [];
 	/** Every rename that is not handled yet: queued, or in the running update. */
@@ -236,6 +275,11 @@ export class LinkUpdater {
 		this.queue.length = 0;
 	}
 
+	/** Unload, or the user turned "Update tree links" off: the running update writes nothing more. */
+	private halted(): boolean {
+		return this.stopped || !this.enabled();
+	}
+
 	private start(): void {
 		this.running ??= this.run().finally(() => (this.running = null));
 	}
@@ -277,7 +321,7 @@ export class LinkUpdater {
 			const st: Progress = { found: false, scanned: false, shown: null };
 			const timer = setTimeout(() => {
 				try {
-					if (!this.stopped && (!st.scanned || st.found)) st.shown = new Notice(RENAME_UI.progress, 0);
+					if (!this.halted() && (!st.scanned || st.found)) st.shown = new Notice(RENAME_UI.progress, 0);
 				} catch (e) {
 					console.error('Dynasty Tree: cannot show the link update Notice', e);
 				}
@@ -289,22 +333,10 @@ export class LinkUpdater {
 				await pause(0);
 				batch = this.queue.splice(0);
 				if (this.stopped || !this.enabled() || !batch.length) continue;
-				report = {
-					renames: batch.map((r) => ({ from: shownPath(r.oldPath), to: shownPath(r.file.path) })),
-					state: 'running',
-					ms: 0,
-					notes: 0,
-					read: 0,
-					unread: 0,
-					trees: 0,
-					links: 0,
-					changedTrees: 0,
-					skipped: [],
-					failed: [],
-				};
+				report = newReport(batch);
 				this.last = report;
 				await this.update(batch, obsidian.done, st, report);
-				report.state = this.stopped ? 'stopped' : 'done';
+				report.state = this.halted() ? 'stopped' : 'done';
 			} catch (e) {
 				console.error('Dynasty Tree: cannot update the links after a rename', e);
 				if (report) report.state = 'failed';
@@ -315,7 +347,8 @@ export class LinkUpdater {
 				st.shown?.hide();
 				if (report) report.ms = Date.now() - started;
 				// Handled, also after an error: a rename that fails at each start must not come back for ever.
-				if (!this.stopped) {
+				// A stopped update stays stored: the next start continues it if the setting is on then.
+				if (!this.stopped && report?.state !== 'stopped') {
 					for (const r of batch) this.open.delete(r);
 					this.persist();
 				}
@@ -413,7 +446,7 @@ export class LinkUpdater {
 	private candidates(files: TFile[]): TFile[] {
 		const known = new Set<string>();
 		try {
-			for (const h of this.blocks.all?.() ?? []) known.add(h.key.path);
+			for (const h of this.blocks.all()) known.add(h.key.path);
 			for (const p of this.hooks.known?.() ?? []) known.add(p);
 		} catch (e) {
 			console.error('Dynasty Tree: cannot list the notes that show a tree', e);
@@ -434,8 +467,22 @@ export class LinkUpdater {
 	}
 
 	private async update(batch: Renamed[], obsidian: Promise<void>, st: Progress, report: LinkReportText): Promise<void> {
+		const found = await this.scan(batch, obsidian, st, report);
+		if (!found) return;
+		st.scanned = true;
+		if (this.halted()) return;
+		report.changedTrees = found.trees;
+		this.carryUndo(batch);
+		this.showResult(report, st, found);
+	}
+
+	/**
+	 * Reads the candidate notes and updates the links of their trees, one note at a time. Null if the
+	 * batch has no name to look for, or the update halted during the scan.
+	 */
+	private async scan(batch: Renamed[], obsidian: Promise<void>, st: Progress, report: LinkReportText): Promise<ScanResult | null> {
 		const names = [...new Set(batch.flatMap((r) => nameForms(baseName(r.oldPath))))].filter(Boolean);
-		if (!names.length) return;
+		if (!names.length) return null;
 		const olds = new Set(batch.map((r) => baseName(r.oldPath)));
 		const files = this.app.vault.getMarkdownFiles();
 		report.notes = files.length;
@@ -444,7 +491,7 @@ export class LinkUpdater {
 		const kept: (Kept & { path: string })[] = [];
 		let slice = Date.now();
 		for (const file of this.candidates(files)) {
-			if (this.stopped) return;
+			if (this.halted()) return null;
 			if (Date.now() - slice > SLICE_MS) {
 				await pause(0);
 				slice = Date.now();
@@ -464,7 +511,7 @@ export class LinkUpdater {
 			if (!count) continue;
 			st.found = true;
 			await this.obsidianFinished(file, olds, obsidian);
-			for (let ordinal = 0; ordinal < count && !this.stopped; ordinal++) {
+			for (let ordinal = 0; ordinal < count && !this.halted(); ordinal++) {
 				const path = file.path;
 				const r = await this.tree(path, ordinal, batch);
 				if (r === 'gone') break;
@@ -484,10 +531,11 @@ export class LinkUpdater {
 			// One note at a time, so a vault with many trees never holds up the interface (spec §6.9).
 			await pause(0);
 		}
-		st.scanned = true;
-		if (this.stopped) return;
-		report.changedTrees = trees;
-		this.carryUndo(batch);
+		return { trees, failures, kept };
+	}
+
+	/** The Notices at the end of an update. */
+	private showResult(report: LinkReportText, st: Progress, { trees, failures, kept }: ScanResult): void {
 		// D35: the numbers only.
 		if (report.links > 0) new Notice(RENAME_UI.updated(report.links, trees));
 		else if (st.shown && !kept.length && !failures.length) new Notice(RENAME_UI.noLinks);
@@ -502,13 +550,13 @@ export class LinkUpdater {
 	 * between (stale) is read again and tried once more. `gone`: the note has no more trees. Null:
 	 * the tree has no link to a renamed note.
 	 */
-	private async tree(path: string, ordinal: number, batch: Renamed[]): Promise<{ changed: number; kept: Kept[] } | { failed: Failure } | 'gone' | null> {
+	private async tree(path: string, ordinal: number, batch: Renamed[]): Promise<TreeResult> {
 		let map: Record<string, string> = {};
 		for (let attempt = 0; attempt < 2; attempt++) {
-			// The plugin was turned off: no further write, also not a retry.
-			if (this.stopped) return null;
+			// The plugin or the setting was turned off: no further write, also not a retry.
+			if (this.halted()) return null;
 			const h = await this.blocks.forBlock(path, ordinal);
-			if (!h || this.stopped) return h ? null : 'gone';
+			if (!h || this.halted()) return h ? null : 'gone';
 			const found = this.linksFor(h.body, path, batch);
 			map = found.map;
 			if (!Object.keys(map).length) return found.named ? { changed: 0, kept: found.kept } : null;
@@ -522,11 +570,11 @@ export class LinkUpdater {
 	}
 
 	/**
-	 * Every handle's undo entries get the same link update (the decision notes "WP6.4 fix round"): also a tree that
+	 * Every handle's undo entries get the same link update: also a tree that
 	 * has no link to the old note now, but had one before an edit that "Undo last tree edit" can undo.
 	 */
 	private carryUndo(batch: Renamed[]): void {
-		for (const h of this.blocks.all?.() ?? []) {
+		for (const h of this.blocks.all()) {
 			try {
 				h.mapUndo((body) => {
 					const map = this.linksFor(body, h.key.path, batch).map;
@@ -558,14 +606,16 @@ export class LinkUpdater {
 			// `./` and `../` lead from the folder of the note that holds the link (as Obsidian reads them).
 			const rel = isRelative(t) ? resolveRelative(t, folder.toLowerCase()) : null;
 			if (isRelative(t) && rel === null) continue;
-			const hit = batch.find((r) => {
+			const matches = batch.filter((r) => {
 				const old = normaliseTarget(r.oldPath);
 				return rel !== null ? old === rel : old === t || old.endsWith(`/${t}`);
 			});
+			const hit = matches[0];
 			if (!hit || hit.file.path === hit.oldPath) continue;
 			named = true;
 			const dest = mc.getFirstLinkpathDest(target, notePath);
-			if (dest && batch.some((r) => r.file === dest)) continue;
+			// Only a rename of this target counts: after two notes swap names, the link opens the other renamed note.
+			if (dest && matches.some((r) => r.file === dest)) continue;
 			if (dest && hit.others.has(dest)) {
 				kept.push({ link: target, other: dest.path });
 				continue;

@@ -1,8 +1,3 @@
-import { isAlias, isMap, isScalar, isSeq, Lexer, parseDocument, Parser, Scalar, type Document, type Node, type Pair, type YAMLMap, type YAMLSeq } from 'yaml';
-import type { EditRefusal, EditResult, FieldValue, PersonField } from './edit';
-import { parseBody } from './parse';
-import { bool, isEmpty, linkValue, str, type Raw, type RawMap } from './tolerate';
-
 /*
  * Edits go through the parsed `yaml` Document (spec §3, §6.2), but are written as text patches
  * at the node ranges the Document reports: re-stringifying the Document would reformat
@@ -11,10 +6,16 @@ import { bool, isEmpty, linkValue, str, type Raw, type RawMap } from './tolerate
  * if anything else differs, the edit is refused instead of written.
  */
 
+import { isAlias, isMap, isScalar, isSeq, Lexer, parseDocument, Parser, Scalar, type Document, type Node, type Pair, type YAMLMap, type YAMLSeq } from 'yaml';
+import type { EditRefusal, EditResult, FieldValue, PersonField } from './edit';
+import { parseBody } from './parse';
+import { bool, isEmpty, linkValue, str, type Raw, type RawMap } from './tolerate';
+
 /** §4.1 field order; a new key goes after the nearest earlier key that is present. */
 export const PERSON_ORDER = ['id', 'name', 'title', 'house', 'sex', 'born', 'died', 'parents', 'placement', 'illegitimate', 'union', 'link', 'notes'];
+/** §4.1 order of the `options` keys. */
 export const OPTION_ORDER = ['start', 'focus', 'generations', 'height'];
-export const TOP_ORDER = ['options', 'houses', 'people', 'unions'];
+const TOP_ORDER = ['options', 'houses', 'people', 'unions'];
 
 /**
  * Fields read as text whatever YAML would type them as (spec §3, §6.8): a new `1103` is written
@@ -22,14 +23,18 @@ export const TOP_ORDER = ['options', 'houses', 'people', 'unions'];
  */
 export const TEXT_FIELDS = new Set(['id', 'house', 'born', 'died', 'union', 'start', 'focus', 'end']);
 
+/** The person fields `personValue` and `sameValue` handle. */
 export const PERSON_FIELDS: readonly PersonField[] = ['name', 'title', 'house', 'sex', 'born', 'died', 'illegitimate', 'link', 'notes', 'placement'];
 
+/** The failure case of an `EditResult`. */
 export type Refusal = Extract<EditResult, { ok: false }>;
+/** Builds a `Refusal` with this code and, optionally, a detail for the user. */
 export const refuse = (code: EditRefusal, detail?: string): Refusal => (detail ? { ok: false, code, detail } : { ok: false, code });
 
 // ---------------------------------------------------------------------------------------------
 // Scalar rendering
 
+/** How a scalar is being written: in flow or block style, whether it is a text field, and the indentation for a block scalar. */
 export interface ScalarContext {
 	flow: boolean;
 	text: boolean;
@@ -37,8 +42,9 @@ export interface ScalarContext {
 	indent: string;
 }
 
-export const PRINTABLE = /^[\t\n\x20-\x7e\x85\xa0-퟿-�\u{10000}-\u{10ffff}]*$/u;
+const PRINTABLE = /^[\t\n\x20-\x7e\x85\xa0-퟿-�\u{10000}-\u{10ffff}]*$/u;
 
+/** Writes `v` as a double-quoted YAML scalar, escaping every character that needs it. */
 export function doubleQuoted(v: string): string {
 	let out = '"';
 	for (const ch of v) {
@@ -55,6 +61,7 @@ export function doubleQuoted(v: string): string {
 	return out + '"';
 }
 
+/** Writes `v` as a block literal scalar (`|`) indented to `indent`, or null if `v` cannot be one. */
 export function literal(v: string, indent: string): string | null {
 	if (v === '' || !PRINTABLE.test(v)) return null;
 	const chomp = v.endsWith('\n\n') ? '+' : v.endsWith('\n') ? '' : '-';
@@ -68,7 +75,7 @@ export function literal(v: string, indent: string): string | null {
  * (spec §3 reads them "as strings, whatever YAML typed them as"): `1103` stays plain, `0042` and
  * `null` do not.
  */
-export function readsBack(rendered: string, value: string, ctx: ScalarContext): boolean {
+function readsBack(rendered: string, value: string, ctx: ScalarContext): boolean {
 	const snippet = ctx.flow ? `{k: ${rendered}}\n` : `k: ${rendered}\n`;
 	try {
 		const safe = parseDocument(snippet, { schema: 'failsafe', logLevel: 'silent' });
@@ -104,12 +111,13 @@ export function renderScalar(value: string, old: Node | null | undefined, ctx: S
  * A written line that Markdown could read as a code fence would end the `dynasty` block and spill
  * the rest of the tree into the note (CommonMark allows up to 3 spaces before a closing fence).
  */
-export const FENCE_LINE = /^[ \t]{0,3}(`{3,}|~{3,})/;
-export const hasFenceLine = (text: string) => text.split('\n').some((l, n) => n > 0 && FENCE_LINE.test(l));
+const FENCE_LINE = /^[ \t]{0,3}(`{3,}|~{3,})/;
+const hasFenceLine = (text: string) => text.split('\n').some((l, n) => n > 0 && FENCE_LINE.test(l));
 
 // ---------------------------------------------------------------------------------------------
 // Text positions
 
+/** One text replacement: `text` replaces the range `[start, end)` in the body. */
 export interface Patch {
 	start: number;
 	end: number;
@@ -122,7 +130,7 @@ export interface Patch {
 	writes?: string[];
 }
 
-/** One parsed body and the text positions of its nodes. */
+/** One parsed body, plus helpers for finding the line and column bounds of its nodes. */
 export class Source {
 	readonly eol: '\n' | '\r\n';
 
@@ -134,6 +142,7 @@ export class Source {
 		this.eol = nl > 0 && text[nl - 1] === '\r' ? '\r\n' : '\n';
 	}
 
+	/** Start of the line holding `pos`. */
 	lineStart(pos: number): number {
 		return this.text.lastIndexOf('\n', pos - 1) + 1;
 	}
@@ -145,11 +154,12 @@ export class Source {
 		return nl > 0 && this.text[nl - 1] === '\r' ? nl - 1 : nl;
 	}
 
+	/** Column of `pos` on its line, 0-based. */
 	column(pos: number): number {
 		return pos - this.lineStart(pos);
 	}
 
-	/** Only spaces (or a sequence dash) before `pos` on its line: is `pos` the first key there? */
+	/** Only whitespace before `pos` on its line; false for a key after a list dash (`- title: T`). */
 	startsLine(pos: number): boolean {
 		return this.text.slice(this.lineStart(pos), pos).trim() === '';
 	}
@@ -171,6 +181,7 @@ export class Source {
 		return colon === -1 ? keyEnd : colon + 1;
 	}
 
+	/** True if the pair's value node holds a written value, rather than being empty (`key:` with nothing after it). */
 	hasValue(pair: Pair): boolean {
 		const v = pair.value as Node | null;
 		return !!v && !!v.range && v.range[1] > v.range[0];
@@ -209,15 +220,16 @@ export class Source {
 	}
 }
 
-export const keyOf = (pair: Pair): string | undefined => (isScalar(pair.key) ? str(pair.key.value) : undefined);
+const keyOf = (pair: Pair): string | undefined => (isScalar(pair.key) ? str(pair.key.value) : undefined);
 
+/** The pair of `map` with this key, or undefined. */
 export function findPair(map: YAMLMap, key: string): Pair | undefined {
 	return (map.items as Pair[]).find((p) => keyOf(p) === key);
 }
 
-export const rankIn = (order: string[], key: string | undefined) => (key === undefined ? -1 : order.indexOf(key));
+const rankIn = (order: string[], key: string | undefined) => (key === undefined ? -1 : order.indexOf(key));
 
-/** Indentation habits of the body, so new lines look like the old ones. */
+/** Indentation habits read from a body, so lines a patch adds match the ones already there. */
 export interface Layout {
 	/** Columns from a key to the items of its nested map. */
 	mapIndent: number;
@@ -227,6 +239,7 @@ export interface Layout {
 	itemIndent: number;
 }
 
+/** Reads the indentation habits of a body's top-level lists and maps. */
 export function layoutOf(src: Source): Layout {
 	const layout: Layout = { mapIndent: 2, seqIndent: 2, itemIndent: 2 };
 	const top = src.doc.contents;
@@ -255,7 +268,7 @@ export function layoutOf(src: Source): Layout {
 /** A value to write under a key: a scalar, or block lines (relative, first line at the key's child indentation). */
 export type NewValue = { scalar: string; old?: Node | null; text: boolean } | { block: string[]; flow: string } | { raw: string };
 
-export function scalarText(src: Source, value: Extract<NewValue, { scalar: string }>, flow: boolean, keyCol: number, layout: Layout): string {
+function scalarText(src: Source, value: Extract<NewValue, { scalar: string }>, flow: boolean, keyCol: number, layout: Layout): string {
 	let indent = ' '.repeat(keyCol + layout.mapIndent);
 	// A block scalar keeps its own indentation.
 	if (isScalar(value.old) && value.old.range && (value.old.type === Scalar.BLOCK_LITERAL || value.old.type === Scalar.BLOCK_FOLDED)) {
@@ -266,7 +279,7 @@ export function scalarText(src: Source, value: Extract<NewValue, { scalar: strin
 }
 
 /** Text after `key:` for a new value in a block map whose keys sit at `keyCol`. */
-export function valueAfterKey(src: Source, value: NewValue, flow: boolean, keyCol: number, layout: Layout): string {
+function valueAfterKey(src: Source, value: NewValue, flow: boolean, keyCol: number, layout: Layout): string {
 	if ('raw' in value) return ' ' + value.raw;
 	if ('scalar' in value) return ' ' + scalarText(src, value, flow, keyCol, layout);
 	if (flow) return ' ' + value.flow;
@@ -376,8 +389,12 @@ export function removePair(src: Source, map: YAMLMap, pair: Pair): Patch {
 	return { start: before, end, text: '', allow: [start, end] };
 }
 
-/** Appends an item to a list. `block` lines are relative to the dash; `flow` is the one-line form. */
-export function appendItem(src: Source, seq: YAMLSeq, block: string[], flow: string): Patch {
+/**
+ * Appends an item to a list. `block` lines are relative to the dash; `flow` is the one-line form.
+ * `end` is where the last item's own text ends in a block list (`itemEnd`, with the comments it owns);
+ * by default the end of its last line.
+ */
+export function appendItem(src: Source, seq: YAMLSeq, block: string[], flow: string, end?: number): Patch {
 	const items = seq.items as Node[];
 	if (seq.flow) {
 		const last = items[items.length - 1];
@@ -386,7 +403,7 @@ export function appendItem(src: Source, seq: YAMLSeq, block: string[], flow: str
 	}
 	const last = items[items.length - 1];
 	const dashCol = src.column(seq.range![0]);
-	const at = src.nodeLineEnd(last);
+	const at = end ?? src.nodeLineEnd(last);
 	// Items written as one-line flow maps get a new one-line item.
 	if (isMap(last) && last.flow) return insertAt(at, '\n' + ' '.repeat(dashCol) + '- ' + flow);
 	let itemCol = dashCol + 2;
@@ -395,12 +412,13 @@ export function appendItem(src: Source, seq: YAMLSeq, block: string[], flow: str
 	return insertAt(at, lines.map((l) => '\n' + l).join(''));
 }
 
+/** A patch that inserts `text` at `at` without removing anything. */
 export const insertAt = (at: number, text: string): Patch => ({ start: at, end: at, text });
 
 // ---------------------------------------------------------------------------------------------
 // Checks
 
-export function deepEqual(a: Raw, b: Raw): boolean {
+function deepEqual(a: Raw, b: Raw): boolean {
 	if (a === b) return true;
 	if (Array.isArray(a) || Array.isArray(b)) {
 		if (!Array.isArray(a) || !Array.isArray(b) || a.length !== b.length) return false;
@@ -413,16 +431,20 @@ export function deepEqual(a: Raw, b: Raw): boolean {
 	return ka.every((k) => Object.prototype.hasOwnProperty.call(b, k) && deepEqual((a as RawMap)[k], (b as RawMap)[k]));
 }
 
+/** A deep copy of a raw YAML value, safe for an op to mutate while building its expected data. */
 export const clone = (v: Raw): Raw => (v === undefined ? undefined : JSON.parse(JSON.stringify(v)));
 
+/** One parsed body: its `Source` and the raw data `toJS` gave for it. */
 export type Parsed = { src: Source; data: Raw };
 
+/** Parses a body into a `Parsed`, or a `Refusal` if it does not parse. */
 export function parse(body: string): Parsed | Refusal {
 	const parsed = parseBody(body);
 	if (!parsed.ok) return refuse('invalid-yaml', parsed.error.detail ?? parsed.error.code);
 	return { src: new Source(body, parsed.doc), data: parsed.data };
 }
 
+/** True if `v` is a `Refusal`. */
 export const isRefusal = (v: unknown): v is Refusal => typeof v === 'object' && v !== null && (v as Refusal).ok === false;
 
 // ---------------------------------------------------------------------------------------------
@@ -431,8 +453,9 @@ export const isRefusal = (v: unknown): v is Refusal => typeof v === 'object' && 
 /** A step gives one patch, or several computed on the same parse (applied together, in order for equal positions). */
 export type Step = (p: Parsed) => Patch | Patch[] | null | Refusal;
 
+/** The detail text used when two patches computed in one step would overlap. */
 export const OVERLAP = 'Patches overlap.';
-export const LEXER_ONLY = new Set(['\x02', '\x18', '\x1f']);
+const LEXER_ONLY = new Set(['\x02', '\x18', '\x1f']);
 
 /** Every comment of a body, with its offset. Comment-like text in scalars is not a comment. */
 export function commentsOf(text: string): { offset: number; text: string }[] {
@@ -486,7 +509,7 @@ export function mergeRemovals(patches: Patch[]): Patch[] {
 }
 
 /** Applies patches computed on one parse; null if they overlap. */
-export function applyPatches(src: Source, patches: Patch[]): string | null {
+function applyPatches(src: Source, patches: Patch[]): string | null {
 	const order = patches.map((p, n) => ({ p, n })).sort((a, b) => b.p.start - a.p.start || b.p.end - a.p.end || b.n - a.n);
 	let text = src.text;
 	for (let k = 0; k < order.length; k++) {
@@ -564,6 +587,7 @@ export function addSection(p: Parsed, key: string, value: Extract<NewValue, { bl
 // ---------------------------------------------------------------------------------------------
 // Shared by the ops
 
+/** Checks and normalises one person field's new value, or refuses it (spec §4.1). */
 export function personValue(field: PersonField, value: FieldValue): { write: string | null } | Refusal {
 	if (field === 'illegitimate') {
 		if (value === null || value === false) return { write: null };
@@ -586,6 +610,7 @@ export function sameValue(field: PersonField, raw: Raw, write: string | null): b
 	return read === (write === null ? undefined : str(write));
 }
 
+/** The person item at `index` in the parsed body's `people` list, or a refusal. */
 export function personNode(p: Parsed, index: number): YAMLMap | Refusal {
 	const top = topMap(p);
 	if (isRefusal(top)) return top;
@@ -606,4 +631,23 @@ export function finish(first: Parsed, steps: Step[], expected: RawMap, created: 
 		return refuse('bad-value', 'The change cannot be written without a change to other values. Edit the note text.');
 	}
 	return { ok: true, body: out, created };
+}
+
+/**
+ * Runs several changes computed on one parse as one step. If two of them touch the same text, it
+ * runs them again as one step each, each on a fresh parse.
+ */
+export function finishTogether(first: Parsed, steps: Step[], expected: RawMap, created: string[]): EditResult {
+	if (steps.length < 2) return finish(first, steps, expected, created);
+	const together: Step = (p) => {
+		const patches: Patch[] = [];
+		for (const step of steps) {
+			const r = step(p);
+			if (isRefusal(r)) return r;
+			if (r) patches.push(...(Array.isArray(r) ? r : [r]));
+		}
+		return patches;
+	};
+	const r = finish(first, [together], expected, created);
+	return !r.ok && r.detail === OVERLAP ? finish(first, steps, expected, created) : r;
 }
