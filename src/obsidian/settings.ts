@@ -1,0 +1,77 @@
+import { DEFAULT_SETTINGS, type DynastySettings, type NormaliseSettings } from './settings-contract';
+
+/*
+ * Reads the stored settings (spec §9). Pure and free of `obsidian`, so it has unit tests: stored data
+ * can come from an older version, a sync conflict or a hand edit of `data.json`.
+ */
+
+/** The phone heights the settings tab offers, in % of the screen height (D30). */
+export const PHONE_HEIGHTS = [40, 50, 60, 70, 80] as const;
+export const DESKTOP_HEIGHT = { min: 100, max: 5000 } as const;
+export const PHONE_HEIGHT = { min: 40, max: 80 } as const;
+export const GENERATIONS = { min: 0, max: 10 } as const;
+
+const wholeIn = (v: unknown, r: { min: number; max: number }): v is number => typeof v === 'number' && Number.isInteger(v) && v >= r.min && v <= r.max;
+
+export const normaliseSettings: NormaliseSettings = (raw) => {
+	const s = raw !== null && typeof raw === 'object' && !Array.isArray(raw) ? (raw as Record<string, unknown>) : {};
+	const d = DEFAULT_SETTINGS;
+	// A height typed as 480.5 is still a height: round it, then check the range.
+	const desktop = typeof s.embedHeightDesktop === 'number' && Number.isFinite(s.embedHeightDesktop) ? Math.round(s.embedHeightDesktop) : NaN;
+	const phone = typeof s.embedHeightPhone === 'number' && Number.isFinite(s.embedHeightPhone) ? Math.round(s.embedHeightPhone) : NaN;
+	return {
+		embedHeightDesktop: wholeIn(desktop, DESKTOP_HEIGHT) ? desktop : d.embedHeightDesktop,
+		embedHeightPhone: wholeIn(phone, PHONE_HEIGHT) ? phone : d.embedHeightPhone,
+		cardSize: s.cardSize === 'compact' || s.cardSize === 'normal' ? s.cardSize : d.cardSize,
+		showDates: typeof s.showDates === 'boolean' ? s.showDates : d.showDates,
+		focusGenerations: wholeIn(s.focusGenerations, GENERATIONS) ? s.focusGenerations : d.focusGenerations,
+		updateLinks: typeof s.updateLinks === 'boolean' ? s.updateLinks : d.updateLinks,
+	};
+};
+
+/**
+ * The height a desktop user typed, or null if it is not a whole number of pixels in range. Leading
+ * and trailing spaces and a "px" unit are accepted.
+ */
+export function parseDesktopHeight(text: string): number | null {
+	const m = /^\s*(\d{1,5})\s*(?:px)?\s*$/i.exec(text);
+	if (!m) return null;
+	const n = Number(m[1]);
+	return wholeIn(n, DESKTOP_HEIGHT) ? n : null;
+}
+
+/** What changed between two settings, for the views (a card-size change drops the carried view). */
+export function settingsChanges(a: DynastySettings, b: DynastySettings): (keyof DynastySettings)[] {
+	return (Object.keys(DEFAULT_SETTINGS) as (keyof DynastySettings)[]).filter((k) => a[k] !== b[k]);
+}
+
+/**
+ * A rename whose tree links the plugin has not updated yet (spec §6.9). It is stored in `data.json`
+ * next to the settings, under its own key: an update that stopped (a phone closed the app) continues
+ * at the next start. `others`: the notes with the old name that existed at the rename.
+ */
+export interface PendingRename {
+	oldPath: string;
+	newPath: string;
+	others: string[];
+}
+
+/** The key of the pending renames in `data.json`; `normaliseSettings` ignores it. */
+export const PENDING_KEY = 'pendingRenames';
+
+const isPath = (v: unknown): v is string => typeof v === 'string' && v.length > 0;
+
+/** The pending renames of stored data; a bad entry is dropped. Pure. */
+export function readPending(raw: unknown): PendingRename[] {
+	if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) return [];
+	const list = (raw as Record<string, unknown>)[PENDING_KEY];
+	if (!Array.isArray(list)) return [];
+	const out: PendingRename[] = [];
+	for (const e of list) {
+		if (e === null || typeof e !== 'object' || Array.isArray(e)) continue;
+		const r = e as Record<string, unknown>;
+		if (!isPath(r.oldPath) || !isPath(r.newPath)) continue;
+		out.push({ oldPath: r.oldPath, newPath: r.newPath, others: Array.isArray(r.others) ? r.others.filter(isPath) : [] });
+	}
+	return out;
+}

@@ -1,0 +1,124 @@
+import { Notice, PluginSettingTab, Setting, SettingGroup, type App, type Plugin } from 'obsidian';
+import { SETTINGS_UI } from '../render/ui-text';
+import { GENERATIONS, PHONE_HEIGHTS, parseDesktopHeight } from './settings';
+import type { DynastySettings } from './settings-contract';
+
+/*
+ * The settings page (spec §9, D33): the settings in groups under short headings. Obsidian 1.11 and
+ * later draw a group with SettingGroup; older versions get a heading row above the group.
+ */
+
+/** What the tab needs from the plugin. */
+export interface SettingsHost extends Plugin {
+	readonly settings: DynastySettings;
+	/** Stores a change and tells every tree view (spec §9). */
+	changeSettings(change: Partial<DynastySettings>): Promise<void>;
+	/** Empties the layout cache (spec §9 "Clear layout cache"). */
+	clearCaches(): void;
+}
+
+type Group = (add: (build: (s: Setting) => void) => void) => void;
+
+export class DynastySettingTab extends PluginSettingTab {
+	constructor(
+		app: App,
+		private readonly host: SettingsHost,
+	) {
+		super(app, host);
+	}
+
+	override display(): void {
+		const el = this.containerEl;
+		el.empty();
+		el.addClass('dynasty-settings');
+		const t = SETTINGS_UI;
+		const s = this.host.settings;
+		this.group(el, t.groups.height, (add) => {
+			add((row) => {
+				row.setName(t.heightDesktop).setDesc(t.heightDesktopDesc);
+				row.addText((text) => {
+					text.inputEl.addClass('dynasty-setting-height');
+					text.inputEl.setAttribute('inputmode', 'numeric');
+					text.setValue(String(s.embedHeightDesktop));
+					text.onChange((v) => {
+						const n = parseDesktopHeight(v);
+						if (n !== null) void this.host.changeSettings({ embedHeightDesktop: n });
+					});
+					// A value out of range is not stored: the field shows the stored value again.
+					text.inputEl.addEventListener('blur', () => text.setValue(String(this.host.settings.embedHeightDesktop)));
+				});
+			});
+			add((row) => {
+				row.setName(t.heightPhone).setDesc(t.heightPhoneDesc);
+				row.addDropdown((d) => {
+					const values: number[] = [...PHONE_HEIGHTS];
+					if (!values.includes(s.embedHeightPhone)) values.push(s.embedHeightPhone);
+					for (const v of values.sort((a, b) => a - b)) d.addOption(String(v), `${v}%`);
+					d.setValue(String(s.embedHeightPhone));
+					d.onChange((v) => void this.host.changeSettings({ embedHeightPhone: Number(v) }));
+				});
+			});
+		});
+		this.group(el, t.groups.cards, (add) => {
+			add((row) => {
+				row.setName(t.cardSize).setDesc(t.cardSizeDesc);
+				row.addDropdown((d) => {
+					d.addOption('normal', t.cardNormal);
+					d.addOption('compact', t.cardCompact);
+					d.setValue(s.cardSize);
+					d.onChange((v) => void this.host.changeSettings({ cardSize: v === 'compact' ? 'compact' : 'normal' }));
+				});
+			});
+			add((row) => {
+				row.setName(t.dates).setDesc(t.datesDesc);
+				row.addToggle((tg) => {
+					tg.setValue(s.showDates);
+					tg.onChange((v) => void this.host.changeSettings({ showDates: v }));
+				});
+			});
+		});
+		this.group(el, t.groups.focus, (add) => {
+			add((row) => {
+				row.setName(t.generations).setDesc(t.generationsDesc);
+				row.addDropdown((d) => {
+					for (let n = GENERATIONS.min; n <= GENERATIONS.max; n++) d.addOption(String(n), String(n));
+					d.setValue(String(s.focusGenerations));
+					d.onChange((v) => void this.host.changeSettings({ focusGenerations: Number(v) }));
+				});
+			});
+		});
+		this.group(el, t.groups.links, (add) => {
+			add((row) => {
+				row.setName(t.links).setDesc(t.linksDesc);
+				row.addToggle((tg) => {
+					tg.setValue(s.updateLinks);
+					tg.onChange((v) => void this.host.changeSettings({ updateLinks: v }));
+				});
+			});
+		});
+		this.group(el, t.groups.repair, (add) => {
+			add((row) => {
+				row.setName(t.cache).setDesc(t.cacheDesc);
+				row.addButton((b) => {
+					b.setButtonText(t.cacheButton);
+					b.onClick(() => {
+						this.host.clearCaches();
+						new Notice(t.cacheDone);
+					});
+				});
+			});
+		});
+	}
+
+	/** One group under a heading (D33). */
+	private group(el: HTMLElement, heading: string, fill: Group): void {
+		// SettingGroup is in Obsidian 1.11 and later; the manifest allows older versions.
+		if (typeof SettingGroup === 'function') {
+			const g = new SettingGroup(el).setHeading(heading).addClass('dynasty-setting-group');
+			fill((build) => g.addSetting(build));
+			return;
+		}
+		new Setting(el).setName(heading).setHeading().setClass('dynasty-setting-heading');
+		fill((build) => build(new Setting(el)));
+	}
+}

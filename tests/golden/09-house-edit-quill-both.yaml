@@ -1,0 +1,73 @@
+# The Harrow line, as kept by the archivist of Greyfen.
+options:
+  start: edric                # open on the heir
+  archive-shelf: B-12         # unknown key in options
+
+houses:
+  - id: harrow
+    name: House Harrow
+    color: "#5b2a86"          # quoted, or YAML reads a comment
+    motto: 'Root and branch'  # unknown key in a house
+  - id: quill
+    name: 'House Quill-Marsh'
+    color: "#123456"
+
+people:
+  # First generation
+  - id: aldous
+    name: Aldous Harrow
+    title: Lord of Greyfen    # an end-of-line comment on a title
+    house: harrow
+    sex: m
+    born: 1102
+    died: 1161
+    epithet: the Patient      # unknown key in a person
+  - id: "0017"                # a quoted id; it stays text
+    name: "Maud Quill"
+    house: quill
+    sex: f
+    born: "1104-03-09"        # a quoted date
+
+  # Second generation
+  - id: edric
+    name: Edric Harrow
+    house: harrow
+    sex: m
+    born: 1131
+    parents: [aldous, "0017"]
+  - id: rosamund
+    name: 'Rosamund Harrow'
+    nickname: Ros
+    sex: f
+    born: 1133
+    parents:
+      - aldous                # a block-style parents list
+      - "0017"
+  - id: piers
+    name: Piers Harrow
+    sex: m
+    born: 1136
+    parents: [aldous]
+  # Wards and married-in
+  - id: tamsin
+    name: Tamsin
+    title: Keeper of the Rolls
+    sex: f
+    parents:
+      - id: aldous
+        type: ward
+        since: 1140           # unknown key in a parent entry
+  - {id: joan, name: Joan Marsh, sex: f, born: 1135}   # a flow-map person
+
+unions:
+  - id: harrow-quill
+    partners: [aldous, "0017"]
+    type: marriage
+    start: 1129
+    witnessed-by: the Abbot   # unknown key in a union
+  # Edric is promised to Joan.
+  - partners: [edric, joan]
+    type: betrothal
+
+chronicle: Greyfen Rolls, vol. 2   # unknown top-level key
+# End of the Harrow line.

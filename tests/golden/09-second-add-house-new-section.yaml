@@ -1,0 +1,12 @@
+houses:
+  - id: house-fenn
+    name: House Fenn
+
+people:
+  - id: bertram
+    name: Bertram Fenn
+    sex: m
+  - id: ysolde
+    name: Ysolde Fenn
+    sex: f
+    parents: [bertram]

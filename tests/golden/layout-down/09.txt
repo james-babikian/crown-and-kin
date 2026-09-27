@@ -1,0 +1,25 @@
+orientation down
+size 996 228
+geometry font 16 normal card 180x64 union 10 couple 36 node 20 row 100 tag 18
+row 0: aldous 0017
+row 1: piers tamsin edric joan rosamund
+gap 0: 64 164
+person 0017 gen 0 at 556 0 size 180 64
+person aldous gen 0 at 340 0 size 180 64
+person edric gen 1 at 400 164 size 180 64
+person joan gen 1 at 616 164 size 180 64
+person piers gen 1 at 0 164 size 180 64
+person rosamund gen 1 at 816 164 size 180 64
+person tamsin gen 1 at 200 164 size 180 64
+union u0 at 538 32 bar
+union u1 at 598 196 bar
+path marriage [aldous 0017] M520 32H556
+path betrothal [edric joan] M580 196H616
+path descent [aldous 0017 edric rosamund] M538 32V134M490 134H906
+path descent [edric aldous 0017] M490 134V164
+path descent [rosamund aldous 0017] M906 134V164
+path descent [aldous piers tamsin] M430 64V134M90 134H430
+path descent [piers aldous] M90 134V164
+path ward [tamsin aldous] M290 134V164
+marker union at 538 32
+marker union at 598 196

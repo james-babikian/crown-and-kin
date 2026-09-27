@@ -1,0 +1,22 @@
+orientation down
+size 724 228
+geometry font 16 normal card 180x64 union 10 couple 36 node 20 row 100 tag 18
+row 0: aldric isolde gareth
+row 1: wren roderick helena
+gap 0: 64 164
+person aldric gen 0 at 128 0 size 180 64
+person gareth gen 0 at 544 0 size 180 64
+person helena gen 1 at 400 164 size 180 64
+person isolde gen 0 at 344 0 size 180 64
+person roderick gen 1 at 200 164 size 180 64
+person wren gen 1 at 0 164 size 180 64
+union u0 at 326 32 bar
+path marriage [aldric isolde] M308 32H344
+path descent [aldric isolde roderick helena] M326 32V134M290 134H490
+path descent [roderick aldric isolde] M290 134V164
+path descent [helena aldric isolde] M490 134V164
+path illegitimate [aldric wren] M218 64V134M90 134H218
+path illegitimate [wren aldric] M90 134V164
+path rumoured [gareth roderick] M634 64V86C634 125 304 125 304 164
+marker union at 326 32
+marker rumour at 481.365 123.536

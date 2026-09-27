@@ -1,0 +1,11 @@
+options:
+  height: 500
+
+people:
+  - id: bertram
+    name: Bertram Fenn
+    sex: m
+  - id: ysolde
+    name: Ysolde Fenn
+    sex: f
+    parents: [bertram]

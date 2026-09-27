@@ -1,0 +1,47 @@
+orientation down
+size 2039.828 392
+geometry font 16 normal card 180x64 union 10 couple 36 node 20 row 100 tag 18
+row 0: osmund berta ranulf sela arn
+row 1: wynn hal maren joss piers tilda cole edda bram
+row 2: col
+gap 0: 64 164
+gap 1: 228 328
+person arn gen 0 at 1859.828 0 size 180 64
+person berta gen 0 at 730.286 0 size 180 64
+person bram gen 1 at 1859.828 164 size 180 64
+person col gen 2 at 1859.828 328 size 180 64
+person cole gen 1 at 1216 164 size 180 64
+person edda gen 1 at 1443.828 164 size 180 64
+person hal gen 1 at 200 164 size 180 64
+person joss gen 1 at 616 164 size 180 64
+person maren gen 1 at 416 164 size 180 64
+person osmund gen 0 at 514.286 0 size 180 64
+person piers gen 1 at 816 164 size 180 64
+person ranulf gen 0 at 1443.828 0 size 180 64
+person sela gen 0 at 1659.828 0 size 180 64
+person tilda gen 1 at 1016 164 size 180 64
+person wynn gen 1 at 0 164 size 180 64
+union u0 at 712.286 32 bar
+union u1 at 398 196 bar
+union u5 at 1641.828 32 bar
+path marriage [osmund berta] M694.3 32H730.3
+path marriage [hal maren] M380 196H416
+path marriage [ranulf sela] M1623.8 32H1659.8
+path descent [osmund berta hal joss piers tilda cole] M712.3 32V134M290 134H1306
+path descent [hal osmund berta] M290 134V164
+path descent [joss osmund berta] M706 134V164
+path descent [piers osmund berta] M906 134V164
+path descent [tilda osmund berta] M1106 134V164
+path descent [cole osmund berta] M1306 134V164
+path descent [osmund wynn] M604.3 64V122M90 122H604.3
+path descent [wynn osmund] M90 122V164
+path descent [ranulf edda] M1533.8 64V134
+path descent [edda ranulf] M1533.8 134V164
+path descent [arn bram] M1949.8 64V134
+path descent [bram arn] M1949.8 134V164
+path adoptive [bram col] M1949.8 228V298
+path adoptive [col bram] M1949.8 298V328
+path birth-link [ranulf joss] M1521.8 64V86C1521.8 125 720 125 720 164
+marker union at 712.286 32
+marker union at 398 196
+marker union at 1641.828 32

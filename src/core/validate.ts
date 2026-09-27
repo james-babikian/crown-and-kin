@@ -1,0 +1,210 @@
+import type { CodedIssue, IssueCode, IssueParams } from './issues';
+import { PARENT_TYPES, PLACEMENT_TYPES, UNION_TYPES, type House, type ParentRef, type Person, type Tree, type Union } from './types';
+
+const isOneOf = (list: readonly string[], v: string) => list.includes(v);
+
+/** The parts of a tree that are safe to draw, and every problem found on the way (spec §8, §4.1). */
+export interface Validated {
+	/** Unique people in document order. The first entry with an id wins. */
+	people: Person[];
+	byId: Map<string, Person>;
+	/** The first house with an id wins. */
+	houses: Map<string, House>;
+	/** Listed unions with exactly 2 different partners who both exist, in list order. */
+	unions: Union[];
+	/**
+	 * Parent links per person that point at someone else who exists, with unknown types read as
+	 * birth, duplicates removed, and the links that close a cycle dropped.
+	 */
+	refs: Map<string, ParentRef[]>;
+	/** Every union id written, drawable or not; tells a missing `union` from a misplaced one. */
+	unionIds: Set<string>;
+	issues: CodedIssue[];
+}
+
+function push<K, V>(map: Map<K, V[]>, key: K, value: V) {
+	const arr = map.get(key);
+	if (arr) arr.push(value);
+	else map.set(key, [value]);
+}
+
+class Collector {
+	readonly issues: CodedIssue[] = [];
+
+	blocking(code: IssueCode, params: IssueParams, ids?: string[]) {
+		this.issues.push(ids?.length ? { code, level: 'blocking', params, ids } : { code, level: 'blocking', params });
+	}
+
+	warn(code: IssueCode, params: IssueParams, ids?: string[]) {
+		this.issues.push(ids?.length ? { code, level: 'warning', params, ids } : { code, level: 'warning', params });
+	}
+}
+
+/**
+ * Removes parent links that would make someone their own ancestor. Walks people in document
+ * order so the result is deterministic; the link that closes each cycle is the one dropped.
+ * Iterative, so a very long line of descent cannot overflow the stack.
+ */
+function breakCycles(people: Person[], refs: Map<string, ParentRef[]>, byId: Map<string, Person>, out: Collector) {
+	const childrenOf = new Map<string, string[]>();
+	for (const p of people) for (const r of refs.get(p.id)!) push(childrenOf, r.id, p.id);
+
+	const state = new Map<string, 1 | 2>(); // 1 = on the path, 2 = done
+	const dropped = new Set<string>(); // "parent\0child"
+	const name = (id: string) => byId.get(id)!.name;
+
+	for (const root of people) {
+		if (state.has(root.id)) continue;
+		const path: string[] = [root.id];
+		const next: number[] = [0];
+		state.set(root.id, 1);
+		while (path.length) {
+			const id = path[path.length - 1];
+			const kids = childrenOf.get(id) ?? [];
+			const i = next[next.length - 1]++;
+			if (i >= kids.length) {
+				state.set(id, 2);
+				path.pop();
+				next.pop();
+				continue;
+			}
+			const child = kids[i];
+			if (dropped.has(`${id}\0${child}`)) continue;
+			const s = state.get(child);
+			if (s === 1) {
+				const loop = path.slice(path.indexOf(child));
+				dropped.add(`${id}\0${child}`);
+				out.warn('cycle', { people: loop.map(name), dropped: name(child), parent: name(id) }, loop);
+			} else if (s === undefined) {
+				state.set(child, 1);
+				path.push(child);
+				next.push(0);
+			}
+		}
+	}
+
+	if (dropped.size) {
+		for (const p of people) refs.set(p.id, refs.get(p.id)!.filter((r) => !dropped.has(`${r.id}\0${p.id}`)));
+	}
+}
+
+/**
+ * Checks references and values, and returns only what is safe to draw. Everything that needs
+ * the derived families (primary unions) is checked in `derive.ts`.
+ */
+export function validateTree(tree: Tree): Validated {
+	const out = new Collector();
+
+	// Duplicate ids. People and houses: the first wins. Unions: both are drawn; only editing is unsafe.
+	const byId = new Map<string, Person>();
+	const people: Person[] = [];
+	const dupPeople = new Set<string>();
+	for (const p of tree.people) {
+		if (byId.has(p.id)) {
+			if (!dupPeople.has(p.id)) out.blocking('duplicate-person-id', { id: p.id, name: byId.get(p.id)!.name }, [p.id]);
+			dupPeople.add(p.id);
+			continue;
+		}
+		byId.set(p.id, p);
+		people.push(p);
+	}
+	const name = (id: string) => byId.get(id)?.name ?? id;
+
+	const houses = new Map<string, House>();
+	const dupHouses = new Set<string>();
+	for (const h of tree.houses) {
+		if (!houses.has(h.id)) {
+			houses.set(h.id, h);
+			continue;
+		}
+		if (!dupHouses.has(h.id)) out.warn('duplicate-house-id', { id: h.id, house: houses.get(h.id)!.name }, [h.id]);
+		dupHouses.add(h.id);
+	}
+
+	const unionIds = new Set<string>();
+	const unionsById = new Map<string, Union[]>();
+	for (const u of tree.unions) {
+		if (u.id === undefined) continue;
+		unionIds.add(u.id);
+		push(unionsById, u.id, u);
+	}
+	for (const [id, list] of unionsById) {
+		if (list.length < 2) continue;
+		const partners = [...new Set(list.flatMap((u) => u.partners).filter((x) => byId.has(x)))];
+		out.blocking('duplicate-union-id', { id }, partners);
+	}
+
+	for (const [key, ref] of [['start', tree.options.start], ['focus', tree.options.focus]] as const) {
+		if (ref !== undefined && !byId.has(ref)) out.warn(key === 'start' ? 'missing-start' : 'missing-focus', { ref });
+	}
+
+	// People: values, then parent links.
+	const refs = new Map<string, ParentRef[]>();
+	for (const p of people) {
+		const who = { person: p.name };
+		if (p.house !== undefined && !houses.has(p.house)) out.warn('missing-house', { ...who, ref: p.house }, [p.id]);
+		if (p.union !== undefined && !unionIds.has(p.union)) out.warn('missing-union', { ...who, ref: p.union }, [p.id]);
+
+		const valid: ParentRef[] = [];
+		const seen = new Set<string>();
+		const missing = new Set<string>();
+		let self = false;
+		for (const r of p.parents) {
+			if (r.id === p.id) {
+				if (!self) out.warn('self-parent', who, [p.id]);
+				self = true;
+				continue;
+			}
+			if (!byId.has(r.id)) {
+				if (!missing.has(r.id)) out.warn('missing-parent', { ...who, ref: r.id }, [p.id]);
+				missing.add(r.id);
+				continue;
+			}
+			let type = r.type;
+			if (!isOneOf(PARENT_TYPES, type)) {
+				out.warn('unknown-parent-type', { ...who, value: type, parent: name(r.id) }, [p.id, r.id]);
+				type = 'birth';
+			}
+			const key = `${r.id}\0${type}`;
+			if (seen.has(key)) continue;
+			seen.add(key);
+			valid.push({ id: r.id, type });
+		}
+		refs.set(p.id, valid);
+
+		const byType = new Map<string, number>();
+		for (const r of valid) byType.set(r.type, (byType.get(r.type) ?? 0) + 1);
+		for (const [type, count] of byType) {
+			if (count > 2) out.warn('too-many-parents', { ...who, type, count }, [p.id]);
+		}
+		if (p.placement !== undefined) {
+			if (!isOneOf(PLACEMENT_TYPES, p.placement)) out.warn('unknown-placement', { ...who, value: p.placement }, [p.id]);
+			else if (!byType.has(p.placement)) out.warn('placement-without-parents', { ...who, placement: p.placement }, [p.id]);
+		}
+	}
+
+	// Unions: one issue per union for its shape, then one per missing partner.
+	const unions: Union[] = [];
+	for (const u of tree.unions) {
+		const label = { union: u.id ?? `#${u.index + 1}`, partners: u.partners.map(name) };
+		const known = [...new Set(u.partners.filter((x) => byId.has(x)))];
+		if (u.partners.length !== 2) {
+			out.warn('union-partner-count', { ...label, count: u.partners.length }, known);
+			continue;
+		}
+		const [a, b] = u.partners;
+		if (a === b) {
+			out.warn('union-same-partner', { ...label, person: name(a) }, known);
+			continue;
+		}
+		const absent = u.partners.filter((x) => !byId.has(x));
+		for (const ref of absent) out.warn('missing-partner', { ...label, ref, absent }, known);
+		if (absent.length) continue;
+		if (!isOneOf(UNION_TYPES, u.type)) out.warn('unknown-union-type', { ...label, value: u.type }, known);
+		unions.push(u);
+	}
+
+	breakCycles(people, refs, byId, out);
+
+	return { people, byId, houses, unions, refs, unionIds, issues: out.issues };
+}

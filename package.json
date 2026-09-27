@@ -1,0 +1,32 @@
+{
+  "name": "dynasty-tree",
+  "version": "0.1.0",
+  "description": "Obsidian plugin: editable family trees for fictional dynasties",
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "build": "node esbuild.config.mjs production",
+    "dev": "node esbuild.config.mjs",
+    "lint": "eslint src tests"
+  },
+  "author": "",
+  "license": "GPL-3.0-only",
+  "type": "module",
+  "dependencies": {
+    "yaml": "^2.9.1"
+  },
+  "devDependencies": {
+    "@resvg/resvg-js": "^2.6.2",
+    "@types/node": "^26.6.2",
+    "elkjs": "^0.12.0",
+    "esbuild": "^0.28.2",
+    "eslint": "^10.11.0",
+    "obsidian": "^1.13.1",
+    "puppeteer-core": "^25.12.0",
+    "tsx": "^4.23.15",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.70.1",
+    "vitest": "^5.0.1"
+  },
+  "private": true
+}

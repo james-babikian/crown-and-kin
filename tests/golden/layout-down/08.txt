@@ -1,0 +1,45 @@
+orientation down
+size 1351 392
+geometry font 16 normal card 180x64 union 10 couple 36 node 20 row 100 tag 18
+row 0: aldric isolde marek anna gareth odette
+row 1: tomas sabine jasper piers roderick
+row 2: lucan
+gap 0: 64 164
+gap 1: 228 328
+person aldric gen 0 at 0 0 size 180 64
+person anna gen 0 at 745 0 size 180 64
+person gareth gen 0 at 945 0 size 180 64
+person isolde gen 0 at 216 0 size 180 64
+person jasper gen 1 at 637 164 size 180 64
+person lucan gen 2 at 216 328 size 180 64
+person marek gen 0 at 529 0 size 180 64
+person odette gen 0 at 1161 0 size 180 64
+person piers gen 1 at 935 164 size 180 64
+person roderick gen 1 at 1171 164 size 180 64
+person sabine gen 1 at 324 164 size 180 64
+person tomas gen 1 at 108 164 size 180 64
+union u0 at 198 32 bar
+union u1 at 727 32 bar
+union u2 at 1143 32 bar
+union u3 at 306 196 bar
+path marriage [aldric isolde] M180 32H216
+path marriage [marek anna] M709 32H745
+path marriage [gareth odette] M1125 32H1161
+path marriage [tomas sabine] M288 196H324
+path adoptive [aldric isolde tomas] M198 32V134
+path adoptive [tomas aldric isolde] M198 134V164
+path descent [marek anna jasper] M727 32V134
+path descent [jasper marek anna] M727 134V164
+path descent [gareth odette piers roderick] M1143 32V134M1025 134H1261
+path descent [piers gareth odette] M1025 134V164
+path descent [roderick gareth odette] M1261 134V164
+path descent [tomas sabine lucan] M306 196V298
+path descent [lucan tomas sabine] M306 298V328
+path birth-link [marek anna tomas] M727 32V86C727 125 212 125 212 164
+path ward [aldric piers] M90 64V86C90 125 1039 125 1039 164
+path rumoured [marek roderick] M619 64V86C619 125 1275 125 1275 164
+marker union at 198 32
+marker union at 727 32
+marker union at 1143 32
+marker union at 306 196
+marker rumour at 947 125
