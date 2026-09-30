@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 const DIR = fileURLToPath(new URL('../../fixtures/', import.meta.url));
 
 export interface FixtureBlock {
-	/** Two-digit number, for example '05'. */
+	/** The file name up to its first '-': a two-digit number such as '05', or '07b' (spec §13.0 item 9). */
 	id: string;
 	file: string;
 	/** Body of the first top-level dynasty block in the note, each line ending in '\n'. */
@@ -45,7 +45,7 @@ export function allFixtures(): FixtureBlock[] {
 	const out: FixtureBlock[] = [];
 	for (const file of readdirSync(DIR).filter((f) => f.endsWith('.md')).sort()) {
 		const source = topLevelBlocks(readFileSync(DIR + file, 'utf8'))[0];
-		if (source !== undefined) out.push({ id: file.slice(0, 2), file, source });
+		if (source !== undefined) out.push({ id: file.slice(0, file.indexOf('-')), file, source });
 	}
 	return out;
 }

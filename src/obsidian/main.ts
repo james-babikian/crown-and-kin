@@ -3,10 +3,12 @@
  * extension that keeps tall blocks parsed in Live Preview, the commands and the settings tab, and
  * it owns the state that outlives any one `TreeView`: the block handles, the settings, the loose
  * (read-only) block states and the render timings the test harness reads. It implements `TreeHost`
- * and `SettingsHost` so that `TreeView` and the settings tab can call back into it.
+ * and `SettingsHost` so that `TreeView` and the settings tab can call back into it. It also owns the
+ * one picture store of all trees (spec §13.0 item 3) and tells it when a picture file changes.
  */
 
-import { Notice, Plugin, TFile, debounce } from 'obsidian';
+import { Notice, Plugin, TFile, debounce, type TAbstractFile } from 'obsidian';
+import { createParseCache } from '../core/parse-cache';
 import { INSERT_UI, RENAME_UI, TIMING_UI, UI, WRITE_TEXT } from '../render/ui-text';
 import { clearLayoutCache } from '../layout/index';
 import { clearMeasureCache } from '../render/dom/measure';
@@ -19,10 +21,15 @@ import { FullScreenModal } from './full-screen';
 import { insertTree } from './insert-tree';
 import { closePluginModals } from './plugin-modals';
 import { tallBlockParser } from './live-preview';
-import { LinkUpdater, RENAME_TIMING } from './rename-links';
+import { clearRelationCache } from './relation-cache';
+import { createPictureStore, isPictureExtension } from './picture-store';
+import { LinkUpdater, RENAME_TIMING, extensionOf } from './rename-links';
 import { DEFAULT_SETTINGS, PENDING_KEY, normaliseSettings, readPending, settingsChanges, type DynastySettings } from './settings';
 import { DynastySettingTab, type SettingsHost } from './settings-tab';
 import { HOVER_SOURCE, THEME_RECHECK_MS, TreeView, type TreeHost } from './tree-view';
+
+/** B16: vault events for picture files are grouped for this long, in ms, before the views refresh. */
+export const PICTURE_EVENT_MS = 250;
 
 /** The Dynasty Tree plugin: Obsidian loads one instance and calls `onload`/`onunload` on it. */
 export default class DynastyTreePlugin extends Plugin implements TreeHost, SettingsHost {
@@ -45,6 +52,24 @@ export default class DynastyTreePlugin extends Plugin implements TreeHost, Setti
 	readonly firstTimings = new Map<string, RenderTiming>();
 	/** Number of tree renders in this session; the harness checks that a tree settles. */
 	renderCount = 0;
+	/** M9 contract O3: one picture store for all trees (`TreeHost.pictures`). */
+	readonly pictures = createPictureStore(this.app);
+	/**
+	 * M11: the one parse cache of the tree views. The harness build freezes the cached trees, so that a
+	 * reader which changes one (layout, relations, fold planning) throws in the harness and not in a note.
+	 */
+	readonly parseCache = createParseCache({ freeze: typeof __DYNASTY_HARNESS__ !== 'undefined' && __DYNASTY_HARNESS__ === true });
+	/** O9, B16: picture files that changed, told to the store's listeners together after a short wait. */
+	private changedPictures = new Set<string>();
+	private readonly tellPictures = debounce(
+		() => {
+			const paths = [...this.changedPictures];
+			this.changedPictures = new Set();
+			if (paths.length) this.pictures.changed(paths);
+		},
+		PICTURE_EVENT_MS,
+		false,
+	);
 
 	override async onload(): Promise<void> {
 		this.registerHoverLinkSource(HOVER_SOURCE, { display: 'Dynasty Tree', defaultMod: false });
@@ -91,6 +116,16 @@ export default class DynastyTreePlugin extends Plugin implements TreeHost, Setti
 				if (file instanceof TFile && file.extension === 'md') this.handles.modified(file.path);
 			}),
 		);
+		// O9: a picture file that changes, goes or comes makes the trees show their pictures again (no new layout).
+		this.registerEvent(this.app.vault.on('modify', (file) => this.pictureChanged(file)));
+		this.registerEvent(this.app.vault.on('delete', (file) => this.pictureChanged(file)));
+		this.registerEvent(
+			this.app.vault.on('rename', (file, oldPath) => {
+				this.pictureChanged(file, oldPath);
+				this.pictureChanged(file);
+			}),
+		);
+		this.register(() => this.tellPictures.cancel?.());
 		this.addCommand({
 			id: 'undo-last-tree-edit',
 			name: WRITE_TEXT.undoCommand,
@@ -130,7 +165,11 @@ export default class DynastyTreePlugin extends Plugin implements TreeHost, Setti
 		// Registered after the handler above, so the handles follow the rename first.
 		this.registerEvent(this.app.vault.on('rename', (file, oldPath) => this.links.renamed(file, oldPath)));
 		try {
-			this.app.workspace.onLayoutReady(() => this.links.resume());
+			this.app.workspace.onLayoutReady(() => {
+				this.links.resume();
+				// Obsidian sends `create` for every file while the vault loads: only later ones count.
+				this.registerEvent(this.app.vault.on('create', (file) => this.pictureChanged(file)));
+			});
 		} catch (e) {
 			console.error('Dynasty Tree: cannot continue the link update of an earlier rename', e);
 		}
@@ -185,6 +224,9 @@ export default class DynastyTreePlugin extends Plugin implements TreeHost, Setti
 
 	override onunload(): void {
 		this.links.stop();
+		// Every blob URL of the pictures goes; the queue stops.
+		this.pictures.clear();
+		this.parseCache.clear();
 		// Modals live outside every note: close them (sheets first, then full-screen views with their
 		// vault listeners), so that nothing of the plugin stays on screen or writes after it is turned off.
 		closePluginModals();
@@ -260,6 +302,22 @@ export default class DynastyTreePlugin extends Plugin implements TreeHost, Setti
 		}
 	}
 
+	/**
+	 * O8, O9: a picture file (a known picture extension, shown or not) was made, changed, deleted or
+	 * renamed (`path` then is the old path). The store forgets it at once; the views hear of it after
+	 * `PICTURE_EVENT_MS`, once for all the events of that time (a folder rename sends many).
+	 */
+	private pictureChanged(file: TAbstractFile, path = file.path): void {
+		try {
+			if (!(file instanceof TFile) || !isPictureExtension(extensionOf(path))) return;
+			this.pictures.invalidate(path);
+			this.changedPictures.add(path);
+			this.tellPictures();
+		} catch (e) {
+			console.error('Dynasty Tree: cannot follow the changed picture', e);
+		}
+	}
+
 	/** Plugin undo (spec §6.1, D8): the last tree edit in the active note, else the last one anywhere. */
 	private async undoLastEdit(): Promise<void> {
 		try {
@@ -278,12 +336,13 @@ export default class DynastyTreePlugin extends Plugin implements TreeHost, Setti
 	}
 
 	/**
-	 * Empties the layout and text-width caches, so the next render is a cold one: the settings
-	 * button of spec §9, and the test harness to time first renders.
+	 * Empties the layout, text-width and relation-name caches, so the next render is a cold one: the
+	 * settings button of spec §9, and the test harness to time first renders.
 	 */
 	clearCaches(): void {
 		clearLayoutCache();
 		clearMeasureCache();
+		clearRelationCache();
 	}
 
 	/** Records a tree's render time for the timing command and the test harness. */

@@ -1,12 +1,14 @@
 /*
  * Builds the family graph a tree is drawn from: each person's placement parents, their primary
- * union, and every other parent link or partnership (spec §4.3). Calls `validateTree` first, then
- * works out who is placed under whom. `generations.ts`, `order.ts` and the layout code read the
- * result; `family-query.ts` answers questions about one person's family from it.
+ * union, and every other parent link or partnership (spec §4.3); it also carries the titles
+ * (§13.4). Calls `validateTree` first, then works out who is placed under whom. `generations.ts`,
+ * `order.ts` and the layout code read the result; `family-query.ts` answers questions about one
+ * person's family from it. `drawnParents` gives the cycle-broken parent links that focus mode and
+ * relation names (`relations.ts`) follow.
  */
 
 import { codedIssue, type CodedIssue } from './messages';
-import { isPlacementType, PLACEMENT_TYPES, type House, type Person, type Tree } from './types';
+import { isPlacementType, parentKind, PLACEMENT_TYPES, type House, type ParentType, type Person, type Title, type Tree } from './types';
 import { push, validateTree } from './validate';
 
 /** One partnership as it is drawn: a union listed in the block, or one inferred from shared children. */
@@ -55,12 +57,19 @@ export interface FamilyGraph {
 	secondary: SecondaryEdge[];
 	/** Partners of every union item as written, drawable or not, in list order. */
 	writtenUnions: string[][];
+	/** Spec §13.4: the titles that can show (`Validated.titles`), in list order; `[]` with none. */
+	titles: Title[];
+	/**
+	 * Every title with an id as written, duplicates included, with its holders as read (before
+	 * validation dropped any): what a delete removes and its confirmation counts (D57).
+	 */
+	writtenTitles: Title[];
 	/** Parse issues, then validation issues, then those found here (spec §8). */
 	issues: CodedIssue[];
 }
 
 /** Order-free key for a couple. JSON keeps ids that contain "|" apart and cannot throw. */
-const pairKey = (a: string, b: string) => {
+export const pairKey = (a: string, b: string) => {
 	const [x, y] = a < b ? [a, b] : [b, a];
 	return JSON.stringify([x, y]);
 };
@@ -146,7 +155,36 @@ export function deriveFamilies(tree: Tree): FamilyGraph {
 	for (const fu of unions) for (const partner of fu.partners) push(unionsOf, partner, fu.key);
 
 	const writtenUnions = tree.unions.map((u) => [...u.partners]);
-	return { people, byId, houses, placementParents, placementType, primaryUnion, unions, unionByKey, unionsOf, soloChildren, secondary, writtenUnions, issues };
+	return { people, byId, houses, placementParents, placementType, primaryUnion, unions, unionByKey, unionsOf, soloChildren, secondary, writtenUnions, titles: v.titles, writtenTitles: tree.titles ?? [], issues };
+}
+
+/** One parent link the tree draws: the parent's id and the link type (unknown types read as birth). */
+export interface DrawnParent {
+	id: string;
+	type: ParentType;
+}
+
+/**
+ * Every person's drawn parent links, after validation and cycle breaking: placement links first,
+ * then the side links in `g.secondary` order. People with no drawn parent are absent.
+ */
+export function drawnParentMap(g: FamilyGraph): Map<string, DrawnParent[]> {
+	const out = new Map<string, DrawnParent[]>();
+	for (const [child, placed] of g.placementParents) {
+		const type = g.placementType.get(child);
+		if (type) for (const q of placed) push(out, child, { id: q, type: parentKind(type) });
+	}
+	for (const e of g.secondary) for (const q of e.parents) push(out, e.child, { id: q, type: parentKind(e.type) });
+	return out;
+}
+
+/** The parent links the tree draws for one person, in the order of `drawnParentMap`. */
+export function drawnParents(g: FamilyGraph, id: string): DrawnParent[] {
+	const out: DrawnParent[] = [];
+	const type = g.placementType.get(id);
+	if (type) for (const q of g.placementParents.get(id) ?? []) out.push({ id: q, type: parentKind(type) });
+	for (const e of g.secondary) if (e.child === id) for (const q of e.parents) out.push({ id: q, type: parentKind(e.type) });
+	return out;
 }
 
 /** The other partner in a union. */

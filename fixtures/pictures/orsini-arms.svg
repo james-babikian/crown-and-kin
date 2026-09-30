@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!--
+  Arms of House Orsini: Azure, on a pale Argent a crescent Gules.
+  A fictional coat of arms, drawn for the Dynasty Tree sample trees (spec section 13.6).
+  Note 01: this comment is long on purpose, so that the picture's first kilobyte holds no svg element.
+  Note 02: this comment is long on purpose, so that the picture's first kilobyte holds no svg element.
+  Note 03: this comment is long on purpose, so that the picture's first kilobyte holds no svg element.
+  Note 04: this comment is long on purpose, so that the picture's first kilobyte holds no svg element.
+  Note 05: this comment is long on purpose, so that the picture's first kilobyte holds no svg element.
+  Note 06: this comment is long on purpose, so that the picture's first kilobyte holds no svg element.
+  Note 07: this comment is long on purpose, so that the picture's first kilobyte holds no svg element.
+  Note 08: this comment is long on purpose, so that the picture's first kilobyte holds no svg element.
+  Note 09: this comment is long on purpose, so that the picture's first kilobyte holds no svg element.
+  Note 10: this comment is long on purpose, so that the picture's first kilobyte holds no svg element.
+  Note 11: this comment is long on purpose, so that the picture's first kilobyte holds no svg element.
+  Note 12: this comment is long on purpose, so that the picture's first kilobyte holds no svg element.
+  Note 13: this comment is long on purpose, so that the picture's first kilobyte holds no svg element.
+  Note 14: this comment is long on purpose, so that the picture's first kilobyte holds no svg element.
+  Note 15: this comment is long on purpose, so that the picture's first kilobyte holds no svg element.
+  Note 16: this comment is long on purpose, so that the picture's first kilobyte holds no svg element.
+-->
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg xmlns="http://www.w3.org/2000/svg" width="500" height="600" viewBox="0 0 500 600">
+<defs><clipPath id="shield"><path d="M20 20H480V280C480 440 360 540 250 582C140 540 20 440 20 280Z"/></clipPath><mask id="crescent"><rect width="500" height="600" fill="#fff"/><circle cx="250" cy="276" r="52" fill="#000"/></mask></defs>
+<g clip-path="url(#shield)"><rect width="500" height="600" fill="#1f4e9c"/>
+<rect x="170" y="0" width="160" height="600" fill="#f7f7f4" stroke="#1b1b1b" stroke-width="4"/>
+<circle cx="250" cy="300" r="62" fill="#c8102e" mask="url(#crescent)"/></g>
+<path d="M20 20H480V280C480 440 360 540 250 582C140 540 20 440 20 280Z" fill="none" stroke="#1b1b1b" stroke-width="10" stroke-linejoin="round"/>
+</svg>

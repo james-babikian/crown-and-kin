@@ -1,10 +1,12 @@
 /*
- * Which focus family a view draws, and its first view (spec §5.6, D18). Pure, so the priority
- * rules run under vitest; the tree view supplies the facts.
+ * Which focus family a view draws, and its first view (spec §5.6, D18); also the direction of the
+ * relation finder's small tree on an upright phone (D51) and the first view of the finder's line.
+ * Pure, so the priority rules run under vitest; the tree view supplies the facts.
  */
 
 import type { Orientation, Rect } from '../layout/model';
-import { FIT_MIN_NAME_PX, MIN_HIT_PX, READABLE_NAME_PX, START_TOP_GAP, fitScale, type Size, type View } from '../render/view-math';
+import { COMPACT_NAME_EM } from '../render/dom/scene';
+import { FIT_MIN_NAME_PX, MIN_HIT_PX, READABLE_NAME_PX, START_TOP_GAP, chooseLod, fitScale, fitView, type Size, type View } from '../render/view-math';
 
 /**
  * What the user chose for this block in this session (Focus, Focus here, a `+` badge, Show all
@@ -322,4 +324,76 @@ export function tagHitBelow(hit: Rect, card: Rect | undefined, scale: number): R
 	}
 	const top = card.y + card.h;
 	return { x, y: top, w, h: Math.max(min, hit.y + hit.h - top) };
+}
+
+/**
+ * D51: the name size, in screen px, that a fitted view of a tree of `bounds` shows in `area`, as the
+ * level of detail draws it: Compact names count 1.5 times the Full size (spec §5.4), Overview none.
+ */
+export function fittedNamePx(bounds: Rect, area: Size, fontPx: number): number {
+	const px = fitScale(bounds, area) * fontPx;
+	const lod = chooseLod(null, px);
+	return lod === 'full' ? px : lod === 'compact' ? COMPACT_NAME_EM * px : 0;
+}
+
+/**
+ * What the finder's first view (`finderFirstView`) shows of a line fitted into `area`, for D51: 2 =
+ * the whole line at Full level, 1 = the whole line at Compact level, 0 = not the whole line (its names
+ * would be under 11 px, so the view zooms to 14 px names).
+ */
+export function finderLevel(bounds: Rect, area: Size, fontPx: number): 0 | 1 | 2 {
+	if (fittedNamePx(bounds, area, fontPx) < FIT_MIN_NAME_PX) return 0;
+	return chooseLod(null, fitScale(bounds, area) * fontPx) === 'full' ? 2 : 1;
+}
+
+/**
+ * D51: the direction of the relation finder's small tree on an upright phone. The level counts
+ * first (`finderLevel`: a direction that shows the whole line at Full level wins over one that needs
+ * Compact), then the name size as drawn; `down` wins only when it is strictly better, so on a tie
+ * the tree stays sideways (D24).
+ */
+export function finderOrientation(area: Size, sideways: { bounds: Rect; fontPx: number }, down: { bounds: Rect; fontPx: number }): Orientation {
+	const facts = (t: { bounds: Rect; fontPx: number }) => ({ level: finderLevel(t.bounds, area, t.fontPx), px: fittedNamePx(t.bounds, area, t.fontPx) });
+	const s = facts(sideways);
+	const d = facts(down);
+	return d.level > s.level || (d.level === s.level && d.px > s.px) ? 'down' : 'sideways';
+}
+
+/**
+ * The first view of the relation finder's result, on every device: the whole line (`bounds`) fitted
+ * into the free area below `insetTop` (the result bar) when its names are then at least 11 px as the
+ * level of detail draws them (Compact names count 1.5 times, spec §5.4). Else the names are 14 px and
+ * the view starts at the common ancestors, `oldest` (the line's cards of the oldest generation), so
+ * the result bar never hides them: at the top of the free area in `down`, at the left in `sideways`.
+ */
+export function finderFirstView(bounds: Rect, size: Size, fontPx: number, insetTop: number, oldest: readonly Rect[], orientation: Orientation): View {
+	const top = Math.max(0, Math.min(insetTop, size.h - 1));
+	const area = { w: size.w, h: size.h - top };
+	const f = fontPx > 0 ? fontPx : 16;
+	if (!oldest.length || !(area.w > 0) || fittedNamePx(bounds, area, f) >= FIT_MIN_NAME_PX) return fitView(bounds, size, insetTop);
+	const scale = READABLE_NAME_PX / f;
+	const x0 = Math.min(...oldest.map((b) => b.x));
+	const y0 = Math.min(...oldest.map((b) => b.y));
+	const x1 = Math.max(...oldest.map((b) => b.x + b.w));
+	const y1 = Math.max(...oldest.map((b) => b.y + b.h));
+	const halfW = area.w / 2 / scale;
+	const halfH = area.h / 2 / scale;
+	const pad = START_TOP_GAP;
+	// Across the generations the view starts at the ancestors; along a generation it shows as much of
+	// the line as it can, but never loses the ancestors (if they do not fit, it centres on the first).
+	const along = (lo: number, hi: number, firstLo: number, firstLen: number, bLo: number, bLen: number, half: number) => {
+		if (hi - lo + 2 * pad > 2 * half) return firstLo + firstLen / 2;
+		return Math.min(lo - pad + half, Math.max(hi + pad - half, bLo + bLen / 2));
+	};
+	const first = oldest[0];
+	let cx: number;
+	let cy: number;
+	if (orientation === 'sideways') {
+		cx = x0 - pad + halfW;
+		cy = along(y0, y1, first.y, first.h, bounds.y, bounds.h, halfH);
+	} else {
+		cy = y0 - pad + halfH;
+		cx = along(x0, x1, first.x, first.w, bounds.x, bounds.w, halfW);
+	}
+	return { scale, cx, cy: cy - top / 2 / scale };
 }

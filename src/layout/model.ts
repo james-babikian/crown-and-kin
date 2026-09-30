@@ -6,6 +6,7 @@
  * list the same line kinds in the same order: add a new kind to both.
  */
 import type { FamilyGraph } from '../core/derive';
+import type { FoldControl, FoldKey } from '../core/folds';
 
 /** Card size a tree draws with (spec §9 "Card size"); `compact` is narrower and tighter. */
 export type CardSize = 'normal' | 'compact';
@@ -59,15 +60,35 @@ export interface Geometry {
 	rowGap: number;
 	/** Height of a far-couple tag drawn at a card's bottom edge (its hit area is larger). */
 	tagH: number;
+	/**
+	 * D40 (M7): set by the layout from `LayoutSettings.relationLine`, in every layout and card size;
+	 * `cardH` then already includes one small text line (`relationExtra(geo)` = round(line height ×
+	 * 0.85 × fontPx)), so `cardText`, `tagTop` and the lines need no other change. `drawnGeometry` and
+	 * `layoutFamilies` apply it before anything else. `cardText` then centres three small lines.
+	 */
+	relationLine?: boolean;
 }
 
 /** `geometry.ts` exports `geometryFor: GeometryFor`. Card size scales with the font. */
 export type GeometryFor = (fontPx: number, cardSize: CardSize) => Geometry;
 
+/** How many text lines a name takes on a card (D29, D81). */
+export type NameLineCount = 1 | 2 | 3;
+
 /** A person's card: its box, id and generation (row in `down`, column in `sideways`). */
 export interface PersonBox extends Rect {
 	id: string;
 	gen: number;
+	/** D29, D37: the name takes two text lines (`LayoutSettings.tallCards`); set only when true. */
+	tallName?: true;
+	/** D81: the name takes three text lines (`LayoutSettings.longNames`); set only when true, together with `tallName`. */
+	longName?: true;
+	/** D61: the title text line takes two text lines (`LayoutSettings.tallTitles`); set only when true. */
+	tallTitle?: true;
+	/** D67, D78: the card shows its house's arms (`armsCards`); set only when true. The box keeps its size. */
+	arms?: true;
+	/** D76, D78: the card shows a portrait (`LayoutSettings.portraits`); set only when true. The box keeps its size. */
+	portrait?: true;
 }
 
 /** Where a couple's dot is drawn, and how (spec §5.3, D10). */
@@ -111,6 +132,15 @@ export interface FarCoupleRule {
 	maxGenerations: number;
 }
 
+/** M10 (F5): a point in layout px; the centre of a fold control. */
+export interface FoldSpot {
+	x: number;
+	y: number;
+}
+
+/** M10 (F5): a fold control of the core with its place in the layout. */
+export type PlacedFoldControl = FoldControl & { spot: FoldSpot };
+
 /** A finished arrangement of one tree: every card and union point placed, ready to route lines through. */
 export interface TreeLayout {
 	persons: Map<string, PersonBox>;
@@ -130,6 +160,12 @@ export interface TreeLayout {
 	width: number;
 	height: number;
 	geometry: Geometry;
+	/**
+	 * M10 (spec §13.10, F5): the fold controls with the centre of each, set only when
+	 * `LayoutSettings.foldControls` is true (absent, not empty, otherwise). `width` and `height` include
+	 * every control's largest mark and its 44 px hit area (F5b).
+	 */
+	folds?: PlacedFoldControl[];
 }
 
 /** Every kind of line the tree draws (spec §5.3). `render/styles.ts` gives each one its `STROKES` style. */
@@ -152,6 +188,12 @@ export interface EdgePath {
 	kind: StrokeKind;
 	/** People this line connects; lets the renderer highlight a person's lines. */
 	people: string[];
+	/** M7: the union of a bar (a shared bar: the pair's last-listed union), a leg, a trunk or a drop. */
+	union?: string;
+	/** M7: a trunk and its drops: the family's parents; a side link: the link's parents. */
+	parents?: string[];
+	/** M7: a drop or a side link: the child. */
+	child?: string;
 }
 
 /** A dot or "?" mark drawn on top of the lines: a union's sign, or a rumoured parent's mark. */
@@ -161,6 +203,8 @@ export interface EdgeMarker {
 	kind: 'union' | 'implicit-union' | 'rumour';
 	/** D26, D38: for `kind: 'union'`, the partnership type as written (a missing `type` gives `marriage`). Renderers draw the dot's shape from it: marriage dot, betrothal ring, concubinage diamond, affair open triangle; an unknown value is drawn as the marriage dot. `implicit-union` markers draw no sign. Far-couple dots use the same shapes. */
 	unionType?: string;
+	/** M7: `union` and `implicit-union` markers: the union key. */
+	union?: string;
 }
 
 /** All the lines and markers routed for one tree layout. */
@@ -191,10 +235,56 @@ export interface LayoutSettings {
 	 * a row share their top edge; the gap below starts under the row's tallest card) and `sideways`
 	 * (longer along the column), normal, narrow and compact cards. Part of the cache key (sorted).
 	 * Every consumer uses `PersonBox.h`, never `geometry.cardH`, for a card's height;
-	 * `cardText(geo, tall)` gives the text positions of a tall card (two name baselines; title and
-	 * dates one text line lower).
+	 * `cardText(geo, box.tallName, box.tallTitle)` gives the text positions of a tall card (two name
+	 * baselines; title and dates one text line lower).
 	 */
 	tallCards?: readonly string[];
+	/**
+	 * D81: people whose name needs exactly three text lines (a subset of `tallCards`, from `tallCardsFor`).
+	 * Such a card is two `tallExtra` taller than a card with a one-line name. The box gets `longName`.
+	 * Part of the cache key (sorted); none leaves the key as it was.
+	 */
+	longNames?: readonly string[];
+	/**
+	 * D61 (spec §13.3): people whose title text line takes two text lines (`tallTitlesFor`). Such a
+	 * card is `relationExtra` (one small text line) taller; a card also in `tallCards` is taller by
+	 * the sum. `down`: a row's gap starts under its tallest card; `sideways`: each card keeps its own
+	 * height (the D37 rule). The box gets `tallTitle`. Part of the cache key (sorted).
+	 */
+	tallTitles?: readonly string[];
+	/**
+	 * D40 (spec §13.1): the tree has a mark and relation names show on cards, so every card is one
+	 * small text line (0.85 em × line height) taller, in every layout and card size; the relation text
+	 * sits on that line after the card's other text lines (`CardText.relationBaseline`). The setting
+	 * "Show relation names on cards" off keeps the height (like "Show dates on cards"), so this is
+	 * true whenever the tree has a valid mark. Part of the cache key. The layout applies it to
+	 * `Geometry` (`Geometry.relationLine`, `cardH` += `relationExtra`). The line-only small tree of
+	 * the relation finder is laid out without it. `NEVER_FAR_RULE` (`layout.ts`, M7) =
+	 * `{ maxCardWidths: Infinity, maxGenerations: Infinity }` never splits a couple.
+	 */
+	relationLine?: boolean;
+	/**
+	 * Spec §13.6 (D67, D78): ids of the houses whose `arms` is written in the tree text, sorted
+	 * (`pictureSets`). A written value counts even when the file is missing or cannot show, so a
+	 * picture that loads late never changes a layout. Cards of these houses get `PersonBox.arms`;
+	 * no box changes size or place. Part of the cache key when not empty.
+	 */
+	arms?: readonly string[];
+	/**
+	 * Spec §13.7 (D76, D78): ids of the people whose `portrait` is written, sorted; empty or absent
+	 * when "Show portraits on cards" is off (`pictureSets`). These cards get `PersonBox.portrait`; no
+	 * box changes size or place. Part of the cache key when not empty.
+	 */
+	portraits?: readonly string[];
+	/**
+	 * Spec §13.10 (F1, F2): the people that the folds hide, sorted. The layout takes the generations
+	 * from the whole graph and arranges the graph without these people. Part of the cache key when not empty.
+	 */
+	foldHidden?: readonly string[];
+	/** Spec §13.10 (F4): the effective fold keys, sorted. The layout keeps a folded family's dot, stem lane and room for its "+ N" sign. Part of the cache key when not empty. */
+	foldedFamilies?: readonly FoldKey[];
+	/** Spec §13.10 (F5): the view can fold, so the layout computes `TreeLayout.folds`. Absent in a static preview. Part of the cache key when true. */
+	foldControls?: true;
 }
 
 /** A tree layout together with its routed lines: what `layoutTree` returns and the cache stores. */

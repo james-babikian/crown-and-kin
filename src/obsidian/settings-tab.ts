@@ -95,6 +95,20 @@ export class DynastySettingTab extends PluginSettingTab {
 					tg.onChange((v) => void this.host.changeSettings({ showDates: v }));
 				});
 			});
+			add((row) => {
+				row.setName(t.relations).setDesc(t.relationsDesc);
+				row.addToggle((tg) => {
+					tg.setValue(s.showRelations);
+					tg.onChange((v) => void this.host.changeSettings({ showRelations: v }));
+				});
+			});
+			add((row) => {
+				row.setName(t.portraits).setDesc(t.portraitsDesc);
+				row.addToggle((tg) => {
+					tg.setValue(s.showPortraits);
+					tg.onChange((v) => void this.host.changeSettings({ showPortraits: v }));
+				});
+			});
 		});
 		this.group(el, t.groups.focus, (add) => {
 			add((row) => {

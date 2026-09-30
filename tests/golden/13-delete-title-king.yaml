@@ -1,0 +1,263 @@
+# Sample tree 13: titles, holders and regnal numbers (spec §13.3–§13.5).
+#
+# warning: section-wrong-shape | section=holders; title=Warden of the Marches
+# warning: entry-not-map | section=titles; index=5
+# warning: missing-id | section=titles; index=6; name=Margrave of the Salt Coast
+# warning: duplicate-title-id | id=count-of-orsini; title=Count of Orsini
+# warning: entry-not-map | section=holders; title=King of the Vale; index=4
+# warning: missing-holder | title=Count of Orsini; ref=cosimo; name=Cosimo Orsini
+# warning: missing-holder | title=Count of Orsini; ref=beatrice
+# warning: holder-empty | title=Count of Orsini; index=9
+# warning: card-title-not-held | person=Isolde Orsini; ref=duke-of-valmont; ids=isolde
+options:
+  start: roderick
+
+houses:
+  - id: valmont
+    name: House Valmont
+    color: "#8b1e3f"
+  - id: orsini
+    name: House Orsini
+    color: "#1e4f8b"
+  - id: harrow
+    name: House Harrow
+    color: "#2f6b3a"
+
+titles:
+  - id: duke-of-valmont
+    name: Duke of Valmont
+    plural: Dukes of Valmont
+    seat: Valmont Keep
+    holders:
+      - {name: Aldric, number: I, from: 1062, to: 1110}
+      - {person: aldric, number: II, from: 1110, to: 1150, epithet: the Wise}
+      - {person: roderick, from: 1150, to: 1158}
+      - person: gareth
+        # Hand-typed as a block map: it stays a block map when edited.
+        as: Gareth
+        number: I
+        from: 1158
+        to: 1163
+      # Roderick came back after the siege of 1163.
+      - {person: roderick, number: I, from: 1163}
+      - {person: young-aldric, number: III, from: 1175, to: 1210}
+      - {person: edmund, from: 1210, to: 1228}
+  - id: count-of-orsini
+    name: Count of Orsini
+    plural: Counts of Orsini
+    holders:
+      - {name: Orso the Old, to: 1090}
+      - {person: bertrand, from: 1090, to: 1128}
+      # Co-rulers: the brothers Matteo and Piero.
+      - {person: matteo, from: 1128, to: 1140}
+      - {person: piero, to: 1140}
+      - {person: cosimo, name: Cosimo Orsini, from: 1140, to: 1145}   # no person "cosimo"
+      - {person: piero, from: 1145, to: 1160}
+      - luca
+      - {person: beatrice, from: 1190}   # typo for beatrix
+      - {from: 1200}
+  - id: warden-of-the-marches
+    name: Warden of the Marches
+    holders:
+      person: roderick
+      from: 1150
+  - Baron of Greyfen
+  - name: Margrave of the Salt Coast
+    plural: Margraves of the Salt Coast
+  - id: count-of-orsini
+    name: Count of the Salt Coast
+    holders:
+      - {person: gareth, from: 1165, to: 1170}
+
+people:
+  - id: bertrand
+    name: Bertrand Orsini
+    title: Count Palatine of Orsini
+    house: orsini
+    sex: m
+    born: 1060
+    died: 1128
+    # name line: Bertrand Orsini
+    # title line: Count Palatine of Orsini (r. 1090–1128)
+    # holds: count-of-orsini
+    # shown: count-of-orsini
+    # search: none
+    # picker: none
+  - id: aldric
+    name: Aldric Valmont
+    house: valmont
+    sex: m
+    born: 1085
+    died: 1150
+    # name line: Aldric II
+    # title line: Duke of Valmont (r. 1110–1150)
+    # holds: duke-of-valmont
+    # shown: duke-of-valmont
+    # search: Aldric II
+    # picker: (Aldric II)
+  - id: isolde
+    name: Isolde Orsini
+    title: Duchess of Valmont
+    card-title: duke-of-valmont
+    house: orsini
+    sex: f
+    born: 1092
+    died: 1160
+    parents: [bertrand]
+    # name line: Isolde Orsini
+    # title line: Duchess of Valmont
+    # holds: none
+    # shown: none
+    # search: none
+    # picker: none
+  - id: matteo
+    name: Matteo Orsini
+    title: Regent of Orsini, Warden of the Southern Shore and Keeper of the Salt Roads
+    house: orsini
+    sex: m
+    born: 1095
+    died: 1140
+    parents: [bertrand]
+    # name line: Matteo Orsini
+    # title line: Regent of Orsini, Warden of the Southern Shore and Keeper of the Salt Roads (r. 1128–1140)
+    # holds: count-of-orsini
+    # shown: count-of-orsini
+    # search: none
+    # picker: none
+  - id: piero
+    name: Piero Orsini
+    house: orsini
+    sex: m
+    born: 1098
+    died: 1160
+    parents: [bertrand]
+    # name line: Piero Orsini
+    # title line: Count of Orsini (r. until 1140, 1145–1160)
+    # holds: count-of-orsini
+    # shown: count-of-orsini
+    # search: none
+    # picker: none
+  - id: gareth
+    name: Ser Gareth Orsini
+    title: Protector
+    house: orsini
+    sex: m
+    born: 1118
+    died: 1170
+    parents: [matteo]
+    # name line: Gareth I
+    # title line: Protector (r. 1158–1163)
+    # holds: duke-of-valmont
+    # shown: duke-of-valmont
+    # search: Gareth I
+    # picker: (Gareth I)
+  - id: luca
+    name: Luca Orsini
+    house: orsini
+    sex: m
+    born: 1125
+    died: 1190
+    parents: [piero]
+    # name line: Luca Orsini
+    # title line: Count of Orsini
+    # holds: count-of-orsini
+    # shown: count-of-orsini
+    # search: none
+    # picker: none
+  - id: roderick
+    name: Roderick Valmont
+    house: valmont
+    sex: m
+    born: 1112
+    died: 1175
+    parents: [aldric, isolde]
+    # name line: Roderick I
+    # title line: Duke of Valmont (r. 1150–1158, from 1163)
+    # holds: duke-of-valmont
+    # shown: duke-of-valmont
+    # search: Roderick I
+    # picker: (Roderick I)
+  - id: elinor
+    name: Elinor Harrow
+    house: harrow
+    sex: f
+    born: 1118
+    died: 1180
+    # name line: Elinor Harrow
+    # title line: none
+    # holds: none
+    # shown: none
+    # search: none
+    # picker: none
+  - id: young-aldric
+    name: Aldric Valmont
+    house: valmont
+    sex: m
+    born: 1140
+    died: 1210
+    parents: [roderick, elinor]
+    # name line: Aldric III
+    # title line: King of the Vale (r. 1180–1210)
+    # holds: duke-of-valmont, king-of-the-vale
+    # shown: king-of-the-vale (selected)
+    # search: Aldric III
+    # picker: (Aldric III)
+  - id: mathilde
+    name: Mathilde Harrow
+    house: harrow
+    sex: f
+    born: 1145
+    # name line: Mathilde Harrow
+    # title line: none
+    # holds: none
+    # shown: none
+    # search: none
+    # picker: none
+  - id: beatrix
+    name: Beatrix Orsini
+    house: orsini
+    sex: f
+    born: 1170
+    parents: [luca]
+    # name line: Beatrix Orsini
+    # title line: none
+    # holds: none
+    # shown: none
+    # search: none
+    # picker: none
+  - id: edmund
+    name: Edmund Valmont
+    house: valmont
+    sex: m
+    born: 1165
+    died: 1228
+    parents: [young-aldric, mathilde]
+    # name line: Edmund Valmont
+    # title line: Duke of Valmont (r. 1210–1228)
+    # holds: duke-of-valmont, king-of-the-vale
+    # shown: duke-of-valmont
+    # search: Edmund I
+    # picker: (Edmund I)
+  - id: king-roderick
+    name: Roderick Valmont
+    title: Prince of the Vale
+    house: valmont
+    sex: m
+    born: 1190
+    parents: [edmund, beatrix]
+    # name line: Roderick Valmont
+    # title line: King of the Vale (r. from 1228)
+    # holds: king-of-the-vale
+    # shown: king-of-the-vale (selected)
+    # search: none
+    # picker: none
+
+unions:
+  - partners: [aldric, isolde]
+    start: 1110
+  - partners: [roderick, elinor]
+    start: 1138
+  - partners: [young-aldric, mathilde]
+    start: 1163
+  - partners: [edmund, beatrix]
+    start: 1188

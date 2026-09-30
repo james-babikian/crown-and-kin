@@ -5,7 +5,8 @@
  * end-of-line comments, the full-line comments right below it indented deeper than its dash,
  * and the full-line comments directly above it at or left of its dash, up to the previous item or
  * a blank line. In a flow list, an end-of-line comment belongs to the item it follows. A move
- * takes all of them; a removal keeps the comments above the item.
+ * takes all of them; a removal keeps the comments above the item, except for a holder of a title,
+ * which goes "with its comments" (spec §13.4).
  */
 
 import { isMap, isScalar, isSeq, type Node, type Pair, type YAMLMap, type YAMLSeq } from 'yaml';
@@ -113,8 +114,9 @@ const blankLine = (src: Source, start: number) => start < src.text.length && src
 /**
  * Patches that remove some items of a list. The caller removes the whole key instead when no
  * item stays. Flow items take the separator after them (the last one takes the one before).
+ * `above`: a block item also takes the comment lines it owns above it.
  */
-export function removeItems(src: Source, seq: YAMLSeq, remove: Set<number>): Patch[] {
+export function removeItems(src: Source, seq: YAMLSeq, remove: Set<number>, above = false): Patch[] {
 	const n = seq.items.length;
 	const patches: Patch[] = [];
 	if (seq.flow) {
@@ -129,7 +131,7 @@ export function removeItems(src: Source, seq: YAMLSeq, remove: Set<number>): Pat
 	}
 	for (const i of [...remove].sort((a, b) => a - b)) {
 		// The comments above a removed item stay (the decision notes "Relationship-op details").
-		const start = ownStart(src, seq, i);
+		const start = above ? itemStart(src, seq, i) : ownStart(src, seq, i);
 		const end = itemEnd(src, seq, i);
 		const next = lineAfter(src, end);
 		if (next) {
@@ -190,7 +192,7 @@ export function insertItem(p: Parsed, key: 'people' | 'unions', where: Where, bl
 }
 
 /** The top-level list and the key that holds it. */
-export function section(p: Parsed, key: 'people' | 'unions' | 'houses'): { top: YAMLMap; pair: Pair; seq: YAMLSeq } | null {
+export function section(p: Parsed, key: 'people' | 'unions' | 'houses' | 'titles'): { top: YAMLMap; pair: Pair; seq: YAMLSeq } | null {
 	const top = topMap(p);
 	if (!top || isRefusal(top)) return null;
 	const pair = findPair(top, key);
@@ -198,7 +200,7 @@ export function section(p: Parsed, key: 'people' | 'unions' | 'houses'): { top: 
 }
 
 /** Removes items from a top-level list, or the whole section when none stays. */
-export function removeFromSection(p: Parsed, key: 'people' | 'unions' | 'houses', remove: Set<number>): Patch[] {
+export function removeFromSection(p: Parsed, key: 'people' | 'unions' | 'houses' | 'titles', remove: Set<number>): Patch[] {
 	const s = section(p, key);
 	if (!s || remove.size === 0) return [];
 	if (remove.size >= s.seq.items.length) return [removePair(p.src, s.top, s.pair)];

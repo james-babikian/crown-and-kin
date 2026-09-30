@@ -10,11 +10,15 @@ export interface DynastySettings {
 	/** Height of a tree in a note on a phone, in % of the screen height, 40–80. Default 60 (D30: also on its side). */
 	embedHeightPhone: number;
 	cardSize: 'normal' | 'compact';
-	/** Dates on cards. Changing it does not change the card height (geometry and layout key stay). */
+	/** Dates on cards, and the reigns in the title text line (spec §13.3). Born and died do not change the card height; a reign can make the title two text lines, so the card can get taller (D61). */
 	showDates: boolean;
+	/** D40 (spec §13.1): relation names on cards. Off keeps the card height and the screen-reader label; only a class changes. */
+	showRelations: boolean;
+	/** Spec §13.7 (M9 contract O10): portraits on cards. Off: no card shows a portrait or its room; a change lays the trees out again. */
+	showPortraits: boolean;
 	/** Focus mode default generations (§5.6, §9), a whole number 0–10. Default 3; `options.generations` wins; D23 (n = 1 in the static phone preview) wins over both. */
 	focusGenerations: number;
-	/** Update tree links when a note is renamed (§6.9, D6). Default on. */
+	/** Update tree links when a note or a picture is renamed (§6.9, D6, §13.0 item 3). Default on. */
 	updateLinks: boolean;
 }
 
@@ -24,6 +28,8 @@ export const DEFAULT_SETTINGS: DynastySettings = {
 	embedHeightPhone: 60,
 	cardSize: 'normal',
 	showDates: true,
+	showRelations: true,
+	showPortraits: true,
 	focusGenerations: 3,
 	updateLinks: true,
 };
@@ -61,6 +67,8 @@ export const normaliseSettings = (raw: unknown): DynastySettings => {
 		embedHeightPhone: wholeIn(phone, PHONE_HEIGHT) ? phone : d.embedHeightPhone,
 		cardSize: s.cardSize === 'compact' || s.cardSize === 'normal' ? s.cardSize : d.cardSize,
 		showDates: typeof s.showDates === 'boolean' ? s.showDates : d.showDates,
+		showRelations: typeof s.showRelations === 'boolean' ? s.showRelations : d.showRelations,
+		showPortraits: typeof s.showPortraits === 'boolean' ? s.showPortraits : d.showPortraits,
 		focusGenerations: wholeIn(s.focusGenerations, GENERATIONS) ? s.focusGenerations : d.focusGenerations,
 		updateLinks: typeof s.updateLinks === 'boolean' ? s.updateLinks : d.updateLinks,
 	};

@@ -6,14 +6,16 @@
  */
 import type { FamilyGraph } from '../core/derive';
 import { computeGenerations } from '../core/generations';
+import { foldControls, foldFamilies, hiddenPartners, pruneGraph, type FoldControl } from '../core/folds';
 import { computeModelOrder } from '../core/order';
 import { routeEdges } from './edges';
+import type { FoldInput } from './fold-spots';
 import { narrowWidth } from './geometry';
 import { layoutFamilies } from './layout';
 import type { Geometry, LaidOut, LayoutSettings, LayoutTree } from './model';
 
 export { geometryFor, NORMAL_GEOMETRY } from './geometry';
-export { DEFAULT_FAR_RULE, DEFAULT_LAYOUT_SETTINGS } from './layout';
+export { DEFAULT_FAR_RULE, DEFAULT_LAYOUT_SETTINGS, NEVER_FAR_RULE, armsCards, pictureSets } from './layout';
 export { illegitimateSigns } from './illegitimate-sign';
 
 /** Recent layouts. Layout is cheap (spec D9), so this only saves repeat work on re-render. */
@@ -33,12 +35,34 @@ export function layoutKey(g: FamilyGraph, geo: Geometry, settings: LayoutSetting
 	const narrow = sideways && settings.sidewaysCards === 'narrow';
 	// D29, D37: only people of this tree count, once each, in a stable order; none leaves the key as before.
 	const tall = [...new Set(settings.tallCards ?? [])].filter((id) => g.byId.has(id)).sort();
+	// D81: the same for three-line names; none leaves the key as before.
+	const long = [...new Set(settings.longNames ?? [])].filter((id) => g.byId.has(id)).sort();
+	// D61: the same for two-line title text lines; none leaves the key as before.
+	const tallT = [...new Set(settings.tallTitles ?? [])].filter((id) => g.byId.has(id)).sort();
+	// D40: only a relation line changes the key; without one the key is as before.
+	const rel = settings.relationLine ? { relationLine: true } : {};
+	// M9 (L3): the picture sets, filtered, once each and sorted; none leaves the key as in M8.
+	const arms = [...new Set(settings.arms ?? [])].filter((id) => g.houses.has(id)).sort();
+	const portraits = [...new Set(settings.portraits ?? [])].filter((id) => g.byId.has(id)).sort();
+	// M10 (L3, F1): the people that folds hide, the folded families and the controls; empty or absent leaves the key as before.
+	const hidden = [...new Set(settings.foldHidden ?? [])].filter((id) => g.byId.has(id)).sort();
+	const folded = [...new Set(settings.foldedFamilies ?? [])].sort();
+	const tallParts = {
+		...(tall.length ? { tallCards: tall } : {}),
+		...(tallT.length ? { tallTitles: tallT } : {}),
+		...(long.length ? { longNames: long } : {}),
+		...(hidden.length ? { foldHidden: hidden } : {}),
+		...(folded.length ? { foldedFamilies: folded } : {}),
+		...(settings.foldControls ? { foldControls: true } : {}),
+		...(arms.length ? { arms } : {}),
+		...(portraits.length ? { portraits } : {}),
+	};
 	const parts: unknown[] = [
 		fontFamily,
 		geo,
 		sideways
-			? { sweeps: settings.sweeps, far: settings.far, orientation: 'sideways', sidewaysCards: narrow ? 'narrow' : 'normal', ...(narrow ? { narrowCardW: narrowWidth(geo, settings.narrowCardW) } : {}), ...(tall.length ? { tallCards: tall } : {}) }
-			: { sweeps: settings.sweeps, far: settings.far, ...(tall.length ? { tallCards: tall } : {}) },
+			? { sweeps: settings.sweeps, far: settings.far, orientation: 'sideways', sidewaysCards: narrow ? 'narrow' : 'normal', ...(narrow ? { narrowCardW: narrowWidth(geo, settings.narrowCardW) } : {}), ...tallParts, ...rel }
+			: { sweeps: settings.sweeps, far: settings.far, ...tallParts, ...rel },
 		g.people.map((p) => [p.id, p.sex ?? '', p.house ?? '', p.illegitimate ? 1 : 0, g.placementParents.get(p.id) ?? [], g.placementType.get(p.id) ?? '', g.primaryUnion.get(p.id) ?? '']),
 		g.unions.map((u) => [u.key, u.partners, u.type, u.implicit ? 1 : 0, u.children]),
 		[...g.unionsOf],
@@ -64,6 +88,21 @@ function hash(s: string): string {
 }
 
 /**
+ * M10 (F1–F5): what the layout needs to know about folds, or undefined for a tree with no folds and no controls (then
+ * nothing differs from M9). `pruned` is the graph to arrange, without the people that folds hide (rule 7).
+ */
+function foldPlan(g: FamilyGraph, settings: LayoutSettings): { pruned: FamilyGraph; input: FoldInput } | undefined {
+	const hidden = new Set((settings.foldHidden ?? []).filter((id) => g.byId.has(id)));
+	if (!hidden.size && !settings.foldControls) return undefined;
+	const partners = hiddenPartners(g, hidden);
+	const controls = settings.foldControls ? foldControls(g, new Set(settings.foldedFamilies ?? []), hidden) : undefined;
+	// A folded family keeps a stem only when none of its children shows; a fold that hides nobody has no sign.
+	const byKey = new Map(foldFamilies(g).map((f) => [f.key, f]));
+	const folded: FoldControl[] = (controls ?? []).filter((c) => c.folded && byKey.get(c.key)?.children.every((id) => hidden.has(id)));
+	return { pruned: pruneGraph(g, hidden), input: { full: g, partners, controls, lines: { tagged: new Set(partners.keys()), folded, ...(controls ? { controls } : {}) } } };
+}
+
+/**
  * Results are shared between callers through the cache, so they are read-only: every object is
  * frozen, and the maps throw on `set`, `delete` and `clear`. The layout keeps its own copy of
  * `geo`.
@@ -78,9 +117,12 @@ export const layoutTree: LayoutTree = (g, geo, settings, fontFamily) => {
 		return hit;
 	}
 	const gen = computeGenerations(g);
-	const order = computeModelOrder(g, gen);
-	const layout = layoutFamilies(g, gen, order, { ...geo }, settings);
-	const out: LaidOut = deepFreeze({ layout, edges: routeEdges(g, layout, order.anchors) });
+	const fold = foldPlan(g, settings);
+	// F2: the generations come from the whole graph; the arranger and the router get the graph without the hidden people.
+	const shown = fold ? fold.pruned : g;
+	const order = computeModelOrder(shown, gen);
+	const layout = layoutFamilies(shown, gen, order, { ...geo }, settings, undefined, fold?.input);
+	const out: LaidOut = deepFreeze({ layout, edges: routeEdges(shown, layout, order.anchors, fold?.input.lines) });
 	cache.set(key, out);
 	while (cache.size > LAYOUT_CACHE_SIZE) cache.delete(cache.keys().next().value!);
 	return out;

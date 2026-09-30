@@ -1,24 +1,29 @@
 /*
- * Dispatches one `Op` (spec §6.2–§6.10) to the code that carries it out: the relationship ops in
- * `relationship-ops.ts`, the house ops in `house-ops.ts`, the link rewrite in `link-rewrite.ts`, or
- * the field and option writes below. `applyOp` is the plugin's single entry point for editing a
- * block body; `block-handle.ts` calls it for every write, `rename-links.ts` calls it for link
- * rewrites.
+ * Dispatches one `Op` (spec §6.2–§6.10, §13.4) to the code that carries it out: the relationship
+ * ops in `relationship-ops.ts`, the house ops in `house-ops.ts`, the title ops in `title-ops.ts`,
+ * the link rewrite in `link-rewrite.ts`, or the field and option writes below. After the op (or
+ * after all ops of a batch) it removes the keys the write left stale: `placement` and `union`
+ * (`removeStaleKeys`) and `card-title` (`cleanCardTitles`). `applyOp` is the plugin's single
+ * entry point for editing a block body; `block-handle.ts` calls it for every write,
+ * `rename-links.ts` calls it for link rewrites.
  */
 
 import { isMap, isSeq, type Node } from 'yaml';
-import { deriveFamilies } from './derive';
-import type { AddHouse, ApplyOp, EditResult, FieldValue, NewPersonId, Op, PersonField, SetOption, SetPersonFields } from './edit';
+import { deriveFamilies, type FamilyGraph } from './derive';
+import type { AddHouse, ApplyOp, Batch, EditResult, FieldValue, NewPersonId, Op, PersonField, RewriteLinksOp, SetOption, SetPersonFields } from './edit';
 import { deleteHouse, editHouse } from './house-ops';
 import { newIdIn, uniqueId } from './id-gen';
 import { rewriteLinks } from './link-rewrite';
 import { parseBody, readTree, referencedIds } from './parse';
 import { relationshipOp, removeStaleKeys } from './relationship-ops';
+import { cleanCardTitles, titleOp } from './title-ops';
 import { isEmpty, isMap as isRawMap, str, type Raw, type RawMap } from './tolerate';
+import type { Tree } from './types';
 import { itemEnd } from './yaml-list';
 import {
-	addPair, addSection, appendItem, clone, findPair, finish, finishTogether, isRefusal, layoutOf, OPTION_ORDER, PERSON_FIELDS, PERSON_ORDER, personNode, personValue,
-	refuse, removePair, renderScalar, sameValue, setPairValue, Source, TEXT_FIELDS, topMap, type NewValue, type Parsed, type Step,
+	addPair, addSection, appendItem, clone, doubleQuoted, findPair, finish, finishTogether, isRefusal, layoutOf, OPTION_ORDER, PERSON_FIELDS, PERSON_ORDER, personNode,
+	personValue, forget, QUOTED_FIELDS, refuse, remember, removePair, renderScalar, sameValue, setPairValue, Source, sourceText, TEXT_FIELDS, topMap, type NewValue, type Parsed,
+	type Step,
 } from './yaml-patch';
 
 function setPersonFields(first: Parsed, op: SetPersonFields, data: RawMap, index: number): EditResult {
@@ -41,12 +46,18 @@ function setPersonFields(first: Parsed, op: SetPersonFields, data: RawMap, index
 			return pair ? setPairValue(p.src, item, pair, nv, layout) : addPair(p.src, item, 'id', nv, PERSON_ORDER, layout);
 		});
 	}
+	// D91: a changed or removed `portrait` removes `portrait-crop` in the same write, unless the op sets a part itself.
+	const fields: Partial<Record<PersonField, FieldValue>> = { ...op.fields };
+	if (op.fields && Object.prototype.hasOwnProperty.call(op.fields, 'portrait') && !Object.prototype.hasOwnProperty.call(op.fields, 'portrait-crop')) {
+		const v = personValue('portrait', op.fields.portrait as FieldValue);
+		if (!isRefusal(v) && !sameValue('portrait', person.portrait, v.write, () => sourceText(first.src.doc, first.src.text, ['people', index, 'portrait']))) fields['portrait-crop'] = null;
+	}
 	// §4.1 order, so new keys that land on the same spot come out in that order.
 	for (const field of PERSON_ORDER.filter((f): f is PersonField => (PERSON_FIELDS as readonly string[]).includes(f))) {
-		if (!op.fields || !Object.prototype.hasOwnProperty.call(op.fields, field)) continue;
-		const v = personValue(field, op.fields[field] as FieldValue);
+		if (!Object.prototype.hasOwnProperty.call(fields, field)) continue;
+		const v = personValue(field, fields[field] as FieldValue);
 		if (isRefusal(v)) return v;
-		if (sameValue(field, person[field], v.write)) continue;
+		if (sameValue(field, person[field], v.write, () => sourceText(first.src.doc, first.src.text, ['people', index, field]))) continue;
 		if (v.write === null) delete person[field];
 		else person[field] = v.write;
 		const write = v.write;
@@ -56,6 +67,10 @@ function setPersonFields(first: Parsed, op: SetPersonFields, data: RawMap, index
 			const pair = findPair(item, field);
 			const layout = layoutOf(p.src);
 			if (write === null) return pair ? removePair(p.src, item, pair) : null;
+			if (QUOTED_FIELDS.has(field)) {
+				const quoted: NewValue = { raw: doubleQuoted(write) };
+				return pair ? setPairValue(p.src, item, pair, quoted, layout) : addPair(p.src, item, field, quoted, PERSON_ORDER, layout);
+			}
 			const nv: NewValue = { scalar: write, old: pair?.value as Node | null, text: TEXT_FIELDS.has(field) };
 			if (field === 'illegitimate') return pair ? setPairValue(p.src, item, pair, { ...nv, old: null, text: true }, layout) : addPair(p.src, item, field, { ...nv, text: true }, PERSON_ORDER, layout);
 			return pair ? setPairValue(p.src, item, pair, nv, layout) : addPair(p.src, item, field, nv, PERSON_ORDER, layout);
@@ -123,12 +138,16 @@ export function newHouseId(data: Raw, name: string): string {
 function addHouse(first: Parsed, op: AddHouse, data: RawMap): EditResult {
 	if (typeof op.name !== 'string' || op.name.trim() === '') return refuse('bad-value', 'A house must have a name.');
 	if (op.color !== undefined && typeof op.color !== 'string') return refuse('bad-value', 'The colour must be text.');
+	// Null is taken as "no arms", as an empty text is.
+	if (op.arms !== undefined && op.arms !== null && typeof op.arms !== 'string') return refuse('bad-value', 'The arms must be a link.');
 	const expected = clone(data ?? {}) as RawMap;
 	if (!isEmpty(expected.houses) && !Array.isArray(expected.houses)) return refuse('bad-value', 'The houses section is not a list.');
 	const id = newHouseId(expected, op.name);
 	const house: RawMap = { id, name: op.name };
 	const color = op.color?.trim() ? op.color : undefined;
 	if (color !== undefined) house.color = color;
+	const arms = typeof op.arms === 'string' && op.arms.trim() !== '' ? op.arms : undefined;
+	if (arms !== undefined) house.arms = arms;
 	expected.houses = [...(Array.isArray(expected.houses) ? expected.houses : []), house];
 
 	const entries: [string, string, boolean][] = [
@@ -136,12 +155,14 @@ function addHouse(first: Parsed, op: AddHouse, data: RawMap): EditResult {
 		['name', op.name, false],
 	];
 	if (color !== undefined) entries.push(['color', color, false]);
+	if (arms !== undefined) entries.push(['arms', arms, false]);
+	const rendered = (k: string, v: string, text: boolean, flow: boolean) => (QUOTED_FIELDS.has(k) ? doubleQuoted(v) : renderScalar(v, null, { flow, text, indent: '' }));
 	const step: Step = (p) => {
 		const top = topMap(p);
 		if (isRefusal(top)) return top;
 		const layout = layoutOf(p.src);
-		const block = entries.map(([k, v, text]) => `${k}: ${renderScalar(v, null, { flow: false, text, indent: '' })}`);
-		const flow = `{${entries.map(([k, v, text]) => `${k}: ${renderScalar(v, null, { flow: true, text, indent: '' })}`).join(', ')}}`;
+		const block = entries.map(([k, v, text]) => `${k}: ${rendered(k, v, text, false)}`);
+		const flow = `{${entries.map(([k, v, text]) => `${k}: ${rendered(k, v, text, true)}`).join(', ')}}`;
 		const housesPair = top ? findPair(top, 'houses') : undefined;
 		const node = housesPair?.value;
 		// Like add-person, the new house goes after the comments the last house owns.
@@ -188,7 +209,9 @@ function applyOne(body: string, op: Op, keepStale = false): EditResult {
 		if (!keepStale && current !== body) {
 			const clean = removeStaleKeys(body, current);
 			if (!clean.ok) return clean;
-			current = clean.body;
+			const titles = cleanCardTitles(body, clean.body);
+			if (!titles.ok) return titles;
+			current = titles.body;
 		}
 		const out: EditResult = { ok: true, body: current, created };
 		if (changed !== undefined) out.changed = changed;
@@ -197,6 +220,7 @@ function applyOne(body: string, op: Op, keepStale = false): EditResult {
 	}
 	const parsed = parseBody(body);
 	if (!parsed.ok) return refuse('invalid-yaml', parsed.error.detail ?? parsed.error.code);
+	remember(body, parsed.data);
 	// §6.9: renames also update a tree that is blocked for editing; only `link` values change.
 	if (op.kind === 'rewrite-links') return rewriteLinks({ src: new Source(body, parsed.doc), data: parsed.data }, (isEmpty(parsed.data) ? {} : parsed.data) as RawMap, op);
 	const tree = readTree(parsed.doc, parsed.data, body);
@@ -204,6 +228,23 @@ function applyOne(body: string, op: Op, keepStale = false): EditResult {
 	if (g.issues.some((i) => i.level === 'blocking')) return refuse('blocked');
 	const data = (isEmpty(parsed.data) ? {} : parsed.data) as RawMap;
 	const first: Parsed = { src: new Source(body, parsed.doc), data: parsed.data };
+	let r: EditResult;
+	try {
+		r = dispatch(op, { first, data, tree, g }, keepStale);
+	} catch (e) {
+		// An alias that points to its own list makes the data loop; `clone` cannot copy it. Say so instead of the catch-all text.
+		if (e instanceof TypeError && /circular/i.test(e.message)) return refuse('bad-value', 'The note text has a value that points to itself. Edit the note text.');
+		throw e;
+	}
+	if (keepStale || !r.ok || r.body === body) return r;
+	// Rule 7 of the titles rules (`title-ops.ts` header): once per write, like the stale keys.
+	const clean = cleanCardTitles(body, r.body, parsed.data);
+	return clean.ok ? { ...r, body: clean.body } : clean;
+}
+
+/** Runs one op (not a batch or a link rewrite) on a body that may be edited. */
+function dispatch(op: Exclude<Op, Batch | RewriteLinksOp>, ctx: { first: Parsed; data: RawMap; tree: Tree; g: FamilyGraph }, keepStale: boolean): EditResult {
+	const { first, data, tree, g } = ctx;
 	switch (op.kind) {
 		case 'add-person':
 		case 'add-parent':
@@ -228,6 +269,14 @@ function applyOne(body: string, op: Op, keepStale = false): EditResult {
 			return editHouse(first, data, op);
 		case 'delete-house':
 			return deleteHouse(first, data, op);
+		case 'add-title':
+		case 'edit-title':
+		case 'delete-title':
+		case 'add-holder':
+		case 'edit-holder':
+		case 'remove-holder':
+		case 'set-holders':
+			return titleOp(ctx, op);
 		default:
 			return refuse('bad-value', 'Unknown edit.');
 	}
@@ -242,5 +291,7 @@ export const applyOp: ApplyOp = (body, op) => {
 		// §8: nothing may throw out of a public function. The detail can reach the user, so it is
 		// never the raw error text.
 		return refuse('bad-value', 'The plugin cannot make this change. Edit the note text.');
+	} finally {
+		forget();
 	}
 };

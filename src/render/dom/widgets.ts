@@ -1,6 +1,7 @@
 /*
  * Small DOM pieces of the tree view: Obsidian-style callouts (spec §5.8: warning and error boxes
- * use Obsidian's own callout styles) and a popover that closes on Escape or a press outside it.
+ * use Obsidian's own callout styles) and a popover that closes on Escape or a press outside it,
+ * with a hook for what must happen when it closes (the legend lets go of its arms pictures).
  */
 
 import { setIcon } from 'obsidian';
@@ -90,6 +91,22 @@ export class Popover {
 		el.style.setProperty('--dynasty-pop-x', `${Math.round(x)}px`);
 		el.style.setProperty('--dynasty-pop-y', `${Math.round(y)}px`);
 		el.addClass('is-anchored');
+	}
+
+	/**
+	 * Runs `fn` once when the open popover closes, in any way (Escape, a press outside, its button, a
+	 * new popover, the view goes). With no popover open, `fn` runs now.
+	 */
+	whenClosed(fn: () => void): void {
+		const once = () => {
+			try {
+				fn();
+			} catch (e) {
+				console.error('Dynasty Tree: cannot close the popover', e);
+			}
+		};
+		if (this.el) this.cleanup.push(once);
+		else once();
 	}
 
 	/** Closes the open popover, if any; with `refocus`, gives the focus back to its opener. */

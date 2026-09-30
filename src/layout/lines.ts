@@ -9,8 +9,9 @@
  * own lane.
  */
 import type { FamilyGraph } from '../core/derive';
-import { barClear, lineMetrics, sideTagDepth, tagTop, type LineMetrics } from './geometry';
-import type { Geometry, PersonBox, UnionPoint } from './model';
+import { barClear, lineMetrics, sideTagDepth, tagHit, tagTop, type LineMetrics } from './geometry';
+import { FOLD_EM, placeFoldSpots, type LineExtras } from './fold-spots';
+import type { Geometry, PersonBox, Rect, UnionPoint } from './model';
 
 /** A sideways run inside gap `gap` (below row `gap`) at couple lane `lane`, ending at `x`. */
 export interface Hop {
@@ -54,6 +55,18 @@ export interface TagZone {
 	hit?: { x: number; w: number };
 }
 
+/** M10 (F4): the stem of a folded family, from its union point or one parent's card straight down to the spot of its "+ N" sign. */
+export interface FoldStem {
+	/** The control's key. */
+	key: string;
+	parents: string[];
+	union?: string;
+	/** x where the stem leaves the union point (or bar) or the single parent's card. */
+	fromX: number;
+	/** The gap the stem is in: the one below the parents' row. */
+	gap: number;
+}
+
 /** Everything `planLines` decided: legs, sibling bars, dot positions and tag zones for one tree. */
 export interface LinePlan {
 	legs: Leg[];
@@ -64,11 +77,17 @@ export interface LinePlan {
 	families: FamilyLine[];
 	/** Where a side link from a single parent leaves that parent's card: `${child}|${parent}`. */
 	sideExits: Map<string, number>;
+	/** Where a single parent's trunk leaves that parent's card (x). */
+	soloExits: Map<string, number>;
 	/** The part of a card's bottom edge a far-couple tag may use (sideways: x from the card's left edge). */
 	tagZones: Map<string, TagZone>;
 	/** Couple lanes and sibling-bar lanes used in each gap (index = row above the gap). */
 	coupleLanes: number[];
 	barLanes: number[];
+	/** M10 (F4): one stem for each folded family of `PlanInput.extras`. */
+	stems: FoldStem[];
+	/** M10 (F4): the smallest height each gap needs to hold the spot of its stems and the sign (index = row above the gap); 0 without stems. */
+	stemNeed: number[];
 	/** Rightmost x a leg uses; routing around the end of a row can go past the last card. */
 	maxX: number;
 }
@@ -88,20 +107,27 @@ export interface PlanInput {
 	 * of its row, where only the columns of routed legs could cross it.
 	 */
 	side?: Geometry;
+	/** M10 (F3, F4): people tagged for a hidden partner, and the folded families that keep a stem. */
+	extras?: LineExtras;
 }
 
 /** Plans every leg, sibling bar, dot position and tag zone of a tree: see the file header. */
-export function planLines({ g, persons, rows, unions, anchors, geo, side }: PlanInput): LinePlan {
+export function planLines({ g, persons, rows, unions, anchors, geo, side, extras }: PlanInput): LinePlan {
 	const m = lineMetrics(geo);
 	const box = (id: string) => persons.get(id)!;
 	const centre = (b: PersonBox) => b.x + b.w / 2;
 	// Two vertical lines closer than this would touch a union dot (or each other).
 	const near = geo.unionSize / 2 + 2;
 	const dotUsed = new Set(g.secondary.flatMap((s) => (s.unionKey ? [s.unionKey] : [])));
+	// A folded family has no child in `g`, but its union keeps its dot (a far pair too) and its one parent keeps the exit of a
+	// single parent's trunk, so the stem of its "+ N" sign starts where the trunk would.
+	const foldedList = extras?.folded ?? [];
+	const foldedUnion = new Set(foldedList.flatMap((f) => (f.union !== undefined && g.unionByKey.has(f.union) ? [f.union] : [])));
+	const foldedSolo = new Set(foldedList.filter((f) => f.union === undefined && f.parents.length === 1 && persons.has(f.parents[0])).map((f) => f.parents[0]));
 	const hasDot = (key: string) => {
 		const u = unions.get(key)!;
 		const fu = g.unionByKey.get(key)!;
-		return !u.bar && (!u.far || fu.children.length > 0 || dotUsed.has(key));
+		return !u.bar && (!u.far || fu.children.length > 0 || dotUsed.has(key) || foldedUnion.has(key));
 	};
 	const anchorOf = (key: string) => box(anchors.get(key) ?? g.unionByKey.get(key)!.partners[0]);
 	const dotGap = (key: string) => Math.max(...g.unionByKey.get(key)!.partners.map((p) => box(p).gen));
@@ -133,7 +159,7 @@ export function planLines({ g, persons, rows, unions, anchors, geo, side }: Plan
 	}
 
 	// 2. Exits: where each line leaves the bottom of a card. Tagged cards keep the middle for the tag.
-	const tagged = new Set<string>();
+	const tagged = new Set<string>(extras?.tagged);
 	for (const fu of g.unions) if (unions.get(fu.key)!.far) fu.partners.forEach((p) => tagged.add(p));
 	const legExit = new Map<string, number>(); // `${union}|${person}`
 	const exitsIn = new Map<number, number[]>(); // leg exits by gap
@@ -146,7 +172,7 @@ export function planLines({ g, persons, rows, unions, anchors, geo, side }: Plan
 		const gap = b.gen;
 		const legs = (g.unionsOf.get(p.id) ?? []).filter((k) => hasDot(k) && (!unions.get(k)!.far || anchorOf(k).id === p.id));
 		const sides = g.secondary.filter((s) => !s.unionKey && s.parents.includes(p.id));
-		const solo = (g.soloChildren.get(p.id) ?? []).length > 0;
+		const solo = (g.soloChildren.get(p.id) ?? []).length > 0 || foldedSolo.has(p.id);
 		const sideOf = (k: string): 'left' | 'right' => (ux(k) >= cx ? 'right' : 'left');
 		if (side) {
 			const slot = edgeSlots(b, legs.length + sides.length + (solo ? 1 : 0), m, near, (x) => isFree(gap, x), () => reserved.get(gap) ?? []);
@@ -398,7 +424,61 @@ export function planLines({ g, persons, rows, unions, anchors, geo, side }: Plan
 		if (gap >= 0) barLanes[gap] = used;
 	}
 
-	return { legs, dots, dotX, families, sideExits, tagZones, coupleLanes, barLanes, maxX };
+	// M10 (F4): the stem of each folded family, and the gap height that holds its sign below the dot (F5).
+	const stems: FoldStem[] = [];
+	const stemNeed = new Array<number>(rows.length).fill(0);
+	// V2, V4: place every control once on cards that stand a huge step apart per row, so that only the controls and tags of one
+	// row meet. A control that the rules move down needs room for its new spot; the others keep the room they had.
+	const STEP = 1e6;
+	const rowH = rows.map((r) => Math.max(0, ...r.map((id) => box(id).h)));
+	const flat = new Map<string, PersonBox>();
+	for (const [id, b] of persons) flat.set(id, { ...b, y: b.gen * STEP });
+	const flatUnions = new Map<string, UnionPoint>();
+	for (const [key, u] of unions) {
+		const fu = g.unionByKey.get(key);
+		if (!fu) continue;
+		const dot = dots.get(key);
+		const a = box(fu.partners[0]);
+		const gap = dot?.gap ?? a.gen;
+		const y = u.bar ? a.gen * STEP + Math.min(...fu.partners.map((p) => box(p).h)) / 2 : gap * STEP + rowH[gap] + m.coupleLane0 + (dot?.lane ?? 0) * m.coupleLaneStep;
+		flatUnions.set(key, { ...u, x: ux(key), y });
+	}
+	const flatTags = new Map<string, Rect>();
+	if (!side) for (const [id, zone] of tagZones) flatTags.set(id, tagHit(zone, flat.get(id)!.y + box(id).h, geo));
+	const spotOf = new Map<string, { y: number; pushed: boolean }>();
+	for (const r of placeFoldSpots(extras?.controls ?? [], flat, flatUnions, [], geo.fontPx, { tags: flatTags, soloX: soloExit, turned: !!side })) {
+		const gen = Math.max(...r.control.parents.map((p) => box(p).gen));
+		spotOf.set(r.control.key, { y: r.control.spot.y - gen * STEP - rowH[gen], pushed: r.pushed });
+	}
+	const reachOf = (folded: boolean, count: number) => {
+		// The sign is 1.25 em high; a quarter em stays free above the lowest sibling bar of the gap.
+		let reach = (FOLD_EM.signHeight / 2 + 0.25) * geo.fontPx;
+		// Sideways the sign grows to the right, along the gap: it needs the whole width of the pill (0.6 em a character is above the real width).
+		if (side && folded) reach = (-FOLD_EM.signHeight / 2 + FOLD_EM.signPad + (2 + String(Math.max(0, Math.trunc(count))).length) * 0.6 + 0.5) * geo.fontPx;
+		return reach;
+	};
+	for (const f of foldedList) {
+		const shown = f.parents.filter((p) => persons.has(p));
+		if (!shown.length || shown.length !== f.parents.length) continue;
+		const fromX = f.union !== undefined && g.unionByKey.has(f.union) ? ux(f.union) : soloExit.get(f.parents[0]);
+		if (fromX === undefined) continue;
+		const gap = f.union !== undefined ? dotGap(f.union) : box(f.parents[0]).gen;
+		stems.push({ key: f.key, parents: [...f.parents], ...(f.union !== undefined ? { union: f.union } : {}), fromX, gap });
+		const dot = f.union === undefined ? undefined : dots.get(f.union);
+		let below = dot ? m.coupleLane0 + dot.lane * m.coupleLaneStep + FOLD_EM.afterMarker * geo.fontPx : FOLD_EM.below * geo.fontPx;
+		const moved = spotOf.get(f.key);
+		if (moved?.pushed) below = Math.max(below, moved.y);
+		const need = below + reachOf(true, f.count) + m.barDrop + Math.max(0, barLanes[gap] - 1) * m.barLaneStep;
+		stemNeed[gap] = Math.max(stemNeed[gap], need);
+	}
+	for (const c of extras?.controls ?? []) {
+		const moved = spotOf.get(c.key);
+		if (!moved?.pushed || foldedList.some((f) => f.key === c.key)) continue;
+		const gap = Math.max(...c.parents.map((p) => box(p).gen));
+		stemNeed[gap] = Math.max(stemNeed[gap], moved.y + reachOf(false, 0) + m.barDrop + Math.max(0, barLanes[gap] - 1) * m.barLaneStep);
+	}
+
+	return { legs, dots, dotX, families, sideExits, soloExits: soloExit, tagZones, coupleLanes, barLanes, stems, stemNeed, maxX };
 }
 
 /** Adds `value` to the list kept for `key`, in place: a new copy of the list on each add was quadratic. */

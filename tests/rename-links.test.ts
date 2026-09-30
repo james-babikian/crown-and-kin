@@ -551,7 +551,7 @@ describe('Rename, fix round after the M6 iPhone test (the decision notes "M6 iPh
 		it('before any rename, and with the setting off', () => {
 			expect(RENAME_UI.command).toBe('Show the last link update');
 			expect(RENAME_UI.report(null, true)).toBe('The plugin did not update tree links after Obsidian started.');
-			expect(RENAME_UI.report(null, false)).toBe('The plugin did not update tree links after Obsidian started. The setting "Update tree links when you rename a note" is off.');
+			expect(RENAME_UI.report(null, false)).toBe('The plugin did not update tree links after Obsidian started. The setting "Update tree links when you rename a note or a picture" is off.');
 		});
 
 		it('a stopped, a failed and a running update, and trees that the plugin cannot change', () => {

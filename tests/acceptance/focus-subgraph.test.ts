@@ -1100,7 +1100,8 @@ describe('the model on every other tree, every focus person, n = 0 to 3', () => 
 		['COLLAPSE', COLLAPSE],
 		['IMPLICIT', IMPLICIT],
 		...allFixtures()
-			.filter((f) => f.id !== '07')
+			// 07b has the same people as 7 (spec §13.0 item 9), which has its own tests below.
+			.filter((f) => f.id !== '07' && f.id !== '07b')
 			.map((f): [string, Tree] => [`sample tree ${f.id}`, parse(f.source)]),
 	];
 

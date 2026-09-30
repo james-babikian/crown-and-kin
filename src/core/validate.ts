@@ -6,7 +6,8 @@
  */
 
 import { codedIssue, type CodedIssue, type IssueCode, type IssueParams } from './messages';
-import { isParentType, isPlacementType, isUnionType, parentKind, type House, type ParentRef, type ParentType, type Person, type Tree, type Union } from './types';
+import { readPortraitCrop } from './portrait-crop';
+import { isParentType, isPlacementType, isUnionType, parentKind, type Holder, type House, type ParentRef, type ParentType, type Person, type Title, type Tree, type Union } from './types';
 
 /** The parts of a tree that are safe to draw, and every problem found on the way (spec §8, §4.1). */
 export interface Validated {
@@ -24,6 +25,11 @@ export interface Validated {
 	refs: Map<string, ParentRef[]>;
 	/** Every union id written, drawable or not; tells a missing `union` from a misplaced one. */
 	unionIds: Set<string>;
+	/**
+	 * Spec §13.4: the first title with each id, in list order, with the holders that can show: a
+	 * holder whose `person` names nobody stays only if it has a `name`. `[]` with no titles.
+	 */
+	titles: Title[];
 	issues: CodedIssue[];
 }
 
@@ -171,8 +177,9 @@ export function validateTree(tree: Tree): Validated {
 		out.blocking('duplicate-union-id', { id }, partners);
 	}
 
-	for (const [key, ref] of [['start', tree.options.start], ['focus', tree.options.focus]] as const) {
-		if (ref !== undefined && !byId.has(ref)) out.warn(key === 'start' ? 'missing-start' : 'missing-focus', { ref });
+	const optionRefs = [['missing-start', tree.options.start], ['missing-focus', tree.options.focus], ['missing-me', tree.options.me]] as const;
+	for (const [code, ref] of optionRefs) {
+		if (ref !== undefined && !byId.has(ref)) out.warn(code, { ref });
 	}
 
 	// People: values, then parent links.
@@ -204,6 +211,8 @@ export function validateTree(tree: Tree): Validated {
 			if (!isPlacementType(p.placement)) out.warn('unknown-placement', { ...who, value: p.placement }, [p.id]);
 			else if (!byType.has(p.placement)) out.warn('placement-without-parents', { ...who, placement: p.placement }, [p.id]);
 		}
+		// A crop with no portrait does nothing and gives no warning (spec §13.13).
+		if (p.portrait !== undefined && readPortraitCrop(p.portraitCrop).kind === 'bad') out.warn('bad-portrait-crop', who, [p.id]);
 	}
 
 	// Unions: one issue per union for its shape, then one per missing partner.
@@ -228,6 +237,41 @@ export function validateTree(tree: Tree): Validated {
 	}
 
 	breakCycles(people, refs, byId, out);
+	const titles = validateTitles(tree.titles ?? [], people, byId, out);
 
-	return { people, byId, houses, unions, refs, unionIds, issues: out.issues };
+	return { people, byId, houses, unions, refs, unionIds, titles, issues: out.issues };
+}
+
+/** Spec §13.3, §13.4 rules for titles, holders and `card-title` (the first title with an id wins). */
+function validateTitles(written: readonly Title[], people: Person[], byId: Map<string, Person>, out: Collector): Title[] {
+	const titles: Title[] = [];
+	const byTitleId = new Map<string, Title>();
+	const dup = new Set<string>();
+	for (const t of written) {
+		const first = byTitleId.get(t.id);
+		if (first) {
+			if (!dup.has(t.id)) out.warn('duplicate-title-id', { id: t.id, title: first.name });
+			dup.add(t.id);
+			continue;
+		}
+		const holders: Holder[] = [];
+		for (const h of t.holders) {
+			if (h.person !== undefined && !byId.has(h.person)) {
+				out.warn('missing-holder', h.name !== undefined ? { title: t.name, ref: h.person, name: h.name } : { title: t.name, ref: h.person });
+				if (h.name === undefined) continue;
+			} else if (h.person === undefined && h.name === undefined) {
+				out.warn('holder-empty', { title: t.name, index: h.index + 1 });
+				continue;
+			}
+			holders.push(h);
+		}
+		const title = { ...t, holders };
+		byTitleId.set(t.id, title);
+		titles.push(title);
+	}
+	for (const p of people) {
+		if (p.cardTitle === undefined) continue;
+		if (!byTitleId.get(p.cardTitle)?.holders.some((h) => h.person === p.id)) out.warn('card-title-not-held', { person: p.name, ref: p.cardTitle }, [p.id]);
+	}
+	return titles;
 }

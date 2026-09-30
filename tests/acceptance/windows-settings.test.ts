@@ -95,7 +95,8 @@ describe('the settings tab (spec §9, D33)', () => {
 		expect(settingGroups.map((x) => x.heading)).toEqual([g.height, g.cards, g.focus, g.links, g.repair]);
 		const names = (i: number) => settingGroups[i].listEl.querySelectorAll('.setting-item-name').map((n) => n.getText());
 		expect(names(0)).toEqual([SETTINGS_UI.heightDesktop, SETTINGS_UI.heightPhone]);
-		expect(names(1)).toEqual([SETTINGS_UI.cardSize, SETTINGS_UI.dates]);
+		// M7 (spec §13.1): the relation names are in the Cards group.
+		expect(names(1)).toEqual([SETTINGS_UI.cardSize, SETTINGS_UI.dates, SETTINGS_UI.relations, SETTINGS_UI.portraits]);
 		expect(names(2)).toEqual([SETTINGS_UI.generations]);
 		expect(names(3)).toEqual([SETTINGS_UI.links]);
 		expect(names(4)).toEqual([SETTINGS_UI.cache]);
@@ -105,13 +106,14 @@ describe('the settings tab (spec §9, D33)', () => {
 
 	it('shows the stored values; a bad stored value shows its default', async () => {
 		const { fake, plugin } = await loadPlugin({ embedHeightDesktop: 640, embedHeightPhone: 70, cardSize: 'compact', showDates: false, focusGenerations: 99, updateLinks: false });
-		expect(plugin.settings).toEqual({ embedHeightDesktop: 640, embedHeightPhone: 70, cardSize: 'compact', showDates: false, focusGenerations: 3, updateLinks: false });
+		expect(plugin.settings).toEqual({ embedHeightDesktop: 640, embedHeightPhone: 70, cardSize: 'compact', showDates: false, showRelations: true, showPortraits: true, focusGenerations: 3, updateLinks: false });
 		openTab(fake);
 		expect(control<TextComponent>(SETTINGS_UI.heightDesktop).getValue()).toBe('640');
 		expect(control<DropdownComponent>(SETTINGS_UI.heightPhone).getValue()).toBe('70');
 		expect(control<DropdownComponent>(SETTINGS_UI.heightPhone).options.map((o) => o[1])).toEqual(['40%', '50%', '60%', '70%', '80%']);
 		expect(control<DropdownComponent>(SETTINGS_UI.cardSize).getValue()).toBe('compact');
 		expect(control<ToggleComponent>(SETTINGS_UI.dates).getValue()).toBe(false);
+		expect(control<ToggleComponent>(SETTINGS_UI.relations).getValue()).toBe(true);
 		expect(control<DropdownComponent>(SETTINGS_UI.generations).getValue()).toBe('3');
 		expect(control<ToggleComponent>(SETTINGS_UI.links).getValue()).toBe(false);
 	});
@@ -388,12 +390,24 @@ describe('the command Insert family tree (spec §5.9, D34)', () => {
 describe('keyboard (spec §5.2)', () => {
 	/** Every element that Tab stops at, in document order. */
 	const tabStops = (root: FEl) => root.all().filter((e) => (e.tag === 'button' && !e.hidden) || e.getAttribute('tabindex') === '0');
-	const kind = (e: FEl) => (e.closest('.dynasty-toolbar') ? 'tool' : e.hasClass('dynasty-card') ? 'card' : e.hasClass('dynasty-focus-badge') ? 'badge' : e.hasClass('dynasty-tag') ? 'tag' : 'other');
+	const kind = (e: FEl) => (e.closest('.dynasty-toolbar') ? 'tool' : e.hasClass('dynasty-card') ? 'card' : e.hasClass('dynasty-focus-badge') ? 'badge' : e.hasClass('dynasty-tag') ? 'tag' : e.hasClass('dynasty-fold') ? 'fold' : 'other');
+
+	/** A fold control (spec §13.10) is a Tab stop after the card of the later of its parents. */
+	const foldsFollowParents = (stops: FEl[]) => {
+		stops.forEach((e, i) => {
+			if (kind(e) !== 'fold') return;
+			const ids = (e.getAttribute('data-fold') ?? '').match(/[^"\[\],]+/g) ?? [];
+			const at = ids.map((id) => stops.findIndex((c) => kind(c) === 'card' && c.getAttribute('data-person') === id)).filter((n) => n >= 0);
+			if (at.length) expect(i, e.getAttribute('data-fold') ?? '').toBeGreaterThan(Math.max(...at));
+		});
+	};
 
 	it('Tab reaches every toolbar button first, then the cards, then the tags', async () => {
 		const { el } = await embed(FAR, { handle: fakeHandle('n.md', FAR) });
-		const kinds: string[] = tabStops(el).map(kind);
+		const stops = tabStops(el);
+		const kinds: string[] = stops.map(kind);
 		expect(kinds.filter((k) => k === 'other')).toEqual([]);
+		foldsFollowParents(stops);
 		const lastAt = (k: string) => kinds.lastIndexOf(k);
 		const first = (k: string) => kinds.indexOf(k);
 		expect(first('tool')).toBe(0);
@@ -407,6 +421,7 @@ describe('keyboard (spec §5.2)', () => {
 		const { root } = await openFullScreen(LINE);
 		const stops = tabStops(root);
 		const kinds: string[] = stops.map(kind);
+		foldsFollowParents(stops);
 		expect(kinds[0]).toBe('tool');
 		expect(kinds.lastIndexOf('tool')).toBeLessThan(kinds.indexOf('card'));
 		const badges = stops.filter((e) => kind(e) === 'badge');

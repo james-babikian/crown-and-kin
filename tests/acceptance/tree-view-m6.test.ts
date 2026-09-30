@@ -294,8 +294,8 @@ describe('D29: names measured with the real font make only their cards taller (n
 	it('a name that does not fit uses two text lines on a taller card; a short name keeps one line and the normal height', async () => {
 		phonePortrait();
 		const { el } = await preview(NAMES);
-		expect(card(el, 'will').h).toBe(TALL_H);
-		expect(names(el, 'will')).toEqual(['Wilhelmina', expect.stringMatching(/^Blackmere.*…$/)]);
+		expect(card(el, 'will').h).toBe(DOWN.cardH + 2 * tallExtra(DOWN));
+		expect(names(el, 'will')).toEqual(['Wilhelmina', 'Blackmere-Orsi', 'ni']);
 		expect(card(el, 'bo').h).toBe(DOWN.cardH);
 		expect(names(el, 'bo')).toEqual(['Bo']);
 		expect(card(el, 'anna').h).toBe(DOWN.cardH);

@@ -131,7 +131,8 @@ describe('linkTargets: every person link, in document order, every written form 
 	});
 
 	it('sample trees: 4 (quoted) and 10 (unquoted) link to Wren of the Marches; the others have no links', () => {
-		for (const f of allFixtures()) {
+		// Sample trees 14 and 07b have picture links (M9, contract rule 11): m9-links.test.ts checks them.
+		for (const f of allFixtures().filter((x) => x.id !== '14' && x.id !== '07b')) {
 			expect(linkTargets(f.source), f.file).toEqual(f.id === '04' || f.id === '10' ? ['Wren of the Marches'] : []);
 		}
 	});

@@ -1,18 +1,19 @@
 /*
- * House ops for the Houses window (spec §6.10, D32). Same machinery as the other ops: the expected
- * data is built first, the text is patched at the parse positions, and `finish` re-parses and
- * compares.
+ * House ops for the Houses window (spec §6.10, D32; arms §13.6). Same machinery as the other ops:
+ * the expected data is built first, the text is patched at the parse positions, and `finish`
+ * re-parses and compares.
  */
 
 import { isAlias, isMap, type Node, type Pair, type YAMLMap } from 'yaml';
 import type { DeleteHouse, EditHouse, EditResult } from './edit';
-import { str, type Raw, type RawMap } from './tolerate';
+import { linkValue, str, type Raw, type RawMap } from './tolerate';
 import { removeFromSection, section } from './yaml-list';
 import {
-	addPair, clone, doubleQuoted, findPair, finish, finishTogether, isRefusal, layoutOf, refuse, removePair, setPairValue, type Parsed, type Patch, type Refusal, type Source, type Step,
+	addPair, clone, doubleQuoted, findPair, finish, finishTogether, isRefusal, layoutOf, refuse, removePair, setPairValue, sourceText, type Parsed, type Patch, type Refusal, type Source, type Step,
 } from './yaml-patch';
 
-const HOUSE_ORDER = ['id', 'name', 'color'];
+/** §4.1 and §13.0 item 1 order of a house's keys. */
+const HOUSE_ORDER = ['id', 'name', 'color', 'arms'];
 const COLOUR = /^#[0-9a-fA-F]{6}$/;
 
 /** The index of the first house item with this id: the one the tree uses (§4.1). */
@@ -45,7 +46,7 @@ function replaceCommentedColour(src: Source, pair: Pair, text: string): Patch | 
 	return { start, end, text: text + kept, allow: [start, start + 1], writes: comment ? [comment] : undefined };
 }
 
-/** Renames and/or recolours a house (§6.10). */
+/** Renames, recolours and/or changes the arms of a house (§6.10, §13.6). */
 export function editHouse(first: Parsed, data: RawMap, op: EditHouse): EditResult {
 	const index = houseIndex(data, op.id);
 	if (index === undefined) return refuse('unknown-house');
@@ -53,17 +54,27 @@ export function editHouse(first: Parsed, data: RawMap, op: EditHouse): EditResul
 	// An empty colour removes the key, as an empty optional person field does (`personValue`).
 	const wanted = typeof op.color === 'string' && op.color.trim() === '' ? null : op.color;
 	if (wanted !== undefined && wanted !== null && (typeof wanted !== 'string' || !COLOUR.test(wanted))) return refuse('bad-value', 'A colour must be written as #rrggbb.');
+	if (op.arms !== undefined && op.arms !== null && typeof op.arms !== 'string') return refuse('bad-value', 'The arms must be a link.');
+	const wantedArms = typeof op.arms === 'string' && op.arms.trim() === '' ? null : op.arms;
 
 	const expected = clone(data) as RawMap;
 	const house = (expected.houses as RawMap[])[index];
 	const name = op.name !== undefined && str(house.name) !== str(op.name) ? op.name : undefined;
 	const color = wanted === undefined ? undefined : wanted === null ? (Object.prototype.hasOwnProperty.call(house, 'color') ? null : undefined) : house.color !== wanted ? wanted : undefined;
-	if (name === undefined && color === undefined) return { ok: true, body: first.src.text, created: [] };
+	// Compared as `parse.ts` reads it (`linkValue` with the source text), so an unquoted [[x.png]]
+	// equals "[[x.png]]" and an unquoted [[x,y.png]] equals "[[x,y.png]]".
+	let arms: string | null | undefined;
+	const readArms = () => linkValue(house.arms, () => sourceText(first.src.doc, first.src.text, ['houses', index, 'arms']));
+	if (wantedArms === null) arms = Object.prototype.hasOwnProperty.call(house, 'arms') ? null : undefined;
+	else if (wantedArms !== undefined && readArms() !== str(wantedArms)) arms = wantedArms;
+	if (name === undefined && color === undefined && arms === undefined) return { ok: true, body: first.src.text, created: [] };
 	if (name !== undefined) house.name = name;
 	if (color === null) delete house.color;
 	else if (color !== undefined) house.color = color;
+	if (arms === null) delete house.arms;
+	else if (arms !== undefined) house.arms = arms;
 
-	const change = (which: 'name' | 'color'): Step => (p) => {
+	const change = (which: 'name' | 'color' | 'arms'): Step => (p) => {
 		const node = houseNode(p, index);
 		if (isRefusal(node)) return node;
 		const src = p.src;
@@ -73,13 +84,19 @@ export function editHouse(first: Parsed, data: RawMap, op: EditHouse): EditResul
 			const nv = { scalar: name!, old: pair?.value as Node | null, text: false };
 			return pair ? setPairValue(src, node, pair, nv, layout) : addPair(src, node, 'name', nv, HOUSE_ORDER, layout);
 		}
+		if (which === 'arms') {
+			if (arms === null) return removePair(src, node, pair!);
+			// §13.0 item 3: a picture link is always double-quoted.
+			const raw = { raw: doubleQuoted(arms!) };
+			return pair ? setPairValue(src, node, pair, raw, layout) : addPair(src, node, 'arms', raw, HOUSE_ORDER, layout);
+		}
 		if (color === null) return removePair(src, node, pair!);
 		// §6.10: a colour is always double-quoted; plain, YAML would read it as a comment.
 		const raw = { raw: doubleQuoted(color!) };
 		if (!pair) return addPair(src, node, 'color', raw, HOUSE_ORDER, layout);
 		return (!src.hasValue(pair) && replaceCommentedColour(src, pair, raw.raw)) || setPairValue(src, node, pair, raw, layout);
 	};
-	const steps = [...(name !== undefined ? [change('name')] : []), ...(color !== undefined ? [change('color')] : [])];
+	const steps = [...(name !== undefined ? [change('name')] : []), ...(color !== undefined ? [change('color')] : []), ...(arms !== undefined ? [change('arms')] : [])];
 	return finishTogether(first, steps, expected, []);
 }
 

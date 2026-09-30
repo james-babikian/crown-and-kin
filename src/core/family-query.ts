@@ -72,10 +72,17 @@ export interface DeleteSummary {
 	childLinks: number;
 	clearsStart: boolean;
 	clearsFocus: boolean;
+	/** Spec §13.1: the person has the "This is me" mark. Set only when `options` has a `me`. */
+	clearsMe?: boolean;
+	/**
+	 * D57: the written holder items that name the person (`entries`) and the titles they are in
+	 * (`titles`; a title with a duplicate id counts on its own). Set only when the tree has titles.
+	 */
+	holders?: { titles: number; entries: number };
 }
 
 /** Builds the `DeleteSummary` for deleting one person. */
-export type DescribeDelete = (g: FamilyGraph, id: string, options: { start?: string; focus?: string }) => DeleteSummary;
+export type DescribeDelete = (g: FamilyGraph, id: string, options: { start?: string; focus?: string; me?: string }) => DeleteSummary;
 
 /** Parent entries that name someone else in the tree, in written order, once per id and type. */
 export function writtenParents(g: FamilyGraph, id: string): ParentLink[] {
@@ -191,5 +198,14 @@ export const describeDelete: DescribeDelete = (g, id, options) => {
 		clearsStart: options?.start === id,
 		clearsFocus: options?.focus === id,
 	};
+	if (options?.me !== undefined) summary.clearsMe = options.me === id;
+	let titles = 0;
+	let entries = 0;
+	for (const t of g.writtenTitles ?? []) {
+		const n = t.holders.filter((h) => h.person === id).length;
+		if (n) titles++;
+		entries += n;
+	}
+	if (g.writtenTitles?.length) summary.holders = { titles, entries };
 	return summary;
 };

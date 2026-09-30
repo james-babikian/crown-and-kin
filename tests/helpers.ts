@@ -5,7 +5,7 @@ import { computeModelOrder } from '../src/core/order';
 import { parseDynasty } from '../src/core/parse';
 
 export function fixture(prefix: string): string {
-	const file = readdirSync('fixtures').find((f) => f.startsWith(prefix))!;
+	const file = readdirSync('fixtures').find((f) => f.startsWith(prefix + '-'))!;
 	const md = readFileSync(`fixtures/${file}`, 'utf8');
 	return md.match(/^```dynasty\r?\n([\s\S]*?)^```/m)![1];
 }

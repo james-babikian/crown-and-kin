@@ -1,15 +1,18 @@
 /*
- * Link maintenance (spec §6.9, D6, D35). After a Markdown note is renamed, every tree link that
- * pointed to it gets the new link text, one `rewrite-links` write per tree, through the tree's
- * handle (also in closed notes and in trees with blocking problems). The writes are not the user's edits: they are on neither undo stack. Nothing
- * here throws into Obsidian.
+ * Link maintenance (spec §6.9, D6, D35; pictures §13.0 item 3). After a Markdown note or a picture
+ * (PNG, JPEG, WebP, GIF, BMP, SVG) is renamed, every tree link that pointed to it (`link`,
+ * `portrait`, `arms`) gets the new link text, one `rewrite-links` write per tree, through the tree's
+ * handle (also in closed notes and in trees with blocking problems). A picture link keeps its file
+ * extension. The writes are not the user's edits: they are on neither undo stack. Nothing here
+ * throws into Obsidian.
  */
 
 import { Notice, TFile, type App, type CachedMetadata, type EventRef, type TAbstractFile } from 'obsidian';
 import { findBlocks } from '../core/block-locate';
 import { encode, linkTargets, normaliseTarget } from '../core/link-rewrite';
+import { pictureFormat } from '../core/pictures';
 import { applyOp } from '../core/yaml-edit';
-import { RENAME_UI, renamedText, type LinkReportText } from '../render/ui-text';
+import { RENAME_UI, renamedKind, renamedText, type LinkReportText } from '../render/ui-text';
 import type { Handle } from './block-handle';
 import type { PendingRename } from './settings';
 
@@ -88,14 +91,50 @@ interface Progress {
 }
 
 const pause = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
-/** The last part of a path, without `.md`, lower case: the "old basename" of spec §6.9. */
+/** The last part of a path, without `.md`, lower case: the "old basename" of spec §6.9. A picture keeps its extension. */
 const baseName = (path: string) => (path.split('/').pop() ?? path).replace(/\.md$/i, '').toLowerCase();
 const shownPath = (path: string) => path.replace(/\.md$/i, '');
+
+/** The lower-case extension of the last part of a path ('' with none). */
+export function extensionOf(path: string): string {
+	const name = path.split('/').pop() ?? path;
+	const dot = name.lastIndexOf('.');
+	return dot > 0 ? name.slice(dot + 1).toLowerCase() : '';
+}
+
+/** Spec §13.0 item 3: a picture that the plugin shows (its rename updates `arms` and `portrait`). */
+export const isPicturePath = (path: string) => pictureFormat(extensionOf(path)).kind === 'supported';
+
+/**
+ * B16: what a rename is about, from the extensions of the old and the new path: a note (md to md),
+ * a picture (a shown picture format to a shown picture format), or nothing for the link update.
+ */
+export function renameKind(oldPath: string, newPath: string): 'note' | 'picture' | null {
+	const a = extensionOf(oldPath);
+	const b = extensionOf(newPath);
+	if (a === 'md' && b === 'md') return 'note';
+	if (isPicturePath(oldPath) && isPicturePath(newPath)) return 'picture';
+	return null;
+}
+
+/**
+ * B16: a link target can name the renamed file only if its extension agrees: a picture rename
+ * needs the old picture's extension (`x.png`), a note rename a target that is not a picture name
+ * (`x`, `x.md`), so a note "x.png.md" never takes over a link to the picture "x.png".
+ */
+function extensionAgrees(target: string, oldPath: string): boolean {
+	const ext = extensionOf(target.replace(/\\/g, '/'));
+	if (isPicturePath(oldPath)) return ext === extensionOf(oldPath);
+	return pictureFormat(ext).kind !== 'supported';
+}
+
+/** Notes, pictures or both: the words of the Notices (an empty batch counts as notes). */
+const kindOf = (batch: readonly Renamed[]) => renamedKind(batch.map((r) => ({ from: r.oldPath, picture: isPicturePath(r.oldPath) })));
 
 /** The report of an update that starts now, for the renames of `batch`. */
 function newReport(batch: Renamed[]): LinkReportText {
 	return {
-		renames: batch.map((r) => ({ from: shownPath(r.oldPath), to: shownPath(r.file.path) })),
+		renames: batch.map((r) => ({ from: shownPath(r.oldPath), to: shownPath(r.file.path), ...(isPicturePath(r.oldPath) ? { picture: true } : {}) })),
 		state: 'running',
 		ms: 0,
 		notes: 0,
@@ -208,7 +247,7 @@ export class LinkUpdater {
 				p.newPath = file.path;
 				moved = true;
 			}
-			if (this.stopped || !this.enabled() || !(file instanceof TFile) || file.extension !== 'md') {
+			if (this.stopped || !this.enabled() || !(file instanceof TFile) || !renameKind(oldPath, file.path)) {
 				if (moved) this.persist();
 				return;
 			}
@@ -245,7 +284,7 @@ export class LinkUpdater {
 				const vault = this.app.vault;
 				for (const p of list) {
 					const file = vault.getAbstractFileByPath(p.newPath);
-					if (!(file instanceof TFile) || file.extension !== 'md') continue;
+					if (!(file instanceof TFile) || !renameKind(p.oldPath, file.path)) continue;
 					const others = new Set<TFile>();
 					for (const o of p.others) {
 						const f = vault.getAbstractFileByPath(o);
@@ -297,20 +336,27 @@ export class LinkUpdater {
 			.catch((e) => console.error('Dynasty Tree: cannot store the renames that wait for a link update', e));
 	}
 
-	/** The notes with the name of `oldPath` now, other than `file`. */
+	/** The notes with the name of `oldPath` now, other than `file`; for a picture, the vault files with its extension (O8). */
 	private sameName(oldPath: string, file: TFile): Set<TFile> {
 		if (!this.names) {
 			const m = new Map<string, TFile[]>();
-			for (const f of this.app.vault.getMarkdownFiles()) {
-				const k = baseName(f.path);
+			const add = (k: string, f: TFile) => {
 				const l = m.get(k);
 				if (l) l.push(f);
 				else m.set(k, [f]);
+			};
+			for (const f of this.app.vault.getMarkdownFiles()) add(baseName(f.path), f);
+			// A picture's base name keeps its extension, so it never meets a note's.
+			try {
+				for (const f of this.app.vault.getFiles()) if (isPicturePath(f.path)) add(`\u0000${baseName(f.path)}`, f);
+			} catch {
+				// Only notes then.
 			}
 			this.names = m;
 			setTimeout(() => (this.names = null), 0);
 		}
-		return new Set((this.names.get(baseName(oldPath)) ?? []).filter((f) => f !== file));
+		const key = isPicturePath(oldPath) ? `\u0000${baseName(oldPath)}` : baseName(oldPath);
+		return new Set((this.names.get(key) ?? []).filter((f) => f !== file));
 	}
 
 	private async run(): Promise<void> {
@@ -321,7 +367,7 @@ export class LinkUpdater {
 			const st: Progress = { found: false, scanned: false, shown: null };
 			const timer = setTimeout(() => {
 				try {
-					if (!this.halted() && (!st.scanned || st.found)) st.shown = new Notice(RENAME_UI.progress, 0);
+					if (!this.halted() && (!st.scanned || st.found)) st.shown = new Notice(RENAME_UI.progressFor(kindOf(batch)), 0);
 				} catch (e) {
 					console.error('Dynasty Tree: cannot show the link update Notice', e);
 				}
@@ -340,7 +386,7 @@ export class LinkUpdater {
 			} catch (e) {
 				console.error('Dynasty Tree: cannot update the links after a rename', e);
 				if (report) report.state = 'failed';
-				if (!this.stopped && batch.length) new Notice(RENAME_UI.stopped(renamedText(batch.map((r) => ({ from: shownPath(r.oldPath) })))), 0);
+				if (!this.stopped && batch.length) new Notice(RENAME_UI.stopped(renamedText(batch.map((r) => ({ from: shownPath(r.oldPath), picture: isPicturePath(r.oldPath) })))), 0);
 			} finally {
 				clearTimeout(timer);
 				obsidian.end();
@@ -538,7 +584,7 @@ export class LinkUpdater {
 	private showResult(report: LinkReportText, st: Progress, { trees, failures, kept }: ScanResult): void {
 		// D35: the numbers only.
 		if (report.links > 0) new Notice(RENAME_UI.updated(report.links, trees));
-		else if (st.shown && !kept.length && !failures.length) new Notice(RENAME_UI.noLinks);
+		else if (st.shown && !kept.length && !failures.length) new Notice(RENAME_UI.noLinksFor(renamedKind(report.renames)));
 		for (const k of kept.slice(0, MAX_FAILURE_NOTICES)) new Notice(RENAME_UI.kept(k.link, shownPath(k.path), shownPath(k.other)), KEPT_NOTICE_MS);
 		if (kept.length > MAX_FAILURE_NOTICES) new Notice(RENAME_UI.moreKept(kept.length - MAX_FAILURE_NOTICES), KEPT_NOTICE_MS);
 		for (const f of failures.slice(0, MAX_FAILURE_NOTICES)) new Notice(RENAME_UI.failed(shownPath(f.path), f.old, f.next), 0);
@@ -607,6 +653,7 @@ export class LinkUpdater {
 			const rel = isRelative(t) ? resolveRelative(t, folder.toLowerCase()) : null;
 			if (isRelative(t) && rel === null) continue;
 			const matches = batch.filter((r) => {
+				if (!extensionAgrees(target, r.oldPath)) return false;
 				const old = normaliseTarget(r.oldPath);
 				return rel !== null ? old === rel : old === t || old.endsWith(`/${t}`);
 			});

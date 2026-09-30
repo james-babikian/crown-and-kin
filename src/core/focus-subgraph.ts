@@ -5,7 +5,7 @@
  * than the whole tree does, and never draws a link the whole tree dropped to break a cycle.
  */
 
-import { deriveFamilies, partnerOf, type FamilyGraph } from './derive';
+import { deriveFamilies, drawnParentMap, partnerOf, type FamilyGraph } from './derive';
 import { writtenParents } from './family-query';
 import { parentKind, type Tree, type TreeOptions } from './types';
 import { push } from './validate';
@@ -43,7 +43,8 @@ export interface FocusSubgraphResult {
 	 *   the whole tree does not draw (dropped to break a cycle) is never drawn;
 	 * - `unions` keeps only unions whose partners are all inside it, as the original objects
 	 *   with their original `index` (edits from a focus view address the right union);
-	 * - `houses` unchanged; `options` unchanged except `start`, which is the focus id;
+	 * - `houses` and `titles` unchanged (a holder left out may give `missing-holder`, which nobody
+	 *   shows); `options` unchanged except `start`, which is the focus id;
 	 * - `issues` is empty: the whole tree's issues are shown, not the subgraph's.
 	 */
 	tree: Tree;
@@ -113,15 +114,10 @@ interface Drawn {
 function drawnLinks(g: FamilyGraph): Drawn {
 	const links = new Map<string, Set<string>>();
 	const parents = new Map<string, Set<string>>();
-	const add = (child: string, parent: string, type: string) => {
-		(links.get(child) ?? links.set(child, new Set()).get(child)!).add(linkKey(parent, type));
-		(parents.get(child) ?? parents.set(child, new Set()).get(child)!).add(parent);
-	};
-	for (const [child, placed] of g.placementParents) {
-		const type = g.placementType.get(child);
-		if (type) for (const q of placed) add(child, q, type);
+	for (const [child, drawn] of drawnParentMap(g)) {
+		links.set(child, new Set(drawn.map((q) => linkKey(q.id, q.type))));
+		parents.set(child, new Set(drawn.map((q) => q.id)));
 	}
-	for (const e of g.secondary) for (const q of e.parents) add(e.child, q, e.type);
 	return { links, parents };
 }
 
@@ -210,5 +206,6 @@ export const focusSubgraph: FocusSubgraph = (tree, focus, n) => {
 		unions: tree.unions.filter((u) => u.partners.every((id) => family.has(id))),
 		issues: [],
 	};
+	if (tree.titles !== undefined) sub.titles = tree.titles;
 	return { tree: sub, hidden };
 };

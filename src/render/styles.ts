@@ -28,6 +28,8 @@ const PLAIN_VARS = {
 	adoptive: '--color-green',
 	ward: '--color-blue',
 	rumoured: '--color-red',
+	/** M7: the marked card's border (D41) and the relation finder's line (D47). */
+	accent: '--interactive-accent',
 } as const;
 
 /** A colour role backed by a single Obsidian CSS variable. */
@@ -102,6 +104,7 @@ export const DEFAULT_LIGHT: Palette = withMixes({
 	adoptive: '#08b94e',
 	ward: '#086ddd',
 	rumoured: '#e93147',
+	accent: '#8a5cf5',
 });
 
 /** Approximations of Obsidian's default dark theme, for headless pictures only. */
@@ -118,6 +121,7 @@ export const DEFAULT_DARK: Palette = withMixes({
 	adoptive: '#44cf6e',
 	ward: '#027aff',
 	rumoured: '#fb464c',
+	accent: '#7f6df2',
 });
 
 /** D32: the 12 house colours offered in the Houses window, in this order. Names are in `ui-text.ts`. */
@@ -220,3 +224,28 @@ export function unionMark(shape: UnionShape, x: number, y: number, s: number): {
 	if (shape === 'open-triangle') return { tag: 'path', attr: { d: `M${r2(x)} ${r2(y - s)}L${r2(x + 0.95 * s)} ${r2(y + 0.7 * s)}L${r2(x - 0.95 * s)} ${r2(y + 0.7 * s)}Z` } };
 	return { tag: 'circle', attr: { cx: x, cy: y, r: s } };
 }
+
+/** D47: a line on the relation finder's line is this much wider than its kind (styles.css `.dynasty-on-line`). */
+export const ON_LINE_EXTRA = 1.5;
+/** D47: the opacity of every part beside the finder's line in "Show in the whole tree" (`.dynasty-faded`). */
+export const FADED_OPACITY = 0.25;
+/** D41: the marked card's accent border and the text-colour ring inside it, stroke widths in px (`.dynasty-card-me`). */
+export const ME_LOOK = { border: 3, ring: 1.5 } as const;
+
+/**
+ * M10 (spec §13.10): the class names of a fold control in the scene (`render/dom/folds.ts`). The CSS block that styles them is
+ * written with the tree view; the headless pictures write their own colours inline. A control is `dynasty-fold` with
+ * `is-open` (the button: `dynasty-fold-button` circle and `dynasty-fold-minus` path) or `is-folded` (the sign: `dynasty-fold-pill`
+ * for Full and Compact, `dynasty-fold-pill-big` for Overview, and one `dynasty-fold-text`); its tap area is `dynasty-fold-hit`.
+ */
+export const FOLD_CLASSES = {
+	control: 'dynasty-fold',
+	open: 'is-open',
+	folded: 'is-folded',
+	button: 'dynasty-fold-button',
+	minus: 'dynasty-fold-minus',
+	pill: 'dynasty-fold-pill',
+	pillBig: 'dynasty-fold-pill-big',
+	text: 'dynasty-fold-text',
+	hit: 'dynasty-fold-hit',
+} as const;

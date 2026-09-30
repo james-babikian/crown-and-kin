@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="600" height="600" viewBox="0 0 600 600">
+<defs>
+<radialGradient id="bg" cx="0.42" cy="0.3" r="0.85"><stop offset="0" stop-color="#9aa35a"/><stop offset="1" stop-color="#3f4520"/></radialGradient>
+<radialGradient id="skin" cx="0.4" cy="0.36" r="0.72"><stop offset="0" stop-color="#f6d8c4"/><stop offset="0.6" stop-color="#e8b99c"/><stop offset="1" stop-color="#c98e72"/></radialGradient>
+<linearGradient id="cloth" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#4f86c6"/><stop offset="1" stop-color="#1d3f73"/></linearGradient>
+<radialGradient id="hair" cx="0.4" cy="0.3" r="0.8"><stop offset="0" stop-color="#b9b4ab" stop-opacity="1"/><stop offset="1" stop-color="#000" stop-opacity="0.35"/></radialGradient>
+<filter id="paint" x="-5%" y="-5%" width="110%" height="110%"><feTurbulence type="fractalNoise" baseFrequency="0.022" numOctaves="2" seed="125" result="n"/><feDisplacementMap in="SourceGraphic" in2="n" scale="9" xChannelSelector="R" yChannelSelector="G"/></filter>
+<filter id="soft"><feGaussianBlur stdDeviation="6"/></filter>
+</defs>
+<rect width="600" height="600" fill="#3f4520"/>
+<g>
+<path d="M40 600C45 560 120 462 225 432L375 432C480 462 555 560 560 600Z" fill="url(#cloth)"/>
+<path d="M150 485C200 450 250 450 300 480C350 450 400 450 450 485L470 540C400 510 350 520 300 550C250 520 200 510 130 540Z" fill="#f4f2ea"/>
+<path d="M180 500l-5 12h10z" fill="#1a1a1a"/>
+<path d="M230 485l-5 12h10z" fill="#1a1a1a"/>
+<path d="M265 510l-5 12h10z" fill="#1a1a1a"/>
+<path d="M335 510l-5 12h10z" fill="#1a1a1a"/>
+<path d="M370 485l-5 12h10z" fill="#1a1a1a"/>
+<path d="M420 500l-5 12h10z" fill="#1a1a1a"/>
+<path d="M256 350L256 444C280 460 320 460 344 444L344 350Z" fill="#e8b99c"/><ellipse cx="300" cy="392" rx="46" ry="16" fill="#c98e72" opacity="0.6" filter="url(#soft)"/>
+<ellipse cx="197" cy="262" rx="16" ry="28" fill="#e8b99c"/><ellipse cx="403" cy="262" rx="16" ry="28" fill="#e8b99c"/>
+<ellipse cx="300" cy="255" rx="104" ry="132" fill="#e8b99c"/>
+<path d="M196 268C190 200 214 170 238 160C222 190 216 220 214 250ZM404 268C410 200 386 170 362 160C378 190 384 220 386 250Z" fill="#b9b4ab"/>
+<path d="M232 222C248 210 270 210 284 218" stroke="#cfcac0" stroke-width="7" stroke-linecap="round" fill="none"/><path d="M316 218C330 210 352 210 368 222" stroke="#cfcac0" stroke-width="7" stroke-linecap="round" fill="none"/>
+<path d="M238 252C248 240 268 240 278 252C268 262 248 262 238 252Z" fill="#f4efe6"/>
+<circle cx="258" cy="252" r="8.5" fill="#4d6a8a"/><circle cx="258" cy="252" r="4" fill="#111"/><circle cx="255" cy="249" r="2" fill="#fff"/>
+<path d="M237 251C248 238 268 238 279 251" stroke="#3a2a22" stroke-width="3" fill="none"/>
+<path d="M322 252C332 240 352 240 362 252C352 262 332 262 322 252Z" fill="#f4efe6"/>
+<circle cx="342" cy="252" r="8.5" fill="#4d6a8a"/><circle cx="342" cy="252" r="4" fill="#111"/><circle cx="339" cy="249" r="2" fill="#fff"/>
+<path d="M321 251C332 238 352 238 363 251" stroke="#3a2a22" stroke-width="3" fill="none"/>
+<path d="M298 262C294 285 286 300 290 306C296 311 306 311 312 306" stroke="#c98e72" stroke-width="5" stroke-linecap="round" fill="none"/>
+<path d="M274 336C288 330 312 330 326 336C314 350 286 350 274 336Z" fill="#b06a60"/><path d="M274 336C290 340 310 340 326 336" stroke="#6a3a34" stroke-width="2.5" fill="none"/>
+<path d="M236 272C244 278 254 280 262 278M338 278C346 280 356 278 364 272M262 316C258 330 262 342 268 348M338 316C342 330 338 342 332 348M250 180C280 172 320 172 350 180" stroke="#c98e72" stroke-width="2.5" fill="none" opacity="0.8"/>
+<path d="M198 270C200 350 240 400 300 404C360 400 400 350 402 270C392 320 370 352 340 358C330 346 312 340 300 342C288 340 270 346 260 358C230 352 208 320 198 270Z" fill="#cfcac0"/><path d="M262 330C280 318 320 318 338 330C320 326 280 326 262 330Z" fill="#cfcac0"/>
+<path d="M196 150L200 108L232 132L252 96L276 128L300 88L324 128L348 96L368 132L400 108L404 150C360 138 240 138 196 150Z" fill="#e0b94c" stroke="#8a6a1e" stroke-width="4"/>
+<path d="M196 150C240 138 360 138 404 150L404 170C360 158 240 158 196 170Z" fill="#c9a03a" stroke="#8a6a1e" stroke-width="4"/>
+<circle cx="236" cy="158" r="7" fill="#b3202c"/>
+<circle cx="300" cy="158" r="7" fill="#b3202c"/>
+<circle cx="364" cy="158" r="7" fill="#b3202c"/>
+</g>
+</svg>

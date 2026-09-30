@@ -16,7 +16,7 @@ const UNDO_NOTICE_MS = 10_000;
  * the plugin undo. Undo acts only while the block is still what this action wrote (or what a link
  * update after a rename made of it); otherwise it refuses, as the "Undo last tree edit" command does.
  */
-export function undoNotice(text: string, handle: Handle, written: string, onUndone?: () => void): Notice {
+export function undoNotice(text: string, handle: Handle, written: string, onUndone?: () => void, doneText: string = WRITE_TEXT.undoDone): Notice {
 	const frag = createFragment((f) => {
 		f.createSpan({ cls: 'dynasty-undo-text', text });
 	});
@@ -54,7 +54,7 @@ export function undoNotice(text: string, handle: Handle, written: string, onUndo
 				}
 				const out = await handle.undo();
 				if (out.ok) {
-					new Notice(WRITE_TEXT.undoDone);
+					new Notice(doneText);
 					onUndone?.();
 				} else new Notice(out.code === 'missing' ? WRITE_TEXT.undoMissing : out.code === 'empty' ? WRITE_TEXT.undoEmpty : WRITE_TEXT.undoChanged);
 			} catch (err) {

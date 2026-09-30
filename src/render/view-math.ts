@@ -1,7 +1,8 @@
 /*
  * Pure viewport arithmetic for the DOM renderer: default view (spec §5.5), pan and zoom, level of
- * detail with hysteresis (§5.4), hit-area scaling (§7.5) and text truncation. Used by the tree
- * view, the scene and pan-zoom, and others; no DOM here, so all of it runs under vitest.
+ * detail with hysteresis (§5.4), hit-area scaling (§7.5), text truncation and (M9) which picture
+ * slots a view fills (`livePictureSlots`). Used by the tree view, the scene and pan-zoom, and
+ * others; no DOM here, so all of it runs under vitest.
  */
 import type { Rect } from '../layout/model';
 
@@ -269,6 +270,11 @@ export function clampPan(view: View, bounds: Rect): View {
 	};
 }
 
+/** M11: true when `box` meets `view` grown by one view width left and right and one view height above and below (layout px). */
+export function boxNearView(box: Rect, view: Rect): boolean {
+	return box.x < view.x + 2 * view.w && box.x + box.w > view.x - view.w && box.y < view.y + 2 * view.h && box.y + box.h > view.y - view.h;
+}
+
 /** The SVG transform that shows `view` in a viewport of `size`. */
 export function transformFor(view: View, size: Size): string {
 	const tx = size.w / 2 - view.cx * view.scale;
@@ -305,6 +311,25 @@ export function enlargeHit(hit: Rect, scale: number, minScreen = MIN_HIT_PX): Re
 	const w = Math.max(hit.w, min);
 	const h = Math.max(hit.h, min);
 	return { x: hit.x - (w - hit.w) / 2, y: hit.y - (h - hit.h) / 2, w, h };
+}
+
+/**
+ * M10 (F7): the tap area of a fold control at zoom `scale`: at least 44 screen px each way (44 / scale layout px),
+ * centred on the centre of the `visible` mark. A mark wider than that (a long "+ N" sign) keeps its own width.
+ * Where it meets a card, a far-couple tag, a `+` badge or a D14 sign, the tree view cuts it back.
+ */
+export function foldHit(visible: Rect, scale: number): Rect {
+	const min = scale > 0 ? MIN_HIT_PX / scale : MIN_HIT_PX;
+	const w = Math.max(visible.w, min);
+	const h = Math.max(visible.h, min);
+	const cx = visible.x + visible.w / 2;
+	const cy = visible.y + visible.h / 2;
+	return { x: cx - w / 2, y: cy - h / 2, w, h };
+}
+
+/** M10 (F10): moves `view` so that the layout point `to` shows where the layout point `from` showed; the scale stays. */
+export function keepSpot(view: View, from: { x: number; y: number }, to: { x: number; y: number }): View {
+	return { scale: view.scale, cx: view.cx + (to.x - from.x), cy: view.cy + (to.y - from.y) };
 }
 
 /**
@@ -419,3 +444,34 @@ export const isDoubleTap: IsDoubleTap = (t0, p0, t1, p1) => {
 
 /** Resize or orientation change (spec §7.5): see `ResizeView`. */
 export const resizeView: ResizeView = (view, _oldSize, _newSize, newLimits) => ({ scale: clampScale(view.scale, newLimits), cx: view.cx, cy: view.cy });
+
+/** Spec §13.0 item 3: at most this many picture elements in each view (B18). */
+export const MAX_LIVE_PICTURES = 150;
+
+/**
+ * S3 (spec §13.0 item 3 "Live pictures"): the indexes of the picture slots a view fills. Only the
+ * slots of the shown level (Full: Full arms and portraits; Compact: Compact arms; Overview: none),
+ * only those that meet `view` (the visible part, layout px) grown by half its size on each side,
+ * nearest the view's centre first (ties in slot order), and at most `max`.
+ */
+export function livePictureSlots(slots: readonly { kind: 'arms' | 'portrait'; lod: 'full' | 'compact'; rect: Rect }[], view: Rect, lod: Lod, max = MAX_LIVE_PICTURES): number[] {
+	if (lod === 'overview' || !(max > 0)) return [];
+	const x0 = view.x - view.w / 2;
+	const y0 = view.y - view.h / 2;
+	const x1 = view.x + view.w * 1.5;
+	const y1 = view.y + view.h * 1.5;
+	const cx = view.x + view.w / 2;
+	const cy = view.y + view.h / 2;
+	const near: { i: number; d: number }[] = [];
+	slots.forEach((s, i) => {
+		if (s.lod !== lod) return;
+		const r = s.rect;
+		if (r.x >= x1 || r.x + r.w <= x0 || r.y >= y1 || r.y + r.h <= y0) return;
+		const dx = r.x + r.w / 2 - cx;
+		const dy = r.y + r.h / 2 - cy;
+		near.push({ i, d: dx * dx + dy * dy });
+	});
+	// Array.prototype.sort is stable, so equal distances keep slot order.
+	near.sort((a, b) => a.d - b.d);
+	return near.slice(0, max).map((n) => n.i);
+}

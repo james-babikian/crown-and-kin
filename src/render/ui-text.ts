@@ -4,6 +4,8 @@
  * themselves come from `src/core/messages.ts`.
  */
 
+import type { PictureProblem } from '../core/pictures';
+
 /** The error view, the banner for blocking problems (spec §8), the Fit and legend buttons, and the partner list title. */
 export const UI = {
 	errorTitle: 'The plugin cannot show this tree',
@@ -220,12 +222,17 @@ export const REMOVE = {
  * The delete confirmation (spec §6.7), in STE with the same meaning as the spec example:
  * what else changes, then that nobody else is deleted.
  */
-export function deleteText(name: string, s: { unions: number; childLinks: number; clearsStart: boolean; clearsFocus: boolean }): string[] {
+export function deleteText(
+	name: string,
+	s: { unions: number; childLinks: number; clearsStart: boolean; clearsFocus: boolean; clearsMe?: boolean; holders?: { titles: number; entries: number } },
+): string[] {
 	const out: string[] = [];
 	if (s.unions > 0) out.push(s.unions === 1 ? 'The plugin also removes 1 partnership of this person.' : `The plugin also removes ${s.unions} partnerships of this person.`);
 	if (s.childLinks > 0) out.push(s.childLinks === 1 ? `The plugin removes ${name} as a parent of 1 person.` : `The plugin removes ${name} as a parent of ${s.childLinks} people.`);
+	if (s.holders && s.holders.entries > 0 && s.holders.titles > 0) out.push(TITLES_UI.deleteHolder(name, s.holders.titles));
 	if (s.clearsStart) out.push('The tree starts at this person now. After the delete, it will start at a different person.');
 	if (s.clearsFocus) out.push('The tree shows the family of this person now. After the delete, it will show all people.');
+	if (s.clearsMe) out.push(ME_UI.deleteClears);
 	out.push('The plugin does not delete other people.');
 	return out;
 }
@@ -267,6 +274,44 @@ export const FOCUS_UI = {
 		hidden === 1 ? `Show the family of ${name}. The tree does not show 1 relative.` : `Show the family of ${name}. The tree does not show ${hidden} relatives.`,
 } as const;
 
+/** The mark "This is me" and the relation text of the edit sheet (spec §13.1, D40–D46). */
+export const ME_UI = {
+	mark: 'This is me',
+	// A label begins with the text that the button shows, so voice control finds the button by that text.
+	markLabel: (name: string) => `This is me: mark ${name} as you`,
+	unmark: 'Remove "This is me"',
+	unmarkLabel: (name: string) => `Remove "This is me" from ${name}`,
+	showLine: 'Show the line',
+	showLineLabel: (name: string) => `Show the line from you to ${name}`,
+	showRelationTo: 'Show the relation to…',
+	showRelationToLabel: (name: string) => `Show the relation to…: find the relation between ${name} and another person`,
+	/** Added to the delete confirmation of the marked person (spec §13.1). */
+	deleteClears: 'This person has the mark "This is me". If you delete this person, no person in the tree will have the mark.',
+} as const;
+
+/** The toolbar's More button (D49) and the relation finder (spec §13.2, D47, D48). */
+export const FINDER_UI = {
+	more: 'Show more actions',
+	relation: 'Relation',
+	relationLabel: 'Relation: find the relation between two people',
+	firstTitle: 'Select the first person',
+	secondTitle: 'Select the second person',
+	/** The picker of "Show the relation to…" in the edit sheet. */
+	otherTitle: 'Select the other person',
+	placeholder: 'Type the name of the person',
+	/** The first row of a picker when the tree has a mark: the marked person. */
+	you: (name: string) => `You: ${name}`,
+	showSteps: 'Show the steps',
+	hideSteps: 'Hide the steps',
+	moreSteps: (n: number) => (n === 1 ? 'and 1 more step' : `and ${n} more steps`),
+	other: 'Other relation',
+	otherLabel: (second: string, first: string) => `Other relation: show the next relation of ${second} and ${first}`,
+	whole: 'Show in the whole tree',
+	lineOnly: 'Show only the line',
+	close: 'Close',
+	closeLabel: 'Close: show the tree as it was before.',
+} as const;
+
 /** D32: names of the house colours of `HOUSE_PALETTE`, in the same order. */
 export const HOUSE_COLOUR_NAMES = ['Dark red', 'Red', 'Orange', 'Gold', 'Olive', 'Green', 'Blue green', 'Light blue', 'Dark blue', 'Purple', 'Brown', 'Grey'] as const;
 
@@ -305,6 +350,110 @@ export const HOUSES = {
 	failed: 'The plugin cannot save your changes because of an error in the plugin. Your changes are still in the window.',
 } as const;
 
+/**
+ * Titles and holders (spec §13.3–§13.5, D54–D63): the More item, the Titles window, the holder
+ * form, the Titles section of the edit sheet, the table note and the delete confirmations. Plugin
+ * texts say "holder"; "Ruler name" is only a field label (spec §13.0 item 5).
+ */
+export const TITLES_UI = {
+	// The More list (D49, D52).
+	more: 'Titles',
+	moreLabel: 'Titles: edit the titles of the tree',
+	// The Titles window.
+	title: 'Titles',
+	intro: 'Each title has a list of holders. The list starts with the first holder and ends with the newest holder.',
+	none: 'This tree has no titles.',
+	newTitle: 'New title',
+	nameLabel: 'Name of the title',
+	// D66: the male form of the title, which the card of a man holder shows.
+	maleLabel: 'Name for a man',
+	malePlaceholder: 'For example: King of the Isles',
+	maleAria: (title: string) => `Name for a man: the name of ${title} for a man holder`,
+	// D65: the female form of the title, which the card of a woman holder shows.
+	femaleLabel: 'Name for a woman',
+	femalePlaceholder: 'For example: Duchess of Valmont',
+	femaleAria: (title: string) => `Name for a woman: the name of ${title} for a woman holder`,
+	// D64: the plural, which names the holder list and the table note.
+	pluralLabel: 'Name of the list',
+	pluralPlaceholder: 'For example: Dukes of Valmont',
+	pluralAria: (title: string) => `Name of the list: the holders of ${title}`,
+	count: (n: number) => (n === 0 ? 'No holders' : n === 1 ? '1 holder' : `${n} holders`),
+	showHolders: 'Show holders',
+	hideHolders: 'Hide holders',
+	showHoldersLabel: (title: string) => `Show holders: show the holders of ${title}`,
+	hideHoldersLabel: (title: string) => `Hide holders: hide the holders of ${title}`,
+	delete: 'Delete',
+	deleteLabel: (title: string) => `Delete ${title}`,
+	add: 'Add title',
+	noHolders: 'This title has no holders.',
+	notInTree: 'Not in the tree',
+	showCardLabel: (holder: string) => `${holder}: show the card in the tree`,
+	edit: 'Edit',
+	editLabel: (holder: string) => `Edit ${holder}`,
+	moveEarlier: 'Move earlier',
+	moveLater: 'Move later',
+	moveEarlierLabel: (holder: string) => `Move earlier: ${holder}`,
+	moveLaterLabel: (holder: string) => `Move later: ${holder}`,
+	remove: 'Remove',
+	removeLabel: (holder: string) => `Remove ${holder}`,
+	addHolder: 'Add holder',
+	addHolderLabel: (title: string) => `Add holder: add a holder to ${title}`,
+	pickerTitle: 'Select the holder',
+	pickerPlaceholder: 'Type the name of the holder',
+	/** The first row of the holder picker. */
+	notInTreeRow: 'A holder who is not in the tree',
+	needName: 'Enter a name for each title.',
+	discardText: 'You did not save the changes to the titles.',
+	cannotOpen: 'The plugin cannot show the titles. The tree text has an error.',
+	stale: 'The tree changed after you opened this window. The plugin did not save. Your changes are still in the window. Select Save again to save them.',
+	personGone: 'The plugin cannot save a holder. The person is not in the tree now. Your changes are still in the window.',
+	deleteTitle: (title: string) => `Delete ${title}?`,
+	deleteHolders: (n: number) =>
+		n === 1 ? 'The plugin also removes the list of its 1 holder. The people stay in the tree.' : `The plugin also removes the list of its ${n} holders. The people stay in the tree.`,
+	deleteCards: (n: number) => (n === 1 ? '1 card then shows a different title or no title.' : `${n} cards then show a different title or no title.`),
+	deleted: (titles: string[]) => (titles.length === 1 ? `The plugin deleted ${titles[0]}. You can undo this.` : `The plugin deleted ${titles.length} titles. You can undo this.`),
+	// The table note (D55, D60).
+	makeNote: 'Make a note with this table',
+	makeNoteLabel: (plural: string) => `Make a note with this table: a note with the list of ${plural}`,
+	noteTitle: 'Make a note with the saved list?',
+	noteText: 'You did not save the changes in this window. The note will have the list of holders that the tree has now.',
+	noteConfirm: 'Make the note',
+	noteMade: (name: string) => `The plugin made the note "${name}".`,
+	noteFailed: 'The plugin cannot make the note.',
+	noteGone: 'This title is not in the tree now. The plugin did not make a note.',
+	// The holder form (spec §13.5).
+	formEdit: 'Edit holder',
+	formNew: 'New holder',
+	titleName: 'Name of the title',
+	holderName: 'Name of the holder',
+	number: 'Number',
+	numberPlaceholder: 'II',
+	ruler: 'Ruler name',
+	from: 'From',
+	until: 'Until',
+	preview: (full: string, shown: string) => `${full} shows as: ${shown}`,
+	needTitleName: 'Enter a name for the title.',
+	needHolderName: 'Enter the name of the holder.',
+	formDiscardText: 'You did not save the changes to this holder.',
+	// The Titles section of the edit sheet (spec §13.4).
+	heading: 'Titles',
+	noneHeld: 'This person holds no title.',
+	onCard: 'On the card',
+	showOnCard: 'Show on the card',
+	showOnCardLabel: (title: string) => `Show on the card: show ${title} on the card of this person`,
+	entryNone: 'No number and no dates',
+	entryEditLabel: (title: string, entry: string) => `Edit ${title}, ${entry}`,
+	entryRemoveLabel: (title: string, entry: string) => `Remove ${title}, ${entry}`,
+	addTitle: 'Add title',
+	addTitleText: (name: string) => `Select a title for ${name}.`,
+	newTitleChoice: 'New title…',
+	newTitleDetail: 'Enter a title that is not in the tree.',
+	removed: (person: string, title: string) => `The plugin removed ${person} from the holders of ${title}. You can undo this.`,
+	/** Added to the Delete person confirmation (D57). */
+	deleteHolder: (name: string, titles: number) =>
+		titles === 1 ? `The plugin also removes ${name} from the holders of 1 title.` : `The plugin also removes ${name} from the holders of ${titles} titles.`,
+} as const;
+
 /** The settings tab (spec §9, D33). */
 export const SETTINGS_UI = {
 	groups: { height: 'Height in a note', cards: 'Cards', focus: 'Focus mode', links: 'Links', repair: 'Repair' },
@@ -317,11 +466,17 @@ export const SETTINGS_UI = {
 	cardNormal: 'Normal',
 	cardCompact: 'Compact',
 	dates: 'Show dates on cards',
-	datesDesc: 'If this is on, the cards show when each person was born and died.',
+	datesDesc: 'If this is on, the cards show when each person was born and died, and the years of each reign.',
+	relations: 'Show relation names on cards',
+	relationsDesc: 'If this is on, each card shows the relation of the person to you. A person in the tree must have the mark "This is me".',
+	/** Spec §13.7 (M9 contract O10). */
+	portraits: 'Show portraits on cards',
+	portraitsDesc: 'If this is on, the cards show the portraits of the people.',
 	generations: 'Generations in focus mode',
 	generationsDesc: 'This is the number of generations above and below the person in focus mode. The default is 3. A tree can have its own number.',
-	links: 'Update tree links when you rename a note',
-	linksDesc: 'If you rename a note, the plugin changes the links to that note in all trees. If this is off, the links do not change.',
+	/** Spec §13.0 item 3 (M9 contract O8). */
+	links: 'Update tree links when you rename a note or a picture',
+	linksDesc: 'If you rename a note or a picture, the plugin changes the links to it in all trees. If this is off, the links do not change.',
 	cache: 'Arrange all trees again',
 	cacheDesc: 'The plugin keeps the arrangement of each tree in memory. This makes trees open quickly. If a tree looks wrong, select Arrange again.',
 	cacheButton: 'Arrange again',
@@ -349,6 +504,10 @@ export const RENAME_UI = {
 	progress: 'The plugin updates the tree links to the renamed note. This can take some time.',
 	/** Only after the progress Notice: it tells the user that the update ended. */
 	noLinks: 'The trees have no links to the renamed note. The plugin did not change a tree.',
+	/** `progress` for a rename of pictures, or of notes and pictures together (spec §13.0 item 3). */
+	progressFor: (kind: RenamedKind) => (kind === 'note' ? RENAMED_NOTE_PROGRESS : `The plugin updates the tree links to ${renamedWhat(kind)}. This can take some time.`),
+	/** `noLinks` for a rename of pictures, or of notes and pictures together. */
+	noLinksFor: (kind: RenamedKind) => (kind === 'note' ? RENAMED_NOTE_NO_LINKS : `The trees have no links to ${renamedWhat(kind)}. The plugin did not change a tree.`),
 	/** A tree named the old note, but its link now opens another note that existed at the rename. */
 	kept: (link: string, note: string, other: string) =>
 		`The plugin did not change the link "${link}" in a tree in the note "${note}". The link now opens a different note with the same name: "${other}".`,
@@ -359,9 +518,27 @@ export const RENAME_UI = {
 	report: linkReportText,
 } as const;
 
+/** What a rename was about: notes only, pictures only, or both (a folder rename). */
+export type RenamedKind = 'note' | 'picture' | 'both';
+
+const RENAMED_NOTE_PROGRESS = 'The plugin updates the tree links to the renamed note. This can take some time.';
+const RENAMED_NOTE_NO_LINKS = 'The trees have no links to the renamed note. The plugin did not change a tree.';
+
+/** "the renamed note", "the renamed picture" or "the renamed notes and pictures". */
+export function renamedWhat(kind: RenamedKind): string {
+	return kind === 'note' ? 'the renamed note' : kind === 'picture' ? 'the renamed picture' : 'the renamed notes and pictures';
+}
+
+/** The kind of a list of renames: notes only, pictures only, or both. */
+export function renamedKind(renames: { from: string; picture?: boolean }[]): RenamedKind {
+	const pictures = renames.filter((r) => r.picture).length;
+	return pictures === 0 ? 'note' : pictures === renames.length ? 'picture' : 'both';
+}
+
 /** What the command "Show the last link update" tells (rename-links.ts fills it). */
 export interface LinkReportText {
-	renames: { from: string; to: string }[];
+	/** `picture`: the renamed file is a picture (spec §13.0 item 3). */
+	renames: { from: string; to: string; picture?: boolean }[];
 	state: 'running' | 'done' | 'failed' | 'stopped';
 	ms: number;
 	notes: number;
@@ -374,9 +551,11 @@ export interface LinkReportText {
 	failed: string[];
 }
 
-/** The renamed note in a Notice: `"Old"`, or the number of notes after a folder rename. */
-export function renamedText(renames: { from: string }[]): string {
-	return renames.length === 1 ? `"${renames[0].from}"` : `${renames.length} renamed notes`;
+/** The renamed note in a Notice: `"Old"`, or the number of notes (or pictures) after a folder rename. */
+export function renamedText(renames: { from: string; picture?: boolean }[]): string {
+	if (renames.length === 1) return `"${renames[0].from}"`;
+	const kind = renamedKind(renames);
+	return `${renames.length} ${kind === 'note' ? 'renamed notes' : kind === 'picture' ? 'renamed pictures' : 'renamed notes and pictures'}`;
 }
 
 /** Most notes that the report names in each list. */
@@ -385,7 +564,8 @@ const REPORT_NAMES = 3;
 function linkReportText(r: LinkReportText | null, enabled: boolean): string {
 	const off = enabled ? '' : ` The setting "${SETTINGS_UI.links}" is off.`;
 	if (!r) return `The plugin did not update tree links after Obsidian started.${off}`;
-	const what = r.renames.length === 1 ? `"${r.renames[0].from}" to "${r.renames[0].to}"` : `${r.renames.length} notes`;
+	const kind = renamedKind(r.renames);
+	const what = r.renames.length === 1 ? `"${r.renames[0].from}" to "${r.renames[0].to}"` : `${r.renames.length} ${kind === 'note' ? 'notes' : kind === 'picture' ? 'pictures' : 'notes and pictures'}`;
 	const head = {
 		running: `The plugin still updates the tree links after the rename of ${what}.`,
 		done: `The last link update was after the rename of ${what}. It took ${(r.ms / 1000).toFixed(1)} seconds.`,
@@ -395,7 +575,7 @@ function linkReportText(r: LinkReportText | null, enabled: boolean): string {
 	// One paragraph per topic (STE rule 11); the command shows each paragraph as its own block.
 	const notes = [`Notes in the vault: ${r.notes}. Notes that the plugin read: ${r.read}.`];
 	if (r.unread) notes.push(`Notes that the plugin cannot read: ${r.unread}.`);
-	const groups = [[head], notes, [`Trees with a link to the renamed note: ${r.trees}. Changed links: ${r.links}. Changed trees: ${r.changedTrees}.`]];
+	const groups = [[head], notes, [`Trees with a link to ${renamedWhat(kind)}: ${r.trees}. Changed links: ${r.links}. Changed trees: ${r.changedTrees}.`]];
 	if (r.skipped.length) {
 		groups.push([
 			`Links that the plugin did not change: ${r.skipped.length}.`,
@@ -435,4 +615,175 @@ export const WRITE_TEXT = {
 	limit: 'The plugin cannot make this change. A person can have only 2 parents of each type.',
 	noSibling: 'There is no sibling in that direction.',
 	needNameFirst: 'First, enter a name for this person.',
+} as const;
+
+/**
+ * Arms, portraits and the picture picker (spec §13.6, §13.7; D67–D69, D75–D78; M9 contract O6, O7,
+ * B2, B8). "Colours from the arms" shows the exact colours of the arms (D68).
+ */
+export const PICTURES_UI = {
+	// The Houses window (spec §13.6).
+	/** The accessible name of the arms box of a house; a tap on it opens the picker. */
+	armsLabel: (house: string) => `Select the arms of ${house}`,
+	armsHeading: 'Arms',
+	selectArms: 'Select arms',
+	removeArms: 'Remove arms',
+	coloursFromArms: 'Colours from the arms',
+	houseColours: 'House colours',
+	armsColourLabel: (n: number) => `Colour ${n} from the arms`,
+	noArmsColours: 'The plugin cannot read the colours of this picture.',
+	// The edit sheet (spec §13.7).
+	portraitHeading: 'Portrait',
+	selectPortrait: 'Select portrait',
+	removePortrait: 'Remove portrait',
+	// The picture picker (spec §13.6 "Picture picker", D69).
+	pickerPortraitTitle: (name: string) => `Select a portrait for ${name}`,
+	search: 'Type the name of a picture',
+	searchLabel: 'Find a picture in the vault',
+	fromDevice: 'Add a picture from this device',
+	fromDeviceDetail: 'The plugin copies the picture into the attachment folder of this note.',
+	topFolder: 'Top folder of the vault',
+	noMatch: 'The vault has no picture with this name.',
+	noPictures: 'The vault has no pictures.',
+	select: 'Select',
+	cancel: 'Cancel',
+	added: (name: string, folder: string) =>
+		folder ? `The plugin added the picture "${name}" to the folder "${folder}".` : `The plugin added the picture "${name}" to the top folder of the vault.`,
+	addFailed: 'The plugin cannot add the picture because of an error. Try again.',
+} as const;
+
+/** The picture list (spec §13.14, D92 to D95): the folder rows, the mark on the current picture and the search limit. */
+export const PICKER_UI = {
+	inUse: 'In use',
+	inUseLabel: 'This picture is in use now',
+	openFolder: (path: string) => `Open the folder ${path}`,
+	closeFolder: (path: string) => `Close the folder ${path}`,
+	more: 'The vault has more pictures with this name. Type more of the name.',
+} as const;
+
+/**
+ * B2 (spec §13.6 "Picture picker"): the Notice for a file from the device that fails the format or
+ * size check (§13.0 item 3). The plugin writes no file then.
+ */
+export function deviceNotice(problem: PictureProblem): string {
+	if (problem?.code === 'picture-not-image' && problem.format) return `The plugin cannot show this ${problem.format} picture. Save the picture as PNG or JPEG. Then select it again.`;
+	if (problem?.code === 'picture-too-large') {
+		return typeof problem.pixels === 'number'
+			? `This picture is too large (${problem.pixels} million pixels). Use a picture with 40 million pixels or less.`
+			: 'This picture is too large. Use a picture with 40 million pixels or less.';
+	}
+	return 'This file is not a picture. Select a PNG, JPEG, WebP, GIF, BMP or SVG picture.';
+}
+
+/**
+ * Save as picture (spec §13.8, D70–D74; M9 contract O11, B8): the More item, the window with the
+ * kind of file, and the Notices of the save.
+ */
+export const SAVE_UI = {
+	more: 'Save as picture',
+	moreLabel: 'Save the tree as a picture',
+	title: 'Save as a picture',
+	/** The accessible name of the two choices of the window. */
+	kindLabel: 'Kind of file',
+	png: 'PNG',
+	pngDetail: 'A picture that most apps and devices can open.',
+	svg: 'SVG',
+	svgDetail: 'A picture that stays sharp at every size.',
+	save: 'Save',
+	cancel: 'Cancel',
+	progress: 'The plugin makes the picture. This can take some time.',
+	saved: (name: string, folder: string) =>
+		folder ? `The plugin saved the picture "${name}" in the folder "${folder}".` : `The plugin saved the picture "${name}" in the top folder of the vault.`,
+	small: 'The tree is very large. The names are small in this picture.',
+	smallSvg: 'If you want sharp names, save the tree as SVG (a picture that stays sharp at every size).',
+	share: 'Share',
+	shareLabel: (name: string) => `Share the picture "${name}"`,
+	failed: 'The plugin cannot save the picture because of an error. Try again.',
+} as const;
+
+/**
+ * The portrait crop tool (spec §13.13, D79, D90): the button in the edit sheet, the window and
+ * its hints. The buttons also show their label as a tooltip.
+ */
+export const CROP_UI = {
+	/** The button under the portrait in the edit sheet. */
+	select: 'Select the part',
+	selectLabel: 'Select the part of the portrait that the card shows',
+	title: (name: string) => `Select the part of the portrait of ${name}`,
+	hintTouch: 'Move the picture with one finger. Zoom with two fingers.',
+	hintMouse: 'Drag the picture to move it. Use the mouse wheel or the slider to zoom.',
+	zoomOut: 'Zoom out',
+	zoomIn: 'Zoom in',
+	sliderLabel: 'Zoom',
+	save: 'Save',
+	cancel: 'Cancel',
+	reset: 'Reset',
+	resetLabel: 'Reset: select the automatic part again',
+	loading: 'The plugin loads the picture.',
+	problem: 'The plugin cannot show this picture.',
+} as const;
+
+/**
+ * "Make a note for this person" (spec §13.11, D60, D86, D87): the two buttons of
+ * the Actions section, the question when a note with that name exists, and the Notices.
+ */
+export const NOTE_UI = {
+	make: 'Make a note',
+	makeLabel: (name: string) => `Make a note: the plugin makes a note for ${name} and links it to this card`,
+	makeLinked: 'Make the linked note',
+	makeLinkedLabel: (name: string) => `Make the linked note: the plugin makes the note that the link of ${name} names`,
+	/** The start of the one text line in a new note; the link back follows it. */
+	treeLine: 'Tree: ',
+	made: (name: string) => `The plugin made the note "${name}" and linked it to the card.`,
+	linkedTo: (name: string) => `The plugin linked the card to the note "${name}".`,
+	madeOnly: (name: string) => `The plugin made the note "${name}".`,
+	cannot: (name: string) => `The plugin cannot make the note "${name}".`,
+	linkNotAdded: (name: string) => `The plugin made the note "${name}". It cannot add the link to the tree text. The note is in the vault. Add the link by hand.`,
+	askTitle: (name: string) => `The vault has a note with the name "${name}".`,
+	askLink: 'Link to this note',
+	askNew: (name: string) => `Make a new note "${name}"`,
+	askCancel: 'Cancel',
+	undone: (name: string) => `The plugin removed the link. The note "${name}" is still in the vault.`,
+} as const;
+
+/**
+ * The house page (spec §13.12, D55, D88, D89): the People button, the window
+ * with its table, and the note made from the table.
+ */
+export const HOUSE_PAGE_UI = {
+	people: 'People',
+	peopleLabel: (house: string) => `People: show the people of ${house}`,
+	count: (n: number) => (n === 1 ? '1 person' : `${n} people`),
+	none: 'No person in the tree has this house.',
+	generation: 'Generation',
+	name: 'Name',
+	title: 'Title',
+	born: 'Born',
+	died: 'Died',
+	/** On a phone the second text line of a row starts with this. */
+	generationOn: (n: number) => `Generation ${n}`,
+	rowLabel: (name: string) => `Show ${name} in the tree`,
+	close: 'Close',
+	makeNote: 'Make a note with this table',
+	makeNoteLabel: (house: string) => `Make a note with this table: the plugin makes a note with the people of ${house}`,
+	noteMade: (name: string) => `The plugin made the note "${name}".`,
+	noteFailed: (name: string) => `The plugin cannot make the note "${name}".`,
+	armsLabel: 'Arms of the house',
+	unnamed: 'House',
+} as const;
+
+/**
+ * Fold a branch (spec §13.10, D83–D85): the accessible names and tooltips of the fold
+ * button and the "+ N" sign, and the two buttons of the edit sheet. `names` are the parents' names.
+ */
+export const FOLD_UI = {
+	hideDescendants: 'Hide descendants',
+	showDescendants: 'Show descendants',
+	hideDescendantsLabel: (name: string) => `Hide descendants: hide the people below ${name}`,
+	showDescendantsLabel: (name: string) => `Show descendants: show the hidden people below ${name}`,
+	/** The button of an open family: no count. */
+	hideLabel: (names: readonly string[]) => `Hide the people below ${names.join(' and ')}`,
+	/** The sign of a folded family, with the number of hidden people. */
+	showLabel: (names: readonly string[], count: number) =>
+		count === 1 ? `Show the hidden person below ${names.join(' and ')}` : `Show the ${count} hidden people below ${names.join(' and ')}`,
 } as const;

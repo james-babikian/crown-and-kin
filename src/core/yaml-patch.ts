@@ -9,22 +9,30 @@
 import { isAlias, isMap, isScalar, isSeq, Lexer, parseDocument, Parser, Scalar, type Document, type Node, type Pair, type YAMLMap, type YAMLSeq } from 'yaml';
 import type { EditRefusal, EditResult, FieldValue, PersonField } from './edit';
 import { parseBody } from './parse';
+import { cropValue, sameCropText } from './portrait-crop';
 import { bool, isEmpty, linkValue, str, type Raw, type RawMap } from './tolerate';
 
-/** §4.1 field order; a new key goes after the nearest earlier key that is present. */
-export const PERSON_ORDER = ['id', 'name', 'title', 'house', 'sex', 'born', 'died', 'parents', 'placement', 'illegitimate', 'union', 'link', 'notes'];
-/** §4.1 order of the `options` keys. */
-export const OPTION_ORDER = ['start', 'focus', 'generations', 'height'];
-const TOP_ORDER = ['options', 'houses', 'people', 'unions'];
+/** §4.1 and §13.0 field order; a new key goes after the nearest earlier key that is present. */
+export const PERSON_ORDER = ['id', 'name', 'title', 'card-title', 'house', 'sex', 'born', 'died', 'parents', 'placement', 'illegitimate', 'union', 'link', 'portrait', 'portrait-crop', 'notes'];
+/** §4.1 and §13.0 order of the `options` keys. */
+export const OPTION_ORDER = ['start', 'focus', 'me', 'generations', 'height'];
+/** §4.1 and §13.0 order of the top-level sections. */
+export const TOP_ORDER = ['options', 'houses', 'titles', 'people', 'unions'];
 
 /**
  * Fields read as text whatever YAML would type them as (spec §3, §6.8): a new `1103` is written
  * plain. Other fields are quoted when the core schema would see a number, boolean or null.
  */
-export const TEXT_FIELDS = new Set(['id', 'house', 'born', 'died', 'union', 'start', 'focus', 'end']);
+export const TEXT_FIELDS = new Set(['id', 'house', 'card-title', 'born', 'died', 'union', 'start', 'focus', 'me', 'end']);
 
 /** The person fields `personValue` and `sameValue` handle. */
-export const PERSON_FIELDS: readonly PersonField[] = ['name', 'title', 'house', 'sex', 'born', 'died', 'illegitimate', 'link', 'notes', 'placement'];
+export const PERSON_FIELDS: readonly PersonField[] = ['name', 'title', 'card-title', 'house', 'sex', 'born', 'died', 'illegitimate', 'link', 'portrait', 'portrait-crop', 'notes', 'placement'];
+
+/**
+ * Picture keys (spec §13.0 item 3): always written in double quotes, whatever the text is, so a
+ * written link never depends on what plain YAML would make of it.
+ */
+export const QUOTED_FIELDS: ReadonlySet<string> = new Set(['portrait', 'portrait-crop', 'arms']);
 
 /** The failure case of an `EditResult`. */
 export type Refusal = Extract<EditResult, { ok: false }>;
@@ -437,6 +445,16 @@ export const clone = (v: Raw): Raw => (v === undefined ? undefined : JSON.parse(
 /** One parsed body: its `Source` and the raw data `toJS` gave for it. */
 export type Parsed = { src: Source; data: Raw };
 
+/** A value's text as written (comments after it left out), for `linkValue`; undefined when there is no node. */
+export function sourceText(doc: Document, text: string, path: (string | number)[]): string | undefined {
+	try {
+		const node = doc.getIn(path, true) as { range?: [number, number, number] } | undefined;
+		return node?.range ? text.slice(node.range[0], node.range[1]) : undefined;
+	} catch {
+		return undefined;
+	}
+}
+
 /** Parses a body into a `Parsed`, or a `Refusal` if it does not parse. */
 export function parse(body: string): Parsed | Refusal {
 	const parsed = parseBody(body);
@@ -594,7 +612,8 @@ export function personValue(field: PersonField, value: FieldValue): { write: str
 		if (value === true) return { write: 'true' };
 		return refuse('bad-value', 'illegitimate must be true, false or null.');
 	}
-	if (typeof value === 'boolean') return refuse('bad-value', `${field} must be text.`);
+	// Callers outside TypeScript can pass anything (spec §8: refuse, never throw).
+	if (value !== null && typeof value !== 'string') return refuse('bad-value', `${field} must be text.`);
 	if (field === 'name') {
 		if (value === null || value.trim() === '') return refuse('bad-value', 'A person must have a name.');
 		return { write: value };
@@ -603,10 +622,15 @@ export function personValue(field: PersonField, value: FieldValue): { write: str
 	return { write: value };
 }
 
-/** True if the model would read the same value either way, so nothing needs writing. */
-export function sameValue(field: PersonField, raw: Raw, write: string | null): boolean {
+/**
+ * True if the model would read the same value either way, so nothing needs writing. `written` gives
+ * the value's source text: `parse.ts` reads an unquoted [[x,y]] as that text, so it is compared so here.
+ */
+export function sameValue(field: PersonField, raw: Raw, write: string | null, written?: () => string | undefined): boolean {
 	if (field === 'illegitimate') return bool(raw) === (write === 'true');
-	const read = field === 'link' ? linkValue(raw) : str(raw);
+	// Two parts are the same when their numbers agree at 4 decimals, whatever the source text (spec §13.13).
+	if (field === 'portrait-crop') return sameCropText(cropValue(raw), write === null ? undefined : write);
+	const read = field === 'link' || field === 'portrait' ? linkValue(raw, written) : str(raw);
 	return read === (write === null ? undefined : str(write));
 }
 
@@ -630,7 +654,32 @@ export function finish(first: Parsed, steps: Step[], expected: RawMap, created: 
 	if (!check.ok || !deepEqual(isEmpty(check.data) ? {} : check.data, expected)) {
 		return refuse('bad-value', 'The change cannot be written without a change to other values. Edit the note text.');
 	}
+	remember(out, check.data);
 	return { ok: true, body: out, created };
+}
+
+/**
+ * The raw data of the bodies parsed during the current write, so the once-per-write cleanup
+ * (`cleanCardTitles`) does not parse a large tree again (a parse of sample tree 7 takes about
+ * 25 ms). Read only: every op clones the data before it changes it. `applyOp` clears it after each
+ * write, so a large tree's data is not kept after the write.
+ */
+const recent: { body: string; data: Raw }[] = [];
+
+/** Keeps the raw data of a parsed body for `recall`. */
+export function remember(body: string, data: Raw): void {
+	recent.unshift({ body, data });
+	if (recent.length > 4) recent.length = 4;
+}
+
+/** The raw data of `body` if it was parsed last, else undefined. Do not change it. */
+export function recall(body: string): Raw | undefined {
+	return recent.find((r) => r.body === body)?.data;
+}
+
+/** Clears the data kept for `recall`; `applyOp` calls it at the end of every write. */
+export function forget(): void {
+	recent.length = 0;
 }
 
 /**

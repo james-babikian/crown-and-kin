@@ -39,6 +39,8 @@ const context = await esbuild.context({
 	sourcemap: prod ? false : 'inline',
 	treeShaking: true,
 	outfile: 'main.js',
+	// Only the harness install turns this on (DYNASTY_HARNESS=1): the parse cache then freezes its trees (spec §13.15 rule 3).
+	define: { __DYNASTY_HARNESS__: process.env.DYNASTY_HARNESS === '1' ? 'true' : 'false' },
 	minify: prod,
 	plugins: [noElk],
 });

@@ -509,6 +509,8 @@ export function installDom(): void {
 	g.createEl = (tag: string, o?: ElOptions | string) => new FEl(tag, typeof o === 'string' ? { cls: o } : o);
 	g.createDiv = (o?: ElOptions | string) => new FEl('div', typeof o === 'string' ? { cls: o } : o);
 	g.createSpan = (o?: ElOptions | string) => new FEl('span', typeof o === 'string' ? { cls: o } : o);
+	// The lazy scene (M11) builds card content in a detached holder made with the global `createSvg`.
+	g.createSvg = (tag: string, o?: ElOptions | string) => new FEl(tag, typeof o === 'string' ? { cls: o } : o);
 	// Obsidian's createFragment: a fake element stands in for the DocumentFragment (the Notice with Undo).
 	g.createFragment = (cb?: (f: FEl) => void) => {
 		const f = new FEl('fragment');

@@ -5,10 +5,11 @@
  * and size the gaps between rows. `index.ts` is the only caller in `src/`; `edges.ts` routes the
  * lines afterwards from the same finished layout.
  */
-import { placedChildren, type FamilyGraph, type FamilyUnion } from '../core/derive';
+import { partnerOf, placedChildren, type FamilyGraph, type FamilyUnion } from '../core/derive';
 import type { ModelOrder } from '../core/order';
-import type { FarCoupleRule, FarTag, Geometry, LayoutSettings, PersonBox, Rect, TreeLayout, UnionPoint } from './model';
-import { MIN_HIT, barClear, gapHeight, lineMetrics, sideTagDepth, sidewaysGeometry, tagTop, tallExtra, turnedGeometry } from './geometry';
+import type { FarCoupleRule, FarTag, Geometry, LayoutSettings, PersonBox, PlacedFoldControl, Rect, TreeLayout, UnionPoint } from './model';
+import { MIN_HIT, barClear, tagHit, gapHeight, lineMetrics, relationExtra, sideTagDepth, sidewaysGeometry, tagTop, tallExtra, turnedGeometry, withRelationLine } from './geometry';
+import { foldExtent, foldSpots, turnSpots, type FoldInput } from './fold-spots';
 import { addTo, planLines, type LinePlan } from './lines';
 import { placeInOrder } from './pava';
 import { soloFamiliesOutside } from './solo-side';
@@ -18,6 +19,30 @@ import { turnBox, turnUnion } from './turn';
 export const DEFAULT_FAR_RULE: FarCoupleRule = { maxCardWidths: 3, maxGenerations: 1 };
 /** Default layout settings: `down` orientation, 4 sweeps, the D11 far-couple rule. */
 export const DEFAULT_LAYOUT_SETTINGS: LayoutSettings = { sweeps: 4, far: DEFAULT_FAR_RULE };
+/** M7: never far, so a couple is never split (the relation finder's small tree, D47). */
+export const NEVER_FAR_RULE: FarCoupleRule = { maxCardWidths: Infinity, maxGenerations: Infinity };
+
+/**
+ * M9 (spec §13.6, §13.7): the picture sets that every caller puts into `LayoutSettings` (the tree
+ * view, the saved picture, the spike and the tests). `arms`: the houses whose `arms` is written;
+ * `portraits`: the people whose `portrait` is written, or none with "Show portraits on cards" off.
+ * Both sorted. "Written" is enough: a missing or failing picture still keeps its room, so loading
+ * never changes a layout.
+ */
+export function pictureSets(g: FamilyGraph, showPortraits: boolean): { arms: string[]; portraits: string[] } {
+	const arms = [...g.houses.values()].filter((h) => !!h.arms).map((h) => h.id);
+	const portraits = showPortraits ? g.people.filter((p) => !!p.portrait).map((p) => p.id) : [];
+	return { arms: [...new Set(arms)].sort(), portraits: [...new Set(portraits)].sort() };
+}
+
+/** M9 (spec §13.6): the people whose card shows arms: their house is a house of `g` and in `arms`. */
+export function armsCards(g: FamilyGraph, arms: readonly string[] | undefined): Set<string> {
+	const out = new Set<string>();
+	if (!arms?.length) return out;
+	const wanted = new Set(arms.filter((id) => g.houses.has(id)));
+	for (const p of g.people) if (p.house !== undefined && wanted.has(p.house)) out.add(p.id);
+	return out;
+}
 
 /**
  * Where each union's dot goes, given final card positions.
@@ -70,7 +95,9 @@ function placeUnions(
 }
 
 /**
- * Places every card. `initialX` (card centre x per person) optionally seeds the starting
+ * Places every card. `g` is the graph to arrange (M10: the graph without the people that folds hide, F2), `coreGen` the
+ * generations of the whole graph; `fold` (M10) holds the whole graph, the hidden partners for the tags, the lines of the folded
+ * families and the controls to place. `initialX` (card centre x per person) optionally seeds the starting
  * positions and the order of blocks within each row; without it, rows start packed in model
  * order and the sweeps do all the positioning. The spike uses it to compare other arrangers.
  */
@@ -78,23 +105,47 @@ export function layoutFamilies(
 	g: FamilyGraph,
 	coreGen: Map<string, number>,
 	order: ModelOrder,
-	given: Geometry,
+	plain: Geometry,
 	settings: LayoutSettings,
 	initialX?: Map<string, number>,
+	fold?: FoldInput,
 ): TreeLayout {
+	// D40: the relation text line makes every card taller before anything is sized from the card.
+	const given = withRelationLine(plain, settings);
 	// D24 sideways: everything below runs in the turned frame (`turn.ts`) and is turned at the end.
 	const side = settings.orientation === 'sideways' ? sidewaysGeometry(given, settings.sidewaysCards ?? 'normal', settings.narrowCardW) : undefined;
 	const geo = side ? turnedGeometry(side) : given;
 	// D11 keeps its length in px: 3 widths of a `down` card, measured along the column.
 	const farRule = side ? { ...settings.far, maxCardWidths: (settings.far.maxCardWidths * given.cardW) / side.cardH } : settings.far;
-	// D29, D37: a card with a two-line name is one name text line taller. Sideways that is longer along
-	// its column (in the turned frame, wider); in `down` the row takes the height of its tallest card.
-	const tall = new Set((settings.tallCards ?? []).filter((id) => g.byId.has(id)));
-	const extra = tall.size ? tallExtra(side ?? given) : 0;
-	const wide = side ? extra : 0;
-	const cw = (id: string) => (wide && tall.has(id) ? geo.cardW + wide : geo.cardW);
-	const ch = (id: string) => (!side && extra && tall.has(id) ? geo.cardH + extra : geo.cardH);
+	// D29, D37, D81: a card with a two-line name is one name text line taller (a three-line name, two); D61: a card with a two-line
+	// title text line is one small text line taller; a card with both, by the sum. Sideways that is
+	// longer along its column (in the turned frame, wider); in `down` the row takes the height of its
+	// tallest card.
+	// D81: a three-line name is also a tall name; the card is two name text lines taller.
+	const long = new Set((settings.longNames ?? []).filter((id) => g.byId.has(id)));
+	const tall = new Set([...(settings.tallCards ?? []).filter((id) => g.byId.has(id)), ...long]);
+	const tallT = new Set((settings.tallTitles ?? []).filter((id) => g.byId.has(id)));
+	const nameExtra = tall.size ? tallExtra(side ?? given) : 0;
+	const titleExtra = tallT.size ? relationExtra(side ?? given) : 0;
+	const more = (id: string) => (tall.has(id) ? nameExtra * (long.has(id) ? 2 : 1) : 0) + (tallT.has(id) ? titleExtra : 0);
+	const extra = tall.size > 0 || tallT.size > 0;
+	const wide = !!side && extra;
+	const cw = (id: string) => (wide ? geo.cardW + more(id) : geo.cardW);
+	const ch = (id: string) => (!side && extra ? geo.cardH + more(id) : geo.cardH);
+	// M9: which cards show arms or a portrait. Flags only: the pictures never change a box.
+	const withArms = armsCards(g, settings.arms);
+	const withPortrait = new Set(settings.portraits ?? []);
+	// Set only when true, so boxes of a tree with no tall cards and no pictures stay as they were.
+	const flags = (id: string) => ({
+		...(tall.has(id) ? { tallName: true as const } : {}),
+		...(long.has(id) ? { longName: true as const } : {}),
+		...(tallT.has(id) ? { tallTitle: true as const } : {}),
+		...(withArms.has(id) ? { arms: true as const } : {}),
+		...(withPortrait.has(id) ? { portrait: true as const } : {}),
+	});
 	const { gen, blocks } = consistentRows(g, coreGen, soloFamiliesOutside(g, order));
+	// M10 (F3): a shown person with a hidden partner has a tag like one with a far partner.
+	const hiddenTagged = fold?.partners ?? new Map<string, string[]>();
 	const blockOf = new Map<string, number>();
 	blocks.forEach((b, i) => b.forEach((p) => blockOf.set(p, i)));
 	const maxGen = Math.max(0, ...gen.values());
@@ -134,7 +185,7 @@ export function layoutFamilies(
 	const rowIndex = new Map<string, number>();
 	// Sideways: cards with a far tag, and the gap after them that holds the tag's whole hit area
 	// (`sideTagDepth`) and room for one routed leg below it.
-	const spaced = new Set<string>();
+	const spaced = new Set<string>(side ? hiddenTagged.keys() : []);
 	const tagGap = side ? sideTagDepth(side) + lineMetrics(geo).exitStep : 0;
 
 	const placeRow = (r: number, blockTargets: Map<number, number>) => {
@@ -173,7 +224,7 @@ export function layoutFamilies(
 		rows[r] = ids;
 		ids.forEach((id, i) => {
 			rowIndex.set(id, i);
-			persons.set(id, { id, x: centres[i] - cw(id) / 2, y: r * (geo.cardH + geo.rowGap), w: cw(id), h: ch(id), gen: r });
+			persons.set(id, { id, x: centres[i] - cw(id) / 2, y: r * (geo.cardH + geo.rowGap), w: cw(id), h: ch(id), gen: r, ...flags(id) });
 		});
 	};
 	const blockCentre = (bi: number) => {
@@ -262,18 +313,18 @@ export function layoutFamilies(
 		if (!more.length) break;
 		for (const p of more) spaced.add(p);
 	}
-	const barAt = side ? sideBars(g, persons, unions, side) : new Map<string, number>();
+	const barAt = side ? sideBars(g, persons, unions, side, fold?.lines.tagged) : new Map<string, number>();
 	for (const [key, at] of barAt) unions.get(key)!.y = persons.get(g.unionByKey.get(key)!.partners[0])!.y + at;
 
 	// Gaps between rows grow to hold the lanes their lines need; y is set only now. The plan may
 	// move a dot sideways (never a card), so that no two trunks share a line.
-	const plan = planLines({ g, persons, rows, unions, anchors: order.anchors, geo, side });
+	const plan = planLines({ g, persons, rows, unions, anchors: order.anchors, geo, side, extras: fold?.lines });
 	for (const [key, x] of plan.dotX) unions.get(key)!.x = x;
 	const m = lineMetrics(geo);
 	// Cards in a row share their top edge; the gap below starts under the row's tallest card.
 	const rowH = rows.map((ids) => (extra && !side ? Math.max(...ids.map(ch)) : geo.cardH));
 	const rowTop: number[] = [0];
-	for (let r = 1; r < rows.length; r++) rowTop[r] = rowTop[r - 1] + rowH[r - 1] + gapHeight(geo, plan.coupleLanes[r - 1], plan.barLanes[r - 1]);
+	for (let r = 1; r < rows.length; r++) rowTop[r] = rowTop[r - 1] + rowH[r - 1] + Math.max(gapHeight(geo, plan.coupleLanes[r - 1], plan.barLanes[r - 1]), plan.stemNeed[r - 1]);
 	for (const p of persons.values()) p.y = rowTop[p.gen];
 	const gapTop = (k: number) => rowTop[k] + rowH[k];
 	for (const fu of g.unions) {
@@ -284,8 +335,8 @@ export function layoutFamilies(
 		if (u.bar) u.y = a.y + (barAt.get(fu.key) ?? Math.min(a.h, b.h) / 2);
 		else u.y = gapTop(dot?.gap ?? a.gen) + m.coupleLane0 + (dot?.lane ?? 0) * m.coupleLaneStep;
 	}
-	if (side) return turnLayout(g, persons, unions, rows, rows.slice(1).map((_, r) => ({ top: gapTop(r), bottom: rowTop[r + 1] })), plan, geo, side);
-	const farTags = buildFarTags(g, persons, unions, plan, geo);
+	if (side) return turnLayout(g, persons, unions, rows, rows.slice(1).map((_, r) => ({ top: gapTop(r), bottom: rowTop[r + 1] })), plan, geo, side, fold);
+	const farTags = buildFarTags(g, persons, unions, plan, geo, fold);
 
 	const rowGaps = rows.slice(1).map((_, r) => ({ top: gapTop(r), bottom: rowTop[r + 1] }));
 	const width = Math.max(0, plan.maxX + geo.nodeGap / 2, ...[...persons.values()].map((p) => p.x + p.w));
@@ -296,7 +347,39 @@ export function layoutFamilies(
 		...[...plan.dots.keys()].map((k) => unions.get(k)!.y + geo.unionSize / 2),
 		...[...farTags.values()].map((t) => tagTop(geo, t.y) + geo.tagH),
 	);
-	return { persons, unions, rows, rowGaps, farTags, width, height, geometry: geo, orientation: 'down' };
+	const done: TreeLayout = { persons, unions, rows, rowGaps, farTags, width, height, geometry: geo, orientation: 'down' };
+	return fold?.controls ? withFolds(done, foldSpots(fold.controls, persons, unions, rowGaps, geo.fontPx, { tags: new Map([...farTags].map(([k, t]) => [k, t.hit])), soloX: plan.soloExits })) : done;
+}
+
+/**
+ * M10 (F5, F5b): puts the fold controls into a finished layout (`spots` are in its own frame). Width and height grow
+ * to hold every control's largest mark and hit area; if one lies left of or above 0, everything moves by the same amount.
+ */
+function withFolds(layout: TreeLayout, spots: PlacedFoldControl[]): TreeLayout {
+	const em = layout.geometry.fontPx;
+	const boxes = spots.map((c) => foldExtent(c, c.spot, em));
+	const dx = Math.max(0, ...boxes.map((b) => -b.x));
+	const dy = Math.max(0, ...boxes.map((b) => -b.y));
+	let folds = spots;
+	let rowGaps = layout.rowGaps;
+	let farTags = layout.farTags;
+	if (dx || dy) {
+		for (const b of layout.persons.values()) {
+			b.x += dx;
+			b.y += dy;
+		}
+		for (const u of layout.unions.values()) {
+			u.x += dx;
+			u.y += dy;
+		}
+		farTags = new Map([...farTags].map(([k, t]) => [k, { ...t, x: t.x + dx, y: t.y + dy, hit: { ...t.hit, x: t.hit.x + dx, y: t.hit.y + dy } }]));
+		const along = layout.orientation === 'sideways' ? dx : dy;
+		rowGaps = rowGaps.map((gap) => ({ top: gap.top + along, bottom: gap.bottom + along }));
+		folds = spots.map((c) => ({ ...c, spot: { x: c.spot.x + dx, y: c.spot.y + dy } }));
+	}
+	const right = Math.max(layout.width + dx, ...boxes.map((b) => b.x + dx + b.w));
+	const bottom = Math.max(layout.height + dy, ...boxes.map((b) => b.y + dy + b.h));
+	return { ...layout, rowGaps, farTags, width: right, height: bottom, folds };
 }
 
 /**
@@ -307,6 +390,8 @@ export function layoutFamilies(
  * member who cannot share the row of their block (they are its ancestor) leaves the block.
  */
 export function consistentRows(g: FamilyGraph, coreGen: Map<string, number>, modelBlocks: string[][]): { gen: Map<string, number>; blocks: string[][] } {
+	// M10 (F2): `coreGen` can hold people that folds hide; they must not keep a row empty. The generations of the shown people stay.
+	if (coreGen.size !== g.people.length) coreGen = new Map([...coreGen].filter(([id]) => g.byId.has(id)));
 	const hasParents = (p: string) => g.placementParents.get(p)!.length > 0;
 	const isAncestor = (a: string, of: string) => {
 		const seen = new Set<string>();
@@ -380,8 +465,11 @@ function markFarCouples(g: FamilyGraph, persons: Map<string, PersonBox>, unions:
 	}
 }
 
-/** Far spouses of each person, in union order. */
-function farSpouses(g: FamilyGraph, unions: Map<string, UnionPoint>): Map<string, string[]> {
+/**
+ * Far spouses of each person, in union order. M10 (F3): a person with a hidden partner lists the far
+ * shown partners and the hidden ones together, in the order of the whole graph's `unionsOf`.
+ */
+function farSpouses(g: FamilyGraph, unions: Map<string, UnionPoint>, fold?: FoldInput): Map<string, string[]> {
 	const spouses = new Map<string, string[]>();
 	for (const fu of g.unions) {
 		if (!unions.get(fu.key)!.far) continue;
@@ -391,13 +479,22 @@ function farSpouses(g: FamilyGraph, unions: Map<string, UnionPoint>): Map<string
 			spouses.set(p, list);
 		}
 	}
+	for (const [person, hidden] of fold?.partners ?? []) {
+		const far = new Set(spouses.get(person));
+		const list: string[] = [];
+		for (const k of fold!.full.unionsOf.get(person) ?? []) {
+			const other = partnerOf(fold!.full.unionByKey.get(k)!, person);
+			if ((hidden.includes(other) || far.has(other)) && !list.includes(other)) list.push(other);
+		}
+		spouses.set(person, list);
+	}
 	return spouses;
 }
 
 /** One tag per person with far spouses, listed in union order. */
-function buildFarTags(g: FamilyGraph, persons: Map<string, PersonBox>, unions: Map<string, UnionPoint>, plan: LinePlan, geo: Geometry): Map<string, FarTag> {
+function buildFarTags(g: FamilyGraph, persons: Map<string, PersonBox>, unions: Map<string, UnionPoint>, plan: LinePlan, geo: Geometry, fold?: FoldInput): Map<string, FarTag> {
 	const tags = new Map<string, FarTag>();
-	for (const [person, list] of farSpouses(g, unions)) {
+	for (const [person, list] of farSpouses(g, unions, fold)) {
 		const box = persons.get(person)!;
 		const zone = plan.tagZones.get(person)!;
 		const y = box.y + box.h;
@@ -405,19 +502,6 @@ function buildFarTags(g: FamilyGraph, persons: Map<string, PersonBox>, unions: M
 		tags.set(person, { person, spouses: list, x: zone.x, y, hit: tagHit(zone, y, geo), zoneW: Math.max(0, zone.w) });
 	}
 	return tags;
-}
-
-/**
- * The tag hangs from the card's bottom edge (see `tagTop`), in the part of the edge that no other
- * line leaves from. The visible tag is never wider than that part (`FarTag.zoneW`): renderers
- * truncate the text to fit it. Its hit area is at least 44×44 px and sits mostly below the card, so it takes
- * as little of the card's own tap area as possible. Nothing about it depends on names (names are
- * not part of the layout cache key).
- */
-export function tagHit(zone: { x: number; w: number }, y: number, geo: Geometry): Rect {
-	const w = Math.max(MIN_HIT, zone.w);
-	const top = tagTop(geo, y) - 2;
-	return { x: zone.x - w / 2, y: top, w, h: Math.max(MIN_HIT, geo.tagH + 4) };
 }
 
 /**
@@ -436,8 +520,8 @@ export function sideTagHit(span: { x: number; w: number }, y: number, limit: num
  * than its width (small note fonts). The bar and its union point then move right; the visible tag
  * stays in the left half. The default is the middle.
  */
-function sideBars(g: FamilyGraph, persons: Map<string, PersonBox>, unions: Map<string, UnionPoint>, side: Geometry): Map<string, number> {
-	const tagged = new Set(g.unions.filter((fu) => unions.get(fu.key)!.far).flatMap((fu) => fu.partners));
+function sideBars(g: FamilyGraph, persons: Map<string, PersonBox>, unions: Map<string, UnionPoint>, side: Geometry, hiddenTagged?: ReadonlySet<string>): Map<string, number> {
+	const tagged = new Set([...g.unions.filter((fu) => unions.get(fu.key)!.far).flatMap((fu) => fu.partners), ...(hiddenTagged ?? [])]);
 	const out = new Map<string, number>();
 	const need = lineMetrics(side).tagInset + sideTagDepth(side) + barClear(side);
 	for (const fu of g.unions) {
@@ -459,13 +543,14 @@ function turnLayout(
 	plan: LinePlan,
 	geo: Geometry,
 	side: Geometry,
+	fold?: FoldInput,
 ): TreeLayout {
 	const persons = new Map<string, PersonBox>();
 	for (const b of turnedPersons.values()) persons.set(b.id, turnBox(b));
 	const unions = new Map<string, UnionPoint>();
 	for (const u of turnedUnions.values()) unions.set(u.key, turnUnion(u));
 	const farTags = new Map<string, FarTag>();
-	for (const [person, list] of farSpouses(g, unions)) {
+	for (const [person, list] of farSpouses(g, unions, fold)) {
 		const box = persons.get(person)!;
 		const row = rows[box.gen];
 		const next = row[row.indexOf(person) + 1];
@@ -488,5 +573,7 @@ function turnLayout(
 		...[...persons.values()].map((p) => p.y + p.h),
 		...[...farTags.values()].map((t) => Math.max(tagTop(side, t.y) + side.tagH, t.hit.y + t.hit.h)),
 	);
-	return { persons, unions, rows, rowGaps, farTags, width, height, geometry: side, orientation: 'sideways' };
+	const done: TreeLayout = { persons, unions, rows, rowGaps, farTags, width, height, geometry: side, orientation: 'sideways' };
+	// The spots follow the rules of the turned frame (`down` rules on the turned numbers); their sign then grows to the right.
+	return fold?.controls ? withFolds(done, turnSpots(foldSpots(fold.controls, turnedPersons, turnedUnions, rowGaps, geo.fontPx, { turned: true }))) : done;
 }

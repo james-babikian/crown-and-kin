@@ -212,10 +212,17 @@ describe('Full-screen view: the TreeView in the modal', () => {
 		expect(e.defaultPrevented).toBe(false);
 	});
 
+	/** D52: on a phone, Fit is an item of the More list. */
+	const fitOnPhone = (root: FEl) => {
+		expect(root.querySelector('.dynasty-fit')).toBeNull();
+		dispatch(root.querySelector('.dynasty-more')!, 'click', { detail: 1 });
+		dispatch(root.querySelector('.dynasty-more-fit')!, 'click', { detail: 1 });
+	};
+
 	it('control: a Fit animation that runs to its end stores the view on screen as the shared view', async () => {
 		phone();
 		const { root, handle } = await openFullScreen(ONE);
-		dispatch(root.querySelector('.dynasty-fit')!, 'click');
+		fitOnPhone(root);
 		flushFrames();
 		const view = handle!.state.view;
 		expect(view).not.toBeNull();
@@ -229,7 +236,7 @@ describe('Full-screen view: the TreeView in the modal', () => {
 		const { root, handle } = await openFullScreen(ONE);
 		const bg = root.querySelector('.dynasty-svg')!;
 		if (kind === 'Fit') {
-			dispatch(root.querySelector('.dynasty-fit')!, 'click');
+			fitOnPhone(root);
 		} else {
 			for (let i = 0; i < 2; i++) {
 				dispatch(bg, 'pointerdown', pointer('touch', 10 + i, 400, 300));

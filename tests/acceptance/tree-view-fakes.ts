@@ -3,6 +3,7 @@ import { newBlockState } from '../../src/obsidian/block-state';
 import { EditSheet } from '../../src/obsidian/edit-sheet';
 import { FullScreenModal } from '../../src/obsidian/full-screen';
 import DynastyTreePlugin from '../../src/obsidian/main';
+import { FILL_ALL_EVENT } from '../../src/render/dom/scene';
 import { TreeView } from '../../src/obsidian/tree-view';
 import { FEl, device, dispatch, flushFrames, pointer, resizeAll, settle } from './fake-dom';
 import { events, openModals, type Plugin as FakePlugin } from './fake-obsidian';
@@ -37,6 +38,15 @@ export function phoneOnSide(): void {
 	device.coarse = true;
 	device.width = 844;
 	device.height = 390;
+}
+
+/**
+ * M11: the tree view draws the content of the cards near its first view only. A test that reads card
+ * content calls this first: it sends the tree view's own `dynasty-fill-all` event (`scene.ts`) to
+ * every tree under `el`, as the harness helper `fillAllCards` does.
+ */
+export function fillAllCards(el: FEl): void {
+	for (const root of el.querySelectorAll('.dynasty-root')) dispatch(root, FILL_ALL_EVENT);
 }
 
 /** A desktop: a mouse and a wide viewport. */

@@ -1,5 +1,5 @@
 /*
- * The shape of a parsed tree: people, unions, houses and options (spec §4). `parse.ts` builds a
+ * The shape of a parsed tree: people, unions, houses, titles and options (spec §4, §13.4). `parse.ts` builds a
  * `Tree` from a block's YAML; `validate.ts`, `derive.ts` and the render code read it. These types
  * hold values as read from the YAML, before validation removes anything unsafe to draw.
  */
@@ -47,6 +47,8 @@ export interface Person {
 	id: string;
 	name: string;
 	title?: string;
+	/** Spec §13.3, D62: the id of the title the card shows, as written. Present only when written. */
+	cardTitle?: string;
 	house?: string;
 	sex?: string;
 	born?: string;
@@ -56,6 +58,10 @@ export interface Person {
 	illegitimate: boolean;
 	union?: string;
 	link?: string;
+	/** Spec §13.7: the portrait picture link, as written (flattened like `link`); absent when not written or empty. */
+	portrait?: string;
+	/** Spec §13.13, D79: the text of `portrait-crop` as written (a list or map as JSON text); absent when not written or empty. */
+	portraitCrop?: string;
 	notes?: string;
 	/** Position in the `people` list. Sibling order derives from this. */
 	index: number;
@@ -78,20 +84,66 @@ export interface House {
 	id: string;
 	name: string;
 	color?: string;
+	/** Spec §13.6: the arms picture link, as written (flattened like `link`); absent when not written or empty. */
+	arms?: string;
+}
+
+/** One holder entry of a title, as written (spec §13.4). All values are text as written. */
+export interface Holder {
+	/** The written person id; wins over `name`. It may name nobody (`missing-holder`). */
+	person?: string;
+	/** A holder who is not in the tree, or the fallback when `person` names nobody. */
+	name?: string;
+	/** The ruler name when it is not the first word of the person's name (§13.5). */
+	as?: string;
+	/** Free text, for example "II"; never checked (§13.5, D59). */
+	number?: string;
+	from?: string;
+	to?: string;
+	/** Position of the item in the written `holders` list, counting skipped items. */
+	index: number;
+	/** The item's source text without comments, whitespace runs as one space (like `Union.text`). */
+	text?: string;
+}
+
+/** One title of the `titles` section (spec §13.4). `numbering` and `count-with` are kept, never read (D59). */
+export interface Title {
+	id: string;
+	/** The id when no name is written. */
+	name: string;
+	/** D66: `male-name`, the name for a holder with `sex: m`; absent when not written or empty. */
+	maleName?: string;
+	/** D65: `female-name`, the name for a holder with `sex: f`; absent when not written or empty. */
+	femaleName?: string;
+	/** The heading of the holder list and the table note name; the name when absent. */
+	plural: string;
+	/** Holder entries that survived validation, in written order (the order of succession). */
+	holders: Holder[];
+	/** Position in the written `titles` list. */
+	index: number;
+	/** As read: the number of items in the written `holders` list, holders or not (the Delete title confirmation). */
+	items: number;
 }
 
 /** The `options` section of a block: the start person, the focus person, and the generation and height limits. */
 export interface TreeOptions {
 	start?: string;
 	focus?: string;
+	/** Spec §13.1, D42: the "This is me" mark. */
+	me?: string;
 	generations?: number;
 	height?: number;
 }
 
-/** A whole parsed block: its houses, people and unions, plus any shape issues found while reading. */
+/** A whole parsed block: its houses, titles, people and unions, plus any shape issues found while reading. */
 export interface Tree {
 	options: TreeOptions;
 	houses: House[];
+	/**
+	 * Spec §13.4: every title with an id, in list order, duplicates included (validation keeps the
+	 * first); holders as read, before validation. Absent when the block has no `titles` key.
+	 */
+	titles?: Title[];
 	people: Person[];
 	unions: Union[];
 	/** Shape problems found while reading; `deriveFamilies` adds the rest. */

@@ -1,19 +1,25 @@
 /*
- * The Houses window (spec §6.10, D32, D36): the houses of one tree with their names and colours. Like
- * the edit sheet it is a draft: Save writes every change in one write (one undo step), Cancel
- * writes nothing, and any other way to close asks first. A colour comes from the 12 house colours
- * (D32) or from the system colour window ("Other colour"). Deleting a house that people have asks
- * whether to remove the house from them or keep it (D32); after Save, a Notice with Undo says so.
+ * The Houses window (spec §6.10, D32, D36; arms §13.6, D67–D69): the houses of one tree with their
+ * arms, names and colours. Like the edit sheet it is a draft: Save writes every change in one write
+ * (one undo step), Cancel writes nothing, and any other way to close asks first. A colour comes from
+ * the colours of the arms (D68, the exact colours), the 12 house colours (D32) or from the system
+ * colour window ("Other colour"). Arms come from the picture picker. Deleting a house that people
+ * have asks whether to remove the house from them or keep it (D32); after Save, a Notice with Undo
+ * says so.
  */
 
 import { Modal, Notice, setIcon, type App } from 'obsidian';
+import { armsColours } from '../core/arms-colours';
 import { deriveFamilies } from '../core/derive';
 import type { Op } from '../core/edit';
 import { parseDynasty } from '../core/parse';
 import { HOUSE_PALETTE } from '../render/styles';
-import { HOUSES, HOUSE_COLOUR_NAMES, REMOVE, SHEET, WRITE_TEXT } from '../render/ui-text';
+import { HOUSES, HOUSE_COLOUR_NAMES, HOUSE_PAGE_UI, PICTURES_UI, REMOVE, SHEET, WRITE_TEXT } from '../render/ui-text';
 import type { Handle, HandleWriteOutcome } from './block-handle';
+import { openHousePage } from './house-page-window';
 import { phoneLayout } from './modal-layout';
+import { currentPictureOf, pickPicture } from './picture-picker';
+import { ARMS_PIXELS, type PictureCopy, type PictureStore } from './picture-store';
 import { trackModal } from './plugin-modals';
 import { drawableColour, freshOrStale, onWriteFailed, showErrorLine } from './sheet-parts';
 import { undoNotice } from './undo-notice';
@@ -26,6 +32,8 @@ export interface LoadedHouse {
 	name: string;
 	/** As written in the tree; null when there is none. */
 	colour: string | null;
+	/** Spec §13.6: the arms link as written (flattened like `link`); null when there is none. */
+	arms: string | null;
 	/** Names of the people who have this house, in tree order. */
 	people: string[];
 }
@@ -42,7 +50,9 @@ export interface HouseRow {
 	id: string | null;
 	name: string;
 	colour: string | null;
-	base: { name: string; colour: string | null } | null;
+	/** Spec §13.6: the arms link of the draft; null for none. */
+	arms: string | null;
+	base: { name: string; colour: string | null; arms: string | null } | null;
 	/** Deleted in the draft, and what happens to its people (D32). */
 	deleted: 'clear' | 'keep' | null;
 	/** The user chose `deleted` in the D32 question; false for a house that had no people then. */
@@ -68,7 +78,7 @@ export function loadHouses(body: string): { kind: 'ok'; data: LoadedHouses } | {
 			ids.add(p.id);
 			people.push(p.name || p.id);
 		}
-		houses.push({ id: h.id, name: h.name, colour: h.color ?? null, people });
+		houses.push({ id: h.id, name: h.name, colour: h.color ?? null, arms: h.arms ?? null, people });
 	}
 	return { kind: 'ok', data: { body, houses } };
 }
@@ -77,10 +87,12 @@ export function loadHouses(body: string): { kind: 'ok'; data: LoadedHouses } | {
 export function rowsOf(data: LoadedHouses, key?: () => string): HouseRow[] {
 	let n = 0;
 	const next = key ?? (() => `h${n++}`);
-	return data.houses.map((h) => ({ key: next(), id: h.id, name: h.name, colour: h.colour, base: { name: h.name, colour: h.colour }, deleted: null }));
+	return data.houses.map((h) => ({ key: next(), id: h.id, name: h.name, colour: h.colour, arms: h.arms ?? null, base: { name: h.name, colour: h.colour, arms: h.arms ?? null }, deleted: null }));
 }
 
 const lower = (c: string | null) => (c === null ? null : c.toLowerCase());
+/** An arms link with only white space is no arms. */
+const armsOf = (a: string | null | undefined) => (typeof a === 'string' && a.trim() !== '' ? a.trim() : null);
 
 /** D32: a new house takes the first house colour that no house in the draft uses. */
 export function firstFreeColour(rows: HouseRow[]): string {
@@ -95,7 +107,8 @@ export function houseOps(rows: HouseRow[]): Op[] {
 	const adds: Op[] = [];
 	for (const r of rows) {
 		if (r.id === null) {
-			if (!r.deleted) adds.push({ kind: 'add-house', name: r.name.trim(), ...(r.colour && HEX.test(r.colour) ? { color: r.colour.toLowerCase() } : {}) });
+			const arms = armsOf(r.arms);
+			if (!r.deleted) adds.push({ kind: 'add-house', name: r.name.trim(), ...(r.colour && HEX.test(r.colour) ? { color: r.colour.toLowerCase() } : {}), ...(arms ? { arms } : {}) });
 			continue;
 		}
 		if (r.deleted) {
@@ -105,7 +118,10 @@ export function houseOps(rows: HouseRow[]): Op[] {
 		const base = r.base!;
 		const name = r.name.trim() !== base.name ? r.name.trim() : undefined;
 		const colour = lower(r.colour) !== lower(base.colour) && r.colour && HEX.test(r.colour) ? r.colour.toLowerCase() : undefined;
-		if (name !== undefined || colour !== undefined) edits.push({ kind: 'edit-house', id: r.id, ...(name !== undefined ? { name } : {}), ...(colour !== undefined ? { color: colour } : {}) });
+		// Spec §13.6: Select arms or Remove arms; null removes the key.
+		const arms = armsOf(r.arms) !== armsOf(base.arms) ? armsOf(r.arms) : undefined;
+		if (name !== undefined || colour !== undefined || arms !== undefined)
+			edits.push({ kind: 'edit-house', id: r.id, ...(name !== undefined ? { name } : {}), ...(colour !== undefined ? { color: colour } : {}), ...(arms !== undefined ? { arms } : {}) });
 	}
 	return [...edits, ...deletes, ...adds];
 }
@@ -117,7 +133,22 @@ export interface HousesOptions {
 	beforeWrite?: () => void;
 	/** Runs when the window has closed: the focus goes back to the Houses button (spec §5.2). */
 	onClosed?: () => void;
+	/** The tree's note: arms links are found and made from it (spec §13.6). */
+	sourcePath?: string;
+	/** The plugin's picture store (M9 contract O3); without it the window shows no arms pictures. */
+	pictures?: PictureStore;
+	/**
+	 * Spec §13.12 (H1, H3): what the People button needs from the tree view. Without it the rows have no
+	 * People button. `show` runs after this window has closed; `openNote` opens the note of the house page.
+	 */
+	people?: {
+		show: (personId: string) => void;
+		openNote: (open: () => Promise<void>) => void;
+	};
 }
+
+/** The arms box of the Houses window is this high, in CSS px (spec §13.6 "about 40 px"). */
+export const ARMS_BOX_PX = 40;
 
 /** The modal that lists a tree's houses and edits their names and colours (spec §6.10). */
 export class HousesWindow extends Modal {
@@ -133,6 +164,22 @@ export class HousesWindow extends Modal {
 	private errorEl: HTMLElement | null = null;
 	private error = '';
 	private readonly cleanup: (() => void)[] = [];
+	/** Spec §13.6: the arms pictures of the window by link (a copy, a problem, or still loading). */
+	private readonly copies = new Map<string, PictureCopy | 'problem' | 'loading'>();
+	/**
+	 * The copy request of each link that runs now. A link that is 'loading' with no request here got
+	 * null (its file changed during the copy) and waits for the store's change event (O3).
+	 */
+	private readonly asks = new Map<string, object>();
+	/** The arms boxes on screen now, by row key. */
+	private armsBoxes = new Map<string, HTMLElement>();
+	/** D68: the colours of each arms link, null when the plugin cannot read them. */
+	private readonly colours = new Map<string, string[] | null | 'loading'>();
+	/** The "Colours from the arms" group of the open palette. */
+	private armsGroup: { key: string; el: HTMLElement } | null = null;
+	private shown = false;
+	/** What runs when the window has really closed (the People button: show a card); dropped if the user keeps editing. */
+	private afterClose: (() => void) | null = null;
 
 	/** Null, with a Notice, if the block cannot be edited now. */
 	static create(app: App, o: HousesOptions): HousesWindow | null {
@@ -157,6 +204,9 @@ export class HousesWindow extends Modal {
 		this.modalEl.addClass('dynasty-sheet');
 		this.modalEl.addClass('dynasty-houses');
 		this.cleanup.push(phoneLayout(this), trackModal(this, () => this.finish()));
+		const store = this.o.pictures;
+		if (store) this.cleanup.push(store.onChange((paths) => this.guard(() => this.armsFilesChanged(paths))));
+		this.shown = true;
 		this.build();
 		// Keyboard users start at the top of the window, not in the note below it.
 		this.modalEl.setAttribute('tabindex', '-1');
@@ -169,11 +219,25 @@ export class HousesWindow extends Modal {
 		const active = this.modalEl.doc?.activeElement as HTMLElement | null | undefined;
 		if (active && this.modalEl.contains(active)) active.blur();
 		for (const c of this.cleanup.splice(0)) c();
+		this.shown = false;
+		// The window lets go of its arms copies: the store may forget them now.
+		for (const c of this.copies.values()) if (typeof c === 'object') c.release();
+		this.copies.clear();
+		this.asks.clear();
+		this.armsBoxes.clear();
+		this.armsGroup = null;
 		this.contentEl.empty();
 		try {
 			this.o.onClosed?.();
 		} catch (e) {
 			console.error('Dynasty Tree: cannot return the focus', e);
+		}
+		const after = this.afterClose;
+		this.afterClose = null;
+		try {
+			after?.();
+		} catch (e) {
+			console.error('Dynasty Tree: cannot show the person', e);
 		}
 	}
 
@@ -184,6 +248,7 @@ export class HousesWindow extends Modal {
 			return;
 		}
 		if (this.confirmEl) {
+			this.afterClose = null;
 			this.hideConfirm();
 			return;
 		}
@@ -195,7 +260,14 @@ export class HousesWindow extends Modal {
 		}
 		if (this.isDirty()) {
 			this.showConfirm(SHEET.discardTitle, [HOUSES.discardText], null, [
-				{ label: SHEET.keepEditing, cls: 'dynasty-sheet-keep', run: () => this.hideConfirm() },
+				{
+					label: SHEET.keepEditing,
+					cls: 'dynasty-sheet-keep',
+					run: () => {
+						this.afterClose = null;
+						this.hideConfirm();
+					},
+				},
 				{ label: SHEET.discard, cls: 'mod-warning dynasty-sheet-discard', run: () => this.finish() },
 			]);
 			return;
@@ -227,6 +299,8 @@ export class HousesWindow extends Modal {
 		const had = active && el.contains(active) ? active.getAttribute('data-focus') : null;
 		focus ??= had;
 		el.empty();
+		this.armsBoxes = new Map();
+		this.armsGroup = null;
 		this.hideConfirm(false);
 		el.addClass('dynasty-sheet-content');
 		const header = el.createDiv({ cls: 'dynasty-sheet-header' });
@@ -271,6 +345,7 @@ export class HousesWindow extends Modal {
 				this.build(`swatch:${r.key}`);
 			}),
 		);
+		this.armsBox(row, r);
 		const name = row.createEl('input', { cls: 'dynasty-sheet-input', attr: { type: 'text', autocomplete: 'off', autocapitalize: 'words', spellcheck: 'false', 'aria-label': HOUSES.nameLabel, 'data-focus': `name:${r.key}` } });
 		name.value = r.name;
 		name.addEventListener('input', () => {
@@ -279,17 +354,265 @@ export class HousesWindow extends Modal {
 		});
 		const n = r.id === null ? 0 : (this.data.houses.find((h) => h.id === r.id)?.people.length ?? 0);
 		row.createDiv({ cls: 'dynasty-house-count', text: HOUSES.count(n) });
+		// H1: only a saved house has a page; a house that is new in the draft has none.
+		if (this.o.people && r.id !== null) {
+			const people = row.createEl('button', {
+				cls: ['dynasty-sheet-action', 'dynasty-house-people'],
+				text: HOUSE_PAGE_UI.people,
+				attr: { type: 'button', 'aria-label': HOUSE_PAGE_UI.peopleLabel(this.savedName(r.id) ?? this.label(r)), 'data-focus': `people:${r.key}` },
+			});
+			const id = r.id;
+			people.addEventListener('click', () => this.guard(() => this.openPeople(id, `people:${r.key}`)));
+		}
 		const del = row.createEl('button', { cls: ['dynasty-sheet-action', 'dynasty-house-delete'], text: HOUSES.delete, attr: { type: 'button', 'aria-label': HOUSES.deleteLabel(this.label(r)), 'data-focus': `delete:${r.key}` } });
 		del.addEventListener('click', () => this.guard(() => this.askDelete(r)));
 		if (open) this.palette(list, r);
 	}
 
-	/** D32: the 12 house colours and "Other colour" (the system colour window). */
+	// ---------- the house page (spec §13.12) ----------
+
+	/** The name of a saved house, as the page shows it (the name, else the id). */
+	private savedName(id: string): string | null {
+		const h = this.data.houses.find((x) => x.id === id);
+		return h ? h.name.trim() || h.id : null;
+	}
+
+	/**
+	 * People: the page of the saved house. The page reads the saved tree, never the draft. A tap on a
+	 * name closes the page, then this window through its normal close (with its question about unsaved
+	 * changes), then the view shows the card.
+	 */
+	private openPeople(id: string, focus: string): void {
+		const people = this.o.people;
+		const parsed = parseDynasty(this.data.body);
+		if (!people || !parsed.ok) return;
+		const leaveThen = (run: () => void) => {
+			// An open colour list would take the first close and drop the action.
+			if (this.openKey !== null) {
+				const key = this.openKey;
+				this.openKey = null;
+				this.build(`swatch:${key}`);
+			}
+			this.afterClose = run;
+			this.close();
+			// Only a question about unsaved changes keeps the window open with the action waiting.
+			if (!this.closing && !this.confirmEl) this.afterClose = null;
+		};
+		openHousePage(this.app, {
+			app: this.app,
+			houseId: id,
+			whole: deriveFamilies(parsed.tree),
+			sourcePath: this.o.sourcePath ?? '',
+			pictures: this.o.pictures,
+			show: (personId) => leaveThen(() => people.show(personId)),
+			openNote: (open) => leaveThen(() => people.openNote(open)),
+			onClosed: () => {
+				// Back to the People button, unless this window is closing too.
+				if (this.shown && !this.closing) this.modalEl.querySelector<HTMLElement>(`[data-focus="${focus}"]`)?.focus();
+			},
+		});
+	}
+
+	// ---------- arms (spec §13.6) ----------
+
+	/**
+	 * The arms box of a row (about 40 px high, before the name): the arms picture, or an empty dashed
+	 * box for a house with no arms or arms that cannot show. A tap opens the picture picker; the box is
+	 * at least 44 × 44 px (spec §7.5, B8).
+	 */
+	private armsBox(row: HTMLElement, r: HouseRow): void {
+		const b = row.createEl('button', {
+			cls: 'dynasty-house-arms',
+			attr: { type: 'button', 'aria-label': PICTURES_UI.armsLabel(this.label(r)), 'data-focus': `arms:${r.key}` },
+		});
+		b.addEventListener('click', () => this.guard(() => void this.selectArms(r, `arms:${r.key}`)));
+		this.armsBoxes.set(r.key, b);
+		this.showArms(b, armsOf(r.arms));
+	}
+
+	/** Fills an arms box for `link`: its picture when the copy is ready, else the loading or empty state. */
+	private showArms(b: HTMLElement, link: string | null): void {
+		b.empty();
+		b.removeClass('is-empty');
+		b.removeClass('is-loading');
+		const state = link ? this.copyFor(link) : 'problem';
+		if (state === 'problem') b.addClass('is-empty');
+		else if (state === 'loading') b.addClass('is-loading');
+		// The copy has the screen's pixel density; CSS shows it at most 40 px high, with its own proportions (D75).
+		else b.createEl('img', { cls: 'dynasty-house-arms-img', attr: { src: state.url, alt: '' } });
+	}
+
+	/** The window's copy of an arms picture; starts it when it is not there. */
+	private copyFor(link: string): PictureCopy | 'problem' | 'loading' {
+		const have = this.copies.get(link);
+		if (have) return have;
+		const store = this.o.pictures;
+		const found = store ? store.resolve(link, this.o.sourcePath ?? '') : null;
+		if (!store || !found || !found.ok) {
+			this.copies.set(link, 'problem');
+			return 'problem';
+		}
+		this.copies.set(link, 'loading');
+		const ask = {};
+		this.asks.set(link, ask);
+		// O3: the copy for the Houses window is 40 px high; the store makes it sharp for the screen.
+		void store
+			.acquire(found.file, { w: ARMS_BOX_PX, h: ARMS_BOX_PX, fit: 'meet' })
+			.then((c) => {
+				const copy = c && 'url' in c ? c : null;
+				if (!this.shown || this.asks.get(link) !== ask) {
+					copy?.release();
+					return;
+				}
+				this.asks.delete(link);
+				// The file changed during the copy: the box shows "loading" until the store's change event.
+				if (c === null) return;
+				this.copies.set(link, copy ?? 'problem');
+				this.redrawArms(link);
+			})
+			.catch((e) => console.error('Dynasty Tree: cannot show the arms', e));
+		return 'loading';
+	}
+
+	/** Shows the state of `link` in every arms box that has it. */
+	private redrawArms(link: string): void {
+		for (const row of this.rows) {
+			const box = this.armsBoxes.get(row.key);
+			if (box && armsOf(row.arms) === link) this.showArms(box, link);
+		}
+	}
+
+	/**
+	 * O3, O9: picture files changed (main.ts tells the store after its wait). The arms of a changed
+	 * file, a link with no file or no picture, and a copy dropped because its file changed are asked
+	 * for again; their colours too.
+	 */
+	private armsFilesChanged(paths: readonly string[]): void {
+		const store = this.o.pictures;
+		if (!this.shown || !store) return;
+		const touched = new Set(paths);
+		const again: string[] = [];
+		for (const [link, state] of this.copies) {
+			const found = store.resolve(link, this.o.sourcePath ?? '');
+			const hit = found.ok && touched.has(found.file.path);
+			const waiting = state === 'loading' && !this.asks.has(link);
+			if (hit || waiting || state === 'problem') again.push(link);
+		}
+		for (const link of again) {
+			const state = this.copies.get(link);
+			this.copies.delete(link);
+			this.asks.delete(link);
+			this.colours.delete(link);
+			if (typeof state === 'object') state.release();
+			this.redrawArms(link);
+		}
+		const g = this.armsGroup;
+		const r = g ? this.rows.find((x) => x.key === g.key) : undefined;
+		const link = r ? armsOf(r.arms) : null;
+		if (g && r && link && again.includes(link)) this.fillArmsColours(g.el, r, link);
+	}
+
+	/** Select arms (spec §13.6): the picture picker; the chosen link goes into the draft. */
+	private async selectArms(r: HouseRow, focus: string): Promise<void> {
+		const sourcePath = this.o.sourcePath ?? '';
+		// V1: the window's draft value (not the saved one) is the current picture.
+		const current = currentPictureOf(this.o.pictures, armsOf(r.arms), sourcePath);
+		const link = await pickPicture(this.app, { sourcePath, store: this.o.pictures, title: PICTURES_UI.armsLabel(this.label(r)), current });
+		if (!this.shown) return;
+		if (link) {
+			r.arms = link;
+			this.clearError();
+		}
+		this.build(focus);
+	}
+
+	/** D68: the colours of the arms, from the store's 64 × 64 pixels; the group fills in when they are ready. */
+	private armsColoursFor(link: string): string[] | null | 'loading' {
+		const have = this.colours.get(link);
+		if (have !== undefined) return have;
+		const store = this.o.pictures;
+		const found = store ? store.resolve(link, this.o.sourcePath ?? '') : null;
+		if (!store || !found || !found.ok) {
+			this.colours.set(link, null);
+			return null;
+		}
+		this.colours.set(link, 'loading');
+		void store
+			.pixels(found.file)
+			.then((px) => {
+				let list: string[] | null = null;
+				try {
+					list = px ? armsColours(px, ARMS_PIXELS, ARMS_PIXELS) : null;
+				} catch (e) {
+					console.error('Dynasty Tree: cannot read the colours of the arms', e);
+				}
+				this.colours.set(link, list);
+				const g = this.armsGroup;
+				const r = g ? this.rows.find((x) => x.key === g.key) : undefined;
+				if (this.shown && g && r && armsOf(r.arms) === link) this.fillArmsColours(g.el, r, link);
+			})
+			.catch((e) => console.error('Dynasty Tree: cannot read the colours of the arms', e));
+		return 'loading';
+	}
+
+	/** The "Colours from the arms" buttons (D68: the exact colours), or the text that says the colours are unknown. */
+	private fillArmsColours(group: HTMLElement, r: HouseRow, link: string): void {
+		group.empty();
+		const list = this.armsColoursFor(link);
+		group.toggleClass('is-loading', list === 'loading');
+		if (list === 'loading') return;
+		if (list === null) {
+			group.createDiv({ cls: ['dynasty-sheet-hint', 'dynasty-house-arms-none'], text: PICTURES_UI.noArmsColours });
+			return;
+		}
+		list.forEach((hex, i) => {
+			const chosen = lower(r.colour) === hex;
+			const b = group.createEl('button', {
+				cls: chosen ? ['dynasty-house-arms-colour', 'is-selected'] : 'dynasty-house-arms-colour',
+				attr: { type: 'button', 'aria-label': PICTURES_UI.armsColourLabel(i + 1), 'aria-pressed': String(chosen), 'data-colour': hex, 'data-focus': `arms-colour:${r.key}:${hex}` },
+			});
+			b.style.setProperty('--dynasty-house-color', hex);
+			if (chosen) setIcon(b, 'check');
+			b.addEventListener('click', () =>
+				this.guard(() => {
+					r.colour = hex;
+					this.build(`arms-colour:${r.key}:${hex}`);
+				}),
+			);
+		});
+	}
+
+	/**
+	 * D32: the 12 house colours and "Other colour" (the system colour window). Spec §13.6: first Select
+	 * arms and Remove arms; with arms, the colours of the arms come before the label "House colours".
+	 */
 	private palette(list: HTMLElement, r: HouseRow): void {
 		const box = list.createDiv({ cls: 'dynasty-house-palette', attr: { 'data-house': r.id ?? r.key } });
+		const arms = armsOf(r.arms);
+		const armsPart = box.createDiv({ cls: 'dynasty-house-arms-part' });
+		armsPart.createDiv({ cls: 'dynasty-sheet-label', text: PICTURES_UI.armsHeading });
+		const armsButtons = armsPart.createDiv({ cls: 'dynasty-house-arms-buttons' });
+		const select = armsButtons.createEl('button', { cls: ['dynasty-sheet-action', 'dynasty-house-select-arms'], text: PICTURES_UI.selectArms, attr: { type: 'button', 'data-focus': `select-arms:${r.key}` } });
+		select.addEventListener('click', () => this.guard(() => void this.selectArms(r, `select-arms:${r.key}`)));
+		if (arms) {
+			const remove = armsButtons.createEl('button', { cls: ['dynasty-sheet-action', 'dynasty-house-remove-arms'], text: PICTURES_UI.removeArms, attr: { type: 'button', 'data-focus': `remove-arms:${r.key}` } });
+			remove.addEventListener('click', () =>
+				this.guard(() => {
+					r.arms = null;
+					this.build(`select-arms:${r.key}`);
+				}),
+			);
+		}
 		const title = box.createDiv({ cls: 'dynasty-sheet-label', text: HOUSES.paletteTitle(this.label(r)) });
 		const titleId = `dynasty-house-palette-${r.key}-${this.keys}`;
 		title.setAttribute('id', titleId);
+		if (arms) {
+			box.createDiv({ cls: ['dynasty-sheet-label', 'dynasty-house-arms-title'], text: PICTURES_UI.coloursFromArms });
+			const group = box.createDiv({ cls: ['dynasty-house-colours', 'dynasty-house-arms-colours'], attr: { role: 'group', 'aria-label': PICTURES_UI.coloursFromArms } });
+			this.armsGroup = { key: r.key, el: group };
+			this.fillArmsColours(group, r, arms);
+			box.createDiv({ cls: ['dynasty-sheet-label', 'dynasty-house-palette-title'], text: PICTURES_UI.houseColours });
+		}
 		const grid = box.createDiv({ cls: 'dynasty-house-colours', attr: { role: 'group', 'aria-labelledby': titleId } });
 		HOUSE_PALETTE.forEach((hex, i) => {
 			const chosen = lower(r.colour) === hex;
@@ -322,7 +645,7 @@ export class HousesWindow extends Modal {
 
 	private addHouse(): void {
 		const key = this.nextKey();
-		this.rows.push({ key, id: null, name: '', colour: firstFreeColour(this.rows), base: null, deleted: null });
+		this.rows.push({ key, id: null, name: '', colour: firstFreeColour(this.rows), arms: null, base: null, deleted: null });
 		this.openKey = null;
 		this.clearError();
 		this.build(`name:${key}`);
@@ -523,6 +846,7 @@ export class HousesWindow extends Modal {
 				key: was.key,
 				name: was.name !== was.base!.name ? was.name : fresh.name,
 				colour: lower(was.colour) !== lower(was.base!.colour) ? was.colour : fresh.colour,
+				arms: armsOf(was.arms) !== armsOf(was.base!.arms) ? was.arms : fresh.arms,
 				deleted: was.deleted,
 				asked: was.asked,
 			};

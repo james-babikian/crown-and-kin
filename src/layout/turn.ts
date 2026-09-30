@@ -8,8 +8,8 @@
 import { turnedGeometry } from './geometry';
 import type { EdgeDrawing, PersonBox, TreeLayout, UnionPoint } from './model';
 
-/** Mirrors a card's box on the diagonal: x ↔ y, w ↔ h. */
-export const turnBox = (b: PersonBox): PersonBox => ({ id: b.id, x: b.y, y: b.x, w: b.h, h: b.w, gen: b.gen });
+/** Mirrors a card's box on the diagonal: x ↔ y, w ↔ h; `tallName` and `tallTitle` stay. */
+export const turnBox = (b: PersonBox): PersonBox => ({ ...b, x: b.y, y: b.x, w: b.h, h: b.w });
 
 /** Mirrors a union point's position on the diagonal: x ↔ y. */
 export const turnUnion = (u: UnionPoint): UnionPoint => ({ ...u, x: u.y, y: u.x });

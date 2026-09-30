@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { drawnParentMap, drawnParents } from '../src/core/derive';
 import { build } from './helpers';
 
 const person = (id: string, extra = '') => `  - id: ${id}\n    name: ${id.toUpperCase()}\n${extra}`;
@@ -61,5 +62,37 @@ describe('deriveFamilies', () => {
 		);
 		expect(g.primaryUnion.get('c')).toBe('u0');
 		expect(g.primaryUnion.get('d')).toBe('u1');
+	});
+});
+
+describe('drawnParents (the cycle-broken links relations and focus mode follow)', () => {
+	it('lists the placement links first, then the side links in order; unknown types read as birth', () => {
+		const { g } = build(
+			`people:\n${person('a')}${person('b')}${person('r')}${person('w')}${person('c', '    parents: [{id: r, type: rumoured}, a, {id: w, type: ward}, {id: b, type: godparent}]\n')}`,
+		);
+		expect(drawnParents(g, 'c')).toEqual([
+			{ id: 'a', type: 'birth' },
+			{ id: 'b', type: 'birth' },
+			{ id: 'r', type: 'rumoured' },
+			{ id: 'w', type: 'ward' },
+		]);
+		expect(drawnParents(g, 'a')).toEqual([]);
+		expect(drawnParents(g, 'ghost')).toEqual([]);
+	});
+
+	it('leaves out the link that closes a cycle, and a link to nobody', () => {
+		const { g } = build(`people:\n${person('a', '    parents: [b]\n')}${person('b', '    parents: [a, ghost]\n')}`);
+		const all = [...drawnParents(g, 'a'), ...drawnParents(g, 'b')];
+		expect(all).toHaveLength(1);
+		expect(all.some((l) => l.id === 'ghost')).toBe(false);
+	});
+
+	it('drawnParentMap gives the same lists for every person', () => {
+		const { g } = build(
+			`people:\n${person('a')}${person('b')}${person('c', '    parents: [a, b, {id: a, type: adoptive}]\n')}${person('d', '    parents: [{id: c, type: ward}, a]\n')}`,
+		);
+		const map = drawnParentMap(g);
+		for (const p of g.people) expect(map.get(p.id) ?? []).toEqual(drawnParents(g, p.id));
+		expect(map.has('a')).toBe(false);
 	});
 });

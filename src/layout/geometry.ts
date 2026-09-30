@@ -1,11 +1,17 @@
 /**
  * Turns a note's font size into the card and gap sizes a tree draws with (spec §5.8), and the line
  * lane layout of the gaps between rows. `layout.ts` and `lines.ts` call these functions to size
- * and place cards; `render/dom/scene.ts` and `render/svg-string.ts` call `cardText`, `isTall` and
- * `tagTop` to draw and measure the same card the layout used, so every level of detail agrees on
- * where the text sits (spec §5.4). `NORMAL_GEOMETRY` is used only by scripts and tests.
+ * and place cards; `render/dom/scene.ts` and `render/svg-string.ts` call `cardText` (with the
+ * card's `PersonBox.tallName` and `tallTitle`) and `tagTop` to draw and measure the same card the
+ * layout used, so every level of detail agrees on where the text sits (spec §5.4). `NORMAL_GEOMETRY` is used only by scripts and tests.
+ * M9: the places of the arms and the portrait on a card (`armsPlace`, `portraitBox`) and the width of
+ * a small text line beside the portrait (`smallTextWidth`), shared by the same renderers. Owner
+ * decision D78 made the arms and the portrait the same height: 1.25 name text lines (1.5 em on
+ * normal cards), so both fit on a card with no relation line. The arms narrow only the name (and
+ * move the D14 sign left); the portrait narrows only the small text lines beside it, which are cut
+ * with "…". No picture adds a text line or changes a card's height, so pictures never move a card.
  */
-import type { CardSize, Geometry, GeometryFor, LayoutSettings, SidewaysCards } from './model';
+import type { CardSize, Geometry, GeometryFor, LayoutSettings, NameLineCount, Rect, SidewaysCards } from './model';
 
 /** Obsidian's default note font size; the card geometry (180×64 cards) was tuned at this size. */
 export const BASE_FONT_PX = 16;
@@ -40,6 +46,19 @@ const TAG_EM = 1.125;
  * cover the date line.
  */
 export const tagTop = (geo: Geometry, y: number) => y - Math.round(0.1875 * geo.fontPx);
+
+/**
+ * The tag hangs from the card's bottom edge (see `tagTop`), in the part of the edge that no other
+ * line leaves from. The visible tag is never wider than that part (`FarTag.zoneW`): renderers
+ * truncate the text to fit it. Its hit area is at least 44×44 px and sits mostly below the card, so it takes
+ * as little of the card's own tap area as possible. Nothing about it depends on names (names are
+ * not part of the layout cache key).
+ */
+export function tagHit(zone: { x: number; w: number }, y: number, geo: Geometry): Rect {
+	const w = Math.max(MIN_HIT, zone.w);
+	const top = tagTop(geo, y) - 2;
+	return { x: zone.x - w / 2, y: top, w, h: Math.max(MIN_HIT, geo.tagH + 4) };
+}
 
 /** Distance between sibling-bar lanes in one gap between rows (spec §5.3: 12 px at the default font). */
 export const laneStep = (geo: Geometry) => 0.75 * geo.fontPx;
@@ -160,9 +179,22 @@ export function sidewaysGeometry(geo: Geometry, cards: SidewaysCards, narrowCard
 	};
 }
 
+/** D40: how much taller every card is when the tree has a mark: one small (0.85 em) text line, whole px. */
+export const relationExtra = (geo: Geometry) => Math.round(EMS[geo.cardSize].lineHeight * 0.85 * geo.fontPx);
+
+/**
+ * D40: `geo` with the relation text line (`LayoutSettings.relationLine`). A geometry that already
+ * has it is returned as it is, so a drawn geometry passed back in does not grow a second time.
+ */
+export function withRelationLine(geo: Geometry, settings: LayoutSettings): Geometry {
+	if (!settings.relationLine || geo.relationLine) return geo;
+	return { ...geo, cardH: geo.cardH + relationExtra(geo), relationLine: true };
+}
+
 /** `TreeLayout.geometry` of a layout with `settings`, known before the layout runs (renderers measure names with it). */
 export function drawnGeometry(geo: Geometry, settings: LayoutSettings): Geometry {
-	return settings.orientation === 'sideways' ? sidewaysGeometry(geo, settings.sidewaysCards ?? 'normal', settings.narrowCardW) : geo;
+	const g = withRelationLine(geo, settings);
+	return settings.orientation === 'sideways' ? sidewaysGeometry(g, settings.sidewaysCards ?? 'normal', settings.narrowCardW) : g;
 }
 
 /** Smallest tappable size in px (spec §7.5). */
@@ -193,13 +225,12 @@ export function turnedGeometry(side: Geometry): Geometry {
 }
 
 /**
- * D29: how much taller a card with a two-line name is: one name text line, whole px. The layout
- * gives such a card this much more height (`PersonBox.h`); `cardText(geo, true)` places its text.
+ * D29, D81: how much taller a card is for each name text line after the first: one name text line,
+ * whole px. The layout gives a card with a two-line name this much more height, a card with a
+ * three-line name twice this (`PersonBox.h`, `PersonBox.tallName`, `PersonBox.longName`);
+ * `cardText(geo, 2)` and `cardText(geo, 3)` place its text. A card with a two-line title text line (D61) is `relationExtra` taller.
  */
 export const tallExtra = (geo: Geometry) => Math.round(EMS[geo.cardSize].lineHeight * geo.fontPx);
-
-/** A card the layout made taller for a two-line name (D29): renderers read it from the box, not the settings. */
-export const isTall = (geo: Geometry, box: { h: number }) => box.h > geo.cardH + 0.5;
 
 /** Where card text goes, so every renderer lays out the Full level of detail the same way. */
 export interface CardText {
@@ -216,8 +247,18 @@ export interface CardText {
 	nameBaseline: number;
 	/** D29, a tall card only: the baseline of the name's second text line. */
 	name2Baseline?: number;
+	/** D81, a card with a three-line name only: the baseline of the name's third text line. */
+	name3Baseline?: number;
 	titleBaseline: number;
+	/** D61, a card with a two-line title text line only: the baseline of the title's second text line. */
+	title2Baseline?: number;
 	datesBaseline: number;
+	/**
+	 * D40, only when `Geometry.relationLine`: the baseline of the relation text line, the third small
+	 * text line. The renderer moves it up one small line for each of the title and dates lines that the
+	 * card does not show, as the dates move up today.
+	 */
+	relationBaseline?: number;
 	/**
 	 * The "illegitimate" sign (spec D14) in the card's top right corner: a dashed bar from
 	 * top right to bottom left, like a heraldic baton sinister, dashed like an illegitimate line.
@@ -226,22 +267,33 @@ export interface CardText {
 	sign: { x1: number; y1: number; x2: number; y2: number; width: number; dash: [number, number] };
 	/** Name width before truncation on a card with the sign, so the name stops short of it. */
 	nameWithSignW: number;
+	/**
+	 * M9 (D76, D78): the bottom of the text block (the name lines and every small text line place,
+	 * the relation line included when the cards have one), from the card's top edge. The portrait's
+	 * bottom sits here.
+	 */
+	textBottom: number;
 }
 
 /**
- * Text positions of a card; `tall` (D29) for a card that is `tallExtra` taller: two name text
- * lines, and the title and dates one name text line lower. The text block stays centred.
+ * Text positions of a card, from its `PersonBox`. `names` is the number of name text lines (D29, D81):
+ * 1, 2 or 3; a card with more has `tallExtra` more height for each, and the title and dates sit one
+ * name text line lower for each. A boolean is still accepted (true is 2, false is 1). `tallTitle` (D61)
+ * for a card that is `relationExtra` taller: two title text lines, and the dates and relation text
+ * one small text line lower. The text block stays centred.
  */
-export function cardText(geo: Geometry, tall = false): CardText {
+export function cardText(geo: Geometry, nameCount: boolean | NameLineCount = 1, tallTitle = false): CardText {
 	const f = geo.fontPx;
 	const lh = EMS[geo.cardSize].lineHeight;
 	const nameSize = f;
 	const smallSize = 0.85 * f;
 	const nameLine = lh * nameSize;
 	const smallLine = lh * smallSize;
-	const names = tall ? 2 : 1;
-	const cardH = tall ? geo.cardH + tallExtra(geo) : geo.cardH;
-	const top = (cardH - names * nameLine - 2 * smallLine) / 2;
+	const names: NameLineCount = nameCount === true ? 2 : nameCount === false ? 1 : nameCount;
+	// D40: `cardH` already holds the relation text line, the third small line.
+	const smalls = (geo.relationLine ? 3 : 2) + (tallTitle ? 1 : 0);
+	const cardH = geo.cardH + (names - 1) * tallExtra(geo) + (tallTitle ? relationExtra(geo) : 0);
+	const top = (cardH - names * nameLine - smalls * smallLine) / 2;
 	// Baseline of a line box: its middle plus about a third of the font size (Latin cap height ≈ 0.7 em).
 	const baseline = (lineTop: number, line: number, size: number) => lineTop + line / 2 + 0.35 * size;
 	const stripW = 0.5 * f;
@@ -255,6 +307,8 @@ export function cardText(geo: Geometry, tall = false): CardText {
 	const signGap = 0.25 * f;
 	const signDash = (Math.SQRT2 * signSize - signGap) / 2;
 	const small = top + names * nameLine;
+	// D61: the title's second text line pushes every small line below it down by one.
+	const titles = tallTitle ? 2 : 1;
 	return {
 		stripW,
 		padX,
@@ -262,10 +316,113 @@ export function cardText(geo: Geometry, tall = false): CardText {
 		nameSize,
 		smallSize,
 		nameBaseline: baseline(top, nameLine, nameSize),
-		...(tall ? { name2Baseline: baseline(top + nameLine, nameLine, nameSize) } : {}),
+		...(names > 1 ? { name2Baseline: baseline(top + nameLine, nameLine, nameSize) } : {}),
+		...(names > 2 ? { name3Baseline: baseline(top + 2 * nameLine, nameLine, nameSize) } : {}),
 		titleBaseline: baseline(small, smallLine, smallSize),
-		datesBaseline: baseline(small + smallLine, smallLine, smallSize),
+		...(tallTitle ? { title2Baseline: baseline(small + smallLine, smallLine, smallSize) } : {}),
+		datesBaseline: baseline(small + titles * smallLine, smallLine, smallSize),
+		...(geo.relationLine ? { relationBaseline: baseline(small + (titles + 1) * smallLine, smallLine, smallSize) } : {}),
 		sign: { x1: signRight, y1: signTop, x2: signRight - signSize, y2: signTop + signSize, width: 0.15625 * f, dash: [signDash, signGap] },
 		nameWithSignW: textW - signSize - 0.5 * f,
+		textBottom: small + smalls * smallLine,
 	};
 }
+
+/**
+ * D40: the baseline of a card's relation text, from its top edge. Like the dates, it moves up one
+ * small text line for each of the title and dates lines that the card does not show; on a card with
+ * a two-line title text line (`title2Baseline`, D61) the title counts as two. Undefined when the
+ * cards have no relation line (`Geometry.relationLine`).
+ */
+export function relationY(t: CardText, hasTitle: boolean, hasDates: boolean): number | undefined {
+	if (t.relationBaseline === undefined) return undefined;
+	const two = t.title2Baseline !== undefined;
+	const lines = two ? [t.titleBaseline, t.title2Baseline!, t.datesBaseline, t.relationBaseline] : [t.titleBaseline, t.datesBaseline, t.relationBaseline];
+	return lines[(hasTitle ? (two ? 2 : 1) : 0) + (hasDates ? 1 : 0)];
+}
+
+/**
+ * M9 picture sizes (D78, which replaced the first contract values): arms and portrait are both
+ * `sizeLines` name text lines high; the arms box is `armsAspect` of that wide; `armsGap` (em) is
+ * the gap between the name and the arms; the Compact arms box is `compactArmsW` × `compactArmsH`
+ * em (C4); `portraitGap` (em) is the gap between a narrowed text line and the portrait.
+ */
+export const PICTURE_EM = { sizeLines: 1.25, armsAspect: 5 / 6, armsGap: 0.3, compactArmsW: 1.5, compactArmsH: 1.8, portraitGap: 0.25 } as const;
+
+/** G3: a small text line is beside the portrait only when its line box overlaps the circle by more than this, in px. */
+export const PORTRAIT_OVERLAP_PX = 0.5;
+
+/** D78: the height of the arms box and the portrait's diameter: 1.25 name text lines (24 px on normal cards at 16 px). */
+export const pictureSize = (geo: Geometry) => PICTURE_EM.sizeLines * EMS[geo.cardSize].lineHeight * geo.fontPx;
+
+/** The arms boxes of one card and how far the names and the D14 signs move left for them (D67, D78, G2). */
+export interface ArmsPlace {
+	/** Full level, card-relative: right edge at the text's right edge, centred on the first name text line. */
+	full: Rect;
+	/** Compact level, card-relative: at the right of the card, centred on its height. */
+	compact: Rect;
+	/** Full: how much narrower the name is and how far the D14 sign moves left (box + 0.3 em, 1.55 em on normal cards). */
+	shift: number;
+	/** Compact: how far the Compact D14 sign moves left (1.8 em, B7). */
+	compactShift: number;
+}
+
+/**
+ * The arms places of a card with text positions `t`, height `boxH` and a sideways `+` badge cut
+ * `cut` (0 without a badge; the arms, the sign and the name all move left by it). The picture keeps
+ * its own proportions inside the box (D75), so only the box is fixed here.
+ */
+export function armsPlace(geo: Geometry, t: CardText, boxH: number, cut: number): ArmsPlace {
+	const f = geo.fontPx;
+	const h = pictureSize(geo);
+	const w = PICTURE_EM.armsAspect * h;
+	// The centre of the first name line box (its baseline sits 0.35 em below the middle).
+	const nameMiddle = t.nameBaseline - 0.35 * t.nameSize;
+	const cw = PICTURE_EM.compactArmsW * f;
+	const ch = PICTURE_EM.compactArmsH * f;
+	return {
+		full: { x: t.padX + t.textW - cut - w, y: nameMiddle - h / 2, w, h },
+		compact: { x: geo.cardW - 0.5 * f - cut - cw, y: boxH / 2 - ch / 2, w: cw, h: ch },
+		shift: w + PICTURE_EM.armsGap * f,
+		compactShift: cw + PICTURE_EM.armsGap * f,
+	};
+}
+
+/** D76, D78: the portrait's square, card-relative: right edge at the text's right edge, bottom at the text block's bottom. */
+export function portraitBox(geo: Geometry, t: CardText): Rect {
+	const d = pictureSize(geo);
+	return { x: t.padX + t.textW - d, y: t.textBottom - d, w: d, h: d };
+}
+
+/**
+ * G3, D76, D77: the width of a small text line (title, second title line, dates, relation) whose
+ * baseline is at `baseline`, card-relative. Beside the portrait (its line box overlaps the circle's
+ * height by more than 0.5 px) the line is narrower by the portrait and a 0.25 em gap; else it keeps
+ * `textW`. The name never uses this: it never narrows for a portrait.
+ */
+export function smallTextWidth(geo: Geometry, t: CardText, baseline: number, portrait: Rect | undefined): number {
+	if (!portrait) return t.textW;
+	const line = EMS[geo.cardSize].lineHeight * t.smallSize;
+	const top = baseline - 0.35 * t.smallSize - line / 2;
+	const overlap = Math.min(top + line, portrait.y + portrait.h) - Math.max(top, portrait.y);
+	return overlap > PORTRAIT_OVERLAP_PX ? t.textW - portrait.w - PICTURE_EM.portraitGap * geo.fontPx : t.textW;
+}
+
+/**
+ * L5 (D76, D77, spec §13.9): the width of name text line `line` (1 to `names`) of a card. It is the
+ * text width less `shift` (the arms, the badge room). A line whose box overlaps the portrait's circle
+ * by more than 0.5 px is narrower by the portrait and a 0.25 em gap; the breaks stay where they were
+ * made at the wider width, so the line is only cut shorter and the card does not change height.
+ */
+export function nameTextWidth(geo: Geometry, t: CardText, line: NameLineCount, names: NameLineCount, portrait: Rect | undefined, shift: number): number {
+	const width = t.textW - shift;
+	const baseline = [t.nameBaseline, t.name2Baseline, t.name3Baseline][line - 1];
+	if (!portrait || line > names || baseline === undefined) return width;
+	const height = EMS[geo.cardSize].lineHeight * t.nameSize;
+	const top = baseline - 0.35 * t.nameSize - height / 2;
+	const overlap = Math.min(top + height, portrait.y + portrait.h) - Math.max(top, portrait.y);
+	return overlap > PORTRAIT_OVERLAP_PX ? width - portrait.w - PICTURE_EM.portraitGap * geo.fontPx : width;
+}
+
+/** D29, D81: the number of name text lines a card was made for (`tallName`, `longName`). */
+export const nameCountOf = (box: { tallName?: true; longName?: true }): NameLineCount => (box.longName ? 3 : box.tallName ? 2 : 1);

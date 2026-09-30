@@ -3,7 +3,10 @@
  * the tree, so styles.css colours both alike. A partnership is a line between two card ends with
  * its union sign (D26, D38: none for no recorded partnership); a child line is a family's bar with two drops; a parent drawn elsewhere
  * is a curve. Pure: the DOM renderer and the headless pictures both build from this.
+ * M9 (spec §13.6 "Legend", §13.8): the houses part (`legendHouses`, `LegendHouse`) as pure data; the
+ * DOM legend (`buildLegend` in `dom/scene.ts`) and the saved picture (`svg-string.ts`) draw it.
  */
+import type { FamilyGraph } from '../core/derive';
 import type { StrokeKind } from '../layout/model';
 import { UNION_MARKS, unionMark, unionShape, type UnionShape } from './styles';
 import { LEGEND_LABELS, LEGEND_ORDER, SIGN_LEGEND_LABEL } from './tree-info';
@@ -87,4 +90,36 @@ export function legendRows(): LegendRow[] {
 		],
 	});
 	return rows;
+}
+
+/** One house row of a legend (S4, P3): colour strip, arms and name. */
+export interface LegendHouse {
+	id: string;
+	name: string;
+	/** The house colour as written; absent = the no-house colour. The renderer checks that it can draw it. */
+	color?: string;
+	/** The house has `arms` written (the picture may still fail: then the row shows no arms). */
+	arms: boolean;
+}
+
+/**
+ * The house rows of a legend, in the order of the tree's `houses` list. `only` limits them to the
+ * houses of those people (the saved picture shows the houses of the drawn people); without it,
+ * every house of the tree (the on-screen legend).
+ */
+export function legendHouses(g: FamilyGraph, only?: Iterable<string>): LegendHouse[] {
+	let used: Set<string> | undefined;
+	if (only) {
+		used = new Set();
+		for (const id of only) {
+			const house = g.byId.get(id)?.house;
+			if (house !== undefined) used.add(house);
+		}
+	}
+	const out: LegendHouse[] = [];
+	for (const h of g.houses.values()) {
+		if (used && !used.has(h.id)) continue;
+		out.push({ id: h.id, name: h.name, ...(h.color ? { color: h.color } : {}), arms: !!h.arms });
+	}
+	return out;
 }

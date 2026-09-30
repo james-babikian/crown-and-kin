@@ -469,6 +469,117 @@
 	stroke-width: 6;
 }
 
+/* ---------- You and your family (M7: spec §13.1, §13.2) ---------- */
+
+/* D40: the relation to the marked person, one small text line after the card's other text lines. */
+.dynasty-card-relation {
+	font-size: calc(var(--dynasty-font-size) * 0.85);
+	font-style: italic;
+	fill: var(--text-normal);
+}
+
+/* D41: "You" on the marked card is upright and semibold. */
+.dynasty-card-me .dynasty-card-relation {
+	font-style: normal;
+	font-weight: var(--font-semibold, 600);
+}
+
+/* "Show relation names on cards" off: the text hides, the card keeps its size and the label keeps the relation. */
+.dynasty-no-relations .dynasty-card-relation {
+	display: none;
+}
+
+/* D41: the marked card has a thicker border in the accent colour, and inside it a thin ring in the
+   text colour, so the mark shows also where the accent is pale or there is no colour. */
+.dynasty-card-me .dynasty-card-bg {
+	stroke: var(--interactive-accent);
+	stroke-width: 3;
+}
+
+.dynasty-card-me:focus-visible .dynasty-card-bg {
+	stroke-width: 3;
+}
+
+.dynasty-card-me-ring {
+	fill: none;
+	stroke: var(--text-normal);
+	stroke-width: 1.5;
+	rx: max(0px, calc(var(--radius-s) - 2.25px));
+	ry: max(0px, calc(var(--radius-s) - 2.25px));
+	pointer-events: none;
+}
+
+/* D47: the relation finder's line: its lines are thicker and in the accent colour, with their normal
+   pattern; its union signs and far-couple tags take the accent. Cards keep their border (D41). */
+.dynasty-line.dynasty-on-line {
+	stroke: var(--interactive-accent);
+	stroke-opacity: 1;
+}
+
+.dynasty-line-marriage.dynasty-on-line {
+	stroke-width: 4;
+}
+
+.dynasty-line-betrothal.dynasty-on-line {
+	stroke-width: 4;
+}
+
+.dynasty-line-concubinage.dynasty-on-line {
+	stroke-width: 3.5;
+}
+
+.dynasty-line-affair.dynasty-on-line {
+	stroke-width: 3.5;
+}
+
+.dynasty-line-implicit.dynasty-on-line {
+	stroke-width: 2.75;
+}
+
+.dynasty-line-descent.dynasty-on-line {
+	stroke-width: 3;
+}
+
+.dynasty-line-illegitimate.dynasty-on-line {
+	stroke-width: 3;
+}
+
+.dynasty-line-birth-link.dynasty-on-line {
+	stroke-width: 3;
+}
+
+.dynasty-line-adoptive.dynasty-on-line {
+	stroke-width: 4.5;
+}
+
+.dynasty-line-ward.dynasty-on-line {
+	stroke-width: 4.5;
+}
+
+.dynasty-line-rumoured.dynasty-on-line {
+	stroke-width: 3;
+}
+
+.dynasty-union-dot.dynasty-on-line {
+	fill: var(--interactive-accent);
+}
+
+.dynasty-union-ring.dynasty-on-line,
+.dynasty-union-open-triangle.dynasty-on-line {
+	fill: var(--background-primary);
+	stroke: var(--interactive-accent);
+}
+
+.dynasty-tag.dynasty-on-line .dynasty-tag-pill {
+	stroke: var(--interactive-accent);
+	stroke-width: 2;
+}
+
+/* D47 "Show in the whole tree": every card, line, sign and tag beside the line is faded. */
+.dynasty-faded {
+	opacity: 0.25;
+}
+
 /* ---------- Focus mode (spec §5.6) ---------- */
 
 /* The `+` badge of a card with relatives who are not shown. It follows its card, over the card's
@@ -1552,6 +1663,35 @@ textarea.dynasty-sheet-input {
 	flex: 1 1 0;
 }
 
+/*
+ * D52: one row, and Close always on the screen. The buttons keep 44 px (spec §7.5); the "Read only"
+ * text gives up its width first. If the buttons are still wider than the phone, Close stays at the
+ * right edge over the others (sticky in the row, which clips instead of wrapping).
+ */
+.modal.dynasty-fullscreen.is-phone .dynasty-full .dynasty-toolbar {
+	flex-wrap: nowrap;
+	overflow-x: auto;
+	overflow-y: hidden;
+	scrollbar-width: none;
+}
+
+.modal.dynasty-fullscreen.is-phone .dynasty-full .dynasty-toolbar .dynasty-read-only-label {
+	flex: 0 1 auto;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.modal.dynasty-fullscreen.is-phone .dynasty-full .dynasty-toolbar .dynasty-close {
+	position: sticky;
+	right: 0;
+	background-color: var(--background-primary);
+}
+
+.modal.dynasty-fullscreen.is-phone .dynasty-full .dynasty-toolbar .dynasty-close:hover {
+	background-image: linear-gradient(var(--background-modifier-hover), var(--background-modifier-hover));
+}
+
 .modal.dynasty-fullscreen.is-phone .dynasty-full .dynasty-popover:not(.is-anchored) {
 	top: auto;
 	left: var(--size-4-2);
@@ -1611,9 +1751,10 @@ body.dynasty-fullscreen-open .popover.hover-popover {
 	color: var(--text-muted);
 }
 
+/* Colour swatch, arms (spec §13.6), name, count, Delete. */
 .dynasty-house-row {
 	display: grid;
-	grid-template-columns: auto 1fr auto auto;
+	grid-template-columns: auto auto 1fr auto auto;
 	align-items: center;
 	gap: var(--size-4-2) var(--size-4-3);
 	padding: var(--size-4-1) 0;
@@ -1676,7 +1817,9 @@ body.dynasty-fullscreen-open .popover.hover-popover {
 	gap: var(--size-4-2);
 }
 
-.dynasty-sheet button.dynasty-house-colour {
+/* The house colours and the colours from the arms have one edge, strong enough (3:1 on the panel) that a very dark or very pale colour of the arms still shows. */
+.dynasty-sheet button.dynasty-house-colour,
+.dynasty-sheet button.dynasty-house-arms-colour {
 	width: 44px;
 	height: 44px;
 	min-height: 44px;
@@ -1685,24 +1828,30 @@ body.dynasty-fullscreen-open .popover.hover-popover {
 	align-items: center;
 	justify-content: center;
 	border-radius: 50%;
-	border: 1px solid var(--background-modifier-border);
+	border: 1px solid;
+	border-color: var(--text-muted);
+	border-color: color-mix(in srgb, var(--text-muted) 55%, var(--text-faint));
 	background: var(--dynasty-house-color);
 	box-shadow: none;
 	color: var(--text-on-accent);
 }
 
 /* Selected: a ring in the text colour, not colour alone, plus a check mark. */
-.dynasty-sheet button.dynasty-house-colour.is-selected {
+.dynasty-sheet button.dynasty-house-colour.is-selected,
+.dynasty-sheet button.dynasty-house-arms-colour.is-selected {
 	box-shadow: 0 0 0 2px var(--background-secondary), 0 0 0 4px var(--text-normal);
 }
 
-.dynasty-house-colour .svg-icon {
+.dynasty-house-colour .svg-icon,
+.dynasty-house-arms-colour .svg-icon {
 	filter: drop-shadow(0 0 1px var(--background-modifier-cover));
 }
 
 /* Keyboard focus in the Houses window (spec §5.2): outside the selection ring, in the text colour so a weak theme accent cannot hide it. */
 .dynasty-sheet button.dynasty-house-swatch:focus-visible,
 .dynasty-sheet button.dynasty-house-colour:focus-visible,
+.dynasty-sheet button.dynasty-house-arms-colour:focus-visible,
+.dynasty-sheet button.dynasty-house-arms:focus-visible,
 .modal.dynasty-sheet .dynasty-house-other input[type='color']:focus-visible {
 	outline: 2px solid var(--text-normal);
 	outline-offset: 5px;
@@ -1718,24 +1867,24 @@ body.dynasty-fullscreen-open .popover.hover-popover {
 	cursor: pointer;
 }
 
-/* Phone: the name has the whole width; the count and Delete go on a second row (spec §7.4). */
+/* Phone: the name has the rest of the width; the count and Delete go on a second row (spec §7.4). */
 .dynasty-sheet.is-phone .dynasty-house-row {
-	grid-template-columns: auto 1fr auto;
+	grid-template-columns: auto auto 1fr auto;
 	gap: var(--size-4-1) var(--size-4-3);
 	padding-bottom: var(--size-4-2);
 	border-bottom: 1px solid var(--background-modifier-border);
 }
 
 .dynasty-sheet.is-phone .dynasty-house-row .dynasty-sheet-input {
-	grid-column: 2 / 4;
+	grid-column: 3 / 5;
 }
 
 .dynasty-sheet.is-phone .dynasty-house-row .dynasty-house-count {
-	grid-column: 2 / 3;
+	grid-column: 3 / 4;
 }
 
 .dynasty-sheet.is-phone .dynasty-house-row .dynasty-sheet-action {
-	grid-column: 3 / 4;
+	grid-column: 4 / 5;
 	justify-self: end;
 }
 
@@ -1749,4 +1898,1282 @@ body.dynasty-fullscreen-open .popover.hover-popover {
 
 .dynasty-sheet-confirm .dynasty-choice-options {
 	margin-top: var(--size-4-3);
+}
+
+/* ---------- M7: the More list, the relation finder's result bar, the relation text of the sheet (spec §13.1, §13.2; D47–D49) ---------- */
+
+/* D49: the More list; each action is a row with its icon, at least 44 px high. */
+.dynasty-popover-more {
+	min-width: 220px;
+	padding: var(--size-4-1);
+}
+
+.dynasty-popover .dynasty-popover-item.dynasty-more-item {
+	display: flex;
+	align-items: center;
+	gap: var(--size-4-3);
+	font-size: var(--font-ui-medium);
+}
+
+/* On a phone the list sits above the toolbar at the right, near the More button. */
+.modal.dynasty-fullscreen.is-phone .dynasty-full .dynasty-popover-more:not(.is-anchored) {
+	left: auto;
+	width: 60%;
+}
+
+/*
+ * The finder's result bar (D47, D48): under the toolbar on the computer, at the top inside the safe
+ * area on a phone. Its own background, like the toolbar: the tree shows around it. On the computer it
+ * is as wide as the tree, so its buttons share one row when they fit and the bar keeps less of the
+ * tree's height (the first view measures it).
+ */
+.dynasty-result {
+	position: absolute;
+	z-index: 1;
+	top: calc(var(--size-4-1) + 44px + 2px + var(--size-4-2));
+	left: var(--size-4-1);
+	right: var(--size-4-1);
+	width: auto;
+	box-sizing: border-box;
+	padding: var(--size-4-3) var(--size-4-4);
+	background: var(--background-primary);
+	border: 1px solid var(--background-modifier-border);
+	border-radius: var(--radius-m);
+	box-shadow: var(--shadow-s);
+	font-family: var(--font-interface);
+	color: var(--text-normal);
+	cursor: default;
+	user-select: text;
+	-webkit-user-select: text;
+}
+
+.callout .dynasty-result {
+	background-image: var(--dynasty-callout-bg, linear-gradient(rgba(var(--callout-color), 0.1), rgba(var(--callout-color), 0.1)));
+}
+
+.dynasty-full .dynasty-result {
+	top: calc(max(var(--size-4-1), env(safe-area-inset-top)) + 44px + 2px + var(--size-4-2));
+	left: max(var(--size-4-1), env(safe-area-inset-left));
+	right: max(var(--size-4-1), env(safe-area-inset-right));
+}
+
+/* Phone: the toolbar is at the bottom, so the bar is at the top, inside the safe area (spec §13.2). */
+.modal.dynasty-fullscreen.is-phone .dynasty-full .dynasty-result {
+	top: max(var(--size-4-1), env(safe-area-inset-top));
+	left: max(var(--size-4-2), env(safe-area-inset-left));
+	right: max(var(--size-4-2), env(safe-area-inset-right));
+	width: auto;
+}
+
+.dynasty-result-text {
+	font-size: var(--font-ui-medium);
+	font-weight: var(--font-semibold);
+	line-height: 1.35;
+	overflow-wrap: anywhere;
+}
+
+/* The sentence takes the focus only so that a screen reader reads it; it is not a control. */
+.dynasty-result-text:focus {
+	outline: none;
+}
+
+.dynasty-result-steps {
+	margin: var(--size-4-2) 0 0 0;
+	padding-left: 1.4em;
+	font-size: var(--font-ui-small);
+	line-height: 1.45;
+	max-height: 40vh;
+	overflow-y: auto;
+}
+
+.dynasty-result-more-steps {
+	list-style: none;
+	color: var(--text-muted);
+}
+
+.dynasty-result-buttons {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--size-4-2);
+	margin-top: var(--size-4-3);
+}
+
+/* Spec §7.5, §13.0 item 8: every button of the bar has a hit area of at least 44 × 44 px. */
+.dynasty-result .dynasty-result-button {
+	min-height: 44px;
+	min-width: 44px;
+	height: auto;
+	padding: 0 var(--size-4-3);
+	font-family: var(--font-interface);
+}
+
+/*
+ * Phone: a shorter bar, so the tree keeps more height. The buttons share one row; a long label
+ * breaks into two text lines inside its button, which stays at least 44 × 44 px.
+ */
+.modal.dynasty-fullscreen.is-phone .dynasty-full .dynasty-result {
+	padding: var(--size-4-2) var(--size-4-3);
+}
+
+.modal.dynasty-fullscreen.is-phone .dynasty-full .dynasty-result-buttons {
+	flex-wrap: nowrap;
+	gap: var(--size-4-1);
+	margin-top: var(--size-4-2);
+}
+
+.modal.dynasty-fullscreen.is-phone .dynasty-full .dynasty-result .dynasty-result-button {
+	flex: 1 1 auto;
+	padding: var(--size-2-1) var(--size-4-1);
+	white-space: normal;
+	line-height: 1.2;
+	text-align: center;
+}
+
+/* Spec §13.1: the relation to the marked person, at the top of the sheet's Family section. */
+.dynasty-relation-summary {
+	display: flex;
+	flex-direction: column;
+	gap: var(--size-4-1);
+	margin-bottom: var(--size-4-3);
+	padding: var(--size-4-2) var(--size-4-3);
+	border-radius: var(--radius-m);
+	background: var(--background-secondary);
+}
+
+.dynasty-relation-main {
+	font-weight: var(--font-semibold);
+}
+
+.dynasty-relation-also {
+	color: var(--text-muted);
+	font-size: var(--font-ui-small);
+}
+
+.dynasty-sheet .dynasty-relation-summary .dynasty-sheet-action {
+	align-self: flex-start;
+	width: auto;
+	margin-top: var(--size-4-1);
+}
+
+/* ---------- M8: titles and holders (spec §13.3–§13.5; D54–D63) ---------- */
+
+/* Spec §13.5: the ruler name of the shown title after the full name in a picker row. */
+.dynasty-picker-suffix {
+	color: var(--text-muted);
+	font-weight: var(--font-normal);
+}
+
+/* The Titles window: wider than the sheet, so a holder row keeps its buttons beside its text (M8 decision page). */
+.modal.dynasty-sheet.dynasty-titles:not(.is-phone) {
+	width: min(720px, calc(100vw - 2 * var(--size-4-4)));
+}
+
+.dynasty-title-list {
+	display: flex;
+	flex-direction: column;
+	gap: var(--size-4-2);
+}
+
+.dynasty-title-none,
+.dynasty-holder-none {
+	color: var(--text-muted);
+}
+
+.dynasty-title-box {
+	display: flex;
+	flex-direction: column;
+	gap: var(--size-4-2);
+	padding-bottom: var(--size-4-2);
+	border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.dynasty-title-row {
+	display: grid;
+	grid-template-columns: 1fr auto auto auto;
+	align-items: center;
+	gap: var(--size-4-2) var(--size-4-3);
+}
+
+/*
+ * "Name for a man" (D66), "Name for a woman" (D65) and "Name of the list" (D64) under the name of the
+ * title. Each label is a <label>, so the whole row (at least 44 px high) puts the cursor in the field.
+ * The rows share the columns of their container (subgrid), so the inputs start at the same place.
+ */
+.dynasty-title-fields {
+	display: grid;
+	grid-template-columns: auto 1fr;
+	gap: var(--size-4-1) var(--size-4-3);
+}
+
+.dynasty-title-field {
+	grid-column: 1 / -1;
+	display: grid;
+	grid-template-columns: subgrid;
+	align-items: center;
+	min-height: 44px;
+}
+
+.dynasty-title-count {
+	color: var(--text-muted);
+	font-size: var(--font-ui-small);
+	white-space: nowrap;
+	min-width: 5.5em;
+}
+
+.dynasty-sheet .dynasty-title-row .dynasty-sheet-action,
+.dynasty-sheet .dynasty-title-add.dynasty-sheet-action,
+.dynasty-sheet .dynasty-holder-panel-buttons .dynasty-sheet-action,
+.dynasty-sheet .dynasty-holder-buttons .dynasty-sheet-action {
+	width: auto;
+}
+
+.dynasty-title-add {
+	align-self: flex-start;
+}
+
+.dynasty-holder-panel {
+	display: flex;
+	flex-direction: column;
+	gap: var(--size-4-2);
+	padding: var(--size-4-2) var(--size-4-3);
+	border-radius: var(--radius-m);
+	background: var(--background-secondary);
+}
+
+.dynasty-holder-list {
+	display: flex;
+	flex-direction: column;
+}
+
+.dynasty-holder-row {
+	display: flex;
+	align-items: center;
+	gap: var(--size-4-2) var(--size-4-3);
+	padding: var(--size-4-1) 0;
+}
+
+.dynasty-holder-row + .dynasty-holder-row {
+	border-top: 1px solid var(--background-modifier-border);
+}
+
+.dynasty-holder-text {
+	flex: 1 1 auto;
+	min-width: 0;
+	display: flex;
+	flex-direction: column;
+	overflow-wrap: anywhere;
+}
+
+/* A holder in the tree: a tap shows the card (spec §13.4). The hit area is at least 44 px high (§13.0 item 8). */
+.dynasty-sheet button.dynasty-holder-name {
+	align-self: flex-start;
+	min-height: 44px;
+	min-width: 44px;
+	max-width: 100%;
+	height: auto;
+	padding: 0 var(--size-4-2);
+	margin-left: calc(-1 * var(--size-4-2));
+	font-weight: var(--font-semibold);
+	text-align: left;
+	white-space: normal;
+	background: transparent;
+	box-shadow: none;
+	color: var(--text-normal);
+	text-decoration: underline;
+	text-decoration-color: var(--text-faint);
+	text-underline-offset: 3px;
+}
+
+.dynasty-sheet button.dynasty-holder-name:hover {
+	background: var(--background-modifier-hover);
+}
+
+/* The name of a holder has one size and weight, as a button (in the tree) or as text (not in the tree, G5 M8). */
+.dynasty-sheet button.dynasty-holder-name,
+.dynasty-sheet div.dynasty-holder-name {
+	font-size: var(--font-ui-small);
+	font-weight: var(--font-semibold);
+}
+
+/* A holder who is not in the tree shows in muted text, and says so in words (not colour alone). */
+.dynasty-holder-row.is-not-in-tree .dynasty-holder-text {
+	color: var(--text-muted);
+}
+
+.dynasty-holder-full,
+.dynasty-holder-reign,
+.dynasty-holder-note {
+	color: var(--text-muted);
+	font-size: var(--font-ui-small);
+}
+
+.dynasty-holder-note {
+	font-style: italic;
+}
+
+.dynasty-holder-buttons {
+	flex: none;
+	display: flex;
+	flex-wrap: nowrap;
+	align-items: center;
+	gap: var(--size-4-1);
+}
+
+.dynasty-holder-panel-buttons {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--size-4-2);
+}
+
+/*
+ * The buttons of the holder panel need their own shape: on a phone Obsidian fills a button with
+ * --background-secondary and no shadow, the same as the panel (G5 M8). A border keeps them visible in any theme.
+ */
+.dynasty-sheet .dynasty-holder-panel button:not(.dynasty-holder-name) {
+	border: 1px solid var(--background-modifier-border);
+}
+
+/* Move earlier and Move later: text on the computer, a 44 px arrow on a phone (supervisor, WP8.3). */
+.dynasty-holder-move {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+}
+
+.dynasty-holder-move-icon {
+	display: none;
+}
+
+.dynasty-sheet.is-phone .dynasty-holder-move-icon {
+	display: inline-flex;
+}
+
+.dynasty-sheet.is-phone .dynasty-holder-move-text {
+	display: none;
+}
+
+/* Phone: the text above, all four buttons in one row below it (supervisor, WP8.3); the name has the whole width. */
+.dynasty-sheet.is-phone .dynasty-title-row {
+	grid-template-columns: 1fr auto;
+}
+
+.dynasty-sheet.is-phone .dynasty-title-row .dynasty-sheet-input {
+	grid-column: 1 / 3;
+}
+
+.dynasty-sheet.is-phone .dynasty-title-row .dynasty-title-count {
+	grid-column: 1 / 3;
+}
+
+.dynasty-sheet.is-phone .dynasty-title-row .dynasty-title-toggle {
+	justify-self: stretch;
+}
+
+/* Phone: each label above its field, which has the whole width (16 px text and 44 px from the phone input rule). */
+.dynasty-sheet.is-phone .dynasty-title-fields {
+	grid-template-columns: 1fr;
+	row-gap: var(--size-4-2);
+}
+
+.dynasty-sheet.is-phone .dynasty-title-field {
+	grid-template-columns: 1fr;
+	row-gap: var(--size-4-1);
+}
+
+/*
+ * Phone: the panel has the fill of the window and a border for its own shape. A theme makes its buttons
+ * visible on the window fill; Obsidian's phone button fill is the old panel fill (G5 M8).
+ */
+.dynasty-sheet.is-phone .dynasty-holder-panel {
+	padding: var(--size-4-2);
+	border: 1px solid var(--background-modifier-border);
+	background: var(--modal-background, var(--background-primary));
+}
+
+.dynasty-sheet.is-phone .dynasty-holder-row {
+	flex-direction: column;
+	align-items: stretch;
+}
+
+.dynasty-sheet.is-phone .dynasty-holder-buttons > .dynasty-holder-move {
+	flex: none;
+	width: 44px;
+	padding: 0;
+}
+
+.dynasty-sheet.is-phone .dynasty-holder-buttons > .dynasty-holder-edit,
+.dynasty-sheet.is-phone .dynasty-holder-buttons > .dynasty-holder-remove {
+	flex: 1 1 0;
+	min-width: 0;
+	padding: 0 var(--size-4-2);
+}
+
+.dynasty-sheet.is-phone .dynasty-holder-panel-buttons .dynasty-sheet-action,
+.dynasty-sheet.is-phone .dynasty-title-add.dynasty-sheet-action {
+	width: 100%;
+}
+
+/* The holder form: Number beside Ruler name, From beside Until; the live preview below them (spec §13.5). */
+.dynasty-holder-form-row {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: var(--size-4-3);
+}
+
+.dynasty-holder-preview {
+	padding: var(--size-4-2) var(--size-4-3);
+	border-radius: var(--radius-m);
+	background: var(--background-secondary);
+	font-weight: var(--font-semibold);
+	overflow-wrap: anywhere;
+}
+
+/* The Titles section of the edit sheet (spec §13.4). */
+.dynasty-title-holding + .dynasty-title-holding {
+	margin-top: var(--size-4-2);
+}
+
+.dynasty-title-holding-name {
+	font-weight: var(--font-semibold);
+}
+
+/* "On the card": a label, not a button; a border in the text colour, so it does not rely on colour alone. */
+.dynasty-title-on-card {
+	padding: var(--size-2-1) var(--size-4-2);
+	border: 1px solid var(--text-muted);
+	border-radius: var(--radius-s);
+	color: var(--text-normal);
+	font-size: var(--font-ui-small);
+	white-space: nowrap;
+}
+
+.dynasty-sheet.is-phone .dynasty-title-holding-head .dynasty-family-controls > .dynasty-title-on-card {
+	flex: none;
+	align-self: flex-start;
+}
+
+/* ---------- M9: arms in the Houses window, the portrait in the edit sheet, the picture picker (spec §13.6, §13.7; D67–D69, D75) ---------- */
+
+/* The arms of a house, about 40 px high, in a 44 × 44 px button (spec §7.5, B8). D75: the arms show as the picture is, with no frame, edge or background. */
+.dynasty-sheet button.dynasty-house-arms {
+	width: 44px;
+	height: 44px;
+	min-width: 44px;
+	min-height: 44px;
+	padding: 2px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	border: none;
+	border-radius: var(--radius-s);
+	background: transparent;
+	box-shadow: none;
+	cursor: pointer;
+}
+
+.dynasty-house-arms-img {
+	display: block;
+	width: auto;
+	height: auto;
+	max-width: 40px;
+	max-height: 40px;
+}
+
+/* A house with no arms, or arms that cannot show: an empty dashed box of the same size (spec §13.6). */
+.dynasty-sheet button.dynasty-house-arms.is-empty::before {
+	content: '';
+	box-sizing: border-box;
+	width: 34px;
+	height: 40px;
+	border: 1px dashed var(--text-faint);
+	border-radius: var(--radius-s);
+}
+
+.dynasty-house-arms-part {
+	display: flex;
+	flex-direction: column;
+	gap: var(--size-4-2);
+	padding-bottom: var(--size-4-2);
+	border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.dynasty-house-arms-buttons {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--size-4-2);
+}
+
+.dynasty-sheet .dynasty-house-arms-buttons .dynasty-sheet-action {
+	width: auto;
+}
+
+/* D68: the exact colours of the arms, before the label "House colours". */
+.dynasty-house-arms-colours.is-loading {
+	min-height: 44px;
+}
+
+.dynasty-house-arms-none {
+	grid-column: 1 / -1;
+}
+
+/* The portrait at the top of the edit sheet (spec §13.7): a round picture of about 96 px. */
+.dynasty-sheet-portrait-row {
+	display: flex;
+	align-items: center;
+	gap: var(--size-4-4);
+}
+
+.dynasty-sheet-portrait-frame {
+	flex: none;
+	box-sizing: border-box;
+	width: 96px;
+	height: 96px;
+	border-radius: 50%;
+	border: 2px solid var(--background-modifier-border);
+	background: var(--background-secondary);
+	overflow: hidden;
+}
+
+/* B1: only a missing file gives the dashed frame. */
+.dynasty-sheet-portrait-frame.is-missing {
+	border-style: dashed;
+	border-color: var(--text-faint);
+	background: transparent;
+}
+
+.dynasty-sheet-portrait-img {
+	display: block;
+	width: 100%;
+	height: 100%;
+}
+
+.dynasty-sheet-portrait-buttons {
+	flex: 1 1 auto;
+	min-width: 0;
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+	gap: var(--size-4-2);
+}
+
+.dynasty-sheet .dynasty-sheet-portrait-buttons .dynasty-sheet-action {
+	width: auto;
+}
+
+/* The picture picker (spec §13.14, D92 to D95): a search field and the folder list. The sheet body is the scroller, on the computer and on the phone. */
+.dynasty-picture-list {
+	flex: none;
+	display: block;
+	min-width: 0;
+}
+
+/* A row is at least 44 px high (§7.5). content-visibility keeps a list of 2 000 rows cheap to lay out and to scroll; 44 px is its guess for a row that is not drawn. The indent is 16 px for each depth. */
+.dynasty-picture-row {
+	box-sizing: border-box;
+	display: flex;
+	align-items: center;
+	gap: var(--size-4-2);
+	min-height: 44px;
+	padding: var(--size-4-1) var(--size-4-2);
+	padding-left: calc(var(--size-4-2) + var(--dynasty-picker-depth, 0) * 16px);
+	border-radius: var(--radius-s);
+	cursor: pointer;
+	content-visibility: auto;
+	contain-intrinsic-size: auto 44px;
+}
+
+.dynasty-picture-row:hover,
+.dynasty-picture-row.is-cursor {
+	background: var(--background-modifier-hover);
+}
+
+/* The selected picture: a bar in the text colour, not colour alone, so a weak theme accent cannot hide it. */
+.dynasty-picture-row.is-selected {
+	background: var(--background-modifier-hover);
+	box-shadow: inset 3px 0 0 var(--text-normal);
+}
+
+.dynasty-picture-plus {
+	flex: none;
+	width: 32px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	color: var(--interactive-accent);
+	font-weight: var(--font-semibold);
+	font-size: var(--font-ui-large);
+}
+
+.dynasty-picture-text {
+	min-width: 0;
+}
+
+.dynasty-picture-name {
+	overflow-wrap: anywhere;
+}
+
+.dynasty-picture-device .dynasty-picture-name {
+	color: var(--interactive-accent);
+	font-weight: var(--font-semibold);
+}
+
+.dynasty-picture-folder,
+.dynasty-picture-none {
+	color: var(--text-muted);
+	font-size: var(--font-ui-smaller);
+	overflow-wrap: anywhere;
+}
+
+.dynasty-picture-none {
+	padding: var(--size-4-2);
+}
+
+/* A folder row: the arrow turns down when the folder is open. */
+.dynasty-picture-folder-row {
+	font-weight: var(--font-semibold);
+}
+
+.dynasty-picture-chevron,
+.dynasty-picture-spacer {
+	flex: none;
+	width: 20px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	color: var(--text-muted);
+}
+
+.dynasty-picture-chevron .svg-icon,
+.dynasty-picture-folder-icon .svg-icon {
+	width: 18px;
+	height: 18px;
+}
+
+.dynasty-picture-chevron .svg-icon {
+	transition: transform 80ms ease-out;
+}
+
+.dynasty-picture-folder-row.is-open .dynasty-picture-chevron .svg-icon {
+	transform: rotate(90deg);
+}
+
+.dynasty-picture-folder-icon {
+	flex: none;
+	display: flex;
+	color: var(--text-muted);
+}
+
+.dynasty-picture-folder-name {
+	min-width: 0;
+	overflow-wrap: anywhere;
+}
+
+.dynasty-picture-count {
+	flex: none;
+	margin-left: auto;
+	padding-left: var(--size-4-2);
+	color: var(--text-muted);
+	font-size: var(--font-ui-smaller);
+	font-weight: var(--font-normal);
+	font-variant-numeric: tabular-nums;
+}
+
+/* The row preview: a 32 px box that keeps the picture's own proportions. It is empty while the picture loads. A picture that cannot show has a solid frame; a file that is not in the vault has a dashed frame. */
+.dynasty-picture-thumb {
+	flex: none;
+	box-sizing: border-box;
+	width: 32px;
+	height: 32px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	overflow: hidden;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: var(--radius-s);
+	background: var(--background-primary);
+}
+
+.dynasty-picture-thumb.is-missing {
+	border-style: dashed;
+}
+
+.dynasty-picture-thumb-img {
+	display: block;
+	max-width: 100%;
+	max-height: 100%;
+	object-fit: contain;
+	pointer-events: none;
+}
+
+/* The mark on the current picture: a check and the text, in both lists. */
+.dynasty-picture-inuse {
+	flex: none;
+	margin-left: auto;
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	padding-left: var(--size-4-2);
+	color: var(--text-muted);
+	font-size: var(--font-ui-smaller);
+}
+
+.dynasty-picture-inuse .svg-icon {
+	width: 16px;
+	height: 16px;
+}
+
+/* ---------- M9: arms and portraits on the cards, the legend's houses, Save as a picture (spec §13.6–§13.8; D67, D74–D78) ---------- */
+
+/* A picture never takes a press: the card under it does (spec §7.2). */
+.dynasty-picture {
+	pointer-events: none;
+}
+
+/* D75: the arms show as the picture is, with no frame, edge or background. The Compact arms show only at the Compact level (C4). */
+.dynasty-card-compact-arms {
+	display: none;
+}
+
+.dynasty-lod-compact .dynasty-card-compact-arms {
+	display: inline;
+}
+
+/* D76, B1: the portrait's frame, a thin ring in theme colours; empty and solid while the picture loads or when it cannot show. --text-muted: --text-faint is under 3:1 on the card in the default and Minimal themes. */
+.dynasty-portrait-frame {
+	fill: none;
+	stroke: var(--text-muted);
+	stroke-width: 1;
+	pointer-events: none;
+}
+
+/* B1: only a file that is not in the vault gives the dashed frame, with a grey inside. */
+.dynasty-portrait-frame.is-missing {
+	fill: var(--background-modifier-border);
+	stroke-dasharray: 3 2;
+}
+
+/* With the picture, the frame is only a fine edge round it (the copy is already round). */
+.dynasty-portrait.has-picture .dynasty-portrait-frame {
+	fill: none;
+	stroke: var(--background-modifier-border);
+	stroke-dasharray: none;
+}
+
+/* G4: a deceased person's arms and portrait are muted like the house strip (the frame is not, as in the saved picture). */
+.dynasty-deceased .dynasty-picture {
+	opacity: 0.8;
+}
+
+/* S4, spec §13.6 "Legend": the houses under the line styles; the rows are not buttons in M9. */
+.dynasty-legend-houses {
+	display: grid;
+	gap: var(--size-4-1);
+	margin-top: var(--size-4-1);
+	padding-top: var(--size-4-2);
+	border-top: 1px solid var(--background-modifier-border);
+}
+
+.dynasty-legend-title {
+	color: var(--text-normal);
+	font-weight: var(--font-semibold);
+}
+
+.dynasty-legend-house {
+	display: flex;
+	align-items: center;
+	gap: var(--size-4-2);
+	min-height: 28px;
+}
+
+.dynasty-legend-strip {
+	flex: none;
+	width: 7px;
+	height: 26px;
+	border-radius: 2px;
+	background: var(--dynasty-house-color, var(--background-modifier-border));
+}
+
+/* D27: as on the cards, a house colour is lighter in the dark theme. */
+.theme-dark .dynasty-legend-strip.dynasty-has-house {
+	background: var(--dynasty-house-color);
+	background: color-mix(in srgb, var(--dynasty-house-color) 70%, var(--text-normal));
+}
+
+/* Every row keeps the arms place (20 × 24 px, the legend copy size in tree-view.ts), so the names line up. */
+.dynasty-legend-arms {
+	flex: none;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 20px;
+	height: 24px;
+}
+
+.dynasty-legend-arms .dynasty-picture {
+	display: block;
+	max-width: 100%;
+	max-height: 100%;
+}
+
+/* Spec §13.8, D72: the window "Save as a picture", with PNG and SVG as a pair of choices. */
+.modal.dynasty-save-window {
+	width: min(480px, calc(100vw - 2 * var(--size-4-4)));
+}
+
+.modal.dynasty-save-window.is-phone {
+	width: 100vw;
+}
+
+.dynasty-sheet .dynasty-save-kind {
+	position: relative;
+	padding-left: calc(var(--size-4-3) + 26px);
+}
+
+/* A round mark shows the selected kind also without colour. */
+.dynasty-sheet .dynasty-save-kind::before {
+	content: '';
+	position: absolute;
+	left: var(--size-4-3);
+	top: 50%;
+	box-sizing: border-box;
+	width: 16px;
+	height: 16px;
+	margin-top: -8px;
+	border: 2px solid var(--text-muted);
+	border-radius: 50%;
+}
+
+.dynasty-sheet .dynasty-save-kind.is-selected {
+	box-shadow: 0 0 0 2px var(--interactive-accent);
+}
+
+.dynasty-sheet .dynasty-save-kind.is-selected::before {
+	border-color: var(--interactive-accent);
+	background: var(--interactive-accent);
+	box-shadow: inset 0 0 0 3px var(--background-primary);
+}
+
+/* The result Notice (spec §13.8): Share has a 44 × 44 px hit area (B8). */
+.dynasty-save-small {
+	margin-top: var(--size-4-1);
+}
+
+.notice button.dynasty-save-share {
+	display: block;
+	min-width: 88px;
+	min-height: 44px;
+	margin-top: var(--size-4-2);
+}
+
+/* ---------- The portrait crop tool (spec §13.13, D79, D90) ---------- */
+
+.modal.dynasty-crop {
+	width: min(440px, calc(100vw - 2 * var(--size-4-4)));
+	/*
+	 * The picture is not part of the theme, so the part outside the frame is darker with black in both
+	 * themes (a black shadow at half strength), and the ring is white with a dark line.
+	 */
+	--dynasty-crop-ring: white;
+}
+
+.modal.dynasty-crop.is-phone {
+	width: 100vw;
+}
+
+.dynasty-crop-body {
+	align-items: center;
+}
+
+.dynasty-crop-hint,
+.dynasty-crop-status {
+	text-align: center;
+	color: var(--text-muted);
+}
+
+/* The area is a square a little larger than the round frame; what lies outside the frame is dimmed. */
+.dynasty-crop-area {
+	position: relative;
+	flex: none;
+	box-sizing: border-box;
+	width: var(--dynasty-crop-area, 336px);
+	height: var(--dynasty-crop-area, 336px);
+	overflow: hidden;
+	background: var(--background-secondary);
+	border-radius: var(--radius-m);
+	/* The picture area takes every touch and pointer gesture itself (spec §13.13). */
+	touch-action: none;
+	user-select: none;
+	-webkit-user-select: none;
+	cursor: grab;
+}
+
+.dynasty-crop-area:active {
+	cursor: grabbing;
+}
+
+.dynasty-crop-img {
+	position: absolute;
+	left: 0;
+	top: 0;
+	display: none;
+	width: var(--dynasty-crop-w, 0);
+	height: var(--dynasty-crop-h, 0);
+	max-width: none;
+	transform-origin: 0 0;
+	transform: translate(var(--dynasty-crop-tx, 0), var(--dynasty-crop-ty, 0)) scale(var(--dynasty-crop-scale, 1));
+	-webkit-user-drag: none;
+	pointer-events: none;
+}
+
+.dynasty-crop-area.has-picture .dynasty-crop-img {
+	display: block;
+}
+
+.dynasty-crop-frame {
+	position: absolute;
+	left: 50%;
+	top: 50%;
+	box-sizing: border-box;
+	width: var(--dynasty-crop-frame, 240px);
+	height: var(--dynasty-crop-frame, 240px);
+	transform: translate(-50%, -50%);
+	border-radius: 50%;
+	border: 2px solid var(--dynasty-crop-ring);
+	box-shadow: 0 0 0 1px black;
+	pointer-events: none;
+}
+
+/* The dim part is a huge shadow that the round frame cuts out; it starts outside the ring. Half strength: black at 50 % opacity. */
+.dynasty-crop-frame::before {
+	content: '';
+	position: absolute;
+	inset: -2px;
+	border-radius: 50%;
+	box-shadow: 0 0 0 999px black;
+	opacity: 0.5;
+}
+
+.dynasty-crop-area:focus-visible {
+	outline: 2px solid var(--interactive-accent);
+	outline-offset: 2px;
+}
+
+.dynasty-crop-zoom {
+	display: flex;
+	align-items: center;
+	gap: var(--size-4-2);
+	width: var(--dynasty-crop-area, 336px);
+	max-width: 100%;
+}
+
+.dynasty-crop-slider {
+	flex: 1 1 auto;
+	min-width: 0;
+	min-height: 44px;
+}
+
+.dynasty-crop-button {
+	flex: none;
+	min-width: 44px;
+	min-height: 44px;
+	padding: 0 var(--size-4-4);
+}
+
+.dynasty-crop-bar {
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: center;
+	gap: var(--size-4-2);
+	width: 100%;
+}
+
+/* On a phone the picture fills the screen and Reset, Cancel and Save sit at the bottom (D90). */
+.dynasty-crop.is-phone .dynasty-crop-bar {
+	margin-top: auto;
+	padding-bottom: env(safe-area-inset-bottom);
+}
+
+.dynasty-crop.is-phone .dynasty-crop-bar .dynasty-crop-button {
+	flex: 1 1 0;
+}
+
+/* ---------- Make a note (spec §13.11) and the house page (spec §13.12), M10 ---------- */
+
+/* The slot only holds the button, so the button lays out like the other Actions buttons. */
+.dynasty-note-slot {
+	display: contents;
+}
+
+/* The same-name question has three buttons: on a wide window they sit in a row, on a phone one under the other. */
+.dynasty-sheet-confirm-actions .dynasty-note-ask-link,
+.dynasty-sheet-confirm-actions .dynasty-note-ask-new {
+	flex: 0 1 auto;
+}
+
+/* The People button of a house row: a 44 px hit area, in a sixth column so the other controls keep their places. */
+.dynasty-house-row {
+	grid-template-columns: auto auto 1fr auto auto auto;
+}
+
+.dynasty-sheet button.dynasty-house-people {
+	min-height: 44px;
+	min-width: 44px;
+}
+
+.dynasty-sheet.is-phone .dynasty-house-row .dynasty-house-people {
+	grid-column: 3 / 4;
+	justify-self: start;
+}
+
+/* A house row of the legend is a button of at least 44 px (H1). */
+.dynasty-legend-house.is-button {
+	width: 100%;
+	min-height: 44px;
+	padding: 0 var(--size-4-1);
+	border: none;
+	border-radius: var(--radius-s);
+	background: transparent;
+	box-shadow: none;
+	color: var(--text-normal);
+	font: inherit;
+	text-align: left;
+	cursor: pointer;
+}
+
+.dynasty-legend-house.is-button:hover,
+.dynasty-legend-house.is-button:focus-visible {
+	background: var(--background-modifier-hover);
+}
+
+.modal.dynasty-house-page {
+	width: min(760px, calc(100vw - 2 * var(--size-4-4)));
+}
+
+.modal.dynasty-house-page.is-phone {
+	width: 100vw;
+}
+
+/* D94, H1: the house page has one close control, its own Close button, on every device. Obsidian's X (1.12 `.modal-close-button`, 1.13 `.modal-header-button`) is hidden; a hidden control is not in the Tab order. This comes after the sheet rules for the X, so it wins at equal specificity. */
+.dynasty-house-page .modal-close-button,
+.dynasty-house-page > .modal-header-button {
+	display: none;
+}
+
+/* The X is hidden here, so its room in the header is free: Close sits at the right edge. */
+.dynasty-house-page .dynasty-sheet-header {
+	padding-right: var(--size-4-4);
+}
+
+.dynasty-house-page .dynasty-sheet-actions {
+	margin-left: auto;
+}
+
+.dynasty-hp-summary {
+	display: flex;
+	align-items: center;
+	gap: var(--size-4-3);
+	margin-bottom: var(--size-4-3);
+}
+
+/* The colour comes only from --dynasty-house-color (spec §5.8). */
+.dynasty-hp-swatch {
+	flex: none;
+	width: 10px;
+	height: 40px;
+	border-radius: 2px;
+	background: var(--dynasty-house-color, var(--background-modifier-border));
+}
+
+.dynasty-hp-swatch.is-none {
+	background: transparent;
+	border: 1px dashed var(--background-modifier-border);
+}
+
+.dynasty-hp-arms {
+	flex: none;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	min-width: 40px;
+	height: 40px;
+}
+
+.dynasty-hp-arms.is-empty {
+	display: none;
+}
+
+.dynasty-hp-count {
+	color: var(--text-muted);
+}
+
+.dynasty-hp-none {
+	color: var(--text-muted);
+}
+
+.dynasty-sheet button.dynasty-hp-make-note {
+	min-height: 44px;
+	margin-bottom: var(--size-4-3);
+}
+
+.dynasty-hp-head,
+.dynasty-hp-row {
+	display: grid;
+	grid-template-columns: 6.5rem minmax(0, 2fr) minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr);
+	align-items: center;
+	gap: var(--size-4-3);
+	text-align: left;
+}
+
+.dynasty-hp-head {
+	padding: 0 var(--size-4-2) var(--size-4-1);
+	border-bottom: 1px solid var(--background-modifier-border);
+	color: var(--text-muted);
+	font-size: var(--font-ui-small);
+}
+
+.dynasty-sheet button.dynasty-hp-row {
+	width: 100%;
+	min-height: 44px;
+	height: auto;
+	padding: var(--size-4-1) var(--size-4-2);
+	border: none;
+	border-bottom: 1px solid var(--background-modifier-border);
+	border-radius: 0;
+	background: transparent;
+	box-shadow: none;
+	color: var(--text-normal);
+	font: inherit;
+	cursor: pointer;
+}
+
+.dynasty-sheet button.dynasty-hp-row:hover,
+.dynasty-sheet button.dynasty-hp-row:focus-visible {
+	background: var(--background-modifier-hover);
+}
+
+.dynasty-hp-cell {
+	min-width: 0;
+	overflow-wrap: anywhere;
+}
+
+/* On a phone each row has two text lines: the name and the title, then the generation and the dates (D88). */
+.dynasty-house-page.is-phone .dynasty-hp-head {
+	display: none;
+}
+
+.dynasty-house-page.is-phone .dynasty-hp-row {
+	grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr);
+	grid-template-areas:
+		'name name title'
+		'gen born died';
+	align-items: start;
+	gap: 0 var(--size-4-2);
+}
+
+.dynasty-house-page.is-phone .dynasty-hp-name {
+	grid-area: name;
+	font-weight: var(--font-semibold);
+}
+
+.dynasty-house-page.is-phone .dynasty-hp-title {
+	grid-area: title;
+	color: var(--text-muted);
+}
+
+.dynasty-house-page.is-phone .dynasty-hp-gen {
+	grid-area: gen;
+	color: var(--text-muted);
+	font-size: var(--font-ui-small);
+}
+
+.dynasty-house-page.is-phone .dynasty-hp-born {
+	grid-area: born;
+	color: var(--text-muted);
+	font-size: var(--font-ui-small);
+}
+
+.dynasty-house-page.is-phone .dynasty-hp-died {
+	grid-area: died;
+	color: var(--text-muted);
+	font-size: var(--font-ui-small);
+}
+
+/* ---------- Fold a branch (M10: spec §13.10, D83–D85) ---------- */
+
+/* The open button ("−") and the folded sign ("+ N"). The tooltip is the <title> child; Obsidian's aria-label tooltip fails on SVG. */
+.dynasty-fold {
+	--no-tooltip: true;
+	cursor: pointer;
+	outline: none;
+	font-family: var(--font-interface);
+}
+
+/* The tap area is invisible and lies below the cards, so a card wins where they meet (F7). */
+.dynasty-fold-hit {
+	cursor: pointer;
+	fill: none;
+	stroke: none;
+	pointer-events: all;
+}
+
+.dynasty-fold-button,
+.dynasty-fold-pill,
+.dynasty-fold-pill-big {
+	fill: var(--background-primary-alt);
+	stroke: var(--text-muted);
+	stroke-width: 1;
+}
+
+.dynasty-fold-minus {
+	fill: none;
+	stroke: var(--text-normal);
+	stroke-linecap: round;
+}
+
+.dynasty-fold-text {
+	font-size: calc(var(--dynasty-font-size) * 0.8);
+	font-weight: 600;
+	fill: var(--text-normal);
+	pointer-events: none;
+}
+
+.dynasty-fold:hover .dynasty-fold-button,
+.dynasty-fold:hover .dynasty-fold-pill,
+.dynasty-fold:hover .dynasty-fold-pill-big,
+.dynasty-fold.is-hover .dynasty-fold-button,
+.dynasty-fold.is-hover .dynasty-fold-pill,
+.dynasty-fold.is-hover .dynasty-fold-pill-big {
+	stroke: var(--interactive-accent);
+	stroke-width: 2;
+}
+
+/* Keyboard focus: a thick edge in the accent colour, as on the tags. */
+.dynasty-fold:focus-visible .dynasty-fold-button,
+.dynasty-fold:focus-visible .dynasty-fold-pill,
+.dynasty-fold:focus-visible .dynasty-fold-pill-big {
+	stroke: var(--interactive-accent);
+	stroke-width: 3;
+}
+
+/* Levels of detail: Full and Compact draw the same size in em; Overview draws only signs, in the larger pill (F6). */
+.dynasty-fold-pill-big {
+	display: none;
+}
+
+.dynasty-lod-overview .dynasty-fold-pill {
+	display: none;
+}
+
+.dynasty-lod-overview .dynasty-fold-pill-big {
+	display: inline;
+}
+
+.dynasty-lod-overview .dynasty-fold-text {
+	font-size: calc(var(--dynasty-font-size) * 1.5);
+}
+
+/* A hidden control is not in the Tab order, and its tap area does not take presses. */
+.dynasty-lod-overview .dynasty-fold.is-open,
+.dynasty-lod-overview .dynasty-fold-hit.is-open {
+	display: none;
 }

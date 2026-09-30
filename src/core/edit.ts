@@ -10,10 +10,16 @@
  * - `born`, `died`, `start`, `end` and ids are text: `born: 1103` stays plain.
  * - A new key goes in the §4.1 field order relative to the keys already there.
  * - Setting a field to null removes the key (and only that key's lines).
+ * - Picture links (`portrait`, house `arms`; spec §13.0 item 3) are always written in double
+ *   quotes. The caller gives the link text (the Obsidian side makes it); no op checks that the
+ *   file exists.
  */
 
-/** Person fields the edit sheet can set (§6.3 "Fields"). */
-export type PersonField = 'name' | 'title' | 'house' | 'sex' | 'born' | 'died' | 'illegitimate' | 'link' | 'notes' | 'placement';
+/**
+ * Person fields the edit sheet can set (§6.3 "Fields"); `card-title` is written by "Show on the
+ * card" (§13.3, D62), `portrait` by Select portrait and Remove portrait (§13.7).
+ */
+export type PersonField = 'name' | 'title' | 'card-title' | 'house' | 'sex' | 'born' | 'died' | 'illegitimate' | 'link' | 'portrait' | 'portrait-crop' | 'notes' | 'placement';
 
 /** A value an edit can write for a person field: text, a boolean (`illegitimate` only), or `null` to remove the key. */
 export type FieldValue = string | boolean | null;
@@ -30,19 +36,21 @@ export interface SetPersonFields {
 	fields: Partial<Record<PersonField, FieldValue>> & { id?: string };
 }
 
-/** Sets or clears one tree option (`start`, `focus`, `generations` or `height`). */
+/** Sets or clears one tree option (`start`, `focus`, `me`, `generations` or `height`). `me` is the "This is me" mark (spec §13.1, D42). */
 export interface SetOption {
 	kind: 'set-option';
-	key: 'start' | 'focus' | 'generations' | 'height';
+	key: 'start' | 'focus' | 'me' | 'generations' | 'height';
 	/** `null` removes the key; removing the last key removes `options`. */
 	value: string | number | null;
 }
 
-/** "New house…" in the edit sheet (§6.3). The id is generated from the name (§6.8). */
+/** "New house…" in the edit sheet (§6.3) and the Houses window. The id is generated from the name (§6.8). */
 export interface AddHouse {
 	kind: 'add-house';
 	name: string;
 	color?: string;
+	/** Spec §13.6: the arms picture link. Empty text (or null) writes nothing; another type is refused `bad-value`. */
+	arms?: string;
 }
 
 /** Several ops in one write (for example a new house and the person's fields). Applied in order; later ops may use ids created by earlier ones via `EditResult.created`. */
@@ -168,7 +176,12 @@ export interface MoveSibling {
 	direction: 'earlier' | 'later';
 }
 
-/** Delete a person (§6.7): the item, their id from every parent entry, their unions, and `options.start`/`focus` if they point to them. Nobody else is deleted. */
+/**
+ * Delete a person (§6.7): the item, their id from every parent entry, their unions, and
+ * `options.start`, `focus` and `me` if they point to them. Nobody else is deleted. D57: also every
+ * written holder item whose `person` is the id, in every title with an id (also one that loses to
+ * a duplicate id); a title that loses its last holder keeps `holders: []`.
+ */
 export interface DeletePerson {
 	kind: 'delete-person';
 	id: string;
@@ -177,8 +190,10 @@ export interface DeletePerson {
 // ---- Houses ----
 
 /**
- * Houses window (§6.10, D32): rename and/or recolour a house. Only given fields change;
- * `color: null` removes the colour. The id never changes (§4.1). Acts on the first house with the
+ * Houses window (§6.10, D32, §13.6): rename, recolour and/or change the arms of a house. Only given
+ * fields change; `color: null` removes the colour, `arms: null` (or empty text) the arms; `arms`
+ * of another type than text is refused `bad-value`; a value equal to the read one (compared like
+ * `link`) writes nothing. The id never changes (§4.1). Acts on the first house with the
  * id (the one the tree uses); an empty name or a colour that is not `#rrggbb` gives `bad-value`;
  * a colour is always written in double quotes. If `color:` reads as null because an unquoted
  * `#rrggbb` became an end-of-line comment, the op replaces that comment.
@@ -188,6 +203,7 @@ export interface EditHouse {
 	id: string;
 	name?: string;
 	color?: string | null;
+	arms?: string | null;
 }
 
 /**
@@ -200,14 +216,101 @@ export interface DeleteHouse {
 	people: 'clear' | 'keep';
 }
 
+// ---- Titles (spec §13.3–§13.5) ----
+
+/** The fields of a holder that ops can write. `null` (or empty text) removes the key. */
+export type HolderFields = Partial<Record<'person' | 'name' | 'as' | 'number' | 'from' | 'to', string | null>>;
+
 /**
- * Link maintenance (§6.9, D6). For each person `link` whose target (normalised with
- * `NormaliseTarget` from `link-rewrite.ts`) is a key of `map`, write the new target
- * `map[key]`, keeping `#heading`, `|alias` and a trailing `.md` if the old text had it. A value
- * keeps its written style (quotes, the unquoted nested form) only if that style can hold the new
- * text; otherwise the value-quoting rule (spec §3) applies. Nothing else in the body changes. Allowed on
- * a tree with blocking issues (it touches only `link` values). `EditResult.changed` gives the
- * number of links changed (0 = the body is unchanged).
+ * A written holder item: its title, its index in the written `holders` list, who it names and
+ * its `text`. `applyOp` refuses `unknown-holder` if the item at `index` does not name the same
+ * `person` (or, with no `person`, the same `name`), or when `text` is given and differs. Like
+ * `UnionRef`, callers pass back what they read (`Holder.index`, `Holder.text`).
+ */
+export interface HolderRef {
+	title: string;
+	index: number;
+	person?: string;
+	name?: string;
+	text?: string;
+}
+
+/** Picks an unused title id from a name (§6.8, own namespace); `taken` adds ids chosen earlier in the same batch. */
+export type NewTitleId = (body: string, name: string, taken?: ReadonlySet<string>) => string;
+
+/** Add a title at the end of `titles`; the caller chooses the id (`newTitleId`); refused `id-taken`. */
+export interface AddTitle {
+	kind: 'add-title';
+	id: string;
+	name: string;
+	/** D66: the name for a holder with `sex: m`; empty text writes nothing. */
+	maleName?: string;
+	/** D65: the name for a holder with `sex: f`; empty text writes nothing. */
+	femaleName?: string;
+	plural?: string;
+}
+
+/** Rename a title or change its male name, female name or plural; `null` (or empty text) removes the key. The id never changes. */
+export interface EditTitle {
+	kind: 'edit-title';
+	id: string;
+	name?: string;
+	maleName?: string | null;
+	femaleName?: string | null;
+	plural?: string | null;
+}
+
+/** Delete a title with its holders (the `card-title` cleanup removes the `card-title`s that name it). */
+export interface DeleteTitle {
+	kind: 'delete-title';
+	id: string;
+}
+
+/** Sheet: append one holder at the end of the list (the newest ruler). Needs `person` (refused `unknown-person` if not in the tree) or `name`. */
+export interface AddHolder {
+	kind: 'add-holder';
+	title: string;
+	fields: HolderFields;
+}
+
+/** Sheet: change fields of one holder; a block-map item stays a block map. */
+export interface EditHolder {
+	kind: 'edit-holder';
+	holder: HolderRef;
+	fields: HolderFields;
+}
+
+/** Sheet: remove one holder item with its comments. */
+export interface RemoveHolder {
+	kind: 'remove-holder';
+	holder: HolderRef;
+}
+
+/**
+ * Titles window: the whole final holder list of one title. Each item is an existing holder
+ * (`ref`, checked against the body before this op, with optional changed `fields`) or a new one
+ * (`add`). Existing items keep their comments and style and move as whole items; items not
+ * listed are removed; only changed values are written. Each existing ref may appear once.
+ */
+export interface SetHolders {
+	kind: 'set-holders';
+	title: string;
+	items: ({ ref: HolderRef; fields?: HolderFields } | { add: HolderFields })[];
+}
+
+/** The title ops (spec §13.4); `title-ops.ts` carries them out. They act on the first title with the id. */
+export type TitleOp = AddTitle | EditTitle | DeleteTitle | AddHolder | EditHolder | RemoveHolder | SetHolders;
+
+/**
+ * Link maintenance (§6.9, D6, §13.0 item 3). For each person `link`, person `portrait` and house
+ * `arms` whose target (normalised with `NormaliseTarget` from `link-rewrite.ts`) is a key of `map`,
+ * write the new target `map[key]`, keeping `#heading`, `|alias`, a leading `!` and a trailing `.md`
+ * if the old text had it. A value keeps its written style (quotes, the unquoted nested form) only
+ * if that style can hold the new text; otherwise the value-quoting rule (spec §3) applies. Nothing
+ * else in the body changes. Allowed on a tree with blocking issues (it touches only these values).
+ * `EditResult.changed` gives the number of values changed (0 = the body is unchanged): a person
+ * whose `link` and `portrait` both change counts 2; an item written once and used again through a
+ * YAML alias counts once per value.
  */
 export interface RewriteLinksOp {
 	kind: 'rewrite-links';
@@ -231,6 +334,7 @@ export type Op =
 	| DeletePerson
 	| EditHouse
 	| DeleteHouse
+	| TitleOp
 	| RewriteLinksOp;
 
 /** Picks an unused person id from a name (§6.8); `yaml-edit.ts` exports it. */
@@ -257,7 +361,11 @@ export type EditRefusal =
 	/** `move-sibling` at the start or end of the group. */
 	| 'no-sibling'
 	/** `edit-house` / `delete-house` name a house that is not in the block. */
-	| 'unknown-house';
+	| 'unknown-house'
+	/** A title op names a title id that no title in the block has. */
+	| 'unknown-title'
+	/** A `HolderRef` does not match the holder item at that index. */
+	| 'unknown-holder';
 
 /** The result of `applyOp`: the new body and any created ids or effects, or a refusal code and detail. */
 export type EditResult =
@@ -266,7 +374,7 @@ export type EditResult =
 			body: string;
 			/** Ids created by this op, in order (for example the new house id). */
 			created: string[];
-			/** For `rewrite-links`, the number of links changed (0 = the body is unchanged). */
+			/** For `rewrite-links`, the number of link, portrait and arms values changed (0 = the body is unchanged). */
 			changed?: number;
 			/** Side effects the UI must mention (`auto-union`: a marriage was added, §6.4). */
 			effects?: ('auto-union')[];

@@ -176,7 +176,7 @@ describe('every fixture: spec §8, §10 acceptance', () => {
 	}
 
 	// Hand-written, well-formed trees: any warning here would be a false alarm.
-	for (const id of ['01', '02', '03', '04', '08', '09', '11']) {
+	for (const id of ['01', '02', '03', '04', '08', '09', '11', '12']) {
 		it(`fixture ${id}: no issues`, () => {
 			expect(tally(issuesOf(fixtureSource(id)))).toEqual([]);
 		});

@@ -20,6 +20,13 @@
  * left to the note; Ctrl/Cmd+wheel (and a trackpad pinch, which arrives as Ctrl+wheel) zooms.
  * Full screen ('full'): every pointer pans with one finger or the mouse, two fingers pinch, a
  * double-tap on empty background zooms 2×, a plain wheel pans and Ctrl/Cmd+wheel zooms.
+ *
+ * M11 (spec §13.15): the tree view attaches card content that is near the view. `onFirstDraw` runs once,
+ * right after the first write of the scene transform, in the same task (`onSettle` cannot do this: it runs
+ * before that write). `onFill` also runs during a wheel or trackpad zoom and an animation, but only when
+ * the visible rectangle leaves the last filled one and at most once for each frame. A drag pan never
+ * fills; it ends at its settle. `visibleRect` is the one owner of the conversion from a `View` and the
+ * viewport size to a layout `Rect`.
  */
 
 import type { Rect } from '../../layout/model';
@@ -40,6 +47,8 @@ export interface PanZoomOptions {
 	onSettle: (view: View, byUser: boolean) => void;
 	/** A pinch drew the real view to fill empty space (D19); the pinch goes on. */
 	onFill?: (view: View) => void;
+	/** Once, right after the first write of the scene transform, in the same task. No pan, pinch, animation frame or later `setView` calls it. */
+	onFirstDraw?: (view: View) => void;
 	/** Runs an entry point (event, frame, timer) so that an error cannot escape into Obsidian (spec §8). */
 	guard: (fn: () => void) => void;
 }
@@ -48,9 +57,15 @@ export interface PanZoomOptions {
 const WHEEL_SETTLE_MS = 180;
 const ANIMATE_MS = 280;
 /** Presses here are not gestures: HTML controls on top of the tree handle their own. */
-const CONTROLS = '.dynasty-toolbar, .dynasty-popover';
+const CONTROLS = '.dynasty-toolbar, .dynasty-popover, .dynasty-result';
 /** A press on these is not on the empty background (no double-tap zoom there). */
-const TARGETS = '.dynasty-card, .dynasty-tag, .dynasty-tag-hit, .dynasty-focus-badge, .dynasty-toolbar, .dynasty-popover';
+const TARGETS = '.dynasty-card, .dynasty-tag, .dynasty-tag-hit, .dynasty-focus-badge, .dynasty-toolbar, .dynasty-popover, .dynasty-result';
+
+/** The layout rectangle that `view` shows in a viewport of `size`; null when the scale or the size is not positive. The one owner of this conversion. */
+export function visibleRect(view: View, size: Size): Rect | null {
+	if (!(view.scale > 0) || !(size.w > 0) || !(size.h > 0)) return null;
+	return { x: view.cx - size.w / 2 / view.scale, y: view.cy - size.h / 2 / view.scale, w: size.w / view.scale, h: size.h / view.scale };
+}
 
 /** The class that turns on the wrapper transform (styles.css). */
 export const GESTURE_CLASS = 'dynasty-gesture';
@@ -162,6 +177,10 @@ export class PanZoom {
 	private fillTimer = 0;
 	/** The wrapper transform is on (a pinch runs). */
 	private wrapped = false;
+	private firstDrawn = false;
+	/** M11 (B1): the rectangle of the last fill or settle, and whether a wheel zoom runs. A plain pan never fills. */
+	private filled: Rect | null = null;
+	private wheelZoom = false;
 	private readonly off: (() => void)[] = [];
 
 	constructor(private readonly o: PanZoomOptions) {
@@ -228,7 +247,7 @@ export class PanZoom {
 		this.anim = null;
 		this.view = view;
 		this.schedule();
-		this.o.onSettle(view, opts.byUser ?? false);
+		this.settled(view, opts.byUser ?? false);
 	}
 
 	/** A press or the wheel stops an animation where it is; that view is settled (LOD, shared view). */
@@ -237,7 +256,25 @@ export class PanZoom {
 		this.anim = null;
 		// The next frame puts the view where the animation stopped on the scene (off the wrapper).
 		this.schedule();
-		if (this.view) this.o.onSettle(this.view, this.animSettleUser);
+		if (this.view) this.settled(this.view, this.animSettleUser);
+	}
+
+	/** Calls `onSettle` and keeps the rectangle that the caller has filled for this view. */
+	private settled(view: View, byUser: boolean): void {
+		this.filled = visibleRect(view, this.size);
+		this.o.onSettle(view, byUser);
+	}
+
+	/** During a wheel zoom or an animation: fills once the view leaves the last filled rectangle. At most once per frame, as `apply` runs once per frame. */
+	private fillIfLeft(): void {
+		if (!this.view || !this.o.onFill || !(this.wheelZoom || this.anim)) return;
+		const r = visibleRect(this.view, this.size);
+		const f = this.filled;
+		if (!r) return;
+		const eps = 0.5;
+		if (f && r.x >= f.x - eps && r.y >= f.y - eps && r.x + r.w <= f.x + f.w + eps && r.y + r.h <= f.y + f.h + eps) return;
+		this.filled = r;
+		this.o.onFill(this.view);
 	}
 
 	private schedule(): void {
@@ -258,7 +295,7 @@ export class PanZoom {
 			else {
 				this.anim = null;
 				this.view = to;
-				this.o.onSettle(to, this.animSettleUser);
+				this.settled(to, this.animSettleUser);
 			}
 		}
 		if (!this.view || this.size.w <= 0 || this.size.h <= 0) return;
@@ -278,6 +315,7 @@ export class PanZoom {
 				this.o.scene.setAttribute('transform', transformFor(this.view, this.size));
 				this.drawn = { view: this.view, size: this.size, at: performance.now() };
 				w.style.setProperty('--dynasty-gesture-transform', 'matrix(1, 0, 0, 1, 0, 0)');
+				this.filled = visibleRect(this.view, this.size);
 				this.o.onFill?.(this.view);
 				return;
 			}
@@ -301,6 +339,7 @@ export class PanZoom {
 				w.addClass(GESTURE_CLASS);
 				this.wrapped = true;
 			}
+			this.fillIfLeft();
 			return;
 		}
 		this.o.scene.setAttribute('transform', transformFor(this.view, this.size));
@@ -310,6 +349,12 @@ export class PanZoom {
 			w.style.setProperty('--dynasty-gesture-transform', 'none');
 		}
 		this.wrapped = false;
+		this.fillIfLeft();
+		// After the first write only: `onSettle` runs inside `setView`, before this write, so it cannot serve. The flag is set first so a throwing hook does not run twice.
+		if (!this.firstDrawn) {
+			this.firstDrawn = true;
+			this.o.onFirstDraw?.(this.view);
+		}
 	}
 
 	private local(e: PointerEvent | WheelEvent): Point {
@@ -434,7 +479,7 @@ export class PanZoom {
 		// The click that follows this pointerup is part of the pan.
 		this.suppressClick = true;
 		(this.o.viewport.win ?? window).setTimeout(() => this.o.guard(() => (this.suppressClick = false)), 0);
-		if (this.view) this.o.onSettle(this.view, true);
+		if (this.view) this.settled(this.view, true);
 	}
 
 	private wheel(e: WheelEvent): void {
@@ -448,6 +493,7 @@ export class PanZoom {
 		this.stopAnim();
 		if (zoom) {
 			const at = this.local(e);
+			this.wheelZoom = true;
 			this.view = zoomAt(this.view, wheelFactor(e.deltaY, e.deltaMode), at.x, at.y, this.size, this.limits);
 		} else {
 			const k = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? this.size.h : 1;
@@ -461,7 +507,8 @@ export class PanZoom {
 		win.clearTimeout(this.settleTimer);
 		this.settleTimer = win.setTimeout(() => {
 			this.o.guard(() => {
-				if (this.view) this.o.onSettle(this.view, true);
+				this.wheelZoom = false;
+				if (this.view) this.settled(this.view, true);
 			});
 		}, WHEEL_SETTLE_MS);
 	}

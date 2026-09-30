@@ -132,7 +132,8 @@ function type(input: FEl, text: string): void {
 describe('the Houses button (D36, spec §6.10)', () => {
 	it('sits after Add person in the desktop embed', async () => {
 		const { el } = await embed(SOURCE, { handle: writingHandle() });
-		expect(toolbar(el)).toEqual(['dynasty-add-person', 'dynasty-houses-button', 'dynasty-focus', 'dynasty-fit', 'dynasty-legend-button', 'dynasty-expand']);
+		// M7 (D49): More after the legend.
+		expect(toolbar(el)).toEqual(['dynasty-add-person', 'dynasty-houses-button', 'dynasty-focus', 'dynasty-fit', 'dynasty-legend-button', 'dynasty-more', 'dynasty-expand']);
 		const b = el.querySelector('.dynasty-houses-button')!;
 		expect(b.tag).toBe('button');
 		expect(b.getAttribute('aria-label')).toBe(HOUSES.button);
@@ -140,7 +141,7 @@ describe('the Houses button (D36, spec §6.10)', () => {
 
 	it('is in the full-screen view, on the computer and on a phone', async () => {
 		const desk = await openFullScreen(SOURCE);
-		expect(toolbar(desk.root)).toEqual(['dynasty-add-person', 'dynasty-houses-button', 'dynasty-focus', 'dynasty-find', 'dynasty-fit', 'dynasty-legend-button', 'dynasty-close']);
+		expect(toolbar(desk.root)).toEqual(['dynasty-add-person', 'dynasty-houses-button', 'dynasty-focus', 'dynasty-find', 'dynasty-fit', 'dynasty-legend-button', 'dynasty-more', 'dynasty-close']);
 		desk.modal.close();
 		phone();
 		const ph = await openFullScreen(SOURCE);

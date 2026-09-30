@@ -95,7 +95,7 @@ describe('review 6.4: D29 on css-change', () => {
 			resizeAll();
 			flushFrames();
 		}
-		expect(card(el, 'will').h).toBe(TALL_H);
+		expect(card(el, 'will').h).toBe(DOWN.cardH + 2 * tallExtra(DOWN));
 		expect(card(el, 'anna').h).toBe(DOWN.cardH);
 		// The theme's face for the same font name is wider now (the tree-view-m6 test's "text.wide = 1.2").
 		canvas.wide = 1.2;

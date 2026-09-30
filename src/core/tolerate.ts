@@ -1,11 +1,12 @@
 /*
  * Readers for raw YAML values that accept the slips of hand-typing without a warning
- * (spec §8 "Tolerated silently"): numeric ids, an unquoted [[link]], and a single value where a
- * list was expected. Nothing here reports issues; `parse.ts` decides what deserves one, and
- * `yaml-patch.ts` uses the same readers to compare a written value with an edit's expected one.
+ * (spec §8 "Tolerated silently"): numeric ids, an unquoted [[link]], an unquoted ![[embed]] in a
+ * link key, and a single value where a list was expected. Nothing here reports issues; `parse.ts`
+ * decides what deserves one, and `yaml-patch.ts` uses the same readers to compare a written value
+ * with an edit's expected one.
  */
 
-import { Scalar, visit, type Document } from 'yaml';
+import { isScalar, isSeq, Scalar, visit, type Document } from 'yaml';
 
 /** A YAML value read with the failsafe schema, before it is checked or shaped into a `Tree`. */
 export type Raw = unknown;
@@ -23,6 +24,41 @@ export function blankPlainNulls(doc: Document): void {
 			if (key !== 'key' && node.type === Scalar.PLAIN && typeof node.value === 'string' && /^(~|null|Null|NULL|)$/.test(node.value)) node.value = null;
 		},
 	});
+}
+
+/** The keys whose value is a link: a person's `link` and `portrait`, a house's `arms` (spec §13.0 item 3). */
+export const LINK_KEYS: ReadonlySet<string> = new Set(['link', 'portrait', 'arms']);
+
+/**
+ * Contract A3: a pasted embed written without quotes, `portrait: ![[x.png]]`. YAML reads the `!`
+ * as a tag glued to the list after it, which is an error. In a link key the value is read like the
+ * quoted text "![[x.png]]" instead: the node becomes that text and the error goes. The same
+ * glued `!` anywhere else stays an error. Call it before looking at `doc.errors`.
+ */
+export function tolerateEmbeds(doc: Document, source: string): void {
+	if (!doc.errors.length) return;
+	const starts = new Set<number>();
+	visit(doc, {
+		Pair(_, pair) {
+			const key = isScalar(pair.key) ? pair.key.value : undefined;
+			const v = pair.value;
+			if (typeof key !== 'string' || !LINK_KEYS.has(key) || !isSeq(v) || !v.flow || !v.range) return;
+			const [start, end, nodeEnd] = v.range;
+			// Exactly the tag `!` (the yaml package resolves it to the plain list tag), glued to `[[`.
+			if (source[start - 1] !== '!' || !/^[\s:,[{]?$/.test(source.charAt(start - 2)) || !source.startsWith('[[', start)) return;
+			starts.add(start);
+			// The shape `link` accepts (one list holding one list); any other shape reads as a list, which is "absent".
+			const text = linkValue(v.toJS(doc) as Raw, () => source.slice(start, end));
+			if (text === undefined) return;
+			const scalar = new Scalar(`!${text}`);
+			scalar.range = [start - 1, end, nodeEnd];
+			if (v.comment) scalar.comment = v.comment;
+			pair.value = scalar;
+		},
+	});
+	if (!starts.size) return;
+	const kept = doc.errors.filter((e) => !(e.code === 'MISSING_CHAR' && starts.has(e.pos[0])));
+	doc.errors.splice(0, doc.errors.length, ...kept);
 }
 
 /** True if `v` is a YAML mapping (and not a list, a scalar, or a `Date`). */

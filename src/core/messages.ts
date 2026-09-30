@@ -47,6 +47,10 @@ export type WarningCode =
 	| 'missing-start'
 	/** params: ref */
 	| 'missing-focus'
+	/** `options.me` names nobody (spec §13.1). params: ref */
+	| 'missing-me'
+	/** `options.me` is a list or a map, not one person id (spec §13.1). No params. */
+	| 'me-not-id'
 	// Structure.
 	/** params: person, type, count */
 	| 'too-many-parents'
@@ -64,6 +68,27 @@ export type WarningCode =
 	| 'house-color-null'
 	/** params: id, house (name of the first house with the id) */
 	| 'duplicate-house-id'
+	// Titles (spec §13.3, §13.4).
+	/** params: id, title (name of the first title with the id) */
+	| 'duplicate-title-id'
+	/** A holder's `person` names nobody. params: title (name), ref; name when the entry has one */
+	| 'missing-holder'
+	/** A holder with no `person` and no `name`. params: title (name), index (1-based) */
+	| 'holder-empty'
+	/** A `card-title` that names no title the person holds. params: person (name), ref */
+	| 'card-title-not-held'
+	// Pictures (spec §13.6, §13.7). Found by the Obsidian side (they need the vault), never by `validate.ts`; built by `pictureIssue`.
+	/** A picture link that opens no file. params: owner ('arms' | 'portrait'), house or person (name), file (the path as written) */
+	| 'missing-picture'
+	/** A picture link that is a web address. params: owner, house or person */
+	| 'picture-web'
+	/** A file the plugin cannot show. params: owner, house or person, file; format when it is a known picture format (HEIC, AVIF, …) */
+	| 'picture-not-image'
+	/** A picture of more than 40 million pixels. params: owner, house or person, file; pixels (millions, rounded up) when known */
+	| 'picture-too-large'
+	// Portrait crop (spec §13.13). Found by `validate.ts`: it needs no vault.
+	/** A `portrait-crop` that is not three numbers, on a person with a `portrait`. params: person (name) */
+	| 'bad-portrait-crop'
 	// Unknown values: kept in the YAML, drawn with default styling.
 	/** params: union (label), partners (names), value */
 	| 'unknown-union-type'
@@ -72,11 +97,14 @@ export type WarningCode =
 	/** params: person, value, parent (name) */
 	| 'unknown-parent-type'
 	// Shape problems that are not silently tolerated (spec §8 "Tolerated silently" is not reported).
-	/** A person, house, union or parent entry is not a map. params: section, index; person for a parent entry */
+	/**
+	 * A person, house, union, title, holder or parent entry is not a map (a holder can also be a
+	 * string). params: section, index; person for a parent entry; title (name) for a holder
+	 */
 	| 'entry-not-map'
-	/** A person, house or parent entry has no id. params: section, index; name when written; person for a parent entry */
+	/** A person, house, title or parent entry has no id. params: section, index; name when written; person for a parent entry */
 	| 'missing-id'
-	/** A section that must be a list or map has another shape. params: section */
+	/** A section that must be a list or map has another shape. params: section; title (name) for `holders` */
 	| 'section-wrong-shape';
 
 /** Every issue code the plugin can report: a `BlockingCode` or a `WarningCode`. */
@@ -164,7 +192,19 @@ const ENTRY: Record<string, { what: string; start: string }> = {
 	people: { what: 'a person', start: 'Start each person with "- id:".' },
 	houses: { what: 'a house', start: 'Start each house with "- id:".' },
 	unions: { what: 'a partnership', start: 'Start each partnership with "- partners:".' },
+	titles: { what: 'a title', start: 'Start each title with "- id:".' },
 };
+
+/** The title a holder issue is about: "the title Duke of Valmont", or "a title" when the name is missing. */
+const titleOf = (p: P) => {
+	const name = s(p, 'title', '');
+	return name ? `the title ${name}` : 'a title';
+};
+const holdersOf = (p: P) => {
+	const name = s(p, 'title', '');
+	return name ? `the holders of ${name}` : 'the holders of a title';
+};
+const HOLDER_FORM = 'Write each holder like this: - {person: aldric}.';
 
 function entryNotMap(p: P): string {
 	const section = s(p, 'section', 'people');
@@ -172,6 +212,7 @@ function entryNotMap(p: P): string {
 	if (section === 'parents') {
 		return `Entry ${index} in the parents of ${person(p)} is not a person id. Write an id, or a parent such as {id: aldric, type: adoptive}.`;
 	}
+	if (section === 'holders') return `Entry ${index} in ${holdersOf(p)} is not a holder. ${HOLDER_FORM}`;
 	const e = ENTRY[section] ?? ENTRY.people;
 	return `Entry ${index} in the "${section}" list is not ${e.what}, so the tree does not show it. ${e.start}`;
 }
@@ -185,6 +226,10 @@ function missingId(p: P): string {
 		const who = name || `Entry ${index} in the "houses" list`;
 		return `${who} has no id, so the tree does not use this house. Add an id, for example: id: ${name ? slugify(name) : 'valmont'}.`;
 	}
+	if (section === 'titles') {
+		const who = name || `Entry ${index} in the "titles" list`;
+		return `${who} has no id, so the tree does not use this title. Add an id, for example: id: ${name ? slugify(name) : 'duke-of-valmont'}.`;
+	}
 	const who = name || `Entry ${index} in the "people" list`;
 	return `${who} has no id. Add an id, for example: id: ${name ? slugify(name) : 'aldric'}.`;
 }
@@ -192,8 +237,39 @@ function missingId(p: P): string {
 function sectionWrongShape(p: P): string {
 	const section = s(p, 'section', 'people');
 	if (section === 'options') return 'The "options" section is not a set of options, so the tree ignores it. Write each option like this: start: aldric.';
+	if (section === 'holders') {
+		const name = s(p, 'title', '');
+		return `The holders of ${name ? `the title ${name}` : 'a title'} are not a list, so the tree ignores them. ${HOLDER_FORM}`;
+	}
 	const e = ENTRY[section] ?? ENTRY.people;
 	return `The "${section}" section is not a list, so the tree ignores it. ${e.start}`;
+}
+
+/**
+ * Whose picture a picture warning is about, as the start of its first sentence, and the verb forms
+ * that agree with it: "The arms of House Valmont use", "The portrait of Aldric Valmont uses".
+ */
+function pictureOwner(p: P): { who: string; uses: string; is: string; other: string } {
+	if (s(p, 'owner', '') === 'portrait' || (s(p, 'owner', '') === '' && s(p, 'person', '') !== '')) {
+		return { who: `The portrait of ${s(p, 'person', 'a person')}`, uses: 'uses', is: 'is', other: 'select another portrait' };
+	}
+	return { who: `The arms of ${s(p, 'house', 'a house')}`, uses: 'use', is: 'are', other: 'select other arms' };
+}
+
+const PICTURE_FORMATS = 'Select a PNG, JPEG, WebP, GIF, BMP or SVG picture.';
+
+function pictureNotImage(p: P): string {
+	const o = pictureOwner(p);
+	const file = q(s(p, 'file', '?'));
+	const format = s(p, 'format', '');
+	if (format) return `${o.who} ${o.uses} the picture ${file}. The plugin cannot show ${format} pictures. Save the picture as PNG or JPEG. Then select it again.`;
+	return `${o.who} ${o.uses} the file ${file}, which is not a picture. ${PICTURE_FORMATS}`;
+}
+
+function pictureTooLarge(p: P): string {
+	const o = pictureOwner(p);
+	const pixels = typeof p.pixels === 'number' && Number.isFinite(p.pixels) && p.pixels > 0 ? ` (${p.pixels} million pixels)` : '';
+	return `${o.who} ${o.uses} the picture ${q(s(p, 'file', '?'))}, which is too large${pixels}. Use a picture with 40 million pixels or less.`;
 }
 
 const ISSUE_TEXT: { [C in IssueCode]: (p: P) => string } = {
@@ -220,6 +296,11 @@ const ISSUE_TEXT: { [C in IssueCode]: (p: P) => string } = {
 		const ref = s(p, 'ref', '?');
 		return `No person has the id ${q(ref)}, so the tree cannot show the family of this person. Correct the id, or remove "focus: ${ref}".`;
 	},
+	'missing-me': (p) => {
+		const ref = s(p, 'ref', '?');
+		return `No person has the id ${q(ref)}, so the tree cannot show how people relate to you. Correct the id, or remove "me: ${ref}".`;
+	},
+	'me-not-id': () => '"me" in the options does not name one person. Write one person id after "me:".',
 
 	'too-many-parents': (p) =>
 		`${person(p)} has ${n(p, 'count')} ${s(p, 'type', 'birth')} parents, but a person can have only 2 of each type. Remove the extra parents, or change their type.`,
@@ -248,12 +329,31 @@ const ISSUE_TEXT: { [C in IssueCode]: (p: P) => string } = {
 		return `${cap(house(p))} has no colour. If you wrote a colour, put quotes around it, for example: color: "#8b1e3f".`;
 	},
 	'duplicate-house-id': (p) => `More than one house has the id ${q(s(p, 'id', '?'))}, and the tree uses only the first. Give each house a different id.`,
+	'duplicate-title-id': (p) => `More than one title has the id ${q(s(p, 'id', '?'))}, and the tree uses only the first. Give each title a different id.`,
+	'missing-holder': (p) =>
+		`${cap(titleOf(p))} has a holder with the id ${q(s(p, 'ref', '?'))}, but no person has this id. Correct the id, or write the name of the holder.`,
+	'holder-empty': (p) => `Entry ${s(p, 'index', '?')} in ${holdersOf(p)} has no person and no name. Add "person:" or "name:".`,
+	'card-title-not-held': (p) =>
+		`${person(p)} has "card-title: ${s(p, 'ref', '?')}", but ${person(p)} does not hold a title with this id. The card shows the first title instead. Correct the id, or remove it.`,
 
 	'unknown-union-type': (p) =>
 		`${cap(partnership(p))} has the unknown type ${q(s(p, 'value', '?'))}. Use marriage, betrothal, concubinage or affair.`,
 	'unknown-placement': (p) => `${person(p)} has the unknown placement ${q(s(p, 'value', '?'))}. Use birth, adoptive or ward.`,
 	'unknown-parent-type': (p) =>
 		`${person(p)} has the parent ${s(p, 'parent', 'a parent')} with the unknown type ${q(s(p, 'value', '?'))}. Use birth, adoptive, ward or rumoured.`,
+
+	'missing-picture': (p) => {
+		const o = pictureOwner(p);
+		return `${o.who} ${o.uses} the picture ${q(s(p, 'file', '?'))}, but the vault has no file with this name. Correct the link, or ${o.other}.`;
+	},
+	'picture-web': (p) => {
+		const o = pictureOwner(p);
+		return `${o.who} ${o.is} a web address. The plugin shows only pictures from the vault.`;
+	},
+	'picture-not-image': pictureNotImage,
+	'picture-too-large': pictureTooLarge,
+	'bad-portrait-crop': (p) =>
+		`The plugin cannot read the selected part of the portrait of ${s(p, 'person', 'a person')}, so the card shows the automatic part. Select the part again, or remove ${q('portrait-crop')}.`,
 
 	'entry-not-map': entryNotMap,
 	'missing-id': missingId,

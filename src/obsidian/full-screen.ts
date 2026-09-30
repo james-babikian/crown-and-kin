@@ -74,6 +74,10 @@ export class FullScreenModal extends Modal implements FullHost {
 			if (![...FullScreenModal.openViews].some((m) => (m.modalEl.doc ?? document).body === body)) body.removeClass('dynasty-fullscreen-open');
 		});
 		this.watchNote();
+		// The note's tree of the same block is hidden now: it stops asking for pictures, so this view gets them first.
+		for (const v of this.host.views) {
+			if (v.stateKey === this.from.key && !v.isFull) v.pausePictures();
+		}
 		const box = contentEl.createDiv({ cls: 'dynasty-fullscreen-tree' });
 		try {
 			this.tree = new TreeView(this.host, box, this.from.source, { kind: 'full', from: this.from, host: this });
@@ -168,7 +172,11 @@ export class FullScreenModal extends Modal implements FullHost {
 		}
 		this.tree = null;
 		this.contentEl.empty();
-		for (const v of this.host.views) if (v.stateKey === key && !v.isFull) v.adoptView();
+		for (const v of this.host.views) {
+			if (v.stateKey !== key || v.isFull) continue;
+			v.adoptView();
+			v.resumePictures();
+		}
 		// Focus returns to the note when the modal closes; that must not move the note (spec §7.1).
 		const restore = () => {
 			for (const s of this.scrolls) {
