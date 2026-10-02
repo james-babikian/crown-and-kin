@@ -43,6 +43,8 @@
  *      (Chromium makes an SVG element with a focus listener a Tab stop).
  *   d. Before a highlight, e. before a reveal, f. before the sheet opens by keyboard or code: fill the
  *      person first.
+ *   (1.1.1, rule 4: the lines and partnership signs follow the same calls; `fillNear`, `fillPerson`, `fillChunk` and
+ *   `fillAll` build them too, and `pendingLines` keeps the idle chain running until they are built.)
  *   g. Idle: after the first view the rest is attached in idle chunks (`later`, at most
  *      `IDLE_CARDS_PER_CHUNK` cards, stop at `IDLE_STOP_MS`), nearest to the view first, one chain for
  *      each scene. A chunk that finds the view busy asks again; it never drops the chain. Folds go
@@ -55,7 +57,7 @@
  *   before any code that reads layout (`highlight`). The error box and the empty tree are built shown.
  * - S8 One `TreeHost.parseCache` serves the read paths (`parse`); see `core/parse-cache.ts`.
  * - S10 Accessibility does not change: every shell keeps its Tab stop, name, role and order.
- * - The root attribute `data-dynasty-cards-pending` (`CARDS_PENDING_ATTR`; the lint rule wants a plain string here) and the event `FILL_ALL_EVENT` (both in `render/dom/scene.ts`)
+ * - The root attributes `data-dynasty-cards-pending` (`CARDS_PENDING_ATTR`; the lint rule wants a plain string here) and `data-dynasty-lines-pending` (`LINES_PENDING_ATTR`, 1.1.1) and the event `FILL_ALL_EVENT` (both in `render/dom/scene.ts`)
  *   are the harness hooks: the harness fills everything, then reads card content.
  */
 
@@ -1131,6 +1133,7 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 		this.wireScene(this.scene);
 		this.makeLive();
 		root.setAttribute('data-dynasty-cards-pending', String(this.scene.fill.pending));
+		root.setAttribute('data-dynasty-lines-pending', String(this.scene.fill.pendingLines));
 		// T1: the harness asks for all the content at once.
 		root.addEventListener(FILL_ALL_EVENT, () =>
 			this.guard(() => {
@@ -1782,7 +1785,7 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 
 	/** Fold controls or card content still wait for the idle chain. A static phone preview has no idle fill of cards (S5g). */
 	private idleWork(scene: Scene): boolean {
-		return scene.folds.some((f) => !f.filled) || ((!!this.full || !this.coarse) && scene.fill.pending > 0);
+		return scene.folds.some((f) => !f.filled) || ((!!this.full || !this.coarse) && (scene.fill.pending > 0 || scene.fill.pendingLines > 0));
 	}
 
 	/**
@@ -1825,7 +1828,7 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 				const v = pz?.view;
 				if (n) {
 					if (v) this.placeFolds(v);
-				} else if (scene.fill.pending > 0) {
+				} else if (scene.fill.pending > 0 || scene.fill.pendingLines > 0) {
 					const rect = v && pz ? visibleRect(v, pz.size) : null;
 					// No view yet: the first draw or the next settle starts the chain again.
 					if (!rect) {
@@ -1864,6 +1867,8 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 		if (!root || !scene) return;
 		const n = String(scene.fill.pending);
 		if (root.getAttribute('data-dynasty-cards-pending') !== n) root.setAttribute('data-dynasty-cards-pending', n);
+		const lines = String(scene.fill.pendingLines);
+		if (root.getAttribute('data-dynasty-lines-pending') !== lines) root.setAttribute('data-dynasty-lines-pending', lines);
 	}
 
 	/** S7: the tree's svg shows. Safe to repeat and never throws, so that an error path can call it. */

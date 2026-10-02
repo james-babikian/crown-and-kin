@@ -5,6 +5,7 @@
  */
 
 import type { PictureProblem } from '../core/pictures';
+import { quote } from '../core/quote';
 
 /** The error view, the banner for blocking problems (spec §8), the Fit and legend buttons, and the partner list title. */
 export const UI = {
@@ -45,7 +46,9 @@ export const SHEET = {
 	cancel: 'Cancel',
 	close: 'Close',
 	name: 'Name',
-	title: 'Title',
+	// D98: the free text under the name. The Titles section holds titles with a number and dates.
+	title: 'Title text on the card',
+	titleHint: 'This text shows under the name on the card. For a title with a number and dates, use the Titles section below.',
 	house: 'House',
 	noHouse: 'No house',
 	newHouse: 'New house…',
@@ -162,7 +165,7 @@ export const FLOW = {
 	pickerChild: 'Type the name of the child',
 	pickerPartner: 'Type the name of the partner',
 	pickerEmpty: 'No person has this name.',
-	createNew: (text: string) => (text.trim() ? `Create a new person "${text.trim()}"` : 'Create a new person'),
+	createNew: (text: string) => (text.trim() ? `Create a new person ${quote(text.trim())}` : 'Create a new person'),
 	autoUnion: (a: string, b: string) => `The plugin also added a marriage of ${a} and ${b}. To change its type, open the sheet of ${a}. Then select Edit under Partners.`,
 } as const;
 
@@ -279,14 +282,14 @@ export const ME_UI = {
 	mark: 'This is me',
 	// A label begins with the text that the button shows, so voice control finds the button by that text.
 	markLabel: (name: string) => `This is me: mark ${name} as you`,
-	unmark: 'Remove "This is me"',
-	unmarkLabel: (name: string) => `Remove "This is me" from ${name}`,
+	unmark: `Remove ${quote('This is me')}`,
+	unmarkLabel: (name: string) => `Remove ${quote('This is me')} from ${name}`,
 	showLine: 'Show the line',
 	showLineLabel: (name: string) => `Show the line from you to ${name}`,
 	showRelationTo: 'Show the relation to…',
 	showRelationToLabel: (name: string) => `Show the relation to…: find the relation between ${name} and another person`,
 	/** Added to the delete confirmation of the marked person (spec §13.1). */
-	deleteClears: 'This person has the mark "This is me". If you delete this person, no person in the tree will have the mark.',
+	deleteClears: `This person has the mark ${quote('This is me')}. If you delete this person, no person in the tree will have the mark.`,
 } as const;
 
 /** The toolbar's More button (D49) and the relation finder (spec §13.2, D47, D48). */
@@ -418,7 +421,7 @@ export const TITLES_UI = {
 	noteTitle: 'Make a note with the saved list?',
 	noteText: 'You did not save the changes in this window. The note will have the list of holders that the tree has now.',
 	noteConfirm: 'Make the note',
-	noteMade: (name: string) => `The plugin made the note "${name}".`,
+	noteMade: (name: string) => `The plugin made the note ${quote(name)}.`,
 	noteFailed: 'The plugin cannot make the note.',
 	noteGone: 'This title is not in the tree now. The plugin did not make a note.',
 	// The holder form (spec §13.5).
@@ -468,7 +471,7 @@ export const SETTINGS_UI = {
 	dates: 'Show dates on cards',
 	datesDesc: 'If this is on, the cards show when each person was born and died, and the years of each reign.',
 	relations: 'Show relation names on cards',
-	relationsDesc: 'If this is on, each card shows the relation of the person to you. A person in the tree must have the mark "This is me".',
+	relationsDesc: `If this is on, each card shows the relation of the person to you. A person in the tree must have the mark ${quote('This is me')}.`,
 	/** Spec §13.7 (M9 contract O10). */
 	portraits: 'Show portraits on cards',
 	portraitsDesc: 'If this is on, the cards show the portraits of the people.',
@@ -486,7 +489,9 @@ export const SETTINGS_UI = {
 /** The command Insert family tree (spec §5.9, D34). */
 export const INSERT_UI = {
 	command: 'Insert family tree',
-	hint: 'To add the first person, select "Add first person" in Reading view or Live Preview.',
+	hint: `To add the first person, select ${quote('Add first person')} in Reading view or Live Preview.`,
+	/** The same sentence with straight marks: the plugin writes it into the owner's note, and it keeps that text plain ASCII (as in 1.1.0). */
+	noteHint: 'To add the first person, select "Add first person" in Reading view or Live Preview.',
 } as const;
 
 /** The command that shows how long the last tree took to draw (spec §7.7). */
@@ -498,7 +503,7 @@ export const TIMING_UI = {
 export const RENAME_UI = {
 	/** D35: only the numbers. */
 	updated: (links: number, trees: number) => `The plugin changed ${links === 1 ? '1 link' : `${links} links`} in ${trees === 1 ? '1 tree' : `${trees} trees`}.`,
-	failed: (note: string, old: string, next: string) => `The plugin cannot change the link "${old}" in a tree in the note "${note}". Replace "${old}" with "${next}" by hand.`,
+	failed: (note: string, old: string, next: string) => `The plugin cannot change the link ${quote(old)} in a tree in the note ${quote(note)}. Replace ${quote(old)} with ${quote(next)} by hand.`,
 	moreFailed: (trees: number) => (trees === 1 ? 'The plugin also cannot change the links in 1 other tree.' : `The plugin also cannot change the links in ${trees} other trees.`),
 	/** After 2 s, while the update runs (also while it waits for Obsidian's own link update). */
 	progress: 'The plugin updates the tree links to the renamed note. This can take some time.',
@@ -510,7 +515,7 @@ export const RENAME_UI = {
 	noLinksFor: (kind: RenamedKind) => (kind === 'note' ? RENAMED_NOTE_NO_LINKS : `The trees have no links to ${renamedWhat(kind)}. The plugin did not change a tree.`),
 	/** A tree named the old note, but its link now opens another note that existed at the rename. */
 	kept: (link: string, note: string, other: string) =>
-		`The plugin did not change the link "${link}" in a tree in the note "${note}". The link now opens a different note with the same name: "${other}".`,
+		`The plugin did not change the link ${quote(link)} in a tree in the note ${quote(note)}. The link now opens a different note with the same name: ${quote(other)}.`,
 	moreKept: (trees: number) => (trees === 1 ? 'The plugin also did not change the links in 1 other tree for the same reason.' : `The plugin also did not change the links in ${trees} other trees for the same reason.`),
 	/** An error stopped the whole update. */
 	stopped: (what: string) => `The plugin cannot complete the update of the tree links to ${what}. Some trees can still have the old link. Change these links by hand.`,
@@ -553,7 +558,7 @@ export interface LinkReportText {
 
 /** The renamed note in a Notice: `"Old"`, or the number of notes (or pictures) after a folder rename. */
 export function renamedText(renames: { from: string; picture?: boolean }[]): string {
-	if (renames.length === 1) return `"${renames[0].from}"`;
+	if (renames.length === 1) return `${quote(renames[0].from)}`;
 	const kind = renamedKind(renames);
 	return `${renames.length} ${kind === 'note' ? 'renamed notes' : kind === 'picture' ? 'renamed pictures' : 'renamed notes and pictures'}`;
 }
@@ -562,10 +567,10 @@ export function renamedText(renames: { from: string; picture?: boolean }[]): str
 const REPORT_NAMES = 3;
 
 function linkReportText(r: LinkReportText | null, enabled: boolean): string {
-	const off = enabled ? '' : ` The setting "${SETTINGS_UI.links}" is off.`;
+	const off = enabled ? '' : ` The setting ${quote(SETTINGS_UI.links)} is off.`;
 	if (!r) return `The plugin did not update tree links after Obsidian started.${off}`;
 	const kind = renamedKind(r.renames);
-	const what = r.renames.length === 1 ? `"${r.renames[0].from}" to "${r.renames[0].to}"` : `${r.renames.length} ${kind === 'note' ? 'notes' : kind === 'picture' ? 'pictures' : 'notes and pictures'}`;
+	const what = r.renames.length === 1 ? `${quote(r.renames[0].from)} to ${quote(r.renames[0].to)}` : `${r.renames.length} ${kind === 'note' ? 'notes' : kind === 'picture' ? 'pictures' : 'notes and pictures'}`;
 	const head = {
 		running: `The plugin still updates the tree links after the rename of ${what}.`,
 		done: `The last link update was after the rename of ${what}. It took ${(r.ms / 1000).toFixed(1)} seconds.`,
@@ -579,11 +584,11 @@ function linkReportText(r: LinkReportText | null, enabled: boolean): string {
 	if (r.skipped.length) {
 		groups.push([
 			`Links that the plugin did not change: ${r.skipped.length}.`,
-			...r.skipped.slice(0, REPORT_NAMES).map((s) => `The link "${s.link}" in the note "${s.note}" opens a different note with the same name: "${s.other}".`),
+			...r.skipped.slice(0, REPORT_NAMES).map((s) => `The link ${quote(s.link)} in the note ${quote(s.note)} opens a different note with the same name: ${quote(s.other)}.`),
 		]);
 	}
 	if (r.failed.length) {
-		groups.push([`Trees that the plugin cannot change: ${r.failed.length}.`, ...r.failed.slice(0, REPORT_NAMES).map((n) => `The plugin cannot change a tree in the note "${n}".`)]);
+		groups.push([`Trees that the plugin cannot change: ${r.failed.length}.`, ...r.failed.slice(0, REPORT_NAMES).map((n) => `The plugin cannot change a tree in the note ${quote(n)}.`)]);
 	}
 	return groups.map((g) => g.join(' ')).join('\n\n') + off;
 }
@@ -648,7 +653,7 @@ export const PICTURES_UI = {
 	select: 'Select',
 	cancel: 'Cancel',
 	added: (name: string, folder: string) =>
-		folder ? `The plugin added the picture "${name}" to the folder "${folder}".` : `The plugin added the picture "${name}" to the top folder of the vault.`,
+		folder ? `The plugin added the picture ${quote(name)} to the folder ${quote(folder)}.` : `The plugin added the picture ${quote(name)} to the top folder of the vault.`,
 	addFailed: 'The plugin cannot add the picture because of an error. Try again.',
 } as const;
 
@@ -693,11 +698,11 @@ export const SAVE_UI = {
 	cancel: 'Cancel',
 	progress: 'The plugin makes the picture. This can take some time.',
 	saved: (name: string, folder: string) =>
-		folder ? `The plugin saved the picture "${name}" in the folder "${folder}".` : `The plugin saved the picture "${name}" in the top folder of the vault.`,
+		folder ? `The plugin saved the picture ${quote(name)} in the folder ${quote(folder)}.` : `The plugin saved the picture ${quote(name)} in the top folder of the vault.`,
 	small: 'The tree is very large. The names are small in this picture.',
 	smallSvg: 'If you want sharp names, save the tree as SVG (a picture that stays sharp at every size).',
 	share: 'Share',
-	shareLabel: (name: string) => `Share the picture "${name}"`,
+	shareLabel: (name: string) => `Share the picture ${quote(name)}`,
 	failed: 'The plugin cannot save the picture because of an error. Try again.',
 } as const;
 
@@ -734,16 +739,16 @@ export const NOTE_UI = {
 	makeLinkedLabel: (name: string) => `Make the linked note: the plugin makes the note that the link of ${name} names`,
 	/** The start of the one text line in a new note; the link back follows it. */
 	treeLine: 'Tree: ',
-	made: (name: string) => `The plugin made the note "${name}" and linked it to the card.`,
-	linkedTo: (name: string) => `The plugin linked the card to the note "${name}".`,
-	madeOnly: (name: string) => `The plugin made the note "${name}".`,
-	cannot: (name: string) => `The plugin cannot make the note "${name}".`,
-	linkNotAdded: (name: string) => `The plugin made the note "${name}". It cannot add the link to the tree text. The note is in the vault. Add the link by hand.`,
-	askTitle: (name: string) => `The vault has a note with the name "${name}".`,
+	made: (name: string) => `The plugin made the note ${quote(name)} and linked it to the card.`,
+	linkedTo: (name: string) => `The plugin linked the card to the note ${quote(name)}.`,
+	madeOnly: (name: string) => `The plugin made the note ${quote(name)}.`,
+	cannot: (name: string) => `The plugin cannot make the note ${quote(name)}.`,
+	linkNotAdded: (name: string) => `The plugin made the note ${quote(name)}. It cannot add the link to the tree text. The note is in the vault. Add the link by hand.`,
+	askTitle: (name: string) => `The vault has a note with the name ${quote(name)}.`,
 	askLink: 'Link to this note',
-	askNew: (name: string) => `Make a new note "${name}"`,
+	askNew: (name: string) => `Make a new note ${quote(name)}`,
 	askCancel: 'Cancel',
-	undone: (name: string) => `The plugin removed the link. The note "${name}" is still in the vault.`,
+	undone: (name: string) => `The plugin removed the link. The note ${quote(name)} is still in the vault.`,
 } as const;
 
 /**
@@ -766,8 +771,8 @@ export const HOUSE_PAGE_UI = {
 	close: 'Close',
 	makeNote: 'Make a note with this table',
 	makeNoteLabel: (house: string) => `Make a note with this table: the plugin makes a note with the people of ${house}`,
-	noteMade: (name: string) => `The plugin made the note "${name}".`,
-	noteFailed: (name: string) => `The plugin cannot make the note "${name}".`,
+	noteMade: (name: string) => `The plugin made the note ${quote(name)}.`,
+	noteFailed: (name: string) => `The plugin cannot make the note ${quote(name)}.`,
 	armsLabel: 'Arms of the house',
 	unnamed: 'House',
 } as const;

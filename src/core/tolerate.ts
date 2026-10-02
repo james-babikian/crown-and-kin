@@ -1,7 +1,8 @@
 /*
  * Readers for raw YAML values that accept the slips of hand-typing without a warning
  * (spec §8 "Tolerated silently"): numeric ids, an unquoted [[link]], an unquoted ![[embed]] in a
- * link key, and a single value where a list was expected. Nothing here reports issues; `parse.ts`
+ * link key, a single value where a list was expected, and one pair of curly quote marks around a
+ * colour, a link or a reference (D103). Nothing here reports issues; `parse.ts`
  * decides what deserves one, and `yaml-patch.ts` uses the same readers to compare a written value
  * with an edit's expected one.
  */
@@ -59,6 +60,83 @@ export function tolerateEmbeds(doc: Document, source: string): void {
 	if (!starts.size) return;
 	const kept = doc.errors.filter((e) => !(e.code === 'MISSING_CHAR' && starts.has(e.pos[0])));
 	doc.errors.splice(0, doc.errors.length, ...kept);
+}
+
+/**
+ * The curly quote pairs a phone keyboard makes from ' and " (spec §13.16 rule 11, D103): “…”,
+ * ‘…’, „…“ and „…”. Written as code points so the file does not depend on its encoding.
+ */
+const CURLY_WRAPS: readonly (readonly [string, string])[] = [
+	['“', '”'],
+	['‘', '’'],
+	['„', '“'],
+	['„', '”'],
+];
+/** Any curly mark that opens a pair or closes a double pair. The apostrophe U+2019 may stay inside a value. */
+const INNER_MARKS = /[‘“”„]/;
+
+/**
+ * Splits a text that is wrapped, as a whole, in one pair of curly quote marks. The text inside
+ * holds no other pair mark, so one pair is taken off and the result is never wrapped again.
+ */
+export function curlyParts(s: string): { open: string; inner: string; close: string } | undefined {
+	const t = s.trim();
+	if (t.length < 2) return undefined;
+	const open = t[0];
+	const close = t[t.length - 1];
+	if (!CURLY_WRAPS.some(([o, c]) => o === open && c === close)) return undefined;
+	const inner = t.slice(1, -1);
+	return INNER_MARKS.test(inner) ? undefined : { open, inner, close };
+}
+
+/** The text inside one pair of curly quote marks, trimmed, or the same value if it is not wrapped in one. */
+export function unwrapCurly<T>(v: T): T | string {
+	if (typeof v !== 'string') return v;
+	const parts = curlyParts(v);
+	return parts ? parts.inner.trim() : v;
+}
+
+/** Takes the curly pair off a string-valued key of a map; leaves every other value as it is. */
+function unwrapKey(map: RawMap, key: string): void {
+	const v = map[key];
+	if (typeof v !== 'string') return;
+	const u = unwrapCurly(v);
+	if (u !== v) map[key] = u;
+}
+
+/** Takes the curly pair off a reference that is written as an id, a map with this key, or a list of those. */
+function unwrapRefs(map: RawMap, key: string, inner: string | undefined): void {
+	const v = map[key];
+	if (typeof v === 'string') return unwrapKey(map, key);
+	const items = Array.isArray(v) ? v : [v];
+	items.forEach((item, i) => {
+		if (typeof item === 'string') {
+			if (Array.isArray(v)) v[i] = unwrapCurly(item);
+		} else if (inner !== undefined && isMap(item)) unwrapKey(item, inner);
+	});
+}
+
+/**
+ * Reads the structural values of a parsed body as if the curly pair were not there (D103). These are
+ * the colour, the links, and every reference to a person, a union or a house. Names, titles, dates
+ * and notes are left as typed. It changes the data only; the note text is never touched.
+ */
+export function unwrapCurlyKeys(data: Raw): void {
+	if (!isMap(data)) return;
+	const each = (section: Raw, fn: (item: RawMap) => void) => {
+		if (Array.isArray(section)) for (const item of section) if (isMap(item)) fn(item);
+	};
+	if (isMap(data.options)) for (const key of ['start', 'focus', 'me']) unwrapKey(data.options, key);
+	each(data.houses, (h) => ['id', 'color', 'arms'].forEach((key) => unwrapKey(h, key)));
+	each(data.people, (p) => {
+		for (const key of ['id', 'house', 'placement', 'union', 'link', 'portrait']) unwrapKey(p, key);
+		unwrapRefs(p, 'parents', 'id');
+	});
+	each(data.unions, (u) => {
+		unwrapKey(u, 'id');
+		unwrapRefs(u, 'partners', undefined);
+	});
+	each(data.titles, (t) => unwrapRefs(t, 'holders', 'person'));
 }
 
 /** True if `v` is a YAML mapping (and not a list, a scalar, or a `Date`). */

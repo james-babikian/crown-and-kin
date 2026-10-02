@@ -214,7 +214,7 @@ describe('the finder first view on a phone (D51 at 12 px and 16 px text)', () =>
 			phone();
 			const { root } = await openFullScreen(F03);
 			await finder(root, 'conrad', 'ulric', frame);
-			expect(root.querySelector('.dynasty-result-text')!.getText()).toBe("Ulric Veyle is Conrad Castellane's first cousin.");
+			expect(root.querySelector('.dynasty-result-text')!.getText()).toBe("Ulric Veyle is Conrad Castellane’s first cousin.");
 			expect(orientation(root)).toBe('down');
 			expect(cardsOnScreen(root).size).toBe(6);
 			expect(notWhole(root, frame)).toEqual([]);

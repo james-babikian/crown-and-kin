@@ -361,13 +361,13 @@ describe('the command Insert family tree (spec §5.9, D34)', () => {
 		cmd.editorCallback!(editor, {});
 		const blocks = findBlocks(text);
 		expect(blocks).toHaveLength(1);
-		expect(blocks[0].body.trimEnd()).toBe(`# ${INSERT_UI.hint}`);
+		expect(blocks[0].body.trimEnd()).toBe(`# ${INSERT_UI.noteHint}`);
 		expect(cursor.line).toBe(blocks[0].closeLine! + 1);
 	});
 
 	it('the new tree shows "Add first person"', async () => {
 		const { host } = await loadPlugin();
-		const source = `# ${INSERT_UI.hint}\n`;
+		const source = `# ${INSERT_UI.noteHint}\n`;
 		const handle = fakeHandle('n.md', source);
 		Object.assign(host.handles, { quickOrdinal: () => 0, peek: () => handle, resolve: async () => handle, resolveByBody: () => handle, inEditorOf: () => false });
 		const el = new FEl('div');

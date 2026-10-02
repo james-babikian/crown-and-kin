@@ -213,6 +213,14 @@ export const UNION_MARKS: Record<UnionShape, { size: number; stroke?: number }> 
 	'open-triangle': { size: 0.65, stroke: 1.6 },
 };
 
+/**
+ * 1.1.1: the partnership sign inside a far-couple tag. `unit` is the sign's size unit as a fraction of the
+ * tag's text size (it replaces the union size of a near couple's sign, so the sign fits the pill); `slot` is
+ * the room the sign takes in the tag, in text sizes, with a small gap on each side. The shapes and outline
+ * widths are those of `UNION_MARKS`.
+ */
+export const TAG_MARK = { unit: 0.5, slot: 1.1 } as const;
+
 const r2 = (n: number) => Math.round(n * 100) / 100;
 
 /**
@@ -231,6 +239,10 @@ export const ON_LINE_EXTRA = 1.5;
 export const FADED_OPACITY = 0.25;
 /** D41: the marked card's accent border and the text-colour ring inside it, stroke widths in px (`.dynasty-card-me`). */
 export const ME_LOOK = { border: 3, ring: 1.5 } as const;
+/** D96: how far the marked card's inner ring edge lies inside the card's edge, in px: half the border and the whole ring. */
+export const ME_RING_INNER = ME_LOOK.border / 2 + ME_LOOK.ring;
+/** D41: the centre line of the marked card's ring lies this far inside the card's edge, in px: half the border and half the ring. */
+export const ME_RING_INSET = ME_LOOK.border / 2 + ME_LOOK.ring / 2;
 
 /**
  * M10 (spec §13.10): the class names of a fold control in the scene (`render/dom/folds.ts`). The CSS block that styles them is

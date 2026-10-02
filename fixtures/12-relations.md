@@ -19,14 +19,14 @@ The comments in the block give the expected names (read by `tests/acceptance/rel
 # Marked people for the expected names: gwen, alan, leo.
 #
 # Finder pairs (spec §13.2): the second person as a relative of the first.
-# pair: leo > wynn | Wynn is Leo's rumoured half-brother. | 1 | leo, harold, wynn
-# pair: ivo > kit | Kit is Ivo's wife. | 2 | ivo, kit
-# pair: mabel > kester | Kester is Mabel's husband. | 2 | mabel, kester
-# pair: gwen > tamsin | Tamsin is Gwen's stepsister. | 1 | gwen, alan, fenna, tamsin
-# pair: alan > pim | Pim is Alan's ward. | 2 | alan, pim
-# pair: alan > nils | Nils is Alan's wife's first cousin. | 1 | alan, dana, hugo, sigmund, wilma, maud, nils
-# pair: nora > zed | Zed is Nora's co-parent. | 1 | nora, zed
-# pair: wat > alan | Alan is Wat's guardian. | 1 | wat, alan
+# pair: leo > wynn | Wynn is Leo’s rumoured half-brother. | 1 | leo, harold, wynn
+# pair: ivo > kit | Kit is Ivo’s wife. | 2 | ivo, kit
+# pair: mabel > kester | Kester is Mabel’s husband. | 2 | mabel, kester
+# pair: gwen > tamsin | Tamsin is Gwen’s stepsister. | 1 | gwen, alan, fenna, tamsin
+# pair: alan > pim | Pim is Alan’s ward. | 2 | alan, pim
+# pair: alan > nils | Nils is Alan’s wife’s first cousin. | 1 | alan, dana, hugo, sigmund, wilma, maud, nils
+# pair: nora > zed | Zed is Nora’s co-parent. | 1 | nora, zed
+# pair: wat > alan | Alan is Wat’s guardian. | 1 | wat, alan
 # pair: gwen > rolf | Gwen and Rolf have a relation through 2 other people. | chain | gwen, alan, fenna, rolf
 # pair: gwen > quill | Gwen and Quill have no relation in this tree. | none | -
 options:
@@ -57,9 +57,9 @@ people:
   - id: thea
     name: Thea
     sex: f
-    # gwen: Great-grandfather's wife
+    # gwen: Great-grandfather’s wife
     # alan: none
-    # leo: Great-great-grandfather's wife
+    # leo: Great-great-grandfather’s wife
   - id: odo
     name: Odo
     house: ashby
@@ -92,14 +92,14 @@ people:
     sex: f
     # gwen: Step-grandmother
     # alan: none
-    # leo: Great-grandfather's wife
+    # leo: Great-grandfather’s wife
   - id: maud
     name: Maud
     house: harlow
     sex: f
     parents: [sigmund, wilma]
     # gwen: Great-aunt
-    # alan: Wife's aunt
+    # alan: Wife’s aunt
     # leo: Great-great-aunt
   - id: alan
     name: Alan
@@ -155,7 +155,7 @@ people:
     parents: [maud]
     illegitimate: true
     # gwen: First cousin once removed
-    # alan: Wife's first cousin
+    # alan: Wife’s first cousin
     # leo: First cousin twice removed
   - id: fenna
     name: Fenna
@@ -219,7 +219,7 @@ people:
     sex: m
     parents: [brand, edith]
     # gwen: Double first cousin
-    # alan: Nephew; maybe: wife's nephew
+    # alan: Nephew; maybe: wife’s nephew
     # leo: Double first cousin once removed
   - id: jory
     name: Jory
@@ -268,22 +268,22 @@ people:
     sex: m
     parents: [harold, una]
     # gwen: Nephew
-    # alan: Grandson; maybe: wife's grandson
+    # alan: Grandson; maybe: wife’s grandson
     # leo: You
   - id: rowan
     name: Rowan
     house: ashby
     sex: x
     parents: [harold, una]
-    # gwen: Sibling's child
-    # alan: Grandchild; maybe: wife's grandchild
+    # gwen: Sibling’s child
+    # alan: Grandchild; maybe: wife’s grandchild
     # leo: Sibling
   - id: wynn
     name: Wynn
     sex: m
     parents: [{id: harold, type: rumoured}]
     # gwen: Rumoured nephew
-    # alan: Rumoured grandson; maybe: wife's rumoured grandson
+    # alan: Rumoured grandson; maybe: wife’s rumoured grandson
     # leo: Rumoured half-brother
   - id: vera
     name: Vera
@@ -297,14 +297,14 @@ people:
     sex: f
     parents: [kester]
     # gwen: Half-niece
-    # alan: Granddaughter; maybe: wife's granddaughter
+    # alan: Granddaughter; maybe: wife’s granddaughter
     # leo: Half first cousin
   - id: nia
     name: Nia
     house: ashby
     parents: [kester]
-    # gwen: Half-sibling's child
-    # alan: Grandchild; maybe: wife's grandchild
+    # gwen: Half-sibling’s child
+    # alan: Grandchild; maybe: wife’s grandchild
     # leo: Half first cousin
   - id: pim
     name: Pim
@@ -319,7 +319,7 @@ people:
     sex: f
     parents: [ivo, kit]
     # gwen: Double first cousin once removed
-    # alan: Great-niece; maybe: wife's great-niece
+    # alan: Great-niece; maybe: wife’s great-niece
     # leo: Double second cousin
   - id: ansel
     name: Ansel
@@ -335,7 +335,7 @@ people:
     sex: m
     parents: [kester, mabel]
     # gwen: Half-nephew
-    # alan: Grandson; maybe: wife's grandson
+    # alan: Grandson; maybe: wife’s grandson
     # leo: Half first cousin
   - id: nora
     name: Nora
@@ -343,7 +343,7 @@ people:
     sex: f
     parents: [leo, vera]
     # gwen: Great-niece
-    # alan: Great-granddaughter; maybe: wife's great-granddaughter
+    # alan: Great-granddaughter; maybe: wife’s great-granddaughter
     # leo: Daughter
   - id: bryn
     name: Bryn
@@ -364,8 +364,8 @@ people:
     sex: m
     parents: [nora, zed]
     # gwen: Great-great-nephew
-    # alan: Great-great-grandson; maybe: wife's great-great-grandson
-    # leo: Grandson; maybe: wife's grandson
+    # alan: Great-great-grandson; maybe: wife’s great-great-grandson
+    # leo: Grandson; maybe: wife’s grandson
   - id: cai
     name: Cai
     sex: m

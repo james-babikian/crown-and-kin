@@ -175,12 +175,12 @@ describe('words for each sex (D12)', () => {
 			expect(first(g, 'a1', 'b1')).toBe('sibling');
 			expect(first(g, 'a1', 'a3')).toBe('grandchild');
 			expect(first(g, 'a3', 'a1')).toBe('grandparent');
-			expect(first(g, 'a2', 'b1')).toBe("parent's sibling");
-			expect(first(g, 'a3', 'b1')).toBe("grandparent's sibling");
-			expect(first(g, 'a4', 'b1')).toBe("great-grandparent's sibling");
-			expect(first(g, 'a1', 'b2')).toBe("sibling's child");
-			expect(first(g, 'a1', 'b3')).toBe("sibling's grandchild");
-			expect(first(g, 'a1', 'b4')).toBe("sibling's great-grandchild");
+			expect(first(g, 'a2', 'b1')).toBe("parent’s sibling");
+			expect(first(g, 'a3', 'b1')).toBe("grandparent’s sibling");
+			expect(first(g, 'a4', 'b1')).toBe("great-grandparent’s sibling");
+			expect(first(g, 'a1', 'b2')).toBe("sibling’s child");
+			expect(first(g, 'a1', 'b3')).toBe("sibling’s grandchild");
+			expect(first(g, 'a1', 'b4')).toBe("sibling’s great-grandchild");
 			expect(first(g, 'a2', 'b2')).toBe('first cousin');
 		}
 	});
@@ -188,7 +188,7 @@ describe('words for each sex (D12)', () => {
 	it('changing sex changes only the words', () => {
 		const one = computeRelations(twoLines(3, 'x', 'x'), 'a2').get('b1')!;
 		const two = computeRelations(twoLines(3, 'x', 'm'), 'a2').get('b1')!;
-		expect(one.map((r) => r.lower)).toEqual(["parent's sibling"]);
+		expect(one.map((r) => r.lower)).toEqual(["parent’s sibling"]);
 		expect(two.map((r) => r.lower)).toEqual(['uncle']);
 		expect(one[0].line).toEqual(two[0].line);
 		expect(one[0].distance).toBe(two[0].distance);
@@ -211,9 +211,9 @@ describe('half relations (§13.1 half rule, D45, ruling 3)', () => {
 
 	it('the neutral forms put "half" on the inner word', () => {
 		expect(first(g, 'm1', 'nh')).toBe('half-sibling');
-		expect(first(g, 'me', 'nh')).toBe("parent's half-sibling");
-		expect(first(g, 'kid', 'nh')).toBe("grandparent's half-sibling");
-		expect(first(g, 'm1', 'nhc')).toBe("half-sibling's child");
+		expect(first(g, 'me', 'nh')).toBe("parent’s half-sibling");
+		expect(first(g, 'kid', 'nh')).toBe("grandparent’s half-sibling");
+		expect(first(g, 'm1', 'nhc')).toBe("half-sibling’s child");
 	});
 
 	it('the direct line is never half', () => {
@@ -399,11 +399,11 @@ describe('relations by marriage (§13.1 rules 1–4, D43)', () => {
 		expect(n.gkidH).toEqual(['grandson-in-law']);
 	});
 
-	it('rule 1: uncle, cousin by marriage; any other relation: "great-grandson\'s wife", "great-grandfather\'s wife"', () => {
+	it('rule 1: uncle, cousin by marriage; any other relation: "great-grandson\’s wife", "great-grandfather\’s wife"', () => {
 		expect(n.auntH).toEqual(['uncle by marriage']);
 		expect(n.cousinW).toEqual(['first cousin by marriage']);
-		expect(n.ggkidW).toEqual(["great-grandson's wife"]);
-		expect(n.ggw).toEqual(["great-grandfather's wife"]);
+		expect(n.ggkidW).toEqual(["great-grandson’s wife"]);
+		expect(n.ggw).toEqual(["great-grandfather’s wife"]);
 	});
 
 	it('the named forms leave out "half": the husband of a half-sister is a brother-in-law', () => {
@@ -411,15 +411,15 @@ describe('relations by marriage (§13.1 rules 1–4, D43)', () => {
 		expect(n.hsisH).toEqual(['brother-in-law']);
 	});
 
-	it('rule 2: parent-in-law, grandparent-in-law, sibling-in-law, stepchild, step-grandchild, "wife\'s …"', () => {
+	it('rule 2: parent-in-law, grandparent-in-law, sibling-in-law, stepchild, step-grandchild, "wife\’s …"', () => {
 		expect(n.wf).toEqual(['father-in-law']);
 		expect(n.wm).toEqual(['mother-in-law']);
 		expect(n.wgf).toEqual(['grandfather-in-law']);
 		expect(n.wbro).toEqual(['brother-in-law']);
 		expect(n.wstep).toEqual(['stepdaughter']);
 		expect(n.wstepk).toEqual(['step-grandson']);
-		expect(n.waunt).toEqual(["wife's aunt"]);
-		expect(n.wcousin).toEqual(["wife's first cousin"]);
+		expect(n.waunt).toEqual(["wife’s aunt"]);
+		expect(n.wcousin).toEqual(["wife’s first cousin"]);
 	});
 
 	it('rule 2: a child of the spouse who is also the marked person\'s child is only a child', () => {
@@ -454,12 +454,12 @@ describe('relations by marriage (§13.1 rules 1–4, D43)', () => {
 		expect(rels.get('wcousin')![0]).toMatchObject({ kind: 'by-marriage', distance: 5 });
 	});
 
-	it('the "\'s" form follows the spouse\'s sex and keeps half; the named forms leave it out', () => {
+	it('the "\’s" form follows the spouse\'s sex and keeps half; the named forms leave it out', () => {
 		// s is a grandchild of x through c (x + y); hb is x's son with z: the half-uncle of s.
 		const h = tree(['me m', 'x m', 'y f', 'z f', 'c m x y', 's - c', 'hb m x z', 'hs f x z'], ['me s', 'x y', 'x z']);
-		expect(names(h, 'me').hb).toEqual(["spouse's half-uncle"]);
+		expect(names(h, 'me').hb).toEqual(["spouse’s half-uncle"]);
 		const w = tree(['me f', 'x m', 'y f', 'z f', 'c m x y', 's m c', 'hb m x z'], ['me s', 'x y', 'x z']);
-		expect(names(w, 'me').hb).toEqual(["husband's half-uncle"]);
+		expect(names(w, 'me').hb).toEqual(["husband’s half-uncle"]);
 		// A half-brother of the spouse is a brother-in-law.
 		const b = tree(['me f', 'x m', 'y f', 'z f', 's m x y', 'hb m x z'], ['me s', 'x y', 'x z']);
 		expect(names(b, 'me').hb).toEqual(['brother-in-law']);
@@ -468,10 +468,10 @@ describe('relations by marriage (§13.1 rules 1–4, D43)', () => {
 	it('neutral and "great" forms by marriage (ruling 2)', () => {
 		const h = tree(['gg m', 'g m gg', 'gu m gg', 'guW -', 'p m g', 'me f p', 'ne m me', 'neW f', 'gn m ne', 'gnW f'], ['gu guW', 'ne neW', 'gn gnW']);
 		const m = names(h, 'me');
-		expect(m.guW).toEqual(["grandparent's sibling by marriage"]);
+		expect(m.guW).toEqual(["grandparent’s sibling by marriage"]);
 		expect(m.gnW).toEqual(['granddaughter-in-law']);
 		const k = names(h, 'p');
-		expect(k.guW).toEqual(["parent's sibling by marriage"]);
+		expect(k.guW).toEqual(["parent’s sibling by marriage"]);
 		const u = tree(['gg m', 'g m gg', 'gu m gg', 'guW f', 'p m g', 'me f p', 'sib m p', 'nep m sib', 'nepW f', 'gnep m nep', 'gnepW f'], ['gu guW', 'nep nepW', 'gnep gnepW']);
 		expect(names(u, 'me').guW).toEqual(['great-aunt by marriage']);
 		expect(names(u, 'me').nepW).toEqual(['niece by marriage']);

@@ -93,9 +93,9 @@ type Picker = { contentEl: FEl; modalEl: FEl; close(): void };
 const openPicker = () => openModals[openModals.length - 1] as unknown as Picker;
 
 async function pick(o: { current?: VaultFile | null; store?: unknown; files?: VaultFile[] } = {}) {
-	const M = (await pickerModule()) as { pickPicture: (a: never, o: never) => Promise<string | null> };
+	const M = (await pickerModule()) as { pickPicture: (a: never, o: never) => Promise<{ kind: 'choose'; link: string } | { kind: 'remove' } | { kind: 'cancel' }> };
 	let result: string | null | undefined;
-	const done = M.pickPicture(app(o.files) as never, { sourcePath: 'Trees/Tree.md', title: 'Select', store: o.store, ...(o.current !== undefined ? { current: o.current } : {}) } as never).then((v) => (result = v));
+	const done = M.pickPicture(app(o.files) as never, { sourcePath: 'Trees/Tree.md', title: 'Select', store: o.store, ...(o.current !== undefined ? { current: o.current } : {}) } as never).then((v) => (result = v.kind === 'choose' ? v.link : null));
 	const m = openPicker();
 	return { m, done, result: () => result };
 }

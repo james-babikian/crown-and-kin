@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { CodedIssue, HardError, HardErrorCode, IssueCode, IssueParams } from '../src/core/messages';
-import { codedIssue, hardErrorText, issueText } from '../src/core/messages';
+import { codedIssue, hardErrorText, ISSUE_CODES, issueText } from '../src/core/messages';
+import { CURLY_APOSTROPHE, quote } from '../src/core/quote';
 
 // Typed as a full record, so a new code in messages.ts fails the typecheck until it gets a sample here.
 const SAMPLES: Record<IssueCode, IssueParams> = {
@@ -56,7 +57,7 @@ const issue = (code: IssueCode, params: IssueParams): CodedIssue => ({ code, lev
 
 const sentences = (text: string) => text.split(/(?<=[.!?])\s+(?=[A-Z])/);
 /** Quoted text is what the user typed (ids, YAML keys), so the word list does not apply to it. */
-const unquoted = (text: string) => text.replace(/"[^"]*"/g, '""').replace(/\{[^}]*\}/g, '{}');
+const unquoted = (text: string) => text.replace(/“[^”]*”/g, '“”').replace(/"[^"]*"/g, '""').replace(/\{[^}]*\}/g, '{}');
 
 /** Words the project word list replaces, plus signs of an unfilled template. */
 const FORBIDDEN = /\b(union|unions|node|nodes|edge|edges|graph|diagram|chart|layer|rank|fixture|file|document)\b/i;
@@ -86,14 +87,14 @@ describe('issueText: one STE entry per code', () => {
 
 	it('uses names for people and quotes only ids that do not exist', () => {
 		expect(issueText(issue('missing-parent', SAMPLES['missing-parent']))).toBe(
-			'Wynn Ashford has a parent with the id "ghost", but no person has this id. Correct the id, or add the person.',
+			'Wynn Ashford has a parent with the id “ghost”, but no person has this id. Correct the id, or add the person.',
 		);
-		expect(issueText(issue('missing-partner', SAMPLES['missing-partner']))).toContain('the partnership of Piers Ashford and "nobody"');
+		expect(issueText(issue('missing-partner', SAMPLES['missing-partner']))).toContain('the partnership of Piers Ashford and “nobody”');
 	});
 
 	it('gives the colour to quote when it was recovered', () => {
 		expect(issueText(issue('house-color-null', SAMPLES['house-color-null']))).toBe('House Brennock has no colour. Put quotes around the colour: color: "#2e7d4f".');
-		expect(issueText(issue('house-color-null', { house: 'valmont', id: 'valmont' }))).toMatch(/^The house "valmont" has no colour\. If you wrote a colour/);
+		expect(issueText(issue('house-color-null', { house: 'valmont', id: 'valmont' }))).toMatch(/^The house “valmont” has no colour\. If you wrote a colour/);
 	});
 
 	it('covers every section for the shape codes', () => {
@@ -116,17 +117,17 @@ describe('issueText: title warnings (spec §13.3, §13.4)', () => {
 	const text = (code: IssueCode, params: IssueParams) => issueText(issue(code, params));
 
 	it('the titles section and its entries', () => {
-		expect(text('section-wrong-shape', { section: 'titles' })).toBe('The "titles" section is not a list, so the tree ignores it. Start each title with "- id:".');
-		expect(text('entry-not-map', { section: 'titles', index: 2 })).toBe('Entry 2 in the "titles" list is not a title, so the tree does not show it. Start each title with "- id:".');
+		expect(text('section-wrong-shape', { section: 'titles' })).toBe('The “titles” section is not a list, so the tree ignores it. Start each title with “- id:”.');
+		expect(text('entry-not-map', { section: 'titles', index: 2 })).toBe('Entry 2 in the “titles” list is not a title, so the tree does not show it. Start each title with “- id:”.');
 		expect(text('missing-id', { section: 'titles', index: 3 })).toBe(
-			'Entry 3 in the "titles" list has no id, so the tree does not use this title. Add an id, for example: id: duke-of-valmont.',
+			'Entry 3 in the “titles” list has no id, so the tree does not use this title. Add an id, for example: id: duke-of-valmont.',
 		);
 		expect(text('missing-id', { section: 'titles', index: 3, name: 'Duke of Valmont' })).toBe(
 			'Duke of Valmont has no id, so the tree does not use this title. Add an id, for example: id: duke-of-valmont.',
 		);
 		expect(text('missing-id', { section: 'titles', index: 1, name: 'King of Ostmark' })).toContain('id: king-of-ostmark.');
 		expect(text('duplicate-title-id', SAMPLES['duplicate-title-id'])).toBe(
-			'More than one title has the id "duke-of-valmont", and the tree uses only the first. Give each title a different id.',
+			'More than one title has the id “duke-of-valmont”, and the tree uses only the first. Give each title a different id.',
 		);
 	});
 
@@ -138,15 +139,15 @@ describe('issueText: title warnings (spec §13.3, §13.4)', () => {
 			'Entry 5 in the holders of Duke of Valmont is not a holder. Write each holder like this: - {person: aldric}.',
 		);
 		expect(text('missing-holder', { title: 'Duke of Valmont', ref: 'aldrik' })).toBe(
-			'The title Duke of Valmont has a holder with the id "aldrik", but no person has this id. Correct the id, or write the name of the holder.',
+			'The title Duke of Valmont has a holder with the id “aldrik”, but no person has this id. Correct the id, or write the name of the holder.',
 		);
 		expect(text('missing-holder', { title: 'Duke of Valmont', ref: 'aldrik', name: 'Aldric' })).toBe(text('missing-holder', { title: 'Duke of Valmont', ref: 'aldrik' }));
-		expect(text('holder-empty', SAMPLES['holder-empty'])).toBe('Entry 4 in the holders of Duke of Valmont has no person and no name. Add "person:" or "name:".');
+		expect(text('holder-empty', SAMPLES['holder-empty'])).toBe('Entry 4 in the holders of Duke of Valmont has no person and no name. Add “person:” or “name:”.');
 	});
 
 	it('card-title-not-held', () => {
 		expect(text('card-title-not-held', SAMPLES['card-title-not-held'])).toBe(
-			'Roderick Valmont has "card-title: king-of-ostmark", but Roderick Valmont does not hold a title with this id. The card shows the first title instead. Correct the id, or remove it.',
+			'Roderick Valmont has “card-title: king-of-ostmark”, but Roderick Valmont does not hold a title with this id. The card shows the first title instead. Correct the id, or remove it.',
 		);
 	});
 
@@ -159,7 +160,7 @@ describe('issueText: title warnings (spec §13.3, §13.4)', () => {
 			}
 		}
 		expect(text('missing-holder', { ref: 'x' })).toMatch(/^A title has a holder/);
-		expect(text('holder-empty', { index: 2 })).toBe('Entry 2 in the holders of a title has no person and no name. Add "person:" or "name:".');
+		expect(text('holder-empty', { index: 2 })).toBe('Entry 2 in the holders of a title has no person and no name. Add “person:” or “name:”.');
 	});
 
 	it('covers the new sections of the shape codes', () => {
@@ -178,10 +179,10 @@ describe('issueText: picture warnings (spec §13.6, §13.7)', () => {
 
 	it('arms take "use" and "are", a portrait "uses" and "is"', () => {
 		expect(text('missing-picture', { ...arms, file: 'x.png' })).toBe(
-			'The arms of House Valmont use the picture "x.png", but the vault has no file with this name. Correct the link, or select other arms.',
+			'The arms of House Valmont use the picture “x.png”, but the vault has no file with this name. Correct the link, or select other arms.',
 		);
 		expect(text('missing-picture', { ...portrait, file: 'x.png' })).toBe(
-			'The portrait of Aldric Valmont uses the picture "x.png", but the vault has no file with this name. Correct the link, or select another portrait.',
+			'The portrait of Aldric Valmont uses the picture “x.png”, but the vault has no file with this name. Correct the link, or select another portrait.',
 		);
 		expect(text('picture-web', arms)).toBe('The arms of House Valmont are a web address. The plugin shows only pictures from the vault.');
 		expect(text('picture-web', portrait)).toBe('The portrait of Aldric Valmont is a web address. The plugin shows only pictures from the vault.');
@@ -189,21 +190,21 @@ describe('issueText: picture warnings (spec §13.6, §13.7)', () => {
 
 	it('picture-not-image names a known format, else says the file is not a picture', () => {
 		expect(text('picture-not-image', { ...arms, file: 'x.tif', format: 'TIFF' })).toBe(
-			'The arms of House Valmont use the picture "x.tif". The plugin cannot show TIFF pictures. Save the picture as PNG or JPEG. Then select it again.',
+			'The arms of House Valmont use the picture “x.tif”. The plugin cannot show TIFF pictures. Save the picture as PNG or JPEG. Then select it again.',
 		);
 		expect(text('picture-not-image', { ...portrait, file: 'x.pdf' })).toBe(
-			'The portrait of Aldric Valmont uses the file "x.pdf", which is not a picture. Select a PNG, JPEG, WebP, GIF, BMP or SVG picture.',
+			'The portrait of Aldric Valmont uses the file “x.pdf”, which is not a picture. Select a PNG, JPEG, WebP, GIF, BMP or SVG picture.',
 		);
 	});
 
 	it('picture-too-large gives the millions of pixels only when known (A6)', () => {
 		expect(text('picture-too-large', { ...arms, file: 'x.png', pixels: 41 })).toBe(
-			'The arms of House Valmont use the picture "x.png", which is too large (41 million pixels). Use a picture with 40 million pixels or less.',
+			'The arms of House Valmont use the picture “x.png”, which is too large (41 million pixels). Use a picture with 40 million pixels or less.',
 		);
 		for (const pixels of [undefined, 0, Number.NaN]) {
 			const params: IssueParams = { ...arms, file: 'x.png' };
 			if (pixels !== undefined) params.pixels = pixels;
-			expect(text('picture-too-large', params)).toBe('The arms of House Valmont use the picture "x.png", which is too large. Use a picture with 40 million pixels or less.');
+			expect(text('picture-too-large', params)).toBe('The arms of House Valmont use the picture “x.png”, which is too large. Use a picture with 40 million pixels or less.');
 		}
 	});
 
@@ -211,7 +212,7 @@ describe('issueText: picture warnings (spec §13.6, §13.7)', () => {
 		expect(text('picture-web', { person: 'Wren' })).toBe('The portrait of Wren is a web address. The plugin shows only pictures from the vault.');
 		expect(text('picture-web', {})).toBe('The arms of a house are a web address. The plugin shows only pictures from the vault.');
 		expect(text('missing-picture', { owner: 'portrait' })).toBe(
-			'The portrait of a person uses the picture "?", but the vault has no file with this name. Correct the link, or select another portrait.',
+			'The portrait of a person uses the picture “?”, but the vault has no file with this name. Correct the link, or select another portrait.',
 		);
 	});
 
@@ -239,6 +240,41 @@ describe('hardErrorText', () => {
 			'The block has an error on text line 3. Correct this text line to show the tree. Details: Nested mappings are not allowed',
 		);
 		expect(hardErrorText({ code: 'yaml-invalid' })).toBe('The block has an error. Correct the text to show the tree.');
+	});
+});
+
+describe('quote marks in the message table (D99)', () => {
+	/** The one text with a straight quote mark on purpose: the YAML example that the user types. */
+	const YAML_EXAMPLE: IssueCode = 'house-color-null';
+	const everyText = (code: IssueCode): string[] => [issueText(issue(code, SAMPLES[code])), issueText(issue(code, {}))];
+
+	it('SAMPLES has a sample for every code of the table', () => {
+		expect(Object.keys(SAMPLES).sort()).toEqual([...ISSUE_CODES].sort());
+	});
+
+	it('no message has a straight double quote mark or apostrophe, except the YAML example', () => {
+		for (const code of ISSUE_CODES) {
+			if (code === YAML_EXAMPLE) continue;
+			for (const text of everyText(code)) expect(text, code).not.toMatch(/["']/);
+		}
+		for (const error of Object.values(HARD)) expect(hardErrorText(error)).not.toMatch(/["']/);
+		expect(hardErrorText({ code: 'not-a-map' })).toContain(quote('people:'));
+	});
+
+	it('the colour message keeps its YAML example straight and quotes the rest with curly marks', () => {
+		const text = issueText(issue('house-color-null', { house: 'valmont', id: 'valmont' }));
+		expect(text).toContain('color: "#8b1e3f".');
+		expect(text).toContain(quote('valmont'));
+		expect(text.replace('color: "#8b1e3f"', '')).not.toMatch(/["']/);
+		const recovered = issueText(issue('house-color-null', SAMPLES['house-color-null']));
+		expect(recovered).toBe('House Brennock has no colour. Put quotes around the colour: color: "#2e7d4f".');
+	});
+
+	it('a message quotes ids and keys with curly marks and leaves names bare', () => {
+		const text = issueText(issue('missing-parent', SAMPLES['missing-parent']));
+		expect(text).toContain(`the id ${quote('ghost')}`);
+		expect(text).toContain('Wynn Ashford has');
+		expect(text).not.toContain(CURLY_APOSTROPHE);
 	});
 });
 

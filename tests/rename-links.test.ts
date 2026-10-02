@@ -241,7 +241,7 @@ describe('Rename: tree links follow the renamed note (spec §6.9, D6)', () => {
 		expect(findBlocks(s.texts.get('Bad.md')!)[0].body).toContain('"[[Old]]"');
 		expect(findBlocks(s.texts.get('Good.md')!)[0].body).toContain('"[[Kept]]"');
 		expect(notices).toEqual([RENAME_UI.updated(1, 1), RENAME_UI.failed('Bad', 'Old', 'Odd|name')]);
-		expect(notices[1]).toBe('The plugin cannot change the link "Old" in a tree in the note "Bad". Replace "Old" with "Odd|name" by hand.');
+		expect(notices[1]).toBe('The plugin cannot change the link “Old” in a tree in the note “Bad”. Replace “Old” with “Odd|name” by hand.');
 	});
 
 	it('a tree that stays stale: after one more try, the failure Notice', async () => {
@@ -355,7 +355,7 @@ describe('Rename, fix round after the M6 iPhone test (the decision notes "M6 iPh
 			const s = setup(files);
 			await s.rename(['x/Old.md', 'x/New.md']);
 			expect(notices).toEqual([RENAME_UI.kept('Old', 'A', 'y/Old'), RENAME_UI.kept('Old', 'B', 'y/Old'), RENAME_UI.kept('Old', 'C', 'y/Old'), RENAME_UI.moreKept(2)]);
-			expect(notices[0]).toBe('The plugin did not change the link "Old" in a tree in the note "A". The link now opens a different note with the same name: "y/Old".');
+			expect(notices[0]).toBe('The plugin did not change the link “Old” in a tree in the note “A”. The link now opens a different note with the same name: “y/Old”.');
 			expect(RENAME_UI.moreKept(2)).toBe('The plugin also did not change the links in 2 other trees for the same reason.');
 		});
 	});
@@ -526,8 +526,8 @@ describe('Rename, fix round after the M6 iPhone test (the decision notes "M6 iPh
 			const s = setup({ 'T.md': tree(person('a', '"[[Old]]"')), 'Old.md': '' });
 			vi.spyOn(s.handles, 'forBlock').mockRejectedValue(new Error('disk'));
 			await s.rename(['Old.md', 'New.md']);
-			expect(notices).toEqual([RENAME_UI.stopped('"Old"')]);
-			expect(notices[0]).toBe('The plugin cannot complete the update of the tree links to "Old". Some trees can still have the old link. Change these links by hand.');
+			expect(notices).toEqual([RENAME_UI.stopped('“Old”')]);
+			expect(notices[0]).toBe('The plugin cannot complete the update of the tree links to “Old”. Some trees can still have the old link. Change these links by hand.');
 			expect(s.updater.last?.state).toBe('failed');
 			expect(s.updater.pendingList()).toEqual([]);
 			expect(err).toHaveBeenCalled();
@@ -542,16 +542,16 @@ describe('Rename, fix round after the M6 iPhone test (the decision notes "M6 iPh
 			expect(notices).toEqual([RENAME_UI.updated(1, 1), RENAME_UI.kept('Old', 'U', 'y/Old')]);
 			const last = { ...s.updater.last!, ms: 1200 };
 			expect(RENAME_UI.report(last, true)).toBe(
-				'The last link update was after the rename of "x/Old" to "x/New". It took 1.2 seconds.\n\nNotes in the vault: 4. Notes that the plugin read: 4.\n\n' +
+				'The last link update was after the rename of “x/Old” to “x/New”. It took 1.2 seconds.\n\nNotes in the vault: 4. Notes that the plugin read: 4.\n\n' +
 					'Trees with a link to the renamed note: 2. Changed links: 1. Changed trees: 1.\n\nLinks that the plugin did not change: 1. ' +
-					'The link "Old" in the note "U" opens a different note with the same name: "y/Old".',
+					'The link “Old” in the note “U” opens a different note with the same name: “y/Old”.',
 			);
 		});
 
 		it('before any rename, and with the setting off', () => {
 			expect(RENAME_UI.command).toBe('Show the last link update');
 			expect(RENAME_UI.report(null, true)).toBe('The plugin did not update tree links after Obsidian started.');
-			expect(RENAME_UI.report(null, false)).toBe('The plugin did not update tree links after Obsidian started. The setting "Update tree links when you rename a note or a picture" is off.');
+			expect(RENAME_UI.report(null, false)).toBe('The plugin did not update tree links after Obsidian started. The setting “Update tree links when you rename a note or a picture” is off.');
 		});
 
 		it('a stopped, a failed and a running update, and trees that the plugin cannot change', () => {
@@ -559,7 +559,7 @@ describe('Rename, fix round after the M6 iPhone test (the decision notes "M6 iPh
 			expect(RENAME_UI.report({ ...base, state: 'running' }, true)).toBe(
 				'The plugin still updates the tree links after the rename of 2 notes.\n\nNotes in the vault: 10. Notes that the plugin read: 3. Notes that the plugin cannot read: 1.\n\n' +
 					'Trees with a link to the renamed note: 2. Changed links: 0. Changed trees: 0.\n\nTrees that the plugin cannot change: 2. ' +
-					'The plugin cannot change a tree in the note "N1". The plugin cannot change a tree in the note "N2".',
+					'The plugin cannot change a tree in the note “N1”. The plugin cannot change a tree in the note “N2”.',
 			);
 			expect(RENAME_UI.report({ ...base, state: 'stopped' }, true)).toContain('It stopped before the end. The plugin will continue it at the next start.');
 			expect(RENAME_UI.report({ ...base, state: 'failed' }, true)).toContain('An error stopped it before the end.');

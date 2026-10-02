@@ -14,7 +14,8 @@
  */
 import type { FamilyGraph } from '../core/derive';
 import type { CardLabel } from '../core/titles';
-import { armsPlace, cardText, nameCountOf, nameTextWidth, portraitBox, relationY, smallTextWidth, tagTop, type CardText } from '../layout/geometry';
+import { armsPlace, cardText, nameCountOf, nameTextWidth, portraitBox, relationY, signBelowRing, smallTextWidth, tagTop, type CardText } from '../layout/geometry';
+import { farTagSigns } from '../layout/far-tag-sign';
 import { illegitimateSigns } from '../layout/illegitimate-sign';
 import { FOLD_EM } from '../layout/fold-spots';
 import type { EdgeDrawing, NameLineCount, StrokeKind, TreeLayout } from '../layout/model';
@@ -24,7 +25,7 @@ import { legendRows, type LegendHouse, type LegendPart } from './legend';
 import { lineLook, type LineMarks, type LineState } from './line-highlight';
 import { nameLines, titleLines } from './name-lines';
 import { fixedColour, fontOf, savedFrame, xmlText, type PictureMap, type SavedFrame, type SavedParts } from './saved-picture';
-import { DEAD_STRIP_OPACITY, DEFAULT_DARK, DEFAULT_LIGHT, FADED_OPACITY, ME_LOOK, ON_LINE_EXTRA, STROKES, UNION_MARKS, stripColour, unionMark, unionShape, type Palette, type UnionShape } from './styles';
+import { DEAD_STRIP_OPACITY, DEFAULT_DARK, DEFAULT_LIGHT, FADED_OPACITY, ME_LOOK, ME_RING_INNER, ME_RING_INSET, ON_LINE_EXTRA, STROKES, TAG_MARK, UNION_MARKS, stripColour, unionMark, unionShape, type Palette, type UnionShape } from './styles';
 import { LEGEND_LABELS, SIGN_LEGEND_LABEL, dateLine, farTagName } from './tree-info';
 import { truncate } from './view-math';
 
@@ -183,11 +184,15 @@ export function renderSvg(g: FamilyGraph, layout: TreeLayout, edges: EdgeDrawing
 		const t = textOf(count, box.tallTitle);
 		const tx = box.x + t.padX;
 		// D67, D78: the arms at the top right; the name ends before them and the D14 sign moves left of them.
-		const place = box.arms && house ? armsPlace(geo, t, box.h, 0) : undefined;
-		const nameW = place ? (signed.has(p.id) ? t.nameWithSignW : t.textW) - place.shift : signed.has(p.id) ? t.nameWithSignW : t.textW;
+		const isMe = opts.me !== undefined && p.id === opts.me;
+		// D96: on the marked card the pictures and the sign keep clear of the mark's inner ring.
+		const ring = isMe ? ME_RING_INNER : undefined;
+		const hasArms = !!(box.arms && house);
 		// D76, D77: the small text lines beside the portrait are narrower; the name never is.
-		const portrait = box.portrait ? portraitBox(geo, t) : undefined;
-		const widthAt = (baseline: number) => (portrait ? smallTextWidth(geo, t, baseline, portrait) : t.textW);
+		const portrait = box.portrait ? portraitBox(geo, t, ring === undefined ? undefined : { boxH: box.h, ring, arms: hasArms }) : undefined;
+		const place = hasArms ? armsPlace(geo, t, box.h, 0, ring, portrait) : undefined;
+		const nameW = place ? (signed.has(p.id) ? t.nameWithSignW : t.textW) - place.shift : signed.has(p.id) ? t.nameWithSignW : t.textW;
+		const widthAt = (baseline: number) => smallTextWidth(geo, t, baseline, portrait, ring === undefined ? undefined : place?.full);
 		const nameFont = fontOf(fonts.bold, t.nameSize, fonts.text);
 		const smallFont = fontOf('400', t.smallSize, fonts.text);
 		const cutSmall = (text: string, px: number) => (measured ? cutWith(text, px, smallFont) : fit(text, px, t.smallSize));
@@ -207,14 +212,13 @@ export function renderSvg(g: FamilyGraph, layout: TreeLayout, edges: EdgeDrawing
 			const w = nameTextWidth(geo, t, (i + 1) as NameLineCount, count, portrait, t.textW - nameW);
 			return w < nameW ? (measured ? cutWith(line, w, nameFont) : fit(line, w, t.nameSize, true)) : line;
 		});
-		const isMe = opts.me !== undefined && p.id === opts.me;
 		out.push(`<g${di(`card:${p.id}`)}${fadeAttr(look.card(p.id))}>`);
 		// D41: the marked card has a thicker accent border, with a thin text-colour ring inside it.
 		const border = isMe ? `stroke="${c.accent}" stroke-width="${ME_LOOK.border}"` : `stroke="${c.cardBorder}"`;
 		out.push(`<rect x="${box.x}" y="${box.y}" width="${box.w}" height="${box.h}" rx="6" fill="${c.cardFill}" ${border}/>`);
 		out.push(`<rect x="${box.x}" y="${box.y}" width="${t.stripW}" height="${box.h}" rx="3" fill="${esc(accent)}"${dead ? ` fill-opacity="${DEAD_STRIP_OPACITY}"` : ''}/>`);
 		if (isMe) {
-			const i = ME_LOOK.border / 2 + ME_LOOK.ring / 2;
+			const i = ME_RING_INSET;
 			out.push(`<rect x="${box.x + i}" y="${box.y + i}" width="${box.w - 2 * i}" height="${box.h - 2 * i}" rx="${6 - i}" fill="none" stroke="${c.text}" stroke-width="${ME_LOOK.ring}"/>`);
 		}
 		names.forEach((line, i) => {
@@ -222,7 +226,8 @@ export function renderSvg(g: FamilyGraph, layout: TreeLayout, edges: EdgeDrawing
 			out.push(`<text x="${tx}" y="${y}" font-size="${t.nameSize}" font-weight="${esc(nameWeight)}" fill="${dead ? c.textMuted : c.text}">${esc(line)}</text>`);
 		});
 		if (signed.has(p.id)) {
-			const s = place ? { ...t.sign, x1: t.sign.x1 - place.shift, x2: t.sign.x2 - place.shift } : t.sign;
+			const moved = place ? { ...t.sign, x1: t.sign.x1 - place.shift, x2: t.sign.x2 - place.shift } : t.sign;
+			const s = ring === undefined ? moved : signBelowRing(moved, ring);
 			out.push(`<line x1="${box.x + s.x1}" y1="${box.y + s.y1}" x2="${box.x + s.x2}" y2="${box.y + s.y2}" stroke="${c.line}" stroke-width="${s.width}" stroke-dasharray="${s.dash.join(' ')}"${dead ? ' stroke-opacity="0.6"' : ''}${di(`sign:${p.id}`)}/>`);
 		}
 		const titleText = cl ? cl.title : p.title;
@@ -235,7 +240,7 @@ export function renderSvg(g: FamilyGraph, layout: TreeLayout, edges: EdgeDrawing
 			titles = titleLines(titleText, reign, t.textW, smallMeasure);
 			if (titles.length > 1 && t.title2Baseline === undefined) titles = [cutSmall([titleText, reign].filter(Boolean).join(' '), widthAt(t.titleBaseline))];
 		} else if (titleText) titles = [cutSmall(titleText, widthAt(t.titleBaseline))];
-		if (portrait) {
+		if (portrait || (ring !== undefined && place)) {
 			// G3: the break is made at the normal width; a text line beside the portrait is then cut shorter.
 			titles = titles.map((line, i) => {
 				const w = widthAt(i ? t.title2Baseline! : t.titleBaseline);
@@ -335,14 +340,19 @@ export function renderSvg(g: FamilyGraph, layout: TreeLayout, edges: EdgeDrawing
 	const tagFont = 0.75 * geo.fontPx;
 	const tagFontStr = fontOf('400', tagFont, fonts.ui);
 	const tagFamily = saved ? ` font-family="${esc(fonts.ui)}"` : '';
+	// 1.1.1: a far couple with no children has no union dot, so its tag carries the partnership sign.
+	const farSigns = farTagSigns(g, layout, edges);
 	for (const tag of layout.farTags.values()) {
 		const pad = tagH / 2;
 		// The marriage sign is drawn apart: few text fonts have it, and resvg would switch the whole label to the fallback font.
 		const sign = tagFont * 1.4;
+		const farShape = farSigns.has(tag.person) ? unionShape('union', farSigns.get(tag.person)) : null;
+		// The partnership sign takes its own room between the marriage sign and the name.
+		const slot = farShape ? TAG_MARK.slot * tagFont : 0;
 		// The widest the tag may be; a sideways hit area can be wider than the part of the edge the tag may use.
 		const room = tag.zoneW ?? tag.hit.w;
-		const label = measured ? cutWith(farTagName(g, tag.spouses), room - 2 * pad - sign, tagFontStr) : fit(farTagName(g, tag.spouses), room - 2 * pad - sign, tagFont);
-		const w = Math.min(room, (measured ? measured(label, tagFontStr) : textWidth(label, tagFont)) + sign + 2 * pad);
+		const label = measured ? cutWith(farTagName(g, tag.spouses), room - 2 * pad - sign - slot, tagFontStr) : fit(farTagName(g, tag.spouses), room - 2 * pad - sign - slot, tagFont);
+		const w = Math.min(room, (measured ? measured(label, tagFontStr) : textWidth(label, tagFont)) + sign + slot + 2 * pad);
 		const left = tag.x - w / 2;
 		const top = tagTop(geo, tag.y);
 		const base = top + tagH / 2 + 0.35 * tagFont;
@@ -353,7 +363,15 @@ export function renderSvg(g: FamilyGraph, layout: TreeLayout, edges: EdgeDrawing
 		const edge = state === 'on' ? `stroke="${c.accent}" stroke-width="2"` : `stroke="${c.line}" stroke-width="1"`;
 		out.push(`<rect x="${left}" y="${top}" width="${w}" height="${tagH}" rx="${tagH / 2}" fill="${c.cardFill}" ${edge}/>`);
 		out.push(`<text x="${left + pad}" y="${base}" font-size="${1.25 * tagFont}" font-family="Segoe UI Symbol, DejaVu Sans, sans-serif" fill="${c.textMuted}">⚭</text>`);
-		out.push(`<text x="${left + pad + sign}" y="${base}" font-size="${tagFont}"${tagFamily} fill="${c.textMuted}">${esc(label)}</text>`);
+		if (farShape) {
+			const spec = UNION_MARKS[farShape];
+			const m = unionMark(farShape, left + pad + sign + slot / 2, top + tagH / 2, spec.size * TAG_MARK.unit * tagFont);
+			const at = Object.entries(m.attr).map(([k, v]) => `${k}="${v}"`).join(' ');
+			const paint = spec.stroke ? `fill="${c.cardFill}" stroke="${c.textMuted}" stroke-width="${spec.stroke}" stroke-linejoin="round"` : `fill="${c.textMuted}"`;
+			// The sign is listed like any union sign, as the live tree's sign has the class of one.
+			out.push(`<${m.tag} ${at} ${paint}${di(`union:${farShape}`)}/>`);
+		}
+		out.push(`<text x="${left + pad + sign + slot}" y="${base}" font-size="${tagFont}"${tagFamily} fill="${c.textMuted}">${esc(label)}</text>`);
 		if (group) out.push('</g>');
 	}
 

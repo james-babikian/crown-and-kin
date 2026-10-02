@@ -353,8 +353,8 @@ describe('N2 step 2: a note with that name exists', () => {
 		dispatch(s.button()!, 'click');
 		await settle();
 		const q = question(s)!;
-		expect(q.querySelector('.dynasty-sheet-confirm-title')!.getText()).toBe('The vault has a note with the name "Aldric Valmont".');
-		expect(q.querySelectorAll('button').map((b) => b.getText())).toEqual(['Cancel', 'Link to this note', 'Make a new note "Aldric Valmont 1"']);
+		expect(q.querySelector('.dynasty-sheet-confirm-title')!.getText()).toBe('The vault has a note with the name “Aldric Valmont”.');
+		expect(q.querySelectorAll('button').map((b) => b.getText())).toEqual(['Cancel', 'Link to this note', 'Make a new note “Aldric Valmont 1”']);
 		expect(s.created).toEqual([]);
 	});
 

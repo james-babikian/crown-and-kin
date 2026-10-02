@@ -6,9 +6,9 @@ import type { FinderResult, Relation, RelationStep } from '../src/core/relations
 import { cardText, geometryFor, relationY } from '../src/layout/geometry';
 import { DEFAULT_LAYOUT_SETTINGS, clearLayoutCache, layoutTree } from '../src/layout/index';
 import type { LaidOut, LayoutSettings } from '../src/layout/model';
-import { ME_RING_INSET, buildScene, type SceneOptions } from '../src/render/dom/scene';
+import { buildScene, type SceneOptions } from '../src/render/dom/scene';
 import { lineLook, type LineMarks } from '../src/render/line-highlight';
-import { DEFAULT_DARK, DEFAULT_LIGHT, FADED_OPACITY, ME_LOOK, ON_LINE_EXTRA, STROKES } from '../src/render/styles';
+import { DEFAULT_DARK, DEFAULT_LIGHT, FADED_OPACITY, ME_LOOK, ME_RING_INSET, ON_LINE_EXTRA, STROKES } from '../src/render/styles';
 import { renderSvg } from '../src/render/svg-string';
 import { cardLabel, finderSentence, relationSummary, stepSentences } from '../src/render/tree-info';
 import { FEl, installDom } from './acceptance/fake-dom';
@@ -428,10 +428,10 @@ describe('RelationTexts: the finder and sheet sentences (spec §13.1, §13.2)', 
 
 	it('a named relation: "Wren is Roderick\'s half-sister."; "Other relation" picks by index', () => {
 		const res: FinderResult = { kind: 'named', first: 'rod', second: 'wren', relations: [{ relation: r('Half-sister'), steps: [] }, { relation: r('Wife'), steps: [] }] };
-		expect(finderSentence(g, res, 0)).toBe("Wren is Roderick's half-sister.");
-		expect(finderSentence(g, res, 1)).toBe("Wren is Roderick's wife.");
-		expect(finderSentence(g, res, 7)).toBe("Wren is Roderick's wife.");
-		expect(finderSentence(g, { ...res, first: 'noname' }, 0)).toBe("Wren is noname's half-sister.");
+		expect(finderSentence(g, res, 0)).toBe("Wren is Roderick’s half-sister.");
+		expect(finderSentence(g, res, 1)).toBe("Wren is Roderick’s wife.");
+		expect(finderSentence(g, res, 7)).toBe("Wren is Roderick’s wife.");
+		expect(finderSentence(g, { ...res, first: 'noname' }, 0)).toBe("Wren is noname’s half-sister.");
 	});
 
 	it('a chain and no relation', () => {
@@ -447,7 +447,7 @@ describe('RelationTexts: the finder and sheet sentences (spec §13.1, §13.2)', 
 			{ person: 'gareth', of: 'isolde', word: 'brother' },
 			{ person: 'mira', of: 'gareth', word: 'daughter' },
 		];
-		expect(stepSentences(g, steps)).toEqual({ shown: ["Isolde is Roderick's wife.", "Gareth is Isolde's brother.", "Mira is Gareth's daughter."], more: 0 });
+		expect(stepSentences(g, steps)).toEqual({ shown: ["Isolde is Roderick’s wife.", "Gareth is Isolde’s brother.", "Mira is Gareth’s daughter."], more: 0 });
 		const twelve = Array.from({ length: 12 }, () => steps[0]);
 		const out = stepSentences(g, twelve);
 		expect(out.shown).toHaveLength(8);

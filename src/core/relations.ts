@@ -54,6 +54,7 @@
  */
 
 import { deriveFamilies, drawnParentMap, type DrawnParent, type FamilyGraph, type FamilyUnion } from './derive';
+import { CURLY_APOSTROPHE } from './quote';
 import { isUnionType, PARENT_TYPES, type ParentType, type Tree, type Union } from './types';
 import { push } from './validate';
 
@@ -182,7 +183,7 @@ const WORDS = {
 	once: 'once removed',
 	twice: 'twice removed',
 	times: (n: number) => `${n} times removed`,
-	possessive: "'s",
+	possessive: `${CURLY_APOSTROPHE}s`,
 	spouse: ['husband', 'wife', 'spouse'],
 	betrothed: 'betrothed',
 	concubinage: 'partner in concubinage',

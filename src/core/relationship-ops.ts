@@ -14,7 +14,7 @@ import { descendantsOf, siblingGroup, writtenParents } from './family-query';
 import { newIdIn } from './id-gen';
 import { parseBody, readTree, textWithoutComments } from './parse';
 import { dropHolderPatches, dropHolders } from './title-ops';
-import { isEmpty, isMap as isRawMap, list, str, type Raw, type RawMap } from './tolerate';
+import { isEmpty, isMap as isRawMap, list, str, unwrapCurly, type Raw, type RawMap } from './tolerate';
 import { isParentType, isPlacementType, isUnionType, parentKind, PLACEMENT_TYPES, type Tree } from './types';
 import { dashOf, flowComment, insertItem, itemEnd, itemStart, removeFromSection, removeItems, section, type Where } from './yaml-list';
 import {
@@ -75,8 +75,9 @@ function parentEntries(p: Parsed, item: YAMLMap): { pair?: Pair; seq?: YAMLSeq; 
 	const v = pair?.value as Node | null | undefined;
 	const read = (node: Node, index: number): Entry => {
 		const n = isAlias(node) ? (node.resolve(p.src.doc) as Node | undefined) ?? node : node;
-		if (isMap(n)) return { index, id: str(n.get('id')), type: parentKind(str(n.get('type'))), node };
-		return { index, id: isScalar(n) ? str(n.value) : undefined, type: 'birth', node };
+		// The id is read as `parse.ts` reads it, with a curly pair taken off (D103); the entry's text is never rewritten.
+		if (isMap(n)) return { index, id: str(unwrapCurly(n.get('id'))), type: parentKind(str(n.get('type'))), node };
+		return { index, id: isScalar(n) ? str(unwrapCurly(n.value)) : undefined, type: 'birth', node };
 	};
 	if (isSeq(v)) return { pair, seq: v, entries: v.items.map((it, i) => read(it as Node, i)) };
 	if ((isScalar(v) && !isEmpty(v.value)) || isMap(v)) return { pair, entries: [read(v, 0)] };

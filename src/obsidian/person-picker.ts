@@ -5,11 +5,13 @@
  * puts the marked person first, as "You: NAME". Spec §13.5: the picker also matches the ruler name
  * with the number of every numbered holder entry ("Aldric II"), and a row shows the ruler name of the
  * shown title after the full name ("Aldric Valmont (Aldric II)"). The Titles window's picker has its
- * own first row, "A holder who is not in the tree".
+ * own first row, "A holder who is not in the tree". The typed text and the text of each person are
+ * folded with `foldForMatch` before they are compared (D100): case, accents and quote look-alikes do not matter.
  */
 
 import { SuggestModal, prepareFuzzySearch, type App } from 'obsidian';
 import type { FamilyGraph } from '../core/derive';
+import { foldForMatch } from '../core/fold';
 import { cardLabels, pickerSuffix, searchNames, type CardLabel } from '../core/titles';
 import type { Person } from '../core/types';
 import { dateLine } from '../render/tree-info';
@@ -86,15 +88,19 @@ function definePicker() {
 			const q = query.trim();
 			const first: Item[] = this.allowNew ? [{ kind: 'new', text: query }] : [];
 			if (!q) return [...first, ...this.people.map((person): Item => ({ kind: 'person', person }))];
-			const match = prepareFuzzySearch(q);
+			// D100: both sides are folded (case, accents, quote look-alikes), so "d'España" finds "d’España". Only the
+			// match changes. The rows show the stored text, and the plugin does not use the match positions: folding
+			// can change the length of a text ("Æthelred" is longer), so positions would not fit the shown text.
+			const lower = foldForMatch(q);
+			if (!lower) return [...first, ...this.people.map((person): Item => ({ kind: 'person', person }))];
+			const match = prepareFuzzySearch(lower);
 			const scored: { person: Person; score: number; exact: boolean }[] = [];
-			const lower = q.toLowerCase();
 			for (const person of this.people) {
 				const label = this.labels.get(person.id);
 				const extra = label ? searchNames(label, person.name) : [];
-				const r = match([person.name, person.title ?? '', dateLine(person) ?? '', ...extra].join(' '));
+				const r = match(foldForMatch([person.name, person.title ?? '', dateLine(person) ?? '', ...extra].join(' ')));
 				// "Aldric II" typed in full names one holder entry: that person comes before "Aldric III" (spec §13.5).
-				if (r) scored.push({ person, score: r.score, exact: extra.some((n) => n.toLowerCase() === lower) });
+				if (r) scored.push({ person, score: r.score, exact: extra.some((n) => foldForMatch(n) === lower) });
 			}
 			const rank = (s: { person: Person; exact: boolean }) => (this.isYou(s.person) ? 0 : s.exact ? 1 : 2);
 			scored.sort((a, b) => rank(a) - rank(b) || b.score - a.score || a.person.index - b.person.index);

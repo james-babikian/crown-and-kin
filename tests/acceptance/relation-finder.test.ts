@@ -191,7 +191,7 @@ describe('"Show the steps" (D48): one step per link; up and down to a sibling is
 		const { findRelation } = await relationsModule();
 		const sentences = relationText('stepSentences');
 		const r = findRelation(G, 'gwen', 'tamsin');
-		expect(sentences(G, named(r).relations[0].steps)).toEqual({ shown: ["Alan is Gwen's father.", "Fenna is Alan's wife.", "Tamsin is Fenna's daughter."], more: 0 });
+		expect(sentences(G, named(r).relations[0].steps)).toEqual({ shown: ["Alan is Gwen’s father.", "Fenna is Alan’s wife.", "Tamsin is Fenna’s daughter."], more: 0 });
 		const twelve = Array.from({ length: 12 }, () => step('alan', 'gwen', 'father'));
 		const long = sentences(G, twelve);
 		expect(long.shown).toHaveLength(8);
@@ -217,9 +217,9 @@ describe('the named result', () => {
 	it('the relation of the other direction: Gwen is Leo\'s aunt, Leo is Gwen\'s nephew', async () => {
 		const { findRelation } = await relationsModule();
 		const sentence = relationText('finderSentence');
-		expect(sentence(G, findRelation(G, 'leo', 'gwen'), 0)).toBe("Gwen is Leo's aunt.");
-		expect(sentence(G, findRelation(G, 'gwen', 'leo'), 0)).toBe("Leo is Gwen's nephew.");
-		expect(sentence(G, findRelation(G, 'cora', 'nell'), 0)).toBe("Nell is Cora's adopted daughter.");
+		expect(sentence(G, findRelation(G, 'leo', 'gwen'), 0)).toBe("Gwen is Leo’s aunt.");
+		expect(sentence(G, findRelation(G, 'gwen', 'leo'), 0)).toBe("Leo is Gwen’s nephew.");
+		expect(sentence(G, findRelation(G, 'cora', 'nell'), 0)).toBe("Nell is Cora’s adopted daughter.");
 	});
 
 	it('"Other relation" order on a cousin marriage (fixture 3): the partner name, then the blood name', async () => {
@@ -231,8 +231,8 @@ describe('the named result', () => {
 		expect(conrad.relations[1].relation.line.people).toEqual(['conrad', 'bastien', 'aurel', 'viviane', 'giselle', 'lisette']);
 		expect(named(findRelation(g, 'lisette', 'conrad')).relations.map((x) => x.relation.lower)).toEqual(['husband', 'first cousin']);
 		const sentence = relationText('finderSentence');
-		expect(sentence(g, conrad, 0)).toBe("Lisette Veyle is Conrad Castellane's wife.");
-		expect(sentence(g, conrad, 1)).toBe("Lisette Veyle is Conrad Castellane's first cousin.");
+		expect(sentence(g, conrad, 0)).toBe("Lisette Veyle is Conrad Castellane’s wife.");
+		expect(sentence(g, conrad, 1)).toBe("Lisette Veyle is Conrad Castellane’s first cousin.");
 	});
 
 	it('from the sheet of Wren, picking Roderick (the §4 tree): Wren is the half-sister', async () => {
@@ -243,7 +243,7 @@ describe('the named result', () => {
 		expect(r.relations.map((x) => x.relation.lower)).toEqual(['half-sister']);
 		expect(r.relations[0].relation.line).toEqual({ people: ['roderick', 'aldric', 'wren'], links: [birth('aldric', 'roderick'), birth('aldric', 'wren')], unions: [] });
 		// Names come from the name field (relations.ts), so the sentence has the full name.
-		expect(relationText('finderSentence')(g, r, 0)).toBe("Wren is Roderick Valmont's half-sister.");
+		expect(relationText('finderSentence')(g, r, 0)).toBe("Wren is Roderick Valmont’s half-sister.");
 	});
 });
 
@@ -256,7 +256,7 @@ describe('chain and none (spec §13.2 "No relation of §13.1")', () => {
 		expect(rolf.kind).toBe('chain');
 		if (rolf.kind !== 'chain') return;
 		expect(rolf.steps).toEqual([step('alan', 'gwen', 'father'), step('fenna', 'alan', 'wife'), step('rolf', 'fenna', 'husband')]);
-		expect(sentences(G, rolf.steps)).toEqual({ shown: ["Alan is Gwen's father.", "Fenna is Alan's wife.", "Rolf is Fenna's husband."], more: 0 });
+		expect(sentences(G, rolf.steps)).toEqual({ shown: ["Alan is Gwen’s father.", "Fenna is Alan’s wife.", "Rolf is Fenna’s husband."], more: 0 });
 		const alan = findRelation(G, 'alan', 'rolf');
 		expect(sentence(G, alan, 0)).toBe('Alan and Rolf have a relation through 1 other person.');
 	});

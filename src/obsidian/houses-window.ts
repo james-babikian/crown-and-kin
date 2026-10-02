@@ -517,11 +517,16 @@ export class HousesWindow extends Modal {
 		const sourcePath = this.o.sourcePath ?? '';
 		// V1: the window's draft value (not the saved one) is the current picture.
 		const current = currentPictureOf(this.o.pictures, armsOf(r.arms), sourcePath);
-		const link = await pickPicture(this.app, { sourcePath, store: this.o.pictures, title: PICTURES_UI.armsLabel(this.label(r)), current });
+		// D97: the list has a Remove row only when the draft has arms.
+		const remove = armsOf(r.arms) ? PICTURES_UI.removeArms : undefined;
+		const picked = await pickPicture(this.app, { sourcePath, store: this.o.pictures, title: PICTURES_UI.armsLabel(this.label(r)), current, remove });
 		if (!this.shown) return;
-		if (link) {
-			r.arms = link;
+		if (picked.kind === 'choose') {
+			r.arms = picked.link;
 			this.clearError();
+		} else if (picked.kind === 'remove') {
+			// The same as the Remove arms button: the draft changes; Save writes it.
+			r.arms = null;
 		}
 		this.build(focus);
 	}

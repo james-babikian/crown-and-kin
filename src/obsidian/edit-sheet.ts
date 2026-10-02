@@ -531,7 +531,13 @@ export class EditSheet extends Modal {
 
 		this.portraitField(body);
 		this.textField(body, 'name', SHEET.name, { autocapitalize: 'words' });
-		this.textField(body, 'title', SHEET.title);
+		const titleInput = this.textField(body, 'title', SHEET.title);
+		// D98: the hint points to the Titles section, which the sheet of a new person does not have.
+		if (!this.isNew) {
+			const titleId = titleInput.getAttribute('id') ?? '';
+			titleInput.parentElement?.createDiv({ cls: 'dynasty-sheet-hint', text: SHEET.titleHint, attr: { id: `${titleId}-hint` } });
+			titleInput.setAttribute('aria-describedby', `${titleId}-hint`);
+		}
 		this.houseField(body);
 		this.sexField(body);
 		this.textField(body, 'born', SHEET.born);
@@ -820,11 +826,18 @@ export class EditSheet extends Modal {
 		const name = this.draft.name.trim() || this.data.person.name || SHEET.unnamed;
 		// V1: the sheet's draft value is the current picture.
 		const current = currentPictureOf(this.o.pictures, this.draft.portrait?.trim(), this.o.sourcePath);
-		const link = await pickPicture(this.app, { sourcePath: this.o.sourcePath, store: this.o.pictures, title: PICTURES_UI.pickerPortraitTitle(name), current });
+		// D97: the list has a Remove row only when the draft has a portrait.
+		const remove = this.draft.portrait.trim() ? PICTURES_UI.removePortrait : undefined;
+		const picked = await pickPicture(this.app, { sourcePath: this.o.sourcePath, store: this.o.pictures, title: PICTURES_UI.pickerPortraitTitle(name), current, remove });
 		if (!this.shown) return;
-		if (link) {
-			this.portraitLinkChanged(link);
-			this.draft.portrait = link;
+		if (picked.kind === 'choose') {
+			this.portraitLinkChanged(picked.link);
+			this.draft.portrait = picked.link;
+			this.clearError();
+		} else if (picked.kind === 'remove') {
+			// The same as the Remove portrait button: the draft changes; Save writes it.
+			this.portraitLinkChanged('');
+			this.draft.portrait = '';
 			this.clearError();
 		}
 		this.drawPortrait('select');
@@ -869,7 +882,7 @@ export class EditSheet extends Modal {
 		this.drawPortrait('part');
 	}
 
-	private textField(parent: HTMLElement, key: (typeof TEXT_FIELDS)[number], label: string, o: { autocapitalize?: string; placeholder?: string } = {}, area = false): void {
+	private textField(parent: HTMLElement, key: (typeof TEXT_FIELDS)[number], label: string, o: { autocapitalize?: string; placeholder?: string } = {}, area = false): HTMLInputElement | HTMLTextAreaElement {
 		const { row, id } = sheetField(parent, label, key);
 		// Plain attribute names (no spread), so the colour rule of eslint.config.mjs can check them; null writes no attribute.
 		const extra = { autocapitalize: o.autocapitalize ?? null, placeholder: o.placeholder ?? null };
@@ -886,6 +899,7 @@ export class EditSheet extends Modal {
 			// The button and its label follow the draft name and link (N1).
 			if (key === 'link' || key === 'name') this.updateNoteButton();
 		});
+		return input;
 	}
 
 	private select(parent: HTMLElement, key: 'house' | 'sex' | 'placement', label: string, options: [string, string][]): HTMLSelectElement {

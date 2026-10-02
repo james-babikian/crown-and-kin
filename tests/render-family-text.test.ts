@@ -39,7 +39,7 @@ describe('family texts (WP3.3)', () => {
 		expect(NEW_SHEET.childOf('Roderick Valmont', 'Mathilde Harrow')).toBe('Child of Roderick Valmont and Mathilde Harrow');
 		expect(NEW_SHEET.childOf('Roderick Valmont', null)).toBe('Child of Roderick Valmont');
 		expect(NEW_SHEET.parentOf('adoptive', 'Tomas')).toBe('Adoptive parent of Tomas');
-		expect(FLOW.createNew('  Ann ')).toBe('Create a new person "Ann"');
+		expect(FLOW.createNew('  Ann ')).toBe('Create a new person “Ann”');
 		expect(FLOW.createNew('')).toBe('Create a new person');
 	});
 

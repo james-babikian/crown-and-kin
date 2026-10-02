@@ -4,22 +4,14 @@
  * `edit-sheet.ts` and `messages.ts` also use `uniqueId` and `slugify`.
  */
 
+import { COMBINING_MARKS, foldLetters } from './fold';
 import { str, type Raw, type RawMap } from './tolerate';
 
 /** Turns a display name into a slug: "Aldric Valmont" → "aldric-valmont", "Þórr" → "thorr". */
 export function slugify(name: string): string {
-	const slug = name
-		.replace(/[Þþ]/g, 'th')
-		.replace(/[Ææ]/g, 'ae')
-		.replace(/[Øø]/g, 'o')
-		.replace(/ß/g, 'ss')
-		.replace(/[Łł]/g, 'l')
-		.replace(/[Đđ]/g, 'd')
-		.replace(/[Œœ]/g, 'oe')
-		.replace(/[Ħħ]/g, 'h')
-		.replace(/ı/g, 'i')
+	const slug = foldLetters(name)
 		.normalize('NFKD')
-		.replace(/[̀-ͯ]/g, '')
+		.replace(COMBINING_MARKS, '')
 		.toLowerCase()
 		.replace(/[^a-z0-9]+/g, '-')
 		.replace(/^-+|-+$/g, '');

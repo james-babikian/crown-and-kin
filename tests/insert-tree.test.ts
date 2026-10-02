@@ -8,7 +8,7 @@ import { INSERT_UI } from '../src/render/ui-text';
 // cursor, in the container of the cursor's line (callout, list item), with the cursor on the line
 // after the closing fence, so the note shows "Add first person".
 
-const HINT = `# ${INSERT_UI.hint}`;
+const HINT = `# ${INSERT_UI.noteHint}`;
 
 type Pos = { line: number; ch: number };
 

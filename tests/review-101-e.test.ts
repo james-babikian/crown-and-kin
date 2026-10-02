@@ -267,7 +267,7 @@ function editor(text: string, from: Pos, to: Pos = from) {
 	};
 }
 
-const HINT = `# ${INSERT_UI.hint}`;
+const HINT = `# ${INSERT_UI.noteHint}`;
 const emptyTrees = (text: string) => findBlocks(text).filter((b) => b.body.trimEnd() === HINT);
 
 describe('review 1.0.1 E: Insert family tree', () => {

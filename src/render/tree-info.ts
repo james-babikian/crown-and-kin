@@ -4,12 +4,13 @@
  * obeys Simplified Technical English (ASD-STE100) and the project word list.
  */
 import type { FamilyGraph } from '../core/derive';
+import { CURLY_APOSTROPHE } from '../core/quote';
 import type { FinderResult, Relation, RelationStep } from '../core/relations';
 import type { CardLabel } from '../core/titles';
 import type { Person } from '../core/types';
 import type { StrokeKind } from '../layout/model';
 
-/** The relation text builders below (spec §13.1, §13.2). Names come from `g.byId`; an empty name uses the id; the possessive is always "'s". */
+/** The relation text builders below (spec §13.1, §13.2). Names come from `g.byId`; an empty name uses the id; the possessive is always "’s" (D99). */
 export interface RelationTexts {
 	/** "Wren is Roderick's half-sister." for `relations[index]`; the chain and none sentences of §13.2 otherwise. */
 	finderSentence(g: FamilyGraph, r: FinderResult, index: number): string;
@@ -188,7 +189,7 @@ export function farTagLabel(g: FamilyGraph, spouses: string[]): string {
 const shownName = (g: FamilyGraph, id: string) => g.byId.get(id)?.name || id;
 
 /** "NAME is OF's WORD." One sentence of the relation finder (spec §13.2). */
-const isOf = (g: FamilyGraph, person: string, of: string, word: string) => `${shownName(g, person)} is ${shownName(g, of)}'s ${word}.`;
+const isOf = (g: FamilyGraph, person: string, of: string, word: string) => `${shownName(g, person)} is ${shownName(g, of)}${CURLY_APOSTROPHE}s ${word}.`;
 
 /** The most step sentences the finder shows before "and N more steps" (spec §13.2). */
 export const MAX_STEP_SENTENCES = 8;

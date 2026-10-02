@@ -3,10 +3,12 @@
  * (spec §8). A problem gets a stable code, so `validate.ts`, `parse.ts` and the render code can
  * find and test problems by code without depending on the wording. `issueText` and `hardErrorText`
  * turn a code and its parameters into the sentence the user sees. Keep new wording in Simplified
- * Technical English, using the project word list.
+ * Technical English, using the project word list. Quote marks are curly (D99); only the
+ * YAML example that the user types keeps straight quotes.
  */
 
 import { slugify } from './id-gen';
+import { quote } from './quote';
 
 /** Tree not rendered (spec §8). */
 export type HardErrorCode =
@@ -155,7 +157,6 @@ function strings(p: P, key: string): string[] {
 	return Array.isArray(v) ? v.filter((x) => typeof x === 'string' && x.trim() !== '') : [];
 }
 
-const q = (x: string) => `"${x}"`;
 const cap = (x: string) => x.charAt(0).toUpperCase() + x.slice(1);
 const plural = (count: number, one: string, many: string) => `${count} ${count === 1 ? one : many}`;
 
@@ -170,29 +171,29 @@ const person = (p: P) => s(p, 'person', 'A person');
 /** How a union is named in text: by its partners, else by its id, else by its place in the list. */
 function partnership(p: P): string {
 	const absent = strings(p, 'absent');
-	const partners = strings(p, 'partners').map((x) => (absent.includes(x) ? q(x) : x));
+	const partners = strings(p, 'partners').map((x) => (absent.includes(x) ? quote(x) : x));
 	if (partners.length) return `the partnership of ${andList(partners)}`;
 	return byLabel(p);
 }
 
 function byLabel(p: P): string {
 	const label = s(p, 'union', '');
-	if (/^#\d+$/.test(label)) return `partnership ${label.slice(1)} in the "unions" list`;
-	return label ? `the partnership ${q(label)}` : 'a partnership';
+	if (/^#\d+$/.test(label)) return `partnership ${label.slice(1)} in the “unions” list`;
+	return label ? `the partnership ${quote(label)}` : 'a partnership';
 }
 
 function house(p: P): string {
 	const name = s(p, 'house', '');
 	const id = s(p, 'id', '');
 	if (name && name !== id) return name;
-	return id ? `the house ${q(id)}` : 'a house';
+	return id ? `the house ${quote(id)}` : 'a house';
 }
 
 const ENTRY: Record<string, { what: string; start: string }> = {
-	people: { what: 'a person', start: 'Start each person with "- id:".' },
-	houses: { what: 'a house', start: 'Start each house with "- id:".' },
-	unions: { what: 'a partnership', start: 'Start each partnership with "- partners:".' },
-	titles: { what: 'a title', start: 'Start each title with "- id:".' },
+	people: { what: 'a person', start: 'Start each person with “- id:”.' },
+	houses: { what: 'a house', start: 'Start each house with “- id:”.' },
+	unions: { what: 'a partnership', start: 'Start each partnership with “- partners:”.' },
+	titles: { what: 'a title', start: 'Start each title with “- id:”.' },
 };
 
 /** The title a holder issue is about: "the title Duke of Valmont", or "a title" when the name is missing. */
@@ -214,7 +215,7 @@ function entryNotMap(p: P): string {
 	}
 	if (section === 'holders') return `Entry ${index} in ${holdersOf(p)} is not a holder. ${HOLDER_FORM}`;
 	const e = ENTRY[section] ?? ENTRY.people;
-	return `Entry ${index} in the "${section}" list is not ${e.what}, so the tree does not show it. ${e.start}`;
+	return `Entry ${index} in the “${section}” list is not ${e.what}, so the tree does not show it. ${e.start}`;
 }
 
 function missingId(p: P): string {
@@ -223,26 +224,26 @@ function missingId(p: P): string {
 	const name = s(p, 'name', '');
 	if (section === 'parents') return `Entry ${index} in the parents of ${person(p)} has no id. Add the id of the parent.`;
 	if (section === 'houses') {
-		const who = name || `Entry ${index} in the "houses" list`;
+		const who = name || `Entry ${index} in the “houses” list`;
 		return `${who} has no id, so the tree does not use this house. Add an id, for example: id: ${name ? slugify(name) : 'valmont'}.`;
 	}
 	if (section === 'titles') {
-		const who = name || `Entry ${index} in the "titles" list`;
+		const who = name || `Entry ${index} in the “titles” list`;
 		return `${who} has no id, so the tree does not use this title. Add an id, for example: id: ${name ? slugify(name) : 'duke-of-valmont'}.`;
 	}
-	const who = name || `Entry ${index} in the "people" list`;
+	const who = name || `Entry ${index} in the “people” list`;
 	return `${who} has no id. Add an id, for example: id: ${name ? slugify(name) : 'aldric'}.`;
 }
 
 function sectionWrongShape(p: P): string {
 	const section = s(p, 'section', 'people');
-	if (section === 'options') return 'The "options" section is not a set of options, so the tree ignores it. Write each option like this: start: aldric.';
+	if (section === 'options') return 'The “options” section is not a set of options, so the tree ignores it. Write each option like this: start: aldric.';
 	if (section === 'holders') {
 		const name = s(p, 'title', '');
 		return `The holders of ${name ? `the title ${name}` : 'a title'} are not a list, so the tree ignores them. ${HOLDER_FORM}`;
 	}
 	const e = ENTRY[section] ?? ENTRY.people;
-	return `The "${section}" section is not a list, so the tree ignores it. ${e.start}`;
+	return `The “${section}” section is not a list, so the tree ignores it. ${e.start}`;
 }
 
 /**
@@ -260,7 +261,7 @@ const PICTURE_FORMATS = 'Select a PNG, JPEG, WebP, GIF, BMP or SVG picture.';
 
 function pictureNotImage(p: P): string {
 	const o = pictureOwner(p);
-	const file = q(s(p, 'file', '?'));
+	const file = quote(s(p, 'file', '?'));
 	const format = s(p, 'format', '');
 	if (format) return `${o.who} ${o.uses} the picture ${file}. The plugin cannot show ${format} pictures. Save the picture as PNG or JPEG. Then select it again.`;
 	return `${o.who} ${o.uses} the file ${file}, which is not a picture. ${PICTURE_FORMATS}`;
@@ -269,38 +270,38 @@ function pictureNotImage(p: P): string {
 function pictureTooLarge(p: P): string {
 	const o = pictureOwner(p);
 	const pixels = typeof p.pixels === 'number' && Number.isFinite(p.pixels) && p.pixels > 0 ? ` (${p.pixels} million pixels)` : '';
-	return `${o.who} ${o.uses} the picture ${q(s(p, 'file', '?'))}, which is too large${pixels}. Use a picture with 40 million pixels or less.`;
+	return `${o.who} ${o.uses} the picture ${quote(s(p, 'file', '?'))}, which is too large${pixels}. Use a picture with 40 million pixels or less.`;
 }
 
 const ISSUE_TEXT: { [C in IssueCode]: (p: P) => string } = {
-	'duplicate-person-id': (p) => `More than one person has the id ${q(s(p, 'id', '?'))}. To edit the tree again, give each person a different id.`,
-	'duplicate-union-id': (p) => `More than one partnership has the id ${q(s(p, 'id', '?'))}. To edit the tree again, give each partnership a different id.`,
+	'duplicate-person-id': (p) => `More than one person has the id ${quote(s(p, 'id', '?'))}. To edit the tree again, give each person a different id.`,
+	'duplicate-union-id': (p) => `More than one partnership has the id ${quote(s(p, 'id', '?'))}. To edit the tree again, give each partnership a different id.`,
 
-	'missing-parent': (p) => `${person(p)} has a parent with the id ${q(s(p, 'ref', '?'))}, but no person has this id. Correct the id, or add the person.`,
+	'missing-parent': (p) => `${person(p)} has a parent with the id ${quote(s(p, 'ref', '?'))}, but no person has this id. Correct the id, or add the person.`,
 	'missing-partner': (p) =>
-		`The tree does not show ${partnership(p)}, because no person has the id ${q(s(p, 'ref', '?'))}. Correct the id, or add the person.`,
-	'missing-house': (p) => `${person(p)} has the house ${q(s(p, 'ref', '?'))}, but no house has this id. Correct the id, or add the house.`,
+		`The tree does not show ${partnership(p)}, because no person has the id ${quote(s(p, 'ref', '?'))}. Correct the id, or add the person.`,
+	'missing-house': (p) => `${person(p)} has the house ${quote(s(p, 'ref', '?'))}, but no house has this id. Correct the id, or add the house.`,
 	'missing-union': (p) => {
 		const ref = s(p, 'ref', '?');
-		return `${person(p)} has "union: ${ref}", but no partnership has this id. Correct the id, or remove "union: ${ref}".`;
+		return `${person(p)} has “union: ${ref}”, but no partnership has this id. Correct the id, or remove “union: ${ref}”.`;
 	},
 	'union-not-of-parents': (p) => {
 		const ref = s(p, 'ref', '?');
-		return `${person(p)} has "union: ${ref}", but this partnership is not between the parents of ${person(p)}. Correct the id, or remove "union: ${ref}".`;
+		return `${person(p)} has “union: ${ref}”, but this partnership is not between the parents of ${person(p)}. Correct the id, or remove “union: ${ref}”.`;
 	},
 	'missing-start': (p) => {
 		const ref = s(p, 'ref', '?');
-		return `No person has the id ${q(ref)}, so the tree cannot start at this person. Correct the id, or remove "start: ${ref}".`;
+		return `No person has the id ${quote(ref)}, so the tree cannot start at this person. Correct the id, or remove “start: ${ref}”.`;
 	},
 	'missing-focus': (p) => {
 		const ref = s(p, 'ref', '?');
-		return `No person has the id ${q(ref)}, so the tree cannot show the family of this person. Correct the id, or remove "focus: ${ref}".`;
+		return `No person has the id ${quote(ref)}, so the tree cannot show the family of this person. Correct the id, or remove “focus: ${ref}”.`;
 	},
 	'missing-me': (p) => {
 		const ref = s(p, 'ref', '?');
-		return `No person has the id ${q(ref)}, so the tree cannot show how people relate to you. Correct the id, or remove "me: ${ref}".`;
+		return `No person has the id ${quote(ref)}, so the tree cannot show how people relate to you. Correct the id, or remove “me: ${ref}”.`;
 	},
-	'me-not-id': () => '"me" in the options does not name one person. Write one person id after "me:".',
+	'me-not-id': () => '“me” in the options does not name one person. Write one person id after “me:”.',
 
 	'too-many-parents': (p) =>
 		`${person(p)} has ${n(p, 'count')} ${s(p, 'type', 'birth')} parents, but a person can have only 2 of each type. Remove the extra parents, or change their type.`,
@@ -321,30 +322,30 @@ const ISSUE_TEXT: { [C in IssueCode]: (p: P) => string } = {
 	'self-parent': (p) => `The parents of ${person(p)} include ${person(p)}. Remove ${person(p)} from these parents.`,
 	'placement-without-parents': (p) => {
 		const t = s(p, 'placement', '?');
-		return `${person(p)} has "placement: ${t}", but has no ${t} parents. Add ${t} parents, or remove "placement: ${t}".`;
+		return `${person(p)} has “placement: ${t}”, but has no ${t} parents. Add ${t} parents, or remove “placement: ${t}”.`;
 	},
 	'house-color-null': (p) => {
 		const value = s(p, 'value', '');
 		if (value) return `${cap(house(p))} has no colour. Put quotes around the colour: color: "${value}".`;
 		return `${cap(house(p))} has no colour. If you wrote a colour, put quotes around it, for example: color: "#8b1e3f".`;
 	},
-	'duplicate-house-id': (p) => `More than one house has the id ${q(s(p, 'id', '?'))}, and the tree uses only the first. Give each house a different id.`,
-	'duplicate-title-id': (p) => `More than one title has the id ${q(s(p, 'id', '?'))}, and the tree uses only the first. Give each title a different id.`,
+	'duplicate-house-id': (p) => `More than one house has the id ${quote(s(p, 'id', '?'))}, and the tree uses only the first. Give each house a different id.`,
+	'duplicate-title-id': (p) => `More than one title has the id ${quote(s(p, 'id', '?'))}, and the tree uses only the first. Give each title a different id.`,
 	'missing-holder': (p) =>
-		`${cap(titleOf(p))} has a holder with the id ${q(s(p, 'ref', '?'))}, but no person has this id. Correct the id, or write the name of the holder.`,
-	'holder-empty': (p) => `Entry ${s(p, 'index', '?')} in ${holdersOf(p)} has no person and no name. Add "person:" or "name:".`,
+		`${cap(titleOf(p))} has a holder with the id ${quote(s(p, 'ref', '?'))}, but no person has this id. Correct the id, or write the name of the holder.`,
+	'holder-empty': (p) => `Entry ${s(p, 'index', '?')} in ${holdersOf(p)} has no person and no name. Add “person:” or “name:”.`,
 	'card-title-not-held': (p) =>
-		`${person(p)} has "card-title: ${s(p, 'ref', '?')}", but ${person(p)} does not hold a title with this id. The card shows the first title instead. Correct the id, or remove it.`,
+		`${person(p)} has “card-title: ${s(p, 'ref', '?')}”, but ${person(p)} does not hold a title with this id. The card shows the first title instead. Correct the id, or remove it.`,
 
 	'unknown-union-type': (p) =>
-		`${cap(partnership(p))} has the unknown type ${q(s(p, 'value', '?'))}. Use marriage, betrothal, concubinage or affair.`,
-	'unknown-placement': (p) => `${person(p)} has the unknown placement ${q(s(p, 'value', '?'))}. Use birth, adoptive or ward.`,
+		`${cap(partnership(p))} has the unknown type ${quote(s(p, 'value', '?'))}. Use marriage, betrothal, concubinage or affair.`,
+	'unknown-placement': (p) => `${person(p)} has the unknown placement ${quote(s(p, 'value', '?'))}. Use birth, adoptive or ward.`,
 	'unknown-parent-type': (p) =>
-		`${person(p)} has the parent ${s(p, 'parent', 'a parent')} with the unknown type ${q(s(p, 'value', '?'))}. Use birth, adoptive, ward or rumoured.`,
+		`${person(p)} has the parent ${s(p, 'parent', 'a parent')} with the unknown type ${quote(s(p, 'value', '?'))}. Use birth, adoptive, ward or rumoured.`,
 
 	'missing-picture': (p) => {
 		const o = pictureOwner(p);
-		return `${o.who} ${o.uses} the picture ${q(s(p, 'file', '?'))}, but the vault has no file with this name. Correct the link, or ${o.other}.`;
+		return `${o.who} ${o.uses} the picture ${quote(s(p, 'file', '?'))}, but the vault has no file with this name. Correct the link, or ${o.other}.`;
 	},
 	'picture-web': (p) => {
 		const o = pictureOwner(p);
@@ -353,12 +354,15 @@ const ISSUE_TEXT: { [C in IssueCode]: (p: P) => string } = {
 	'picture-not-image': pictureNotImage,
 	'picture-too-large': pictureTooLarge,
 	'bad-portrait-crop': (p) =>
-		`The plugin cannot read the selected part of the portrait of ${s(p, 'person', 'a person')}, so the card shows the automatic part. Select the part again, or remove ${q('portrait-crop')}.`,
+		`The plugin cannot read the selected part of the portrait of ${s(p, 'person', 'a person')}, so the card shows the automatic part. Select the part again, or remove ${quote('portrait-crop')}.`,
 
 	'entry-not-map': entryNotMap,
 	'missing-id': missingId,
 	'section-wrong-shape': sectionWrongShape,
 };
+
+/** Every issue code that has a message, for tests that read the whole table. */
+export const ISSUE_CODES = Object.keys(ISSUE_TEXT) as IssueCode[];
 
 /** The sentence to show the user for one issue. */
 export const issueText = (issue: CodedIssue): string => {
@@ -372,7 +376,7 @@ const HARD_ERROR_TEXT: { [C in HardErrorCode]: (e: HardError) => string } = {
 			e.line !== undefined ? `The block has an error on text line ${e.line}. Correct this text line to show the tree.` : 'The block has an error. Correct the text to show the tree.';
 		return e.detail ? `${where} Details: ${e.detail}` : where;
 	},
-	'not-a-map': () => 'The block does not have sections such as "people:". To show the tree, put each person in a list below "people:".',
+	'not-a-map': () => 'The block does not have sections such as “people:”. To show the tree, put each person in a list below “people:”.',
 };
 
 /** The sentence to show the user for a hard error (the tree cannot be drawn at all). */

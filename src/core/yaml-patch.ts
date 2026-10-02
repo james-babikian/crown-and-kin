@@ -10,7 +10,7 @@ import { isAlias, isMap, isScalar, isSeq, Lexer, parseDocument, Parser, Scalar, 
 import type { EditRefusal, EditResult, FieldValue, PersonField } from './edit';
 import { parseBody } from './parse';
 import { cropValue, sameCropText } from './portrait-crop';
-import { bool, isEmpty, linkValue, str, type Raw, type RawMap } from './tolerate';
+import { bool, isEmpty, linkValue, str, unwrapCurlyKeys, type Raw, type RawMap } from './tolerate';
 
 /** §4.1 and §13.0 field order; a new key goes after the nearest earlier key that is present. */
 export const PERSON_ORDER = ['id', 'name', 'title', 'card-title', 'house', 'sex', 'born', 'died', 'parents', 'placement', 'illegitimate', 'union', 'link', 'portrait', 'portrait-crop', 'notes'];
@@ -651,6 +651,8 @@ export function finish(first: Parsed, steps: Step[], expected: RawMap, created: 
 	const out = run(first.src.text, steps, first);
 	if (isRefusal(out)) return out;
 	const check = parseBody(out);
+	// The new body is read with the curly pairs taken off structural values (D103), so the expected data is too.
+	unwrapCurlyKeys(expected);
 	if (!check.ok || !deepEqual(isEmpty(check.data) ? {} : check.data, expected)) {
 		return refuse('bad-value', 'The change cannot be written without a change to other values. Edit the note text.');
 	}

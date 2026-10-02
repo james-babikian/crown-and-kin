@@ -18,13 +18,18 @@
  *   `rect.dynasty-card-bg` (the size and hit area). Its content is every other child (ring, strip, me-ring,
  *   full, compact levels). A tag shell has its attributes and hit rect, its content the three pill groups.
  *   A badge shell has its attributes and hit rect, its content the circle and the plus path. Fold controls
- *   keep the M10 rule (`FoldRef.fill`); lines, markers and union signs are not delayed. A shell never
- *   moves, so the Tab order, the names and the roles exist from the build on.
+ *   keep the M10 rule (`FoldRef.fill`). A shell never moves, so the Tab order, the names and the roles
+ *   exist from the build on.
  * - S2 Built detached, attached later. The content is created in a detached holder, `fitted`, the
  *   `fitters`, `links` and `PictureSlot`s are registered as in an eager scene, and the holder's children
  *   move into the shell at fill. After a fill the shell has exactly the eager children in the eager
  *   order, so an eager and a filled lazy scene serialise byte for byte the same.
  * - S3 Near the view. `boxNearView` (`view-math.ts`) decides which items a fill attaches.
+ * - S3b 1.1.1 (spec §13.15 rule 4): lines and partnership signs are delayed too. A lazy scene does not make
+ *   their elements at build time; it keeps each one's box (`pathBox`) and builds the element at fill, into its
+ *   layer at its place (`orderedLayer`), so the layer after `fillAll` is the eager layer byte for byte. They have
+ *   no tap area, so a missing one never costs a tap. `SceneFill.pendingLines` counts them; they are not in
+ *   `pending` and not in the numbers the fill calls return.
  * - S4 `Scene.fill` (`SceneFill`) is the fill API; an eager scene has one that does nothing. The
  *   tree view decides when to call it (see `obsidian/tree-view.ts`). `Scene.cards`, `tags`, `badges`,
  *   `links`, `pictures` and `folds` contain every item from the build on.
@@ -33,16 +38,17 @@
 import type { FamilyGraph } from '../../core/derive';
 import type { CardLabel } from '../../core/titles';
 import type { Person } from '../../core/types';
-import { armsPlace, cardText, nameCountOf, nameTextWidth, portraitBox, relationY, smallTextWidth, tagTop, type CardText } from '../../layout/geometry';
+import { armsPlace, cardText, nameCountOf, nameTextWidth, portraitBox, relationY, signBelowRing, smallTextWidth, tagTop, type CardText } from '../../layout/geometry';
+import { farTagSigns } from '../../layout/far-tag-sign';
 import { illegitimateSigns } from '../../layout/index';
 import type { FarTag, LaidOut, NameLineCount, PersonBox, PlacedFoldControl, Rect } from '../../layout/model';
 import { legendRows, unionMarkClass, type LegendHouse, type LegendPart } from '../legend';
 import { lineLook, type LineMarks, type LineState } from '../line-highlight';
 import { nameLines, titleLines } from '../name-lines';
-import { ME_LOOK, UNION_MARKS, unionMark, unionShape } from '../styles';
+import { ME_RING_INNER, ME_RING_INSET, TAG_MARK, UNION_MARKS, unionMark, unionShape, type UnionShape } from '../styles';
 import { LEGEND_HOUSES_LABEL, SIGN_CARD_LABEL, cardLabel, dateLine, farTagLabel, farTagName } from '../tree-info';
 import { HOUSE_PAGE_UI } from '../ui-text';
-import { boxNearView, truncate } from '../view-math';
+import { boxNearView, pathBox, truncate } from '../view-math';
 import { drawFold, type FoldRef } from './folds';
 import type { PictureSlot } from './pictures';
 
@@ -112,19 +118,30 @@ export interface SceneOptions {
 export const FILL_ALL_EVENT = 'dynasty-fill-all';
 /** The root attribute with `SceneFill.pending` ('0' on an empty root; the harness helper counts a missing attribute as 0). */
 export const CARDS_PENDING_ATTR = 'data-dynasty-cards-pending';
+/** 1.1.1: the root attribute with `SceneFill.pendingLines` (lines and partnership signs that are not built yet). */
+export const LINES_PENDING_ATTR = 'data-dynasty-lines-pending';
 
-/** M11 (S4): attaches the delayed content of a lazy scene. Every call is safe to repeat; each returns how many items it attached. */
+/**
+ * M11 (S4): attaches the delayed content of a lazy scene. Every call is safe to repeat; each returns how many cards, tags and
+ * badges it attached. 1.1.1 (S3b): the same calls build the lines and partnership signs that wait, but those are counted by
+ * `pendingLines` and never in a return value.
+ */
 export interface SceneFill {
-	/** The cards, tags and badges near `view` (`boxNearView`). */
+	/** The cards, tags and badges near `view` (`boxNearView`), and the lines and signs near it. */
 	fillNear(view: Rect): number;
-	/** The card of `id`, its badge and its tags. False if the id is unknown. */
+	/** The card of `id`, its badge and its tags, and the lines that touch the card. False if the id is unknown. */
 	fillPerson(id: string): boolean;
 	/** Everything that is left. */
 	fillAll(): number;
-	/** Up to `max` cards, the nearest to `view` first, with the tags and badges that lie before the next card. */
+	/**
+	 * Up to `max` cards, the nearest to `view` first, with the tags and badges that lie before the next card. The lines and signs
+	 * that wait come in the same chunks, the nearest first, so that they end with the last card.
+	 */
 	fillChunk(view: Rect, max: number): number;
-	/** Items whose content is not attached yet; 0 in an eager scene. */
+	/** Cards, tags and badges whose content is not attached yet; 0 in an eager scene. */
 	readonly pending: number;
+	/** Lines and partnership signs that are not built yet; 0 in an eager scene. */
+	readonly pendingLines: number;
 }
 
 /** M10: how the scene draws the fold controls. */
@@ -203,8 +220,6 @@ export const BADGE_RADIUS_EM = 0.6;
 export const BADGE_INSET_EM = 0.25;
 /** How much further left the name and the D14 sign end on a sideways card with a badge, in em. */
 export const BADGE_TEXT_CUT_EM = BADGE_INSET_EM + 2 * BADGE_RADIUS_EM + 0.25 - 0.5;
-/** D41: the text-colour ring of the marked card sits this far inside the card's edge, in px: inside the accent border, touching it (styles.css sizes its stroke). */
-export const ME_RING_INSET = ME_LOOK.border / 2 + ME_LOOK.ring / 2;
 /** "?" of the rumoured-parent marker, in em. */
 export const RUMOUR_FONT_EM = 0.7;
 // All font sizes are set in styles.css from --dynasty-font-size (spec §5.8: nothing that styles
@@ -240,6 +255,42 @@ function isColour(value: string | undefined): value is string {
 	}
 }
 
+/** The box of a line or sign that has none we can read: near every view. */
+const EVERYWHERE: Rect = { x: -1e9, y: -1e9, w: 2e9, h: 2e9 };
+/** Room added around a late line's box for its stroke and for the highlight's wider stroke, in px. */
+const LATE_PAD = 4;
+/** When no card waits, a chunk builds this many late lines for each card of its size. */
+const LATE_LINES_PER_CARD_SLOT = 4;
+
+/** Makes one element of a marker, in the layer or (lazy) as a free element that the layer then takes. */
+type Maker = <K extends 'circle' | 'path' | 'g'>(tag: K, info: { cls: string[]; attr?: Record<string, string | number | boolean | null> }) => SVGElementTagNameMap[K];
+
+/**
+ * A layer whose members are made one by one in any order and still stand in their build order, so a layer that is
+ * filled late serialises like one that was built at once. `reserve` takes the next place; `put` puts an element there.
+ */
+function orderedLayer(parent: SVGElement): { reserve: () => number; put: (slot: number, el: SVGElement) => SVGElement } {
+	const els: (SVGElement | undefined)[] = [];
+	// The slots that have an element, in order: the first one after a new slot is the element to insert before.
+	const done: number[] = [];
+	return {
+		reserve: () => els.push(undefined) - 1,
+		put(slot, el) {
+			let lo = 0;
+			let hi = done.length;
+			while (lo < hi) {
+				const mid = (lo + hi) >> 1;
+				if (done[mid]! < slot) lo = mid + 1;
+				else hi = mid;
+			}
+			parent.insertBefore(el, lo < done.length ? els[done[lo]!]! : null);
+			done.splice(lo, 0, slot);
+			els[slot] = el;
+			return el;
+		},
+	};
+}
+
 /** Draws the whole tree's SVG content (lines, markers, cards, badges, tags) into `parent`. */
 export function buildScene(parent: SVGGElement, g: FamilyGraph, laid: LaidOut, opts: SceneOptions): Scene {
 	const { layout, edges } = laid;
@@ -264,15 +315,30 @@ export function buildScene(parent: SVGGElement, g: FamilyGraph, laid: LaidOut, o
 	const delay = (person: string, box: Rect, card: boolean, attach: () => void) => {
 		const d: Delayed = { box, person, card, attach };
 		delayed.add(d);
+		if (card) cardsLeft++;
 		const list = byPerson.get(person);
 		if (list) list.push(d);
 		else byPerson.set(person, [d]);
+	};
+	let cardsLeft = 0;
+	/** 1.1.1 (S3b): a line or sign that is not built yet: where it lies and the step that builds it into its layer. */
+	interface LateLine {
+		box: Rect;
+		put: () => void;
+	}
+	const lateLines = new Set<LateLine>();
+	const lateLine = (box: Rect | null, put: () => void) => lateLines.add({ box: box ?? EVERYWHERE, put });
+	const putLine = (l: LateLine): number => {
+		if (!lateLines.delete(l)) return 0;
+		l.put();
+		return 1;
 	};
 	const attachChildren = (holder: SVGElement, shell: SVGElement) => {
 		for (const c of Array.from(holder.children)) shell.appendChild(c);
 	};
 	const attachItem = (d: Delayed): number => {
 		if (!delayed.delete(d)) return 0;
+		if (d.card) cardsLeft--;
 		d.attach();
 		return 1;
 	};
@@ -286,25 +352,55 @@ export function buildScene(parent: SVGGElement, g: FamilyGraph, laid: LaidOut, o
 	// D47: the relation finder's line; without one every part is drawn as usual.
 	const look = lineLook(g, layout, edges, opts.line);
 	const linesEl = parent.createSvg('g', { cls: 'dynasty-lines' });
+	const linesLayer = lazy ? orderedLayer(linesEl) : null;
 	for (const p of look.paths) {
-		linesEl.createSvg('path', { cls: ['dynasty-line', `dynasty-line-${p.kind}`, ...stateCls(p.state)], attr: { d: p.d } });
+		const info = { cls: ['dynasty-line', `dynasty-line-${p.kind}`, ...stateCls(p.state)], attr: { d: p.d } };
+		if (!linesLayer) {
+			linesEl.createSvg('path', info);
+			continue;
+		}
+		const slot = linesLayer.reserve();
+		lateLine(pathBox(p.d, LATE_PAD), () => linesLayer.put(slot, createSvg('path', info)));
 	}
 
 	const markersEl = parent.createSvg('g', { cls: 'dynasty-markers' });
+	const markersLayer = lazy ? orderedLayer(markersEl) : null;
+	/** Builds one marker: into the layer at once, or (lazy) when its box comes near the view. */
+	const markerAt = (box: Rect, draw: (make: Maker) => void) => {
+		if (!markersLayer) {
+			draw((tag, info) => markersEl.createSvg(tag, info));
+			return;
+		}
+		const slot = markersLayer.reserve();
+		lateLine(box, () =>
+			draw((tag, info) => {
+				const el = createSvg(tag, info);
+				markersLayer.put(slot, el);
+				return el;
+			}),
+		);
+	};
 	edges.markers.forEach((m, i) => {
 		const state = stateCls(look.markers[i]);
 		if (m.kind === 'union' || m.kind === 'implicit-union') {
 			// D26, D38: the shape tells the kind of partnership; no recorded partnership has none.
 			const shape = unionShape(m.kind, m.unionType);
 			if (!shape) return;
-			const mark = unionMark(shape, m.x, m.y, UNION_MARKS[shape].size * geo.unionSize);
-			markersEl.createSvg(mark.tag, { cls: [...unionMarkClass(shape), ...state], attr: mark.attr });
+			const size = UNION_MARKS[shape].size * geo.unionSize;
+			const half = size + LATE_PAD;
+			markerAt({ x: m.x - half, y: m.y - half, w: 2 * half, h: 2 * half }, (make) => {
+				const mark = unionMark(shape, m.x, m.y, size);
+				make(mark.tag, { cls: [...unionMarkClass(shape), ...state], attr: mark.attr });
+			});
 		} else {
 			const r = 0.5 * f;
-			const q = markersEl.createSvg('g', { cls: ['dynasty-rumour-marker', ...state] });
-			q.createSvg('circle', { attr: { cx: m.x, cy: m.y, r } });
-			const size = RUMOUR_FONT_EM * f;
-			q.createSvg('text', { attr: { x: m.x, y: m.y + 0.35 * size, 'text-anchor': 'middle' } }).setText('?');
+			const half = f + LATE_PAD;
+			markerAt({ x: m.x - half, y: m.y - half, w: 2 * half, h: 2 * half }, (make) => {
+				const q = make('g', { cls: ['dynasty-rumour-marker', ...state] });
+				q.createSvg('circle', { attr: { cx: m.x, cy: m.y, r } });
+				const size = RUMOUR_FONT_EM * f;
+				q.createSvg('text', { attr: { x: m.x, y: m.y + 0.35 * size, 'text-anchor': 'middle' } }).setText('?');
+			});
 		}
 	});
 
@@ -451,11 +547,14 @@ export function buildScene(parent: SVGGElement, g: FamilyGraph, laid: LaidOut, o
 			card.setAttribute('aria-label', `${label}, ${SIGN_CARD_LABEL}`);
 		}
 		// D67, D78: arms at the top right; the name ends before them and the D14 sign moves left of them.
-		const place = box.arms && house ? armsPlace(geo, ct, box.h, nameCut) : undefined;
+		// D96: on the marked card the pictures and the sign keep clear of the mark's inner ring.
+		const markRing = isMe ? ME_RING_INNER : undefined;
+		const hasArms = !!(box.arms && house);
+		// D76, D77: the portrait sits in the lower right corner; a name text line beside it is cut shorter.
+		const portrait = box.portrait ? portraitBox(geo, ct, markRing === undefined ? undefined : { boxH: box.h, ring: markRing, arms: hasArms }) : undefined;
+		const place = hasArms ? armsPlace(geo, ct, box.h, nameCut, markRing, portrait) : undefined;
 		const armsShift = place ? place.shift : 0;
 		const nameW = (sign ? t.nameWithSignW : t.textW) - nameCut - armsShift;
-		// D76, D77: the portrait sits in the lower right corner; a name text line beside it is cut shorter.
-		const portrait = box.portrait ? portraitBox(geo, ct) : undefined;
 		const count = nameCountOf(box);
 		const lineW = (line: NameLineCount) => nameTextWidth(geo, ct, line, count, portrait, t.textW - nameW);
 		const names = [name];
@@ -475,7 +574,8 @@ export function buildScene(parent: SVGGElement, g: FamilyGraph, laid: LaidOut, o
 			fitters.push(run);
 		} else fitted(name, shownName, lineW(1), nameFont);
 		const fullSign = ct.sign;
-		if (sign) drawSign(full, box.x, box.y, inCard || place ? moved(fullSign, nameCut + armsShift) : fullSign);
+		const shownSign = inCard || place ? moved(fullSign, nameCut + armsShift) : fullSign;
+		if (sign) drawSign(full, box.x, box.y, markRing === undefined ? shownSign : signBelowRing(shownSign, markRing));
 		if (link) {
 			for (const el of names) {
 				el.setAttribute('data-href', link.linktext);
@@ -483,7 +583,8 @@ export function buildScene(parent: SVGGElement, g: FamilyGraph, laid: LaidOut, o
 			}
 		}
 		// D76, D77: the portrait sits in the lower right corner; the small text lines beside it are narrower.
-		const widthAt = (baseline: number) => smallTextWidth(geo, ct, baseline, portrait);
+		// D96: on the marked card the lowered arms box can reach the title, so it narrows the lines it reaches too.
+		const widthAt = (baseline: number) => smallTextWidth(geo, ct, baseline, portrait, markRing === undefined ? undefined : place?.full);
 		// D61: with a label, the title text line carries the reign, unless dates are off.
 		const titleText = cl ? cl.title : p.title;
 		const reign = cl && opts.showDates !== false ? cl.reign : undefined;
@@ -522,7 +623,8 @@ export function buildScene(parent: SVGGElement, g: FamilyGraph, laid: LaidOut, o
 		});
 		const cs = sign ? (tall ? compactSign(box.h) : baseCompactSign) : undefined;
 		// G2, B7: Compact arms at the card's right; the sign's right end 0.3 em left of them.
-		const shownCs = cs && (inCard || place) ? moved(cs, nameCut + (place ? place.compactShift : 0)) : cs;
+		const movedCs = cs && (inCard || place) ? moved(cs, nameCut + (place ? place.compactShift : 0)) : cs;
+		const shownCs = movedCs && markRing !== undefined ? signBelowRing(movedCs, markRing) : movedCs;
 		const compactLeft = t.stripW + 0.5 * f;
 		// Unsigned, the Compact name ends 0.25 em from the card's edge, not 0.5 em like the Full name.
 		// Beside arms it ends 0.3 em before them, or 0.5 em before the sign.
@@ -576,6 +678,8 @@ export function buildScene(parent: SVGGElement, g: FamilyGraph, laid: LaidOut, o
 	const small = tagFont(TAG_FONT_EM);
 	const large = tagFont(TAG_COMPACT_FONT_EM);
 	const bigH = TAG_COMPACT_PILL_EM * f;
+	// 1.1.1: a far couple with no children has no union dot, so its tag carries the partnership sign.
+	const farSigns = farTagSigns(g, layout, edges);
 	for (const tag of layout.farTags.values()) {
 		const prefix = '⚭ ';
 		const rest = farTagName(g, tag.spouses);
@@ -591,53 +695,100 @@ export function buildScene(parent: SVGGElement, g: FamilyGraph, laid: LaidOut, o
 		// The pill never grows past its zone (FarTag.zoneW): in `sideways` the tap area can be wider than the card's edge.
 		const zone = tag.zoneW ?? tag.hit.w;
 		// One rendering per level of detail, like the cards; a class on the <svg> shows one.
-		const pill = (cls: string, font: string, fontEm: number, h: number, text: string, fitText: boolean) => {
+		const pill = (cls: string, font: string, fontEm: number, h: number, text: string, fitText: boolean, shape?: UnionShape) => {
 			const pad = h / 2;
 			const part = pills.createSvg('g', { cls });
 			const ring = part.createSvg('rect', { cls: 'dynasty-tag-ring', attr: { y: bottom - h, height: h, rx: h / 2 } });
 			const rect = part.createSvg('rect', { cls: 'dynasty-tag-pill', attr: { y: bottom - h, height: h, rx: h / 2 } });
 			const textEl = part.createSvg('text', { cls: 'dynasty-tag-text', attr: { x: tag.x, y: bottom - h / 2 + 0.35 * fontEm * f, 'text-anchor': 'middle' } });
+			// 1.1.1: the partnership sign sits between the ⚭ and the name. The text stays one text element; en spaces leave
+			// the room, and the sign is drawn on that room, found with the same measure as the text.
+			const markPx = fontEm * f;
+			const markAt = (cx: number) => unionMark(shape!, cx, bottom - h / 2, UNION_MARKS[shape!].size * TAG_MARK.unit * markPx);
+			const markEl = shape ? part.createSvg(markAt(0).tag, { cls: ['dynasty-tag-mark', ...unionMarkClass(shape)], attr: markAt(0).attr }) : undefined;
 			const run = () => {
-				const label = fitText ? prefix + fit(rest, Math.max(0, zone - 2 * pad - opts.measure(prefix, font)), font) : text;
+				let lead = prefix;
+				if (shape) {
+					const en = opts.measure(' ', font);
+					lead = prefix + ' '.repeat(en > 0 ? Math.max(1, Math.round((TAG_MARK.slot * markPx) / en)) : 2);
+				}
+				const label = fitText ? lead + fit(rest, Math.max(0, zone - 2 * pad - opts.measure(lead, font)), font) : text;
 				const w = Math.min(zone, opts.measure(label, font) + 2 * pad);
 				for (const r of [ring, rect]) {
 					r.setAttribute('x', String(tag.x - w / 2));
 					r.setAttribute('width', String(w));
 				}
 				textEl.setText(label);
+				if (markEl) {
+					const start = tag.x - opts.measure(label, font) / 2;
+					const cx = start + opts.measure(prefix, font) + (opts.measure(lead, font) - opts.measure(prefix, font)) / 2;
+					const at = markAt(cx).attr;
+					if ('d' in at) markEl.setAttribute('d', at.d);
+					else {
+						markEl.setAttribute('cx', String(at.cx));
+						markEl.setAttribute('cy', String(at.cy));
+						markEl.setAttribute('r', String(at.r));
+					}
+				}
 			};
 			run();
 			fitters.push(run);
 		};
-		pill('dynasty-tag-full', small, TAG_FONT_EM, geo.tagH, '', true);
-		pill('dynasty-tag-compact', large, TAG_COMPACT_FONT_EM, bigH, '', true);
+		const farShape = farSigns.has(tag.person) ? unionShape('union', farSigns.get(tag.person)) : null;
+		pill('dynasty-tag-full', small, TAG_FONT_EM, geo.tagH, '', true, farShape ?? undefined);
+		pill('dynasty-tag-compact', large, TAG_COMPACT_FONT_EM, bigH, '', true, farShape ?? undefined);
 		pill('dynasty-tag-sign', large, TAG_COMPACT_FONT_EM, bigH, '⚭', false);
 		if (lazy) delay(tag.person, tag.hit, false, () => attachChildren(pills, el));
 		tags.push({ tag, el, hit });
 	}
 
 	let chain: { cx: number; cy: number; items: Delayed[]; at: number } | null = null;
+	let lineChain: { cx: number; cy: number; items: LateLine[]; at: number } | null = null;
+	/** Builds up to `count` late lines, the nearest to the point first. The order is sorted once for each point, like `chain`. */
+	const fillLines = (cx: number, cy: number, count: number) => {
+		if (count <= 0 || !lateLines.size) return;
+		if (!lineChain || lineChain.cx !== cx || lineChain.cy !== cy) {
+			const order = [...lateLines].map((l) => ({ l, k: (l.box.x + l.box.w / 2 - cx) ** 2 + (l.box.y + l.box.h / 2 - cy) ** 2 }));
+			order.sort((a, b) => a.k - b.k);
+			lineChain = { cx, cy, items: order.map((o) => o.l), at: 0 };
+		}
+		let left = count;
+		while (left > 0 && lineChain.at < lineChain.items.length) left -= putLine(lineChain.items[lineChain.at++]!);
+	};
 	const fill: SceneFill = lazy
 		? {
 				fillNear(view) {
 					let n = 0;
 					for (const d of [...delayed]) if (boxNearView(d.box, view)) n += attachItem(d);
+					if (lateLines.size) for (const l of [...lateLines]) if (boxNearView(l.box, view)) putLine(l);
 					return n;
 				},
 				fillPerson(id) {
-					if (!cards.has(id)) return false;
+					const box = layout.persons.get(id);
+					if (!cards.has(id) || !box) return cards.has(id);
 					for (const d of byPerson.get(id) ?? []) attachItem(d);
+					// The lines that touch the card come with it; their boxes include the stroke room.
+					if (lateLines.size) {
+						for (const l of [...lateLines]) {
+							const b = l.box;
+							if (b.x < box.x + box.w && b.x + b.w > box.x && b.y < box.y + box.h && b.y + b.h > box.y) putLine(l);
+						}
+					}
 					return true;
 				},
 				fillAll() {
 					let n = 0;
 					for (const d of [...delayed]) n += attachItem(d);
+					for (const l of [...lateLines]) putLine(l);
 					return n;
 				},
 				fillChunk(view, max) {
-					if (max <= 0 || !delayed.size) return 0;
+					if (max <= 0) return 0;
 					const cx = view.x + view.w / 2;
 					const cy = view.y + view.h / 2;
+					// The lines are spread over the chunks that the cards still need, so both end together; with no card left they come in chunks of their own.
+					if (lateLines.size) fillLines(cx, cy, cardsLeft > 0 ? Math.ceil(lateLines.size / Math.ceil(cardsLeft / max)) : LATE_LINES_PER_CARD_SLOT * max);
+					if (!delayed.size) return 0;
 					// The order is sorted once per chain: the same view centre keeps the list and a cursor. Items that other fills attached meanwhile are skipped.
 					if (!chain || chain.cx !== cx || chain.cy !== cy) {
 						// Squared distance from the view's centre to the item's centre: nearest first, so the cards the person looks at come first.
@@ -663,8 +814,11 @@ export function buildScene(parent: SVGGElement, g: FamilyGraph, laid: LaidOut, o
 				get pending() {
 					return delayed.size;
 				},
+				get pendingLines() {
+					return lateLines.size;
+				},
 			}
-		: { fillNear: () => 0, fillPerson: (id) => cards.has(id), fillAll: () => 0, fillChunk: () => 0, pending: 0 };
+		: { fillNear: () => 0, fillPerson: (id) => cards.has(id), fillAll: () => 0, fillChunk: () => 0, pending: 0, pendingLines: 0 };
 
 	return { cards, tags, badges, links, pictures, folds, refit: () => fitters.forEach((run) => run()), fill };
 }

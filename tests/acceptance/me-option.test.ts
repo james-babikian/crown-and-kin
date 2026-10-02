@@ -209,13 +209,13 @@ describe('hand-typed values and warnings (§13.1 "Tree text")', () => {
 		expect(problems(body)).toEqual([
 			{
 				code: 'missing-me',
-				text: 'No person has the id "ghost", so the tree cannot show how people relate to you. Correct the id, or remove "me: ghost".',
+				text: 'No person has the id “ghost”, so the tree cannot show how people relate to you. Correct the id, or remove “me: ghost”.',
 			},
 		]);
 	});
 
 	it('me is a list or a map: me-not-id, with the §13.1 text', () => {
-		const text = '"me" in the options does not name one person. Write one person id after "me:".';
+		const text = '“me” in the options does not name one person. Write one person id after “me:”.';
 		for (const value of ['[a, b]', '{id: a}', '\n    - a\n    - b']) {
 			const body = `options:\n  me: ${value}\n\n${PEOPLE}\n`;
 			expect(problems(body), value).toEqual([{ code: 'me-not-id', text }]);

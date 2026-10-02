@@ -6,7 +6,7 @@ import { INSERT_UI } from '../src/render/ui-text';
 // Review of WP6.3 (code-reviewer): Insert family tree (spec §5.9, D34) must give a tree that the
 // plugin finds, wherever the cursor is.
 
-const HINT = `# ${INSERT_UI.hint}`;
+const HINT = `# ${INSERT_UI.noteHint}`;
 
 describe('review 6.3: Insert family tree', () => {
 	it('after a paragraph line indented by 4 spaces (a lazy continuation line), the note has one tree', () => {

@@ -73,23 +73,23 @@ describe('sample tree 13: the listed warnings and no others (spec §13.4 accepta
 			return t;
 		};
 		expect(text('section-wrong-shape', { section: 'holders' })).toContain('Warden of the Marches');
-		expect(text('entry-not-map', { section: 'titles' })).toMatch(/Entry 5\b.*"titles"/);
+		expect(text('entry-not-map', { section: 'titles' })).toMatch(/Entry 5\b.*“titles”/);
 		expect(text('missing-id', { section: 'titles' })).toMatch(/^Margrave of the Salt Coast has no id/);
-		expect(text('duplicate-title-id')).toContain('"count-of-orsini"');
+		expect(text('duplicate-title-id')).toContain('“count-of-orsini”');
 		expect(text('entry-not-map', { section: 'holders' })).toMatch(/Entry 4\b.*King of the Vale/);
-		expect(text('missing-holder', { ref: 'beatrice' })).toMatch(/Count of Orsini.*"beatrice"/);
+		expect(text('missing-holder', { ref: 'beatrice' })).toMatch(/Count of Orsini.*“beatrice”/);
 		expect(text('holder-empty')).toMatch(/Entry 9\b.*Count of Orsini/);
 		expect(text('card-title-not-held')).toMatch(/Isolde Orsini.*duke-of-valmont/);
 		const second = graphOf(sample13(1).body);
 		const shape = second.issues.find((i) => i.code === 'section-wrong-shape');
-		expect(shape && issueText(shape)).toContain('"titles"');
+		expect(shape && issueText(shape)).toContain('“titles”');
 	});
 
 	it('a title with no id and no name is named by its place in the list', () => {
 		const g = graphOf('titles:\n  - plural: Dukes\npeople:\n  - id: a\n    name: A\n');
 		const i = g.issues.find((x) => x.code === 'missing-id');
 		expect(i && asWritten(i)).toEqual({ code: 'missing-id', params: { section: 'titles', index: '1' } });
-		expect(issueText(i!)).toMatch(/Entry 1\b.*"titles".*no id/);
+		expect(issueText(i!)).toMatch(/Entry 1\b.*“titles”.*no id/);
 	});
 });
 

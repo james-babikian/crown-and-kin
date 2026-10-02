@@ -1,12 +1,14 @@
 /*
  * The picture picker (spec §13.6 "Picture picker", D69; §13.14 picture list, D92 to D95; M9 contract O6
- * and B2). A window with a search field and the vault's pictures that the plugin
+ * and B2). A window with a search bar and the vault's pictures that the plugin
  * can show, as a folder view (the current picture's folders open, "In use" on its row) or, while the
  * search field has a word, as a flat list. Each picture row has a small preview from the picture store.
- * Its first row, "Add a picture from this device", opens the device's file choice; the plugin checks the
+ * When the caller's draft has a picture (`PickPictureOptions.remove`), the list starts with a Remove row
+ * ("Remove arms" or "Remove portrait", D97); the picker then answers `remove` as well as `choose` and
+ * `cancel`. Its next row, "Add a picture from this device", opens the device's file choice; the plugin checks the
  * file's format and size, copies it into Obsidian's attachment folder for the tree's note at once (not
  * part of a draft or of undo) and selects it. The picker gives the link text to write (`pictureLink`),
- * or null. The Houses window (arms) and the edit sheet (portrait) open it. The rules of the rows, the
+ * in a `PickResult`. The Houses window (arms) and the edit sheet (portrait) open it. The rules of the rows, the
  * keys and the taps are in `core/picture-list.ts`; this file only draws them.
  *
  * Rules of the view:
@@ -17,8 +19,10 @@
  *   `currentPictureOf(store, link, sourcePath)` returns `store.resolve(link, sourcePath).file` when the
  *   result is `ok`, else null. The Houses window passes the link of the row being edited from its draft
  *   (trimmed); the edit sheet passes its draft portrait (trimmed). The picker never writes `current`.
- * - Layout. Header (title, Cancel, Select), then the body with the search field, then the list. On a phone
- *   the sheet body is the scroller; `pickerScroller(modalEl)` returns the element that scrolls.
+ * - Layout (D102). Header (title, Cancel, Select), then the search bar, then the sheet body with the list.
+ *   The search field is in the bar, which never scrolls; only the sheet body scrolls, on the phone and on the
+ *   computer. `pickerScroller(modalEl)` returns it. A field inside the scroller made iOS scroll the whole
+ *   scroller when the keyboard opened, and the field left the view.
  * - Open. The list shows its top with the device row visible. Nothing calls `scrollIntoView` at open. The
  *   plugin sets `scrollTop = 0` at open, at `PICKER_TOP_MS` and on the first `visualViewport` resize, and
  *   stops as soon as the owner scrolls, presses a key, types or touches the window. Only Arrow keys and
@@ -70,6 +74,7 @@ import {
 	type PictureFileLike,
 	type PictureTree,
 } from '../core/picture-list';
+import { foldForMatch } from '../core/fold';
 import { judgeHeader, readPictureHeader, type PictureProblem, type SupportedFormat } from '../core/pictures';
 import { PICKER_UI, PICTURES_UI, deviceNotice } from '../render/ui-text';
 import { NO_READ_BYTES, NO_READ_BYTES_COARSE, isShownPictureExtension, type CopyBox, type PictureCopy, type PictureStore } from './picture-store';
@@ -137,7 +142,18 @@ export interface PickPictureOptions {
 	title: string;
 	/** The current picture as a resolved file (`currentPictureOf`), or null or absent for none. The picker only shows it. */
 	current?: CurrentFileLike | null;
+	/**
+	 * D97: the text of the first row ("Remove arms"). The caller sets it only when its draft has a picture
+	 * (the draft value is not empty, also when the file is missing); without it the list has no Remove row.
+	 */
+	remove?: string;
 }
+
+/** What the picker answers: a chosen picture (the link text to write), "remove the picture", or no change. */
+export type PickResult = { kind: 'choose'; link: string } | { kind: 'remove' } | { kind: 'cancel' };
+
+/** The cursor key of the Remove row; the model of `core/picture-list.ts` does not know this row. */
+const REMOVE_KEY = 'remove';
 
 /** The most rows whose position one update reads: a guard for a hidden list, whose rows all report the same place. */
 const NEAR_ROWS_MAX = 150;
@@ -161,12 +177,15 @@ export function vaultPictures(app: App): TFile[] {
 	return files.sort((a, b) => a.name.localeCompare(b.name) || a.path.localeCompare(b.path));
 }
 
-/** The pictures whose path has every word of `query` (no case). */
+/** The pictures whose path has every word of `query`; case, accents and quote look-alikes are ignored on both sides (D100). */
 export function matchPictures(files: readonly TFile[], query: string): TFile[] {
-	const words = query.toLowerCase().split(/\s+/).filter(Boolean);
-	if (!words.length) return [...files];
+	const words = foldForMatch(query).split(/\s+/).filter(Boolean);
+	if (!words.length) {
+		// A query with only spaces is no search; a query that folds to nothing (a lone accent) finds nothing, as in 1.1.0 (the picker's "searching" test reads the raw query too).
+		return query.split(/\s+/).some(Boolean) ? [] : [...files];
+	}
 	return files.filter((f) => {
-		const p = f.path.toLowerCase();
+		const p = foldForMatch(f.path);
 		return words.every((w) => p.includes(w));
 	});
 }
@@ -205,7 +224,7 @@ export function isTouchFirst(win: Window): boolean {
 	}
 }
 
-/** The element that scrolls the list. It is the sheet body on the phone and on the computer (the list never scrolls itself). */
+/** The element that scrolls the list: the sheet body, on the phone and on the computer. The search bar is not inside it (D102). */
 export function pickerScroller(modalEl: HTMLElement): HTMLElement {
 	return modalEl.querySelector<HTMLElement>('.dynasty-sheet-body') ?? modalEl;
 }
@@ -425,6 +444,7 @@ class PicturePicker extends Modal {
 	private listEl: HTMLElement | null = null;
 	private searchEl: HTMLInputElement | null = null;
 	private selectEl: HTMLButtonElement | null = null;
+	private removeEl: HTMLElement | null = null;
 	private fileInput: HTMLInputElement | null = null;
 	private scroller: HTMLElement | null = null;
 	private previews: RowPreviews | null = null;
@@ -439,7 +459,7 @@ class PicturePicker extends Modal {
 	constructor(
 		app: App,
 		private readonly o: PickPictureOptions,
-		private readonly done: (link: string | null) => void,
+		private readonly done: (result: PickResult) => void,
 	) {
 		super(app);
 		let files: TFile[] = [];
@@ -474,13 +494,15 @@ class PicturePicker extends Modal {
 		this.selectEl = actions.createEl('button', { cls: ['mod-cta', 'dynasty-picture-select'], text: PICTURES_UI.select, attr: { type: 'button' } });
 		this.selectEl.addEventListener('click', () => this.guard(() => this.chooseSelected()));
 
-		const body = el.createDiv({ cls: 'dynasty-sheet-body' });
-		const search = body.createEl('input', {
+		// The bar is a sibling of the scroller, not a child: iOS scrolls the scroller that holds the focused field.
+		const bar = el.createDiv({ cls: 'dynasty-picture-searchbar' });
+		const search = bar.createEl('input', {
 			cls: ['dynasty-sheet-input', 'dynasty-picture-search'],
 			attr: { type: 'search', autocomplete: 'off', spellcheck: 'false', placeholder: PICTURES_UI.search, 'aria-label': PICTURES_UI.searchLabel, 'aria-controls': 'dynasty-picture-list' },
 		});
 		this.searchEl = search;
 		search.addEventListener('input', () => this.guard(() => this.onSearch()));
+		const body = el.createDiv({ cls: 'dynasty-sheet-body' });
 		this.listEl = body.createDiv({ cls: 'dynasty-picture-list', attr: { id: 'dynasty-picture-list', 'aria-label': this.o.title } });
 		// The device's file choice (Photos or Files on an iPhone, D69); hidden, opened by the first row.
 		const input = body.createEl('input', { cls: 'dynasty-picture-file', attr: { type: 'file', accept: 'image/*', tabindex: '-1', 'aria-hidden': 'true' } });
@@ -514,7 +536,7 @@ class PicturePicker extends Modal {
 		this.previews = null;
 		this.contentEl.empty();
 		// A promise settles once: a choice already resolved it.
-		if (!this.chosen) this.done(null);
+		if (!this.chosen) this.done({ kind: 'cancel' });
 	}
 
 	/** A failed step never leaves an exception in Obsidian (spec §8). */
@@ -605,6 +627,8 @@ class PicturePicker extends Modal {
 		if (switching) this.state = pickerSwitch(this.rows, this.state);
 		list.setAttribute('role', this.searching ? 'listbox' : 'tree');
 		list.empty();
+		this.removeEl = null;
+		if (this.o.remove) this.drawRemove(list, this.o.remove);
 		this.refs = [];
 		this.els = [];
 		this.index.clear();
@@ -615,6 +639,17 @@ class PicturePicker extends Modal {
 		this.previews?.rowsChanged();
 		this.mark();
 		this.scheduleUpdate();
+	}
+
+	/** D97: the Remove row, above the device row. It is not a row of the model, so it has no place in `rows`, `els` or `index`. */
+	private drawRemove(list: HTMLElement, label: string): void {
+		const el = list.createDiv({ cls: ['dynasty-picture-row', 'dynasty-picture-remove'], attr: { role: this.searching ? 'option' : 'treeitem', id: 'dynasty-picture-row-remove', 'data-remove': 'true' } });
+		if (!this.searching) el.setAttribute('aria-level', '1');
+		el.createSpan({ cls: 'dynasty-picture-plus', text: '×', attr: { 'aria-hidden': 'true' } });
+		const text = el.createDiv({ cls: 'dynasty-picture-text' });
+		text.createDiv({ cls: 'dynasty-picture-name', text: label });
+		el.addEventListener('click', () => this.guard(() => this.removeChosen()));
+		this.removeEl = el;
 	}
 
 	private drawRow(list: HTMLElement, row: PickerTreeRow, i: number): void {
@@ -683,7 +718,11 @@ class PicturePicker extends Modal {
 			this.marked.push(this.els[selectedAt]);
 		}
 		const cursorAt = cursor === null ? undefined : this.index.get(cursor);
-		if (cursorAt !== undefined) {
+		if (cursor === REMOVE_KEY && this.removeEl) {
+			this.removeEl.addClass('is-cursor');
+			this.marked.push(this.removeEl);
+			this.searchEl?.setAttribute('aria-activedescendant', 'dynasty-picture-row-remove');
+		} else if (cursorAt !== undefined) {
 			const el = this.els[cursorAt];
 			el.addClass('is-cursor');
 			// A picture row is "selected" for a screen reader when the keys act on it and it is the selected picture.
@@ -698,6 +737,10 @@ class PicturePicker extends Modal {
 
 	/** Only the Arrow keys and typing scroll the cursor row into view. */
 	private keepRowInView(): void {
+		if (this.state.cursor === REMOVE_KEY) {
+			this.removeEl?.scrollIntoView?.({ block: 'nearest' });
+			return;
+		}
 		const at = this.state.cursor === null ? undefined : this.index.get(this.state.cursor);
 		if (at !== undefined) this.els[at].scrollIntoView?.({ block: 'nearest' });
 	}
@@ -710,6 +753,7 @@ class PicturePicker extends Modal {
 		if (e.ctrlKey || e.metaKey || e.altKey || !HANDLED_KEYS.includes(e.key)) return;
 		// A key on Select or Cancel belongs to that button.
 		if ((e.target as HTMLElement | null)?.closest?.('button')) return;
+		if (this.removeEl && this.onRemoveKey(e)) return;
 		const before = this.state.cursor;
 		const step = pickerKey(this.rows, this.state, e.key as PickerKey);
 		this.state = step.state;
@@ -723,6 +767,47 @@ class PicturePicker extends Modal {
 		e.preventDefault();
 		this.act(step.action);
 		if (e.key.startsWith('Arrow')) this.keepRowInView();
+	}
+
+	/**
+	 * D97: the keys around the Remove row, which sits before the first row of the model. Down from no
+	 * cursor, and Up from the first row, land on it; Down from the last row also lands on it. Enter on it
+	 * removes. Returns true when the key is dealt with here.
+	 */
+	private onRemoveKey(e: KeyboardEvent): boolean {
+		const { cursor } = this.state;
+		const onRemove = cursor === REMOVE_KEY;
+		const down = e.key === 'ArrowDown';
+		const up = e.key === 'ArrowUp';
+		if (onRemove && e.key === 'Enter') {
+			e.preventDefault();
+			this.removeChosen();
+			return true;
+		}
+		let toRemove = false;
+		if (!onRemove && (down || up)) {
+			const first = this.rows.length ? rowKey(this.rows[0]) : null;
+			const last = this.rows.length ? rowKey(this.rows[this.rows.length - 1]) : null;
+			const at = cursor === null ? -1 : this.rows.findIndex((r) => rowKey(r) === cursor);
+			toRemove = (down && (at < 0 || cursor === last)) || (up && cursor === first);
+		}
+		if (toRemove) {
+			e.preventDefault();
+			this.state = { ...this.state, cursor: REMOVE_KEY };
+			this.mark();
+			this.keepRowInView();
+			return true;
+		}
+		if (!onRemove) return false;
+		if (down || up) {
+			// Leave the Remove row: the model starts from "no cursor", so Down gives the first row and Up the last.
+			e.preventDefault();
+			this.state = pickerKey(this.rows, { ...this.state, cursor: null }, e.key as PickerKey).state;
+			this.mark();
+			this.keepRowInView();
+		}
+		// The other keys do nothing on this row, and the search field keeps them (the caret, the space).
+		return true;
 	}
 
 	private onTap(key: string): void {
@@ -761,7 +846,15 @@ class PicturePicker extends Modal {
 	private finish(link: string): void {
 		if (this.chosen) return;
 		this.chosen = true;
-		this.done(link);
+		this.done({ kind: 'choose', link });
+		this.close();
+	}
+
+	/** D97: the owner chose "Remove": the caller clears its draft value; nothing is written here. */
+	private removeChosen(): void {
+		if (this.chosen || this.busy) return;
+		this.chosen = true;
+		this.done({ kind: 'remove' });
 		this.close();
 	}
 
@@ -813,11 +906,11 @@ class PicturePicker extends Modal {
 	}
 }
 
-/** O6: opens the picture picker; resolves to the link text to write, or null (Cancel, Esc). Never rejects. */
-export function pickPicture(app: App, o: PickPictureOptions): Promise<string | null> {
+/** O6: opens the picture picker; resolves to what the owner did (`choose`, `remove` or `cancel`). Never rejects. */
+export function pickPicture(app: App, o: PickPictureOptions): Promise<PickResult> {
 	return new Promise((resolve) => {
 		let settled = false;
-		const done = (v: string | null) => {
+		const done = (v: PickResult) => {
 			if (settled) return;
 			settled = true;
 			resolve(v);
@@ -826,7 +919,7 @@ export function pickPicture(app: App, o: PickPictureOptions): Promise<string | n
 			new PicturePicker(app, o, done).open();
 		} catch (e) {
 			console.error('Dynasty Tree: cannot open the picture picker', e);
-			done(null);
+			done({ kind: 'cancel' });
 		}
 	});
 }

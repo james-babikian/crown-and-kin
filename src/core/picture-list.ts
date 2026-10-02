@@ -33,7 +33,7 @@
  *    (P5 path; the same file). The number of rows is bounded by the open folders, not by the vault. A
  *    vault with no shown picture gives the device row alone (the view adds the "no pictures" text).
  * P7 Rows (the search). `searchRows(tree, query, current, limit = PICKER_SEARCH_LIMIT)`: the query is
- *    split on whitespace; a picture matches when its lower-case path has every word. A query with no word is not a search: the caller uses `pickerRows`. Result: the device
+ *    split on whitespace; a picture matches when its path has every word, both folded by `foldForMatch` (case, accents and quote look-alikes ignored, D100; each path is folded once, with the ranking). A query with no word is not a search: the caller uses `pickerRows`. A query that has text but folds to no word (a lone accent mark) finds no picture. Result: the device
  *    row, then at most `limit` matches, each a picture row at depth 0 in the P4 order (file name, then
  *    folder path; the entries are ranked once in `buildPictureTree`, so a search only filters and stops
  *    after `limit` + 1), and `more` = there are more matches than `limit` (200). The row shows the folder
@@ -94,6 +94,8 @@
  *    visible part (the rows in view first). Both use rects, not row numbers, because on a phone the list
  *    sits below the search field inside the sheet body (the scroller).
  */
+
+import { foldForMatch } from './fold';
 
 /** The part of a vault file that the model needs; `TFile` satisfies it (so the model stays free of `obsidian`). */
 export interface PictureFileLike {
@@ -287,18 +289,18 @@ export const buildPictureTree: BuildPictureTree = <F extends PictureFileLike>(fi
 	rootPictures.sort(entryOrder);
 	const tree: PictureTree<F> = { folders: topFolders, pictures: rootPictures, count, byPath, entries };
 	// Rank once here so a search (which runs on every key) only filters.
-	RANKED.set(tree, [...entries.values()].sort(entryOrder).map((entry) => ({ entry, lower: entry.file.path.toLowerCase() })));
+	RANKED.set(tree, [...entries.values()].sort(entryOrder).map((entry) => ({ entry, folded: foldForMatch(entry.file.path) })));
 	return tree;
 };
 
-type Ranked = { entry: PictureEntry<PictureFileLike>; lower: string };
+type Ranked = { entry: PictureEntry<PictureFileLike>; folded: string };
 const RANKED = new WeakMap<object, Ranked[]>();
 
 function rankedOf<F extends PictureFileLike>(tree: PictureTree<F>): Ranked[] {
 	let ranked = RANKED.get(tree);
 	if (!ranked) {
 		// A tree that did not come from `buildPictureTree`: rank it on first use.
-		ranked = [...tree.entries.values()].sort(entryOrder).map((entry) => ({ entry, lower: entry.file.path.toLowerCase() }));
+		ranked = [...tree.entries.values()].sort(entryOrder).map((entry) => ({ entry, folded: foldForMatch(entry.file.path) }));
 		RANKED.set(tree, ranked);
 	}
 	return ranked;
@@ -332,12 +334,14 @@ export const pickerRows: PickerRows = <F extends PictureFileLike>(tree: PictureT
 
 /** P7: the flat search list. */
 export const searchRows: SearchRows = <F extends PictureFileLike>(tree: PictureTree<F>, query: string, current: string | null, limit: number = PICKER_SEARCH_LIMIT) => {
-	const words = query.toLowerCase().split(/\s+/).filter(Boolean);
+	const words = foldForMatch(query).split(/\s+/).filter(Boolean);
 	const rows: PickerRow<F>[] = [{ kind: 'device' }];
+	// A query that folds to nothing (a lone accent mark) is still a search and finds nothing, as in 1.1.0. An empty query is the job of the caller.
+	if (!words.length && query.trim() !== '') return { rows, more: false };
 	let more = false;
 	let taken = 0;
-	for (const { entry, lower } of rankedOf(tree)) {
-		if (!words.every((w) => lower.includes(w))) continue;
+	for (const { entry, folded } of rankedOf(tree)) {
+		if (!words.every((w) => folded.includes(w))) continue;
 		// One match beyond the limit is enough to know that there are more.
 		if (taken >= limit) {
 			more = true;

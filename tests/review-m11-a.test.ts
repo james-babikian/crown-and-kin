@@ -44,9 +44,9 @@ function app(createBinary?: (path: string, data: ArrayBuffer) => Promise<unknown
 }
 
 async function pick(o: { current?: VaultFile | null; app?: unknown } = {}) {
-	const M = (await pickerModule()) as { pickPicture: (a: never, o: never) => Promise<string | null> };
+	const M = (await pickerModule()) as { pickPicture: (a: never, o: never) => Promise<{ kind: 'choose'; link: string } | { kind: 'remove' } | { kind: 'cancel' }> };
 	let result: string | null | undefined;
-	const done = M.pickPicture((o.app ?? app()) as never, { sourcePath: 'Trees/Tree.md', title: 'Select', current: o.current ?? null } as never).then((v) => (result = v));
+	const done = M.pickPicture((o.app ?? app()) as never, { sourcePath: 'Trees/Tree.md', title: 'Select', current: o.current ?? null } as never).then((v) => (result = v.kind === 'choose' ? v.link : null));
 	const m = openModals[openModals.length - 1] as unknown as Picker;
 	return { m, done, result: () => result };
 }

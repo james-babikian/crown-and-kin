@@ -8,7 +8,7 @@
 import { partnerOf, placedChildren, type FamilyGraph, type FamilyUnion } from '../core/derive';
 import type { ModelOrder } from '../core/order';
 import type { FarCoupleRule, FarTag, Geometry, LayoutSettings, PersonBox, PlacedFoldControl, Rect, TreeLayout, UnionPoint } from './model';
-import { MIN_HIT, barClear, tagHit, gapHeight, lineMetrics, relationExtra, sideTagDepth, sidewaysGeometry, tagTop, tallExtra, turnedGeometry, withRelationLine } from './geometry';
+import { MIN_HIT, barClear, tagHit, gapHeight, lineMetrics, relationExtra, sideTagDepth, sidewaysGeometry, sidewaysPartnerGap, tagTop, tallExtra, turnedGeometry, withRelationLine } from './geometry';
 import { foldExtent, foldSpots, turnSpots, type FoldInput } from './fold-spots';
 import { addTo, planLines, type LinePlan } from './lines';
 import { placeInOrder } from './pava';
@@ -94,6 +94,16 @@ function placeUnions(
 	return unions;
 }
 
+/** The most partnerships any one couple of `g` has (1 when no couple has more than one, 0 with none). */
+function mostUnionsOfOneCouple(g: FamilyGraph): number {
+	const counts = new Map<string, number>();
+	for (const fu of g.unions) {
+		const key = [...fu.partners].sort().join('\n');
+		counts.set(key, (counts.get(key) ?? 0) + 1);
+	}
+	return Math.max(0, ...counts.values());
+}
+
 /**
  * Places every card. `g` is the graph to arrange (M10: the graph without the people that folds hide, F2), `coreGen` the
  * generations of the whole graph; `fold` (M10) holds the whole graph, the hidden partners for the tags, the lines of the folded
@@ -113,7 +123,9 @@ export function layoutFamilies(
 	// D40: the relation text line makes every card taller before anything is sized from the card.
 	const given = withRelationLine(plain, settings);
 	// D24 sideways: everything below runs in the turned frame (`turn.ts`) and is turned at the end.
-	const side = settings.orientation === 'sideways' ? sidewaysGeometry(given, settings.sidewaysCards ?? 'normal', settings.narrowCardW) : undefined;
+	const narrowSide = settings.orientation === 'sideways' ? sidewaysGeometry(given, settings.sidewaysCards ?? 'normal', settings.narrowCardW) : undefined;
+	// 1.1.1: a couple with two or more partnerships has several signs in its gap; only then is the gap wider.
+	const side = narrowSide && g.unions.length > 1 ? { ...narrowSide, coupleGap: sidewaysPartnerGap(narrowSide, mostUnionsOfOneCouple(g)) } : narrowSide;
 	const geo = side ? turnedGeometry(side) : given;
 	// D11 keeps its length in px: 3 widths of a `down` card, measured along the column.
 	const farRule = side ? { ...settings.far, maxCardWidths: (settings.far.maxCardWidths * given.cardW) / side.cardH } : settings.far;

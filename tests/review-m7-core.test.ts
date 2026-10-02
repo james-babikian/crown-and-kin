@@ -82,8 +82,8 @@ function oracleName(a: number, b: number, s: S, half: boolean): string {
 	if (a === 0) return down(b, s);
 	if (b === 0) return up(a, s);
 	if (a === 1 && b === 1) return withHalf(SIB[s], half);
-	if (b === 1) return s === 2 ? `${up(a - 1, 2)}'s ${withHalf('sibling', half)}` : withHalf(`${great(a - 2)}${s === 0 ? 'uncle' : 'aunt'}`, half);
-	if (a === 1) return s === 2 ? `${withHalf('sibling', half)}'s ${down(b - 1, 2)}` : withHalf(`${great(b - 2)}${s === 0 ? 'nephew' : 'niece'}`, half);
+	if (b === 1) return s === 2 ? `${up(a - 1, 2)}’s ${withHalf('sibling', half)}` : withHalf(`${great(a - 2)}${s === 0 ? 'uncle' : 'aunt'}`, half);
+	if (a === 1) return s === 2 ? `${withHalf('sibling', half)}’s ${down(b - 1, 2)}` : withHalf(`${great(b - 2)}${s === 0 ? 'nephew' : 'niece'}`, half);
 	const deg = Math.min(a, b) - 1;
 	const rem = Math.abs(a - b);
 	let w = `${deg <= 10 ? DEG[deg - 1] : nth(deg)} cousin`;

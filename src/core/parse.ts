@@ -3,13 +3,13 @@
  * any shape issues found while reading (spec §4, §8, §13.4). `parseDynasty` is the entry point;
  * `tree-view.ts` and `houses-window.ts` call it. `parseBody` is shared with the edit code in
  * `yaml-patch.ts`, so both work from the same parsed document. Depends on `tolerate.ts` for
- * lenient reads of raw YAML values.
+ * lenient reads of raw YAML values, among them the curly quote marks around structural values (D103).
  */
 
 import { isScalar, Lexer, parseDocument, type Document } from 'yaml';
 import { codedIssue, type CodedIssue, type HardError } from './messages';
 import { cropValue } from './portrait-crop';
-import { blankPlainNulls, bool, int, isEmpty, isMap, linkValue, list, str, tolerateEmbeds, type Raw, type RawMap } from './tolerate';
+import { blankPlainNulls, bool, int, isEmpty, isMap, linkValue, list, str, tolerateEmbeds, unwrapCurlyKeys, type Raw, type RawMap } from './tolerate';
 import type { Holder, House, ParentRef, ParseResult, Person, Title, Tree, TreeOptions, Union } from './types';
 
 type Section = 'people' | 'houses' | 'unions' | 'titles';
@@ -345,6 +345,8 @@ export function parseBody(source: string): ParsedBody {
 		// `house: *h` for every person. The limit still grows only with the text, so it stays safe.
 		const data: Raw = doc.toJS({ maxAliasCount: Math.max(100, source.length) });
 		if (!isEmpty(data) && !isMap(data)) return { ok: false, error: { code: 'not-a-map' } };
+		// On the data only, not on the document: the note text and the document nodes stay as typed (D103).
+		unwrapCurlyKeys(data);
 		return { ok: true, doc, data };
 	} catch (e) {
 		// Unresolved or excessive aliases surface only while converting.

@@ -26,7 +26,7 @@ import { graphOf, lowers, relationsModule, relationText, sample12, SPEC_4, type 
  *   "Stepsister" (rule 3). For Leo she has no name: Fenna married his grandfather, not a parent.
  * - Mabel and Nia list only Kester, so they are full sisters; for Gwen X = Alan and the children of
  *   Alan where the paths leave are Gwen and Kester (half): "Half-niece"; Nia has no sex, so the
- *   neutral form carries "half" on the inner word: "Half-sibling's child". For Leo X = Alan,
+ *   neutral form carries "half" on the inner word: "Half-sibling’s child". For Leo X = Alan,
  *   c1 = Harold, c2 = Kester: "Half first cousin". Mabel married her father Kester, but she is a blood
  *   relative, so rule 1 ("aunt by marriage" for Leo) does not apply to her.
  * - Tobin (Kester and Mabel): rule 1 takes the shortest b for each X, so for Gwen X = Alan gives
@@ -48,15 +48,15 @@ import { graphOf, lowers, relationsModule, relationText, sample12, SPEC_4, type 
  * - Edith for Alan: rule 1 (Brand's wife) and rule 2 (Dana's sister) both give "sister-in-law"; each
  *   distinct name is listed once.
  * - Thea and Ysolde married Gwen's great-grandfather Sigmund and grandfather Hugo: "Step-grandmother"
- *   for Ysolde, but a great-grandparent is "any other", so Thea is "Great-grandfather's wife".
- *   For Alan they have no name (two marriages away). Maud is Dana's aunt: "Wife's aunt"; her son
- *   Nils is Dana's first cousin: "Wife's first cousin".
+ *   for Ysolde, but a great-grandparent is "any other", so Thea is "Great-grandfather’s wife".
+ *   For Alan they have no name (two marriages away). Maud is Dana's aunt: "Wife’s aunt"; her son
+ *   Nils is Dana's first cousin: "Wife’s first cousin".
  * - Great forms: Leo's great-great-grandfather Sigmund (a = 4); Gwen's great-great-nephew Otto
  *   (b = 4); Alan's 3rd great-nephew Cai (a = 1, b = 5: b − 2 = 3 greats).
  *
  * "maybe" names (allowed, not required) are the §13.1 rule 2 names of people who are also blood
  * relatives of the marked person, for example Leo for Alan: Leo is the grandson of Alan's wife Dana
- * through Harold, who is not a stepchild, so rule 2 read word for word gives "wife's grandson". The
+ * through Harold, who is not a stepchild, so rule 2 read word for word gives "wife’s grandson". The
  * spec does not say whether rule 2 applies to a blood relative (see the WP7.0 report).
  */
 
@@ -152,7 +152,7 @@ describe('sample tree 12: every card for each marked person (golden, spec §13.1
 		const pick = (marked: string, id: string) => computeRelations(g, marked).get(id)!.map((r) => [r.lower, r.kind, r.distance]);
 		expect(pick('gwen', 'fenna')).toEqual([['stepmother', 'by-marriage', 2]]);
 		expect(pick('gwen', 'tamsin')).toEqual([['stepsister', 'step-sibling', 3]]);
-		expect(pick('gwen', 'thea')).toEqual([["great-grandfather's wife", 'by-marriage', 4]]);
+		expect(pick('gwen', 'thea')).toEqual([["great-grandfather’s wife", 'by-marriage', 4]]);
 		expect(pick('gwen', 'ysolde')).toEqual([['step-grandmother', 'by-marriage', 3]]);
 		expect(pick('gwen', 'ivo')).toEqual([['double first cousin', 'blood', 4]]);
 		expect(pick('gwen', 'cai')).toEqual([['first cousin 3 times removed', 'blood', 7]]);
@@ -164,7 +164,7 @@ describe('sample tree 12: every card for each marked person (golden, spec §13.1
 			['ward', 'ward', 1],
 			['step-grandson', 'by-marriage', 3],
 		]);
-		expect(pick('alan', 'nils')).toEqual([["wife's first cousin", 'by-marriage', 5]]);
+		expect(pick('alan', 'nils')).toEqual([["wife’s first cousin", 'by-marriage', 5]]);
 		expect(pick('alan', 'cai')).toEqual([['3rd great-nephew', 'blood', 6]]);
 		expect(pick('leo', 'orla')).toEqual([
 			['aunt by marriage', 'by-marriage', 4],
@@ -366,7 +366,7 @@ describe('words for each sex (spec §13.1, D12)', () => {
 		const source = SAMPLE.source.replace('    sex: x\n', '    sex: m\n');
 		expect(source).not.toBe(SAMPLE.source);
 		const after = graphOf(source);
-		const neutral = { gwen: "Sibling's child", alan: 'Grandchild', leo: 'Sibling' };
+		const neutral = { gwen: "Sibling’s child", alan: 'Grandchild', leo: 'Sibling' };
 		const male = { gwen: 'Nephew', alan: 'Grandson', leo: 'Brother' };
 		for (const marked of ['gwen', 'alan', 'leo'] as const) {
 			const a = computeRelations(before, marked);
@@ -386,7 +386,7 @@ describe('words for each sex (spec §13.1, D12)', () => {
 			const source = SAMPLE.source.replace('  - id: nia\n    name: Nia\n', `  - id: nia\n    name: Nia\n${sex}`);
 			const g = graphOf(source);
 			expect(g.issues, JSON.stringify(sex)).toEqual([]);
-			expect(computeRelations(g, 'gwen').get('nia')?.[0].text, JSON.stringify(sex)).toBe("Half-sibling's child");
+			expect(computeRelations(g, 'gwen').get('nia')?.[0].text, JSON.stringify(sex)).toBe("Half-sibling’s child");
 			expect(computeRelations(g, 'alan').get('nia')?.[0].text, JSON.stringify(sex)).toBe('Grandchild');
 		}
 	});

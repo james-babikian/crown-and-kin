@@ -331,14 +331,14 @@ describe('the picture picker (O6, B2)', () => {
 		dispatch(target, 'click');
 		expect(pickerRowFor(m.contentEl, 'Pictures/valmont-arms.png').getAttribute('aria-selected')).toBe('true');
 		dispatch(pickerRowFor(m.contentEl, 'Pictures/valmont-arms.png'), 'click');
-		expect(await got).toBe('[[valmont-arms.png]]');
+		expect(await got).toEqual({ kind: 'choose', link: '[[valmont-arms.png]]' });
 		expect(openModals).toHaveLength(0);
 	});
 
 	it('Cancel gives null', async () => {
 		const got = pickPicture(storeApp(pics) as never, { sourcePath: 'Tree.md', title: 'x' });
 		dispatch(pickerOf().contentEl.querySelector('.dynasty-sheet-cancel')!, 'click');
-		expect(await got).toBeNull();
+		expect(await got).toEqual({ kind: 'cancel' });
 	});
 
 	it('D69, B2: a device picture is checked, written at once into the attachment folder and chosen; a HEIC gives its Notice and no file', async () => {
@@ -361,7 +361,7 @@ describe('the picture picker (O6, B2)', () => {
 		await m.fromDevice({ name: 'image', size: png.length, arrayBuffer: async () => png.buffer });
 		expect(made).toEqual([['Attachments/image.png', png.length]]);
 		expect(notices[1]).toBe(PICTURES_UI.added('image.png', 'Attachments'));
-		expect(await got).toBe('[[image.png]]');
+		expect(await got).toEqual({ kind: 'choose', link: '[[image.png]]' });
 	});
 });
 

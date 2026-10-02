@@ -157,6 +157,22 @@ export function narrowWidth(geo: Geometry, narrowCardW?: number): number {
 	if (typeof narrowCardW !== 'number' || !Number.isFinite(narrowCardW)) return max;
 	return Math.min(max, Math.max(Math.round(SIDE_NARROW_MIN_EM * geo.fontPx), Math.round(narrowCardW * 2) / 2));
 }
+/** 1.1.1: the clear space, in px, a partnership sign keeps from both cards of its couple in a `sideways` layout. */
+export const SIGN_CLEAR_PX = 3;
+
+/**
+ * 1.1.1, D24: the stack gap between the partners of a couple that has `unions` partnerships, in a `sideways`
+ * layout. The signs are spread two sign sizes apart along the gap (`placeUnions`), so the gap must hold them
+ * all with `SIGN_CLEAR_PX` to spare at both ends. Fewer than two partnerships keep the gap of `side` as it is.
+ */
+export function sidewaysPartnerGap(side: Geometry, unions: number): number {
+	if (unions < 2) return side.coupleGap;
+	const u = side.unionSize;
+	// Half the height of the tallest sign: the ring (0.6 u plus half its 2.5 px outline) or the triangle's point (0.65 u plus half its 1.6 px outline).
+	const reach = Math.max(0.6 * u + 1.25, 0.65 * u + 0.8);
+	return Math.max(side.coupleGap, Math.ceil(2 * (unions - 1) * u + 2 * (reach + SIGN_CLEAR_PX)));
+}
+
 // In the turned frame the tag does not sit in the gap between generations; this only keeps the
 // first couple lane, and its union dot, clear of the card edge.
 const TURNED_TAG_EM = 0.375;
@@ -165,7 +181,8 @@ const TURNED_TAG_EM = 0.375;
  * The geometry a sideways layout (D24) draws with. Cards keep their height and text; `narrow`
  * cards take `narrowWidth` (8 to 10.25 em, never wider than `geo`'s). The gaps take their sideways meaning:
  * `rowGap` is the smallest gap between generation columns, `nodeGap` the gap between stacked cards,
- * `coupleGap` the gap between stacked partners.
+ * `coupleGap` the gap between stacked partners (1.1.1: the layout widens it, with `sidewaysPartnerGap`, for a tree
+ * with a couple of two or more partnerships; `drawnGeometry` does not know the tree, so it keeps the narrow value).
  */
 export function sidewaysGeometry(geo: Geometry, cards: SidewaysCards, narrowCardW?: number): Geometry {
 	const f = geo.fontPx;
@@ -349,6 +366,9 @@ export function relationY(t: CardText, hasTitle: boolean, hasDates: boolean): nu
  */
 export const PICTURE_EM = { sizeLines: 1.25, armsAspect: 5 / 6, armsGap: 0.3, compactArmsW: 1.5, compactArmsH: 1.8, portraitGap: 0.25 } as const;
 
+/** Height of Latin capitals in em of the font size (the baselines above sit 0.35 em below the middle of a line box). */
+const CAP_HEIGHT_EM = 0.7;
+
 /** G3: a small text line is beside the portrait only when its line box overlaps the circle by more than this, in px. */
 export const PORTRAIT_OVERLAP_PX = 0.5;
 
@@ -367,12 +387,19 @@ export interface ArmsPlace {
 	compactShift: number;
 }
 
+/** D96: the clear space, in px, between the marked card's inner ring and the arms box, the portrait or the D14 sign. */
+export const MARK_CLEAR_PX = 1.5;
+
 /**
  * The arms places of a card with text positions `t`, height `boxH` and a sideways `+` badge cut
  * `cut` (0 without a badge; the arms, the sign and the name all move left by it). The picture keeps
- * its own proportions inside the box (D75), so only the box is fixed here.
+ * its own proportions inside the box (D75), so only the box is fixed here. D96: for the "This is me"
+ * card, `ring` is how far the inner edge of the mark's ring lies inside the card's edge; the boxes
+ * then start at least `MARK_CLEAR_PX` below it. Without `ring` the places are as for every other card.
+ * `portrait` (the marked card's portrait box, from `portraitBox`) is a hard limit: the Full arms box
+ * never reaches into it, and the gap to the ring gives way when both cannot hold.
  */
-export function armsPlace(geo: Geometry, t: CardText, boxH: number, cut: number): ArmsPlace {
+export function armsPlace(geo: Geometry, t: CardText, boxH: number, cut: number, ring?: number, portrait?: Rect): ArmsPlace {
 	const f = geo.fontPx;
 	const h = pictureSize(geo);
 	const w = PICTURE_EM.armsAspect * h;
@@ -380,18 +407,41 @@ export function armsPlace(geo: Geometry, t: CardText, boxH: number, cut: number)
 	const nameMiddle = t.nameBaseline - 0.35 * t.nameSize;
 	const cw = PICTURE_EM.compactArmsW * f;
 	const ch = PICTURE_EM.compactArmsH * f;
+	const floor = ring === undefined ? -Infinity : ring + MARK_CLEAR_PX;
+	const lowered = Math.max(nameMiddle - h / 2, floor);
 	return {
-		full: { x: t.padX + t.textW - cut - w, y: nameMiddle - h / 2, w, h },
-		compact: { x: geo.cardW - 0.5 * f - cut - cw, y: boxH / 2 - ch / 2, w: cw, h: ch },
+		full: { x: t.padX + t.textW - cut - w, y: ring !== undefined && portrait ? Math.min(lowered, portrait.y - h) : lowered, w, h },
+		compact: { x: geo.cardW - 0.5 * f - cut - cw, y: Math.max(boxH / 2 - ch / 2, floor), w: cw, h: ch },
 		shift: w + PICTURE_EM.armsGap * f,
 		compactShift: cw + PICTURE_EM.armsGap * f,
 	};
 }
 
-/** D76, D78: the portrait's square, card-relative: right edge at the text's right edge, bottom at the text block's bottom. */
-export function portraitBox(geo: Geometry, t: CardText): Rect {
+/**
+ * D76, D78: the portrait's square, card-relative: right edge at the text's right edge, bottom at the text block's bottom.
+ * D96: for the "This is me" card, `mark` gives the card's height and the ring's inner edge; the bottom then stays
+ * `MARK_CLEAR_PX` above the ring. With `arms` (the card shows arms) the portrait also stays below the arms box in the
+ * tightest case: it moves down, as far as the ring's inner edge or more, only so far that both boxes fit between the ring.
+ */
+export function portraitBox(geo: Geometry, t: CardText, mark?: { boxH: number; ring: number; arms?: boolean }): Rect {
 	const d = pictureSize(geo);
-	return { x: t.padX + t.textW - d, y: t.textBottom - d, w: d, h: d };
+	let bottom = mark ? Math.min(t.textBottom, mark.boxH - mark.ring - MARK_CLEAR_PX) : t.textBottom;
+	if (mark?.arms) bottom = Math.max(bottom, armsFloor(mark.boxH, mark.ring, d) + 2 * d);
+	return { x: t.padX + t.textW - d, y: bottom - d, w: d, h: d };
+}
+
+/** D96: the highest top of the arms box on a marked card that has a portrait: the ring's inner edge, or less if both boxes would not fit under it. */
+const armsFloor = (boxH: number, ring: number, d: number) => Math.min(ring, (boxH - 2 * d) / 2);
+
+/**
+ * D96: the D14 sign of the "This is me" card, moved down if its top edge would come closer than `MARK_CLEAR_PX`
+ * to the ring's inner edge (`ring`, from the card's edge). A sign that is clear already is returned as it is.
+ */
+export function signBelowRing(sign: CardText['sign'], ring: number): CardText['sign'] {
+	// The dashed bar has flat ends, so its top corner lies half a stroke width above the end point, at 45 degrees.
+	const top = Math.min(sign.y1, sign.y2) - sign.width / (2 * Math.SQRT2);
+	const dy = ring + MARK_CLEAR_PX - top;
+	return dy > 0 ? { ...sign, y1: sign.y1 + dy, y2: sign.y2 + dy } : sign;
 }
 
 /**
@@ -399,13 +449,18 @@ export function portraitBox(geo: Geometry, t: CardText): Rect {
  * baseline is at `baseline`, card-relative. Beside the portrait (its line box overlaps the circle's
  * height by more than 0.5 px) the line is narrower by the portrait and a 0.25 em gap; else it keeps
  * `textW`. The name never uses this: it never narrows for a portrait.
+ * D96: on the marked card, `arms` (its Full arms box) narrows a line whose capitals the box reaches: the line then ends
+ * the arms gap (0.3 em, as for the name) before the box. The lowered arms box can reach the title on a small card.
  */
-export function smallTextWidth(geo: Geometry, t: CardText, baseline: number, portrait: Rect | undefined): number {
-	if (!portrait) return t.textW;
+export function smallTextWidth(geo: Geometry, t: CardText, baseline: number, portrait: Rect | undefined, arms?: Rect): number {
+	if (!portrait && !arms) return t.textW;
 	const line = EMS[geo.cardSize].lineHeight * t.smallSize;
 	const top = baseline - 0.35 * t.smallSize - line / 2;
-	const overlap = Math.min(top + line, portrait.y + portrait.h) - Math.max(top, portrait.y);
-	return overlap > PORTRAIT_OVERLAP_PX ? t.textW - portrait.w - PICTURE_EM.portraitGap * geo.fontPx : t.textW;
+	let width = t.textW;
+	if (portrait && Math.min(top + line, portrait.y + portrait.h) - Math.max(top, portrait.y) > PORTRAIT_OVERLAP_PX) width = t.textW - portrait.w - PICTURE_EM.portraitGap * geo.fontPx;
+	// The arms box is judged by the capitals of the line, not by its line box: a centred box on a normal card then does not narrow anything.
+	if (arms && arms.y + arms.h > baseline - CAP_HEIGHT_EM * t.smallSize && arms.y < baseline) width = Math.min(width, arms.x - PICTURE_EM.armsGap * geo.fontPx - t.padX);
+	return width;
 }
 
 /**

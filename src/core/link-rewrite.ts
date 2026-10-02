@@ -12,7 +12,7 @@ import { isAlias, isMap, isScalar, isSeq, parseDocument, Scalar, type Node, type
 import type { EditResult, RewriteLinksOp } from './edit';
 import { parseBody } from './parse';
 import { pictureFormat } from './pictures';
-import { isMap as isRawMap, linkValue, type Raw, type RawMap } from './tolerate';
+import { curlyParts, isMap as isRawMap, linkValue, type Raw, type RawMap } from './tolerate';
 import { section } from './yaml-list';
 import { clone, doubleQuoted, findPair, finish, layoutOf, refuse, renderScalar, setPairValue, sourceText, type Parsed, type Patch, type Step } from './yaml-patch';
 
@@ -204,10 +204,13 @@ function linkPatch(p: Parsed, item: YAMLMap, key: string, map: Map<string, strin
 	const flow = !!item.flow;
 	if (isScalar(node)) {
 		if (typeof node.value !== 'string') return null;
-		const text = rewritten(node.value, map, parserFor(key));
+		// A value in curly quote marks (D103) is rewritten inside the marks, and the marks stay as the owner typed them.
+		const curly = curlyParts(node.value);
+		const text = rewritten(curly ? curly.inner : node.value, map, parserFor(key));
 		if (text === 'refused') return text;
-		if (text === null || text === node.value) return null;
-		return { patch: setPairValue(src, item, pair, { scalar: text, old: node, text: false }, layoutOf(src)), raw: text };
+		if (text === null || text === (curly ? curly.inner : node.value)) return null;
+		const written = curly ? curly.open + text + curly.close : text;
+		return { patch: setPairValue(src, item, pair, { scalar: written, old: node, text: false }, layoutOf(src)), raw: written };
 	}
 	const inner = nestedInner(node);
 	if (!inner) return null;

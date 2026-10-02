@@ -406,7 +406,7 @@ describe('rule 25: the warning `bad-portrait-crop` (validateTree)', () => {
 	it('the text of spec §13.13', () => {
 		const g = graphOf(B3);
 		expect(issueText(g.issues[0])).toBe(
-			'The plugin cannot read the selected part of the portrait of Bertrand Valmont, so the card shows the automatic part. Select the part again, or remove "portrait-crop".',
+			'The plugin cannot read the selected part of the portrait of Bertrand Valmont, so the card shows the automatic part. Select the part again, or remove “portrait-crop”.',
 		);
 	});
 

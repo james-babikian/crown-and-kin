@@ -117,7 +117,7 @@ export function planInsert(head: string, tail: string): InsertPlan {
 	const lines: string[] = [];
 	if (onLine) lines.push(`${p.first}\`\`\`dynasty`);
 	else lines.push(head.trimEnd(), blank, `${p.rest}\`\`\`dynasty`);
-	lines.push(`${p.rest}# ${INSERT_UI.hint}`, `${p.rest}\`\`\``, blank);
+	lines.push(`${p.rest}# ${INSERT_UI.noteHint}`, `${p.rest}\`\`\``, blank);
 	const cursor = { line: lines.length - 1, ch: blank.length };
 	const rest = tail.trim();
 	if (rest) lines.push(`${p.rest}${tail.trimStart()}`);
@@ -138,7 +138,7 @@ export function insertTree(editor: Editor): void {
 	const props = propertiesEnd(lines, from.line);
 	if (props !== null) {
 		const end = { line: props, ch: lines[props].length };
-		const text = ['', '```dynasty', `# ${INSERT_UI.hint}`, '```', ''].join('\n');
+		const text = ['', '```dynasty', `# ${INSERT_UI.noteHint}`, '```', ''].join('\n');
 		editor.transaction({ changes: [{ from: end, to: end, text }], selection: { from: { line: props + 4, ch: 0 } } });
 		return;
 	}
@@ -148,7 +148,7 @@ export function insertTree(editor: Editor): void {
 			// After the block, the tree would be code of that block and its closing fence would close it.
 			const rest = markerAsSpaces(around.openPrefix);
 			const blank = rest.trimEnd();
-			const text = [`${around.openPrefix}\`\`\`dynasty`, `${rest}# ${INSERT_UI.hint}`, `${rest}\`\`\``, blank, ''].join('\n');
+			const text = [`${around.openPrefix}\`\`\`dynasty`, `${rest}# ${INSERT_UI.noteHint}`, `${rest}\`\`\``, blank, ''].join('\n');
 			const start = { line: around.open, ch: 0 };
 			editor.transaction({ changes: [{ from: start, to: start, text }], selection: { from: { line: around.open + 3, ch: blank.length } } });
 			return;
@@ -158,7 +158,7 @@ export function insertTree(editor: Editor): void {
 		// The block's own container: quote markers and list indentation, as its closing fence has them.
 		const pre = markerAsSpaces(around.prefix);
 		const blank = pre.trimEnd();
-		const text = ['', blank, `${pre}\`\`\`dynasty`, `${pre}# ${INSERT_UI.hint}`, `${pre}\`\`\``, blank].join('\n');
+		const text = ['', blank, `${pre}\`\`\`dynasty`, `${pre}# ${INSERT_UI.noteHint}`, `${pre}\`\`\``, blank].join('\n');
 		editor.transaction({ changes: [{ from: end, to: end, text }], selection: { from: { line: at + 5, ch: blank.length } } });
 		return;
 	}

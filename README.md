@@ -20,7 +20,7 @@ You can also type the code block yourself. See "The tree text" below.
 - **Add relatives.** In the edit sheet, use Add parent, Add child or Add partner.
 - **Move and zoom.** On the computer, drag the tree. To zoom, hold Ctrl and turn the mouse wheel. On a phone, the tree in a note does not move. Tap Expand to open the full-screen view. Move the tree with one finger. Zoom with two fingers.
 - **Full-screen view.** Select Expand. Select the X button to close it. You can also push Esc.
-- **Find.** In the full-screen view, select Find. Type a name.
+- **Find.** In the full-screen view, select Find. Type a name. Find ignores capital letters, accents and the look of the apostrophe.
 - **Focus.** Select Focus. Choose a person. The tree shows only the family of that person. A "+" sign on a card shows that the person has more relatives outside the view. Select Show all people to see the whole tree.
 - **Pin.** In the edit sheet, select "Pin focus here". The tree then always opens on the family of that person. Select "Remove pin" to stop this.
 - **Houses.** Select the Houses button (the castle) to add, rename, recolour or delete a house. On a phone, the Houses button is only in the full-screen view.
@@ -67,7 +67,7 @@ On a phone, the tree in a note has no More button. First tap Expand to open the 
 
 The result:
 
-- A bar at the top of the tree shows one sentence, for example "Wren is Roderick's half-sister." The sentence gives the relation of the second person to the first person.
+- A bar at the top of the tree shows one sentence, for example “Wren is Roderick’s half-sister.” The sentence gives the relation of the second person to the first person.
 - The tree shows only the people on the line between the two people. The line is thicker and in the accent colour of your theme.
 - Select **Show the steps** to see each step of the line as a short sentence. Select **Hide the steps** to hide them.
 - If the two people have more than one relation, select **Other relation** to see the next relation.
@@ -84,7 +84,7 @@ A title (for example "Duke of Valmont") has a list of holders. The list starts w
 
 - **The card.** The card of a holder shows the title with the reign, for example "Duke of Valmont (r. 1175–1207)". If the text is too long for one text line, it continues on a second text line. Then only that card is taller. If the holder has a number, the name text line shows the ruler name and number, for example "Aldric II". The edit sheet and the list of holders show the full name.
 - **Two or more titles.** The card shows the first title of the person in the list of titles. To show another title, open the edit sheet. In Titles, select "Show on the card" at that title. The title that the card shows says "On the card".
-- **Your own title text.** If a holder has your text in the Title field, the card shows that text. The reign of the first title follows it. If you select "Show on the card" at a title, the card shows that title instead of your text.
+- **Your own title text.** If a holder has your text in the field Title text on the card, the card shows that text. The reign of the first title follows it. If you select "Show on the card" at a title, the card shows that title instead of your text.
 - **The edit sheet.** The Titles section is between the fields and Family. It shows each title of the person with the number and the reign. Select **Edit** to change the number, the ruler name, From or Until. A text line under the fields shows the result, for example "Ser Darian Harrow shows as: Darian II". Select **Add title** to add the person as the newest holder of a title, or of a new title.
 - **Remove.** In the edit sheet, each reign of a title has its own **Remove**. **Remove** removes only that reign from the holders. If the person has other reigns of that title, they stay.
 - **The Titles window.** In the toolbar, select More (the "⋯" button). Then select Titles. The window lists the titles of the tree. Select **Show holders** to see the holders of a title. In this window, you can rename or delete a title. In "Name for a man", you can type the name for a man, for example "King of the Isles". In "Name for a woman", you can type the name for a woman, for example "Duchess of Valmont". The card and the edit sheet of a man show the name for a man. The card and the edit sheet of a woman show the name for a woman. If this name is empty, the card and the edit sheet show the title name. The card of a holder whose sex is not male or female also shows the title name. In "Name of the list", you can type a name for the list of holders, for example "Dukes of Valmont". You can also add, edit, move or remove a holder.
@@ -110,10 +110,12 @@ To give a house its arms:
 
 You can also select the colour of the house in the Houses window. The colour choice has **Select arms** and **Remove arms**.
 
+If the house has arms, the picture list starts with **Remove arms**. Select it to clear the arms in the window. Then select Save.
+
 - **The picture list.** The list shows the folders of your vault that hold pictures. Each folder shows the number of pictures in it. Tap or click a folder to open or close it. Each picture has a small preview before its name. The folder of the current picture is open when the list opens, and the current picture has the mark "In use". The list always starts at the top.
-- **Search.** Type a part of the name in the search field. The list then shows all pictures that match, with the folder below each name. On a phone, the keyboard opens only when you tap the search field.
+- **Search.** Type a part of the name in the search field. The list then shows all pictures that match, with the folder below each name. The search ignores capital letters, accents and the look of the apostrophe. On a phone, the keyboard opens only when you tap the search field.
 - **Keyboard.** The arrow keys move through the rows. On a folder, the right arrow opens it and the left arrow closes it. On a picture, press the Enter key to choose it and close the list.
-- **Add a picture from this device.** This is the first row of the picture list. It opens the file choice of your device. On an iPhone, you can select a photo in Photos or a file in Files. The plugin copies the picture into the attachment folder (the folder that Obsidian uses for new attachments) and selects it. The plugin copies the picture at once. If you then select Cancel, the picture stays in the vault.
+- **Add a picture from this device.** This is the first row of the picture list, or the second row if the list starts with a Remove row. It opens the file choice of your device. On an iPhone, you can select a photo in Photos or a file in Files. The plugin copies the picture into the attachment folder (the folder that Obsidian uses for new attachments) and selects it. The plugin copies the picture at once. If you then select Cancel, the picture stays in the vault.
 - **Colours from the arms.** If a house has arms, the colour choice starts with "Colours from the arms". These are the main colours of the picture, at most 5. Select one of them to make it the house colour. The label "House colours" and the 12 house colours come after them. The plugin never changes the colour of a house by itself. If the plugin cannot read the colours of a picture, the window tells you, and you select one of the house colours.
 - **Save and Cancel.** The Houses window changes nothing until you select Save. Save makes one change, which one Undo reverses. Cancel discards your changes.
 - **The card.** The arms show in the top right corner of the card. The name text line is a little shorter for them. The arms keep the shape of the picture. The plugin does not cut the picture and does not add a border or a background. On the card of a person who is dead, the arms are a little pale, like the house colour. If the tree is very small on the screen, the cards do not show the arms.
@@ -133,7 +135,7 @@ To give a person a portrait:
 4. Select the same picture again, or select **Select**.
 5. Select **Save**.
 
-To remove the portrait, select **Remove portrait** in the edit sheet. Then select Save.
+To remove the portrait, select **Remove portrait** in the edit sheet, or at the top of the picture list. Then select Save.
 
 - **The part of the picture.** The circle shows a square part of the picture. For a tall picture, this part is at the top and has the full width of the picture. For a wide picture, it is the middle part. A portrait photo usually has the face in its upper part. To show a different part, see "Select the part of a portrait".
 - **The card.** The portrait does not make the card larger. The text lines next to the portrait become shorter. If a text is then too long, it ends with "…". On the card of a person who is dead, the portrait is a little pale. The cards show the portraits only when they show all of their text. If you zoom out, the cards show less text and no portraits.

@@ -401,6 +401,12 @@
 	stroke-linejoin: round;
 }
 
+/* 1.1.1: inside a far-couple tag the hole of an open sign has the fill of the tag pill, not of the page. */
+.dynasty-tag-mark.dynasty-union-ring,
+.dynasty-tag-mark.dynasty-union-open-triangle {
+	fill: var(--background-primary-alt);
+}
+
 .dynasty-rumour-marker circle {
 	fill: var(--background-primary);
 	stroke: var(--color-red);
@@ -2460,7 +2466,28 @@ body.dynasty-fullscreen-open .popover.hover-popover {
 	width: auto;
 }
 
-/* The picture picker (spec §13.14, D92 to D95): a search field and the folder list. The sheet body is the scroller, on the computer and on the phone. */
+/* The picture picker (spec §13.14, D92 to D95, D102): a search bar and the folder list. The bar never scrolls; the sheet body below it is the scroller, on the computer and on the phone. */
+.dynasty-picture-searchbar {
+	flex: none;
+	padding: var(--size-4-2) var(--size-4-4);
+	border-bottom: 1px solid var(--background-modifier-border);
+	background: var(--modal-background, var(--background-primary));
+}
+
+.dynasty-sheet.is-phone .dynasty-picture-searchbar {
+	padding-left: max(var(--size-4-3), env(safe-area-inset-left));
+	padding-right: max(var(--size-4-3), env(safe-area-inset-right));
+}
+
+.dynasty-picture-picker .dynasty-sheet-body {
+	padding-top: var(--size-4-2);
+}
+
+.dynasty-sheet.is-saving .dynasty-picture-searchbar {
+	opacity: 0.6;
+	pointer-events: none;
+}
+
 .dynasty-picture-list {
 	flex: none;
 	display: block;
@@ -2515,6 +2542,15 @@ body.dynasty-fullscreen-open .popover.hover-popover {
 .dynasty-picture-device .dynasty-picture-name {
 	color: var(--interactive-accent);
 	font-weight: var(--font-semibold);
+}
+
+/* The Remove row (D97): the same row look as the device row, in the text colour, so it reads as an action on the current picture. */
+.dynasty-picture-remove .dynasty-picture-name {
+	font-weight: var(--font-semibold);
+}
+
+.dynasty-picture-remove .dynasty-picture-plus {
+	color: var(--text-muted);
 }
 
 .dynasty-picture-folder,

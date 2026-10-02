@@ -275,6 +275,75 @@ export function boxNearView(box: Rect, view: Rect): boolean {
 	return box.x < view.x + 2 * view.w && box.x + box.w > view.x - view.w && box.y < view.y + 2 * view.h && box.y + box.h > view.y - view.h;
 }
 
+/**
+ * 1.1.1: the box that holds an SVG path made of the absolute commands M, L, H, V, C, S, Q, T and Z, grown by `pad` on
+ * every side. A curve lies inside the box of its control points, so the box never cuts a line short. Null when the path
+ * has any other command (relative, arcs) or no point; the caller then treats the path as near every view.
+ */
+export function pathBox(d: string, pad = 0): Rect | null {
+	let minX = Infinity;
+	let minY = Infinity;
+	let maxX = -Infinity;
+	let maxY = -Infinity;
+	// 0: no command yet; 72 H and 86 V take one number; 90 Z takes none; the others take pairs.
+	let cmd = 0;
+	let held = 0;
+	let holding = false;
+	const n = d.length;
+	let i = 0;
+	// A hand-written scan: the box of every line is computed when the scene is built, and a regular expression costs more here.
+	while (i < n) {
+		const c = d.charCodeAt(i);
+		if (c <= 32 || c === 44) {
+			i++;
+			continue;
+		}
+		if (c === 77 || c === 76 || c === 72 || c === 86 || c === 67 || c === 83 || c === 81 || c === 84 || c === 90) {
+			cmd = c;
+			holding = false;
+			i++;
+			continue;
+		}
+		const start = i;
+		if (c === 45) i++;
+		while (i < n && ((d.charCodeAt(i) >= 48 && d.charCodeAt(i) <= 57) || d.charCodeAt(i) === 46)) i++;
+		const e = d.charCodeAt(i);
+		if (e === 101 || e === 69) {
+			let k = i + 1;
+			const sign = d.charCodeAt(k);
+			if (sign === 43 || sign === 45) k++;
+			if (d.charCodeAt(k) >= 48 && d.charCodeAt(k) <= 57) {
+				while (d.charCodeAt(k) >= 48 && d.charCodeAt(k) <= 57) k++;
+				i = k;
+			}
+		}
+		if (i === start) return null;
+		const v = Number(d.slice(start, i));
+		if (v !== v) return null;
+		if (cmd === 72) {
+			if (minY === Infinity) return null;
+			if (v < minX) minX = v;
+			if (v > maxX) maxX = v;
+		} else if (cmd === 86) {
+			if (minX === Infinity) return null;
+			if (v < minY) minY = v;
+			if (v > maxY) maxY = v;
+		} else if (cmd === 0 || cmd === 90) return null;
+		else if (!holding) {
+			held = v;
+			holding = true;
+		} else {
+			if (held < minX) minX = held;
+			if (held > maxX) maxX = held;
+			if (v < minY) minY = v;
+			if (v > maxY) maxY = v;
+			holding = false;
+		}
+	}
+	if (minX === Infinity) return null;
+	return { x: minX - pad, y: minY - pad, w: maxX - minX + 2 * pad, h: maxY - minY + 2 * pad };
+}
+
 /** The SVG transform that shows `view` in a viewport of `size`. */
 export function transformFor(view: View, size: Size): string {
 	const tx = size.w / 2 - view.cx * view.scale;
