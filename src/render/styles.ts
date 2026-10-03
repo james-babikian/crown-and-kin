@@ -216,10 +216,41 @@ export const UNION_MARKS: Record<UnionShape, { size: number; stroke?: number }> 
 /**
  * 1.1.1: the partnership sign inside a far-couple tag. `unit` is the sign's size unit as a fraction of the
  * tag's text size (it replaces the union size of a near couple's sign, so the sign fits the pill); `slot` is
- * the room the sign takes in the tag, in text sizes, with a small gap on each side. The shapes and outline
- * widths are those of `UNION_MARKS`.
+ * the room of the dot only, in text sizes, with a small gap on each side (1.1.2: `tagMarkSlot` gives the room of
+ * each shape, wider for the ring, the diamond and the triangle). The shapes and outline widths are those of
+ * `UNION_MARKS`.
  */
 export const TAG_MARK = { unit: 0.5, slot: 1.1 } as const;
+
+/** Half the width of a union shape drawn at size `s` px, with its outline (the side corners of the triangle are 0.95 s from its centre). */
+function shapeHalfWidth(shape: UnionShape, s: number): number {
+	const { stroke } = UNION_MARKS[shape];
+	return (shape === 'open-triangle' ? 0.95 * s : s) + (stroke ?? 0) / 2;
+}
+
+/** 1.1.2 (D108): half the drawn width of the sign of `shape` in a far-couple tag of text size `font` px, outline included. */
+export function tagMarkHalfWidth(shape: UnionShape, font: number): number {
+	return shapeHalfWidth(shape, UNION_MARKS[shape].size * TAG_MARK.unit * font);
+}
+
+/**
+ * 1.1.2 (D108): the clear gap G between the right edge of the partnership sign and the start of the name in a
+ * far-couple tag, for text size `font` px. It is the gap that the dot always had (the dot sits in the middle of the
+ * 1.1 text-size slot), and every shape gets the same one: the shapes differ in width, so a fixed centred slot
+ * left the ring and the open triangle 1 to 2 px from the first letter.
+ */
+export function tagMarkGap(font: number): number {
+	return (TAG_MARK.slot * font) / 2 - tagMarkHalfWidth('dot', font);
+}
+
+/**
+ * 1.1.2 (D108): the room a sign of `shape` takes in a far-couple tag, in px: the gap G on each side of the shape.
+ * The sign sits in the middle of this room. For the dot it is `TAG_MARK.slot` text sizes, as in 1.1.1; wider shapes
+ * take more room, so the gap before the name is the same and the shape never touches the marriage sign.
+ */
+export function tagMarkSlot(shape: UnionShape, font: number): number {
+	return TAG_MARK.slot * font + 2 * (tagMarkHalfWidth(shape, font) - tagMarkHalfWidth('dot', font));
+}
 
 const r2 = (n: number) => Math.round(n * 100) / 100;
 

@@ -83,7 +83,7 @@ describe('parseDynasty: shape issues and hard errors', () => {
 	it('keeps a person with no id under an id nobody wrote, and reports it', () => {
 		const t = ok('people:\n  - name: Aldric\n  - id: "~1"\n    name: Tilde\n');
 		expect(t.people.map((p) => p.id)).toEqual(['~~1', '~1']);
-		expect(t.issues).toEqual([{ code: 'missing-id', level: 'warning', params: { section: 'people', index: 1, name: 'Aldric' }, ids: ['~~1'] }]);
+		expect(t.issues).toEqual([{ code: 'missing-id', level: 'warning', params: { section: 'people', index: 1, name: 'Aldric', example: 'p1' }, ids: ['~~1'] }]);
 	});
 
 	it('gives a person with no id an id that no reference uses (review F2)', () => {

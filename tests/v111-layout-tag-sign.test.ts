@@ -6,7 +6,7 @@ import { MIN_HIT, geometryFor } from '../src/layout/geometry';
 import { DEFAULT_LAYOUT_SETTINGS, clearLayoutCache, layoutTree } from '../src/layout/index';
 import type { LaidOut, LayoutSettings } from '../src/layout/model';
 import { buildScene } from '../src/render/dom/scene';
-import { DEFAULT_LIGHT, TAG_MARK, UNION_MARKS, unionShape, type UnionShape } from '../src/render/styles';
+import { DEFAULT_LIGHT, UNION_MARKS, tagMarkSlot, unionShape, type UnionShape } from '../src/render/styles';
 import { approxMeasure, renderSvg, textWidth } from '../src/render/svg-string';
 import { FEl, installDom } from './acceptance/fake-dom';
 
@@ -194,7 +194,8 @@ describe('the headless drawing', () => {
 		expect(pill).toBeTruthy();
 		const label = new RegExp(String.raw`<text x="([\d.]+)" y="[\d.]+" font-size="${tagFont}"[^>]*>Zelda</text>`).exec(svg)!;
 		const pad = geo.tagH / 2;
-		const slot = TAG_MARK.slot * tagFont;
+		// 1.1.2 (D108): the room depends on the shape; this tag shows a ring.
+		const slot = tagMarkSlot('ring', tagFont);
 		expect(Number(label[1])).toBeCloseTo(pill.left + pad + tagFont * 1.4 + slot, 6);
 		expect(pill.w).toBeCloseTo(textWidth('Zelda', tagFont) + tagFont * 1.4 + slot + 2 * pad, 6);
 		expect(tagMark(svg)).not.toBeNull();

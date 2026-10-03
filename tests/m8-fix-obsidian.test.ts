@@ -75,13 +75,13 @@ describe('withHolderIds', () => {
 		];
 		const out = withHolderIds(ops, g, raw);
 		expect(out.slice(0, 2)).toEqual([
-			{ kind: 'set-person-fields', id: '~2', fields: { id: 'bran-valmont' } },
-			{ kind: 'set-person-fields', id: '~3', fields: { id: 'bran-valmont-2' } },
+			{ kind: 'set-person-fields', id: '~2', fields: { id: 'p1' } },
+			{ kind: 'set-person-fields', id: '~3', fields: { id: 'p2' } },
 		]);
 		const r = applyOp(BODY, { kind: 'batch', ops: out });
 		if (!r.ok) throw new Error(`refused: ${r.code}`);
 		const g2 = load(r.body).g;
-		expect(g2.titles[0].holders.map((h) => `${h.person}:${h.number ?? ''}`)).toEqual(['a:I', 'bran-valmont:II', 'bran-valmont-2:', 'bran-valmont:III', 'a:']);
+		expect(g2.titles[0].holders.map((h) => `${h.person}:${h.number ?? ''}`)).toEqual(['a:I', 'p1:II', 'p2:', 'p1:III', 'a:']);
 		// The input ops stay as they were.
 		expect((ops[0] as Extract<Op, { kind: 'set-holders' }>).items[1]).toEqual({ add: { person: '~2', number: 'II' } });
 	});

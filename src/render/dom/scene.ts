@@ -45,7 +45,7 @@ import type { FarTag, LaidOut, NameLineCount, PersonBox, PlacedFoldControl, Rect
 import { legendRows, unionMarkClass, type LegendHouse, type LegendPart } from '../legend';
 import { lineLook, type LineMarks, type LineState } from '../line-highlight';
 import { nameLines, titleLines } from '../name-lines';
-import { ME_RING_INNER, ME_RING_INSET, TAG_MARK, UNION_MARKS, unionMark, unionShape, type UnionShape } from '../styles';
+import { ME_RING_INNER, ME_RING_INSET, TAG_MARK, UNION_MARKS, tagMarkGap, tagMarkHalfWidth, tagMarkSlot, unionMark, unionShape, type UnionShape } from '../styles';
 import { LEGEND_HOUSES_LABEL, SIGN_CARD_LABEL, cardLabel, dateLine, farTagLabel, farTagName } from '../tree-info';
 import { HOUSE_PAGE_UI } from '../ui-text';
 import { boxNearView, pathBox, truncate } from '../view-math';
@@ -710,7 +710,8 @@ export function buildScene(parent: SVGGElement, g: FamilyGraph, laid: LaidOut, o
 				let lead = prefix;
 				if (shape) {
 					const en = opts.measure(' ', font);
-					lead = prefix + ' '.repeat(en > 0 ? Math.max(1, Math.round((TAG_MARK.slot * markPx) / en)) : 2);
+					// Rounded up: the room is never smaller than the shape needs (D108); a little more only moves the name right.
+					lead = prefix + ' '.repeat(en > 0 ? Math.max(1, Math.ceil(tagMarkSlot(shape, markPx) / en - 1e-9)) : 2);
 				}
 				const label = fitText ? lead + fit(rest, Math.max(0, zone - 2 * pad - opts.measure(lead, font)), font) : text;
 				const w = Math.min(zone, opts.measure(label, font) + 2 * pad);
@@ -720,8 +721,10 @@ export function buildScene(parent: SVGGElement, g: FamilyGraph, laid: LaidOut, o
 				}
 				textEl.setText(label);
 				if (markEl) {
-					const start = tag.x - opts.measure(label, font) / 2;
-					const cx = start + opts.measure(prefix, font) + (opts.measure(lead, font) - opts.measure(prefix, font)) / 2;
+					// D108: the sign is placed from the start of the name, so the gap before the name is the same for every
+					// shape whatever the width of a space; the spaces above leave at least a gap G on the left of the shape.
+					const nameStart = tag.x - opts.measure(label, font) / 2 + opts.measure(lead, font);
+					const cx = nameStart - tagMarkGap(markPx) - tagMarkHalfWidth(shape!, markPx);
 					const at = markAt(cx).attr;
 					if ('d' in at) markEl.setAttribute('d', at.d);
 					else {

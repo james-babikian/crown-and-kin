@@ -25,7 +25,7 @@ import { legendRows, type LegendHouse, type LegendPart } from './legend';
 import { lineLook, type LineMarks, type LineState } from './line-highlight';
 import { nameLines, titleLines } from './name-lines';
 import { fixedColour, fontOf, savedFrame, xmlText, type PictureMap, type SavedFrame, type SavedParts } from './saved-picture';
-import { DEAD_STRIP_OPACITY, DEFAULT_DARK, DEFAULT_LIGHT, FADED_OPACITY, ME_LOOK, ME_RING_INNER, ME_RING_INSET, ON_LINE_EXTRA, STROKES, TAG_MARK, UNION_MARKS, stripColour, unionMark, unionShape, type Palette, type UnionShape } from './styles';
+import { DEAD_STRIP_OPACITY, DEFAULT_DARK, DEFAULT_LIGHT, FADED_OPACITY, ME_LOOK, ME_RING_INNER, ME_RING_INSET, ON_LINE_EXTRA, STROKES, TAG_MARK, UNION_MARKS, stripColour, tagMarkSlot, unionMark, unionShape, type Palette, type UnionShape } from './styles';
 import { LEGEND_LABELS, SIGN_LEGEND_LABEL, dateLine, farTagName } from './tree-info';
 import { truncate } from './view-math';
 
@@ -347,8 +347,8 @@ export function renderSvg(g: FamilyGraph, layout: TreeLayout, edges: EdgeDrawing
 		// The marriage sign is drawn apart: few text fonts have it, and resvg would switch the whole label to the fallback font.
 		const sign = tagFont * 1.4;
 		const farShape = farSigns.has(tag.person) ? unionShape('union', farSigns.get(tag.person)) : null;
-		// The partnership sign takes its own room between the marriage sign and the name.
-		const slot = farShape ? TAG_MARK.slot * tagFont : 0;
+		// The partnership sign takes its own room between the marriage sign and the name; the room depends on the shape, so the gap before the name is the same (D108).
+		const slot = farShape ? tagMarkSlot(farShape, tagFont) : 0;
 		// The widest the tag may be; a sideways hit area can be wider than the part of the edge the tag may use.
 		const room = tag.zoneW ?? tag.hit.w;
 		const label = measured ? cutWith(farTagName(g, tag.spouses), room - 2 * pad - sign - slot, tagFontStr) : fit(farTagName(g, tag.spouses), room - 2 * pad - sign - slot, tagFont);

@@ -11,8 +11,8 @@
 import { isMap, isSeq, type Node } from 'yaml';
 import { deriveFamilies, type FamilyGraph } from './derive';
 import type { AddHouse, ApplyOp, Batch, EditResult, FieldValue, NewPersonId, Op, PersonField, RewriteLinksOp, SetOption, SetPersonFields } from './edit';
-import { deleteHouse, editHouse } from './house-ops';
-import { newIdIn, uniqueId } from './id-gen';
+import { deleteHouse, editHouse, setHouseId } from './house-ops';
+import { newIdIn, nextPersonId } from './id-gen';
 import { rewriteLinks } from './link-rewrite';
 import { parseBody, readTree, referencedIds } from './parse';
 import { relationshipOp, removeStaleKeys } from './relationship-ops';
@@ -177,29 +177,35 @@ function addHouse(first: Parsed, op: AddHouse, data: RawMap): EditResult {
 }
 
 /**
- * The id a new person with this name gets (§6.8, person namespace): unused by any person and by
- * any reference, so a dangling reference is never filled by accident.
+ * The id a new person gets (D104, §13.17 rule 1): `nextPersonId` over every person id and every
+ * reference to a person, so a dangling reference is never filled by accident. The name argument of
+ * `NewPersonId` stays for the callers; it is not used, so this function does not list it.
  */
-export const newPersonId: NewPersonId = (body, name) => {
+export const newPersonId: NewPersonId = (body) => {
 	try {
 		const parsed = typeof body === 'string' ? parseBody(body) : null;
 		const taken = parsed?.ok && isRawMap(parsed.data) ? referencedIds(parsed.data) : new Set<string>();
-		return uniqueId(typeof name === 'string' ? name : '', taken);
+		return nextPersonId(taken);
 	} catch {
-		return uniqueId('', new Set());
+		return nextPersonId(new Set());
 	}
 };
 
-/** `keepStale`: inside a batch, keys left stale are judged once, on the batch's final data. */
-function applyOne(body: string, op: Op, keepStale = false): EditResult {
+/**
+ * `keepStale`: inside a batch, keys left stale are judged once, on the batch's final data.
+ * `renames`: the title ids that `set-title-id` ops of the batch changed (old to new), so the
+ * final `card-title` cleanup finds the people it judged before the write.
+ */
+function applyOne(body: string, op: Op, keepStale = false, renames?: Map<string, string>): EditResult {
 	if (op === null || typeof op !== 'object') return refuse('bad-value');
 	if (op.kind === 'batch') {
 		let current = body;
 		const created: string[] = [];
 		const effects: ('auto-union')[] = [];
 		let changed: number | undefined;
+		const titleRenames = renames ?? new Map<string, string>();
 		for (const inner of Array.isArray(op.ops) ? op.ops : []) {
-			const r = applyOne(current, inner, true);
+			const r = applyOne(current, inner, true, titleRenames);
 			if (!r.ok) return r;
 			current = r.body;
 			created.push(...r.created);
@@ -209,7 +215,7 @@ function applyOne(body: string, op: Op, keepStale = false): EditResult {
 		if (!keepStale && current !== body) {
 			const clean = removeStaleKeys(body, current);
 			if (!clean.ok) return clean;
-			const titles = cleanCardTitles(body, clean.body);
+			const titles = cleanCardTitles(body, clean.body, undefined, titleRenames);
 			if (!titles.ok) return titles;
 			current = titles.body;
 		}
@@ -235,6 +241,16 @@ function applyOne(body: string, op: Op, keepStale = false): EditResult {
 		// An alias that points to its own list makes the data loop; `clone` cannot copy it. Say so instead of the catch-all text.
 		if (e instanceof TypeError && /circular/i.test(e.message)) return refuse('bad-value', 'The note text has a value that points to itself. Edit the note text.');
 		throw e;
+	}
+	if (r.ok && r.body !== body && op.kind === 'set-title-id' && renames) {
+		// A chain (a to b, then b to c) is one rename of a to c.
+		let chained = false;
+		for (const [from, to] of renames) {
+			if (to !== op.id) continue;
+			renames.set(from, op.newId);
+			chained = true;
+		}
+		if (!chained) renames.set(op.id, op.newId);
 	}
 	if (keepStale || !r.ok || r.body === body) return r;
 	// Rule 7 of the titles rules (`title-ops.ts` header): once per write, like the stale keys.
@@ -269,6 +285,8 @@ function dispatch(op: Exclude<Op, Batch | RewriteLinksOp>, ctx: { first: Parsed;
 			return editHouse(first, data, op);
 		case 'delete-house':
 			return deleteHouse(first, data, op);
+		case 'set-house-id':
+			return setHouseId(first, data, op);
 		case 'add-title':
 		case 'edit-title':
 		case 'delete-title':
@@ -276,6 +294,7 @@ function dispatch(op: Exclude<Op, Batch | RewriteLinksOp>, ctx: { first: Parsed;
 		case 'edit-holder':
 		case 'remove-holder':
 		case 'set-holders':
+		case 'set-title-id':
 			return titleOp(ctx, op);
 		default:
 			return refuse('bad-value', 'Unknown edit.');

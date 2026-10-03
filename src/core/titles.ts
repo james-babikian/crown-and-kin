@@ -196,6 +196,14 @@ export function describeDeleteTitle(g: FamilyGraph, id: string): { holders: numb
 }
 
 /**
+ * The Id confirmation for a title (§13.17 rule 5): the written people whose `card-title` is `id`.
+ * `g` is the graph of the whole parsed body, never of a focus view.
+ */
+export function describeTitleIdChange(g: FamilyGraph, id: string): { people: number } {
+	return { people: (g?.people ?? []).filter((p) => p.cardTitle === id).length };
+}
+
+/**
  * §13.11 note-name cleaning: forbidden characters and control characters removed, spaces joined,
  * trimmed; `fallback` when empty (the title id for a table note).
  */

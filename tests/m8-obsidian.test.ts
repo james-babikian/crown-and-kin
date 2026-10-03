@@ -153,7 +153,7 @@ describe('the Titles window draft: Save is one batch (spec §13.4, §13.0 item 6
 		expect(windowOps(rows, newId(BODY_13))).toEqual([]);
 	});
 
-	it('add, rename, move, edit, add and remove holders, delete: add-title, edit-title, set-holders, delete-title, in that order', () => {
+	it('add, rename, move, edit, add and remove holders, delete: edit-title, set-holders, delete-title, add-title, in that order (§13.17: add ops last)', () => {
 		const rows = rowsOf();
 		const duke = titleOf(rows, 'duke-of-valmont');
 		const [h0, h1, h2, h3, h4, h5] = duke.holders;
@@ -164,7 +164,7 @@ describe('the Titles window draft: Save is one batch (spec §13.4, §13.0 item 6
 		rows.push({ key: 'nt', id: null, name: 'Lord of Harrowmere', baseName: null, plural: 'Lords of Harrowmere', basePlural: null, maleName: '', baseMaleName: null, femaleName: '', baseFemaleName: null, deleted: false, holders: [], baseRows: [] });
 		expect(draftChanged(rows)).toBe(true);
 		const ops = windowOps(rows, newId(BODY_13));
-		expect(ops.map((o) => o.kind)).toEqual(['add-title', 'edit-title', 'set-holders', 'delete-title']);
+		expect(ops.map((o) => o.kind)).toEqual(['edit-title', 'set-holders', 'delete-title', 'add-title']);
 		// The same text as the WP 8.0 golden Save, with the plural of the new title (D64).
 		const out = bodyOf(applyOp(BODY_13, { kind: 'batch', ops }));
 		expect(out + '\n').toBe(golden('13-window-save.yaml'));

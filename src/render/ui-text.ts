@@ -78,6 +78,8 @@ export const SHEET = {
 	discard: 'Discard changes',
 	keepEditing: 'Continue to edit',
 	unnamed: 'Person with no name',
+	// D106: the small grey text line at the end of the sheet of a person whose id is written.
+	idLine: (id: string) => `Id: ${id}`,
 } as const;
 
 /** Names of parent types, as the sheet and the flows show them. */
@@ -351,6 +353,47 @@ export const HOUSES = {
 	invalid: 'The plugin cannot save. The tree text has an error. Your changes are still in the window.',
 	refused: 'The plugin cannot save this change safely. The note did not change. Your changes are still in the window.',
 	failed: 'The plugin cannot save your changes because of an error in the plugin. Your changes are still in the window.',
+} as const;
+
+/**
+ * The Id field of the Houses window and the Titles window (spec §13.17 rule 5, D109): the field, the
+ * button that makes an id from the name, the reasons for a refused id, the question before Save and
+ * the Notice after it.
+ */
+export const ID_UI = {
+	label: 'Id',
+	aria: (item: string) => `Id of ${item}`,
+	/** The small button on a saved row of the Houses window and the Titles window (D110). */
+	open: 'Change id',
+	openAria: (item: string) => `Change the id of ${item}`,
+	/** The title of the small window. */
+	windowTitle: (item: string) => `Id of ${item}`,
+	hint: (kind: 'house' | 'title') => `The id is a short name. The plugin uses it to find this ${kind}. Most users never change it.`,
+	use: 'Use this id',
+	/** The small grey note of a row whose id is waiting for Save. */
+	newId: (id: string) => `New id: ${id}`,
+	/** The button that drops the new id of a row. "Reset" is the portrait crop button. */
+	keepOld: 'Keep old id',
+	keepOldAria: (item: string) => `Keep the old id of ${item}`,
+	make: 'Make id from the name',
+	makeAria: (item: string) => `Make id from the name for ${item}`,
+	empty: 'Enter an id.',
+	characters: 'Use only small letters a to z, digits and hyphens (-).',
+	taken: 'This id is in use. Enter a different id.',
+	/** The error line of the window when Save finds a refused id: the item and the reason. */
+	problem: (item: string, reason: string) => `${item}: ${reason}`,
+	/** The second sentence of the question: what else a change of id changes. */
+	places: (n: number) =>
+		n === 0 ? 'The plugin changes nothing else.' : n === 1 ? 'The plugin also changes the id in the text of 1 person.' : `The plugin also changes the id in the text of ${n} people.`,
+	confirmTitle: (n: number) => (n === 1 ? 'Change the id?' : 'Change the ids?'),
+	confirmLine: (item: string, from: string, to: string, places: string) => `${item}: the plugin changes the id ${quote(from)} to ${quote(to)}. ${places}`,
+	change: (n: number) => (n === 1 ? 'Change the id' : 'Change the ids'),
+	keep: 'Do not change',
+	changed: (n: number) => (n === 1 ? 'The plugin changed the id. You can undo this.' : `The plugin changed ${n} ids. You can undo this.`),
+	inUse: 'The plugin cannot save. An id in this window is in use in the tree now. The note did not change. Your changes are still in the window.',
+	notAllowed: 'The plugin cannot save. An id in this window has a character that is not allowed. The note did not change. Your changes are still in the window.',
+	anchor:
+		'The plugin cannot save. An id in this window has a YAML anchor or alias in the tree text. An anchor (&name) names a value, and an alias (*name) copies that value. Edit the id in the tree text yourself. The note did not change. Your changes are still in the window.',
 } as const;
 
 /**

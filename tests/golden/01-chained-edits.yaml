@@ -34,28 +34,28 @@ people:
     sex: m
     born: 1158
     parents: [roderick, mathilde]
-  - id: beatrice-lorne
+  - id: p1
     name: Beatrice Lorne
     sex: f
     born: 1160
-  - id: roderick-2
+  - id: p2
     name: Roderick
     house: valmont
     sex: m
     born: 1181
-    parents: [edric, beatrice-lorne]
-  - id: isolde-2
+    parents: [edric, p1]
+  - id: p3
     name: Isolde
     house: valmont
     sex: f
     born: 1183
-    parents: [edric, beatrice-lorne]
-  - id: aldric-2
+    parents: [edric, p1]
+  - id: p4
     name: Aldric
     house: valmont
     sex: m
     born: 1185
-    parents: [edric, beatrice-lorne]
+    parents: [edric, p1]
   - id: alys
     name: Alys Valmont
     house: valmont
@@ -68,6 +68,6 @@ unions:
     start: 1129
   - partners: [roderick, mathilde]
     start: 1156
-  - partners: [edric, beatrice-lorne]
+  - partners: [edric, p1]
     type: marriage
     start: 1180

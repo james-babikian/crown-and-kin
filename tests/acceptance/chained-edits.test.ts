@@ -34,7 +34,7 @@ describe('chained edits on fixture 1 (§10)', () => {
 
 		// 1. Open Edric, change his title in the draft, then Add spouse → New: one write (§6.3).
 		const spouse = newPersonId(body, 'Beatrice Lorne');
-		expect(spouse).toBe('beatrice-lorne');
+		expect(spouse).toBe('p1');
 		let r = applyOp(body, {
 			kind: 'batch',
 			ops: [
@@ -59,9 +59,9 @@ describe('chained edits on fixture 1 (§10)', () => {
 		];
 		const ids: string[] = [];
 		for (const [name, sex, born] of children) {
-			// Each name is taken by an ancestor, so the id gets -2 (§6.8).
+			// Each new person gets the next number, whatever the name (D104).
 			const id = newPersonId(body, name);
-			expect(id).toBe(`${name.toLowerCase()}-2`);
+			expect(id).toBe(`p${ids.length + 2}`);
 			const op: Op = {
 				kind: 'batch',
 				ops: [
@@ -100,11 +100,12 @@ describe('chained edits on fixture 1 (§10)', () => {
 
 	it('Move earlier on the last child changes the order in the layout (§6.5, §10)', () => {
 		const body = golden('01-chained-edits.yaml').replace(/\n$/, '');
-		const moved = ok(applyOp(body, { kind: 'move-sibling', id: 'aldric-2', direction: 'earlier' })).body;
+		// p2 Roderick, p3 Isolde, p4 Aldric.
+		const moved = ok(applyOp(body, { kind: 'move-sibling', id: 'p4', direction: 'earlier' })).body;
 		expectNoIssues(moved);
 		const { layout } = layOut(moved);
 		const x = (id: string) => layout.persons.get(id)!.x;
-		expect(x('roderick-2')).toBeLessThan(x('aldric-2'));
-		expect(x('aldric-2')).toBeLessThan(x('isolde-2'));
+		expect(x('p2')).toBeLessThan(x('p4'));
+		expect(x('p4')).toBeLessThan(x('p3'));
 	});
 });

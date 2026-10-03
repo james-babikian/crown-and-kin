@@ -14,7 +14,8 @@ import { sampleSources } from './acceptance/m11-support';
  * Narrow cards, light and dark) of sample trees 07, 07b, 12 and 15. The 1.1.1 work on the sideways partner gap and
  * the far-couple tag sign changes these layouts on purpose, and `m11-spike-hashes` only holds the `down` layouts.
  * The values are recorded from the code of the 1.1.1 fix round: a later change of the sideways layout or of its
- * drawing must change them on purpose. Run: npx vitest run tests/v111-layout-sideways-hash.test.ts
+ * drawing must change them on purpose. 1.1.2 (D108): the values of 07 and 07b were recorded again, because their far-couple
+ * tags show a ring or an open triangle, which now keep the same gap before the name as the dot. Run: npx vitest run tests/v111-layout-sideways-hash.test.ts
  */
 
 const GEO = geometryFor(16, 'normal');
@@ -36,10 +37,10 @@ function sidewaysHash(source: string, cards: (typeof CARDS)[number]): string {
 }
 
 const RECORDED: Record<string, string> = {
-	'07 normal': 'b5018cffc4d55756046f2e4bfd73be285e0024f9b62b1248b8c84b63adcf24c4',
-	'07 narrow': '0303db7c053442ce03e5f2eaaec7dd2d01dff9b42fbe1ed1e473e2de7f994300',
-	'07b normal': 'b5018cffc4d55756046f2e4bfd73be285e0024f9b62b1248b8c84b63adcf24c4',
-	'07b narrow': '0303db7c053442ce03e5f2eaaec7dd2d01dff9b42fbe1ed1e473e2de7f994300',
+	'07 normal': 'aa041ace44d5652323524a1477dff06572a2a4fe60d09567197d2358d1768708',
+	'07 narrow': '16b2e33dd5eae67ff331bb166a40d2fefb32a69c6fd32658cd68c0da54cf0ce8',
+	'07b normal': 'aa041ace44d5652323524a1477dff06572a2a4fe60d09567197d2358d1768708',
+	'07b narrow': '16b2e33dd5eae67ff331bb166a40d2fefb32a69c6fd32658cd68c0da54cf0ce8',
 	'12 normal': '80bc72756579c388b1401a5140d6a52ee36013bfd05eb25f5024998802980cc2',
 	'12 narrow': '734999d19077a2cb71d7dc4fe8e00d88624ccbb94cc9a23c12ec2bd76d894674',
 	'15 normal': 'e8cde35d4595296d0468e0a7282bbbd9548bba352d51d65ce30486568d107f81',

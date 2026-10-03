@@ -5,18 +5,24 @@
  * the colours of the arms (D68, the exact colours), the 12 house colours (D32) or from the system
  * colour window ("Other colour"). Arms come from the picture picker. Deleting a house that people
  * have asks whether to remove the house from them or keep it (D32); after Save, a Notice with Undo
- * says so.
+ * says so. Each saved house also has the button "Change id" (spec §13.17 rule 5, D109, D110): it opens
+ * a small window (`id-window.ts`) whose "Use this id" puts the id into the draft of the row; Save
+ * changes the id and the `house` value of every person who has it, after one question, in the same write.
  */
 
 import { Modal, Notice, setIcon, type App } from 'obsidian';
 import { armsColours } from '../core/arms-colours';
-import { deriveFamilies } from '../core/derive';
+import { deriveFamilies, type FamilyGraph } from '../core/derive';
 import type { Op } from '../core/edit';
-import { parseDynasty } from '../core/parse';
+import { describeHouseIdChange } from '../core/house-ops';
+import { parseBody, parseDynasty } from '../core/parse';
 import { HOUSE_PALETTE } from '../render/styles';
-import { HOUSES, HOUSE_COLOUR_NAMES, HOUSE_PAGE_UI, PICTURES_UI, REMOVE, SHEET, WRITE_TEXT } from '../render/ui-text';
+import { HOUSES, HOUSE_COLOUR_NAMES, HOUSE_PAGE_UI, ID_UI, PICTURES_UI, REMOVE, SHEET, WRITE_TEXT } from '../render/ui-text';
 import type { Handle, HandleWriteOutcome } from './block-handle';
 import { openHousePage } from './house-page-window';
+import { danglingIds, draftId, idChanged, idFromName, idOps, idProblemFor, idProblems, idRefusalText, isIdOp, reasonText, type IdReason, type IdRow } from './id-draft';
+import { idNote, idOpenButton, type IdRowView } from './id-field';
+import { openIdWindow } from './id-window';
 import { phoneLayout } from './modal-layout';
 import { currentPictureOf, pickPicture } from './picture-picker';
 import { ARMS_PIXELS, type PictureCopy, type PictureStore } from './picture-store';
@@ -42,12 +48,18 @@ export interface LoadedHouse {
 export interface LoadedHouses {
 	body: string;
 	houses: LoadedHouse[];
+	/** The `house` values of people that no house has (§13.17 rule 5): such an id is taken. */
+	dangling: string[];
+	/** The graph of the whole body, for the count in the id question (never a focus view). */
+	g: FamilyGraph;
 }
 
 /** One house in the draft. `id` null: a house added in this window. */
 export interface HouseRow {
 	key: string;
 	id: string | null;
+	/** The id in the draft (§13.17 rule 5, D110): the saved id until "Use this id"; absent for a house that is new in the draft. */
+	idDraft?: string;
 	name: string;
 	colour: string | null;
 	/** Spec §13.6: the arms link of the draft; null for none. */
@@ -64,7 +76,8 @@ export function loadHouses(body: string): { kind: 'ok'; data: LoadedHouses } | {
 	const parsed = parseDynasty(body);
 	if (!parsed.ok) return { kind: 'invalid' };
 	const tree = parsed.tree;
-	if (deriveFamilies(tree).issues.some((i) => i.level === 'blocking')) return { kind: 'blocked' };
+	const g = deriveFamilies(tree);
+	if (g.issues.some((i) => i.level === 'blocking')) return { kind: 'blocked' };
 	const seen = new Set<string>();
 	const houses: LoadedHouse[] = [];
 	for (const h of tree.houses) {
@@ -80,14 +93,15 @@ export function loadHouses(body: string): { kind: 'ok'; data: LoadedHouses } | {
 		}
 		houses.push({ id: h.id, name: h.name, colour: h.color ?? null, arms: h.arms ?? null, people });
 	}
-	return { kind: 'ok', data: { body, houses } };
+	const raw = parseBody(body);
+	return { kind: 'ok', data: { body, houses, dangling: raw.ok ? danglingIds(raw.data, 'house') : [], g } };
 }
 
 /** The houses as draft rows; `key` names each row in the window (an id can hold any text, a key cannot). */
 export function rowsOf(data: LoadedHouses, key?: () => string): HouseRow[] {
 	let n = 0;
 	const next = key ?? (() => `h${n++}`);
-	return data.houses.map((h) => ({ key: next(), id: h.id, name: h.name, colour: h.colour, arms: h.arms ?? null, base: { name: h.name, colour: h.colour, arms: h.arms ?? null }, deleted: null }));
+	return data.houses.map((h) => ({ key: next(), id: h.id, idDraft: h.id, name: h.name, colour: h.colour, arms: h.arms ?? null, base: { name: h.name, colour: h.colour, arms: h.arms ?? null }, deleted: null }));
 }
 
 const lower = (c: string | null) => (c === null ? null : c.toLowerCase());
@@ -100,8 +114,15 @@ export function firstFreeColour(rows: HouseRow[]): string {
 	return HOUSE_PALETTE.find((c) => !used.has(c)) ?? HOUSE_PALETTE[0];
 }
 
-/** The draft as ops, in the order edits, deletes, new houses. Empty if nothing changed. */
+/** The row as the Id logic sees it. */
+const idRow = (r: HouseRow): IdRow => ({ key: r.key, id: r.id, idDraft: r.idDraft, name: r.name, deleted: r.deleted !== null });
+
+/**
+ * The draft as ops, in the order id changes, edits, deletes, new houses (§13.17 rule 5: the id ops
+ * come first, so the other ops of a changed row name the new id). Empty if nothing changed.
+ */
 export function houseOps(rows: HouseRow[]): Op[] {
+	const ids = idOps('house', rows.map(idRow));
 	const edits: Op[] = [];
 	const deletes: Op[] = [];
 	const adds: Op[] = [];
@@ -116,14 +137,16 @@ export function houseOps(rows: HouseRow[]): Op[] {
 			continue;
 		}
 		const base = r.base!;
+		// After its id op the house has its new id.
+		const id = idChanged(idRow(r)) ? draftId(idRow(r)) : r.id;
 		const name = r.name.trim() !== base.name ? r.name.trim() : undefined;
 		const colour = lower(r.colour) !== lower(base.colour) && r.colour && HEX.test(r.colour) ? r.colour.toLowerCase() : undefined;
 		// Spec §13.6: Select arms or Remove arms; null removes the key.
 		const arms = armsOf(r.arms) !== armsOf(base.arms) ? armsOf(r.arms) : undefined;
 		if (name !== undefined || colour !== undefined || arms !== undefined)
-			edits.push({ kind: 'edit-house', id: r.id, ...(name !== undefined ? { name } : {}), ...(colour !== undefined ? { color: colour } : {}), ...(arms !== undefined ? { arms } : {}) });
+			edits.push({ kind: 'edit-house', id, ...(name !== undefined ? { name } : {}), ...(colour !== undefined ? { color: colour } : {}), ...(arms !== undefined ? { arms } : {}) });
 	}
-	return [...edits, ...deletes, ...adds];
+	return [...ids, ...edits, ...deletes, ...adds];
 }
 
 /** What opens a `HousesWindow`. */
@@ -158,11 +181,17 @@ export class HousesWindow extends Modal {
 	private keys = 0;
 	private saving = false;
 	private closing = false;
+	/** True while the small Id window is open, so a second "Change id" opens no second window. */
+	private idWindowOpen = false;
 	private confirmEl: HTMLElement | null = null;
 	/** Where the focus goes when a question over the window closes. */
 	private confirmFrom: string | null = null;
 	private errorEl: HTMLElement | null = null;
 	private error = '';
+	/** The Id parts (button and note) of the rows on screen now, by row key. */
+	private idViews = new Map<string, IdRowView[]>();
+	/** The batch that is being written had id ops: a refusal of `id-taken` or `bad-value` is about an id. */
+	private sentIds = false;
 	private readonly cleanup: (() => void)[] = [];
 	/** Spec §13.6: the arms pictures of the window by link (a copy, a problem, or still loading). */
 	private readonly copies = new Map<string, PictureCopy | 'problem' | 'loading'>();
@@ -301,6 +330,7 @@ export class HousesWindow extends Modal {
 		el.empty();
 		this.armsBoxes = new Map();
 		this.armsGroup = null;
+		this.idViews = new Map();
 		this.hideConfirm(false);
 		el.addClass('dynasty-sheet-content');
 		const header = el.createDiv({ cls: 'dynasty-sheet-header' });
@@ -319,7 +349,8 @@ export class HousesWindow extends Modal {
 		const list = body.createDiv({ cls: 'dynasty-house-list' });
 		const shown = this.rows.filter((r) => !r.deleted);
 		if (!shown.length) list.createDiv({ cls: 'dynasty-house-none', text: HOUSES.none });
-		for (const r of shown) this.row(list, r);
+		const problems = idProblems('house', this.rows.map(idRow), this.data.dangling);
+		for (const r of shown) this.row(list, r, problems.get(r.key));
 		const add = body.createEl('button', { cls: ['dynasty-sheet-action', 'dynasty-house-add'], text: HOUSES.add, attr: { type: 'button', 'data-focus': 'add' } });
 		add.addEventListener('click', () => this.guard(() => this.addHouse()));
 		if (focus) el.querySelector<HTMLElement>(`[data-focus="${focus}"]`)?.focus();
@@ -329,7 +360,7 @@ export class HousesWindow extends Modal {
 		return r.name.trim() || HOUSES.newHouse;
 	}
 
-	private row(list: HTMLElement, r: HouseRow): void {
+	private row(list: HTMLElement, r: HouseRow, problem?: IdReason): void {
 		const row = list.createDiv({ cls: 'dynasty-house-row', attr: { 'data-house': r.id ?? r.key } });
 		const open = this.openKey === r.key;
 		const swatch = row.createEl('button', {
@@ -351,7 +382,28 @@ export class HousesWindow extends Modal {
 		name.addEventListener('input', () => {
 			r.name = name.value;
 			this.clearError();
+			for (const v of this.idViews.get(r.key) ?? []) v.setItem(this.label(r));
+			// A new house's name can change the id that it would get.
+			this.refreshIdProblems();
 		});
+		const views: IdRowView[] = [];
+		// The note of a new id sits under the name (D110); the grid puts it there.
+		if (r.id !== null && idChanged(idRow(r))) {
+			views.push(
+				idNote(row, {
+					key: r.key,
+					item: this.label(r),
+					id: draftId(idRow(r)),
+					problem: problem ? reasonText(problem) : '',
+					onKeepOld: () =>
+						this.guard(() => {
+							r.idDraft = r.id!;
+							this.clearError();
+							this.build(`id-open:${r.key}`);
+						}),
+				}),
+			);
+		}
 		const n = r.id === null ? 0 : (this.data.houses.find((h) => h.id === r.id)?.people.length ?? 0);
 		row.createDiv({ cls: 'dynasty-house-count', text: HOUSES.count(n) });
 		// H1: only a saved house has a page; a house that is new in the draft has none.
@@ -364,9 +416,53 @@ export class HousesWindow extends Modal {
 			const id = r.id;
 			people.addEventListener('click', () => this.guard(() => this.openPeople(id, `people:${r.key}`)));
 		}
+		// Only a saved house has an id to change; a new house gets its id when it is saved (§6.8).
+		if (r.id !== null) views.push(idOpenButton(row, { key: r.key, item: this.label(r), onOpen: () => this.guard(() => this.changeId(r)) }));
+		this.idViews.set(r.key, views);
 		const del = row.createEl('button', { cls: ['dynasty-sheet-action', 'dynasty-house-delete'], text: HOUSES.delete, attr: { type: 'button', 'aria-label': HOUSES.deleteLabel(this.label(r)), 'data-focus': `delete:${r.key}` } });
 		del.addEventListener('click', () => this.guard(() => this.askDelete(r)));
 		if (open) this.palette(list, r);
+	}
+
+	// ---------- the small Id window (spec §13.17 rule 5, D110) ----------
+
+	/** "Change id": the small window; "Use this id" puts the id into the draft of the row. */
+	private changeId(r: HouseRow): void {
+		// Focus can leave the small window by Tab, and a screen reader can activate the button below it.
+		if (this.idWindowOpen) return;
+		this.idWindowOpen = true;
+		const from = `id-open:${r.key}`;
+		openIdWindow(this.app, {
+			kind: 'house',
+			item: this.label(r),
+			key: r.key,
+			value: r.idDraft ?? r.id ?? '',
+			check: (value) => idProblemFor('house', this.rows.map(idRow), idRow(r), value, this.data.dangling),
+			make: () => idFromName('house', this.rows.map(idRow), idRow(r), this.data.dangling),
+			use: (value) => {
+				// The saved id again is no change: the draft goes away.
+				r.idDraft = value;
+				this.clearError();
+			},
+			closed: (used) => {
+				// Before the guard, so no path leaves the flag set.
+				this.idWindowOpen = false;
+				this.guard(() => {
+					if (!this.shown || this.closing) return;
+					if (used) this.build(from);
+					else this.contentEl.querySelector<HTMLElement>(`[data-focus="${from}"]`)?.focus();
+				});
+			},
+		});
+	}
+
+	/** Shows the reason in the note of each row whose draft id is refused, without drawing the window again. */
+	private refreshIdProblems(): void {
+		const problems = idProblems('house', this.rows.map(idRow), this.data.dangling);
+		for (const [key, views] of this.idViews) {
+			const why = problems.get(key);
+			for (const v of views) v.setProblem(why ? reasonText(why) : '');
+		}
 	}
 
 	// ---------- the house page (spec §13.12) ----------
@@ -782,8 +878,47 @@ export class HousesWindow extends Modal {
 			return;
 		}
 		if (!this.fresh()) return;
+		const problems = idProblems('house', this.rows.map(idRow), this.data.dangling);
+		const bad = this.rows.find((r) => problems.has(r.key));
+		if (bad) {
+			this.showError(ID_UI.problem(this.label(bad), reasonText(problems.get(bad.key)!)));
+			this.contentEl.querySelector<HTMLElement>(`[data-focus="id-open:${bad.key}"]`)?.focus();
+			return;
+		}
+		const changed = this.rows.filter((r) => idChanged(idRow(r)));
+		if (changed.length) {
+			// The note can change while the question is open (sync, another pane): the answer checks the body again.
+			this.askIds(changed, () => {
+				if (this.fresh()) void this.commit(ops);
+			});
+			return;
+		}
+		await this.commit(ops);
+	}
+
+	/** The one question before Save changes an id: what changes, and how many people. Closing it is Cancel. */
+	private askIds(changed: HouseRow[], go: () => void): void {
+		const lines = changed.map((r) => ID_UI.confirmLine(this.label(r), r.id!, draftId(idRow(r)), ID_UI.places(describeHouseIdChange(this.data.g, r.id!).people)));
+		this.showConfirm(ID_UI.confirmTitle(changed.length), [...lines, REMOVE.canUndo], 'save', [
+			{ label: ID_UI.keep, cls: 'dynasty-sheet-keep dynasty-id-keep', run: () => this.hideConfirm() },
+			{
+				label: ID_UI.change(changed.length),
+				cls: 'mod-cta dynasty-id-change',
+				run: () => {
+					this.hideConfirm();
+					go();
+				},
+			},
+		]);
+	}
+
+	/** Writes the ops of the draft as one batch (one Undo step) and closes the window when it works. */
+	private async commit(ops: Op[]): Promise<void> {
+		if (this.saving) return;
 		const deleted = this.rows.filter((r) => r.id !== null && r.deleted).map((r) => r.base?.name || r.id!);
+		const idCount = ops.filter(isIdOp).length;
 		const h = this.o.handle;
+		this.sentIds = idCount > 0;
 		this.saving = true;
 		this.modalEl.addClass('is-saving');
 		let out: HandleWriteOutcome;
@@ -807,17 +942,23 @@ export class HousesWindow extends Modal {
 		if (deleted.length) {
 			const others = ops.length > deleted.length;
 			undoNotice(others ? `${HOUSES.deleted(deleted)} ${REMOVE.undoAlso}` : HOUSES.deleted(deleted), h, out.body);
+		} else if (idCount) {
+			undoNotice(ops.length > idCount ? `${ID_UI.changed(idCount)} ${REMOVE.undoAlso}` : ID_UI.changed(idCount), h, out.body);
 		}
 	}
 
 	private failed(out: Exclude<HandleWriteOutcome, { ok: true }>): void {
 		const h = this.o.handle;
+		const detail = out.code === 'refused' ? out.refusal.detail : undefined;
 		onWriteFailed(out, {
 			stale: () => this.stale(h.body),
 			missing: () => this.refused(HOUSES.missing),
 			refused: (code) => {
+				// §13.17 rule 5: `id-taken` and `bad-value` of an id op are about the id, never "changed under the window".
+				const idText = this.sentIds ? idRefusalText(code, detail) : null;
 				// A house that is not in the tree now: the tree changed under the window.
 				if (code === 'unknown-house') this.stale(h.body);
+				else if (idText) this.refused(idText);
 				else if (code === 'blocked') this.refused(WRITE_TEXT.blocked);
 				else if (code === 'invalid-yaml') this.refused(HOUSES.invalid);
 				else this.refused(HOUSES.refused);
@@ -849,6 +990,8 @@ export class HousesWindow extends Modal {
 			return {
 				...fresh,
 				key: was.key,
+				// An id the user typed stays; else the row shows the new saved id.
+				idDraft: (was.idDraft ?? was.id!).trim() !== was.id ? was.idDraft : fresh.id!,
 				name: was.name !== was.base!.name ? was.name : fresh.name,
 				colour: lower(was.colour) !== lower(was.base!.colour) ? was.colour : fresh.colour,
 				arms: armsOf(was.arms) !== armsOf(was.base!.arms) ? was.arms : fresh.arms,

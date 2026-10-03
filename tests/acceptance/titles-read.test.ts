@@ -188,9 +188,12 @@ describe('sample tree 13: the titles the tree uses (spec §13.4, contract rules 
 	});
 
 	it('a holder person counts as a written reference, so a new person never takes that id (contract: referencedIds)', () => {
-		expect(newPersonId(BODY_13, 'Cosimo')).toBe('cosimo-2');
-		expect(newPersonId(BODY_13, 'Beatrice')).toBe('beatrice-2');
-		expect(newPersonId(BODY_13, 'Godric')).toBe('godric');
+		// Version 1.1.2 (D104): ids are numbers, and the name does not matter.
+		expect(newPersonId(BODY_13, 'Cosimo')).toBe('p1');
+		expect(newPersonId(BODY_13, 'Godric')).toBe('p1');
+		// A holder who is not a person yet still counts: the number 9 is taken.
+		const dangling = 'titles:\n  - id: t\n    name: T\n    holders: [{person: p9}]\npeople:\n  - {id: p2, name: Two}\n';
+		expect(newPersonId(dangling, 'Nine')).toBe('p10');
 	});
 });
 

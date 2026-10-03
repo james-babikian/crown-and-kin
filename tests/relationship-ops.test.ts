@@ -91,18 +91,17 @@ describe('add-person', () => {
 	});
 });
 
-describe('newPersonId (§6.8)', () => {
-	it('avoids people and every reference, and is a string', () => {
-		const src = 'options:\n  start: ghost\npeople:\n  - id: ada\n    name: Ada\n  - id: b\n    name: B\n    parents: [ada-2]\n';
-		expect(newPersonId(src, 'Ada')).toBe('ada-3');
-		expect(newPersonId(src, 'Ghost')).toBe('ghost-2');
-		expect(newPersonId(src, '1234')).toBe('p-1234');
-		expect(newPersonId(src, '')).toBe('person');
+describe('newPersonId (§6.8, D104)', () => {
+	it('is above every person id and every reference, and is a string', () => {
+		const src = 'options:\n  start: p12\npeople:\n  - id: ada\n    name: Ada\n  - id: p2\n    name: B\n    parents: [p5]\n';
+		expect(newPersonId(src, 'Ada')).toBe('p13');
+		expect(newPersonId(src, '1234')).toBe('p13');
+		expect(newPersonId(src, '')).toBe('p13');
 	});
 
 	it('never throws on bad input', () => {
-		expect(newPersonId('a: [', 'Ada')).toBe('ada');
-		expect(newPersonId(undefined as unknown as string, undefined as unknown as string)).toBe('person');
+		expect(newPersonId('a: [', 'Ada')).toBe('p1');
+		expect(newPersonId(undefined as unknown as string, undefined as unknown as string)).toBe('p1');
 	});
 });
 

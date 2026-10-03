@@ -108,8 +108,20 @@ describe('issueText: one STE entry per code', () => {
 		checkText(issueText(issue('union-partner-count', { union: '#1', partners: ['Aldric Valmont'], count: 1 })));
 	});
 
-	it('suggests an id made from the name', () => {
-		expect(issueText(issue('missing-id', SAMPLES['missing-id']))).toContain('id: aldric-valmont');
+	it('suggests the example id that the reader gives (D104), and p1 when there is none', () => {
+		expect(issueText(issue('missing-id', { ...SAMPLES['missing-id'], example: 'p4' }))).toBe('Aldric Valmont has no id. Add an id, for example: id: p4.');
+		expect(issueText(issue('missing-id', { section: 'people', index: 2 }))).toBe('Entry 2 in the “people” list has no id. Add an id, for example: id: p1.');
+		// The name never makes the example.
+		expect(issueText(issue('missing-id', SAMPLES['missing-id']))).not.toContain('aldric-valmont');
+	});
+
+	it('a duplicate person id shows the name and the id as NAME (id), without quote marks (D105)', () => {
+		const text = (params: IssueParams) => issueText(issue('duplicate-person-id', params));
+		expect(text({ id: 'p3', name: 'Aldric Valmont' })).toBe('Aldric Valmont (p3) has the same id as another person. To edit the tree again, give each person a different id.');
+		// No name, or the name is the id: the id alone, in quote marks.
+		expect(text({ id: 'p3', name: 'p3' })).toBe('More than one person has the id “p3”. To edit the tree again, give each person a different id.');
+		expect(text({ id: 'p3', name: '' })).toBe(text({ id: 'p3' }));
+		expect(text({ id: 'p3' })).toContain('“p3”');
 	});
 });
 

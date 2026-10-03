@@ -2069,9 +2069,14 @@ body.dynasty-fullscreen-open .popover.hover-popover {
 	font-weight: var(--font-normal);
 }
 
-/* The Titles window: wider than the sheet, so a holder row keeps its buttons beside its text (M8 decision page). */
+/*
+ * The Titles window: wider than the sheet, so a holder row keeps its buttons beside its text (M8 decision page).
+ * Obsidian's `.modal` also has `max-width: var(--dialog-max-width)` (80vw on the computer): without `max-width: none` the
+ * window is only 80vw wide when the Obsidian window is narrower than 900 px, and the name field shrinks.
+ */
 .modal.dynasty-sheet.dynasty-titles:not(.is-phone) {
 	width: min(720px, calc(100vw - 2 * var(--size-4-4)));
+	max-width: none;
 }
 
 .dynasty-title-list {
@@ -2095,7 +2100,8 @@ body.dynasty-fullscreen-open .popover.hover-popover {
 
 .dynasty-title-row {
 	display: grid;
-	grid-template-columns: 1fr auto auto auto;
+	/* Name, count, Show holders, Change id (D110), Delete. */
+	grid-template-columns: 1fr auto auto auto auto;
 	align-items: center;
 	gap: var(--size-4-2) var(--size-4-3);
 }
@@ -2258,17 +2264,17 @@ body.dynasty-fullscreen-open .popover.hover-popover {
 	display: none;
 }
 
-/* Phone: the text above, all four buttons in one row below it (supervisor, WP8.3); the name has the whole width. */
+/* Phone: the text above, the three buttons in one row below it (supervisor, WP8.3; D110); the name has the whole width. */
 .dynasty-sheet.is-phone .dynasty-title-row {
-	grid-template-columns: 1fr auto;
+	grid-template-columns: 1fr auto auto;
 }
 
 .dynasty-sheet.is-phone .dynasty-title-row .dynasty-sheet-input {
-	grid-column: 1 / 3;
+	grid-column: 1 / 4;
 }
 
 .dynasty-sheet.is-phone .dynasty-title-row .dynasty-title-count {
-	grid-column: 1 / 3;
+	grid-column: 1 / 4;
 }
 
 .dynasty-sheet.is-phone .dynasty-title-row .dynasty-title-toggle {
@@ -2946,9 +2952,41 @@ body.dynasty-fullscreen-open .popover.hover-popover {
 	flex: 0 1 auto;
 }
 
-/* The People button of a house row: a 44 px hit area, in a sixth column so the other controls keep their places. */
+/*
+ * The People button of a house row: a 44 px hit area. The buttons have fixed columns (People 5, Change id 6,
+ * Delete 7), so Delete stays at the right edge also in a row that has no People or Change id button (D110).
+ */
 .dynasty-house-row {
-	grid-template-columns: auto auto 1fr auto auto auto;
+	grid-template-columns: auto auto minmax(100px, 1fr) auto auto auto auto;
+}
+
+.dynasty-house-row .dynasty-house-people {
+	grid-column: 5;
+}
+
+.dynasty-house-row .dynasty-id-open {
+	grid-column: 6;
+}
+
+.dynasty-house-row .dynasty-house-delete {
+	grid-column: 7;
+}
+
+/* D110: the Houses window is as wide as the Titles window, so the name keeps its room beside four buttons. `max-width: none` lifts the 80vw cap of Obsidian's `.modal` (see the Titles window). */
+.modal.dynasty-sheet.dynasty-houses:not(.is-phone) {
+	width: min(720px, calc(100vw - 2 * var(--size-4-4)));
+	max-width: none;
+}
+
+/* In an Obsidian window of 600 to 700 px the name keeps at least 100 px: closer columns and a shorter count column (the phone layout is not changed). */
+@media (max-width: 700px) {
+	.dynasty-sheet.dynasty-houses:not(.is-phone) .dynasty-house-row {
+		column-gap: var(--size-4-2);
+	}
+
+	.dynasty-sheet.dynasty-houses:not(.is-phone) .dynasty-house-count {
+		min-width: 4.5em;
+	}
 }
 
 .dynasty-sheet button.dynasty-house-people {
@@ -2956,9 +2994,29 @@ body.dynasty-fullscreen-open .popover.hover-popover {
 	min-width: 44px;
 }
 
+/* Phone: the name and the count have the right part of the width; People, Change id and Delete share the last line (D110). */
+.dynasty-sheet.is-phone .dynasty-house-row {
+	grid-template-columns: auto auto 1fr auto auto;
+}
+
+.dynasty-sheet.is-phone .dynasty-house-row .dynasty-sheet-input,
+.dynasty-sheet.is-phone .dynasty-house-row .dynasty-house-count {
+	grid-column: 3 / 6;
+}
+
 .dynasty-sheet.is-phone .dynasty-house-row .dynasty-house-people {
-	grid-column: 3 / 4;
+	grid-column: 1 / 4;
 	justify-self: start;
+}
+
+.dynasty-sheet.is-phone .dynasty-house-row .dynasty-id-open {
+	grid-column: 4 / 5;
+	justify-self: end;
+}
+
+.dynasty-sheet.is-phone .dynasty-house-row .dynasty-house-delete {
+	grid-column: 5 / 6;
+	justify-self: end;
 }
 
 /* A house row of the legend is a button of at least 44 px (H1). */
@@ -3212,4 +3270,159 @@ body.dynasty-fullscreen-open .popover.hover-popover {
 .dynasty-lod-overview .dynasty-fold.is-open,
 .dynasty-lod-overview .dynasty-fold-hit.is-open {
 	display: none;
+}
+
+/* D106: "Id: p12", the last line of the edit sheet of a person whose id is written. Muted text, never below 4.5:1; the text can be selected and copied. */
+.dynasty-sheet-id {
+	margin-top: var(--size-4-4);
+	color: var(--text-muted);
+	font-size: var(--font-ui-smaller);
+	-webkit-user-select: text;
+	user-select: text;
+	/* An id with no hyphen has no place to break; without this the sheet scrolls sideways. */
+	overflow-wrap: anywhere;
+}
+
+/* The small button "Change id" of a saved house or title (spec §13.17 rule 5, D110): at least 44 px high (spec §7.5). */
+.dynasty-sheet button.dynasty-id-open {
+	min-height: 44px;
+	min-width: 44px;
+}
+
+/* The note of a new id: a small grey text line under the name, with the button "Keep old id". */
+.dynasty-id-new {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0 var(--size-4-2);
+	min-width: 0;
+	color: var(--text-muted);
+	font-size: var(--font-ui-small);
+}
+
+.dynasty-house-row .dynasty-id-new {
+	grid-column: 3 / -1;
+	grid-row: 2;
+}
+
+.dynasty-title-row .dynasty-id-new {
+	grid-column: 1 / -1;
+	grid-row: 2;
+}
+
+/* Phone: the note has its own line under the name, before the count. */
+.dynasty-sheet.is-phone .dynasty-house-row .dynasty-id-new,
+.dynasty-sheet.is-phone .dynasty-title-row .dynasty-id-new {
+	grid-row: auto;
+}
+
+.dynasty-sheet.is-phone .dynasty-house-row .dynasty-id-new {
+	grid-column: 3 / 6;
+}
+
+.dynasty-id-new-text {
+	min-width: 0;
+	overflow-wrap: anywhere;
+}
+
+.dynasty-id-new-problem {
+	flex: 1 1 100%;
+	color: var(--text-error);
+}
+
+/* "Keep old id" looks like a link, but it is a button with a 44 px hit area. */
+.dynasty-sheet button.dynasty-id-old {
+	width: auto;
+	min-width: 44px;
+	min-height: 44px;
+	padding: 0 var(--size-4-2);
+	background: transparent;
+	box-shadow: none;
+	color: var(--text-accent);
+	font-size: var(--font-ui-small);
+}
+
+/* The small Id window (D110): the field, "Make id from the name", the reason, and two buttons. */
+.modal.dynasty-sheet.dynasty-id-window:not(.is-phone) {
+	width: min(420px, calc(100vw - 2 * var(--size-4-4)));
+}
+
+.dynasty-id-window .dynasty-sheet-body {
+	overflow-y: auto;
+}
+
+.dynasty-id-row {
+	display: flex;
+	flex-direction: column;
+	align-items: stretch;
+	gap: var(--size-4-1);
+}
+
+.dynasty-id-field {
+	display: flex;
+	align-items: center;
+	gap: var(--size-4-3);
+	min-height: 44px;
+}
+
+.dynasty-sheet .dynasty-id-field .dynasty-sheet-input {
+	flex: 1 1 auto;
+	width: auto;
+	min-width: 6em;
+	min-height: 44px;
+}
+
+.dynasty-sheet .dynasty-id-row .dynasty-id-make {
+	width: 100%;
+	min-height: 44px;
+}
+
+.dynasty-id-problem {
+	color: var(--text-error);
+	font-size: var(--font-ui-small);
+}
+
+.dynasty-sheet .dynasty-id-input[aria-invalid='true'] {
+	border-color: var(--text-error);
+}
+
+.dynasty-id-window .dynasty-id-actions {
+	flex-wrap: nowrap;
+	margin-top: var(--size-4-1);
+}
+
+/* Cancel and Use this id stay side by side, also on a phone, so the window stays low. */
+.dynasty-id-window .dynasty-id-actions button {
+	flex: 1 1 0;
+	width: auto;
+}
+
+.modal.dynasty-sheet.dynasty-id-window:not(.is-phone) .dynasty-id-actions button {
+	flex: 0 0 auto;
+}
+
+.dynasty-id-window .dynasty-id-use:disabled {
+	opacity: 0.5;
+	cursor: default;
+}
+
+/*
+ * Phone: a small sheet at the top of the screen, as high as its content and never higher than the
+ * visible area, so the keyboard cannot cover the field or the buttons (D110). The body scrolls if the
+ * visible area is too low for all of it.
+ */
+.modal.dynasty-sheet.dynasty-id-window.is-phone {
+	height: auto;
+	max-height: var(--dynasty-sheet-height, 100%);
+	border-radius: 0 0 var(--radius-l) var(--radius-l);
+	border-bottom: 1px solid var(--background-modifier-border);
+	box-shadow: var(--shadow-l);
+	/* Obsidian slides a phone modal by its own height (a bottom sheet) with an inline transform and
+	   transition. This is a top sheet, so the slide shows as a jump. An inline style loses only to !important. */
+	transform: none !important;
+	transition: none !important;
+}
+
+.dynasty-id-window.is-phone .dynasty-sheet-body {
+	padding-bottom: var(--size-4-3);
 }

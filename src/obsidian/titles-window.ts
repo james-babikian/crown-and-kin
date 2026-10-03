@@ -1,6 +1,6 @@
 /*
  * The Titles window (spec §13.4, §13.0 item 6; D49, D52, D55): the titles of one tree with their
- * holder lists, and the "Name for a man" (D66), "Name for a woman" (D65) and "Name of the list" (D64) of each title. Like the Houses window it is a draft: Save writes every change in one `batch` (one
+ * holder lists, and the "Name for a man" (D66), "Name for a woman" (D65), "Name of the list" (D64) of each title and the button "Change id" (§13.17 rule 5, D109, D110; the small window is `id-window.ts`). Like the Houses window it is a draft: Save writes every change in one `batch` (one
  * undo step), Cancel writes nothing, and any other way to close with changes asks first. The window
  * opens from the More list on the computer and in the full-screen view, never from the static phone
  * preview (`tree-view.ts`). The draft logic is in `titles-draft.ts`, the holder form in
@@ -9,19 +9,23 @@
 
 import { Modal, Notice, setIcon, type App } from 'obsidian';
 import { deriveFamilies, type FamilyGraph } from '../core/derive';
+import type { Op } from '../core/edit';
 import { normBody } from '../core/block-match';
 import { parseBody, readTree } from '../core/parse';
 import { newTitleId } from '../core/title-ops';
-import { describeDeleteTitle } from '../core/titles';
-import { HOUSES, REMOVE, SHEET, TITLES_UI, WRITE_TEXT } from '../render/ui-text';
+import { describeDeleteTitle, describeTitleIdChange } from '../core/titles';
+import { HOUSES, ID_UI, REMOVE, SHEET, TITLES_UI, WRITE_TEXT } from '../render/ui-text';
 import type { Handle, HandleWriteOutcome } from './block-handle';
 import { holderForm } from './holder-form';
+import { danglingIds, draftId, idChanged, idFromName, idProblemFor, idProblems, idRefusalText, isIdOp, reasonText, type IdReason } from './id-draft';
+import { idNote, idOpenButton, type IdRowView } from './id-field';
+import { openIdWindow } from './id-window';
 import { phoneLayout } from './modal-layout';
 import { pickPerson } from './person-picker';
 import { trackModal } from './plugin-modals';
 import { freshOrStale, onWriteFailed, showErrorLine } from './sheet-parts';
 import { makeTableNote } from './table-note';
-import { draftChanged, emptyNames, holderText, listName, personNameOf, rebase, savedListName, titleRows, windowOps, withHolderIds, type HolderRow, type HolderValues, type TitleRow } from './titles-draft';
+import { draftChanged, emptyNames, holderText, listName, personNameOf, rebase, savedListName, titleIdRow, titleRows, windowOps, withHolderIds, type HolderRow, type HolderValues, type TitleRow } from './titles-draft';
 import { undoNotice } from './undo-notice';
 
 /** The tree that the window edits, loaded from one block body. */
@@ -30,6 +34,8 @@ export interface LoadedTitles {
 	/** The body as plain data: which people have no written id (`withHolderIds`). */
 	raw: unknown;
 	g: FamilyGraph;
+	/** The `card-title` values of people that no title has (§13.17 rule 5): such an id is taken. */
+	dangling: string[];
 }
 
 /** The titles of a block body, or why the window cannot edit them. */
@@ -38,7 +44,7 @@ export function loadTitles(body: string): { kind: 'ok'; data: LoadedTitles } | {
 	if (!parsed.ok) return { kind: 'invalid' };
 	const g = deriveFamilies(readTree(parsed.doc, parsed.data, body));
 	if (g.issues.some((i) => i.level === 'blocking')) return { kind: 'blocked' };
-	return { kind: 'ok', data: { body, raw: parsed.data, g } };
+	return { kind: 'ok', data: { body, raw: parsed.data, g, dangling: danglingIds(parsed.data, 'title') } };
 }
 
 /** What opens a `TitlesWindow`. */
@@ -67,8 +73,14 @@ export class TitlesWindow extends Modal {
 	private confirmFrom: string | null = null;
 	private errorEl: HTMLElement | null = null;
 	private error = '';
+	/** The Id parts (button and note) of the rows on screen now, by row key. */
+	private idViews = new Map<string, IdRowView[]>();
+	/** The batch that is being written had id ops: a refusal of `id-taken` or `bad-value` is about an id. */
+	private sentIds = false;
 	/** A picker or the holder form is open over the window. */
 	private busy = false;
+	/** True while the small Id window is open, so a second "Change id" opens no second window. */
+	private idWindowOpen = false;
 	private readonly cleanup: (() => void)[] = [];
 
 	/** Null, with a Notice, if the block cannot be edited now. */
@@ -154,6 +166,7 @@ export class TitlesWindow extends Modal {
 		focus ??= had;
 		const top = el.querySelector<HTMLElement>('.dynasty-sheet-body')?.scrollTop ?? 0;
 		el.empty();
+		this.idViews = new Map();
 		this.hideConfirm(false);
 		el.addClass('dynasty-sheet-content');
 		const header = el.createDiv({ cls: 'dynasty-sheet-header' });
@@ -172,7 +185,8 @@ export class TitlesWindow extends Modal {
 		const list = body.createDiv({ cls: 'dynasty-title-list' });
 		const shown = this.rows.filter((t) => !t.deleted);
 		if (!shown.length) list.createDiv({ cls: 'dynasty-title-none', text: TITLES_UI.none });
-		for (const t of shown) this.titleRow(list, t);
+		const problems = idProblems('title', this.rows.map(titleIdRow), this.data.dangling);
+		for (const t of shown) this.titleRow(list, t, problems.get(t.key));
 		const add = body.createEl('button', { cls: ['dynasty-sheet-action', 'dynasty-title-add'], text: TITLES_UI.add, attr: { type: 'button', 'data-focus': 'add' } });
 		add.addEventListener('click', () => this.guard(() => this.addTitle()));
 		body.scrollTop = top;
@@ -187,11 +201,29 @@ export class TitlesWindow extends Modal {
 		return listName(t) || TITLES_UI.newTitle;
 	}
 
-	private titleRow(list: HTMLElement, t: TitleRow): void {
+	private titleRow(list: HTMLElement, t: TitleRow, problem?: IdReason): void {
 		const box = list.createDiv({ cls: 'dynasty-title-box', attr: { 'data-title': t.id ?? t.key } });
 		const row = box.createDiv({ cls: 'dynasty-title-row' });
 		const name = row.createEl('input', { cls: 'dynasty-sheet-input', attr: { type: 'text', autocomplete: 'off', autocapitalize: 'words', spellcheck: 'false', 'aria-label': TITLES_UI.nameLabel, 'data-focus': `name:${t.key}` } });
 		name.value = t.name;
+		const views: IdRowView[] = [];
+		// The note of a new id sits under the name (D110); the grid puts it there.
+		if (t.id !== null && idChanged(titleIdRow(t))) {
+			views.push(
+				idNote(row, {
+					key: t.key,
+					item: this.label(t),
+					id: draftId(titleIdRow(t)),
+					problem: problem ? reasonText(problem) : '',
+					onKeepOld: () =>
+						this.guard(() => {
+							t.idDraft = t.id!;
+							this.clearError();
+							this.build(`id-open:${t.key}`);
+						}),
+				}),
+			);
+		}
 		row.createDiv({ cls: 'dynasty-title-count', text: TITLES_UI.count(t.holders.length) });
 		const open = this.shownHolders.has(t.key);
 		const toggle = row.createEl('button', {
@@ -206,6 +238,9 @@ export class TitlesWindow extends Modal {
 				this.build(`toggle:${t.key}`);
 			}),
 		);
+		// Only a saved title has an id to change; a new title gets its id when it is saved (§6.8).
+		if (t.id !== null) views.push(idOpenButton(row, { key: t.key, item: this.label(t), onOpen: () => this.guard(() => this.changeId(t)) }));
+		this.idViews.set(t.key, views);
 		const del = row.createEl('button', { cls: ['dynasty-sheet-action', 'dynasty-title-delete'], text: TITLES_UI.delete, attr: { type: 'button', 'aria-label': TITLES_UI.deleteLabel(this.label(t)), 'data-focus': `delete:${t.key}` } });
 		del.addEventListener('click', () => this.guard(() => this.askDelete(t)));
 		// The text fields share one grid, so their inputs line up.
@@ -241,6 +276,9 @@ export class TitlesWindow extends Modal {
 			plural.setAttribute('aria-label', TITLES_UI.pluralAria(this.label(t)));
 			male.setAttribute('aria-label', TITLES_UI.maleAria(this.label(t)));
 			female.setAttribute('aria-label', TITLES_UI.femaleAria(this.label(t)));
+			for (const v of this.idViews.get(t.key) ?? []) v.setItem(this.label(t));
+			// A new title's name can change the id that it would get.
+			this.refreshIdProblems();
 			this.clearError();
 		};
 		name.addEventListener('input', () => {
@@ -273,6 +311,47 @@ export class TitlesWindow extends Modal {
 			const id = t.id;
 			const note = buttons.createEl('button', { cls: ['dynasty-sheet-action', 'dynasty-title-note'], text: TITLES_UI.makeNote, attr: { type: 'button', 'aria-label': TITLES_UI.makeNoteLabel(savedListName(t)), 'data-focus': `note:${t.key}` } });
 			note.addEventListener('click', () => this.guard(() => this.askNote(id, `note:${t.key}`)));
+		}
+	}
+
+	// ---------- the small Id window (spec §13.17 rule 5, D110) ----------
+
+	/** "Change id": the small window; "Use this id" puts the id into the draft of the row. */
+	private changeId(t: TitleRow): void {
+		// Focus can leave the small window by Tab, and a screen reader can activate the button below it.
+		if (this.idWindowOpen) return;
+		this.idWindowOpen = true;
+		const from = `id-open:${t.key}`;
+		openIdWindow(this.app, {
+			kind: 'title',
+			item: this.label(t),
+			key: t.key,
+			value: t.idDraft ?? t.id ?? '',
+			check: (value) => idProblemFor('title', this.rows.map(titleIdRow), titleIdRow(t), value, this.data.dangling),
+			make: () => idFromName('title', this.rows.map(titleIdRow), titleIdRow(t), this.data.dangling),
+			use: (value) => {
+				// The saved id again is no change: the draft goes away.
+				t.idDraft = value;
+				this.clearError();
+			},
+			closed: (used) => {
+				// Before the guard, so no path leaves the flag set.
+				this.idWindowOpen = false;
+				this.guard(() => {
+					if (this.closing) return;
+					if (used) this.build(from);
+					else this.refocus(from);
+				});
+			},
+		});
+	}
+
+	/** Shows the reason in the note of each row whose draft id is refused, without drawing the window again. */
+	private refreshIdProblems(): void {
+		const problems = idProblems('title', this.rows.map(titleIdRow), this.data.dangling);
+		for (const [key, views] of this.idViews) {
+			const why = problems.get(key);
+			for (const v of views) v.setProblem(why ? reasonText(why) : '');
 		}
 	}
 
@@ -521,6 +600,13 @@ export class TitlesWindow extends Modal {
 			return;
 		}
 		if (!this.fresh()) return;
+		const problems = idProblems('title', this.rows.map(titleIdRow), this.data.dangling);
+		const bad = this.rows.find((t) => problems.has(t.key));
+		if (bad) {
+			this.showError(ID_UI.problem(this.label(bad), reasonText(problems.get(bad.key)!)));
+			this.refocus(`id-open:${bad.key}`);
+			return;
+		}
 		const body = this.data.body;
 		// Ids from the names, each one unused also by the ids chosen before it in this Save (§6.8).
 		// `draftChanged` is true, so `windowOps` is never empty here.
@@ -529,8 +615,40 @@ export class TitlesWindow extends Modal {
 			this.data.g,
 			this.data.raw,
 		);
+		const changed = this.rows.filter((t) => idChanged(titleIdRow(t)));
+		if (changed.length) {
+			// The note can change while the question is open (sync, another pane): the answer checks the body again.
+			this.askIds(changed, () => {
+				if (this.fresh()) void this.commit(ops);
+			});
+			return;
+		}
+		await this.commit(ops);
+	}
+
+	/** The one question before Save changes an id: what changes, and how many people. Closing it is Cancel. */
+	private askIds(changed: TitleRow[], go: () => void): void {
+		const lines = changed.map((t) => ID_UI.confirmLine(this.label(t), t.id!, draftId(titleIdRow(t)), ID_UI.places(describeTitleIdChange(this.data.g, t.id!).people)));
+		this.showConfirm(ID_UI.confirmTitle(changed.length), [...lines, REMOVE.canUndo], 'save', [
+			{ label: ID_UI.keep, cls: 'dynasty-sheet-keep dynasty-id-keep', run: () => this.hideConfirm() },
+			{
+				label: ID_UI.change(changed.length),
+				cls: 'mod-cta dynasty-id-change',
+				run: () => {
+					this.hideConfirm();
+					go();
+				},
+			},
+		]);
+	}
+
+	/** Writes the ops of the draft as one batch (one Undo step) and closes the window when it works. */
+	private async commit(ops: Op[]): Promise<void> {
+		if (this.saving) return;
 		const deleted = this.rows.filter((t) => t.id !== null && t.deleted).map((t) => t.baseName || t.id!);
+		const idCount = ops.filter(isIdOp).length;
 		const h = this.o.handle;
+		this.sentIds = idCount > 0;
 		this.saving = true;
 		this.modalEl.addClass('is-saving');
 		let out: HandleWriteOutcome;
@@ -554,15 +672,24 @@ export class TitlesWindow extends Modal {
 		if (deleted.length) {
 			const others = ops.length > deleted.length;
 			undoNotice(others ? `${TITLES_UI.deleted(deleted)} ${REMOVE.undoAlso}` : TITLES_UI.deleted(deleted), h, out.body);
+		} else if (idCount) {
+			undoNotice(ops.length > idCount ? `${ID_UI.changed(idCount)} ${REMOVE.undoAlso}` : ID_UI.changed(idCount), h, out.body);
 		}
 	}
 
 	private failed(out: Exclude<HandleWriteOutcome, { ok: true }>): void {
 		const h = this.o.handle;
+		const detail = out.code === 'refused' ? out.refusal.detail : undefined;
 		onWriteFailed(out, {
 			stale: () => this.stale(h.body),
 			missing: () => this.refused(HOUSES.missing),
 			refused: (code) => {
+				// §13.17 rule 5: `id-taken` and `bad-value` of an id op are about the id, never "changed under the window".
+				const idText = this.sentIds ? idRefusalText(code, detail) : null;
+				if (idText) {
+					this.refused(idText);
+					return;
+				}
 				const gone = code === 'unknown-title' || code === 'unknown-holder' || code === 'unknown-person' || code === 'id-taken';
 				// A title, holder or person that is not in the tree now: the tree changed under the window.
 				// With the same body a reload changes nothing, so the stale message would come back at each Save.

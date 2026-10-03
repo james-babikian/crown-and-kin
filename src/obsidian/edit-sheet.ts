@@ -25,7 +25,7 @@ import type { PersonFolds } from '../core/folds';
 import { issueText } from '../core/messages';
 import { pictureIssue } from '../core/pictures';
 import { formatPortraitCrop, sameCropText } from '../core/portrait-crop';
-import { uniqueId } from '../core/id-gen';
+import { nextPersonId } from '../core/id-gen';
 import { newHouseId } from '../core/yaml-edit';
 import { parseBody, readTree, referencedIds } from '../core/parse';
 import { isMap, str, type Raw } from '../core/tolerate';
@@ -197,7 +197,7 @@ function idsFor(l: Loaded, names: Iterable<string>): Map<string, string> {
 	const used = takenIds(l);
 	for (const id of names) {
 		if (ids.has(id) || !unwritten(l, id)) continue;
-		const next = uniqueId(l.g.byId.get(id)!.name, used);
+		const next = nextPersonId(used);
 		used.add(next);
 		ids.set(id, next);
 	}
@@ -554,6 +554,7 @@ export class EditSheet extends Modal {
 			this.familySection(body, me);
 			this.actionsSection(body, me);
 			if (!ro) this.deleteSection(body);
+			this.idLine(body);
 		}
 	}
 
@@ -1336,6 +1337,16 @@ export class EditSheet extends Modal {
 		this.leaveFor(() => finder.show(picked.id, p.id));
 	}
 
+	/**
+	 * D106: "Id: p12", a small grey text line at the very end of the body. Only for a person whose id is
+	 * written in the tree text: a person with no id has only the `~N` name that the tree gives them.
+	 */
+	private idLine(parent: HTMLElement): void {
+		const id = this.data.person.id;
+		if (this.gone || !this.data.g.byId.has(id) || unwritten(this.data, id)) return;
+		parent.createDiv({ cls: 'dynasty-sheet-id', text: SHEET.idLine(id) });
+	}
+
 	private deleteSection(parent: HTMLElement): void {
 		const sec = parent.createDiv({ cls: 'dynasty-sheet-section dynasty-delete' });
 		const b = this.button(sec, FAMILY.deletePerson, 'dynasty-delete-person', () => this.confirmDelete());
@@ -1602,8 +1613,8 @@ export class EditSheet extends Modal {
 		const name = this.draft.name.trim();
 		// The related people and the parent sheet's person get an id if they have none (see `idsFor`).
 		const ids = idsFor(this.data, [...(parent ? [parent.data.person.id] : []), ...this.relIds(), ...namesIn(pending)]);
-		// The id newPersonId gives, also unused by the ids above.
-		const id = uniqueId(name, takenIds(this.data, ids.values()));
+		// The id newPersonId gives (D104), also unused by the ids above.
+		const id = nextPersonId(takenIds(this.data, ids.values()));
 		const taken = pending.flatMap((op) => (op.kind === 'batch' ? op.ops : [op])).filter((op) => op.kind === 'add-house').map((op) => (op.kind === 'add-house' && parent ? newHouseId(parent.data.data, op.name) : ''));
 		const out = await this.write(withIds([...pending, ...this.newPersonOps(id, taken)], ids), id);
 		if (!out) {

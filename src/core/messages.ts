@@ -104,7 +104,7 @@ export type WarningCode =
 	 * string). params: section, index; person for a parent entry; title (name) for a holder
 	 */
 	| 'entry-not-map'
-	/** A person, house, title or parent entry has no id. params: section, index; name when written; person for a parent entry */
+	/** A person, house, title or parent entry has no id. params: section, index; name when written; person for a parent entry; example (an unused person id) for a person */
 	| 'missing-id'
 	/** A section that must be a list or map has another shape. params: section; title (name) for `holders` */
 	| 'section-wrong-shape';
@@ -133,7 +133,8 @@ export function codedIssue(code: IssueCode, level: CodedIssue['level'], params: 
  * Every sentence the plugin shows about a problem in a tree. Simplified Technical English
  * (ASD-STE100): short sentences, active voice, one instruction each, and the word list
  * ("partnership", not "union"; "person", not "node"). Say what is wrong, then what to do.
- * People are named by their name; ids appear only for things that do not exist.
+ * People are named by their name; an id appears for things that do not exist, and after the name
+ * of a person in a duplicate id warning.
  */
 
 type P = IssueParams;
@@ -232,7 +233,16 @@ function missingId(p: P): string {
 		return `${who} has no id, so the tree does not use this title. Add an id, for example: id: ${name ? slugify(name) : 'duke-of-valmont'}.`;
 	}
 	const who = name || `Entry ${index} in the “people” list`;
-	return `${who} has no id. Add an id, for example: id: ${name ? slugify(name) : 'aldric'}.`;
+	// The reader gives an id that no person has; `p1` only when the text comes without one.
+	return `${who} has no id. Add an id, for example: id: ${s(p, 'example', 'p1')}.`;
+}
+
+/** D105: the name shows with the id as `NAME (id)`; the brackets mark the id, so it has no quote marks. */
+function duplicatePersonId(p: P): string {
+	const id = s(p, 'id', '?');
+	const name = s(p, 'name', '');
+	if (name && name !== id) return `${name} (${id}) has the same id as another person. To edit the tree again, give each person a different id.`;
+	return `More than one person has the id ${quote(id)}. To edit the tree again, give each person a different id.`;
 }
 
 function sectionWrongShape(p: P): string {
@@ -274,7 +284,7 @@ function pictureTooLarge(p: P): string {
 }
 
 const ISSUE_TEXT: { [C in IssueCode]: (p: P) => string } = {
-	'duplicate-person-id': (p) => `More than one person has the id ${quote(s(p, 'id', '?'))}. To edit the tree again, give each person a different id.`,
+	'duplicate-person-id': duplicatePersonId,
 	'duplicate-union-id': (p) => `More than one partnership has the id ${quote(s(p, 'id', '?'))}. To edit the tree again, give each partnership a different id.`,
 
 	'missing-parent': (p) => `${person(p)} has a parent with the id ${quote(s(p, 'ref', '?'))}, but no person has this id. Correct the id, or add the person.`,

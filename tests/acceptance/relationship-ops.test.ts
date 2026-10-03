@@ -76,25 +76,15 @@ const U0: UnionRef = { index: 0, partners: ['aldous', '0017'] };
 /** Written as [edric, joan]; a ref may name the partners in either order (contract). */
 const U1: UnionRef = { index: 1, partners: ['joan', 'edric'] };
 
-describe('newPersonId (§6.8)', () => {
-	it('slug of the name, unique among person ids', () => {
-		expect(newPersonId(MAIN, 'Ivo Harrow')).toBe('ivo-harrow');
-		expect(newPersonId(MAIN, 'Edric')).toBe('edric-2');
-		// The flow-map person and the quoted id count as taken.
-		expect(newPersonId(MAIN, 'Joan')).toBe('joan-2');
-		expect(newPersonId(MAIN, 'Mäud Quill')).toBe('maud-quill');
+describe('newPersonId (§6.8, D104)', () => {
+	it('a number after the highest p<number>, whatever the name', () => {
+		// MAIN has no numbered id, so the first one is p1 for every name.
+		for (const name of ['Ivo Harrow', 'Edric', 'Joan', 'Mäud Quill', '', '???', '0017']) expect(newPersonId(MAIN, name)).toBe('p1');
+		expect(newPersonId('', 'Aldric Valmont')).toBe('p1');
 	});
 
-	it('houses and unions have their own namespaces', () => {
-		expect(newPersonId(MAIN, 'Harrow')).toBe('harrow');
-		expect(newPersonId(MAIN, 'Harrow Quill')).toBe('harrow-quill');
-	});
-
-	it('empty → person; all digits → p- prefix; an empty body', () => {
-		expect(newPersonId(MAIN, '')).toBe('person');
-		expect(newPersonId(MAIN, '???')).toBe('person');
-		expect(newPersonId(MAIN, '0017')).toBe('p-0017');
-		expect(newPersonId('', 'Aldric Valmont')).toBe('aldric-valmont');
+	it('goes on after the highest number and counts a reference', () => {
+		expect(newPersonId('people:\n  - {id: p3, name: A}\n  - {id: p7, name: B}\n  - {id: edric, name: C, parents: [p9]}\n', 'Ivo')).toBe('p10');
 	});
 });
 

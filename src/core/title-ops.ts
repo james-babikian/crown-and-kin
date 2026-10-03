@@ -26,7 +26,8 @@
 import { isAlias, isMap, isScalar, isSeq, type Node, type Pair, type Scalar, type YAMLMap, type YAMLSeq } from 'yaml';
 import type { FamilyGraph } from './derive';
 import type { AddHolder, AddTitle, DeleteTitle, EditHolder, EditResult, EditTitle, HolderRef, NewTitleId, RemoveHolder, SetHolders, TitleOp } from './edit';
-import { slugify, uniqueId } from './id-gen';
+import { changeItemId } from './id-change';
+import { uniqueTitleId } from './id-gen';
 import { parseBody, textWithoutComments } from './parse';
 import { isEmpty, isMap as isRawMap, str, type Raw, type RawMap } from './tolerate';
 import type { Tree } from './types';
@@ -420,9 +421,7 @@ export const newTitleId: NewTitleId = (body, name, taken) => {
 	} catch {
 		// An id from the name alone is still better than none.
 	}
-	const text = typeof name === 'string' ? name : '';
-	// `slugify` falls back to "person"; a title with no usable letters is a "title".
-	return uniqueId(slugify(text) === 'person' && !/person/i.test(text) ? 'title' : text, ids);
+	return uniqueTitleId(typeof name === 'string' ? name : '', ids);
 };
 
 function addTitle(ctx: TitleContext, op: AddTitle): EditResult {
@@ -684,6 +683,8 @@ export function titleOp(ctx: TitleContext, op: TitleOp): EditResult {
 			return removeHolder(ctx, op);
 		case 'set-holders':
 			return setHolders(ctx, op);
+		case 'set-title-id':
+			return changeItemId(ctx.first, ctx.data, { section: 'titles', refKey: 'card-title', unknown: 'unknown-title' }, op.id, op.newId);
 	}
 }
 
@@ -756,17 +757,20 @@ function validCardTitles(data: Raw): Map<string, string> {
 /**
  * Rule 7 above, once per write (after all ops of a batch): a `card-title` goes if it
  * was valid before the write, still has the same value, and names a title the person no longer
- * holds. `beforeData` is the parse of `before` when the caller has it. A body with no
+ * holds. `beforeData` is the parse of `before` when the caller has it. `renames` (old id to new
+ * id) are the title ids that `set-title-id` ops of the batch changed: the people judged before the
+ * write are matched under the new ids. A body with no
  * `card-title` costs no parse; otherwise the data of the bodies the write parsed anyway is used
  * (`recall`), and the new body is parsed again only to remove a key.
  */
-export function cleanCardTitles(before: string, after: string, beforeData?: Raw): EditResult {
+export function cleanCardTitles(before: string, after: string, beforeData?: Raw, renames?: ReadonlyMap<string, string>): EditResult {
 	const unchanged: EditResult = { ok: true, body: after, created: [] };
 	if (before === after || !before.includes('card-title')) return unchanged;
 	const data = beforeData ?? recall(before) ?? parsedData(before);
 	if (data === undefined) return unchanged;
 	const valid = validCardTitles(data);
 	if (!valid.size) return unchanged;
+	if (renames?.size) for (const [person, title] of valid) valid.set(person, renames.get(title) ?? title);
 	const now = recall(after) ?? parsedData(after);
 	if (!isRawMap(now) || !Array.isArray(now.people)) return unchanged;
 	const expected = clone(now) as RawMap;

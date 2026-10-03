@@ -60,7 +60,7 @@ const NEVER: IssueCode[] = [
 const STALE: IssueCode[] = ['placement-without-parents', 'union-not-of-parents'];
 
 /** Refusals each op can give. `bad-value` is the WP2.3 guard against a change it cannot make safely. */
-const MAY_REFUSE: Record<Exclude<Op['kind'], 'set-person-fields' | 'set-option' | 'add-house' | 'edit-house' | 'delete-house' | 'rewrite-links' | 'add-title' | 'edit-title' | 'delete-title' | 'add-holder' | 'edit-holder' | 'remove-holder' | 'set-holders'>, EditRefusal[]> = {
+const MAY_REFUSE: Record<Exclude<Op['kind'], 'set-person-fields' | 'set-option' | 'add-house' | 'edit-house' | 'delete-house' | 'rewrite-links' | 'add-title' | 'edit-title' | 'delete-title' | 'add-holder' | 'edit-holder' | 'remove-holder' | 'set-holders' | 'set-house-id' | 'set-title-id'>, EditRefusal[]> = {
 	'add-person': ['id-taken', 'unknown-person', 'limit', 'bad-value'],
 	'add-parent': ['limit', 'cycle', 'unknown-person', 'bad-value'],
 	'add-union': ['unknown-person', 'bad-value'],

@@ -193,7 +193,7 @@ export interface DeletePerson {
  * Houses window (§6.10, D32, §13.6): rename, recolour and/or change the arms of a house. Only given
  * fields change; `color: null` removes the colour, `arms: null` (or empty text) the arms; `arms`
  * of another type than text is refused `bad-value`; a value equal to the read one (compared like
- * `link`) writes nothing. The id never changes (§4.1). Acts on the first house with the
+ * `link`) writes nothing. The id changes only with `set-house-id` (§13.17). Acts on the first house with the
  * id (the one the tree uses); an empty name or a colour that is not `#rrggbb` gives `bad-value`;
  * a colour is always written in double quotes. If `color:` reads as null because an unquoted
  * `#rrggbb` became an end-of-line comment, the op replaces that comment.
@@ -214,6 +214,20 @@ export interface DeleteHouse {
 	kind: 'delete-house';
 	id: string;
 	people: 'clear' | 'keep';
+}
+
+/**
+ * Houses window, Id field (§13.17 rule 5, D109): changes the id of a house and the `house` of every
+ * written person who has the old id, in one write. `newId` equal to `id` is a no-op. Refused with
+ * nothing changed: `bad-value` for an empty `newId`, one with a character other than a-z, 0-9 and
+ * hyphen or with no letter and no digit, two houses with the old id, and an alias or an anchor on
+ * a value to change; `unknown-house` if no house has the old id; `id-taken` if a house has `newId`
+ * or a person writes `house: <newId>` (a reference that no house has).
+ */
+export interface SetHouseId {
+	kind: 'set-house-id';
+	id: string;
+	newId: string;
 }
 
 // ---- Titles (spec §13.3–§13.5) ----
@@ -250,7 +264,7 @@ export interface AddTitle {
 	plural?: string;
 }
 
-/** Rename a title or change its male name, female name or plural; `null` (or empty text) removes the key. The id never changes. */
+/** Rename a title or change its male name, female name or plural; `null` (or empty text) removes the key. The id changes only with `set-title-id` (§13.17). */
 export interface EditTitle {
 	kind: 'edit-title';
 	id: string;
@@ -298,8 +312,20 @@ export interface SetHolders {
 	items: ({ ref: HolderRef; fields?: HolderFields } | { add: HolderFields })[];
 }
 
+/**
+ * Titles window, Id field (§13.17 rule 5, D109): like `SetHouseId` for a title and the `card-title`
+ * of the people. The holders are person ids and do not change. Refusals: `unknown-title` for an
+ * old id that no title has; `id-taken` for a title with `newId` or a person who writes
+ * `card-title: <newId>`; `bad-value` as for `SetHouseId`.
+ */
+export interface SetTitleId {
+	kind: 'set-title-id';
+	id: string;
+	newId: string;
+}
+
 /** The title ops (spec §13.4); `title-ops.ts` carries them out. They act on the first title with the id. */
-export type TitleOp = AddTitle | EditTitle | DeleteTitle | AddHolder | EditHolder | RemoveHolder | SetHolders;
+export type TitleOp = AddTitle | EditTitle | DeleteTitle | AddHolder | EditHolder | RemoveHolder | SetHolders | SetTitleId;
 
 /**
  * Link maintenance (§6.9, D6, §13.0 item 3). For each person `link`, person `portrait` and house
@@ -334,10 +360,11 @@ export type Op =
 	| DeletePerson
 	| EditHouse
 	| DeleteHouse
+	| SetHouseId
 	| TitleOp
 	| RewriteLinksOp;
 
-/** Picks an unused person id from a name (§6.8); `yaml-edit.ts` exports it. */
+/** Picks an unused numbered person id (§6.8, §13.17 rule 1); `yaml-edit.ts` exports it. The name is unused. */
 export type NewPersonId = (body: string, name: string) => string;
 
 /** Why `applyOp` refused an edit, instead of throwing (spec §8). */
@@ -352,7 +379,7 @@ export type EditRefusal =
 	| 'bad-value'
 	/** A `UnionRef` does not match the union at that index. */
 	| 'unknown-union'
-	/** The new person's id already exists. */
+	/** The id already exists: a new person's id, a new title's id, or the new id of a house or a title (also when a person already writes it as a reference). */
 	| 'id-taken'
 	/** The person already has 2 parents of that type (§4.2). */
 	| 'limit'

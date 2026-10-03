@@ -342,6 +342,7 @@ describe('P4: without `saved` (and without `pictures`), renderSvg draws exactly 
 	// renderSvg(g, layout, edges, {}) at 16 px with DEFAULT_LAYOUT_SETTINGS (a relation line for 14
 	// and 07b, whose layouts have no picture sets). 1.1.1: the hashes of 06, 07, 07b and 12 were recorded again,
 	// because these trees have far couples with no children, whose tags now carry the partnership sign.
+		// 1.1.2 (D108): the hashes of 07 and 07b were recorded again (ring and open triangle keep the dot's gap before the name).
 	const M8_SVG: Record<string, string> = {
 		'01': '31464ce8b62eaba1',
 		'02': 'c43f9a54754d6172',
@@ -349,8 +350,8 @@ describe('P4: without `saved` (and without `pictures`), renderSvg draws exactly 
 		'04': '891ee22b9a49caf1',
 		'05': '0f94c507b77a9c41',
 		'06': '15190803e77ecaca',
-		'07': '551cf6b1f0673189',
-		'07b': '6f946d2ecce7565c',
+		'07': 'c495c29f029d32cb',
+		'07b': 'fcc0fb91e6f3e14f',
 		'08': 'e678d21ca57ba928',
 		'09': 'c868949b88dd240d',
 		'10': 'ce29021c87b4421f',

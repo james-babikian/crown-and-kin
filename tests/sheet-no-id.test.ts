@@ -70,7 +70,7 @@ function writingHandle(body: string): Writing {
 	return h;
 }
 
-// Aldric has an id; Bran (~2) and Cora (~3) have none.
+// Aldric has an id; Bran (~2) and Cora (~3) have none. A new id is numbered (D104): the first is p1.
 const NO_IDS = ['people:', '  - id: a', '    name: Aldric', '  - name: Bran', '    parents: [a]', '  - name: Cora', '    parents: [a]', ''].join('\n');
 
 function open(h: FakeHandle, id: string): EditSheet {
@@ -107,12 +107,12 @@ describe('a person with no id: the sheet gives them one when an action needs it'
 		await settle();
 		// One write: the id first, then the move by that id.
 		expect(h.ops).toHaveLength(1);
-		expect(h.ops[0]).toEqual({ kind: 'batch', ops: [{ kind: 'set-person-fields', id: '~2', fields: { id: 'bran' } }, { kind: 'move-sibling', id: 'bran', direction: 'later' }] });
-		expect(h.body).toContain('  - name: Cora\n    parents: [a]\n  - id: bran\n    name: Bran\n');
-		expect(personId(sheet)).toBe('bran');
+		expect(h.ops[0]).toEqual({ kind: 'batch', ops: [{ kind: 'set-person-fields', id: '~2', fields: { id: 'p1' } }, { kind: 'move-sibling', id: 'p1', direction: 'later' }] });
+		expect(h.body).toContain('  - name: Cora\n    parents: [a]\n  - id: p1\n    name: Bran\n');
+		expect(personId(sheet)).toBe('p1');
 		expect(shownName(sheet)).toBe('Bran');
 		// The tree view shows the moved person under the new id.
-		expect(h.state.lastEdited).toBe('bran');
+		expect(h.state.lastEdited).toBe('p1');
 		type(sheet, 'title', 'Master of Horse');
 		dispatch(el(sheet, '.dynasty-sheet-save'), 'click');
 		await settle();
@@ -129,11 +129,11 @@ describe('a person with no id: the sheet gives them one when an action needs it'
 		await settle();
 		const ops = (h.ops[0] as { ops: Op[] }).ops;
 		expect(ops.map((o) => o.kind)).toEqual(['set-person-fields', 'set-person-fields', 'move-sibling']);
-		expect(ops[1]).toEqual({ kind: 'set-person-fields', id: 'cora', fields: { born: '1102' } });
-		expect(tree(h.body).g.byId.get('cora')?.born).toBe('1102');
+		expect(ops[1]).toEqual({ kind: 'set-person-fields', id: 'p1', fields: { born: '1102' } });
+		expect(tree(h.body).g.byId.get('p1')?.born).toBe('1102');
 	});
 
-	it('Add child with a new person: the child names the parent by the new id; a same-name child gets another id', async () => {
+	it('Add child with a new person: the child names the parent by the new id; a child with the same name as the parent gets the next number', async () => {
 		const h = writingHandle(NO_IDS);
 		const sheet = open(h, '~3');
 		// Cora has no partners: the flow asks only "new or existing".
@@ -146,12 +146,13 @@ describe('a person with no id: the sheet gives them one when an action needs it'
 		dispatch(el(child, '.dynasty-sheet-save'), 'click');
 		await settle();
 		const { g } = tree(h.body);
-		expect(g.byId.get('cora')?.name).toBe('Cora');
-		expect(g.byId.get('cora-2')?.parents).toEqual([{ id: 'cora', type: 'birth' }]);
+		expect(g.byId.get('p1')?.name).toBe('Cora');
+		expect(g.byId.get('p2')?.name).toBe('Cora');
+		expect(g.byId.get('p2')?.parents).toEqual([{ id: 'p1', type: 'birth' }]);
 		// No reference names nobody (a written `~3` would).
 		expect(g.issues.filter((i) => i.code.startsWith('missing-') && i.code !== 'missing-id')).toEqual([]);
 		// The first sheet follows its person.
-		expect(personId(sheet)).toBe('cora');
+		expect(personId(sheet)).toBe('p1');
 		expect(shownName(sheet)).toBe('Cora');
 	});
 
@@ -169,8 +170,10 @@ describe('a person with no id: the sheet gives them one when an action needs it'
 		dispatch(el(child, '.dynasty-sheet-save'), 'click');
 		await settle();
 		const { g } = tree(h.body);
-		expect(g.byId.get('dara')?.parents).toEqual([{ id: 'bran', type: 'birth' }]);
-		expect(g.byId.get('edric')?.parents).toEqual([{ id: 'bran', type: 'birth' }]);
+		expect(g.byId.get('p2')?.name).toBe('Dara');
+		expect(g.byId.get('p3')?.name).toBe('Edric');
+		expect(g.byId.get('p2')?.parents).toEqual([{ id: 'p1', type: 'birth' }]);
+		expect(g.byId.get('p3')?.parents).toEqual([{ id: 'p1', type: 'birth' }]);
 	});
 
 	it('Add parent with a new person: the new parent is put before the child and linked to the child by the new id', async () => {
@@ -184,9 +187,9 @@ describe('a person with no id: the sheet gives them one when an action needs it'
 		dispatch(el(parent, '.dynasty-sheet-save'), 'click');
 		await settle();
 		const { tree: t, g } = tree(h.body);
-		expect(t.people.map((p) => p.id)).toEqual(['a', 'elin', 'bran', '~4']);
-		expect(g.byId.get('bran')?.parents.map((l) => l.id)).toEqual(['a', 'elin']);
-		expect(personId(sheet)).toBe('bran');
+		expect(t.people.map((p) => p.id)).toEqual(['a', 'p2', 'p1', '~4']);
+		expect(g.byId.get('p1')?.parents.map((l) => l.id)).toEqual(['a', 'p2']);
+		expect(personId(sheet)).toBe('p1');
 	});
 
 	it('Add partner with a person in the tree who has no id either: both get an id', async () => {
@@ -196,11 +199,11 @@ describe('a person with no id: the sheet gives them one when an action needs it'
 		dispatch(el(sheet, '.dynasty-add-partner'), 'click');
 		await settle();
 		const { tree: t } = tree(h.body);
-		expect(t.unions.map((u) => u.partners)).toEqual([['cora', 'bran']]);
-		expect(t.people.map((p) => p.id)).toEqual(['a', 'bran', 'cora']);
-		expect(personId(sheet)).toBe('cora');
+		expect(t.unions.map((u) => u.partners)).toEqual([['p1', 'p2']]);
+		expect(t.people.map((p) => p.id)).toEqual(['a', 'p2', 'p1']);
+		expect(personId(sheet)).toBe('p1');
 		// The partner is shown with the new id.
-		expect(h.state.lastEdited).toBe('bran');
+		expect(h.state.lastEdited).toBe('p2');
 	});
 
 	it('Pin focus here writes the new id as the focus', async () => {
@@ -208,7 +211,7 @@ describe('a person with no id: the sheet gives them one when an action needs it'
 		const sheet = open(h, '~2');
 		dispatch(el(sheet, '.dynasty-pin'), 'click');
 		await settle();
-		expect(tree(h.body).tree.options.focus).toBe('bran');
+		expect(tree(h.body).tree.options.focus).toBe('p1');
 		// The sheet now offers Remove pin for the same person.
 		expect(modal(sheet).querySelector('.dynasty-unpin')).toBeTruthy();
 	});
@@ -218,7 +221,7 @@ describe('a person with no id: the sheet gives them one when an action needs it'
 		const sheet = open(h, '~3');
 		dispatch(el(sheet, '.dynasty-remove-parent'), 'click');
 		await settle();
-		expect(personId(sheet)).toBe('cora');
+		expect(personId(sheet)).toBe('p1');
 		const notice = noticeList[noticeList.length - 1];
 		dispatch(notice.noticeEl.querySelector('.dynasty-undo-button')!, 'click');
 		await settle();

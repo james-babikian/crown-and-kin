@@ -2,17 +2,18 @@
  * The pure part of the title editing (spec §13.4, §13.5): what a holder's text lines say, how the
  * holder form turns its fields into holder values (`as` only when the ruler name changed), and the
  * Titles window's draft: its rows (with the "Name of the list", D64, the "Name for a man", D66, and the "Name for a woman", D65), whether it changed, the one `batch` that Save writes
- * (with ids for holder people who have none), and how the draft follows a tree that changed under the window. No `obsidian` import, so vitest runs it;
+ * (with ids for holder people who have none), the Id field of each title (§13.17 rule 5, D109), and how the draft follows a tree that changed under the window. No `obsidian` import, so vitest runs it;
  * `titles-window.ts`, `holder-form.ts` and `sheet-titles.ts` use it.
  */
 
 import type { FamilyGraph } from '../core/derive';
 import type { HolderFields, HolderRef, Op } from '../core/edit';
-import { uniqueId } from '../core/id-gen';
+import { nextPersonId } from '../core/id-gen';
 import { referencedIds } from '../core/parse';
 import { entryReign, rulerName } from '../core/titles';
 import { isMap, str, type Raw } from '../core/tolerate';
 import type { Holder, Title } from '../core/types';
+import { draftId, idChanged, idOps, isIdOp, type IdRow } from './id-draft';
 
 /** The written values of one holder entry (spec §13.4); absent = no key. */
 export interface HolderValues {
@@ -159,6 +160,8 @@ export interface HolderRow {
 export interface TitleRow {
 	key: string;
 	id: string | null;
+	/** The Id field as typed (§13.17 rule 5); absent for a title that is new in the draft. */
+	idDraft?: string;
 	name: string;
 	/** The name as read; null for a new title. */
 	baseName: string | null;
@@ -194,8 +197,11 @@ function rowOf(t: Title, key: () => string): TitleRow {
 	const plural = t.plural.trim() === t.name.trim() ? '' : t.plural;
 	const maleName = t.maleName ?? '';
 	const femaleName = t.femaleName ?? '';
-	return { key: key(), id: t.id, name: t.name, baseName: t.name, plural, basePlural: plural, maleName, baseMaleName: maleName, femaleName, baseFemaleName: femaleName, deleted: false, holders, baseRows: holders.map((h) => ({ ...h, values: { ...h.values } })) };
+	return { key: key(), id: t.id, idDraft: t.id, name: t.name, baseName: t.name, plural, basePlural: plural, maleName, baseMaleName: maleName, femaleName, baseFemaleName: femaleName, deleted: false, holders, baseRows: holders.map((h) => ({ ...h, values: { ...h.values } })) };
 }
+
+/** The row as the Id logic sees it. */
+export const titleIdRow = (t: TitleRow): IdRow => ({ key: t.key, id: t.id, idDraft: t.idDraft, name: t.name, deleted: t.deleted });
 
 /** The plural that Save writes for the draft (D64): null for an empty field or the title name. */
 export function pluralOf(t: TitleRow): string | null {
@@ -247,20 +253,25 @@ const femaleChanged = (t: TitleRow) => t.baseFemaleName !== null && femaleNameOf
 
 /** True when Save has something to write. */
 export function draftChanged(rows: readonly TitleRow[]): boolean {
-	return rows.some((t) => (t.id === null ? !t.deleted : t.deleted || nameChanged(t) || maleChanged(t) || femaleChanged(t) || pluralChanged(t) || holdersChanged(t)));
+	return rows.some((t) => (t.id === null ? !t.deleted : t.deleted || idChanged(titleIdRow(t)) || nameChanged(t) || maleChanged(t) || femaleChanged(t) || pluralChanged(t) || holdersChanged(t)));
 }
 
 /**
- * The one `batch` of Save (spec §13.4, §13.0 item 6): `add-title` (ids from `newId`, which gets the
- * ids chosen before it), `edit-title`, one `set-holders` per changed title (the whole final list,
- * with changed values only), then `delete-title`. Empty if nothing changed.
+ * The one `batch` of Save (spec §13.4, §13.0 item 6, §13.17 rule 5): the `set-title-id` ops first (the
+ * other ops of a changed title name its new id), then `edit-title`, one `set-holders` per changed
+ * title (the whole final list, with changed values only), `delete-title`, and last `add-title` (ids
+ * from `newId`, which gets the ids chosen before it and every draft id) with the holders of each new
+ * title. Empty if nothing changed.
  */
 export function windowOps(rows: readonly TitleRow[], newId: (name: string, taken: ReadonlySet<string>) => string): Op[] {
+	const ids = idOps('title', rows.map(titleIdRow));
 	const adds: Op[] = [];
+	const addLists: Op[] = [];
 	const edits: Op[] = [];
 	const lists: Op[] = [];
 	const deletes: Op[] = [];
-	const taken = new Set<string>();
+	// A new title never gets an id that a changed title takes.
+	const taken = new Set<string>(rows.flatMap((t) => (t.id !== null && !t.deleted && draftId(titleIdRow(t)) !== '' ? [draftId(titleIdRow(t))] : [])));
 	for (const t of rows) {
 		if (t.id === null) {
 			if (t.deleted) continue;
@@ -272,18 +283,20 @@ export function windowOps(rows: readonly TitleRow[], newId: (name: string, taken
 			const plural = pluralOf(t);
 			adds.push({ kind: 'add-title', id, name, ...(maleName !== null ? { maleName } : {}), ...(femaleName !== null ? { femaleName } : {}), ...(plural !== null ? { plural } : {}) });
 			// A new title gets its `holders` key only with its first holder.
-			if (t.holders.length) lists.push({ kind: 'set-holders', title: id, items: t.holders.map((h) => ({ add: addFields(h.values) })) });
+			if (t.holders.length) addLists.push({ kind: 'set-holders', title: id, items: t.holders.map((h) => ({ add: addFields(h.values) })) });
 			continue;
 		}
 		if (t.deleted) {
 			deletes.push({ kind: 'delete-title', id: t.id });
 			continue;
 		}
+		// After its id op the title has its new id.
+		const id = idChanged(titleIdRow(t)) ? draftId(titleIdRow(t)) : t.id;
 		if (nameChanged(t) || maleChanged(t) || femaleChanged(t) || pluralChanged(t)) {
 			// `null` removes the key: an empty field writes no male-name or female-name (D65, D66); an empty field or the title name writes no plural (D64).
 			edits.push({
 				kind: 'edit-title',
-				id: t.id,
+				id,
 				...(nameChanged(t) ? { name: t.name.trim() } : {}),
 				...(maleChanged(t) ? { maleName: maleNameOf(t) } : {}),
 				...(femaleChanged(t) ? { femaleName: femaleNameOf(t) } : {}),
@@ -293,12 +306,14 @@ export function windowOps(rows: readonly TitleRow[], newId: (name: string, taken
 		if (!holdersChanged(t)) continue;
 		const items = t.holders.map((h) => {
 			if (!h.ref || !h.base) return { add: addFields(h.values) };
+			// A holder ref names the title by its id: the new one, after the id op.
+			const ref = id === t.id ? h.ref : { ...h.ref, title: id };
 			const fields = changedFields(h.base, h.values);
-			return Object.keys(fields).length ? { ref: h.ref, fields } : { ref: h.ref };
+			return Object.keys(fields).length ? { ref, fields } : { ref };
 		});
-		lists.push({ kind: 'set-holders', title: t.id, items });
+		lists.push({ kind: 'set-holders', title: id, items });
 	}
-	return [...adds, ...edits, ...lists, ...deletes];
+	return [...ids, ...edits, ...lists, ...deletes, ...adds, ...addLists];
 }
 
 /** The draft rows whose title name is empty and must be entered before Save. */
@@ -323,11 +338,13 @@ export function rebase(rows: readonly TitleRow[], fresh: readonly TitleRow[]): T
 			continue;
 		}
 		const name = nameChanged(was) ? was.name : f.name;
+		// An id the user typed stays; else the row shows the new saved id.
+		const idDraft = (was.idDraft ?? was.id!).trim() !== was.id ? was.idDraft : f.id!;
 		const plural = pluralEdited(was) ? was.plural : f.plural;
 		const maleName = maleEdited(was) ? was.maleName : f.maleName;
 		const femaleName = femaleEdited(was) ? was.femaleName : f.femaleName;
 		if (!holdersChanged(was)) {
-			out.push({ ...f, key: was.key, name, plural, maleName, femaleName, deleted: was.deleted });
+			out.push({ ...f, key: was.key, idDraft, name, plural, maleName, femaleName, deleted: was.deleted });
 			continue;
 		}
 		// Every holder as read is found again first, also those the draft removed: they stay removed.
@@ -365,7 +382,7 @@ export function rebase(rows: readonly TitleRow[], fresh: readonly TitleRow[]): T
 		holders.push(...pool);
 		const keyOf = (fh: HolderRow) => [...hits].find(([, v]) => v === fh)?.[0] ?? fh.key;
 		const baseRows = f.holders.map((fh) => ({ ...fh, key: keyOf(fh), values: { ...fh.values } }));
-		out.push({ ...f, key: was.key, name, plural, maleName, femaleName, deleted: was.deleted, holders, baseRows });
+		out.push({ ...f, key: was.key, idDraft, name, plural, maleName, femaleName, deleted: was.deleted, holders, baseRows });
 	}
 	out.push(...rows.filter((t) => t.id === null));
 	return out;
@@ -398,7 +415,7 @@ export function withHolderIds(ops: readonly Op[], g: FamilyGraph, data: unknown)
 	const ids = new Map<string, string>();
 	const see = (person: string | null | undefined) => {
 		if (typeof person !== 'string' || ids.has(person) || !unwritten(person)) return;
-		const next = uniqueId(g.byId.get(person)!.name, used);
+		const next = nextPersonId(used);
 		used.add(next);
 		ids.set(person, next);
 	};
@@ -406,6 +423,8 @@ export function withHolderIds(ops: readonly Op[], g: FamilyGraph, data: unknown)
 	if (!ids.size) return [...ops];
 	const map = (fields: HolderFields): HolderFields => (typeof fields.person === 'string' && ids.has(fields.person) ? { ...fields, person: ids.get(fields.person)! } : fields);
 	const give = [...ids].map(([id, next]): Op => ({ kind: 'set-person-fields', id, fields: { id: next } }));
-	const named = ops.map((op): Op => (op.kind === 'set-holders' ? { ...op, items: op.items.map((item) => ('add' in item ? { add: map(item.add) } : item.fields ? { ...item, fields: map(item.fields) } : item)) } : op));
-	return [...give, ...named];
+	// The id changes of titles stay first (§13.17 rule 5); they name no holder person.
+	const lead = ops.filter(isIdOp);
+	const named = ops.filter((op) => !isIdOp(op)).map((op): Op => (op.kind === 'set-holders' ? { ...op, items: op.items.map((item) => ('add' in item ? { add: map(item.add) } : item.fields ? { ...item, fields: map(item.fields) } : item)) } : op));
+	return [...lead, ...give, ...named];
 }

@@ -5,7 +5,9 @@
  */
 
 import { isAlias, isMap, type Node, type Pair, type YAMLMap } from 'yaml';
-import type { DeleteHouse, EditHouse, EditResult } from './edit';
+import type { FamilyGraph } from './derive';
+import type { DeleteHouse, EditHouse, EditResult, SetHouseId } from './edit';
+import { changeItemId } from './id-change';
 import { linkValue, str, type Raw, type RawMap } from './tolerate';
 import { removeFromSection, section } from './yaml-list';
 import {
@@ -98,6 +100,19 @@ export function editHouse(first: Parsed, data: RawMap, op: EditHouse): EditResul
 	};
 	const steps = [...(name !== undefined ? [change('name')] : []), ...(color !== undefined ? [change('color')] : []), ...(arms !== undefined ? [change('arms')] : [])];
 	return finishTogether(first, steps, expected, []);
+}
+
+/** Changes a house id and the `house` of its people in one write (§13.17 rule 5). */
+export function setHouseId(first: Parsed, data: RawMap, op: SetHouseId): EditResult {
+	return changeItemId(first, data, { section: 'houses', refKey: 'house', unknown: 'unknown-house' }, op.id, op.newId);
+}
+
+/**
+ * The count the Id confirmation shows (§13.17 rule 5): the written people whose `house` is `id`.
+ * `g` is the graph of the whole parsed body, never of a focus view.
+ */
+export function describeHouseIdChange(g: FamilyGraph, id: string): { people: number } {
+	return { people: (g?.people ?? []).filter((p) => p.house === id).length };
 }
 
 /** Deletes a house item, clearing or keeping `house:` on its people as `op.people` says (§6.10). */

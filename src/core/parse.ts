@@ -7,6 +7,7 @@
  */
 
 import { isScalar, Lexer, parseDocument, type Document } from 'yaml';
+import { personIdSource } from './id-gen';
 import { codedIssue, type CodedIssue, type HardError } from './messages';
 import { cropValue } from './portrait-crop';
 import { blankPlainNulls, bool, int, isEmpty, isMap, linkValue, list, str, tolerateEmbeds, unwrapCurlyKeys, type Raw, type RawMap } from './tolerate';
@@ -179,10 +180,13 @@ class Reader {
 		}
 	}
 
-	/** `taken`: every id written anywhere as a person or a reference to one. */
+	/** `taken`: every id written anywhere as a person or a reference to one. Examples for people with no id are added to it. */
 	people(v: Raw, taken: Set<string>): Person[] {
 		const entries = this.section(v, 'people');
 		const people: Person[] = [];
+		// Made on the first need: it scans `taken` once, and a tree with ids everywhere never needs it.
+		let source: (() => string) | undefined;
+		const nextExample = () => (source ??= personIdSource(taken))();
 		entries.forEach((p, index) => {
 			if (!isMap(p)) {
 				this.warn('entry-not-map', { section: 'people', index: index + 1 });
@@ -197,7 +201,9 @@ class Reader {
 				// Still drawn, under an id that nothing in the block uses, so nothing links to it by accident.
 				id = `~${index + 1}`;
 				while (taken.has(id)) id = `~${id}`;
-				this.warn('missing-id', name ? { section: 'people', index: index + 1, name } : { section: 'people', index: index + 1 }, [id]);
+				// The example is an id nobody has, and the next missing id gets another one (D104).
+				const example = nextExample();
+				this.warn('missing-id', name ? { section: 'people', index: index + 1, name, example } : { section: 'people', index: index + 1, example }, [id]);
 			}
 			people.push({
 				id,
