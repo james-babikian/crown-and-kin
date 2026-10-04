@@ -9,9 +9,8 @@
 import { Modal, Notice, TFile, type EventRef } from 'obsidian';
 import { FULL_UI } from '../render/ui-text';
 import { isPhoneWidth } from './modal-layout';
+import { nameDialog } from './sheet-parts';
 import { TreeView, type FullHost, type FullSource, type TreeHost } from './tree-view';
-
-let titles = 0;
 
 // Obsidian's sidebar swipe and pull-down gestures listen above the modal; these must not reach them (spec §7.2).
 const STOPPED = ['touchstart', 'touchmove', 'touchend', 'touchcancel', 'pointerdown', 'pointermove', 'pointerup', 'pointercancel'];
@@ -49,11 +48,9 @@ export class FullScreenModal extends Modal implements FullHost {
 		containerEl.addClass('dynasty-fullscreen-container');
 		modalEl.addClass('dynasty-fullscreen');
 		// Named by its (hidden) title, not aria-label: Obsidian shows an aria-label as a tooltip on
-		// every free point of the modal.
-		const titleId = `dynasty-fullscreen-title-${++titles}`;
+		// every free point of the modal. nameDialog also sets role="dialog" and aria-modal (spec §13.18 rule 11).
 		this.setTitle(FULL_UI.dialog);
-		this.titleEl.setAttribute('id', titleId);
-		modalEl.setAttribute('aria-labelledby', titleId);
+		nameDialog(modalEl, this.titleEl);
 		contentEl.addClass('dynasty-fullscreen-content');
 		const win = modalEl.win ?? window;
 		const layout = () => modalEl.toggleClass('is-phone', isPhoneWidth(win));

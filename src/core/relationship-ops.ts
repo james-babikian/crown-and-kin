@@ -21,6 +21,7 @@ import {
 	addPair, clone, commentsOf, doubleQuoted, findPair, finish, finishTogether, insertAt, isRefusal, layoutOf, PERSON_FIELDS, PERSON_ORDER, personNode, personValue,
 	QUOTED_FIELDS, refuse, removePair, renderScalar, setPairValue, TEXT_FIELDS, topMap, type Parsed, type Patch, type Refusal, Source, type Step,
 } from './yaml-patch';
+import { REFUSAL_TEXT } from './refusal-text';
 
 /** The parsed body, its family graph, and other state a relationship op needs to run. */
 export interface OpContext {
@@ -136,12 +137,12 @@ function mapPatches(src: Source, map: YAMLMap, changes: FieldChange[], order: st
 
 function addPerson(ctx: OpContext, op: AddPerson): EditResult {
 	const { data, tree } = ctx;
-	if (typeof op.id !== 'string' || str(op.id) !== op.id) return refuse('bad-value', 'The new id must be text without spaces at the ends.');
+	if (typeof op.id !== 'string' || str(op.id) !== op.id) return refuse('bad-value', REFUSAL_TEXT.newIdText);
 	if (tree.people.some((p) => p.id === op.id)) return refuse('id-taken');
 	if (!isEmpty(data.people) && !Array.isArray(data.people)) return refuse('bad-value', 'The people section is not a list.');
 
 	const fields = op.fields ?? {};
-	if (!Object.prototype.hasOwnProperty.call(fields, 'name')) return refuse('bad-value', 'A person must have a name.');
+	if (!Object.prototype.hasOwnProperty.call(fields, 'name')) return refuse('bad-value', REFUSAL_TEXT.personName);
 	const values = new Map<string, string>();
 	for (const field of PERSON_FIELDS) {
 		if (!Object.prototype.hasOwnProperty.call(fields, field)) continue;
@@ -154,7 +155,7 @@ function addPerson(ctx: OpContext, op: AddPerson): EditResult {
 	const seen = new Set<string>();
 	for (const r of parents) {
 		if (!r || refIndex(ctx, r.id) === undefined) return refuse('unknown-person', typeof r?.id === 'string' ? r.id : undefined);
-		if (!isParentType(r.type)) return refuse('bad-value', 'Unknown parent type.');
+		if (!isParentType(r.type)) return refuse('bad-value', REFUSAL_TEXT.unknownParentType);
 		if (seen.has(`${r.id}\0${r.type}`)) return refuse('bad-value', 'The same parent is given twice.');
 		seen.add(`${r.id}\0${r.type}`);
 		if (parents.filter((x) => x.type === r.type).length > 2) return refuse('limit');
@@ -243,11 +244,11 @@ function addParent(ctx: OpContext, op: AddParent): EditResult {
 	const { g, data } = ctx;
 	const childIndex = personIndex(ctx, op.child);
 	if (childIndex === undefined || refIndex(ctx, op.parent) === undefined) return refuse('unknown-person');
-	if (!isParentType(op.type)) return refuse('bad-value', 'Unknown parent type.');
+	if (!isParentType(op.type)) return refuse('bad-value', REFUSAL_TEXT.unknownParentType);
 	if (op.parent === op.child || descendantsOf(g, op.child).has(op.parent)) return refuse('cycle');
 	const current = writtenParents(g, op.child);
 	const same = current.filter((r) => r.type === op.type);
-	if (same.some((r) => r.id === op.parent)) return refuse('bad-value', 'This person is already a parent of that type.');
+	if (same.some((r) => r.id === op.parent)) return refuse('bad-value', REFUSAL_TEXT.alreadyParent);
 	if (same.length >= 2) return refuse('limit');
 	const chosen = op.union === undefined ? undefined : resolveUnion(ctx, op.union);
 	if (isRefusal(chosen)) return chosen;
@@ -352,7 +353,7 @@ function addUnion(ctx: OpContext, op: AddUnion): EditResult {
 	if (a === b) return refuse('bad-value', 'A partnership needs two different people.');
 	// No type given: none is written (marriage is the default, §4.1).
 	const type = op.type;
-	if (type !== undefined && !isUnionType(type)) return refuse('bad-value', 'Unknown partnership type.');
+	if (type !== undefined && !isUnionType(type)) return refuse('bad-value', REFUSAL_TEXT.unknownUnionType);
 	const text = (v: unknown) => (typeof v === 'string' && v.trim() !== '' ? v : undefined);
 	if ((op.start !== undefined && typeof op.start !== 'string') || (op.end !== undefined && typeof op.end !== 'string')) return refuse('bad-value');
 	const start = text(op.start);
@@ -422,7 +423,7 @@ function editUnion(ctx: OpContext, op: EditUnion): EditResult {
 		if (v === undefined) continue;
 		if (v !== null && typeof v !== 'string') return refuse('bad-value');
 		const write = v === null || v.trim() === '' ? null : v;
-		if (key === 'type' && write !== null && !isUnionType(write)) return refuse('bad-value', 'Unknown partnership type.');
+		if (key === 'type' && write !== null && !isUnionType(write)) return refuse('bad-value', REFUSAL_TEXT.unknownUnionType);
 		if ((write === null && union[key] === undefined) || (write !== null && str(union[key]) === str(write))) continue;
 		if (write === null) delete union[key];
 		else union[key] = write;
@@ -641,14 +642,14 @@ function matchingEntries(p: Parsed, item: YAMLMap, parent: string, type: ParentK
 function setParentType(ctx: OpContext, op: SetParentType): EditResult {
 	const childIndex = personIndex(ctx, op.child);
 	if (childIndex === undefined || typeof op.parent !== 'string') return refuse('unknown-person');
-	if (!isParentType(op.from) || !isParentType(op.to)) return refuse('bad-value', 'Unknown parent type.');
+	if (!isParentType(op.from) || !isParentType(op.to)) return refuse('bad-value', REFUSAL_TEXT.unknownParentType);
 	const item = personNode(ctx.first, childIndex);
 	if (isRefusal(item)) return item;
 	const { match, seq, pair } = matchingEntries(ctx.first, item, op.parent, op.from);
 	if (!match.length) return refuse('bad-value', `${op.parent} is not a ${op.from} parent.`);
 	if (op.from === op.to) return { ok: true, body: ctx.first.src.text, created: [] };
 	const current = writtenParents(ctx.g, op.child).filter((r) => r.type === op.to);
-	if (current.some((r) => r.id === op.parent)) return refuse('bad-value', 'This person is already a parent of that type.');
+	if (current.some((r) => r.id === op.parent)) return refuse('bad-value', REFUSAL_TEXT.alreadyParent);
 	if (current.length >= 2) return refuse('limit');
 
 	const src = ctx.first.src;
@@ -685,7 +686,7 @@ function setParentType(ctx: OpContext, op: SetParentType): EditResult {
 function removeParent(ctx: OpContext, op: RemoveParent): EditResult {
 	const childIndex = personIndex(ctx, op.child);
 	if (childIndex === undefined || typeof op.parent !== 'string') return refuse('unknown-person');
-	if (!isParentType(op.type)) return refuse('bad-value', 'Unknown parent type.');
+	if (!isParentType(op.type)) return refuse('bad-value', REFUSAL_TEXT.unknownParentType);
 	const item = personNode(ctx.first, childIndex);
 	if (isRefusal(item)) return item;
 	const { match } = matchingEntries(ctx.first, item, op.parent, op.type);
@@ -751,7 +752,7 @@ function moveSibling(ctx: OpContext, op: MoveSibling): EditResult {
 	const after = ownedComments(r.body);
 	const owner = (k: number) => (k === i ? j : k === j ? i : k);
 	const same = before && after && before.length === after.length && after.every((texts, k) => texts.join('\n') === before[owner(k)].join('\n'));
-	return same ? r : refuse('bad-value', 'The change cannot be written without a change to a comment. Edit the note text.');
+	return same ? r : refuse('bad-value', REFUSAL_TEXT.commentWouldChange);
 }
 
 /** In a flow list, the end-of-line comments of two items change places with them. */

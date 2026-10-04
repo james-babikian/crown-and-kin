@@ -97,7 +97,7 @@ describe('card labels: the parts (contract CardLabel, spec §13.3)', () => {
 		expect(l).toEqual({ holdings: [], selected: false, name: 'Isolde Orsini', title: 'Duchess of Valmont' });
 	});
 
-	it('a tree with no titles: every label is the 1.0 card text', async () => {
+	it('a tree with no titles: every label is the 0.1 card text', async () => {
 		const { cardLabels } = await titlesModule();
 		const g = graphOf(fixtureSource('08'));
 		for (const p of g.people) {

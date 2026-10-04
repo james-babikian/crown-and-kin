@@ -124,7 +124,7 @@ export function layoutFamilies(
 	const given = withRelationLine(plain, settings);
 	// D24 sideways: everything below runs in the turned frame (`turn.ts`) and is turned at the end.
 	const narrowSide = settings.orientation === 'sideways' ? sidewaysGeometry(given, settings.sidewaysCards ?? 'normal', settings.narrowCardW) : undefined;
-	// 1.1.1: a couple with two or more partnerships has several signs in its gap; only then is the gap wider.
+	// 0.2.1: a couple with two or more partnerships has several signs in its gap; only then is the gap wider.
 	const side = narrowSide && g.unions.length > 1 ? { ...narrowSide, coupleGap: sidewaysPartnerGap(narrowSide, mostUnionsOfOneCouple(g)) } : narrowSide;
 	const geo = side ? turnedGeometry(side) : given;
 	// D11 keeps its length in px: 3 widths of a `down` card, measured along the column.

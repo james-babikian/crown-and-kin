@@ -7,6 +7,7 @@ import { Modal, type App } from 'obsidian';
 import { FLOW } from '../render/ui-text';
 import { ignoreGhostClick, phoneLayout } from './modal-layout';
 import { trackModal } from './plugin-modals';
+import { nameDialog } from './sheet-parts';
 
 /** One large button in a choice step, and what choosing it returns. */
 export interface Choice<T> {
@@ -52,7 +53,7 @@ class ChoiceModal<T> extends Modal {
 		const el = this.contentEl;
 		el.addClass('dynasty-sheet-content');
 		const header = el.createDiv({ cls: 'dynasty-sheet-header' });
-		header.createDiv({ cls: 'dynasty-sheet-title', text: this.spec.title });
+		nameDialog(this.modalEl, header.createDiv({ cls: 'dynasty-sheet-title', text: this.spec.title }));
 		const cancel = header.createDiv({ cls: 'dynasty-sheet-actions' }).createEl('button', { cls: 'dynasty-sheet-cancel', text: FLOW.cancel, attr: { type: 'button' } });
 		cancel.addEventListener('click', () => this.close());
 		const body = el.createDiv({ cls: 'dynasty-sheet-body' });

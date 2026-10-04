@@ -280,7 +280,8 @@ export function renderSvg(g: FamilyGraph, layout: TreeLayout, edges: EdgeDrawing
 			}
 			// B1: dashed with a grey fill only for a missing file; else the solid empty frame (or the ring round the picture).
 			const missing = uri === 'missing';
-			const paint = missing ? `fill="${c.cardBorder}" stroke="${c.textFaint}" stroke-dasharray="3 2"` : `fill="none" stroke="${isUri(uri) ? c.cardBorder : c.textFaint}"`;
+			// The frame uses the muted text colour, as the live CSS does since M9 G5: the faint colour is under 3:1 on the card.
+			const paint = missing ? `fill="${c.cardBorder}" stroke="${c.textMuted}" stroke-dasharray="3 2"` : `fill="none" stroke="${isUri(uri) ? c.cardBorder : c.textMuted}"`;
 			out.push(`<circle cx="${cx}" cy="${cy}" r="${rad - 0.5}" ${paint} stroke-width="1"${di(`frame:${p.id}`)}/>`);
 		}
 		out.push(`</g>`);
@@ -340,7 +341,7 @@ export function renderSvg(g: FamilyGraph, layout: TreeLayout, edges: EdgeDrawing
 	const tagFont = 0.75 * geo.fontPx;
 	const tagFontStr = fontOf('400', tagFont, fonts.ui);
 	const tagFamily = saved ? ` font-family="${esc(fonts.ui)}"` : '';
-	// 1.1.1: a far couple with no children has no union dot, so its tag carries the partnership sign.
+	// 0.2.1: a far couple with no children has no union dot, so its tag carries the partnership sign.
 	const farSigns = farTagSigns(g, layout, edges);
 	for (const tag of layout.farTags.values()) {
 		const pad = tagH / 2;

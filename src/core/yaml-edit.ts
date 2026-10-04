@@ -21,10 +21,11 @@ import { isEmpty, isMap as isRawMap, str, type Raw, type RawMap } from './tolera
 import type { Tree } from './types';
 import { itemEnd } from './yaml-list';
 import {
-	addPair, addSection, appendItem, clone, doubleQuoted, findPair, finish, finishTogether, isRefusal, layoutOf, OPTION_ORDER, PERSON_FIELDS, PERSON_ORDER, personNode,
+	addPair, addSection, appendItem, clone, doubleQuoted, findPair, finish, finishTogether, isRefusal, itemBlock, layoutOf, OPTION_ORDER, PERSON_FIELDS, PERSON_ORDER, personNode,
 	personValue, forget, QUOTED_FIELDS, refuse, remember, removePair, renderScalar, sameValue, setPairValue, Source, sourceText, TEXT_FIELDS, topMap, type NewValue, type Parsed,
 	type Step,
 } from './yaml-patch';
+import { REFUSAL_TEXT } from './refusal-text';
 
 function setPersonFields(first: Parsed, op: SetPersonFields, data: RawMap, index: number): EditResult {
 	const expected = clone(data) as RawMap;
@@ -136,10 +137,10 @@ export function newHouseId(data: Raw, name: string): string {
 }
 
 function addHouse(first: Parsed, op: AddHouse, data: RawMap): EditResult {
-	if (typeof op.name !== 'string' || op.name.trim() === '') return refuse('bad-value', 'A house must have a name.');
+	if (typeof op.name !== 'string' || op.name.trim() === '') return refuse('bad-value', REFUSAL_TEXT.houseName);
 	if (op.color !== undefined && typeof op.color !== 'string') return refuse('bad-value', 'The colour must be text.');
 	// Null is taken as "no arms", as an empty text is.
-	if (op.arms !== undefined && op.arms !== null && typeof op.arms !== 'string') return refuse('bad-value', 'The arms must be a link.');
+	if (op.arms !== undefined && op.arms !== null && typeof op.arms !== 'string') return refuse('bad-value', REFUSAL_TEXT.armsLink);
 	const expected = clone(data ?? {}) as RawMap;
 	if (!isEmpty(expected.houses) && !Array.isArray(expected.houses)) return refuse('bad-value', 'The houses section is not a list.');
 	const id = newHouseId(expected, op.name);
@@ -167,9 +168,7 @@ function addHouse(first: Parsed, op: AddHouse, data: RawMap): EditResult {
 		const node = housesPair?.value;
 		// Like add-person, the new house goes after the comments the last house owns.
 		if (isSeq(node) && (node.items.length || node.flow)) return appendItem(p.src, node, block, flow, node.flow ? undefined : itemEnd(p.src, node, node.items.length - 1));
-		const pad = ' '.repeat(layout.seqIndent);
-		const itemPad = ' '.repeat(layout.seqIndent + layout.itemIndent);
-		const value: NewValue = { block: block.map((l, n) => (n === 0 ? `${pad}- ${l}` : itemPad + l)), flow: `[${flow}]` };
+		const value: NewValue = { block: itemBlock(layout, block), flow: `[${flow}]` };
 		if (housesPair && top) return setPairValue(p.src, top, housesPair, value, layout);
 		return addSection(p, 'houses', value);
 	};

@@ -12,7 +12,7 @@ import { fixtureSource } from './acceptance/load';
 import { serial, type Rect } from './acceptance/m11-support';
 
 /*
- * 1.1.1 WP4 (spec §13.15 rule 4): lines and partnership signs of a lazy scene are built when they come near the
+ * 0.2.1 WP4 (spec §13.15 rule 4): lines and partnership signs of a lazy scene are built when they come near the
  * view. The eager scene and a lazy scene after `fillAll` must be the same bytes, in any order of fills; a line that is
  * partly near is whole; nothing a person can tap is missing (lines and signs have no tap area).
  * Run: npx vitest run tests/v111-cull-scene.test.ts

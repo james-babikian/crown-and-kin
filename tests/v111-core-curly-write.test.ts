@@ -4,7 +4,7 @@ import { linkTargets } from '../src/core/link-rewrite';
 import { parseDynasty } from '../src/core/parse';
 import { applyOp } from '../src/core/yaml-edit';
 
-// Version 1.1.1, D103 (spec §13.16 rule 11): reading a curly-wrapped value never rewrites it.
+// Version 0.2.1, D103 (spec §13.16 rule 11): reading a curly-wrapped value never rewrites it.
 // A write that changes another value leaves the curly value byte for byte as typed, and a value
 // that the plugin writes itself is written with straight marks, as before.
 

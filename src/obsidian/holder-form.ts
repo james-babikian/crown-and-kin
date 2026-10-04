@@ -11,7 +11,7 @@ import { Modal, type App } from 'obsidian';
 import { SHEET, TITLES_UI } from '../render/ui-text';
 import { ignoreGhostClick, phoneLayout } from './modal-layout';
 import { trackModal } from './plugin-modals';
-import { sheetField, showErrorLine } from './sheet-parts';
+import { nameDialog, revealFocused, sheetField, showErrorLine } from './sheet-parts';
 import { formResult, formStart, previewParts, rulerOf, type HolderFormFields, type HolderValues } from './titles-draft';
 
 /** What the holder form shows and where its values go. */
@@ -67,11 +67,15 @@ class HolderFormModal extends Modal {
 	override onOpen(): void {
 		this.modalEl.addClass('dynasty-sheet');
 		this.modalEl.addClass('dynasty-holder-form');
-		this.cleanup.push(phoneLayout(this), ignoreGhostClick(this), trackModal(this, () => this.finish()));
+		this.cleanup.push(phoneLayout(this, () => revealFocused(this.modalEl, this.contentEl)), ignoreGhostClick(this), trackModal(this, () => this.finish()));
+		// The keyboard can cover a field in the scrolling body: bring it into view when it gets the focus (C1).
+		const reveal = () => revealFocused(this.modalEl, this.contentEl, 300);
+		this.contentEl.addEventListener('focusin', reveal);
+		this.cleanup.push(() => this.contentEl.removeEventListener('focusin', reveal));
 		const el = this.contentEl;
 		el.addClass('dynasty-sheet-content');
 		const header = el.createDiv({ cls: 'dynasty-sheet-header' });
-		header.createDiv({ cls: 'dynasty-sheet-title', text: this.spec.heading });
+		nameDialog(this.modalEl, header.createDiv({ cls: 'dynasty-sheet-title', text: this.spec.heading }));
 		const actions = header.createDiv({ cls: 'dynasty-sheet-actions' });
 		actions.createEl('button', { cls: 'dynasty-sheet-cancel', text: SHEET.cancel, attr: { type: 'button' } }).addEventListener('click', () => this.finish());
 		const save = actions.createEl('button', { cls: ['mod-cta', 'dynasty-sheet-save'], text: SHEET.save, attr: { type: 'button' } });

@@ -62,7 +62,7 @@ export type TitleLines = (title: string | undefined, reign: string | undefined, 
 
 /** D61: a title text line, with the reign after it, on one or two text lines; see `TitleLines`. */
 export const titleLines: TitleLines = (title, reign, width, measure) => {
-	// Without a reign the title is cut exactly as a 1.0 title text line is.
+	// Without a reign the title is cut exactly as a 0.1 title text line is.
 	if (!reign?.trim()) return title ? [truncate(title, width, measure)] : [];
 	const tail = reign.trim();
 	const head = title?.trim() ?? '';

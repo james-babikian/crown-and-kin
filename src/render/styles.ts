@@ -214,9 +214,9 @@ export const UNION_MARKS: Record<UnionShape, { size: number; stroke?: number }> 
 };
 
 /**
- * 1.1.1: the partnership sign inside a far-couple tag. `unit` is the sign's size unit as a fraction of the
+ * 0.2.1: the partnership sign inside a far-couple tag. `unit` is the sign's size unit as a fraction of the
  * tag's text size (it replaces the union size of a near couple's sign, so the sign fits the pill); `slot` is
- * the room of the dot only, in text sizes, with a small gap on each side (1.1.2: `tagMarkSlot` gives the room of
+ * the room of the dot only, in text sizes, with a small gap on each side (0.2.2: `tagMarkSlot` gives the room of
  * each shape, wider for the ring, the diamond and the triangle). The shapes and outline widths are those of
  * `UNION_MARKS`.
  */
@@ -228,13 +228,13 @@ function shapeHalfWidth(shape: UnionShape, s: number): number {
 	return (shape === 'open-triangle' ? 0.95 * s : s) + (stroke ?? 0) / 2;
 }
 
-/** 1.1.2 (D108): half the drawn width of the sign of `shape` in a far-couple tag of text size `font` px, outline included. */
+/** 0.2.2 (D108): half the drawn width of the sign of `shape` in a far-couple tag of text size `font` px, outline included. */
 export function tagMarkHalfWidth(shape: UnionShape, font: number): number {
 	return shapeHalfWidth(shape, UNION_MARKS[shape].size * TAG_MARK.unit * font);
 }
 
 /**
- * 1.1.2 (D108): the clear gap G between the right edge of the partnership sign and the start of the name in a
+ * 0.2.2 (D108): the clear gap G between the right edge of the partnership sign and the start of the name in a
  * far-couple tag, for text size `font` px. It is the gap that the dot always had (the dot sits in the middle of the
  * 1.1 text-size slot), and every shape gets the same one: the shapes differ in width, so a fixed centred slot
  * left the ring and the open triangle 1 to 2 px from the first letter.
@@ -244,8 +244,8 @@ export function tagMarkGap(font: number): number {
 }
 
 /**
- * 1.1.2 (D108): the room a sign of `shape` takes in a far-couple tag, in px: the gap G on each side of the shape.
- * The sign sits in the middle of this room. For the dot it is `TAG_MARK.slot` text sizes, as in 1.1.1; wider shapes
+ * 0.2.2 (D108): the room a sign of `shape` takes in a far-couple tag, in px: the gap G on each side of the shape.
+ * The sign sits in the middle of this room. For the dot it is `TAG_MARK.slot` text sizes, as in 0.2.1; wider shapes
  * take more room, so the gap before the name is the same and the shape never touches the marriage sign.
  */
 export function tagMarkSlot(shape: UnionShape, font: number): number {
@@ -275,20 +275,3 @@ export const ME_RING_INNER = ME_LOOK.border / 2 + ME_LOOK.ring;
 /** D41: the centre line of the marked card's ring lies this far inside the card's edge, in px: half the border and half the ring. */
 export const ME_RING_INSET = ME_LOOK.border / 2 + ME_LOOK.ring / 2;
 
-/**
- * M10 (spec §13.10): the class names of a fold control in the scene (`render/dom/folds.ts`). The CSS block that styles them is
- * written with the tree view; the headless pictures write their own colours inline. A control is `dynasty-fold` with
- * `is-open` (the button: `dynasty-fold-button` circle and `dynasty-fold-minus` path) or `is-folded` (the sign: `dynasty-fold-pill`
- * for Full and Compact, `dynasty-fold-pill-big` for Overview, and one `dynasty-fold-text`); its tap area is `dynasty-fold-hit`.
- */
-export const FOLD_CLASSES = {
-	control: 'dynasty-fold',
-	open: 'is-open',
-	folded: 'is-folded',
-	button: 'dynasty-fold-button',
-	minus: 'dynasty-fold-minus',
-	pill: 'dynasty-fold-pill',
-	pillBig: 'dynasty-fold-pill-big',
-	text: 'dynasty-fold-text',
-	hit: 'dynasty-fold-hit',
-} as const;

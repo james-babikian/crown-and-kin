@@ -336,7 +336,7 @@ export const pickerRows: PickerRows = <F extends PictureFileLike>(tree: PictureT
 export const searchRows: SearchRows = <F extends PictureFileLike>(tree: PictureTree<F>, query: string, current: string | null, limit: number = PICKER_SEARCH_LIMIT) => {
 	const words = foldForMatch(query).split(/\s+/).filter(Boolean);
 	const rows: PickerRow<F>[] = [{ kind: 'device' }];
-	// A query that folds to nothing (a lone accent mark) is still a search and finds nothing, as in 1.1.0. An empty query is the job of the caller.
+	// A query that folds to nothing (a lone accent mark) is still a search and finds nothing, as in 0.2.0. An empty query is the job of the caller.
 	if (!words.length && query.trim() !== '') return { rows, more: false };
 	let more = false;
 	let taken = 0;

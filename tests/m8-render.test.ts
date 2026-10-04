@@ -257,7 +257,7 @@ describe('D61: titleLines (spec §13.3 break rule)', () => {
 		expect(titleLines('Count', '(r. 1131–1140, 1145–1160, from 1170)', 20, len)).toEqual(['Count (r. 1131–1140,', '1145–1160, from 117…']);
 	});
 
-	it('dates off (no reign): one text line cut with "…", as a 1.0 title', () => {
+	it('dates off (no reign): one text line cut with "…", as a 0.1 title', () => {
 		expect(titleLines('Grand Duchess of the Western Marches', undefined, 24, len)).toEqual(['Grand Duchess of the We…']);
 		expect(titleLines('Duke', undefined, 24, len)).toEqual(['Duke']);
 		expect(titleLines('Duke', '', 24, len)).toEqual(['Duke']);

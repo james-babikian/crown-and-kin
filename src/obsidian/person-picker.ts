@@ -18,7 +18,7 @@ import { dateLine } from '../render/tree-info';
 import { FINDER_UI, FLOW } from '../render/ui-text';
 import { ignoreGhostClick, phoneLayout } from './modal-layout';
 import { trackModal } from './plugin-modals';
-import { drawableColour } from './sheet-parts';
+import { drawableColour, nameDialog } from './sheet-parts';
 
 /** What the picker resolved to: a person already in the tree, or a new one by the typed name. */
 export type Picked = { kind: 'person'; id: string } | { kind: 'new'; name: string };
@@ -66,10 +66,14 @@ function definePicker() {
 		override onOpen(): void {
 			super.onOpen();
 			this.modalEl.addClass('dynasty-picker');
+			// A placeholder is not a name for a screen reader (P4).
+			this.inputEl.setAttribute('aria-label', FLOW.pickerSearchLabel);
+			// D101: no curly marks and no corrections in a name that the owner types.
+			this.inputEl.setAttribute('spellcheck', 'false');
 			this.cleanup.push(phoneLayout(this), ignoreGhostClick(this), trackModal(this, () => this.close()));
 			// A heading with the title, as on the sheets; a phone has no Esc key, so there it also has Cancel.
 			const head = createDiv({ cls: 'dynasty-picker-head' });
-			head.createDiv({ cls: 'dynasty-sheet-title', text: this.title });
+			nameDialog(this.modalEl, head.createDiv({ cls: 'dynasty-sheet-title', text: this.title }));
 			const cancel = head.createEl('button', { cls: 'dynasty-picker-cancel', text: FLOW.cancel, attr: { type: 'button' } });
 			cancel.addEventListener('click', () => this.close());
 			this.modalEl.prepend(head);

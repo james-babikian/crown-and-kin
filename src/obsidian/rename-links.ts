@@ -91,6 +91,8 @@ interface Progress {
 }
 
 const pause = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+/** The basename as it is written, with its capitals: `nameForms` encodes it before it lowers the case, because "%C3%89" (É) is not "%C3%A9" (é). */
+const plainName = (path: string) => (path.split('/').pop() ?? path).replace(/\.md$/i, '');
 /** The last part of a path, without `.md`, lower case: the "old basename" of spec §6.9. A picture keeps its extension. */
 const baseName = (path: string) => (path.split('/').pop() ?? path).replace(/\.md$/i, '').toLowerCase();
 const shownPath = (path: string) => path.replace(/\.md$/i, '');
@@ -160,20 +162,28 @@ function linkBase(link: string): string {
 }
 
 /**
- * The forms an old basename can take in note text: as typed, percent-encoded in a Markdown link (also
- * as the plugin itself writes one), and fully percent-decoded.
+ * The forms an old basename (with its capitals) can take in note text, all in lower case to match the
+ * lowered note text: as typed, percent-encoded in a Markdown link (also as the plugin itself writes one,
+ * and as `encodeURI` and `encodeURIComponent` do), and fully percent-decoded.
  */
 export function nameForms(name: string): string[] {
-	const forms = [name, name.replace(/ /g, '%20'), encode(name).toLowerCase()];
-	try {
-		forms.push(encodeURIComponent(name).toLowerCase());
-	} catch {
-		// A lone surrogate: the other forms are enough.
-	}
-	try {
-		forms.push(decodeURIComponent(name).toLowerCase());
-	} catch {
-		// A bad escape: the name has no decoded form.
+	// Obsidian finds a note by a name in any case, so a link can spell an accent as "%c3%a9" for "É": the forms of the lower-case name count too.
+	const forms: string[] = [];
+	for (const n of new Set([name, name.toLowerCase()])) {
+		forms.push(n.toLowerCase(), n.replace(/ /g, '%20').toLowerCase(), encode(n).toLowerCase());
+		try {
+			forms.push(encodeURIComponent(n).toLowerCase());
+			// Obsidian writes a Markdown link with `encodeURI`: it keeps `, & ; = + $ @ :` as they are, and
+			// encodes a letter such as "é". Neither form above has that mix.
+			forms.push(encodeURI(n).toLowerCase());
+		} catch {
+			// A lone surrogate: the other forms are enough.
+		}
+		try {
+			forms.push(decodeURIComponent(n).toLowerCase());
+		} catch {
+			// A bad escape: the name has no decoded form.
+		}
 	}
 	return [...new Set(forms)];
 }
@@ -527,7 +537,7 @@ export class LinkUpdater {
 	 * batch has no name to look for, or the update halted during the scan.
 	 */
 	private async scan(batch: Renamed[], obsidian: Promise<void>, st: Progress, report: LinkReportText): Promise<ScanResult | null> {
-		const names = [...new Set(batch.flatMap((r) => nameForms(baseName(r.oldPath))))].filter(Boolean);
+		const names = [...new Set(batch.flatMap((r) => nameForms(plainName(r.oldPath))))].filter(Boolean);
 		if (!names.length) return null;
 		const olds = new Set(batch.map((r) => baseName(r.oldPath)));
 		const files = this.app.vault.getMarkdownFiles();

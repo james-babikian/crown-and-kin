@@ -17,8 +17,8 @@ import { applyOp } from '../src/core/yaml-edit';
 import { HandleRegistry } from '../src/obsidian/block-handle';
 
 /*
- * Review of version 1.0.1, area B (the write path), on scratch/review-101-b. Each test shows one
- * defect and fails on release-1.0.1 (d23ba64).
+ * Review of version 0.1.1, area B (the write path), on scratch/review-101-b. Each test shows one
+ * defect and fails on release-0.1.1 (d23ba64).
  */
 
 /** A vault with one note, no open editors: writes go through `vault.process`. */

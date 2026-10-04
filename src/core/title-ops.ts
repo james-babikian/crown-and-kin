@@ -33,9 +33,10 @@ import { isEmpty, isMap as isRawMap, str, type Raw, type RawMap } from './tolera
 import type { Tree } from './types';
 import { dashOf, itemEnd, itemStart, removeFromSection, removeItems, section } from './yaml-list';
 import {
-	addPair, addSection, appendItem, clone, commentsOf, findPair, finish, finishTogether, insertAt, isRefusal, layoutOf, personNode, recall, refuse, removePair, renderScalar,
+	addPair, addSection, appendItem, clone, commentsOf, findPair, finish, finishTogether, insertAt, isRefusal, itemBlock, layoutOf, personNode, recall, refuse, removePair, renderScalar,
 	setPairValue, Source, topMap, type Layout, type NewValue, type Parsed, type Patch, type Refusal, type Step,
 } from './yaml-patch';
+import { REFUSAL_TEXT } from './refusal-text';
 
 /** §13.0 key order of a title and of a holder. */
 const TITLE_ORDER = ['id', 'name', 'male-name', 'female-name', 'plural', 'numbering', 'count-with', 'holders'];
@@ -141,7 +142,7 @@ function withFields(raw: Raw, changes: Changes): { value: Raw; changed: Changes 
 		changed.push([key, write]);
 	}
 	if (!changed.length) return { value: raw, changed };
-	if (str(base.person) === undefined && str(base.name) === undefined) return refuse('bad-value', 'A holder needs a person or a name.');
+	if (str(base.person) === undefined && str(base.name) === undefined) return refuse('bad-value', REFUSAL_TEXT.holderNeeds);
 	return { value: base, changed };
 }
 
@@ -426,11 +427,11 @@ export const newTitleId: NewTitleId = (body, name, taken) => {
 
 function addTitle(ctx: TitleContext, op: AddTitle): EditResult {
 	const { data } = ctx;
-	if (typeof op.id !== 'string' || str(op.id) !== op.id) return refuse('bad-value', 'The new id must be text without spaces at the ends.');
-	if (typeof op.name !== 'string' || op.name.trim() === '') return refuse('bad-value', 'A title must have a name.');
-	if (op.maleName !== undefined && op.maleName !== null && typeof op.maleName !== 'string') return refuse('bad-value', 'The name for a man must be text.');
-	if (op.femaleName !== undefined && op.femaleName !== null && typeof op.femaleName !== 'string') return refuse('bad-value', 'The name for a woman must be text.');
-	if (op.plural !== undefined && op.plural !== null && typeof op.plural !== 'string') return refuse('bad-value', 'The plural must be text.');
+	if (typeof op.id !== 'string' || str(op.id) !== op.id) return refuse('bad-value', REFUSAL_TEXT.newIdText);
+	if (typeof op.name !== 'string' || op.name.trim() === '') return refuse('bad-value', REFUSAL_TEXT.titleName);
+	if (op.maleName !== undefined && op.maleName !== null && typeof op.maleName !== 'string') return refuse('bad-value', REFUSAL_TEXT.maleNameText);
+	if (op.femaleName !== undefined && op.femaleName !== null && typeof op.femaleName !== 'string') return refuse('bad-value', REFUSAL_TEXT.femaleNameText);
+	if (op.plural !== undefined && op.plural !== null && typeof op.plural !== 'string') return refuse('bad-value', REFUSAL_TEXT.pluralText);
 	if (!isEmpty(data.titles) && !Array.isArray(data.titles)) return refuse('bad-value', 'The titles section is not a list.');
 	if (titleIndex(data, op.id) !== undefined) return refuse('id-taken');
 	const maleName = typeof op.maleName === 'string' && op.maleName.trim() !== '' ? op.maleName : undefined;
@@ -458,9 +459,7 @@ function addTitle(ctx: TitleContext, op: AddTitle): EditResult {
 		const node = pair?.value;
 		// Like add-house, the new title goes after the comments the last title owns.
 		if (isSeq(node) && (node.items.length || node.flow)) return appendItem(src, node, block, flow, node.flow ? undefined : itemEnd(src, node, node.items.length - 1));
-		const pad = ' '.repeat(layout.seqIndent);
-		const itemPad = ' '.repeat(layout.seqIndent + layout.itemIndent);
-		const value = { block: block.map((l, n) => (n === 0 ? `${pad}- ${l}` : itemPad + l)), flow: `[${flow}]` };
+		const value = { block: itemBlock(layout, block), flow: `[${flow}]` };
 		if (pair && top) return setPairValue(src, top, pair, value, layout);
 		return titlesSection(p, value);
 	};
@@ -503,10 +502,10 @@ function titlesSection(p: Parsed, value: Extract<NewValue, { block: string[] }>)
 function editTitle(ctx: TitleContext, op: EditTitle): EditResult {
 	const index = titleIndex(ctx.data, op.id);
 	if (index === undefined) return refuse('unknown-title');
-	if (op.name !== undefined && (typeof op.name !== 'string' || op.name.trim() === '')) return refuse('bad-value', 'A title must have a name.');
-	if (op.maleName !== undefined && op.maleName !== null && typeof op.maleName !== 'string') return refuse('bad-value', 'The name for a man must be text.');
-	if (op.femaleName !== undefined && op.femaleName !== null && typeof op.femaleName !== 'string') return refuse('bad-value', 'The name for a woman must be text.');
-	if (op.plural !== undefined && op.plural !== null && typeof op.plural !== 'string') return refuse('bad-value', 'The plural must be text.');
+	if (op.name !== undefined && (typeof op.name !== 'string' || op.name.trim() === '')) return refuse('bad-value', REFUSAL_TEXT.titleName);
+	if (op.maleName !== undefined && op.maleName !== null && typeof op.maleName !== 'string') return refuse('bad-value', REFUSAL_TEXT.maleNameText);
+	if (op.femaleName !== undefined && op.femaleName !== null && typeof op.femaleName !== 'string') return refuse('bad-value', REFUSAL_TEXT.femaleNameText);
+	if (op.plural !== undefined && op.plural !== null && typeof op.plural !== 'string') return refuse('bad-value', REFUSAL_TEXT.pluralText);
 	const expected = clone(ctx.data) as RawMap;
 	const title = rawTitles(expected)[index] as RawMap;
 	const changes: [string, string | null][] = [];
@@ -587,7 +586,7 @@ function newHolder(ctx: TitleContext, fields: unknown): { value: RawMap } | Refu
 	if (isRefusal(changes)) return changes;
 	const made = withFields({}, changes);
 	if (isRefusal(made)) return made;
-	if (!made.changed.length) return refuse('bad-value', 'A holder needs a person or a name.');
+	if (!made.changed.length) return refuse('bad-value', REFUSAL_TEXT.holderNeeds);
 	return { value: made.value as RawMap };
 }
 

@@ -11,7 +11,7 @@ import { block15 } from './acceptance/m10-support';
 import { desktop, embed, fakeHandle, fullViews, phone } from './acceptance/tree-view-fakes';
 
 /*
- * 1.1.1 WP4 (spec §13.15 rule 4): the tree view builds the lines and partnership signs of a big tree when they come
+ * 0.2.1 WP4 (spec §13.15 rule 4): the tree view builds the lines and partnership signs of a big tree when they come
  * near the view: the first view has the near ones only, the idle chain builds the rest together with the cards, the
  * harness event builds all, and a focus on a far card builds the lines that touch it. The scene itself is tested in
  * `v111-cull-scene`, the cards in `m11-tree-view-lazy`.

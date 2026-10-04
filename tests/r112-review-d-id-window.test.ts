@@ -1,5 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unused-vars -- scratch proof file of the review round: it keeps helpers it does not use now */
-import { readFileSync } from 'node:fs';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('obsidian', () => import('./acceptance/fake-obsidian'));
@@ -11,26 +9,17 @@ const answers: unknown[] = [];
 vi.mock('../src/obsidian/choice-modal', () => ({ choose: async () => answers.shift() ?? null }));
 vi.mock('../src/obsidian/person-picker', () => ({ pickPerson: async () => answers.shift() ?? null }));
 
-import { deriveFamilies } from '../src/core/derive';
 import type { Op } from '../src/core/edit';
-import { describeHouseIdChange } from '../src/core/house-ops';
-import { nextPersonId } from '../src/core/id-gen';
-import { parseBody, parseDynasty, readTree } from '../src/core/parse';
-import { applyOp, newPersonId } from '../src/core/yaml-edit';
-import { EditSheet } from '../src/obsidian/edit-sheet';
+import { applyOp } from '../src/core/yaml-edit';
 import { FullScreenModal } from '../src/obsidian/full-screen';
-import { HousesWindow, houseOps, loadHouses, rowsOf } from '../src/obsidian/houses-window';
-import { danglingIds, idFromName, idOps, idProblemFor, idProblems, idRefusalText, type IdRow } from '../src/obsidian/id-draft';
+import { HousesWindow } from '../src/obsidian/houses-window';
 import { closePluginModals } from '../src/obsidian/plugin-modals';
-import { draftChanged, rebase, titleIdRow, titleRows, windowOps, withHolderIds } from '../src/obsidian/titles-draft';
-import { TitlesWindow } from '../src/obsidian/titles-window';
-import { HOUSES, ID_UI, REMOVE, SHEET, TITLES_UI, WRITE_TEXT } from '../src/render/ui-text';
-import { FEl, clock, dispatch, fakeDoc, fakeWin, installDom, resetDom, settle } from './acceptance/fake-dom';
-import { noticeList, notices, openModals, resetObsidian } from './acceptance/fake-obsidian';
-import { embed, fakeHandle, fakeHost, type FakeHandle, type Host } from './acceptance/tree-view-fakes';
+import { FEl, clock, dispatch, fakeWin, installDom, resetDom, settle } from './acceptance/fake-dom';
+import { openModals, resetObsidian } from './acceptance/fake-obsidian';
+import { embed, fakeHandle, type FakeHandle } from './acceptance/tree-view-fakes';
 
 /*
- * Review D of 1.1.2 (small Id window, D110). The real windows run on the fakes, as in
+ * Review D of 0.2.2 (small Id window, D110). The real windows run on the fakes, as in
  * `v112-obsidian-ids.test.ts`; the helpers below are copied from that file.
  */
 
@@ -88,12 +77,6 @@ const click = async (el: FEl | null) => {
 	await settle();
 };
 
-function type(input: FEl, text: string): void {
-	input.value = text;
-	dispatch(input, 'input');
-}
-
-
 const HOUSES_BODY = `houses:
   - id: valmont
     name: House Valmont
@@ -136,15 +119,10 @@ async function openHouses(body = HOUSES_BODY, handle: Writing = writingHandle(bo
 }
 
 const houseRow = (content: FEl, id: string) => content.querySelector(`.dynasty-house-row[data-house="${id}"]`)!;
-const saveOf = (content: FEl) => content.querySelector('.dynasty-sheet-save')!;
-const confirmOf = (modal: FEl) => modal.querySelector('.dynasty-sheet-confirm');
-const confirmLines = (modal: FEl) => confirmOf(modal)!.querySelectorAll('.dynasty-sheet-confirm-text').map((t) => t.getText());
 
 /** The modal on top: the small Id window when one is open. */
 const topModal = () => (openModals[openModals.length - 1] as unknown as { modalEl: FEl }).modalEl;
 const fieldOf = (w: FEl) => w.querySelector('.dynasty-id-input')!;
-const useOf = (w: FEl) => w.querySelector('.dynasty-id-use')!;
-const problemOf = (w: FEl) => w.querySelector('.dynasty-id-problem')!.getText();
 
 /** Taps "Change id" of a row and returns the small window. */
 async function openIdOf(row: FEl): Promise<FEl> {
@@ -153,53 +131,6 @@ async function openIdOf(row: FEl): Promise<FEl> {
 	expect(w.hasClass('dynasty-id-window')).toBe(true);
 	return w;
 }
-
-/** Types an id into the small window of a row and taps "Use this id". */
-async function setId(row: FEl, value: string): Promise<void> {
-	const w = await openIdOf(row);
-	type(fieldOf(w), value);
-	await click(useOf(w));
-}
-
-const noteOf = (row: FEl) => row.querySelector('.dynasty-id-new');
-
-
-const TITLES_BODY = `titles:
-  - id: duke
-    name: Duke
-    holders:
-      - {person: a, number: I}
-      - {person: b, number: II}
-  - id: baron
-    name: Baron
-people:
-  - id: a
-    name: Aldric
-    card-title: duke
-  - id: b
-    name: Bran
-    card-title: duke
-  - id: c
-    name: Cora
-    card-title: lost
-`;
-
-const titlesWindows = () => openModals.filter((m) => (m as unknown) instanceof TitlesWindow) as unknown as TitlesWindow[];
-
-async function openTitles(body = TITLES_BODY, handle: Writing = writingHandle(body)) {
-	const host = fakeHost() as Host;
-	const { el } = await embed(handle.body, { handle, host });
-	await click(el.querySelector('.dynasty-more'));
-	await click(el.querySelector('.dynasty-more-titles'));
-	const win = titlesWindows()[0];
-	expect(win).toBeDefined();
-	const content = (win as unknown as { contentEl: FEl }).contentEl;
-	const modal = (win as unknown as { modalEl: FEl }).modalEl;
-	return { handle, win, content, modal };
-}
-
-const titleBox = (content: FEl, id: string) => content.querySelector(`.dynasty-title-box[data-title="${id}"]`)!;
-
 
 describe('review D: the small Id window', () => {
 	it('D1: a second activation of "Change id" while the small window is open opens no second small window', async () => {

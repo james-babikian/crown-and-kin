@@ -10,6 +10,7 @@
 
 import { isAlias, isMap, isScalar, isSeq, parseDocument, Scalar, type Node, type YAMLMap } from 'yaml';
 import type { EditResult, RewriteLinksOp } from './edit';
+import { closesBalanced } from './link-text';
 import { parseBody } from './parse';
 import { pictureFormat } from './pictures';
 import { curlyParts, isMap as isRawMap, linkValue, type Raw, type RawMap } from './tolerate';
@@ -46,16 +47,6 @@ function split(head: string, text: string, tail: string, cut: RegExp, kind: Link
 	const target = kind === 'md' ? decode(core).trim() : core;
 	if (target === '') return null;
 	return { head: head + lead, target, tail: path.slice(lead.length + core.length) + rest + tail, kind };
-}
-
-/** True if every `)` in a Markdown destination closes an earlier `(` (contract A2: `Arms%20(old).png`). */
-function closesBalanced(dest: string): boolean {
-	let depth = 0;
-	for (const ch of dest) {
-		if (ch === '(') depth++;
-		else if (ch === ')' && --depth < 0) return false;
-	}
-	return true;
 }
 
 /**

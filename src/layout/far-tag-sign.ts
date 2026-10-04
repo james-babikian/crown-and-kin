@@ -1,7 +1,7 @@
 /**
  * Decides which far-couple tags (spec D10) show a partnership sign inside the tag. A far couple with
  * children has a union dot below the anchor partner, and that dot is the sign. A far couple with no
- * children has no dot, so the tag carries the sign instead (1.1.1). `render/svg-string.ts` and
+ * children has no dot, so the tag carries the sign instead (0.2.1). `render/svg-string.ts` and
  * `render/dom/scene.ts` both call `farTagSigns`, so the headless picture and the live tree agree.
  */
 import type { FamilyGraph } from '../core/derive';

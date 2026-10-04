@@ -16,7 +16,7 @@ import { findBlocks } from '../src/core/block-locate';
 import { HandleRegistry } from '../src/obsidian/block-handle';
 
 /*
- * Write-path rules of the version 1.0.1 area B fix round (the decision notes "Version 1.0.1"): a copy of a
+ * Write-path rules of the version 0.1.1 area B fix round (the decision notes "Version 0.1.1"): a copy of a
  * block is not the block moved (1), a `missing` write is retried like a stale one (3), and a write
  * that changes nothing leaves no trace (4).
  */

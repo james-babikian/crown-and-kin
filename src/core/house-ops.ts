@@ -13,6 +13,7 @@ import { removeFromSection, section } from './yaml-list';
 import {
 	addPair, clone, doubleQuoted, findPair, finish, finishTogether, isRefusal, layoutOf, refuse, removePair, setPairValue, sourceText, type Parsed, type Patch, type Refusal, type Source, type Step,
 } from './yaml-patch';
+import { REFUSAL_TEXT } from './refusal-text';
 
 /** §4.1 and §13.0 item 1 order of a house's keys. */
 const HOUSE_ORDER = ['id', 'name', 'color', 'arms'];
@@ -52,11 +53,11 @@ function replaceCommentedColour(src: Source, pair: Pair, text: string): Patch | 
 export function editHouse(first: Parsed, data: RawMap, op: EditHouse): EditResult {
 	const index = houseIndex(data, op.id);
 	if (index === undefined) return refuse('unknown-house');
-	if (op.name !== undefined && (typeof op.name !== 'string' || op.name.trim() === '')) return refuse('bad-value', 'A house must have a name.');
+	if (op.name !== undefined && (typeof op.name !== 'string' || op.name.trim() === '')) return refuse('bad-value', REFUSAL_TEXT.houseName);
 	// An empty colour removes the key, as an empty optional person field does (`personValue`).
 	const wanted = typeof op.color === 'string' && op.color.trim() === '' ? null : op.color;
 	if (wanted !== undefined && wanted !== null && (typeof wanted !== 'string' || !COLOUR.test(wanted))) return refuse('bad-value', 'A colour must be written as #rrggbb.');
-	if (op.arms !== undefined && op.arms !== null && typeof op.arms !== 'string') return refuse('bad-value', 'The arms must be a link.');
+	if (op.arms !== undefined && op.arms !== null && typeof op.arms !== 'string') return refuse('bad-value', REFUSAL_TEXT.armsLink);
 	const wantedArms = typeof op.arms === 'string' && op.arms.trim() === '' ? null : op.arms;
 
 	const expected = clone(data) as RawMap;

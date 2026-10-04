@@ -98,25 +98,24 @@ describe('H2: the keyboard focus of the house page', () => {
 		expect(openModals).toHaveLength(0);
 	});
 
-	it('a rebuild after a phone / computer change gives the focus to the new Close button when the focus was inside the window', () => {
+	it('a change between a phone and a computer width does not draw the page again: the Close button and the focus stay (the layout is CSS, D113 item 4)', () => {
 		device.width = 1280;
 		const p = open();
 		expect(fakeDoc.activeElement).toBe(p.close);
 		device.width = 390;
 		dispatchWindow('resize');
-		const now = p.modalEl.querySelector('.dynasty-sheet-cancel')!;
-		expect(now).not.toBe(p.close);
-		expect(fakeDoc.activeElement).toBe(now);
+		expect(p.modalEl.querySelector('.dynasty-sheet-cancel')).toBe(p.close);
+		expect(fakeDoc.activeElement).toBe(p.close);
 	});
 
-	it('a rebuild leaves the focus alone when it was outside the window', () => {
+	it('the focus stays outside the window when it was outside', () => {
 		device.width = 1280;
 		const p = open();
 		const elsewhere = new FEl('div');
 		elsewhere.focus();
 		device.width = 390;
 		dispatchWindow('resize');
-		expect(p.modalEl.querySelector('.dynasty-sheet-cancel')).not.toBe(p.close);
+		expect(p.modalEl.querySelector('.dynasty-sheet-cancel')).toBe(p.close);
 		expect(fakeDoc.activeElement).toBe(elsewhere);
 	});
 });

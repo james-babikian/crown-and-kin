@@ -10,11 +10,11 @@ import { approxMeasure, renderSvg } from '../src/render/svg-string';
 import { sampleSources } from './acceptance/m11-support';
 
 /*
- * Review of 1.1.1 area C (finding C4): golden hashes of the headless pictures of the sideways layouts (Normal and
- * Narrow cards, light and dark) of sample trees 07, 07b, 12 and 15. The 1.1.1 work on the sideways partner gap and
+ * Review of 0.2.1 area C (finding C4): golden hashes of the headless pictures of the sideways layouts (Normal and
+ * Narrow cards, light and dark) of sample trees 07, 07b, 12 and 15. The 0.2.1 work on the sideways partner gap and
  * the far-couple tag sign changes these layouts on purpose, and `m11-spike-hashes` only holds the `down` layouts.
- * The values are recorded from the code of the 1.1.1 fix round: a later change of the sideways layout or of its
- * drawing must change them on purpose. 1.1.2 (D108): the values of 07 and 07b were recorded again, because their far-couple
+ * The values are recorded from the code of the 0.2.1 fix round: a later change of the sideways layout or of its
+ * drawing must change them on purpose. 0.2.2 (D108): the values of 07 and 07b were recorded again, because their far-couple
  * tags show a ring or an open triangle, which now keep the same gap before the name as the dot. Run: npx vitest run tests/v111-layout-sideways-hash.test.ts
  */
 

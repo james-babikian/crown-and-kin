@@ -1,5 +1,5 @@
-// Design gate 1.1.2 (code-reviewer): tests that pin the corrections to the contract. They are red until WP1 exists
-// (the ops and `nextPersonId` are not built yet), except G1 which runs against the contract text itself.
+// Design gate 0.2.2 (code-reviewer): tests that pin the corrections to the contract of the id operations and
+// `nextPersonId`. They were red until WP1 was built; they now pass and guard the built code.
 import { describe, expect, it } from 'vitest';
 import { nextPersonId } from '../src/core/id-gen';
 import { issueText } from '../src/core/messages';

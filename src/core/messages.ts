@@ -212,7 +212,7 @@ function entryNotMap(p: P): string {
 	const section = s(p, 'section', 'people');
 	const index = s(p, 'index', '?');
 	if (section === 'parents') {
-		return `Entry ${index} in the parents of ${person(p)} is not a person id. Write an id, or a parent such as {id: aldric, type: adoptive}.`;
+		return `Entry ${index} in the parents of ${person(p)} is not a person ID. Write an ID, or a parent such as {id: aldric, type: adoptive}.`;
 	}
 	if (section === 'holders') return `Entry ${index} in ${holdersOf(p)} is not a holder. ${HOLDER_FORM}`;
 	const e = ENTRY[section] ?? ENTRY.people;
@@ -223,26 +223,26 @@ function missingId(p: P): string {
 	const section = s(p, 'section', 'people');
 	const index = s(p, 'index', '?');
 	const name = s(p, 'name', '');
-	if (section === 'parents') return `Entry ${index} in the parents of ${person(p)} has no id. Add the id of the parent.`;
+	if (section === 'parents') return `Entry ${index} in the parents of ${person(p)} has no ID. Add the ID of the parent.`;
 	if (section === 'houses') {
 		const who = name || `Entry ${index} in the “houses” list`;
-		return `${who} has no id, so the tree does not use this house. Add an id, for example: id: ${name ? slugify(name) : 'valmont'}.`;
+		return `${who} has no ID, so the tree does not use this house. Add an ID, for example: id: ${name ? slugify(name) : 'valmont'}.`;
 	}
 	if (section === 'titles') {
 		const who = name || `Entry ${index} in the “titles” list`;
-		return `${who} has no id, so the tree does not use this title. Add an id, for example: id: ${name ? slugify(name) : 'duke-of-valmont'}.`;
+		return `${who} has no ID, so the tree does not use this title. Add an ID, for example: id: ${name ? slugify(name) : 'duke-of-valmont'}.`;
 	}
 	const who = name || `Entry ${index} in the “people” list`;
 	// The reader gives an id that no person has; `p1` only when the text comes without one.
-	return `${who} has no id. Add an id, for example: id: ${s(p, 'example', 'p1')}.`;
+	return `${who} has no ID. Add an ID, for example: id: ${s(p, 'example', 'p1')}.`;
 }
 
 /** D105: the name shows with the id as `NAME (id)`; the brackets mark the id, so it has no quote marks. */
 function duplicatePersonId(p: P): string {
 	const id = s(p, 'id', '?');
 	const name = s(p, 'name', '');
-	if (name && name !== id) return `${name} (${id}) has the same id as another person. To edit the tree again, give each person a different id.`;
-	return `More than one person has the id ${quote(id)}. To edit the tree again, give each person a different id.`;
+	if (name && name !== id) return `${name} (${id}) has the same ID as another person. To edit the tree again, give each person a different ID.`;
+	return `More than one person has the ID ${quote(id)}. To edit the tree again, give each person a different ID.`;
 }
 
 function sectionWrongShape(p: P): string {
@@ -285,33 +285,33 @@ function pictureTooLarge(p: P): string {
 
 const ISSUE_TEXT: { [C in IssueCode]: (p: P) => string } = {
 	'duplicate-person-id': duplicatePersonId,
-	'duplicate-union-id': (p) => `More than one partnership has the id ${quote(s(p, 'id', '?'))}. To edit the tree again, give each partnership a different id.`,
+	'duplicate-union-id': (p) => `More than one partnership has the ID ${quote(s(p, 'id', '?'))}. To edit the tree again, give each partnership a different ID.`,
 
-	'missing-parent': (p) => `${person(p)} has a parent with the id ${quote(s(p, 'ref', '?'))}, but no person has this id. Correct the id, or add the person.`,
+	'missing-parent': (p) => `${person(p)} has a parent with the ID ${quote(s(p, 'ref', '?'))}, but no person has this ID. Correct the ID, or add the person.`,
 	'missing-partner': (p) =>
-		`The tree does not show ${partnership(p)}, because no person has the id ${quote(s(p, 'ref', '?'))}. Correct the id, or add the person.`,
-	'missing-house': (p) => `${person(p)} has the house ${quote(s(p, 'ref', '?'))}, but no house has this id. Correct the id, or add the house.`,
+		`The tree does not show ${partnership(p)}, because no person has the ID ${quote(s(p, 'ref', '?'))}. Correct the ID, or add the person.`,
+	'missing-house': (p) => `${person(p)} has the house ${quote(s(p, 'ref', '?'))}, but no house has this ID. Correct the ID, or add the house.`,
 	'missing-union': (p) => {
 		const ref = s(p, 'ref', '?');
-		return `${person(p)} has “union: ${ref}”, but no partnership has this id. Correct the id, or remove “union: ${ref}”.`;
+		return `${person(p)} has “union: ${ref}”, but no partnership has this ID. Correct the ID, or remove “union: ${ref}”.`;
 	},
 	'union-not-of-parents': (p) => {
 		const ref = s(p, 'ref', '?');
-		return `${person(p)} has “union: ${ref}”, but this partnership is not between the parents of ${person(p)}. Correct the id, or remove “union: ${ref}”.`;
+		return `${person(p)} has “union: ${ref}”, but this partnership is not between the parents of ${person(p)}. Correct the ID, or remove “union: ${ref}”.`;
 	},
 	'missing-start': (p) => {
 		const ref = s(p, 'ref', '?');
-		return `No person has the id ${quote(ref)}, so the tree cannot start at this person. Correct the id, or remove “start: ${ref}”.`;
+		return `No person has the ID ${quote(ref)}, so the tree cannot start at this person. Correct the ID, or remove “start: ${ref}”.`;
 	},
 	'missing-focus': (p) => {
 		const ref = s(p, 'ref', '?');
-		return `No person has the id ${quote(ref)}, so the tree cannot show the family of this person. Correct the id, or remove “focus: ${ref}”.`;
+		return `No person has the ID ${quote(ref)}, so the tree cannot show the family of this person. Correct the ID, or remove “focus: ${ref}”.`;
 	},
 	'missing-me': (p) => {
 		const ref = s(p, 'ref', '?');
-		return `No person has the id ${quote(ref)}, so the tree cannot show how people relate to you. Correct the id, or remove “me: ${ref}”.`;
+		return `No person has the ID ${quote(ref)}, so the tree cannot show how people relate to you. Correct the ID, or remove “me: ${ref}”.`;
 	},
-	'me-not-id': () => '“me” in the options does not name one person. Write one person id after “me:”.',
+	'me-not-id': () => '“me” in the options does not name one person. Write one person ID after “me:”.',
 
 	'too-many-parents': (p) =>
 		`${person(p)} has ${n(p, 'count')} ${s(p, 'type', 'birth')} parents, but a person can have only 2 of each type. Remove the extra parents, or change their type.`,
@@ -339,13 +339,13 @@ const ISSUE_TEXT: { [C in IssueCode]: (p: P) => string } = {
 		if (value) return `${cap(house(p))} has no colour. Put quotes around the colour: color: "${value}".`;
 		return `${cap(house(p))} has no colour. If you wrote a colour, put quotes around it, for example: color: "#8b1e3f".`;
 	},
-	'duplicate-house-id': (p) => `More than one house has the id ${quote(s(p, 'id', '?'))}, and the tree uses only the first. Give each house a different id.`,
-	'duplicate-title-id': (p) => `More than one title has the id ${quote(s(p, 'id', '?'))}, and the tree uses only the first. Give each title a different id.`,
+	'duplicate-house-id': (p) => `More than one house has the ID ${quote(s(p, 'id', '?'))}, and the tree uses only the first. Give each house a different ID.`,
+	'duplicate-title-id': (p) => `More than one title has the ID ${quote(s(p, 'id', '?'))}, and the tree uses only the first. Give each title a different ID.`,
 	'missing-holder': (p) =>
-		`${cap(titleOf(p))} has a holder with the id ${quote(s(p, 'ref', '?'))}, but no person has this id. Correct the id, or write the name of the holder.`,
+		`${cap(titleOf(p))} has a holder with the ID ${quote(s(p, 'ref', '?'))}, but no person has this ID. Correct the ID, or write the name of the holder.`,
 	'holder-empty': (p) => `Entry ${s(p, 'index', '?')} in ${holdersOf(p)} has no person and no name. Add “person:” or “name:”.`,
 	'card-title-not-held': (p) =>
-		`${person(p)} has “card-title: ${s(p, 'ref', '?')}”, but ${person(p)} does not hold a title with this id. The card shows the first title instead. Correct the id, or remove it.`,
+		`${person(p)} has “card-title: ${s(p, 'ref', '?')}”, but ${person(p)} does not hold a title with this ID. The card shows the first title instead. Correct the ID, or remove it.`,
 
 	'unknown-union-type': (p) =>
 		`${cap(partnership(p))} has the unknown type ${quote(s(p, 'value', '?'))}. Use marriage, betrothal, concubinage or affair.`,
@@ -380,10 +380,11 @@ export const issueText = (issue: CodedIssue): string => {
 	return make ? make(issue.params ?? {}) : 'The tree has a problem.';
 };
 
+const BLOCK_ERROR = 'The block has an error. Correct the text to show the tree.';
+
 const HARD_ERROR_TEXT: { [C in HardErrorCode]: (e: HardError) => string } = {
 	'yaml-invalid': (e) => {
-		const where =
-			e.line !== undefined ? `The block has an error on text line ${e.line}. Correct this text line to show the tree.` : 'The block has an error. Correct the text to show the tree.';
+		const where = e.line !== undefined ? `The block has an error on text line ${e.line}. Correct this text line to show the tree.` : BLOCK_ERROR;
 		return e.detail ? `${where} Details: ${e.detail}` : where;
 	},
 	'not-a-map': () => 'The block does not have sections such as “people:”. To show the tree, put each person in a list below “people:”.',
@@ -392,5 +393,5 @@ const HARD_ERROR_TEXT: { [C in HardErrorCode]: (e: HardError) => string } = {
 /** The sentence to show the user for a hard error (the tree cannot be drawn at all). */
 export const hardErrorText = (error: HardError): string => {
 	const make = HARD_ERROR_TEXT[error.code] as ((e: HardError) => string) | undefined;
-	return make ? make(error) : 'The block has an error. Correct the text to show the tree.';
+	return make ? make(error) : BLOCK_ERROR;
 };

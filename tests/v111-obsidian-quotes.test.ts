@@ -5,7 +5,7 @@ import * as UI_TEXT from '../src/render/ui-text';
 import * as TREE_INFO from '../src/render/tree-info';
 import { CURLY_APOSTROPHE, CURLY_CLOSE, CURLY_OPEN } from '../src/core/quote';
 
-// D99 (spec §13.0, 1.1.1): the plugin's own texts use curly quote marks and the curly apostrophe. This test
+// D99 (spec §13.0, 0.2.1): the plugin's own texts use curly quote marks and the curly apostrophe. This test
 // calls every exported text table and text function of the render text files and fails on any straight
 // " or '. The YAML example that the owner types stays straight; it lives in `src/core/messages.ts`, not here.
 // `INSERT_UI.noteHint` is the one text here that stays straight: the plugin writes it into the owner's note (ruling A4).

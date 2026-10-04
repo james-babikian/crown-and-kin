@@ -9,7 +9,7 @@ import { DEFAULT_LIGHT, ME_LOOK, ME_RING_INNER } from '../src/render/styles';
 import { approxMeasure, renderSvg } from '../src/render/svg-string';
 import { FEl, installDom } from './acceptance/fake-dom';
 
-// Review of 1.1.1 area C (proof adopted from the code-reviewer), D96: the lowered arms box on the marked card at note
+// Review of 0.2.1 area C (proof adopted from the code-reviewer), D96: the lowered arms box on the marked card at note
 // font sizes 8 to 48 px. Hard rule: the arms box never overlaps the portrait and never covers the mark's border.
 // Soft rule: 1.5 px to the ring, which gives way when both cannot hold. The title text lines the box reaches end before it.
 

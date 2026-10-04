@@ -31,6 +31,7 @@ import { CROP_UI } from '../render/ui-text';
 import { ignoreGhostClick, isPhoneWidth, phoneLayout } from './modal-layout';
 import type { PictureCopy, PictureStore } from './picture-store';
 import { trackModal } from './plugin-modals';
+import { nameDialog } from './sheet-parts';
 
 /** What opens the crop tool. */
 export interface CropToolOptions {
@@ -171,7 +172,7 @@ class CropModal extends Modal {
 		const el = this.contentEl;
 		el.addClass('dynasty-sheet-content');
 		const header = el.createDiv({ cls: 'dynasty-sheet-header' });
-		header.createDiv({ cls: 'dynasty-sheet-title', text: CROP_UI.title(this.o.personName) });
+		nameDialog(this.modalEl, header.createDiv({ cls: 'dynasty-sheet-title', text: CROP_UI.title(this.o.personName) }));
 		const body = el.createDiv({ cls: ['dynasty-sheet-body', 'dynasty-crop-body'] });
 		body.createDiv({ cls: 'dynasty-crop-hint', text: this.coarse() ? CROP_UI.hintTouch : CROP_UI.hintMouse, attr: { id: 'dynasty-crop-hint' } });
 		this.statusEl = body.createDiv({ cls: 'dynasty-crop-status', attr: { role: 'status' }, text: CROP_UI.loading });

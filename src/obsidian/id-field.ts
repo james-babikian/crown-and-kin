@@ -1,14 +1,14 @@
 /*
- * The parts of the Id change that both the Houses window and the Titles window draw (spec §13.17
- * rule 5, D109, D110): the small button "Change id" and the grey note "New id: …" with its button
- * "Keep old id" on a row of the list, and the Id field (a labelled text field, the button "Make id
- * from the name" and the line that says why the draft id is refused) inside the small Id window
+ * The parts of the ID change that both the Houses window and the Titles window draw (spec §13.17
+ * rule 5, D109, D110, D113): the small button "Change ID" and the note "New ID: …" with its button
+ * "Keep old ID" on a row of the list, and the ID field (a labelled text field, the button "Make ID
+ * from the name" and the line that says why the draft ID is refused) inside the small ID window
  * (`id-window.ts`). The draft logic is in `id-draft.ts`.
  */
 
 import { ID_UI } from '../render/ui-text';
 
-/** What a window gives the Id field of the small window. */
+/** What a window gives the ID field of the small window. */
 export interface IdFieldOptions {
 	/** The row's key: it makes the `data-focus` names `id:<key>` and `make-id:<key>`. */
 	key: string;
@@ -31,7 +31,7 @@ export interface IdFieldView {
 	setProblem: (text: string) => void;
 }
 
-/** Adds the Id row to `parent` and returns the handles that keep it up to date. */
+/** Adds the ID row to `parent` and returns the handles that keep it up to date. */
 export function idField(parent: HTMLElement, o: IdFieldOptions): IdFieldView {
 	const row = parent.createDiv({ cls: 'dynasty-id-row', attr: { 'data-id-row': o.key } });
 	const field = row.createEl('label', { cls: 'dynasty-id-field' });
@@ -76,13 +76,13 @@ export function idField(parent: HTMLElement, o: IdFieldOptions): IdFieldView {
 	};
 }
 
-/** What a window changes on the Id parts of a list row that is on screen. */
+/** What a window changes on the ID parts of a list row that is on screen. */
 export interface IdRowView {
 	setItem: (item: string) => void;
 	setProblem: (text: string) => void;
 }
 
-/** The small button "Change id" of a saved row: it opens the small Id window. At least 44 px high (CSS). */
+/** The small button "Change ID" of a saved row: it opens the small ID window. At least 44 px high (CSS). */
 export function idOpenButton(parent: HTMLElement, o: { key: string; item: string; onOpen: () => void }): IdRowView {
 	const b = parent.createEl('button', {
 		cls: ['dynasty-sheet-action', 'dynasty-id-open'],
@@ -97,9 +97,10 @@ export function idOpenButton(parent: HTMLElement, o: { key: string; item: string
 }
 
 /**
- * The note of a row whose id waits for Save: "New id: …" and the button "Keep old id". `problem` is the
+ * The note of a row whose ID waits for Save: "New ID: …" and the button "Keep old ID". `problem` is the
  * reason the draft is refused now (a draft can be refused after it was accepted, when another row
- * or a new row's name changes); it shows in red in the same line.
+ * or a new row's name changes). It shows once, in red in the same line, and the row gets a red edge
+ * (D113 item 3); a refused Save shows no other message for it.
  */
 export function idNote(parent: HTMLElement, o: { key: string; item: string; id: string; problem: string; onKeepOld: () => void }): IdRowView {
 	const note = parent.createDiv({ cls: 'dynasty-id-new', attr: { 'data-id-new': o.key } });
@@ -115,10 +116,32 @@ export function idNote(parent: HTMLElement, o: { key: string; item: string; id: 
 	const show = (reason: string) => {
 		problem.setText(reason);
 		problem.toggle(reason !== '');
+		parent.toggleClass('has-id-problem', reason !== '');
 	};
 	show(o.problem);
 	return {
 		setItem: (item) => keep.setAttribute('aria-label', ID_UI.keepOldAria(item)),
+		setProblem: show,
+	};
+}
+
+/**
+ * The note of a new row (not saved yet) whose name gives an ID that a changed row has taken (owner
+ * decision "3-both"). It is the same note as the one of the changed row, without "New ID" and the button:
+ * the reason in red text in the same place, and the same red edge on the row. It is empty and hidden
+ * until a reason comes, because the name can change while the owner types.
+ */
+export function idNewNameNote(parent: HTMLElement, o: { key: string; problem: string }): IdRowView {
+	const note = parent.createDiv({ cls: 'dynasty-id-new', attr: { 'data-id-new-name': o.key } });
+	const problem = note.createSpan({ cls: 'dynasty-id-new-problem', attr: { role: 'status' } });
+	const show = (reason: string) => {
+		problem.setText(reason);
+		note.toggle(reason !== '');
+		parent.toggleClass('has-id-problem', reason !== '');
+	};
+	show(o.problem);
+	return {
+		setItem: () => undefined,
 		setProblem: show,
 	};
 }

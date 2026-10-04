@@ -6,11 +6,12 @@
  * if anything else differs, the edit is refused instead of written.
  */
 
-import { isAlias, isMap, isScalar, isSeq, Lexer, parseDocument, Parser, Scalar, type Document, type Node, type Pair, type YAMLMap, type YAMLSeq } from 'yaml';
+import { isAlias, isMap, isPair, isScalar, isSeq, Lexer, parseDocument, Parser, Scalar, type Document, type Node, type Pair, type YAMLMap, type YAMLSeq } from 'yaml';
 import type { EditRefusal, EditResult, FieldValue, PersonField } from './edit';
 import { parseBody } from './parse';
 import { cropValue, sameCropText } from './portrait-crop';
 import { bool, isEmpty, linkValue, str, unwrapCurlyKeys, type Raw, type RawMap } from './tolerate';
+import { REFUSAL_TEXT } from './refusal-text';
 
 /** §4.1 and §13.0 field order; a new key goes after the nearest earlier key that is present. */
 export const PERSON_ORDER = ['id', 'name', 'title', 'card-title', 'house', 'sex', 'born', 'died', 'parents', 'placement', 'illegitimate', 'union', 'link', 'portrait', 'portrait-crop', 'notes'];
@@ -136,6 +137,8 @@ export interface Patch {
 	reorder?: boolean;
 	/** Comments this patch leaves on purpose in place of the ones in `allow` (the rest of a comment it cut). */
 	writes?: string[];
+	/** Set by `mergeRemovals` when two removals overlapped and became this one. */
+	joined?: boolean;
 }
 
 /** One parsed body, plus helpers for finding the line and column bounds of its nodes. */
@@ -175,11 +178,76 @@ export class Source {
 	/** End of a node's own text, before a trailing line break (block scalars and block collections include one). */
 	nodeEnd(node: Node): number {
 		let e = node.range![1];
+		// Lines that start before this point are text of a block scalar, even when they hold only
+		// spaces: the scalar's own range says so.
+		const floor = this.scalarEnd(node);
+		// A block collection that ends with a comment line, or an empty value with a comment, reports
+		// an end after the next line's indentation. That indentation is not the node's text.
+		const ls = this.lineStart(e);
+		if (ls > node.range![0] && ls < e && ls >= floor && this.text.slice(ls, e).trim() === '') e = ls;
 		if (e > node.range![0] && this.text[e - 1] === '\n') {
 			e--;
 			if (e > node.range![0] && this.text[e - 1] === '\r') e--;
+			// Blank lines after such a comment are inside the range too (not in a `|+` scalar: they are its text).
+			if (!this.keepsBlankLines(node)) {
+				for (let b = this.lineStart(e); b > node.range![0] && b >= floor && this.text.slice(b, e).trim() === ''; b = this.lineStart(e)) {
+					e = b - 1;
+					if (e > node.range![0] && this.text[e - 1] === '\r') e--;
+				}
+			}
 		}
 		return e;
+	}
+
+	/** The last value of a block node, found through the last entries of its block collections. */
+	private lastLeaf(node: Node): unknown {
+		let n: unknown = node;
+		while ((isMap(n) || isSeq(n)) && !n.flow && n.items.length) {
+			const last = n.items[n.items.length - 1] as unknown;
+			n = isPair(last) ? last.value : last;
+		}
+		return n;
+	}
+
+	/** End of the block scalar that is the node's last value, or -1 when the node does not end with one. */
+	private scalarEnd(node: Node): number {
+		const n = this.lastLeaf(node);
+		return isScalar(n) && n.range && (n.type === Scalar.BLOCK_LITERAL || n.type === Scalar.BLOCK_FOLDED) ? n.range[1] : -1;
+	}
+
+	/** True if the last value in the node is a block scalar with keep chomping (`|+`), whose blank lines are its text. */
+	private keepsBlankLines(node: Node): boolean {
+		const n = this.lastLeaf(node);
+		if (!isScalar(n) || !n.range || (n.type !== Scalar.BLOCK_LITERAL && n.type !== Scalar.BLOCK_FOLDED)) return false;
+		return /^[|>][^\s#]*\+/.test(this.text.slice(n.range[0], n.range[0] + 8));
+	}
+
+	/**
+	 * Pulls `end` (a line end) back over the whole-line comments at the end of the node that sit at
+	 * or left of `col`. The range of a nested collection includes them, but they belong to what
+	 * comes next. Comments deeper than `col` stay with the node.
+	 */
+	private beforeShallowComments(node: Node, end: number, col: number): number {
+		const floor = this.scalarEnd(node);
+		const run: { ls: number; le: number; comment: boolean; indent: number }[] = [];
+		for (let le = end; ; ) {
+			const ls = this.lineStart(le);
+			if (ls <= node.range![0] || ls < floor) break;
+			const raw = this.text.slice(ls, le);
+			const line = raw.trim();
+			if (line !== '' && !line.startsWith('#')) break;
+			run.unshift({ ls, le, comment: line !== '', indent: raw.length - raw.trimStart().length });
+			le = ls - 1;
+			if (le > 0 && this.text[le - 1] === '\r') le--;
+		}
+		const k = run.findIndex((l) => l.comment && l.indent <= col);
+		if (k < 0) return end;
+		// Blank lines before the cut comment go with the cut text: they separate it from the node.
+		let j = k - 1;
+		while (j >= 0 && !run[j].comment) j--;
+		if (j >= 0) return run[j].le;
+		const ls0 = run[0].ls - 1;
+		return ls0 > 0 && this.text[ls0 - 1] === '\r' ? ls0 - 1 : ls0;
 	}
 
 	/** Position just after the `:` of a pair (the key is a simple plain key). */
@@ -201,16 +269,20 @@ export class Source {
 	}
 
 	/** End of a node's last line, with any trailing comment, before the line break. */
-	nodeLineEnd(node: Node): number {
+	nodeLineEnd(node: Node, ownerCol?: number): number {
 		const e = this.nodeEnd(node);
 		// A node that ended with a line break ends exactly there (a `|+` scalar's blank lines are its content).
-		if (e < node.range![1]) return e;
-		return this.lineEnd(Math.max(e - 1, node.range![0]));
+		const end = e < node.range![1] ? e : this.lineEnd(Math.max(e - 1, node.range![0]));
+		// With `ownerCol`, comments at or left of that column are not the node's (see `beforeShallowComments`).
+		return ownerCol === undefined ? end : this.beforeShallowComments(node, end, ownerCol);
 	}
 
-	/** The line after which a new key can follow a block pair: its last line, with any trailing comment. */
-	pairLineEnd(pair: Pair): number {
-		return this.hasValue(pair) ? this.nodeLineEnd(pair.value as Node) : this.lineEnd(this.colonEnd(pair));
+	/**
+	 * The line after which a new key can follow a block pair: its last line, with any trailing comment.
+	 * With `ownCol` (the column of the pair's key), comments at or left of it are not part of the pair.
+	 */
+	pairLineEnd(pair: Pair, ownCol?: number): number {
+		return this.hasValue(pair) ? this.nodeLineEnd(pair.value as Node, ownCol) : this.lineEnd(this.colonEnd(pair));
 	}
 
 	/**
@@ -273,6 +345,16 @@ export function layoutOf(src: Source): Layout {
 	return layout;
 }
 
+/**
+ * Lines of a new block list item under a key: the dash, then the item's keys the same number of
+ * columns after it as in the existing items (`-   key` is written by some tools, so not always 2).
+ */
+export function itemBlock(layout: Layout, block: string[]): string[] {
+	const pad = ' '.repeat(layout.seqIndent);
+	const itemPad = ' '.repeat(layout.seqIndent + layout.itemIndent);
+	return block.map((l, n) => (n === 0 ? `${pad}-${' '.repeat(Math.max(1, layout.itemIndent - 1))}${l}` : itemPad + l));
+}
+
 /** A value to write under a key: a scalar, or block lines (relative, first line at the key's child indentation). */
 export type NewValue = { scalar: string; old?: Node | null; text: boolean } | { block: string[]; flow: string } | { raw: string };
 
@@ -311,7 +393,13 @@ export function setPairValue(src: Source, map: YAMLMap, pair: Pair, value: NewVa
 		return { start: src.hasValue(pair) ? at : lineEnd, end: src.hasValue(pair) ? end : lineEnd, text: valueAfterKey(src, value, false, keyCol, layout) };
 	}
 	const node = pair.value as Node;
-	return { start: node.range![0], end: src.nodeEnd(node), text: scalarText(src, value, flow, keyCol, layout) };
+	let text = scalarText(src, value, flow, keyCol, layout);
+	// The comment on the header line of a block scalar (`notes: |- # keep`) is inside the node's
+	// range, so the new text must carry it on its first line.
+	const block = isScalar(node) && (node.type === Scalar.BLOCK_LITERAL || node.type === Scalar.BLOCK_FOLDED);
+	const header = block ? /^[|>][^\s#]*([ \t]+#[^\r\n]*)/.exec(src.text.slice(node.range![0], src.lineEnd(node.range![0]))) : null;
+	if (header) text = text.replace(/^[^\n]*/, (first) => first + header[1]);
+	return { start: node.range![0], end: src.nodeEnd(node), text };
 }
 
 /**
@@ -360,12 +448,20 @@ export function removePair(src: Source, map: YAMLMap, pair: Pair): Patch {
 		// The pair and the comma after it; the last pair takes the comma before it instead. Comments
 		// between pairs are never inside the span.
 		const after = /^[ \t]*,[ \t]*/.exec(text.slice(end));
-		if (after && i < pairs.length - 1) return { start: keyStart, end: end + after[0].length, text: '', allow: own };
+		// A pair alone on its lines goes with them, so no line of spaces stays.
+		const wholeLine = (cut: number): Patch => {
+			const ls = src.lineStart(keyStart);
+			const le = src.lineEnd(cut);
+			if (text.slice(ls, keyStart).trim() !== '' || text.slice(cut, le).trim() !== '' || le >= text.length) return { start: keyStart, end: cut, text: '', allow: own };
+			return { start: ls, end: text.indexOf('\n', le) + 1, text: '', allow: own };
+		};
+		if (after && i < pairs.length - 1) return wholeLine(end + after[0].length);
 		const before = /,[ \t\r\n]*$/.exec(text.slice(0, keyStart));
 		if (before && i > 0) return { start: before.index, end, text: '', allow: own };
-		return { start: keyStart, end, text: '', allow: own };
+		return wholeLine(end);
 	}
-	const end = src.pairLineEnd(pair);
+	// Comments after the value that sit at or left of the key belong to what follows (the next key or item).
+	const end = src.pairLineEnd(pair, src.column(keyStart));
 	if (!src.startsLine(keyStart)) {
 		// The key follows a dash (`- title: T`): what comes next (a key or a comment) moves up onto
 		// the dash line.
@@ -416,7 +512,7 @@ export function appendItem(src: Source, seq: YAMLSeq, block: string[], flow: str
 	if (isMap(last) && last.flow) return insertAt(at, '\n' + ' '.repeat(dashCol) + '- ' + flow);
 	let itemCol = dashCol + 2;
 	if (isMap(last) && last.items.length) itemCol = src.column(((last.items[0] as Pair).key as Node).range![0]);
-	const lines = block.map((l, n) => (n === 0 ? ' '.repeat(dashCol) + '- ' + l : ' '.repeat(itemCol) + l));
+	const lines = block.map((l, n) => (n === 0 ? ' '.repeat(dashCol) + '-' + ' '.repeat(Math.max(1, itemCol - dashCol - 1)) + l : ' '.repeat(itemCol) + l));
 	return insertAt(at, lines.map((l) => '\n' + l).join(''));
 }
 
@@ -520,6 +616,7 @@ export function mergeRemovals(patches: Patch[]): Patch[] {
 			continue;
 		}
 		last.end = Math.max(last.end, p.end);
+		last.joined = true;
 		const allow = [last.allow ?? [last.start, last.start], p.allow ?? [p.start, p.start]];
 		last.allow = [Math.min(allow[0][0], allow[1][0]), Math.max(allow[0][1], allow[1][1])];
 	}
@@ -554,6 +651,12 @@ export function run(body: string, steps: Step[], first: Parsed): string | Refusa
 		// break before them goes too, so the body does not gain one.
 		for (const pt of patches) {
 			const t = p.src.text;
+			// Two removals of neighbouring pairs of a flow map can join into whole lines without their
+			// line break (each alone took a different one): the break goes too, so no empty line stays.
+			if (pt.joined && pt.text === '' && (pt.start === 0 || t[pt.start - 1] === '\n') && t[pt.end - 1] !== '\n' && (t[pt.end] === '\n' || (t[pt.end] === '\r' && t[pt.end + 1] === '\n'))) {
+				pt.end += t[pt.end] === '\r' ? 2 : 1;
+				continue;
+			}
 			if (pt.text !== '' || pt.end !== t.length || t.endsWith('\n') || pt.start === 0 || t[pt.start - 1] !== '\n' || t[pt.start] === '\n' || t[pt.start] === '\r') continue;
 			pt.start -= pt.start >= 2 && t[pt.start - 2] === '\r' ? 2 : 1;
 		}
@@ -574,7 +677,7 @@ export function run(body: string, steps: Step[], first: Parsed): string | Refusa
 			now = now.sort();
 		}
 		if (kept.length !== now.length || kept.some((c, i) => c !== now[i])) {
-			return refuse('bad-value', 'The change cannot be written without a change to a comment. Edit the note text.');
+			return refuse('bad-value', REFUSAL_TEXT.commentWouldChange);
 		}
 		text = next;
 	}
@@ -615,7 +718,7 @@ export function personValue(field: PersonField, value: FieldValue): { write: str
 	// Callers outside TypeScript can pass anything (spec §8: refuse, never throw).
 	if (value !== null && typeof value !== 'string') return refuse('bad-value', `${field} must be text.`);
 	if (field === 'name') {
-		if (value === null || value.trim() === '') return refuse('bad-value', 'A person must have a name.');
+		if (value === null || value.trim() === '') return refuse('bad-value', REFUSAL_TEXT.personName);
 		return { write: value };
 	}
 	if (value === null || value.trim() === '') return { write: null };
@@ -654,7 +757,7 @@ export function finish(first: Parsed, steps: Step[], expected: RawMap, created: 
 	// The new body is read with the curly pairs taken off structural values (D103), so the expected data is too.
 	unwrapCurlyKeys(expected);
 	if (!check.ok || !deepEqual(isEmpty(check.data) ? {} : check.data, expected)) {
-		return refuse('bad-value', 'The change cannot be written without a change to other values. Edit the note text.');
+		return refuse('bad-value', REFUSAL_TEXT.otherValuesWouldChange);
 	}
 	remember(out, check.data);
 	return { ok: true, body: out, created };

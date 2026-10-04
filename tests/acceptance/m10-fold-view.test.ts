@@ -471,15 +471,24 @@ describe('the label texts of spec §13.10 are in the plugin texts', () => {
 	});
 });
 
-describe('not run here', () => {
-	// These need the Obsidian harness (the real Find, the toolbar, the problem list, the relation finder, the edit sheet's write, a real
-	// Reading view or Live Preview, real pointers and the CSS of the theme), or the unit of work that does not exist yet. The rules behind
-	// them are proved above (`unfoldFor` in m10-fold-core, `keepSpot`, the scene) and the wiring is a harness step of WP 10.3c.
-	it.skip('Find, Focus, a far-couple tag on a hidden partner, a problem in the list, a house page row and the finder\'s Show in the tree open only the folds that hide the person, then centre on the person (harness step of 10.3c: needs the real person picker and view)', () => {});
-	it.skip('the relation finder shows the line people while the result shows and changes no fold state (harness step of 10.3c: needs the real finder)', () => {});
-	it.skip('after an ok write from the sheet (Add child, Add parent, Add spouse) the plugin opens the folds that hide the new people and never before the write is ok (harness step of 10.3c: needs a real vault write)', () => {});
-	it.skip('the view keeps the button and the sign at the same screen point when the tree is folded (F10; harness step of 10.3c: needs real layout of the viewport)', () => {});
-	it.skip('the "−" buttons are hidden in Overview and the "+ N" sign stays, larger; a hidden control is not in the Tab order (CSS classes of the level of detail: harness and visual-qa)', () => {});
-	it.skip('the hit area of a control is cut back where it meets a card, a far-couple tag, a + badge or a D14 sign (F7; needs real pixel geometry: harness and visual-qa)', () => {});
-	it.skip('fixtures 7 and 15: a fold or an open draws the new view in under 100 ms (computer) and 300 ms (phone) (G5 timing on the real device)', () => {});
-});
+/*
+ * Not run here. These need the Obsidian harness (the real Find, the toolbar, the problem list, the relation finder,
+ * the edit sheet's write, a real Reading view or Live Preview, real pointers and the CSS of the theme). The rules
+ * behind them are proved above (`unfoldFor` in m10-fold-core, `keepSpot`, the scene) and the wiring is a harness
+ * step of WP 10.3c (an internal harness script).
+ *  - Find, Focus, a far-couple tag on a hidden partner, a problem in the list, a house page row and the finder's
+ *    Show in the tree open only the folds that hide the person, then centre on the person (needs the real person
+ *    picker and view).
+ *  - The relation finder shows the line people while the result shows and changes no fold state (needs the real
+ *    finder).
+ *  - After an ok write from the sheet (Add child, Add parent, Add spouse) the plugin opens the folds that hide the
+ *    new people and never before the write is ok (needs a real vault write).
+ *  - The view keeps the button and the sign at the same screen point when the tree is folded (F10; needs the real
+ *    layout of the viewport).
+ *  - The "-" buttons are hidden in Overview and the "+ N" sign stays, larger; a hidden control is not in the Tab
+ *    order (CSS classes of the level of detail: harness and visual-qa).
+ *  - The hit area of a control is cut back where it meets a card, a far-couple tag, a + badge or a D14 sign (F7;
+ *    needs real pixel geometry: harness and visual-qa).
+ *  - Fixtures 7 and 15: a fold or an open draws the new view in under 100 ms (computer) and 300 ms (phone) (G5
+ *    timing on the real device).
+ */

@@ -10,8 +10,8 @@ import { parseDynasty } from '../src/core/parse';
 import { applyOp } from '../src/core/yaml-edit';
 
 /*
- * Review of version 1.0.1, area A (core read side). Each test states the correct behaviour and
- * fails on release-1.0.1 at d23ba64.
+ * Review of version 0.1.1, area A (core read side). Each test states the correct behaviour and
+ * fails on release-0.1.1 at d23ba64.
  */
 
 function tree(src: string) {

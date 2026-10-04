@@ -9,7 +9,7 @@ import { CURLY_APOSTROPHE, CURLY_CLOSE, CURLY_OPEN, quote } from '../src/core/qu
 
 import { fixture } from './helpers';
 
-// Version 1.1.1, D99 and D100: one fold for matching, one helper for quote marks.
+// Version 0.2.1, D99 and D100: one fold for matching, one helper for quote marks.
 
 describe('foldForMatch (D100)', () => {
 	it('treats the straight and the curly apostrophe as the same mark', () => {

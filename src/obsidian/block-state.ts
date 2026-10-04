@@ -32,6 +32,8 @@ export interface BlockState {
 	focus: SessionFocus | null;
 	/** The focus the phone rule chose, kept so that an edit does not move it; until the note closes. */
 	autoFocus: string | null;
+	/** The marked person (`options.me`) that was valid when `autoFocus` was chosen; the family ends when the mark changes (spec §13.18 rule 5). */
+	autoMark: string | null;
 	/**
 	 * A person just saved, to show once (§5.5): the first view of `place` (the kind of view whose
 	 * sheet or toolbar wrote) that renders after the write takes it, and shows all people if its
@@ -68,7 +70,7 @@ export interface FinderState {
 export type ViewKind = 'embed' | 'full';
 
 /** A fresh, empty `BlockState` for a block that has not drawn yet. */
-export const newBlockState = (): BlockState => ({ view: null, lastEdited: null, highlight: null, viewFor: '', views: {}, focus: null, autoFocus: null, shown: null, finder: null, folds: new Set() });
+export const newBlockState = (): BlockState => ({ view: null, lastEdited: null, highlight: null, viewFor: '', views: {}, focus: null, autoFocus: null, autoMark: null, shown: null, finder: null, folds: new Set() });
 
 /**
  * The key of a drawn tree for `BlockState.viewFor`: the focus person and the generations, or '' for
@@ -82,7 +84,32 @@ export const focusKey = (id: string | null, n = 0, orientation: Orientation = 'd
 export function endSessionFocus(st: BlockState): void {
 	st.focus = null;
 	st.autoFocus = null;
+	st.autoMark = null;
 	st.shown = null;
 	st.finder = null;
 	st.folds.clear();
+}
+
+/**
+ * A view found its block again under a new handle: the session memory of the lost handle (focus, folds,
+ * finder, last edited person, saved view) moves to the new one. A field that the new state already holds
+ * stays, so a handle that other views already use is never overwritten.
+ */
+export function carryState(from: BlockState, to: BlockState): void {
+	if (from === to) return;
+	if (!to.view && from.view) {
+		to.view = from.view;
+		to.viewFor = from.viewFor;
+	}
+	if (!Object.keys(to.views).length) to.views = { ...from.views };
+	to.lastEdited ??= from.lastEdited;
+	to.highlight ??= from.highlight;
+	to.focus ??= from.focus;
+	if (to.autoFocus === null) {
+		to.autoFocus = from.autoFocus;
+		to.autoMark = from.autoMark;
+	}
+	to.shown ??= from.shown;
+	to.finder ??= from.finder;
+	if (!to.folds.size) to.folds = new Set(from.folds);
 }

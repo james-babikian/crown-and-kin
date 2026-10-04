@@ -114,7 +114,7 @@ describe('reading `arms` and `portrait` (spec §13.6, §13.7 "Tree text"; rule 1
 		expect(deriveFamilies(t).issues).toEqual([]);
 	});
 
-	it('A3: other unquoted values keep their 1.0 reading (an unquoted ![[…]] in `notes` is still a YAML error)', () => {
+	it('A3: other unquoted values keep their 0.1 reading (an unquoted ![[…]] in `notes` is still a YAML error)', () => {
 		expect(parseDynasty('people:\n  - id: p\n    name: P\n    notes: ![[x.png]]\n').ok).toBe(false);
 	});
 

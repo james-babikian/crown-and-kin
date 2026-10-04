@@ -9,8 +9,8 @@ import { DEFAULT_LIGHT, UNION_MARKS, tagMarkGap, tagMarkSlot, type UnionShape } 
 import { approxMeasure, renderSvg } from '../src/render/svg-string';
 import { FEl, installDom } from './acceptance/fake-dom';
 
-// 1.1.2 (D108, spec §13.17 rule 4): in a far-couple tag the gap G from the right edge of the partnership sign to the
-// start of the name is the same for the dot, the ring, the diamond and the open triangle, and it is the dot's gap of 1.1.1.
+// 0.2.2 (D108, spec §13.17 rule 4): in a far-couple tag the gap G from the right edge of the partnership sign to the
+// start of the name is the same for the dot, the ring, the diamond and the open triangle, and it is the dot's gap of 0.2.1.
 
 beforeAll(() => {
 	installDom();
@@ -68,7 +68,7 @@ function edges(shape: UnionShape, attr: { cx?: string; r?: string; d?: string })
 
 describe('the headless drawing: the same gap G before the name for the four shapes (Full text size)', () => {
 	for (const fontPx of [12, 16, 22]) {
-		it(`at ${fontPx} px: G is equal within 0.01 px, equals the dot's gap of 1.1.1 and the sign clears the marriage sign`, () => {
+		it(`at ${fontPx} px: G is equal within 0.01 px, equals the dot's gap of 0.2.1 and the sign clears the marriage sign`, () => {
 			const gaps: number[] = [];
 			for (const [type, shape] of SHAPES) {
 				const g = graph(type);
@@ -85,7 +85,7 @@ describe('the headless drawing: the same gap G before the name for the four shap
 				const e = edges(shape, attr);
 				const gap = name - e.right;
 				gaps.push(gap);
-				// The dot's gap of 1.1.1: half of the slot of 1.1 text sizes minus the dot's radius.
+				// The dot's gap of 0.2.1: half of the slot of 1.1 text sizes minus the dot's radius.
 				// A path is written with two decimals, so its edge can be 0.005 px off.
 				expect(Math.abs(gap - (0.55 * tagFont - 0.2 * tagFont)), shape).toBeLessThan(0.01);
 				expect(Math.abs(gap - tagMarkGap(tagFont)), shape).toBeLessThan(0.01);
@@ -117,13 +117,13 @@ describe('the headless drawing: the same gap G before the name for the four shap
 		}
 	});
 
-	it('the dot is drawn as in 1.1.1, byte for byte (tag of a childless far couple, 16 px)', () => {
+	it('the dot is drawn as in 0.2.1, byte for byte (tag of a childless far couple, 16 px)', () => {
 		const g = graph('marriage');
 		const laid = lay(g, 16);
 		const svg = renderSvg(g, laid.layout, laid.edges, { palette: DEFAULT_LIGHT, measure: approxMeasure, fonts: FONTS });
 		const i = svg.indexOf('⚭</text>');
 		const chunk = svg.slice(svg.lastIndexOf('<rect', i), svg.indexOf('Zelda</text>', i) + 'Zelda</text>'.length);
-		// Recorded from the 1.1.1 build (d26fe18).
+		// Recorded from the 0.2.1 build (d26fe18).
 		expect(chunk).toBe(
 			'<rect x="51" y="225" width="78" height="18" rx="9" fill="#fafafa" stroke="#5c5c5c" stroke-width="1"/>\n' +
 				'<text x="60" y="238.2" font-size="15" font-family="Segoe UI Symbol, DejaVu Sans, sans-serif" fill="#5c5c5c">⚭</text>\n' +
@@ -165,7 +165,7 @@ describe('the live drawing: the same gap G before the name for the four shapes (
 						const e = edges(shape, { cx: mark.getAttribute('cx') ?? undefined, r: mark.getAttribute('r') ?? undefined, d: mark.getAttribute('d') ?? undefined });
 						const gap = nameStart - e.right;
 						gaps.push(gap);
-						// G is the dot's gap of 1.1.1 (half the slot minus the dot's radius, in the text size of this level).
+						// G is the dot's gap of 0.2.1 (half the slot minus the dot's radius, in the text size of this level).
 						expect(gap, `${level} ${shape}`).toBeCloseTo(tagMarkGap(em * laid.layout.geometry.fontPx), 1);
 						// The clear room on the left of the sign (after the marriage sign) is at least G.
 						expect(e.left - (textStart + measure('⚭')), `${level} ${shape}`).toBeGreaterThanOrEqual(gap - 0.5);

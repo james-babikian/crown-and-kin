@@ -8,7 +8,7 @@ import { planInsert } from '../src/obsidian/insert-tree';
 import { matchPictures } from '../src/obsidian/picture-picker';
 import { INSERT_UI } from '../src/render/ui-text';
 
-// Adopted from scratch/r111-review-a 153116b (N1 and F4b). Rulings A3 and A4 of the 1.1.1 review wave.
+// Adopted from scratch/r111-review-a 153116b (N1 and F4b). Rulings A3 and A4 of the 0.2.1 review wave.
 describe('review A: text that the plugin writes into a note, and a query that folds to nothing', () => {
 	it('N1: the block that "Insert family tree" writes is plain ASCII (the note gets no curly marks)', () => {
 		const plan = planInsert('', '');

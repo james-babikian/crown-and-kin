@@ -8,9 +8,15 @@
  * - The Houses window (a People button in each row of a saved house) and the house rows of the legend
  *   open it, on the computer and in the full-screen view. The page is read-only, so it also works in a
  *   read-only tree. The static phone preview has no legend button and no Houses window.
- * - Below 600 px (`isPhoneWidth`) each row is two text lines: name and title, then generation and dates.
- *   A row is a button of at least 44 px. A house with no person shows a message and no table and no
- *   note button.
+ * - Design 4B (D113 item 4). A wide table has a head row and the columns Generation, Name, Title, Born
+ *   and Died. When the table is narrower than 34 text widths (a container query in `em`, so a phone, a
+ *   narrow window and large text all count) each row is two text lines: name and title, then generation
+ *   and dates, with a small chevron at the right that shows that the row opens. The text wraps; nothing is
+ *   wider than the window. A row is a button of at least 44 px. A house with no person shows a message and
+ *   no table and no note button.
+ * - The setting "Show generation on the house page" (default on) takes the Generation column and the
+ *   generation of the second text line away. It is read when the page opens (the setting tab cannot be
+ *   open at the same time). The note that "Make a note with this table" writes is not changed by it.
  * - A tap on a row closes the window (and the Houses window under it, through its normal close), then
  *   the tree view shows the card as Find does, opening the folds that hide it first.
  * - "Make a note with this table" makes the note with `makeNote`, in the D60 folder with the next free
@@ -25,16 +31,14 @@
  */
 
 import type { FamilyGraph } from '../core/derive';
-import type { Person } from '../core/types';
-import { dateLine } from '../render/tree-info';
 import { Modal, Notice, type App } from 'obsidian';
 import { houseNoteName, housePage, houseTableNote, type HousePage } from '../core/house-page';
 import { HOUSE_PAGE_UI } from '../render/ui-text';
 import { openMadeNote } from './make-note';
-import { isPhoneWidth, phoneLayout } from './modal-layout';
+import { phoneLayout } from './modal-layout';
 import type { PictureCopy, PictureStore } from './picture-store';
 import { trackModal } from './plugin-modals';
-import { drawableColour } from './sheet-parts';
+import { drawableColour, nameDialog } from './sheet-parts';
 import { makeNote } from './table-note';
 
 /** What opens the house page. */
@@ -51,6 +55,17 @@ export interface HousePageOptions {
 	openNote: (open: () => Promise<void>) => void;
 	/** The window has closed; the focus goes back to the button or legend row that opened it. */
 	onClosed?: () => void;
+	/** The setting "Show generation on the house page", from the tree view; without it the page shows the generation. */
+	showGeneration?: () => boolean;
+}
+
+/** True if the house page shows the generation: the caller's answer, else on. A failing answer never stops the page. */
+function wantsGeneration(o: HousePageOptions): boolean {
+	try {
+		return o.showGeneration ? o.showGeneration() : true;
+	} catch {
+		return true;
+	}
 }
 
 /** The arms box of the page is this high, in CSS px (the same as the Houses window). */
@@ -60,7 +75,7 @@ const ARMS_PX = 40;
 export class HousePageWindow extends Modal {
 	private readonly cleanup: (() => void)[] = [];
 	private page: HousePage;
-	private phone = false;
+	private generation = true;
 	private shown = false;
 	private busy = false;
 	private armsCopy: PictureCopy | null = null;
@@ -90,21 +105,8 @@ export class HousePageWindow extends Modal {
 	override onOpen(): void {
 		this.modalEl.addClass('dynasty-sheet');
 		this.modalEl.addClass('dynasty-house-page');
-		const win = this.modalEl.win ?? window;
-		this.phone = isPhoneWidth(win);
-		this.cleanup.push(
-			phoneLayout(this, () => {
-				const phone = isPhoneWidth(this.modalEl.win ?? window);
-				if (phone !== this.phone && this.shown) {
-					this.phone = phone;
-					// The new Close button gets the focus only if the focus was in the window.
-					const had = this.modalEl.contains(this.modalEl.doc?.activeElement ?? null);
-					this.guard(() => this.build());
-					if (had) this.closeButton?.focus({ preventScroll: true });
-				}
-			}),
-			trackModal(this, () => this.finish()),
-		);
+		this.generation = wantsGeneration(this.o);
+		this.cleanup.push(phoneLayout(this), trackModal(this, () => this.finish()));
 		this.shown = true;
 		this.guard(() => this.build());
 		// The focus starts on Close, with no timer to move it again (the window has one close control, D94).
@@ -135,11 +137,8 @@ export class HousePageWindow extends Modal {
 		const el = this.contentEl;
 		el.empty();
 		el.addClass('dynasty-sheet-content');
-		this.modalEl.setAttribute('role', 'dialog');
 		const header = el.createDiv({ cls: 'dynasty-sheet-header' });
-		const title = header.createDiv({ cls: 'dynasty-sheet-title', text: this.page.house.name });
-		title.setAttribute('id', 'dynasty-house-page-title');
-		this.modalEl.setAttribute('aria-labelledby', 'dynasty-house-page-title');
+		nameDialog(this.modalEl, header.createDiv({ cls: 'dynasty-sheet-title', text: this.page.house.name }));
 		const actions = header.createDiv({ cls: 'dynasty-sheet-actions' });
 		const close = actions.createEl('button', { cls: ['mod-cta', 'dynasty-sheet-cancel'], text: HOUSE_PAGE_UI.close, attr: { type: 'button', 'aria-label': HOUSE_PAGE_UI.close } });
 		this.closeButton = close;
@@ -166,7 +165,12 @@ export class HousePageWindow extends Modal {
 		const swatch = box.createSpan({ cls: 'dynasty-hp-swatch' });
 		if (drawableColour(this.page.house.color)) swatch.style.setProperty('--dynasty-house-color', this.page.house.color);
 		else swatch.addClass('is-none');
-		const arms = box.createDiv({ cls: 'dynasty-hp-arms', attr: { 'aria-label': HOUSE_PAGE_UI.armsLabel } });
+		const arms = box.createDiv({ cls: 'dynasty-hp-arms' });
+		// C7: a plain div has no role, so a name on it is never announced. A house with arms gets role "img" and a name; a box with no arms gets neither.
+		if (this.page.house.arms?.trim()) {
+			arms.setAttribute('role', 'img');
+			arms.setAttribute('aria-label', HOUSE_PAGE_UI.armsLabel(this.page.house.name));
+		}
 		this.showArms(arms);
 		if (this.page.count > 0) box.createSpan({ cls: 'dynasty-hp-count', text: HOUSE_PAGE_UI.count(this.page.count) });
 	}
@@ -211,6 +215,7 @@ export class HousePageWindow extends Modal {
 	/** The head row and one button for each person (at least 44 px high). */
 	private table(body: HTMLElement): void {
 		const table = body.createDiv({ cls: 'dynasty-hp-table' });
+		table.toggleClass('has-no-generation', !this.generation);
 		const head = table.createDiv({ cls: 'dynasty-hp-head' });
 		for (const [cls, text] of [
 			['gen', HOUSE_PAGE_UI.generation],
@@ -219,21 +224,32 @@ export class HousePageWindow extends Modal {
 			['born', HOUSE_PAGE_UI.born],
 			['died', HOUSE_PAGE_UI.died],
 		] as const) {
+			if (cls === 'gen' && !this.generation) continue;
 			head.createSpan({ cls: `dynasty-hp-cell dynasty-hp-${cls}`, text });
 		}
 		const list = table.createDiv({ cls: 'dynasty-hp-rows' });
 		for (const r of this.page.rows) {
 			const row = list.createEl('button', {
 				cls: 'dynasty-hp-row',
-				attr: { type: 'button', 'aria-label': HOUSE_PAGE_UI.rowLabel(r.name), 'data-person': r.id },
+				attr: { type: 'button', title: HOUSE_PAGE_UI.rowHint, 'data-person': r.id },
 			});
-			row.createSpan({ cls: 'dynasty-hp-cell dynasty-hp-gen', text: this.phone ? HOUSE_PAGE_UI.generationOn(r.generation) : String(r.generation) });
-			row.createSpan({ cls: 'dynasty-hp-cell dynasty-hp-name', text: r.name });
-			row.createSpan({ cls: 'dynasty-hp-cell dynasty-hp-title', text: r.title });
-			row.createSpan({ cls: 'dynasty-hp-cell dynasty-hp-born', text: this.phone && r.born ? (dateLine({ born: r.born } as Person) ?? r.born) : r.born });
-			row.createSpan({ cls: 'dynasty-hp-cell dynasty-hp-died', text: this.phone && r.died ? (dateLine({ died: r.died } as Person) ?? r.died) : r.died });
+			// The lead ("Generation", "b.", "d.") shows only in the two-line layout; the wide table has column heads.
+			if (this.generation) this.cell(row, 'gen', HOUSE_PAGE_UI.lead.generation, String(r.generation));
+			this.cell(row, 'name', '', r.name);
+			this.cell(row, 'title', '', r.title);
+			this.cell(row, 'born', HOUSE_PAGE_UI.lead.born, r.born);
+			this.cell(row, 'died', HOUSE_PAGE_UI.lead.died, r.died);
+			row.createSpan({ cls: 'dynasty-hp-chevron', attr: { 'aria-hidden': 'true' } });
 			row.addEventListener('click', () => this.guard(() => this.pick(r.id)));
 		}
+	}
+
+	/** One cell of a row. An empty value gives an empty cell with no lead, which the two-line layout hides. */
+	private cell(row: HTMLElement, key: string, lead: string, value: string): void {
+		const cell = row.createSpan({ cls: `dynasty-hp-cell dynasty-hp-${key}` });
+		if (value === '') return;
+		if (lead) cell.createSpan({ cls: 'dynasty-hp-lead', text: lead });
+		cell.createSpan({ cls: 'dynasty-hp-value', text: value });
 	}
 
 	/** H3: the window closes, then the view shows the card. */

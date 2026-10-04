@@ -25,7 +25,7 @@
  *   move into the shell at fill. After a fill the shell has exactly the eager children in the eager
  *   order, so an eager and a filled lazy scene serialise byte for byte the same.
  * - S3 Near the view. `boxNearView` (`view-math.ts`) decides which items a fill attaches.
- * - S3b 1.1.1 (spec §13.15 rule 4): lines and partnership signs are delayed too. A lazy scene does not make
+ * - S3b 0.2.1 (spec §13.15 rule 4): lines and partnership signs are delayed too. A lazy scene does not make
  *   their elements at build time; it keeps each one's box (`pathBox`) and builds the element at fill, into its
  *   layer at its place (`orderedLayer`), so the layer after `fillAll` is the eager layer byte for byte. They have
  *   no tap area, so a missing one never costs a tap. `SceneFill.pendingLines` counts them; they are not in
@@ -118,12 +118,12 @@ export interface SceneOptions {
 export const FILL_ALL_EVENT = 'dynasty-fill-all';
 /** The root attribute with `SceneFill.pending` ('0' on an empty root; the harness helper counts a missing attribute as 0). */
 export const CARDS_PENDING_ATTR = 'data-dynasty-cards-pending';
-/** 1.1.1: the root attribute with `SceneFill.pendingLines` (lines and partnership signs that are not built yet). */
+/** 0.2.1: the root attribute with `SceneFill.pendingLines` (lines and partnership signs that are not built yet). */
 export const LINES_PENDING_ATTR = 'data-dynasty-lines-pending';
 
 /**
  * M11 (S4): attaches the delayed content of a lazy scene. Every call is safe to repeat; each returns how many cards, tags and
- * badges it attached. 1.1.1 (S3b): the same calls build the lines and partnership signs that wait, but those are counted by
+ * badges it attached. 0.2.1 (S3b): the same calls build the lines and partnership signs that wait, but those are counted by
  * `pendingLines` and never in a return value.
  */
 export interface SceneFill {
@@ -321,7 +321,7 @@ export function buildScene(parent: SVGGElement, g: FamilyGraph, laid: LaidOut, o
 		else byPerson.set(person, [d]);
 	};
 	let cardsLeft = 0;
-	/** 1.1.1 (S3b): a line or sign that is not built yet: where it lies and the step that builds it into its layer. */
+	/** 0.2.1 (S3b): a line or sign that is not built yet: where it lies and the step that builds it into its layer. */
 	interface LateLine {
 		box: Rect;
 		put: () => void;
@@ -678,7 +678,7 @@ export function buildScene(parent: SVGGElement, g: FamilyGraph, laid: LaidOut, o
 	const small = tagFont(TAG_FONT_EM);
 	const large = tagFont(TAG_COMPACT_FONT_EM);
 	const bigH = TAG_COMPACT_PILL_EM * f;
-	// 1.1.1: a far couple with no children has no union dot, so its tag carries the partnership sign.
+	// 0.2.1: a far couple with no children has no union dot, so its tag carries the partnership sign.
 	const farSigns = farTagSigns(g, layout, edges);
 	for (const tag of layout.farTags.values()) {
 		const prefix = '⚭ ';
@@ -701,7 +701,7 @@ export function buildScene(parent: SVGGElement, g: FamilyGraph, laid: LaidOut, o
 			const ring = part.createSvg('rect', { cls: 'dynasty-tag-ring', attr: { y: bottom - h, height: h, rx: h / 2 } });
 			const rect = part.createSvg('rect', { cls: 'dynasty-tag-pill', attr: { y: bottom - h, height: h, rx: h / 2 } });
 			const textEl = part.createSvg('text', { cls: 'dynasty-tag-text', attr: { x: tag.x, y: bottom - h / 2 + 0.35 * fontEm * f, 'text-anchor': 'middle' } });
-			// 1.1.1: the partnership sign sits between the ⚭ and the name. The text stays one text element; en spaces leave
+			// 0.2.1: the partnership sign sits between the ⚭ and the name. The text stays one text element; en spaces leave
 			// the room, and the sign is drawn on that room, found with the same measure as the text.
 			const markPx = fontEm * f;
 			const markAt = (cx: number) => unionMark(shape!, cx, bottom - h / 2, UNION_MARKS[shape!].size * TAG_MARK.unit * markPx);

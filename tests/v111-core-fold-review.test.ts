@@ -4,7 +4,7 @@ import { foldForMatch, foldLetters } from '../src/core/fold';
 import { slugify } from '../src/core/id-gen';
 import { buildPictureTree, searchRows } from '../src/core/picture-list';
 
-/** The slug function of version 1.1.0 (before `foldLetters` was shared), kept as the reference. */
+/** The slug function of version 0.2.0 (before `foldLetters` was shared), kept as the reference. */
 function slugifyOld(name: string): string {
 	const slug = name
 		.replace(/[Þþ]/g, 'th')
@@ -25,7 +25,7 @@ function slugifyOld(name: string): string {
 	return /^\d+$/.test(slug) ? `p-${slug}` : slug;
 }
 
-// Fix round of 1.1.1, review A (D100, spec 13.16 rule 5). The proofs F1 to F4 come from the code-reviewer.
+// Fix round of 0.2.1, review A (D100, spec 13.16 rule 5). The proofs F1 to F4 come from the code-reviewer.
 
 describe('review A: foldForMatch', () => {
 	// F1: a letter from the map that also carries an accent was not mapped, because the map ran before NFKD.
@@ -78,7 +78,7 @@ describe('review A: foldForMatch', () => {
 	});
 });
 
-describe('review A: slugify is the same as in 1.1.0', () => {
+describe('review A: slugify is the same as in 0.2.0', () => {
 	it('gives the same id for 20 000 random strings', () => {
 		let seed = 12345;
 		const next = () => (seed = (seed * 1664525 + 1013904223) >>> 0);
@@ -107,7 +107,7 @@ describe('review A: searchRows with a query that folds to nothing', () => {
 	const tree = buildPictureTree(files, () => true);
 	const pictures = (query: string) => searchRows(tree, query, null).rows.filter((r) => r.kind !== 'device');
 
-	// F4: a query that folds to nothing is not an empty query; 1.1.0 found no picture.
+	// F4: a query that folds to nothing is not an empty query; 0.2.0 found no picture.
 	it('F4: a query of one combining mark does not match every picture', () => {
 		expect(pictures('\u0301')).toHaveLength(0);
 	});

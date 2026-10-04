@@ -32,7 +32,7 @@
  *   the focus at open and refocus timers run until the owner presses a key or a pointer.
  * - Rows. Each row is at least `PICKER_ROW_PX` high, with `content-visibility: auto`, so a list of 2 000
  *   rows is cheap. Order: the device row, folders, then the root's pictures. A folder row has a chevron,
- *   the folder icon, the name and the count, indented `PICKER_INDENT_PX` for each depth. `role="tree"` in
+ *   the folder icon, the name and the count, indented for each depth by the CSS. `role="tree"` in
  *   the folder view; in the search the list is a `listbox` of `option`s. A folder row's label is
  *   `PICKER_UI.openFolder(path)` or `closeFolder(path)`. The current picture has the "In use" mark in both
  *   lists. The keys and taps are the reducers of `core/picture-list.ts`; a search with no match shows
@@ -80,11 +80,10 @@ import { PICKER_UI, PICTURES_UI, deviceNotice } from '../render/ui-text';
 import { NO_READ_BYTES, NO_READ_BYTES_COARSE, isShownPictureExtension, type CopyBox, type PictureCopy, type PictureStore } from './picture-store';
 import { phoneLayout } from './modal-layout';
 import { trackModal } from './plugin-modals';
+import { nameDialog } from './sheet-parts';
 
 /** The row height, in CSS px (spec §7.5); the CSS sets the same minimum. */
 export const PICKER_ROW_PX = 44;
-/** The indent of a folder's content for each depth, in CSS px. */
-export const PICKER_INDENT_PX = 16;
 /** The row preview box, in CSS px (D93). */
 export const PREVIEW_BOX_PX = 32;
 /** The copy box of a row preview: the picture's own proportions, never cut. */
@@ -181,7 +180,7 @@ export function vaultPictures(app: App): TFile[] {
 export function matchPictures(files: readonly TFile[], query: string): TFile[] {
 	const words = foldForMatch(query).split(/\s+/).filter(Boolean);
 	if (!words.length) {
-		// A query with only spaces is no search; a query that folds to nothing (a lone accent) finds nothing, as in 1.1.0 (the picker's "searching" test reads the raw query too).
+		// A query with only spaces is no search; a query that folds to nothing (a lone accent) finds nothing, as in 0.2.0 (the picker's "searching" test reads the raw query too).
 		return query.split(/\s+/).some(Boolean) ? [] : [...files];
 	}
 	return files.filter((f) => {
@@ -487,7 +486,7 @@ class PicturePicker extends Modal {
 		el.empty();
 		el.addClass('dynasty-sheet-content');
 		const header = el.createDiv({ cls: 'dynasty-sheet-header' });
-		header.createDiv({ cls: 'dynasty-sheet-title', text: this.o.title });
+		nameDialog(this.modalEl, header.createDiv({ cls: 'dynasty-sheet-title', text: this.o.title }));
 		const actions = header.createDiv({ cls: 'dynasty-sheet-actions' });
 		const cancel = actions.createEl('button', { cls: 'dynasty-sheet-cancel', text: PICTURES_UI.cancel, attr: { type: 'button' } });
 		cancel.addEventListener('click', () => this.close());
@@ -521,8 +520,13 @@ class PicturePicker extends Modal {
 		this.listen();
 		this.guard(() => this.render(false));
 		this.keepAtTop();
-		// A touch-first device never focuses the search field, so the keyboard stays closed.
+		// A touch-first device never focuses the search field, so the keyboard stays closed. The focus goes to the window
+		// itself, so it is inside the dialog (a screen reader, the Tab key) and no keyboard opens.
 		if (!isTouchFirst(this.pickerWin)) this.focusSearch();
+		else {
+			this.modalEl.setAttribute('tabindex', '-1');
+			this.modalEl.focus({ preventScroll: true });
+		}
 		this.scheduleUpdate();
 	}
 

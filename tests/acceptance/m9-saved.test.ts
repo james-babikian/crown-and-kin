@@ -340,9 +340,9 @@ describe('P6: savedFileName', () => {
 describe('P4: without `saved` (and without `pictures`), renderSvg draws exactly as in M8', () => {
 	// Recorded from the M8 build (milestone-9 at a01649a): the first 16 hex digits of the SHA-256 of
 	// renderSvg(g, layout, edges, {}) at 16 px with DEFAULT_LAYOUT_SETTINGS (a relation line for 14
-	// and 07b, whose layouts have no picture sets). 1.1.1: the hashes of 06, 07, 07b and 12 were recorded again,
+	// and 07b, whose layouts have no picture sets). 0.2.1: the hashes of 06, 07, 07b and 12 were recorded again,
 	// because these trees have far couples with no children, whose tags now carry the partnership sign.
-		// 1.1.2 (D108): the hashes of 07 and 07b were recorded again (ring and open triangle keep the dot's gap before the name).
+		// 0.2.2 (D108): the hashes of 07 and 07b were recorded again (ring and open triangle keep the dot's gap before the name).
 	const M8_SVG: Record<string, string> = {
 		'01': '31464ce8b62eaba1',
 		'02': 'c43f9a54754d6172',

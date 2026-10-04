@@ -9,7 +9,7 @@ import { DEFAULT_LIGHT, ME_LOOK, ME_RING_INNER } from '../src/render/styles';
 import { approxMeasure, renderSvg } from '../src/render/svg-string';
 import { FEl, installDom } from './acceptance/fake-dom';
 
-// WP 1.1.1-WP2, D96: on the "This is me" card the arms box, the portrait and the D14 sign keep a gap of
+// WP 0.2.1-WP2, D96: on the "This is me" card the arms box, the portrait and the D14 sign keep a gap of
 // at least 1.5 px to the inner edge of the mark's ring; every other card is drawn as before.
 
 beforeAll(() => {

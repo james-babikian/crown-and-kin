@@ -17,7 +17,7 @@
  * - Writing: each number is rounded to 4 decimals with no trailing zeros, joined by single spaces. Two
  *   values are the same (no write) when their rounded numbers are equal.
  * - Automatic part: the fractions of the upper-centre square of `portraitCrop(w, h)`. A crop equal to it
- *   within `CROP_EPSILON` is saved as no key at all.
+ *   when both are rounded to 4 decimals is saved as no key at all.
  * - `cropSquare` gives the square in whole picture px, inside the picture, that the picture store cuts.
  *   A person with no `portrait`, no crop, or a bad crop uses the automatic square. A crop without a
  *   portrait is ignored with no warning.
@@ -42,8 +42,6 @@ export type CropRead = { kind: 'absent' } | { kind: 'bad' } | { kind: 'ok'; crop
 
 /** The smallest part: one tenth of the shorter side (spec §13.13 "Zoom limits"). */
 export const CROP_MIN_SIDE = 0.1;
-/** Two crops within this many fractions are the same part. */
-export const CROP_EPSILON = 0.00005;
 
 const NUMBER = /^-?(\d+\.?\d*|\.\d+)$/;
 

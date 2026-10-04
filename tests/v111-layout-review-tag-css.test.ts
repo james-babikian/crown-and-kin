@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { cssRules } from './acceptance/m11-support';
 
-// Review of 1.1.1 area C, rule 6: the hole of an open sign (ring, open triangle) inside a tag pill must have the pill's fill.
+// Review of 0.2.1 area C, rule 6: the hole of an open sign (ring, open triangle) inside a tag pill must have the pill's fill.
 // The headless drawing uses `cardFill` for both; the live tree takes the fill from the near-couple rule.
 
 const css = readFileSync('styles.css', 'utf8');

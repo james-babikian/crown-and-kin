@@ -126,7 +126,7 @@ describe('cardLabels (§13.3, §13.5, D56, D58, D61–D63)', () => {
 		expect(t).toMatchObject({ selected: false, title: 'King of Ostmark', name: 'Tomas IV' });
 	});
 
-	it('a person with no title keeps the 1.0 text', () => {
+	it('a person with no title keeps the 0.1 text', () => {
 		const p = labels.get('piers')!;
 		expect(p).toEqual({ holdings: [], selected: false, name: 'Piers', title: 'Squire' });
 		expect('shown' in p).toBe(false);
@@ -140,7 +140,7 @@ describe('cardLabels (§13.3, §13.5, D56, D58, D61–D63)', () => {
 		expect(Object.isFrozen(labels.get('aldric'))).toBe(true);
 	});
 
-	it('a tree with no titles: every label is the 1.0 name and title', () => {
+	it('a tree with no titles: every label is the 0.1 name and title', () => {
 		const g1 = graph(fixture('01'));
 		for (const p of g1.people) {
 			const l = cardLabels(g1).get(p.id)!;

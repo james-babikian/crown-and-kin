@@ -43,7 +43,7 @@
  *      (Chromium makes an SVG element with a focus listener a Tab stop).
  *   d. Before a highlight, e. before a reveal, f. before the sheet opens by keyboard or code: fill the
  *      person first.
- *   (1.1.1, rule 4: the lines and partnership signs follow the same calls; `fillNear`, `fillPerson`, `fillChunk` and
+ *   (0.2.1, rule 4: the lines and partnership signs follow the same calls; `fillNear`, `fillPerson`, `fillChunk` and
  *   `fillAll` build them too, and `pendingLines` keeps the idle chain running until they are built.)
  *   g. Idle: after the first view the rest is attached in idle chunks (`later`, at most
  *      `IDLE_CARDS_PER_CHUNK` cards, stop at `IDLE_STOP_MS`), nearest to the view first, one chain for
@@ -57,7 +57,7 @@
  *   before any code that reads layout (`highlight`). The error box and the empty tree are built shown.
  * - S8 One `TreeHost.parseCache` serves the read paths (`parse`); see `core/parse-cache.ts`.
  * - S10 Accessibility does not change: every shell keeps its Tab stop, name, role and order.
- * - The root attributes `data-dynasty-cards-pending` (`CARDS_PENDING_ATTR`; the lint rule wants a plain string here) and `data-dynasty-lines-pending` (`LINES_PENDING_ATTR`, 1.1.1) and the event `FILL_ALL_EVENT` (both in `render/dom/scene.ts`)
+ * - The root attributes `data-dynasty-cards-pending` (`CARDS_PENDING_ATTR`; the lint rule wants a plain string here) and `data-dynasty-lines-pending` (`LINES_PENDING_ATTR`, 0.2.1) and the event `FILL_ALL_EVENT` (both in `render/dom/scene.ts`)
  *   are the harness hooks: the harness fills everything, then reads card content.
  */
 
@@ -112,7 +112,7 @@ import {
 } from '../render/view-math';
 import { sameBody } from '../core/block-match';
 import type { Handle, HandleRegistry } from './block-handle';
-import { focusKey, newBlockState, type BlockState, type FinderState } from './block-state';
+import { carryState, focusKey, newBlockState, type BlockState, type FinderState } from './block-state';
 import { EditSheet, type SheetFolds } from './edit-sheet';
 import { NARROW_MAX_EM, PHONE_FOCUS_MIN_PEOPLE, badgeHit, badgeHitInCard, chooseFocus, clearToolbar, finderFirstView, finderOrientation, focusView, isPhoneWindow, narrowCardWidth, orientationFor, outsideBox, sidewaysView, tagHitBelow } from './focus-mode';
 import { cutBack, planFolds, withFolds, type FoldPlan } from './fold-view';
@@ -395,6 +395,11 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 	private readonly sectionNote: string;
 	/** The block's handle once known; null while it resolves, and for a read-only view. */
 	private handle: Handle | null = null;
+	/** The handle this view lost (detached): its session state moves to the next handle of the block (D6). */
+	private lost: Handle | null = null;
+	/** A look for the block after a change of the note is under way (D7). */
+	private lateBusy = false;
+	private unwatch: (() => void) | null = null;
 	private peeked: Handle | null = null;
 	private ready: Promise<Handle | null>;
 	/** No handle (transclusion, Canvas card, hover popover, or the block cannot be told apart): no edits (spec §6.1). */
@@ -576,6 +581,8 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 		// O9: a picture file changed, came or went: the pictures of this tree follow (no new layout).
 		const store = this.host.pictures;
 		if (store) this.unsubPictures = store.onChange((paths) => this.guard(() => this.picturesChanged(paths)));
+		// D7: a view that gave up finding its block tries again when the note changes (the pasted copy is deleted).
+		if (this.info && !this.full) this.unwatch = this.host.handles.watchNote?.((path) => this.guard(() => this.noteModified(path))) ?? null;
 		this.guard(() => this.render(null));
 		if (this.info || this.full) {
 			void this.ready.then((h) => this.guard(() => this.attach(h)));
@@ -592,7 +599,21 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 		this.unsubscribe = null;
 		this.unsubPictures?.();
 		this.unsubPictures = null;
+		this.unwatch?.();
+		this.unwatch = null;
 		this.teardown();
+	}
+
+	/**
+	 * The plugin is turned off while this tree is on the page (Obsidian does not unload a note's render
+	 * children then): the tree stays as a read-only picture, its listeners and observers go, and no
+	 * card, button or key writes through the old handle registry any more.
+	 */
+	retire(): void {
+		if (this.unloaded) return;
+		this.readOnly = true;
+		this.guard(() => this.updateEditUi());
+		this.unload();
 	}
 
 	/** Plugin memory for this block (spec §5.5): on the handle, or keyed by text for a read-only block; null if there is none yet. */
@@ -629,6 +650,9 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 		}
 		this.readOnly = false;
 		if (this.handle !== h) {
+			// A new handle of the same block (the old one was detached): the session state follows the block.
+			if (this.lost) carryState(this.lost.state, h.state);
+			this.lost = null;
 			// The body tells a different block from the one the lines suggested: move a view state across.
 			const loose = this.host.looseStates.get(this.key);
 			if (loose?.view && !h.state.view) {
@@ -637,7 +661,10 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 				h.state.views = { ...loose.views };
 			}
 			if (loose && !h.state.focus) h.state.focus = loose.focus;
-			if (loose && h.state.autoFocus === null) h.state.autoFocus = loose.autoFocus;
+			if (loose && h.state.autoFocus === null) {
+					h.state.autoFocus = loose.autoFocus;
+					h.state.autoMark = loose.autoMark;
+				}
 			if (loose && !h.state.folds.size) h.state.folds = new Set(loose.folds);
 		}
 		this.handle = h;
@@ -664,6 +691,7 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 	private async reResolve(): Promise<Handle | null> {
 		this.unsubscribe?.();
 		this.unsubscribe = null;
+		this.lost = this.handle ?? this.lost;
 		this.handle = null;
 		const info = this.info;
 		let h: Handle | null = null;
@@ -713,6 +741,26 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 	}
 
 	/**
+	 * The note changed after this view gave up finding its block (`retryResolve` made its last try): look
+	 * once more, so that the view is editable again when the copy that made two blocks alike is gone.
+	 */
+	private noteModified(path: string): void {
+		const info = this.info;
+		if (path !== this.sourcePath || !info || this.unloaded || this.handle || this.lateBusy || this.retryTimer) return;
+		if (this.retries < RESOLVE_RETRIES_MS.length) return;
+		this.lateBusy = true;
+		this.ready = this.host.handles.resolve(this.sourcePath, info, this.source).catch(() => null);
+		void this.ready
+			.then((h) => {
+				this.lateBusy = false;
+				if (h && !this.handle) this.guard(() => this.attach(h));
+			})
+			.catch(() => {
+				this.lateBusy = false;
+			});
+	}
+
+	/**
 	 * The handle changed. A detached handle no longer knows its block: find the block again from
 	 * what this view rendered. Otherwise the handle's new body is this block's new text: show it.
 	 */
@@ -743,7 +791,7 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 	private async fullReattach(): Promise<void> {
 		this.unsubscribe?.();
 		this.unsubscribe = null;
-		const old = this.handle;
+		this.lost = this.handle ?? this.lost;
 		this.handle = null;
 		const h = await this.host.handles.resolveUnique(this.sourcePath, this.source).catch(() => null);
 		if (this.unloaded) return;
@@ -751,7 +799,6 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 			this.full?.close(FULL_UI.gone);
 			return;
 		}
-		if (old && old !== h && !h.state.view) Object.assign(h.state, old.state);
 		this.ready = Promise.resolve(h);
 		this.guard(() => this.attach(h));
 	}
@@ -1257,20 +1304,24 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 		const own = this.full?.focus;
 		if (own && (own.id === null || whole.byId.has(own.id))) return own.id;
 		const st = this.ensureState();
+		const me = validMe(whole, tree.options.me);
 		const choice = chooseFocus({
 			session: st.focus,
 			pin: tree.options.focus,
 			phone: this.isPhone(),
 			auto: st.autoFocus,
+			autoMark: st.autoMark,
+			// D111: a marked person opens a small tree on a phone as a family too; the full-screen view keeps its rule.
+			marked: !this.full && me !== null,
+			...(this.full ? {} : { mark: me }),
 			has: (id) => whole.byId.has(id),
 			large: () => whole.people.length > PHONE_FOCUS_MIN_PEOPLE,
-			start: () => {
-				const edited = st.lastEdited;
-				return startPerson(whole, edited !== null && whole.byId.has(edited) ? edited : tree.options.start);
-			},
+			// Spec §5.5 on a phone: the person last edited, `options.start`, the marked person, the first root.
+			start: () => startPerson(whole, [st.lastEdited, tree.options.start, this.full ? null : me].find((id) => id != null && whole.byId.has(id)) ?? undefined),
 		});
 		if (choice.dropSession) st.focus = null;
 		st.autoFocus = choice.auto;
+		st.autoMark = choice.autoMark;
 		return choice.id;
 	}
 
@@ -2316,6 +2367,7 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 			onClosed: () => TreeView.refocusButton(this.host, st, full, '.dynasty-houses-button'),
 			sourcePath: this.sourcePath,
 			pictures: this.host.pictures,
+			showGeneration: () => this.settings.showHouseGeneration,
 			people: {
 				// This view if it is still drawn; after a Save the note draws the tree again, and the view of the same state shows the card.
 				show: (id) => (this.unloaded ? TreeView.showFound(this.host, st, full, id) : this.guard(() => this.showFound(id))),
@@ -2571,7 +2623,8 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 	/** Find (spec §6.10): the picker with every person; centres and highlights the choice, no focus mode. */
 	private async find(): Promise<void> {
 		const g = this.whole;
-		if (!g) return;
+		// A retired view is only a picture: its toolbar opens nothing.
+		if (!g || this.unloaded) return;
 		const picked = await pickPerson(this.host.app, g, new Set(), FULL_UI.findPlaceholder, FULL_UI.findTitle, false);
 		if (picked?.kind !== 'person' || this.unloaded) return;
 		// Find never enters focus mode (spec §6.10); a person outside the focus family is shown in the whole tree.
@@ -2581,7 +2634,8 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 	/** Toolbar Focus (spec §5.6, §6.6): the picker with every person of the whole tree, and no "Create" row. */
 	private async pickFocusPerson(): Promise<void> {
 		const g = this.whole;
-		if (!g) return;
+		// A retired view is only a picture: its toolbar opens nothing.
+		if (!g || this.unloaded) return;
 		const picked = await pickPerson(this.host.app, g, new Set(), FOCUS_UI.pickerPlaceholder, FOCUS_UI.pickerTitle, false);
 		if (picked?.kind !== 'person' || this.unloaded) return;
 		this.guard(() => this.focusOn(picked.id));
@@ -2782,6 +2836,7 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 		const host = this.host;
 		openHousePage(this.host.app, {
 			app: this.host.app,
+			showGeneration: () => this.settings.showHouseGeneration,
 			houseId,
 			whole,
 			sourcePath: this.sourcePath,

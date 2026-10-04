@@ -231,6 +231,16 @@ export default class DynastyTreePlugin extends Plugin implements TreeHost, Setti
 		// vault listeners), so that nothing of the plugin stays on screen or writes after it is turned off.
 		closePluginModals();
 		FullScreenModal.closeAll();
+		// A tree in a note is a child of the note, not of the plugin: Obsidian does not unload it when the
+		// plugin goes. Unload it here (its listeners and observers go, and it refuses edits and writes).
+		for (const v of [...this.views]) {
+			try {
+				v.retire();
+			} catch (e) {
+				console.error('Dynasty Tree: cannot close a tree view', e);
+			}
+		}
+		this.views.clear();
 	}
 
 	/**

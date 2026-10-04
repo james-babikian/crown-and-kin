@@ -42,7 +42,7 @@ import { clock, dispatch, fakeWin, installDom, resetDom, runTimers, settle } fro
 import { noticeList, resetObsidian, settingRows, type Plugin as FakePlugin, type PluginSettingTab, type TextComponent } from './acceptance/fake-obsidian';
 import { fakeApp, fakeHandle } from './acceptance/tree-view-fakes';
 
-/* Review 1.0.1 area E, findings 7, 8 and 9 (the decision notes "Version 1.0.1", area E rulings). */
+/* Review 0.1.1 area E, findings 7, 8 and 9 (the decision notes "Version 0.1.1", area E rulings). */
 
 beforeAll(() => {
 	installDom();

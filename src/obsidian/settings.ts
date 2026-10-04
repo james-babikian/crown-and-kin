@@ -18,6 +18,8 @@ export interface DynastySettings {
 	showPortraits: boolean;
 	/** Focus mode default generations (§5.6, §9), a whole number 0–10. Default 3; `options.generations` wins; D23 (n = 1 in the static phone preview) wins over both. */
 	focusGenerations: number;
+	/** D113 item 4: the house page shows the generation of each person. Off: only the dates (and no Generation column). Read when the page opens. */
+	showHouseGeneration: boolean;
 	/** Update tree links when a note or a picture is renamed (§6.9, D6, §13.0 item 3). Default on. */
 	updateLinks: boolean;
 }
@@ -30,6 +32,7 @@ export const DEFAULT_SETTINGS: DynastySettings = {
 	showDates: true,
 	showRelations: true,
 	showPortraits: true,
+	showHouseGeneration: true,
 	focusGenerations: 3,
 	updateLinks: true,
 };
@@ -69,6 +72,7 @@ export const normaliseSettings = (raw: unknown): DynastySettings => {
 		showDates: typeof s.showDates === 'boolean' ? s.showDates : d.showDates,
 		showRelations: typeof s.showRelations === 'boolean' ? s.showRelations : d.showRelations,
 		showPortraits: typeof s.showPortraits === 'boolean' ? s.showPortraits : d.showPortraits,
+		showHouseGeneration: typeof s.showHouseGeneration === 'boolean' ? s.showHouseGeneration : d.showHouseGeneration,
 		focusGenerations: wholeIn(s.focusGenerations, GENERATIONS) ? s.focusGenerations : d.focusGenerations,
 		updateLinks: typeof s.updateLinks === 'boolean' ? s.updateLinks : d.updateLinks,
 	};

@@ -12,14 +12,25 @@
 import { isMap, isScalar, isSeq, type Node, type Pair, type YAMLMap, type YAMLSeq } from 'yaml';
 import { isEmpty } from './tolerate';
 import {
-	addSection, findPair, insertAt, isRefusal, layoutOf, mergeRemovals, refuse, removePair, setPairValue, topMap, type Parsed, type Patch, type Refusal, type Source,
+	addSection, findPair, insertAt, isRefusal, itemBlock, layoutOf, mergeRemovals, refuse, removePair, setPairValue, topMap, type Parsed, type Patch, type Refusal, type Source,
 } from './yaml-patch';
 
 /** The position of the item's dash (its own start in a flow list). */
 export function dashOf(src: Source, node: Node): number {
 	let p = node.range![0] - 1;
-	while (p >= 0 && /\s/.test(src.text[p])) p--;
-	return p >= 0 && src.text[p] === '-' ? p : node.range![0];
+	for (;;) {
+		while (p >= 0 && /\s/.test(src.text[p])) p--;
+		// A hyphen inside a comment (`# see Jean-`) is text, not a dash.
+		if (p >= 0 && src.text[p] === '-' && !/(^|[ \t])#/.test(src.text.slice(src.lineStart(p), p))) return p;
+		if (p < 0) return node.range![0];
+		// Comments between the dash and the item's first text: `- # note`, or lines of their own.
+		const start = src.lineStart(p);
+		const line = src.text.slice(start, src.lineEnd(p));
+		const m = /^[ \t]*(-[ \t]+)?#/.exec(line);
+		if (!m) return node.range![0];
+		if (m[1]) return start + m[0].indexOf('-');
+		p = start - 1;
+	}
 }
 
 const lineAfter = (src: Source, end: number): [number, number] | null => {
@@ -39,7 +50,8 @@ export function itemEnd(src: Source, seq: YAMLSeq, i: number): number {
 	const node = seq.items[i] as Node;
 	if (seq.flow) return src.nodeEnd(node);
 	const dashCol = src.column(dashOf(src, node));
-	let end = src.nodeLineEnd(node);
+	// The range of a nested collection includes shallower comment lines; they belong to the next item (see `itemStart`).
+	let end = src.nodeLineEnd(node, dashCol);
 	for (let next = lineAfter(src, end); next; next = lineAfter(src, end)) {
 		const line = src.text.slice(next[0], next[1]);
 		if (!isCommentLine(line) || indentOf(line) <= dashCol) break;
@@ -184,9 +196,7 @@ export function insertItem(p: Parsed, key: 'people' | 'unions', where: Where, bl
 		return insertAt(itemEnd(src, seq, where ? where.after : seq.items.length - 1), lines.map((l) => '\n' + l).join(''));
 	}
 	if (pair && !isSeq(seq) && !(isScalar(seq) && isEmpty(seq.value)) && seq !== null) return refuse('bad-value', `The ${key} section is not a list.`);
-	const pad = ' '.repeat(layout.seqIndent);
-	const itemPad = ' '.repeat(layout.seqIndent + layout.itemIndent);
-	const value = { block: block.map((l, n) => (n === 0 ? `${pad}- ${l}` : itemPad + l)), flow: `[${flow}]` };
+	const value = { block: itemBlock(layout, block), flow: `[${flow}]` };
 	if (pair && top) return setPairValue(src, top, pair, value, layout);
 	return addSection(p, key, value);
 }

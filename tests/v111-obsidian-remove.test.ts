@@ -17,7 +17,7 @@ import { openModals, resetObsidian } from './acceptance/fake-obsidian';
 import { fakeHandle, type FakeHandle } from './acceptance/tree-view-fakes';
 
 /*
- * 1.1.1 WP3, D97 (spec §13.6, §13.13): the Remove row in the picture lists for arms and for a portrait.
+ * 0.2.1 WP3, D97 (spec §13.6, §13.13): the Remove row in the picture lists for arms and for a portrait.
  * The picker answers `remove` as well as `choose` and `cancel`; the Houses window and the edit sheet
  * clear the value in the open window, and Save writes it. D92 to D95 stay true with the row.
  * Run: npx vitest run tests/v111-obsidian-remove.test.ts

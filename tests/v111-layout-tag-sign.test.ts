@@ -10,7 +10,7 @@ import { DEFAULT_LIGHT, UNION_MARKS, tagMarkSlot, unionShape, type UnionShape } 
 import { approxMeasure, renderSvg, textWidth } from '../src/render/svg-string';
 import { FEl, installDom } from './acceptance/fake-dom';
 
-// WP 1.1.1-WP2, item 2: a far couple with no children has no union dot, so its tag carries the partnership sign.
+// WP 0.2.1-WP2, item 2: a far couple with no children has no union dot, so its tag carries the partnership sign.
 // A couple with children, a tag for several partners and a near couple are drawn as before.
 
 beforeAll(() => {
@@ -194,7 +194,7 @@ describe('the headless drawing', () => {
 		expect(pill).toBeTruthy();
 		const label = new RegExp(String.raw`<text x="([\d.]+)" y="[\d.]+" font-size="${tagFont}"[^>]*>Zelda</text>`).exec(svg)!;
 		const pad = geo.tagH / 2;
-		// 1.1.2 (D108): the room depends on the shape; this tag shows a ring.
+		// 0.2.2 (D108): the room depends on the shape; this tag shows a ring.
 		const slot = tagMarkSlot('ring', tagFont);
 		expect(Number(label[1])).toBeCloseTo(pill.left + pad + tagFont * 1.4 + slot, 6);
 		expect(pill.w).toBeCloseTo(textWidth('Zelda', tagFont) + tagFont * 1.4 + slot + 2 * pad, 6);

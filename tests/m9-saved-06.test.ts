@@ -100,7 +100,7 @@ function sceneItems(root: FEl, saved: SavedParts): string[] {
 			if (all(e).some((x) => x.hasClass('dynasty-card-relation'))) out.push(`relation:${id}`);
 		}
 		if (e.hasClass('dynasty-line') && e.parentElement?.hasClass('dynasty-lines')) out.push(`line:${[...e.classes].find((c) => c.startsWith('dynasty-line-'))!.slice('dynasty-line-'.length)}`);
-		// 1.1.1: a far-couple tag draws its partnership sign in the Full and in the Compact pill; the saved picture has the Full one only.
+		// 0.2.1: a far-couple tag draws its partnership sign in the Full and in the Compact pill; the saved picture has the Full one only.
 		if (e.hasClass('dynasty-union-dot') && !e.parentElement?.hasClass('dynasty-tag-compact')) out.push(`union:${[...e.classes].find((c) => c.startsWith('dynasty-union-') && c !== 'dynasty-union-dot')?.slice('dynasty-union-'.length) ?? 'dot'}`);
 		if (e.hasClass('dynasty-rumour-marker')) out.push('rumour');
 		if (e.hasClass('dynasty-tag')) out.push(`tag:${e.getAttribute('data-person')}`);

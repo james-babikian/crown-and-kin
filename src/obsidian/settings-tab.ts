@@ -18,6 +18,11 @@ export interface SettingsHost extends Plugin {
 
 type Group = (add: (build: (s: Setting) => void) => void) => void;
 
+/** Obsidian does not join a setting's name to its control; a screen reader needs the name on the control itself (P4). */
+function name(control: HTMLElement | null | undefined, label: string): void {
+	control?.setAttribute('aria-label', label);
+}
+
 /** The desktop height is stored this long after the last key press (or at once on blur or Enter). */
 const HEIGHT_TYPING_MS = 400;
 
@@ -44,6 +49,7 @@ export class DynastySettingTab extends PluginSettingTab {
 				row.setName(t.heightDesktop).setDesc(t.heightDesktopDesc);
 				row.addText((text) => {
 					text.inputEl.addClass('dynasty-setting-height');
+					name(text.inputEl, t.heightDesktop);
 					text.inputEl.setAttribute('inputmode', 'numeric');
 					text.setValue(String(s.embedHeightDesktop));
 					// "1200" passes through "120": a value is stored only when the typing stops, not at each key press.
@@ -70,6 +76,7 @@ export class DynastySettingTab extends PluginSettingTab {
 			add((row) => {
 				row.setName(t.heightPhone).setDesc(t.heightPhoneDesc);
 				row.addDropdown((d) => {
+					name(d.selectEl, t.heightPhone);
 					const values: number[] = [...PHONE_HEIGHTS];
 					if (!values.includes(s.embedHeightPhone)) values.push(s.embedHeightPhone);
 					for (const v of values.sort((a, b) => a - b)) d.addOption(String(v), `${v}%`);
@@ -82,6 +89,7 @@ export class DynastySettingTab extends PluginSettingTab {
 			add((row) => {
 				row.setName(t.cardSize).setDesc(t.cardSizeDesc);
 				row.addDropdown((d) => {
+					name(d.selectEl, t.cardSize);
 					d.addOption('normal', t.cardNormal);
 					d.addOption('compact', t.cardCompact);
 					d.setValue(s.cardSize);
@@ -91,6 +99,8 @@ export class DynastySettingTab extends PluginSettingTab {
 			add((row) => {
 				row.setName(t.dates).setDesc(t.datesDesc);
 				row.addToggle((tg) => {
+					name(tg.toggleEl, t.dates);
+					name(tg.toggleEl.querySelector('input'), t.dates);
 					tg.setValue(s.showDates);
 					tg.onChange((v) => void this.host.changeSettings({ showDates: v }));
 				});
@@ -98,6 +108,8 @@ export class DynastySettingTab extends PluginSettingTab {
 			add((row) => {
 				row.setName(t.relations).setDesc(t.relationsDesc);
 				row.addToggle((tg) => {
+					name(tg.toggleEl, t.relations);
+					name(tg.toggleEl.querySelector('input'), t.relations);
 					tg.setValue(s.showRelations);
 					tg.onChange((v) => void this.host.changeSettings({ showRelations: v }));
 				});
@@ -105,8 +117,21 @@ export class DynastySettingTab extends PluginSettingTab {
 			add((row) => {
 				row.setName(t.portraits).setDesc(t.portraitsDesc);
 				row.addToggle((tg) => {
+					name(tg.toggleEl, t.portraits);
+					name(tg.toggleEl.querySelector('input'), t.portraits);
 					tg.setValue(s.showPortraits);
 					tg.onChange((v) => void this.host.changeSettings({ showPortraits: v }));
+				});
+			});
+		});
+		this.group(el, t.groups.housePage, (add) => {
+			add((row) => {
+				row.setName(t.houseGeneration).setDesc(t.houseGenerationDesc);
+				row.addToggle((tg) => {
+					name(tg.toggleEl, t.houseGeneration);
+					name(tg.toggleEl.querySelector('input'), t.houseGeneration);
+					tg.setValue(s.showHouseGeneration);
+					tg.onChange((v) => void this.host.changeSettings({ showHouseGeneration: v }));
 				});
 			});
 		});
@@ -114,6 +139,7 @@ export class DynastySettingTab extends PluginSettingTab {
 			add((row) => {
 				row.setName(t.generations).setDesc(t.generationsDesc);
 				row.addDropdown((d) => {
+					name(d.selectEl, t.generations);
 					for (let n = GENERATIONS.min; n <= GENERATIONS.max; n++) d.addOption(String(n), String(n));
 					d.setValue(String(s.focusGenerations));
 					d.onChange((v) => void this.host.changeSettings({ focusGenerations: Number(v) }));
@@ -124,6 +150,8 @@ export class DynastySettingTab extends PluginSettingTab {
 			add((row) => {
 				row.setName(t.links).setDesc(t.linksDesc);
 				row.addToggle((tg) => {
+					name(tg.toggleEl, t.links);
+					name(tg.toggleEl.querySelector('input'), t.links);
 					tg.setValue(s.updateLinks);
 					tg.onChange((v) => void this.host.changeSettings({ updateLinks: v }));
 				});

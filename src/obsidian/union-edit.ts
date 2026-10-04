@@ -10,7 +10,7 @@ import { UNION_TYPES } from '../core/types';
 import { SHEET, UNION_EDIT, UNION_TYPE_TEXT } from '../render/ui-text';
 import { ignoreGhostClick, phoneLayout } from './modal-layout';
 import { trackModal } from './plugin-modals';
-import { sheetField } from './sheet-parts';
+import { nameDialog, revealFocused, sheetField } from './sheet-parts';
 
 /** The editable fields of one partnership. */
 export interface UnionValues {
@@ -45,11 +45,15 @@ class UnionEditModal extends Modal {
 	override onOpen(): void {
 		this.modalEl.addClass('dynasty-sheet');
 		this.modalEl.addClass('dynasty-union-edit');
-		this.cleanup.push(phoneLayout(this), ignoreGhostClick(this), trackModal(this, () => this.finish()));
+		this.cleanup.push(phoneLayout(this, () => revealFocused(this.modalEl, this.contentEl)), ignoreGhostClick(this), trackModal(this, () => this.finish()));
+		// The keyboard can cover a field in the scrolling body: bring it into view when it gets the focus (C1).
+		const reveal = () => revealFocused(this.modalEl, this.contentEl, 300);
+		this.contentEl.addEventListener('focusin', reveal);
+		this.cleanup.push(() => this.contentEl.removeEventListener('focusin', reveal));
 		const el = this.contentEl;
 		el.addClass('dynasty-sheet-content');
 		const header = el.createDiv({ cls: 'dynasty-sheet-header' });
-		header.createDiv({ cls: 'dynasty-sheet-title', text: UNION_EDIT.title });
+		nameDialog(this.modalEl, header.createDiv({ cls: 'dynasty-sheet-title', text: UNION_EDIT.title }));
 		const actions = header.createDiv({ cls: 'dynasty-sheet-actions' });
 		actions.createEl('button', { cls: 'dynasty-sheet-cancel', text: SHEET.cancel, attr: { type: 'button' } }).addEventListener('click', () => this.finish());
 		const save = actions.createEl('button', { cls: ['mod-cta', 'dynasty-sheet-save'], text: SHEET.save, attr: { type: 'button' } });

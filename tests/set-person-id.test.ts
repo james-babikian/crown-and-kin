@@ -4,7 +4,7 @@ import { parseDynasty } from '../src/core/parse';
 import { applyOp } from '../src/core/yaml-edit';
 
 /*
- * Review 1.0.1 area E, finding 1: `set-person-fields` with `id` gives a person with no written id
+ * Review 0.1.1 area E, finding 1: `set-person-fields` with `id` gives a person with no written id
  * (named `~N` after their place in the list) a written id, so later ops of the batch can name them.
  */
 

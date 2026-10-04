@@ -9,7 +9,7 @@ import { Transaction } from '@codemirror/state';
 import type { EditorView } from '@codemirror/view';
 import type { WritePlan } from '../core/block-write';
 import { findBlocks, ordinalForSection, type LocatedBlock } from '../core/block-locate';
-import { relocateAll, sameBody, smallestChange, undoBlock } from '../core/block-match';
+import { relocate, relocateAll, sameBody, smallestChange, undoBlock } from '../core/block-match';
 import { createUndoStack, planWrite } from '../core/block-write';
 import type { EditResult, Op } from '../core/edit';
 import { applyOp } from '../core/yaml-edit';
@@ -264,7 +264,7 @@ export class Handle {
 			if (view) {
 				const text = view.editor.getValue();
 				seen = text;
-				plan = planWrite(text, this.key.ordinal, expected, edit);
+				plan = this.plan(text, expected, edit);
 				unchanged = plan.ok && plan.newText === text;
 				if (plan.ok && !unchanged) {
 					applyToEditor(view, smallestChange(text, plan.newText), !maintenance);
@@ -273,7 +273,7 @@ export class Handle {
 			} else {
 				await this.reg.app.vault.process(file, (text) => {
 					seen = text;
-					plan = planWrite(text, this.key.ordinal, expected, edit);
+					plan = this.plan(text, expected, edit);
 					unchanged = plan.ok && plan.newText === text;
 					// Obsidian's `process` does not write the file when the function returns the same text.
 					return plan.ok && !unchanged ? plan.newText : text;
@@ -298,6 +298,19 @@ export class Handle {
 		if (!maintenance) this.reg.noteWrite(this);
 		this.notify();
 		return 'written';
+	}
+
+	/**
+	 * `planWrite`, after a check that the text still says which block this handle is. The editor can be
+	 * newer than the file and than the handle (a block was pasted or deleted, `modify` has not come):
+	 * with two blocks of the same body, the body at the ordinal does not tell which one the view shows,
+	 * so the write is refused as stale and the re-read detaches the handle (spec §6.1).
+	 */
+	private plan(text: string, expected: string, edit: Parameters<typeof planWrite>[3]): WritePlan {
+		const bodies = findBlocks(text).map((b) => b.body);
+		// With no block at the ordinal `planWrite` says `missing`: the retry in `write` and its callers know that case.
+		if (this.key.ordinal < bodies.length && !this.reg.placeIsClear(this, expected, bodies)) return { ok: false, code: 'stale' };
+		return planWrite(text, this.key.ordinal, expected, edit);
 	}
 
 	/**
@@ -327,6 +340,8 @@ export class HandleRegistry {
 	 * compares with it, so a copy of a block is never taken for the block itself.
 	 */
 	private readonly lastSeen = new Map<string, string[]>();
+	/** Views that gave up finding their block listen for later changes of the note (D7). */
+	private readonly noteWatchers = new Set<(path: string) => void>();
 
 	constructor(readonly app: App) {}
 
@@ -484,6 +499,15 @@ export class HandleRegistry {
 		const seen = this.lastSeen.get(path);
 		if (seen && seen.length === h.count && h.key.ordinal < seen.length) seen[h.key.ordinal] = h.body;
 		else this.applyText(path, text);
+	}
+
+	/**
+	 * False if the note's block `bodies` cannot tell safely which block the handle `h` means: `relocate` would detach it
+	 * (the number of blocks changed and its body is not unique, or the body is also in another block
+	 * that the last read did not hold).
+	 */
+	placeIsClear(h: Handle, expected: string, bodies: readonly string[]): boolean {
+		return relocate(bodies, h.count, h.key.ordinal, expected, this.lastSeen.get(h.key.path)).kind !== 'detached';
 	}
 
 	/** Moves a handle to another block (an undo found its block elsewhere). A handle already there is detached. */
@@ -654,6 +678,14 @@ export class HandleRegistry {
 
 	/** After an outside change of the note, every handle of it finds its block again. */
 	modified(path: string): void {
-		void this.sync(path);
+		void this.sync(path).then(() => {
+			for (const w of [...this.noteWatchers]) w(path);
+		});
+	}
+
+	/** Calls `fn` with the path of a note after each outside change of it, once the handles have read it. Returns an unsubscribe function. */
+	watchNote(fn: (path: string) => void): () => void {
+		this.noteWatchers.add(fn);
+		return () => this.noteWatchers.delete(fn);
 	}
 }

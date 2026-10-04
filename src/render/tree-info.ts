@@ -4,6 +4,7 @@
  * obeys Simplified Technical English (ASD-STE100) and the project word list.
  */
 import type { FamilyGraph } from '../core/derive';
+import { linkText } from '../core/link-text';
 import { CURLY_APOSTROPHE } from '../core/quote';
 import type { FinderResult, Relation, RelationStep } from '../core/relations';
 import type { CardLabel } from '../core/titles';
@@ -80,19 +81,7 @@ export function cardLabel(p: Person, relation?: string, label?: CardLabel): stri
  */
 export function linkTarget(link: string | undefined): string | null {
 	if (typeof link !== 'string') return null;
-	let s = link.trim();
-	const wiki = /^!?\[\[([^\]]*)\]\]$/.exec(s);
-	const md = /^!?\[[^\]]*\]\(([^)]*)\)$/.exec(s);
-	if (wiki) s = wiki[1].split('|')[0];
-	else if (md) {
-		s = md[1].trim().replace(/^<(.*)>$/, '$1');
-		try {
-			s = decodeURIComponent(s);
-		} catch {
-			// Keep the text as written if it is not valid percent-encoding.
-		}
-	}
-	s = s.trim();
+	const s = linkText(link);
 	return s === '' || s === '#' ? null : s;
 }
 

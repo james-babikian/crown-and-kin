@@ -162,7 +162,7 @@ describe('insertTree in an editor', () => {
 		expect(s.cursor).toEqual({ line: blocks[1].closeLine! + 1, ch: 1 });
 	});
 
-	it('in a code block that never closes: the tree goes above its opening fence (review 1.0.1 E)', () => {
+	it('in a code block that never closes: the tree goes above its opening fence (review 0.1.1 E)', () => {
 		const s = run('Intro\n```js\nlet a = 1;', { line: 2, ch: 3 });
 		expect(s.text).toBe(['Intro', '```dynasty', HINT, '```', '', '```js', 'let a = 1;'].join('\n'));
 		const b = expectOneEmptyTree(s.text);
@@ -175,7 +175,7 @@ describe('insertTree in an editor', () => {
 		expect(s.cursor).toEqual({ line: 3, ch: 1 });
 	});
 
-	it('in the note properties: the tree goes after them, and they do not change (review 1.0.1 E)', () => {
+	it('in the note properties: the tree goes after them, and they do not change (review 0.1.1 E)', () => {
 		for (const close of ['---', '...']) {
 			const s = run(`---\ntitle: Valmont\n${close}\nBody`, { line: 1, ch: 3 });
 			expect(s.text).toBe(['---', 'title: Valmont', close, '```dynasty', HINT, '```', '', 'Body'].join('\n'));

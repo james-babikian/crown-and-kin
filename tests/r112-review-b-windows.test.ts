@@ -18,7 +18,7 @@ import { notices, openModals, resetObsidian } from './acceptance/fake-obsidian';
 import { embed, fakeHandle, fakeHost, type FakeHandle, type Host } from './acceptance/tree-view-fakes';
 
 /*
- * Review round 1.1.2, area B (windows). Each test is the smallest sequence of user actions that shows
+ * Review round 0.2.2, area B (windows). Each test is the smallest sequence of user actions that shows
  * a defect in the Id change of the Houses window or the Titles window (since D110 the id is typed in the small Id window). The real windows run on the
  * fakes; the handle's write applies the op with the real `applyOp`, like the other tests of the round.
  */

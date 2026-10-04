@@ -8,7 +8,7 @@ import { nameLines } from '../src/render/name-lines';
 import * as S from './acceptance/sideways-checks';
 import { build } from './helpers';
 
-// Review 1.0.1, area C (layout and headless render). Each test shows one finding; see the report.
+// Review 0.1.1, area C (layout and headless render). Each test shows one finding; see the report.
 
 const FAR = { maxCardWidths: 3, maxGenerations: 1 };
 const DOWN: LayoutSettings = { sweeps: 4, far: FAR };
@@ -91,7 +91,8 @@ unions:
   - {partners: [s1, s2]}
   - {partners: [a, z], type: betrothal}
 `;
-	// Accepted for 1.0.1; version 1.1 idea (a sign in the tag pill).
+	// Fails today (checked again for 0.2.3): in the downward layout a far betrothal with no children has no
+	// marker. Accepted for 0.1.1; an open idea (a sign in the tag pill). Keep skipped until the owner decides.
 	it.skip('down', () => {
 		const { g, layout, edges } = lay(src, DOWN);
 		const fu = g.unions.find((u) => u.type === 'betrothal')!;
@@ -175,9 +176,9 @@ describe('C6: nameLines trims the name before it decides on two text lines (the 
 });
 
 describe('C7: a very long line of descent does not throw in layoutTree (spec §8)', () => {
-	// core/order.ts `visit` recurses once per generation; 4000 generations overflow the stack.
-	// Fixed by the area A fix of order.ts.
-	it.skip('4000 generations', () => {
+	// core/order.ts `visit` recurses once per generation; 4000 generations once overflowed the stack.
+	// Fixed by the area A fix of order.ts; the test runs in about 1 s.
+	it('4000 generations', () => {
 		const n = 4000;
 		const src = `people:\n  - {id: c0, name: C0}\n${Array.from({ length: n }, (_, i) => `  - {id: c${i + 1}, name: C${i + 1}, parents: [c${i}]}`).join('\n')}\n`;
 		const parsed = parseDynasty(src);

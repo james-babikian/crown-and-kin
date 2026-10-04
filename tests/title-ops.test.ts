@@ -450,7 +450,7 @@ describe('delete-person also removes holder entries (D57)', () => {
 		const dup = graph('titles:\n  - id: t\n    holders: [a]\n  - id: t\n    holders: [a, {person: a}]\npeople:\n  - {id: a, name: A}\n  - {id: b, name: B}\n');
 		expect(describeDelete(dup, 'a', {}).holders).toEqual({ titles: 2, entries: 3 });
 		expect(describeDelete(dup, 'b', {}).holders).toEqual({ titles: 0, entries: 0 });
-		// A tree with no titles: the summary is as in 1.0.
+		// A tree with no titles: the summary is as in 0.1.
 		expect('holders' in describeDelete(graph(PEOPLE), 'wren', {})).toBe(false);
 	});
 });

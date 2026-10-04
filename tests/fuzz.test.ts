@@ -30,22 +30,22 @@ import { linkTargets } from '../src/core/link-rewrite';
  * people, findRelation for random pairs, and lineSubgraph → layout for some of the lines.
  *
  * Titles (spec §13.3–§13.5, M8; §13.0 item 10): the mutations add `titles` sections, holder entries
- * of every shape and `card-title` keys. Until WP 8.1 the parser keeps them as unknown keys, so the
- * pipeline above must still pass. Once `src/core/titles.ts` exists, the last group also runs card
- * labels, the reign and name helpers, the table note and random title ops on the mutated trees.
+ * of every shape and `card-title` keys. The pipeline above must pass on them, and a later group also
+ * runs card labels, the reign and name helpers, the table note and random title ops on the mutated trees
+ * (`src/core/titles.ts`).
  *
  * Pictures (spec §13.0 items 3 and 10, M9): the mutations add `arms` to houses and `portrait` to
- * people in every written form (and unquoted `![[…]]` text, amendment A3). Until WP 9.1 the parser
- * keeps them as unknown keys, so the pipeline above must still pass. Once `src/core/pictures.ts` and
- * `pictureSets` exist, the last group also lays trees out with their picture sets, runs the pure
- * picture helpers on the values and on damaged headers, and applies random picture ops.
+ * people in every written form (and unquoted `![[…]]` text, amendment A3). The pipeline above must pass
+ * on them, and a later group also lays trees out with their picture sets (`pictureSets`), runs the pure
+ * picture helpers (`src/core/pictures.ts`) on the values and on damaged headers, and applies random
+ * picture ops.
  *
  * Portrait crop and folds (spec §13.0 item 10, §13.10, §13.13, M10): the mutations add `portrait-crop`
  * to people (three numbers, commas, exponents, lists, maps, empty and garbage), and the last group
  * runs the fold functions (families, hidden people, controls, tags, pruned graph, folds to open, folds
  * that end) on random sets of fold keys, valid and made up, and lays the folded trees out; it also runs
- * the crop helpers on random texts and sizes and applies random `portrait-crop` ops. The group is
- * skipped until `src/core/folds.ts` and `src/core/portrait-crop.ts` exist (WP 10.1) and then must pass.
+ * the crop helpers on random texts and sizes and applies random `portrait-crop` ops (`src/core/folds.ts`
+ * and `src/core/portrait-crop.ts`).
  *
  * Deterministic: each case has its own seed, printed on failure. To re-run one case on every
  * fixture: FUZZ_SEED=0x1234abcd npx vitest run tests/fuzz.test.ts
@@ -852,7 +852,7 @@ describe('fuzz: relation names and the finder never throw (spec §13.1, §13.2, 
 	}
 });
 
-// --- Titles (M8): waits for WP 8.1 ---------------------------------------------------------
+// --- Titles (M8) ---------------------------------------------------------
 
 interface TitlesHelpers {
 	cardLabels: CardLabels;
@@ -864,10 +864,9 @@ interface TitlesHelpers {
 	holderTable: HolderTable;
 }
 
-// A variable path: this file compiles and passes before WP 8.1 adds the module; the group below
-// is skipped until then, and then must pass.
+// Variable paths keep the module types loose in this file; the modules exist and a missing one fails the file.
 const TITLES_PATH = '../src/core/titles';
-const titles = (await import(/* @vite-ignore */ TITLES_PATH).catch(() => null)) as TitlesHelpers | null;
+const titles = (await import(/* @vite-ignore */ TITLES_PATH)) as TitlesHelpers;
 
 const BAD_TEXT = /undefined|NaN|\[object/;
 const TITLE_KINDS = ['add-title', 'edit-title', 'delete-title', 'add-holder', 'edit-holder', 'remove-holder', 'set-holders'];
@@ -945,7 +944,7 @@ function runTitles(text: string, rng: Rng, m: TitlesHelpers) {
 	}
 }
 
-describe.skipIf(!titles)('fuzz: titles, card labels and title ops never throw (spec §13.3–§13.5, §8; waits for WP 8.1)', () => {
+describe('fuzz: titles, card labels and title ops never throw (spec §13.3–§13.5, §8)', () => {
 	for (const f of allFixtures()) {
 		it(`fixture ${f.id}`, () => {
 			let parsed: unknown;
@@ -960,7 +959,7 @@ describe.skipIf(!titles)('fuzz: titles, card labels and title ops never throw (s
 				const rng = new Rng(seed);
 				const { text, names } = mutate(f.source, parsed, rng);
 				try {
-					runTitles(text, rng, titles!);
+					runTitles(text, rng, titles);
 				} catch (e) {
 					const err = e instanceof Error ? `${e.name}: ${e.message}\n${e.stack ?? ''}` : String(e);
 					throw new Error(
@@ -973,15 +972,14 @@ describe.skipIf(!titles)('fuzz: titles, card labels and title ops never throw (s
 	}
 });
 
-// --- Pictures (M9): waits for WP 9.1 and WP 9.2 -------------------------------------------
+// --- Pictures (M9) -------------------------------------------
 
-// Variable paths, like the titles group: this file compiles and passes before the work packages
-// add the modules; the group below is skipped until both exist, and then must pass.
+// Variable paths, like the titles group.
 const PICTURES_PATH = '../src/core/pictures';
 const LAYOUT_INDEX_PATH = '../src/layout/index';
-const pictures = (await import(/* @vite-ignore */ PICTURES_PATH).catch(() => null)) as PicturesModule | null;
-const layoutIndex = (await import(/* @vite-ignore */ LAYOUT_INDEX_PATH).catch(() => null)) as { pictureSets?: PictureSets } | null;
-const pictureSets = layoutIndex?.pictureSets;
+const pictures = (await import(/* @vite-ignore */ PICTURES_PATH)) as PicturesModule;
+const layoutIndex = (await import(/* @vite-ignore */ LAYOUT_INDEX_PATH)) as { pictureSets: PictureSets };
+const pictureSets = layoutIndex.pictureSets;
 
 const PICTURE_KINDS = ['set-person-fields', 'add-person', 'add-house', 'edit-house', 'rewrite-links'];
 const HEADERS: Uint8Array[] = [
@@ -1100,7 +1098,7 @@ function runPictures(text: string, rng: Rng, m: PicturesModule, sets: PictureSet
 	}
 }
 
-describe.skipIf(!pictures || !pictureSets)('fuzz: arms, portraits, picture helpers and picture ops never throw (spec §13.0 items 3 and 10, §8; waits for WP 9.1 and 9.2)', () => {
+describe('fuzz: arms, portraits, picture helpers and picture ops never throw (spec §13.0 items 3 and 10, §8)', () => {
 	for (const f of allFixtures()) {
 		it(`fixture ${f.id}`, () => {
 			let parsed: unknown;
@@ -1115,7 +1113,7 @@ describe.skipIf(!pictures || !pictureSets)('fuzz: arms, portraits, picture helpe
 				const rng = new Rng(seed);
 				const { text, names } = mutate(f.source, parsed, rng);
 				try {
-					runPictures(text, rng, pictures!, pictureSets!);
+					runPictures(text, rng, pictures, pictureSets);
 				} catch (e) {
 					const err = e instanceof Error ? `${e.name}: ${e.message}\n${e.stack ?? ''}` : String(e);
 					throw new Error(
@@ -1128,12 +1126,12 @@ describe.skipIf(!pictures || !pictureSets)('fuzz: arms, portraits, picture helpe
 	}
 });
 
-// --- Folds and the portrait crop (M10): waits for WP 10.1 -------------------------------------
+// --- Folds and the portrait crop (M10) -------------------------------------
 
 const FOLDS_PATH = '../src/core/folds';
 const CROP_PATH = '../src/core/portrait-crop';
-const folds = (await import(/* @vite-ignore */ FOLDS_PATH).catch(() => null)) as FoldsModule | null;
-const crop = (await import(/* @vite-ignore */ CROP_PATH).catch(() => null)) as CropModule | null;
+const folds = (await import(/* @vite-ignore */ FOLDS_PATH)) as FoldsModule;
+const crop = (await import(/* @vite-ignore */ CROP_PATH)) as CropModule;
 
 /** Fold keys that name no family, or are not keys at all. */
 function garbageKeys(ids: string[], rng: Rng): string[] {
@@ -1312,7 +1310,7 @@ function runCrop(text: string, rng: Rng, m: CropModule) {
 	}
 }
 
-describe.skipIf(!folds || !crop)('fuzz: fold sets, the pruned graph, the folded layout, the crop helpers and crop ops never throw (spec §13.0 item 10, §13.10, §13.13, §8; waits for WP 10.1)', () => {
+describe('fuzz: fold sets, the pruned graph, the folded layout, the crop helpers and crop ops never throw (spec §13.0 item 10, §13.10, §13.13, §8)', () => {
 	for (const f of allFixtures()) {
 		it(`fixture ${f.id}`, () => {
 			let parsed: unknown;
@@ -1327,8 +1325,8 @@ describe.skipIf(!folds || !crop)('fuzz: fold sets, the pruned graph, the folded 
 				const rng = new Rng(seed);
 				const { text, names } = mutate(f.source, parsed, rng);
 				try {
-					runFolds(text, rng, folds!);
-					runCrop(text, rng, crop!);
+					runFolds(text, rng, folds);
+					runCrop(text, rng, crop);
 				} catch (e) {
 					const err = e instanceof Error ? `${e.name}: ${e.message}\n${e.stack ?? ''}` : String(e);
 					throw new Error(

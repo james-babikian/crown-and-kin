@@ -401,7 +401,7 @@
 	stroke-linejoin: round;
 }
 
-/* 1.1.1: inside a far-couple tag the hole of an open sign has the fill of the tag pill, not of the page. */
+/* 0.2.1: inside a far-couple tag the hole of an open sign has the fill of the tag pill, not of the page. */
 .dynasty-tag-mark.dynasty-union-ring,
 .dynasty-tag-mark.dynasty-union-open-triangle {
 	fill: var(--background-primary-alt);
@@ -744,7 +744,7 @@
 	 * Left, right and bottom stay flush so the callout's own border sits at the popover's edge.
 	 * The top keeps clearance: Minimal's outlined callouts (owner's theme) draw the title row on
 	 * and above the callout's top border (a −24px offset in Minimal's theme.css); without room
-	 * above the callout, the popover's `overflow: auto` cuts the title off (1.0.1 iPhone test).
+	 * above the callout, the popover's `overflow: auto` cuts the title off (0.1.1 iPhone test).
 	 */
 	padding: var(--size-4-6) 0 0 0;
 }
@@ -1115,6 +1115,15 @@ textarea.dynasty-sheet-input {
 	width: 100%;
 }
 
+/* P2, P3: Obsidian gives a button `white-space: nowrap` and a fixed height. At large text a label such as "Show holders" or "Remove partnership" is then wider than its button and sticks out of it, or the second text line leaves the button. These buttons wrap their label and grow in height; each has `min-height: 44px` from the rules above and below, so a short label keeps its height. */
+.dynasty-sheet-action,
+.dynasty-sheet-actions button,
+.dynasty-sheet-confirm-actions button {
+	height: auto;
+	white-space: normal;
+	overflow-wrap: break-word;
+}
+
 .dynasty-sheet.is-saving .dynasty-sheet-body,
 .dynasty-sheet.is-saving .dynasty-sheet-actions {
 	opacity: 0.6;
@@ -1130,16 +1139,41 @@ textarea.dynasty-sheet-input {
 	align-items: center;
 	justify-content: center;
 	padding: var(--size-4-4);
+	/* A phone window reaches under the status bar and the home bar: the box keeps clear of them (D113 item 1). */
+	padding-top: max(var(--size-4-4), env(safe-area-inset-top, 0px));
+	padding-bottom: max(var(--size-4-4), env(safe-area-inset-bottom, 0px));
 	background: var(--background-modifier-cover);
 }
 
+/* The box is never taller than the layer; in the question of the Houses window the buttons stay outside the part that scrolls (D113 item 1). */
 .dynasty-sheet-confirm-box {
+	display: flex;
+	flex-direction: column;
+	box-sizing: border-box;
 	max-width: 400px;
+	max-height: 100%;
+	/* A question with no scrolling part of its own (a long text on a small screen) scrolls as a whole, so no button is cut off. */
+	overflow-y: auto;
 	padding: var(--size-4-4);
 	background: var(--background-primary);
 	border: 1px solid var(--background-modifier-border);
 	border-radius: var(--radius-l);
 	box-shadow: var(--shadow-l);
+}
+
+/* Title and text of a question: the only part of the box that scrolls. */
+.dynasty-sheet-confirm-scroll {
+	flex: 0 1 auto;
+	min-height: 0;
+	overflow-y: auto;
+}
+
+.dynasty-sheet-confirm-box > * {
+	flex-shrink: 0;
+}
+
+.dynasty-sheet-confirm-box > .dynasty-sheet-confirm-scroll {
+	flex-shrink: 1;
 }
 
 .dynasty-sheet-confirm-title {
@@ -1166,6 +1200,16 @@ textarea.dynasty-sheet-input {
 	margin-top: var(--dynasty-sheet-top, 0);
 	border-radius: 0;
 	border: none;
+}
+
+/* P1, modal-layout.ts: a closing window keeps its content size and gets the room that the keyboard took as padding at the bottom, so Obsidian's slide takes the whole box off the screen. */
+.modal.dynasty-sheet.is-holding {
+	padding-bottom: var(--dynasty-sheet-extra, 0px);
+}
+
+/* Obsidian's phone prompt already has the safe area as padding at the bottom. */
+.prompt.dynasty-picker.is-holding {
+	padding-bottom: calc(var(--safe-area-inset-bottom, 0px) + var(--dynasty-sheet-extra, 0px));
 }
 
 .dynasty-sheet.is-phone .dynasty-sheet-header {
@@ -1738,6 +1782,14 @@ body.dynasty-fullscreen-open .popover.hover-popover {
 
 .dynasty-settings .dynasty-setting-height {
 	width: 7em;
+}
+
+/* P7: iOS zooms the page when a field has text under 16 px. Obsidian's field text is 15 px; on a touch screen or a narrow window the fields of this tab have at least 16 px. */
+@media (pointer: coarse), (max-width: 599px) {
+	.dynasty-settings input,
+	.dynasty-settings select {
+		font-size: max(16px, var(--font-ui-medium));
+	}
 }
 
 /* Obsidian gives a setting description `text-overflow: ellipsis`; iOS WebKit then puts "…" in the
@@ -3106,7 +3158,22 @@ body.dynasty-fullscreen-open .popover.hover-popover {
 
 .dynasty-sheet button.dynasty-hp-make-note {
 	min-height: 44px;
+	/* Like the other sheet buttons: at 320 px and large text the label wraps and the button grows with it. */
+	height: auto;
+	white-space: normal;
+	overflow-wrap: break-word;
+	/* The body is a flex column; a `min-height` that is set shrinks the button below its wrapped text in a long list. */
+	flex: none;
 	margin-bottom: var(--size-4-3);
+}
+
+/*
+ * The table is a size container. Its rows change to two text lines when it is narrower than 34 text widths (em of the
+ * table), so a phone, a narrow window and large text are all covered (D113 item 4, design 4B). Obsidian gives a button
+ * `white-space: nowrap`; the row is a button, so the rule below sets it back to normal and the text wraps.
+ */
+.dynasty-hp-table {
+	container-type: inline-size;
 }
 
 .dynasty-hp-head,
@@ -3116,6 +3183,12 @@ body.dynasty-fullscreen-open .popover.hover-popover {
 	align-items: center;
 	gap: var(--size-4-3);
 	text-align: left;
+}
+
+/* The setting "Show generation on the house page" is off: no Generation column. */
+.dynasty-hp-table.has-no-generation .dynasty-hp-head,
+.dynasty-hp-table.has-no-generation .dynasty-hp-row {
+	grid-template-columns: minmax(0, 2fr) minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr);
 }
 
 .dynasty-hp-head {
@@ -3137,6 +3210,7 @@ body.dynasty-fullscreen-open .popover.hover-popover {
 	box-shadow: none;
 	color: var(--text-normal);
 	font: inherit;
+	white-space: normal;
 	cursor: pointer;
 }
 
@@ -3147,49 +3221,87 @@ body.dynasty-fullscreen-open .popover.hover-popover {
 
 .dynasty-hp-cell {
 	min-width: 0;
-	overflow-wrap: anywhere;
+	overflow-wrap: break-word;
 }
 
-/* On a phone each row has two text lines: the name and the title, then the generation and the dates (D88). */
-.dynasty-house-page.is-phone .dynasty-hp-head {
+/* The wide table has column heads, so it needs neither the lead words nor the chevron. */
+.dynasty-hp-lead,
+.dynasty-hp-chevron {
 	display: none;
 }
 
-.dynasty-house-page.is-phone .dynasty-hp-row {
-	grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr);
-	grid-template-areas:
-		'name name title'
-		'gen born died';
-	align-items: start;
-	gap: 0 var(--size-4-2);
-}
+@container (max-width: 34em) {
+	/* Two text lines: name and title, then generation and dates. A small chevron at the right shows that the row opens. */
+	.dynasty-hp-head {
+		display: none;
+	}
 
-.dynasty-house-page.is-phone .dynasty-hp-name {
-	grid-area: name;
-	font-weight: var(--font-semibold);
-}
+	.dynasty-sheet button.dynasty-hp-row {
+		position: relative;
+		display: flex;
+		flex-wrap: wrap;
+		align-items: baseline;
+		justify-content: flex-start;
+		gap: 0 0.75em;
+		padding-right: 2.5em;
+	}
 
-.dynasty-house-page.is-phone .dynasty-hp-title {
-	grid-area: title;
-	color: var(--text-muted);
-}
+	/* A full-width item with no height ends the first text line, so the second line always starts new. */
+	.dynasty-sheet button.dynasty-hp-row::after {
+		content: '';
+		order: 3;
+		flex-basis: 100%;
+		height: 0;
+	}
 
-.dynasty-house-page.is-phone .dynasty-hp-gen {
-	grid-area: gen;
-	color: var(--text-muted);
-	font-size: var(--font-ui-small);
-}
+	.dynasty-hp-cell {
+		flex: 0 1 auto;
+	}
 
-.dynasty-house-page.is-phone .dynasty-hp-born {
-	grid-area: born;
-	color: var(--text-muted);
-	font-size: var(--font-ui-small);
-}
+	.dynasty-hp-cell:empty {
+		display: none;
+	}
 
-.dynasty-house-page.is-phone .dynasty-hp-died {
-	grid-area: died;
-	color: var(--text-muted);
-	font-size: var(--font-ui-small);
+	.dynasty-hp-lead {
+		display: inline;
+	}
+
+	.dynasty-hp-name {
+		order: 1;
+		font-weight: var(--font-semibold);
+	}
+
+	.dynasty-hp-title {
+		order: 2;
+		color: var(--text-muted);
+	}
+
+	.dynasty-hp-gen {
+		order: 4;
+		color: var(--text-muted);
+	}
+
+	.dynasty-hp-born {
+		order: 5;
+		color: var(--text-muted);
+	}
+
+	.dynasty-hp-died {
+		order: 6;
+		color: var(--text-muted);
+	}
+
+	.dynasty-hp-chevron {
+		position: absolute;
+		top: 50%;
+		right: var(--size-4-3);
+		display: block;
+		width: 0.5em;
+		height: 0.5em;
+		border-top: 2px solid var(--text-muted);
+		border-right: 2px solid var(--text-muted);
+		transform: translateY(-50%) rotate(45deg);
+	}
 }
 
 /* ---------- Fold a branch (M10: spec §13.10, D83–D85) ---------- */
@@ -3272,11 +3384,11 @@ body.dynasty-fullscreen-open .popover.hover-popover {
 	display: none;
 }
 
-/* D106: "Id: p12", the last line of the edit sheet of a person whose id is written. Muted text, never below 4.5:1; the text can be selected and copied. */
+/* D106: "ID: p12", the last line of the edit sheet of a person whose ID is written. Muted text, never below 4.5:1; the text can be selected and copied. A theme can set --font-ui-smaller to 9.6 px on a phone; the line is never smaller than 12 px (review 0.2.3). */
 .dynasty-sheet-id {
 	margin-top: var(--size-4-4);
 	color: var(--text-muted);
-	font-size: var(--font-ui-smaller);
+	font-size: max(12px, var(--font-ui-smaller));
 	-webkit-user-select: text;
 	user-select: text;
 	/* An id with no hyphen has no place to break; without this the sheet scrolls sideways. */
@@ -3289,15 +3401,15 @@ body.dynasty-fullscreen-open .popover.hover-popover {
 	min-width: 44px;
 }
 
-/* The note of a new id: a small grey text line under the name, with the button "Keep old id". */
+/* The note of a new ID: a text line under the name in the normal text colour and size (D113 item 2), with the button "Keep old ID". */
 .dynasty-id-new {
 	display: flex;
 	flex-wrap: wrap;
 	align-items: center;
 	gap: 0 var(--size-4-2);
 	min-width: 0;
-	color: var(--text-muted);
-	font-size: var(--font-ui-small);
+	color: var(--text-normal);
+	font-size: var(--font-ui-medium);
 }
 
 .dynasty-house-row .dynasty-id-new {
@@ -3325,21 +3437,38 @@ body.dynasty-fullscreen-open .popover.hover-popover {
 	overflow-wrap: anywhere;
 }
 
+/* Phone: the text takes the room that the button leaves and wraps in it, so the button stays on the line of the text and the row does not get taller (D113 item 2). */
+.dynasty-sheet.is-phone .dynasty-id-new-text {
+	flex: 1 1 8em;
+}
+
 .dynasty-id-new-problem {
 	flex: 1 1 100%;
 	color: var(--text-error);
 }
 
-/* "Keep old id" looks like a link, but it is a button with a 44 px hit area. */
+/* "Keep old ID" is a normal small button (D113 item 2, not a link) with a 44 px hit area. */
 .dynasty-sheet button.dynasty-id-old {
 	width: auto;
 	min-width: 44px;
 	min-height: 44px;
-	padding: 0 var(--size-4-2);
-	background: transparent;
-	box-shadow: none;
-	color: var(--text-accent);
+	padding: 0 var(--size-4-3);
+	background: var(--interactive-normal);
+	box-shadow: var(--input-shadow);
+	color: var(--text-normal);
 	font-size: var(--font-ui-small);
+}
+
+.dynasty-sheet button.dynasty-id-old:hover {
+	background: var(--interactive-hover);
+}
+
+/* A row whose draft ID is refused: a red edge at its left (D113 item 3). The edge sits in the padding of the window body, so nothing moves. */
+.dynasty-house-row.has-id-problem,
+.dynasty-title-row.has-id-problem {
+	margin-left: calc(-1 * (3px + var(--size-4-2)));
+	padding-left: var(--size-4-2);
+	border-left: 3px solid var(--text-error);
 }
 
 /* The small Id window (D110): the field, "Make id from the name", the reason, and two buttons. */

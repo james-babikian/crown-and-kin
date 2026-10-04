@@ -23,7 +23,7 @@ import { FEl, device, dispatch, fakeWin, installDom, resetDom } from './acceptan
 import { openModals, resetObsidian } from './acceptance/fake-obsidian';
 
 /*
- * 1.1.1 WP3, D100 (spec §13.6): Find, the person pickers and the picture search ignore case, accents and the
+ * 0.2.1 WP3, D100 (spec §13.6): Find, the person pickers and the picture search ignore case, accents and the
  * look of quote marks on both sides of the match. Only the match changes; the rows show the stored text.
  * Run: npx vitest run tests/v111-obsidian-search.test.ts
  */

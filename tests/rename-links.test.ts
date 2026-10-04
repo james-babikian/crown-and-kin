@@ -510,15 +510,15 @@ describe('Rename, fix round after the M6 iPhone test (the decision notes "M6 iPh
 		it('a progress Notice if the update takes longer than the limit; it closes at the end', async () => {
 			const s = setup({ 'T.md': tree(person('a', '"[[Old]]"')), 'Old.md': '' }, true, { timing: now });
 			await s.rename(['Old.md', 'New.md']);
-			expect(notices).toEqual([RENAME_UI.progress, RENAME_UI.updated(1, 1)]);
+			expect(notices).toEqual([RENAME_UI.progressFor('note'), RENAME_UI.updated(1, 1)]);
 			expect(noticeList[0].hidden).toBe(true);
-			expect(RENAME_UI.progress).toBe('The plugin updates the tree links to the renamed note. This can take some time.');
+			expect(RENAME_UI.progressFor('note')).toBe('The plugin updates the tree links to the renamed note. This can take some time.');
 		});
 
 		it('after a progress Notice, a Notice also when no tree links to the renamed note', async () => {
 			const s = setup({ 'T.md': tree(person('a', '"[[Other]]"')), 'A.md': '' }, true, { timing: now });
 			await s.rename(['A.md', 'B.md']);
-			expect(notices).toEqual([RENAME_UI.progress, RENAME_UI.noLinks]);
+			expect(notices).toEqual([RENAME_UI.progressFor('note'), RENAME_UI.noLinksFor('note')]);
 		});
 
 		it('an error stops the update: a Notice, the report says so, and the rename is not stored again', async () => {
@@ -567,7 +567,7 @@ describe('Rename, fix round after the M6 iPhone test (the decision notes "M6 iPh
 	});
 });
 
-describe('Rename, review 1.0.1 area E', () => {
+describe('Rename, review 0.1.1 area E', () => {
 	it('nameForms: as typed, with %20, as the plugin encodes it, as encodeURIComponent does, and fully decoded', () => {
 		expect(nameForms('castle (old)')).toEqual(['castle (old)', 'castle%20(old)', 'castle%20%28old%29']);
 		expect(nameForms('100%25 keep')).toEqual(['100%25 keep', '100%25%20keep', '100%2525%20keep', '100% keep']);

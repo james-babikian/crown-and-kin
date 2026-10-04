@@ -1,63 +1,21 @@
-/* eslint-disable @typescript-eslint/no-unused-vars -- scratch proof file of the review round: it keeps helpers it does not use now */
 import { describe, it } from 'vitest';
 import { parse as parseYaml, stringify } from 'yaml';
-import { deriveFamilies } from '../src/core/derive';
-import { focusSubgraph } from '../src/core/focus-subgraph';
-import type { HolderFields, HolderRef, Op, TitleOp } from '../src/core/edit';
-import type { IssueCode } from '../src/core/messages';
+import type { Op } from '../src/core/edit';
 import { parseDynasty } from '../src/core/parse';
-import { computeRelations, findRelation, lineSubgraph, relationsKey } from '../src/core/relations';
-import type { CardLabels, CardTitleOp, DescribeDeleteTitle, HolderTable, PickerSuffix, ReignText, SearchNames } from '../src/core/titles';
-import type { Title } from '../src/core/types';
-import { applyOp } from '../src/core/yaml-edit';
-import { geometryFor } from '../src/layout/geometry';
-import { layoutTree } from '../src/layout/index';
-import type { LayoutSettings } from '../src/layout/model';
+import { applyOp, newPersonId } from '../src/core/yaml-edit';
 import { allFixtures } from './acceptance/load';
-import { exifSegment, isoFile, jpegHead, pngHead, type PictureSets, type PicturesModule } from './acceptance/m9-support';
-import type { CropModule, FoldsModule } from './acceptance/m10-support';
-import { linkTargets } from '../src/core/link-rewrite';
 
 /*
- * Spec §8: nothing may throw or blank the note. Every sample tree is mutated a few hundred times
- * (fewer for the large ones, to keep the file near 3 s) and pushed through parse → derive →
- * layout (layout includes edge routing). A hard error is a fine outcome; a throw is not.
- *
- * Focus mode (spec §5.6, M5) runs the same mutated trees through focus subgraph → derive → layout
- * for a few focus ids and generation counts, including ids that name no person.
- *
- * Relation names (spec §13.1, §13.2, M7) run the mutated trees through computeRelations for the
- * mark (`options.me`, which the mutations set to people, nobody, lists and maps) and a few other
- * people, findRelation for random pairs, and lineSubgraph → layout for some of the lines.
- *
- * Titles (spec §13.3–§13.5, M8; §13.0 item 10): the mutations add `titles` sections, holder entries
- * of every shape and `card-title` keys. Until WP 8.1 the parser keeps them as unknown keys, so the
- * pipeline above must still pass. Once `src/core/titles.ts` exists, the last group also runs card
- * labels, the reign and name helpers, the table note and random title ops on the mutated trees.
- *
- * Pictures (spec §13.0 items 3 and 10, M9): the mutations add `arms` to houses and `portrait` to
- * people in every written form (and unquoted `![[…]]` text, amendment A3). Until WP 9.1 the parser
- * keeps them as unknown keys, so the pipeline above must still pass. Once `src/core/pictures.ts` and
- * `pictureSets` exist, the last group also lays trees out with their picture sets, runs the pure
- * picture helpers on the values and on damaged headers, and applies random picture ops.
- *
- * Portrait crop and folds (spec §13.0 item 10, §13.10, §13.13, M10): the mutations add `portrait-crop`
- * to people (three numbers, commas, exponents, lists, maps, empty and garbage), and the last group
- * runs the fold functions (families, hidden people, controls, tags, pruned graph, folds to open, folds
- * that end) on random sets of fold keys, valid and made up, and lays the folded trees out; it also runs
- * the crop helpers on random texts and sizes and applies random `portrait-crop` ops. The group is
- * skipped until `src/core/folds.ts` and `src/core/portrait-crop.ts` exist (WP 10.1) and then must pass.
+ * Spec §8: nothing may throw. Every sample tree is mutated a few hundred times (the structure and
+ * the text) and then the id operations (`set-house-id`, `set-title-id`) and `newPersonId` run on the
+ * result. A refusal is a fine outcome; a throw, a body that does not parse, or a change to anything
+ * but ids is not. The mutation machinery is a copy of the one in `fuzz.test.ts`.
  *
  * Deterministic: each case has its own seed, printed on failure. To re-run one case on every
- * fixture: FUZZ_SEED=0x1234abcd npx vitest run tests/fuzz.test.ts
+ * fixture: FUZZ_SEED=0x1234abcd npx vitest run tests/r112-review-a-fuzz-idops.test.ts
  */
 
 const BASE_SEED = 0x5eed2026;
-const SETTINGS: LayoutSettings = { sweeps: 4, far: { maxCardWidths: 3, maxGenerations: 1 } };
-/** The relation finder's small tree never splits a couple (relations.ts, `NEVER_FAR_RULE`). */
-const NEVER_FAR: LayoutSettings = { sweeps: 4, far: { maxCardWidths: Infinity, maxGenerations: Infinity } };
-const BLOCKING: IssueCode[] = ['duplicate-person-id', 'duplicate-union-id'];
-const HARD: string[] = ['yaml-invalid', 'not-a-map'];
 
 // --- Deterministic randomness -------------------------------------------------------------
 
@@ -658,89 +616,6 @@ function fail(msg: string): never {
 	throw new Error(msg);
 }
 
-function runPipeline(text: string) {
-	const r = parseDynasty(text);
-	if (!r.ok) {
-		if (!HARD.includes(r.error.code)) fail(`unknown hard error code ${String(r.error.code)}`);
-		return;
-	}
-	const g = deriveFamilies(r.tree);
-	for (const i of g.issues) {
-		const want = BLOCKING.includes(i.code) ? 'blocking' : 'warning';
-		if (i.level !== want) fail(`issue ${i.code} has level ${i.level}, expected ${want}`);
-	}
-	const { layout, edges } = layoutTree(g, geometryFor(16, 'normal'), SETTINGS, 'sans-serif');
-	if (layout.persons.size !== g.people.length) fail(`${g.people.length} people but ${layout.persons.size} cards`);
-	for (const b of layout.persons.values()) {
-		if (![b.x, b.y, b.w, b.h].every(Number.isFinite)) fail(`card ${b.id} has a non-finite position`);
-	}
-	if (!Number.isFinite(layout.width) || !Number.isFinite(layout.height)) fail('layout size is not finite');
-	for (const p of edges.paths) if (/NaN|Infinity|undefined/.test(p.d)) fail(`bad path ${p.kind}: ${p.d.slice(0, 200)}`);
-}
-
-const FOCUS_N = [0, 1, 3, -1, 2.5, Number.NaN, 1_000_000];
-
-/** Focus mode on a mutated tree: focus subgraph → derive → layout, for a few focus ids (§5.6, §8). */
-function runFocus(text: string, rng: Rng) {
-	const r = parseDynasty(text);
-	if (!r.ok) return;
-	const ids = r.tree.people.map((p) => p.id);
-	const focusIds = [r.tree.options.focus, r.tree.options.start, rng.pick(['ghost', '', rng.pick(SPECIAL_IDS)])];
-	for (let k = 0; k < 3 && ids.length; k++) focusIds.push(rng.pick(ids));
-	for (const id of focusIds) {
-		if (id === undefined) continue;
-		const n = rng.pick(FOCUS_N);
-		const res = focusSubgraph(r.tree, id, n);
-		const exists = ids.includes(id);
-		if (!res) {
-			if (exists) fail(`focusSubgraph returned null for existing person ${JSON.stringify(id)}`);
-			continue;
-		}
-		if (!exists) fail(`focusSubgraph returned a family for unknown id ${JSON.stringify(id)}`);
-		const g = deriveFamilies(res.tree);
-		const { layout } = layoutTree(g, geometryFor(16, 'normal'), SETTINGS, 'sans-serif');
-		if (layout.persons.size !== g.people.length) fail(`focus ${id}: ${g.people.length} people but ${layout.persons.size} cards`);
-		for (const b of layout.persons.values()) {
-			if (![b.x, b.y, b.w, b.h].every(Number.isFinite)) fail(`focus ${id}: card ${b.id} has a non-finite position`);
-		}
-	}
-}
-
-/** Relation names and the finder on a mutated tree (spec §13.1, §13.2, §8): they end and never throw. */
-function runRelations(text: string, rng: Rng) {
-	const r = parseDynasty(text);
-	if (!r.ok) return;
-	const g = deriveFamilies(r.tree);
-	const ids = g.people.map((p) => p.id);
-	const marks = [r.tree.options.me, rng.pick(['ghost', rng.pick(SPECIAL_IDS)])];
-	if (ids.length) marks.push(rng.pick(ids));
-	for (const me of marks) {
-		if (me === undefined) continue;
-		const rels = computeRelations(g, me);
-		relationsKey(g, me);
-		if (!ids.includes(me)) {
-			if (rels.size) fail(`relations for ${JSON.stringify(me)}, who is not in the tree`);
-			continue;
-		}
-		if (rels.get(me)?.[0]?.kind !== 'self') fail(`the marked person ${JSON.stringify(me)} is not "You"`);
-		let drawn = 0;
-		for (const [id, list] of rels) {
-			if (!ids.includes(id)) fail(`a relation for ${JSON.stringify(id)}, who is not in the tree`);
-			for (const rel of list) {
-				if (!rel.lower || /undefined|NaN|null|\[object/.test(rel.lower)) fail(`bad name ${JSON.stringify(rel.lower)}`);
-				if (rel.line.people.some((p) => !ids.includes(p))) fail(`a line through someone not in the tree: ${rel.line.people.join(', ')}`);
-				if (new Set(rel.line.people).size !== rel.line.people.length) fail(`a line with repeats: ${rel.line.people.join(', ')}`);
-			}
-			if (list.length && drawn++ < 3) layoutTree(lineSubgraph(g, list[list.length - 1].line), geometryFor(16, 'normal'), NEVER_FAR, 'sans-serif');
-		}
-	}
-	for (let k = 0; k < 3 && ids.length; k++) {
-		const f = findRelation(g, rng.pick(ids), rng.pick(ids));
-		if (f.kind === 'chain') layoutTree(lineSubgraph(g, f.line), geometryFor(16, 'normal'), NEVER_FAR, 'sans-serif');
-		if (f.kind === 'named' && f.relations.length < 1) fail('a named finder result with no relation');
-	}
-}
-
 function casesFor(sourceLength: number): number {
 	if (sourceLength < 6000) return 200;
 	if (sourceLength < 30000) return 50;
@@ -820,8 +695,6 @@ describe('review A: id ops on mutated trees never throw and change only ids', ()
 		}, 120000);
 	}
 });
-
-import { newPersonId } from '../src/core/yaml-edit';
 
 function runNewId(text: string) {
 	const r = parseDynasty(text);

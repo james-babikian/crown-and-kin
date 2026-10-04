@@ -209,13 +209,13 @@ describe('hand-typed values and warnings (§13.1 "Tree text")', () => {
 		expect(problems(body)).toEqual([
 			{
 				code: 'missing-me',
-				text: 'No person has the id “ghost”, so the tree cannot show how people relate to you. Correct the id, or remove “me: ghost”.',
+				text: 'No person has the ID “ghost”, so the tree cannot show how people relate to you. Correct the ID, or remove “me: ghost”.',
 			},
 		]);
 	});
 
 	it('me is a list or a map: me-not-id, with the §13.1 text', () => {
-		const text = '“me” in the options does not name one person. Write one person id after “me:”.';
+		const text = '“me” in the options does not name one person. Write one person ID after “me:”.';
 		for (const value of ['[a, b]', '{id: a}', '\n    - a\n    - b']) {
 			const body = `options:\n  me: ${value}\n\n${PEOPLE}\n`;
 			expect(problems(body), value).toEqual([{ code: 'me-not-id', text }]);
@@ -240,7 +240,7 @@ describe('older plugin versions keep the mark (§13.0 item 2)', () => {
 	it('pinning and removing the pin keep the me line', () => {
 		const body = `options:\n  me: b\n\n${PEOPLE}`;
 		const pinned = ok(applyOp(body, { kind: 'set-option', key: 'focus', value: 'a' }));
-		// Version 1.0.1 puts the pin after the unknown key; 1.1 puts it before `me` (key order).
+		// Version 0.1.1 puts the pin after the unknown key; 0.2 puts it before `me` (key order).
 		expect(pinned).toContain('\n  me: b\n');
 		expect(pinned).toContain('\n  focus: a\n');
 		expect(ok(applyOp(pinned, { kind: 'set-option', key: 'focus', value: null }))).toBe(body);

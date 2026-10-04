@@ -526,9 +526,13 @@ describe('H2: the house page window', () => {
 		expect(p.content.querySelector('.dynasty-sheet-title')!.getText()).toBe('House Valmont');
 		expect(p.content.querySelector('.dynasty-hp-count')!.getText()).toBe('4 people');
 		expect(p.rows().map((r) => r.getAttribute('data-person'))).toEqual(['aldric', 'bran', 'cara', 'dora']);
-		expect(p.rows()[0].getAttribute('aria-label')).toBe(HOUSE_PAGE_UI.rowLabel('Aldric Valmont'));
+		// RB2: the name of the row comes from its text (WCAG 2.5.3); the title only adds the action.
+		expect(p.rows()[0].getAttribute('aria-label')).toBeNull();
+		expect(p.rows()[0].getAttribute('title')).toBe(HOUSE_PAGE_UI.rowHint);
 		expect(p.content.querySelector('.dynasty-hp-head')!.children.map((c) => c.getText())).toEqual(['Generation', 'Name', 'Title', 'Born', 'Died']);
-		expect(p.rows()[0].querySelector('.dynasty-hp-gen')!.getText()).toBe('1');
+		// The value is the plain number; the lead word shows only in the two-line layout (CSS).
+		expect(p.rows()[0].querySelector('.dynasty-hp-gen .dynasty-hp-value')!.getText()).toBe('1');
+		expect(p.rows()[0].querySelector('.dynasty-hp-gen .dynasty-hp-lead')!.getText()).toBe('Generation ');
 	});
 
 	it('"1 person" for one person', () => {
@@ -552,7 +556,7 @@ describe('H2: the house page window', () => {
 		expect(lastNotice()).toBe(HOUSE_PAGE_UI.none);
 	});
 
-	it('below 600 px the window has the phone class and the generation reads "Generation N"', () => {
+	it('below 600 px the window has the phone class; the text of a row is the same (the layout is CSS)', () => {
 		device.width = 390;
 		device.height = 844;
 		const p = openPage('valmont');

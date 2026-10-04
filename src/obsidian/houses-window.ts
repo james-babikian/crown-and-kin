@@ -5,8 +5,8 @@
  * the colours of the arms (D68, the exact colours), the 12 house colours (D32) or from the system
  * colour window ("Other colour"). Arms come from the picture picker. Deleting a house that people
  * have asks whether to remove the house from them or keep it (D32); after Save, a Notice with Undo
- * says so. Each saved house also has the button "Change id" (spec §13.17 rule 5, D109, D110): it opens
- * a small window (`id-window.ts`) whose "Use this id" puts the id into the draft of the row; Save
+ * says so. Each saved house also has the button "Change ID" (spec §13.17 rule 5, D109, D110): it opens
+ * a small window (`id-window.ts`) whose "Use this ID" puts the id into the draft of the row; Save
  * changes the id and the `house` value of every person who has it, after one question, in the same write.
  */
 
@@ -21,13 +21,13 @@ import { HOUSES, HOUSE_COLOUR_NAMES, HOUSE_PAGE_UI, ID_UI, PICTURES_UI, REMOVE, 
 import type { Handle, HandleWriteOutcome } from './block-handle';
 import { openHousePage } from './house-page-window';
 import { danglingIds, draftId, idChanged, idFromName, idOps, idProblemFor, idProblems, idRefusalText, isIdOp, reasonText, type IdReason, type IdRow } from './id-draft';
-import { idNote, idOpenButton, type IdRowView } from './id-field';
+import { idNewNameNote, idNote, idOpenButton, type IdRowView } from './id-field';
 import { openIdWindow } from './id-window';
 import { phoneLayout } from './modal-layout';
 import { currentPictureOf, pickPicture } from './picture-picker';
 import { ARMS_PIXELS, type PictureCopy, type PictureStore } from './picture-store';
 import { trackModal } from './plugin-modals';
-import { drawableColour, freshOrStale, onWriteFailed, showErrorLine } from './sheet-parts';
+import { drawableColour, freshOrStale, nameDialog, onWriteFailed, revealFocused, showErrorLine } from './sheet-parts';
 import { undoNotice } from './undo-notice';
 
 const HEX = /^#[0-9a-f]{6}$/i;
@@ -58,7 +58,7 @@ export interface LoadedHouses {
 export interface HouseRow {
 	key: string;
 	id: string | null;
-	/** The id in the draft (§13.17 rule 5, D110): the saved id until "Use this id"; absent for a house that is new in the draft. */
+	/** The id in the draft (§13.17 rule 5, D110): the saved id until "Use this ID"; absent for a house that is new in the draft. */
 	idDraft?: string;
 	name: string;
 	colour: string | null;
@@ -168,6 +168,8 @@ export interface HousesOptions {
 		show: (personId: string) => void;
 		openNote: (open: () => Promise<void>) => void;
 	};
+	/** The setting "Show generation on the house page" (spec §9); on when absent. */
+	showGeneration?: () => boolean;
 }
 
 /** The arms box of the Houses window is this high, in CSS px (spec §13.6 "about 40 px"). */
@@ -181,7 +183,7 @@ export class HousesWindow extends Modal {
 	private keys = 0;
 	private saving = false;
 	private closing = false;
-	/** True while the small Id window is open, so a second "Change id" opens no second window. */
+	/** True while the small ID window is open, so a second "Change ID" opens no second window. */
 	private idWindowOpen = false;
 	private confirmEl: HTMLElement | null = null;
 	/** Where the focus goes when a question over the window closes. */
@@ -232,7 +234,11 @@ export class HousesWindow extends Modal {
 	override onOpen(): void {
 		this.modalEl.addClass('dynasty-sheet');
 		this.modalEl.addClass('dynasty-houses');
-		this.cleanup.push(phoneLayout(this), trackModal(this, () => this.finish()));
+		this.cleanup.push(phoneLayout(this, () => revealFocused(this.modalEl, this.contentEl)), trackModal(this, () => this.finish()));
+		// The keyboard can cover a field in the scrolling body: bring it into view when it gets the focus (C1).
+		const reveal = () => revealFocused(this.modalEl, this.contentEl, 300);
+		this.contentEl.addEventListener('focusin', reveal);
+		this.cleanup.push(() => this.contentEl.removeEventListener('focusin', reveal));
 		const store = this.o.pictures;
 		if (store) this.cleanup.push(store.onChange((paths) => this.guard(() => this.armsFilesChanged(paths))));
 		this.shown = true;
@@ -334,7 +340,7 @@ export class HousesWindow extends Modal {
 		this.hideConfirm(false);
 		el.addClass('dynasty-sheet-content');
 		const header = el.createDiv({ cls: 'dynasty-sheet-header' });
-		header.createDiv({ cls: 'dynasty-sheet-title', text: HOUSES.title });
+		nameDialog(this.modalEl, header.createDiv({ cls: 'dynasty-sheet-title', text: HOUSES.title }));
 		const actions = header.createDiv({ cls: 'dynasty-sheet-actions' });
 		const cancel = actions.createEl('button', { cls: 'dynasty-sheet-cancel', text: SHEET.cancel, attr: { type: 'button', 'data-focus': 'cancel' } });
 		cancel.addEventListener('click', () => this.finish());
@@ -404,6 +410,8 @@ export class HousesWindow extends Modal {
 				}),
 			);
 		}
+		// A new row is marked when its name gives the ID that a changed row has taken (owner decision "3-both").
+		if (r.id === null) views.push(idNewNameNote(row, { key: r.key, problem: problem ? reasonText(problem) : '' }));
 		const n = r.id === null ? 0 : (this.data.houses.find((h) => h.id === r.id)?.people.length ?? 0);
 		row.createDiv({ cls: 'dynasty-house-count', text: HOUSES.count(n) });
 		// H1: only a saved house has a page; a house that is new in the draft has none.
@@ -424,9 +432,9 @@ export class HousesWindow extends Modal {
 		if (open) this.palette(list, r);
 	}
 
-	// ---------- the small Id window (spec §13.17 rule 5, D110) ----------
+	// ---------- the small ID window (spec §13.17 rule 5, D110) ----------
 
-	/** "Change id": the small window; "Use this id" puts the id into the draft of the row. */
+	/** "Change ID": the small window; "Use this ID" puts the id into the draft of the row. */
 	private changeId(r: HouseRow): void {
 		// Focus can leave the small window by Tab, and a screen reader can activate the button below it.
 		if (this.idWindowOpen) return;
@@ -496,6 +504,7 @@ export class HousesWindow extends Modal {
 		};
 		openHousePage(this.app, {
 			app: this.app,
+			showGeneration: this.o.showGeneration,
 			houseId: id,
 			whole: deriveFamilies(parsed.tree),
 			sourcePath: this.o.sourcePath ?? '',
@@ -785,9 +794,11 @@ export class HousesWindow extends Modal {
 	/** The D32 question: what happens to the people of a house that is deleted. */
 	private askPeople(r: HouseRow, people: string[], from: string | null, chose: (how: 'clear' | 'keep') => void, cancel: () => void): void {
 		const name = r.base?.name || this.label(r);
-		this.showConfirm(HOUSES.confirmTitle(name), [HOUSES.confirmPeople(people), HOUSES.confirmAsk], from, [
-			{ label: HOUSES.clearLabel, detail: HOUSES.clearDetail, cls: 'dynasty-choice-option dynasty-house-clear', run: () => chose('clear') },
-			{ label: HOUSES.keepLabel, detail: HOUSES.keepDetail, cls: 'dynasty-choice-option dynasty-house-keep', run: () => chose('keep') },
+		// D113 item 1: the question gives the number of people, not their names, so it stays short for a house of 400 people.
+		const n = people.length;
+		this.showConfirm(HOUSES.confirmTitle(name), [HOUSES.confirmPeople(n), HOUSES.confirmAsk(n)], from, [
+			{ label: HOUSES.clearLabel(n), detail: HOUSES.clearDetail(n), cls: 'dynasty-choice-option dynasty-house-clear', run: () => chose('clear') },
+			{ label: HOUSES.keepLabel(n), detail: HOUSES.keepDetail(n), cls: 'dynasty-choice-option dynasty-house-keep', run: () => chose('keep') },
 			{ label: HOUSES.cancel, cls: 'dynasty-sheet-keep', run: cancel },
 		]);
 	}
@@ -827,11 +838,13 @@ export class HousesWindow extends Modal {
 		const layer = this.modalEl.createDiv({ cls: 'dynasty-sheet-confirm', attr: { role: 'alertdialog', 'aria-modal': 'true' } });
 		this.confirmEl = layer;
 		const box = layer.createDiv({ cls: 'dynasty-sheet-confirm-box' });
-		const titleEl = box.createDiv({ cls: 'dynasty-sheet-confirm-title', text: title });
+		// Title and text scroll if the screen is too low; the buttons below never scroll (D113 item 1).
+		const scroll = box.createDiv({ cls: 'dynasty-sheet-confirm-scroll' });
+		const titleEl = scroll.createDiv({ cls: 'dynasty-sheet-confirm-title', text: title });
 		const titleId = `dynasty-houses-confirm-${Math.random().toString(36).slice(2, 8)}`;
 		titleEl.setAttribute('id', titleId);
 		layer.setAttribute('aria-labelledby', titleId);
-		for (const t of text) box.createDiv({ cls: 'dynasty-sheet-confirm-text', text: t });
+		for (const t of text) scroll.createDiv({ cls: 'dynasty-sheet-confirm-text', text: t });
 		const options = buttons.filter((b) => b.detail !== undefined);
 		const choices = options.length ? box.createDiv({ cls: 'dynasty-choice-options' }) : null;
 		const row = box.createDiv({ cls: 'dynasty-sheet-confirm-actions' });
@@ -863,7 +876,12 @@ export class HousesWindow extends Modal {
 		return freshOrStale(this.o.handle, this.data.body, (body) => this.stale(body));
 	}
 
-	private async save(): Promise<void> {
+	/**
+	 * Save. `asked` is the ID change that the owner just answered ("Change the ID?"): the answer runs Save again
+	 * on the draft as it is then, so an edit made behind the question is written, and a different ID change
+	 * is asked again (C4).
+	 */
+	private async save(asked: string | null = null): Promise<void> {
 		if (this.saving) return;
 		const empty = this.rows.find((r) => !r.deleted && r.name.trim() === '' && (r.id === null || r.name.trim() !== r.base?.name));
 		if (empty) {
@@ -879,18 +897,21 @@ export class HousesWindow extends Modal {
 		}
 		if (!this.fresh()) return;
 		const problems = idProblems('house', this.rows.map(idRow), this.data.dangling);
-		const bad = this.rows.find((r) => problems.has(r.key));
+		// The focus goes to a saved row: a new row has no "Change ID" button, and the saved row that it conflicts with is marked too.
+		const bad = this.rows.find((r) => r.id !== null && problems.has(r.key));
 		if (bad) {
-			this.showError(ID_UI.problem(this.label(bad), reasonText(problems.get(bad.key)!)));
+			// D113 item 3: the reason shows once, in the row (its note and red edge); the top line shows nothing for an ID.
+			// An earlier "the tree changed under the window" message stays: this refusal does not answer it.
+			if (this.error !== HOUSES.stale) this.clearError();
+			this.refreshIdProblems();
 			this.contentEl.querySelector<HTMLElement>(`[data-focus="id-open:${bad.key}"]`)?.focus();
 			return;
 		}
 		const changed = this.rows.filter((r) => idChanged(idRow(r)));
-		if (changed.length) {
+		const what = changed.map((r) => `${r.key}:${r.id}>${draftId(idRow(r))}`).join('|');
+		if (changed.length && what !== asked) {
 			// The note can change while the question is open (sync, another pane): the answer checks the body again.
-			this.askIds(changed, () => {
-				if (this.fresh()) void this.commit(ops);
-			});
+			this.askIds(changed, () => void this.save(what));
 			return;
 		}
 		await this.commit(ops);
@@ -1018,6 +1039,8 @@ export class HousesWindow extends Modal {
 	private clearError(): void {
 		if (!this.error) return;
 		this.error = '';
+		// The text goes too: a hidden line must not keep an old message that a screen reader or a test can still read.
+		this.errorEl?.setText('');
 		this.errorEl?.hide();
 	}
 

@@ -7,7 +7,7 @@ import { parseDynasty, parseBody, referencedIds } from '../src/core/parse';
 import { applyOp, newPersonId } from '../src/core/yaml-edit';
 import { randomTree } from './random-trees';
 
-// Version 1.1.2, D104 and D105 (spec §13.17 rules 1 and 2): numbered ids for new people, the
+// Version 0.2.2, D104 and D105 (spec §13.17 rules 1 and 2): numbered ids for new people, the
 // example in the "has no id" warning, and the name in the duplicate id warning.
 
 const ok = (r: EditResult): EditResult & { ok: true } => {
@@ -116,13 +116,13 @@ describe('newPersonId and add-person (D104)', () => {
 
 describe('the "has no id" example for a person (D104, the reader)', () => {
 	it('is p1 in a tree with no numbered id', () => {
-		expect(texts('people:\n  - {name: Aldric}\n', 'missing-id')).toEqual(['Aldric has no id. Add an id, for example: id: p1.']);
-		expect(texts('people:\n  - {id: aldric, name: Aldric}\n  - {name: Bea}\n', 'missing-id')).toEqual(['Bea has no id. Add an id, for example: id: p1.']);
+		expect(texts('people:\n  - {name: Aldric}\n', 'missing-id')).toEqual(['Aldric has no ID. Add an ID, for example: id: p1.']);
+		expect(texts('people:\n  - {id: aldric, name: Aldric}\n  - {name: Bea}\n', 'missing-id')).toEqual(['Bea has no ID. Add an ID, for example: id: p1.']);
 	});
 
 	it('is a number that is not used when the tree has p1 to p3', () => {
 		const body = 'people:\n  - {id: p1, name: One}\n  - {id: p2, name: Two}\n  - {id: p3, name: Three}\n  - {name: Four}\n';
-		expect(texts(body, 'missing-id')).toEqual(['Four has no id. Add an id, for example: id: p4.']);
+		expect(texts(body, 'missing-id')).toEqual(['Four has no ID. Add an ID, for example: id: p4.']);
 	});
 
 	it('two people with no id get two different examples', () => {
@@ -135,11 +135,11 @@ describe('the "has no id" example for a person (D104, the reader)', () => {
 
 	it('does not use the name, and a reference counts as taken', () => {
 		const body = 'people:\n  - {name: Aldric Valmont, parents: [p4]}\n';
-		expect(texts(body, 'missing-id')).toEqual(['Aldric Valmont has no id. Add an id, for example: id: p5.']);
+		expect(texts(body, 'missing-id')).toEqual(['Aldric Valmont has no ID. Add an ID, for example: id: p5.']);
 	});
 
 	it('an entry with no name is named by its place', () => {
-		expect(texts('people:\n  - {house: x}\n', 'missing-id')).toEqual(['Entry 1 in the “people” list has no id. Add an id, for example: id: p1.']);
+		expect(texts('people:\n  - {house: x}\n', 'missing-id')).toEqual(['Entry 1 in the “people” list has no ID. Add an ID, for example: id: p1.']);
 	});
 
 	it('the example pasted into the tree gives no duplicate id', () => {
@@ -154,10 +154,10 @@ describe('the "has no id" example for a person (D104, the reader)', () => {
 
 	it('houses and titles keep the slug of the name as the example', () => {
 		expect(texts('houses:\n  - {name: House Valmont}\n', 'missing-id')).toEqual([
-			'House Valmont has no id, so the tree does not use this house. Add an id, for example: id: house-valmont.',
+			'House Valmont has no ID, so the tree does not use this house. Add an ID, for example: id: house-valmont.',
 		]);
 		expect(texts('titles:\n  - {name: Duke of Valmont}\n', 'missing-id')).toEqual([
-			'Duke of Valmont has no id, so the tree does not use this title. Add an id, for example: id: duke-of-valmont.',
+			'Duke of Valmont has no ID, so the tree does not use this title. Add an ID, for example: id: duke-of-valmont.',
 		]);
 	});
 
@@ -176,7 +176,7 @@ describe('the duplicate person id warning (D105)', () => {
 	};
 
 	it('shows the name of the first person and the id as NAME (id)', () => {
-		expect(banner(dup('Aldric Valmont'))).toEqual(['Aldric Valmont (p3) has the same id as another person. To edit the tree again, give each person a different id.']);
+		expect(banner(dup('Aldric Valmont'))).toEqual(['Aldric Valmont (p3) has the same ID as another person. To edit the tree again, give each person a different ID.']);
 	});
 
 	it('the id has no quote mark inside NAME (id)', () => {
@@ -186,7 +186,7 @@ describe('the duplicate person id warning (D105)', () => {
 	});
 
 	it('a first person with no name, or a name equal to the id, gives the id-only text', () => {
-		const idOnly = 'More than one person has the id “p3”. To edit the tree again, give each person a different id.';
+		const idOnly = 'More than one person has the ID “p3”. To edit the tree again, give each person a different ID.';
 		expect(banner(dup(''))).toEqual([idOnly]);
 		expect(banner(dup('p3'))).toEqual([idOnly]);
 	});
@@ -199,7 +199,7 @@ describe('the duplicate person id warning (D105)', () => {
 	it('a warning about an id that no person has shows the id only', () => {
 		const src = 'people:\n  - {id: p1, name: A, parents: [p9]}\n';
 		const text = tree(src).issues.concat(deriveFamilies(tree(src)).issues).map(issueText).find((t) => t.includes('p9'));
-		expect(text).toBe('A has a parent with the id “p9”, but no person has this id. Correct the id, or add the person.');
+		expect(text).toBe('A has a parent with the ID “p9”, but no person has this ID. Correct the ID, or add the person.');
 	});
 
 	it('the editing is blocked, as before', () => {

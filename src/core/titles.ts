@@ -30,7 +30,7 @@ export interface Holding {
 	entries: Holder[];
 }
 
-/** What a card shows for a person, beyond the 1.0 fields (spec §13.3, §13.5). */
+/** What a card shows for a person, beyond the 0.1 fields (spec §13.3, §13.5). */
 export interface CardLabel {
 	/** Every title the person holds, in `titles` list order (the edit sheet lists these). */
 	holdings: Holding[];
@@ -250,8 +250,6 @@ export type EntryReign = typeof entryReign;
 export type ReignText = typeof reignText;
 /** The signature of `rulerName`. */
 export type RulerName = typeof rulerName;
-/** The signature of `titleNameFor`. */
-export type TitleNameFor = typeof titleNameFor;
 /** The signature of `searchNames`. */
 export type SearchNames = typeof searchNames;
 /** The signature of `pickerSuffix`. */

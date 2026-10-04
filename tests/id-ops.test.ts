@@ -7,7 +7,7 @@ import { parseDynasty } from '../src/core/parse';
 import { describeTitleIdChange } from '../src/core/titles';
 import { applyOp } from '../src/core/yaml-edit';
 
-// Version 1.1.2, D109 (spec §13.17 rule 5): the ops set-house-id and set-title-id, and the counts
+// Version 0.2.2, D109 (spec §13.17 rule 5): the ops set-house-id and set-title-id, and the counts
 // that the confirm of the Houses and Titles windows shows.
 
 const ok = (r: EditResult): string => {

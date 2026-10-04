@@ -1,6 +1,6 @@
 /*
  * The Titles window (spec §13.4, §13.0 item 6; D49, D52, D55): the titles of one tree with their
- * holder lists, and the "Name for a man" (D66), "Name for a woman" (D65), "Name of the list" (D64) of each title and the button "Change id" (§13.17 rule 5, D109, D110; the small window is `id-window.ts`). Like the Houses window it is a draft: Save writes every change in one `batch` (one
+ * holder lists, and the "Name for a man" (D66), "Name for a woman" (D65), "Name of the list" (D64) of each title and the button "Change ID" (§13.17 rule 5, D109, D110; the small window is `id-window.ts`). Like the Houses window it is a draft: Save writes every change in one `batch` (one
  * undo step), Cancel writes nothing, and any other way to close with changes asks first. The window
  * opens from the More list on the computer and in the full-screen view, never from the static phone
  * preview (`tree-view.ts`). The draft logic is in `titles-draft.ts`, the holder form in
@@ -18,12 +18,12 @@ import { HOUSES, ID_UI, REMOVE, SHEET, TITLES_UI, WRITE_TEXT } from '../render/u
 import type { Handle, HandleWriteOutcome } from './block-handle';
 import { holderForm } from './holder-form';
 import { danglingIds, draftId, idChanged, idFromName, idProblemFor, idProblems, idRefusalText, isIdOp, reasonText, type IdReason } from './id-draft';
-import { idNote, idOpenButton, type IdRowView } from './id-field';
+import { idNewNameNote, idNote, idOpenButton, type IdRowView } from './id-field';
 import { openIdWindow } from './id-window';
 import { phoneLayout } from './modal-layout';
 import { pickPerson } from './person-picker';
 import { trackModal } from './plugin-modals';
-import { freshOrStale, onWriteFailed, showErrorLine } from './sheet-parts';
+import { freshOrStale, nameDialog, onWriteFailed, revealFocused, showErrorLine } from './sheet-parts';
 import { makeTableNote } from './table-note';
 import { draftChanged, emptyNames, holderText, listName, personNameOf, rebase, savedListName, titleIdRow, titleRows, windowOps, withHolderIds, type HolderRow, type HolderValues, type TitleRow } from './titles-draft';
 import { undoNotice } from './undo-notice';
@@ -79,7 +79,7 @@ export class TitlesWindow extends Modal {
 	private sentIds = false;
 	/** A picker or the holder form is open over the window. */
 	private busy = false;
-	/** True while the small Id window is open, so a second "Change id" opens no second window. */
+	/** True while the small ID window is open, so a second "Change ID" opens no second window. */
 	private idWindowOpen = false;
 	private readonly cleanup: (() => void)[] = [];
 
@@ -104,7 +104,11 @@ export class TitlesWindow extends Modal {
 	override onOpen(): void {
 		this.modalEl.addClass('dynasty-sheet');
 		this.modalEl.addClass('dynasty-titles');
-		this.cleanup.push(phoneLayout(this), trackModal(this, () => this.finish()));
+		this.cleanup.push(phoneLayout(this, () => revealFocused(this.modalEl, this.contentEl)), trackModal(this, () => this.finish()));
+		// The keyboard can cover a field in the scrolling body: bring it into view when it gets the focus (C1).
+		const reveal = () => revealFocused(this.modalEl, this.contentEl, 300);
+		this.contentEl.addEventListener('focusin', reveal);
+		this.cleanup.push(() => this.contentEl.removeEventListener('focusin', reveal));
 		this.build();
 		// Keyboard users start at the top of the window, not in the note below it.
 		this.modalEl.setAttribute('tabindex', '-1');
@@ -170,7 +174,7 @@ export class TitlesWindow extends Modal {
 		this.hideConfirm(false);
 		el.addClass('dynasty-sheet-content');
 		const header = el.createDiv({ cls: 'dynasty-sheet-header' });
-		header.createDiv({ cls: 'dynasty-sheet-title', text: TITLES_UI.title });
+		nameDialog(this.modalEl, header.createDiv({ cls: 'dynasty-sheet-title', text: TITLES_UI.title }));
 		const actions = header.createDiv({ cls: 'dynasty-sheet-actions' });
 		const cancel = actions.createEl('button', { cls: 'dynasty-sheet-cancel', text: SHEET.cancel, attr: { type: 'button', 'data-focus': 'cancel' } });
 		cancel.addEventListener('click', () => this.finish());
@@ -224,6 +228,8 @@ export class TitlesWindow extends Modal {
 				}),
 			);
 		}
+		// A new row is marked when its name gives the ID that a changed row has taken (owner decision "3-both").
+		if (t.id === null) views.push(idNewNameNote(row, { key: t.key, problem: problem ? reasonText(problem) : '' }));
 		row.createDiv({ cls: 'dynasty-title-count', text: TITLES_UI.count(t.holders.length) });
 		const open = this.shownHolders.has(t.key);
 		const toggle = row.createEl('button', {
@@ -314,9 +320,9 @@ export class TitlesWindow extends Modal {
 		}
 	}
 
-	// ---------- the small Id window (spec §13.17 rule 5, D110) ----------
+	// ---------- the small ID window (spec §13.17 rule 5, D110) ----------
 
-	/** "Change id": the small window; "Use this id" puts the id into the draft of the row. */
+	/** "Change ID": the small window; "Use this ID" puts the id into the draft of the row. */
 	private changeId(t: TitleRow): void {
 		// Focus can leave the small window by Tab, and a screen reader can activate the button below it.
 		if (this.idWindowOpen) return;
@@ -587,7 +593,8 @@ export class TitlesWindow extends Modal {
 		return freshOrStale(this.o.handle, this.data.body, (body) => this.stale(body));
 	}
 
-	private async save(): Promise<void> {
+	/** Save. `asked` is the ID change that the owner just answered: the answer runs Save again on the draft as it is then (C4). */
+	private async save(asked: string | null = null): Promise<void> {
 		if (this.saving || this.busy) return;
 		const empty = emptyNames(this.rows)[0];
 		if (empty) {
@@ -601,9 +608,12 @@ export class TitlesWindow extends Modal {
 		}
 		if (!this.fresh()) return;
 		const problems = idProblems('title', this.rows.map(titleIdRow), this.data.dangling);
-		const bad = this.rows.find((t) => problems.has(t.key));
+		// The focus goes to a saved row: a new row has no "Change ID" button, and the saved row that it conflicts with is marked too.
+		const bad = this.rows.find((t) => t.id !== null && problems.has(t.key));
 		if (bad) {
-			this.showError(ID_UI.problem(this.label(bad), reasonText(problems.get(bad.key)!)));
+			// D113 item 3: the reason shows once, in the row (its note and red edge); the top line shows nothing for an ID.
+			this.clearError();
+			this.refreshIdProblems();
 			this.refocus(`id-open:${bad.key}`);
 			return;
 		}
@@ -616,11 +626,10 @@ export class TitlesWindow extends Modal {
 			this.data.raw,
 		);
 		const changed = this.rows.filter((t) => idChanged(titleIdRow(t)));
-		if (changed.length) {
+		const what = changed.map((t) => `${t.key}:${t.id}>${draftId(titleIdRow(t))}`).join('|');
+		if (changed.length && what !== asked) {
 			// The note can change while the question is open (sync, another pane): the answer checks the body again.
-			this.askIds(changed, () => {
-				if (this.fresh()) void this.commit(ops);
-			});
+			this.askIds(changed, () => void this.save(what));
 			return;
 		}
 		await this.commit(ops);
@@ -735,6 +744,8 @@ export class TitlesWindow extends Modal {
 	private clearError(): void {
 		if (!this.error) return;
 		this.error = '';
+		// The text goes too: a hidden line must not keep an old message that a screen reader or a test can still read.
+		this.errorEl?.setText('');
 		this.errorEl?.hide();
 	}
 

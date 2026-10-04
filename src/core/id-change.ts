@@ -12,6 +12,7 @@ import { checkNewId } from './id-gen';
 import { isMap as isRawMap, str, type Raw, type RawMap } from './tolerate';
 import { section } from './yaml-list';
 import { clone, findPair, finish, layoutOf, refuse, setPairValue, type Parsed, type Patch, type Refusal, type Step } from './yaml-patch';
+import { REFUSAL_TEXT } from './refusal-text';
 
 /** Which kind of item an id change is for. */
 export interface IdChange {
@@ -65,7 +66,7 @@ export function changeItemId(first: Parsed, data: RawMap, change: IdChange, id: 
 		const setIn = (map: YAMLMap, key: string): Refusal | null => {
 			const pair = findPair(map, key);
 			const value = pair?.value as Node | null | undefined;
-			if (!pair || !value) return refuse('bad-value', 'The change cannot be written. Edit the note text.');
+			if (!pair || !value) return refuse('bad-value', REFUSAL_TEXT.notWritable);
 			if (isAlias(value) || value.anchor !== undefined) return refuse('bad-value', ANCHOR);
 			// `text: false`: the writer quotes a value that plain YAML would read as another type (`123`).
 			patches.push(setPairValue(p.src, map, pair, { scalar: newId, old: value, text: false }, layout));
@@ -79,7 +80,7 @@ export function changeItemId(first: Parsed, data: RawMap, change: IdChange, id: 
 			// A person written as an alias shares the item it points to; that item changes once.
 			const raw = list?.seq.items[k];
 			const map = isAlias(raw) ? raw.resolve(p.src.doc) : raw;
-			if (!isMap(map)) return refuse('bad-value', 'The change cannot be written. Edit the note text.');
+			if (!isMap(map)) return refuse('bad-value', REFUSAL_TEXT.notWritable);
 			if (seen.has(map)) continue;
 			seen.add(map);
 			const refused = setIn(map, change.refKey);

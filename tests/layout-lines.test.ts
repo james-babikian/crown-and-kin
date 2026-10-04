@@ -129,7 +129,7 @@ function overlaps(edges: EdgeDrawing, only?: (p: EdgePath) => boolean): string[]
 }
 
 /** Lines that pass through a far-couple tag, other than the lines of that person's far couples. */
-function linesThroughTags(g: FamilyGraph, layout: TreeLayout, edges: EdgeDrawing): string[] {
+function linesThroughTags(layout: TreeLayout, edges: EdgeDrawing): string[] {
 	const bad: string[] = [];
 	const geo = layout.geometry;
 	for (const tag of layout.farTags.values()) {
@@ -150,7 +150,7 @@ describe('line invariants over every fixture and the three far-couple options', 
 				const { g, layout, edges } = lay(fixture(f), rule);
 				expect(dotsOnForeignLines(g, layout, edges)).toEqual([]);
 				expect(overlaps(edges, (p) => COUPLE.has(p.kind))).toEqual([]);
-				expect(linesThroughTags(g, layout, edges)).toEqual([]);
+				expect(linesThroughTags(layout, edges)).toEqual([]);
 				// Every couple drawn with a line, and every couple with children, has its dot.
 				for (const fu of g.unions) {
 					const u = layout.unions.get(fu.key)!;
@@ -248,9 +248,9 @@ people:
 unions:
   - partners: [p, w]
 `;
-		const { g, layout, edges } = lay(src);
+		const { layout, edges } = lay(src);
 		expect(layout.farTags.has('p')).toBe(true);
-		expect(linesThroughTags(g, layout, edges)).toEqual([]);
+		expect(linesThroughTags(layout, edges)).toEqual([]);
 		expect(overlaps(edges)).toEqual([]);
 	});
 
@@ -279,14 +279,14 @@ people:
   - {id: n1, name: N1, parents: [c1, c1w]}
   - {id: k1, name: K1, parents: [varian, n1]}
 `;
-		const { g, layout, edges } = lay(src);
+		const { layout, edges } = lay(src);
 		const tag = layout.farTags.get('varian')!;
 		const leg = edges.paths.find((e) => COUPLE.has(e.kind) && e.people.includes('varian'))!;
 		// Supervisor decision: the far couple's line lists only the anchor partner.
 		expect(leg.people).toHaveLength(1);
 		const x = Number(leg.d.match(/^M([\d.]+)/)![1]);
 		expect(x > tag.hit.x && x < tag.hit.x + tag.hit.w, `leg ${leg.d}, tag ${tag.hit.x}..${tag.hit.x + tag.hit.w}`).toBe(false);
-		expect(linesThroughTags(g, layout, edges)).toEqual([]);
+		expect(linesThroughTags(layout, edges)).toEqual([]);
 	});
 
 	it('N3: more than 8 overlapping couple runs in one gap each get a lane', () => {

@@ -1,5 +1,5 @@
 /*
- * The pure part of the Id change of the Houses window and the Titles window (spec §13.17 rule 5,
+ * The pure part of the ID change of the Houses window and the Titles window (spec §13.17 rule 5,
  * D109, D110): which ids the draft changes, which of them is refused and why, what the button "Make id
  * from the name" gives, the `set-house-id` / `set-title-id` ops, and which refusal text a failed
  * write gets. No `obsidian` import, so vitest runs it; `houses-window.ts`, `titles-window.ts` and
@@ -14,8 +14,11 @@ import { ID_UI } from '../render/ui-text';
 /** Which kind of item a window edits. */
 export type IdKind = 'house' | 'title';
 
-/** Why a draft id is refused: the three codes of `checkNewId`. */
-export type IdReason = 'empty' | 'characters' | 'taken';
+/**
+ * Why a draft id is refused: the three codes of `checkNewId`, and `newName` for a new row whose name would get
+ * the id that a changed saved row has taken (owner decision "3-both", 2026-10-03: both rows are marked).
+ */
+export type IdReason = 'empty' | 'characters' | 'taken' | 'newName';
 
 /** What the id logic needs of a row of either window. `id` null: a row that is not saved. */
 export interface IdRow {
@@ -71,7 +74,7 @@ function takenFor(rows: readonly IdRow[], row: IdRow, dangling: Iterable<string>
 	return taken;
 }
 
-/** The refused id drafts, by row key. A row with an unchanged field is never checked. */
+/** The refused id drafts, by row key. A row with an unchanged field is never checked. A new row is marked only with `newName`. */
 export function idProblems(kind: IdKind, rows: readonly IdRow[], dangling: Iterable<string>): Map<string, IdReason> {
 	const out = new Map<string, IdReason>();
 	const fresh = newRowIds(kind, rows);
@@ -81,17 +84,21 @@ export function idProblems(kind: IdKind, rows: readonly IdRow[], dangling: Itera
 		const why = checkNewId(draftId(r), takenFor(rows, r, names, fresh));
 		if (why !== null) out.set(r.key, why);
 	}
+	// The saved row is refused because a new row's name gives its id; the owner sees both rows with the same name, so both get a mark.
+	const refused = new Set<string>();
+	for (const r of rows) if (out.get(r.key) === 'taken') refused.add(draftId(r));
+	for (const [key, id] of fresh) if (refused.has(id)) out.set(key, 'newName');
 	return out;
 }
 
-/** Why `value` would be refused as the id of `row` (the small Id window checks while the owner types); null when it is allowed. */
+/** Why `value` would be refused as the id of `row` (the small ID window checks while the owner types); null when it is allowed. */
 export function idProblemFor(kind: IdKind, rows: readonly IdRow[], row: IdRow, value: string, dangling: Iterable<string>): IdReason | null {
 	const probe = rows.map((r) => (r.key === row.key ? { ...r, idDraft: value } : r));
 	return idProblems(kind, probe, dangling).get(row.key) ?? null;
 }
 
 /**
- * What the button "Make id from the name" puts in the field of `row`: the id that a new item with the
+ * What the button "Make ID from the name" puts in the field of `row`: the id that a new item with the
  * draft name would get, also unused by the other drafts. Null when the name is empty.
  */
 export function idFromName(kind: IdKind, rows: readonly IdRow[], row: IdRow, dangling: Iterable<string>): string | null {

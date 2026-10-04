@@ -228,7 +228,7 @@ describe('S1: the shells of a lazy scene', () => {
 		expect([...lazy.s.links.values()]).toEqual([...eager.s.links.values()]);
 	});
 
-	it('the tag hit layer is built at once, as in an eager scene; the lines and markers wait for a fill (1.1.1 rule 4, tests/v111-cull-scene.test.ts)', () => {
+	it('the tag hit layer is built at once, as in an eager scene; the lines and markers wait for a fill (0.2.1 rule 4, tests/v111-cull-scene.test.ts)', () => {
 		const eager = build(false);
 		const lazy = build(true);
 		const layer = (b: Built, cls: string) => serial(b.root.children.find((c) => c.hasClass(cls))!);

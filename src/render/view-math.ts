@@ -276,7 +276,7 @@ export function boxNearView(box: Rect, view: Rect): boolean {
 }
 
 /**
- * 1.1.1: the box that holds an SVG path made of the absolute commands M, L, H, V, C, S, Q, T and Z, grown by `pad` on
+ * 0.2.1: the box that holds an SVG path made of the absolute commands M, L, H, V, C, S, Q, T and Z, grown by `pad` on
  * every side. A curve lies inside the box of its control points, so the box never cuts a line short. Null when the path
  * has any other command (relative, arcs) or no point; the caller then treats the path as near every view.
  */

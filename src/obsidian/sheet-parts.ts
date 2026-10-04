@@ -20,6 +20,33 @@ export function drawableColour(c: string | null | undefined): c is string {
 	}
 }
 
+/**
+ * Makes a window a dialog that a screen reader can name: role, aria-modal and aria-labelledby (its title). Returns the
+ * title so a call can wrap the line that makes it. A window that draws its title again calls this again.
+ */
+export function nameDialog(modalEl: HTMLElement, title: HTMLElement): HTMLElement {
+	const id = `dynasty-dialog-title-${Math.random().toString(36).slice(2, 8)}`;
+	title.setAttribute('id', id);
+	modalEl.setAttribute('role', 'dialog');
+	modalEl.setAttribute('aria-modal', 'true');
+	modalEl.setAttribute('aria-labelledby', id);
+	return title;
+}
+
+/**
+ * Scrolls the focused field of a window into the visible part, above the keyboard (C1). A browser does this only for
+ * its own scroller and only some of the time; the field sits inside `.dynasty-sheet-body`, which scrolls. `delay` waits
+ * for the keyboard to finish opening.
+ */
+export function revealFocused(modalEl: HTMLElement, contentEl: HTMLElement, delay = 0): void {
+	const run = () => {
+		const a = modalEl.doc.activeElement as HTMLElement | null;
+		if (a && contentEl.contains(a) && a.matches('input, select, textarea')) a.scrollIntoView({ block: 'nearest' });
+	};
+	if (delay) (modalEl.win ?? window).setTimeout(run, delay);
+	else run();
+}
+
 /** A labelled row of a sheet form; `id` joins the label to the control that the caller adds to `row`. */
 export function sheetField(parent: HTMLElement, label: string, name: string, idPrefix = 'dynasty-sheet'): { row: HTMLElement; id: string } {
 	const row = parent.createDiv({ cls: 'dynasty-sheet-field', attr: { 'data-field': name } });

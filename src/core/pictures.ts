@@ -273,8 +273,7 @@ function svgHeader(b: Uint8Array): PictureHeader | null {
 	}
 	if (!/^<svg[\s/>]/i.test(text.slice(i, i + 5))) return null;
 	const tag = startTag(text, i + 4);
-	const attrs = new Map<string, string>();
-	for (const m of tag.matchAll(/([^\s=/>]+)\s*=\s*(?:"([^"]*)"|'([^']*)')/g)) if (!attrs.has(m[1])) attrs.set(m[1], m[2] ?? m[3]);
+	const attrs = attributes(tag);
 	const w = svgLength(attrs.get('width'));
 	const h = svgLength(attrs.get('height'));
 	if (w !== null && h !== null) return sized('svg', w, h);
@@ -284,6 +283,47 @@ function svgHeader(b: Uint8Array): PictureHeader | null {
 		.map(Number);
 	if (box.length === 4 && box.every(Number.isFinite) && box[2] > 0 && box[3] > 0) return sized('svg', box[2], box[3]);
 	return { format: 'svg', ...NO_SIZE };
+}
+
+/**
+ * The quoted attributes of a start tag (the first of a repeated name wins). It reads the same as
+ * the regular expression `([^\s=/>]+)\s*=\s*("…"|'…')` but in one pass: that expression is
+ * quadratic on a long token or an unclosed quote, and the tag may be 64 KB of any bytes.
+ */
+function attributes(tag: string): Map<string, string> {
+	const attrs = new Map<string, string>();
+	const isName = (c: string) => !/[\s=/>]/.test(c);
+	// Once a quote has no closing mark, no later quote of that kind has one.
+	const noClose = new Set<string>();
+	let i = 0;
+	while (i < tag.length) {
+		if (!isName(tag[i])) {
+			i++;
+			continue;
+		}
+		let r = i;
+		while (r < tag.length && isName(tag[r])) r++;
+		// A shorter name from a later start in the same run fails the same way, so the run is skipped whole.
+		let k = r;
+		while (k < tag.length && /\s/.test(tag[k])) k++;
+		if (tag[k] !== '=') {
+			i = r;
+			continue;
+		}
+		k++;
+		while (k < tag.length && /\s/.test(tag[k])) k++;
+		const q = tag[k];
+		const close = q === '"' || q === "'" ? (noClose.has(q) ? -1 : tag.indexOf(q, k + 1)) : -1;
+		if (close < 0) {
+			if (q === '"' || q === "'") noClose.add(q);
+			i = r;
+			continue;
+		}
+		const name = tag.slice(i, r);
+		if (!attrs.has(name)) attrs.set(name, tag.slice(k + 1, close));
+		i = close + 1;
+	}
+	return attrs;
 }
 
 /** The position after the next `end` from `from`, or -1. */

@@ -292,10 +292,10 @@ describe('delete a house (D32, spec §6.1 Notice with Undo)', () => {
 		const ask = modal.querySelector('.dynasty-sheet-confirm')!;
 		expect(ask.getAttribute('role')).toBe('alertdialog');
 		expect(ask.querySelector('.dynasty-sheet-confirm-title')!.getText()).toBe(HOUSES.confirmTitle('House Orsini'));
-		expect(ask.querySelectorAll('.dynasty-sheet-confirm-text').map((t) => t.getText())).toEqual([HOUSES.confirmPeople(['Isolde Orsini', 'Lucan Orsini']), HOUSES.confirmAsk]);
+		expect(ask.querySelectorAll('.dynasty-sheet-confirm-text').map((t) => t.getText())).toEqual([HOUSES.confirmPeople(2), HOUSES.confirmAsk(2)]);
 		const clear = ask.querySelector('.dynasty-house-clear')!;
-		expect(clear.querySelector('.dynasty-choice-label')!.getText()).toBe(HOUSES.clearLabel);
-		expect(ask.querySelector('.dynasty-house-keep .dynasty-choice-label')!.getText()).toBe(HOUSES.keepLabel);
+		expect(clear.querySelector('.dynasty-choice-label')!.getText()).toBe(HOUSES.clearLabel(2));
+		expect(ask.querySelector('.dynasty-house-keep .dynasty-choice-label')!.getText()).toBe(HOUSES.keepLabel(2));
 		// The first choice has the focus, for the keyboard.
 		expect(fakeDoc.activeElement).toBe(clear);
 		dispatch(clear, 'click');

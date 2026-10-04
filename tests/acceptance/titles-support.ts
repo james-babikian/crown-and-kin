@@ -88,7 +88,7 @@ export type TitledTree = Tree & { titles?: readonly Title[] };
 /** A `Person` with the M8 field `cardTitle`. */
 export type TitledPerson = Person & { cardTitle?: string };
 
-/** Every op `applyOp` accepts after WP 8.1: the 1.0 ops, the title ops, and `card-title` in `set-person-fields`. */
+/** Every op `applyOp` accepts after WP 8.1: the 0.1 ops, the title ops, and `card-title` in `set-person-fields`. */
 export type AnyOp = Op | TitleOp | { kind: 'set-person-fields'; id: string; fields: Record<string, string | boolean | null> } | { kind: 'batch'; ops: AnyOp[] };
 
 const applyOpNow: ApplyOp = edit.applyOp;

@@ -5,7 +5,7 @@
  *
  * Rules:
  * - `personNoteName` uses the name as written (not the regnal name), cleaned by `noteName`.
- * - `linkedNotePath` reads the target of a `link` the way `linkTarget` (`render/tree-info.ts`) does,
+ * - `linkedNotePath` reads the target of a `link` with `linkText` (`link-text.ts`), as `linkTarget` (`render/tree-info.ts`) does,
  *   without `#...` and `|...`, and without a leading "/". It splits at the last "/" into a folder
  *   ('' = the D60 folder) and a name, and adds ".md" unless the path already ends with it (compared
  *   without case). It gives null for no link, an empty target, a web address, a path with a ".."
@@ -13,6 +13,7 @@
  *   "Report.pdf.md". Any other extension is part of the name: "St.John" is a note.
  */
 
+import { linkText } from './link-text';
 import { noteName } from './titles';
 import type { Person } from './types';
 
@@ -37,27 +38,10 @@ export function personNoteName(person: Pick<Person, 'name'>): string {
 	return noteName(person?.name ?? '', 'Person');
 }
 
-/** The target of a `link` value the way `linkTarget` in `render/tree-info.ts` reads it (core cannot import render). */
-function target(link: string): string {
-	let s = link.trim();
-	const wiki = /^!?\[\[([^\]]*)\]\]$/.exec(s);
-	const md = /^!?\[[^\]]*\]\(([^)]*)\)$/.exec(s);
-	if (wiki) s = wiki[1].split('|')[0];
-	else if (md) {
-		s = md[1].trim().replace(/^<(.*)>$/, '$1');
-		try {
-			s = decodeURIComponent(s);
-		} catch {
-			// Keep the text as written if it is not valid percent-encoding.
-		}
-	}
-	return s.trim();
-}
-
 /** The path of the note that a person's `link` names, or null (no link, a web address, or another kind of file). */
 export function linkedNotePath(link: string | undefined): LinkedNotePath | null {
 	if (typeof link !== 'string') return null;
-	const text = target(link).split('#')[0].split('|')[0].trim();
+	const text = linkText(link).split('#')[0].split('|')[0].trim();
 	// A scheme such as "https:" or "mailto:" is an address, not a vault path.
 	if (text === '' || /^[a-z][a-z0-9+.-]+:/i.test(text)) return null;
 	const parts = text.split('/').filter((x) => x !== '' && x !== '.');

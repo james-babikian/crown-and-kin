@@ -7,6 +7,11 @@
 import type { PictureProblem } from '../core/pictures';
 import { quote } from '../core/quote';
 
+/** Texts that two or more windows show in the same words (D112 X10): one constant each. */
+const STALE_TEXT = 'The tree changed after you opened this window. The plugin did not save. Your changes are still in the window. Select Save again to save them.';
+const MAKE_NOTE_TEXT = 'Make a note with this table';
+const PERSON_PLACEHOLDER = 'Type the name of the person';
+
 /** The error view, the banner for blocking problems (spec §8), the Fit and legend buttons, and the partner list title. */
 export const UI = {
 	errorTitle: 'The plugin cannot show this tree',
@@ -78,8 +83,8 @@ export const SHEET = {
 	discard: 'Discard changes',
 	keepEditing: 'Continue to edit',
 	unnamed: 'Person with no name',
-	// D106: the small grey text line at the end of the sheet of a person whose id is written.
-	idLine: (id: string) => `Id: ${id}`,
+	// D106, D113 item 5: the small grey text line at the end of the sheet of a person whose ID is written.
+	idLine: (id: string) => `ID: ${id}`,
 } as const;
 
 /** Names of parent types, as the sheet and the flows show them. */
@@ -116,14 +121,15 @@ export const FAMILY = {
 	noParents: 'This person has no recorded parents.',
 	parentTypeLabel: (name: string) => `Type of parent: ${name}`,
 	remove: 'Remove as parent',
-	removeParentLabel: (name: string) => `Remove ${name} as a parent`,
+	// C8: the name of a button starts with the text that the button shows, so voice control finds it by that text.
+	removeParentLabel: (name: string) => `Remove as parent: remove ${name} as a parent`,
 	partners: 'Partners',
 	noPartners: 'This person has no recorded partners.',
 	noPartnership: 'No recorded partnership',
 	edit: 'Edit',
 	editLabel: (name: string) => `Edit the partnership with ${name}`,
 	removePartnership: 'Remove partnership',
-	removePartnershipLabel: (name: string) => `Remove the partnership with ${name}`,
+	removePartnershipLabel: (name: string) => `Remove partnership: remove the partnership with ${name}`,
 	siblings: 'Position among siblings',
 	position: (i: number, n: number) => `Position ${i} of ${n}`,
 	moveEarlier: 'Move earlier',
@@ -167,6 +173,8 @@ export const FLOW = {
 	pickerChild: 'Type the name of the child',
 	pickerPartner: 'Type the name of the partner',
 	pickerEmpty: 'No person has this name.',
+	/** The accessible name of the search field of every person list (the placeholder is not a name). */
+	pickerSearchLabel: 'Find a person',
 	createNew: (text: string) => (text.trim() ? `Create a new person ${quote(text.trim())}` : 'Create a new person'),
 	autoUnion: (a: string, b: string) => `The plugin also added a marriage of ${a} and ${b}. To change its type, open the sheet of ${a}. Then select Edit under Partners.`,
 } as const;
@@ -213,8 +221,9 @@ export const REMOVE = {
 	removeConfirm: 'Remove partnership',
 	cancel: 'Cancel',
 	partnershipTitle: 'Remove partnership?',
+	// Only the first letter changes: a type that the owner wrote keeps its own capitals (C5).
 	partnershipText: (type: string, a: string, b: string) =>
-		`The plugin removes the ${type.toLowerCase()} of ${a} and ${b}. If ${a} and ${b} have children, the children stay connected to both parents.`,
+		`The plugin removes the ${type.charAt(0).toLowerCase()}${type.slice(1)} of ${a} and ${b}. If ${a} and ${b} have children, the children stay connected to both parents.`,
 	canUndo: 'You can undo this.',
 	deleted: (name: string) => `The plugin deleted ${name}. You can undo this.`,
 	removedPartnership: (a: string, b: string) => `The plugin removed the partnership of ${a} and ${b}. You can undo this.`,
@@ -256,7 +265,7 @@ export const FULL_UI = {
 	dialog: 'Tree in a full-screen view',
 	find: 'Find a person in the tree',
 	findTitle: 'Find a person',
-	findPlaceholder: 'Type the name of the person',
+	findPlaceholder: PERSON_PLACEHOLDER,
 	gone: 'The plugin cannot find this tree in the note now. It closed the full-screen view.',
 	invalid: 'The tree text has an error now. The plugin closed the full-screen view.',
 	failed: 'The plugin closed the full-screen view because of an error in the plugin.',
@@ -266,14 +275,14 @@ export const FULL_UI = {
 export const FOCUS_UI = {
 	focus: 'Focus on a person in the tree',
 	pickerTitle: 'Focus on a person',
-	pickerPlaceholder: 'Type the name of the person',
+	pickerPlaceholder: PERSON_PLACEHOLDER,
 	showAll: 'Show all people',
 	focusHere: 'Focus here',
-	focusHereLabel: (name: string) => `Show only the family of ${name}`,
+	focusHereLabel: (name: string) => `Focus here: show only the family of ${name}`,
 	pin: 'Pin focus here',
-	pinLabel: (name: string) => `Always open this tree on the family of ${name}`,
+	pinLabel: (name: string) => `Pin focus here: always open this tree on the family of ${name}`,
 	unpin: 'Remove pin',
-	unpinLabel: (name: string) => `Do not always open this tree on the family of ${name}`,
+	unpinLabel: (name: string) => `Remove pin: do not open this tree on the family of ${name} each time`,
 	/** The `+` badge on a card with relatives who are not shown. */
 	badgeLabel: (name: string, hidden: number) =>
 		hidden === 1 ? `Show the family of ${name}. The tree does not show 1 relative.` : `Show the family of ${name}. The tree does not show ${hidden} relatives.`,
@@ -303,7 +312,7 @@ export const FINDER_UI = {
 	secondTitle: 'Select the second person',
 	/** The picker of "Show the relation to…" in the edit sheet. */
 	otherTitle: 'Select the other person',
-	placeholder: 'Type the name of the person',
+	placeholder: PERSON_PLACEHOLDER,
 	/** The first row of a picker when the tree has a mark: the marked person. */
 	you: (name: string) => `You: ${name}`,
 	showSteps: 'Show the steps',
@@ -336,19 +345,22 @@ export const HOUSES = {
 	paletteTitle: (house: string) => `Colour of ${house}`,
 	otherColour: 'Other colour',
 	confirmTitle: (house: string) => `Delete ${house}?`,
-	confirmPeople: (names: string[]) =>
-		names.length === 1 ? `1 person has this house: ${names[0]}.` : `${names.length} people have this house: ${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}.`,
-	confirmAsk: 'Select what happens to these people.',
-	clearLabel: 'Remove the house from these people',
-	clearDetail: 'These people will have no house. Their cards will show no house colour.',
-	keepLabel: 'Keep the house for these people',
-	keepDetail: 'The tree text keeps the house for these people. The tree will show a warning for each of them.',
+	// D113 item 1: the question gives the number only; the singular and plural texts agree.
+	confirmPeople: (n: number) => (n === 1 ? '1 person has this house.' : `${n} people have this house.`),
+	confirmAsk: (n: number) => (n === 1 ? 'Select what happens to this person.' : 'Select what happens to these people.'),
+	clearLabel: (n: number) => (n === 1 ? 'Remove the house from this person' : 'Remove the house from these people'),
+	clearDetail: (n: number) => (n === 1 ? 'This person will have no house. The card will show no house colour.' : 'These people will have no house. Their cards will show no house colour.'),
+	keepLabel: (n: number) => (n === 1 ? 'Keep the house for this person' : 'Keep the house for these people'),
+	keepDetail: (n: number) =>
+		n === 1
+			? 'The tree text keeps the house for this person. The tree will show a warning for this person.'
+			: 'The tree text keeps the house for these people. The tree will show a warning for each of them.',
 	cancel: 'Cancel',
 	discardText: 'You did not save the changes to the houses.',
 	cannotOpen: 'The plugin cannot show the houses. The tree text has an error.',
 	needName: 'Enter a name for each house.',
 	deleted: (houses: string[]) => (houses.length === 1 ? `The plugin deleted ${houses[0]}. You can undo this.` : `The plugin deleted ${houses.length} houses. You can undo this.`),
-	stale: 'The tree changed after you opened this window. The plugin did not save. Your changes are still in the window. Select Save again to save them.',
+	stale: STALE_TEXT,
 	missing: 'The plugin cannot find this tree in the note. It did not save your changes. Your changes are still in the window.',
 	invalid: 'The plugin cannot save. The tree text has an error. Your changes are still in the window.',
 	refused: 'The plugin cannot save this change safely. The note did not change. Your changes are still in the window.',
@@ -361,39 +373,39 @@ export const HOUSES = {
  * the Notice after it.
  */
 export const ID_UI = {
-	label: 'Id',
-	aria: (item: string) => `Id of ${item}`,
+	label: 'ID',
+	aria: (item: string) => `ID of ${item}`,
 	/** The small button on a saved row of the Houses window and the Titles window (D110). */
-	open: 'Change id',
-	openAria: (item: string) => `Change the id of ${item}`,
+	open: 'Change ID',
+	openAria: (item: string) => `Change ID of ${item}`,
 	/** The title of the small window. */
-	windowTitle: (item: string) => `Id of ${item}`,
-	hint: (kind: 'house' | 'title') => `The id is a short name. The plugin uses it to find this ${kind}. Most users never change it.`,
-	use: 'Use this id',
+	windowTitle: (item: string) => `ID of ${item}`,
+	hint: (kind: 'house' | 'title') => `The ID is a short name. The plugin uses it to find this ${kind}. Most users never change it.`,
+	use: 'Use this ID',
 	/** The small grey note of a row whose id is waiting for Save. */
-	newId: (id: string) => `New id: ${id}`,
+	newId: (id: string) => `New ID: ${id}`,
 	/** The button that drops the new id of a row. "Reset" is the portrait crop button. */
-	keepOld: 'Keep old id',
-	keepOldAria: (item: string) => `Keep the old id of ${item}`,
-	make: 'Make id from the name',
-	makeAria: (item: string) => `Make id from the name for ${item}`,
-	empty: 'Enter an id.',
+	keepOld: 'Keep old ID',
+	keepOldAria: (item: string) => `Keep old ID of ${item}`,
+	make: 'Make ID from the name',
+	makeAria: (item: string) => `Make ID from the name for ${item}`,
+	empty: 'Enter an ID.',
 	characters: 'Use only small letters a to z, digits and hyphens (-).',
-	taken: 'This id is in use. Enter a different id.',
-	/** The error line of the window when Save finds a refused id: the item and the reason. */
-	problem: (item: string, reason: string) => `${item}: ${reason}`,
+	taken: 'This ID is in use. Enter a different ID.',
+	/** The note of a new row whose name gives an ID that a changed row has taken. */
+	newName: 'This name gives an ID that is in use. Enter a different name.',
 	/** The second sentence of the question: what else a change of id changes. */
 	places: (n: number) =>
-		n === 0 ? 'The plugin changes nothing else.' : n === 1 ? 'The plugin also changes the id in the text of 1 person.' : `The plugin also changes the id in the text of ${n} people.`,
-	confirmTitle: (n: number) => (n === 1 ? 'Change the id?' : 'Change the ids?'),
-	confirmLine: (item: string, from: string, to: string, places: string) => `${item}: the plugin changes the id ${quote(from)} to ${quote(to)}. ${places}`,
-	change: (n: number) => (n === 1 ? 'Change the id' : 'Change the ids'),
+		n === 0 ? 'The plugin changes nothing else.' : n === 1 ? 'The plugin also changes the ID in the text of 1 person.' : `The plugin also changes the ID in the text of ${n} people.`,
+	confirmTitle: (n: number) => (n === 1 ? 'Change the ID?' : 'Change the IDs?'),
+	confirmLine: (item: string, from: string, to: string, places: string) => `${item}: the plugin changes the ID ${quote(from)} to ${quote(to)}. ${places}`,
+	change: (n: number) => (n === 1 ? 'Change the ID' : 'Change the IDs'),
 	keep: 'Do not change',
-	changed: (n: number) => (n === 1 ? 'The plugin changed the id. You can undo this.' : `The plugin changed ${n} ids. You can undo this.`),
-	inUse: 'The plugin cannot save. An id in this window is in use in the tree now. The note did not change. Your changes are still in the window.',
-	notAllowed: 'The plugin cannot save. An id in this window has a character that is not allowed. The note did not change. Your changes are still in the window.',
+	changed: (n: number) => (n === 1 ? 'The plugin changed the ID. You can undo this.' : `The plugin changed ${n} IDs. You can undo this.`),
+	inUse: 'The plugin cannot save. An ID in this window is in use in the tree now. The note did not change. Your changes are still in the window.',
+	notAllowed: 'The plugin cannot save. An ID in this window has a character that is not allowed. The note did not change. Your changes are still in the window.',
 	anchor:
-		'The plugin cannot save. An id in this window has a YAML anchor or alias in the tree text. An anchor (&name) names a value, and an alias (*name) copies that value. Edit the id in the tree text yourself. The note did not change. Your changes are still in the window.',
+		'The plugin cannot save. The tree text writes an ID in this window with a YAML anchor (&name) or alias (*name). These marks copy text from another place in the tree text. Edit the ID in the tree text yourself. The note did not change. Your changes are still in the window.',
 } as const;
 
 /**
@@ -451,7 +463,7 @@ export const TITLES_UI = {
 	needName: 'Enter a name for each title.',
 	discardText: 'You did not save the changes to the titles.',
 	cannotOpen: 'The plugin cannot show the titles. The tree text has an error.',
-	stale: 'The tree changed after you opened this window. The plugin did not save. Your changes are still in the window. Select Save again to save them.',
+	stale: STALE_TEXT,
 	personGone: 'The plugin cannot save a holder. The person is not in the tree now. Your changes are still in the window.',
 	deleteTitle: (title: string) => `Delete ${title}?`,
 	deleteHolders: (n: number) =>
@@ -459,7 +471,7 @@ export const TITLES_UI = {
 	deleteCards: (n: number) => (n === 1 ? '1 card then shows a different title or no title.' : `${n} cards then show a different title or no title.`),
 	deleted: (titles: string[]) => (titles.length === 1 ? `The plugin deleted ${titles[0]}. You can undo this.` : `The plugin deleted ${titles.length} titles. You can undo this.`),
 	// The table note (D55, D60).
-	makeNote: 'Make a note with this table',
+	makeNote: MAKE_NOTE_TEXT,
 	makeNoteLabel: (plural: string) => `Make a note with this table: a note with the list of ${plural}`,
 	noteTitle: 'Make a note with the saved list?',
 	noteText: 'You did not save the changes in this window. The note will have the list of holders that the tree has now.',
@@ -502,7 +514,7 @@ export const TITLES_UI = {
 
 /** The settings tab (spec §9, D33). */
 export const SETTINGS_UI = {
-	groups: { height: 'Height in a note', cards: 'Cards', focus: 'Focus mode', links: 'Links', repair: 'Repair' },
+	groups: { height: 'Height in a note', cards: 'Cards', housePage: 'House page', focus: 'Focus mode', links: 'Links', repair: 'Repair' },
 	heightDesktop: 'Height on a computer or tablet',
 	heightDesktopDesc: 'This is the height of a tree in a note, in pixels. The default is 500. If you drag the bottom edge of a tree, that tree keeps its new height.',
 	heightPhone: 'Height on a phone',
@@ -518,13 +530,16 @@ export const SETTINGS_UI = {
 	/** Spec §13.7 (M9 contract O10). */
 	portraits: 'Show portraits on cards',
 	portraitsDesc: 'If this is on, the cards show the portraits of the people.',
+	/** D113 item 4. */
+	houseGeneration: 'Show generation on the house page',
+	houseGenerationDesc: 'If this is on, the house page shows the generation of each person. If this is off, the house page does not show it. The note that you make from the house page always has the generation.',
 	generations: 'Generations in focus mode',
 	generationsDesc: 'This is the number of generations above and below the person in focus mode. The default is 3. A tree can have its own number.',
 	/** Spec §13.0 item 3 (M9 contract O8). */
 	links: 'Update tree links when you rename a note or a picture',
 	linksDesc: 'If you rename a note or a picture, the plugin changes the links to it in all trees. If this is off, the links do not change.',
 	cache: 'Arrange all trees again',
-	cacheDesc: 'The plugin keeps the arrangement of each tree in memory. This makes trees open quickly. If a tree looks wrong, select Arrange again.',
+	cacheDesc: 'The plugin remembers how it arranged each tree. This makes trees open quickly. If a tree looks wrong, select Arrange again.',
 	cacheButton: 'Arrange again',
 	cacheDone: 'The plugin will arrange each tree again when it shows the tree.',
 } as const;
@@ -533,7 +548,7 @@ export const SETTINGS_UI = {
 export const INSERT_UI = {
 	command: 'Insert family tree',
 	hint: `To add the first person, select ${quote('Add first person')} in Reading view or Live Preview.`,
-	/** The same sentence with straight marks: the plugin writes it into the owner's note, and it keeps that text plain ASCII (as in 1.1.0). */
+	/** The same sentence with straight marks: the plugin writes it into the owner's note, and it keeps that text plain ASCII (as in 0.2.0). */
 	noteHint: 'To add the first person, select "Add first person" in Reading view or Live Preview.',
 } as const;
 
@@ -548,13 +563,9 @@ export const RENAME_UI = {
 	updated: (links: number, trees: number) => `The plugin changed ${links === 1 ? '1 link' : `${links} links`} in ${trees === 1 ? '1 tree' : `${trees} trees`}.`,
 	failed: (note: string, old: string, next: string) => `The plugin cannot change the link ${quote(old)} in a tree in the note ${quote(note)}. Replace ${quote(old)} with ${quote(next)} by hand.`,
 	moreFailed: (trees: number) => (trees === 1 ? 'The plugin also cannot change the links in 1 other tree.' : `The plugin also cannot change the links in ${trees} other trees.`),
-	/** After 2 s, while the update runs (also while it waits for Obsidian's own link update). */
-	progress: 'The plugin updates the tree links to the renamed note. This can take some time.',
-	/** Only after the progress Notice: it tells the user that the update ended. */
-	noLinks: 'The trees have no links to the renamed note. The plugin did not change a tree.',
-	/** `progress` for a rename of pictures, or of notes and pictures together (spec §13.0 item 3). */
+	/** After 2 s, while the update runs (also while it waits for Obsidian's own link update); for notes, pictures or both (spec §13.0 item 3). */
 	progressFor: (kind: RenamedKind) => (kind === 'note' ? RENAMED_NOTE_PROGRESS : `The plugin updates the tree links to ${renamedWhat(kind)}. This can take some time.`),
-	/** `noLinks` for a rename of pictures, or of notes and pictures together. */
+	/** Only after the progress Notice: it tells the user that the update ended. */
 	noLinksFor: (kind: RenamedKind) => (kind === 'note' ? RENAMED_NOTE_NO_LINKS : `The trees have no links to ${renamedWhat(kind)}. The plugin did not change a tree.`),
 	/** A tree named the old note, but its link now opens another note that existed at the rename. */
 	kept: (link: string, note: string, other: string) =>
@@ -729,7 +740,7 @@ export function deviceNotice(problem: PictureProblem): string {
  */
 export const SAVE_UI = {
 	more: 'Save as picture',
-	moreLabel: 'Save the tree as a picture',
+	moreLabel: 'Save as picture: save the tree as a picture',
 	title: 'Save as a picture',
 	/** The accessible name of the two choices of the window. */
 	kindLabel: 'Kind of file',
@@ -808,16 +819,16 @@ export const HOUSE_PAGE_UI = {
 	title: 'Title',
 	born: 'Born',
 	died: 'Died',
-	/** On a phone the second text line of a row starts with this. */
-	generationOn: (n: number) => `Generation ${n}`,
-	rowLabel: (name: string) => `Show ${name} in the tree`,
+	/** In the two-line layout the second text line of a row starts with these. */
+	lead: { generation: 'Generation ', born: 'b. ', died: 'd. ' },
+	/** The tooltip and description of a row; the name of the row comes from its visible text. */
+	rowHint: 'Show in the tree',
 	close: 'Close',
-	makeNote: 'Make a note with this table',
+	makeNote: MAKE_NOTE_TEXT,
 	makeNoteLabel: (house: string) => `Make a note with this table: the plugin makes a note with the people of ${house}`,
 	noteMade: (name: string) => `The plugin made the note ${quote(name)}.`,
 	noteFailed: (name: string) => `The plugin cannot make the note ${quote(name)}.`,
-	armsLabel: 'Arms of the house',
-	unnamed: 'House',
+	armsLabel: (house: string) => `Arms of ${house}`,
 } as const;
 
 /**

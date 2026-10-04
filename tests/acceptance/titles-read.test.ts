@@ -74,7 +74,7 @@ describe('sample tree 13: the listed warnings and no others (spec §13.4 accepta
 		};
 		expect(text('section-wrong-shape', { section: 'holders' })).toContain('Warden of the Marches');
 		expect(text('entry-not-map', { section: 'titles' })).toMatch(/Entry 5\b.*“titles”/);
-		expect(text('missing-id', { section: 'titles' })).toMatch(/^Margrave of the Salt Coast has no id/);
+		expect(text('missing-id', { section: 'titles' })).toMatch(/^Margrave of the Salt Coast has no ID/);
 		expect(text('duplicate-title-id')).toContain('“count-of-orsini”');
 		expect(text('entry-not-map', { section: 'holders' })).toMatch(/Entry 4\b.*King of the Vale/);
 		expect(text('missing-holder', { ref: 'beatrice' })).toMatch(/Count of Orsini.*“beatrice”/);
@@ -89,7 +89,7 @@ describe('sample tree 13: the listed warnings and no others (spec §13.4 accepta
 		const g = graphOf('titles:\n  - plural: Dukes\npeople:\n  - id: a\n    name: A\n');
 		const i = g.issues.find((x) => x.code === 'missing-id');
 		expect(i && asWritten(i)).toEqual({ code: 'missing-id', params: { section: 'titles', index: '1' } });
-		expect(issueText(i!)).toMatch(/Entry 1\b.*“titles”.*no id/);
+		expect(issueText(i!)).toMatch(/Entry 1\b.*“titles”.*no ID/);
 	});
 });
 
@@ -188,7 +188,7 @@ describe('sample tree 13: the titles the tree uses (spec §13.4, contract rules 
 	});
 
 	it('a holder person counts as a written reference, so a new person never takes that id (contract: referencedIds)', () => {
-		// Version 1.1.2 (D104): ids are numbers, and the name does not matter.
+		// Version 0.2.2 (D104): ids are numbers, and the name does not matter.
 		expect(newPersonId(BODY_13, 'Cosimo')).toBe('p1');
 		expect(newPersonId(BODY_13, 'Godric')).toBe('p1');
 		// A holder who is not a person yet still counts: the number 9 is taken.

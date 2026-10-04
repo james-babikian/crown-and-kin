@@ -50,8 +50,21 @@ export interface FocusFacts {
 	phone: boolean;
 	/** The focus the phone rule chose earlier for this block (kept so an edit does not move it). */
 	auto: string | null;
+	/** The marked person (`options.me`) that was valid when `auto` was chosen; null if none was. */
+	autoMark?: string | null;
+	/**
+	 * Set only for the note preview (spec §13.18 rule 5): its marked person now, or null if the tree has none.
+	 * Then a remembered `auto` ends when the mark changed or the phone rule no longer applies. The
+	 * full-screen view leaves it unset and never ends the remembered family of the preview.
+	 */
+	mark?: string | null;
 	has(id: string): boolean;
-	/** D20: the whole tree has more than PHONE_FOCUS_MIN_PEOPLE people (distinct ids). Called only on a phone. */
+	/**
+	 * D111: the tree has a valid `options.me` and this view is the note preview (not the full-screen
+	 * view). Then the phone rule applies to a tree of any size.
+	 */
+	marked?: boolean;
+	/** D20: the whole tree has more than PHONE_FOCUS_MIN_PEOPLE people (distinct ids). Called only on a phone, and not when `marked`. */
 	large(): boolean;
 	/** The start person of the whole tree (spec §5.5). Called only when the phone rule decides. */
 	start(): string | null;
@@ -67,25 +80,32 @@ export interface FocusChoice {
 	dropSession: boolean;
 	/** The phone rule's choice to remember (unchanged when the rule did not run). */
 	auto: string | null;
+	/** The marked person to remember with `auto` (see `FocusFacts.autoMark`). */
+	autoMark: string | null;
 }
 
 /**
- * Priority order: the session focus; the pin; on a phone, a large tree opens as the focus
- * family of the start person (D20: more than 100 people); else the whole tree. A reference to a person who is not in the tree
+ * Priority order: the session focus; the pin; on a phone, a large tree (D20: more than 100 people) or a
+ * tree with a marked person (D111) opens as the focus family of the start person; else the whole tree. A reference to a person who is not in the tree
  * counts as absent (the pin's missing reference is one of the tree's problems, spec §8).
  */
 export function chooseFocus(f: FocusFacts): FocusChoice {
 	let dropSession = false;
+	const preview = f.mark !== undefined;
+	// A family that came from a mark that is gone or moved is not kept (spec §13.18 rule 5); an edit of another person does not end it.
+	const kept = f.auto !== null && !(preview && f.mark !== (f.autoMark ?? null)) ? f.auto : null;
+	const same = { auto: f.auto, autoMark: f.autoMark ?? null };
 	if (f.session) {
-		if (f.session.id === null) return { id: null, from: 'session', dropSession, auto: f.auto };
-		if (f.has(f.session.id)) return { id: f.session.id, from: 'session', dropSession, auto: f.auto };
+		if (f.session.id === null) return { id: null, from: 'session', dropSession, ...same };
+		if (f.has(f.session.id)) return { id: f.session.id, from: 'session', dropSession, ...same };
 		dropSession = true;
 	}
-	if (f.pin !== undefined && f.has(f.pin)) return { id: f.pin, from: 'pin', dropSession, auto: f.auto };
-	if (!f.phone || !f.large()) return { id: null, from: 'none', dropSession, auto: f.auto };
-	if (f.auto !== null && f.has(f.auto)) return { id: f.auto, from: 'phone', dropSession, auto: f.auto };
+	if (f.pin !== undefined && f.has(f.pin)) return { id: f.pin, from: 'pin', dropSession, ...same };
+	if (!f.phone || !(f.marked || f.large())) return { id: null, from: 'none', dropSession, ...(preview ? { auto: null, autoMark: null } : same) };
+	if (kept !== null && f.has(kept)) return { id: kept, from: 'phone', dropSession, ...same };
 	const auto = f.start();
-	return auto !== null && f.has(auto) ? { id: auto, from: 'phone', dropSession, auto } : { id: null, from: 'none', dropSession, auto: null };
+	const autoMark = preview ? f.mark ?? null : null;
+	return auto !== null && f.has(auto) ? { id: auto, from: 'phone', dropSession, auto, autoMark } : { id: null, from: 'none', dropSession, auto: null, autoMark: null };
 }
 
 /** Screen px kept free at each side of the cards that the focus view moves into sight. */

@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest';
-import type { FamilyGraph } from '../src/core/derive';
 import { routeEdges } from '../src/layout/edges';
 import { NORMAL_GEOMETRY, tagTop } from '../src/layout/geometry';
 import { DEFAULT_FAR_RULE, layoutFamilies } from '../src/layout/layout';
@@ -57,7 +56,7 @@ function crossesInterior(s: Seg, b: Rect): boolean {
 }
 
 /** Lines that pass through a far-couple tag, other than the lines of that person's far couples. */
-function linesThroughTags(g: FamilyGraph, layout: TreeLayout, edges: EdgeDrawing): string[] {
+function linesThroughTags(layout: TreeLayout, edges: EdgeDrawing): string[] {
 	const bad: string[] = [];
 	const geo = layout.geometry;
 	for (const tag of layout.farTags.values()) {
@@ -111,10 +110,10 @@ people:
 unions:
   - partners: [p, w]
 `;
-		const { layout, edges, g } = lay(src);
+		const { layout, edges } = lay(src);
 		expect(layout.farTags.has('p')).toBe(true);
 		expect(layout.persons.get('c')!.gen).toBe(layout.persons.get('p')!.gen);
-		expect(linesThroughTags(g, layout, edges)).toEqual([]);
+		expect(linesThroughTags(layout, edges)).toEqual([]);
 	});
 });
 

@@ -88,25 +88,27 @@ function openTab(fake: FakePlugin): void {
 }
 
 describe('the settings tab (spec §9, D33)', () => {
-	it('groups the settings under five short headings, in order', async () => {
+	it('groups the settings under six short headings, in order', async () => {
 		const { fake } = await loadPlugin();
 		openTab(fake);
 		const g = SETTINGS_UI.groups;
-		expect(settingGroups.map((x) => x.heading)).toEqual([g.height, g.cards, g.focus, g.links, g.repair]);
+		expect(settingGroups.map((x) => x.heading)).toEqual([g.height, g.cards, g.housePage, g.focus, g.links, g.repair]);
 		const names = (i: number) => settingGroups[i].listEl.querySelectorAll('.setting-item-name').map((n) => n.getText());
 		expect(names(0)).toEqual([SETTINGS_UI.heightDesktop, SETTINGS_UI.heightPhone]);
 		// M7 (spec §13.1): the relation names are in the Cards group.
 		expect(names(1)).toEqual([SETTINGS_UI.cardSize, SETTINGS_UI.dates, SETTINGS_UI.relations, SETTINGS_UI.portraits]);
-		expect(names(2)).toEqual([SETTINGS_UI.generations]);
-		expect(names(3)).toEqual([SETTINGS_UI.links]);
-		expect(names(4)).toEqual([SETTINGS_UI.cache]);
+		// D113 item 4: the house page has its own group.
+		expect(names(2)).toEqual([SETTINGS_UI.houseGeneration]);
+		expect(names(3)).toEqual([SETTINGS_UI.generations]);
+		expect(names(4)).toEqual([SETTINGS_UI.links]);
+		expect(names(5)).toEqual([SETTINGS_UI.cache]);
 		// Every setting has a description.
 		expect(settingRows.every((r) => r.descEl.getText().length > 0)).toBe(true);
 	});
 
 	it('shows the stored values; a bad stored value shows its default', async () => {
 		const { fake, plugin } = await loadPlugin({ embedHeightDesktop: 640, embedHeightPhone: 70, cardSize: 'compact', showDates: false, focusGenerations: 99, updateLinks: false });
-		expect(plugin.settings).toEqual({ embedHeightDesktop: 640, embedHeightPhone: 70, cardSize: 'compact', showDates: false, showRelations: true, showPortraits: true, focusGenerations: 3, updateLinks: false });
+		expect(plugin.settings).toEqual({ embedHeightDesktop: 640, embedHeightPhone: 70, cardSize: 'compact', showDates: false, showRelations: true, showPortraits: true, showHouseGeneration: true, focusGenerations: 3, updateLinks: false });
 		openTab(fake);
 		expect(control<TextComponent>(SETTINGS_UI.heightDesktop).getValue()).toBe('640');
 		expect(control<DropdownComponent>(SETTINGS_UI.heightPhone).getValue()).toBe('70');
@@ -116,6 +118,25 @@ describe('the settings tab (spec §9, D33)', () => {
 		expect(control<ToggleComponent>(SETTINGS_UI.relations).getValue()).toBe(true);
 		expect(control<DropdownComponent>(SETTINGS_UI.generations).getValue()).toBe('3');
 		expect(control<ToggleComponent>(SETTINGS_UI.links).getValue()).toBe(false);
+		expect(control<ToggleComponent>(SETTINGS_UI.houseGeneration).getValue()).toBe(true);
+	});
+
+	it('every field and switch has its setting name as an accessible name (P4)', async () => {
+		const { fake } = await loadPlugin();
+		openTab(fake);
+		expect(control<TextComponent>(SETTINGS_UI.heightDesktop).inputEl.getAttribute('aria-label')).toBe(SETTINGS_UI.heightDesktop);
+		for (const name of [SETTINGS_UI.heightPhone, SETTINGS_UI.cardSize, SETTINGS_UI.generations]) expect(control<DropdownComponent>(name).selectEl.getAttribute('aria-label')).toBe(name);
+		for (const name of [SETTINGS_UI.dates, SETTINGS_UI.relations, SETTINGS_UI.portraits, SETTINGS_UI.houseGeneration, SETTINGS_UI.links]) expect(control<ToggleComponent>(name).toggleEl.getAttribute('aria-label')).toBe(name);
+	});
+
+	it('"Show generation on the house page" is on by default and stores its change', async () => {
+		const { fake, plugin } = await loadPlugin();
+		expect(plugin.settings.showHouseGeneration).toBe(true);
+		openTab(fake);
+		control<ToggleComponent>(SETTINGS_UI.houseGeneration).fire(false);
+		await settle();
+		expect(plugin.settings.showHouseGeneration).toBe(false);
+		expect(last(fake.saved)).toEqual(plugin.settings);
 	});
 
 	it('stores each change', async () => {

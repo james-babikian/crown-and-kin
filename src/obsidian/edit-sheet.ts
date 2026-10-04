@@ -45,7 +45,7 @@ import { pickPerson } from './person-picker';
 import { currentPictureOf, pickPicture } from './picture-picker';
 import type { PictureCopy, PictureStore } from './picture-store';
 import { relationsFor, validMe } from './relation-cache';
-import { freshOrStale, onWriteFailed, sheetField, showErrorLine } from './sheet-parts';
+import { freshOrStale, nameDialog, onWriteFailed, sheetField, showErrorLine } from './sheet-parts';
 import { titlesSection, type TitlesHost } from './sheet-titles';
 import { undoNotice } from './undo-notice';
 import { editUnion } from './union-edit';
@@ -181,6 +181,38 @@ function unwritten(l: Loaded, id: string): boolean {
 	return str(isMap(raw) ? raw.id : undefined) !== id;
 }
 
+/**
+ * The `~N` name of a person with no written id after the tree text changed (C2). `~N` follows the place
+ * in the list, so an edit above the person (sync, another pane) makes `~N` another person. The person is
+ * found by their written fields, else by their name; null when no one matches, or more than one, so the
+ * sheet never shows or saves to another person.
+ */
+function sameUnwritten(was: Loaded, id: string, now: Loaded): string | null {
+	const old = was.g.byId.get(id);
+	const listOf = (l: Loaded): unknown[] | null => {
+		const d = l.data as Raw;
+		return isMap(d) && Array.isArray(d.people) ? d.people : null;
+	};
+	const text = (v: unknown): string | null => {
+		try {
+			return JSON.stringify(v) ?? null;
+		} catch {
+			return null;
+		}
+	};
+	const before = listOf(was);
+	const after = listOf(now);
+	if (!old || !before || !after) return null;
+	const oldText = text(before[old.index]);
+	const candidates = now.g.people.filter((p) => unwritten(now, p.id));
+	// Identical people cannot be told apart by their text: only the same place, with nothing changed above it, is certain.
+	const unchangedAbove = text(before.slice(0, old.index)) === text(after.slice(0, old.index));
+	const pick = (list: Person[]): string | null => (list.length === 1 ? list[0].id : unchangedAbove ? (list.find((p) => p.id === id)?.id ?? null) : null);
+	const exact = oldText === null ? [] : candidates.filter((p) => text(after[p.index]) === oldText);
+	if (exact.length) return pick(exact);
+	return pick(candidates.filter((p) => p.name === old.name));
+}
+
 /** Every person id and reference written in the block, and `more`: a new id must be none of them. */
 function takenIds(l: Loaded, more: Iterable<string> = []): Set<string> {
 	const data = l.data as Raw;
@@ -313,9 +345,13 @@ export class EditSheet extends Modal {
 	private unionType: string = 'marriage';
 	private saving = false;
 	private closing = false;
+	/** `onClose` ran: a write that ends later must not draw the sheet again, which would start a portrait copy that nobody releases (C6). */
+	private closed = false;
 	/** The person left the tree while the sheet was open: the sheet shows the draft but cannot save it. */
 	private gone = false;
 	private confirmEl: HTMLElement | null = null;
+	/** The control that had the focus when a question opened; the focus goes back to it when the question closes (C3). */
+	private confirmFrom: HTMLElement | null = null;
 	private errorEl: HTMLElement | null = null;
 	private statusEl: HTMLElement | null = null;
 	private bodyEl: HTMLElement | null = null;
@@ -413,6 +449,7 @@ export class EditSheet extends Modal {
 	/** Runs the cleanup functions `onOpen` registered and empties the modal. */
 	override onClose(): void {
 		this.shown = false;
+		this.closed = true;
 		this.settleQuestion();
 		for (const c of this.cleanup.splice(0)) c();
 		// O7: the sheet's portrait copy is released when the sheet closes.
@@ -483,6 +520,7 @@ export class EditSheet extends Modal {
 	// ---------- building the form ----------
 
 	private build(): void {
+		if (this.closed) return;
 		const el = this.contentEl;
 		el.empty();
 		this.confirmEl = null;
@@ -494,7 +532,7 @@ export class EditSheet extends Modal {
 		this.modalEl.toggleClass('is-read-only', ro);
 
 		const header = el.createDiv({ cls: 'dynasty-sheet-header' });
-		header.createDiv({ cls: 'dynasty-sheet-title', text: this.title() });
+		nameDialog(this.modalEl, header.createDiv({ cls: 'dynasty-sheet-title', text: this.title() }));
 		const actions = header.createDiv({ cls: 'dynasty-sheet-actions' });
 		const cancel = actions.createEl('button', { cls: 'dynasty-sheet-cancel', text: ro ? SHEET.close : SHEET.cancel, attr: { type: 'button' } });
 		cancel.addEventListener('click', () => this.finish());
@@ -923,7 +961,7 @@ export class EditSheet extends Modal {
 		if (this.readOnly) return;
 		const form = parent.createDiv({ cls: 'dynasty-sheet-subform' });
 		const name = sheetField(form, SHEET.newHouseName, 'new-house-name');
-		const nameInput = name.row.createEl('input', { cls: 'dynasty-sheet-input', attr: { id: name.id, type: 'text', autocomplete: 'off', autocapitalize: 'words' } });
+		const nameInput = name.row.createEl('input', { cls: 'dynasty-sheet-input', attr: { id: name.id, type: 'text', autocomplete: 'off', spellcheck: 'false', autocapitalize: 'words' } });
 		nameInput.value = this.newHouse.name;
 		nameInput.addEventListener('input', () => {
 			this.newHouse.name = nameInput.value;
@@ -1251,6 +1289,7 @@ export class EditSheet extends Modal {
 	private askSameName(name: string, free: string): Promise<SameNameAnswer> {
 		return new Promise((resolve) => {
 			this.hideConfirm();
+			this.rememberFocus();
 			let settled = false;
 			const settle = (answer: SameNameAnswer) => {
 				if (settled) return;
@@ -1798,10 +1837,15 @@ export class EditSheet extends Modal {
 	/** A question over the sheet ("Discard changes?", a delete) until the user chooses. */
 	private showConfirm(c: ConfirmSpec): void {
 		this.hideConfirm();
+		this.rememberFocus();
 		const layer = this.modalEl.createDiv({ cls: 'dynasty-sheet-confirm', attr: { role: 'alertdialog', 'aria-modal': 'true' } });
 		this.confirmEl = layer;
 		const box = layer.createDiv({ cls: 'dynasty-sheet-confirm-box' });
-		box.createDiv({ cls: 'dynasty-sheet-confirm-title', text: c.title });
+		const titleEl = box.createDiv({ cls: 'dynasty-sheet-confirm-title', text: c.title });
+		// The question has a name, like the questions of the Houses and Titles windows.
+		const titleId = `dynasty-sheet-confirm-${Math.random().toString(36).slice(2, 8)}`;
+		titleEl.setAttribute('id', titleId);
+		layer.setAttribute('aria-labelledby', titleId);
 		for (const t of c.text) box.createDiv({ cls: 'dynasty-sheet-confirm-text', text: t });
 		const row = box.createDiv({ cls: 'dynasty-sheet-confirm-actions' });
 		const keep = row.createEl('button', { cls: 'dynasty-sheet-keep', text: c.keep ?? SHEET.keepEditing, attr: { type: 'button' } });
@@ -1815,9 +1859,30 @@ export class EditSheet extends Modal {
 	}
 
 	private hideConfirm(): void {
+		const had = this.confirmEl !== null;
 		this.confirmEl?.remove();
 		this.confirmEl = null;
 		this.settleQuestion();
+		if (had) this.focusBack();
+	}
+
+	/** Notes the control that has the focus now, so a question that closes with no choice can give it back. */
+	private rememberFocus(): void {
+		const active = this.modalEl.doc?.activeElement as HTMLElement | null | undefined;
+		this.confirmFrom = active && this.contentEl.contains(active) ? active : null;
+	}
+
+	/** The focus must stay in the sheet when a question goes: the focused button goes with it (C3). */
+	private focusBack(): void {
+		const from = this.confirmFrom;
+		this.confirmFrom = null;
+		if (this.closing || !this.shown) return;
+		if (from && this.contentEl.contains(from) && !(from as HTMLButtonElement).disabled) {
+			from.focus();
+			return;
+		}
+		this.modalEl.setAttribute('tabindex', '-1');
+		this.modalEl.focus({ preventScroll: true });
 	}
 
 	/** Spec §6.1 stale write: a Notice, the new data in the sheet, and the draft kept with a message that says so. */
@@ -1847,7 +1912,20 @@ export class EditSheet extends Modal {
 	 * changed with the write.
 	 */
 	reload(body: string, id = this.data.person.id): void {
-		const r = loadSheet(body, this.isNew ? null : id);
+		let target = id;
+		// A person with no written id is named `~N`, which follows the place in the list: find them again (C2).
+		if (!this.isNew && unwritten(this.data, id)) {
+			const now = loadSheet(body, null);
+			if (now.kind === 'ok') {
+				const same = sameUnwritten(this.data, id, now.data);
+				if (same === null) {
+					this.markGone();
+					return;
+				}
+				target = same;
+			}
+		}
+		const r = loadSheet(body, this.isNew ? null : target);
 		if (r.kind === 'invalid') {
 			// The draft stays, editable; a later Save compares with the new body and says so again.
 			this.refused(WRITE_TEXT.invalid);

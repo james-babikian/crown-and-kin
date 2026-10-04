@@ -28,6 +28,7 @@ import { measuredLayout } from './measured-layout';
 import { ignoreGhostClick, phoneLayout } from './modal-layout';
 import type { PictureStore } from './picture-store';
 import { trackModal } from './plugin-modals';
+import { nameDialog } from './sheet-parts';
 
 /** What the tree view gives the save (P1): the drawn graph and the view's settings. */
 export interface SaveSource {
@@ -84,7 +85,7 @@ export class SaveWindow extends Modal {
 		const el = this.contentEl;
 		el.addClass('dynasty-sheet-content');
 		const header = el.createDiv({ cls: 'dynasty-sheet-header' });
-		header.createDiv({ cls: 'dynasty-sheet-title', text: SAVE_UI.title });
+		nameDialog(this.modalEl, header.createDiv({ cls: 'dynasty-sheet-title', text: SAVE_UI.title }));
 		const actions = header.createDiv({ cls: 'dynasty-sheet-actions' });
 		const cancel = actions.createEl('button', { cls: 'dynasty-sheet-cancel', text: SAVE_UI.cancel, attr: { type: 'button' } });
 		cancel.addEventListener('click', () => this.close());

@@ -588,8 +588,8 @@ describe('picture renames (O8, B16)', () => {
 	});
 
 	it('texts: a picture rename says "picture"; a folder rename with both says "notes and pictures"', () => {
-		expect(RENAME_UI.progressFor('note')).toBe(RENAME_UI.progress);
-		expect(RENAME_UI.noLinksFor('note')).toBe(RENAME_UI.noLinks);
+		expect(RENAME_UI.progressFor('note')).toBe('The plugin updates the tree links to the renamed note. This can take some time.');
+		expect(RENAME_UI.noLinksFor('note')).toBe('The trees have no links to the renamed note. The plugin did not change a tree.');
 		expect(RENAME_UI.progressFor('picture')).toBe('The plugin updates the tree links to the renamed picture. This can take some time.');
 		expect(renamedText([{ from: 'a.png', picture: true }, { from: 'b', picture: false }])).toBe('2 renamed notes and pictures');
 		expect(renamedText([{ from: 'a' }, { from: 'b' }])).toBe('2 renamed notes');

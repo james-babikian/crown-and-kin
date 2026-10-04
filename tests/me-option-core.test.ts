@@ -39,13 +39,13 @@ describe('options.me is read into TreeOptions.me', () => {
 			expect(tree.options.me).toBeUndefined();
 			expect(g.issues).toEqual([{ code: 'me-not-id', level: 'warning', params: {} }]);
 		}
-		expect(issueText({ code: 'me-not-id', level: 'warning', params: {} })).toBe('“me” in the options does not name one person. Write one person id after “me:”.');
+		expect(issueText({ code: 'me-not-id', level: 'warning', params: {} })).toBe('“me” in the options does not name one person. Write one person ID after “me:”.');
 	});
 
 	it('an id that names nobody gives missing-me', () => {
 		const { g } = read('  me: ghost');
 		expect(g.issues).toEqual([{ code: 'missing-me', level: 'warning', params: { ref: 'ghost' } }]);
-		expect(issueText(g.issues[0])).toBe('No person has the id “ghost”, so the tree cannot show how people relate to you. Correct the id, or remove “me: ghost”.');
+		expect(issueText(g.issues[0])).toBe('No person has the ID “ghost”, so the tree cannot show how people relate to you. Correct the ID, or remove “me: ghost”.');
 	});
 });
 

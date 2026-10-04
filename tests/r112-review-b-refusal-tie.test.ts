@@ -7,7 +7,7 @@ import { idRefusalText } from '../src/obsidian/id-draft';
 import { ID_UI } from '../src/render/ui-text';
 
 /*
- * Review round 1.1.2, area B. `idRefusalText` chooses the window text from the words of the core's
+ * Review round 0.2.2, area B. `idRefusalText` chooses the window text from the words of the core's
  * `detail` (`/anchor|alias/`, `/letters a to z|must be text/`). Nothing ties the two together: the
  * existing tests feed the function copies of the core texts. This guard test feeds it the REAL refusals
  * of `set-house-id` and `set-title-id`. It passes today; it fails the day a core message changes.

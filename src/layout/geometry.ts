@@ -157,11 +157,11 @@ export function narrowWidth(geo: Geometry, narrowCardW?: number): number {
 	if (typeof narrowCardW !== 'number' || !Number.isFinite(narrowCardW)) return max;
 	return Math.min(max, Math.max(Math.round(SIDE_NARROW_MIN_EM * geo.fontPx), Math.round(narrowCardW * 2) / 2));
 }
-/** 1.1.1: the clear space, in px, a partnership sign keeps from both cards of its couple in a `sideways` layout. */
+/** 0.2.1: the clear space, in px, a partnership sign keeps from both cards of its couple in a `sideways` layout. */
 export const SIGN_CLEAR_PX = 3;
 
 /**
- * 1.1.1, D24: the stack gap between the partners of a couple that has `unions` partnerships, in a `sideways`
+ * 0.2.1, D24: the stack gap between the partners of a couple that has `unions` partnerships, in a `sideways`
  * layout. The signs are spread two sign sizes apart along the gap (`placeUnions`), so the gap must hold them
  * all with `SIGN_CLEAR_PX` to spare at both ends. Fewer than two partnerships keep the gap of `side` as it is.
  */
@@ -181,7 +181,7 @@ const TURNED_TAG_EM = 0.375;
  * The geometry a sideways layout (D24) draws with. Cards keep their height and text; `narrow`
  * cards take `narrowWidth` (8 to 10.25 em, never wider than `geo`'s). The gaps take their sideways meaning:
  * `rowGap` is the smallest gap between generation columns, `nodeGap` the gap between stacked cards,
- * `coupleGap` the gap between stacked partners (1.1.1: the layout widens it, with `sidewaysPartnerGap`, for a tree
+ * `coupleGap` the gap between stacked partners (0.2.1: the layout widens it, with `sidewaysPartnerGap`, for a tree
  * with a couple of two or more partnerships; `drawnGeometry` does not know the tree, so it keeps the narrow value).
  */
 export function sidewaysGeometry(geo: Geometry, cards: SidewaysCards, narrowCardW?: number): Geometry {

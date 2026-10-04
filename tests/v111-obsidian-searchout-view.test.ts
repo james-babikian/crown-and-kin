@@ -12,7 +12,7 @@ import { openModals, resetObsidian } from './acceptance/fake-obsidian';
 import { cssRules } from './acceptance/m11-support';
 
 /*
- * 1.1.1 WP6a, D102 (spec §13.16 rule 10): the search field of the picture list is not inside the
+ * 0.2.1 WP6a, D102 (spec §13.16 rule 10): the search field of the picture list is not inside the
  * scrolling list. It sits in a bar between the header and the sheet body, which is the scroller. On the
  * iPhone the scroller that held the focused field scrolled by its full length when the keyboard opened.
  * Run: npx vitest run tests/v111-obsidian-searchout-view.test.ts

@@ -71,6 +71,8 @@ function checkText(text: string, most = 2, file = false) {
 	for (const sentence of parts) expect(sentence.split(/\s+/).length, sentence).toBeLessThanOrEqual(20);
 	expect(file ? unquoted(text).replace(/\bfile\b/g, '') : unquoted(text)).not.toMatch(FORBIDDEN);
 	expect(text).not.toMatch(/\b(don't|can't|isn't|doesn't|won't)\b/i);
+	// Spec D113: the word ID is in capital letters; only the key "id:" in an example (and quoted text) is lower case.
+	expect(unquoted(text), text).not.toMatch(/(?<![\w-])ids?\b(?!:)/);
 }
 
 describe('issueText: one STE entry per code', () => {
@@ -87,7 +89,7 @@ describe('issueText: one STE entry per code', () => {
 
 	it('uses names for people and quotes only ids that do not exist', () => {
 		expect(issueText(issue('missing-parent', SAMPLES['missing-parent']))).toBe(
-			'Wynn Ashford has a parent with the id “ghost”, but no person has this id. Correct the id, or add the person.',
+			'Wynn Ashford has a parent with the ID “ghost”, but no person has this ID. Correct the ID, or add the person.',
 		);
 		expect(issueText(issue('missing-partner', SAMPLES['missing-partner']))).toContain('the partnership of Piers Ashford and “nobody”');
 	});
@@ -109,17 +111,17 @@ describe('issueText: one STE entry per code', () => {
 	});
 
 	it('suggests the example id that the reader gives (D104), and p1 when there is none', () => {
-		expect(issueText(issue('missing-id', { ...SAMPLES['missing-id'], example: 'p4' }))).toBe('Aldric Valmont has no id. Add an id, for example: id: p4.');
-		expect(issueText(issue('missing-id', { section: 'people', index: 2 }))).toBe('Entry 2 in the “people” list has no id. Add an id, for example: id: p1.');
+		expect(issueText(issue('missing-id', { ...SAMPLES['missing-id'], example: 'p4' }))).toBe('Aldric Valmont has no ID. Add an ID, for example: id: p4.');
+		expect(issueText(issue('missing-id', { section: 'people', index: 2 }))).toBe('Entry 2 in the “people” list has no ID. Add an ID, for example: id: p1.');
 		// The name never makes the example.
 		expect(issueText(issue('missing-id', SAMPLES['missing-id']))).not.toContain('aldric-valmont');
 	});
 
 	it('a duplicate person id shows the name and the id as NAME (id), without quote marks (D105)', () => {
 		const text = (params: IssueParams) => issueText(issue('duplicate-person-id', params));
-		expect(text({ id: 'p3', name: 'Aldric Valmont' })).toBe('Aldric Valmont (p3) has the same id as another person. To edit the tree again, give each person a different id.');
+		expect(text({ id: 'p3', name: 'Aldric Valmont' })).toBe('Aldric Valmont (p3) has the same ID as another person. To edit the tree again, give each person a different ID.');
 		// No name, or the name is the id: the id alone, in quote marks.
-		expect(text({ id: 'p3', name: 'p3' })).toBe('More than one person has the id “p3”. To edit the tree again, give each person a different id.');
+		expect(text({ id: 'p3', name: 'p3' })).toBe('More than one person has the ID “p3”. To edit the tree again, give each person a different ID.');
 		expect(text({ id: 'p3', name: '' })).toBe(text({ id: 'p3' }));
 		expect(text({ id: 'p3' })).toContain('“p3”');
 	});
@@ -132,14 +134,14 @@ describe('issueText: title warnings (spec §13.3, §13.4)', () => {
 		expect(text('section-wrong-shape', { section: 'titles' })).toBe('The “titles” section is not a list, so the tree ignores it. Start each title with “- id:”.');
 		expect(text('entry-not-map', { section: 'titles', index: 2 })).toBe('Entry 2 in the “titles” list is not a title, so the tree does not show it. Start each title with “- id:”.');
 		expect(text('missing-id', { section: 'titles', index: 3 })).toBe(
-			'Entry 3 in the “titles” list has no id, so the tree does not use this title. Add an id, for example: id: duke-of-valmont.',
+			'Entry 3 in the “titles” list has no ID, so the tree does not use this title. Add an ID, for example: id: duke-of-valmont.',
 		);
 		expect(text('missing-id', { section: 'titles', index: 3, name: 'Duke of Valmont' })).toBe(
-			'Duke of Valmont has no id, so the tree does not use this title. Add an id, for example: id: duke-of-valmont.',
+			'Duke of Valmont has no ID, so the tree does not use this title. Add an ID, for example: id: duke-of-valmont.',
 		);
 		expect(text('missing-id', { section: 'titles', index: 1, name: 'King of Ostmark' })).toContain('id: king-of-ostmark.');
 		expect(text('duplicate-title-id', SAMPLES['duplicate-title-id'])).toBe(
-			'More than one title has the id “duke-of-valmont”, and the tree uses only the first. Give each title a different id.',
+			'More than one title has the ID “duke-of-valmont”, and the tree uses only the first. Give each title a different ID.',
 		);
 	});
 
@@ -151,7 +153,7 @@ describe('issueText: title warnings (spec §13.3, §13.4)', () => {
 			'Entry 5 in the holders of Duke of Valmont is not a holder. Write each holder like this: - {person: aldric}.',
 		);
 		expect(text('missing-holder', { title: 'Duke of Valmont', ref: 'aldrik' })).toBe(
-			'The title Duke of Valmont has a holder with the id “aldrik”, but no person has this id. Correct the id, or write the name of the holder.',
+			'The title Duke of Valmont has a holder with the ID “aldrik”, but no person has this ID. Correct the ID, or write the name of the holder.',
 		);
 		expect(text('missing-holder', { title: 'Duke of Valmont', ref: 'aldrik', name: 'Aldric' })).toBe(text('missing-holder', { title: 'Duke of Valmont', ref: 'aldrik' }));
 		expect(text('holder-empty', SAMPLES['holder-empty'])).toBe('Entry 4 in the holders of Duke of Valmont has no person and no name. Add “person:” or “name:”.');
@@ -159,7 +161,7 @@ describe('issueText: title warnings (spec §13.3, §13.4)', () => {
 
 	it('card-title-not-held', () => {
 		expect(text('card-title-not-held', SAMPLES['card-title-not-held'])).toBe(
-			'Roderick Valmont has “card-title: king-of-ostmark”, but Roderick Valmont does not hold a title with this id. The card shows the first title instead. Correct the id, or remove it.',
+			'Roderick Valmont has “card-title: king-of-ostmark”, but Roderick Valmont does not hold a title with this ID. The card shows the first title instead. Correct the ID, or remove it.',
 		);
 	});
 
@@ -284,7 +286,7 @@ describe('quote marks in the message table (D99)', () => {
 
 	it('a message quotes ids and keys with curly marks and leaves names bare', () => {
 		const text = issueText(issue('missing-parent', SAMPLES['missing-parent']));
-		expect(text).toContain(`the id ${quote('ghost')}`);
+		expect(text).toContain(`the ID ${quote('ghost')}`);
 		expect(text).toContain('Wynn Ashford has');
 		expect(text).not.toContain(CURLY_APOSTROPHE);
 	});

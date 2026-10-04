@@ -23,13 +23,44 @@ You can also type the code block yourself. See "The tree text" below.
 - **Find.** In the full-screen view, select Find. Type a name. Find ignores capital letters, accents and the look of the apostrophe.
 - **Focus.** Select Focus. Choose a person. The tree shows only the family of that person. A "+" sign on a card shows that the person has more relatives outside the view. Select Show all people to see the whole tree.
 - **Pin.** In the edit sheet, select "Pin focus here". The tree then always opens on the family of that person. Select "Remove pin" to stop this.
-- **Houses.** Select the Houses button (the castle) to add, rename, recolour or delete a house. You can also change the id of a house there: the plugin then changes the id in every person of the house. On a phone, the Houses button is only in the full-screen view.
-- **Undo.** After you delete a person, a relationship or a house, the plugin shows a message with Undo. To undo a different tree edit, use the command "Undo last tree edit".
+- **Houses.** Select the Houses button (the castle) to add, rename, recolour or delete a house. You can also change the ID of a house there (see "Change the ID of a house or a title"). On a phone, the Houses button is only in the full-screen view.
+- **The buttons.** The toolbar of a tree has these buttons:
+  - **Add person** adds a person.
+  - **Houses** (the castle) opens the Houses window.
+  - **Focus** shows the family of one person.
+  - **Show all people** shows the whole tree again while focus mode is on.
+  - **Find** is in the full-screen view only.
+  - **Fit** fits the whole tree in the window.
+  - **Legend** shows the line styles and the houses.
+  - **More** (the "⋯" button) opens a list with Relation, Titles and Save as picture.
+  - **Expand** opens the full-screen view. **Close** closes it.
+  - A **warning button** shows when the tree has problems. Select it to see the list.
+
+  On a phone, a tree in a note has only Add person and Expand, and the warning button if the tree has problems. In the full-screen view on a phone, Fit and Legend are in the More list. A tree that you cannot edit shows Open note instead of Add person and Houses.
+- **Commands.** The command list has four commands:
+  - **Insert family tree** puts a new tree in the note at the cursor.
+  - **Undo last tree edit** reverses the last edit of a tree.
+  - **Show the last link update** shows how many links the last rename changed.
+  - **Show render timing** shows how long the last tree took to draw.
+- **Undo.** After you delete a person, a partnership or a house, the plugin shows a message with Undo. To undo a different tree edit, use the command "Undo last tree edit".
 - **Keyboard.** Push Tab to go to the toolbar buttons, the cards, the tags, the fold buttons and the "+ N" signs. Push Enter to open a card. Push Esc to close a list or a window.
 
 If you hold the phone upright, the tree turns sideways. The generations go from left to right. You scroll down to see more of the tree.
 
 On a phone, the full-screen view has no Fit button and no Legend button. Select More (the "⋯" button) in the toolbar. The list has "Fit the tree in the view" and "Show the line styles". This keeps the toolbar in one row, so the Close button is always on the screen.
+
+## Change the ID of a house or a title
+
+The ID is a short name. The plugin uses it to find a house or a title. You rarely need to change it.
+
+1. Open the window of the house or the title. For a house, select the Houses button (the castle). For a title, select More (the "⋯" button), then select Titles.
+2. Select **Change ID** beside the house or the title. A small window opens.
+3. Type the new ID, or select **Make ID from the name**.
+4. Select **Use this ID**.
+5. Select **Save**. The plugin asks you to confirm the change.
+6. Select **Change the ID**. The plugin changes the ID in the text of each person who uses the house, or who chose the title with "Show on the card".
+
+To keep the old ID, select **Keep old ID** before you select Save.
 
 ## This is me and relations
 
@@ -45,6 +76,8 @@ You can mark one person in the tree as you. Each card then shows the relation of
 - **Undo.** The command "Undo last tree edit" undoes "This is me" and Remove "This is me". If the note is open in Live Preview, Ctrl+Z (Cmd+Z on a Mac) also undoes them.
 
 The mark is in the tree text. All your devices show the same mark.
+
+On a phone, a tree in a note opens on the family of the person that you marked with "This is me". If the tree has a pin, or if you selected Show all people, the tree does not open on that family. If you edit another person, the family of the marked person stays. It stays until you close the note, or until you move or remove the mark. On a phone, the tree is drawn sideways. If the marked person has children, the parents are just left of the first view. Drag the tree to the right to see them.
 
 ## Relation finder
 
@@ -87,7 +120,7 @@ A title (for example "Duke of Valmont") has a list of holders. The list starts w
 - **Your own title text.** If a holder has your text in the field Title text on the card, the card shows that text. The reign of the first title follows it. If you select "Show on the card" at a title, the card shows that title instead of your text.
 - **The edit sheet.** The Titles section is between the fields and Family. It shows each title of the person with the number and the reign. Select **Edit** to change the number, the ruler name, From or Until. A text line under the fields shows the result, for example "Ser Darian Harrow shows as: Darian II". Select **Add title** to add the person as the newest holder of a title, or of a new title.
 - **Remove.** In the edit sheet, each reign of a title has its own **Remove**. **Remove** removes only that reign from the holders. If the person has other reigns of that title, they stay.
-- **The Titles window.** In the toolbar, select More (the "⋯" button). Then select Titles. The window lists the titles of the tree. Select **Show holders** to see the holders of a title. In this window, you can rename or delete a title. You can also change the id of a title: the plugin then changes the id on the card of every person who shows the title. In "Name for a man", you can type the name for a man, for example "King of the Isles". In "Name for a woman", you can type the name for a woman, for example "Duchess of Valmont". The card and the edit sheet of a man show the name for a man. The card and the edit sheet of a woman show the name for a woman. If this name is empty, the card and the edit sheet show the title name. The card of a holder whose sex is not male or female also shows the title name. In "Name of the list", you can type a name for the list of holders, for example "Dukes of Valmont". You can also add, edit, move or remove a holder.
+- **The Titles window.** In the toolbar, select More (the "⋯" button). Then select Titles. The window lists the titles of the tree. Select **Show holders** to see the holders of a title. In this window, you can rename or delete a title. You can also change the ID of a title (see "Change the ID of a house or a title"). In "Name for a man", you can type the name for a man, for example "King of the Isles". In "Name for a woman", you can type the name for a woman, for example "Duchess of Valmont". The card and the edit sheet of a man show the name for a man. The card and the edit sheet of a woman show the name for a woman. If this name is empty, the card and the edit sheet show the title name. The card of a holder whose sex is not male or female also shows the title name. In "Name of the list", you can type a name for the list of holders, for example "Dukes of Valmont". You can also add, edit, move or remove a holder.
 - **A holder who is not in the tree.** A holder who is not in the tree shows in pale text. To add such a holder, select Add holder. Then select "A holder who is not in the tree". Select a holder's name to see the card in the tree.
 - **Save and Cancel.** The Titles window changes nothing until you select Save. Save makes one change, which one Undo reverses. Cancel discards your changes.
 - **A note with the list.** At the end of the holders of a title, select "Make a note with this table". The plugin makes a new note with a table of the holders. The note has the name of the list, for example "Dukes of Valmont". The note is in the folder that Obsidian uses for new notes. The note does not change when the tree changes.
@@ -103,7 +136,7 @@ A house can have arms (a coat of arms). The arms are a picture in your vault. Th
 To give a house its arms:
 
 1. Select the Houses button (the castle).
-2. Select the box before the name of the house. If the house has no arms, the box is empty and has a dashed border.
+2. Select the arms picture before the name of the house. If the house has no arms, the picture is an empty frame with a dashed border.
 3. In the picture list, select a picture. To see the pictures, open a folder or type a part of the name.
 4. Select the same picture again, or select **Select**.
 5. Select **Save**.
@@ -217,7 +250,7 @@ The house page shows the people of one house in a table: generation, name, title
 - **Show a person.** Select a row. The window closes, and the tree shows the card of the person.
 - **Close it.** Select **Close**, or push Esc.
 - **Make a note with this table.** The plugin makes a new note with the table. The note does not change when the tree changes.
-- On a phone, each row has two text lines. The house page is in the full-screen view, not in the tree in a note.
+- If the window is narrow (for example on a phone) or the text is large, each row has two text lines: the name and the title, then the generation and the dates. The house page is in the full-screen view, not in the tree in a note.
 
 ## Settings
 
@@ -229,10 +262,11 @@ Open Settings. Select Dynasty Tree. You can set:
 - dates on the cards and reigns (on or off; see "Titles and reigns");
 - relation names on the cards (on or off; see "This is me and relations");
 - portraits on the cards (on or off; see "Portraits");
+- the generation of each person on the house page (on or off);
 - the number of generations in focus mode;
 - the update of tree links when you rename a note or a picture.
 
-If a tree looks wrong, select Arrange again. The plugin will arrange the tree again.
+If a tree looks wrong, select the button **Arrange again**. The plugin will arrange each tree again when it shows the tree.
 
 ## The tree text
 
@@ -280,10 +314,12 @@ unions:
 ```
 ````
 
-- Each person has an `id`. When you add a person, the plugin gives an id like `p12`. The plugin makes the id of a new house or title from its name. If you rename a person, a house or a title, the id stays the same. The edit sheet of a person shows the id in a small grey line at the end.
+The example uses the pictures `valmont-arms.png` and `roderick.jpg`. If your vault has no such pictures, the tree shows two warnings. Remove the `arms` and `portrait` text lines, or use your own pictures.
+
+- Each person has an `id` (a short name that the plugin uses to find the person). When you add a person, the plugin gives an ID such as `p12`. The plugin makes the ID of a new house or title from its name. If you rename a person, a house or a title, the ID stays the same. The edit sheet of a person shows the ID in a small grey text line at the end, for example "ID: p12".
 - A parent can be a birth, adoptive, ward or rumoured parent, for example `parents: [{id: aldric, type: adoptive}]`.
 - A partnership (in the `unions` list) can be a marriage, a betrothal, a concubinage or an affair.
-- A title has an `id`, a `name`, a `plural` (the name of its list) and `holders`. A holder has `person` (a person id) or `name` (a holder who is not in the tree), and can have `number`, `from`, `to` and `as` (the ruler name, if it is not the first word of the name).
+- A title has an `id`, a `name`, a `plural` (the name of its list) and `holders`. A holder has `person` (a person ID) or `name` (a holder who is not in the tree), and can have `number`, `from`, `to` and `as` (the ruler name, if it is not the first word of the name).
 - `card-title: king-of-the-vale` on a person selects the title that the card shows. "Show on the card" writes this text line.
 - `options` can have `me: roderick`. This text line marks Roderick as you (see "This is me and relations"). "This is me" writes this text line. Remove "This is me" removes it.
 - `link` connects a person to a note. On the computer, a click on the name opens that note. On a phone, the edit sheet has "Open linked note".
@@ -300,8 +336,8 @@ If the text has an error, the plugin shows a warning above the tree. The warning
 - **No import or export.** The plugin does not read or write GEDCOM files (a common file type for family history data). It does not print the tree, and it does not make PDF files. To print the tree, save it as a PNG or SVG picture (see "Save the tree as a picture"). Then print the picture.
 - **One tree in one code block.** A tree cannot use people from other notes.
 - **No names through two marriages.** A relation through two marriages has no name. For example, the father of your sister-in-law has no relation name. The relation finder shows the steps of that relation.
-- **Older plugin versions.** A phone with plugin version 1.0.x keeps the mark and the titles in the tree text. It does not show the mark, the relation names or the titles. If you delete the marked person on that phone, the mark stays in the tree text. If you delete a holder there, the holder stays in the tree text. It then names nobody, and the tree shows a warning.
-- **Older plugin versions and pictures.** A phone with version 1.0.x does not show arms or portraits. If you rename a picture there, the links to it in the trees do not change. Update the plugin on all your devices.
+- **Older plugin versions.** A phone with plugin version 0.1.x keeps the mark and the titles in the tree text. It does not show the mark, the relation names or the titles. If you delete the marked person on that phone, the mark stays in the tree text. If you delete a holder there, the holder stays in the tree text. It then names nobody, and the tree shows a warning.
+- **Older plugin versions and pictures.** A phone with version 0.1.x does not show arms or portraits. If you rename a picture there, the links to it in the trees do not change. Update the plugin on all your devices.
 - **Numbers are not counted.** The plugin does not count the numbers of the holders. You write each number.
 - **Positions are automatic.** You cannot drag cards to a new position. You can change the order of brothers and sisters in the edit sheet.
 - **Tested devices.** The developer tested the plugin on Windows and on an iPhone. The developer did not test it on an Android phone.

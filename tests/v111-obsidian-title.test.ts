@@ -13,7 +13,7 @@ import { resetObsidian } from './acceptance/fake-obsidian';
 import { fakeHandle, type FakeHandle } from './acceptance/tree-view-fakes';
 
 /*
- * 1.1.1 WP3, D98 (spec §5.2, §13.4): the free field of the edit sheet is "Title text on the card", with one
+ * 0.2.1 WP3, D98 (spec §5.2, §13.4): the free field of the edit sheet is "Title text on the card", with one
  * hint line that tells it apart from the Titles section. The function does not change.
  * Run: npx vitest run tests/v111-obsidian-title.test.ts
  */

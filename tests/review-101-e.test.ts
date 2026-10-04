@@ -22,8 +22,8 @@ import { noticeList, resetObsidian, settingRows, type Plugin as FakePlugin, type
 import { fakeApp, fakeHandle, type FakeHandle } from './acceptance/tree-view-fakes';
 
 /*
- * Code review of version 1.0.1, area E (windows, flows and plugin plumbing): scratch/review-101-e.
- * Each describe block is one finding; every test here fails on release-1.0.1 (d23ba64).
+ * Code review of version 0.1.1, area E (windows, flows and plugin plumbing): scratch/review-101-e.
+ * Each describe block is one finding; every test here fails on release-0.1.1 (d23ba64).
  */
 
 beforeAll(() => {
@@ -82,7 +82,7 @@ function people(body: string) {
 	return { tree: r.tree, g: deriveFamilies(r.tree) };
 }
 
-describe('review 1.0.1 E: the sheet of a person with no id', () => {
+describe('review 0.1.1 E: the sheet of a person with no id', () => {
 	it('after Move earlier the sheet still shows the same person, and Save edits that person', async () => {
 		const h = writingHandle(NO_IDS);
 		// Cora is the third entry: generated id ~3.
@@ -91,7 +91,7 @@ describe('review 1.0.1 E: the sheet of a person with no id', () => {
 		dispatch(el(sheet, '.dynasty-move-earlier'), 'click');
 		await settle();
 		// Cora moved to the second place. (Fix round: the move also gives her a written id, the decision notes
-		// 1.0.1 area E ruling 1, so this checks her place, not a generated ~2.)
+		// 0.1.1 area E ruling 1, so this checks her place, not a generated ~2.)
 		expect(people(h.body).tree.people[1].name).toBe('Cora');
 		// The user stays in Cora's sheet and adds a title.
 		const title = el(sheet, '[data-field="title"] input') as FEl;
@@ -192,7 +192,7 @@ function vault(files: [string, string][], enabled: () => boolean = () => true) {
 const treeNote = (links: string[]) =>
 	['# Tree', '', '```dynasty', 'people:', ...links.flatMap((l, i) => [`  - id: p${i}`, `    name: P${i}`, `    link: ${JSON.stringify(l)}`]), '```', ''].join('\n');
 
-describe('review 1.0.1 E: link update after a rename', () => {
+describe('review 0.1.1 E: link update after a rename', () => {
 	it('two notes swap names in quick succession: each tree link still opens the note it opened before', async () => {
 		const v = vault([
 			['Castle.md', '# The castle\n'],
@@ -270,7 +270,7 @@ function editor(text: string, from: Pos, to: Pos = from) {
 const HINT = `# ${INSERT_UI.noteHint}`;
 const emptyTrees = (text: string) => findBlocks(text).filter((b) => b.body.trimEnd() === HINT);
 
-describe('review 1.0.1 E: Insert family tree', () => {
+describe('review 0.1.1 E: Insert family tree', () => {
 	it('with the cursor in a code block that never closes, the note gets a new empty tree', () => {
 		const e = editor('Intro\n```js\nlet a = 1;', { line: 2, ch: 3 });
 		insertTree(e as never);
@@ -293,7 +293,7 @@ describe('review 1.0.1 E: Insert family tree', () => {
 // Plugin unload (main.ts onunload): nothing of the plugin may write after it is turned off.
 // ---------------------------------------------------------------------------------------------
 
-describe('review 1.0.1 E: settings (note)', () => {
+describe('review 0.1.1 E: settings (note)', () => {
 	it('typing 1200 in the desktop height field stores 1200 only, not 120 on the way', async () => {
 		const plugin = new DynastyTreePlugin(fakeApp() as never, { id: 'dynasty-tree' } as never);
 		const fake = plugin as unknown as FakePlugin;
@@ -314,7 +314,7 @@ describe('review 1.0.1 E: settings (note)', () => {
 	});
 });
 
-describe('review 1.0.1 E: a rename while the plugin loads (note)', () => {
+describe('review 0.1.1 E: a rename while the plugin loads (note)', () => {
 	it('a rename before data.json is read neither uses the default "update links" nor stores the default settings', async () => {
 		const app = fakeApp();
 		Object.assign(app.vault, { getMarkdownFiles: () => [], getAbstractFileByPath: () => null });
@@ -337,7 +337,7 @@ describe('review 1.0.1 E: a rename while the plugin loads (note)', () => {
 	});
 });
 
-describe('review 1.0.1 E: after unload (note)', () => {
+describe('review 0.1.1 E: after unload (note)', () => {
 	it('the Undo button of a delete Notice does nothing after the plugin is turned off', async () => {
 		const plugin = new DynastyTreePlugin(fakeApp() as never, { id: 'dynasty-tree' } as never);
 		const fake = plugin as unknown as FakePlugin;

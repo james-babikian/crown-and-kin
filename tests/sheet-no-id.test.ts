@@ -19,7 +19,7 @@ import { noticeList, openModals, resetObsidian } from './acceptance/fake-obsidia
 import { fakeHandle, type FakeHandle } from './acceptance/tree-view-fakes';
 
 /*
- * Review 1.0.1 area E, finding 1 (the decision notes "Version 1.0.1", area E ruling 1): a person with no
+ * Review 0.1.1 area E, finding 1 (the decision notes "Version 0.1.1", area E ruling 1): a person with no
  * written `id` is named `~N` after their place in the list. Every sheet action that needs a stable
  * id gives them one in the same write, and the sheet follows the new id.
  */

@@ -2,7 +2,7 @@
 
 Titles, holders, reigns and regnal numbers of spec §13.3–§13.5 (decisions D54–D63). The expected card texts are worked out by hand from the §13.3 and §13.5 rules.
 
-- Three titles with holders: Duke of Valmont, Count of Orsini and King of the Vale. King of the Vale has `numbering: auto` and `count-with`; version 1.1 keeps them and does not read them (D59), so King Roderick shows no number.
+- Three titles with holders: Duke of Valmont, Count of Orsini and King of the Vale. King of the Vale has `numbering: auto` and `count-with`; version 0.2 keeps them and does not read them (D59), so King Roderick shows no number.
 - Holders who are not in the tree: Aldric I (a name-only holder "Aldric" with number I, before the Aldric Valmont of the tree, Aldric II) and Orso the Old.
 - Roderick lost the duchy to his cousin Ser Gareth (a hand-typed block-map holder with `as: Gareth`, styled "Protector": a short written title whose reign fits on one text line) and got it back: two reigns in mixed forms, "(r. 1150–1158, from 1163)". Only his second entry has a number, so his card shows "Roderick I".
 - The brothers Matteo and Piero ruled Orsini together (co-rulers). Piero ruled again later: "(r. until 1140, 1145–1160)". Matteo's written title with its reign needs more than two text lines.

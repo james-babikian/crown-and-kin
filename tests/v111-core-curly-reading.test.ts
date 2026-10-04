@@ -4,7 +4,7 @@ import { parseDynasty } from '../src/core/parse';
 import { linkTargets, parsePictureLink } from '../src/core/link-rewrite';
 import { curlyParts, unwrapCurly } from '../src/core/tolerate';
 
-// Version 1.1.1, D103 (spec §13.16 rule 11): one pair of curly quote marks around a structural value
+// Version 0.2.1, D103 (spec §13.16 rule 11): one pair of curly quote marks around a structural value
 // (colour, link, picture links, references) is read as the value inside. Names, titles and notes
 // are read as typed. A phone keyboard makes these marks from ' and " (Smart Punctuation).
 

@@ -7,7 +7,7 @@ import type { CardSize, LaidOut, LayoutSettings } from '../src/layout/model';
 import { UNION_MARKS, unionShape, type UnionShape } from '../src/render/styles';
 import { allFixtures } from './acceptance/load';
 
-// WP 1.1.1-WP2, item 3: on a phone on its side (`sideways`), a couple with two or more partnerships has its
+// WP 0.2.1-WP2, item 3: on a phone on its side (`sideways`), a couple with two or more partnerships has its
 // signs spread along the gap between the two cards. The gap is widened for that case only, so that every
 // sign keeps at least 3 px clear of both cards. Every other layout is as it was.
 
