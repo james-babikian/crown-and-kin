@@ -1,10 +1,10 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import { DEFAULT_LAYOUT_SETTINGS, clearLayoutCache, layoutKey, layoutTree } from '../../src/layout/index';
-import { cardText, geometryFor, nameTextWidth, portraitBox, sidewaysGeometry, tallExtra } from '../../src/layout/geometry';
+import { cardText, geometryFor, namesOnlyGeometry, portraitBox, roomAt, sidewaysGeometry, tallExtra } from '../../src/layout/geometry';
 import type { Geometry, LayoutSettings, PersonBox } from '../../src/layout/model';
-import { BADGE_TEXT_CUT_EM, buildScene, type Scene } from '../../src/render/dom/scene';
-import { tallCardsFor, type TallNames } from '../../src/render/dom/tall-cards';
-import { nameLines, titleLines } from '../../src/render/name-lines';
+import { buildScene, type Scene } from '../../src/render/dom/scene';
+import { tallCardsFor } from '../../src/render/dom/tall-cards';
+import { cardNameLines, nameLines, runsText, titleLines } from '../../src/render/name-lines';
 import { approxMeasure, renderSvg } from '../../src/render/svg-string';
 import { FEl, installDom } from './fake-dom';
 import { block15, comments15, graphOf } from './m10-support';
@@ -14,14 +14,19 @@ import { block15, comments15, graphOf } from './m10-support';
  * three name text lines, "…" on the third, the counts (`tall`, `long`), the card heights, the cache
  * key, `cardText` with three name text lines, the SVG and the scene, and the name beside a portrait.
  * Sample tree 15 (block 2) gives the names, chosen by measurement with the headless measure
- * (`approxMeasure`, bold 16 px) with their expected text lines in its comments. These tests wait
+ * (`approxMeasure`, bold 13.6 px = 0.85 em, D117) with their expected text lines in its comments. These tests wait
  * for WP 10.2a. The D37 cases and `titleLines` (D61) must not change.
  */
 
 beforeAll(installDom);
 
 const three = nameLines;
-const tallFor = tallCardsFor;
+/** `tallCardsFor` (0.2.4 signature: no `sideways`, no `hidden`) reduced to the two lists these tests read. */
+type TallLists = { tall: string[]; long: string[] };
+const tallFor = (...args: Parameters<typeof tallCardsFor>): TallLists | undefined => {
+	const r = tallCardsFor(...args);
+	return r && { tall: r.tall, long: r.long };
+};
 const textFor = cardText;
 type Text3 = ReturnType<typeof cardText>;
 type Settings = LayoutSettings;
@@ -169,7 +174,9 @@ describe('L1: `nameLines` with up to three text lines (D81, D82)', () => {
 
 describe('sample tree 15, block 2: the names chosen by measurement (spec §13.9 acceptance)', () => {
 	const facts = comments15().names;
-	const approx = (s: string) => approxMeasure(s, '600 16px x');
+	// 0.2.4 (D117, spec §13.9): the name text is 0.85 em, so the names were chosen again with the card rule (`cardNameLines`) at bold 13.6 px.
+	const approx = (s: string) => approxMeasure(s, '600 13.6px x');
+	const three = (name: string, width: number, max: 2 | 3 = 3): string[] => cardNameLines(name, undefined, width, (s) => approx(s), max).map(runsText);
 	const source = block15(1);
 	const g = graphOf(source);
 	const nameOf = (id: string) => g.byId.get(id)!.name;
@@ -180,28 +187,28 @@ describe('sample tree 15, block 2: the names chosen by measurement (spec §13.9 
 		);
 	});
 
-	it('the text lines at the default font, 158 px on a normal card and 142 px on a narrow card, are the ones in the comments', () => {
-		for (const f of facts) expect(three(nameOf(f.id), f.width, approx), `${f.id} at ${f.width}`).toEqual(f.lines);
+	it('the text lines at the default font (name text 13.6 px), 158 px on a normal card and 142 px on a narrow card, are the ones in the comments', () => {
+		for (const f of facts) expect(three(nameOf(f.id), f.width), `${f.id} at ${f.width}`).toEqual(f.lines);
 	});
 
 	it('the name chosen for normal cards needs exactly three text lines, with no "…"', () => {
-		const lines = three(nameOf('three-normal'), 158, approx);
+		const lines = three(nameOf('three-normal'), 158);
 		expect(lines).toHaveLength(3);
 		expect(lines.some((l) => l.endsWith(ELLIPSIS))).toBe(false);
 		expect(lines.join(' ')).toBe(nameOf('three-normal'));
 	});
 
 	it('the name chosen for the narrow note-preview cards of D24 needs exactly three text lines there, with no "…", and two on a normal card', () => {
-		const narrow = three(nameOf('three-narrow'), 142, approx);
+		const narrow = three(nameOf('three-narrow'), 142);
 		expect(narrow).toHaveLength(3);
 		expect(narrow.some((l) => l.endsWith(ELLIPSIS))).toBe(false);
 		expect(narrow.join(' ')).toBe(nameOf('three-narrow'));
-		expect(three(nameOf('three-narrow'), 158, approx)).toHaveLength(2);
+		expect(three(nameOf('three-narrow'), 158)).toHaveLength(2);
 	});
 
 	it('the longer name ends with "…" on the third text line, on both widths', () => {
 		for (const width of [158, 142]) {
-			const lines = three(nameOf('over-three'), width, approx);
+			const lines = three(nameOf('over-three'), width);
 			expect(lines).toHaveLength(3);
 			expect(lines[2].endsWith(ELLIPSIS)).toBe(true);
 			expect(lines.slice(0, 2).some((l) => l.endsWith(ELLIPSIS))).toBe(false);
@@ -210,14 +217,14 @@ describe('sample tree 15, block 2: the names chosen by measurement (spec §13.9 
 	});
 
 	it('the D37 names (one and two text lines) do not change: no "…" and the same breaks as with two lines', () => {
-		for (const id of ['short', 'two-lines']) for (const width of [158, 142]) expect(three(nameOf(id), width, approx), id).toEqual(three(nameOf(id), width, approx, 2));
+		for (const id of ['short', 'two-lines']) for (const width of [158, 142]) expect(three(nameOf(id), width), id).toEqual(three(nameOf(id), width, 2));
 	});
 });
 
 describe('L2: `tallCardsFor` answers `tall` (2 or 3 text lines) and `long` (3), sorted', () => {
 	const FONTS = { text: 'serif', ui: 'sans', bold: '700' };
 	const GEO = geometryFor(16, 'normal');
-	/** 16 px normal card: the text is 158 px wide, so 15 characters of 10 px fit; with arms 133.2 px (13), with the D14 sign 132 px (13), both 107.2 px (10). */
+	/** 16 px normal card: the text is 158 px wide, so 15 characters of 10 px fit; with the D14 sign 132 px (13). */
 	const m = (s: string) => [...s].length * 10;
 	const tree = (people: [string, string, string?][]) =>
 		graphOf(['people:', ...people.flatMap(([id, name, more]) => [`  - id: ${id}`, `    name: ${name}`, ...(more ? [`    ${more}`] : [])]), ''].join('\n'));
@@ -228,42 +235,41 @@ describe('L2: `tallCardsFor` answers `tall` (2 or 3 text lines) and `long` (3), 
 			['a-two', 'Aldric Valmont The Second'],
 			['m-one', 'Aldric Valmont'],
 			['b-word', 'Wenceslausbergwenceslausberg'],
-			['c-over', 'Aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'],
-			['d-three', 'Aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'],
+			['c-over', 'Alamarinalamarinalamarinalamarinalamarinalamarinalamarinalamarin'],
+			['d-three', 'Alamarinalamarinalamarinalamarinalamarin'],
+			// D117: a word with no break place is never broken inside; it stays on one text line and is cut with "…".
+			['e-unbroken', 'Aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'],
 		]);
-		const r = tallFor(g, GEO, false, FONTS, (s) => m(s))!;
+		const r = tallFor(g, GEO, FONTS, (s) => m(s))!;
 		expect(r.tall).toEqual(['a-two', 'b-word', 'c-over', 'd-three', 'z-long']);
-		expect(r.long).toEqual(['c-over', 'd-three', 'z-long']);
+		expect(r.long).toEqual(['b-word', 'c-over', 'd-three', 'z-long']);
 		const subset = r.long.every((id) => r.tall.includes(id));
 		expect(subset).toBe(true);
 	});
 
-	it('the width is the D37 width less the arms room for the people of `arms` (1.55 em), less the `+` badge room, and less the D14 sign room', () => {
+	it('the arms box and the "+" badge no longer narrow a name on a whole card (D117); the D14 sign room still does', () => {
 		const g = tree([
-			['a', 'Aaaaaaaaaaaaaa'], // 14 characters, 140 px
+			['a', 'Aldrimonalotte'], // 14 characters, 140 px
 			['b', 'Bbbbbbbbbbbbbb'],
 			['c', 'Cccccccccccccc'],
 		]);
-		// Nobody is tall on 158 px.
-		expect(tallFor(g, GEO, false, FONTS, (s) => m(s), undefined, new Set())).toEqual({ tall: [], long: [] });
-		// Arms: 133.2 px, 13 characters: only a is asked with arms.
-		const withArms = tallFor(g, GEO, false, FONTS, (s) => m(s), undefined, new Set(), undefined, new Set(['a']))!;
-		expect(withArms).toEqual({ tall: ['a'], long: [] });
-		// The badge room of a sideways `+` badge: 158 − 1.2 em.
-		const cutPx = BADGE_TEXT_CUT_EM * 16;
-		const width = 158 - cutPx;
-		expect(140).toBeGreaterThan(width);
-		const badge = tallFor(g, GEO, true, FONTS, (s) => m(s), new Map([['b', 3]]), new Set())!;
-		expect(badge).toEqual({ tall: ['b'], long: [] });
-		// The badge room counts only in a sideways layout.
-		expect(tallFor(g, GEO, false, FONTS, (s) => m(s), new Map([['b', 3]]), new Set())).toEqual({ tall: [], long: [] });
+		expect(tallFor(g, GEO, FONTS, (s) => m(s), new Set())).toEqual({ tall: [], long: [] });
+		const withArms = tallFor(g, GEO, FONTS, (s) => m(s), new Set(), undefined, new Set(['a', 'b', 'c']), undefined, { portraits: new Set(['a', 'b', 'c']) })!;
+		expect(withArms).toEqual({ tall: [], long: [] });
+	});
+
+	it('the name of a names-only card uses the room that the arms box leaves beside its last text line (D125 a): 14 characters need a second text line only with the box', () => {
+		const g = tree([['a', 'Aldrimonalotte']]);
+		const geo = namesOnlyGeometry(GEO);
+		expect(tallFor(g, geo, FONTS, (s) => m(s), new Set())).toEqual({ tall: [], long: [] });
+		expect(tallFor(g, geo, FONTS, (s) => m(s), new Set(), undefined, new Set(['a']))).toEqual({ tall: ['a'], long: [] });
 	});
 
 	it('the name of the card is measured (D58): the regnal name, with the number', () => {
 		const g = tree([['x', 'Maximilian Valm']]); // 15 characters, fits
-		expect(tallFor(g, GEO, false, FONTS, (s) => m(s))).toEqual({ tall: [], long: [] });
+		expect(tallFor(g, GEO, FONTS, (s) => m(s))).toEqual({ tall: [], long: [] });
 		const labels = new Map([['x', { holdings: [], selected: false, name: 'Maximilian Valm II' }]]);
-		expect(tallFor(g, GEO, false, FONTS, (s) => m(s), undefined, undefined, labels as never)).toEqual({ tall: ['x'], long: [] });
+		expect(tallFor(g, GEO, FONTS, (s) => m(s), undefined, labels as never)).toEqual({ tall: ['x'], long: [] });
 	});
 
 	it('people in `skip` (hidden by folds) are left out of both lists', () => {
@@ -272,28 +278,28 @@ describe('L2: `tallCardsFor` answers `tall` (2 or 3 text lines) and `long` (3), 
 			['b', 'Aldric Valmont The Second'],
 			['c', 'Aldric Valmont'],
 		]);
-		expect(tallFor(g, GEO, false, FONTS, (s) => m(s))).toEqual({ tall: ['a', 'b'], long: ['a'] });
+		expect(tallFor(g, GEO, FONTS, (s) => m(s))).toEqual({ tall: ['a', 'b'], long: ['a'] });
 		const skip = new Set(['a']);
-		expect(tallFor(g, GEO, false, FONTS, (s) => m(s), undefined, undefined, undefined, undefined, skip)).toEqual({ tall: ['b'], long: [] });
-		expect(tallFor(g, GEO, false, FONTS, (s) => m(s), undefined, undefined, undefined, undefined, new Set(['a', 'b']))).toEqual({ tall: [], long: [] });
+		expect(tallFor(g, GEO, FONTS, (s) => m(s), undefined, undefined, undefined, skip)).toEqual({ tall: ['b'], long: [] });
+		expect(tallFor(g, GEO, FONTS, (s) => m(s), undefined, undefined, undefined, new Set(['a', 'b']))).toEqual({ tall: [], long: [] });
 	});
 
 	it('the D14 two-pass rule: the count without the sign room (n1) and with it (n2)', () => {
 		// Width 158 px holds 15 characters (n1); with the sign room 132 px holds 13 (n2).
-		// a: 12 + 14 characters: n1 = 2 text lines, n2 = 3 (the 14-letter word breaks). c: n1 = 2, n2 = 3 as well. b has no sign.
+		// a: "Bartholomewson" (14) breaks at a hyphen in 132 px: n1 = 2 text lines, n2 = 3. c: n1 = 2, n2 = 3 as well. b has no sign.
 		const g = tree([
-			['a', 'Aaaaaaaaaaaa Bbbbbbbbbbbbbb', 'illegitimate: true'],
-			['b', 'Cccccccccccc Dddddddddddddd'],
+			['a', 'Bartholomewson Alexandrovichs', 'illegitimate: true'],
+			['b', 'Cadwallader Dominicusbert'],
 			['c', 'Aldric Valmont The Second', 'illegitimate: true'],
 		]);
 		// No `signed` and n1 differs from n2 for someone: the answer is `undefined` (the caller lays out once and asks again).
-		expect(tallFor(g, GEO, false, FONTS, (s) => m(s))).toBeUndefined();
+		expect(tallFor(g, GEO, FONTS, (s) => m(s))).toBeUndefined();
 		// The sign is drawn on a only: a has n2 = 3, c has n1 = 2.
-		expect(tallFor(g, GEO, false, FONTS, (s) => m(s), undefined, new Set(['a']))).toEqual({ tall: ['a', 'b', 'c'], long: ['a'] });
+		expect(tallFor(g, GEO, FONTS, (s) => m(s), new Set(['a']))).toEqual({ tall: ['a', 'b', 'c'], long: ['a'] });
 		// No sign is drawn: n1 for both.
-		expect(tallFor(g, GEO, false, FONTS, (s) => m(s), undefined, new Set())).toEqual({ tall: ['a', 'b', 'c'], long: [] });
+		expect(tallFor(g, GEO, FONTS, (s) => m(s), new Set())).toEqual({ tall: ['a', 'b', 'c'], long: [] });
 		// Both signs are drawn.
-		expect(tallFor(g, GEO, false, FONTS, (s) => m(s), undefined, new Set(['a', 'c']))).toEqual({ tall: ['a', 'b', 'c'], long: ['a', 'c'] });
+		expect(tallFor(g, GEO, FONTS, (s) => m(s), new Set(['a', 'c']))).toEqual({ tall: ['a', 'b', 'c'], long: ['a', 'c'] });
 	});
 
 	it('the D14 rule needs no `signed` when n1 = n2', () => {
@@ -301,23 +307,31 @@ describe('L2: `tallCardsFor` answers `tall` (2 or 3 text lines) and `long` (3), 
 			['a', 'Ser Gareth Orsini the Younger', 'illegitimate: true'], // 3 text lines at 15 and at 13 characters
 			['b', 'Bo', 'illegitimate: true'],
 		]);
-		expect(tallFor(g, GEO, false, FONTS, (s) => m(s))).toEqual({ tall: ['a'], long: ['a'] });
+		expect(tallFor(g, GEO, FONTS, (s) => m(s))).toEqual({ tall: ['a'], long: ['a'] });
+	});
+
+	it('an illegitimate person with birth parents is never signed (`couldBeSigned`), so no second layout is asked for', () => {
+		const g = tree([
+			['p', 'Pa'],
+			['a', 'Bartholomewson Alexandrovichs', 'illegitimate: true\n    parents: [p]'],
+		]);
+		expect(tallFor(g, GEO, FONTS, (s) => m(s))).toEqual({ tall: ['a'], long: [] });
 	});
 
 	it('sample tree 15, block 2, at the default font: the counts of the comments, on a normal and on a narrow card', () => {
 		const facts = comments15().names;
 		const g = graphOf(block15(1));
 		const fonts = { text: 'Segoe UI, sans-serif', ui: 'Segoe UI, sans-serif', bold: '600' };
-		const want = (width: number): TallNames => ({
+		const want = (width: number): TallLists => ({
 			tall: facts.filter((f) => f.width === width && f.lines.length > 1).map((f) => f.id).sort(),
 			long: facts.filter((f) => f.width === width && f.lines.length === 3).map((f) => f.id).sort(),
 		});
 		expect(want(158)).toEqual({ tall: ['over-three', 'three-narrow', 'three-normal', 'two-lines'], long: ['over-three', 'three-normal'] });
 		expect(want(142)).toEqual({ tall: ['over-three', 'three-narrow', 'three-normal', 'two-lines'], long: ['over-three', 'three-narrow', 'three-normal'] });
-		expect(tallFor(g, GEO, false, fonts, approxMeasure)).toEqual(want(158));
+		expect(tallFor(g, GEO, fonts, approxMeasure)).toEqual(want(158));
 		const narrow: Geometry = sidewaysGeometry(GEO, 'narrow');
 		expect(narrow.cardW).toBe(164);
-		expect(tallFor(g, narrow, true, fonts, approxMeasure)).toEqual(want(142));
+		expect(tallFor(g, narrow, fonts, approxMeasure)).toEqual(want(142));
 	});
 });
 
@@ -332,7 +346,7 @@ describe('L3: card heights, the box flags and the cache key', () => {
 		clearLayoutCache();
 		const laid = lay(settings({ tallCards: ['b', 'c'], longNames: ['c'] }));
 		const box = (id: string) => laid.layout.persons.get(id) as Box;
-		expect(EXTRA).toBe(19);
+		expect(EXTRA).toBe(16); // D117: one name text line is 0.85 em × 1.2 = 16.3 px, whole px
 		expect(box('b').h).toBe(GEO.cardH + EXTRA);
 		expect(box('c').h).toBe(GEO.cardH + 2 * EXTRA);
 		expect(box('d').h).toBe(GEO.cardH);
@@ -389,7 +403,7 @@ describe('L3: card heights, the box flags and the cache key', () => {
 
 describe('L4: `cardText` with one, two or three name text lines', () => {
 	const GEO = geometryFor(16, 'normal');
-	const pitch = 1.2 * 16; // the line height of the name text line (spec §5.4: 1.2 on normal cards)
+	const pitch = 1.2 * 0.85 * 16; // the line height of the name text line (spec §5.4: 1.2 on normal cards; the name is 0.85 em, D117)
 
 	it('a boolean is still accepted: true = 2, false = 1, absent = 1', () => {
 		expect(textFor(GEO, true)).toEqual(textFor(GEO, 2));
@@ -420,7 +434,7 @@ describe('L4: `cardText` with one, two or three name text lines', () => {
 		expect(t3.textBottom - t1.textBottom).toBeLessThan(2 * pitch + 1);
 		expect(t3.textBottom).toBeLessThan(cardH(3));
 		// Centred: the space above the first name text line equals the space below the last text line (within the baseline offset of the last line).
-		const above = t3.nameBaseline - 0.35 * 16 - pitch / 2;
+		const above = t3.nameBaseline - 0.35 * t3.nameSize - pitch / 2;
 		const below = cardH(3) - t3.textBottom;
 		expect(Math.abs(above - below)).toBeLessThan(0.5);
 		// The title and the dates are one name pitch lower for each added name text line.
@@ -485,7 +499,7 @@ describe('the scene and the saved SVG draw the third name text line like the sec
 		const root = new FEl('g');
 		const scene = buildScene(root as unknown as SVGGElement, g, laid, { fonts: FONTS, measure: approxMeasure, link: () => null });
 		const card = scene.cards.get('over-three') as unknown as FEl;
-		expect(card.getAttribute('aria-label')).toContain('Maximilian Alexander Theodoric of Valmont and Orsini');
+		expect(card.getAttribute('aria-label')).toContain(g.byId.get('over-three')!.name);
 	});
 });
 
@@ -498,19 +512,17 @@ describe('L5: a name text line beside a portrait (spec §13.9, §13.7 D76, D77)'
 		return { top, bottom: top + height };
 	};
 
-	it('the width is the normal width less the shift; less the portrait and a 0.25 em gap when the line box overlaps the circle by more than 0.5 px', async () => {
+	it('the room of a name text line: the text width; less the box and its gap when the line box overlaps the circle by more than 0.5 px (roomAt)', () => {
 		const t = textFor(GEO, 3) as Text3;
 		const l3 = lineBox(t, 3);
-		const portrait = (overlap: number) => ({ x: t.padX + t.textW - 24, y: l3.bottom - overlap, w: 24, h: 24 });
-		expect(nameTextWidth(GEO, t, 3, 3, undefined, 0)).toBe(t.textW);
-		expect(nameTextWidth(GEO, t, 3, 3, undefined, 24.8)).toBeCloseTo(t.textW - 24.8, 9);
-		expect(nameTextWidth(GEO, t, 3, 3, portrait(5), 0)).toBeCloseTo(t.textW - 24 - 0.25 * 16, 9);
-		expect(nameTextWidth(GEO, t, 3, 3, portrait(0.6), 0)).toBeCloseTo(t.textW - 24 - 0.25 * 16, 9);
-		expect(nameTextWidth(GEO, t, 3, 3, portrait(0.4), 0)).toBe(t.textW);
-		// The arms shift and the portrait narrow together.
-		expect(nameTextWidth(GEO, t, 3, 3, portrait(5), 24.8)).toBeCloseTo(t.textW - 24.8 - 24 - 4, 9);
+		const portrait = (overlap: number) => [{ r: { x: t.padX + t.textW - 24, y: l3.bottom - overlap, w: 24, h: 24 }, gap: 0.25 * 16 }];
+		const at = (line: 1 | 2 | 3, boxes: ReturnType<typeof portrait>) => roomAt(GEO, t, [t.nameBaseline, t.name2Baseline!, t.name3Baseline!][line - 1], t.nameSize, boxes);
+		expect(at(3, [])).toBe(t.textW);
+		expect(at(3, portrait(5))).toBeCloseTo(t.textW - 24 - 0.25 * 16, 9);
+		expect(at(3, portrait(0.6))).toBeCloseTo(t.textW - 24 - 0.25 * 16, 9);
+		expect(at(3, portrait(0.4))).toBe(t.textW);
 		// A text line above the portrait is not narrowed.
-		expect(nameTextWidth(GEO, t, 1, 3, portrait(5), 0)).toBe(t.textW);
+		expect(at(1, portrait(5))).toBe(t.textW);
 	});
 
 	it('a portrait does not add a text line or make a card taller: the layout with `portraits` has the same boxes', () => {

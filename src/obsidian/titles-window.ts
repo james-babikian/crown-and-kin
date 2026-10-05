@@ -12,6 +12,7 @@ import { deriveFamilies, type FamilyGraph } from '../core/derive';
 import type { Op } from '../core/edit';
 import { normBody } from '../core/block-match';
 import { parseBody, readTree } from '../core/parse';
+import { quotedSobriquet } from '../core/sobriquet';
 import { newTitleId } from '../core/title-ops';
 import { describeDeleteTitle, describeTitleIdChange } from '../core/titles';
 import { HOUSES, ID_UI, REMOVE, SHEET, TITLES_UI, WRITE_TEXT } from '../render/ui-text';
@@ -369,6 +370,8 @@ export class TitlesWindow extends Modal {
 		if (text.inTree) {
 			const person = h.values.person!;
 			const name = words.createEl('button', { cls: 'dynasty-holder-name', text: text.ruler, attr: { type: 'button', 'aria-label': TITLES_UI.showCardLabel(text.ruler), 'data-focus': `name:${h.key}` } });
+			// D122: the sobriquet follows the ruler text on the same text line, in regular weight (the button is semibold).
+			if (text.sobriquet !== undefined) name.createSpan({ cls: 'dynasty-picker-sob', text: ` ${quotedSobriquet(text.sobriquet)}` });
 			name.addEventListener('click', () => this.guard(() => this.showCard(person)));
 		} else words.createDiv({ cls: 'dynasty-holder-name', text: text.ruler });
 		if (text.full) words.createDiv({ cls: 'dynasty-holder-full', text: text.full });

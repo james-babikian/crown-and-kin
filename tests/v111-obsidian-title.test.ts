@@ -76,10 +76,10 @@ describe('D98: the Title field of the edit sheet', () => {
 		expect(hint.getAttribute('id')).toMatch(/-hint$/);
 	});
 
-	it('only the title field has this hint; the other fields keep their labels', () => {
+	it('only the title field and the sobriquet field (D122) have a hint; the other fields keep their labels', () => {
 		const { content } = open();
 		const hinted = content.querySelectorAll('.dynasty-sheet-field').filter((f) => f.querySelector('.dynasty-sheet-hint') !== null);
-		expect(hinted.map((f) => f.getAttribute('data-field'))).toEqual(['title']);
+		expect(hinted.map((f) => f.getAttribute('data-field'))).toEqual(['sobriquet', 'title']);
 		expect(content.querySelector('[data-field="name"] label')!.getText()).toBe('Name');
 		expect(content.querySelector('[data-field="born"] label')!.getText()).toBe('Born');
 	});

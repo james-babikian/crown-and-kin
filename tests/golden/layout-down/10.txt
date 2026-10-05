@@ -1,21 +1,21 @@
 orientation down
-size 642 228
-geometry font 16 normal card 180x64 union 10 couple 36 node 20 row 100 tag 18
+size 642 222
+geometry font 16 normal card 180x61 union 10 couple 36 node 20 row 100 tag 18
 row 0: aldric 42 0042
 row 1: wren 43 piers
-gap 0: 64 164
-person 0042 gen 0 at 462 0 size 180 64
-person 42 gen 0 at 262 0 size 180 64
-person 43 gen 1 at 200 164 size 180 64
-person aldric gen 0 at 46 0 size 180 64
-person piers gen 1 at 462 164 size 180 64
-person wren gen 1 at 0 164 size 180 64
-union u0 at 244 32 bar
-path marriage [aldric 42] M226 32H262
-path descent [aldric 42 43] M244 32V134M244 134H290
-path descent [43 aldric 42] M290 134V164
-path illegitimate [aldric wren] M136 64V134M90 134H136
-path illegitimate [wren aldric] M90 134V164
-path descent [0042 piers] M552 64V134
-path descent [piers 0042] M552 134V164
-marker union at 244 32
+gap 0: 61 161
+person 0042 gen 0 at 462 0 size 180 61
+person 42 gen 0 at 262 0 size 180 61
+person 43 gen 1 at 200 161 size 180 61
+person aldric gen 0 at 46 0 size 180 61
+person piers gen 1 at 462 161 size 180 61
+person wren gen 1 at 0 161 size 180 61
+union u0 at 244 30.5 bar
+path marriage [aldric 42] M226 30.5H262
+path descent [aldric 42 43] M244 30.5V131M244 131H290
+path descent [43 aldric 42] M290 131V161
+path illegitimate [aldric wren] M136 61V131M90 131H136
+path illegitimate [wren aldric] M90 131V161
+path descent [0042 piers] M552 61V131
+path descent [piers 0042] M552 131V161
+marker union at 244 30.5

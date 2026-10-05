@@ -33,10 +33,11 @@ You can also type the code block yourself. See "The tree text" below.
   - **Fit** fits the whole tree in the window.
   - **Legend** shows the line styles and the houses.
   - **More** (the "⋯" button) opens a list with Relation, Titles and Save as picture.
+  - **Height** (two arrows, one above the other) is only in a tree in a note on a phone. It changes the height of the tree (see "The tree in a note on a phone").
   - **Expand** opens the full-screen view. **Close** closes it.
   - A **warning button** shows when the tree has problems. Select it to see the list.
 
-  On a phone, a tree in a note has only Add person and Expand, and the warning button if the tree has problems. In the full-screen view on a phone, Fit and Legend are in the More list. A tree that you cannot edit shows Open note instead of Add person and Houses.
+  On a phone, a tree in a note has only Add person, Height and Expand. If the tree has problems, it also has the warning button. In the full-screen view on a phone, Fit and Legend are in the More list. A tree that you cannot edit shows Open note instead of Add person and Houses.
 - **Commands.** The command list has four commands:
   - **Insert family tree** puts a new tree in the note at the cursor.
   - **Undo last tree edit** reverses the last edit of a tree.
@@ -48,6 +49,17 @@ You can also type the code block yourself. See "The tree text" below.
 If you hold the phone upright, the tree turns sideways. The generations go from left to right. You scroll down to see more of the tree.
 
 On a phone, the full-screen view has no Fit button and no Legend button. Select More (the "⋯" button) in the toolbar. The list has "Fit the tree in the view" and "Show the line styles". This keeps the toolbar in one row, so the Close button is always on the screen.
+
+## The tree in a note on a phone
+
+The tree in a note on a phone is a small preview. It shows names only, so that more cards fit on the screen.
+
+- **Names only.** Each card shows the name, the years, the colour bar of the house and the mark "You". It does not show the title or the relation word. The plugin does not find the relation words for this preview.
+- **Choose the style.** Open the settings. Select "Card style in the phone preview". There are three choices. "Names only, with the arms" is the first choice. "Names only, with the portrait" shows the portrait and not the arms. "Whole card" shows the same card as the full-screen view.
+- **The full-screen view and the saved picture.** The full-screen view always shows whole cards. "Save as picture" always saves whole cards, with the relation words.
+- **Change the height.** Tap the Height button in the toolbar of the tree. The tree gets the next height. The order is lower, start, upper, and then lower again. The tree keeps its centre when the height changes.
+- **The three heights.** The start height is the setting "Height on a phone". The lower height is 20 points of the screen height less than the start height. The upper height is 20 points more. For example, if the start height is 60%, the three heights are 40%, 60% and 80% of the screen height. The height is never below 30% or above 90%.
+- **How long the height stays.** The plugin keeps the height until you close the note. When you open the note again, the tree has the start height.
 
 ## Change the ID of a house or a title
 
@@ -70,6 +82,7 @@ You can mark one person in the tree as you. Each card then shows the relation of
 - **The card "You".** The card of the marked person shows "You". It also has a thicker border in the accent colour of your theme.
 - **Relation names on the cards.** When the tree has a mark, each card gets one more small text line at the bottom. This text line shows the relation to you, for example "Father", "Half-sister" or "Second cousin once removed". All cards get a little taller. A card of a person with no relation to you has no relation name. If the tree is very small on the screen, the cards do not show the relation names.
 - **The edit sheet.** The Family section starts with "Relation to you:" and the relation name. A person can have more than one relation to you, for example after a marriage between cousins. Then the next text line starts with "Also:" and gives the other relations.
+- **A rumoured parent.** A rumoured parent is a parent link that you mark as a rumour. If the rumour is true, two people can be full brothers or sisters. Then the card can say "Half-brother, maybe full". The edit sheet has one more paragraph: "If every rumoured link is true, this person is your …", and the relation name. The list "Also" can say "Rumoured brother".
 - **Show the line.** In the edit sheet, select "Show the line". The relation finder opens with the line from you to the person (see "Relation finder").
 - **Remove the mark.** Open the edit sheet of the marked person. Select Remove "This is me".
 - **Hide the relation names.** In the settings, turn off "Show relation names on cards". The cards keep their size. The edit sheet still shows the relation.
@@ -77,7 +90,9 @@ You can mark one person in the tree as you. Each card then shows the relation of
 
 The mark is in the tree text. All your devices show the same mark.
 
-On a phone, a tree in a note opens on the family of the person that you marked with "This is me". If the tree has a pin, or if you selected Show all people, the tree does not open on that family. If you edit another person, the family of the marked person stays. It stays until you close the note, or until you move or remove the mark. On a phone, the tree is drawn sideways. If the marked person has children, the parents are just left of the first view. Drag the tree to the right to see them.
+On a phone, the tree in a note opens on the family of the marked person. If the tree has a pin, the tree does not open on that family. The same is true if you selected Show all people. If you edit another person, the family of the marked person stays.
+
+It stays until you close the note, or until you move or remove the mark. On a phone, the parents are on the left and the children are on the right. If the marked person has children, the parents are a little outside the view, on the left. Drag the tree to the right to see them.
 
 ## Relation finder
 
@@ -145,13 +160,17 @@ You can also select the colour of the house in the Houses window. The colour cho
 
 If the house has arms, the picture list starts with **Remove arms**. Select it to clear the arms in the window. Then select Save.
 
-- **The picture list.** The list shows the folders of your vault that hold pictures. Each folder shows the number of pictures in it. Tap or click a folder to open or close it. Each picture has a small preview before its name. The folder of the current picture is open when the list opens, and the current picture has the mark "In use". The list always starts at the top.
+- **The picture list.** The list shows the folders of your vault that hold pictures. Each folder shows the number of pictures in it. Tap or click a folder to open or close it. Each picture has a small preview before its name.
+- **The current picture.** When the list opens, the folder of the current picture is open. The current picture has the mark "In use". The list always starts at the top.
 - **Search.** Type a part of the name in the search field. The list then shows all pictures that match, with the folder below each name. The search ignores capital letters, accents and the look of the apostrophe. On a phone, the keyboard opens only when you tap the search field.
-- **Keyboard.** The arrow keys move through the rows. On a folder, the right arrow opens it and the left arrow closes it. On a picture, press the Enter key to choose it and close the list.
-- **Add a picture from this device.** This is the first row of the picture list, or the second row if the list starts with a Remove row. It opens the file choice of your device. On an iPhone, you can select a photo in Photos or a file in Files. The plugin copies the picture into the attachment folder (the folder that Obsidian uses for new attachments) and selects it. The plugin copies the picture at once. If you then select Cancel, the picture stays in the vault.
-- **Colours from the arms.** If a house has arms, the colour choice starts with "Colours from the arms". These are the main colours of the picture, at most 5. Select one of them to make it the house colour. The label "House colours" and the 12 house colours come after them. The plugin never changes the colour of a house by itself. If the plugin cannot read the colours of a picture, the window tells you, and you select one of the house colours.
+- **Keyboard.** The arrow keys move through the rows. On a folder, the right arrow opens it and the left arrow closes it. On a picture, push Enter to select it. The list then closes.
+- **Add a picture from this device.** This is the first row of the picture list. If the list starts with a Remove row, this is the second row. It opens the file choice of your device. On an iPhone, you can select a photo in Photos or a file in Files. The plugin copies the picture into the attachment folder (the folder that Obsidian uses for new attachments) and selects it.
+- **The copy.** The plugin copies the picture at once. If you then select Cancel, the picture stays in the vault.
+- **Colours from the arms.** If a house has arms, the colour choice starts with "Colours from the arms". These are the main colours of the picture, at most 5. Select one of them to make it the house colour. The label "House colours" and the 12 house colours come after them. The plugin never changes the colour of a house by itself.
+- **If the colours cannot be read.** If the plugin cannot read the colours of a picture, the window tells you. Then select one of the house colours.
 - **Save and Cancel.** The Houses window changes nothing until you select Save. Save makes one change, which one Undo reverses. Cancel discards your changes.
-- **The card.** The arms show in the top right corner of the card. The name text line is a little shorter for them. The arms keep the shape of the picture. The plugin does not cut the picture and does not add a border or a background. On the card of a person who is dead, the arms are a little pale, like the house colour. If the tree is very small on the screen, the cards do not show the arms.
+- **The card.** The arms show at the lower right of the card, to the left of the portrait. On a whole card, the arms do not make the name text line shorter. On a names-only card, the last name text line is a little shorter beside the arms and the portrait. The other small text lines next to the arms and the portrait are also a little shorter. If the tree is very small on the screen, the cards do not show the arms.
+- **The look of the arms.** The arms keep the shape of the picture. The plugin does not cut the picture and does not add a border or a background. On the card of a person who is dead, the arms are a little pale, like the house colour.
 - **Arms in the dark theme.** The plugin shows the arms as they are, in the light theme and in the dark theme. Black parts of arms are difficult to see on a dark card. Give such arms a light border in the picture itself. Use a picture with a transparent background, for example a PNG picture.
 
 On a phone, the tree in a note has no Houses button. First tap Expand to open the full-screen view.
@@ -219,6 +238,30 @@ On a phone, the tree in a note has no More button. First tap Expand to open the 
 
 A name that does not fit on one text line uses two or three text lines. Only that card is taller. If a name does not fit on three text lines, the third text line ends with "…". The edit sheet shows the full name. This is the same on the computer, in the full-screen view and on a phone.
 
+The plugin breaks a name at a space first. If one word is too long, the plugin breaks the word with a hyphen. It uses one of these places, in this order:
+
+1. A hyphen that is already in the name. The plugin uses the last one that fits.
+2. A place that you wrote in your list of break places.
+3. A place that the plugin finds with a simple rule for vowels and consonants.
+
+- **Your list.** Open the settings. Find "Break places in long names". Write one word on each text line. Put a hyphen at each place where the word can break, for example `Long-na-munda`.
+- **How the list works.** The plugin breaks a word from the list only at your places. The list is for all the trees in your vault. The plugin ignores capital letters in the words.
+- **A name with a hyphen.** If a name has a hyphen, write each part of the name on its own text line of the list.
+- **A text line with a mistake.** The plugin skips a text line with two hyphens in a row. It also skips a text line with a hyphen at the start or at the end. It gives no message.
+- **How many words.** The list can have 2000 words and 20 000 letters.
+- **Other alphabets.** The plugin finds no break places in names in Cyrillic, Greek or Chinese letters. Use your list for these names. A word that is too long and has no break place ends with "…".
+
+## Sobriquet
+
+A sobriquet is a short extra name, for example "the Wise". Write it in the `sobriquet` text line of a person. Write the words only. The plugin adds the curly quote marks. If you write one pair of double quote marks, the plugin removes that pair and adds its own.
+
+- **On the card.** The card shows the sobriquet after the name and the number, for example "Aldric II “the Wise”". The sobriquet is not bold. It stays in one part: if it does not fit, it moves to the next text line.
+- **Three text lines.** If the name already needs three text lines, the sobriquet may not fit. Then the card shows "…" after the last whole word of the name, if there is room. If there is no room, the card shows nothing more. The edit sheet shows the whole sobriquet.
+- **Where it shows.** The sobriquet shows on a card that shows all of its text. It also shows in Find and in the lists of people. It shows in the lists of title holders, on the house page and in the saved picture.
+- **Where it does not show.** A card that shows less text, for example in a tree that you zoom far out, shows the name only. A screen reader (an aid that reads the screen aloud) does not read the sobriquet.
+- **Edit it.** The edit sheet has the field "Sobriquet". An empty field removes the text line.
+- **No name.** A person with a sobriquet and no name shows neither on the card. The edit sheet still holds both.
+
 ## Fold a branch
 
 To fold a branch means to hide the children of a partnership and all the people below them.
@@ -250,7 +293,7 @@ The house page shows the people of one house in a table: generation, name, title
 - **Show a person.** Select a row. The window closes, and the tree shows the card of the person.
 - **Close it.** Select **Close**, or push Esc.
 - **Make a note with this table.** The plugin makes a new note with the table. The note does not change when the tree changes.
-- If the window is narrow (for example on a phone) or the text is large, each row has two text lines: the name and the title, then the generation and the dates. The house page is in the full-screen view, not in the tree in a note.
+- If the window is narrow or the text is large, each row has two text lines. This is usual on a phone. The first text line has the name and the title. The second has the generation and the dates. The house page is in the full-screen view, not in the tree in a note.
 
 ## Settings
 
@@ -259,6 +302,9 @@ Open Settings. Select Dynasty Tree. You can set:
 - the height of a tree in a note, on a computer or tablet;
 - the height of a tree in a note, on a phone;
 - the card size (Normal or Compact);
+- the card style in the phone preview (see "The tree in a note on a phone");
+- the break places in long names (see "Long names");
+- the setting "Reduce movement" (Follow the device, On or Off; see "Reduce movement");
 - dates on the cards and reigns (on or off; see "Titles and reigns");
 - relation names on the cards (on or off; see "This is me and relations");
 - portraits on the cards (on or off; see "Portraits");
@@ -267,6 +313,12 @@ Open Settings. Select Dynasty Tree. You can set:
 - the update of tree links when you rename a note or a picture.
 
 If a tree looks wrong, select the button **Arrange again**. The plugin will arrange each tree again when it shows the tree.
+
+## Reduce movement
+
+The setting "Reduce movement" has three choices. "Follow the device" is the first choice: the plugin uses the setting of your phone or your computer. "On" reduces movement. "Off" keeps the movement.
+
+When the plugin reduces movement, Fit, Find and a double tap change the view at once. The tree does not move slowly. The short highlight of a card is an outline that does not move. The Houses window goes to a person at once.
 
 ## The tree text
 
@@ -319,7 +371,8 @@ The example uses the pictures `valmont-arms.png` and `roderick.jpg`. If your vau
 - Each person has an `id` (a short name that the plugin uses to find the person). When you add a person, the plugin gives an ID such as `p12`. The plugin makes the ID of a new house or title from its name. If you rename a person, a house or a title, the ID stays the same. The edit sheet of a person shows the ID in a small grey text line at the end, for example "ID: p12".
 - A parent can be a birth, adoptive, ward or rumoured parent, for example `parents: [{id: aldric, type: adoptive}]`.
 - A partnership (in the `unions` list) can be a marriage, a betrothal, a concubinage or an affair.
-- A title has an `id`, a `name`, a `plural` (the name of its list) and `holders`. A holder has `person` (a person ID) or `name` (a holder who is not in the tree), and can have `number`, `from`, `to` and `as` (the ruler name, if it is not the first word of the name).
+- A title has an `id`, a `name`, a `plural` (the name of its list) and `holders`. A holder has `person` (a person ID) or `name` (a holder who is not in the tree). A holder can also have `number`, `from`, `to` and `as`. `as` is the ruler name, if it is not the first word of the name.
+- `sobriquet: the Wise` on a person is a short extra name. The card shows it after the name (see "Sobriquet").
 - `card-title: king-of-the-vale` on a person selects the title that the card shows. "Show on the card" writes this text line.
 - `options` can have `me: roderick`. This text line marks Roderick as you (see "This is me and relations"). "This is me" writes this text line. Remove "This is me" removes it.
 - `link` connects a person to a note. On the computer, a click on the name opens that note. On a phone, the edit sheet has "Open linked note".

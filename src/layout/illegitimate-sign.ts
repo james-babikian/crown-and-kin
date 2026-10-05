@@ -4,6 +4,7 @@
  * so that the sign and the dashed illegitimate line never both appear for the same person.
  */
 import type { FamilyGraph } from '../core/derive';
+import type { Person } from '../core/types';
 import type { EdgeDrawing } from './model';
 
 /**
@@ -27,4 +28,14 @@ export function illegitimateSigns(g: FamilyGraph, edges: EdgeDrawing): Set<strin
 		if (parents.length && rest.length === parents.length && parents.every((x) => rest.includes(x))) shown.add(child);
 	}
 	return new Set(g.people.filter((p) => p.illegitimate && !shown.has(p.id)).map((p) => p.id));
+}
+
+/**
+ * A cheap superset of `illegitimateSigns`, from the graph alone (no lines needed): `illegitimate: true` and no birth-type placement parent,
+ * or placement parents that are adoptive or ward. A person with birth parents always has the dashed illegitimate line, so is never in the real
+ * set. `tallCardsFor` asks this before it asks for a second layout pass: the names-only card (D126 3) needs the signs for every
+ * illegitimate person, and most of them are not signed.
+ */
+export function couldBeSigned(g: FamilyGraph, p: Person): boolean {
+	return !!p.illegitimate && g.placementType.get(p.id) !== 'birth';
 }

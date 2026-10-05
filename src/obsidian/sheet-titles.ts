@@ -12,6 +12,7 @@ import type { App } from 'obsidian';
 import type { FamilyGraph } from '../core/derive';
 import type { Op } from '../core/edit';
 import { newTitleId } from '../core/title-ops';
+import { quotedSobriquet } from '../core/sobriquet';
 import { cardLabels, entryReign, rulerName, titleNameFor, type Holding } from '../core/titles';
 import type { Holder, Person } from '../core/types';
 import { TITLES_UI, WRITE_TEXT } from '../render/ui-text';
@@ -41,9 +42,15 @@ export interface TitlesHost {
 
 const NEW_TITLE = '\u0000new-title';
 
-/** One holder entry as the sheet shows it: "Gareth I, 1158–1163", or "No number and no dates". */
-export function entryText(entry: Holder, personName: string): string {
-	const parts = [entry.number !== undefined ? `${rulerName(entry, personName)} ${entry.number}` : undefined, entryReign(entry)].filter((x): x is string => !!x);
+/**
+ * One holder entry as the sheet shows it: "Gareth I, 1158–1163", or "No number and no dates". D122: the sobriquet
+ * of the person follows the ruler text in curly marks ("Gareth I “the Wise”, 1158–1163"); an entry with no
+ * number has no ruler text, so it shows no sobriquet either.
+ */
+export function entryText(entry: Holder, personName: string, sobriquet?: string): string {
+	const ruler = entry.number !== undefined ? `${rulerName(entry, personName)} ${entry.number}` : undefined;
+	const named = ruler !== undefined && sobriquet !== undefined ? `${ruler} ${quotedSobriquet(sobriquet)}` : ruler;
+	const parts = [named, entryReign(entry)].filter((x): x is string => !!x);
 	return parts.length ? parts.join(', ') : TITLES_UI.entryNone;
 }
 
@@ -88,7 +95,7 @@ function holdingGroup(sec: HTMLElement, host: TitlesHost, h: Holding, choice: bo
 		else if (!host.readOnly) host.button(controls, TITLES_UI.showOnCard, 'dynasty-show-on-card', () => void showOnCard(host, title.id), TITLES_UI.showOnCardLabel(shownName));
 	}
 	for (const entry of h.entries) {
-		const text = entryText(entry, person.name);
+		const text = entryText(entry, person.name, person.sobriquet);
 		const row = group.createDiv({ cls: 'dynasty-family-row dynasty-title-entry', attr: { 'data-index': String(entry.index) } });
 		row.createDiv({ cls: 'dynasty-family-name dynasty-family-detail', text });
 		if (host.readOnly) continue;

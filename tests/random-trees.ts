@@ -46,6 +46,33 @@ export function randomTree(seed: number): string {
 	return `people:\n${people.join('\n')}\n${unions.length ? `unions:\n${unions.join('\n')}\n` : ''}`;
 }
 
+/** A made-up tree: `n` people in a drifting window of parents, and a rumoured link on every person. */
+export function rumourTree(n: number): string {
+	let a = 12345;
+	const rand = () => {
+		a = (a + 0x6d2b79f5) >>> 0;
+		let t = a;
+		t = Math.imul(t ^ (t >>> 15), t | 1);
+		t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+		return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+	};
+	const people: string[] = [];
+	for (let i = 0; i < n; i++) {
+		const parents: string[] = [];
+		if (i >= 8) {
+			const lo = Math.max(0, i - 24);
+			const one = lo + Math.floor(rand() * (i - 8 - lo + 1));
+			parents.push(`p${one}`);
+			const two = lo + Math.floor(rand() * (i - 8 - lo + 1));
+			if (two !== one) parents.push(`p${two}`);
+			const far = Math.floor(rand() * (i - 8));
+			if (!parents.includes(`p${far}`)) parents.push(`{id: p${far}, type: rumoured}`);
+		}
+		people.push(`  - {id: p${i}, name: P${i}, sex: ${i % 2 ? 'f' : 'm'}${parents.length ? `, parents: [${parents.join(', ')}]` : ''}}`);
+	}
+	return `people:\n${people.join('\n')}\n`;
+}
+
 type Seg = { x1: number; y1: number; x2: number; y2: number };
 
 function straight(d: string): Seg[] {

@@ -22,7 +22,25 @@ export interface RelationTexts {
 	 * no relation: "No relation to you in this tree."); `also` "Also: brother-in-law, third cousin."
 	 * for `rels[1..3]`, with ", and N more" before the full stop when there are more than 4.
 	 */
-	relationSummary(rels: readonly Relation[] | undefined, isMe: boolean): { main: string; also?: string };
+	relationSummary(rels: readonly Relation[] | undefined, isMe: boolean): { main: string; also?: string; maybe?: string };
+}
+
+/** D123: the texts of a relation that a rumoured link could change (contract 2.4). */
+export const MAYBE_TEXT = {
+	/** Appended to `Relation.text` on the card when `maybe.effect` is 'full'. */
+	cardFull: ', maybe full',
+	sheet: (lower: string) => `If every rumoured link is true, this person is your ${lower}.`,
+	spoken: (lower: string) => `or ${lower} if the rumoured links are true`,
+} as const;
+
+/** The relation text of a card: "Half-brother, maybe full" when a rumoured parent would make the relation full; else `rel.text`. */
+export function cardRelationText(rel: Relation): string {
+	return rel.maybe?.effect === 'full' ? `${rel.text}${MAYBE_TEXT.cardFull}` : rel.text;
+}
+
+/** The relation as the screen-reader label says it. The rare "maybe half" case adds nothing; the sheet and the "Also" list carry it. */
+export function spokenRelation(rel: Relation): string {
+	return rel.maybe?.effect === 'full' ? `${rel.lower}, ${MAYBE_TEXT.spoken(rel.maybe.lower)}` : rel.lower;
 }
 
 /**
@@ -213,11 +231,13 @@ export const relationSummary: RelationTexts['relationSummary'] = (rels: readonly
 	if (isMe) return { main: 'This is you.' };
 	if (!rels?.length) return { main: 'No relation to you in this tree.' };
 	const main = `Relation to you: ${rels[0].text}.`;
+	// The card shows the first relation only, so the sheet explains the maybe of that one only.
+	const maybe = rels[0].maybe ? { maybe: MAYBE_TEXT.sheet(rels[0].maybe.lower) } : {};
 	const others = rels.slice(1);
-	if (!others.length) return { main };
+	if (!others.length) return { main, ...maybe };
 	const names = others.slice(0, ALSO_SHOWN).map((r) => r.lower);
 	const more = others.length - names.length;
-	return { main, also: `Also: ${names.join(', ')}${more > 0 ? `, and ${more} more` : ''}.` };
+	return { main, also: `Also: ${names.join(', ')}${more > 0 ? `, and ${more} more` : ''}.`, ...maybe };
 };
 
 /** The three builders as one `RelationTexts`, so the compiler keeps them in step with it. */

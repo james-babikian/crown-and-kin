@@ -136,6 +136,8 @@ export function planLines({ g, persons, rows, unions, anchors, geo, side, extras
 	const reserved = new Map<number, number[]>();
 	const isFree = (gap: number, x: number) => !(reserved.get(gap) ?? []).some((t) => Math.abs(t - x) < near);
 	const reserve = (gap: number, x: number) => addTo(reserved, gap, x);
+	// The dots among those trunks: a line that leaves a card must not touch one (L2).
+	const dotsIn = new Map<number, number[]>();
 
 	// 1. Union dots. A dot between side-by-side partners stays in their gap; other dots move
 	//    outwards from their anchor, a step at a time, until no other trunk is there.
@@ -156,6 +158,7 @@ export function planLines({ g, persons, rows, unions, anchors, geo, side, extras
 		while (!isFree(gap, x)) x += dir * m.legStep;
 		if (x !== unions.get(fu.key)!.x) dotX.set(fu.key, x);
 		reserve(gap, x);
+		addTo(dotsIn, gap, x);
 	}
 
 	// 2. Exits: where each line leaves the bottom of a card. Tagged cards keep the middle for the tag.
@@ -175,18 +178,21 @@ export function planLines({ g, persons, rows, unions, anchors, geo, side, extras
 		const solo = (g.soloChildren.get(p.id) ?? []).length > 0 || foldedSolo.has(p.id);
 		const sideOf = (k: string): 'left' | 'right' => (ux(k) >= cx ? 'right' : 'left');
 		if (side) {
-			const slot = edgeSlots(b, legs.length + sides.length + (solo ? 1 : 0), m, near, (x) => isFree(gap, x), () => reserved.get(gap) ?? []);
+			// The side each line prefers, in the order the lines take their places: a single parent's trunk, legs, side links.
+			const prefs = [...(solo ? ['left' as const] : []), ...legs.map(sideOf), ...sides.map((s) => (centre(box(s.child)) >= cx ? ('right' as const) : ('left' as const)))];
+			const xs = edgeSlots(b, prefs, solo, m, near, geo.unionSize / 2, (x) => isFree(gap, x), () => reserved.get(gap) ?? [], dotsIn.get(gap) ?? []);
+			let at = 0;
 			if (solo) {
-				const x = slot('left');
+				const x = xs[at++];
 				soloExit.set(p.id, x);
 				reserve(gap, x);
 			}
 			for (const k of legs) {
-				const x = slot(sideOf(k));
+				const x = xs[at++];
 				legExit.set(`${k}|${p.id}`, x);
 				addTo(exitsIn, gap, x);
 			}
-			for (const s of sides) sideExits.set(`${s.child}|${p.id}`, slot(centre(box(s.child)) >= cx ? 'right' : 'left'));
+			for (const s of sides) sideExits.set(`${s.child}|${p.id}`, xs[at++]);
 			if (tagged.has(p.id)) {
 				// The tag hangs from the real bottom edge. A partner stacked directly below is joined by a
 				// bar from the middle of that edge, so the tag then keeps to the left half.
@@ -280,6 +286,9 @@ export function planLines({ g, persons, rows, unions, anchors, geo, side, extras
 	const tagFrom = side ? tagTop(side, 0) - m.exitStep / 2 : 0;
 	const tagTo = side ? sideTagDepth(side) + m.exitStep / 2 : 0;
 	const inTag = (b: PersonBox, x: number) => !!side && tagged.has(b.id) && x > b.x + b.w + tagFrom && x < b.x + b.w + tagTo;
+	// The drawing starts at the leftmost card. The layout may move every card by one amount after planning (room for a fold
+	// control), and the lines are planned again on the moved cards: the edge must move with them, or the two plans differ.
+	const leftEdge = Math.min(...[...persons.values()].map((b) => b.x));
 	const column = (k: number, cur: number, target: number): number | undefined => {
 		const row = rows[k].map(box);
 		if (free(k, cur) && row.every((b) => (cur <= b.x - geo.nodeGap / 2 || cur >= b.x + b.w + geo.nodeGap / 2) && !inTag(b, cur))) {
@@ -298,7 +307,7 @@ export function planLines({ g, persons, rows, unions, anchors, geo, side, extras
 				break;
 			}
 		}
-		for (let i = 0; first.x - geo.nodeGap / 2 - i * m.legStep >= 0; i++) {
+		for (let i = 0; first.x - geo.nodeGap / 2 - i * m.legStep >= leftEdge; i++) {
 			const x = first.x - geo.nodeGap / 2 - i * m.legStep;
 			if (free(k, x)) {
 				candidates.push({ x, penalty: 0 });
@@ -491,24 +500,55 @@ export function addTo<K, V>(map: Map<K, V[]>, key: K, value: V): void {
 /**
  * D24: where the lines leave one card's edge when that edge is only a card height long (the real
  * right edge of a sideways card). The first line takes the middle; each next one steps outwards on
- * its preferred side, then on the other, keeping 0.5 em clear of the corners. When more lines
- * leave than fit at the usual step, the step shrinks so that every line still leaves the card
- * itself, each at its own place.
+ * its preferred side (`prefs`, one for each line in the order they are placed), then on the other,
+ * keeping 0.5 em clear of the corners. When more lines leave than fit at the usual step, the step shrinks so
+ * that every line still leaves the card itself, each at its own place. When `solo` the first line is a
+ * trunk that the caller reserves at once, so the lines after it keep `near` from it.
+ *
+ * L2: if a line still touches the dot of a union beside the card (`dots`, `r` the dot's radius), the middle
+ * was a bad start: the lines are then spread over the part of the edge that no trunk holds, as far apart as
+ * the room allows. Only a card where a line touched a dot is placed again.
  */
-function edgeSlots(b: PersonBox, n: number, m: LineMetrics, near: number, free: (x: number) => boolean, trunks: () => number[]): (pref: 'left' | 'right') => number {
+function edgeSlots(b: PersonBox, prefs: readonly ('left' | 'right')[], solo: boolean, m: LineMetrics, near: number, r: number, free: (x: number) => boolean, trunks: () => number[], dots: readonly number[]): number[] {
+	const n = prefs.length;
 	const half = b.w / 2 - m.tagInset;
 	const cx = b.x + b.w / 2;
 	const step = Math.min(m.legStep, half / Math.max(1, Math.ceil((n - 1) / 2)));
 	const used: number[] = [];
-	const ok = (x: number) => free(x) && used.every((u) => Math.abs(u - x) >= step - 1e-6);
-	return (pref) => {
+	const reservedNow: number[] = [];
+	const ok = (x: number) => free(x) && reservedNow.every((t) => Math.abs(t - x) >= near) && used.every((u) => Math.abs(u - x) >= step - 1e-6);
+	const out = prefs.map((pref, i) => {
 		const dir = pref === 'left' ? -1 : 1;
 		const candidates = [cx];
-		for (const d of [dir, -dir]) for (let i = 1; i * step <= half + 1e-6; i++) candidates.push(cx + d * i * step);
-		const x = candidates.find(ok) ?? clearestSpot(b, m, used, trunks(), near, step);
+		for (const d of [dir, -dir]) for (let k = 1; k * step <= half + 1e-6; k++) candidates.push(cx + d * k * step);
+		const x = candidates.find(ok) ?? clearestSpot(b, m, used, [...trunks(), ...reservedNow], near, step);
 		used.push(x);
+		if (solo && i === 0) reservedNow.push(x);
 		return x;
-	};
+	});
+	if (!out.some((x) => dots.some((d) => Math.abs(d - x) < r + 1))) return out;
+	const places = spreadSlots(cx, half, n, step, trunks(), near, r + 1);
+	if (!places) return out;
+	// A line that prefers the left takes the leftmost place left, one that prefers the right the rightmost.
+	return prefs.map((pref) => (pref === 'left' ? places.shift()! : places.pop()!));
+}
+
+/**
+ * L2: `n` places on the edge (`cx` ± `half`), sorted, at least `step` apart (or the largest spacing of at least 2 px that
+ * fits), each `near` from every trunk; if no such places exist, `tight` from every trunk. Undefined when neither fits.
+ */
+function spreadSlots(cx: number, half: number, n: number, step: number, trunks: number[], near: number, tight: number): number[] | undefined {
+	for (const keep of [near, tight]) {
+		const allowed = (x: number) => trunks.every((t) => Math.abs(t - x) >= keep - 1e-6);
+		for (let s = step; s >= 2; s -= 0.5) {
+			const out: number[] = [];
+			for (let x = cx - half; x <= cx + half + 1e-6 && out.length < n; x += 0.5) {
+				if ((!out.length || x >= out[out.length - 1] + s - 1e-6) && allowed(x)) out.push(x);
+			}
+			if (out.length === n) return out;
+		}
+	}
+	return undefined;
 }
 
 /**

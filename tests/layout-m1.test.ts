@@ -89,15 +89,15 @@ unions:
 `;
 
 describe('geometryFor', () => {
-	it('matches the milestone 0 cards at the default 16 px font', () => {
-		expect(geometryFor(16, 'normal')).toMatchObject({ fontPx: 16, cardSize: 'normal', cardW: 180, cardH: 64, unionSize: 10, coupleGap: 36, nodeGap: 20, rowGap: 100 });
+	it('matches the cards at the default 16 px font (card height 61 px since 0.2.4, D117)', () => {
+		expect(geometryFor(16, 'normal')).toMatchObject({ fontPx: 16, cardSize: 'normal', cardW: 180, cardH: 61, unionSize: 10, coupleGap: 36, nodeGap: 20, rowGap: 100 });
 		expect(NORMAL_GEOMETRY).toEqual(geometryFor(16, 'normal'));
 	});
 
 	it('scales with the font size', () => {
 		const big = geometryFor(32, 'normal');
 		expect(big.cardW).toBe(360);
-		expect(big.cardH).toBe(128);
+		expect(big.cardH).toBe(122);
 		expect(big.rowGap).toBe(200);
 		expect(geometryFor(12, 'normal').cardW).toBe(135);
 	});
@@ -124,7 +124,8 @@ describe('geometryFor', () => {
 			it(`${size} ${f} px: name, title and dates fit inside the card`, () => {
 				const geo = geometryFor(f, size);
 				const t = cardText(geo);
-				expect(t.nameSize).toBe(f);
+				// D117: one size for all card text.
+				expect(t.nameSize).toBeCloseTo(0.85 * f);
 				expect(t.smallSize).toBeCloseTo(0.85 * f);
 				// Top of the name's capitals and bottom of the dates' descenders stay inside.
 				expect(t.nameBaseline - 0.75 * t.nameSize).toBeGreaterThan(0);

@@ -1,25 +1,25 @@
 orientation down
-size 514 392
-geometry font 16 normal card 180x64 union 10 couple 36 node 20 row 100 tag 18
+size 514 383
+geometry font 16 normal card 180x61 union 10 couple 36 node 20 row 100 tag 18
 row 0: aldric isolde
 row 1: roderick mathilde
 row 2: edric alys
-gap 0: 64 164
-gap 1: 228 328
-person aldric gen 0 at 0 0 size 180 64
-person alys gen 2 at 334 328 size 180 64
-person edric gen 2 at 98 328 size 180 64
-person isolde gen 0 at 216 0 size 180 64
-person mathilde gen 1 at 324 164 size 180 64
-person roderick gen 1 at 108 164 size 180 64
-union u0 at 198 32 bar
-union u1 at 306 196 bar
-path marriage [aldric isolde] M180 32H216
-path marriage [roderick mathilde] M288 196H324
-path descent [aldric isolde roderick] M198 32V134
-path descent [roderick aldric isolde] M198 134V164
-path descent [roderick mathilde edric alys] M306 196V298M188 298H424
-path descent [edric roderick mathilde] M188 298V328
-path descent [alys roderick mathilde] M424 298V328
-marker union at 198 32
-marker union at 306 196
+gap 0: 61 161
+gap 1: 222 322
+person aldric gen 0 at 0 0 size 180 61
+person alys gen 2 at 334 322 size 180 61
+person edric gen 2 at 98 322 size 180 61
+person isolde gen 0 at 216 0 size 180 61
+person mathilde gen 1 at 324 161 size 180 61
+person roderick gen 1 at 108 161 size 180 61
+union u0 at 198 30.5 bar
+union u1 at 306 191.5 bar
+path marriage [aldric isolde] M180 30.5H216
+path marriage [roderick mathilde] M288 191.5H324
+path descent [aldric isolde roderick] M198 30.5V131
+path descent [roderick aldric isolde] M198 131V161
+path descent [roderick mathilde edric alys] M306 191.5V292M188 292H424
+path descent [edric roderick mathilde] M188 292V322
+path descent [alys roderick mathilde] M424 292V322
+marker union at 198 30.5
+marker union at 306 191.5

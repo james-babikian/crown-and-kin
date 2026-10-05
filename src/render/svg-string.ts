@@ -14,16 +14,17 @@
  */
 import type { FamilyGraph } from '../core/derive';
 import type { CardLabel } from '../core/titles';
-import { armsPlace, cardText, nameCountOf, nameTextWidth, portraitBox, relationY, signBelowRing, smallTextWidth, tagTop, type CardText } from '../layout/geometry';
+import { boxesShown, cardBoxes, cardText, nameCountOf, nameRoom, relationY, roomAt, signBelowRing, smallLineOf, tagTop, type CardText } from '../layout/geometry';
 import { farTagSigns } from '../layout/far-tag-sign';
 import { illegitimateSigns } from '../layout/illegitimate-sign';
 import { FOLD_EM } from '../layout/fold-spots';
 import type { EdgeDrawing, NameLineCount, StrokeKind, TreeLayout } from '../layout/model';
 import { signText } from './dom/folds';
-import type { Measure, SceneFonts } from './dom/scene';
+import { ME_WORD, type Measure, type SceneFonts } from './dom/scene';
 import { legendRows, type LegendHouse, type LegendPart } from './legend';
 import { lineLook, type LineMarks, type LineState } from './line-highlight';
-import { nameLines, titleLines } from './name-lines';
+import type { BreakList } from './break-words';
+import { cardNameLines, titleLines, type NameMeasure, type NameRun } from './name-lines';
 import { fixedColour, fontOf, savedFrame, xmlText, type PictureMap, type SavedFrame, type SavedParts } from './saved-picture';
 import { DEAD_STRIP_OPACITY, DEFAULT_DARK, DEFAULT_LIGHT, FADED_OPACITY, ME_LOOK, ME_RING_INNER, ME_RING_INSET, ON_LINE_EXTRA, STROKES, TAG_MARK, UNION_MARKS, stripColour, tagMarkSlot, unionMark, unionShape, type Palette, type UnionShape } from './styles';
 import { LEGEND_LABELS, SIGN_LEGEND_LABEL, dateLine, farTagName } from './tree-info';
@@ -103,10 +104,14 @@ export interface SvgOptions {
 	saved?: SavedParts;
 	/** M10: draw the fold controls of the layout (the spike). A saved picture draws its signs from `saved.folds` and no buttons. Absent = none. */
 	folds?: SvgFolds;
+	/** D118: the user's break places for long names, as `SceneOptions.breaks`. */
+	breaks?: BreakList;
+	/** Rule B (D126 4): the people whose arms box and portrait are one small text line higher, as `SceneOptions.lifted`. */
+	lifted?: ReadonlySet<string>;
 }
 
-/** D40: the font of the relation text, as `relationFont` in `dom/scene.ts`: italic, "You" semibold upright. */
-const relationFontOf = (size: number, family: string, you: boolean) => (you ? `600 ${size}px ${family}` : `italic 400 ${size}px ${family}`);
+/** D40: the font of the relation text, as `relationFont` in `dom/scene.ts`: italic, "You" bold italic (D117). */
+const relationFontOf = (size: number, family: string, you: boolean, bold: string) => (you ? `italic ${bold} ${size}px ${family}` : `italic 400 ${size}px ${family}`);
 
 const isUri = (v: string | null | undefined): v is string => typeof v === 'string' && v.startsWith('data:');
 
@@ -183,35 +188,28 @@ export function renderSvg(g: FamilyGraph, layout: TreeLayout, edges: EdgeDrawing
 		const count = nameCountOf(box);
 		const t = textOf(count, box.tallTitle);
 		const tx = box.x + t.padX;
-		// D67, D78: the arms at the top right; the name ends before them and the D14 sign moves left of them.
+		// D117: the arms box and the portrait sit at the lower right, the arms left of the portrait; the name and the D14 sign do not give way to them.
 		const isMe = opts.me !== undefined && p.id === opts.me;
+		const namesOnly = geo.namesOnly === true;
 		// D96: on the marked card the pictures and the sign keep clear of the mark's inner ring.
 		const ring = isMe ? ME_RING_INNER : undefined;
+		// E4: a marked Normal card with the D14 sign shows no arms and no portrait below 11 px.
+		const showBoxes = boxesShown(geo, isMe, signed.has(p.id));
 		const hasArms = !!(box.arms && house);
-		// D76, D77: the small text lines beside the portrait are narrower; the name never is.
-		const portrait = box.portrait ? portraitBox(geo, t, ring === undefined ? undefined : { boxH: box.h, ring, arms: hasArms }) : undefined;
-		const place = hasArms ? armsPlace(geo, t, box.h, 0, ring, portrait) : undefined;
-		const nameW = place ? (signed.has(p.id) ? t.nameWithSignW : t.textW) - place.shift : signed.has(p.id) ? t.nameWithSignW : t.textW;
-		const widthAt = (baseline: number) => smallTextWidth(geo, t, baseline, portrait, ring === undefined ? undefined : place?.full);
+		const cb = cardBoxes(geo, t, box.h, { arms: showBoxes && hasArms, portrait: showBoxes && !!box.portrait, ...(ring === undefined ? {} : { ring }), lift: opts.lifted?.has(p.id) ? smallLineOf(geo) : 0 });
+		const portrait = cb.portrait;
+		const place = cb.arms;
+		const widthAt = (baseline: number) => roomAt(geo, t, baseline, t.smallSize, cb.boxes);
 		const nameFont = fontOf(fonts.bold, t.nameSize, fonts.text);
+		const sobFont = fontOf('400', t.nameSize, fonts.text);
 		const smallFont = fontOf('400', t.smallSize, fonts.text);
 		const cutSmall = (text: string, px: number) => (measured ? cutWith(text, px, smallFont) : fit(text, px, t.smallSize));
 		// M8: the card's name and title text lines; without a label, the person's own (M7).
 		const cl = opts.labels?.get(p.id);
 		const shownName = cl ? cl.name : p.name;
-		const maxLines = count === 3 ? 3 : 2;
-		const rawNames = measured
-			? count > 1
-				? nameLines(shownName, nameW, (s) => measured(s, nameFont), maxLines)
-				: [cutWith(shownName, nameW, nameFont)]
-			: count > 1
-				? nameLines(shownName, nameW, (s) => textWidth(s, t.nameSize, true), maxLines)
-				: [fit(shownName, nameW, t.nameSize, true)];
-		// D76, D77: a name text line beside the portrait is cut shorter; the breaks stay.
-		const names = rawNames.map((line, i) => {
-			const w = nameTextWidth(geo, t, (i + 1) as NameLineCount, count, portrait, t.textW - nameW);
-			return w < nameW ? (measured ? cutWith(line, w, nameFont) : fit(line, w, t.nameSize, true)) : line;
-		});
+		// D122: the sobriquet follows the name, in regular weight.
+		const nameMeasure: NameMeasure = measured ? (s, sob) => measured(s, sob ? sobFont : nameFont) : (s, sob) => textWidth(s, t.nameSize, !sob);
+		const names = cardNameLines(shownName, cl?.sobriquet ?? p.sobriquet, nameRoom(geo, t, signed.has(p.id), cb.boxes), nameMeasure, count, opts.breaks);
 		out.push(`<g${di(`card:${p.id}`)}${fadeAttr(look.card(p.id))}>`);
 		// D41: the marked card has a thicker accent border, with a thin text-colour ring inside it.
 		const border = isMe ? `stroke="${c.accent}" stroke-width="${ME_LOOK.border}"` : `stroke="${c.cardBorder}"`;
@@ -221,27 +219,27 @@ export function renderSvg(g: FamilyGraph, layout: TreeLayout, edges: EdgeDrawing
 			const i = ME_RING_INSET;
 			out.push(`<rect x="${box.x + i}" y="${box.y + i}" width="${box.w - 2 * i}" height="${box.h - 2 * i}" rx="${6 - i}" fill="none" stroke="${c.text}" stroke-width="${ME_LOOK.ring}"/>`);
 		}
-		names.forEach((line, i) => {
+		names.forEach((runs: NameRun[], i) => {
 			const y = box.y + [t.nameBaseline, t.name2Baseline!, t.name3Baseline!][i];
-			out.push(`<text x="${tx}" y="${y}" font-size="${t.nameSize}" font-weight="${esc(nameWeight)}" fill="${dead ? c.textMuted : c.text}">${esc(line)}</text>`);
+			const inner = runs.map((r) => (r.sob ? `<tspan font-weight="400">${esc(r.text)}</tspan>` : esc(r.text))).join('');
+			out.push(`<text x="${tx}" y="${y}" font-size="${t.nameSize}" font-weight="${esc(nameWeight)}" fill="${dead ? c.textMuted : c.text}">${inner}</text>`);
 		});
 		if (signed.has(p.id)) {
-			const moved = place ? { ...t.sign, x1: t.sign.x1 - place.shift, x2: t.sign.x2 - place.shift } : t.sign;
-			const s = ring === undefined ? moved : signBelowRing(moved, ring);
+			const s = ring === undefined ? t.sign : signBelowRing(t.sign, ring);
 			out.push(`<line x1="${box.x + s.x1}" y1="${box.y + s.y1}" x2="${box.x + s.x2}" y2="${box.y + s.y2}" stroke="${c.line}" stroke-width="${s.width}" stroke-dasharray="${s.dash.join(' ')}"${dead ? ' stroke-opacity="0.6"' : ''}${di(`sign:${p.id}`)}/>`);
 		}
 		const titleText = cl ? cl.title : p.title;
 		const reign = cl && opts.showDates !== false ? cl.reign : undefined;
-		const hasTitle = !!titleText || !!reign;
+		const hasTitle = !namesOnly && (!!titleText || !!reign);
 		let titles: string[] = [];
 		const smallMeasure = (s: string) => (measured ? measured(s, smallFont) : textWidth(s, t.smallSize));
 		if (cl && reign) {
 			// D61: two text lines only on a card the layout made taller for them; else one, cut with "…".
 			titles = titleLines(titleText, reign, t.textW, smallMeasure);
 			if (titles.length > 1 && t.title2Baseline === undefined) titles = [cutSmall([titleText, reign].filter(Boolean).join(' '), widthAt(t.titleBaseline))];
-		} else if (titleText) titles = [cutSmall(titleText, widthAt(t.titleBaseline))];
-		if (portrait || (ring !== undefined && place)) {
-			// G3: the break is made at the normal width; a text line beside the portrait is then cut shorter.
+		} else if (titleText && !namesOnly) titles = [cutSmall(titleText, widthAt(t.titleBaseline))];
+		if (cb.boxes.length) {
+			// G3: the break is made at the normal width; a text line beside a box is then cut shorter.
 			titles = titles.map((line, i) => {
 				const w = widthAt(i ? t.title2Baseline! : t.titleBaseline);
 				return w < t.textW ? cutSmall(line, w) : line;
@@ -252,12 +250,23 @@ export function renderSvg(g: FamilyGraph, layout: TreeLayout, edges: EdgeDrawing
 		});
 		const dates = dateLine(p);
 		const datesY = hasTitle ? t.datesBaseline : t.titleBaseline;
-		if (dates && !(saved && opts.showDates === false)) out.push(`<text x="${tx}" y="${box.y + datesY}" font-size="${t.smallSize}" fill="${c.dates}">${esc(cutSmall(dates, widthAt(datesY)))}</text>`);
+		const showYears = !!dates && !(saved && opts.showDates === false);
+		if (namesOnly && isMe) {
+			// D119, D128: the marked names-only card keeps "You", after the years on the same text line; the years end with "…" first, "You" is never cut.
+			const roomW = widthAt(datesY);
+			const gap = 0.6 * geo.fontPx;
+			const youFont = relationFontOf(t.smallSize, fonts.text, true, fonts.bold);
+			const youW = measured ? measured(ME_WORD, youFont) : textWidth(ME_WORD, t.smallSize, true);
+			const yearsW = (s: string) => (measured ? measured(s, smallFont) : textWidth(s, t.smallSize));
+			const years = showYears ? (yearsW(dates!) + gap + youW > roomW ? cutSmall(dates!, roomW - gap - youW) : dates!) : '';
+			if (years) out.push(`<text x="${tx}" y="${box.y + datesY}" font-size="${t.smallSize}" fill="${c.dates}">${esc(years)}</text>`);
+			out.push(`<text x="${tx + (years ? yearsW(years) + gap : 0)}" y="${box.y + datesY}" font-size="${t.smallSize}" font-style="italic" font-weight="${esc(nameWeight)}" fill="${c.text}"${di(`relation:${p.id}`)}>${ME_WORD}</text>`);
+		} else if (showYears) out.push(`<text x="${tx}" y="${box.y + datesY}" font-size="${t.smallSize}" fill="${c.dates}">${esc(cutSmall(dates!, widthAt(datesY)))}</text>`);
 		const relation = opts.relations?.get(p.id)?.text;
-		const relY = relationY(t, hasTitle, !!dates);
+		const relY = namesOnly ? undefined : relationY(t, hasTitle, !!dates);
 		if (relation && relY !== undefined) {
-			const style = isMe ? 'font-weight="600"' : 'font-style="italic"';
-			const relText = measured ? cutWith(relation, widthAt(relY), relationFontOf(t.smallSize, fonts.text, isMe)) : fit(relation, widthAt(relY), t.smallSize, isMe);
+			const style = isMe ? `font-style="italic" font-weight="${esc(nameWeight)}"` : 'font-style="italic"';
+			const relText = measured ? cutWith(relation, widthAt(relY), relationFontOf(t.smallSize, fonts.text, isMe, fonts.bold)) : fit(relation, widthAt(relY), t.smallSize, isMe);
 			out.push(`<text x="${tx}" y="${box.y + relY}" font-size="${t.smallSize}" ${style} fill="${c.text}"${di(`relation:${p.id}`)}>${esc(relText)}</text>`);
 		}
 		// M9: the pictures. Arms with a problem show nothing; a portrait always has its frame (B1, B9).

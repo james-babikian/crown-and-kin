@@ -18,6 +18,7 @@ import { TreeView } from '../../src/obsidian/tree-view';
 import { HINT_UI } from '../../src/render/ui-text';
 import { FEl, clock, device, dispatch, flushFrames, installDom, pointer, resetDom, resizeAll, runTimers, settle } from './fake-dom';
 import { resetObsidian } from './fake-obsidian';
+import { wholeCardSettings } from './phone-style';
 import { FAR, embed, fakeHandle, fakeHost, fullViews, type Host } from './tree-view-fakes';
 
 /*
@@ -92,7 +93,8 @@ function registry(host: Host, handle: ReturnType<typeof fakeHandle>): void {
 }
 
 async function preview(source: string, box: () => Box = () => previewBox()) {
-	const host = fakeHost();
+	// These tests check whole cards (heights of tall cards); the default phone style of D119 is names only.
+	const host = fakeHost(wholeCardSettings());
 	const handle = fakeHandle('n.md', source);
 	registry(host, handle);
 	const el = new FEl('div');
@@ -294,8 +296,9 @@ describe('D29: names measured with the real font make only their cards taller (n
 	it('a name that does not fit uses two text lines on a taller card; a short name keeps one line and the normal height', async () => {
 		phonePortrait();
 		const { el } = await preview(NAMES);
-		expect(card(el, 'will').h).toBe(DOWN.cardH + 2 * tallExtra(DOWN));
-		expect(names(el, 'will')).toEqual(['Wilhelmina', 'Blackmere-Orsi', 'ni']);
+		// 0.2.4 (D117, D125): the name text is 0.85 em, so "Blackmere-Orsini" fits the narrow card and the name needs two text lines (three before).
+		expect(card(el, 'will').h).toBe(TALL_H);
+		expect(names(el, 'will')).toEqual(['Wilhelmina', 'Blackmere-Orsini']);
 		expect(card(el, 'bo').h).toBe(DOWN.cardH);
 		expect(names(el, 'bo')).toEqual(['Bo']);
 		expect(card(el, 'anna').h).toBe(DOWN.cardH);
@@ -325,7 +328,7 @@ describe('D29: names measured with the real font make only their cards taller (n
 		};
 		const near = ['will', 'bo', 'anna'].map((id) => ({ id, d: Math.hypot(centreOf(id).x - 400, centreOf(id).y - 250) })).sort((a, b) => a.d - b.d)[0].id;
 		const before = { ...screen(el), at: centreOf(near) };
-		text.wide = 1.3;
+		text.wide = 1.6;
 		view.onFontsLoaded(['sans-serif']);
 		flushFrames();
 		expect(card(el, 'anna').h).toBe(TALL_H);
@@ -337,6 +340,8 @@ describe('D29: names measured with the real font make only their cards taller (n
 
 	it('after fitNarrow (a narrower box) the names are measured again: a name that fitted now takes two text lines, and the preview shows its first view', async () => {
 		phonePortrait();
+		// The text is 0.85 em since 0.2.4: a face 10 % wider keeps the old scenario (a name that fits the 342 px box and not the 300 px box).
+		text.wide = 1.1;
 		let w = 342;
 		const { el } = await preview(NAMES, () => previewBox(w));
 		expect(card(el, 'anna').h).toBe(DOWN.cardH);
@@ -355,7 +360,7 @@ describe('D29: names measured with the real font make only their cards taller (n
 		phonePortrait();
 		const { el, view } = await preview(NAMES);
 		expect(card(el, 'anna').h).toBe(DOWN.cardH);
-		text.wide = 1.2;
+		text.wide = 1.5;
 		view.onFontsLoaded(['sans-serif']);
 		flushFrames();
 		expect(card(el, 'anna').h).toBe(TALL_H);
@@ -370,7 +375,7 @@ describe('D29: names measured with the real font make only their cards taller (n
 		const scene = el.querySelector('.dynasty-scene');
 		view.onCssChange();
 		expect(el.querySelector('.dynasty-scene')?.children[0]).toBe(scene?.children[0]);
-		text.wide = 1.2;
+		text.wide = 1.5;
 		view.onCssChange();
 		flushFrames();
 		expect(card(el, 'anna').h).toBe(TALL_H);

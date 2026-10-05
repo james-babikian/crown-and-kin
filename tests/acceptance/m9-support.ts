@@ -28,7 +28,7 @@ import type {
 import type { House, Person, Tree } from '../../src/core/types';
 import { applyOp } from '../../src/core/yaml-edit';
 import type { LayoutSettings, PersonBox } from '../../src/layout/model';
-import type { smallTextWidth } from '../../src/layout/geometry';
+import type { roomAt } from '../../src/layout/geometry';
 import type { armsCards, pictureSets } from '../../src/layout/layout';
 import type { savedFileName, savedLegend, savedScale } from '../../src/render/saved-picture';
 import type { livePictureSlots } from '../../src/render/view-math';
@@ -47,7 +47,7 @@ export type PictureSets = typeof pictureSets;
 type SavedFileName = typeof savedFileName;
 type SavedLegend = typeof savedLegend;
 type SavedScale = typeof savedScale;
-type SmallTextWidth = typeof smallTextWidth;
+type RoomAt = typeof roomAt;
 type LivePictureSlots = typeof livePictureSlots;
 
 // ---------- Loading modules that do not exist yet ----------
@@ -103,9 +103,8 @@ export const savedModule = () => load<SavedModule>(SAVED_PATH, 'src/render/saved
 /** `pictureSets` and `armsCards`, exported from `src/layout/index.ts` (L1, L2). */
 export const layoutPictures = () => load<{ pictureSets: PictureSets; armsCards: ArmsCards }>(LAYOUT_PATH, 'src/layout/index.ts', 'WP 9.2', ['pictureSets', 'armsCards']);
 
-/** `smallTextWidth` of `src/layout/geometry.ts` (G3). */
-export const smallTextWidthOf = async (): Promise<SmallTextWidth> =>
-	(await load<{ smallTextWidth: SmallTextWidth }>(GEOMETRY_PATH, 'src/layout/geometry.ts', 'WP 9.2', ['smallTextWidth'])).smallTextWidth;
+/** `roomAt` of `src/layout/geometry.ts` (G3; since 0.2.4 it replaces `smallTextWidth`, D117). */
+export const roomAtOf = async (): Promise<RoomAt> => (await load<{ roomAt: RoomAt }>(GEOMETRY_PATH, 'src/layout/geometry.ts', 'WP 9.2', ['roomAt'])).roomAt;
 
 /** `livePictureSlots` of `src/render/view-math.ts` (S3). */
 export const livePictureSlotsOf = async (): Promise<LivePictureSlots> =>

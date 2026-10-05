@@ -181,16 +181,74 @@ function childShift(focus: Rect, children: Rect[], width: number, pad: number): 
 	return seen > near.w / 4 ? (right ? max : -max) : 0;
 }
 
+/** Screen px around the badge disc in which the badge wins a tap over its own card (spec §13.10, §7.5). */
+export const BADGE_WIN_MARGIN_PX = 6;
+
+/** The tap shape of one badge at one zoom, in layout px: its square, and the disc in which it wins over its own card. */
+export interface BadgeTap {
+	/** The square of `badgeHit`, after the cap and the clip. */
+	square: Rect;
+	/** The disc around the badge centre in which the badge wins a tap over its own card. Nothing above `top` belongs to it. */
+	disc: { cx: number; cy: number; r: number; top: number };
+}
+
+/** The half side of the tap square, before the clip. Low zoom: only the badge circle, so the cards keep the space. */
+function badgeHalf(r: number, scale: number, fontPx: number, capPx: number): number {
+	if (!(scale > 0) || scale * fontPx < FIT_MIN_NAME_PX) return r;
+	// The cap never takes the square off the visible badge.
+	return Math.min(Math.max(MIN_HIT_PX / (2 * scale), r), Math.max(capPx, r));
+}
+
 /**
- * The tap area of a `+` badge in layout px at `scale` (spec §7.5): at least 44 screen px square
- * while names are at least 11 px, with its right edge at the badge's right edge, so it reaches over
- * its own card's corner and not over the next card (1.25 em away). At a smaller zoom it is only the
- * badge's circle, so the cards keep the space.
+ * How far the square may reach above the card top. The tap area of another person's far-couple tag wins in the strip it
+ * covers (spec §7.5), so the square stops at the lowest of those rects that lie above the card and meet its x range.
  */
-export function badgeHit(mark: Rect, scale: number, fontPx: number): Rect {
-	if (!(scale > 0) || scale * fontPx < FIT_MIN_NAME_PX) return mark;
-	const side = Math.max(MIN_HIT_PX / scale, mark.w, mark.h);
-	return { x: mark.x + mark.w - side, y: mark.y + mark.h / 2 - side / 2, w: side, h: side };
+function badgeReachUp(x0: number, x1: number, cardTop: number, half: number, avoid: readonly Rect[]): number {
+	let nearest = -Infinity;
+	for (const a of avoid) {
+		if (a.x + a.w <= x0 || a.x >= x1 || !(a.y < cardTop)) continue;
+		nearest = Math.max(nearest, a.y + a.h);
+	}
+	return nearest === -Infinity ? half : Math.min(half, Math.max(0, cardTop - nearest));
+}
+
+/**
+ * The tap shape of a `+` badge in layout px at `scale` (spec §7.5, contract 4.2). `mark` is the visible circle: its centre is the
+ * top right corner of the card (D117). The square is at least 44 screen px while names are at least 11 px, with its right edge
+ * at the badge's right edge and centred on the badge vertically. Its half side is capped at `capPx` (the layout's `nodeGap` in
+ * `sideways`, half the card height in `down`) so it never reaches a neighbour or more than half its own card. Above the card top
+ * it stops at `avoid` (the tag tap areas of the other people). At a smaller zoom it is only the badge's circle.
+ */
+export function badgeTap(mark: Rect, scale: number, fontPx: number, capPx: number, avoid: readonly Rect[]): BadgeTap {
+	const r = mark.w / 2;
+	const cx = mark.x + r;
+	const cy = mark.y + mark.h / 2;
+	const half = badgeHalf(r, scale, fontPx, capPx);
+	const x0 = cx + r - 2 * half;
+	const up = badgeReachUp(x0, cx + r, cy, half, avoid);
+	const grown = scale > 0 && scale * fontPx >= FIT_MIN_NAME_PX;
+	return {
+		square: { x: x0, y: cy - up, w: 2 * half, h: up + half },
+		disc: { cx, cy, r: grown ? r + BADGE_WIN_MARGIN_PX / scale : r, top: cy - up },
+	};
+}
+
+/** The square of `badgeTap`: the tap area of the badge outside its own card. */
+export function badgeHit(mark: Rect, scale: number, fontPx: number, capPx: number, avoid: readonly Rect[]): Rect {
+	return badgeTap(mark, scale, fontPx, capPx, avoid).square;
+}
+
+/**
+ * Does the badge win a tap at `point` (layout px)? One rule, like §13.10 for the fold controls. The part of the square outside
+ * its own card (above its top edge or right of its right edge) is the badge. Over its own card the card wins, except inside the
+ * disc of radius `r + 6 px` around the badge centre. The strip a tag tap area covers is not in the square, so the tag wins there.
+ */
+export function badgeTapWins(mark: Rect, point: { x: number; y: number }, scale: number, fontPx: number, capPx: number, avoid: readonly Rect[]): boolean {
+	const { square, disc } = badgeTap(mark, scale, fontPx, capPx, avoid);
+	const inSquare = point.x >= square.x && point.x <= square.x + square.w && point.y >= square.y && point.y <= square.y + square.h;
+	const overOwnCard = point.x <= disc.cx && point.y >= disc.cy;
+	if (inSquare && !overOwnCard) return true;
+	return point.y >= disc.top && Math.hypot(point.x - disc.cx, point.y - disc.cy) <= disc.r;
 }
 
 /**
@@ -220,20 +278,6 @@ export function clearToolbar(view: View, size: Size, bar: { left: number; right:
 		v = { scale: v.scale, cx: v.cx, cy: v.cy - shift / v.scale };
 	}
 	return v;
-}
-
-/**
- * The `+` badge's tap area in `sideways` (D24): the badge sits inside its card's top
- * right corner, off the lines in the column gaps, so the tap area is a square in that corner, at
- * least 44 screen px while names are at least 11 px (the card is then at least 44 px high), and
- * always over the whole visible badge (zoomed in, 44 px can be smaller than the badge). At a smaller
- * zoom it is only the badge's circle, so the card keeps the space.
- */
-export function badgeHitInCard(mark: Rect, card: Rect, scale: number, fontPx: number): Rect {
-	if (!(scale > 0) || scale * fontPx < FIT_MIN_NAME_PX) return mark;
-	const reach = Math.max(card.x + card.w - mark.x, mark.y + mark.h - card.y);
-	const side = Math.max(reach, Math.min(card.w, card.h, MIN_HIT_PX / scale));
-	return { x: card.x + card.w - side, y: card.y, w: side, h: side };
 }
 
 /** The smallest gap between two sideways columns of narrow cards, in em. */

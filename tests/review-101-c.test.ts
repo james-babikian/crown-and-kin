@@ -1,10 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { deriveFamilies } from '../src/core/derive';
 import { parseDynasty } from '../src/core/parse';
+import { farTagSigns } from '../src/layout/far-tag-sign';
 import { geometryFor } from '../src/layout/geometry';
 import { clearLayoutCache, layoutTree } from '../src/layout/index';
 import type { LayoutSettings } from '../src/layout/model';
 import { nameLines } from '../src/render/name-lines';
+import { DEFAULT_LIGHT } from '../src/render/styles';
+import { renderSvg } from '../src/render/svg-string';
 import * as S from './acceptance/sideways-checks';
 import { build } from './helpers';
 
@@ -91,13 +94,18 @@ unions:
   - {partners: [s1, s2]}
   - {partners: [a, z], type: betrothal}
 `;
-	// Fails today (checked again for 0.2.3): in the downward layout a far betrothal with no children has no
-	// marker. Accepted for 0.1.1; an open idea (a sign in the tag pill). Keep skipped until the owner decides.
-	it.skip('down', () => {
+	// In the downward layout a far betrothal with no children has no union dot, so no marker. Since 0.2.1 its sign
+	// is drawn in the tag pill of each partner (`farTagSigns`); 0.2.4 replaces the old skipped test with this one.
+	it('down: no dot marks the far betrothal, so the tag pill of each partner carries its sign', () => {
 		const { g, layout, edges } = lay(src, DOWN);
 		const fu = g.unions.find((u) => u.type === 'betrothal')!;
 		expect(layout.unions.get(fu.key)!.far).toBe(true);
-		expect(edges.markers.filter((m) => m.unionType === 'betrothal')).toHaveLength(1);
+		expect(edges.markers.filter((m) => m.unionType === 'betrothal')).toHaveLength(0);
+		expect([...farTagSigns(g, layout, edges)].sort()).toEqual([['a', 'betrothal'], ['z', 'betrothal']]);
+		// The headless picture draws the ring of the betrothal in both pills (the tag's muted colour marks it).
+		const svg = renderSvg(g, layout, edges, { palette: DEFAULT_LIGHT });
+		const rings = svg.match(new RegExp(`<circle [^>]*fill="${DEFAULT_LIGHT.cardFill}" stroke="${DEFAULT_LIGHT.textMuted}"`, 'g')) ?? [];
+		expect(rings).toHaveLength(2);
 	});
 });
 

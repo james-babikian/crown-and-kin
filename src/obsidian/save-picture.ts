@@ -17,6 +17,7 @@ import type { CardLabel } from '../core/titles';
 import { PICTURE_EM, pictureSize } from '../layout/geometry';
 import { DEFAULT_FAR_RULE, NEVER_FAR_RULE } from '../layout/index';
 import type { Geometry, LaidOut, LayoutSettings, Orientation } from '../layout/model';
+import type { BreakList } from '../render/break-words';
 import { measureText } from '../render/dom/measure';
 import type { SceneFonts } from '../render/dom/scene';
 import type { LineMarks } from '../render/line-highlight';
@@ -41,13 +42,15 @@ export interface SaveSource {
 	/** The relation finder's line; `fade` for "Show in the whole tree". */
 	line?: LineMarks;
 	orientation: Orientation;
-	/** `geometryFor(fontPx, cardSize)`; the save adds the relation line and normal sideways cards. */
+	/** `geometryFor(fontPx, cardSize)`, never the names-only geometry: the saved picture shows whole cards (contract 6.2). The save adds the relation line and normal sideways cards. */
 	geo: Geometry;
 	/** The tree has a mark: every card has the relation text line (D40). */
 	relationLine: boolean;
 	fonts: SceneFonts;
 	showDates: boolean;
 	showPortraits: boolean;
+	/** The user's break places for names (D118). */
+	breaks?: BreakList;
 	sourcePath: string;
 	/** The note's name without ".md" (the heading and the file name). */
 	note: string;
@@ -209,7 +212,18 @@ export async function makePicture(store: PictureStore | undefined, src: SaveSour
 	};
 	// P2: the canvas measures every text with the font strings the file names.
 	const measure = measureText;
-	const { laid } = measuredLayout(g, src.geo, base, { fonts: src.fonts, measure, labels: src.labels, showDates: src.showDates, showPortraits: src.showPortraits, ...(folds?.hidden.length ? { foldHidden: new Set(folds.hidden) } : {}) });
+	// The relation words (when they show) decide rule B in the fit, so the picture lifts the boxes as the screen does.
+	const { laid, lifted } = measuredLayout(g, src.geo, base, {
+		fonts: src.fonts,
+		measure,
+		labels: src.labels,
+		showDates: src.showDates,
+		showPortraits: src.showPortraits,
+		...(folds?.hidden.length ? { foldHidden: new Set(folds.hidden) } : {}),
+		...(src.breaks ? { breaks: src.breaks } : {}),
+		...(src.me !== undefined ? { marked: src.me } : {}),
+		...(src.relations ? { relations: src.relations } : {}),
+	});
 	const fontPx = laid.layout.geometry.fontPx;
 	const legend = savedLegend(g, laid);
 	const heading = src.note;
@@ -224,6 +238,8 @@ export async function makePicture(store: PictureStore | undefined, src: SaveSour
 		...(src.me !== undefined ? { me: src.me } : {}),
 		...(src.line ? { line: src.line } : {}),
 		...(src.labels ? { labels: src.labels } : {}),
+		...(src.breaks ? { breaks: src.breaks } : {}),
+		...(lifted.size ? { lifted } : {}),
 		showDates: src.showDates,
 		measure,
 		fonts: src.fonts,

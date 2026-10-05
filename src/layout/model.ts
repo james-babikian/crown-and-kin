@@ -67,6 +67,8 @@ export interface Geometry {
 	 * `layoutFamilies` apply it before anything else. `cardText` then centres three small lines.
 	 */
 	relationLine?: boolean;
+	/** D119: the names-only card of the phone preview (name and years, no relation line). `cardH` is then `namesOnlyCardH(fontPx)`. Part of the layout key because the key hashes the whole geometry. */
+	namesOnly?: true;
 }
 
 /** `geometry.ts` exports `geometryFor: GeometryFor`. Card size scales with the font. */
@@ -74,6 +76,19 @@ export type GeometryFor = (fontPx: number, cardSize: CardSize) => Geometry;
 
 /** How many text lines a name takes on a card (D29, D81). */
 export type NameLineCount = 1 | 2 | 3;
+
+/** A lower-right box of a card (the arms box or the portrait) and its gap to the text (D117, contract 4.2). */
+export interface LowerRightBox {
+	r: Rect;
+	gap: number;
+}
+
+/** Room for the text lines of a name (px, from the text's left edge). `full`: any line before the last. `last`: the final line of a name of 2 or 3 lines. `only`: the line of a name that stays on ONE line. */
+export interface NameRoom {
+	full: number;
+	last: number;
+	only: number;
+}
 
 /** A person's card: its box, id and generation (row in `down`, column in `sideways`). */
 export interface PersonBox extends Rect {

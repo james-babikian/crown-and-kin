@@ -9,7 +9,7 @@ describe('normaliseSettings', () => {
 	});
 
 	it('keeps valid values', () => {
-		const s = { embedHeightDesktop: 800, embedHeightPhone: 70, cardSize: 'compact', showDates: false, showRelations: false, showPortraits: false, showHouseGeneration: false, focusGenerations: 0, updateLinks: false };
+		const s = { embedHeightDesktop: 800, embedHeightPhone: 70, cardSize: 'compact', showDates: false, showRelations: false, showPortraits: false, showHouseGeneration: false, focusGenerations: 0, updateLinks: false, phoneCardStyle: 'whole', breakWords: 'Long-na-munda', reduceMotion: 'on' };
 		expect(normaliseSettings(s)).toEqual(s);
 		expect(normaliseSettings({ embedHeightDesktop: 100, embedHeightPhone: 40, focusGenerations: 10 })).toMatchObject({ embedHeightDesktop: 100, embedHeightPhone: 40, focusGenerations: 10 });
 		expect(normaliseSettings({ embedHeightDesktop: 5000, embedHeightPhone: 80 })).toMatchObject({ embedHeightDesktop: 5000, embedHeightPhone: 80 });
@@ -81,7 +81,7 @@ describe('pending renames in data.json', () => {
 	const entry = { oldPath: 'A/Old.md', newPath: 'A/New.md', others: ['B/Old.md'] };
 
 	it('normaliseSettings ignores them: the settings are the same with or without the key', () => {
-		const s = { embedHeightDesktop: 800, embedHeightPhone: 70, cardSize: 'compact', showDates: false, showRelations: false, showPortraits: false, showHouseGeneration: false, focusGenerations: 0, updateLinks: false };
+		const s = { embedHeightDesktop: 800, embedHeightPhone: 70, cardSize: 'compact', showDates: false, showRelations: false, showPortraits: false, showHouseGeneration: false, focusGenerations: 0, updateLinks: false, phoneCardStyle: 'whole', breakWords: 'Long-na-munda', reduceMotion: 'on' };
 		expect(PENDING_KEY).toBe('pendingRenames');
 		expect(normaliseSettings({ ...s, [PENDING_KEY]: [entry] })).toEqual(s);
 		expect(normaliseSettings({ [PENDING_KEY]: [entry] })).toEqual(DEFAULT_SETTINGS);

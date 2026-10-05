@@ -5,7 +5,7 @@
 
 import { Notice, PluginSettingTab, Setting, SettingGroup, debounce, type App, type Plugin } from 'obsidian';
 import { SETTINGS_UI } from '../render/ui-text';
-import { GENERATIONS, PHONE_HEIGHTS, parseDesktopHeight, type DynastySettings } from './settings';
+import { GENERATIONS, PHONE_CARD_STYLES, PHONE_HEIGHTS, REDUCE_MOTIONS, parseDesktopHeight, type DynastySettings, type PhoneCardStyle, type ReduceMotion } from './settings';
 
 /** What the tab needs from the plugin. */
 export interface SettingsHost extends Plugin {
@@ -23,13 +23,19 @@ function name(control: HTMLElement | null | undefined, label: string): void {
 	control?.setAttribute('aria-label', label);
 }
 
-/** The desktop height is stored this long after the last key press (or at once on blur or Enter). */
+/** The desktop height and the break list are stored this long after the last key press (or at once on blur; the height also on Enter). */
 const HEIGHT_TYPING_MS = 400;
+
+/** The text of each choice of "Card style in the phone preview" and of "Reduce movement" (D119, D126). */
+const STYLE_LABEL: Record<PhoneCardStyle, string> = { 'names-shield': SETTINGS_UI.styleNamesShield, 'names-portrait': SETTINGS_UI.styleNamesPortrait, whole: SETTINGS_UI.styleWhole };
+const REDUCE_LABEL: Record<ReduceMotion, string> = { system: SETTINGS_UI.reduceFollow, on: SETTINGS_UI.reduceOn, off: SETTINGS_UI.reduceOff };
 
 /** The plugin's settings page, built fresh each time it is shown. */
 export class DynastySettingTab extends PluginSettingTab {
 	/** Stores a desktop height that still waits for the typing to stop. */
 	private pending: (() => void) | null = null;
+	/** The same for the break list. */
+	private pendingBreaks: (() => void) | null = null;
 
 	constructor(
 		app: App,
@@ -94,6 +100,44 @@ export class DynastySettingTab extends PluginSettingTab {
 					d.addOption('compact', t.cardCompact);
 					d.setValue(s.cardSize);
 					d.onChange((v) => void this.host.changeSettings({ cardSize: v === 'compact' ? 'compact' : 'normal' }));
+				});
+			});
+			add((row) => {
+				row.setName(t.phoneCardStyle).setDesc(t.phoneCardStyleDesc);
+				row.addDropdown((d) => {
+					name(d.selectEl, t.phoneCardStyle);
+					for (const v of PHONE_CARD_STYLES) d.addOption(v, STYLE_LABEL[v]);
+					d.setValue(s.phoneCardStyle);
+					d.onChange((v) => void this.host.changeSettings({ phoneCardStyle: PHONE_CARD_STYLES.find((x) => x === v) ?? 'names-shield' }));
+				});
+			});
+			add((row) => {
+				row.setName(t.breakWords).setDesc(t.breakWordsDesc);
+				row.addTextArea((area) => {
+					area.inputEl.addClass('dynasty-setting-break-words');
+					area.inputEl.rows = 6;
+					name(area.inputEl, t.breakWords);
+					area.setValue(s.breakWords);
+					// D118: the list is stored when the typing stops or the field loses the focus, not at each key press (each store lays the trees out again).
+					const store = () => {
+						if (area.getValue() !== this.host.settings.breakWords) void this.host.changeSettings({ breakWords: area.getValue() });
+					};
+					const later = debounce(store, HEIGHT_TYPING_MS, true);
+					this.pendingBreaks = () => {
+						later.cancel?.();
+						store();
+					};
+					area.onChange(() => void Promise.resolve().then(() => later()));
+					area.inputEl.addEventListener('blur', () => this.pendingBreaks?.());
+				});
+			});
+			add((row) => {
+				row.setName(t.reduceMotion).setDesc(t.reduceMotionDesc);
+				row.addDropdown((d) => {
+					name(d.selectEl, t.reduceMotion);
+					for (const v of REDUCE_MOTIONS) d.addOption(v, REDUCE_LABEL[v]);
+					d.setValue(s.reduceMotion);
+					d.onChange((v) => void this.host.changeSettings({ reduceMotion: REDUCE_MOTIONS.find((x) => x === v) ?? 'system' }));
 				});
 			});
 			add((row) => {
@@ -174,6 +218,8 @@ export class DynastySettingTab extends PluginSettingTab {
 	override hide(): void {
 		this.pending?.();
 		this.pending = null;
+		this.pendingBreaks?.();
+		this.pendingBreaks = null;
 		super.hide();
 	}
 

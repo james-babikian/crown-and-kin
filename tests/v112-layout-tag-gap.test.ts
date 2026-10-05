@@ -123,12 +123,12 @@ describe('the headless drawing: the same gap G before the name for the four shap
 		const svg = renderSvg(g, laid.layout, laid.edges, { palette: DEFAULT_LIGHT, measure: approxMeasure, fonts: FONTS });
 		const i = svg.indexOf('⚭</text>');
 		const chunk = svg.slice(svg.lastIndexOf('<rect', i), svg.indexOf('Zelda</text>', i) + 'Zelda</text>'.length);
-		// Recorded from the 0.2.1 build (d26fe18).
+		// Recorded from the 0.2.1 build (d26fe18); every y is 6 px higher since 0.2.4 (D117: the card is 61 px high, not 64, on each of two rows).
 		expect(chunk).toBe(
-			'<rect x="51" y="225" width="78" height="18" rx="9" fill="#fafafa" stroke="#5c5c5c" stroke-width="1"/>\n' +
-				'<text x="60" y="238.2" font-size="15" font-family="Segoe UI Symbol, DejaVu Sans, sans-serif" fill="#5c5c5c">⚭</text>\n' +
-				'<circle cx="83.39999999999999" cy="234" r="2.4000000000000004" fill="#5c5c5c"/>\n' +
-				'<text x="90" y="238.2" font-size="12" fill="#5c5c5c">Zelda</text>',
+			'<rect x="51" y="219" width="78" height="18" rx="9" fill="#fafafa" stroke="#5c5c5c" stroke-width="1"/>\n' +
+				'<text x="60" y="232.2" font-size="15" font-family="Segoe UI Symbol, DejaVu Sans, sans-serif" fill="#5c5c5c">⚭</text>\n' +
+				'<circle cx="83.39999999999999" cy="228" r="2.4000000000000004" fill="#5c5c5c"/>\n' +
+				'<text x="90" y="232.2" font-size="12" fill="#5c5c5c">Zelda</text>',
 		);
 	});
 });

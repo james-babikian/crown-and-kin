@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_LAYOUT_SETTINGS, clearLayoutCache, layoutTree } from '../src/layout/index';
-import { cardText, geometryFor, nameCountOf, nameTextWidth, tallExtra } from '../src/layout/geometry';
+import { cardText, geometryFor, nameCountOf, roomAt, tallExtra } from '../src/layout/geometry';
 import type { LayoutSettings } from '../src/layout/model';
 import { nameLines } from '../src/render/name-lines';
 import { graphOf } from './acceptance/m10-support';
@@ -41,10 +41,10 @@ describe('name text line helpers', () => {
 		expect(nameCountOf({ tallName: true, longName: true })).toBe(3);
 	});
 
-	it('nameTextWidth leaves a text line the card does not have at the normal width', () => {
+	it('roomAt leaves a name text line that no box reaches at the normal width', () => {
 		const t = cardText(GEO, 2);
 		const portrait = { x: t.padX + t.textW - 24, y: t.textBottom - 24, w: 24, h: 24 };
-		expect(nameTextWidth(GEO, t, 3, 2, portrait, 0)).toBe(t.textW);
+		expect(roomAt(GEO, t, t.nameBaseline, t.nameSize, [{ r: portrait, gap: 4 }])).toBe(t.textW);
 	});
 
 	it('an empty name is one empty text line', () => {

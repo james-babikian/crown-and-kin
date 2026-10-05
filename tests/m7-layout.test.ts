@@ -115,7 +115,8 @@ describe('D40: cardText centres three small text lines; relationY moves up like 
 		const geo = geometryFor(16, 'normal');
 		const t = cardText(geo);
 		expect(Object.keys(t)).not.toContain('relationBaseline');
-		expect(t.nameBaseline).toBeCloseTo((64 - 19.2 - 2 * 16.32) / 2 + 9.6 + 5.6, 6);
+		// D117: card 61 px, three text lines of 16.32 px (all text is 0.85 em); the name's baseline is 0.35 of its 13.6 px below the middle.
+		expect(t.nameBaseline).toBeCloseTo((61 - 3 * 16.32) / 2 + 8.16 + 0.35 * 13.6, 6);
 	});
 });
 

@@ -46,6 +46,8 @@ export interface ParentRef {
 export interface Person {
 	id: string;
 	name: string;
+	/** Spec §4.1, D122: shown after the name in curly double marks. Present only when written and not empty; `normaliseSobriquet` (core/sobriquet.ts) reads it. */
+	sobriquet?: string;
 	title?: string;
 	/** Spec §13.3, D62: the id of the title the card shows, as written. Present only when written. */
 	cardTitle?: string;

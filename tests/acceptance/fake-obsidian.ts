@@ -20,6 +20,8 @@ export function resetObsidian(): void {
 	noticeList.length = 0;
 	settingRows.length = 0;
 	settingGroups.length = 0;
+	iconCalls.length = 0;
+	knownIcons.clear();
 }
 
 export class Modal {
@@ -169,7 +171,14 @@ export class Plugin {
 
 export const Keymap = { isModEvent: () => false };
 export const getLinkpath = (s: string) => s;
-export const setIcon = () => {};
+/** The icon names `setIcon` knows. The fake adds an `svg` child only for these, as Obsidian leaves the element empty for an icon it does not have. */
+export const knownIcons = new Set<string>();
+/** Every name `setIcon` was called with, in order. */
+export const iconCalls: string[] = [];
+export const setIcon = (el: FEl, name: string) => {
+	iconCalls.push(name);
+	if (knownIcons.has(name)) el.createSvg('svg', {});
+};
 export const prepareFuzzySearch = () => () => null;
 export const debounce = <F>(f: F) => f;
 
@@ -183,6 +192,30 @@ export class TextComponent {
 	private change: Change<string> | null = null;
 	constructor(parent: FEl) {
 		this.inputEl = parent.createEl('input', { attr: { type: 'text' } });
+	}
+	setValue(v: string): this {
+		this.inputEl.value = v;
+		return this;
+	}
+	getValue(): string {
+		return this.inputEl.value;
+	}
+	onChange(fn: Change<string>): this {
+		this.change = fn;
+		return this;
+	}
+	fire(v: string): void {
+		this.inputEl.value = v;
+		this.change?.(v);
+	}
+}
+
+/** A text area (the break list): `inputEl.value`, `inputEl.rows` and `fire(value)` as if the user typed. */
+export class TextAreaComponent {
+	readonly inputEl: FEl;
+	private change: Change<string> | null = null;
+	constructor(parent: FEl) {
+		this.inputEl = parent.createEl('textarea');
 	}
 	setValue(v: string): this {
 		this.inputEl.value = v;
@@ -272,7 +305,7 @@ export class ButtonComponent {
 	}
 }
 
-type Component = TextComponent | DropdownComponent | ToggleComponent | ButtonComponent;
+type Component = TextComponent | TextAreaComponent | DropdownComponent | ToggleComponent | ButtonComponent;
 
 /** Every Setting made, with its name and controls, so a test can find a setting by its name. */
 export const settingRows: Setting[] = [];
@@ -317,6 +350,9 @@ export class Setting {
 	}
 	addText(cb: (c: TextComponent) => unknown): this {
 		return this.add(new TextComponent(this.controlEl), cb);
+	}
+	addTextArea(cb: (c: TextAreaComponent) => unknown): this {
+		return this.add(new TextAreaComponent(this.controlEl), cb);
 	}
 	addDropdown(cb: (c: DropdownComponent) => unknown): this {
 		return this.add(new DropdownComponent(this.controlEl), cb);

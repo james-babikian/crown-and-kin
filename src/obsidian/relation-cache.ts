@@ -8,13 +8,20 @@
 import type { FamilyGraph } from '../core/derive';
 import type { Relation } from '../core/relations';
 import { computeRelations, relationsKey } from '../core/relations';
+import { cardRelationText, spokenRelation } from '../render/tree-info';
+
+/** What a card needs of a relation: the text on the card and the words of the screen-reader label (D123 adds "maybe full" to both). */
+export interface CardRelation {
+	text: string;
+	lower: string;
+}
 
 /** The names of one tree for one mark: all names of each person, and the card name of each person. */
 export interface TreeRelations {
 	/** Every relation of each person to the marked person, best first (the sheet lists them). */
 	all: ReadonlyMap<string, readonly Relation[]>;
 	/** The first relation of each person: what the card shows (`SceneOptions.relations`). */
-	cards: ReadonlyMap<string, Relation>;
+	cards: ReadonlyMap<string, CardRelation>;
 }
 
 /** A few trees are open at a time; each note's tree keeps its names while the user moves between them. */
@@ -41,8 +48,8 @@ export function relationsFor(g: FamilyGraph, me: string): TreeRelations {
 	}
 	relationStats.computed++;
 	const all = computeRelations(g, me);
-	const cards = new Map<string, Relation>();
-	for (const [id, rels] of all) if (rels[0]) cards.set(id, rels[0]);
+	const cards = new Map<string, CardRelation>();
+	for (const [id, rels] of all) if (rels[0]) cards.set(id, { text: cardRelationText(rels[0]), lower: spokenRelation(rels[0]) });
 	const out: TreeRelations = { all, cards };
 	cache.set(key, out);
 	while (cache.size > RELATION_CACHE_SIZE) cache.delete(cache.keys().next().value!);

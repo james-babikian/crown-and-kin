@@ -72,7 +72,7 @@ export interface FoldInput {
 export interface SpotHints {
 	/** The tap areas of the far-couple tags, by person (`down` frame only): no control's tap area may meet one. */
 	tags?: ReadonlyMap<string, Rect>;
-	/** Where a single parent's trunk leaves the card; a tagged single parent's control sits there, not under the tag. */
+	/** Where a single parent's trunk leaves the card; a single parent's control sits there, not at the middle, which a tag or another line may hold. */
 	soloX?: ReadonlyMap<string, number>;
 	/** The frame is a sideways layout turned: a control's mark and tap area are wider along y than along x. */
 	turned?: boolean;
@@ -92,7 +92,7 @@ const meets = (a: Rect, b: Rect) => a.x < b.x + b.w - 1e-6 && b.x < a.x + a.w - 
  * below the card at its middle. If the stem to the next row is shorter than 2 em, the spot is its middle.
  * A control whose parents are not both in `persons` is left out.
  *
- * V2, V4: a tagged single parent's control moves to the trunk's x. Then a control moves down its own stem, in the order
+ * V2, V4, L1: a single parent's control sits at the trunk's x, not at the middle of the card. Then a control moves down its own stem, in the order
  * of `controls`, until its tap area meets no tag and no tap area of an earlier control.
  */
 export function foldSpots(
@@ -138,7 +138,8 @@ export function placeFoldSpots(
 			y = u.bar ? Math.max(...cards.map((b) => b.y + b.h)) + FOLD_EM.below * em : u.y + FOLD_EM.afterMarker * em;
 		} else {
 			const b = cards[0];
-			x = hints.tags?.has(b.id) ? (hints.soloX?.get(b.id) ?? b.x + b.w / 2) : b.x + b.w / 2;
+			// The trunk leaves at the exit the planner chose, which is the middle only when nothing else runs there.
+			x = hints.soloX?.get(b.id) ?? b.x + b.w / 2;
 			from = b.y + b.h;
 			y = from + FOLD_EM.below * em;
 		}

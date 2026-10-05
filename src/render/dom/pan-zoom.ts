@@ -51,6 +51,8 @@ export interface PanZoomOptions {
 	onFirstDraw?: (view: View) => void;
 	/** Runs an entry point (event, frame, timer) so that an error cannot escape into Obsidian (spec §8). */
 	guard: (fn: () => void) => void;
+	/** D126: true when movement is reduced. `setView` with `animate` then sets the view at once. Read when an animation starts. Default: never. */
+	reduced?: () => boolean;
 }
 
 /** Wheel zoom counts as settled after this long without another wheel event. */
@@ -163,7 +165,7 @@ export class PanZoom {
 	size: Size = { w: 0, h: 0 };
 	private frame = 0;
 	private settleTimer = 0;
-	private anim: { from: View; to: View; t0: number } | null = null;
+	private anim: { from: View; to: View; t0: number; /** The picture was drawn at `to`, so the frames only move the wrapper (see `apply`). */ baked: boolean } | null = null;
 	private animSettleUser = false;
 	private drag: Drag | null = null;
 	private pinch: Pinch | null = null;
@@ -175,6 +177,8 @@ export class PanZoom {
 	private drawn: { view: View; size: Size; at: number } | null = null;
 	/** A D19 fill that waits for its time while the fingers do not move. */
 	private fillTimer = 0;
+	/** The frame that runs the settle of a pan, after its pointer-up handler (M11). */
+	private settleFrame = 0;
 	/** The wrapper transform is on (a pinch runs). */
 	private wrapped = false;
 	private firstDrawn = false;
@@ -238,8 +242,9 @@ export class PanZoom {
 
 	/** Shows `view` now, or animates to it. */
 	setView(view: View, opts: { animate?: boolean; byUser?: boolean } = {}): void {
-		if (opts.animate && this.view && this.size.w > 0) {
-			this.anim = { from: this.view, to: view, t0: performance.now() };
+		// D126 (1): with reduced movement the view changes at once, as it does without `animate`.
+		if (opts.animate && this.view && this.size.w > 0 && !this.o.reduced?.()) {
+			this.anim = { from: this.view, to: view, t0: performance.now(), baked: false };
 			this.animSettleUser = opts.byUser ?? false;
 			this.schedule();
 			return;
@@ -300,7 +305,7 @@ export class PanZoom {
 		}
 		if (!this.view || this.size.w <= 0 || this.size.h <= 0) return;
 		const w = this.o.wrapper;
-		const d = this.drawn;
+		let d = this.drawn;
 		const sameSize = !!d && d.size.w === this.size.w && d.size.h === this.size.h && d.view.scale > 0;
 		const win = this.o.viewport.win ?? window;
 		if (this.fillTimer) {
@@ -333,6 +338,21 @@ export class PanZoom {
 			}
 			return;
 		}
+		if (w && d && sameSize && this.anim && !this.anim.baked) {
+			// M5: a change of scale on the scene makes the browser shape every text again, so the animation moves the wrapper over one picture.
+			// A zoom out (Fit) has no picture that covers it, so the scene is drawn once at the end view and the wrapper starts from there.
+			this.anim.baked = true;
+			const a = this.anim;
+			const zooms = Math.abs(Math.log(a.to.scale / a.from.scale)) > 1e-3;
+			if (zooms && !covers(d.view, a.to, this.size) && covers(a.to, a.from, this.size)) {
+				this.o.scene.setAttribute('transform', transformFor(a.to, this.size));
+				this.drawn = d = { view: a.to, size: this.size, at: performance.now() };
+				// Everything the end view shows is filled now, once. Every frame shows a part of it (`covers` is convex), so no frame fills again:
+				// a fill at each frame attaches cards and changes the level of detail, and the browser lays the text out again each time.
+				this.filled = visibleRect(a.to, this.size);
+				this.o.onFill?.(a.to);
+			}
+		}
 		if (w && d && sameSize && this.anim && covers(d.view, this.view, this.size)) {
 			w.style.setProperty('--dynasty-gesture-transform', gestureMatrix(d.view, this.view, this.size));
 			if (!this.wrapped) {
@@ -342,8 +362,12 @@ export class PanZoom {
 			this.fillIfLeft();
 			return;
 		}
-		this.o.scene.setAttribute('transform', transformFor(this.view, this.size));
-		this.drawn = { view: this.view, size: this.size, at: performance.now() };
+		// The picture already shows this view (an animation that ended on the view it was drawn at): no second write, so no second text layout.
+		const shown = !!d && sameSize && d.view.scale === this.view.scale && d.view.cx === this.view.cx && d.view.cy === this.view.cy;
+		if (!shown) {
+			this.o.scene.setAttribute('transform', transformFor(this.view, this.size));
+			this.drawn = { view: this.view, size: this.size, at: performance.now() };
+		}
 		if (this.wrapped && w) {
 			w.removeClass(GESTURE_CLASS);
 			w.style.setProperty('--dynasty-gesture-transform', 'none');
@@ -479,7 +503,22 @@ export class PanZoom {
 		// The click that follows this pointerup is part of the pan.
 		this.suppressClick = true;
 		(this.o.viewport.win ?? window).setTimeout(() => this.o.guard(() => (this.suppressClick = false)), 0);
-		if (this.view) this.settled(this.view, true);
+		this.settleSoon();
+	}
+
+	/**
+	 * M11: the work at the end of a pan (level of detail, fills, saving the view) runs in the next frame, not in the pointer-up
+	 * handler, so the handler returns at once and the browser can paint. The settle reads the view of that frame.
+	 */
+	private settleSoon(): void {
+		if (this.settleFrame) return;
+		const win = this.o.viewport.win ?? window;
+		this.settleFrame = win.requestAnimationFrame(() => {
+			this.settleFrame = 0;
+			this.o.guard(() => {
+				if (this.view) this.settled(this.view, true);
+			});
+		});
 	}
 
 	private wheel(e: WheelEvent): void {
@@ -521,6 +560,8 @@ export class PanZoom {
 		win.clearTimeout(this.settleTimer);
 		win.clearTimeout(this.fillTimer);
 		this.fillTimer = 0;
+		if (this.settleFrame) win.cancelAnimationFrame(this.settleFrame);
+		this.settleFrame = 0;
 		this.frame = 0;
 		this.anim = null;
 		this.drag = null;

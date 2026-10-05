@@ -7,15 +7,13 @@
  * `personIdSource` for the many examples of people with no id.
  */
 
-import { COMBINING_MARKS, foldLetters } from './fold';
+import { foldForMatch } from './fold';
 import { str, type Raw, type RawMap } from './tolerate';
 
 /** Turns a display name into a slug: "Aldric Valmont" → "aldric-valmont", "Þórr" → "thorr". */
 export function slugify(name: string): string {
-	const slug = foldLetters(name)
-		.normalize('NFKD')
-		.replace(COMBINING_MARKS, '')
-		.toLowerCase()
+	// The search fold lower-cases before the letter map and repeats until stable, so a capital ẞ or a letter such as Ǣ gives the same text as in search.
+	const slug = foldForMatch(name)
 		.replace(/[^a-z0-9]+/g, '-')
 		.replace(/^-+|-+$/g, '');
 	if (slug === '') return 'person';

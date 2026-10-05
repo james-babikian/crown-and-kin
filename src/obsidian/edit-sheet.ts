@@ -51,13 +51,15 @@ import { undoNotice } from './undo-notice';
 import { editUnion } from './union-edit';
 import { trackModal } from './plugin-modals';
 
-const TEXT_FIELDS = ['name', 'title', 'born', 'died', 'link', 'notes'] as const;
+const TEXT_FIELDS = ['name', 'sobriquet', 'title', 'born', 'died', 'link', 'notes'] as const;
 const NEW_HOUSE = '\u0000new';
 /** Spec §13.7: the sheet's portrait is about 96 px across. */
 export const SHEET_PORTRAIT_PX = 96;
 
 interface Draft {
 	name: string;
+	/** D122: the model value, without the quote marks; the typed text is written as typed. */
+	sobriquet: string;
 	title: string;
 	house: string;
 	sex: string;
@@ -112,6 +114,7 @@ function draftOf(l: Loaded): Draft {
 	const p = l.person;
 	return {
 		name: p.name,
+		sobriquet: p.sobriquet ?? '',
 		title: p.title ?? '',
 		house: p.house ?? '',
 		sex: p.sex ?? '',
@@ -522,6 +525,7 @@ export class EditSheet extends Modal {
 	private build(): void {
 		if (this.closed) return;
 		const el = this.contentEl;
+		const kept = this.focusMark();
 		el.empty();
 		this.confirmEl = null;
 		this.settleQuestion();
@@ -534,14 +538,14 @@ export class EditSheet extends Modal {
 		const header = el.createDiv({ cls: 'dynasty-sheet-header' });
 		nameDialog(this.modalEl, header.createDiv({ cls: 'dynasty-sheet-title', text: this.title() }));
 		const actions = header.createDiv({ cls: 'dynasty-sheet-actions' });
-		const cancel = actions.createEl('button', { cls: 'dynasty-sheet-cancel', text: ro ? SHEET.close : SHEET.cancel, attr: { type: 'button' } });
+		const cancel = actions.createEl('button', { cls: 'dynasty-sheet-cancel', text: ro ? SHEET.close : SHEET.cancel, attr: { type: 'button', 'data-focus': 'cancel' } });
 		cancel.addEventListener('click', () => this.finish());
 		if (!ro) {
-			const save = actions.createEl('button', { cls: ['mod-cta', 'dynasty-sheet-save'], text: SHEET.save, attr: { type: 'button' } });
+			const save = actions.createEl('button', { cls: ['mod-cta', 'dynasty-sheet-save'], text: SHEET.save, attr: { type: 'button', 'data-focus': 'save' } });
 			save.addEventListener('click', () => void this.save());
 			if (this.rel?.kind === 'child') {
 				// Spec §6.3: quick entry of several children; in the header, so it stays reachable (spec §7.4).
-				const more = header.createEl('button', { cls: 'dynasty-sheet-save-another', text: NEW_SHEET.saveAnother, attr: { type: 'button' } });
+				const more = header.createEl('button', { cls: 'dynasty-sheet-save-another', text: NEW_SHEET.saveAnother, attr: { type: 'button', 'data-focus': 'save-another' } });
 				more.addEventListener('click', () => void this.save(true));
 			}
 		}
@@ -569,6 +573,11 @@ export class EditSheet extends Modal {
 
 		this.portraitField(body);
 		this.textField(body, 'name', SHEET.name, { autocapitalize: 'words' });
+		// D122: the card adds the quote marks, so the hint says so; a sobriquet usually starts with a small letter.
+		const sobInput = this.textField(body, 'sobriquet', SHEET.sobriquet, { autocapitalize: 'none' });
+		const sobId = sobInput.getAttribute('id') ?? '';
+		sobInput.parentElement?.createDiv({ cls: 'dynasty-sheet-hint', text: SHEET.sobriquetHint, attr: { id: `${sobId}-hint` } });
+		sobInput.setAttribute('aria-describedby', `${sobId}-hint`);
 		const titleInput = this.textField(body, 'title', SHEET.title);
 		// D98: the hint points to the Titles section, which the sheet of a new person does not have.
 		if (!this.isNew) {
@@ -594,6 +603,41 @@ export class EditSheet extends Modal {
 			if (!ro) this.deleteSection(body);
 			this.idLine(body);
 		}
+		this.restoreFocus(kept);
+	}
+
+	/**
+	 * O2: the control that has the focus now, as a `data-focus` key and its place among the controls of that key. A rebuild
+	 * removes it, and the browser then puts the focus on the page, outside the dialog (a keyboard user is lost).
+	 */
+	private focusMark(): { key: string; index: number; start: number | null; end: number | null } | 'sheet' | null {
+		const el = this.contentEl;
+		const active = this.modalEl.doc?.activeElement as HTMLInputElement | null | undefined;
+		if (!active || !el.contains(active)) return null;
+		const key = active.getAttribute('data-focus');
+		if (!key) return 'sheet';
+		const index = Array.from(el.querySelectorAll<HTMLElement>(`[data-focus="${key}"]`)).indexOf(active);
+		const caret = typeof active.selectionStart === 'number' && typeof active.selectionEnd === 'number';
+		return { key, index: Math.max(0, index), start: caret ? active.selectionStart : null, end: caret ? active.selectionEnd : null };
+	}
+
+	/**
+	 * O2: gives the focus back to the same control of the new form (the same key and place, never a disabled one), or
+	 * to the sheet itself when that control is gone (Pin becomes Unpin). `preventScroll`: the scroll place is kept.
+	 */
+	private restoreFocus(mark: ReturnType<EditSheet['focusMark']>): void {
+		if (mark === null || this.closing || !this.shown) return;
+		if (mark !== 'sheet') {
+			const same = Array.from(this.contentEl.querySelectorAll<HTMLInputElement>(`[data-focus="${mark.key}"]`)).filter((c) => !c.disabled);
+			const target = same[Math.min(mark.index, same.length - 1)];
+			if (target) {
+				target.focus({ preventScroll: true });
+				if (mark.start !== null && mark.end !== null && target.setSelectionRange) target.setSelectionRange(mark.start, mark.end);
+				return;
+			}
+		}
+		this.modalEl.setAttribute('tabindex', '-1');
+		this.modalEl.focus({ preventScroll: true });
 	}
 
 	private title(): string {
@@ -611,7 +655,7 @@ export class EditSheet extends Modal {
 		if (rel.kind === 'person') return;
 		if (this.relBlocked && this.relIds().some((id) => !this.data.g.byId.has(id))) {
 			// A related person left the tree: keep the draft, and offer to add the person alone.
-			const alone = box.createEl('button', { cls: ['dynasty-sheet-action', 'dynasty-sheet-alone'], text: NEW_SHEET.noRelatives, attr: { type: 'button' } });
+			const alone = box.createEl('button', { cls: ['dynasty-sheet-action', 'dynasty-sheet-alone'], text: NEW_SHEET.noRelatives, attr: { type: 'button', 'data-focus': 'alone' } });
 			alone.addEventListener('click', () => {
 				this.rel = { kind: 'person' };
 				this.relNote = null;
@@ -927,8 +971,8 @@ export class EditSheet extends Modal {
 		const extra = { autocapitalize: o.autocapitalize ?? null, placeholder: o.placeholder ?? null };
 		// born and died are free text (fictional calendars): never a numeric keyboard (spec §7.4).
 		const input = area
-			? row.createEl('textarea', { cls: 'dynasty-sheet-input', attr: { id, rows: 4, autocapitalize: extra.autocapitalize, placeholder: extra.placeholder } })
-			: row.createEl('input', { cls: 'dynasty-sheet-input', attr: { id, type: 'text', autocomplete: 'off', spellcheck: key === 'notes' ? 'true' : 'false', autocapitalize: extra.autocapitalize, placeholder: extra.placeholder } });
+			? row.createEl('textarea', { cls: 'dynasty-sheet-input', attr: { id, rows: 4, autocapitalize: extra.autocapitalize, placeholder: extra.placeholder, 'data-focus': `field:${key}` } })
+			: row.createEl('input', { cls: 'dynasty-sheet-input', attr: { id, type: 'text', autocomplete: 'off', spellcheck: key === 'notes' ? 'true' : 'false', autocapitalize: extra.autocapitalize, placeholder: extra.placeholder, 'data-focus': `field:${key}` } });
 		input.value = this.draft[key];
 		// Read-only, not disabled: the user can still select and copy the text.
 		input.readOnly = this.readOnly;
@@ -943,7 +987,7 @@ export class EditSheet extends Modal {
 
 	private select(parent: HTMLElement, key: 'house' | 'sex' | 'placement', label: string, options: [string, string][]): HTMLSelectElement {
 		const { row, id } = sheetField(parent, label, key);
-		const sel = row.createEl('select', { cls: ['dropdown', 'dynasty-sheet-input'], attr: { id } });
+		const sel = row.createEl('select', { cls: ['dropdown', 'dynasty-sheet-input'], attr: { id, 'data-focus': `field:${key}` } });
 		for (const [value, text] of options) sel.createEl('option', { text, attr: { value } });
 		sel.value = this.draft[key];
 		sel.disabled = this.readOnly;
@@ -995,7 +1039,7 @@ export class EditSheet extends Modal {
 	private checkField(parent: HTMLElement): void {
 		// The whole row is the label, so the hit area is the full row (spec §7.5).
 		const row = parent.createEl('label', { cls: 'dynasty-sheet-field dynasty-sheet-check', attr: { 'data-field': 'illegitimate' } });
-		const box = row.createEl('input', { attr: { type: 'checkbox' } });
+		const box = row.createEl('input', { attr: { type: 'checkbox', 'data-focus': 'field:illegitimate' } });
 		box.checked = this.draft.illegitimate;
 		box.disabled = this.readOnly;
 		row.createSpan({ cls: 'dynasty-sheet-label', text: SHEET.illegitimate });
@@ -1016,7 +1060,7 @@ export class EditSheet extends Modal {
 	// ---------- Family, Actions, Delete (spec §6.3) ----------
 
 	private button(parent: HTMLElement, text: string, cls: string, run: () => void, label?: string): HTMLButtonElement {
-		const b = parent.createEl('button', { cls: ['dynasty-sheet-action', cls], text, attr: { type: 'button' } });
+		const b = parent.createEl('button', { cls: ['dynasty-sheet-action', cls], text, attr: { type: 'button', 'data-focus': cls } });
 		if (label) b.setAttribute('aria-label', label);
 		b.addEventListener('click', () => {
 			if (this.saving) return;
@@ -1079,6 +1123,8 @@ export class EditSheet extends Modal {
 		const box = sec.createDiv({ cls: 'dynasty-relation-summary' });
 		box.createDiv({ cls: 'dynasty-relation-main', text: sum.main });
 		if (sum.also) box.createDiv({ cls: 'dynasty-relation-also', text: sum.also });
+		// D123: what a rumoured link could change; it has the look of the "Also" line. `relationSummary` gives it for the first relation only.
+		if (sum.maybe) box.createDiv({ cls: ['dynasty-relation-also', 'dynasty-relation-maybe'], text: sum.maybe });
 		const finder = this.o.finder;
 		if (isMe || !finder || this.gone) return;
 		this.button(box, ME_UI.showLine, 'dynasty-show-line', () => this.leaveFor(() => finder.show(me, p.id)), ME_UI.showLineLabel(p.name || p.id));
@@ -1089,7 +1135,7 @@ export class EditSheet extends Modal {
 		const row = parent.createDiv({ cls: 'dynasty-family-row', attr: { 'data-parent': link.id, 'data-type': link.type } });
 		row.createDiv({ cls: 'dynasty-family-name', text: name });
 		const controls = row.createDiv({ cls: 'dynasty-family-controls' });
-		const sel = controls.createEl('select', { cls: ['dropdown', 'dynasty-family-select'], attr: { 'aria-label': FAMILY.parentTypeLabel(name) } });
+		const sel = controls.createEl('select', { cls: ['dropdown', 'dynasty-family-select'], attr: { 'aria-label': FAMILY.parentTypeLabel(name), 'data-focus': 'parent-type' } });
 		const count = (t: string) => fam.parents.filter((l) => l.type === t).length;
 		for (const t of PARENT_TYPES) {
 			const opt = sel.createEl('option', { text: parentTypeText(t), attr: { value: t } });

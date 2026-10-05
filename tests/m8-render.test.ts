@@ -118,12 +118,12 @@ describe('D61: a card in tallTitles is one small text line taller, in every layo
 		}
 	});
 
-	it('card sizes at 16 px: plain 64, two-line name 83, two-line title 80, both 99; narrow cards the same heights', () => {
+	it('card sizes at 16 px: plain 61, two-line name 77, two-line title 77, both 93; narrow cards the same heights (D117: 3.8 em cards, 16 px per name text line)', () => {
 		const { g } = build('people:\n  - {id: a, name: A}\n  - {id: b, name: B}\n  - {id: c, name: C}\n  - {id: d, name: D}\n');
 		for (const [view, settings] of VIEWS) {
 			const { layout } = lay(g, { ...settings, tallCards: ['b', 'd'], tallTitles: ['c', 'd'] });
 			const h = (id: string) => layout.persons.get(id)!.h;
-			expect([h('a'), h('b'), h('c'), h('d')], view).toEqual([64, 83, 80, 99]);
+			expect([h('a'), h('b'), h('c'), h('d')], view).toEqual([61, 77, 77, 93]);
 		}
 		expect(lay(g, NARROW).layout.geometry.cardW).toBe(140);
 	});
@@ -307,11 +307,11 @@ describe('D61: tallTitlesFor and the name measure of tallCardsFor', () => {
 	});
 
 	it('tallCardsFor measures the name text line of the label ("Roderick II" decides)', () => {
-		expect(tallCardsFor(g, GEO, false, fonts, measure)?.tall).toEqual([]);
-		expect(tallCardsFor(g, GEO, false, fonts, measure, undefined, undefined, labels)?.tall).toEqual(['e']);
+		expect(tallCardsFor(g, GEO, fonts, measure)?.tall).toEqual([]);
+		expect(tallCardsFor(g, GEO, fonts, measure, undefined, labels)?.tall).toEqual(['e']);
 		const long = build('people:\n  - {id: x, name: Maximilian Aurelian Castellane}\n').g;
-		expect(tallCardsFor(long, GEO, false, fonts, measure)?.tall).toEqual(['x']);
-		expect(tallCardsFor(long, GEO, false, fonts, measure, undefined, undefined, new Map([['x', label('Maximilian II')]]))?.tall).toEqual([]);
+		expect(tallCardsFor(long, GEO, fonts, measure)?.tall).toEqual(['x']);
+		expect(tallCardsFor(long, GEO, fonts, measure, undefined, new Map([['x', label('Maximilian II')]]))?.tall).toEqual([]);
 	});
 });
 
@@ -415,7 +415,7 @@ unions:
 	it('a two-line name from the label on a tallName box', () => {
 		const long = new Map(labels);
 		long.set('kit', label('Kit Aurelian Maximilian IV', 'Count', '(r. 1175)'));
-		const tallCards = tallCardsFor(g, GEO, false, fonts, measure, undefined, undefined, long)!.tall;
+		const tallCards = tallCardsFor(g, GEO, fonts, measure, undefined, long)!.tall;
 		expect(tallCards).toEqual(['kit']);
 		const laid = lay(g, { ...DEFAULT_LAYOUT_SETTINGS, tallCards, tallTitles });
 		const root = scene(laid, { labels: long });

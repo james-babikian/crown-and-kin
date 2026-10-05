@@ -366,8 +366,9 @@ describe('the headless SVG draws the same (spike pictures)', () => {
 		const on = lay(g, { ...DEFAULT_LAYOUT_SETTINGS, relationLine: true });
 		for (const palette of [DEFAULT_LIGHT, DEFAULT_DARK]) {
 			const svg = renderSvg(g, on.layout, on.edges, { palette, relations: CONRAD, me: 'conrad', line: COUSIN });
-			expect(svg.match(/font-style="italic"/g)).toHaveLength(CONRAD.size - 1);
-			expect(svg).toContain(`font-weight="600" fill="${palette.text}">You</text>`);
+			// D117: every relation text is italic, "You" too (bold and italic).
+			expect(svg.match(/font-style="italic"/g)).toHaveLength(CONRAD.size);
+			expect(svg).toContain(`font-style="italic" font-weight="600" fill="${palette.text}">You</text>`);
 			expect(svg).toContain(`stroke="${palette.accent}" stroke-width="${ME_LOOK.border}"`);
 			expect(svg).toContain(`stroke="${palette.text}" stroke-width="${ME_LOOK.ring}"`);
 			const onPaths = svg.match(new RegExp(`<path d="[^"]*" fill="none" stroke="${palette.accent}" stroke-width="${STROKES.marriage.width + ON_LINE_EXTRA}"`, 'g')) ?? [];
@@ -401,7 +402,7 @@ describe('styles.css: the M7 looks use theme variables and match styles.ts', () 
 		expect(rule('.dynasty-tag.dynasty-on-line .dynasty-tag-pill')!.stroke).toBe('var(--interactive-accent)');
 		expect(Number(rule('.dynasty-faded')!.opacity)).toBe(FADED_OPACITY);
 		expect(rule('.dynasty-card-relation')).toEqual({ 'font-size': 'calc(var(--dynasty-font-size) * 0.85)', 'font-style': 'italic', fill: 'var(--text-normal)' });
-		expect(rule('.dynasty-card-me .dynasty-card-relation')!['font-style']).toBe('normal');
+		expect(rule('.dynasty-card-me .dynasty-card-relation')).toEqual({ 'font-style': 'italic', 'font-weight': 'var(--bold-weight, 600)' });
 		expect(rule('.dynasty-no-relations .dynasty-card-relation')).toEqual({ display: 'none' });
 		expect(rule('.dynasty-card-me .dynasty-card-bg')).toEqual({ stroke: 'var(--interactive-accent)', 'stroke-width': String(ME_LOOK.border) });
 		const ring = rule('.dynasty-card-me-ring')!;

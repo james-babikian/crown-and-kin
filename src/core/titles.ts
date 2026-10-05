@@ -40,6 +40,8 @@ export interface CardLabel {
 	selected: boolean;
 	/** The name text line (D58): the ruler name and number of the first numbered entry of `shown` ("Roderick II"), else `Person.name`. */
 	name: string;
+	/** D122: the person's sobriquet (bare text, no marks). The card adds it after `name`; the screen-reader label does not (D127). */
+	sobriquet?: string;
 	/**
 	 * The title text line without the reign: the shown title's name if `selected` (D63); else the
 	 * written `Person.title` if any; else the shown title's name (D56); undefined if none. The
@@ -122,6 +124,7 @@ export function cardLabels(g: FamilyGraph): ReadonlyMap<string, CardLabel> {
 		const chosen = p.cardTitle === undefined ? undefined : held.find((h) => h.title.id === p.cardTitle);
 		const shown = chosen ?? held[0];
 		const label: CardLabel = { holdings: held, selected: chosen !== undefined, name: p.name };
+		if (p.sobriquet !== undefined) label.sobriquet = p.sobriquet;
 		if (shown) {
 			label.shown = shown;
 			for (const e of shown.entries) {
@@ -262,3 +265,11 @@ export type DescribeDeleteTitle = typeof describeDeleteTitle;
 export type NoteName = typeof noteName;
 /** The signature of `holderTable`. */
 export type HolderTable = typeof holderTable;
+
+/**
+ * True when the drawn graph needs card labels: it has titles (spec §13.4) or a person has a sobriquet (D122).
+ * A tree with neither draws with no labels, as in 0.2.3.
+ */
+export function needsLabels(g: FamilyGraph): boolean {
+	return (g.titles?.length ?? 0) > 0 || g.people.some((p) => p.sobriquet !== undefined);
+}

@@ -12,7 +12,7 @@
  *   generation among the members, plus 1. Numbers count on over a generation with no member.
  * - Order: by generation, then by the person's place in the model order (`computeModelOrder`, which
  *   keeps the sibling order of D2), not by the final left-to-right place of the layout.
- * - Cells: `name` is the regnal name of D58; `title` is the title text line as the card shows it, with
+ * - Cells: `name` is the regnal name of D58, then the sobriquet in curly marks if there is one (D122); `title` is the title text line as the card shows it, with
  *   the reign, joined with one space, or ''; `born` and `died` as written, or ''.
  * - Table note: only the table (header, separator, one row per member), every cell through `tableCell`,
  *   one line break at the end. The note name is cleaned as `noteName` cleans it.
@@ -21,6 +21,7 @@
 import type { FamilyGraph } from './derive';
 import { computeGenerations } from './generations';
 import { computeModelOrder } from './order';
+import { withSobriquet } from './sobriquet';
 import { cardLabels, noteName, tableCell } from './titles';
 import type { House } from './types';
 
@@ -67,7 +68,7 @@ export function housePage(g: FamilyGraph, houseId: string): HousePage | null {
 		return {
 			id: p.id,
 			generation: gen(p.id) - oldest + 1,
-			name: label?.name ?? p.name,
+			name: withSobriquet(label?.name ?? p.name, p.sobriquet),
 			title: [label?.title, label?.reign].filter((x) => x !== undefined && x !== '').join(' '),
 			born: p.born ?? '',
 			died: p.died ?? '',

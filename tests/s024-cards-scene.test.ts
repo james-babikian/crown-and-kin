@@ -1,0 +1,379 @@
+import { beforeAll, describe, expect, it } from 'vitest';
+import type { FamilyGraph } from '../src/core/derive';
+import { cardLabels, type CardLabel } from '../src/core/titles';
+import { cardText, geometryFor, nameCountOf, namesOnlyGeometry, smallLineOf, tallExtra } from '../src/layout/geometry';
+import { DEFAULT_LAYOUT_SETTINGS, clearLayoutCache, layoutTree, pictureSets } from '../src/layout/index';
+import type { LaidOut, LayoutSettings } from '../src/layout/model';
+import { measuredLayout } from '../src/obsidian/measured-layout';
+import { parseBreakList } from '../src/render/break-words';
+import { BADGE_RADIUS_EM, ME_WORD, buildScene, relationFont, type Scene, type SceneOptions } from '../src/render/dom/scene';
+import { tallCardsFor } from '../src/render/dom/tall-cards';
+import { cardNameLines, runsText } from '../src/render/name-lines';
+import { DEFAULT_LIGHT } from '../src/render/styles';
+import { savedLegend } from '../src/render/saved-picture';
+import { approxMeasure, renderSvg } from '../src/render/svg-string';
+import { FEl, installDom } from './acceptance/fake-dom';
+import { sampleSources } from './acceptance/m11-support';
+import { build } from './helpers';
+
+// 0.2.4 (D117, D119, D122, D125, D126; contract 1.4, 4.1 to 4.3, 6.1): what the live scene and the headless picture draw on a card.
+
+beforeAll(() => {
+	installDom();
+	(globalThis as Record<string, unknown>).CSS = { supports: (_p: string, v: string) => /^#[0-9a-f]{6}$/i.test(v) };
+});
+
+const FONTS = { text: 'serif', ui: 'sans', bold: '700' };
+/** Every character is 0.55 em wide: 7.48 px at 13.6 px. */
+const measure = (s: string, font: string) => [...s].length * 0.55 * Number(/(\d+(?:\.\d+)?)px/.exec(font)![1]);
+const WHOLE = geometryFor(16, 'normal');
+const ONLY = namesOnlyGeometry(WHOLE);
+const NL = String.fromCharCode(10);
+const all = (el: FEl): FEl[] => [el, ...el.children.flatMap(all)];
+
+function graph(src: string): FamilyGraph {
+	return build(src).g;
+}
+function lay(g: FamilyGraph, settings: LayoutSettings = DEFAULT_LAYOUT_SETTINGS, geo = WHOLE): LaidOut {
+	clearLayoutCache();
+	return layoutTree(g, geo, { ...settings, ...pictureSets(g, true) } as LayoutSettings, 'test');
+}
+function scene(laid: LaidOut, g: FamilyGraph, extra: Partial<SceneOptions> = {}): { root: FEl; scene: Scene } {
+	const root = new FEl('g');
+	return { root, scene: buildScene(root as unknown as SVGGElement, g, laid, { fonts: FONTS, measure, link: () => null, ...extra }) };
+}
+const card = (root: FEl, id: string) => all(root).find((e) => e.hasClass('dynasty-card') && e.getAttribute('data-person') === id)!;
+const nameEls = (root: FEl, id: string) => all(card(root, id)).filter((e) => e.hasClass('dynasty-card-name'));
+const nameLinesOf = (root: FEl, id: string) => nameEls(root, id).map((e) => e.getText());
+const label = (name: string, extra: Partial<CardLabel> = {}): CardLabel => ({ holdings: [], selected: false, name, ...extra }) as CardLabel;
+
+describe('the sobriquet on the card (D122)', () => {
+	const g = graph('people:\n  - {id: a, name: Aldric II}\n  - {id: b, name: Bo}\n');
+	const labels = new Map([['a', label('Aldric II', { sobriquet: 'the Wise' })], ['b', label('Bo')]]);
+
+	it('the name text holds the name and one tspan with the class `dynasty-card-sob`, made with createSvg: class only, no style attribute', () => {
+		const { root } = scene(lay(g), g, { labels });
+		const [name] = nameEls(root, 'a');
+		expect(name.getText()).toBe('Aldric II “the Wise”');
+		const spans = name.children.filter((c) => c.tag === 'tspan');
+		expect(spans).toHaveLength(1);
+		expect(spans[0].hasClass('dynasty-card-sob')).toBe(true);
+		expect(spans[0].getText()).toBe('“the Wise”');
+		expect(spans[0].attrs.has('style')).toBe(false);
+		expect(spans[0].attrs.size).toBe(0);
+		// A card without a sobriquet has no tspan.
+		expect(nameEls(root, 'b')[0].children).toHaveLength(0);
+	});
+
+	it('the Compact level and the screen-reader label show no sobriquet', () => {
+		const { root } = scene(lay(g), g, { labels });
+		const compact = all(card(root, 'a')).find((e) => e.hasClass('dynasty-card-compact'))!;
+		expect(compact.getText()).toBe('Aldric II');
+		expect(card(root, 'a').getAttribute('aria-label')).not.toContain('Wise');
+	});
+
+	it('it follows the regnal name from the label ("Roderick II"), and the Person.sobriquet when the label has none', () => {
+		const g2 = graph('people:\n  - {id: a, name: Roderick}\n');
+		(g2.byId.get('a') as { sobriquet?: string }).sobriquet = 'the Bold';
+		const labels2 = new Map([['a', label('Roderick II')]]);
+		const tall = tallCardsFor(g2, WHOLE, FONTS, measure, undefined, labels2)!;
+		// 22 characters of 7.48 px do not fit 158 px on one line: the person's own sobriquet makes the card taller, and shows whole on line 2.
+		const { root } = scene(lay(g2, { ...DEFAULT_LAYOUT_SETTINGS, tallCards: tall.tall } as LayoutSettings), g2, { labels: labels2 });
+		expect(nameLinesOf(root, 'a')).toEqual(['Roderick II', '“the Bold”']);
+		// A layout made without the sobriquet shows the name and drops the sobriquet (D127): the tree view lays out again with it.
+		expect(nameLinesOf(scene(lay(g2), g2, { labels: labels2 }).root, 'a')).toEqual(['Roderick II…']);
+	});
+
+	it('it moves whole to the next text line, in a card the layout made taller for it', () => {
+		const g3 = graph('people:\n  - {id: a, name: Placeholder}\n');
+		const long = new Map([['a', label('Aldrimonalot Fitz', { sobriquet: 'the Wise' })]]);
+		// 17 characters = 127 px fit one line; with the sobriquet (10 more characters) the name needs a second text line.
+		const tall = tallCardsFor(g3, WHOLE, FONTS, measure, undefined, long)!;
+		expect(tall.tall).toEqual(['a']);
+		const laid = lay(g3, { ...DEFAULT_LAYOUT_SETTINGS, tallCards: tall.tall } as LayoutSettings);
+		const { root } = scene(laid, g3, { labels: long });
+		expect(nameLinesOf(root, 'a')).toEqual(['Aldrimonalot Fitz', '“the Wise”']);
+		expect(nameEls(root, 'a')[1].children.map((c) => c.getText())).toEqual(['“the Wise”']);
+	});
+
+	it('a sobriquet that does not fit three text lines is dropped completely (D127)', () => {
+		const g3 = graph('people:\n  - {id: a, name: Placeholder}\n');
+		const long = new Map([['a', label('Alexandrovichs Bartholomewson Cadwalladerson Wolfgangsenal', { sobriquet: 'the Wise' })]]);
+		const tall = tallCardsFor(g3, WHOLE, FONTS, measure, undefined, long)!;
+		const laid = lay(g3, { ...DEFAULT_LAYOUT_SETTINGS, tallCards: tall.tall, longNames: tall.long } as LayoutSettings);
+		const { root } = scene(laid, g3, { labels: long });
+		const lines = nameLinesOf(root, 'a');
+		expect(lines).toHaveLength(3);
+		expect(lines.join(' ')).not.toContain('“');
+		expect(nameEls(root, 'a').every((e) => e.children.length === 0)).toBe(true);
+	});
+});
+
+describe('card text: sizes, weights and the word "You" (D117)', () => {
+	it('relationFont: "You" is bold and italic with the bold weight of the page; other relation texts are italic regular', () => {
+		expect(relationFont(13.6, 'serif', true, '600')).toBe('italic 600 13.6px serif');
+		expect(relationFont(13.6, 'serif', true)).toBe('italic 700 13.6px serif');
+		expect(relationFont(13.6, 'serif', false, '600')).toBe('italic 400 13.6px serif');
+	});
+
+	it('the whole marked card draws "You" through the relation text, measured with `relationFont`', () => {
+		const g = graph('options:\n  me: a\npeople:\n  - {id: a, name: Aldric, born: 1100}\n');
+		const seen = new Set<string>();
+		const spy = (s: string, font: string) => (seen.add(font), measure(s, font));
+		const laid = lay(g, { ...DEFAULT_LAYOUT_SETTINGS, relationLine: true } as LayoutSettings);
+		const { root } = scene(laid, g, { measure: spy, me: 'a', relations: new Map([['a', { text: 'You', lower: 'you' }]]) });
+		expect(all(card(root, 'a')).filter((e) => e.hasClass('dynasty-card-relation')).map((e) => e.getText())).toEqual(['You']);
+		expect(seen.has('italic 700 13.6px serif')).toBe(true);
+		expect(seen.has('700 13.6px serif')).toBe(true);
+	});
+});
+
+describe('the "+" badge on the corner of the card, in every layout (D117 4)', () => {
+	for (const orientation of ['down', 'sideways'] as const) {
+		it(`${orientation}: the centre of the badge is the card's top right corner; no in-card badge`, () => {
+			const g = graph('people:\n  - {id: a, name: Aldric}\n  - {id: b, name: Bo, parents: [a]}\n');
+			const laid = lay(g, { ...DEFAULT_LAYOUT_SETTINGS, ...(orientation === 'sideways' ? { orientation, sidewaysCards: 'normal' } : {}) } as LayoutSettings);
+			const { scene: s } = scene(laid, g, { badges: { hidden: new Map([['a', 2], ['b', 1]]), label: () => 'More' } });
+			expect(s.badges).toHaveLength(2);
+			for (const b of s.badges) {
+				const box = laid.layout.persons.get(b.person)!;
+				expect(b.mark.x + b.mark.w / 2).toBeCloseTo(box.x + box.w, 9);
+				expect(b.mark.y + b.mark.h / 2).toBeCloseTo(box.y, 9);
+				expect(b.mark.w).toBeCloseTo(2 * BADGE_RADIUS_EM * 16, 9);
+			}
+		});
+	}
+
+	it('the name and the D14 sign do not give way to the badge (they ended 1.2 em before it in a sideways card of 0.2.3)', () => {
+		const g = graph('people:\n  - {id: a, name: Aldric Valmont Fitzgerald, illegitimate: true}\n');
+		const laid = lay(g, { ...DEFAULT_LAYOUT_SETTINGS, orientation: 'sideways', sidewaysCards: 'normal' } as LayoutSettings);
+		const without = scene(laid, g);
+		const withBadge = scene(laid, g, { badges: { hidden: new Map([['a', 2]]), label: () => 'More' } });
+		const strip = (root: FEl) => all(card(root, 'a')).map((e) => [e.tag, [...e.attrs].join(','), e.getText()].join('|'));
+		expect(strip(withBadge.root)).toEqual(strip(without.root));
+	});
+});
+
+describe('rule B in the scene: the lifted set moves both boxes one small text line up (D126 4)', () => {
+	const g = graph('houses:\n  - {id: v, name: V, color: "#8b1e3f", arms: "[[v.png]]"}\npeople:\n  - {id: a, name: Aldric, house: v, portrait: "[[a.png]]", born: 1100, title: Duke}\n');
+	const REL = { ...DEFAULT_LAYOUT_SETTINGS, relationLine: true } as LayoutSettings;
+
+	it('the scene reads the set and never decides it: with `lifted` both boxes are one small line higher and the text lines stay', () => {
+		const laid = lay(g, REL);
+		const plain = scene(laid, g);
+		const lifted = scene(laid, g, { lifted: new Set(['a']) });
+		const rect = (s: Scene, kind: string) => s.pictures.find((p) => p.kind === kind && p.lod === 'full')!.rect;
+		const dy = smallLineOf(laid.layout.geometry);
+		expect(rect(plain.scene, 'arms').y - rect(lifted.scene, 'arms').y).toBeCloseTo(dy, 9);
+		expect(rect(plain.scene, 'portrait').y - rect(lifted.scene, 'portrait').y).toBeCloseTo(dy, 9);
+		expect(rect(plain.scene, 'arms').x).toBe(rect(lifted.scene, 'arms').x);
+		// The Compact arms box is not lifted.
+		const compact = (s: Scene) => s.pictures.find((p) => p.kind === 'arms' && p.lod === 'compact')!.rect;
+		expect(compact(plain.scene)).toEqual(compact(lifted.scene));
+	});
+
+	it('the headless picture places the lifted boxes where the scene does', () => {
+		const laid = lay(g, REL);
+		const { scene: s } = scene(laid, g, { lifted: new Set(['a']) });
+		const pictures = new Map<string, string | 'missing' | null>([['arms:v', 'data:image/png;base64,AAAA'], ['portrait:a', 'data:image/png;base64,AAAA']]);
+		const svg = renderSvg(g, laid.layout, laid.edges, { palette: DEFAULT_LIGHT, measure, fonts: FONTS, pictures, lifted: new Set(['a']) });
+		const images = [...svg.matchAll(/<image [^>]*>/g)].map((m) => m[0]);
+		const num = (tag: string, name: string) => Number(new RegExp(` ${name}="([^"]+)"`).exec(tag)![1]);
+		const arms = images.find((t) => t.includes('meet'))!;
+		const portrait = images.find((t) => t.includes('slice'))!;
+		const liveArms = s.pictures.find((p) => p.kind === 'arms' && p.lod === 'full')!.rect;
+		const livePortrait = s.pictures.find((p) => p.kind === 'portrait')!.rect;
+		expect(num(arms, 'y')).toBeCloseTo(liveArms.y, 9);
+		expect(num(arms, 'x')).toBeCloseTo(liveArms.x, 9);
+		expect(num(portrait, 'y')).toBeCloseTo(livePortrait.y, 9);
+	});
+});
+
+describe('the names-only card in the scene (D119)', () => {
+	const SRC = 'houses:\n  - {id: v, name: V, color: "#8b1e3f", arms: "[[v.png]]"}\noptions:\n  me: a\npeople:\n  - {id: a, name: Aldric, house: v, born: 1100, died: 1160, title: Duke}\n  - {id: b, name: Bertram, house: v, illegitimate: true}\n  - {id: c, name: Cedric, house: v, born: 1130, parents: [a]}\n';
+	const g = graph(SRC);
+	const labels = cardLabels(g);
+
+	it('the card is 51 px high and shows the name and the years only: no title text line, no relation text', () => {
+		const laid = lay(g, DEFAULT_LAYOUT_SETTINGS, ONLY);
+		const { root } = scene(laid, g, { labels, relations: new Map([['c', { text: 'Son', lower: 'son' }]]) });
+		expect(laid.layout.persons.get('c')!.h).toBe(51);
+		const t = cardText(laid.layout.geometry);
+		const texts = (id: string, cls: string) => all(card(root, id)).filter((e) => e.hasClass(cls));
+		expect(texts('a', 'dynasty-card-title')).toHaveLength(0);
+		expect(texts('c', 'dynasty-card-relation')).toHaveLength(0);
+		const years = texts('a', 'dynasty-card-dates')[0];
+		expect(years.getText()).toBe('1100–1160');
+		expect(Number(years.getAttribute('y')) - laid.layout.persons.get('a')!.y).toBeCloseTo(t.datesBaseline, 9);
+	});
+
+	it('the marked card keeps "You" after the years on the same text line, 0.6 em after them; with no years at the text left', () => {
+		const laid = lay(g, DEFAULT_LAYOUT_SETTINGS, ONLY);
+		const { root } = scene(laid, g, { labels, me: 'a' });
+		const box = laid.layout.persons.get('a')!;
+		const t = cardText(laid.layout.geometry);
+		const small = (s: string) => measure(s, `400 ${t.smallSize}px serif`);
+		const years = all(card(root, 'a')).find((e) => e.hasClass('dynasty-card-dates'))!;
+		const you = all(card(root, 'a')).find((e) => e.hasClass('dynasty-card-relation'))!;
+		expect(you.getText()).toBe(ME_WORD);
+		expect(you.getAttribute('y')).toBe(years.getAttribute('y'));
+		expect(Number(you.getAttribute('x'))).toBeCloseTo(box.x + t.padX + small(years.getText()) + 0.6 * 16, 9);
+		// A marked person with no years: "You" at the text left.
+		const g2 = graph('options:\n  me: a\npeople:\n  - {id: a, name: Aldric}\n');
+		const laid2 = lay(g2, DEFAULT_LAYOUT_SETTINGS, ONLY);
+		const root2 = scene(laid2, g2, { me: 'a' }).root;
+		const you2 = all(card(root2, 'a')).find((e) => e.hasClass('dynasty-card-relation'))!;
+		expect(Number(you2.getAttribute('x'))).toBeCloseTo(laid2.layout.persons.get('a')!.x + t.padX, 9);
+	});
+
+	it('G2 review: with "Show dates on cards" off, "You" sits at the text left and the years are not drawn (scene and picture)', () => {
+		const laid = lay(g, DEFAULT_LAYOUT_SETTINGS, ONLY);
+		const box = laid.layout.persons.get('a')!;
+		const t = cardText(laid.layout.geometry);
+		const { root } = scene(laid, g, { labels, me: 'a', showDates: false });
+		const you = all(card(root, 'a')).find((e) => e.hasClass('dynasty-card-relation'))!;
+		expect(you.getText()).toBe(ME_WORD);
+		expect(Number(you.getAttribute('x'))).toBeCloseTo(box.x + t.padX, 9);
+		expect(all(card(root, 'a')).filter((e) => e.hasClass('dynasty-card-dates') && e.getText() !== '')).toHaveLength(0);
+		// The saved picture agrees: no years, "You" at the text left. With the setting on, "You" is after the years.
+		const svgFor = (showDates: boolean) => renderSvg(g, laid.layout, laid.edges, { palette: DEFAULT_LIGHT, measure, fonts: FONTS, labels, me: 'a', showDates, saved: { heading: 'H', legend: savedLegend(g, laid), pictures: new Map(), scale: 1 } });
+		const youX = (svg: string) => Number(/<text x="([\d.]+)"[^>]*>You<\/text>/.exec(svg)![1]);
+		const off = svgFor(false);
+		expect(off).not.toContain('1100–1160');
+		expect(youX(off)).toBeCloseTo(box.x + t.padX, 9);
+		expect(youX(svgFor(true))).toBeGreaterThan(box.x + t.padX + 20);
+	});
+
+	it('the years end with "…" first when years and "You" do not both fit beside the arms box; "You" is never cut', () => {
+		const laid = lay(g, DEFAULT_LAYOUT_SETTINGS, ONLY);
+		// A wide measure: the years (9 characters) and "You" fill the room beside the arms box (133.2 px of 158).
+		const wide = (s: string, font: string) => [...s].length * 0.9 * Number(/(\d+(?:\.\d+)?)px/.exec(font)![1]);
+		const { root } = scene(laid, g, { labels, me: 'a', measure: wide });
+		const years = all(card(root, 'a')).find((e) => e.hasClass('dynasty-card-dates'))!;
+		const you = all(card(root, 'a')).find((e) => e.hasClass('dynasty-card-relation'))!;
+		expect(years.getText().endsWith('…')).toBe(true);
+		expect(you.getText()).toBe('You');
+		// The room: 158 - the arms box (20) - 0.3 em (4.8); the years, 0.6 em and "You" fit it.
+		const t = cardText(laid.layout.geometry);
+		const youW = wide('You', `italic 700 ${t.smallSize}px serif`);
+		const used = wide(years.getText(), `400 ${t.smallSize}px serif`) + 0.6 * 16 + youW;
+		expect(used).toBeLessThanOrEqual(158 - 20 - 0.3 * 16 + 1e-6);
+	});
+
+	it('a narrow sideways card on a small phone (note box 288 px): the years end with "…" and "You" stays whole; on a 358 px box both fit', () => {
+		const g1 = graph('houses:' + NL + '  - {id: v, name: V, color: "#8b1e3f", arms: "[[v.png]]"}' + NL + 'options:' + NL + '  me: a' + NL + 'people:' + NL + '  - {id: a, name: Aldric, house: v, born: 1131, died: 1160}' + NL);
+		for (const [box, cut] of [[288, true], [358, false]] as const) {
+			const want = (box - 8 - 0.9 * 14 - 3 * 14) / 2 / (14 / 16); // narrowCardWidth() of focus-mode.ts, layout px
+			const laid = lay(g1, { ...DEFAULT_LAYOUT_SETTINGS, orientation: 'sideways', sidewaysCards: 'narrow', narrowCardW: want } as LayoutSettings, namesOnlyGeometry(WHOLE));
+			const { root } = scene(laid, g1, { measure: approxMeasure, fonts: { text: 'sans-serif', ui: 'sans-serif', bold: '700' }, me: 'a' });
+			const years = all(card(root, 'a')).find((e) => e.hasClass('dynasty-card-dates'))!;
+			const you = all(card(root, 'a')).find((e) => e.hasClass('dynasty-card-relation'))!;
+			expect(you.getText()).toBe('You');
+			expect(years.getText().endsWith('…'), `box ${box}: ${years.getText()} in a card of ${laid.layout.geometry.cardW} px`).toBe(cut);
+		}
+	});
+
+	it('a signed one-line name has two slots: the name line is in slot 1, the card is 67 px, the second text element is empty', () => {
+		const first = lay(g, DEFAULT_LAYOUT_SETTINGS, ONLY);
+		const signedIds = tallCardsFor(g, ONLY, FONTS, measure, new Set(['b']), labels, new Set(['a', 'b', 'c']))!;
+		expect(signedIds.slots.get('b')).toBe(2);
+		const laid = lay(g, { ...DEFAULT_LAYOUT_SETTINGS, tallCards: signedIds.tall } as LayoutSettings, ONLY);
+		expect(first.layout.persons.get('b')!.h).toBe(51);
+		expect(laid.layout.persons.get('b')!.h).toBe(67);
+		const { root } = scene(laid, g, { labels });
+		const names = nameEls(root, 'b');
+		expect(names.map((e) => e.getText())).toEqual(['Bertram', '']);
+		expect(nameCountOf(laid.layout.persons.get('b')!)).toBe(2);
+		expect(card(root, 'b').hasClass('dynasty-signed')).toBe(true);
+	});
+});
+
+// The live scene and the headless picture must draw the same text lines (spec §13.9 "The headless SVG ... show the same text lines as the view").
+describe('the scene and the headless picture draw the same name text lines', () => {
+	/** The name text lines of a card in the SVG string, by the font size and weight attributes of the name. */
+	function svgNames(svg: string, size: number): string[] {
+		const out: string[] = [];
+		for (const m of svg.matchAll(/<text [^>]*font-size="([\d.]+)"[^>]*font-weight="700"[^>]*>(.*?)<\/text>/g)) {
+			if (Math.abs(Number(m[1]) - size) < 1e-9) out.push(m[2].replace(/<[^>]+>/g, '').replace(/&#?\w+;/g, (e) => (e === '&quot;' ? '"' : e)));
+		}
+		return out;
+	}
+
+	it('sample tree 07b and a long-name tree: every card, with sobriquets, labels and the owner list', () => {
+		const g = graph(
+			[
+				'houses:',
+				'  - {id: v, name: V, color: "#8b1e3f", arms: "[[v.png]]"}',
+				'people:',
+				'  - {id: a, name: Placeholder, house: v}',
+				'  - {id: b, name: Bo, parents: [a]}',
+				'  - {id: c, name: Placeholder, parents: [a], house: v}',
+				'  - {id: d, name: Placeholder, parents: [b]}',
+				'',
+			].join('\n'),
+		);
+		(g.byId.get('a') as { name: string }).name = 'Alexandrovichsmarinovichalexandrovichs';
+		(g.byId.get('c') as { name: string }).name = 'Aldrimonalot Fitzgerald Bartholomewson Cadwalladerson';
+		(g.byId.get('d') as { name: string }).name = 'Maximilian Valheim';
+		const labels = new Map([
+			['a', label('Alexandrovichsmarinovichalexandrovichs')],
+			['b', label('Bo', { sobriquet: 'the Wise' })],
+			['c', label('Aldrimonalot Fitzgerald Bartholomewson Cadwalladerson', { sobriquet: 'the Magnificent Defender of the North' })],
+			['d', label('Maximilian Valheim', { sobriquet: 'the Fair' })],
+		]);
+		const breaks = parseBreakList('Alexandrov-ic-hsmarinovichalexandro-vichs');
+		const real = (s: string, font: string) => approxMeasure(s, font);
+		const opts = { fonts: { text: 'sans-serif', ui: 'sans-serif', bold: '700' }, measure: real, labels, breaks };
+		const plan = measuredLayout(g, WHOLE, DEFAULT_LAYOUT_SETTINGS, { fonts: opts.fonts, measure: real, labels, showDates: true, showPortraits: true });
+		const { root } = scene(plan.laid, g, opts);
+		const svg = renderSvg(g, plan.laid.layout, plan.laid.edges, { palette: DEFAULT_LIGHT, ...opts });
+		const live: string[] = [];
+		for (const id of plan.laid.layout.persons.keys()) live.push(...nameLinesOf(root, id).filter((l) => l !== ''));
+		const headless = svgNames(svg, cardText(plan.laid.layout.geometry).nameSize);
+		expect(headless).toEqual(live);
+		// The sobriquet shows in a regular tspan in the picture.
+		expect(svg).toContain('<tspan font-weight="400">“the Wise”</tspan>');
+	});
+
+	it('every sample tree: the scene draws as many non-empty text lines as the layout made room for, on whole and names-only cards', () => {
+		const bad: string[] = [];
+		for (const s of sampleSources()) {
+			const parsed = build(s.source);
+			const g = parsed.g;
+			const labels = cardLabels(g);
+			for (const geo of [WHOLE, ONLY]) {
+				const fonts = { text: 'sans-serif', ui: 'sans-serif', bold: '600' };
+				const plan = measuredLayout(g, geo, DEFAULT_LAYOUT_SETTINGS, { fonts, measure: approxMeasure, labels, showDates: true, showPortraits: true });
+				const { root } = scene(plan.laid, g, { fonts, measure: approxMeasure, labels });
+				const signed = new Set([...plan.laid.layout.persons.keys()].filter((id) => card(root, id).hasClass('dynasty-signed')));
+				for (const [id, box] of plan.laid.layout.persons) {
+					const lines = nameLinesOf(root, id).filter((l) => l !== '');
+					const slots = nameCountOf(box);
+					const expected = geo.namesOnly && signed.has(id) && slots === 2 && lines.length === 1 ? 1 : slots;
+					if (lines.length !== expected && g.byId.get(id)!.name) bad.push(`${s.id} ${geo.namesOnly ? 'names-only' : 'whole'} ${id}: ${lines.length} lines, ${slots} slots`);
+				}
+			}
+		}
+		expect(bad.slice(0, 8), `${bad.length} mismatches`).toEqual([]);
+	}, 60000);
+
+	it('cardNameLines gives the lines the scene draws (one function for the layout, the scene and the picture)', () => {
+		const g = graph('people:\n  - {id: a, name: Aldric Valmont}\n');
+		const t = cardText(WHOLE);
+		const lines = cardNameLines('Aldric Valmont', 'the Wise', { full: t.textW, last: t.textW, only: t.textW }, (s, sob) => measure(s, sob ? `400 ${t.nameSize}px serif` : `700 ${t.nameSize}px serif`), 3).map(runsText);
+		const plan = tallCardsFor(g, WHOLE, FONTS, measure, undefined, new Map([['a', label('Aldric Valmont', { sobriquet: 'the Wise' })]]))!;
+		const laid = lay(g, { ...DEFAULT_LAYOUT_SETTINGS, tallCards: plan.tall } as LayoutSettings);
+		const { root } = scene(laid, g, { labels: new Map([['a', label('Aldric Valmont', { sobriquet: 'the Wise' })]]) });
+		expect(nameLinesOf(root, 'a')).toEqual(lines);
+	});
+});
+
+describe('a card that the layout made taller shows at most its text lines (a name that needs more is cut by `last`)', () => {
+	it('the card height steps by `tallExtra` per name slot, on whole and names-only cards', () => {
+		const g = graph('people:\n  - {id: a, name: Aldric}\n');
+		for (const geo of [WHOLE, ONLY]) {
+			const heights = [[], ['a']].map((tall) => lay(g, { ...DEFAULT_LAYOUT_SETTINGS, tallCards: tall } as LayoutSettings, geo).layout.persons.get('a')!.h);
+			expect(heights[1] - heights[0]).toBe(tallExtra(geo));
+		}
+	});
+});

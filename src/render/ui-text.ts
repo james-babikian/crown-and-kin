@@ -54,6 +54,9 @@ export const SHEET = {
 	// D98: the free text under the name. The Titles section holds titles with a number and dates.
 	title: 'Title text on the card',
 	titleHint: 'This text shows under the name on the card. For a title with a number and dates, use the Titles section below.',
+	// D122: the sobriquet shows after the name in quote marks.
+	sobriquet: 'Sobriquet',
+	sobriquetHint: `The card shows this text after the name, in quote marks. The plugin adds the quote marks. An example is ${quote('the Wise')}.`,
 	house: 'House',
 	noHouse: 'No house',
 	newHouse: 'New house…',
@@ -512,17 +515,37 @@ export const TITLES_UI = {
 		titles === 1 ? `The plugin also removes ${name} from the holders of 1 title.` : `The plugin also removes ${name} from the holders of ${titles} titles.`,
 } as const;
 
+/** The button that changes the height of the tree in a note on a phone (D120). */
+export const HEIGHT_UI = {
+	button: 'Change the height of the tree',
+} as const;
+
 /** The settings tab (spec §9, D33). */
 export const SETTINGS_UI = {
 	groups: { height: 'Height in a note', cards: 'Cards', housePage: 'House page', focus: 'Focus mode', links: 'Links', repair: 'Repair' },
 	heightDesktop: 'Height on a computer or tablet',
 	heightDesktopDesc: 'This is the height of a tree in a note, in pixels. The default is 500. If you drag the bottom edge of a tree, that tree keeps its new height.',
 	heightPhone: 'Height on a phone',
-	heightPhoneDesc: 'This is the height of a tree in a note, as a part of the screen height. The default is 60%.',
+	heightPhoneDesc: 'This is the start height of a tree in a note, as a percent of the screen height. The default is 60%. A button on the tree changes the height for the open note.',
 	cardSize: 'Card size',
 	cardSizeDesc: 'Compact cards show more people on the screen. Normal cards show more of each name.',
 	cardNormal: 'Normal',
 	cardCompact: 'Compact',
+	/** D119: the card style of the tree in a note on a phone. */
+	phoneCardStyle: 'Card style in the phone preview',
+	phoneCardStyleDesc: 'This is how the tree looks in a note on a phone. The full-screen view always shows whole cards.',
+	styleNamesShield: 'Names only, with the arms',
+	styleNamesPortrait: 'Names only, with the portrait',
+	styleWhole: 'Whole card',
+	/** D118: the user's own break places in long names. */
+	breakWords: 'Break places in long names',
+	breakWordsDesc: `The plugin can break a long word into parts. Write one word on each text line. Put a hyphen at each place where the word can break. An example is ${quote('Long-na-munda')}. If a name has a hyphen, write each part on its own text line. The plugin breaks a word from this list only at your places.`,
+	/** D124 item 5, D126. */
+	reduceMotion: 'Reduce movement',
+	reduceMotionDesc: 'If you choose On, the tree changes at once and does not move slowly. If you choose Follow the device, the tree uses the setting of your phone or your computer.',
+	reduceFollow: 'Follow the device',
+	reduceOn: 'On',
+	reduceOff: 'Off',
 	dates: 'Show dates on cards',
 	datesDesc: 'If this is on, the cards show when each person was born and died, and the years of each reign.',
 	relations: 'Show relation names on cards',

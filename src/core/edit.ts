@@ -19,7 +19,7 @@
  * Person fields the edit sheet can set (§6.3 "Fields"); `card-title` is written by "Show on the
  * card" (§13.3, D62), `portrait` by Select portrait and Remove portrait (§13.7).
  */
-export type PersonField = 'name' | 'title' | 'card-title' | 'house' | 'sex' | 'born' | 'died' | 'illegitimate' | 'link' | 'portrait' | 'portrait-crop' | 'notes' | 'placement';
+export type PersonField = 'name' | 'sobriquet' | 'title' | 'card-title' | 'house' | 'sex' | 'born' | 'died' | 'illegitimate' | 'link' | 'portrait' | 'portrait-crop' | 'notes' | 'placement';
 
 /** A value an edit can write for a person field: text, a boolean (`illegitimate` only), or `null` to remove the key. */
 export type FieldValue = string | boolean | null;

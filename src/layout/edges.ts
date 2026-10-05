@@ -255,7 +255,14 @@ function segmentsOf(d: string): Seg[] {
 	return out;
 }
 
+/** True if `p` is more than `r` from the box of the segment, so more than `r` from the segment: a cheap test before `distance`. */
+const beyond = (p: { x: number; y: number }, [x1, y1, x2, y2]: Seg, r: number) => p.x < Math.min(x1, x2) - r || p.x > Math.max(x1, x2) + r || p.y < Math.min(y1, y2) - r || p.y > Math.max(y1, y2) + r;
+
+/** Counts the distance tests of the "?" search (the speed proof of 0.2.4 reads it). */
+export const rumourWork = { distances: 0 };
+
 function distance(p: { x: number; y: number }, [x1, y1, x2, y2]: Seg): number {
+	rumourWork.distances++;
 	const dx = x2 - x1;
 	const dy = y2 - y1;
 	const len = dx * dx + dy * dy;
@@ -286,15 +293,18 @@ interface RumourRoom {
  */
 function rumourSpot(curve: Curve, all: Seg[], own: [number, number], dots: Spot[], clearest: boolean, near: RumourRoom): Spot {
 	const other = (i: number) => i < own[0] || i >= own[1];
-	// Sideways, only lines near the curve are looked at (the curve lies inside the box of its ends).
+	// Only what lies near the curve is looked at: it lies inside the box of its ends, and nothing farther than 40 px
+	// (46 for a dot, which counts 6 px less) can change which point is clear or which is the clearest.
 	const [sx, sy, , tx, ty] = curve;
 	const box = { x0: Math.min(sx, tx) - 40, x1: Math.max(sx, tx) + 40, y0: Math.min(sy, ty) - 40, y1: Math.max(sy, ty) + 40 };
-	const lines = clearest ? all.filter(([x1, y1, x2, y2], i) => other(i) && Math.max(x1, x2) >= box.x0 && Math.min(x1, x2) <= box.x1 && Math.max(y1, y2) >= box.y0 && Math.min(y1, y2) <= box.y1) : all;
-	// Not sideways, `lines` is every segment, so the curve's own segments are skipped here.
-	const skip = (i: number) => !clearest && !other(i);
+	const lines = all.filter(([x1, y1, x2, y2], i) => other(i) && Math.max(x1, x2) >= box.x0 && Math.min(x1, x2) <= box.x1 && Math.max(y1, y2) >= box.y0 && Math.min(y1, y2) <= box.y1);
+	const nearDots = dots.filter((d) => d.x >= box.x0 - 6 && d.x <= box.x1 + 6 && d.y >= box.y0 - 6 && d.y <= box.y1 + 6);
+	const nearCards = near.cards.filter((b) => b.x < box.x1 && b.x + b.w > box.x0 && b.y < box.y1 && b.y + b.h > box.y0);
 	const offCards = (p: Spot) => near.cards.every((b) => boxGap(p, b) >= near.room);
-	const clearOf = (p: Spot, ok: (i: number) => boolean, segs: Seg[]) => segs.every((s, i) => ok(i) || distance(p, s) > 10) && dots.every((d) => Math.hypot(p.x - d.x, p.y - d.y) > 16) && offCards(p);
-	const clear = (p: Spot) => clearOf(p, skip, lines);
+	// For a point of the curve itself: a card that is 40 px from the curve's box is farther than `room` from the point.
+	const offCurveCards = (p: Spot) => nearCards.every((b) => boxGap(p, b) >= near.room);
+	const clearOf = (p: Spot, ok: (i: number) => boolean, segs: Seg[], ds: Spot[], offC: (q: Spot) => boolean) => segs.every((s, i) => ok(i) || beyond(p, s, 10) || distance(p, s) > 10) && ds.every((d) => Math.hypot(p.x - d.x, p.y - d.y) > 16) && offC(p);
+	const clear = (p: Spot) => clearOf(p, () => false, lines, nearDots, offCurveCards);
 	const along = (at: (t: number) => Spot, steps: number): Spot[] => {
 		const out: Spot[] = [];
 		for (let i = 0; i <= steps; i++) out.push(at(0.5 + (i % 2 ? 1 : -1) * Math.ceil(i / 2) * (0.5 / Math.ceil(steps / 2))));
@@ -309,25 +319,25 @@ function rumourSpot(curve: Curve, all: Seg[], own: [number, number], dots: Spot[
 	if (near.alt) {
 		const mine = near.alt.own;
 		const ok = (i: number) => mine.some(([a, b]) => i >= a && i < b);
-		const spot = altSpots.find((p) => clearOf(p, ok, all));
+		const spot = altSpots.find((p) => clearOf(p, ok, all, dots, offCards));
 		if (spot) return spot;
 	}
 	const mid = bezier(curve, 0.5);
 	if (!clearest) {
-		if (offCards(mid)) return mid;
+		if (offCurveCards(mid)) return mid;
 	} else {
 		let best = mid;
 		let room = -1;
 		for (let i = 2; i <= 38; i++) {
 			const p = bezier(curve, i / 40);
-			if (!offCards(p)) continue;
-			const d = Math.min(40, ...lines.map((s) => distance(p, s)), ...dots.map((q) => Math.hypot(p.x - q.x, p.y - q.y) - 6));
+			if (!offCurveCards(p)) continue;
+			const d = Math.min(40, ...lines.map((s) => (beyond(p, s, 40) ? 40 : distance(p, s))), ...nearDots.map((q) => Math.hypot(p.x - q.x, p.y - q.y) - 6));
 			if (d > room) {
 				room = d;
 				best = p;
 			}
 		}
-		if (offCards(best)) return best;
+		if (offCurveCards(best)) return best;
 	}
 	// No place clear of the cards is also clear of the lines: the cards come first. A link between two
 	// cards of one row crosses only the gap between them, so there it takes the gap's middle.

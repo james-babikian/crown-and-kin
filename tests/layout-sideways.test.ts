@@ -58,13 +58,13 @@ describe('turned frame', () => {
 
 	it('sideways geometry: normal cards keep their size, narrow cards are 10.25 em, gaps take the sideways sizes', () => {
 		const normal = sidewaysGeometry(GEO, 'normal');
-		expect([normal.cardW, normal.cardH, normal.rowGap, normal.nodeGap, normal.coupleGap]).toEqual([180, 64, 56, 24, 24]);
+		expect([normal.cardW, normal.cardH, normal.rowGap, normal.nodeGap, normal.coupleGap]).toEqual([180, 61, 56, 24, 24]);
 		const narrow = sidewaysGeometry(GEO, 'narrow');
 		expect([narrow.cardW, narrow.rowGap]).toEqual([164, 48]);
 		// Compact cards are already narrower than 10.25 em.
 		expect(sidewaysGeometry(geometryFor(16, 'compact'), 'narrow').cardW).toBe(geometryFor(16, 'compact').cardW);
 		const turned = turnedGeometry(normal);
-		expect([turned.cardW, turned.cardH, turned.tagH]).toEqual([64, 180, 6]);
+		expect([turned.cardW, turned.cardH, turned.tagH]).toEqual([61, 180, 6]);
 		// The first couple lane sits just clear of the card edge: no tag hangs into the gap between columns.
 		expect(lineMetrics(turned).coupleLane0).toBeLessThan(lineMetrics(GEO).coupleLane0);
 	});

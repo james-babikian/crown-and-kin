@@ -60,6 +60,8 @@ export function personNameOf(g: FamilyGraph | null, v: HolderValues): string | u
 export interface HolderText {
 	/** The ruler name with the number ("Aldric II"). */
 	ruler: string;
+	/** D122: the sobriquet of the person, bare text (the row adds the curly marks); absent for a holder who is not in the tree. */
+	sobriquet?: string;
 	/** The full name when it says more than the ruler name, else undefined. */
 	full?: string;
 	/** `entryReign`: "1131–1160", "from 1131", "until 1160", or undefined. */
@@ -76,7 +78,8 @@ export function holderText(g: FamilyGraph | null, v: HolderValues): HolderText {
 	const ruler = v.number !== undefined ? `${base} ${v.number}`.trim() : base;
 	const fullName = personName ?? v.name ?? v.person ?? '';
 	const reign = entryReign({ ...v, index: 0 });
-	return { ruler, ...(fullName && fullName !== base ? { full: fullName } : {}), ...(reign !== undefined ? { reign } : {}), inTree };
+	const sobriquet = v.person !== undefined ? g?.byId.get(v.person)?.sobriquet : undefined;
+	return { ruler, ...(sobriquet !== undefined ? { sobriquet } : {}), ...(fullName && fullName !== base ? { full: fullName } : {}), ...(reign !== undefined ? { reign } : {}), inTree };
 }
 
 /** The fields of the holder form (all text as typed). `name` only for a holder who is not in the tree. */

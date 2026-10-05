@@ -435,7 +435,7 @@ export class HandleRegistry {
 			}
 			const read = await this.readOnce(path);
 			if (!read) return;
-			if (!read.fresh) continue;
+			if (!this.stillFresh(path, read)) continue;
 			this.applyText(path, read.text);
 			return;
 		}
@@ -445,13 +445,22 @@ export class HandleRegistry {
 	 * One read of the note. `fresh` is false if a write of the same note ran at any time during the
 	 * read: then the text can be older than the handles' bodies and must not replace them.
 	 */
-	private async readOnce(path: string): Promise<{ text: string; fresh: boolean } | null> {
+	private async readOnce(path: string): Promise<{ text: string; fresh: boolean; gen: number } | null> {
 		const busy = (this.writing.get(path) ?? 0) > 0;
 		const gen = this.written.get(path) ?? 0;
 		const text = await this.readText(path);
 		if (text === null) return null;
 		const fresh = !busy && (this.writing.get(path) ?? 0) === 0 && (this.written.get(path) ?? 0) === gen;
-		return { text, fresh };
+		return { text, fresh, gen };
+	}
+
+	/**
+	 * True if no write of the note began or ended since `read` started. `readOnce` decides this when the
+	 * read ends, but the caller applies the text a tick later; an editor write is synchronous and can
+	 * run in that gap, so the caller asks again at the moment it applies the text.
+	 */
+	private stillFresh(path: string, read: { fresh: boolean; gen: number }): boolean {
+		return read.fresh && (this.writing.get(path) ?? 0) === 0 && (this.written.get(path) ?? 0) === read.gen;
 	}
 
 	/**
@@ -558,7 +567,7 @@ export class HandleRegistry {
 		const text = read.text;
 		// A read that overlapped a write only finds the ordinal (a write never moves blocks); the
 		// handles keep their newer bodies, and a later sync reads again.
-		if (read.fresh) this.applyText(path, text);
+		if (this.stillFresh(path, read)) this.applyText(path, text);
 		else void this.sync(path);
 		const blocks = findBlocks(text);
 		// ordinalForSection compares bodies strictly; a Live Preview list item needs `sameBody`.
@@ -622,7 +631,7 @@ export class HandleRegistry {
 			}
 			const read = await this.readOnce(path);
 			if (!read) return null;
-			if (!read.fresh) continue;
+			if (!this.stillFresh(path, read)) continue;
 			this.applyText(path, read.text);
 			const blocks = findBlocks(read.text);
 			return blocks[ordinal] ? this.obtain(path, ordinal, blocks) : null;
@@ -676,9 +685,13 @@ export class HandleRegistry {
 		this.lastSeen.delete(path);
 	}
 
-	/** After an outside change of the note, every handle of it finds its block again. */
+	/**
+	 * After an outside change of the note, every handle of it finds its block again. A note that no
+	 * handle holds is not read (a sync of many notes must not read them all); a watcher reads it if it needs to.
+	 */
 	modified(path: string): void {
-		void this.sync(path).then(() => {
+		const held = this.attached(path).length > 0;
+		void (held ? this.sync(path) : Promise.resolve()).then(() => {
 			for (const w of [...this.noteWatchers]) w(path);
 		});
 	}

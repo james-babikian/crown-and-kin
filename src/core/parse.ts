@@ -10,6 +10,7 @@ import { isScalar, Lexer, parseDocument, type Document } from 'yaml';
 import { personIdSource } from './id-gen';
 import { codedIssue, type CodedIssue, type HardError } from './messages';
 import { cropValue } from './portrait-crop';
+import { normaliseSobriquet } from './sobriquet';
 import { blankPlainNulls, bool, int, isEmpty, isMap, linkValue, list, str, tolerateEmbeds, unwrapCurlyKeys, type Raw, type RawMap } from './tolerate';
 import type { Holder, House, ParentRef, ParseResult, Person, Title, Tree, TreeOptions, Union } from './types';
 
@@ -194,6 +195,7 @@ class Reader {
 			}
 			const name = str(p.name);
 			const cardTitle = str(p['card-title']);
+			const sobriquet = normaliseSobriquet(str(p.sobriquet));
 			const portrait = linkValue(p.portrait, () => this.sourceText(['people', index, 'portrait']));
 			const portraitCrop = cropValue(p['portrait-crop']);
 			let id = str(p.id);
@@ -211,6 +213,8 @@ class Reader {
 				title: str(p.title),
 				// Only when written, so a tree without titles reads exactly as before.
 				...(cardTitle !== undefined ? { cardTitle } : {}),
+				// Only when written and not empty (D122).
+				...(sobriquet !== undefined ? { sobriquet } : {}),
 				house: str(p.house),
 				sex: str(p.sex),
 				born: str(p.born),

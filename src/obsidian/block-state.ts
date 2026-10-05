@@ -51,6 +51,11 @@ export interface BlockState {
 	 * written to the note.
 	 */
 	folds: Set<FoldKey>;
+	/**
+	 * D120: the step of the height button of the phone preview (0 lower, 1 start, 2 upper). `undefined` means untouched, so
+	 * the effective step is `heightStep ?? 1`. Never stored in the note or in `data.json`; cleared when the note closes.
+	 */
+	heightStep?: 0 | 1 | 2;
 }
 
 /** What the relation finder shows (spec §13.2, D47, D48); it writes nothing to the note. */
@@ -88,6 +93,8 @@ export function endSessionFocus(st: BlockState): void {
 	st.shown = null;
 	st.finder = null;
 	st.folds.clear();
+	// D120: the height button starts again at the middle step.
+	st.heightStep = undefined;
 }
 
 /**
@@ -112,4 +119,6 @@ export function carryState(from: BlockState, to: BlockState): void {
 	to.shown ??= from.shown;
 	to.finder ??= from.finder;
 	if (!to.folds.size) to.folds = new Set(from.folds);
+	// D120: a step the user chose goes with the block; a step the new state already has stays (`undefined` is "untouched", `1` is "chose the middle").
+	if (to.heightStep === undefined) to.heightStep = from.heightStep;
 }

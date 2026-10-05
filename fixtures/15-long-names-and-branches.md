@@ -689,20 +689,20 @@ unions:
 
 ```dynasty
 # Sample tree 15, block 2: long names (spec §13.9, D81, D82). Worked out by hand and checked with the headless measure
-# (`approxMeasure` of `src/render/svg-string.ts`, name font: bold, 16 px, the default note font).
+# (`approxMeasure` of `src/render/svg-string.ts`, name font: bold, 13.6 px = 0.85 em of the default 16 px note font, D117; `cardNameLines`).
 #
 # Text width of a name: normal card 180 - 14 - 8 = 158 px; narrow D24 card at its widest, 164 px: 164 - 22 = 142 px.
 # name-lines: ID | width=<px>; lines=<text line> / <text line> / <text line>
 # name-lines: short | width=158; lines=Aldric Valmont
 # name-lines: short | width=142; lines=Aldric Valmont
 # name-lines: two-lines | width=158; lines=Ser Gareth Orsini the / Younger
-# name-lines: two-lines | width=142; lines=Ser Gareth Orsini / the Younger
-# name-lines: three-normal | width=158; lines=Isabella Wilhelmina / Josephine Charlotte / Valmont-Orsini
-# name-lines: three-normal | width=142; lines=Isabella / Wilhelmina / Josephine Charlo…
-# name-lines: three-narrow | width=158; lines=Wilhelmina Charlotte / of Castellane
-# name-lines: three-narrow | width=142; lines=Wilhelmina / Charlotte of / Castellane
-# name-lines: over-three | width=158; lines=Maximilian / Alexander Theodoric / of Valmont and Orsi…
-# name-lines: over-three | width=142; lines=Maximilian / Alexander / Theodoric of Val…
+# name-lines: two-lines | width=142; lines=Ser Gareth Orsini the / Younger
+# name-lines: three-normal | width=158; lines=Isabella Wilhelmina / Josephine Charlotte / Montgomery Castellane
+# name-lines: three-normal | width=142; lines=Isabella Wilhelmina / Josephine Charlotte / Montgomery…
+# name-lines: three-narrow | width=158; lines=Wilhelmina Charlotte of / Montgomery Castellane
+# name-lines: three-narrow | width=142; lines=Wilhelmina Charlotte / of Montgomery / Castellane
+# name-lines: over-three | width=158; lines=Maximilian Alexander / Theodoric Montgomery / of Valmont and Orsini…
+# name-lines: over-three | width=142; lines=Maximilian Alexander / Theodoric / Montgomery of…
 houses:
   - id: valmont
     name: House Valmont
@@ -734,21 +734,21 @@ people:
     parents: [leopold, cecilia]
   # Exactly three text lines on a normal card, no "…". On a narrow card the third text line ends with "…".
   - id: three-normal
-    name: Isabella Wilhelmina Josephine Charlotte Valmont-Orsini
+    name: Isabella Wilhelmina Josephine Charlotte Montgomery Castellane
     house: valmont
     sex: m
     born: 1127
     parents: [leopold, cecilia]
   # Two text lines on a normal card; exactly three text lines, no "…", on a narrow note-preview card (D24).
   - id: three-narrow
-    name: Wilhelmina Charlotte of Castellane
+    name: Wilhelmina Charlotte of Montgomery Castellane
     house: valmont
     sex: f
     born: 1128
     parents: [leopold, cecilia]
   # Needs more than three text lines: the third text line ends with "…" on both.
   - id: over-three
-    name: Maximilian Alexander Theodoric of Valmont and Orsini
+    name: Maximilian Alexander Theodoric Montgomery of Valmont and Orsini the Younger
     house: valmont
     sex: m
     born: 1129

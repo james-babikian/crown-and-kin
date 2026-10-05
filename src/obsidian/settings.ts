@@ -3,6 +3,17 @@
  * can come from an older version, a sync conflict or a hand edit of `data.json`.
  */
 
+/** The card styles of the phone preview (D119). */
+export type PhoneCardStyle = 'names-shield' | 'names-portrait' | 'whole';
+export const PHONE_CARD_STYLES: readonly PhoneCardStyle[] = ['names-shield', 'names-portrait', 'whole'];
+
+/** The choices of "Reduce movement" (D126). */
+export type ReduceMotion = 'system' | 'on' | 'off';
+export const REDUCE_MOTIONS: readonly ReduceMotion[] = ['system', 'on', 'off'];
+
+/** The characters of `breakWords` that `normaliseSettings` keeps. */
+export const BREAK_WORDS_MAX = 20000;
+
 /** The plugin settings (spec §9, D33), stored with `Plugin.saveData`. The settings tab and every reader use this shape. */
 export interface DynastySettings {
 	/** Height of a tree in a note on a computer or tablet, in px (spec §7.5), 100–5000. Default 500. `options.height` wins. */
@@ -22,6 +33,12 @@ export interface DynastySettings {
 	showHouseGeneration: boolean;
 	/** Update tree links when a note or a picture is renamed (§6.9, D6, §13.0 item 3). Default on. */
 	updateLinks: boolean;
+	/** D119: how the tree in a note on a phone looks. The full-screen view always shows whole cards. Default 'names-shield'. */
+	phoneCardStyle: PhoneCardStyle;
+	/** D118: the user's own break places for long names, as typed: one word on each text line, hyphen-marked ("Long-na-munda"). Default ''. */
+	breakWords: string;
+	/** D124 item 5, D126: reduce movement. 'system' follows the device. Default 'system'. */
+	reduceMotion: ReduceMotion;
 }
 
 /** The settings a fresh install starts with. */
@@ -35,6 +52,9 @@ export const DEFAULT_SETTINGS: DynastySettings = {
 	showHouseGeneration: true,
 	focusGenerations: 3,
 	updateLinks: true,
+	phoneCardStyle: 'names-shield',
+	breakWords: '',
+	reduceMotion: 'system',
 };
 
 /*
@@ -75,8 +95,20 @@ export const normaliseSettings = (raw: unknown): DynastySettings => {
 		showHouseGeneration: typeof s.showHouseGeneration === 'boolean' ? s.showHouseGeneration : d.showHouseGeneration,
 		focusGenerations: wholeIn(s.focusGenerations, GENERATIONS) ? s.focusGenerations : d.focusGenerations,
 		updateLinks: typeof s.updateLinks === 'boolean' ? s.updateLinks : d.updateLinks,
+		phoneCardStyle: PHONE_CARD_STYLES.find((v) => v === s.phoneCardStyle) ?? d.phoneCardStyle,
+		breakWords: typeof s.breakWords === 'string' ? s.breakWords.slice(0, BREAK_WORDS_MAX) : d.breakWords,
+		reduceMotion: REDUCE_MOTIONS.find((v) => v === s.reduceMotion) ?? d.reduceMotion,
 	};
 };
+
+/** True when movement is reduced (D126). `prefers` is `matchMedia('(prefers-reduced-motion: reduce)').matches` on the view's own window. */
+export const reducedMotion = (setting: ReduceMotion, prefers: boolean): boolean => (setting === 'on' ? true : setting === 'off' ? false : prefers);
+
+/** How many percent the height button of the phone preview moves from the start height (D120, D126). */
+export const PHONE_STEP_POINTS = 20;
+
+/** The three heights of the phone preview in % of the screen: [lower, start, upper]. The start is `embedHeightPhone`; the limits are 30 and 90. */
+export const phoneHeightSteps = (base: number): readonly [number, number, number] => [Math.max(30, base - PHONE_STEP_POINTS), base, Math.min(90, base + PHONE_STEP_POINTS)];
 
 /**
  * The height a desktop user typed, or null if it is not a whole number of pixels in range. Leading

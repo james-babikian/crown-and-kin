@@ -15,7 +15,7 @@ import { Popover } from '../../src/render/dom/widgets';
 import { ADD_UI, INSERT_UI, RENAME_UI, SETTINGS_UI } from '../../src/render/ui-text';
 import { TreeView } from '../../src/obsidian/tree-view';
 import { FEl, clock, device, dispatch, dispatchWindow, fakeDoc, fakeWin, flushFrames, installDom, resetDom, resizeAll, settle } from './fake-dom';
-import { notices, resetObsidian, settingGroups, settingRows, type DropdownComponent, type Plugin as FakePlugin, type TextComponent, type ToggleComponent } from './fake-obsidian';
+import { notices, resetObsidian, settingGroups, settingRows, type DropdownComponent, type Plugin as FakePlugin, type TextAreaComponent, type TextComponent, type ToggleComponent } from './fake-obsidian';
 import { FAR, desktop, embed, fakeApp, fakeHandle, fullViews, openFullScreen, phone, phoneOnSide, type Host } from './tree-view-fakes';
 
 const last = <T>(a: T[]): T | undefined => a[a.length - 1];
@@ -96,7 +96,8 @@ describe('the settings tab (spec §9, D33)', () => {
 		const names = (i: number) => settingGroups[i].listEl.querySelectorAll('.setting-item-name').map((n) => n.getText());
 		expect(names(0)).toEqual([SETTINGS_UI.heightDesktop, SETTINGS_UI.heightPhone]);
 		// M7 (spec §13.1): the relation names are in the Cards group.
-		expect(names(1)).toEqual([SETTINGS_UI.cardSize, SETTINGS_UI.dates, SETTINGS_UI.relations, SETTINGS_UI.portraits]);
+		// 0.2.4 (D118, D119, D126): the card style of the phone preview, the break list and "Reduce movement" follow "Card size".
+		expect(names(1)).toEqual([SETTINGS_UI.cardSize, SETTINGS_UI.phoneCardStyle, SETTINGS_UI.breakWords, SETTINGS_UI.reduceMotion, SETTINGS_UI.dates, SETTINGS_UI.relations, SETTINGS_UI.portraits]);
 		// D113 item 4: the house page has its own group.
 		expect(names(2)).toEqual([SETTINGS_UI.houseGeneration]);
 		expect(names(3)).toEqual([SETTINGS_UI.generations]);
@@ -108,7 +109,7 @@ describe('the settings tab (spec §9, D33)', () => {
 
 	it('shows the stored values; a bad stored value shows its default', async () => {
 		const { fake, plugin } = await loadPlugin({ embedHeightDesktop: 640, embedHeightPhone: 70, cardSize: 'compact', showDates: false, focusGenerations: 99, updateLinks: false });
-		expect(plugin.settings).toEqual({ embedHeightDesktop: 640, embedHeightPhone: 70, cardSize: 'compact', showDates: false, showRelations: true, showPortraits: true, showHouseGeneration: true, focusGenerations: 3, updateLinks: false });
+		expect(plugin.settings).toEqual({ embedHeightDesktop: 640, embedHeightPhone: 70, cardSize: 'compact', showDates: false, showRelations: true, showPortraits: true, showHouseGeneration: true, focusGenerations: 3, updateLinks: false, phoneCardStyle: 'names-shield', breakWords: '', reduceMotion: 'system' });
 		openTab(fake);
 		expect(control<TextComponent>(SETTINGS_UI.heightDesktop).getValue()).toBe('640');
 		expect(control<DropdownComponent>(SETTINGS_UI.heightPhone).getValue()).toBe('70');
@@ -147,6 +148,72 @@ describe('the settings tab (spec §9, D33)', () => {
 		await settle();
 		expect(plugin.settings).toEqual({ ...DEFAULT_SETTINGS, updateLinks: false, focusGenerations: 5 });
 		expect(last(fake.saved)).toEqual(plugin.settings);
+	});
+
+	it('0.2.4: the card style, the break list and "Reduce movement" show their stored values, with the choices in the plugin words and an accessible name', async () => {
+		const { fake } = await loadPlugin({ phoneCardStyle: 'whole', breakWords: 'Long-na-munda', reduceMotion: 'on' });
+		openTab(fake);
+		const style = control<DropdownComponent>(SETTINGS_UI.phoneCardStyle);
+		expect(style.getValue()).toBe('whole');
+		expect(style.options).toEqual([
+			['names-shield', SETTINGS_UI.styleNamesShield],
+			['names-portrait', SETTINGS_UI.styleNamesPortrait],
+			['whole', SETTINGS_UI.styleWhole],
+		]);
+		const motion = control<DropdownComponent>(SETTINGS_UI.reduceMotion);
+		expect(motion.getValue()).toBe('on');
+		expect(motion.options).toEqual([
+			['system', SETTINGS_UI.reduceFollow],
+			['on', SETTINGS_UI.reduceOn],
+			['off', SETTINGS_UI.reduceOff],
+		]);
+		const area = control<TextAreaComponent>(SETTINGS_UI.breakWords);
+		expect(area.getValue()).toBe('Long-na-munda');
+		expect((area.inputEl as unknown as { rows: number }).rows).toBe(6);
+		expect(area.inputEl.tag).toBe('textarea');
+		for (const [c, name] of [[style.selectEl, SETTINGS_UI.phoneCardStyle], [motion.selectEl, SETTINGS_UI.reduceMotion], [area.inputEl, SETTINGS_UI.breakWords]] as const) expect(c.getAttribute('aria-label')).toBe(name);
+	});
+
+	it('0.2.4: the defaults are the names-only style with the arms, an empty break list and "Follow the device"', async () => {
+		const { fake } = await loadPlugin();
+		openTab(fake);
+		expect(control<DropdownComponent>(SETTINGS_UI.phoneCardStyle).getValue()).toBe('names-shield');
+		expect(control<TextAreaComponent>(SETTINGS_UI.breakWords).getValue()).toBe('');
+		expect(control<DropdownComponent>(SETTINGS_UI.reduceMotion).getValue()).toBe('system');
+	});
+
+	it('0.2.4: each of the two choices stores its change; the break list stores the text as typed', async () => {
+		const { fake, plugin } = await loadPlugin();
+		openTab(fake);
+		control<DropdownComponent>(SETTINGS_UI.phoneCardStyle).fire('names-portrait');
+		control<DropdownComponent>(SETTINGS_UI.reduceMotion).fire('off');
+		control<TextAreaComponent>(SETTINGS_UI.breakWords).fire('Long-na-munda\nVal-mont ');
+		await settle();
+		expect(plugin.settings).toEqual({ ...DEFAULT_SETTINGS, phoneCardStyle: 'names-portrait', reduceMotion: 'off', breakWords: 'Long-na-munda\nVal-mont ' });
+		expect(last(fake.saved)).toEqual(plugin.settings);
+	});
+
+	it('0.2.4: the break list is stored when the field loses the focus, and when the tab closes with the typing not yet stored', async () => {
+		const { fake, plugin } = await loadPlugin();
+		openTab(fake);
+		const area = control<TextAreaComponent>(SETTINGS_UI.breakWords);
+		// A key press changes the value but the store waits (the timer of the real tab is 400 ms): set the value without the change event.
+		area.inputEl.value = 'Val-mont';
+		dispatch(area.inputEl, 'blur');
+		await settle();
+		expect(plugin.settings.breakWords).toBe('Val-mont');
+		area.inputEl.value = 'Val-mont\nAr-den';
+		(fake.settingTabs[0] as unknown as { hide(): void }).hide();
+		await settle();
+		expect(plugin.settings.breakWords).toBe('Val-mont\nAr-den');
+	});
+
+	it('0.2.4: a blur with the stored text stores nothing', async () => {
+		const { fake } = await loadPlugin({ breakWords: 'Val-mont' });
+		openTab(fake);
+		dispatch(control<TextAreaComponent>(SETTINGS_UI.breakWords).inputEl, 'blur');
+		await settle();
+		expect(fake.saved).toEqual([]);
 	});
 
 	it('a desktop height out of range is not stored, and the field shows the stored value again', async () => {

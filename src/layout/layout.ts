@@ -15,6 +15,9 @@ import { placeInOrder } from './pava';
 import { soloFamiliesOutside } from './solo-side';
 import { turnBox, turnUnion } from './turn';
 
+/** Counts the work of the union dots (the speed proof of 0.2.4 reads it): calls and unions placed. */
+export const unionWork = { calls: 0, placed: 0 };
+
 /** Spec D11 defaults: far when more than 3 card widths apart, or more than one generation. */
 export const DEFAULT_FAR_RULE: FarCoupleRule = { maxCardWidths: 3, maxGenerations: 1 };
 /** Default layout settings: `down` orientation, 4 sweeps, the D11 far-couple rule. */
@@ -45,7 +48,8 @@ export function armsCards(g: FamilyGraph, arms: readonly string[] | undefined): 
 }
 
 /**
- * Where each union's dot goes, given final card positions.
+ * Where each union's dot goes, given final card positions. `placeUnions(only)` places just the unions named in `only`
+ * (a sweep needs the dots of one row only); with no `only` it places all of them.
  * - Partners side by side: in the gap between them, on a bar. A couple with several unions (a
  *   betrothal, then a marriage) gets one dot for each, spread along the gap in list order.
  * - Partners in the same block (e.g. a third wife two cards along): below, halfway between.
@@ -53,45 +57,47 @@ export function armsCards(g: FamilyGraph, arms: readonly string[] | undefined): 
  *   towards the other, so the children stay with the family they were drawn under. Far couples
  *   (D10) use the same spot, so the far rule never moves a card.
  */
-function placeUnions(
-	g: FamilyGraph,
-	persons: Map<string, PersonBox>,
-	rowIndex: Map<string, number>,
-	order: ModelOrder,
-	blockOf: Map<string, number>,
-	geo: Geometry,
-): Map<string, UnionPoint> {
-	const unions = new Map<string, UnionPoint>();
+function unionPlacer(g: FamilyGraph, persons: Map<string, PersonBox>, rowIndex: Map<string, number>, order: ModelOrder, blockOf: Map<string, number>, geo: Geometry) {
+	// The unions of one couple, in list order: side by side they share one gap, so each needs to know the others.
+	const sameCouple = new Map<string, string[]>();
+	const pairOf = new Map<string, string>();
+	for (const fu of g.unions) {
+		const pair = [...fu.partners].sort().join('\n');
+		pairOf.set(fu.key, pair);
+		addTo(sameCouple, pair, fu.key);
+	}
 	const adjacent = (fu: FamilyUnion) => {
 		const [a, b] = fu.partners.map((p) => persons.get(p)!);
 		return a.gen === b.gen && Math.abs(rowIndex.get(a.id)! - rowIndex.get(b.id)!) === 1;
 	};
-	const leftOf = (fu: FamilyUnion) => fu.partners.map((p) => persons.get(p)!).reduce((l, b) => (b.x < l.x ? b : l)).id;
-	// The left card names the pair: it has only one neighbour on its right.
-	const barsOf = new Map<string, string[]>();
-	for (const fu of g.unions) if (adjacent(fu)) addTo(barsOf, leftOf(fu), fu.key);
-	for (const fu of g.unions) {
-		const [a, b] = fu.partners.map((p) => persons.get(p)!);
-		const y = Math.max(a.y + a.h, b.y + b.h) + geo.rowGap * 0.2;
-		if (adjacent(fu)) {
-			const [l, r] = a.x < b.x ? [a, b] : [b, a];
-			// Signs on one point would cover each other, and the trunks would share a line: space the
-			// dots two union sizes apart where the gap allows, and never less than one.
-			const keys = barsOf.get(l.id)!;
-			const gap = r.x - l.x - l.w;
-			const step = keys.length > 1 ? Math.min(2 * geo.unionSize, Math.max(geo.unionSize, (gap - geo.unionSize) / (keys.length - 1))) : 0;
-			const x = (l.x + l.w + r.x) / 2 + (keys.indexOf(fu.key) - (keys.length - 1) / 2) * step;
-			unions.set(fu.key, { key: fu.key, x, y: l.y + l.h / 2, bar: true, far: false });
-		} else if (blockOf.get(a.id) === blockOf.get(b.id)) {
-			unions.set(fu.key, { key: fu.key, x: (a.x + a.w / 2 + b.x + b.w / 2) / 2, y, bar: false, far: false });
-		} else {
-			const anchor = persons.get(order.anchors.get(fu.key)!)!;
-			const other = anchor === a ? b : a;
-			const dir = other.x >= anchor.x ? 1 : -1;
-			unions.set(fu.key, { key: fu.key, x: anchor.x + anchor.w / 2 + (dir * anchor.w) / 4, y, bar: false, far: false });
+	return (only?: ReadonlySet<string>): Map<string, UnionPoint> => {
+		const unions = new Map<string, UnionPoint>();
+		const list = only ? [...only].map((k) => g.unionByKey.get(k)!) : g.unions;
+		unionWork.calls++;
+		unionWork.placed += list.length;
+		for (const fu of list) {
+			const [a, b] = fu.partners.map((p) => persons.get(p)!);
+			const y = Math.max(a.y + a.h, b.y + b.h) + geo.rowGap * 0.2;
+			if (adjacent(fu)) {
+				const [l, r] = a.x < b.x ? [a, b] : [b, a];
+				// Signs on one point would cover each other, and the trunks would share a line: space the
+				// dots two union sizes apart where the gap allows, and never less than one.
+				const keys = sameCouple.get(pairOf.get(fu.key)!)!;
+				const gap = r.x - l.x - l.w;
+				const step = keys.length > 1 ? Math.min(2 * geo.unionSize, Math.max(geo.unionSize, (gap - geo.unionSize) / (keys.length - 1))) : 0;
+				const x = (l.x + l.w + r.x) / 2 + (keys.indexOf(fu.key) - (keys.length - 1) / 2) * step;
+				unions.set(fu.key, { key: fu.key, x, y: l.y + l.h / 2, bar: true, far: false });
+			} else if (blockOf.get(a.id) === blockOf.get(b.id)) {
+				unions.set(fu.key, { key: fu.key, x: (a.x + a.w / 2 + b.x + b.w / 2) / 2, y, bar: false, far: false });
+			} else {
+				const anchor = persons.get(order.anchors.get(fu.key)!)!;
+				const other = anchor === a ? b : a;
+				const dir = other.x >= anchor.x ? 1 : -1;
+				unions.set(fu.key, { key: fu.key, x: anchor.x + anchor.w / 2 + (dir * anchor.w) / 4, y, bar: false, far: false });
+			}
 		}
-	}
-	return unions;
+		return unions;
+	};
 }
 
 /** The most partnerships any one couple of `g` has (1 when no couple has more than one, 0 with none). */
@@ -245,6 +251,25 @@ export function layoutFamilies(
 	};
 	const currentTargets = (r: number) => new Map(rowBlocks[r].map((bi) => [bi, blockCentre(bi)]));
 
+	const placeUnions = unionPlacer(g, persons, rowIndex, order, blockOf, geo);
+	// A sweep of row r reads the dots of that row's families only; the other rows' dots would be placed for nothing.
+	const downNeed: Set<string>[] = Array.from({ length: maxGen + 1 }, () => new Set<string>());
+	const upNeed: Set<string>[] = Array.from({ length: maxGen + 1 }, () => new Set<string>());
+	for (const kids of families) {
+		const union = g.primaryUnion.get(kids[0]);
+		if (union) downNeed[gen.get(kids[0])!].add(union);
+	}
+	rowBlocks.forEach((row, r) => {
+		for (const bi of row) {
+			for (const p of blocks[bi]) {
+				for (const key of g.unionsOf.get(p) ?? []) {
+					const fu = g.unionByKey.get(key)!;
+					if (fu.children.length && fu.partners[0] === p) upNeed[r].add(key);
+				}
+			}
+		}
+	});
+
 	const centreX = (id: string) => persons.get(id)!.x + cw(id) / 2;
 	const span = (ids: string[]) => {
 		const xs = ids.map(centreX);
@@ -254,7 +279,7 @@ export function layoutFamilies(
 	/** Children under parents: shift each sibling group so it's centred under its union or single parent. */
 	const downSweep = () => {
 		for (let r = 1; r <= maxGen; r++) {
-			const unions = placeUnions(g, persons, rowIndex, order, blockOf, geo);
+			const unions = placeUnions(downNeed[r]);
 			const targets = currentTargets(r);
 			for (const kids of families) {
 				if (gen.get(kids[0]) !== r) continue;
@@ -270,7 +295,7 @@ export function layoutFamilies(
 	/** Parents over children: shift each block towards centring its unions over their children. */
 	const upSweep = () => {
 		for (let r = maxGen - 1; r >= 0; r--) {
-			const unions = placeUnions(g, persons, rowIndex, order, blockOf, geo);
+			const unions = placeUnions(upNeed[r]);
 			const targets = currentTargets(r);
 			for (const bi of rowBlocks[r]) {
 				// Each family's wish counts once per child. The down sweep moves a crowded row as one pool
@@ -316,7 +341,7 @@ export function layoutFamilies(
 		// Normalise x to start at 0.
 		const minX = Math.min(...[...persons.values()].map((p) => p.x));
 		for (const p of persons.values()) p.x -= minX;
-		unions = placeUnions(g, persons, rowIndex, order, blockOf, geo);
+		unions = placeUnions();
 		markFarCouples(g, persons, unions, blockOf, farRule, geo.cardW);
 		if (!side) break;
 		// A tag's gap moves the cards below it, which can make other couples far: arrange again until
@@ -587,5 +612,5 @@ function turnLayout(
 	);
 	const done: TreeLayout = { persons, unions, rows, rowGaps, farTags, width, height, geometry: side, orientation: 'sideways' };
 	// The spots follow the rules of the turned frame (`down` rules on the turned numbers); their sign then grows to the right.
-	return fold?.controls ? withFolds(done, turnSpots(foldSpots(fold.controls, turnedPersons, turnedUnions, rowGaps, geo.fontPx, { turned: true }))) : done;
+	return fold?.controls ? withFolds(done, turnSpots(foldSpots(fold.controls, turnedPersons, turnedUnions, rowGaps, geo.fontPx, { turned: true, soloX: plan.soloExits }))) : done;
 }

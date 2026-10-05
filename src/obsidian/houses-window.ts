@@ -23,11 +23,11 @@ import { openHousePage } from './house-page-window';
 import { danglingIds, draftId, idChanged, idFromName, idOps, idProblemFor, idProblems, idRefusalText, isIdOp, reasonText, type IdReason, type IdRow } from './id-draft';
 import { idNewNameNote, idNote, idOpenButton, type IdRowView } from './id-field';
 import { openIdWindow } from './id-window';
-import { phoneLayout } from './modal-layout';
+import { phoneLayout, settledReveal } from './modal-layout';
 import { currentPictureOf, pickPicture } from './picture-picker';
 import { ARMS_PIXELS, type PictureCopy, type PictureStore } from './picture-store';
 import { trackModal } from './plugin-modals';
-import { drawableColour, freshOrStale, nameDialog, onWriteFailed, revealFocused, showErrorLine } from './sheet-parts';
+import { drawableColour, freshOrStale, nameDialog, onWriteFailed, showErrorLine } from './sheet-parts';
 import { undoNotice } from './undo-notice';
 
 const HEX = /^#[0-9a-f]{6}$/i;
@@ -156,6 +156,8 @@ export interface HousesOptions {
 	beforeWrite?: () => void;
 	/** Runs when the window has closed: the focus goes back to the Houses button (spec §5.2). */
 	onClosed?: () => void;
+	/** D126: true when movement is reduced; the window then scrolls at once. The tree view passes it; the default is `() => false`. */
+	reduced?: () => boolean;
 	/** The tree's note: arms links are found and made from it (spec §13.6). */
 	sourcePath?: string;
 	/** The plugin's picture store (M9 contract O3); without it the window shows no arms pictures. */
@@ -174,6 +176,11 @@ export interface HousesOptions {
 
 /** The arms box of the Houses window is this high, in CSS px (spec §13.6 "about 40 px"). */
 export const ARMS_BOX_PX = 40;
+
+/** How long the window must stay still before the focused field is scrolled into view (the keyboard slides in about 250 ms). */
+const SETTLE_MS = 150;
+/** The wait after a focus change (C1): the keyboard needs this long to open. */
+const FOCUS_REVEAL_MS = 300;
 
 /** The modal that lists a tree's houses and edits their names and colours (spec §6.10). */
 export class HousesWindow extends Modal {
@@ -234,9 +241,11 @@ export class HousesWindow extends Modal {
 	override onOpen(): void {
 		this.modalEl.addClass('dynasty-sheet');
 		this.modalEl.addClass('dynasty-houses');
-		this.cleanup.push(phoneLayout(this, () => revealFocused(this.modalEl, this.contentEl)), trackModal(this, () => this.finish()));
+		// M1 to M3: one scroll after the keyboard has settled, not one at each step of its slide.
+		const settled = settledReveal(this.modalEl, this.contentEl, () => this.o.reduced?.() ?? false);
+		this.cleanup.push(phoneLayout(this, () => settled.schedule(SETTLE_MS)), trackModal(this, () => this.finish()), settled.cancel);
 		// The keyboard can cover a field in the scrolling body: bring it into view when it gets the focus (C1).
-		const reveal = () => revealFocused(this.modalEl, this.contentEl, 300);
+		const reveal = () => settled.schedule(FOCUS_REVEAL_MS);
 		this.contentEl.addEventListener('focusin', reveal);
 		this.cleanup.push(() => this.contentEl.removeEventListener('focusin', reveal));
 		const store = this.o.pictures;
@@ -333,6 +342,8 @@ export class HousesWindow extends Modal {
 		const active = this.modalEl.doc?.activeElement as HTMLElement | null | undefined;
 		const had = active && el.contains(active) ? active.getAttribute('data-focus') : null;
 		focus ??= had;
+		// M1: the list keeps its place over a redraw (Add house draws the whole window again).
+		const top = el.querySelector<HTMLElement>('.dynasty-sheet-body')?.scrollTop ?? 0;
 		el.empty();
 		this.armsBoxes = new Map();
 		this.armsGroup = null;
@@ -359,7 +370,9 @@ export class HousesWindow extends Modal {
 		for (const r of shown) this.row(list, r, problems.get(r.key));
 		const add = body.createEl('button', { cls: ['dynasty-sheet-action', 'dynasty-house-add'], text: HOUSES.add, attr: { type: 'button', 'data-focus': 'add' } });
 		add.addEventListener('click', () => this.guard(() => this.addHouse()));
-		if (focus) el.querySelector<HTMLElement>(`[data-focus="${focus}"]`)?.focus();
+		body.scrollTop = top;
+		// On a phone the keyboard follows the focus and shrinks the window, so the one scroll waits for it (M2, M3).
+		if (focus) el.querySelector<HTMLElement>(`[data-focus="${focus}"]`)?.focus({ preventScroll: this.modalEl.hasClass('is-phone') });
 	}
 
 	private label(r: HouseRow): string {

@@ -2,7 +2,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import { deriveFamilies, type FamilyGraph } from '../src/core/derive';
 import { parseDynasty } from '../src/core/parse';
 import type { Tree } from '../src/core/types';
-import { armsPlace, cardText, geometryFor, pictureSize, portraitBox, smallTextWidth } from '../src/layout/geometry';
+import { PICTURE_EM, armsPlace, cardText, geometryFor, pictureSize, portraitBox, roomAt } from '../src/layout/geometry';
 import { DEFAULT_LAYOUT_SETTINGS, armsCards, clearLayoutCache, layoutTree, pictureSets } from '../src/layout/index';
 import type { LaidOut, LayoutSettings } from '../src/layout/model';
 import { buildScene, type Scene } from '../src/render/dom/scene';
@@ -87,26 +87,24 @@ describe('picture sets and flags (L1, L2)', () => {
 });
 
 describe('geometry (D78, G2, G3)', () => {
-	it('arms and portrait are both 1.25 text lines; the arms are 5/6 of that wide; the Full shift is 1.55 em', () => {
+	it('arms and portrait are both 1.25 text lines; the arms are 5/6 of that wide; the arms no longer shift the name or the sign (D117)', () => {
 		const t = cardText(GEO);
 		expect(pictureSize(GEO)).toBeCloseTo(24, 9);
-		const place = armsPlace(GEO, t, GEO.cardH, 0);
+		const place = armsPlace(GEO, t, GEO.cardH);
 		expect(place.full.w).toBeCloseTo(20, 9);
-		expect(place.shift).toBeCloseTo(24.8, 9);
+		expect('shift' in place).toBe(false);
 		expect(place.compactShift).toBeCloseTo(1.8 * 16, 9);
 		expect(place.compact.x + place.compact.w).toBeCloseTo(GEO.cardW - 8, 9);
-		const withCut = armsPlace(GEO, t, GEO.cardH, 10);
-		expect(withCut.full.x).toBeCloseTo(place.full.x - 10, 9);
-		expect(withCut.compact.x).toBeCloseTo(place.compact.x - 10, 9);
 	});
 
-	it('the arms (top) and the portrait (bottom) never meet on a card with no relation line', () => {
+	it('the arms and the portrait sit side by side at the lower right, end at the bottom of the text block, and never meet (D117)', () => {
 		for (const size of ['normal', 'compact'] as const) {
 			const geo = geometryFor(16, size);
 			const t = cardText(geo);
-			const arms = armsPlace(geo, t, geo.cardH, 0).full;
 			const portrait = portraitBox(geo, t);
-			expect(portrait.y - (arms.y + arms.h), size).toBeGreaterThan(0);
+			const arms = armsPlace(geo, t, geo.cardH, undefined, portrait).full;
+			expect(portrait.x - (arms.x + arms.w), size).toBeCloseTo(PICTURE_EM.armsGap * 16, 9);
+			expect(arms.y + arms.h, size).toBeCloseTo(portrait.y + portrait.h, 9);
 			expect(portrait.y + portrait.h).toBeCloseTo(t.textBottom, 9);
 		}
 	});
@@ -114,11 +112,12 @@ describe('geometry (D78, G2, G3)', () => {
 	it('the name text line is not beside the portrait; the title narrows only without a relation line (D77)', () => {
 		const t = cardText(GEO);
 		const p = portraitBox(GEO, t);
-		expect(smallTextWidth(GEO, t, t.nameBaseline, p)).toBe(t.textW);
-		expect(smallTextWidth(GEO, t, t.titleBaseline, p)).toBeLessThan(t.textW);
+		const boxes = (r: typeof p) => [{ r, gap: PICTURE_EM.portraitGap * 16 }];
+		expect(roomAt(GEO, t, t.nameBaseline, t.nameSize, boxes(p))).toBe(t.textW);
+		expect(roomAt(GEO, t, t.titleBaseline, t.smallSize, boxes(p))).toBeLessThan(t.textW);
 		const rel = { ...GEO, cardH: GEO.cardH + 16, relationLine: true };
 		const tr = cardText(rel);
-		expect(smallTextWidth(rel, tr, tr.titleBaseline, portraitBox(rel, tr))).toBe(tr.textW);
+		expect(roomAt(rel, tr, tr.titleBaseline, tr.smallSize, boxes(portraitBox(rel, tr)))).toBe(tr.textW);
 	});
 });
 

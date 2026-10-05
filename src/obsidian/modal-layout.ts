@@ -158,3 +158,31 @@ export function ignoreGhostClick(modal: Modal): () => void {
 	modal.containerEl.addEventListener('click', ghost, true);
 	return () => modal.containerEl.removeEventListener('click', ghost, true);
 }
+
+/**
+ * M1 to M3: scrolls the focused field of a window into view ONCE, after the keyboard has settled. The window follows the
+ * keyboard step by step while it slides in (`phoneLayout` calls back at each step); a scroll at each step moves the list
+ * by a row in a few frames, which looks like a stutter. Each call to `schedule` restarts one timer, so only the last
+ * call counts: `delay` ms after the last step the field is brought into view. `reduced` (D126): when it is true the
+ * scroll jumps at once even if the page asks for a smooth one.
+ */
+export function settledReveal(modalEl: HTMLElement, contentEl: HTMLElement, reduced: () => boolean = () => false): { schedule(delay: number): void; cancel(): void } {
+	let timer: number | null = null;
+	const win = modalEl.win ?? window;
+	const run = () => {
+		timer = null;
+		const a = modalEl.doc.activeElement as HTMLElement | null;
+		if (a && contentEl.contains(a) && a.matches('input, select, textarea')) a.scrollIntoView({ block: 'nearest', behavior: reduced() ? 'instant' : 'auto' });
+	};
+	const cancel = () => {
+		if (timer !== null) win.clearTimeout(timer);
+		timer = null;
+	};
+	return {
+		schedule(delay: number) {
+			cancel();
+			timer = win.setTimeout(run, delay);
+		},
+		cancel,
+	};
+}

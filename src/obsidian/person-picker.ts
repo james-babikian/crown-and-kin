@@ -7,12 +7,14 @@
  * shown title after the full name ("Aldric Valmont (Aldric II)"). The Titles window's picker has its
  * own first row, "A holder who is not in the tree". The typed text and the text of each person are
  * folded with `foldForMatch` before they are compared (D100): case, accents and quote look-alikes do not matter.
+ * D122: the sobriquet shows after the name in curly marks, and the search matches its text.
  */
 
 import { SuggestModal, prepareFuzzySearch, type App } from 'obsidian';
 import type { FamilyGraph } from '../core/derive';
 import { foldForMatch } from '../core/fold';
-import { cardLabels, pickerSuffix, searchNames, type CardLabel } from '../core/titles';
+import { quotedSobriquet } from '../core/sobriquet';
+import { cardLabels, needsLabels, pickerSuffix, searchNames, type CardLabel } from '../core/titles';
 import type { Person } from '../core/types';
 import { dateLine } from '../render/tree-info';
 import { FINDER_UI, FLOW } from '../render/ui-text';
@@ -48,7 +50,7 @@ function definePicker() {
 			private readonly newRow: ((typed: string) => string) | null = null,
 		) {
 			super(app);
-			this.labels = (g.titles?.length ?? 0) > 0 ? cardLabels(g) : new Map();
+			this.labels = needsLabels(g) ? cardLabels(g) : new Map();
 			const people = g.people.filter((p) => !exclude.has(p.id));
 			const me = you !== null ? people.find((p) => p.id === you) : undefined;
 			this.people = me ? [me, ...people.filter((p) => p !== me)] : people;
@@ -102,7 +104,8 @@ function definePicker() {
 			for (const person of this.people) {
 				const label = this.labels.get(person.id);
 				const extra = label ? searchNames(label, person.name) : [];
-				const r = match(foldForMatch([person.name, person.title ?? '', dateLine(person) ?? '', ...extra].join(' ')));
+				// D122: the text of the sobriquet is matched too (without its marks).
+				const r = match(foldForMatch([person.name, person.sobriquet ?? '', person.title ?? '', dateLine(person) ?? '', ...extra].join(' ')));
 				// "Aldric II" typed in full names one holder entry: that person comes before "Aldric III" (spec §13.5).
 				if (r) scored.push({ person, score: r.score, exact: extra.some((n) => foldForMatch(n) === lower) });
 			}
@@ -132,6 +135,8 @@ function definePicker() {
 			const label = this.labels.get(p.id);
 			const suffix = label ? pickerSuffix(label, p.name) : undefined;
 			if (suffix) name.createSpan({ cls: 'dynasty-picker-suffix', text: ` ${suffix}` });
+			// D122: the sobriquet in curly marks, in regular weight, after the name and the ruler name.
+			if (p.sobriquet !== undefined) name.createSpan({ cls: 'dynasty-picker-sob', text: ` ${quotedSobriquet(p.sobriquet)}` });
 			const sub = [p.title, dateLine(p)].filter(Boolean).join(' · ');
 			if (sub) text.createDiv({ cls: 'dynasty-picker-sub', text: sub });
 		}

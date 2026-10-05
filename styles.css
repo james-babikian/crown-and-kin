@@ -134,10 +134,16 @@
 	ry: var(--radius-s);
 }
 
+/* D117: one size for all card text (0.85 of the note font); the weight carries the difference. */
 .dynasty-card-name {
-	font-size: var(--dynasty-font-size);
+	font-size: calc(var(--dynasty-font-size) * 0.85);
 	fill: var(--text-normal);
 	font-weight: var(--bold-weight, 600);
+}
+
+/* D122: the sobriquet after the name is in regular weight. */
+.dynasty-card-sob {
+	font-weight: 400;
 }
 
 .dynasty-card-title {
@@ -213,34 +219,30 @@
 	stroke-width: 2;
 }
 
+/*
+ * The highlight pulse (M7, M8). Only the outer ring pulses, and only its opacity: a change of stroke-width makes the browser measure the
+ * shape again at each step. It is `stroke-opacity`, not `opacity`: the browser does not move an `opacity` animation of an SVG shape to its own
+ * layer in a way that suits a tree whose view moves at the same time (Find); it laid out the layers of all cards again at each move frame
+ * (harness step "r024 anim"). The accent border has a fixed width; the ring stays 2 px outside it.
+ * `.dynasty-reduce-motion` (D126) stops the pulse: the ring then stays as a still outline.
+ */
 .dynasty-card.dynasty-highlight .dynasty-card-ring {
 	display: inline;
-	stroke-width: 7;
+	stroke-width: 9;
 	animation: dynasty-pulse-ring 0.5s ease-in-out 4 alternate;
 }
 
 .dynasty-card.dynasty-highlight .dynasty-card-bg {
 	stroke: var(--interactive-accent);
-	stroke-width: 3;
-	animation: dynasty-pulse 0.5s ease-in-out 4 alternate;
+	stroke-width: 5;
 }
 
-@keyframes dynasty-pulse {
-	from {
-		stroke-width: 2;
-	}
-	to {
-		stroke-width: 6;
-	}
-}
-
-/* The outer ring stays 2 px outside the pulsing accent. */
 @keyframes dynasty-pulse-ring {
 	from {
-		stroke-width: 6;
+		stroke-opacity: 0;
 	}
 	to {
-		stroke-width: 10;
+		stroke-opacity: 1;
 	}
 }
 
@@ -484,10 +486,10 @@
 	fill: var(--text-normal);
 }
 
-/* D41: "You" on the marked card is upright and semibold. */
+/* D41, D117: "You" on the marked card is bold and italic. */
 .dynasty-card-me .dynasty-card-relation {
-	font-style: normal;
-	font-weight: var(--font-semibold, 600);
+	font-style: italic;
+	font-weight: var(--bold-weight, 600);
 }
 
 /* "Show relation names on cards" off: the text hides, the card keeps its size and the label keeps the relation. */
@@ -588,18 +590,21 @@
 
 /* ---------- Focus mode (spec §5.6) ---------- */
 
-/* The `+` badge of a card with relatives who are not shown. It follows its card, over the card's
-   corner; its invisible tap area grows to 44 px only while names are at least 11 px. */
+/* The `+` badge of a card with relatives who are not shown. It follows its card; its centre is the
+   card's top right corner in every layout (D117); its invisible tap area grows to 44 px only while names are at least 11 px. */
 .dynasty-focus-badge {
 	--no-tooltip: true;
 	cursor: pointer;
 	outline: none;
 }
 
-.dynasty-focus-badge-hit {
+/* The tap square lies below the cards (its own layer); the disc is the part that wins over the badge's own card. */
+.dynasty-focus-badge-hit,
+.dynasty-focus-badge-disc {
 	fill: none;
 	stroke: none;
 	pointer-events: all;
+	cursor: pointer;
 }
 
 /* A thin ring in the text colour: the badge shows on the note and on a card also where the theme's
@@ -644,6 +649,7 @@
 }
 
 .dynasty-focus-badge:hover .dynasty-focus-badge-mark,
+.dynasty-focus-badge.is-hover .dynasty-focus-badge-mark,
 .dynasty-focus-badge:focus-visible .dynasty-focus-badge-mark {
 	stroke: var(--text-normal);
 	stroke-width: 2.5;
@@ -1503,6 +1509,12 @@ textarea.dynasty-sheet-input {
 	border: none;
 	display: flex;
 	flex-direction: column;
+	/*
+	 * D125 (3): Obsidian's `.is-phone .prompt` keeps the safe area at the bottom (the home bar). The keyboard covers that
+	 * bar and the plugin already ends the prompt at the keyboard (`--dynasty-sheet-height`), so while a keyboard is up the
+	 * space is blank. It goes by the keyboard height itself: no number is compared, and no keyboard gives the old space.
+	 */
+	padding-bottom: max(0px, calc(var(--safe-area-inset-bottom, 0px) - var(--keyboard-height, 0px)));
 }
 
 .dynasty-picker.is-phone .dynasty-picker-head {
@@ -1511,7 +1523,8 @@ textarea.dynasty-sheet-input {
 	display: flex;
 	align-items: center;
 	gap: var(--size-4-2);
-	padding: max(var(--size-4-2), env(safe-area-inset-top)) max(var(--size-4-3), env(safe-area-inset-right)) var(--size-4-2) max(var(--size-4-3), env(safe-area-inset-left));
+	/* D125 (3): a lower head (4 px under the 44 px Cancel button, not 8) gives the list more rows above the keyboard. */
+	padding: max(var(--size-4-2), env(safe-area-inset-top)) max(var(--size-4-3), env(safe-area-inset-right)) var(--size-4-1) max(var(--size-4-3), env(safe-area-inset-left));
 	border-bottom: 1px solid var(--background-modifier-border);
 }
 
@@ -1537,6 +1550,8 @@ textarea.dynasty-sheet-input {
 	flex: 1 1 auto;
 	max-height: none;
 	overflow-y: auto;
+	/* D125 (3): the first row starts 4 px under the field (Obsidian's own padding is 12 px). */
+	padding-top: var(--size-4-1);
 }
 
 /* ---------- Notice with Undo (spec §6.1, §6.7) ---------- */
@@ -3554,4 +3569,32 @@ body.dynasty-fullscreen-open .popover.hover-popover {
 
 .dynasty-id-window.is-phone .dynasty-sheet-body {
 	padding-bottom: var(--size-4-3);
+}
+
+/* phone-B: picker */
+/* Wave 2 only: new rules for `.dynasty-picker*` (person list height, `.dynasty-picker-sob`) go below this line. */
+/* D122: the sobriquet after a name in a person list and in a holder list: regular weight (the name is semibold). */
+.dynasty-picker-sob {
+	font-weight: var(--font-normal);
+}
+
+/* phone-A: view */
+/* Wave 2 only: new rules for the tree view (height button, reduced movement) go below this line. */
+
+/* D126 (1): reduced movement. The view sets the class on the tree root before it starts a highlight; the highlight then stays as a still outline. */
+.dynasty-reduce-motion .dynasty-card.dynasty-highlight .dynasty-card-ring {
+	animation: none;
+}
+
+/* The break list of the settings tab (D118): a wide field, and 16 px text on a touch screen like the other fields (P7). */
+.dynasty-settings .dynasty-setting-break-words {
+	width: 18em;
+	max-width: 100%;
+	resize: vertical;
+}
+
+@media (pointer: coarse), (max-width: 599px) {
+	.dynasty-settings textarea {
+		font-size: max(16px, var(--font-ui-medium));
+	}
 }

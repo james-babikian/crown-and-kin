@@ -72,11 +72,16 @@ describe('review A: foldForMatch', () => {
 		expect(foldForMatch('日本語 Москва')).toBe('日本語 москва');
 	});
 
-	it('does not change foldLetters or slugify', () => {
-		expect(foldLetters('Ǣ Ǽ ǿ ẞ ŉ')).toBe('Ǣ Ǽ ǿ ẞ ŉ');
-		expect(foldLetters('Þórr Ææ Øø ß Łł Đđ Œœ Ħħ ı')).toBe('thórr aeae oo ss ll dd oeoe hh i');
+	it('does not change foldLetters or slugify (0.2.4: the eth and the capital sharp s are mapped too)', () => {
+		expect(foldLetters('Ǣ Ǽ ǿ ŉ')).toBe('Ǣ Ǽ ǿ ŉ');
+		expect(foldLetters('Þórr Ææ Øø ßẞ Łł Đđ Ðð Œœ Ħħ ı')).toBe('thórr aeae oo ssss ll dd dd oeoe hh i');
 	});
 });
+
+// 0.2.4 (C1, C1b): the letters Ð ð ẞ Ǣ ǣ Ǽ ǽ Ǿ ǿ now give their plain letters (see `s024-core-slug.test.ts`), also
+// when NFKD makes them (ᴭ gives Æ). A text with one of them is not compared.
+const MAPPED = /[ÞþÆæØøßẞŁłÐðĐđŒœĦħı]/;
+const CHANGED_IN_024 = { test: (t: string) => [...t].some((c) => /[ÐðẞǢǣǼǽǾǿ]/.test(c) || (c.normalize('NFKD') !== c && MAPPED.test(c.normalize('NFKD')))) };
 
 describe('review A: slugify is the same as in 0.2.0', () => {
 	it('gives the same id for 20 000 random strings', () => {
@@ -87,6 +92,7 @@ describe('review A: slugify is the same as in 0.2.0', () => {
 			let text = '';
 			const n = 1 + (next() % 12);
 			for (let k = 0; k < n; k++) text += next() % 10 === 0 ? String.fromCharCode(next() % 0x2fff) : pool[next() % pool.length];
+			if (CHANGED_IN_024.test(text)) continue;
 			expect(slugify(text), JSON.stringify(text)).toBe(slugifyOld(text));
 		}
 	});
@@ -94,7 +100,7 @@ describe('review A: slugify is the same as in 0.2.0', () => {
 	it('gives the same id for every name in the sample trees', () => {
 		for (const file of readdirSync('fixtures').filter((f) => f.endsWith('.md'))) {
 			const names = [...readFileSync(`fixtures/${file}`, 'utf8').matchAll(/name:\s*(.+)/g)].map((m) => m[1].replace(/^["']|["']$/g, ''));
-			for (const name of names) expect(slugify(name), `${file}: ${name}`).toBe(slugifyOld(name));
+			for (const name of names.filter((n) => !CHANGED_IN_024.test(n))) expect(slugify(name), `${file}: ${name}`).toBe(slugifyOld(name));
 		}
 	});
 });

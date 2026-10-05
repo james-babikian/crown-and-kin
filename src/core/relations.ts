@@ -46,9 +46,19 @@
  * parent followed by a step down to another child of that parent is one sibling step ("brother",
  * "half-brother" by the §13.1 half rule, "sibling"); a ward link never joins a sibling step. A step
  * carries the type of its links: "adoptive father", "adopted son", "rumoured father", "rumoured
- * son", "guardian", "ward", and for a sibling step "rumoured half-brother" if one of its two links is
- * rumoured, else "adoptive brother" if one is adoptive. A partner step uses the §13.1 partner table.
+ * son", "guardian", "ward", and for a sibling step "rumoured brother" or "rumoured half-brother" (half or
+ * full by rule 1 of the D123 paragraph below) if one of its two links is rumoured, else "adoptive brother"
+ * if one is adoptive. A partner step uses the §13.1 partner table.
  * "Through N other people" counts `line.people.length − 2`.
+ *
+ * D123 (rumoured parents). The sure names ignore a rumoured parent that is not on the line (spec §13.1:
+ * a parent that is not listed adds nothing). Per candidate (X, c1, c2), with c1 and c2 the children of X on
+ * the two paths: S_i are the sure parents of c_i of the type of c_i's link to X, R_i the rumoured parents of
+ * c_i counted as birth parents (none when the link is adoptive). (1) A candidate on a rumoured line takes
+ * half or full from S1 + R1 against S2 + R2. (2) A sure half candidate gets `maybe` 'full' if R1 or R2 is not
+ * empty and S1 + R1 equals S2 + R2. (3) A sure full candidate gets `maybe` 'half' if R1 and R2 are both not
+ * empty and differ and S1 equals S2. A `double` name never has a `maybe`; equal names keep the `maybe` of
+ * any of them. The comparison runs only where a rumoured link lies in the blood ancestry of either person.
  *
  * Results are deep-frozen, like layout results, because the views share them.
  */
@@ -78,6 +88,19 @@ export interface RelationLine {
 	unions: string[];
 }
 
+/** D123: what rumoured links could change in a blood relation. */
+export interface RelationMaybe {
+	/** 'full': the sure relation is half and the rumour would make it full (card text ", maybe full"). 'half': the sure relation is full and two different rumoured parents would make it half (edit sheet and "Also" list only). */
+	effect: 'full' | 'half';
+	/** The name if the rumoured links are true, with no word "rumoured": "Brother". */
+	text: string;
+	/** The same name in lower case: "brother". */
+	lower: string;
+}
+
+/** D123: counts the second comparison run (the one that counts a rumoured link like a birth link). A tree with no rumoured link must leave it at 0. */
+export const relationRunStats = { second: 0 };
+
 /** One name of a person's relation to the marked person (or to the finder's first person). */
 export interface Relation {
 	/** As a card shows it, first letter capital: "Second cousin once removed", "Wife's first cousin", "You". */
@@ -88,6 +111,8 @@ export interface Relation {
 	/** §13.1 "Which name wins", rule 3; the values per kind are in the file header. */
 	distance: number;
 	line: RelationLine;
+	/** D123: only on `kind: 'blood'`, only when a rumoured link could change the relation. */
+	maybe?: RelationMaybe;
 }
 
 /**
@@ -326,6 +351,8 @@ interface Blood {
 	/** From the second person up to `x`, both included. */
 	pathP: number[];
 	key: string;
+	/** D123: the effect a rumoured parent could have on this sure candidate (rules 2 and 3 of the file header). */
+	maybe?: 'full' | 'half';
 }
 
 /** Half or full for two children of a common ancestor, the couple of a full relation (else the ancestor), and the candidate key. */
@@ -355,8 +382,21 @@ interface Cand {
 	anc: number;
 	/** 1 for a name by marriage of a person who also has a blood name: it comes after every other name. */
 	after?: number;
+	/** D123: set on a sure blood name that a rumoured parent could change. */
+	maybe?: RelationMaybe;
 	/** Builds the line and the walk; only the names that are kept need them. */
 	make: () => { line: Line; walk: Walk };
+}
+
+/** The parent sets of a child for the D123 comparisons, as sorted id lists. */
+interface Counted {
+	/** The sure parents of the type of the child's link (the half rule of §13.1). */
+	sure: string;
+	/** The sure parents and every rumoured parent counted as a birth parent. */
+	all: string;
+	/** The rumoured parents alone; empty for an adoptive link. */
+	rumoured: string;
+	hasRumoured: boolean;
 }
 
 /** Supervisor ruling on rule 3: step-siblings come through birth and adoptive parents only. */
@@ -395,6 +435,8 @@ class Kin {
 	private readonly belowScratch = new Map<number, Map<number, number>>();
 	/** `parentsOfType` results by `child * 4 + type`. */
 	private readonly typedParents = new Map<number, { list: number[]; sig: string }>();
+	/** `counted` results by `child * 2 + (adoptive ? 1 : 0)`. */
+	private readonly countedMemo = new Map<number, Counted>();
 	/** `dagOf` results, kept like `belowMemo` and `belowScratch`. */
 	private readonly dagMemo = new Map<number, Dag>();
 	private readonly dagScratch = new Map<number, Dag>();
@@ -493,6 +535,27 @@ class Kin {
 	/** §13.1 half rule: `c1` (linked by `t1`) and `c2` (by `t2`) have different parents of their link's type. */
 	isHalf(c1: number, t1: ParentType, c2: number, t2: ParentType): boolean {
 		return this.parentsOfType(c1, t1).sig !== this.parentsOfType(c2, t2).sig;
+	}
+
+	/** D123: the parent sets of `child` for a link of type `t` (an adoptive link counts adoptive parents only; birth and rumoured links count birth parents and rumoured parents). */
+	counted(child: number, t: ParentType): Counted {
+		const adoptive = t === 'adoptive';
+		const key = child * 2 + (adoptive ? 1 : 0);
+		let out = this.countedMemo.get(key);
+		if (!out) {
+			const sure = this.parentsOfType(child, adoptive ? 'adoptive' : 'birth');
+			const rumoured = adoptive ? [] : this.up[child].filter((l) => l.type === 'rumoured' && !sure.list.includes(l.p)).map((l) => l.p);
+			const text = (list: number[]) => [...list].sort((i, j) => i - j).join(',');
+			out = { sure: sure.sig, all: text([...sure.list, ...rumoured]), rumoured: text(rumoured), hasRumoured: rumoured.length > 0 };
+			this.countedMemo.set(key, out);
+		}
+		return out;
+	}
+
+	/** D123 rule 1: half or full for two children with a link of `t1` and `t2`, every rumoured parent counted as a birth parent. */
+	halfCounted(c1: number, t1: ParentType, c2: number, t2: ParentType): boolean {
+		relationRunStats.second++;
+		return this.counted(c1, t1).all !== this.counted(c2, t2).all;
 	}
 
 	/**
@@ -650,6 +713,8 @@ class Kin {
 			}
 		}
 		const shapeOf = (pair: (typeof pairs)[number]) => (pair.shape ??= this.pairShape(x, pair.c1, pair.c2, bestF + 1, bestP + 1));
+		// D123: a rumoured link can matter only if one lies in the blood ancestry of either person (that covers c1 and c2 too).
+		const second = this.topRank[f] === 2 || this.topRank[p] === 2;
 		const out: Blood[] = [];
 		const has = (key: string) => out.some((b) => b.key === key);
 		for (let level = 0; level <= 2; level++) {
@@ -664,7 +729,7 @@ class Kin {
 					if (level > pair.hi) continue;
 				}
 				const paths = this.disjointPair(f, c1, aF, p, c2, aP, level);
-				if (paths) out.push(this.collateralCandidate(shapeOf(pair), paths[0], paths[1]));
+				if (paths) out.push(this.collateralCandidate(shapeOf(pair), paths[0], paths[1], x, c1, c2, second));
 			}
 		}
 		return out;
@@ -792,13 +857,27 @@ class Kin {
 		return half ? { half, couple: [x], key: `H:${x}:${a}:${b}` } : { half, couple: own.list, key: `F:${own.sig}:${a}:${b}` };
 	}
 
-	private collateralCandidate(shape: Shape, pf: number[], pp: number[]): Blood {
-		const { half, couple, key } = shape;
-		const lx = couple[0];
-		const y = couple.length > 1 ? couple[1] : -1;
+	private collateralCandidate(shape: Shape, pf: number[], pp: number[], x: number, c1: number, c2: number, second: boolean): Blood {
+		const lx = shape.couple[0];
+		const y = shape.couple.length > 1 ? shape.couple[1] : -1;
 		const pathF = [...pf, lx];
 		const pathP = [...pp, lx];
-		return { a: pathF.length - 1, b: pathP.length - 1, x: lx, y, half, double: false, word: this.wordOf(pathF, pathP, y), pathF, pathP, key };
+		const word = this.wordOf(pathF, pathP, y);
+		const out: Blood = { a: pathF.length - 1, b: pathP.length - 1, x: lx, y, half: shape.half, double: false, word, pathF, pathP, key: shape.key };
+		if (!second) return out;
+		const [t1, t2] = [this.typeOf(c1, x), this.typeOf(c2, x)];
+		if (word === 'rumoured') {
+			// Rule 1. When the word changes, the line passes `x` alone (a half name has no couple); the new key keeps it apart from the sure shape of the pair.
+			const half = this.halfCounted(c1, t1, c2, t2);
+			if (half !== shape.half) Object.assign(out, { half, x, y: -1, pathF: [...pf, x], pathP: [...pp, x], key: `${half ? 'H' : 'F'}R:${x}:${out.a}:${out.b}` });
+			return out;
+		}
+		relationRunStats.second++;
+		const [s1, s2] = [this.counted(c1, t1), this.counted(c2, t2)];
+		if (shape.half) {
+			if ((s1.hasRumoured || s2.hasRumoured) && s1.all === s2.all) out.maybe = 'full';
+		} else if (s1.hasRumoured && s2.hasRumoured && s1.rumoured !== s2.rumoured) out.maybe = 'half';
+		return out;
 	}
 
 	/** "rumoured" if a link of the line is rumoured, else "adoptive" if one is adoptive, else "birth". */
@@ -825,6 +904,8 @@ class Kin {
 			if (group.length < 2) continue;
 			group.sort((i, j) => i.x - j.x);
 			group[0].double = true;
+			// A double name is one name from two couples; no rumour is compared against it (rule 5).
+			delete group[0].maybe;
 			for (const c of group.slice(1)) drop.add(c);
 		}
 		return list.filter((c) => !drop.has(c));
@@ -940,13 +1021,35 @@ class Kin {
 
 		const blood = this.blood(m, p, aP);
 		for (const c of blood) {
+			const lower = this.bloodLower(c, sexP);
 			cands.push({
-				lower: this.bloodLower(c, sexP),
+				lower,
+				...(c.maybe ? { maybe: this.maybeOf(c, sexP) } : {}),
 				kind: 'blood',
 				distance: c.a + c.b,
 				cat: c.word === 'rumoured' ? 4 : c.word === 'adoptive' ? 1 : 0,
 				direct: c.a === 0 || c.b === 0 ? 0 : 1,
 				half: c.half ? 1 : 0,
+				removal: Math.abs(c.a - c.b),
+				anc: c.x,
+				make: () => ({ line: this.bloodLine(c), walk: this.bloodWalk(c) }),
+			});
+		}
+
+		// D123: the name that the rumoured parents would make true is also a relation, with the word "rumoured", unless a rumoured line already gave it.
+		const have = new Set(cands.map((c) => c.lower));
+		for (const c of blood) {
+			if (!c.maybe) continue;
+			const lower = this.bloodLower({ ...c, half: !c.half, word: 'rumoured' }, sexP);
+			if (have.has(lower)) continue;
+			have.add(lower);
+			cands.push({
+				lower,
+				kind: 'blood',
+				distance: c.a + c.b,
+				cat: 4,
+				direct: 1,
+				half: c.half ? 0 : 1,
 				removal: Math.abs(c.a - c.b),
 				anc: c.x,
 				make: () => ({ line: this.bloodLine(c), walk: this.bloodWalk(c) }),
@@ -1002,12 +1105,23 @@ class Kin {
 		// Supervisor ruling: a name by marriage (rules 1 and 2) never wins over a blood name.
 		if (blood.length) for (const c of cands) if (c.kind === 'by-marriage') c.after = 1;
 		cands.sort(compareCands);
-		const seen = new Set<string>();
+		const seen = new Map<string, Cand>();
 		return cands.filter((c) => {
-			if (seen.has(c.lower)) return false;
-			seen.add(c.lower);
-			return true;
+			const first = seen.get(c.lower);
+			if (!first) {
+				seen.set(c.lower, c);
+				return true;
+			}
+			// Equal names keep the maybe of any of them ('full' wins), so it never depends on the order of the people.
+			if (c.maybe && first.kind === 'blood' && c.kind === 'blood' && (!first.maybe || (c.maybe.effect === 'full' && first.maybe.effect === 'half'))) first.maybe = c.maybe;
+			return false;
 		});
+	}
+
+	/** D123: the name a sure blood candidate would have if every rumoured link were true. */
+	private maybeOf(c: Blood, sex: Sex): RelationMaybe {
+		const lower = this.bloodLower({ ...c, half: !c.half }, sex);
+		return Object.freeze({ effect: c.maybe!, text: capital(lower), lower });
 	}
 
 	private wardCand(m: number, p: number, kind: 'guardian' | 'ward'): Cand {
@@ -1121,7 +1235,7 @@ class Kin {
 			// A ward is not a sibling: a ward link stays a step of its own.
 			if (e.k === 'up' && after?.k === 'down' && nodes[i + 2] !== from && e.type !== 'ward' && after.type !== 'ward') {
 				const sib = nodes[i + 2];
-				const half = this.isHalf(from, e.type, sib, after.type);
+				const half = e.type === 'rumoured' || after.type === 'rumoured' ? this.halfCounted(from, e.type, sib, after.type) : this.isHalf(from, e.type, sib, after.type);
 				out.push({ person: this.ids[sib], of: this.ids[from], word: siblingStepWord(this.sex[sib], half, e.type, after.type) });
 				i++;
 				continue;
@@ -1138,7 +1252,7 @@ class Kin {
 
 	/** A `Relation` with ids in place of indices. */
 	relation(c: Cand, line: Line): Relation {
-		return { text: capital(c.lower), lower: c.lower, kind: c.kind, distance: c.distance, line: this.lineIds(line) };
+		return { text: capital(c.lower), lower: c.lower, kind: c.kind, distance: c.distance, line: this.lineIds(line), ...(c.maybe ? { maybe: c.maybe } : {}) };
 	}
 
 	/**
@@ -1153,6 +1267,7 @@ class Kin {
 			lower: c.lower,
 			kind: c.kind,
 			distance: c.distance,
+			...(c.maybe ? { maybe: c.maybe } : {}),
 			get line() {
 				return make();
 			},

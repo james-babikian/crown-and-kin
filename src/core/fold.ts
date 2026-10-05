@@ -2,7 +2,7 @@
  * One pure function that makes two texts comparable for search (D100): it ignores case, accents
  * and the look of quote marks. Find, the person picker and the picture search fold the query and
  * the text they look in with `foldForMatch`, and never change stored or shown text. The letter map
- * that has no accent form (Þ, Æ, Ø, ß and so on) is shared with `slugify` in `id-gen.ts`, so ids
+ * that has no accent form (Þ, Æ, Ø, Ð, ß and so on) is shared with `slugify` in `id-gen.ts`, so ids
  * and search agree on what "ø" is.
  */
 
@@ -11,9 +11,9 @@ const LETTER_MAP: ReadonlyArray<readonly [RegExp, string]> = [
 	[/[Þþ]/g, 'th'],
 	[/[Ææ]/g, 'ae'],
 	[/[Øø]/g, 'o'],
-	[/ß/g, 'ss'],
+	[/[ßẞ]/g, 'ss'],
 	[/[Łł]/g, 'l'],
-	[/[Đđ]/g, 'd'],
+	[/[ÐðĐđ]/g, 'd'],
 	[/[Œœ]/g, 'oe'],
 	[/[Ħħ]/g, 'h'],
 	[/ı/g, 'i'],

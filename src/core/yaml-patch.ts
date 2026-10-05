@@ -12,9 +12,10 @@ import { parseBody } from './parse';
 import { cropValue, sameCropText } from './portrait-crop';
 import { bool, isEmpty, linkValue, str, unwrapCurlyKeys, type Raw, type RawMap } from './tolerate';
 import { REFUSAL_TEXT } from './refusal-text';
+import { normaliseSobriquet } from './sobriquet';
 
 /** §4.1 and §13.0 field order; a new key goes after the nearest earlier key that is present. */
-export const PERSON_ORDER = ['id', 'name', 'title', 'card-title', 'house', 'sex', 'born', 'died', 'parents', 'placement', 'illegitimate', 'union', 'link', 'portrait', 'portrait-crop', 'notes'];
+export const PERSON_ORDER = ['id', 'name', 'sobriquet', 'title', 'card-title', 'house', 'sex', 'born', 'died', 'parents', 'placement', 'illegitimate', 'union', 'link', 'portrait', 'portrait-crop', 'notes'];
 /** §4.1 and §13.0 order of the `options` keys. */
 export const OPTION_ORDER = ['start', 'focus', 'me', 'generations', 'height'];
 /** §4.1 and §13.0 order of the top-level sections. */
@@ -27,7 +28,7 @@ export const TOP_ORDER = ['options', 'houses', 'titles', 'people', 'unions'];
 export const TEXT_FIELDS = new Set(['id', 'house', 'card-title', 'born', 'died', 'union', 'start', 'focus', 'me', 'end']);
 
 /** The person fields `personValue` and `sameValue` handle. */
-export const PERSON_FIELDS: readonly PersonField[] = ['name', 'title', 'card-title', 'house', 'sex', 'born', 'died', 'illegitimate', 'link', 'portrait', 'portrait-crop', 'notes', 'placement'];
+export const PERSON_FIELDS: readonly PersonField[] = ['name', 'sobriquet', 'title', 'card-title', 'house', 'sex', 'born', 'died', 'illegitimate', 'link', 'portrait', 'portrait-crop', 'notes', 'placement'];
 
 /**
  * Picture keys (spec §13.0 item 3): always written in double quotes, whatever the text is, so a
@@ -215,8 +216,13 @@ export class Source {
 		return isScalar(n) && n.range && (n.type === Scalar.BLOCK_LITERAL || n.type === Scalar.BLOCK_FOLDED) ? n.range[1] : -1;
 	}
 
+	/** True if the last value in the node is a block scalar (`|` or `>`). */
+	endsWithBlockScalar(node: Node): boolean {
+		return this.scalarEnd(node) >= 0;
+	}
+
 	/** True if the last value in the node is a block scalar with keep chomping (`|+`), whose blank lines are its text. */
-	private keepsBlankLines(node: Node): boolean {
+	keepsBlankLines(node: Node): boolean {
 		const n = this.lastLeaf(node);
 		if (!isScalar(n) || !n.range || (n.type !== Scalar.BLOCK_LITERAL && n.type !== Scalar.BLOCK_FOLDED)) return false;
 		return /^[|>][^\s#]*\+/.test(this.text.slice(n.range[0], n.range[0] + 8));
@@ -475,6 +481,9 @@ export function removePair(src: Source, map: YAMLMap, pair: Pair): Patch {
 	const start = src.lineStart(keyStart);
 	if (end < src.text.length) {
 		let after = src.text.indexOf('\n', end) + 1;
+		// A block scalar right before the key would swallow what is left under the key's lines.
+		const prevValue = i > 0 && src.hasValue(pairs[i - 1]) ? (pairs[i - 1].value as Node) : null;
+		if (prevValue && src.endsWithBlockScalar(prevValue)) return removeAfterBlockScalar(src, start, end, after, src.column(keyStart), src.keepsBlankLines(prevValue));
 		// A top-level section at the start, after a blank line or after a comment line takes its
 		// trailing blank lines too, so the body neither starts with a blank line nor gets two in a
 		// row. After another section's last line the blank line stays to keep the sections apart.
@@ -491,6 +500,35 @@ export function removePair(src: Source, map: YAMLMap, pair: Pair): Patch {
 		for (let m = /\r?\n[ \t]*$/.exec(src.text.slice(0, before)); m && m.index > 0; m = /\r?\n[ \t]*$/.exec(src.text.slice(0, before))) before = m.index;
 	}
 	return { start: before, end, text: '', allow: [start, end] };
+}
+
+/**
+ * Removes a block pair whose previous pair ends with a block scalar. Comment lines indented deeper
+ * than the key (and blank lines before them) would join the scalar's text once the key is gone, so
+ * the comments move to the key's column, which ends the scalar. Blank lines right after the key
+ * would join a `|+` scalar, which keeps every blank line, so they go with the key.
+ */
+function removeAfterBlockScalar(src: Source, start: number, end: number, after: number, keyCol: number, keep: boolean): Patch {
+	const text = src.text;
+	const lines: { start: number; end: number; comment: boolean }[] = [];
+	for (let at = after; at < text.length; ) {
+		const nl = text.indexOf('\n', at);
+		const next = nl === -1 ? text.length : nl + 1;
+		const raw = text.slice(at, nl === -1 ? text.length : nl).replace(/\r$/, '');
+		const t = raw.trim();
+		if (t !== '' && !(t.startsWith('#') && raw.length - raw.trimStart().length > keyCol)) break;
+		lines.push({ start: at, end: next, comment: t !== '' });
+		at = next;
+	}
+	let last = lines.length - 1;
+	while (last >= 0 && !lines[last].comment) last--;
+	const allow: [number, number] = [start, end];
+	if (last < 0) return { start, end: keep && lines.length ? lines[lines.length - 1].end : after, text: '', allow };
+	// Blank lines after the last deeper comment stay: they follow a comment that already ends the scalar.
+	const run = lines.slice(0, last + 1);
+	const from = keep ? run.findIndex((l) => l.comment) : 0;
+	const moved = run.slice(from).map((l) => (l.comment ? ' '.repeat(keyCol) + text.slice(l.start, l.end).trimStart() : text.slice(l.start, l.end)));
+	return { start, end: run[last].end, text: moved.join(''), allow };
 }
 
 /**
@@ -733,6 +771,8 @@ export function sameValue(field: PersonField, raw: Raw, write: string | null, wr
 	if (field === 'illegitimate') return bool(raw) === (write === 'true');
 	// Two parts are the same when their numbers agree at 4 decimals, whatever the source text (spec §13.13).
 	if (field === 'portrait-crop') return sameCropText(cropValue(raw), write === null ? undefined : write);
+	// The model unwraps a pair of marks around a sobriquet, so the old and the new text are compared the way the model reads them.
+	if (field === 'sobriquet') return normaliseSobriquet(str(raw)) === normaliseSobriquet(write === null ? undefined : str(write));
 	const read = field === 'link' || field === 'portrait' ? linkValue(raw, written) : str(raw);
 	return read === (write === null ? undefined : str(write));
 }

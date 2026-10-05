@@ -15,13 +15,14 @@ import { drawnGeometry } from '../layout/geometry';
 import { armsCards, illegitimateSigns, layoutTree, pictureSets } from '../layout/index';
 import type { Geometry, LaidOut, LayoutSettings } from '../layout/model';
 import type { Measure, SceneFonts } from '../render/dom/scene';
+import type { BreakList } from '../render/break-words';
 import { tallCardsFor, tallTitlesFor, titleMeasure } from '../render/dom/tall-cards';
 
 /** What `measuredLayout` needs beyond the graph, the geometry and the base settings. */
 export interface MeasuredOptions {
 	fonts: SceneFonts;
 	measure: Measure;
-	/** Focus mode: people with relatives who are not shown (their sideways `+` badge narrows the name). */
+	/** Focus mode: people with relatives who are not shown. Not read since 0.2.4 (the `+` badge sits on the corner and no longer narrows a name); kept so callers compile. */
 	hidden?: ReadonlyMap<string, number>;
 	/** M8: the card labels of the drawn graph. */
 	labels?: ReadonlyMap<string, CardLabel>;
@@ -34,6 +35,22 @@ export interface MeasuredOptions {
 	 * the settings or the cache key. Not the same as `hidden` (the focus badge counts). Absent = the `foldHidden` of `base`.
 	 */
 	foldHidden?: ReadonlySet<string>;
+	/** Whether the cards show the arms box (default true). A names-only style that shows portraits only sets it false (contract 6.1). */
+	showArms?: boolean;
+	/** The user's break places for names (D118). */
+	breaks?: BreakList;
+	/** The marked person (D41): the arms box, the portrait and the D14 sign keep clear of its ring. */
+	marked?: string;
+	/** The relation text of each card, only when the words show: rule B reads it (D126 4). Absent: nothing lifts. */
+	relations?: ReadonlyMap<string, { text: string }>;
+}
+
+/** What `measuredLayout` returns: the layout, its settings, and the people whose boxes lift (rule B, `TallNames.lifted`). */
+export interface MeasuredResult {
+	laid: LaidOut;
+	settings: LayoutSettings;
+	/** Set on every path, also when no card is tall: a lift needs no taller card. */
+	lifted: ReadonlySet<string>;
 }
 
 /**
@@ -43,10 +60,11 @@ export interface MeasuredOptions {
  * layout run twice (the sign comes from the lines of a layout with no tall cards). Pictures and their
  * loading never feed back into these steps. M10 (F1): the fold settings of `base` (`foldHidden`, `foldedFamilies`,
  * `foldControls`) go into the layout as they are (`o.foldHidden` fills `foldHidden` when `base` has none), and the
- * people that folds hide are skipped in steps 3 and 4.
+ * people that folds hide are skipped in steps 3 and 4. Step 4 also decides rule B, which boxes lift one text line (`lifted`).
  */
-export function measuredLayout(g: FamilyGraph, geo: Geometry, base: LayoutSettings, o: MeasuredOptions): { laid: LaidOut; settings: LayoutSettings } {
-	const sets = pictureSets(g, o.showPortraits);
+export function measuredLayout(g: FamilyGraph, geo: Geometry, base: LayoutSettings, o: MeasuredOptions): MeasuredResult {
+	const picked = pictureSets(g, o.showPortraits);
+	const sets = o.showArms === false ? { ...picked, arms: [] } : picked;
 	const plain: LayoutSettings = { ...base };
 	delete plain.tallCards;
 	delete plain.longNames;
@@ -66,17 +84,23 @@ export function measuredLayout(g: FamilyGraph, geo: Geometry, base: LayoutSettin
 	if (sets.arms.length) plain.arms = sets.arms;
 	if (sets.portraits.length) plain.portraits = sets.portraits;
 	const drawn = drawnGeometry(geo, plain);
-	const sideways = plain.orientation === 'sideways';
 	const arms = sets.arms.length ? armsCards(g, sets.arms) : undefined;
-	const titles = o.labels ? tallTitlesFor(g, o.labels, drawn, o.showDates, titleMeasure(drawn, o.fonts, o.measure)).filter((id) => !skip.has(id)) : [];
+	const titles = o.labels && !drawn.namesOnly ? tallTitlesFor(g, o.labels, drawn, o.showDates, titleMeasure(drawn, o.fonts, o.measure)).filter((id) => !skip.has(id)) : [];
 	const titled: LayoutSettings = titles.length ? { ...plain, tallTitles: titles } : plain;
 	const skipping = skip.size ? skip : undefined;
-	let tall = tallCardsFor(g, drawn, sideways, o.fonts, o.measure, o.hidden, undefined, o.labels, arms, skipping);
+	const extra = {
+		portraits: new Set(sets.portraits),
+		showDates: o.showDates,
+		...(o.breaks ? { breaks: o.breaks } : {}),
+		...(o.marked !== undefined ? { marked: o.marked } : {}),
+		...(o.relations ? { relations: o.relations } : {}),
+	};
+	let tall = tallCardsFor(g, drawn, o.fonts, o.measure, undefined, o.labels, arms, skipping, extra);
 	if (tall === undefined) {
 		const first = layoutTree(g, geo, titled, o.fonts.text);
-		tall = tallCardsFor(g, drawn, sideways, o.fonts, o.measure, o.hidden, illegitimateSigns(g, first.edges), o.labels, arms, skipping) ?? { tall: [], long: [] };
-		if (!tall.tall.length) return { laid: first, settings: titled };
+		tall = tallCardsFor(g, drawn, o.fonts, o.measure, illegitimateSigns(g, first.edges), o.labels, arms, skipping, extra) ?? { tall: [], long: [], slots: new Map(), lifted: new Set<string>() };
+		if (!tall.tall.length) return { laid: first, settings: titled, lifted: tall.lifted };
 	}
 	const settings: LayoutSettings = tall.tall.length ? { ...titled, tallCards: tall.tall, ...(tall.long.length ? { longNames: tall.long } : {}) } : titled;
-	return { laid: layoutTree(g, geo, settings, o.fonts.text), settings };
+	return { laid: layoutTree(g, geo, settings, o.fonts.text), settings, lifted: tall.lifted };
 }

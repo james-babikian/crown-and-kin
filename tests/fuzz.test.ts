@@ -5,6 +5,7 @@ import { focusSubgraph } from '../src/core/focus-subgraph';
 import type { HolderFields, HolderRef, Op, TitleOp } from '../src/core/edit';
 import type { IssueCode } from '../src/core/messages';
 import { parseDynasty } from '../src/core/parse';
+import { normaliseSobriquet } from '../src/core/sobriquet';
 import { computeRelations, findRelation, lineSubgraph, relationsKey } from '../src/core/relations';
 import type { CardLabels, CardTitleOp, DescribeDeleteTitle, HolderTable, PickerSuffix, ReignText, SearchNames } from '../src/core/titles';
 import type { Title } from '../src/core/types';
@@ -1336,5 +1337,93 @@ describe('fuzz: fold sets, the pruned graph, the folded layout, the crop helpers
 				}
 			}
 		}, 120000);
+	}
+});
+
+// --- Sobriquet (D122, 0.2.4) ---------------------------------------------------------
+
+const SOBRIQUET_TEXTS = ['the Wise', '“the Wise”', '"the Wise"', '‘Fox’', '“the ‘Wise’ one”', '„der Weise“', 'the  Old\tOne', '#1', 'a: b', '[x]', '- x', '"', "it's", 'x'.repeat(400), '日本語', '', '   ', 'null', '1066', 'true'];
+const SOBRIQUET_RAW: unknown[] = ['the Wise', '“the Wise”', 1066, true, [], ['x'], { a: 1 }, '', null, '  ', '"the Wise"', '‘Fox’', '“a” “b”', 'x'.repeat(2000)];
+
+/** The model value the reader must give for typed text (contract 1.1), with the parser itself as the proof. */
+function readBack(body: string, id: string): { found: boolean; sobriquet?: string } {
+	const r = parseDynasty(body);
+	if (!r.ok) return { found: false };
+	const p = r.tree.people.find((x) => x.id === id);
+	return p ? { found: true, sobriquet: p.sobriquet } : { found: false };
+}
+
+/** Sobriquet on a mutated tree: the reader and the labels hold, and a typed text reads back; add then remove restores the body. */
+function runSobriquet(text: string, rng: Rng) {
+	const r = parseDynasty(text);
+	if (!r.ok) return;
+	const labels = titles.cardLabels(deriveFamilies(r.tree));
+	for (const p of r.tree.people) {
+		const s = p.sobriquet;
+		if (s !== undefined && (typeof s !== 'string' || s === '' || s !== s.trim() || /\s{2}|[\t\n]/.test(s))) fail(`bad sobriquet ${JSON.stringify(s)} on ${p.id}`);
+		// A label is kept by id, so a duplicated id has one label for two people.
+		if (r.tree.people.filter((x) => x.id === p.id).length > 1) continue;
+		if ((labels.get(p.id) as { sobriquet?: string } | undefined)?.sobriquet !== s) fail(`the label of ${p.id} does not carry the sobriquet`);
+	}
+	const ids = r.tree.people.map((p) => p.id);
+	if (!ids.length) return;
+	const id = rng.pick(ids);
+	const before = readBack(text, id);
+	const typed = rng.pick(SOBRIQUET_TEXTS);
+	const added = applyOp(text, { kind: 'set-person-fields', id, fields: { sobriquet: typed } } as Op);
+	if (!added.ok) {
+		if (added.detail === CATCH_ALL) fail(`set sobriquet ${JSON.stringify(typed)} threw inside applyOp`);
+		return;
+	}
+	const mid = readBack(added.body, id);
+	if (!mid.found) fail(`the body after setting ${JSON.stringify(typed)} does not parse or lost ${id}`);
+	const want = normaliseSobriquet(typed) ?? (typed.trim() === '' ? before.sobriquet : undefined);
+	// A blank text removes the key, so the old value goes.
+	const expected = typed.trim() === '' ? undefined : want;
+	if (mid.sobriquet !== expected) fail(`typed ${JSON.stringify(typed)} reads back as ${JSON.stringify(mid.sobriquet)}, expected ${JSON.stringify(expected)}`);
+	const other = (body: string) => {
+		const q = parseDynasty(body);
+		return q.ok ? JSON.stringify(q.tree.people.filter((p) => p.id !== id)) + JSON.stringify(q.tree.unions) + JSON.stringify(q.tree.houses) : '';
+	};
+	if (other(added.body) !== other(text)) fail(`setting the sobriquet of ${id} changed other data`);
+	// Only a body with no `sobriquet` key anywhere (a key with an empty value reads as none but is not added by the op).
+	if (text.includes('sobriquet')) return;
+	const removed = applyOp(added.body, { kind: 'set-person-fields', id, fields: { sobriquet: null } } as Op);
+	if (!removed.ok) {
+		if (removed.detail === CATCH_ALL) fail('removing the sobriquet threw inside applyOp');
+		return;
+	}
+	if (removed.body !== text) fail(`add then remove did not restore the body:\n${JSON.stringify(text.slice(0, 600))}\n${JSON.stringify(removed.body.slice(0, 600))}`);
+}
+
+describe('fuzz: the sobriquet reads, shows on labels and round-trips through ops (D122, spec §8)', () => {
+	for (const f of allFixtures()) {
+		it(`fixture ${f.id}`, () => {
+			let parsed: unknown;
+			try {
+				parsed = parseYaml(f.source);
+			} catch {
+				parsed = {};
+			}
+			const n = onlySeed === undefined ? Math.max(2, Math.floor(casesFor(f.source.length) / 4)) : 1;
+			for (let i = 0; i < n; i++) {
+				const seed = onlySeed ?? hash32(`${BASE_SEED}:sobriquet:${f.id}:${i}`);
+				const rng = new Rng(seed);
+				// Put sobriquets of every shape on a few people, then mutate as the other groups do.
+				const withKeys = structuredClone(parsed);
+				for (const p of section(withKeys, 'people').filter(() => rng.chance(0.3))) p.sobriquet = rng.pick(SOBRIQUET_RAW);
+				const { text, names } = mutate(f.source, withKeys, rng);
+				try {
+					runPipeline(text);
+					runSobriquet(text, rng);
+				} catch (e) {
+					const err = e instanceof Error ? `${e.name}: ${e.message}\n${e.stack ?? ''}` : String(e);
+					throw new Error(
+						`Sobriquet fuzz failure on fixture ${f.id}, case ${i}, seed 0x${seed.toString(16)} (FUZZ_SEED=0x${seed.toString(16)})\n` +
+							`mutations: ${names.join(', ')}\n${err}\n--- mutated block (first 3000 chars) ---\n${text.slice(0, 3000)}`,
+					);
+				}
+			}
+		}, 60000);
 	}
 });

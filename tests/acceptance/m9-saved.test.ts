@@ -243,7 +243,8 @@ describe('P3, D73, D74: colours, heading and legend of the saved picture', () =>
 			return [...s].length * 8;
 		};
 		renderSvg(d.g, d.laid.layout, d.laid.edges, { palette: DEFAULT_LIGHT, dark: false, relations: d.relations, me: 'roderick', ...({ saved: saveOf(d), measure: spy, fonts: FONTS } as object) } as SvgOptions);
-		expect(fonts.has('700 16px serif')).toBe(true);
+		// D117: the name is 0.85 em like the other text, so its font is 13.6 px at 16 px.
+		expect(fonts.has('700 13.6px serif')).toBe(true);
 		expect([...fonts].some((f) => /^400 13\.6px serif$/.test(f))).toBe(true);
 		// A measure that finds every text too wide cuts every name with "…".
 		const wide = renderSvg(d.g, d.laid.layout, d.laid.edges, { palette: DEFAULT_LIGHT, dark: false, ...({ saved: saveOf(d), measure: (s: string) => [...s].length * 1000, fonts: FONTS } as object) } as SvgOptions);
@@ -343,23 +344,24 @@ describe('P4: without `saved` (and without `pictures`), renderSvg draws exactly 
 	// and 07b, whose layouts have no picture sets). 0.2.1: the hashes of 06, 07, 07b and 12 were recorded again,
 	// because these trees have far couples with no children, whose tags now carry the partnership sign.
 		// 0.2.2 (D108): the hashes of 07 and 07b were recorded again (ring and open triangle keep the dot's gap before the name).
+		// 0.2.4: all 16 were recorded again for the card geometry (card 61 px high, name text 0.85 em, boxes at the lower right).
 	const M8_SVG: Record<string, string> = {
-		'01': '31464ce8b62eaba1',
-		'02': 'c43f9a54754d6172',
-		'03': 'ef71ede678a8ebfb',
-		'04': '891ee22b9a49caf1',
-		'05': '0f94c507b77a9c41',
-		'06': '15190803e77ecaca',
-		'07': 'c495c29f029d32cb',
-		'07b': 'fcc0fb91e6f3e14f',
-		'08': 'e678d21ca57ba928',
-		'09': 'c868949b88dd240d',
-		'10': 'ce29021c87b4421f',
-		'11': '3f8ba080b967fc27',
-		'12': '65d784323277cdbe',
-		'13': '5e9fd7aaf9fb68bc',
-		'14': '94d0fc45f5613b69',
-		'15': 'eea22d043fd5e123',
+		'01': '3cd017b8964acae4',
+		'02': '80646b0e0f77bcdd',
+		'03': 'fe3824ac60454583',
+		'04': 'e5904c56484e3ce6',
+		'05': '14b66bb8799df29d',
+		'06': 'e89860b7a3d19c45',
+		'07': '9a9471e459c3cb0f',
+		'07b': '8f74091d524b6417',
+		'08': 'd7a77a2c8c85e2b2',
+		'09': '95f43e80a3dd21c4',
+		'10': 'd471d3aa1c57d8ad',
+		'11': '2ecf7dc5003a58e6',
+		'12': 'e84bff7d7cdd1b6a',
+		'13': '7c4d84eb85d2362c',
+		'14': 'fc6b084470e7219a',
+		'15': '7883e14d94949d4e',
 	};
 	for (const f of allFixtures()) {
 		it(`sample tree ${f.id}`, () => {

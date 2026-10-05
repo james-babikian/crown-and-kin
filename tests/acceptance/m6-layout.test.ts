@@ -233,7 +233,8 @@ describe('D26: a union marker carries the written partnership type (contract Edg
  * geometry of spec §5.8 (`src/layout/geometry.ts`: 1.2 for normal cards, 1.1 for compact). The
  * layout may round it to whole px.
  */
-const nameLine = (geo: Geometry) => (geo.cardSize === 'compact' ? 1.1 : 1.2) * geo.fontPx;
+// D117: the name text line is 0.85 em of the note font, like every other line of the card (0.2.3: 1 em).
+const nameLine = (geo: Geometry) => (geo.cardSize === 'compact' ? 1.1 : 1.2) * 0.85 * geo.fontPx;
 
 /** Where each person's own drop line ends, if it has one: the child first, then its placement parents. */
 function dropEnds(l: Laid): Map<string, { x: number; y: number }[]> {
@@ -321,14 +322,14 @@ describe('D29: tallCards makes exactly those narrow sideways cards one name text
 		});
 	}
 
-	it('the drawn size: a tall card is 19 px taller at 16 px (1.2 × 16 = 19.2, whole px allowed)', () => {
+	it('the drawn size: a tall card is 16 px taller at 16 px (1.2 × 0.85 × 16 = 16.3, whole px allowed)', () => {
 		const src = allFixtures().find((f) => f.id === '01')!.source;
 		const id = parse(src).people[0].id;
 		const base = lay(src, NARROW);
 		const l = lay(src, { ...NARROW, tallCards: [id] });
 		const extra = l.layout.persons.get(id)!.h - base.layout.persons.get(id)!.h;
-		expect(extra).toBeGreaterThanOrEqual(18.7);
-		expect(extra).toBeLessThanOrEqual(19.7);
+		expect(extra).toBeGreaterThanOrEqual(15.8);
+		expect(extra).toBeLessThanOrEqual(16.8);
 	});
 
 	for (const [geo, narrowCardW] of [

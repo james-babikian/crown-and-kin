@@ -1,5 +1,6 @@
 import { expect, vi } from 'vitest';
 import { newBlockState } from '../../src/obsidian/block-state';
+import type { DynastySettings } from '../../src/obsidian/settings';
 import { EditSheet } from '../../src/obsidian/edit-sheet';
 import { FullScreenModal } from '../../src/obsidian/full-screen';
 import DynastyTreePlugin from '../../src/obsidian/main';
@@ -154,11 +155,14 @@ export interface Host {
 	views: Set<TreeView>;
 	looseStates: Map<string, unknown>;
 	renders?: number;
+	/** The plugin settings; absent means `DEFAULT_SETTINGS`. A phone test that checks whole cards passes `wholeCardSettings()` (D119: the default phone style is names only). */
+	settings?: DynastySettings;
 	recordTiming(): void;
 }
 
-export function fakeHost(): Host {
+export function fakeHost(settings?: DynastySettings): Host {
 	return {
+		...(settings ? { settings } : {}),
 		app: fakeApp(),
 		handles: {},
 		views: new Set<TreeView>(),

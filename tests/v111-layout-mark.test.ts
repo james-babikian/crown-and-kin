@@ -1,10 +1,12 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import { deriveFamilies, type FamilyGraph } from '../src/core/derive';
 import { parseDynasty } from '../src/core/parse';
-import { armsPlace, cardText, geometryFor, portraitBox, signBelowRing, MARK_CLEAR_PX } from '../src/layout/geometry';
-import { DEFAULT_LAYOUT_SETTINGS, clearLayoutCache, layoutTree, pictureSets } from '../src/layout/index';
-import type { LaidOut } from '../src/layout/model';
+import { armsPlace, cardText, drawnGeometry, geometryFor, portraitBox, signBelowRing, tallExtra, MARK_CLEAR_PX } from '../src/layout/geometry';
+import { illegitimateSigns } from '../src/layout/illegitimate-sign';
+import { DEFAULT_LAYOUT_SETTINGS, armsCards, clearLayoutCache, layoutTree, pictureSets } from '../src/layout/index';
+import type { LaidOut, LayoutSettings } from '../src/layout/model';
 import { buildScene } from '../src/render/dom/scene';
+import { tallCardsFor } from '../src/render/dom/tall-cards';
 import { DEFAULT_LIGHT, ME_LOOK, ME_RING_INNER } from '../src/render/styles';
 import { approxMeasure, renderSvg } from '../src/render/svg-string';
 import { FEl, installDom } from './acceptance/fake-dom';
@@ -24,12 +26,12 @@ const SIZES = ['normal', 'compact'] as const;
 const NOTE_FONTS = [12, 14, 16, 18, 20];
 const EPS = 1e-9;
 
-// Two cards with the same data: `m` is marked, `o` is not. Both have arms, a portrait and the D14 sign.
+// Two cards with the same data: `m` is marked, `o` is not. Both have arms, a portrait and the D14 sign. The names are short, so no name needs a second text line (only D129 makes a card taller).
 const SOURCE = `houses:
   - {id: v, name: House V, color: "#8b1e3f", arms: "[[v.png]]"}
 people:
-  - {id: m, name: Me Valmont, house: v, illegitimate: true, portrait: "[[m.png]]"}
-  - {id: o, name: Other Valmont, house: v, illegitimate: true, portrait: "[[o.png]]"}
+  - {id: m, name: Me Val, house: v, illegitimate: true, portrait: "[[m.png]]"}
+  - {id: o, name: Other Val, house: v, illegitimate: true, portrait: "[[o.png]]"}
 `;
 
 function graph(): FamilyGraph {
@@ -38,9 +40,18 @@ function graph(): FamilyGraph {
 	return deriveFamilies(r.tree);
 }
 
+/** The layout the tree view makes: a first pass for the signs, then `tallCardsFor` (marked person `m`) and the layout with the tall cards (D129: the marked, signed Compact card is one text line higher). */
 function lay(g: FamilyGraph, font: number, size: 'normal' | 'compact', relationLine: boolean): LaidOut {
 	clearLayoutCache();
-	return layoutTree(g, geometryFor(font, size), { ...DEFAULT_LAYOUT_SETTINGS, relationLine, ...pictureSets(g, true) }, 'test');
+	const geo = geometryFor(font, size);
+	const settings: LayoutSettings = { ...DEFAULT_LAYOUT_SETTINGS, relationLine, ...pictureSets(g, true) };
+	const first = layoutTree(g, geo, settings, 'test');
+	const sets = pictureSets(g, true);
+	const tall = tallCardsFor(g, drawnGeometry(geo, settings), FONTS, measure, illegitimateSigns(g, first.edges), undefined, armsCards(g, sets.arms), undefined, {
+		marked: 'm',
+		portraits: new Set(sets.portraits),
+	});
+	return layoutTree(g, geo, { ...settings, tallCards: tall?.tall ?? [], longNames: tall?.long ?? [] }, 'test');
 }
 
 /** The cases every test below walks through. */
@@ -104,20 +115,22 @@ describe('D96 geometry', () => {
 	it.each(CASES.map((c) => [label(c), c] as const))('armsPlace with a ring: both boxes start at least 1.5 px below it (%s)', (_n, c) => {
 		const geo = { ...geometryFor(c.font, c.size), ...(c.relationLine ? { relationLine: true } : {}) };
 		const t = cardText(geo);
-		const place = armsPlace(geo, t, geo.cardH, 0, ME_RING_INNER);
-		const plain = armsPlace(geo, t, geo.cardH, 0);
+		const place = armsPlace(geo, t, geo.cardH, ME_RING_INNER);
+		const plain = armsPlace(geo, t, geo.cardH);
 		expect(place.full.y - ME_RING_INNER).toBeGreaterThanOrEqual(MARK_CLEAR_PX - EPS);
 		expect(place.compact.y - ME_RING_INNER).toBeGreaterThanOrEqual(MARK_CLEAR_PX - EPS);
-		// Only the top moves, and only down.
-		expect(place.full.y).toBeGreaterThanOrEqual(plain.full.y);
+		// 0.2.4 (D117): the Full box ends at the bottom of the text block, so the ring only ever moves it up, never down.
+		expect(place.full.y).toBeLessThanOrEqual(plain.full.y);
+		expect(geo.cardH - ME_RING_INNER - (place.full.y + place.full.h)).toBeGreaterThanOrEqual(MARK_CLEAR_PX - EPS);
 		expect({ ...place, full: { ...place.full, y: 0 }, compact: { ...place.compact, y: 0 } }).toEqual({ ...plain, full: { ...plain.full, y: 0 }, compact: { ...plain.compact, y: 0 } });
 	});
 
-	it('without a ring nothing moves: the centred places of D67 and D78', () => {
+	it('without a ring nothing moves: the places of D117 at the lower right, and the Compact arms centred (D78)', () => {
 		const geo = geometryFor(16, 'normal');
 		const t = cardText(geo);
-		const place = armsPlace(geo, t, geo.cardH, 0);
-		expect(place.full.y).toBeCloseTo(t.nameBaseline - 0.35 * t.nameSize - 12, 9);
+		const place = armsPlace(geo, t, geo.cardH);
+		expect(place.full.y + place.full.h).toBeCloseTo(t.textBottom, 9);
+		expect(place.full.x + place.full.w).toBeCloseTo(t.padX + t.textW, 9);
 		expect(place.compact.y).toBeCloseTo(geo.cardH / 2 - 14.4, 9);
 		expect(portraitBox(geo, t).y + 24).toBeCloseTo(t.textBottom, 9);
 		expect(signBelowRing(t.sign, 0)).toEqual(t.sign);
@@ -126,10 +139,21 @@ describe('D96 geometry', () => {
 	it('a gap that is wide enough already is left alone', () => {
 		const geo = geometryFor(16, 'normal');
 		const t = cardText(geo);
-		// A ring that ends 1 px inside the edge leaves 2.68 px already; the arms stay centred.
-		expect(armsPlace(geo, t, geo.cardH, 0, 1).full).toEqual(armsPlace(geo, t, geo.cardH, 0).full);
+		// A ring that ends 1 px inside the edge leaves a wide gap already; the arms stay where they are.
+		expect(armsPlace(geo, t, geo.cardH, 1).full).toEqual(armsPlace(geo, t, geo.cardH).full);
 		expect(portraitBox(geo, t, { boxH: geo.cardH, ring: ME_RING_INNER })).toEqual(portraitBox(geo, t));
-		expect(signBelowRing(t.sign, ME_RING_INNER)).toEqual(t.sign);
+		// The sign sits 1.6 px higher with the smaller name (D117): a ring that ends 2 px inside the edge leaves it alone.
+		expect(signBelowRing(t.sign, 2)).toEqual(t.sign);
+	});
+
+	it('the arms box is left of the portrait at the same bottom, and the two never overlap (D117)', () => {
+		const geo = geometryFor(16, 'normal');
+		const t = cardText(geo);
+		const portrait = portraitBox(geo, t);
+		const place = armsPlace(geo, t, geo.cardH, undefined, portrait);
+		expect(place.full.y + place.full.h).toBeCloseTo(portrait.y + portrait.h, 9);
+		expect(place.full.x + place.full.w).toBeLessThan(portrait.x);
+		expect(portrait.x - (place.full.x + place.full.w)).toBeCloseTo(0.3 * 16, 9);
 	});
 
 	it('the Compact card at 16 px really needs the move (the owner picture)', () => {
@@ -147,6 +171,13 @@ describe('D96 geometry', () => {
 
 describe('D96 live drawing (the scene)', () => {
 	const g = graph();
+	it.each(CASES.map((c) => [label(c), c] as const))('D129: the marked, signed Compact card is one text line higher than the card that is not marked; a Normal card is not (%s)', (_n, c) => {
+		const laid = lay(g, c.font, c.size, c.relationLine);
+		const mine = laid.layout.persons.get('m')!.h;
+		const other = laid.layout.persons.get('o')!.h;
+		expect(mine - other).toBe(c.size === 'compact' ? tallExtra(laid.layout.geometry) : 0);
+	});
+
 	it.each(CASES.map((c) => [label(c), c] as const))('the marked card keeps 1.5 px clear of the ring (%s)', (_n, c) => {
 		const laid = lay(g, c.font, c.size, c.relationLine);
 		const p = sceneParts(g, laid, 'm', 'm');
@@ -161,9 +192,10 @@ describe('D96 live drawing (the scene)', () => {
 		const laid = lay(g, c.font, c.size, c.relationLine);
 		expect(sceneParts(g, laid, 'o', 'm')).toEqual(sceneParts(g, laid, 'o', undefined));
 		const t = cardText(laid.layout.geometry);
-		// ... and the arms stay centred on the first name text line (spec §13.6, G2).
-		const arms = sceneParts(g, laid, 'o', 'm').arms[0];
-		expect(arms.y + arms.h / 2).toBeCloseTo(t.nameBaseline - 0.35 * t.nameSize, 9);
+		// ... and the arms sit at the lower right, ending where the portrait ends (D117, spec §13.6).
+		const parts = sceneParts(g, laid, 'o', 'm');
+		expect(parts.arms[0].y + parts.arms[0].h).toBeCloseTo(t.textBottom, 9);
+		expect(parts.arms[0].y + parts.arms[0].h).toBeCloseTo(parts.portrait!.y + parts.portrait!.h, 9);
 	});
 });
 

@@ -204,7 +204,7 @@ describe('S1: the shells of a lazy scene', () => {
 		});
 	});
 
-	it('a focus badge shell has its attributes and its hit rect, and not the circle and the plus', () => {
+	it('a focus badge shell has its attributes and its tap disc, and not the circle and the plus; the tap square is built at once in its own layer', () => {
 		const eager = build(false);
 		const lazy = build(true);
 		expect(lazy.s.badges).toHaveLength(eager.s.badges.length);
@@ -212,7 +212,9 @@ describe('S1: the shells of a lazy scene', () => {
 			const e = eager.s.badges[i];
 			expect([...el(b.el).attrs]).toEqual([...el(e.el).attrs]);
 			expect(el(b.el).children).toHaveLength(1);
-			expect(el(b.el).children[0]).toBe(el(b.hit));
+			expect(el(b.el).children[0]).toBe(el(b.disc));
+			expect(serial(el(b.disc))).toBe(serial(el(e.disc)));
+			expect(el(b.hit).parentElement?.hasClass('dynasty-badge-hits')).toBe(true);
 			expect(serial(el(b.hit))).toBe(serial(el(e.hit)));
 			expect(b.mark).toEqual(e.mark);
 		});

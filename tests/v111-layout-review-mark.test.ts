@@ -1,7 +1,7 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import { deriveFamilies, type FamilyGraph } from '../src/core/derive';
 import { parseDynasty } from '../src/core/parse';
-import { cardText, geometryFor, smallTextWidth } from '../src/layout/geometry';
+import { PICTURE_EM, cardText, geometryFor, roomAt } from '../src/layout/geometry';
 import { DEFAULT_LAYOUT_SETTINGS, clearLayoutCache, layoutTree, pictureSets } from '../src/layout/index';
 import type { LaidOut } from '../src/layout/model';
 import { buildScene } from '../src/render/dom/scene';
@@ -9,9 +9,10 @@ import { DEFAULT_LIGHT, ME_LOOK, ME_RING_INNER } from '../src/render/styles';
 import { approxMeasure, renderSvg } from '../src/render/svg-string';
 import { FEl, installDom } from './acceptance/fake-dom';
 
-// Review of 0.2.1 area C (proof adopted from the code-reviewer), D96: the lowered arms box on the marked card at note
+// Review of 0.2.1 area C (proof adopted from the code-reviewer), D96: the arms box on the marked card at note
 // font sizes 8 to 48 px. Hard rule: the arms box never overlaps the portrait and never covers the mark's border.
 // Soft rule: 1.5 px to the ring, which gives way when both cannot hold. The title text lines the box reaches end before it.
+// 0.2.4 (D117): the arms box sits left of the portrait at the lower right, so "never overlaps" is a horizontal gap, not a stack.
 
 beforeAll(() => {
 	installDom();
@@ -45,8 +46,8 @@ interface Rel {
 	h: number;
 }
 interface Parts {
-	arms: Rel & { x: number };
-	portrait: (Rel & { x: number }) | undefined;
+	arms: Rel & { x: number; w: number };
+	portrait: (Rel & { x: number; w: number }) | undefined;
 	boxH: number;
 	/** Where the drawn title text ends, card-relative (the 8 px per character measure). */
 	titleEnd: number | undefined;
@@ -100,8 +101,9 @@ describe.each([['live tree', scene], ['headless picture', headless]] as const)('
 			for (const font of FONT_SIZES) {
 				const laid = lay(g, font, size, relationLine);
 				const mine = draw(g, laid, 'm', 'm');
-				const overlap = mine.arms.y + mine.arms.h - mine.portrait!.y;
-				if (overlap > EPS) bad.push(`${font} px${relationLine ? ' relation' : ''}: arms bottom ${(mine.arms.y + mine.arms.h).toFixed(2)} > portrait top ${mine.portrait!.y.toFixed(2)}`);
+				const gap = mine.portrait!.x - (mine.arms.x + mine.arms.w);
+				if (gap < PICTURE_EM.armsGap * font - 1e-6) bad.push(`${font} px${relationLine ? ' relation' : ''}: arms right ${(mine.arms.x + mine.arms.w).toFixed(2)}, portrait left ${mine.portrait!.x.toFixed(2)}`);
+				if (Math.abs(mine.arms.y + mine.arms.h - (mine.portrait!.y + mine.portrait!.h)) > EPS) bad.push(`${font} px: the two boxes end at different heights`);
 			}
 		}
 		expect(bad).toEqual([]);
@@ -147,21 +149,22 @@ describe.each([['live tree', scene], ['headless picture', headless]] as const)('
 	});
 });
 
-describe('D96 the title narrowing rule', () => {
-	it('a centred arms box on a normal card at 16 px (not marked) reaches no capitals, so nothing narrows without the box', () => {
+describe('D96 the text narrowing rule (roomAt)', () => {
+	it('with no box nothing narrows a text line', () => {
 		const geo = geometryFor(16, 'normal');
 		const t = cardText(geo);
-		expect(smallTextWidth(geo, t, t.titleBaseline, undefined)).toBe(t.textW);
+		expect(roomAt(geo, t, t.titleBaseline, t.smallSize, [])).toBe(t.textW);
 	});
 
-	it('the Compact card at 16 px: the marked card narrows the title by the arms column and 0.3 em; the dates line below it is not touched', () => {
+	it('the Compact card at 16 px: the lower-right arms box narrows the title and the dates line that it reaches by the box and 0.3 em, and not the name', () => {
 		const laid = lay(graph(), 16, 'compact', false);
 		const geo = laid.layout.geometry;
 		const t = cardText(geo);
 		const m = scene(graph(), laid, 'm', 'm');
-		const w = smallTextWidth(geo, t, t.titleBaseline, undefined, { x: m.arms.x, y: m.arms.y, w: 1, h: m.arms.h });
+		const box = { r: { x: m.arms.x, y: m.arms.y, w: 1, h: m.arms.h }, gap: 0.3 * 16 };
+		const w = roomAt(geo, t, t.datesBaseline, t.smallSize, [box]);
 		expect(w).toBeCloseTo(m.arms.x - 0.3 * 16 - t.padX, 9);
 		expect(w).toBeLessThan(t.textW);
-		expect(smallTextWidth(geo, t, t.datesBaseline, undefined, { x: m.arms.x, y: m.arms.y, w: 1, h: m.arms.h })).toBe(t.textW);
+		expect(roomAt(geo, t, t.nameBaseline, t.nameSize, [box])).toBe(t.textW);
 	});
 });

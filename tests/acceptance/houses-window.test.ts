@@ -151,7 +151,8 @@ describe('the Houses button (D36, spec §6.10)', () => {
 	it('is not in the static phone preview (D1), a read-only tree or a tree with editing off', async () => {
 		phone();
 		const still = await embed(SOURCE, { handle: writingHandle() });
-		expect(toolbar(still.el)).toEqual(['dynasty-add-person', 'dynasty-expand']);
+		// D120: the phone preview has the height button, left of Expand.
+		expect(toolbar(still.el)).toEqual(['dynasty-add-person', 'dynasty-height', 'dynasty-expand']);
 		resetDom();
 		const ro = await embed(SOURCE);
 		expect(ro.el.querySelector('.dynasty-houses-button')).toBeNull();

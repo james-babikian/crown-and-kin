@@ -35,7 +35,8 @@ export const clock = { now: 10_000 };
  * What the fake window reports: `(pointer: coarse)`, its width and its height, and the screen's
  * size (`window.screen`; 0 = the same as the window, as on a phone with no keyboard open).
  */
-export const device = { coarse: false, width: 1280, height: 800, screenWidth: 0, screenHeight: 0 };
+/** `reduceMotion` is the answer of `(prefers-reduced-motion: reduce)` (D126). */
+export const device = { coarse: false, width: 1280, height: 800, screenWidth: 0, screenHeight: 0, reduceMotion: false };
 const FRAME_MS = 16;
 
 /** Listeners on the window: the top of every event path (capture first, bubble last). */
@@ -55,6 +56,7 @@ const mediaListeners = new Set<{ query: string; fn: (e: unknown) => void }>();
  */
 function fakeMedia(query: string) {
 	const matches = (): boolean => {
+		if (query.includes('prefers-reduced-motion')) return device.reduceMotion;
 		if (query.includes('coarse')) return device.coarse;
 		if (query.includes('orientation: portrait')) return device.height > device.width;
 		if (query.includes('orientation: landscape')) return device.height <= device.width;
@@ -306,8 +308,22 @@ export class FEl {
 		this.children = [];
 	}
 
+	/** Obsidian's `appendText`: adds a text node after the existing content. The fake keeps it in `text`. */
+	appendText(t: string): void {
+		this.text += t;
+	}
+
 	getText(): string {
 		return this.text + this.children.map((c) => c.getText()).join('');
+	}
+
+	/** The DOM `textContent`: the own text plus the text of every child (a name `<text>` holds `<tspan>`s). */
+	get textContent(): string {
+		return this.getText();
+	}
+
+	set textContent(t: string) {
+		this.setText(t);
 	}
 
 	show(): void {
@@ -534,6 +550,7 @@ export function resetDom(): void {
 	device.height = 800;
 	device.screenWidth = 0;
 	device.screenHeight = 0;
+	device.reduceMotion = false;
 	fakeDoc.activeElement = null;
 	fakeDoc.body.empty();
 }

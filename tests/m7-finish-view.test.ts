@@ -250,10 +250,12 @@ describe('the finder first view on the computer (a tree in a note, 700 × 500, a
 		clearMeasureCache();
 		desktop();
 		const { root } = await openFullScreen(F03);
-		await finder(root, 'conrad', 'ulric', frame);
+		// 0.2.4 (D117): cards are 61 px high, not 64, so the line fits at 11.9 px names in 500 px; 470 px is the case where it does not.
+		const low: Frame = { ...frame, h: 470 };
+		await finder(root, 'conrad', 'ulric', low);
 		expect(scaleOf(root) * 12).toBeCloseTo(14);
-		expect(underBar(root, frame)).toEqual([]);
-		const cut = notWhole(root, frame);
+		expect(underBar(root, low)).toEqual([]);
+		const cut = notWhole(root, low);
 		expect(cut).not.toContain('aurel');
 		expect(cut).not.toContain('viviane');
 	});
