@@ -19,6 +19,7 @@ import { TitlesWindow } from '../src/obsidian/titles-window';
 import { FEl, clock, device, dispatch, fakeDoc, fakeWin, installDom, resetDom, runTimers } from './acceptance/fake-dom';
 import { openModals, resetObsidian } from './acceptance/fake-obsidian';
 import { fakeApp } from './acceptance/tree-view-fakes';
+import { openPage } from './lw-support';
 import { stripNotDisabled, writingHandle } from './s113-c-support';
 
 /*
@@ -149,24 +150,28 @@ describe('C1: a field in the scrolling body is brought into view when it gets th
 		const win = HousesWindow.create(fakeApp() as never, { handle: writingHandle(BODY) as never, sourcePath: 'n.md' })!;
 		win.open();
 		const modal = (win as unknown as { modalEl: FEl }).modalEl;
-		expect(reveals(modal, modal.querySelector('.dynasty-house-row input.dynasty-sheet-input')!)).toBeGreaterThan(0);
+		const page = openPage((win as unknown as { contentEl: FEl }).contentEl, 'valmont');
+		expect(reveals(modal, page.querySelector('.dynasty-house-name textarea')!)).toBeGreaterThan(0);
 	});
 
 	it('the title name field of the Titles window', () => {
 		const win = TitlesWindow.create(fakeApp() as never, { handle: writingHandle(BODY) as never, sourcePath: 'n.md' })!;
 		win.open();
 		const modal = (win as unknown as { modalEl: FEl }).modalEl;
-		expect(reveals(modal, modal.querySelector('.dynasty-title-row input.dynasty-sheet-input')!)).toBeGreaterThan(0);
+		const page = openPage((win as unknown as { contentEl: FEl }).contentEl, 'duke');
+		expect(reveals(modal, page.querySelector('.dynasty-title-name textarea')!)).toBeGreaterThan(0);
 	});
 
 	it('a window that has closed does nothing when the timer runs', () => {
 		const win = HousesWindow.create(fakeApp() as never, { handle: writingHandle(BODY) as never, sourcePath: 'n.md' })!;
 		win.open();
-		const modal = (win as unknown as { modalEl: FEl }).modalEl;
-		const field = modal.querySelector('.dynasty-house-row input.dynasty-sheet-input')!;
+		const field = openPage((win as unknown as { contentEl: FEl }).contentEl, 'valmont').querySelector('.dynasty-house-name textarea')!;
 		field.focus();
 		dispatch(field, 'focusin');
+		// The first close leaves the page; the second closes the window.
 		win.close();
+		win.close();
+		expect(openModals.includes(win as never)).toBe(false);
 		const spy = vi.spyOn(FEl.prototype, 'scrollIntoView');
 		expect(() => runTimers(400)).not.toThrow();
 		expect(spy).not.toHaveBeenCalled();

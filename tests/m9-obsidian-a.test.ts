@@ -20,6 +20,7 @@ import { notices, openModals, resetObsidian } from './acceptance/fake-obsidian';
 import { isoFile, pngHead } from './acceptance/m9-support';
 import { pickerRowFor } from './acceptance/m11-support';
 import { fakeHandle, type FakeHandle } from './acceptance/tree-view-fakes';
+import { backButton, backToList, openPage, rowOf } from './lw-support';
 
 /*
  * WP 9.3a (M9 contract O1, O3, O4, O6–O10, B1, B2, B8, B10–B16): the picture store beyond the
@@ -424,21 +425,24 @@ describe('the Houses window: arms and their colours (spec §13.6, O7, B8)', () =
 		const win = HousesWindow.create(app as never, { handle: handle as never, sourcePath: 'Tree.md', pictures: store })!;
 		win.open();
 		const content = (win as unknown as { contentEl: FEl }).contentEl;
-		const row = (id: string) => content.querySelector(`.dynasty-house-row[data-house="${id}"]`)!;
-		return { app, store, released, handle, win, content, row };
+		// 0.2.5 (D134): the list shows the rows with their arms; the page of a house has the arms box button and the palette.
+		const row = (id: string) => rowOf(content, id);
+		const page = (id: string) => (backButton(content) ? (backToList(content), openPage(content, id)) : openPage(content, id));
+		return { app, store, released, handle, win, content, row, page };
 	}
 
-	it('each row shows its arms before the name; a house with no arms has the dashed box with its accessible name', async () => {
-		const { content, row } = open();
+	it('each row shows its arms before the name; a house with no arms has the dashed box, and its page has the button with its accessible name', async () => {
+		const { content, row, page } = open();
 		await settle();
-		const arms = row('valmont').querySelector('.dynasty-house-arms')!;
+		const arms = row('valmont').querySelector('.dynasty-lw-armsbox')!;
 		expect(arms.querySelector('img')?.getAttribute('src')).toMatch(/^blob:/);
-		const empty = row('thorne').querySelector('.dynasty-house-arms')!;
+		const empty = row('thorne').querySelector('.dynasty-lw-armsbox')!;
 		expect(empty.hasClass('is-empty')).toBe(true);
-		expect(empty.getAttribute('aria-label')).toBe('Select the arms of House Thorne');
-		// The name input is still the first input of the row (the arms box is a button).
-		expect(row('thorne').querySelector('input')!.value).toBe('House Thorne');
-		expect(content.querySelectorAll('.dynasty-house-row').length).toBe(2);
+		expect(row('thorne').querySelector('.dynasty-lw-row-name')!.getText()).toBe('House Thorne');
+		expect(content.querySelectorAll('button.dynasty-lw-row').length).toBe(2);
+		const button = page('thorne').querySelector('button.dynasty-house-arms')!;
+		expect(button.hasClass('is-empty')).toBe(true);
+		expect(button.getAttribute('aria-label')).toBe('Select the arms of House Thorne');
 	});
 
 	it('loadHouses and houseOps: Remove arms and Select arms are one batch; a new house can have arms', () => {
@@ -460,12 +464,12 @@ describe('the Houses window: arms and their colours (spec §13.6, O7, B8)', () =
 	});
 
 	it('Remove arms and Select arms for two houses, then Save: one write that changes only the arms lines', async () => {
-		const { content, row, handle } = open();
+		const { content, page, handle } = open();
 		await settle();
-		dispatch(row('valmont').querySelector('.dynasty-house-swatch')!, 'click');
+		page('valmont');
 		dispatch(content.querySelector('.dynasty-house-remove-arms')!, 'click');
-		expect(row('valmont').querySelector('.dynasty-house-arms')!.hasClass('is-empty')).toBe(true);
-		dispatch(row('thorne').querySelector('.dynasty-house-arms')!, 'click');
+		expect(content.querySelector('.dynasty-lw-page button.dynasty-house-arms')!.hasClass('is-empty')).toBe(true);
+		dispatch(page('thorne').querySelector('button.dynasty-house-arms')!, 'click');
 		const picker = openModals[openModals.length - 1] as unknown as { contentEl: FEl };
 		// M11 (D92): this house has no arms yet, so the folder "Pictures" is closed: open it first.
 		const target = pickerRowFor(picker.contentEl, 'Pictures/thorne.png');
@@ -481,9 +485,9 @@ describe('the Houses window: arms and their colours (spec §13.6, O7, B8)', () =
 	});
 
 	it('D68: with arms, "Colours from the arms" comes first with the exact colours, then "House colours"; a colour of the arms is written like D32', async () => {
-		const { content, row, handle } = open();
+		const { content, page, handle } = open();
 		await settle();
-		dispatch(row('valmont').querySelector('.dynasty-house-swatch')!, 'click');
+		page('valmont');
 		await settle();
 		const labels = content.querySelectorAll('.dynasty-house-palette .dynasty-sheet-label').map((l) => l.getText());
 		expect(labels).toEqual([PICTURES_UI.armsHeading, 'Colour of House Valmont', PICTURES_UI.coloursFromArms, PICTURES_UI.houseColours]);
@@ -498,9 +502,9 @@ describe('the Houses window: arms and their colours (spec §13.6, O7, B8)', () =
 	});
 
 	it('when the plugin cannot read the pixels, the window says so and shows the normal colours', async () => {
-		const { content, row } = open({ pixels: null });
+		const { content, page } = open({ pixels: null });
 		await settle();
-		dispatch(row('valmont').querySelector('.dynasty-house-swatch')!, 'click');
+		page('valmont');
 		await settle();
 		expect(content.querySelector('.dynasty-house-arms-none')!.getText()).toBe('The plugin cannot read the colours of this picture.');
 		expect(content.querySelectorAll('.dynasty-house-colour').length).toBe(12);

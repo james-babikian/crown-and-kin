@@ -18,12 +18,12 @@ import { TreeView } from '../../src/obsidian/tree-view';
 import { HINT_UI } from '../../src/render/ui-text';
 import { FEl, clock, device, dispatch, flushFrames, installDom, pointer, resetDom, resizeAll, runTimers, settle } from './fake-dom';
 import { resetObsidian } from './fake-obsidian';
-import { wholeCardSettings } from './phone-style';
-import { FAR, embed, fakeHandle, fakeHost, fullViews, type Host } from './tree-view-fakes';
+import { FAR, embed, fakeHandle, fakeHost, fullViews, tabletDevice, type Host } from './tree-view-fakes';
 
 /*
- * WP6.4 on the fakes: the D28 hint, D29 name measure and tall cards in the note preview, the D31 tag
- * tap area in `down`, and the note preview's `fitNarrow` with a box that has no height yet.
+ * WP6.4 on the fakes: the D28 hint, D29 name measure and tall cards in the full-screen view and the static preview of a tablet, and the D31 tag
+ * tap area in `down`. 0.2.5 (D144): a tree in a note on a phone is a list, so the note preview of a phone, its narrow cards, the `fitNarrow`
+ * refit and the hint at the note's toolbar are gone; the full-screen view and the tablet keep every check below.
  */
 
 const DOWN = geometryFor(16, 'normal');
@@ -93,8 +93,7 @@ function registry(host: Host, handle: ReturnType<typeof fakeHandle>): void {
 }
 
 async function preview(source: string, box: () => Box = () => previewBox()) {
-	// These tests check whole cards (heights of tall cards); the default phone style of D119 is names only.
-	const host = fakeHost(wholeCardSettings());
+	const host = fakeHost();
 	const handle = fakeHandle('n.md', source);
 	registry(host, handle);
 	const el = new FEl('div');
@@ -196,61 +195,32 @@ const NAMES = [
 // =============================================================================================
 
 describe('D28: the hint for children outside the first view (upright phone)', () => {
-	it('note preview: "↑ n more child(ren)" and "↓ n more child(ren)" match the cards outside the box; a label left of the toolbar, not a button', async () => {
-		phonePortrait();
-		const { source, kids } = family(14);
-		const { el } = await preview(source);
-		const { h } = screen(el);
-		const want = outside(el, kids, 0, h);
-		expect(want.up + want.down).toBeGreaterThan(0);
-		for (const dir of ['up', 'down'] as const) {
-			const e = hint(el, dir);
-			if (!want[dir]) {
-				expect(e).toBeNull();
-				continue;
-			}
-			expect(e?.getText()).toBe(HINT_UI[dir](want[dir]));
-			expect(e!.hasClass('dynasty-hint')).toBe(true);
-			// Not tappable: no button role, not in the Tab order, no listeners.
-			expect(e!.tag).toBe('div');
-			expect(e!.getAttribute('tabindex')).toBeNull();
-			expect(e!.getAttribute('role')).toBeNull();
-			expect(e!.listeners.size).toBe(0);
-		}
-		const up = hint(el, 'up');
-		if (up) {
-			const box = previewBox();
-			expect(parseFloat(up.style.getPropertyValue('--dynasty-hint-right'))).toBeGreaterThanOrEqual(box.w - box.bar.left);
-		}
-	});
-
-	it('the ↑ hint stays left of the toolbar when the toolbar gets wider later (Add person comes when the handle is known)', async () => {
-		phonePortrait();
-		const { source } = family(14);
-		let barW = 44;
-		const box = () => {
-			const b = previewBox();
-			return { ...b, bar: { ...b.bar, left: b.w - 6 - barW, width: barW } };
-		};
-		const { el } = await preview(source, box);
-		expect(hint(el, 'up')).not.toBeNull();
-		const right = () => parseFloat(hint(el, 'up')!.style.getPropertyValue('--dynasty-hint-right'));
-		expect(right()).toBe(6 + 44 + 4);
-		barW = 96;
-		layoutAll();
-		expect(right()).toBe(6 + 96 + 4);
-	});
-
 	it('the words (STE, ASD-STE100)', () => {
 		expect([HINT_UI.up(1), HINT_UI.up(3), HINT_UI.down(1), HINT_UI.down(2)]).toEqual(['↑ 1 more child', '↑ 3 more children', '↓ 1 more child', '↓ 2 more children']);
 	});
 
 	it('no hint when every child shows whole', async () => {
 		phonePortrait();
-		const { el } = await preview(SMALL.source);
-		const { h } = screen(el);
-		expect(outside(el, SMALL.kids, 0, h)).toEqual({ up: 0, down: 0 });
-		expect(el.querySelectorAll('.dynasty-hint')).toHaveLength(0);
+		const { root } = await full(SMALL.source);
+		const { h } = screen(root);
+		expect(outside(root, SMALL.kids, 0, h - 68)).toEqual({ up: 0, down: 0 });
+		expect(root.querySelectorAll('.dynasty-hint')).toHaveLength(0);
+	});
+
+	it('a tree in a note on a phone is a list: it has no hint, whichever way the phone is held', async () => {
+		const { source } = family(14);
+		for (const [w, hh] of [
+			[390, 844],
+			[844, 390],
+		] as const) {
+			resetDom();
+			device.coarse = true;
+			device.width = w;
+			device.height = hh;
+			const { el } = await preview(source);
+			expect(el.querySelector('.dynasty-root')?.getAttribute('data-dynasty-orientation')).toBe('list');
+			expect(el.querySelectorAll('.dynasty-hint')).toHaveLength(0);
+		}
 	});
 
 	it('full-screen view: the hint shows above the bottom toolbar at the first view and goes when the user moves the tree', async () => {
@@ -275,10 +245,10 @@ describe('D28: the hint for children outside the first view (upright phone)', ()
 		expect(root.querySelectorAll('.dynasty-hint')).toHaveLength(0);
 	});
 
-	it('no hint in `down` (a phone on its side, a computer)', async () => {
+	it('no hint in `down` (a tablet, a computer)', async () => {
 		const { source } = family(14);
 		for (const [w, hh, coarse] of [
-			[844, 390, true],
+			[1180, 820, true],
 			[1280, 800, false],
 		] as const) {
 			resetDom();
@@ -292,19 +262,7 @@ describe('D28: the hint for children outside the first view (upright phone)', ()
 	});
 });
 
-describe('D29: names measured with the real font make only their cards taller (note preview, upright phone)', () => {
-	it('a name that does not fit uses two text lines on a taller card; a short name keeps one line and the normal height', async () => {
-		phonePortrait();
-		const { el } = await preview(NAMES);
-		// 0.2.4 (D117, D125): the name text is 0.85 em, so "Blackmere-Orsini" fits the narrow card and the name needs two text lines (three before).
-		expect(card(el, 'will').h).toBe(TALL_H);
-		expect(names(el, 'will')).toEqual(['Wilhelmina', 'Blackmere-Orsini']);
-		expect(card(el, 'bo').h).toBe(DOWN.cardH);
-		expect(names(el, 'bo')).toEqual(['Bo']);
-		expect(card(el, 'anna').h).toBe(DOWN.cardH);
-		expect(names(el, 'anna')).toEqual(['Anna Blackmer']);
-	});
-
+describe('D29: names measured with the real font make only their cards taller (full-screen view, static preview of a tablet)', () => {
 	it('D37: the full-screen view on the phone uses two text lines too, on its normal cards; a short name keeps one line', async () => {
 		phonePortrait();
 		const { root } = await full(NAMES);
@@ -338,29 +296,11 @@ describe('D29: names measured with the real font make only their cards taller (n
 		expect(Math.abs(centreOf(near).y - before.at.y)).toBeLessThan(0.5);
 	});
 
-	it('after fitNarrow (a narrower box) the names are measured again: a name that fitted now takes two text lines, and the preview shows its first view', async () => {
-		phonePortrait();
-		// The text is 0.85 em since 0.2.4: a face 10 % wider keeps the old scenario (a name that fits the 342 px box and not the 300 px box).
-		text.wide = 1.1;
-		let w = 342;
-		const { el } = await preview(NAMES, () => previewBox(w));
-		expect(card(el, 'anna').h).toBe(DOWN.cardH);
-		const narrowW = card(el, 'anna').w;
-		w = 300;
-		layoutAll();
-		expect(card(el, 'anna').w).toBeLessThan(narrowW);
-		expect(card(el, 'anna').h).toBe(TALL_H);
-		expect(names(el, 'anna')).toEqual(['Anna', 'Blackmer']);
-		// The same as a preview that opened in the 300 px box.
-		const fresh = await preview(NAMES, () => previewBox(300));
-		expect(screen(el).t).toBe(screen(fresh.el).t);
-	});
-
 	it('when a web font loads (wider text), the cards are measured again and the preview shows its first view of the new layout', async () => {
-		phonePortrait();
+		tabletDevice();
 		const { el, view } = await preview(NAMES);
 		expect(card(el, 'anna').h).toBe(DOWN.cardH);
-		text.wide = 1.5;
+		text.wide = 1.7;
 		view.onFontsLoaded(['sans-serif']);
 		flushFrames();
 		expect(card(el, 'anna').h).toBe(TALL_H);
@@ -370,32 +310,15 @@ describe('D29: names measured with the real font make only their cards taller (n
 	});
 
 	it('on css-change with the same fonts, a changed measure is picked up too; with no change nothing is drawn again', async () => {
-		phonePortrait();
+		tabletDevice();
 		const { el, view } = await preview(NAMES);
 		const scene = el.querySelector('.dynasty-scene');
 		view.onCssChange();
 		expect(el.querySelector('.dynasty-scene')?.children[0]).toBe(scene?.children[0]);
-		text.wide = 1.5;
+		text.wide = 1.7;
 		view.onCssChange();
 		flushFrames();
 		expect(card(el, 'anna').h).toBe(TALL_H);
-	});
-});
-
-describe('fitNarrow with a box that has a width but no height yet (the decision notes WP5.5b open note)', () => {
-	it('the next resize with a height shows the first view of the new layout', async () => {
-		phonePortrait();
-		let box: Box = previewBox(342);
-		const { el } = await preview(NAMES, () => box);
-		box = { ...previewBox(300), h: 0 };
-		layoutAll();
-		// No height: nothing to show yet. Then the height: a view that kept its centre from the 342 px box
-		// would sit 21 px further left than the first view (8 px from the left edge).
-		box = previewBox(300);
-		layoutAll();
-		const fresh = await preview(NAMES, () => previewBox(300));
-		expect(screen(el).t).toBe(screen(fresh.el).t);
-		expect(screen(el).tx).toBe(8);
 	});
 });
 

@@ -13,6 +13,7 @@ import { HOUSES, HOUSE_COLOUR_NAMES, REMOVE, SHEET, WRITE_TEXT } from '../../src
 import { FEl, clock, dispatch, fakeDoc, fakeWin, installDom, resetDom, runTimers, settle } from './fake-dom';
 import { noticeList, notices, openModals, resetObsidian } from './fake-obsidian';
 import { embed, fakeHandle, openFullScreen, phone, type FakeHandle } from './tree-view-fakes';
+import { backButton, backToList, listRows, openPage, pageOf, rowOf } from '../lw-support';
 
 const last = <T>(a: T[]): T | undefined => a[a.length - 1];
 
@@ -118,9 +119,17 @@ async function openWindow(o: { handle?: FakeHandle & { ops: Op[] }; source?: str
 	return { ...e, handle, win, content, modal, button: button! };
 }
 
-const rows = (content: FEl) => content.querySelectorAll('.dynasty-house-row');
-const row = (content: FEl, id: string) => content.querySelector(`.dynasty-house-row[data-house="${id}"]`)!;
-const nameInput = (content: FEl, id: string) => row(content, id).querySelector('input')!;
+// 0.2.5 (D134): the window is a list and an edit page. A row is a button of the list; the fields are on the page.
+const rows = (content: FEl) => listRows(content);
+const row = (content: FEl, id: string) => rowOf(content, id);
+/** The edit page of a house: back to the list first when another page is open. */
+function pageFor(content: FEl, id: string): FEl {
+	if (backButton(content)) backToList(content);
+	return openPage(content, id);
+}
+const nameField = (content: FEl) => pageOf(content).querySelector('textarea.dynasty-lw-field')!;
+const nameInput = (content: FEl, id: string) => pageFor(content, id).querySelector('textarea.dynasty-lw-field')!;
+const deleteOf = (content: FEl, id: string) => pageFor(content, id).querySelector('.dynasty-house-delete')!;
 const byText = (el: FEl, sel: string, text: string) => el.querySelectorAll(sel).find((b) => b.getText() === text) ?? null;
 const save = (content: FEl) => dispatch(content.querySelector('.dynasty-sheet-save')!, 'click');
 
@@ -151,8 +160,8 @@ describe('the Houses button (D36, spec §6.10)', () => {
 	it('is not in the static phone preview (D1), a read-only tree or a tree with editing off', async () => {
 		phone();
 		const still = await embed(SOURCE, { handle: writingHandle() });
-		// D120: the phone preview has the height button, left of Expand.
-		expect(toolbar(still.el)).toEqual(['dynasty-add-person', 'dynasty-height', 'dynasty-expand']);
+		// D144: the bar above the list of a phone note is Add person, Find and Expand (Back comes after a move).
+		expect(toolbar(still.el)).toEqual(['dynasty-add-person', 'dynasty-list-find', 'dynasty-expand']);
 		resetDom();
 		const ro = await embed(SOURCE);
 		expect(ro.el.querySelector('.dynasty-houses-button')).toBeNull();
@@ -167,9 +176,9 @@ describe('the Houses button (D36, spec §6.10)', () => {
 		expect(modal.hasClass('dynasty-houses')).toBe(true);
 		expect(content.querySelector('.dynasty-sheet-title')!.getText()).toBe(HOUSES.title);
 		expect(rows(content).map((r) => r.getAttribute('data-house'))).toEqual(['valmont', 'orsini', 'thorne']);
-		expect(rows(content).map((r) => r.querySelector('input')!.value)).toEqual(['House Valmont', 'House Orsini', 'House Thorne']);
-		expect(rows(content).map((r) => r.querySelector('.dynasty-house-count')!.getText())).toEqual(['1 person', '2 people', 'No people']);
-		const swatch = (id: string) => row(content, id).querySelector('.dynasty-house-swatch')!;
+		expect(rows(content).map((r) => r.querySelector('.dynasty-lw-row-name')!.getText())).toEqual(['House Valmont', 'House Orsini', 'House Thorne']);
+		expect(rows(content).map((r) => r.querySelector('.dynasty-lw-row-sum')!.getText())).toEqual(['1 person', '2 people', 'No people']);
+		const swatch = (id: string) => row(content, id).querySelector('.dynasty-lw-swatch')!;
 		// Only the custom property carries the colour (spec §5.8).
 		expect(swatch('valmont').styleProps.get('--dynasty-house-color')).toBe(P[0]);
 		expect(swatch('thorne').hasClass('is-none')).toBe(true);
@@ -178,11 +187,10 @@ describe('the Houses button (D36, spec §6.10)', () => {
 });
 
 describe('draft and Save (spec §6.10, D32)', () => {
-	it('opens the 12 house colours and "Other colour" from a swatch', async () => {
+	it('shows the 12 house colours and "Other colour" on the edit page of a house', async () => {
 		const { content } = await openWindow();
-		const swatch = row(content, 'valmont').querySelector('.dynasty-house-swatch')!;
-		expect(swatch.getAttribute('aria-expanded')).toBe('false');
-		dispatch(swatch, 'click');
+		expect(content.querySelector('.dynasty-house-colour')).toBeNull();
+		pageFor(content, 'valmont');
 		const colours = content.querySelectorAll('.dynasty-house-colour');
 		expect(colours.map((c) => c.getAttribute('data-colour'))).toEqual([...HOUSE_PALETTE]);
 		expect(colours.map((c) => c.getAttribute('aria-label'))).toEqual([...HOUSE_COLOUR_NAMES]);
@@ -191,24 +199,23 @@ describe('draft and Save (spec §6.10, D32)', () => {
 		const other = content.querySelector('.dynasty-house-other input')!;
 		expect(other.getAttribute('type')).toBe('color');
 		expect(content.querySelector('.dynasty-house-other label')!.getText()).toBe(HOUSES.otherColour);
-		// The swatch that opened the palette keeps the focus and says it is open.
-		const again = row(content, 'valmont').querySelector('.dynasty-house-swatch')!;
-		expect(again.getAttribute('aria-expanded')).toBe('true');
-		expect(fakeDoc.activeElement).toBe(again);
+		// The page opens with the focus on Back, so no keyboard opens on a phone.
+		expect(fakeDoc.activeElement).toBe(backButton(content));
 	});
 
 	it('Save writes every change in one batch, then closes; the note gets the new text', async () => {
 		const { content, handle, win } = await openWindow();
-		dispatch(row(content, 'valmont').querySelector('.dynasty-house-swatch')!, 'click');
+		pageFor(content, 'valmont');
 		dispatch(content.querySelector(`.dynasty-house-colour[data-colour="${P[5]}"]`)!, 'click');
 		expect(content.querySelector(`.dynasty-house-colour[data-colour="${P[5]}"]`)!.getAttribute('aria-pressed')).toBe('true');
 		type(nameInput(content, 'orsini'), 'House Orsini of Vel');
+		backToList(content);
 		dispatch(content.querySelector('.dynasty-house-add')!, 'click');
-		const fresh = last(content.querySelectorAll('.dynasty-house-row'))!;
+		const fresh = pageOf(content);
 		// The new name field has the focus; the new house takes the first colour no house uses (D32).
-		expect(fakeDoc.activeElement).toBe(fresh.querySelector('input'));
-		expect(fresh.querySelector('.dynasty-house-swatch')!.styleProps.get('--dynasty-house-color')).toBe(P[0]);
-		type(fresh.querySelector('input')!, 'House Harrow');
+		expect(fakeDoc.activeElement).toBe(fresh.querySelector('textarea'));
+		expect(fresh.querySelectorAll('.dynasty-house-colour').filter((c) => c.getAttribute('aria-pressed') === 'true').map((c) => c.getAttribute('data-colour'))).toEqual([P[0]]);
+		type(fresh.querySelector('textarea')!, 'House Harrow');
 		expect(handle.write).not.toHaveBeenCalled();
 		save(content);
 		await settle();
@@ -231,11 +238,12 @@ describe('draft and Save (spec §6.10, D32)', () => {
 
 	it('a colour from "Other colour" is written as #rrggbb', async () => {
 		const { content, handle } = await openWindow();
-		dispatch(row(content, 'thorne').querySelector('.dynasty-house-swatch')!, 'click');
+		pageFor(content, 'thorne');
 		const other = content.querySelector('.dynasty-house-other input')!;
 		other.value = '#A0B1C2';
 		dispatch(other, 'change');
-		expect(row(content, 'thorne').querySelector('.dynasty-house-swatch')!.styleProps.get('--dynasty-house-color')).toBe('#a0b1c2');
+		backToList(content);
+		expect(row(content, 'thorne').querySelector('.dynasty-lw-swatch')!.styleProps.get('--dynasty-house-color')).toBe('#a0b1c2');
 		save(content);
 		await settle();
 		expect(handle.ops[0]).toEqual({ kind: 'batch', ops: [{ kind: 'edit-house', id: 'thorne', color: '#a0b1c2' }] });
@@ -258,7 +266,9 @@ describe('draft and Save (spec §6.10, D32)', () => {
 		await settle();
 		expect(handle.write).not.toHaveBeenCalled();
 		expect(content.querySelector('.dynasty-sheet-error')!.getText()).toBe(HOUSES.needName);
-		expect(fakeDoc.activeElement).toBe(nameInput(content, 'orsini'));
+		// The page of the house with the empty name opens, and its field has the focus.
+		expect(pageOf(content).getAttribute('data-house')).toBe('orsini');
+		expect(fakeDoc.activeElement).toBe(nameField(content));
 	});
 
 	it('Cancel writes nothing; the focus goes back to the Houses button (spec §5.2)', async () => {
@@ -287,7 +297,7 @@ describe('draft and Save (spec §6.10, D32)', () => {
 describe('delete a house (D32, spec §6.1 Notice with Undo)', () => {
 	it('with people: asks, "Remove the house from these people" clears it from them, and the Notice has Undo', async () => {
 		const { content, modal, handle, win } = await openWindow();
-		const del = row(content, 'orsini').querySelector('.dynasty-house-delete')!;
+		const del = deleteOf(content, 'orsini');
 		expect(del.getAttribute('aria-label')).toBe(HOUSES.deleteLabel('House Orsini'));
 		dispatch(del, 'click');
 		const ask = modal.querySelector('.dynasty-sheet-confirm')!;
@@ -322,7 +332,7 @@ describe('delete a house (D32, spec §6.1 Notice with Undo)', () => {
 
 	it('"Keep the house for these people" keeps their house key', async () => {
 		const { content, modal, handle } = await openWindow();
-		dispatch(row(content, 'orsini').querySelector('.dynasty-house-delete')!, 'click');
+		dispatch(deleteOf(content, 'orsini'), 'click');
 		dispatch(modal.querySelector('.dynasty-house-keep')!, 'click');
 		save(content);
 		await settle();
@@ -333,10 +343,11 @@ describe('delete a house (D32, spec §6.1 Notice with Undo)', () => {
 
 	it('with no people: no question', async () => {
 		const { content, modal, handle } = await openWindow();
-		dispatch(row(content, 'thorne').querySelector('.dynasty-house-delete')!, 'click');
+		dispatch(deleteOf(content, 'thorne'), 'click');
 		expect(modal.querySelector('.dynasty-sheet-confirm')).toBeNull();
-		// The focus goes to a control that is still there.
-		expect(fakeDoc.activeElement).toBe(content.querySelector('.dynasty-house-add'));
+		// The list shows, and the focus goes to the row before the deleted one (D.3.7).
+		expect(backButton(content)).toBeNull();
+		expect(fakeDoc.activeElement).toBe(row(content, 'orsini'));
 		save(content);
 		await settle();
 		expect(handle.ops[0]).toEqual({ kind: 'batch', ops: [{ kind: 'delete-house', id: 'thorne', people: 'clear' }] });
@@ -346,7 +357,7 @@ describe('delete a house (D32, spec §6.1 Notice with Undo)', () => {
 	it('a delete saved with other changes: one write, and the Notice says that Undo removes them too', async () => {
 		const { content, handle } = await openWindow();
 		type(nameInput(content, 'valmont'), 'House Valmont II');
-		dispatch(row(content, 'thorne').querySelector('.dynasty-house-delete')!, 'click');
+		dispatch(deleteOf(content, 'thorne'), 'click');
 		save(content);
 		await settle();
 		expect(handle.write).toHaveBeenCalledTimes(1);
@@ -356,8 +367,8 @@ describe('delete a house (D32, spec §6.1 Notice with Undo)', () => {
 	it('a new house deleted before Save is simply gone', async () => {
 		const { content, handle } = await openWindow();
 		dispatch(content.querySelector('.dynasty-house-add')!, 'click');
-		const fresh = last(rows(content))!;
-		type(fresh.querySelector('input')!, 'House Gone');
+		const fresh = pageOf(content);
+		type(fresh.querySelector('textarea')!, 'House Gone');
 		dispatch(fresh.querySelector('.dynasty-house-delete')!, 'click');
 		expect(rows(content)).toHaveLength(3);
 		save(content);
@@ -370,6 +381,9 @@ describe('closing and questions (spec §6.3 commit model, §5.2 keyboard)', () =
 	it('Esc with changes asks "Discard changes?"; Continue to edit keeps the draft; Discard closes', async () => {
 		const { content, modal, win, handle } = await openWindow();
 		type(nameInput(content, 'valmont'), 'Changed');
+		// The first close goes back from the page to the list; the second asks.
+		win.close();
+		expect(backButton(content)).toBeNull();
 		win.close();
 		const ask = modal.querySelector('.dynasty-sheet-confirm')!;
 		expect(ask.querySelector('.dynasty-sheet-confirm-title')!.getText()).toBe(SHEET.discardTitle);
@@ -379,46 +393,55 @@ describe('closing and questions (spec §6.3 commit model, §5.2 keyboard)', () =
 		expect(modal.querySelector('.dynasty-sheet-confirm')).toBeNull();
 		expect(nameInput(content, 'valmont').value).toBe('Changed');
 		win.close();
+		win.close();
 		dispatch(byText(modal, 'button', SHEET.discard)!, 'click');
 		expect(housesWindows()).not.toContain(win);
 		expect(handle.write).not.toHaveBeenCalled();
 	});
 
-	it('Esc closes an open palette first, and the swatch keeps the focus', async () => {
+	it('Esc on an edit page goes back to the list, and the row keeps the focus', async () => {
 		const { content, win } = await openWindow();
-		dispatch(row(content, 'orsini').querySelector('.dynasty-house-swatch')!, 'click');
+		pageFor(content, 'orsini');
 		expect(content.querySelector('.dynasty-house-palette')).not.toBeNull();
 		win.close();
 		expect(housesWindows()).toContain(win);
 		expect(content.querySelector('.dynasty-house-palette')).toBeNull();
-		expect(fakeDoc.activeElement).toBe(row(content, 'orsini').querySelector('.dynasty-house-swatch'));
+		expect(fakeDoc.activeElement).toBe(row(content, 'orsini'));
 		win.close();
 		expect(housesWindows()).not.toContain(win);
 	});
 
 	it('Esc in the delete question closes only the question; the focus goes back to Delete', async () => {
 		const { content, modal, win } = await openWindow();
-		dispatch(row(content, 'orsini').querySelector('.dynasty-house-delete')!, 'click');
+		dispatch(deleteOf(content, 'orsini'), 'click');
 		win.close();
 		expect(modal.querySelector('.dynasty-sheet-confirm')).toBeNull();
 		expect(housesWindows()).toContain(win);
-		expect(rows(content)).toHaveLength(3);
-		expect(fakeDoc.activeElement).toBe(row(content, 'orsini').querySelector('.dynasty-house-delete'));
+		// The page stays open under the question; the house is still there.
+		expect(pageOf(content).getAttribute('data-house')).toBe('orsini');
+		expect(fakeDoc.activeElement).toBe(pageOf(content).querySelector('.dynasty-house-delete'));
 	});
 
 	it('every control is a button or a field with a name, so the window works by keyboard alone', async () => {
 		const { content, modal } = await openWindow();
-		dispatch(row(content, 'valmont').querySelector('.dynasty-house-swatch')!, 'click');
-		const controls = modal.all().filter((e) => ['button', 'input', 'select'].includes(e.tag));
+		const named = (c: FEl) => !!c.getAttribute('aria-label') || c.getText() !== '' || (c.getAttribute('id') && modal.querySelector(`label[for="${c.getAttribute('id')}"]`));
+		const controlsOf = () => modal.all().filter((e) => ['button', 'input', 'select', 'textarea'].includes(e.tag));
+		// The list: Cancel, Save, the search box and Add, then the rows.
+		for (const c of controlsOf()) {
+			expect(c.getAttribute('tabindex')).not.toBe('-1');
+			expect(named(c), `${c.tag}.${[...c.classes].join('.')}`).toBeTruthy();
+		}
+		expect(controlsOf().map((c) => [...c.classes][0] ?? c.tag).slice(0, 2)).toEqual(['dynasty-sheet-cancel', 'mod-cta']);
+		pageFor(content, 'valmont');
+		const controls = controlsOf();
 		for (const c of controls) {
 			expect(c.getAttribute('tabindex')).not.toBe('-1');
-			const named = !!c.getAttribute('aria-label') || c.getText() !== '' || (c.getAttribute('id') && modal.querySelector(`label[for="${c.getAttribute('id')}"]`));
-			expect(named, `${c.tag}.${[...c.classes].join('.')}`).toBeTruthy();
+			expect(named(c), `${c.tag}.${[...c.classes].join('.')}`).toBeTruthy();
 		}
-		// Header first: Cancel, Save; then the list; Add house last.
+		// Header first: Cancel, Save; then Back and the page; Delete (in Other actions) last.
 		const order = controls.map((c) => [...c.classes][0] ?? c.tag);
 		expect(order.slice(0, 2)).toEqual(['dynasty-sheet-cancel', 'mod-cta']);
-		expect(last(order)).toBe('dynasty-sheet-action');
+		expect(last(controls)!.hasClass('dynasty-house-delete')).toBe(true);
 	});
 });
 
@@ -434,7 +457,9 @@ describe('stale writes (spec §6.1)', () => {
 		expect(notices).toEqual([WRITE_TEXT.stale]);
 		expect(housesWindows()).toContain(win);
 		expect(content.querySelector('.dynasty-sheet-error')!.getText()).toBe(HOUSES.stale);
-		expect(nameInput(content, 'valmont').value).toBe('My Valmont');
+		// The open page stays, with the draft.
+		expect(nameField(content).value).toBe('My Valmont');
+		backToList(content);
 		expect(rows(content).map((r) => r.getAttribute('data-house'))).toEqual(['valmont', 'orsini', 'thorne', 'blackwood']);
 		// Save again: it writes the user's change on the new text.
 		save(content);
@@ -468,7 +493,7 @@ describe('stale writes (spec §6.1)', () => {
 		await settle();
 		expect(notices).toEqual([HOUSES.refused]);
 		expect(housesWindows()).toContain(win);
-		expect(nameInput(content, 'valmont').value).toBe('X');
+		expect(nameField(content).value).toBe('X');
 	});
 });
 

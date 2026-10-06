@@ -10,7 +10,7 @@ import { FEl, clock, dispatch, fakeWin, flushFrames, installDom, resetDom, resiz
 import { resetObsidian } from './acceptance/fake-obsidian';
 import { block15 } from './acceptance/m10-support';
 import { TreeView } from '../src/obsidian/tree-view';
-import { desktop, embed, fakeHandle, fakeHost, fullViews, phone } from './acceptance/tree-view-fakes';
+import { desktop, embed, fakeHandle, fakeHost, fullViews, tabletDevice } from './acceptance/tree-view-fakes';
 
 /*
  * M11 work package 11.4 (contract S5 to S8): the tree view builds its scene lazily, fills the cards near the
@@ -139,8 +139,8 @@ describe('the tree view builds lazy cards (S5, S7)', () => {
 		expect(idle.length).toBe(0);
 	});
 
-	it('a static phone preview starts no idle fill of cards', async () => {
-		phone();
+	it('a static touch preview (a tablet) starts no idle fill of cards', async () => {
+		tabletDevice();
 		const { view } = await embed(SOURCE, { handle: fakeHandle('n.md', SOURCE) });
 		await run();
 		expect(idle.length).toBe(0);

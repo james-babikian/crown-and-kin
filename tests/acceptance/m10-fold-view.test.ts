@@ -15,7 +15,7 @@ import { renderSvg, type SvgFolds, type SvgOptions } from '../../src/render/svg-
 import { FEl, dispatch, fakeWin, flushFrames, installDom, resetDom, settle } from './fake-dom';
 import { resetObsidian } from './fake-obsidian';
 import { block15, comments15, graphOf, loadModule } from './m10-support';
-import { desktop, embed, fakeHandle, openFullScreen, openSheetOn, phone, sheets } from './tree-view-fakes';
+import { desktop, embed, fakeHandle, openFullScreen, openSheetOn, sheets, tabletDevice } from './tree-view-fakes';
 
 /*
  * Spec §13.10 (D83–D85) and the M10 fold rules F6-F10, F14-F16: the fold controls in the
@@ -173,7 +173,7 @@ describe('F6, F7, F16: the controls in the scene', () => {
 	});
 });
 
-describe('F8: the static phone preview has no controls', () => {
+describe('F8: the static touch preview (a tablet) has no controls', () => {
 	it('without `SceneOptions.folds` no control is drawn, although the layout has them', () => {
 		const d = draw('A', undefined);
 		expect(d.scene.folds ?? []).toEqual([]);
@@ -365,8 +365,8 @@ describe('D83–D85 on the tree view (fake DOM): a control folds with Enter, the
 		expect(controlWith(el, 'Show the hidden person below Dorian Valmont and Clarice Valmont')).toBeDefined();
 	});
 
-	it('the static phone preview shows no button, no sign and never applies a fold', async () => {
-		phone();
+	it('the static touch preview (a tablet) shows no button, no sign and never applies a fold', async () => {
+		tabletDevice();
 		const handle = fakeHandle('n.md', SOURCE);
 		(handle.state as unknown as { folds: Set<string> }).folds = new Set([F.folds.get('A')!.key]);
 		const { el } = await embed(SOURCE, { handle });
@@ -376,7 +376,7 @@ describe('D83–D85 on the tree view (fake DOM): a control folds with Enter, the
 	});
 
 	it('the full-screen view on a phone has the controls (every device), and folds there stay in the block state', async () => {
-		phone();
+		tabletDevice();
 		const { root, handle } = await openFullScreen(SOURCE);
 		const button = controlWith(root, A_LABEL)!;
 		expect(button).toBeDefined();

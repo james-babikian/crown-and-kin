@@ -126,11 +126,11 @@ describe('the sample scene has every kind of item (precondition of the tests bel
 });
 
 describe('an eager scene is the M10 scene (S1, S4)', () => {
-	it('a card has its children in the M10 order: ring, bg, strip, [me-ring], full, compact, [compact-sign], [compact-arms]', () => {
+	it('a card has its children in the M10 order: ring, bg, strip, full, compact, [compact-sign], [compact-arms]', () => {
 		const b = build(false);
 		for (const c of cardsOf(b)) {
 			const names = classesOf(c);
-			const expected = ['dynasty-card-ring', 'dynasty-card-bg', 'dynasty-card-strip', ...(c.hasClass('dynasty-card-me') ? ['dynasty-card-me-ring'] : []), 'dynasty-card-full', 'dynasty-card-compact'];
+			const expected = ['dynasty-card-ring', 'dynasty-card-bg', 'dynasty-card-strip', 'dynasty-card-full', 'dynasty-card-compact'];
 			expect(names.slice(0, expected.length)).toEqual(expected);
 			const rest = names.slice(expected.length);
 			expect(rest.every((n) => n === 'dynasty-card-compact-sign' || n === 'dynasty-card-compact-arms')).toBe(true);
@@ -336,7 +336,12 @@ describe('S3, S4: fillNear', () => {
 		const names = classesOf(el(lazy.s.cards.get(id)));
 		expect(names).toContain('dynasty-card-full');
 		expect(names).toContain('dynasty-card-compact');
-		expect(names.indexOf('dynasty-card-ring')).toBeLessThan(names.indexOf('dynasty-card-bg'));
+		// WP-B8 3: `fillNear` makes no ring; `fillPerson` does, before the bg rect.
+		expect(names).not.toContain('dynasty-card-ring');
+		lazy.fill.fillPerson(id);
+		const asked = classesOf(el(lazy.s.cards.get(id)));
+		expect(asked.indexOf('dynasty-card-ring')).toBe(0);
+		expect(asked.indexOf('dynasty-card-bg')).toBe(1);
 	});
 });
 
@@ -402,6 +407,8 @@ describe('S4, S5g: fillChunk', () => {
 			if (n === 0) break;
 		}
 		expect(lazy.fill.pending).toBe(0);
+		// WP-B8 3: the focus rings are made by `fillPerson` and `fillAll`, so a chunk-filled scene is the eager scene once `fillAll` has made them.
+		lazy.fill.fillAll();
 		expect(serial(lazy.root)).toBe(serial(eager.root));
 		expect(sum).toBeGreaterThan(0);
 	});

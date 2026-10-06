@@ -15,6 +15,7 @@ import { FullScreenModal } from '../src/obsidian/full-screen';
 import { HousesWindow } from '../src/obsidian/houses-window';
 import { closePluginModals } from '../src/obsidian/plugin-modals';
 import { FEl, clock, dispatch, fakeWin, installDom, resetDom, settle } from './acceptance/fake-dom';
+import { openPage } from './lw-support';
 import { openModals, resetObsidian } from './acceptance/fake-obsidian';
 import { embed, fakeHandle, type FakeHandle } from './acceptance/tree-view-fakes';
 
@@ -118,7 +119,8 @@ async function openHouses(body = HOUSES_BODY, handle: Writing = writingHandle(bo
 	return { ...e, handle, win, content, modal };
 }
 
-const houseRow = (content: FEl, id: string) => content.querySelector(`.dynasty-house-row[data-house="${id}"]`)!;
+// 0.2.5 (D134): Change ID is on the edit page of the house, so "the row" is the page that a tap on the row opens.
+const houseRow = (content: FEl, id: string) => openPage(content, id);
 
 /** The modal on top: the small Id window when one is open. */
 const topModal = () => (openModals[openModals.length - 1] as unknown as { modalEl: FEl }).modalEl;

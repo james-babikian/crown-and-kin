@@ -183,7 +183,7 @@ describe('review M9 obsidian: the Houses window after a file change', () => {
 		// main.ts tells the store after its 250 ms wait.
 		store.changed(['Pictures/valmont-arms.png']);
 		await settle();
-		const box = content.querySelector('.dynasty-house-row[data-house="valmont"] .dynasty-house-arms')!;
+		const box = content.querySelector('button.dynasty-lw-row[data-house="valmont"] .dynasty-lw-armsbox')!;
 		expect({ dashed: box.hasClass('is-empty'), src: box.querySelector('img')?.getAttribute('src') ?? null }).toEqual({ dashed: false, src: 'blob:valmont' });
 	});
 });

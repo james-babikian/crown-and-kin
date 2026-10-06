@@ -22,7 +22,7 @@ describe('badge disc against the fold button circle', () => {
 					if (!parsed.ok) continue;
 					const g = deriveFamilies(parsed.tree);
 					clearLayoutCache();
-					const settings: LayoutSettings = { ...DEFAULT_LAYOUT_SETTINGS, orientation, sidewaysCards: 'normal', foldControls: true };
+					const settings: LayoutSettings = { ...DEFAULT_LAYOUT_SETTINGS, orientation, foldControls: true };
 					const L = layoutTree(g, geometryFor(f, 'normal'), settings, 'font').layout;
 					for (const p of L.persons.values()) {
 						for (const c of L.folds ?? []) {

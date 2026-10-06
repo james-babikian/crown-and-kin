@@ -10,7 +10,7 @@ import { PanZoom } from '../../src/render/dom/pan-zoom';
 import { pinchView, transformFor, treeBounds, type View } from '../../src/render/view-math';
 import { FEl, clock, dispatch, flushFrames, installDom, pointer, resetDom, runFrame, runTimers, settle, wheel } from './fake-dom';
 import { events, notices, openModals, resetObsidian } from './fake-obsidian';
-import { FAR, desktop, embed, fakeHandle, isOpen, loadPlugin, openFullScreen, openSheetOn, phone, sheets, shown, type FakeApp, type FakeHandle } from './tree-view-fakes';
+import { FAR, desktop, embed, fakeHandle, isOpen, loadPlugin, openFullScreen, openSheetOn, phone, sheets, shown, tabletDevice, type FakeApp, type FakeHandle } from './tree-view-fakes';
 
 /*
  * Adopted from the code reviews of WP4.1/4.2 (round 1: scratch/review-4.1-4.2, 28fd3d8; round 2:
@@ -372,7 +372,7 @@ describe('Plugin unload: no edit sheet of the plugin stays open (spec §8)', () 
 	});
 
 	it.each(['mouse', 'touch'] as const)('after the plugin unloads, no edit sheet opened from an embedded tree (%s) stays open', async (type) => {
-		if (type === 'touch') phone();
+		if (type === 'touch') tabletDevice();
 		else desktop();
 		const { plugin, host } = await loadPlugin();
 		const { el } = await embed(LINKED, { host, handle: fakeHandle('n.md', LINKED) });
@@ -392,7 +392,7 @@ describe('Static touch embed: the focus after a tap never moves the embed (D1, s
 	 * Returns the embed's transform before, and after each focus.
 	 */
 	async function tagTapThenFocus(later: number) {
-		phone();
+		tabletDevice();
 		const { el } = await embed(FAR);
 		expect(el.querySelector('.dynasty-root')?.hasClass('dynasty-static')).toBe(true);
 		const tags = el.querySelectorAll('.dynasty-tag');
@@ -418,7 +418,7 @@ describe('Static touch embed: the focus after a tap never moves the embed (D1, s
 
 	/** The same with each card: the tap opens the edit sheet, and Cancel `later` ms after the tap gives the focus back. */
 	async function cardTapThenFocus(later: number) {
-		phone();
+		tabletDevice();
 		const { el } = await embed(FAR, { handle: fakeHandle('n.md', FAR) });
 		expect(el.querySelector('.dynasty-root')?.hasClass('dynasty-static')).toBe(true);
 		const start = shown(el);

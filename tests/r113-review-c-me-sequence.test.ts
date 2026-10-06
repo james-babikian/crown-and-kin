@@ -4,15 +4,15 @@ vi.mock('obsidian', () => import('./acceptance/fake-obsidian'));
 vi.mock('@codemirror/language', () => ({ forceParsing: () => false, syntaxTree: () => ({ length: 0 }) }));
 vi.mock('@codemirror/view', () => ({ ViewPlugin: { fromClass: () => ({}) } }));
 
-import { focusSubgraph } from '../src/core/focus-subgraph';
-import { parseDynasty } from '../src/core/parse';
 import { FullScreenModal } from '../src/obsidian/full-screen';
 import { FEl, clock, fakeWin, flushFrames, installDom, resetDom, resizeAll, settle } from './acceptance/fake-dom';
 import { resetObsidian } from './acceptance/fake-obsidian';
 import { embed, fakeHandle, phone } from './acceptance/tree-view-fakes';
 
 /*
- * Review round 0.2.3, area C, spec 13.18 rule 5: what the phone preview shows over a sequence of edits of the mark.
+ * Review round 0.2.3, area C, spec 13.18 rule 5, moved to the list of 0.2.5 (D144): what the list of a phone note stands on over a sequence
+ * of edits of the mark. The start chain is the session choice, the pin, the marked person, the person edited last, the oldest person who has
+ * children, the first root (spec §5.5).
  */
 
 beforeAll(() => {
@@ -36,13 +36,10 @@ function line(n: number, ...options: string[]): string {
 	const people = Array.from({ length: n }, (_, i) => `  - id: p${i}\n    name: P${i}${i ? `\n    parents: [p${i - 1}]` : ''}`).join('\n');
 	return `${options.length ? `options:\n${options.map((o) => `  ${o}\n`).join('')}\n` : ''}people:\n${people}\n`;
 }
-const family1 = (src: string, id: string) => {
-	const r = parseDynasty(src);
-	if (!r.ok) throw new Error('parse');
-	return [...new Set(focusSubgraph(r.tree, id, 1)!.tree.people.map((p) => p.id))].sort();
+const stands = (root: FEl) => {
+	const r = root.querySelector('.dynasty-root')!;
+	return [r.getAttribute('data-dynasty-focus'), r.getAttribute('data-dynasty-list-from')];
 };
-const everybody = (n: number) => Array.from({ length: n }, (_, i) => `p${i}`).sort();
-const drawn = (root: FEl) => [...new Set(root.querySelectorAll('.dynasty-card').map((c) => c.getAttribute('data-person')!))].sort();
 async function change(handle: ReturnType<typeof fakeHandle>, next: string) {
 	handle.change(next);
 	await settle();
@@ -50,19 +47,19 @@ async function change(handle: ReturnType<typeof fakeHandle>, next: string) {
 	flushFrames();
 }
 
-describe('the phone preview over a sequence of changes of the mark (spec 13.18 rule 5)', () => {
-	it('an edit of another person does not move the family', async () => {
+describe('the list of a phone note over a sequence of changes of the mark (spec 13.18 rule 5, D144)', () => {
+	it('an edit of another person does not move the list that stands on the marked person', async () => {
 		phone();
 		const a = line(7, 'me: p3');
 		const handle = fakeHandle('n.md', a);
 		const { el } = await embed(a, { handle });
-		expect(drawn(el)).toEqual(family1(a, 'p3'));
+		expect(stands(el)).toEqual(['p3', 'me']);
 		handle.state.lastEdited = 'p5';
 		await change(handle, a.replace('name: P5', 'name: Five'));
-		expect(drawn(el)).toEqual(family1(a, 'p3'));
+		expect(stands(el)).toEqual(['p3', 'me']);
 	});
 
-	it('the mark moved from p3 to p6 in one step: the preview shows the family of p6', async () => {
+	it('the mark moved from p3 to p6 in one step: the list stands on p6', async () => {
 		phone();
 		const a = line(7, 'me: p3');
 		const handle = fakeHandle('n.md', a);
@@ -70,23 +67,34 @@ describe('the phone preview over a sequence of changes of the mark (spec 13.18 r
 		const c = line(7, 'me: p6');
 		handle.state.lastEdited = 'p6';
 		await change(handle, c);
-		expect(drawn(el)).toEqual(family1(c, 'p6'));
+		expect(stands(el)).toEqual(['p6', 'me']);
 	});
 
-	it('mark, remove the mark, mark another person: the preview shows the family of the person marked last', async () => {
+	it('mark, remove the mark, mark another person: the list stands on the person marked last', async () => {
 		phone();
 		const a = line(7, 'me: p3');
 		const handle = fakeHandle('n.md', a);
 		const { el } = await embed(a, { handle });
-		expect(drawn(el)).toEqual(family1(a, 'p3'));
-		// "Remove the mark" on a small tree: the old rule stands, the whole tree.
+		expect(stands(el)).toEqual(['p3', 'me']);
+		// "Remove the mark": no mark, no pin, no edit, so the oldest person who has children.
 		const b = line(7);
 		await change(handle, b);
-		expect(drawn(el)).toEqual(everybody(7));
+		expect(stands(el)).toEqual(['p0', 'oldest']);
 		// "This is me" on p6: the sheet sets the edited person first (edit-sheet.ts write()), then the text changes.
 		const c = line(7, 'me: p6');
 		handle.state.lastEdited = 'p6';
 		await change(handle, c);
-		expect(drawn(el)).toEqual(family1(c, 'p6'));
+		expect(stands(el)).toEqual(['p6', 'me']);
+	});
+
+	it('with no mark the list follows the person edited last', async () => {
+		phone();
+		const a = line(7);
+		const handle = fakeHandle('n.md', a);
+		const { el } = await embed(a, { handle });
+		expect(stands(el)).toEqual(['p0', 'oldest']);
+		handle.state.lastEdited = 'p4';
+		await change(handle, a.replace('name: P4', 'name: Four'));
+		expect(stands(el)).toEqual(['p4', 'edited']);
 	});
 });

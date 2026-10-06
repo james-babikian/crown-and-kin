@@ -1,13 +1,16 @@
 /*
- * The Titles window (spec §13.4, §13.0 item 6; D49, D52, D55): the titles of one tree with their
- * holder lists, and the "Name for a man" (D66), "Name for a woman" (D65), "Name of the list" (D64) of each title and the button "Change ID" (§13.17 rule 5, D109, D110; the small window is `id-window.ts`). Like the Houses window it is a draft: Save writes every change in one `batch` (one
- * undo step), Cancel writes nothing, and any other way to close with changes asks first. The window
- * opens from the More list on the computer and in the full-screen view, never from the static phone
- * preview (`tree-view.ts`). The draft logic is in `titles-draft.ts`, the holder form in
- * `holder-form.ts`, and "Make a note with this table" in `table-note.ts`.
+ * The Titles window (spec §13.4, §13.0 item 6; D49, D52, D55, D134, D138): the titles of one tree as a searchable
+ * list. A tap on a title opens its edit page in the same window: the four name fields (D64, D65, D66), the "Change ID"
+ * note (§13.17 rule 5, D109, D110; the small window is `id-window.ts`), the holder list and, at the end, the section
+ * "Other actions" with Change ID and Delete. The list, the page, the questions, the close rules and the name fields
+ * come from `list-window.ts`; this file gives the rows, the page, the draft and the save pipeline. Like the Houses
+ * window it is a draft: Save writes every change in one `batch` (one undo step), Cancel writes nothing, and any
+ * other way to close with changes asks first. The window opens from the More list on the computer and in the
+ * full-screen view, never from the static phone preview (`tree-view.ts`). The draft logic is in `titles-draft.ts`,
+ * the holder form in `holder-form.ts`, and "Make a note with this table" in `table-note.ts`.
  */
 
-import { Modal, Notice, setIcon, type App } from 'obsidian';
+import { Notice, setIcon, type App } from 'obsidian';
 import { deriveFamilies, type FamilyGraph } from '../core/derive';
 import type { Op } from '../core/edit';
 import { normBody } from '../core/block-match';
@@ -15,16 +18,16 @@ import { parseBody, readTree } from '../core/parse';
 import { quotedSobriquet } from '../core/sobriquet';
 import { newTitleId } from '../core/title-ops';
 import { describeDeleteTitle, describeTitleIdChange } from '../core/titles';
-import { HOUSES, ID_UI, REMOVE, SHEET, TITLES_UI, WRITE_TEXT } from '../render/ui-text';
+import { HOUSES, ID_UI, REMOVE, TITLES_UI, WIN_LIST_UI, WRITE_TEXT } from '../render/ui-text';
 import type { Handle, HandleWriteOutcome } from './block-handle';
 import { holderForm } from './holder-form';
-import { danglingIds, draftId, idChanged, idFromName, idProblemFor, idProblems, idRefusalText, isIdOp, reasonText, type IdReason } from './id-draft';
-import { idNewNameNote, idNote, idOpenButton, type IdRowView } from './id-field';
+import { danglingIds, draftId, idChanged, idFromName, idProblemFor, idProblems, idRefusalText, isIdOp, reasonText } from './id-draft';
+import { idNewNameNote, idNote, type IdRowView } from './id-field';
 import { openIdWindow } from './id-window';
-import { phoneLayout } from './modal-layout';
+import { ListEditWindow, type ListRowView } from './list-window';
+import { matchesAll } from './list-search';
 import { pickPerson } from './person-picker';
-import { trackModal } from './plugin-modals';
-import { freshOrStale, nameDialog, onWriteFailed, revealFocused, showErrorLine } from './sheet-parts';
+import { freshOrStale, onWriteFailed } from './sheet-parts';
 import { makeTableNote } from './table-note';
 import { draftChanged, emptyNames, holderText, listName, personNameOf, rebase, savedListName, titleIdRow, titleRows, windowOps, withHolderIds, type HolderRow, type HolderValues, type TitleRow } from './titles-draft';
 import { undoNotice } from './undo-notice';
@@ -59,30 +62,19 @@ export interface TitlesOptions {
 	onClosed?: () => void;
 	/** Shows a person's card in the tree the way Find does (spec §13.4); the window has closed. */
 	show?: (id: string) => void;
+	/** True when the owner asks the system for less motion (D126): a field is then scrolled into view at once. Default: false. */
+	reduced?: () => boolean;
 }
 
 /** The modal that lists a tree's titles and edits them and their holders (spec §13.4). */
-export class TitlesWindow extends Modal {
+export class TitlesWindow extends ListEditWindow {
 	private data: LoadedTitles;
 	private rows: TitleRow[];
-	/** The titles whose holders show. */
-	private readonly shownHolders = new Set<string>();
 	private keys = 0;
-	private saving = false;
-	private closing = false;
-	private confirmEl: HTMLElement | null = null;
-	private confirmFrom: string | null = null;
-	private errorEl: HTMLElement | null = null;
-	private error = '';
-	/** The Id parts (button and note) of the rows on screen now, by row key. */
-	private idViews = new Map<string, IdRowView[]>();
 	/** The batch that is being written had id ops: a refusal of `id-taken` or `bad-value` is about an id. */
 	private sentIds = false;
-	/** A picker or the holder form is open over the window. */
-	private busy = false;
-	/** True while the small ID window is open, so a second "Change ID" opens no second window. */
-	private idWindowOpen = false;
-	private readonly cleanup: (() => void)[] = [];
+	/** The ID notes of the page on screen now. */
+	private pageViews: IdRowView[] = [];
 
 	/** Null, with a Notice, if the block cannot be edited now. */
 	static create(app: App, o: TitlesOptions): TitlesWindow | null {
@@ -97,58 +89,9 @@ export class TitlesWindow extends Modal {
 		private readonly o: TitlesOptions,
 		data: LoadedTitles,
 	) {
-		super(app);
+		super(app, 'titles', 'dynasty-titles');
 		this.data = data;
 		this.rows = titleRows(data.g, () => this.nextKey());
-	}
-
-	override onOpen(): void {
-		this.modalEl.addClass('dynasty-sheet');
-		this.modalEl.addClass('dynasty-titles');
-		this.cleanup.push(phoneLayout(this, () => revealFocused(this.modalEl, this.contentEl)), trackModal(this, () => this.finish()));
-		// The keyboard can cover a field in the scrolling body: bring it into view when it gets the focus (C1).
-		const reveal = () => revealFocused(this.modalEl, this.contentEl, 300);
-		this.contentEl.addEventListener('focusin', reveal);
-		this.cleanup.push(() => this.contentEl.removeEventListener('focusin', reveal));
-		this.build();
-		// Keyboard users start at the top of the window, not in the note below it.
-		this.modalEl.setAttribute('tabindex', '-1');
-		this.modalEl.focus({ preventScroll: true });
-	}
-
-	override onClose(): void {
-		// The focused control goes with the window: let go of it first, so the focus can go back to More.
-		const active = this.modalEl.doc?.activeElement as HTMLElement | null | undefined;
-		if (active && this.modalEl.contains(active)) active.blur();
-		for (const c of this.cleanup.splice(0)) c();
-		this.contentEl.empty();
-		try {
-			this.o.onClosed?.();
-		} catch (e) {
-			console.error('Dynasty Tree: cannot return the focus', e);
-		}
-	}
-
-	/** Esc, the X button, a press outside and Android back all come here (spec §6.3 commit model). */
-	override close(): void {
-		if (this.closing) {
-			super.close();
-			return;
-		}
-		if (this.confirmEl) {
-			this.hideConfirm();
-			return;
-		}
-		if (this.isDirty()) {
-			this.askDiscard(() => this.finish());
-			return;
-		}
-		this.finish();
-	}
-
-	private finish(): void {
-		this.closing = true;
-		this.close();
 	}
 
 	private nextKey(): string {
@@ -160,42 +103,26 @@ export class TitlesWindow extends Modal {
 		return draftChanged(this.rows);
 	}
 
-	// ---------- building the window ----------
+	protected discardText(): string {
+		return TITLES_UI.discardText;
+	}
 
-	/** Draws the window again from the draft; `focus` names the control that gets the focus. */
-	private build(focus: string | null = null): void {
-		const el = this.contentEl;
-		// A control that had the focus keeps it, so the focus never leaves the window.
-		const active = this.modalEl.doc?.activeElement as HTMLElement | null | undefined;
-		const had = active && el.contains(active) ? active.getAttribute('data-focus') : null;
-		focus ??= had;
-		const top = el.querySelector<HTMLElement>('.dynasty-sheet-body')?.scrollTop ?? 0;
-		el.empty();
-		this.idViews = new Map();
-		this.hideConfirm(false);
-		el.addClass('dynasty-sheet-content');
-		const header = el.createDiv({ cls: 'dynasty-sheet-header' });
-		nameDialog(this.modalEl, header.createDiv({ cls: 'dynasty-sheet-title', text: TITLES_UI.title }));
-		const actions = header.createDiv({ cls: 'dynasty-sheet-actions' });
-		const cancel = actions.createEl('button', { cls: 'dynasty-sheet-cancel', text: SHEET.cancel, attr: { type: 'button', 'data-focus': 'cancel' } });
-		cancel.addEventListener('click', () => this.finish());
-		const save = actions.createEl('button', { cls: ['mod-cta', 'dynasty-sheet-save'], text: SHEET.save, attr: { type: 'button', 'data-focus': 'save' } });
-		save.addEventListener('click', () => void this.save());
+	protected override reduced(): boolean {
+		return this.o.reduced?.() ?? false;
+	}
 
-		const body = el.createDiv({ cls: 'dynasty-sheet-body' });
-		body.createDiv({ cls: 'dynasty-sheet-hint', text: TITLES_UI.intro });
-		this.errorEl = body.createDiv({ cls: 'dynasty-sheet-error', attr: { role: 'alert' } });
-		this.errorEl.setText(this.error);
-		this.errorEl.toggle(this.error !== '');
-		const list = body.createDiv({ cls: 'dynasty-title-list' });
-		const shown = this.rows.filter((t) => !t.deleted);
-		if (!shown.length) list.createDiv({ cls: 'dynasty-title-none', text: TITLES_UI.none });
-		const problems = idProblems('title', this.rows.map(titleIdRow), this.data.dangling);
-		for (const t of shown) this.titleRow(list, t, problems.get(t.key));
-		const add = body.createEl('button', { cls: ['dynasty-sheet-action', 'dynasty-title-add'], text: TITLES_UI.add, attr: { type: 'button', 'data-focus': 'add' } });
-		add.addEventListener('click', () => this.guard(() => this.addTitle()));
-		body.scrollTop = top;
-		if (focus) el.querySelector<HTMLElement>(`[data-focus="${focus}"]`)?.focus({ preventScroll: false });
+	protected released(): void {
+		try {
+			this.o.onClosed?.();
+		} catch (e) {
+			console.error('Dynasty Tree: cannot return the focus', e);
+		}
+	}
+
+	// ---------- the list ----------
+
+	private byKey(key: string): TitleRow | undefined {
+		return this.rows.find((t) => t.key === key);
 	}
 
 	private label(t: TitleRow): string {
@@ -206,16 +133,137 @@ export class TitlesWindow extends Modal {
 		return listName(t) || TITLES_UI.newTitle;
 	}
 
-	private titleRow(list: HTMLElement, t: TitleRow, problem?: IdReason): void {
-		const box = list.createDiv({ cls: 'dynasty-title-box', attr: { 'data-title': t.id ?? t.key } });
-		const row = box.createDiv({ cls: 'dynasty-title-row' });
-		const name = row.createEl('input', { cls: 'dynasty-sheet-input', attr: { type: 'text', autocomplete: 'off', autocapitalize: 'words', spellcheck: 'false', 'aria-label': TITLES_UI.nameLabel, 'data-focus': `name:${t.key}` } });
-		name.value = t.name;
-		const views: IdRowView[] = [];
-		// The note of a new id sits under the name (D110); the grid puts it there.
+	protected labelOf(key: string): string {
+		const t = this.byKey(key);
+		return t ? this.label(t) : TITLES_UI.newTitle;
+	}
+
+	protected isSaved(key: string): boolean {
+		return this.byKey(key)?.id != null;
+	}
+
+	protected rowViews(): ListRowView[] {
+		const problems = idProblems('title', this.rows.map(titleIdRow), this.data.dangling);
+		return this.rows
+			.filter((t) => !t.deleted)
+			.map((t) => ({
+				key: t.key,
+				id: t.id,
+				name: this.label(t),
+				summary: this.summary(t),
+				state: problems.has(t.key) ? 'check-id' : t.id === null ? 'new' : draftChanged([t]) ? 'changed' : '',
+			}));
+	}
+
+	/** "3 holders · Newest holder: Aldric II": the newest holder is the last one of the draft, named as the holder row names it. */
+	private summary(t: TitleRow): string {
+		const count = TITLES_UI.count(t.holders.length);
+		const last = t.holders[t.holders.length - 1];
+		const ruler = last ? holderText(this.data.g, last.values).ruler : '';
+		return ruler ? `${count} · ${WIN_LIST_UI.newest(ruler)}` : count;
+	}
+
+	/** The texts of a holder that the search looks at (the draft values): ruler text, full name, typed name, sobriquet. */
+	private holderTexts(h: HolderRow): { full: string; texts: string[] } {
+		const x = holderText(this.data.g, h.values);
+		return { full: x.full ?? x.ruler, texts: [x.ruler, x.full ?? '', h.values.name ?? '', x.sobriquet ?? ''] };
+	}
+
+	protected matchReason(key: string, words: readonly string[]): string | null {
+		const t = this.byKey(key);
+		if (!t) return null;
+		const own = [t.name, t.plural, t.maleName, t.femaleName];
+		const holders = t.holders.map((h) => this.holderTexts(h));
+		const id = t.id ?? '';
+		if (!matchesAll(words, [...own, id, ...holders.flatMap((h) => h.texts)])) return null;
+		// The name forms say it all: no reason line.
+		if (matchesAll(words, own)) return '';
+		const together = holders.find((h) => matchesAll(words, [...own, ...h.texts]));
+		const any = together ?? holders.find((h) => words.some((w) => matchesAll([w], h.texts)));
+		if (any) return WIN_LIST_UI.holder(any.full);
+		return id ? WIN_LIST_UI.id(id) : '';
+	}
+
+	protected addItem(): string {
+		const key = this.nextKey();
+		this.rows.push({ key, id: null, name: '', baseName: null, plural: '', basePlural: null, maleName: '', baseMaleName: null, femaleName: '', baseFemaleName: null, deleted: false, holders: [], baseRows: [] });
+		return key;
+	}
+
+	// ---------- the edit page ----------
+
+	protected renderPage(page: HTMLElement, key: string): void {
+		const t = this.byKey(key);
+		if (!t) return;
+		this.pageViews = [];
+		const problem = idProblems('title', this.rows.map(titleIdRow), this.data.dangling).get(t.key);
+		let heading: HTMLElement | null = null;
+		// The heading of the holder list and the accessible names show the draft's names at once.
+		const follow = () => {
+			heading?.setText(this.listLabel(t));
+			plural.setAttribute('aria-label', TITLES_UI.pluralAria(this.label(t)));
+			male.setAttribute('aria-label', TITLES_UI.maleAria(this.label(t)));
+			female.setAttribute('aria-label', TITLES_UI.femaleAria(this.label(t)));
+			this.updateBackName(t.key);
+			for (const v of this.pageViews) v.setItem(this.label(t));
+			// A new title's name can change the id that it would get.
+			this.refreshIdProblems();
+		};
+		this.textField(page, {
+			cls: 'dynasty-title-name',
+			label: TITLES_UI.nameLabel,
+			value: t.name,
+			aria: TITLES_UI.nameLabel,
+			focus: `name:${t.key}`,
+			onInput: (v) => {
+				t.name = v;
+				follow();
+			},
+		});
+		// D66: the male form, before the female form (as in the text of the note).
+		const male = this.textField(page, {
+			cls: 'dynasty-title-male',
+			label: TITLES_UI.maleLabel,
+			value: t.maleName,
+			placeholder: TITLES_UI.malePlaceholder,
+			aria: TITLES_UI.maleAria(this.label(t)),
+			focus: `male-name:${t.key}`,
+			onInput: (v) => {
+				t.maleName = v;
+			},
+		});
+		male.parentElement?.setAttribute('data-field', 'male-name');
+		// D65: the female form.
+		const female = this.textField(page, {
+			cls: 'dynasty-title-female',
+			label: TITLES_UI.femaleLabel,
+			value: t.femaleName,
+			placeholder: TITLES_UI.femalePlaceholder,
+			aria: TITLES_UI.femaleAria(this.label(t)),
+			focus: `female-name:${t.key}`,
+			onInput: (v) => {
+				t.femaleName = v;
+			},
+		});
+		female.parentElement?.setAttribute('data-field', 'female-name');
+		// D64: the plural.
+		const plural = this.textField(page, {
+			cls: 'dynasty-title-plural',
+			label: TITLES_UI.pluralLabel,
+			value: t.plural,
+			placeholder: TITLES_UI.pluralPlaceholder,
+			aria: TITLES_UI.pluralAria(this.label(t)),
+			focus: `plural:${t.key}`,
+			onInput: (v) => {
+				t.plural = v;
+				follow();
+			},
+		});
+		plural.parentElement?.setAttribute('data-field', 'plural');
+		// The note of a new id sits under the fields (D110). The red edge goes on the page.
 		if (t.id !== null && idChanged(titleIdRow(t))) {
-			views.push(
-				idNote(row, {
+			this.pageViews.push(
+				idNote(page, {
 					key: t.key,
 					item: this.label(t),
 					id: draftId(titleIdRow(t)),
@@ -229,84 +277,12 @@ export class TitlesWindow extends Modal {
 				}),
 			);
 		}
-		// A new row is marked when its name gives the ID that a changed row has taken (owner decision "3-both").
-		if (t.id === null) views.push(idNewNameNote(row, { key: t.key, problem: problem ? reasonText(problem) : '' }));
-		row.createDiv({ cls: 'dynasty-title-count', text: TITLES_UI.count(t.holders.length) });
-		const open = this.shownHolders.has(t.key);
-		const toggle = row.createEl('button', {
-			cls: ['dynasty-sheet-action', 'dynasty-title-toggle'],
-			text: open ? TITLES_UI.hideHolders : TITLES_UI.showHolders,
-			attr: { type: 'button', 'aria-expanded': String(open), 'aria-label': open ? TITLES_UI.hideHoldersLabel(this.label(t)) : TITLES_UI.showHoldersLabel(this.label(t)), 'data-focus': `toggle:${t.key}` },
-		});
-		toggle.addEventListener('click', () =>
-			this.guard(() => {
-				if (open) this.shownHolders.delete(t.key);
-				else this.shownHolders.add(t.key);
-				this.build(`toggle:${t.key}`);
-			}),
-		);
-		// Only a saved title has an id to change; a new title gets its id when it is saved (§6.8).
-		if (t.id !== null) views.push(idOpenButton(row, { key: t.key, item: this.label(t), onOpen: () => this.guard(() => this.changeId(t)) }));
-		this.idViews.set(t.key, views);
-		const del = row.createEl('button', { cls: ['dynasty-sheet-action', 'dynasty-title-delete'], text: TITLES_UI.delete, attr: { type: 'button', 'aria-label': TITLES_UI.deleteLabel(this.label(t)), 'data-focus': `delete:${t.key}` } });
-		del.addEventListener('click', () => this.guard(() => this.askDelete(t)));
-		// The text fields share one grid, so their inputs line up.
-		const fields = box.createDiv({ cls: 'dynasty-title-fields' });
-		// D66: the male form, before the female form (as in the text of the note).
-		const maleField = fields.createEl('label', { cls: ['dynasty-title-field', 'dynasty-title-male'], attr: { 'data-field': 'male-name' } });
-		maleField.createSpan({ cls: 'dynasty-sheet-label', text: TITLES_UI.maleLabel });
-		const male = maleField.createEl('input', {
-			cls: 'dynasty-sheet-input',
-			attr: { type: 'text', autocomplete: 'off', autocapitalize: 'words', spellcheck: 'false', placeholder: TITLES_UI.malePlaceholder, 'aria-label': TITLES_UI.maleAria(this.label(t)), 'data-focus': `male-name:${t.key}` },
-		});
-		male.value = t.maleName;
-		// D65: the female form. A label element, so a press on its text also puts the cursor in the field.
-		const femaleField = fields.createEl('label', { cls: ['dynasty-title-field', 'dynasty-title-female'], attr: { 'data-field': 'female-name' } });
-		femaleField.createSpan({ cls: 'dynasty-sheet-label', text: TITLES_UI.femaleLabel });
-		const female = femaleField.createEl('input', {
-			cls: 'dynasty-sheet-input',
-			attr: { type: 'text', autocomplete: 'off', autocapitalize: 'words', spellcheck: 'false', placeholder: TITLES_UI.femalePlaceholder, 'aria-label': TITLES_UI.femaleAria(this.label(t)), 'data-focus': `female-name:${t.key}` },
-		});
-		female.value = t.femaleName;
-		// D64: the plural.
-		const field = fields.createEl('label', { cls: ['dynasty-title-field', 'dynasty-title-plural'], attr: { 'data-field': 'plural' } });
-		field.createSpan({ cls: 'dynasty-sheet-label', text: TITLES_UI.pluralLabel });
-		const plural = field.createEl('input', {
-			cls: 'dynasty-sheet-input',
-			attr: { type: 'text', autocomplete: 'off', autocapitalize: 'words', spellcheck: 'false', placeholder: TITLES_UI.pluralPlaceholder, 'aria-label': TITLES_UI.pluralAria(this.label(t)), 'data-focus': `plural:${t.key}` },
-		});
-		plural.value = t.plural;
-		let heading: HTMLElement | null = null;
-		// The heading of an open holder list shows the draft's list name at once.
-		const follow = () => {
-			heading?.setText(this.listLabel(t));
-			plural.setAttribute('aria-label', TITLES_UI.pluralAria(this.label(t)));
-			male.setAttribute('aria-label', TITLES_UI.maleAria(this.label(t)));
-			female.setAttribute('aria-label', TITLES_UI.femaleAria(this.label(t)));
-			for (const v of this.idViews.get(t.key) ?? []) v.setItem(this.label(t));
-			// A new title's name can change the id that it would get.
-			this.refreshIdProblems();
-			this.clearError();
-		};
-		name.addEventListener('input', () => {
-			t.name = name.value;
-			follow();
-		});
-		plural.addEventListener('input', () => {
-			t.plural = plural.value;
-			follow();
-		});
-		male.addEventListener('input', () => {
-			t.maleName = male.value;
-			this.clearError();
-		});
-		female.addEventListener('input', () => {
-			t.femaleName = female.value;
-			this.clearError();
-		});
-		if (!open) return;
-		const panel = box.createDiv({ cls: 'dynasty-holder-panel' });
+		// A new title is marked when its name gives the ID that a changed title has taken (owner decision "3-both").
+		if (t.id === null) this.pageViews.push(idNewNameNote(page, { key: t.key, problem: problem ? reasonText(problem) : '' }));
+		const panel = page.createDiv({ cls: 'dynasty-holder-panel' });
 		heading = panel.createDiv({ cls: 'dynasty-sheet-section-title dynasty-holder-heading', text: this.listLabel(t) });
+		panel.createDiv({ cls: 'dynasty-sheet-hint', text: TITLES_UI.intro });
+		panel.createDiv({ cls: 'dynasty-sheet-hint dynasty-holder-count', text: TITLES_UI.count(t.holders.length) });
 		const holders = panel.createDiv({ cls: 'dynasty-holder-list' });
 		if (!t.holders.length) holders.createDiv({ cls: 'dynasty-holder-none', text: TITLES_UI.noHolders });
 		t.holders.forEach((h, i) => this.holderRow(holders, t, h, i));
@@ -319,47 +295,7 @@ export class TitlesWindow extends Modal {
 			const note = buttons.createEl('button', { cls: ['dynasty-sheet-action', 'dynasty-title-note'], text: TITLES_UI.makeNote, attr: { type: 'button', 'aria-label': TITLES_UI.makeNoteLabel(savedListName(t)), 'data-focus': `note:${t.key}` } });
 			note.addEventListener('click', () => this.guard(() => this.askNote(id, `note:${t.key}`)));
 		}
-	}
-
-	// ---------- the small ID window (spec §13.17 rule 5, D110) ----------
-
-	/** "Change ID": the small window; "Use this ID" puts the id into the draft of the row. */
-	private changeId(t: TitleRow): void {
-		// Focus can leave the small window by Tab, and a screen reader can activate the button below it.
-		if (this.idWindowOpen) return;
-		this.idWindowOpen = true;
-		const from = `id-open:${t.key}`;
-		openIdWindow(this.app, {
-			kind: 'title',
-			item: this.label(t),
-			key: t.key,
-			value: t.idDraft ?? t.id ?? '',
-			check: (value) => idProblemFor('title', this.rows.map(titleIdRow), titleIdRow(t), value, this.data.dangling),
-			make: () => idFromName('title', this.rows.map(titleIdRow), titleIdRow(t), this.data.dangling),
-			use: (value) => {
-				// The saved id again is no change: the draft goes away.
-				t.idDraft = value;
-				this.clearError();
-			},
-			closed: (used) => {
-				// Before the guard, so no path leaves the flag set.
-				this.idWindowOpen = false;
-				this.guard(() => {
-					if (this.closing) return;
-					if (used) this.build(from);
-					else this.refocus(from);
-				});
-			},
-		});
-	}
-
-	/** Shows the reason in the note of each row whose draft id is refused, without drawing the window again. */
-	private refreshIdProblems(): void {
-		const problems = idProblems('title', this.rows.map(titleIdRow), this.data.dangling);
-		for (const [key, views] of this.idViews) {
-			const why = problems.get(key);
-			for (const v of views) v.setProblem(why ? reasonText(why) : '');
-		}
+		this.otherActions(page, t.key, 'dynasty-title-delete', (name) => TITLES_UI.deleteLabel(name));
 	}
 
 	private holderRow(list: HTMLElement, t: TitleRow, h: HolderRow, i: number): void {
@@ -369,9 +305,12 @@ export class TitlesWindow extends Modal {
 		const words = row.createDiv({ cls: 'dynasty-holder-text' });
 		if (text.inTree) {
 			const person = h.values.person!;
-			const name = words.createEl('button', { cls: 'dynasty-holder-name', text: text.ruler, attr: { type: 'button', 'aria-label': TITLES_UI.showCardLabel(text.ruler), 'data-focus': `name:${h.key}` } });
+			const name = words.createEl('button', { cls: 'dynasty-holder-name', attr: { type: 'button', 'aria-label': TITLES_UI.showCardLabel(text.ruler), 'data-focus': `name:${h.key}` } });
+			// A button is a flex box in Obsidian, and a flex box drops the space that starts a text item. One inline label around
+			// the ruler text and the sobriquet is the only item, so the space before the sobriquet stays (D130 item 8).
+			const label = name.createSpan({ cls: 'dynasty-holder-label', text: text.ruler });
 			// D122: the sobriquet follows the ruler text on the same text line, in regular weight (the button is semibold).
-			if (text.sobriquet !== undefined) name.createSpan({ cls: 'dynasty-picker-sob', text: ` ${quotedSobriquet(text.sobriquet)}` });
+			if (text.sobriquet !== undefined) label.createSpan({ cls: 'dynasty-picker-sob', text: ` ${quotedSobriquet(text.sobriquet)}` });
 			name.addEventListener('click', () => this.guard(() => this.showCard(person)));
 		} else words.createDiv({ cls: 'dynasty-holder-name', text: text.ruler });
 		if (text.full) words.createDiv({ cls: 'dynasty-holder-full', text: text.full });
@@ -410,29 +349,16 @@ export class TitlesWindow extends Modal {
 		);
 	}
 
-	private addTitle(): void {
-		const key = this.nextKey();
-		this.rows.push({ key, id: null, name: '', baseName: null, plural: '', basePlural: null, maleName: '', baseMaleName: null, femaleName: '', baseFemaleName: null, deleted: false, holders: [], baseRows: [] });
-		this.shownHolders.add(key);
-		this.clearError();
-		this.build(`name:${key}`);
-	}
-
-	/** The control that takes the focus after a title goes: the next title's Delete, else Add title. */
-	private focusAfter(t: TitleRow): string {
-		const shown = this.rows.filter((x) => !x.deleted || x === t);
-		const next = shown[shown.indexOf(t) + 1];
-		return next ? `delete:${next.key}` : 'add';
-	}
+	// ---------- Delete and the small ID window (spec §13.17 rule 5, D110) ----------
 
 	/** Delete (spec §13.4): a saved title asks first, with the number of its holders and of the cards that change. */
-	private askDelete(t: TitleRow): void {
-		const after = this.focusAfter(t);
+	protected askDelete(key: string): void {
+		const t = this.byKey(key);
+		if (!t) return;
 		const drop = () => {
 			if (t.id === null) this.rows.splice(this.rows.indexOf(t), 1);
 			else t.deleted = true;
-			this.shownHolders.delete(t.key);
-			this.build(after);
+			this.afterDelete(key);
 		};
 		if (t.id === null) {
 			drop();
@@ -445,6 +371,47 @@ export class TitlesWindow extends Modal {
 			{ label: TITLES_UI.delete, cls: 'mod-warning dynasty-confirm-delete-title', run: drop },
 		]);
 	}
+
+	/** "Change ID": the small window; "Use this ID" puts the id into the draft of the title. */
+	protected changeId(key: string): void {
+		const t = this.byKey(key);
+		// Focus can leave the small window by Tab, and a screen reader can activate the button below it.
+		if (!t || this.idWindowOpen) return;
+		this.idWindowOpen = true;
+		const from = `id-open:${t.key}`;
+		openIdWindow(this.app, {
+			kind: 'title',
+			item: this.label(t),
+			key: t.key,
+			value: t.idDraft ?? t.id ?? '',
+			check: (value) => idProblemFor('title', this.rows.map(titleIdRow), titleIdRow(t), value, this.data.dangling),
+			make: () => idFromName('title', this.rows.map(titleIdRow), titleIdRow(t), this.data.dangling),
+			use: (value) => {
+				// The saved id again is no change: the draft goes away.
+				t.idDraft = value;
+				this.clearError();
+			},
+			closed: (used) => {
+				// Before the guard, so no path leaves the flag set.
+				this.idWindowOpen = false;
+				this.guard(() => {
+					if (this.closing) return;
+					if (used) this.build(from);
+					else this.refocus(from);
+				});
+			},
+		});
+	}
+
+	/** Shows the reason in the note of the open page when its draft id is refused, without drawing the window again. */
+	private refreshIdProblems(): void {
+		const key = this.page;
+		if (key === null) return;
+		const why = idProblems('title', this.rows.map(titleIdRow), this.data.dangling).get(key);
+		for (const v of this.pageViews) v.setProblem(why ? reasonText(why) : '');
+	}
+
+	// ---------- holders ----------
 
 	private editHolder(t: TitleRow, h: HolderRow): void {
 		const personName = personNameOf(this.data.g, h.values);
@@ -491,7 +458,6 @@ export class TitlesWindow extends Modal {
 				save: (v) => {
 					const key = this.nextKey();
 					t.holders.push({ key, ref: null, base: null, values: v });
-					this.shownHolders.add(t.key);
 					return null;
 				},
 				closed: () => done(`add-holder:${t.key}`),
@@ -513,10 +479,6 @@ export class TitlesWindow extends Modal {
 		});
 	}
 
-	private refocus(focus: string): void {
-		if (!this.closing) this.contentEl.querySelector<HTMLElement>(`[data-focus="${focus}"]`)?.focus();
-	}
-
 	/** A holder's name (spec §13.4): the window closes and the tree shows the card like Find; with changes, it asks first. */
 	private showCard(id: string): void {
 		const go = () => {
@@ -525,13 +487,6 @@ export class TitlesWindow extends Modal {
 		};
 		if (this.isDirty()) this.askDiscard(go);
 		else go();
-	}
-
-	private askDiscard(then: () => void): void {
-		this.showConfirm(SHEET.discardTitle, [TITLES_UI.discardText], null, [
-			{ label: SHEET.keepEditing, cls: 'dynasty-sheet-keep', run: () => this.hideConfirm() },
-			{ label: SHEET.discard, cls: 'mod-warning dynasty-sheet-discard', run: then },
-		]);
 	}
 
 	/** Make a note with this table (spec §13.4, D55): with unsaved changes it asks first, and the note has the saved list. */
@@ -556,39 +511,6 @@ export class TitlesWindow extends Modal {
 		this.refocus(from);
 	}
 
-	// ---------- questions over the window ----------
-
-	private showConfirm(title: string, text: string[], from: string | null, buttons: { label: string; cls: string; run: () => void }[]): void {
-		this.hideConfirm(false);
-		// Without a named control, the focus goes back to the one that had it, else to Save (it must stay in the window).
-		const active = this.modalEl.doc?.activeElement as HTMLElement | null | undefined;
-		this.confirmFrom = from ?? (active && this.contentEl.contains(active) ? active.getAttribute('data-focus') : null) ?? 'save';
-		const layer = this.modalEl.createDiv({ cls: 'dynasty-sheet-confirm', attr: { role: 'alertdialog', 'aria-modal': 'true' } });
-		this.confirmEl = layer;
-		const box = layer.createDiv({ cls: 'dynasty-sheet-confirm-box' });
-		const titleEl = box.createDiv({ cls: 'dynasty-sheet-confirm-title', text: title });
-		const titleId = `dynasty-titles-confirm-${Math.random().toString(36).slice(2, 8)}`;
-		titleEl.setAttribute('id', titleId);
-		layer.setAttribute('aria-labelledby', titleId);
-		for (const t of text) box.createDiv({ cls: 'dynasty-sheet-confirm-text', text: t });
-		const row = box.createDiv({ cls: 'dynasty-sheet-confirm-actions' });
-		let first: HTMLElement | null = null;
-		for (const b of buttons) {
-			const el = row.createEl('button', { cls: b.cls.split(' '), text: b.label, attr: { type: 'button' } });
-			el.addEventListener('click', () => this.guard(b.run));
-			first ??= el;
-		}
-		first?.focus();
-	}
-
-	private hideConfirm(refocus = true): void {
-		const had = this.confirmEl !== null;
-		this.confirmEl?.remove();
-		this.confirmEl = null;
-		if (had && refocus && this.confirmFrom) this.refocus(this.confirmFrom);
-		this.confirmFrom = null;
-	}
-
 	// ---------- writes ----------
 
 	/** True if the window shows the handle's current body; otherwise the stale message and false (spec §6.1). */
@@ -597,12 +519,13 @@ export class TitlesWindow extends Modal {
 	}
 
 	/** Save. `asked` is the ID change that the owner just answered: the answer runs Save again on the draft as it is then (C4). */
-	private async save(asked: string | null = null): Promise<void> {
+	protected async save(asked: string | null = null): Promise<void> {
 		if (this.saving || this.busy) return;
 		const empty = emptyNames(this.rows)[0];
 		if (empty) {
+			// The empty name is on its page: the page opens, the error shows there, and the focus goes to the field.
+			this.openPage(empty.key, `name:${empty.key}`);
 			this.showError(TITLES_UI.needName);
-			this.refocus(`name:${empty.key}`);
 			return;
 		}
 		if (!draftChanged(this.rows)) {
@@ -611,13 +534,12 @@ export class TitlesWindow extends Modal {
 		}
 		if (!this.fresh()) return;
 		const problems = idProblems('title', this.rows.map(titleIdRow), this.data.dangling);
-		// The focus goes to a saved row: a new row has no "Change ID" button, and the saved row that it conflicts with is marked too.
+		// The page of a saved title opens: a new title has no "Change ID" button, and the saved title that it conflicts with is marked too.
 		const bad = this.rows.find((t) => t.id !== null && problems.has(t.key));
 		if (bad) {
-			// D113 item 3: the reason shows once, in the row (its note and red edge); the top line shows nothing for an ID.
+			// D113 item 3: the reason shows once, on the page (its note and red edge); the top line shows nothing for an ID.
 			this.clearError();
-			this.refreshIdProblems();
-			this.refocus(`id-open:${bad.key}`);
+			this.openPage(bad.key, `id-open:${bad.key}`);
 			return;
 		}
 		const body = this.data.body;
@@ -721,7 +643,7 @@ export class TitlesWindow extends Modal {
 		this.showError(TITLES_UI.stale);
 	}
 
-	/** Shows the block's new titles, with the owner's changes on top (`rebase`). */
+	/** Shows the block's new titles, with the owner's changes on top (`rebase`). An open page stays when its title is still there. */
 	private reload(body: string): void {
 		const l = loadTitles(body);
 		if (l.kind !== 'ok') {
@@ -730,34 +652,7 @@ export class TitlesWindow extends Modal {
 		}
 		this.data = l.data;
 		this.rows = rebase(this.rows, titleRows(l.data.g, () => this.nextKey()));
-		for (const k of [...this.shownHolders]) if (!this.rows.some((t) => t.key === k)) this.shownHolders.delete(k);
+		if (this.page !== null && !this.rows.some((t) => t.key === this.page && !t.deleted)) this.page = null;
 		this.build();
-	}
-
-	private refused(text: string): void {
-		new Notice(text);
-		this.showError(text);
-	}
-
-	private showError(text: string): void {
-		this.error = text;
-		showErrorLine(this.errorEl, text);
-	}
-
-	private clearError(): void {
-		if (!this.error) return;
-		this.error = '';
-		// The text goes too: a hidden line must not keep an old message that a screen reader or a test can still read.
-		this.errorEl?.setText('');
-		this.errorEl?.hide();
-	}
-
-	/** A failed step never leaves an exception in Obsidian (spec §8). */
-	private guard(fn: () => void): void {
-		try {
-			fn();
-		} catch (e) {
-			console.error('Dynasty Tree: the Titles window failed', e);
-		}
 	}
 }

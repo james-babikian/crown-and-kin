@@ -22,8 +22,8 @@ function hits(): { tags: string[]; signs: string[]; cards: number } {
 		const parsed = parseDynasty(s.source);
 		if (!parsed.ok) continue;
 		const g = deriveFamilies(parsed.tree);
-		for (const view of ['down', 'sideways', 'narrow'] as const) {
-			const settings: LayoutSettings = { ...DEFAULT_LAYOUT_SETTINGS, ...(view === 'down' ? {} : { orientation: 'sideways', sidewaysCards: view === 'narrow' ? 'narrow' : 'normal' }) } as LayoutSettings;
+		for (const view of ['down', 'sideways'] as const) {
+			const settings: LayoutSettings = { ...DEFAULT_LAYOUT_SETTINGS, ...(view === 'down' ? {} : { orientation: 'sideways' }) } as LayoutSettings;
 			clearLayoutCache();
 			const geo = geometryFor(16, 'normal');
 			const { layout, edges } = layoutTree(g, geo, settings, 'font');

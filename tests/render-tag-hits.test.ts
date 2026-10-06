@@ -8,7 +8,7 @@ vi.mock('@codemirror/view', () => ({ ViewPlugin: { fromClass: () => ({}) } }));
 import { FullScreenModal } from '../src/obsidian/full-screen';
 import { FEl, clock, dispatch, installDom, pointer, resetDom, settle } from './acceptance/fake-dom';
 import { resetObsidian } from './acceptance/fake-obsidian';
-import { FAR, desktop, embed, fakeHandle, fullViews, phone, sheets } from './acceptance/tree-view-fakes';
+import { FAR, desktop, embed, fakeHandle, fullViews, sheets, tabletDevice } from './acceptance/tree-view-fakes';
 
 /*
  * WP4.3 (G5, sample tree 6 at Fit): a far-couple tag's 44 px tap area covered a whole small card,
@@ -50,7 +50,7 @@ describe('Far-couple tag tap areas and cards', () => {
 	});
 
 	it('a tap on a tap area still acts as the tag: a static touch embed opens the full-screen view (D17)', async () => {
-		phone();
+		tabletDevice();
 		const { el } = await embed(FAR);
 		const hit = el.querySelectorAll('.dynasty-tag-hit').find((h) => h.getAttribute('data-person') !== 'aldo')!;
 		dispatch(hit, 'pointerdown', pointer('touch', 1, 20, 20));

@@ -9,7 +9,6 @@ import { FullScreenModal } from '../../src/obsidian/full-screen';
 import { TreeView } from '../../src/obsidian/tree-view';
 import { FEl, clock, device, flushFrames, installDom, resetDom, resizeAll, settle } from './fake-dom';
 import { resetObsidian } from './fake-obsidian';
-import { wholeCardSettings } from './phone-style';
 import { fakeHandle, fakeHost } from './tree-view-fakes';
 
 /*
@@ -79,10 +78,11 @@ function card(root: FEl, id: string) {
 
 describe('review 6.4: D29 on css-change', () => {
 	it('a name that no longer fits after a css-change (same font names) makes its card tall', async () => {
+		// A tablet keeps the static card preview (D1); a tree in a note on a phone is a list now (D144).
 		device.coarse = true;
-		device.width = 390;
-		device.height = 844;
-		const host = fakeHost(wholeCardSettings());
+		device.width = 820;
+		device.height = 1180;
+		const host = fakeHost();
 		const handle = fakeHandle('n.md', NAMES);
 		Object.assign(host.handles, { quickOrdinal: () => 0, peek: () => handle, resolve: async () => handle, resolveByBody: () => handle, inEditorOf: () => false });
 		const el = new FEl('div');
@@ -92,15 +92,15 @@ describe('review 6.4: D29 on css-change', () => {
 		view.load();
 		await settle();
 		for (let i = 0; i < 3; i++) {
-			sizeRoot(el, 342, 506);
+			sizeRoot(el, 772, 708);
 			resizeAll();
 			flushFrames();
 		}
-		// 0.2.4 (D117): the name is 0.85 em, so "Blackmere-Orsini" fits the 142 px line and the name needs two text lines, not three.
+		// 0.2.4 (D117): the name is 0.85 em, so "Blackmere-Orsini" fits the line and the name needs two text lines, not three.
 		expect(card(el, 'will').h).toBe(TALL_H);
 		expect(card(el, 'anna').h).toBe(DOWN.cardH);
 		// The theme's face for the same font name is wider now (the tree-view-m6 test's "text.wide = 1.2"; 1.5 here because the name text is smaller since 0.2.4).
-		canvas.wide = 1.5;
+		canvas.wide = 1.7;
 		view.onCssChange();
 		flushFrames();
 		expect(card(el, 'anna').h).toBe(TALL_H);

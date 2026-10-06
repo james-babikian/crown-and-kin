@@ -22,7 +22,7 @@ import { events, openModals, type Plugin as FakePlugin } from './fake-obsidian';
 
 /**
  * A phone in portrait (an iPhone, 390 × 844): `(pointer: coarse)`, a viewport narrower than 600 px
- * (spec §7), height greater than width. From WP5.5b it draws the tree sideways (D24).
+ * (spec §7), height greater than width. A tree in a note is a list (D144); the full-screen view is sideways (D24) unless the setting says otherwise (D150).
  */
 export function phone(): void {
 	device.coarse = true;
@@ -39,6 +39,16 @@ export function phoneOnSide(): void {
 	device.coarse = true;
 	device.width = 844;
 	device.height = 390;
+}
+
+/**
+ * 0.2.5: a tablet held upright (820 × 1180): a touch screen that is not a phone (the shorter side is 600 px or more).
+ * It is named `tabletDevice` because some test files already define a local `tablet(w, h)`.
+ */
+export function tabletDevice(): void {
+	device.coarse = true;
+	device.width = 820;
+	device.height = 1180;
 }
 
 /**
@@ -155,7 +165,7 @@ export interface Host {
 	views: Set<TreeView>;
 	looseStates: Map<string, unknown>;
 	renders?: number;
-	/** The plugin settings; absent means `DEFAULT_SETTINGS`. A phone test that checks whole cards passes `wholeCardSettings()` (D119: the default phone style is names only). */
+	/** The plugin settings; absent means `DEFAULT_SETTINGS`. */
 	settings?: DynastySettings;
 	recordTiming(): void;
 }
@@ -247,6 +257,18 @@ export async function openSheetOn(root: FEl, id: string, type: 'touch' | 'mouse'
 		dispatch(card, 'pointerup', pointer('mouse', 1, 300, 200));
 		dispatch(card, 'click', { button: 0, clientX: 300, clientY: 200 });
 	}
+	await settle();
+	expect(sheets()).toHaveLength(1);
+	return sheets()[0];
+}
+
+/**
+ * 0.2.5 (D144): opens the edit sheet of person `id` from the phone list: the pencil of the row, or the one button of the centre row. The
+ * list of a phone note has no card to tap, so the tests that opened a sheet with `openSheetOn` on a phone embed use this.
+ */
+export async function openSheetOnRow(root: FEl, id: string, type: 'touch' | 'mouse' = 'touch') {
+	const button = root.querySelector(`.dynasty-list-row[data-person="${id}"] .dynasty-list-edit`)!;
+	dispatch(button, 'click', { button: 0, detail: 1, pointerType: type });
 	await settle();
 	expect(sheets()).toHaveLength(1);
 	return sheets()[0];

@@ -3,7 +3,6 @@ import type { Geometry, NameLineCount } from '../src/layout/model';
 import {
 	MARKED_SIGNED_BOX_MIN_FONT,
 	MARK_CLEAR_PX,
-	NAMES_ONLY_NAME_PX,
 	PICTURE_EM,
 	armsPlace,
 	boxesClear,
@@ -13,9 +12,6 @@ import {
 	geometryFor,
 	nameRoom,
 	nameSlots,
-	namesOnlyCardH,
-	namesOnlyGeometry,
-	narrowWidth,
 	pictureSize,
 	portraitBox,
 	relationExtra,
@@ -27,9 +23,8 @@ import {
 } from '../src/layout/geometry';
 import { BADGE_RADIUS_EM, signAt } from '../src/render/dom/scene';
 import { ME_RING_INNER } from '../src/render/styles';
-import { READABLE_NAME_PX } from '../src/render/view-math';
 
-// 0.2.4 (D117, D119, D125, D126; contract 4.1, 4.2): card sizes, the names-only card, the places of the arms box and the portrait, and the
+// 0.2.4 (D117, D119, D125, D126; contract 4.1, 4.2): card sizes, the places of the arms box and the portrait, and the
 // checks E3 and E4 over every card kind, name-line count and note font from 8 to 48 px.
 
 type Rect = { x: number; y: number; w: number; h: number };
@@ -51,7 +46,6 @@ function gapToSign(s: Sign, r: Rect): number {
 
 const wholeGeo = (f: number, size: 'normal' | 'compact' = 'normal') => geometryFor(f, size);
 const relationGeo = (f: number, size: 'normal' | 'compact' = 'normal') => withRelationLine(geometryFor(f, size), { relationLine: true } as never);
-const onlyGeo = (f: number, size: 'normal' | 'compact' = 'normal') => namesOnlyGeometry(geometryFor(f, size));
 
 describe('4.1 card sizes and the one text size (D117, D126)', () => {
 	it('the card heights are 3.8 em (normal) and 3.35 em (compact), rounded to whole px', () => {
@@ -118,58 +112,6 @@ describe('4.1 card sizes and the one text size (D117, D126)', () => {
 	});
 });
 
-describe('4.1 the names-only card (D119)', () => {
-	it('NAMES_ONLY_NAME_PX equals READABLE_NAME_PX of view-math (geometry may not import render)', () => {
-		expect(NAMES_ONLY_NAME_PX).toBe(READABLE_NAME_PX);
-	});
-
-	it('the height is a finger (44 px) at the 14 px first view: 51 at 16 px, 38 at 12 px', () => {
-		expect(namesOnlyCardH(16)).toBe(51);
-		expect(namesOnlyCardH(12)).toBe(38);
-		expect(onlyGeo(16).cardH).toBe(51);
-		expect(onlyGeo(16).namesOnly).toBe(true);
-		for (const f of FONTS) expect(namesOnlyCardH(f) * (NAMES_ONLY_NAME_PX / f), `font ${f}`).toBeGreaterThanOrEqual(44 - 1e-9);
-	});
-
-	it('heights with one, two and three name lines: 51 / 67 / 83 at 16 px and 38 / 50 / 62 at 12 px', () => {
-		for (const [f, hs] of [[16, [51, 67, 83]], [12, [38, 50, 62]]] as const) {
-			const geo = onlyGeo(f);
-			expect([0, 1, 2].map((k) => geo.cardH + k * tallExtra(geo))).toEqual(hs);
-		}
-	});
-
-	it('cardText: one small slot (the years line), no title, no second title line, no relation line; tallTitle is ignored', () => {
-		const geo = onlyGeo(16);
-		const t = cardText(geo);
-		expect(t.relationBaseline).toBeUndefined();
-		expect(t.title2Baseline).toBeUndefined();
-		expect(t.datesBaseline).toBe(t.titleBaseline);
-		expect(cardText(geo, 1, true)).toEqual(t);
-		// The text block (name line and years line) is centred in the 51 px card.
-		const above = t.nameBaseline - 0.35 * t.nameSize - (1.2 * t.nameSize) / 2;
-		expect(above).toBeCloseTo(geo.cardH - t.textBottom, 6);
-		// A relation line is never set for a names-only card, even if the geometry says so.
-		expect(cardText({ ...geo, relationLine: true }).relationBaseline).toBeUndefined();
-	});
-
-	it('nameSlots: a signed names-only card with a one-line name has two slots; nothing else changes', () => {
-		const only = onlyGeo(16);
-		const whole = wholeGeo(16);
-		expect(nameSlots(only, 1, true)).toBe(2);
-		expect(nameSlots(only, 1, false)).toBe(1);
-		expect(nameSlots(only, 2, true)).toBe(2);
-		expect(nameSlots(only, 3, true)).toBe(3);
-		for (const lines of LINES) expect(nameSlots(whole, lines, true)).toBe(lines);
-		// 67 px at 16 px, 50 px at 12 px.
-		expect(only.cardH + tallExtra(only)).toBe(67);
-		expect(onlyGeo(12).cardH + tallExtra(onlyGeo(12))).toBe(50);
-	});
-
-	it('the geometry flag changes the layout key through the whole geometry object (it is part of the key)', () => {
-		expect(JSON.stringify(onlyGeo(16))).not.toBe(JSON.stringify(wholeGeo(16)));
-	});
-});
-
 describe('4.2 the places of the arms box and the portrait (D117)', () => {
 	it('the portrait is a square of pictureSize, its right edge at the right edge of the text, its bottom at the text block bottom', () => {
 		for (const f of [12, 16, 20]) {
@@ -197,7 +139,7 @@ describe('4.2 the places of the arms box and the portrait (D117)', () => {
 	it('the two boxes never overlap, for every font, size, name-line count and relation line', () => {
 		for (const size of ['normal', 'compact'] as const)
 			for (const f of FONTS)
-				for (const geo of [wholeGeo(f, size), relationGeo(f, size), onlyGeo(f, size)])
+				for (const geo of [wholeGeo(f, size), relationGeo(f, size)])
 					for (const lines of LINES) {
 						const t = cardText(geo, lines);
 						const boxH = geo.cardH + (lines - 1) * tallExtra(geo);
@@ -252,10 +194,10 @@ describe('4.2 nameRoom (D125 a)', () => {
 					}
 	});
 
-	it('`last` is the same for a card of 1, 2 and 3 name lines (under 0.5 px), for a names-only card too', () => {
+	it('`last` is the same for a card of 1, 2 and 3 name lines (under 0.5 px)', () => {
 		for (const f of [8, 12, 16, 20, 48])
 			for (const size of ['normal', 'compact'] as const)
-				for (const geo of [wholeGeo(f, size), relationGeo(f, size), onlyGeo(f, size)])
+				for (const geo of [wholeGeo(f, size), relationGeo(f, size)])
 					for (const kind of ['shield', 'portrait', 'both'] as const) {
 						const rooms = LINES.map((n) => {
 							const t = cardText(geo, n);
@@ -263,37 +205,6 @@ describe('4.2 nameRoom (D125 a)', () => {
 						});
 						expect(Math.max(...rooms) - Math.min(...rooms), `${size} ${f} ${kind}: ${rooms}`).toBeLessThan(0.5);
 					}
-	});
-
-	it('an unsigned names-only card: the last line is beside the boxes (133.2 px with the arms, 130 px with the portrait, 104.4 with both at 16 px)', () => {
-		const geo = onlyGeo(16);
-		const t = cardText(geo);
-		expect(nameRoom(geo, t, false, boxesOf(geo, t, geo.cardH, 'shield')).last).toBeCloseTo(158 - 20 - 0.3 * 16, 6);
-		expect(nameRoom(geo, t, false, boxesOf(geo, t, geo.cardH, 'portrait')).last).toBeCloseTo(158 - 24 - 0.25 * 16, 6);
-		// The arms box ends 0.3 em before the portrait and the text ends 0.3 em before the arms box (the gaps of the approved preview).
-		expect(nameRoom(geo, t, false, boxesOf(geo, t, geo.cardH, 'both')).last).toBeCloseTo(158 - 24 - 0.3 * 16 - 20 - 0.3 * 16, 6);
-	});
-
-	it('a signed names-only card (two slots): a one-line name has `only` = full (nameWithSignW); the last line of a longer name has the room beside the boxes (104.4 at 16 px, 78.3 at 12 px; the contract says 105.2 and 78.9, which use a 0.25 em gap for the arms box too, the approved preview has 0.3 em)', () => {
-		for (const [f, last] of [[16, 104.4], [12, 78.3]] as const) {
-			expect(last).toBeLessThanOrEqual(f === 16 ? 105.2 : 78.9);
-			const geo = onlyGeo(f);
-			const t2 = cardText(geo, 2);
-			const boxH = geo.cardH + tallExtra(geo);
-			const boxes = boxesOf(geo, t2, boxH, 'both');
-			const r = nameRoom(geo, t2, true, boxes);
-			expect(r.full).toBeCloseTo(t2.nameWithSignW, 9);
-			expect(r.only).toBeCloseTo(t2.nameWithSignW, 9);
-			expect(r.last, `font ${f}`).toBeCloseTo(last, 1);
-			// The same answer when the caller passes the one-slot text (the room is moved to the two-slot card).
-			const t1 = cardText(geo, 1);
-			const r1 = nameRoom(geo, t1, true, boxesOf(geo, t1, geo.cardH, 'both'));
-			expect(r1.last).toBeCloseTo(r.last, 6);
-			expect(r1.only).toBeCloseTo(r.only, 6);
-			// With three name lines the last line is in slot 3: the same room.
-			const t3 = cardText(geo, 3);
-			expect(nameRoom(geo, t3, true, boxesOf(geo, t3, geo.cardH + 2 * tallExtra(geo), 'both')).last).toBeCloseTo(r.last, 6);
-		}
 	});
 
 	it('a signed whole card: full is nameWithSignW and the boxes do not reach the name', () => {
@@ -305,9 +216,9 @@ describe('4.2 nameRoom (D125 a)', () => {
 
 // E4 (contract 4.2): on every card kind the D14 sign, the badge disc, the ring of the marked card and the line ends keep clear of the boxes.
 describe('E4: boxes against the D14 sign, the badge disc and the ring, every card kind, line count and font from 8 to 48 px', () => {
-	type Kind = 'whole' | 'whole+relation' | 'names-only';
-	const KINDS: readonly Kind[] = ['whole', 'whole+relation', 'names-only'];
-	const geoOf = (kind: Kind, f: number, size: 'normal' | 'compact' = 'normal') => (kind === 'whole' ? wholeGeo(f, size) : kind === 'whole+relation' ? relationGeo(f, size) : onlyGeo(f, size));
+	type Kind = 'whole' | 'whole+relation';
+	const KINDS: readonly Kind[] = ['whole', 'whole+relation'];
+	const geoOf = (kind: Kind, f: number, size: 'normal' | 'compact' = 'normal') => (kind === 'whole' ? wholeGeo(f, size) : relationGeo(f, size));
 	const PICTURES = [
 		{ arms: true, portrait: false },
 		{ arms: false, portrait: true },
@@ -366,21 +277,27 @@ describe('E4: boxes against the D14 sign, the badge disc and the ring, every car
 		expect(boxesClear(geo, t, [high.arms!.full, high.portrait!], { signed: true })).toBe(false);
 	});
 
-	it('the marked, signed Normal card shows no boxes below 11 px: the matrix fails there without the rule (E4 exception), and holds from there on', () => {
+	it('the marked, signed Normal card shows no boxes below 11 px: the matrix fails there with the old 3 px ring edge (E4 exception), and holds from there on', () => {
 		expect(MARKED_SIGNED_BOX_MIN_FONT).toBe(11);
+		// D153: the mark is now one 3 px border whose inner edge is 1.5 px in, so the matrix holds at every font. The rule stays as it was (the classic
+		// Normal card has no form in the plugin since 0.2.5), and it is still checked against the ring edge of 0.2.4 (3 px) that it was made for.
+		const OLD_RING = 3;
 		const failing: number[] = [];
 		for (const f of FONTS) {
 			const geo = wholeGeo(f);
 			const t = cardText(geo);
-			const sign = signBelowRing(t.sign, ME_RING_INNER);
-			const cb = cardBoxes(geo, t, geo.cardH, { arms: true, portrait: true, ring: ME_RING_INNER });
-			const worst = Math.min(gapToSign(sign, cb.arms!.full), gapToSign(sign, cb.portrait!));
-			if (worst < MARK_CLEAR_PX - 1e-9) failing.push(f);
+			const gap = (ring: number) => {
+				const sign = signBelowRing(t.sign, ring);
+				const cb = cardBoxes(geo, t, geo.cardH, { arms: true, portrait: true, ring });
+				return Math.min(gapToSign(sign, cb.arms!.full), gapToSign(sign, cb.portrait!));
+			};
+			if (gap(OLD_RING) < MARK_CLEAR_PX - 1e-9) failing.push(f);
+			expect(gap(ME_RING_INNER), `font ${f} with the border of D153`).toBeGreaterThanOrEqual(MARK_CLEAR_PX - 1e-9);
 			expect(boxesShown(geo, true, true), `font ${f}`).toBe(f >= MARKED_SIGNED_BOX_MIN_FONT);
 			expect(boxesShown(geo, true, false), `font ${f} (not signed)`).toBe(true);
 			expect(boxesShown(geo, false, true), `font ${f} (not marked)`).toBe(true);
 		}
-		// Every font that fails is below the limit, and there is one.
+		// Every font that fails with the old ring is below the limit, and there is one.
 		expect(failing.length).toBeGreaterThan(0);
 		expect(Math.max(...failing)).toBeLessThan(MARKED_SIGNED_BOX_MIN_FONT);
 	});
@@ -424,15 +341,6 @@ describe('E4: boxes against the D14 sign, the badge disc and the ring, every car
 		expect(Math.min(...at8)).toBeGreaterThan(1.4);
 	});
 
-	it('the signed names-only card of one line: 67 px at 16 px; the box top is clear of the sign by about 6.5 px (4.9 px at 12 px)', () => {
-		for (const [f, clear] of [[16, 6.5], [12, 4.9]] as const) {
-			const geo = onlyGeo(f);
-			const t = cardText(geo, 2);
-			const p = portraitBox(geo, t, undefined);
-			const signBottom = Math.max(t.sign.y1, t.sign.y2) + t.sign.width / 2;
-			expect(p.y - signBottom).toBeGreaterThan(clear - 0.2);
-		}
-	});
 });
 
 // E3 (contract 4.2): the end of the D14 sign against the disc of the badge on the top right corner. The sign does not move.
@@ -440,7 +348,7 @@ describe('E3: the sign end and the badge disc (Full and Compact)', () => {
 	it('the centre line of the sign ends at least r - width/2 from the badge centre, on every kind, font and name-line count; Compact too', () => {
 		const bad: string[] = [];
 		for (const f of FONTS) {
-			for (const geo of [wholeGeo(f), relationGeo(f), onlyGeo(f), wholeGeo(f, 'compact')]) {
+			for (const geo of [wholeGeo(f), relationGeo(f), wholeGeo(f, 'compact')]) {
 				for (const lines of LINES) {
 					const slots = nameSlots(geo, lines, true);
 					const t = cardText(geo, slots);
@@ -472,13 +380,10 @@ describe('E3: the sign end and the badge disc (Full and Compact)', () => {
 		expect(BADGE_RADIUS_EM * 16).toBeCloseTo(9.6, 9);
 	});
 
-	it('sideways and narrow geometries keep the card height, so the sign and the boxes keep their places', () => {
+	it('the sideways geometry keeps the card size, so the sign and the boxes keep their places', () => {
 		const geo = wholeGeo(16);
-		for (const cards of ['normal', 'narrow'] as const) {
-			const side = sidewaysGeometry(geo, cards);
-			expect(side.cardH).toBe(geo.cardH);
-			expect(side.cardW).toBeLessThanOrEqual(geo.cardW);
-		}
-		expect(narrowWidth(geo)).toBe(164);
+		const side = sidewaysGeometry(geo);
+		expect(side.cardH).toBe(geo.cardH);
+		expect(side.cardW).toBe(geo.cardW);
 	});
 });

@@ -72,7 +72,7 @@ describe('picture sets and flags (L1, L2)', () => {
 
 	it('the flags follow the sets and every box keeps its size and place, in every layout', () => {
 		const g = graph();
-		for (const settings of [DEFAULT_LAYOUT_SETTINGS, { ...DEFAULT_LAYOUT_SETTINGS, orientation: 'sideways', sidewaysCards: 'narrow' } as LayoutSettings]) {
+		for (const settings of [DEFAULT_LAYOUT_SETTINGS, { ...DEFAULT_LAYOUT_SETTINGS, orientation: 'sideways' } as LayoutSettings]) {
 			clearLayoutCache();
 			const plain = layoutTree(g, GEO, settings, 'test');
 			const pics = lay(g, settings);

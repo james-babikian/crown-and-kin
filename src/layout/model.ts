@@ -20,12 +20,6 @@ export type CardSize = 'normal' | 'compact';
  */
 export type Orientation = 'down' | 'sideways';
 
-/**
- * Card width in `sideways` (D24): `normal` for the full-screen view, `narrow` for the static
- * phone note preview, so that two whole generations fit in its box. Ignored for `down`.
- */
-export type SidewaysCards = 'normal' | 'narrow';
-
 /*
  * `TreeLayout.geometry` in `sideways`: `cardW`/`cardH` are the drawn card size (renderers draw
  * cards with it); `fontPx`, `unionSize` and `tagH` are as passed in; `coupleGap` is the vertical
@@ -67,8 +61,12 @@ export interface Geometry {
 	 * `layoutFamilies` apply it before anything else. `cardText` then centres three small lines.
 	 */
 	relationLine?: boolean;
-	/** D119: the names-only card of the phone preview (name and years, no relation line). `cardH` is then `namesOnlyCardH(fontPx)`. Part of the layout key because the key hashes the whole geometry. */
-	namesOnly?: true;
+	/** 0.2.5 (D143, D150): the card form. 'roundel' = the top-to-bottom card with a medallion; 'text' = the sideways text card. Absent = the classic card. Set by `cardForm` only, never by `withRelationLine`. */
+	form?: 'roundel' | 'text';
+	/** 0.2.5: the empty space above every card of a Roundel tree that has a picture, in px. Set only when more than 0, so old keys stay. */
+	crown?: number;
+	/** 0.2.5: the px at the start of the first row (down) or the first stack position (sideways) for what sticks out above a card (medallion, "You" tab). Set only when more than 0. */
+	reach?: number;
 }
 
 /** `geometry.ts` exports `geometryFor: GeometryFor`. Card size scales with the font. */
@@ -181,6 +179,8 @@ export interface TreeLayout {
 	 * every control's largest mark and its 44 px hit area (F5b).
 	 */
 	folds?: PlacedFoldControl[];
+	/** 0.2.5 (D148): a copy of `LayoutSettings.youTab`, set by `layoutTree` only when that id is a person of the drawn graph. The scene and the saved picture read the tab from here. */
+	youTab?: string;
 }
 
 /** Every kind of line the tree draws (spec §5.3). `render/styles.ts` gives each one its `STROKES` style. */
@@ -228,27 +228,18 @@ export interface EdgeDrawing {
 	markers: EdgeMarker[];
 }
 
-/** How a tree is arranged: sweep count, the far-couple rule, orientation and card widths. */
+/** How a tree is arranged: sweep count, the far-couple rule and orientation. */
 export interface LayoutSettings {
 	/** Rounds of "centre parents over children, then children under parents". */
 	sweeps: number;
 	far: FarCoupleRule;
-	/** D24. Absent = `down`. Part of the cache key, with `sidewaysCards`. */
+	/** D24. Absent = `down`. Part of the cache key. */
 	orientation?: Orientation;
-	/** D24. Absent = `normal`. */
-	sidewaysCards?: SidewaysCards;
-	/**
-	 * The card width in layout px for `narrow` cards, chosen by the renderer from the
-	 * note preview's box so two whole generations fit. The layout clamps it to [8 em, 10.25 em];
-	 * absent = 10.25 em. Ignored unless `orientation` is `sideways` and `sidewaysCards` is `narrow`.
-	 * Part of the cache key (rounded to 0.5 px).
-	 */
-	narrowCardW?: number;
 	/**
 	 * D29, D37: people whose card is one name text line taller (the renderer found with
 	 * `nameLines` that the name does not fit on one text line). In every layout: `down` (the cards of
 	 * a row share their top edge; the gap below starts under the row's tallest card) and `sideways`
-	 * (longer along the column), normal, narrow and compact cards. Part of the cache key (sorted).
+	 * (longer along the column), normal and compact cards. Part of the cache key (sorted).
 	 * Every consumer uses `PersonBox.h`, never `geometry.cardH`, for a card's height;
 	 * `cardText(geo, box.tallName, box.tallTitle)` gives the text positions of a tall card (two name
 	 * baselines; title and dates one text line lower).
@@ -300,6 +291,8 @@ export interface LayoutSettings {
 	foldedFamilies?: readonly FoldKey[];
 	/** Spec §13.10 (F5): the view can fold, so the layout computes `TreeLayout.folds`. Absent in a static preview. Part of the cache key when true. */
 	foldControls?: true;
+	/** 0.2.5 (D148): the id of the person who gets the "You" tab. Set whenever the tree has a mark and `relationLine` is false (also in the small tree of the relation finder). Part of the cache key. */
+	youTab?: string;
 }
 
 /** A tree layout together with its routed lines: what `layoutTree` returns and the cache stores. */

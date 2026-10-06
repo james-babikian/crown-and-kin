@@ -1236,7 +1236,7 @@ function runFolds(text: string, rng: Rng, m: FoldsModule) {
 		for (const e of pruned.secondary) if (!pruned.byId.has(e.child) || e.parents.some((x) => !pruned.byId.has(x))) fail('pruneGraph: dangling secondary edge');
 		// The folded tree lays out with finite numbers, down and sideways, and hides the hidden people.
 		for (const side of [false, true]) {
-			const settings = { ...SETTINGS, ...(side ? { orientation: 'sideways', sidewaysCards: rng.pick(['normal', 'narrow']) } : {}), foldHidden: [...hidden].sort(), foldedFamilies: [...set].sort(), foldControls: true } as LayoutSettings;
+			const settings = { ...SETTINGS, ...(side ? { orientation: 'sideways' } : {}), foldHidden: [...hidden].sort(), foldedFamilies: [...set].sort(), foldControls: true } as LayoutSettings;
 			const { layout, edges } = layoutTree(g, geometryFor(16, 'normal'), settings, 'sans-serif');
 			for (const b of layout.persons.values()) if (![b.x, b.y, b.w, b.h].every(Number.isFinite)) fail(`folded layout: card ${b.id} has a non-finite position`);
 			if (!Number.isFinite(layout.width) || !Number.isFinite(layout.height)) fail('folded layout: size is not finite');

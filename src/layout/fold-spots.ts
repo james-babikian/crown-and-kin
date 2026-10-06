@@ -47,6 +47,34 @@ export const FOLD_EM = {
 /** The smallest hit area of a control, in screen px (spec §7.5). */
 export const FOLD_HIT_PX = 44;
 
+/** Radius of the "+" badge in em: the same number as `BADGE_RADIUS_EM` in `render/dom/scene.ts` (a test pins that they agree). */
+export const FOLD_BADGE_EM = 0.6;
+
+/** The clear gap in em that a visible fold mark keeps from the badge circle of every card (D137 item 1, spec §13.10). */
+export const FOLD_BADGE_GAP_EM = 0.25;
+
+/** The visible mark of a control as a capsule: the centres of its two end caps and the cap radius, in layout px. */
+export interface FoldMark {
+	x1: number;
+	y1: number;
+	x2: number;
+	y2: number;
+	r: number;
+}
+
+/**
+ * The visible Full-level mark of `control` at `spot`: an open button is a circle (a capsule of length 0), a folded sign a pill that
+ * grows from the spot along x, or along y in the turned frame of a sideways layout. The text width is not known here, so the sign
+ * is as long as the layout reserves for it (0.6 em for each of its characters), the same bound `planLines` uses for its reach.
+ */
+export function foldMark(control: FoldControl, spot: FoldSpot, em: number, turned: boolean): FoldMark {
+	if (!control.folded) return { x1: spot.x, y1: spot.y, x2: spot.x, y2: spot.y, r: (FOLD_EM.button / 2) * em };
+	const r = (FOLD_EM.signHeight / 2) * em;
+	const digits = String(Math.max(0, Math.trunc(control.count))).length;
+	const long = (FOLD_EM.signPad + (2 + digits) * 0.6) * em - 2 * r;
+	return { x1: spot.x, y1: spot.y, x2: turned ? spot.x : spot.x + long, y2: turned ? spot.y + long : spot.y, r };
+}
+
 /** What the line planner needs to know about folds (F3, F4). */
 export interface LineExtras {
 	/** People whose card has a tag only because of a hidden partner (`hiddenPartners`). */
@@ -123,6 +151,10 @@ export function placeFoldSpots(
 		return { x: r.y, y: r.x, w: r.h, h: r.w };
 	};
 	const tags = [...(hints.tags?.values() ?? [])];
+	// D137 item 1: the "+" badge circle of every card is an obstacle, whether or not a badge shows now, so the layout never depends on it.
+	// It is centred on the card's real top right corner, which in the turned frame is the corner (x, y + h).
+	const badges = [...persons.values()].map((b) => (hints.turned ? { x: b.x, y: b.y + b.h } : { x: b.x + b.w, y: b.y }));
+	const badgeNeed = (FOLD_BADGE_EM + FOLD_BADGE_GAP_EM) * em;
 	for (const c of controls) {
 		const boxes = c.parents.map((id) => persons.get(id));
 		if (!boxes.length || boxes.some((b) => !b)) continue;
@@ -146,6 +178,9 @@ export function placeFoldSpots(
 		const next = rowGaps[gen]?.bottom;
 		if (next !== undefined && next - from < FOLD_EM.shortStem * em) y = from + (next - from) / 2;
 		const first = y;
+		// The shape of the mark does not change while the control moves along its stem.
+		const shape = foldMark(c, { x: 0, y: 0 }, em, !!hints.turned);
+		const along = hints.turned ? shape.y2 : shape.x2;
 		// Each move clears one obstacle for good, so the loop ends.
 		for (let again = true; again; ) {
 			again = false;
@@ -154,6 +189,15 @@ export function placeFoldSpots(
 			for (const t of tags) {
 				if (meets(area, t)) {
 					y = t.y + t.h + lift;
+					again = true;
+					break;
+				}
+			}
+			if (again) continue;
+			for (const p of badges) {
+				const down = clearOfBadge(x, y, along, p, shape.r + badgeNeed, !!hints.turned);
+				if (down !== undefined) {
+					y += down;
 					again = true;
 					break;
 				}
@@ -171,6 +215,24 @@ export function placeFoldSpots(
 		out.push({ control: { ...c, spot: { x, y } }, pushed: y > first + 1e-6 });
 	}
 	return out;
+}
+
+const SLACK = 1e-9;
+
+/**
+ * D137 item 1: how far down (y grows) a mark that starts at (x, y) and whose axis is `along` long (along x, or along y when `turned`)
+ * must move to keep `need` from the badge centre `p`; undefined when it is clear already. The mark's own stem is the only way it may
+ * move, so x never changes. A mark that is wholly above the circle is clear too.
+ */
+function clearOfBadge(x: number, y: number, along: number, p: { x: number; y: number }, need: number, turned: boolean): number | undefined {
+	// The distance across the stem: from the badge centre to the mark's axis (turned) or to the span of its axis (down).
+	const across = turned ? Math.abs(p.x - x) : Math.max(x - p.x, 0, p.x - x - along);
+	if (across >= need) return undefined;
+	const reach = Math.sqrt(need * need - across * across);
+	const end = turned ? y + along : y;
+	// The small slack keeps a mark that was just moved from being moved again by rounding.
+	if (end <= p.y - reach + SLACK || y >= p.y + reach - SLACK) return undefined;
+	return p.y + reach - y;
 }
 
 /** The turned copy of `spots` (x and y swapped), for a sideways layout. */

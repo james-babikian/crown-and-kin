@@ -56,13 +56,10 @@ describe('turned frame', () => {
 		expect(turnPath(turnPath(d))).toBe(d);
 	});
 
-	it('sideways geometry: normal cards keep their size, narrow cards are 10.25 em, gaps take the sideways sizes', () => {
-		const normal = sidewaysGeometry(GEO, 'normal');
+	it('sideways geometry: cards keep their size, gaps take the sideways sizes', () => {
+		const normal = sidewaysGeometry(GEO);
 		expect([normal.cardW, normal.cardH, normal.rowGap, normal.nodeGap, normal.coupleGap]).toEqual([180, 61, 56, 24, 24]);
-		const narrow = sidewaysGeometry(GEO, 'narrow');
-		expect([narrow.cardW, narrow.rowGap]).toEqual([164, 48]);
-		// Compact cards are already narrower than 10.25 em.
-		expect(sidewaysGeometry(geometryFor(16, 'compact'), 'narrow').cardW).toBe(geometryFor(16, 'compact').cardW);
+		expect(sidewaysGeometry(geometryFor(16, 'compact')).cardW).toBe(geometryFor(16, 'compact').cardW);
 		const turned = turnedGeometry(normal);
 		expect([turned.cardW, turned.cardH, turned.tagH]).toEqual([61, 180, 6]);
 		// The first couple lane sits just clear of the card edge: no tag hangs into the gap between columns.
@@ -75,12 +72,11 @@ describe('turned frame', () => {
 		expect(routeEdges(g, layout, order.anchors)).toEqual(edges);
 	});
 
-	it('the cache key ignores card width for down, and an absent orientation is down', () => {
+	it('an absent orientation is down, and sideways has its own key', () => {
 		const { g } = build(fixture('01'));
 		const key = (s: LayoutSettings) => layoutKey(g, GEO, s, 'x');
-		expect(key({ sweeps: 4, far: DEFAULT })).toBe(key({ sweeps: 4, far: DEFAULT, orientation: 'down', sidewaysCards: 'narrow' }));
-		expect(key(side())).toBe(key(side(DEFAULT, { sidewaysCards: 'normal' })));
-		expect(key(side())).not.toBe(key(side(DEFAULT, { sidewaysCards: 'narrow' })));
+		expect(key({ sweeps: 4, far: DEFAULT })).toBe(key({ sweeps: 4, far: DEFAULT, orientation: 'down' }));
+		expect(key(side())).not.toBe(key({ sweeps: 4, far: DEFAULT }));
 	});
 });
 
@@ -128,12 +124,12 @@ function pick(l: ReturnType<typeof lay>) {
 
 describe('far tags between stacked cards', () => {
 	it('sideTagHit hangs from the card edge and is 44 px deep at 14 px names', () => {
-		const geo = sidewaysGeometry(GEO, 'normal');
+		const geo = sidewaysGeometry(GEO);
 		// 44 × 16 / 14 = 50.3, rounded up.
 		expect(sideTagDepth(geo)).toBe(51);
 		expect(sideTagHit({ x: 90, w: 164 }, 100, Infinity, geo)).toEqual({ x: 8, y: 100, w: 164, h: 51 });
 		// Never less than 44 layout px, at the smallest font.
-		const small = sidewaysGeometry(geometryFor(8, 'compact'), 'normal');
+		const small = sidewaysGeometry(geometryFor(8, 'compact'));
 		expect(sideTagDepth(small)).toBe(MIN_HIT);
 	});
 
@@ -167,8 +163,8 @@ unions:
   - {partners: [x, z]}
   - {partners: [x, y]}
 `;
-		for (const [px, size, cards] of [[9, 'compact', 'normal'], [8, 'compact', 'normal'], [8, 'normal', 'narrow'], [16, 'normal', 'narrow']] as const) {
-			const { g, layout, edges } = lay(src, side(DEFAULT, { sidewaysCards: cards }), geometryFor(px, size));
+		for (const [px, size] of [[9, 'compact'], [8, 'compact']] as const) {
+			const { g, layout, edges } = lay(src, side(), geometryFor(px, size));
 			const t = layout.farTags.get('x')!;
 			const card = layout.persons.get('x')!;
 			const u = layout.unions.get(g.unions.find((fu) => fu.partners.includes('z'))!.key)!;

@@ -28,7 +28,7 @@ const PLAIN_VARS = {
 	adoptive: '--color-green',
 	ward: '--color-blue',
 	rumoured: '--color-red',
-	/** M7: the marked card's border (D41) and the relation finder's line (D47). */
+	/** D47: the relation finder's line. The marked card does not use it (D153). */
 	accent: '--interactive-accent',
 } as const;
 
@@ -268,10 +268,23 @@ export function unionMark(shape: UnionShape, x: number, y: number, s: number): {
 export const ON_LINE_EXTRA = 1.5;
 /** D47: the opacity of every part beside the finder's line in "Show in the whole tree" (`.dynasty-faded`). */
 export const FADED_OPACITY = 0.25;
-/** D41: the marked card's accent border and the text-colour ring inside it, stroke widths in px (`.dynasty-card-me`). */
-export const ME_LOOK = { border: 3, ring: 1.5 } as const;
-/** D96: how far the marked card's inner ring edge lies inside the card's edge, in px: half the border and the whole ring. */
-export const ME_RING_INNER = ME_LOOK.border / 2 + ME_LOOK.ring;
-/** D41: the centre line of the marked card's ring lies this far inside the card's edge, in px: half the border and half the ring. */
-export const ME_RING_INSET = ME_LOOK.border / 2 + ME_LOOK.ring / 2;
+/**
+ * D41, D153: the marked card has one border in the text colour, `border` px wide (`.dynasty-card-me .dynasty-card-bg`). It is the same stroke
+ * in the live scene and the saved picture; no theme accent colour is used, so the mark never clashes with a house colour.
+ */
+export const ME_LOOK = { border: 3 } as const;
+/**
+ * 0.2.5 (B.3.4, D153): how the Roundel's footer plate and "You" tab look in the saved picture, which has no page CSS. Each number repeats
+ * a rule in the block of styles.css that starts at the marker comment "roundel: card"; `tests/s025-roundel-svg.test.ts` pins that they agree. `plate` is the fill
+ * opacity in the light theme and in the dark theme; the marked card's plate and the tab use the same numbers, in the house colour. `corner` is the radius of the plate's
+ * bottom-right corner, the same number `scene.ts` draws. `tabStroke` is the card-colour gap round the tab, drawn by the base rect under it.
+ */
+export const ROUNDEL_LOOK = {
+	plate: { light: 0.17, dark: 0.26 },
+	hairline: { opacity: 0.55, width: 1 },
+	corner: 3,
+	tabStroke: 1.5,
+} as const;
+/** D96, D153: how far the marked card's border edge lies inside the card's edge, in px: half the border (the stroke is centred on the edge). */
+export const ME_RING_INNER = ME_LOOK.border / 2;
 

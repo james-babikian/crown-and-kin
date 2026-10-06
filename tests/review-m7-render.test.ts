@@ -13,7 +13,7 @@ import { randomTree } from './random-trees';
 // milestone-7 99c53ad and shows one defect of the relation finder's line or the "?" marker.
 
 const GEO = geometryFor(16, 'normal');
-const SIDE: LayoutSettings = { ...DEFAULT_LAYOUT_SETTINGS, orientation: 'sideways', sidewaysCards: 'normal' };
+const SIDE: LayoutSettings = { ...DEFAULT_LAYOUT_SETTINGS, orientation: 'sideways' };
 
 const marks = (line: RelationLine, fade: boolean): LineMarks => ({
 	people: new Set(line.people),
@@ -208,16 +208,14 @@ describe('review M7: the "?" of a rumoured parent in the finder\'s small tree (D
 		const small = lineSubgraph(g, line);
 		const over: string[] = [];
 		for (const font of [12, 16, 20]) {
-			for (const settings of [SIDE, { ...SIDE, sidewaysCards: 'narrow' as const }]) {
-				clearLayoutCache();
-				const laid = layoutTree(small, geometryFor(font, 'normal'), { ...settings, far: NEVER_FAR_RULE }, 'test');
-				// buildScene draws the marker as a circle of radius 0.5 em (renderSvg: 8 px).
-				const r = 0.5 * font;
-				for (const m of laid.edges.markers.filter((x) => x.kind === 'rumour')) {
-					for (const b of laid.layout.persons.values()) {
-						const d = Math.hypot(Math.max(b.x - m.x, 0, m.x - b.x - b.w), Math.max(b.y - m.y, 0, m.y - b.y - b.h));
-						if (d < r) over.push(`${font} px ${settings.sidewaysCards}: "?" at ${m.x.toFixed(1)},${m.y.toFixed(1)} covers ${b.id} by ${(r - d).toFixed(1)} px`);
-					}
+			clearLayoutCache();
+			const laid = layoutTree(small, geometryFor(font, 'normal'), { ...SIDE, far: NEVER_FAR_RULE }, 'test');
+			// buildScene draws the marker as a circle of radius 0.5 em (renderSvg: 8 px).
+			const r = 0.5 * font;
+			for (const m of laid.edges.markers.filter((x) => x.kind === 'rumour')) {
+				for (const b of laid.layout.persons.values()) {
+					const d = Math.hypot(Math.max(b.x - m.x, 0, m.x - b.x - b.w), Math.max(b.y - m.y, 0, m.y - b.y - b.h));
+					if (d < r) over.push(`${font} px: "?" at ${m.x.toFixed(1)},${m.y.toFixed(1)} covers ${b.id} by ${(r - d).toFixed(1)} px`);
 				}
 			}
 		}

@@ -254,7 +254,7 @@ describe('D78 (C1, C2): the arms box on a Full card', () => {
 		clearLayoutCache();
 		const g = graphOf(sample(false));
 		const geo = geometryFor(16, 'normal');
-		const laid = lay(g, { ...DEFAULT_LAYOUT_SETTINGS, orientation: 'sideways', sidewaysCards: 'normal', ...SETS } as PictureSettings, geo);
+		const laid = lay(g, { ...DEFAULT_LAYOUT_SETTINGS, orientation: 'sideways', ...SETS } as PictureSettings, geo);
 		const withBadge = scene(laid, g, { badges: { hidden: new Map([['a', 2], ['b', 1]]), label: () => 'More' } });
 		const without = scene(laid, g);
 		const rects = (s: Scene) => s.pictures.map((x) => `${x.person}:${x.kind}:${x.lod}:${JSON.stringify(x.rect)}`);

@@ -55,7 +55,7 @@ unions:
 
 describe('scene: D27 and D29 cards', () => {
 	const src = `houses:\n  - {id: h, name: House H, color: '#1e4f8b'}\npeople:\n  - {id: a, name: Bartholomew Aldric Penhallow, house: h, born: '1100', title: Lord}\n  - {id: b, name: Bo}`;
-	const settings: LayoutSettings = { sweeps: 4, far: { maxCardWidths: 3, maxGenerations: 1 }, orientation: 'sideways', sidewaysCards: 'narrow', narrowCardW: 128, tallCards: ['a'] };
+	const settings: LayoutSettings = { sweeps: 4, far: { maxCardWidths: 3, maxGenerations: 1 }, orientation: 'sideways', tallCards: ['a'] };
 
 	it('a card with a house colour gets dynasty-has-house; the strip is 0.5 em wide and as tall as the card', () => {
 		const { root, laid } = scene(src, settings);

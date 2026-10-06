@@ -87,10 +87,14 @@ async function openTree(host: Host, handle: FakeHandle) {
 	return e;
 }
 
+/** D132: Focus opens a small list while a focus shows; Clear focus is its second item. */
 async function showAll(root: FEl): Promise<void> {
-	const b = root.querySelector('.dynasty-show-all');
-	if (!b) throw new Error('no Show all people');
-	dispatch(b, 'click', { button: 0, clientX: 10, clientY: 10 });
+	const b = root.querySelector('.dynasty-focus');
+	if (!b) throw new Error('no Focus button');
+	dispatch(b, 'click', { button: 0, clientX: 10, clientY: 10, detail: 1 });
+	const clear = root.querySelectorAll('.dynasty-popover-focus .dynasty-popover-item')[1];
+	if (!clear) throw new Error('no Clear focus');
+	dispatch(clear, 'click', { button: 0, clientX: 10, clientY: 10, detail: 1 });
 	await settle();
 	resizeAll();
 	flushFrames();

@@ -94,10 +94,11 @@ describe('the settings tab (spec §9, D33)', () => {
 		const g = SETTINGS_UI.groups;
 		expect(settingGroups.map((x) => x.heading)).toEqual([g.height, g.cards, g.housePage, g.focus, g.links, g.repair]);
 		const names = (i: number) => settingGroups[i].listEl.querySelectorAll('.setting-item-name').map((n) => n.getText());
-		expect(names(0)).toEqual([SETTINGS_UI.heightDesktop, SETTINGS_UI.heightPhone]);
+		// 0.2.5 (D144): a tree in a note on a phone is a list with its natural height, so only the computer row stays.
+		expect(names(0)).toEqual([SETTINGS_UI.heightDesktop]);
 		// M7 (spec §13.1): the relation names are in the Cards group.
-		// 0.2.4 (D118, D119, D126): the card style of the phone preview, the break list and "Reduce movement" follow "Card size".
-		expect(names(1)).toEqual([SETTINGS_UI.cardSize, SETTINGS_UI.phoneCardStyle, SETTINGS_UI.breakWords, SETTINGS_UI.reduceMotion, SETTINGS_UI.dates, SETTINGS_UI.relations, SETTINGS_UI.portraits]);
+		// 0.2.4 (D118, D126): the break list and "Reduce movement" follow "Card size"; 0.2.5 (D150): the direction row comes right after it, and the card style of the phone preview is gone (D144).
+		expect(names(1)).toEqual([SETTINGS_UI.cardSize, SETTINGS_UI.phoneDirection, SETTINGS_UI.breakWords, SETTINGS_UI.reduceMotion, SETTINGS_UI.dates, SETTINGS_UI.relations, SETTINGS_UI.portraits]);
 		// D113 item 4: the house page has its own group.
 		expect(names(2)).toEqual([SETTINGS_UI.houseGeneration]);
 		expect(names(3)).toEqual([SETTINGS_UI.generations]);
@@ -108,12 +109,11 @@ describe('the settings tab (spec §9, D33)', () => {
 	});
 
 	it('shows the stored values; a bad stored value shows its default', async () => {
-		const { fake, plugin } = await loadPlugin({ embedHeightDesktop: 640, embedHeightPhone: 70, cardSize: 'compact', showDates: false, focusGenerations: 99, updateLinks: false });
-		expect(plugin.settings).toEqual({ embedHeightDesktop: 640, embedHeightPhone: 70, cardSize: 'compact', showDates: false, showRelations: true, showPortraits: true, showHouseGeneration: true, focusGenerations: 3, updateLinks: false, phoneCardStyle: 'names-shield', breakWords: '', reduceMotion: 'system' });
+		// The stored data of 0.2.4 still has the phone height and the card style: both are dropped (D144).
+		const { fake, plugin } = await loadPlugin({ embedHeightDesktop: 640, embedHeightPhone: 70, phoneCardStyle: 'whole', cardSize: 'compact', showDates: false, focusGenerations: 99, updateLinks: false });
+		expect(plugin.settings).toEqual({ embedHeightDesktop: 640, cardSize: 'compact', showDates: false, showRelations: true, showPortraits: true, showHouseGeneration: true, focusGenerations: 3, updateLinks: false, breakWords: '', reduceMotion: 'system', phoneDirection: 'sideways' });
 		openTab(fake);
 		expect(control<TextComponent>(SETTINGS_UI.heightDesktop).getValue()).toBe('640');
-		expect(control<DropdownComponent>(SETTINGS_UI.heightPhone).getValue()).toBe('70');
-		expect(control<DropdownComponent>(SETTINGS_UI.heightPhone).options.map((o) => o[1])).toEqual(['40%', '50%', '60%', '70%', '80%']);
 		expect(control<DropdownComponent>(SETTINGS_UI.cardSize).getValue()).toBe('compact');
 		expect(control<ToggleComponent>(SETTINGS_UI.dates).getValue()).toBe(false);
 		expect(control<ToggleComponent>(SETTINGS_UI.relations).getValue()).toBe(true);
@@ -126,7 +126,7 @@ describe('the settings tab (spec §9, D33)', () => {
 		const { fake } = await loadPlugin();
 		openTab(fake);
 		expect(control<TextComponent>(SETTINGS_UI.heightDesktop).inputEl.getAttribute('aria-label')).toBe(SETTINGS_UI.heightDesktop);
-		for (const name of [SETTINGS_UI.heightPhone, SETTINGS_UI.cardSize, SETTINGS_UI.generations]) expect(control<DropdownComponent>(name).selectEl.getAttribute('aria-label')).toBe(name);
+		for (const name of [SETTINGS_UI.cardSize, SETTINGS_UI.generations]) expect(control<DropdownComponent>(name).selectEl.getAttribute('aria-label')).toBe(name);
 		for (const name of [SETTINGS_UI.dates, SETTINGS_UI.relations, SETTINGS_UI.portraits, SETTINGS_UI.houseGeneration, SETTINGS_UI.links]) expect(control<ToggleComponent>(name).toggleEl.getAttribute('aria-label')).toBe(name);
 	});
 
@@ -150,16 +150,9 @@ describe('the settings tab (spec §9, D33)', () => {
 		expect(last(fake.saved)).toEqual(plugin.settings);
 	});
 
-	it('0.2.4: the card style, the break list and "Reduce movement" show their stored values, with the choices in the plugin words and an accessible name', async () => {
-		const { fake } = await loadPlugin({ phoneCardStyle: 'whole', breakWords: 'Long-na-munda', reduceMotion: 'on' });
+	it('0.2.4: the break list and "Reduce movement" show their stored values, with the choices in the plugin words and an accessible name', async () => {
+		const { fake } = await loadPlugin({ breakWords: 'Long-na-munda', reduceMotion: 'on' });
 		openTab(fake);
-		const style = control<DropdownComponent>(SETTINGS_UI.phoneCardStyle);
-		expect(style.getValue()).toBe('whole');
-		expect(style.options).toEqual([
-			['names-shield', SETTINGS_UI.styleNamesShield],
-			['names-portrait', SETTINGS_UI.styleNamesPortrait],
-			['whole', SETTINGS_UI.styleWhole],
-		]);
 		const motion = control<DropdownComponent>(SETTINGS_UI.reduceMotion);
 		expect(motion.getValue()).toBe('on');
 		expect(motion.options).toEqual([
@@ -171,25 +164,23 @@ describe('the settings tab (spec §9, D33)', () => {
 		expect(area.getValue()).toBe('Long-na-munda');
 		expect((area.inputEl as unknown as { rows: number }).rows).toBe(6);
 		expect(area.inputEl.tag).toBe('textarea');
-		for (const [c, name] of [[style.selectEl, SETTINGS_UI.phoneCardStyle], [motion.selectEl, SETTINGS_UI.reduceMotion], [area.inputEl, SETTINGS_UI.breakWords]] as const) expect(c.getAttribute('aria-label')).toBe(name);
+		for (const [c, name] of [[motion.selectEl, SETTINGS_UI.reduceMotion], [area.inputEl, SETTINGS_UI.breakWords]] as const) expect(c.getAttribute('aria-label')).toBe(name);
 	});
 
-	it('0.2.4: the defaults are the names-only style with the arms, an empty break list and "Follow the device"', async () => {
+	it('0.2.4: the defaults are an empty break list and "Follow the device"', async () => {
 		const { fake } = await loadPlugin();
 		openTab(fake);
-		expect(control<DropdownComponent>(SETTINGS_UI.phoneCardStyle).getValue()).toBe('names-shield');
 		expect(control<TextAreaComponent>(SETTINGS_UI.breakWords).getValue()).toBe('');
 		expect(control<DropdownComponent>(SETTINGS_UI.reduceMotion).getValue()).toBe('system');
 	});
 
-	it('0.2.4: each of the two choices stores its change; the break list stores the text as typed', async () => {
+	it('0.2.4: the choice of Reduce movement stores its change; the break list stores the text as typed', async () => {
 		const { fake, plugin } = await loadPlugin();
 		openTab(fake);
-		control<DropdownComponent>(SETTINGS_UI.phoneCardStyle).fire('names-portrait');
 		control<DropdownComponent>(SETTINGS_UI.reduceMotion).fire('off');
 		control<TextAreaComponent>(SETTINGS_UI.breakWords).fire('Long-na-munda\nVal-mont ');
 		await settle();
-		expect(plugin.settings).toEqual({ ...DEFAULT_SETTINGS, phoneCardStyle: 'names-portrait', reduceMotion: 'off', breakWords: 'Long-na-munda\nVal-mont ' });
+		expect(plugin.settings).toEqual({ ...DEFAULT_SETTINGS, reduceMotion: 'off', breakWords: 'Long-na-munda\nVal-mont ' });
 		expect(last(fake.saved)).toEqual(plugin.settings);
 	});
 
@@ -259,30 +250,28 @@ describe('height of a tree in a note (spec §7.5, §9, D30)', () => {
 		expect(height((await tree(withHeight(300), host)).vp)).toBe('300px');
 	});
 
-	it('phone upright: the setting in % of the screen height; options.height is ignored', async () => {
+	it('D144: a tree in a note on a phone is a list with its natural height: no height is set, and options.height is ignored', async () => {
 		phone();
-		const { host } = await loadPlugin({ embedHeightPhone: 70 });
-		expect(height((await tree(TREE, host)).vp)).toBe('70vh');
-		expect(height((await tree(withHeight(300), host)).vp)).toBe('70vh');
-	});
-
-	it('D30: a phone on its side also takes the phone height (not 500 px, not options.height)', async () => {
-		phoneOnSide();
 		const { host } = await loadPlugin();
-		expect(height((await tree(TREE, host)).vp)).toBe('60vh');
-		expect(height((await tree(withHeight(300), host)).vp)).toBe('60vh');
+		const upright = await tree(TREE, host);
+		expect(upright.vp.hasClass('dynasty-list-viewport')).toBe(true);
+		expect(height(upright.vp)).toBeUndefined();
+		expect(height((await tree(withHeight(300), host)).vp)).toBeUndefined();
+		resetDom();
+		phoneOnSide();
+		expect(height((await tree(withHeight(300), host)).vp)).toBeUndefined();
 	});
 
-	it('D30: turning the phone keeps the phone height', async () => {
+	it('D144: turning the phone keeps the list and sets no height', async () => {
 		phone();
-		const { host } = await loadPlugin({ embedHeightPhone: 50 });
+		const { host } = await loadPlugin();
 		const { vp } = await tree(withHeight(300), host);
-		expect(height(vp)).toBe('50vh');
 		phoneOnSide();
 		dispatchWindow('resize');
 		resizeAll();
 		flushFrames();
-		expect(height(vp)).toBe('50vh');
+		expect(vp.hasClass('dynasty-list-viewport')).toBe(true);
+		expect(height(vp)).toBeUndefined();
 	});
 
 	it('a tablet (touch, both sides 600 px or more) is not a phone: px, and options.height', async () => {
@@ -305,15 +294,6 @@ describe('height of a tree in a note (spec §7.5, §9, D30)', () => {
 		expect(height(b.vp)).toBe('300px');
 	});
 
-	it('the phone height changes the open trees on a phone at once', async () => {
-		phoneOnSide();
-		const { host, fake } = await loadPlugin();
-		const a = await tree(TREE, host);
-		openTab(fake);
-		control<DropdownComponent>(SETTINGS_UI.heightPhone).fire('80');
-		await settle();
-		expect(height(a.vp)).toBe('80vh');
-	});
 });
 
 describe('card size, dates and generations (spec §9)', () => {

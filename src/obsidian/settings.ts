@@ -3,9 +3,9 @@
  * can come from an older version, a sync conflict or a hand edit of `data.json`.
  */
 
-/** The card styles of the phone preview (D119). */
-export type PhoneCardStyle = 'names-shield' | 'names-portrait' | 'whole';
-export const PHONE_CARD_STYLES: readonly PhoneCardStyle[] = ['names-shield', 'names-portrait', 'whole'];
+/** D150: the direction of the full-screen tree on a phone held upright. */
+export type PhoneDirection = 'sideways' | 'down';
+export const PHONE_DIRECTIONS: readonly PhoneDirection[] = ['sideways', 'down'];
 
 /** The choices of "Reduce movement" (D126). */
 export type ReduceMotion = 'system' | 'on' | 'off';
@@ -18,33 +18,30 @@ export const BREAK_WORDS_MAX = 20000;
 export interface DynastySettings {
 	/** Height of a tree in a note on a computer or tablet, in px (spec §7.5), 100–5000. Default 500. `options.height` wins. */
 	embedHeightDesktop: number;
-	/** Height of a tree in a note on a phone, in % of the screen height, 40–80. Default 60 (D30: also on its side). */
-	embedHeightPhone: number;
 	cardSize: 'normal' | 'compact';
 	/** Dates on cards, and the reigns in the title text line (spec §13.3). Born and died do not change the card height; a reign can make the title two text lines, so the card can get taller (D61). */
 	showDates: boolean;
-	/** D40 (spec §13.1): relation names on cards. Off keeps the card height and the screen-reader label; only a class changes. */
+	/** D40, D145 (spec §13.1): relation names on cards. Off removes the word and its plate, so the cards are shorter and the marked person gets the You tab; the screen-reader label keeps the relation. The list in a note on a phone follows it. */
 	showRelations: boolean;
 	/** Spec §13.7 (M9 contract O10): portraits on cards. Off: no card shows a portrait or its room; a change lays the trees out again. */
 	showPortraits: boolean;
-	/** Focus mode default generations (§5.6, §9), a whole number 0–10. Default 3; `options.generations` wins; D23 (n = 1 in the static phone preview) wins over both. */
+	/** Focus mode default generations (§5.6, §9), a whole number 0–10. Default 3; `options.generations` wins. */
 	focusGenerations: number;
 	/** D113 item 4: the house page shows the generation of each person. Off: only the dates (and no Generation column). Read when the page opens. */
 	showHouseGeneration: boolean;
 	/** Update tree links when a note or a picture is renamed (§6.9, D6, §13.0 item 3). Default on. */
 	updateLinks: boolean;
-	/** D119: how the tree in a note on a phone looks. The full-screen view always shows whole cards. Default 'names-shield'. */
-	phoneCardStyle: PhoneCardStyle;
 	/** D118: the user's own break places for long names, as typed: one word on each text line, hyphen-marked ("Long-na-munda"). Default ''. */
 	breakWords: string;
 	/** D124 item 5, D126: reduce movement. 'system' follows the device. Default 'system'. */
 	reduceMotion: ReduceMotion;
+	/** D150: the direction of the full-screen tree on a phone held upright. Default 'sideways' (D24 as before). */
+	phoneDirection: PhoneDirection;
 }
 
 /** The settings a fresh install starts with. */
 export const DEFAULT_SETTINGS: DynastySettings = {
 	embedHeightDesktop: 500,
-	embedHeightPhone: 60,
 	cardSize: 'normal',
 	showDates: true,
 	showRelations: true,
@@ -52,27 +49,20 @@ export const DEFAULT_SETTINGS: DynastySettings = {
 	showHouseGeneration: true,
 	focusGenerations: 3,
 	updateLinks: true,
-	phoneCardStyle: 'names-shield',
 	breakWords: '',
 	reduceMotion: 'system',
+	phoneDirection: 'sideways',
 };
 
 /*
  * How views get the settings: `TreeHost` has `readonly settings: DynastySettings`; when a setting
  * changes, the plugin calls `onSettingsChange()` on every view (as for `css-change`), and the view
- * draws again (a card-size change drops the carried view). Embed height rule (D30): on a phone
- * (`TreeView.isPhone`: `isPhoneWindow` of the screen size, not the window size, because an
- * on-screen keyboard makes the window lower; portrait or on its side) the height is
- * `${embedHeightPhone}vh` and `options.height` is ignored; otherwise `options.height`, else
- * `${embedHeightDesktop}px`.
+ * draws again (a card-size change drops the carried view). Embed height rule (D30, D144): `options.height`, else
+ * `${embedHeightDesktop}px`; a tree in a note on a phone is a list with its natural height and has no height setting.
  */
 
-/** The phone heights the settings tab offers, in % of the screen height (D30). */
-export const PHONE_HEIGHTS = [40, 50, 60, 70, 80] as const;
 /** Valid range for `embedHeightDesktop`, in px. */
 export const DESKTOP_HEIGHT = { min: 100, max: 5000 } as const;
-/** Valid range for `embedHeightPhone`, in % of the screen height. */
-export const PHONE_HEIGHT = { min: 40, max: 80 } as const;
 /** Valid range for `focusGenerations`. */
 export const GENERATIONS = { min: 0, max: 10 } as const;
 
@@ -84,10 +74,8 @@ export const normaliseSettings = (raw: unknown): DynastySettings => {
 	const d = DEFAULT_SETTINGS;
 	// A height typed as 480.5 is still a height: round it, then check the range.
 	const desktop = typeof s.embedHeightDesktop === 'number' && Number.isFinite(s.embedHeightDesktop) ? Math.round(s.embedHeightDesktop) : NaN;
-	const phone = typeof s.embedHeightPhone === 'number' && Number.isFinite(s.embedHeightPhone) ? Math.round(s.embedHeightPhone) : NaN;
 	return {
 		embedHeightDesktop: wholeIn(desktop, DESKTOP_HEIGHT) ? desktop : d.embedHeightDesktop,
-		embedHeightPhone: wholeIn(phone, PHONE_HEIGHT) ? phone : d.embedHeightPhone,
 		cardSize: s.cardSize === 'compact' || s.cardSize === 'normal' ? s.cardSize : d.cardSize,
 		showDates: typeof s.showDates === 'boolean' ? s.showDates : d.showDates,
 		showRelations: typeof s.showRelations === 'boolean' ? s.showRelations : d.showRelations,
@@ -95,20 +83,14 @@ export const normaliseSettings = (raw: unknown): DynastySettings => {
 		showHouseGeneration: typeof s.showHouseGeneration === 'boolean' ? s.showHouseGeneration : d.showHouseGeneration,
 		focusGenerations: wholeIn(s.focusGenerations, GENERATIONS) ? s.focusGenerations : d.focusGenerations,
 		updateLinks: typeof s.updateLinks === 'boolean' ? s.updateLinks : d.updateLinks,
-		phoneCardStyle: PHONE_CARD_STYLES.find((v) => v === s.phoneCardStyle) ?? d.phoneCardStyle,
 		breakWords: typeof s.breakWords === 'string' ? s.breakWords.slice(0, BREAK_WORDS_MAX) : d.breakWords,
 		reduceMotion: REDUCE_MOTIONS.find((v) => v === s.reduceMotion) ?? d.reduceMotion,
+		phoneDirection: PHONE_DIRECTIONS.find((v) => v === s.phoneDirection) ?? d.phoneDirection,
 	};
 };
 
 /** True when movement is reduced (D126). `prefers` is `matchMedia('(prefers-reduced-motion: reduce)').matches` on the view's own window. */
 export const reducedMotion = (setting: ReduceMotion, prefers: boolean): boolean => (setting === 'on' ? true : setting === 'off' ? false : prefers);
-
-/** How many percent the height button of the phone preview moves from the start height (D120, D126). */
-export const PHONE_STEP_POINTS = 20;
-
-/** The three heights of the phone preview in % of the screen: [lower, start, upper]. The start is `embedHeightPhone`; the limits are 30 and 90. */
-export const phoneHeightSteps = (base: number): readonly [number, number, number] => [Math.max(30, base - PHONE_STEP_POINTS), base, Math.min(90, base + PHONE_STEP_POINTS)];
 
 /**
  * The height a desktop user typed, or null if it is not a whole number of pixels in range. Leading

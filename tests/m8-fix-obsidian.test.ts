@@ -16,6 +16,7 @@ import { TITLES_UI, WRITE_TEXT } from '../src/render/ui-text';
 import { FEl, clock, dispatch, fakeWin, installDom, resetDom, settle } from './acceptance/fake-dom';
 import { notices, openModals, resetObsidian } from './acceptance/fake-obsidian';
 import { embed, fakeHandle, fakeHost, type FakeHandle, type Host } from './acceptance/tree-view-fakes';
+import { openPage } from './lw-support';
 
 /*
  * M8 fix round (Obsidian): holder people with no written id get one in Save's write, and a refusal
@@ -109,7 +110,7 @@ describe('Titles window: a refusal for a person who is not in the tree', () => {
 		await click(el.querySelector('.dynasty-more-titles'));
 		const win = openModals.find((m) => (m as unknown) instanceof TitlesWindow) as unknown as { contentEl: FEl };
 		const content = win.contentEl;
-		const name = content.querySelector('.dynasty-title-row input')!;
+		const name = openPage(content, 'duke').querySelector('.dynasty-title-name textarea')!;
 		name.value = 'Grand Duke';
 		dispatch(name, 'input');
 		for (let i = 0; i < 2; i++) {
@@ -119,7 +120,7 @@ describe('Titles window: a refusal for a person who is not in the tree', () => {
 			expect(content.querySelector('.dynasty-sheet-error')!.getText()).toBe(TITLES_UI.personGone);
 			expect(openModals.includes(win as never)).toBe(true);
 			// The draft stays.
-			expect(content.querySelector('.dynasty-title-row input')!.value).toBe('Grand Duke');
+			expect(content.querySelector('.dynasty-title-name textarea')!.value).toBe('Grand Duke');
 		}
 		expect(handle.write).toHaveBeenCalledTimes(2);
 	});

@@ -27,6 +27,7 @@ import { HOUSES, ID_UI, REMOVE, SHEET, TITLES_UI, WRITE_TEXT } from '../src/rend
 import { FEl, clock, dispatch, fakeDoc, fakeWin, installDom, resetDom, settle } from './acceptance/fake-dom';
 import { noticeList, notices, openModals, resetObsidian } from './acceptance/fake-obsidian';
 import { embed, fakeHandle, fakeHost, type FakeHandle, type Host } from './acceptance/tree-view-fakes';
+import { backToList, backButton, openPage, pageOf } from './lw-support';
 
 /*
  * Version 0.2.2, WP3 (spec §13.17): the numbered person id at the four places that make one, the Id
@@ -361,7 +362,13 @@ async function openHouses(body = HOUSES_BODY, handle: Writing = writingHandle(bo
 	return { ...e, handle, win, content, modal };
 }
 
-const houseRow = (content: FEl, id: string) => content.querySelector(`.dynasty-house-row[data-house="${id}"]`)!;
+/** The edit page of an item: the page on screen if it is that item's page, else the list row is tapped (Back first when another page shows). */
+function gotoPage(content: FEl, id: string): FEl {
+	const page = backButton(content) ? pageOf(content) : null;
+	if (page && (page.getAttribute('data-house') === id || page.getAttribute('data-title') === id)) return page;
+	if (page) backToList(content);
+	return openPage(content, id);
+}
 const saveOf = (content: FEl) => content.querySelector('.dynasty-sheet-save')!;
 const confirmOf = (modal: FEl) => modal.querySelector('.dynasty-sheet-confirm');
 const confirmLines = (modal: FEl) => confirmOf(modal)!.querySelectorAll('.dynasty-sheet-confirm-text').map((t) => t.getText());
@@ -372,43 +379,44 @@ const fieldOf = (w: FEl) => w.querySelector('.dynasty-id-input')!;
 const useOf = (w: FEl) => w.querySelector('.dynasty-id-use')!;
 const problemOf = (w: FEl) => w.querySelector('.dynasty-id-problem')!.getText();
 
-/** Taps "Change ID" of a row and returns the small window. */
-async function openIdOf(row: FEl): Promise<FEl> {
-	await click(row.querySelector('.dynasty-id-open'));
+/** Taps "Change ID" on an edit page and returns the small window. */
+async function openIdOf(page: FEl): Promise<FEl> {
+	await click(page.querySelector('.dynasty-id-open'));
 	const w = topModal();
 	expect(w.hasClass('dynasty-id-window')).toBe(true);
 	return w;
 }
 
-/** Types an id into the small window of a row and taps "Use this ID". */
-async function setId(row: FEl, value: string): Promise<void> {
-	const w = await openIdOf(row);
+/** Types an id into the small window of an item and taps "Use this ID"; the page of the item stays open. */
+async function setId(content: FEl, id: string, value: string): Promise<void> {
+	const w = await openIdOf(gotoPage(content, id));
 	type(fieldOf(w), value);
 	await click(useOf(w));
 }
 
-const noteOf = (row: FEl) => row.querySelector('.dynasty-id-new');
+/** The note "New ID: ..." on the page that shows now. */
+const noteOf = (content: FEl) => pageOf(content).querySelector('.dynasty-id-new');
+/** The name field of the page that shows now. */
+const nameField = (content: FEl, cls: 'dynasty-house-name' | 'dynasty-title-name') => pageOf(content).querySelector(`.${cls} textarea`)!;
+const idOpen = (content: FEl) => pageOf(content).querySelector('.dynasty-id-open');
 
 describe('Houses window: the Id change (§13.17 rule 5, D109, D110)', () => {
-	it('the list shows no Id field, no "Make id" button and no reason; each saved house has "Change ID" before Delete, with its accessible name; a new house has none', async () => {
+	it('the list shows no Id field, no "Make id" button and no reason; each saved house page has "Change ID" before Delete, with its accessible name; a new house has none', async () => {
 		const { content } = await openHouses();
-		expect(content.querySelectorAll('.dynasty-id-row')).toHaveLength(0);
-		expect(content.querySelectorAll('.dynasty-id-input')).toHaveLength(0);
-		expect(content.querySelectorAll('.dynasty-id-make')).toHaveLength(0);
-		expect(content.querySelectorAll('.dynasty-id-problem')).toHaveLength(0);
-		expect(content.querySelectorAll('.dynasty-id-new')).toHaveLength(0);
+		for (const q of ['.dynasty-id-row', '.dynasty-id-input', '.dynasty-id-make', '.dynasty-id-problem', '.dynasty-id-new', '.dynasty-id-open']) expect(content.querySelectorAll(q)).toHaveLength(0);
 		for (const [id, name] of [['valmont', 'House Valmont'], ['orsini', 'House Orsini'], ['thorne', 'House Thorne']]) {
-			const row = houseRow(content, id);
-			const button = row.querySelector('.dynasty-id-open')!;
+			const page = gotoPage(content, id);
+			const button = page.querySelector('.dynasty-id-open')!;
 			expect(button.getText()).toBe('Change ID');
 			expect(button.getAttribute('aria-label')).toBe(`Change ID of ${name}`);
 			expect(button.tag).toBe('button');
-			// The button comes before Delete in the row.
+			// The button comes before Delete, in the section "Other actions".
+			const row = button.parentElement!;
 			expect(row.children.indexOf(button)).toBeLessThan(row.children.indexOf(row.querySelector('.dynasty-house-delete')!));
 		}
+		backToList(content);
 		await click(content.querySelector('.dynasty-house-add'));
-		const fresh = content.querySelectorAll('.dynasty-house-row').pop()!;
-		expect(fresh.querySelector('.dynasty-id-open')).toBeNull();
+		expect(pageOf(content).querySelector('.dynasty-id-open')).toBeNull();
 		// 44 px: the CSS rules of the buttons (the harness measures the real window).
 		const css = readFileSync('styles.css', 'utf8');
 		expect(/\.dynasty-sheet button\.dynasty-id-open \{[^}]*min-height: 44px/.test(css)).toBe(true);
@@ -419,13 +427,14 @@ describe('Houses window: the Id change (§13.17 rule 5, D109, D110)', () => {
 
 	it('the accessible name of the button follows the name in the field', async () => {
 		const { content } = await openHouses();
-		type(houseRow(content, 'valmont').querySelector('input')!, 'Crown');
-		expect(houseRow(content, 'valmont').querySelector('.dynasty-id-open')!.getAttribute('aria-label')).toBe('Change ID of Crown');
+		gotoPage(content, 'valmont');
+		type(nameField(content, 'dynasty-house-name'), 'Crown');
+		expect(idOpen(content)!.getAttribute('aria-label')).toBe('Change ID of Crown');
 	});
 
 	it('the small window has the title, the hint, the Id field with the id of the draft, "Make ID from the name", the buttons, and the focus is in the field', async () => {
 		const { content, modal } = await openHouses();
-		const w = await openIdOf(houseRow(content, 'thorne'));
+		const w = await openIdOf(gotoPage(content, 'thorne'));
 		expect(w.hasClass('dynasty-sheet')).toBe(true);
 		expect(w.querySelector('.dynasty-sheet-title')!.getText()).toBe('ID of House Thorne');
 		expect(w.querySelector('.dynasty-sheet-hint')!.getText()).toBe('The ID is a short name. The plugin uses it to find this house. Most users never change it.');
@@ -442,50 +451,49 @@ describe('Houses window: the Id change (§13.17 rule 5, D109, D110)', () => {
 
 	it('"Use this ID" puts the id into the draft, closes the small window and shows the note and "Keep old ID"; nothing is written', async () => {
 		const { content, handle, win } = await openHouses();
-		await setId(houseRow(content, 'valmont'), '  crown ');
+		await setId(content, 'valmont', '  crown ');
 		expect(openModals).toHaveLength(1);
-		const row = houseRow(content, 'valmont');
-		expect(noteOf(row)!.querySelector('.dynasty-id-new-text')!.getText()).toBe('New ID: crown');
-		const keep = noteOf(row)!.querySelector('button')!;
+		expect(noteOf(content)!.querySelector('.dynasty-id-new-text')!.getText()).toBe('New ID: crown');
+		const keep = noteOf(content)!.querySelector('button')!;
 		expect(keep.getText()).toBe('Keep old ID');
 		expect(keep.getAttribute('aria-label')).toBe('Keep old ID of House Valmont');
 		expect(content.querySelectorAll('.dynasty-id-new')).toHaveLength(1);
 		expect(handle.ops).toHaveLength(0);
 		expect(win.isDirty()).toBe(true);
-		// The focus goes back to the button that opened the small window.
-		expect(fakeDoc.activeElement).toBe(row.querySelector('.dynasty-id-open'));
+		// The page is drawn again and the focus goes back to the button that opened the small window.
+		expect(fakeDoc.activeElement).toBe(idOpen(content));
 	});
 
 	it('"Keep old ID" sets the draft back to the saved id: no note, nothing unsaved', async () => {
 		const { content, win } = await openHouses();
-		await setId(houseRow(content, 'valmont'), 'crown');
-		await click(noteOf(houseRow(content, 'valmont'))!.querySelector('button'));
-		expect(noteOf(houseRow(content, 'valmont'))).toBeNull();
+		await setId(content, 'valmont', 'crown');
+		await click(noteOf(content)!.querySelector('button'));
+		expect(noteOf(content)).toBeNull();
 		expect(win.isDirty()).toBe(false);
-		const w = await openIdOf(houseRow(content, 'valmont'));
+		const w = await openIdOf(pageOf(content));
 		expect(fieldOf(w).value).toBe('valmont');
 	});
 
 	it('opening "Change ID" again shows the draft id; Cancel keeps the draft', async () => {
 		const { content, win } = await openHouses();
-		await setId(houseRow(content, 'valmont'), 'crown');
-		const w = await openIdOf(houseRow(content, 'valmont'));
+		await setId(content, 'valmont', 'crown');
+		const w = await openIdOf(pageOf(content));
 		expect(fieldOf(w).value).toBe('crown');
 		type(fieldOf(w), 'something-else');
 		await click(w.querySelector('.dynasty-id-actions .dynasty-sheet-cancel'));
 		expect(openModals).toHaveLength(1);
-		expect(noteOf(houseRow(content, 'valmont'))!.querySelector('.dynasty-id-new-text')!.getText()).toBe('New ID: crown');
+		expect(noteOf(content)!.querySelector('.dynasty-id-new-text')!.getText()).toBe('New ID: crown');
 		// Esc (close of the top modal) is Cancel too.
-		const again = await openIdOf(houseRow(content, 'valmont'));
+		const again = await openIdOf(pageOf(content));
 		type(fieldOf(again), 'other');
 		(openModals[openModals.length - 1] as unknown as { close: () => void }).close();
-		expect(noteOf(houseRow(content, 'valmont'))!.querySelector('.dynasty-id-new-text')!.getText()).toBe('New ID: crown');
+		expect(noteOf(content)!.querySelector('.dynasty-id-new-text')!.getText()).toBe('New ID: crown');
 		expect(win.isDirty()).toBe(true);
 	});
 
 	it('"Use this ID" is off while a reason shows; the reason shows live; the saved id again removes the draft', async () => {
 		const { content } = await openHouses();
-		const w = await openIdOf(houseRow(content, 'valmont'));
+		const w = await openIdOf(gotoPage(content, 'valmont'));
 		const cases: [string, string][] = [
 			['orsini', ID_UI.taken],
 			['ghost', ID_UI.taken],
@@ -501,9 +509,9 @@ describe('Houses window: the Id change (§13.17 rule 5, D109, D110)', () => {
 			expect(fieldOf(w).getAttribute('aria-invalid')).toBe('true');
 			expect((useOf(w) as unknown as { disabled: boolean }).disabled).toBe(true);
 			await click(useOf(w));
-			// A press on the off button changes nothing: the small window stays, the row has no note.
+			// A press on the off button changes nothing: the small window stays, the page has no note.
 			expect(openModals).toHaveLength(2);
-			expect(noteOf(houseRow(content, 'valmont'))).toBeNull();
+			expect(noteOf(content)).toBeNull();
 		}
 		type(fieldOf(w), 'valmont');
 		expect(problemOf(w)).toBe('');
@@ -512,33 +520,34 @@ describe('Houses window: the Id change (§13.17 rule 5, D109, D110)', () => {
 		await click(useOf(w));
 		// The field equals the saved id: the window closes and there is no draft.
 		expect(openModals).toHaveLength(1);
-		expect(noteOf(houseRow(content, 'valmont'))).toBeNull();
+		expect(noteOf(content)).toBeNull();
 	});
 
 	it('the other drafts count as taken in the small window; a hand-typed id that did not change is never checked', async () => {
 		const body = HOUSES_BODY.replace('id: thorne', 'id: House_Thorne');
 		const { content, handle, win } = await openHouses(body);
-		await setId(houseRow(content, 'valmont'), 'crown');
-		const w = await openIdOf(houseRow(content, 'orsini'));
+		await setId(content, 'valmont', 'crown');
+		const w = await openIdOf(gotoPage(content, 'orsini'));
 		type(fieldOf(w), 'crown');
 		expect(problemOf(w)).toBe(ID_UI.taken);
 		// A swap cannot be made: the saved id of the other row is taken.
 		type(fieldOf(w), 'valmont');
 		expect(problemOf(w)).toBe(ID_UI.taken);
 		await click(w.querySelector('.dynasty-id-actions .dynasty-sheet-cancel'));
-		const t = await openIdOf(houseRow(content, 'House_Thorne'));
+		const t = await openIdOf(gotoPage(content, 'House_Thorne'));
 		expect(fieldOf(t).value).toBe('House_Thorne');
 		expect(problemOf(t)).toBe('');
 		await click(useOf(t));
-		expect(noteOf(houseRow(content, 'House_Thorne'))).toBeNull();
+		expect(noteOf(content)).toBeNull();
 		expect(handle.ops).toHaveLength(0);
 		expect(win.isDirty()).toBe(true);
 	});
 
 	it('Save with a new id asks one question with the count, then writes one batch with the id op first; Undo restores the text', async () => {
 		const { content, modal, handle } = await openHouses();
-		type(houseRow(content, 'valmont').querySelector('input')!, 'House Crown');
-		await setId(houseRow(content, 'valmont'), '  crown ');
+		gotoPage(content, 'valmont');
+		type(nameField(content, 'dynasty-house-name'), 'House Crown');
+		await setId(content, 'valmont', '  crown ');
 		await click(saveOf(content));
 		// One question, nothing written yet.
 		expect(handle.ops).toHaveLength(0);
@@ -568,8 +577,8 @@ describe('Houses window: the Id change (§13.17 rule 5, D109, D110)', () => {
 
 	it('the count says "2 people" and "no other place"; one question holds one line for each changed id', async () => {
 		const { content, modal, handle } = await openHouses();
-		await setId(houseRow(content, 'orsini'), 'house-orsini');
-		await setId(houseRow(content, 'thorne'), 'house-thorne');
+		await setId(content, 'orsini', 'house-orsini');
+		await setId(content, 'thorne', 'house-thorne');
 		await click(saveOf(content));
 		expect(confirmOf(modal)!.querySelector('.dynasty-sheet-confirm-title')!.getText()).toBe('Change the IDs?');
 		expect(confirmLines(modal)).toEqual([
@@ -595,56 +604,65 @@ describe('Houses window: the Id change (§13.17 rule 5, D109, D110)', () => {
 
 	it('Do not change, Esc and a press outside keep the draft and write nothing', async () => {
 		const { content, modal, handle, win } = await openHouses();
-		await setId(houseRow(content, 'valmont'), 'crown');
+		await setId(content, 'valmont', 'crown');
 		await click(saveOf(content));
 		expect(confirmOf(modal)).not.toBeNull();
 		await click(confirmOf(modal)!.querySelector('.dynasty-id-keep'));
 		expect(confirmOf(modal)).toBeNull();
 		expect(handle.ops).toHaveLength(0);
-		expect(noteOf(houseRow(content, 'valmont'))!.querySelector('.dynasty-id-new-text')!.getText()).toBe('New ID: crown');
-		// Closing the question (Esc) is the same as Cancel.
+		expect(noteOf(content)!.querySelector('.dynasty-id-new-text')!.getText()).toBe('New ID: crown');
+		// Closing the question (Esc) is the same as Cancel: the question goes first, the page stays.
 		await click(saveOf(content));
 		expect(confirmOf(modal)).not.toBeNull();
 		win.close();
 		expect(confirmOf(modal)).toBeNull();
 		expect(openModals.includes(win as never)).toBe(true);
+		expect(backButton(content)).not.toBeNull();
 		expect(handle.ops).toHaveLength(0);
-		expect(noteOf(houseRow(content, 'valmont'))!.querySelector('.dynasty-id-new-text')!.getText()).toBe('New ID: crown');
+		expect(noteOf(content)!.querySelector('.dynasty-id-new-text')!.getText()).toBe('New ID: crown');
 	});
 
-	it('a draft that is refused later (a new house would get the same id) shows once, in red in the note of the row with a red edge, and not in the error line; Save writes nothing', async () => {
+	it('a draft that is refused later (a new house would get the same id) shows once, in red in the note of the page with a red edge, and not in the error line; Save writes nothing', async () => {
 		const { content, handle, win } = await openHouses();
-		await setId(houseRow(content, 'valmont'), 'crown');
+		await setId(content, 'valmont', 'crown');
+		backToList(content);
 		await click(content.querySelector('.dynasty-house-add'));
-		const fresh = content.querySelectorAll('.dynasty-house-row').pop()!;
-		type(fresh.querySelector('input')!, 'Crown');
-		const note = noteOf(houseRow(content, 'valmont'))!;
-		expect(note.querySelector('.dynasty-id-new-problem')!.getText()).toBe(ID_UI.taken);
+		const freshKey = pageOf(content).getAttribute('data-house')!;
+		type(nameField(content, 'dynasty-house-name'), 'Crown');
+		backToList(content);
+		gotoPage(content, 'valmont');
+		expect(noteOf(content)!.querySelector('.dynasty-id-new-problem')!.getText()).toBe(ID_UI.taken);
 		await click(saveOf(content));
-		// D113 item 3: the reason shows once, in the row (the note and the red edge); the top line shows nothing.
+		// D113 item 3: the reason shows once, on the page (the note and the red edge); the top line shows nothing.
 		expect(content.querySelector('.dynasty-sheet-error')!.getText()).toBe('');
-		expect(note.querySelector('.dynasty-id-new-problem')!.getText()).toBe(ID_UI.taken);
-		expect(houseRow(content, 'valmont').hasClass('has-id-problem')).toBe(true);
+		expect(noteOf(content)!.querySelector('.dynasty-id-new-problem')!.getText()).toBe(ID_UI.taken);
+		expect(pageOf(content).hasClass('has-id-problem')).toBe(true);
 		expect(confirmOf((win as unknown as { modalEl: FEl }).modalEl)).toBeNull();
 		expect(openModals.includes(win as never)).toBe(true);
-		expect(fakeDoc.activeElement).toBe(houseRow(content, 'valmont').querySelector('.dynasty-id-open'));
+		expect(fakeDoc.activeElement).toBe(idOpen(content));
 		expect(handle.ops).toHaveLength(0);
 		// The new house gets another name: the reason goes away.
-		type(fresh.querySelector('input')!, 'House Other');
-		expect(note.querySelector('.dynasty-id-new-problem')!.getText()).toBe('');
+		backToList(content);
+		gotoPage(content, freshKey);
+		type(nameField(content, 'dynasty-house-name'), 'House Other');
+		backToList(content);
+		gotoPage(content, 'valmont');
+		expect(noteOf(content)!.querySelector('.dynasty-id-new-problem')!.getText()).toBe('');
 	});
 
 	it('"Make ID from the name" puts the id of the draft name into the field and does nothing for an empty name', async () => {
 		const { content } = await openHouses();
-		type(houseRow(content, 'thorne').querySelector('input')!, 'The Crown House');
-		const w = await openIdOf(houseRow(content, 'thorne'));
+		gotoPage(content, 'thorne');
+		type(nameField(content, 'dynasty-house-name'), 'The Crown House');
+		const w = await openIdOf(pageOf(content));
 		expect(w.querySelector('.dynasty-sheet-title')!.getText()).toBe('ID of The Crown House');
 		await click(w.querySelector('.dynasty-id-make'));
 		expect(fieldOf(w).value).toBe('the-crown-house');
 		expect((useOf(w) as unknown as { disabled: boolean }).disabled).toBe(false);
 		await click(useOf(w));
-		type(houseRow(content, 'valmont').querySelector('input')!, '  ');
-		const v = await openIdOf(houseRow(content, 'valmont'));
+		gotoPage(content, 'valmont');
+		type(nameField(content, 'dynasty-house-name'), '  ');
+		const v = await openIdOf(pageOf(content));
 		type(fieldOf(v), 'keep-me');
 		await click(v.querySelector('.dynasty-id-make'));
 		expect(fieldOf(v).value).toBe('keep-me');
@@ -652,9 +670,9 @@ describe('Houses window: the Id change (§13.17 rule 5, D109, D110)', () => {
 
 	it('an edit of colour and an id change together are one write; a stale body refuses without a partial write', async () => {
 		const { content, modal, handle } = await openHouses();
-		await setId(houseRow(content, 'valmont'), 'crown');
-		dispatch(houseRow(content, 'valmont').querySelector('.dynasty-house-swatch')!, 'click');
-		dispatch(content.querySelector('.dynasty-house-colour[data-colour="#2f5d8c"]') ?? content.querySelectorAll('.dynasty-house-colour')[3], 'click');
+		await setId(content, 'valmont', 'crown');
+		// The palette is always on the page (no swatch to tap first).
+		dispatch(pageOf(content).querySelector('.dynasty-house-colour[data-colour="#2f5d8c"]') ?? pageOf(content).querySelectorAll('.dynasty-house-colour')[3], 'click');
 		await click(saveOf(content));
 		await click(confirmOf(modal)!.querySelector('.dynasty-id-change'));
 		expect(handle.ops).toHaveLength(1);
@@ -663,7 +681,7 @@ describe('Houses window: the Id change (§13.17 rule 5, D109, D110)', () => {
 
 		// Stale: the note changed under the window; the id write is refused as a whole.
 		const second = await openHouses(HOUSES_BODY);
-		await setId(houseRow(second.content, 'orsini'), 'house-orsini');
+		await setId(second.content, 'orsini', 'house-orsini');
 		await click(saveOf(second.content));
 		second.handle.body = `${second.handle.body}# changed elsewhere\n`;
 		second.handle.write.mockImplementationOnce((async () => ({ ok: false, code: 'stale' })) as never);
@@ -671,8 +689,8 @@ describe('Houses window: the Id change (§13.17 rule 5, D109, D110)', () => {
 		expect(notices).toContain(WRITE_TEXT.stale);
 		expect(second.handle.body).toContain('house: orsini');
 		expect(second.handle.body).not.toContain('house-orsini');
-		// The draft id stays in the row's note after the window read the new body.
-		expect(noteOf(houseRow(second.content, 'orsini'))!.querySelector('.dynasty-id-new-text')!.getText()).toBe('New ID: house-orsini');
+		// The draft id stays in the note of the page after the window read the new body.
+		expect(noteOf(second.content)!.querySelector('.dynasty-id-new-text')!.getText()).toBe('New ID: house-orsini');
 	});
 
 	it('a refusal of the id op (id-taken, bad-value) shows its own text, never the stale text', async () => {
@@ -686,7 +704,7 @@ describe('Houses window: the Id change (§13.17 rule 5, D109, D110)', () => {
 			const handle = writingHandle(HOUSES_BODY);
 			handle.write.mockImplementation((async () => ({ ok: false, code: 'refused', refusal })) as never);
 			const { content, modal, win } = await openHouses(HOUSES_BODY, handle);
-			await setId(houseRow(content, 'valmont'), 'crown');
+			await setId(content, 'valmont', 'crown');
 			await click(saveOf(content));
 			await click(confirmOf(modal)!.querySelector('.dynasty-id-change'));
 			expect(notices[notices.length - 1]).toBe(text);
@@ -694,7 +712,7 @@ describe('Houses window: the Id change (§13.17 rule 5, D109, D110)', () => {
 			expect(content.querySelector('.dynasty-sheet-error')!.getText()).toBe(text);
 			// The window stays open and the draft stays.
 			expect(openModals.includes(win as never)).toBe(true);
-			expect(noteOf(houseRow(content, 'valmont'))!.querySelector('.dynasty-id-new-text')!.getText()).toBe('New ID: crown');
+			expect(noteOf(content)!.querySelector('.dynasty-id-new-text')!.getText()).toBe('New ID: crown');
 		}
 	});
 
@@ -710,15 +728,25 @@ describe('Houses window: the Id change (§13.17 rule 5, D109, D110)', () => {
 		expect(houseOps(rows)).toEqual([]);
 	});
 
-	it('closing the window with only a pending id asks first (Esc); "Keep old ID" then closes with no question', async () => {
+	it('closing the window with only a pending id asks first (Esc, after the page); "Keep old ID" then closes with no question', async () => {
 		const { content, win, modal } = await openHouses();
-		await setId(houseRow(content, 'valmont'), 'crown');
+		await setId(content, 'valmont', 'crown');
+		// The first Esc leaves the page; it asks nothing yet.
+		win.close();
+		await settle();
+		expect(backButton(content)).toBeNull();
+		expect(confirmOf(modal)).toBeNull();
 		win.close();
 		await settle();
 		expect(confirmOf(modal)!.querySelector('.dynasty-sheet-confirm-title')!.getText()).toBe(SHEET.discardTitle);
 		expect(openModals.includes(win as never)).toBe(true);
 		await click(confirmOf(modal)!.querySelector('.dynasty-sheet-keep'));
-		await click(noteOf(houseRow(content, 'valmont'))!.querySelector('button'));
+		gotoPage(content, 'valmont');
+		await click(noteOf(content)!.querySelector('button'));
+		// Leave the page again, then close: nothing is unsaved.
+		win.close();
+		await settle();
+		expect(confirmOf(modal)).toBeNull();
 		win.close();
 		await settle();
 		expect(openModals.includes(win as never)).toBe(false);
@@ -778,27 +806,25 @@ async function openTitles(body = TITLES_BODY, handle: Writing = writingHandle(bo
 	return { handle, win, content, modal };
 }
 
-const titleBox = (content: FEl, id: string) => content.querySelector(`.dynasty-title-box[data-title="${id}"]`)!;
-
 describe('Titles window: the Id change (§13.17 rule 5, D109, D110)', () => {
-	it('the list shows no Id field; each saved title has "Change ID" before Delete with its accessible name; a new title has none', async () => {
+	it('the list shows no Id field; each saved title page has "Change ID" before Delete with its accessible name; a new title has none', async () => {
 		const { content } = await openTitles();
-		expect(content.querySelectorAll('.dynasty-id-row')).toHaveLength(0);
-		expect(content.querySelectorAll('.dynasty-id-input')).toHaveLength(0);
-		expect(content.querySelectorAll('.dynasty-id-make')).toHaveLength(0);
-		const row = titleBox(content, 'duke').querySelector('.dynasty-title-row')!;
-		const button = row.querySelector('.dynasty-id-open')!;
+		for (const q of ['.dynasty-id-row', '.dynasty-id-input', '.dynasty-id-make', '.dynasty-id-open']) expect(content.querySelectorAll(q)).toHaveLength(0);
+		const page = gotoPage(content, 'duke');
+		const button = page.querySelector('.dynasty-id-open')!;
 		expect(button.getText()).toBe('Change ID');
 		expect(button.getAttribute('aria-label')).toBe('Change ID of Duke');
+		// The button comes before Delete, in the section "Other actions".
+		const row = button.parentElement!;
 		expect(row.children.indexOf(button)).toBeLessThan(row.children.indexOf(row.querySelector('.dynasty-title-delete')!));
+		backToList(content);
 		await click(content.querySelector('.dynasty-title-add'));
-		const fresh = content.querySelectorAll('.dynasty-title-box').pop()!;
-		expect(fresh.querySelector('.dynasty-id-open')).toBeNull();
+		expect(pageOf(content).querySelector('.dynasty-id-open')).toBeNull();
 	});
 
 	it('the small window has the title, the hint for a title, the Id field and the buttons; "Use this ID" shows the note; "Keep old ID" removes it', async () => {
 		const { content, win } = await openTitles();
-		const w = await openIdOf(titleBox(content, 'duke'));
+		const w = await openIdOf(gotoPage(content, 'duke'));
 		expect(w.querySelector('.dynasty-sheet-title')!.getText()).toBe('ID of Duke');
 		expect(w.querySelector('.dynasty-sheet-hint')!.getText()).toBe('The ID is a short name. The plugin uses it to find this title. Most users never change it.');
 		expect(fieldOf(w).value).toBe('duke');
@@ -808,26 +834,25 @@ describe('Titles window: the Id change (§13.17 rule 5, D109, D110)', () => {
 		type(fieldOf(w), 'king');
 		await click(useOf(w));
 		expect(openModals).toHaveLength(1);
-		const note = titleBox(content, 'duke').querySelector('.dynasty-id-new')!;
+		const note = noteOf(content)!;
 		expect(note.querySelector('.dynasty-id-new-text')!.getText()).toBe('New ID: king');
 		expect(note.querySelector('button')!.getAttribute('aria-label')).toBe('Keep old ID of Duke');
 		expect(win.isDirty()).toBe(true);
 		// Open again: the draft id.
-		const again = await openIdOf(titleBox(content, 'duke'));
+		const again = await openIdOf(pageOf(content));
 		expect(fieldOf(again).value).toBe('king');
 		await click(again.querySelector('.dynasty-id-actions .dynasty-sheet-cancel'));
-		await click(note.querySelector('button'));
-		expect(titleBox(content, 'duke').querySelector('.dynasty-id-new')).toBeNull();
+		await click(noteOf(content)!.querySelector('button'));
+		expect(noteOf(content)).toBeNull();
 		expect(win.isDirty()).toBe(false);
 	});
 
 	it('Save with a new title id asks one question, then changes the id and card-title in one batch; a holder edit of the same title names the new id', async () => {
 		const { content, modal, handle } = await openTitles();
-		await setId(titleBox(content, 'duke'), 'duke-of-valmont');
-		type(titleBox(content, 'duke').querySelector('.dynasty-title-row input')!, 'Duke of Valmont');
-		// Move the first holder later: a set-holders op with refs.
-		await click(titleBox(content, 'duke').querySelector('.dynasty-title-toggle'));
-		await click(titleBox(content, 'duke').querySelector('.dynasty-holder-later'));
+		await setId(content, 'duke', 'duke-of-valmont');
+		type(nameField(content, 'dynasty-title-name'), 'Duke of Valmont');
+		// Move the first holder later: a set-holders op with refs. The holders are always on the page.
+		await click(pageOf(content).querySelector('.dynasty-holder-later'));
 		await click(saveOf(content));
 		expect(handle.ops).toHaveLength(0);
 		expect(confirmLines(modal)).toEqual([ID_UI.confirmLine('Duke of Valmont', 'duke', 'duke-of-valmont', ID_UI.places(2)), REMOVE.canUndo]);
@@ -849,7 +874,7 @@ describe('Titles window: the Id change (§13.17 rule 5, D109, D110)', () => {
 
 	it('refused ids show the reason in the small window and keep "Use this ID" off; a dangling card-title value is taken', async () => {
 		const { content, handle } = await openTitles();
-		const w = await openIdOf(titleBox(content, 'duke'));
+		const w = await openIdOf(gotoPage(content, 'duke'));
 		for (const [value, reason] of [['baron', ID_UI.taken], ['lost', ID_UI.taken], ['Duke', ID_UI.characters], ['', ID_UI.empty]] as const) {
 			type(fieldOf(w), value);
 			expect(problemOf(w)).toBe(reason);
@@ -857,31 +882,34 @@ describe('Titles window: the Id change (§13.17 rule 5, D109, D110)', () => {
 			await click(useOf(w));
 			expect(openModals).toHaveLength(2);
 		}
-		expect(titleBox(content, 'duke').querySelector('.dynasty-id-new')).toBeNull();
+		expect(noteOf(content)).toBeNull();
 		expect(handle.ops).toHaveLength(0);
 	});
 
-	it('a draft that is refused later shows once, in the note of the row with a red edge, and not in the error line; Save writes nothing', async () => {
+	it('a draft that is refused later shows once, in the note of the page with a red edge, and not in the error line; Save writes nothing', async () => {
 		const { content, handle, win } = await openTitles();
-		await setId(titleBox(content, 'baron'), 'king');
+		await setId(content, 'baron', 'king');
+		backToList(content);
 		await click(content.querySelector('.dynasty-title-add'));
-		const fresh = content.querySelectorAll('.dynasty-title-box').pop()!;
-		type(fresh.querySelector('.dynasty-title-row input')!, 'King');
-		expect(titleBox(content, 'baron').querySelector('.dynasty-id-new-problem')!.getText()).toBe(ID_UI.taken);
+		type(nameField(content, 'dynasty-title-name'), 'King');
+		backToList(content);
+		gotoPage(content, 'baron');
+		expect(noteOf(content)!.querySelector('.dynasty-id-new-problem')!.getText()).toBe(ID_UI.taken);
 		await click(saveOf(content));
-		// D113 item 3: the reason shows once, in the row (the note and the red edge); the top line shows nothing.
+		// D113 item 3: the reason shows once, on the page (the note and the red edge); the top line shows nothing.
 		expect(content.querySelector('.dynasty-sheet-error')!.getText()).toBe('');
-		expect(titleBox(content, 'baron').querySelector('.dynasty-id-new-problem')!.getText()).toBe(ID_UI.taken);
-		expect(titleBox(content, 'baron').querySelector('.dynasty-title-row')!.hasClass('has-id-problem')).toBe(true);
+		expect(noteOf(content)!.querySelector('.dynasty-id-new-problem')!.getText()).toBe(ID_UI.taken);
+		expect(pageOf(content).hasClass('has-id-problem')).toBe(true);
 		expect(openModals.includes(win as never)).toBe(true);
-		expect(fakeDoc.activeElement).toBe(titleBox(content, 'baron').querySelector('.dynasty-id-open'));
+		expect(fakeDoc.activeElement).toBe(idOpen(content));
 		expect(handle.ops).toHaveLength(0);
 	});
 
 	it('"Make ID from the name" uses the draft name; Cancel in the question writes nothing', async () => {
 		const { content, modal, handle } = await openTitles();
-		type(titleBox(content, 'baron').querySelector('.dynasty-title-row input')!, 'Margrave of the Marches');
-		const w = await openIdOf(titleBox(content, 'baron'));
+		gotoPage(content, 'baron');
+		type(nameField(content, 'dynasty-title-name'), 'Margrave of the Marches');
+		const w = await openIdOf(pageOf(content));
 		expect(w.querySelector('.dynasty-sheet-title')!.getText()).toBe('ID of Margrave of the Marches');
 		await click(w.querySelector('.dynasty-id-make'));
 		expect(fieldOf(w).value).toBe('margrave-of-the-marches');
@@ -890,14 +918,14 @@ describe('Titles window: the Id change (§13.17 rule 5, D109, D110)', () => {
 		expect(confirmLines(modal)[0]).toBe(ID_UI.confirmLine('Margrave of the Marches', 'baron', 'margrave-of-the-marches', ID_UI.places(0)));
 		await click(confirmOf(modal)!.querySelector('.dynasty-id-keep'));
 		expect(handle.ops).toHaveLength(0);
-		expect(titleBox(content, 'baron').querySelector('.dynasty-id-new-text')!.getText()).toBe('New ID: margrave-of-the-marches');
+		expect(pageOf(content).querySelector('.dynasty-id-new-text')!.getText()).toBe('New ID: margrave-of-the-marches');
 	});
 
 	it('a refusal of the id op shows its own text, never the stale text', async () => {
 		const handle = writingHandle(TITLES_BODY);
 		handle.write.mockImplementation((async () => ({ ok: false, code: 'refused', refusal: { ok: false, code: 'id-taken' } })) as never);
 		const { content, modal } = await openTitles(TITLES_BODY, handle);
-		await setId(titleBox(content, 'baron'), 'count');
+		await setId(content, 'baron', 'count');
 		await click(saveOf(content));
 		await click(confirmOf(modal)!.querySelector('.dynasty-id-change'));
 		expect(notices[notices.length - 1]).toBe(ID_UI.inUse);
@@ -905,9 +933,14 @@ describe('Titles window: the Id change (§13.17 rule 5, D109, D110)', () => {
 		expect(content.querySelector('.dynasty-sheet-error')!.getText()).toBe(ID_UI.inUse);
 	});
 
-	it('closing the window with only a pending id asks first (Esc)', async () => {
+	it('closing the window with only a pending id asks first (Esc, after the page)', async () => {
 		const { content, win, modal } = await openTitles();
-		await setId(titleBox(content, 'baron'), 'count');
+		await setId(content, 'baron', 'count');
+		// The first Esc leaves the page; the second asks.
+		win.close();
+		await settle();
+		expect(backButton(content)).toBeNull();
+		expect(confirmOf(modal)).toBeNull();
 		win.close();
 		await settle();
 		expect(confirmOf(modal)!.querySelector('.dynasty-sheet-confirm-title')!.getText()).toBe(SHEET.discardTitle);

@@ -19,6 +19,7 @@ import { FEl, clock, dispatch, fakeWin, installDom, resetDom, settle } from './a
 import { openModals, resetObsidian } from './acceptance/fake-obsidian';
 import { BODY_13 } from './acceptance/titles-support';
 import { embed, fakeHandle, fakeHost, openSheetOn, type FakeHandle, type Host } from './acceptance/tree-view-fakes';
+import { openPage } from './lw-support';
 
 /*
  * M8 finishing round (G5 items): the holder buttons have a shape on a phone, a holder who is not in
@@ -130,9 +131,7 @@ describe('G5 M8 item 2: a holder who is not in the tree has the same name size a
 		await click(el.querySelector('.dynasty-more-titles'));
 		const win = openModals.find((m) => (m as unknown) instanceof TitlesWindow) as unknown as { contentEl: FEl };
 		expect(win).toBeDefined();
-		const box = () => win.contentEl.querySelector('.dynasty-title-box[data-title="duke"]')!;
-		await click(box().querySelector('.dynasty-title-toggle'));
-		const names = box().querySelectorAll('.dynasty-holder-name');
+		const names = openPage(win.contentEl, 'duke').querySelectorAll('.dynasty-holder-name');
 		expect(names.map((n) => n.tag.toLowerCase())).toEqual(['div', 'button']);
 		expect(names[0].getAttribute('class')).toBe(names[1].getAttribute('class'));
 	});

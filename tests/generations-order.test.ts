@@ -67,8 +67,9 @@ function rowProblems(src: string): string[] {
 }
 
 describe('computeGenerations: founders who marry a descendant', () => {
-	it('settles the shape of random seed 15: the founder stays above his daughter and beside his other wife', () => {
+	it('settles the shape of random seed 15: the founder p0 stays above his daughter and beside his other wife', () => {
 		// p0 marries his daughter p2 and also p6; p6's father p3 is the other parent of p2's son p5.
+		// 0.2.5 (D140): the partner step moves p1 one row down (the parents p0 and p1 of p2 stand on one row); p7 and her husband p8 follow him.
 		const src = `people:
   - {id: p0, name: P0, sex: m}
   - {id: p1, name: P1, sex: m}
@@ -87,7 +88,7 @@ unions:
 `;
 		const { gen } = build(src);
 		expect(rowProblems(src)).toEqual([]);
-		expect(Object.fromEntries(gen)).toEqual({ p0: 1, p1: 0, p2: 2, p3: 0, p4: 3, p5: 3, p6: 1, p7: 1, p8: 1 });
+		expect(Object.fromEntries(gen)).toEqual({ p0: 1, p1: 1, p2: 2, p3: 0, p4: 3, p5: 3, p6: 1, p7: 2, p8: 2 });
 	});
 
 	it('keeps a founder who marries his granddaughter two rows above her', () => {

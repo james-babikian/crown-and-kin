@@ -1,6 +1,6 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import { DEFAULT_LAYOUT_SETTINGS, clearLayoutCache, layoutKey, layoutTree } from '../../src/layout/index';
-import { cardText, geometryFor, namesOnlyGeometry, portraitBox, roomAt, sidewaysGeometry, tallExtra } from '../../src/layout/geometry';
+import { cardText, geometryFor, portraitBox, roomAt, tallExtra } from '../../src/layout/geometry';
 import type { Geometry, LayoutSettings, PersonBox } from '../../src/layout/model';
 import { buildScene, type Scene } from '../../src/render/dom/scene';
 import { tallCardsFor } from '../../src/render/dom/tall-cards';
@@ -258,13 +258,6 @@ describe('L2: `tallCardsFor` answers `tall` (2 or 3 text lines) and `long` (3), 
 		expect(withArms).toEqual({ tall: [], long: [] });
 	});
 
-	it('the name of a names-only card uses the room that the arms box leaves beside its last text line (D125 a): 14 characters need a second text line only with the box', () => {
-		const g = tree([['a', 'Aldrimonalotte']]);
-		const geo = namesOnlyGeometry(GEO);
-		expect(tallFor(g, geo, FONTS, (s) => m(s), new Set())).toEqual({ tall: [], long: [] });
-		expect(tallFor(g, geo, FONTS, (s) => m(s), new Set(), undefined, new Set(['a']))).toEqual({ tall: ['a'], long: [] });
-	});
-
 	it('the name of the card is measured (D58): the regnal name, with the number', () => {
 		const g = tree([['x', 'Maximilian Valm']]); // 15 characters, fits
 		expect(tallFor(g, GEO, FONTS, (s) => m(s))).toEqual({ tall: [], long: [] });
@@ -318,7 +311,7 @@ describe('L2: `tallCardsFor` answers `tall` (2 or 3 text lines) and `long` (3), 
 		expect(tallFor(g, GEO, FONTS, (s) => m(s))).toEqual({ tall: ['a'], long: [] });
 	});
 
-	it('sample tree 15, block 2, at the default font: the counts of the comments, on a normal and on a narrow card', () => {
+	it('sample tree 15, block 2, at the default font: the counts of the comments, on a normal card', () => {
 		const facts = comments15().names;
 		const g = graphOf(block15(1));
 		const fonts = { text: 'Segoe UI, sans-serif', ui: 'Segoe UI, sans-serif', bold: '600' };
@@ -329,9 +322,6 @@ describe('L2: `tallCardsFor` answers `tall` (2 or 3 text lines) and `long` (3), 
 		expect(want(158)).toEqual({ tall: ['over-three', 'three-narrow', 'three-normal', 'two-lines'], long: ['over-three', 'three-normal'] });
 		expect(want(142)).toEqual({ tall: ['over-three', 'three-narrow', 'three-normal', 'two-lines'], long: ['over-three', 'three-narrow', 'three-normal'] });
 		expect(tallFor(g, GEO, fonts, approxMeasure)).toEqual(want(158));
-		const narrow: Geometry = sidewaysGeometry(GEO, 'narrow');
-		expect(narrow.cardW).toBe(164);
-		expect(tallFor(g, narrow, fonts, approxMeasure)).toEqual(want(142));
 	});
 });
 
@@ -378,7 +368,7 @@ describe('L3: card heights, the box flags and the cache key', () => {
 
 	it('sideways (D24): each card keeps its own height; only the long card is taller; widths are the same', () => {
 		clearLayoutCache();
-		const side = { orientation: 'sideways', sidewaysCards: 'narrow' };
+		const side = { orientation: 'sideways' };
 		const base = lay(settings({ ...side }), GEO);
 		const laid = lay(settings({ ...side, tallCards: ['b', 'c'], longNames: ['c'] }), GEO);
 		const cardH = base.layout.persons.get('a')!.h;
@@ -452,47 +442,44 @@ describe('the scene and the saved SVG draw the third name text line like the sec
 	const g = graphOf(block15(1));
 	const idsAt = (width: number, min: number, max: number) => facts.filter((f) => f.width === width && f.lines.length >= min && f.lines.length <= max).map((f) => f.id).sort();
 
-	function laidOut(width: 158 | 142) {
+	function laidOut(width: 158) {
 		clearLayoutCache();
-		const narrow = width === 142;
 		const settings = {
 			...DEFAULT_LAYOUT_SETTINGS,
-			...(narrow ? { orientation: 'sideways', sidewaysCards: 'narrow' } : {}),
 			tallCards: idsAt(width, 2, 3),
 			longNames: idsAt(width, 3, 3),
 		} as Settings;
 		return layoutTree(g, GEO, settings, 'font');
 	}
 
-	for (const width of [158, 142] as const) {
-		it(`scene, ${width} px: each card shows the text lines of the comments, the third with the same class as the second`, () => {
-			const laid = laidOut(width);
-			const root = new FEl('g');
-			const scene: Scene = buildScene(root as unknown as SVGGElement, g, laid, { fonts: FONTS, measure: approxMeasure, link: () => null });
-			expect(scene.cards.size).toBe(7);
-			const all = (el: FEl): FEl[] => [el, ...el.children.flatMap(all)];
-			for (const f of facts.filter((x) => x.width === width)) {
-				const card = all(root).find((e) => e.hasClass('dynasty-card') && e.getAttribute('data-person') === f.id)!;
-				const names = all(card).filter((e) => e.hasClass('dynasty-card-name'));
-				expect(names.map((e) => e.getText()), f.id).toEqual(f.lines);
-				if (f.lines.length === 3) {
-					const ys = names.map((e) => Number(e.getAttribute('y')));
-					expect(ys[2] - ys[1], f.id).toBeCloseTo(ys[1] - ys[0], 6);
-				}
+	const width = 158;
+	it(`scene, ${width} px: each card shows the text lines of the comments, the third with the same class as the second`, () => {
+		const laid = laidOut(width);
+		const root = new FEl('g');
+		const scene: Scene = buildScene(root as unknown as SVGGElement, g, laid, { fonts: FONTS, measure: approxMeasure, link: () => null });
+		expect(scene.cards.size).toBe(7);
+		const all = (el: FEl): FEl[] => [el, ...el.children.flatMap(all)];
+		for (const f of facts.filter((x) => x.width === width)) {
+			const card = all(root).find((e) => e.hasClass('dynasty-card') && e.getAttribute('data-person') === f.id)!;
+			const names = all(card).filter((e) => e.hasClass('dynasty-card-name'));
+			expect(names.map((e) => e.getText()), f.id).toEqual(f.lines);
+			if (f.lines.length === 3) {
+				const ys = names.map((e) => Number(e.getAttribute('y')));
+				expect(ys[2] - ys[1], f.id).toBeCloseTo(ys[1] - ys[0], 6);
 			}
-		});
+		}
+	});
 
-		it(`renderSvg, ${width} px: the same text lines, at the baselines of cardText`, () => {
-			const laid = laidOut(width);
-			const svg = renderSvg(g, laid.layout, laid.edges, { measure: approxMeasure, fonts: FONTS });
-			for (const f of facts.filter((x) => x.width === width)) {
-				const box = laid.layout.persons.get(f.id) as Box;
-				expect(box.tallName === true, f.id).toBe(f.lines.length > 1);
-				expect(box.longName === true, f.id).toBe(f.lines.length === 3);
-				for (const line of f.lines) expect(svg, `${f.id}: ${line}`).toContain(`>${line}</text>`);
-			}
-		});
-	}
+	it(`renderSvg, ${width} px: the same text lines, at the baselines of cardText`, () => {
+		const laid = laidOut(width);
+		const svg = renderSvg(g, laid.layout, laid.edges, { measure: approxMeasure, fonts: FONTS });
+		for (const f of facts.filter((x) => x.width === width)) {
+			const box = laid.layout.persons.get(f.id) as Box;
+			expect(box.tallName === true, f.id).toBe(f.lines.length > 1);
+			expect(box.longName === true, f.id).toBe(f.lines.length === 3);
+			for (const line of f.lines) expect(svg, `${f.id}: ${line}`).toContain(`>${line}</text>`);
+		}
+	});
 
 	it('the accessible name of a card is the full name (L4)', () => {
 		const laid = laidOut(158);

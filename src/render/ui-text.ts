@@ -279,7 +279,13 @@ export const FOCUS_UI = {
 	focus: 'Focus on a person in the tree',
 	pickerTitle: 'Focus on a person',
 	pickerPlaceholder: PERSON_PLACEHOLDER,
-	showAll: 'Show all people',
+	/** D132: the Focus button of the toolbar chooses a person, and clears the focus while one shows. */
+	choose: 'Choose a person',
+	chooseLabel: 'Choose a person: show only the family of the person that you choose',
+	clear: 'Clear focus',
+	clearLabel: 'Clear focus: show all people again',
+	/** The accessible name of the Focus button while a focus shows. */
+	focusOn: 'Focus is on. Choose a person to change it. Clear the focus to show all people.',
 	focusHere: 'Focus here',
 	focusHereLabel: (name: string) => `Focus here: show only the family of ${name}`,
 	pin: 'Pin focus here',
@@ -339,7 +345,6 @@ export const HOUSES = {
 	intro: 'The colour of a house shows on the cards of the people of that house.',
 	none: 'This tree has no houses.',
 	newHouse: 'New house',
-	swatchLabel: (house: string) => `Change the colour of ${house}`,
 	nameLabel: 'Name of the house',
 	count: (n: number) => (n === 0 ? 'No people' : n === 1 ? '1 person' : `${n} people`),
 	delete: 'Delete',
@@ -439,10 +444,6 @@ export const TITLES_UI = {
 	pluralPlaceholder: 'For example: Dukes of Valmont',
 	pluralAria: (title: string) => `Name of the list: the holders of ${title}`,
 	count: (n: number) => (n === 0 ? 'No holders' : n === 1 ? '1 holder' : `${n} holders`),
-	showHolders: 'Show holders',
-	hideHolders: 'Hide holders',
-	showHoldersLabel: (title: string) => `Show holders: show the holders of ${title}`,
-	hideHoldersLabel: (title: string) => `Hide holders: hide the holders of ${title}`,
 	delete: 'Delete',
 	deleteLabel: (title: string) => `Delete ${title}`,
 	add: 'Add title',
@@ -515,28 +516,15 @@ export const TITLES_UI = {
 		titles === 1 ? `The plugin also removes ${name} from the holders of 1 title.` : `The plugin also removes ${name} from the holders of ${titles} titles.`,
 } as const;
 
-/** The button that changes the height of the tree in a note on a phone (D120). */
-export const HEIGHT_UI = {
-	button: 'Change the height of the tree',
-} as const;
-
 /** The settings tab (spec §9, D33). */
 export const SETTINGS_UI = {
 	groups: { height: 'Height in a note', cards: 'Cards', housePage: 'House page', focus: 'Focus mode', links: 'Links', repair: 'Repair' },
 	heightDesktop: 'Height on a computer or tablet',
 	heightDesktopDesc: 'This is the height of a tree in a note, in pixels. The default is 500. If you drag the bottom edge of a tree, that tree keeps its new height.',
-	heightPhone: 'Height on a phone',
-	heightPhoneDesc: 'This is the start height of a tree in a note, as a percent of the screen height. The default is 60%. A button on the tree changes the height for the open note.',
 	cardSize: 'Card size',
 	cardSizeDesc: 'Compact cards show more people on the screen. Normal cards show more of each name.',
 	cardNormal: 'Normal',
 	cardCompact: 'Compact',
-	/** D119: the card style of the tree in a note on a phone. */
-	phoneCardStyle: 'Card style in the phone preview',
-	phoneCardStyleDesc: 'This is how the tree looks in a note on a phone. The full-screen view always shows whole cards.',
-	styleNamesShield: 'Names only, with the arms',
-	styleNamesPortrait: 'Names only, with the portrait',
-	styleWhole: 'Whole card',
 	/** D118: the user's own break places in long names. */
 	breakWords: 'Break places in long names',
 	breakWordsDesc: `The plugin can break a long word into parts. Write one word on each text line. Put a hyphen at each place where the word can break. An example is ${quote('Long-na-munda')}. If a name has a hyphen, write each part on its own text line. The plugin breaks a word from this list only at your places.`,
@@ -549,7 +537,12 @@ export const SETTINGS_UI = {
 	dates: 'Show dates on cards',
 	datesDesc: 'If this is on, the cards show when each person was born and died, and the years of each reign.',
 	relations: 'Show relation names on cards',
-	relationsDesc: `If this is on, each card shows the relation of the person to you. A person in the tree must have the mark ${quote('This is me')}.`,
+	relationsDesc: `If this is on, each card shows how the person is related to you. A person in the tree must have the mark ${quote('This is me')}. If this is off, the cards are shorter. On a computer, a small label then shows the relation when you rest the pointer on a card. The list in a note on a phone follows this setting.`,
+	/** D150: the direction of the full-screen tree on a phone held upright. */
+	phoneDirection: 'Tree direction on a phone held upright',
+	directionSideways: 'Sideways',
+	directionDown: 'Like the computer',
+	phoneDirectionDesc: 'This is how the tree looks in the full-screen view on a phone that you hold upright. If you choose Sideways, the generations go from left to right. If you choose Like the computer, the generations go from top to bottom. A phone on its side, a tablet and a computer always show the tree from top to bottom. The setting is the same for all trees.',
 	/** Spec §13.7 (M9 contract O10). */
 	portraits: 'Show portraits on cards',
 	portraitsDesc: 'If this is on, the cards show the portraits of the people.',
@@ -868,4 +861,52 @@ export const FOLD_UI = {
 	/** The sign of a folded family, with the number of hidden people. */
 	showLabel: (names: readonly string[], count: number) =>
 		count === 1 ? `Show the hidden person below ${names.join(' and ')}` : `Show the ${count} hidden people below ${names.join(' and ')}`,
+} as const;
+
+/** D144: the list that replaces the tree in a note on a phone (spec §5.5). */
+export const PHONE_LIST_UI = {
+	addPerson: 'Add person',
+	addPersonLabel: 'Add person: add a person to the tree',
+	find: 'Find',
+	findLabel: 'Find: find a person in the tree to show the family of that person',
+	back: 'Back',
+	backLabel: (name: string) => `Back: show the family of ${name} again`,
+	expand: 'Expand',
+	expandLabel: 'Expand: show the tree in a full-screen view',
+	headParents: 'Parents',
+	headYou: 'You',
+	headPerson: 'This person',
+	headChildren: 'Children',
+	withPartner: (name: string, years?: string) => (years ? `With ${name} (${years})` : `With ${name}`),
+	noPartner: 'No partner listed',
+	otherChildren: 'Other children',
+	/** The accessible name of the list. */
+	region: (name: string) => `Family of ${name}`,
+	goLabel: (name: string, word?: string) => `${name}${word ? `, ${word}` : ''}. Show the family of this person.`,
+	editLabel: (name: string) => `Edit ${name}`,
+	you: 'You',
+	savedElsewhere: 'The plugin saved the person. Tap Find to see this person.',
+} as const;
+
+/** D134, D138: the searchable lists of the Titles window and the Houses window. */
+export const WIN_LIST_UI = {
+	searchTitles: 'Search titles',
+	searchHouses: 'Search houses',
+	clearSearch: 'Clear the search',
+	matchTitles: (shown: number, all: number) => `${shown} of ${all} ${all === 1 ? 'title' : 'titles'} ${shown === 1 ? 'matches' : 'match'}.`,
+	matchHouses: (shown: number, all: number) => `${shown} of ${all} ${all === 1 ? 'house' : 'houses'} ${shown === 1 ? 'matches' : 'match'}.`,
+	noResultTitles: (q: string) => `No title matches ${quote(q)}.`,
+	noResultHouses: (q: string) => `No house matches ${quote(q)}.`,
+	holder: (name: string) => `Holder: ${name}`,
+	person: (name: string) => `Person: ${name}`,
+	id: (id: string) => `ID: ${id}`,
+	newest: (ruler: string) => `Newest holder: ${ruler}`,
+	stateNew: 'New',
+	stateChanged: 'Changed',
+	stateCheckId: 'Check the ID',
+	back: 'Back',
+	backTitles: 'Back to the list of titles',
+	backHouses: 'Back to the list of houses',
+	editPage: (name: string) => `Page to edit ${name}`,
+	otherActions: 'Other actions',
 } as const;

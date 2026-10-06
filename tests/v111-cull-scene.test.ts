@@ -332,6 +332,8 @@ describe('fillChunk builds the lines nearest the view with the cards, and they e
 		expect(linesEarly).toBe(false);
 		expect(lazy.s.fill.pendingLines).toBe(0);
 		expect(calls).toBeGreaterThan(10);
+		// WP-B8 3: the focus rings are made by `fillPerson` and `fillAll`, so the eager scene is reached once `fillAll` has made them.
+		lazy.s.fill.fillAll();
 		expect(serial(lazy.root)).toBe(serial(eager.root));
 	});
 

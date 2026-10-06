@@ -11,6 +11,7 @@ import { closePluginModals } from '../src/obsidian/plugin-modals';
 import { FEl, clock, fakeWin, installDom, resetDom } from './acceptance/fake-dom';
 import { openModals, resetObsidian } from './acceptance/fake-obsidian';
 import { fakeApp } from './acceptance/tree-view-fakes';
+import { backToList, openPage, pageOf } from './lw-support';
 import { click, stripNotDisabled, type, writingHandle } from './s113-c-support';
 
 /*
@@ -50,15 +51,17 @@ describe('the question before an id change in the Houses window', () => {
 		const modal = (win as unknown as { modalEl: FEl }).modalEl;
 		const content = (win as unknown as { contentEl: FEl }).contentEl;
 		// Change the id of House Valmont through the small window.
-		await click(content.querySelector('.dynasty-house-row[data-house="valmont"] .dynasty-id-open'));
+		await click(openPage(content, 'valmont').querySelector('.dynasty-id-open'));
 		const idWin = (openModals[openModals.length - 1] as unknown as { modalEl: FEl }).modalEl;
 		type(idWin.querySelector('.dynasty-id-input')!, 'house-valmont');
 		await click(idWin.querySelector('.dynasty-id-use'));
-		// Save: the question opens.
+		// The page of House Orsini stays open behind the question that Save opens.
+		backToList(content);
+		openPage(content, 'orsini');
 		await click(content.querySelector('.dynasty-sheet-save'));
 		expect(modal.querySelector('.dynasty-sheet-confirm')).not.toBeNull();
 		// The owner presses Shift+Tab to a control behind the question and renames House Orsini.
-		const orsini = content.querySelector('.dynasty-house-row[data-house="orsini"] input.dynasty-sheet-input')!;
+		const orsini = pageOf(content).querySelector('.dynasty-house-name textarea')!;
 		type(orsini, 'House Zeta');
 		await click(modal.querySelector('.dynasty-id-change'));
 		const t = parseDynasty(h.body);
@@ -76,13 +79,15 @@ describe('the question before an id change in the Houses window', () => {
 		win.open();
 		const modal = (win as unknown as { modalEl: FEl }).modalEl;
 		const content = (win as unknown as { contentEl: FEl }).contentEl;
-		await click(content.querySelector('.dynasty-title-box[data-title="crown"] .dynasty-id-open'));
+		await click(openPage(content, 'crown').querySelector('.dynasty-id-open'));
 		const idWin = (openModals[openModals.length - 1] as unknown as { modalEl: FEl }).modalEl;
 		type(idWin.querySelector('.dynasty-id-input')!, 'the-crown');
 		await click(idWin.querySelector('.dynasty-id-use'));
+		backToList(content);
+		openPage(content, 'duchy');
 		await click(content.querySelector('.dynasty-sheet-save'));
 		expect(modal.querySelector('.dynasty-sheet-confirm')).not.toBeNull();
-		type(content.querySelector('.dynasty-title-box[data-title="duchy"] .dynasty-title-row input.dynasty-sheet-input')!, 'Grand Duchy');
+		type(pageOf(content).querySelector('.dynasty-title-name textarea')!, 'Grand Duchy');
 		await click(modal.querySelector('.dynasty-id-change'));
 		const t = parseDynasty(h.body);
 		if (!t.ok) throw new Error('parse');

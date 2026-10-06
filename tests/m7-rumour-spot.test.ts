@@ -11,12 +11,10 @@ import { randomTree } from './random-trees';
 // draw (0.5 em in the plugin, 8 px in the headless pictures) and 2 px more clear of every card. A drop
 // too short for it moves the "?" on to its sibling bar or its trunk stem.
 
-const SIDE: LayoutSettings = { ...DEFAULT_LAYOUT_SETTINGS, orientation: 'sideways', sidewaysCards: 'normal' };
-const NARROW: LayoutSettings = { ...SIDE, sidewaysCards: 'narrow' };
+const SIDE: LayoutSettings = { ...DEFAULT_LAYOUT_SETTINGS, orientation: 'sideways' };
 const ORIENTATIONS = [
 	['down', DEFAULT_LAYOUT_SETTINGS],
 	['sideways', SIDE],
-	['sideways narrow', NARROW],
 ] as const;
 
 const room = (font: number) => Math.max(8, 0.5 * font) + 2;

@@ -18,6 +18,7 @@ import { HOUSE_PAGE_UI, NOTE_UI, REMOVE, WRITE_TEXT } from '../src/render/ui-tex
 import { FEl, device, dispatch, fakeWin, installDom, resetDom } from './acceptance/fake-dom';
 import { noticeList, notices, openModals, resetObsidian } from './acceptance/fake-obsidian';
 import { fakeHandle, type FakeHandle } from './acceptance/tree-view-fakes';
+import { backButton, backToList, openPage as openListPage } from './lw-support';
 
 /*
  * WP 10.3b (M10 rules N1–N5, H1–H4; spec §13.11, §13.12): the flow of "Make a note" through the real
@@ -613,16 +614,20 @@ describe('H1: People in the Houses window', () => {
 		const content = (win as unknown as { contentEl: FEl }).contentEl;
 		return { ...v, win, content, shown, handle };
 	}
-	const rowOf = (c: FEl, id: string) => c.querySelectorAll('.dynasty-house-row').find((r) => r.getAttribute('data-house') === id)!;
+	// 0.2.5 (D134): People is on the edit page of a house; this opens the page (back to the list first when another page is open).
+	const rowOf = (c: FEl, id: string) => {
+		if (backButton(c)) backToList(c);
+		return openListPage(c, id);
+	};
 
-	it('each saved house has People with its label; a house new in the draft has none', () => {
+	it('each saved house has People with its label on its page; a house new in the draft has none', () => {
 		const h = openHouses();
 		const b = rowOf(h.content, 'valmont').querySelector('.dynasty-house-people')!;
 		expect(b.getText()).toBe('People');
 		expect(b.getAttribute('aria-label')).toBe('People: show the people of House Valmont');
+		backToList(h.content);
 		dispatch(h.content.querySelector('.dynasty-house-add')!, 'click');
-		const rows = h.content.querySelectorAll('.dynasty-house-row');
-		expect(rows[rows.length - 1].querySelector('.dynasty-house-people')).toBeNull();
+		expect(h.content.querySelector('.dynasty-lw-page')!.querySelector('.dynasty-house-people')).toBeNull();
 	});
 
 	it('without the option there is no People button', () => {
@@ -644,7 +649,7 @@ describe('H1: People in the Houses window', () => {
 
 	it('with unsaved changes the window asks first; keep editing shows nothing, discard shows the card', () => {
 		const h = openHouses();
-		const name = rowOf(h.content, 'orsini').querySelector('input')!;
+		const name = rowOf(h.content, 'orsini').querySelector('textarea')!;
 		(name as unknown as { value: string }).value = 'House Orsini II';
 		dispatch(name, 'input');
 		dispatch(rowOf(h.content, 'valmont').querySelector('.dynasty-house-people')!, 'click');

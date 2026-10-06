@@ -12,7 +12,7 @@
  *   generation among the members, plus 1. Numbers count on over a generation with no member.
  * - Order: by generation, then by the person's place in the model order (`computeModelOrder`, which
  *   keeps the sibling order of D2), not by the final left-to-right place of the layout.
- * - Cells: `name` is the regnal name of D58, then the sobriquet in curly marks if there is one (D122); `title` is the title text line as the card shows it, with
+ * - Cells: `name` is the regnal name of D58 for a numbered entry, else the full name (D131), then the sobriquet in curly marks if there is one (D122); `title` is the title text line as the card shows it, with
  *   the reign, joined with one space, or ''; `born` and `died` as written, or ''.
  * - Table note: only the table (header, separator, one row per member), every cell through `tableCell`,
  *   one line break at the end. The note name is cleaned as `noteName` cleans it.
@@ -30,7 +30,7 @@ export interface HousePageRow {
 	id: string;
 	/** D88: 1 = the oldest generation with a member of the house. */
 	generation: number;
-	/** The card's name text line (regnal name, D58). */
+	/** The regnal name of a numbered entry (D58), else the full name (D131). */
 	name: string;
 	/** The card's title text line with its reign; '' when none. */
 	title: string;
@@ -68,7 +68,8 @@ export function housePage(g: FamilyGraph, houseId: string): HousePage | null {
 		return {
 			id: p.id,
 			generation: gen(p.id) - oldest + 1,
-			name: withSobriquet(label?.name ?? p.name, p.sobriquet),
+			// D131: only a numbered entry gives a regnal name here; a table of one house needs full names.
+			name: withSobriquet(label?.numbered ? label.name : p.name, p.sobriquet),
 			title: [label?.title, label?.reign].filter((x) => x !== undefined && x !== '').join(' '),
 			born: p.born ?? '',
 			died: p.died ?? '',

@@ -162,8 +162,8 @@ describe('a tap on a row of a house page (spec §13.12 H3)', () => {
 	});
 });
 
-describe('Show all people keeps the folds (spec §13.10 "Focus mode")', () => {
-	it('after Focus and Show all people the block still owes its folds, and the folded people stay hidden', async () => {
+describe('Clear focus keeps the folds (spec §13.10 "Focus mode")', () => {
+	it('after Focus and Clear focus the block still owes its folds, and the folded people stay hidden', async () => {
 		const source = block15(0);
 		const handle = handleFor(source, 'B');
 		const { el, view } = await embed(source, { handle });
@@ -171,9 +171,12 @@ describe('Show all people keeps the folds (spec §13.10 "Focus mode")', () => {
 		(view as unknown as { focusOn(id: string | null): void }).focusOn('osric');
 		await run();
 		expect(folds(handle)).toEqual(new Set([key('B')]));
-		const all = el.querySelector('.dynasty-show-all');
-		expect(all).not.toBeNull();
-		dispatch(all!, 'click');
+		// D132: Focus opens a small list while a focus shows; Clear focus is its second item.
+		expect(el.querySelector('.dynasty-show-all')).toBeNull();
+		dispatch(el.querySelector('.dynasty-focus')!, 'click', { detail: 1 });
+		const clear = el.querySelectorAll('.dynasty-popover-focus .dynasty-popover-item')[1];
+		expect(clear).toBeDefined();
+		dispatch(clear, 'click', { detail: 1 });
 		await run();
 		expect(folds(handle)).toEqual(new Set([key('B')]));
 		expect(cardCount(el)).toBe(96 - 14);

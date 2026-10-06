@@ -3,7 +3,7 @@ import { deriveFamilies, type FamilyGraph } from '../src/core/derive';
 import { foldFamilies, foldHidden } from '../src/core/folds';
 import { parseDynasty } from '../src/core/parse';
 import type { CardLabel } from '../src/core/titles';
-import { boxesShown, geometryFor, namesOnlyGeometry, tallExtra, withRelationLine } from '../src/layout/geometry';
+import { boxesShown, geometryFor, tallExtra, withRelationLine } from '../src/layout/geometry';
 import { couldBeSigned, illegitimateSigns } from '../src/layout/illegitimate-sign';
 import { DEFAULT_LAYOUT_SETTINGS, clearLayoutCache, layoutKey, layoutTree } from '../src/layout/index';
 import type { LayoutSettings } from '../src/layout/model';
@@ -21,7 +21,6 @@ const measure = (s: string, font: string) => [...s].length * 0.5 * Number(/(\d+(
 const label = (name: string, extra: Partial<CardLabel> = {}): CardLabel => ({ holdings: [], selected: false, name, ...extra }) as CardLabel;
 const tree = (src: string): FamilyGraph => build(src).g;
 const WHOLE = geometryFor(16, 'normal');
-const ONLY = namesOnlyGeometry(WHOLE);
 const REL = withRelationLine(WHOLE, { relationLine: true } as never);
 const EMPTY = { tall: [], long: [], slots: new Map(), lifted: new Set() };
 
@@ -39,38 +38,6 @@ describe('tallCardsFor: the name room and the slots', () => {
 		const boxed = tallCardsFor(g, WHOLE, FONTS, measure, undefined, undefined, new Set(['a']), undefined, { portraits: new Set(['a']) });
 		expect(boxed?.tall).toEqual(plain?.tall);
 		expect(boxed?.long).toEqual(plain?.long);
-	});
-
-	it('a names-only card: a name of 19 characters (129.2 px) fits one line with the arms (133.2 px) and needs a second with both boxes (104.4 px); no line ends with "…"', () => {
-		const g = one('Aaaaaa Bbbbbbbbbbbb');
-		const only = (arms: boolean, portrait: boolean) => tallCardsFor(g, ONLY, FONTS, measure, undefined, undefined, arms ? new Set(['a']) : undefined, undefined, portrait ? { portraits: new Set(['a']) } : undefined)!;
-		expect(only(false, false)).toEqual(EMPTY);
-		expect(only(true, false)).toEqual(EMPTY);
-		// The portrait alone leaves 130 px: 129.2 px still fits.
-		expect(only(false, true)).toEqual(EMPTY);
-		const both = only(true, true);
-		expect(both.tall).toEqual(['a']);
-		expect(both.long).toEqual([]);
-		expect(both.slots.get('a')).toBe(2);
-	});
-
-	it('a bigger name that needs two and then three text lines grows with the boxes, never shrinks; `last` is the room of the last text line only', () => {
-		const words = ['Bartholomewson', 'Alexandrovichs', 'Wolfgangsenal', 'Cadwalladerson', 'Mariannemarie', 'Ottaviano', 'Fitzgerald', 'Anne', 'Louis', 'Montgomerie'];
-		let seed = 3;
-		const rand = () => ((seed = (seed * 1103515245 + 12345) >>> 0) / 4294967296);
-		let grew = 0;
-		for (let k = 0; k < 300; k++) {
-			const name = Array.from({ length: 1 + Math.floor(rand() * 5) }, () => words[Math.floor(rand() * words.length)]).join(' ');
-			const g = one(name);
-			const free = tallCardsFor(g, ONLY, FONTS, measure)!;
-			const boxed = tallCardsFor(g, ONLY, FONTS, measure, undefined, undefined, new Set(['a']), undefined, { portraits: new Set(['a']) })!;
-			const a = free.slots.get('a') ?? 1;
-			const b = boxed.slots.get('a') ?? 1;
-			expect(b, name).toBeGreaterThanOrEqual(a);
-			expect(b - a, name).toBeLessThanOrEqual(1);
-			if (b > a) grew++;
-		}
-		expect(grew).toBeGreaterThan(5);
 	});
 
 	it('the sobriquet is one part: it takes a text line of its own when the name fills the first', () => {
@@ -125,7 +92,7 @@ describe('tallCardsFor: the name room and the slots', () => {
 	});
 });
 
-describe('tallCardsFor: the D14 sign, the name slots of a signed names-only card (D126 3) and the `couldBeSigned` rule', () => {
+describe('tallCardsFor: the D14 sign, the marked Compact card (D129) and the `couldBeSigned` rule', () => {
 	const SRC = `people:
   - {id: p, name: Pa}
   - {id: a, name: Aldric, illegitimate: true}
@@ -143,23 +110,6 @@ describe('tallCardsFor: the D14 sign, the name slots of a signed names-only card
   - {id: e, name: E, parents: [p]}
 `);
 		expect(g.people.filter((p) => couldBeSigned(g, p)).map((p) => p.id)).toEqual(['a', 'c', 'd']);
-	});
-
-	it('a signed names-only card with a one-line name has two slots: the card is one small text line higher; unsigned, one', () => {
-		const g = tree(SRC);
-		clearLayoutCache();
-		const first = layoutTree(g, ONLY, DEFAULT_LAYOUT_SETTINGS, 'x');
-		const signed = illegitimateSigns(g, first.edges);
-		expect([...signed]).toEqual(['a']);
-		const r = tallCardsFor(g, ONLY, FONTS, measure, signed)!;
-		expect(r.tall).toEqual(['a']);
-		expect(r.slots.get('a')).toBe(2);
-		const laid = layoutTree(g, ONLY, { ...DEFAULT_LAYOUT_SETTINGS, tallCards: r.tall } as LayoutSettings, 'x');
-		expect(laid.layout.persons.get('a')!.h).toBe(ONLY.cardH + tallExtra(ONLY));
-		expect(laid.layout.persons.get('b')!.h).toBe(ONLY.cardH);
-		expect(ONLY.cardH + tallExtra(ONLY)).toBe(67);
-		// A whole card keeps its height: the sign changes no slot count there.
-		expect(tallCardsFor(g, WHOLE, FONTS, measure, signed)?.tall).toEqual([]);
 	});
 
 	it('D129: the Compact card of the marked person who has the sign has two slots and is one small text line higher; every other Compact card, and the Normal card, is as before', () => {
@@ -196,13 +146,11 @@ describe('tallCardsFor: the D14 sign, the name slots of a signed names-only card
 	});
 
 	it('without the signs the answer is `undefined` only because of a person who could be signed', () => {
-		// Names-only: `a` could be signed (no parents): its slots are 1 unsigned and 2 signed.
-		expect(tallCardsFor(tree(SRC), ONLY, FONTS, measure)).toBeUndefined();
-		// `b` has birth parents and is never signed: counted unsigned, no second pass.
-		const onlyB = tree('people:\n  - {id: p, name: Pa}\n  - {id: b, name: Bertram, illegitimate: true, parents: [p]}\n  - {id: c, name: Cedric, parents: [p]}\n');
-		expect(tallCardsFor(onlyB, ONLY, FONTS, measure)).toEqual(EMPTY);
-		// A whole card: the sign changes no slot of a short name, so no second pass either.
+		// A whole card: the sign changes no slot of a short name, so no second pass.
 		expect(tallCardsFor(tree(SRC), WHOLE, FONTS, measure)).toEqual(EMPTY);
+		// `b` has birth parents and is never signed: counted unsigned, no second pass, also with a long name.
+		const onlyB = tree('people:\n  - {id: p, name: Pa}\n  - {id: b, name: Bertram, illegitimate: true, parents: [p]}\n  - {id: c, name: Cedric, parents: [p]}\n');
+		expect(tallCardsFor(onlyB, WHOLE, FONTS, measure)).toEqual(EMPTY);
 	});
 
 	it('the D14 sign still narrows the name of a whole card (the two-pass rule of 0.2.3): 23 characters fit 158 px and not 132 px', () => {
@@ -211,17 +159,6 @@ describe('tallCardsFor: the D14 sign, the name slots of a signed names-only card
 		expect(tallCardsFor(g, WHOLE, FONTS, measure)).toBeUndefined();
 		expect(tallCardsFor(g, WHOLE, FONTS, measure, new Set())?.tall).toEqual([]);
 		expect(tallCardsFor(g, WHOLE, FONTS, measure, new Set(['a']))?.tall).toEqual(['a']);
-	});
-
-	it('an illegitimate person who is signed in a names-only layout counts with the narrower room of the two-slot card', () => {
-		const g = tree('people:\n  - {id: a, name: Placeholder, illegitimate: true}\n');
-		// 20 characters = 136 px: fits 158 (unsigned, one slot) and the 132 px of nameWithSignW only on two lines.
-		(g.byId.get('a') as { name: string }).name = 'Aaaaaa Bbbbbbbbbbbbbb';
-		const unsigned = tallCardsFor(g, ONLY, FONTS, measure, new Set())!;
-		const signed = tallCardsFor(g, ONLY, FONTS, measure, new Set(['a']))!;
-		expect(unsigned.tall).toEqual([]);
-		expect(signed.tall).toEqual(['a']);
-		expect(signed.slots.get('a')).toBe(2);
 	});
 
 	it('couldBeSigned is a superset of illegitimateSigns on every sample tree, down and sideways, with and without folds', () => {
@@ -235,8 +172,7 @@ describe('tallCardsFor: the D14 sign, the name slots of a signed names-only card
 			const hidden = foldHidden(g, folds);
 			const variants: LayoutSettings[] = [
 				{ ...DEFAULT_LAYOUT_SETTINGS },
-				{ ...DEFAULT_LAYOUT_SETTINGS, orientation: 'sideways', sidewaysCards: 'normal' },
-				{ ...DEFAULT_LAYOUT_SETTINGS, orientation: 'sideways', sidewaysCards: 'narrow' },
+				{ ...DEFAULT_LAYOUT_SETTINGS, orientation: 'sideways' },
 				...(hidden.size ? [{ ...DEFAULT_LAYOUT_SETTINGS, foldHidden: [...hidden].sort(), foldedFamilies: [...folds].sort(), foldControls: true as const }] : []),
 			];
 			for (const v of variants) {
@@ -322,10 +258,6 @@ describe('tallCardsFor: rule B, the lift of the arms box and the portrait (D126 
 		expect([...tallCardsFor(g(), REL, FONTS, m, undefined, undefined, ARMS, undefined, { relations: rel(HALF) })!.lifted]).toEqual(['a']);
 	});
 
-	it('a names-only card never lifts (it has no relation line)', () => {
-		expect(tallCardsFor(g(), ONLY, FONTS, m, undefined, undefined, ARMS, undefined, { ...PICS, relations: rel(HALF) })!.lifted.size).toBe(0);
-	});
-
 	it('"Show dates" off with a label that has only a reign: the title line goes, the relation text moves up a line and the boxes no longer lift', () => {
 		const labels = new Map([['a', label('Aldric', { reign: '1131–1160' })]]);
 		const gs = tree(['houses:', '  - {id: v, name: V, arms: "[[v.png]]"}', 'people:', '  - {id: a, name: Aldric, house: v, portrait: "[[a.png]]", born: 1100}', ''].join(String.fromCharCode(10)));
@@ -360,14 +292,6 @@ describe('tallCardsFor: rule B, the lift of the arms box and the portrait (D126 
 		expect(unsigned.lifted.size).toBe(1);
 		expect(signed.lifted.size).toBe(0);
 		expect(tallCardsFor(gs, small, FONTS, m, undefined, undefined, new Set(['a']), undefined, opts)).toBeUndefined();
-	});
-
-	it('the marked, signed card at 10 px has no boxes: its name has the full width (boxes that are not drawn leave no room to the name)', () => {
-		const gs = one('Aaaaaa Bbbbbbbbbbbb', ', house: v, illegitimate: true');
-		const small = namesOnlyGeometry(geometryFor(10, 'normal'));
-		const boxed = tallCardsFor(gs, small, FONTS, measure, new Set(['a']), undefined, new Set(['a']), undefined, { portraits: new Set(['a']) })!;
-		const marked = tallCardsFor(gs, small, FONTS, measure, new Set(['a']), undefined, new Set(['a']), undefined, { portraits: new Set(['a']), marked: 'a' })!;
-		expect(marked.slots.get('a') ?? 1).toBeLessThanOrEqual(boxed.slots.get('a') ?? 1);
 	});
 
 	it('recheckTall: with the fallback measure and then a wider measure the lifted set changes, so the view draws again', () => {

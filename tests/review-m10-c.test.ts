@@ -88,15 +88,15 @@ people:
     name: Aldric Valmont
     house: valmont
 `;
-	it('a tap on a name still shows the card when the colour list of a house is open in the Houses window', () => {
+	it('a tap on a name still shows the card when the edit page of a house is open in the Houses window', () => {
 		const { app } = fakeApp();
 		const shown: string[] = [];
 		const win = HousesWindow.create(app as never, { handle: fakeHandle('Trees/Tree.md', BODY) as never, sourcePath: 'Trees/Tree.md', people: { show: (id) => shown.push(id), openNote: () => undefined } })!;
 		win.open();
 		const content = (win as unknown as { contentEl: FEl }).contentEl;
-		const row = content.querySelectorAll('.dynasty-house-row')[0];
-		dispatch(row.querySelector('.dynasty-house-swatch')!, 'click');
-		dispatch(content.querySelectorAll('.dynasty-house-row')[0].querySelector('.dynasty-house-people')!, 'click');
+		// 0.2.5 (D134): People is on the edit page of the house.
+		dispatch(content.querySelectorAll('button.dynasty-lw-row')[0], 'click');
+		dispatch(content.querySelector('.dynasty-lw-page .dynasty-house-people')!, 'click');
 		const page = openModals[1] as unknown as { contentEl: FEl };
 		dispatch(page.contentEl.querySelectorAll('.dynasty-hp-row')[0], 'click');
 		expect(shown).toEqual(['aldric']);

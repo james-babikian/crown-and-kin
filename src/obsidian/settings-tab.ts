@@ -5,7 +5,7 @@
 
 import { Notice, PluginSettingTab, Setting, SettingGroup, debounce, type App, type Plugin } from 'obsidian';
 import { SETTINGS_UI } from '../render/ui-text';
-import { GENERATIONS, PHONE_CARD_STYLES, PHONE_HEIGHTS, REDUCE_MOTIONS, parseDesktopHeight, type DynastySettings, type PhoneCardStyle, type ReduceMotion } from './settings';
+import { GENERATIONS, PHONE_DIRECTIONS, REDUCE_MOTIONS, parseDesktopHeight, type DynastySettings, type PhoneDirection, type ReduceMotion } from './settings';
 
 /** What the tab needs from the plugin. */
 export interface SettingsHost extends Plugin {
@@ -26,8 +26,9 @@ function name(control: HTMLElement | null | undefined, label: string): void {
 /** The desktop height and the break list are stored this long after the last key press (or at once on blur; the height also on Enter). */
 const HEIGHT_TYPING_MS = 400;
 
-/** The text of each choice of "Card style in the phone preview" and of "Reduce movement" (D119, D126). */
-const STYLE_LABEL: Record<PhoneCardStyle, string> = { 'names-shield': SETTINGS_UI.styleNamesShield, 'names-portrait': SETTINGS_UI.styleNamesPortrait, whole: SETTINGS_UI.styleWhole };
+/** The text of each choice of "Tree direction on a phone held upright" (D150). */
+const DIRECTION_LABEL: Record<PhoneDirection, string> = { sideways: SETTINGS_UI.directionSideways, down: SETTINGS_UI.directionDown };
+/** The text of each choice of "Reduce movement" (D126). */
 const REDUCE_LABEL: Record<ReduceMotion, string> = { system: SETTINGS_UI.reduceFollow, on: SETTINGS_UI.reduceOn, off: SETTINGS_UI.reduceOff };
 
 /** The plugin's settings page, built fresh each time it is shown. */
@@ -79,17 +80,6 @@ export class DynastySettingTab extends PluginSettingTab {
 					});
 				});
 			});
-			add((row) => {
-				row.setName(t.heightPhone).setDesc(t.heightPhoneDesc);
-				row.addDropdown((d) => {
-					name(d.selectEl, t.heightPhone);
-					const values: number[] = [...PHONE_HEIGHTS];
-					if (!values.includes(s.embedHeightPhone)) values.push(s.embedHeightPhone);
-					for (const v of values.sort((a, b) => a - b)) d.addOption(String(v), `${v}%`);
-					d.setValue(String(s.embedHeightPhone));
-					d.onChange((v) => void this.host.changeSettings({ embedHeightPhone: Number(v) }));
-				});
-			});
 		});
 		this.group(el, t.groups.cards, (add) => {
 			add((row) => {
@@ -103,12 +93,12 @@ export class DynastySettingTab extends PluginSettingTab {
 				});
 			});
 			add((row) => {
-				row.setName(t.phoneCardStyle).setDesc(t.phoneCardStyleDesc);
+				row.setName(t.phoneDirection).setDesc(t.phoneDirectionDesc);
 				row.addDropdown((d) => {
-					name(d.selectEl, t.phoneCardStyle);
-					for (const v of PHONE_CARD_STYLES) d.addOption(v, STYLE_LABEL[v]);
-					d.setValue(s.phoneCardStyle);
-					d.onChange((v) => void this.host.changeSettings({ phoneCardStyle: PHONE_CARD_STYLES.find((x) => x === v) ?? 'names-shield' }));
+					name(d.selectEl, t.phoneDirection);
+					for (const v of PHONE_DIRECTIONS) d.addOption(v, DIRECTION_LABEL[v]);
+					d.setValue(s.phoneDirection);
+					d.onChange((v) => void this.host.changeSettings({ phoneDirection: PHONE_DIRECTIONS.find((x) => x === v) ?? 'sideways' }));
 				});
 			});
 			add((row) => {

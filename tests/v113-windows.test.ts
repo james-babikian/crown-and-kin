@@ -16,6 +16,7 @@ import { TitlesWindow } from '../src/obsidian/titles-window';
 import { FEl, clock, fakeDoc, fakeWin, installDom, resetDom, settle } from './acceptance/fake-dom';
 import { openModals, resetObsidian } from './acceptance/fake-obsidian';
 import { fakeApp } from './acceptance/tree-view-fakes';
+import { backToList, listRows, openPage, pageOf, rowOf, rowTexts } from './lw-support';
 import { click, stripNotDisabled, type, writingHandle } from './s113-c-support';
 
 /*
@@ -112,7 +113,7 @@ describe('D113 item 1: the delete question of a house', () => {
 		win.open();
 		const modal = (win as unknown as { modalEl: FEl }).modalEl;
 		const content = (win as unknown as { contentEl: FEl }).contentEl;
-		await click(content.querySelector('.dynasty-house-row[data-house="valmont"] .dynasty-house-delete'));
+		await click(openPage(content, 'valmont').querySelector('.dynasty-house-delete'));
 		const layer = modal.querySelector('.dynasty-sheet-confirm')!;
 		expect(layer.querySelectorAll('.dynasty-sheet-confirm-text').map((t) => t.getText())).toEqual(['1 person has this house.', 'Select what happens to this person.']);
 		expect(layer.querySelector('.dynasty-house-clear .dynasty-choice-label')!.getText()).toBe('Remove the house from this person');
@@ -151,97 +152,138 @@ describe('D113 item 2: the note after "Use this ID"', () => {
 	});
 });
 
-describe('D113 item 3: a refused Save shows its message once, in the row', () => {
+describe('D113 item 3: a refused Save shows its message once, on the edit page', () => {
 	const HOUSES_BODY = ['houses:', '  - {id: valmont, name: House Valmont}', '  - {id: thorne, name: House Thorne}', 'people:', '  - {id: a, name: Aldric, house: valmont}', ''].join('\n');
+	const TITLES_BODY = ['titles:', '  - {id: duke, name: Duke}', '  - {id: baron, name: Baron}', 'people:', '  - {id: a, name: Aldric, card-title: duke}', ''].join('\n');
 
+	const houseName = (content: FEl) => pageOf(content).querySelector('.dynasty-house-name textarea')!;
+	const titleName = (content: FEl) => pageOf(content).querySelector('.dynasty-title-name textarea')!;
+	const problemTexts = (content: FEl) => content.querySelectorAll('.dynasty-id-new-problem').map((e) => e.getText()).filter((t) => t !== '');
+	const checkTags = (content: FEl) => rowTexts(content).filter((t) => t.includes(UI.WIN_LIST_UI.stateCheckId)).length;
+
+	/** Valmont gets the ID of a new house with the same name; the page of the new house is open. */
 	async function refusedHouses() {
 		const h = writingHandle(HOUSES_BODY);
 		const win = HousesWindow.create(fakeApp() as never, { handle: h as never, sourcePath: 'n.md' })!;
 		win.open();
 		const content = (win as unknown as { contentEl: FEl }).contentEl;
-		await click(content.querySelector('.dynasty-house-row[data-house="valmont"] .dynasty-id-open'));
+		await click(openPage(content, 'valmont').querySelector('.dynasty-id-open'));
 		const idWin = (openModals[openModals.length - 1] as unknown as { modalEl: FEl }).modalEl;
 		type(idWin.querySelector('.dynasty-id-input')!, 'house-valmont');
 		await click(idWin.querySelector('.dynasty-id-use'));
+		backToList(content);
 		await click(content.querySelector('.dynasty-house-add'));
-		const fresh = content.querySelectorAll('.dynasty-house-row').pop()!;
-		type(fresh.querySelector('input')!, 'House Valmont');
-		return { h, win, content, fresh };
+		type(houseName(content), 'House Valmont');
+		const freshKey = pageOf(content).getAttribute('data-house')!;
+		return { h, win, content, freshKey };
 	}
 
-	it('the row has the class of the red edge while its draft is refused, and not after', async () => {
-		const { content, fresh } = await refusedHouses();
-		const row = content.querySelector('.dynasty-house-row[data-house="valmont"]')!;
-		expect(row.hasClass('has-id-problem')).toBe(true);
-		type(fresh.querySelector('input')!, 'House Other');
-		expect(row.hasClass('has-id-problem')).toBe(false);
+	/** Baron gets the ID of a new title with the same name; the page of the new title is open. */
+	async function refusedTitles() {
+		const h = writingHandle(TITLES_BODY);
+		const win = TitlesWindow.create(fakeApp() as never, { handle: h as never, sourcePath: 'n.md' })!;
+		win.open();
+		const content = (win as unknown as { contentEl: FEl }).contentEl;
+		await click(openPage(content, 'baron').querySelector('.dynasty-id-open'));
+		const idWin = (openModals[openModals.length - 1] as unknown as { modalEl: FEl }).modalEl;
+		type(idWin.querySelector('.dynasty-id-input')!, 'king');
+		await click(idWin.querySelector('.dynasty-id-use'));
+		backToList(content);
+		await click(content.querySelector('.dynasty-title-add'));
+		type(titleName(content), 'King');
+		const freshKey = pageOf(content).getAttribute('data-title')!;
+		return { h, win, content, freshKey };
+	}
+
+	it('the page has the class of the red edge while its draft is refused, and not after', async () => {
+		const { content, freshKey } = await refusedHouses();
+		expect(pageOf(content).hasClass('has-id-problem')).toBe(true);
+		backToList(content);
+		expect(checkTags(content)).toBe(2);
+		openPage(content, 'valmont');
+		expect(pageOf(content).hasClass('has-id-problem')).toBe(true);
+		backToList(content);
+		openPage(content, freshKey);
+		type(houseName(content), 'House Other');
+		expect(pageOf(content).hasClass('has-id-problem')).toBe(false);
+		backToList(content);
+		expect(checkTags(content)).toBe(0);
+		openPage(content, 'valmont');
+		expect(pageOf(content).hasClass('has-id-problem')).toBe(false);
 	});
 
 	it('Save shows the reason once (in the note), nothing at the top, and puts the focus on "Change ID"', async () => {
 		const { h, content } = await refusedHouses();
 		await click(content.querySelector('.dynasty-sheet-save'));
-		const row = content.querySelector('.dynasty-house-row[data-house="valmont"]')!;
+		const page = pageOf(content);
+		// The open page is the new house; Save opens the page of the first saved house with the problem.
+		expect(page.getAttribute('data-house')).toBe('valmont');
 		expect(content.querySelector('.dynasty-sheet-error')!.getText()).toBe('');
-		expect(row.querySelector('.dynasty-id-new-problem')!.getText()).toBe(UI.ID_UI.taken);
+		expect(page.querySelector('.dynasty-id-new-problem')!.getText()).toBe(UI.ID_UI.taken);
 		const shown = ['.dynasty-sheet-error', '.dynasty-id-new-problem', '.dynasty-id-problem'].flatMap((q) => content.querySelectorAll(q)).filter((e) => e.getText() === UI.ID_UI.taken);
 		expect(shown).toHaveLength(1);
-		expect(fakeDoc.activeElement).toBe(row.querySelector('.dynasty-id-open'));
+		expect(fakeDoc.activeElement).toBe(page.querySelector('.dynasty-id-open'));
 		expect(h.ops).toHaveLength(0);
 	});
 
 	it('an error at the top that is not about an ID still shows, and an earlier one goes when the ID is refused', async () => {
-		const { content, fresh } = await refusedHouses();
-		type(fresh.querySelector('input')!, '');
+		const { content } = await refusedHouses();
+		type(houseName(content), '');
 		await click(content.querySelector('.dynasty-sheet-save'));
 		expect(content.querySelector('.dynasty-sheet-error')!.getText()).toBe(UI.HOUSES.needName);
-		type(fresh.querySelector('input')!, 'House Valmont');
+		type(houseName(content), 'House Valmont');
 		await click(content.querySelector('.dynasty-sheet-save'));
 		expect(content.querySelector('.dynasty-sheet-error')!.getText()).toBe('');
 	});
 
 	it('the Titles window does the same', async () => {
-		const body = ['titles:', '  - {id: duke, name: Duke}', '  - {id: baron, name: Baron}', 'people:', '  - {id: a, name: Aldric, card-title: duke}', ''].join('\n');
-		const h = writingHandle(body);
-		const win = TitlesWindow.create(fakeApp() as never, { handle: h as never, sourcePath: 'n.md' })!;
-		win.open();
-		const content = (win as unknown as { contentEl: FEl }).contentEl;
-		await click(content.querySelector('.dynasty-title-box[data-title="baron"] .dynasty-id-open'));
-		const idWin = (openModals[openModals.length - 1] as unknown as { modalEl: FEl }).modalEl;
-		type(idWin.querySelector('.dynasty-id-input')!, 'king');
-		await click(idWin.querySelector('.dynasty-id-use'));
-		await click(content.querySelector('.dynasty-title-add'));
-		type(content.querySelectorAll('.dynasty-title-box').pop()!.querySelector('.dynasty-title-row input')!, 'King');
+		const { h, content } = await refusedTitles();
 		await click(content.querySelector('.dynasty-sheet-save'));
-		const row = content.querySelector('.dynasty-title-box[data-title="baron"] .dynasty-title-row')!;
+		const page = pageOf(content);
+		expect(page.getAttribute('data-title')).toBe('baron');
 		expect(content.querySelector('.dynasty-sheet-error')!.getText()).toBe('');
-		expect(row.hasClass('has-id-problem')).toBe(true);
-		expect(row.querySelector('.dynasty-id-new-problem')!.getText()).toBe(UI.ID_UI.taken);
-		expect(fakeDoc.activeElement).toBe(row.querySelector('.dynasty-id-open'));
+		expect(page.hasClass('has-id-problem')).toBe(true);
+		expect(page.querySelector('.dynasty-id-new-problem')!.getText()).toBe(UI.ID_UI.taken);
+		expect(fakeDoc.activeElement).toBe(page.querySelector('.dynasty-id-open'));
 		expect(h.ops).toHaveLength(0);
 	});
 
-	it('owner decision "3-both": the new row with the same name is marked too, with its own text, and both marks go when its name changes', async () => {
-		const { h, content, fresh } = await refusedHouses();
-		const saved = content.querySelector('.dynasty-house-row[data-house="valmont"]')!;
-		expect(saved.hasClass('has-id-problem')).toBe(true);
-		expect(fresh.hasClass('has-id-problem')).toBe(true);
-		expect(saved.querySelector('.dynasty-id-new-problem')!.getText()).toBe(UI.ID_UI.taken);
-		expect(fresh.querySelector('.dynasty-id-new-problem')!.getText()).toBe(UI.ID_UI.newName);
-		const texts = () => content.querySelectorAll('.dynasty-id-new-problem').map((e) => e.getText()).filter((t) => t !== '');
-		expect(texts()).toEqual([UI.ID_UI.taken, UI.ID_UI.newName]);
-		// Save refuses, writes nothing and keeps the focus rule: the first saved row, not the new row.
+	it('owner decision "3-both": the new house with the same name is marked too, with its own text, and both marks go when its name changes', async () => {
+		const { h, content, freshKey } = await refusedHouses();
+		// The new house: its own text and the red edge.
+		expect(pageOf(content).hasClass('has-id-problem')).toBe(true);
+		expect(problemTexts(content)).toEqual([UI.ID_UI.newName]);
+		backToList(content);
+		expect(checkTags(content)).toBe(2);
+		openPage(content, 'valmont');
+		expect(pageOf(content).hasClass('has-id-problem')).toBe(true);
+		expect(problemTexts(content)).toEqual([UI.ID_UI.taken]);
+		backToList(content);
+		// Save refuses, writes nothing and keeps the focus rule: the first saved house, not the new house.
 		await click(content.querySelector('.dynasty-sheet-save'));
 		expect(h.ops).toHaveLength(0);
 		expect(content.querySelector('.dynasty-sheet-error')!.getText()).toBe('');
-		expect(texts()).toEqual([UI.ID_UI.taken, UI.ID_UI.newName]);
-		expect(fakeDoc.activeElement).toBe(saved.querySelector('.dynasty-id-open'));
-		type(fresh.querySelector('input')!, 'House Other');
-		expect(saved.hasClass('has-id-problem')).toBe(false);
-		expect(fresh.hasClass('has-id-problem')).toBe(false);
-		expect(texts()).toEqual([]);
+		expect(pageOf(content).getAttribute('data-house')).toBe('valmont');
+		expect(problemTexts(content)).toEqual([UI.ID_UI.taken]);
+		expect(fakeDoc.activeElement).toBe(pageOf(content).querySelector('.dynasty-id-open'));
+		backToList(content);
+		openPage(content, freshKey);
+		type(houseName(content), 'House Other');
+		expect(pageOf(content).hasClass('has-id-problem')).toBe(false);
+		expect(problemTexts(content)).toEqual([]);
+		backToList(content);
+		expect(checkTags(content)).toBe(0);
+		openPage(content, 'valmont');
+		expect(pageOf(content).hasClass('has-id-problem')).toBe(false);
+		expect(problemTexts(content)).toEqual([]);
+		backToList(content);
 		// The name gives the same ID again: both marks come back.
-		type(fresh.querySelector('input')!, 'House Valmont');
-		expect(texts()).toEqual([UI.ID_UI.taken, UI.ID_UI.newName]);
+		openPage(content, freshKey);
+		type(houseName(content), 'House Valmont');
+		expect(problemTexts(content)).toEqual([UI.ID_UI.newName]);
+		backToList(content);
+		openPage(content, 'valmont');
+		expect(problemTexts(content)).toEqual([UI.ID_UI.taken]);
 	});
 
 	it('a new house whose ID is unique shows no mark, and the Save is not blocked by it', async () => {
@@ -250,42 +292,47 @@ describe('D113 item 3: a refused Save shows its message once, in the row', () =>
 		win.open();
 		const content = (win as unknown as { contentEl: FEl }).contentEl;
 		await click(content.querySelector('.dynasty-house-add'));
-		const fresh = content.querySelectorAll('.dynasty-house-row').pop()!;
-		type(fresh.querySelector('input')!, 'House Unique');
-		expect(fresh.hasClass('has-id-problem')).toBe(false);
-		expect(content.querySelectorAll('.dynasty-id-new-problem').map((e) => e.getText()).filter((t) => t !== '')).toEqual([]);
+		type(houseName(content), 'House Unique');
+		expect(pageOf(content).hasClass('has-id-problem')).toBe(false);
+		expect(problemTexts(content)).toEqual([]);
+		backToList(content);
+		expect(checkTags(content)).toBe(0);
+		await click(content.querySelector('.dynasty-sheet-save'));
+		expect(h.ops).toHaveLength(1);
 	});
 
 	it('the Titles window marks the new title too', async () => {
-		const body = ['titles:', '  - {id: duke, name: Duke}', '  - {id: baron, name: Baron}', 'people:', '  - {id: a, name: Aldric, card-title: duke}', ''].join('\n');
-		const h = writingHandle(body);
-		const win = TitlesWindow.create(fakeApp() as never, { handle: h as never, sourcePath: 'n.md' })!;
-		win.open();
-		const content = (win as unknown as { contentEl: FEl }).contentEl;
-		await click(content.querySelector('.dynasty-title-box[data-title="baron"] .dynasty-id-open'));
-		const idWin = (openModals[openModals.length - 1] as unknown as { modalEl: FEl }).modalEl;
-		type(idWin.querySelector('.dynasty-id-input')!, 'king');
-		await click(idWin.querySelector('.dynasty-id-use'));
-		await click(content.querySelector('.dynasty-title-add'));
-		const nameInput = content.querySelectorAll('.dynasty-title-box').pop()!.querySelector('.dynasty-title-row input')!;
-		type(nameInput, 'King');
-		const row = content.querySelector('.dynasty-title-box[data-title="baron"] .dynasty-title-row')!;
-		const newRow = content.querySelectorAll('.dynasty-title-box').pop()!.querySelector('.dynasty-title-row')!;
-		const texts = () => content.querySelectorAll('.dynasty-id-new-problem').map((e) => e.getText()).filter((t) => t !== '');
-		expect(texts()).toEqual([UI.ID_UI.taken, UI.ID_UI.newName]);
-		expect(newRow.hasClass('has-id-problem')).toBe(true);
+		const { h, content, freshKey } = await refusedTitles();
+		expect(problemTexts(content)).toEqual([UI.ID_UI.newName]);
+		expect(pageOf(content).hasClass('has-id-problem')).toBe(true);
+		backToList(content);
+		openPage(content, 'baron');
+		expect(problemTexts(content)).toEqual([UI.ID_UI.taken]);
+		backToList(content);
 		await click(content.querySelector('.dynasty-sheet-save'));
 		expect(h.ops).toHaveLength(0);
 		expect(content.querySelector('.dynasty-sheet-error')!.getText()).toBe('');
-		expect(fakeDoc.activeElement).toBe(row.querySelector('.dynasty-id-open'));
-		type(nameInput, 'Queen');
-		expect(texts()).toEqual([]);
-		expect(newRow.hasClass('has-id-problem')).toBe(false);
-		expect(row.hasClass('has-id-problem')).toBe(false);
+		expect(pageOf(content).getAttribute('data-title')).toBe('baron');
+		expect(fakeDoc.activeElement).toBe(pageOf(content).querySelector('.dynasty-id-open'));
+		backToList(content);
+		openPage(content, freshKey);
+		type(titleName(content), 'Queen');
+		expect(problemTexts(content)).toEqual([]);
+		expect(pageOf(content).hasClass('has-id-problem')).toBe(false);
+		backToList(content);
+		openPage(content, 'baron');
+		expect(pageOf(content).hasClass('has-id-problem')).toBe(false);
+	});
+
+	it('the list tags the refused houses with the words "Check the ID" (the text, not the colour alone)', async () => {
+		const { content } = await refusedHouses();
+		backToList(content);
+		expect(rowOf(content, 'valmont').getText()).toContain(UI.WIN_LIST_UI.stateCheckId);
+		expect(listRows(content).filter((r) => r.getText().includes(UI.WIN_LIST_UI.stateCheckId))).toHaveLength(2);
 	});
 
 	it('the CSS: a red edge of 3 px in the error colour', () => {
-		const edge = rule('.dynasty-house-row.has-id-problem,\n.dynasty-title-row.has-id-problem');
+		const edge = rule('.dynasty-lw .dynasty-lw-page.has-id-problem');
 		expect(edge).toMatch(/border-left:\s*3px solid var\(--text-error\)/);
 	});
 });
@@ -298,7 +345,7 @@ describe('C4: the answer to the question "Change the ID?" writes the draft as it
 		win.open();
 		const modal = (win as unknown as { modalEl: FEl }).modalEl;
 		const content = (win as unknown as { contentEl: FEl }).contentEl;
-		await click(content.querySelector('.dynasty-house-row[data-house="valmont"] .dynasty-id-open'));
+		await click(openPage(content, 'valmont').querySelector('.dynasty-id-open'));
 		const idWin = (openModals[openModals.length - 1] as unknown as { modalEl: FEl }).modalEl;
 		type(idWin.querySelector('.dynasty-id-input')!, 'house-valmont');
 		await click(idWin.querySelector('.dynasty-id-use'));

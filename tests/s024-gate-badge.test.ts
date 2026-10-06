@@ -10,7 +10,7 @@ import { READABLE_NAME_PX } from '../src/render/view-math';
 describe('badge tap square against the card above in a sideways column (contract 4.2 E2)', () => {
 	for (const f of [12, 14, 16, 20]) {
 		it(`note font ${f} px, first view scale ${READABLE_NAME_PX}/${f}`, () => {
-			const geo = sidewaysGeometry(geometryFor(f, 'normal'), 'narrow');
+			const geo = sidewaysGeometry(geometryFor(f, 'normal'));
 			const scale = READABLE_NAME_PX / f;
 			const r = BADGE_RADIUS_EM * f;
 			const mark = { x: geo.cardW - r, y: -r, w: 2 * r, h: 2 * r }; // centre on the top right corner of a card at (0, 0)

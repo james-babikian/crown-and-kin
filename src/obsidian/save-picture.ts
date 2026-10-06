@@ -1,8 +1,8 @@
 /*
  * "Save as picture" (spec §13.8, D70–D74; M9 contract O11, P1–P6, B4, B5, B8, B13). The tree view's
  * More list opens `SaveWindow`, where the owner selects PNG or SVG. `savePicture` then lays the drawn
- * tree out again with normal cards at the Full level (`measured-layout.ts`, with the canvas text
- * measure), asks the picture store for each arms and portrait picture at the size of the file, one at
+ * tree out again with the card form of the view, the plate setting and the "You" tab (0.2.5, D148) at the Full level
+ * (`measured-layout.ts`, with the canvas text measure), asks the picture store for each arms and portrait picture at the size of the file, one at
  * a time (`exportCopy`), draws one standalone SVG with fixed light colours (`renderSvg` with `saved`),
  * for a PNG draws that SVG on a canvas, and writes the file once into the attachment folder of the
  * tree's note. Notices tell the owner what happens. The tree text never changes, the view stays in use
@@ -14,7 +14,7 @@ import type { FamilyGraph } from '../core/derive';
 import type { FoldKey } from '../core/folds';
 import { portraitCropOf, type CropFraction } from '../core/portrait-crop';
 import type { CardLabel } from '../core/titles';
-import { PICTURE_EM, pictureSize } from '../layout/geometry';
+import { PICTURE_EM, isRoundel, pictureSize, roundelPics } from '../layout/geometry';
 import { DEFAULT_FAR_RULE, NEVER_FAR_RULE } from '../layout/index';
 import type { Geometry, LaidOut, LayoutSettings, Orientation } from '../layout/model';
 import type { BreakList } from '../render/break-words';
@@ -42,10 +42,12 @@ export interface SaveSource {
 	/** The relation finder's line; `fade` for "Show in the whole tree". */
 	line?: LineMarks;
 	orientation: Orientation;
-	/** `geometryFor(fontPx, cardSize)`, never the names-only geometry: the saved picture shows whole cards (contract 6.2). The save adds the relation line and normal sideways cards. */
+	/** `cardForm(geometryFor(fontPx, cardSize), orientation)`: the saved picture has the card form of the view, with all its text (D148 2A). The save adds the relation line. */
 	geo: Geometry;
-	/** The tree has a mark: every card has the relation text line (D40). */
+	/** The tree has a mark and "Show relation names on cards" is on: every card has the plate with the relation word (D40, D145). */
 	relationLine: boolean;
+	/** D148: the person who gets the "You" tab; set when there is a mark and `relationLine` is false (`LayoutSettings.youTab`). */
+	youTab?: string;
 	fonts: SceneFonts;
 	showDates: boolean;
 	showPortraits: boolean;
@@ -200,13 +202,14 @@ export async function makePicture(store: PictureStore | undefined, src: SaveSour
 	const { g } = src;
 	const folds = src.folds?.folded.length ? src.folds : undefined;
 	const sideways = src.orientation === 'sideways';
-	// P1: the view's orientation with normal cards; the finder's small tree never splits a couple.
+	// P1: the view's orientation; the finder's small tree never splits a couple.
 	const far = src.line && !src.line.fade ? NEVER_FAR_RULE : DEFAULT_FAR_RULE;
 	const base: LayoutSettings = {
 		sweeps: 4,
 		far,
-		...(sideways ? { orientation: 'sideways' as const, sidewaysCards: 'normal' as const } : {}),
+		...(sideways ? { orientation: 'sideways' as const } : {}),
 		...(src.relationLine ? { relationLine: true } : {}),
+		...(src.youTab !== undefined ? { youTab: src.youTab } : {}),
 		// The picture shows the view's folds: the same people are hidden, and each folded family has its "+ N" sign (spec §13.8).
 		...(folds ? { foldHidden: folds.hidden, foldedFamilies: folds.folded, foldControls: true as const } : {}),
 	};
@@ -265,9 +268,12 @@ async function picturesFor(store: PictureStore | undefined, src: SaveSource, lai
 	const out = new Map<string, string | 'missing' | null>();
 	if (!store) return out;
 	const { g } = src;
-	const d = pictureSize(laid.layout.geometry);
-	const armsW = Math.max(PICTURE_EM.armsAspect * d, legendArms?.w ?? 0);
-	const armsH = Math.max(d, legendArms?.h ?? 0);
+	const geo = laid.layout.geometry;
+	// The Roundel's medallion is 2 em across and its arms alone 2 em high (B.3.3): larger than the classic card's pictures, so the copies are made at that size.
+	const round = isRoundel(geo) ? { portrait: roundelPics(geo, { arms: false, portrait: true }).portrait!, arms: roundelPics(geo, { arms: true, portrait: false }).arms! } : undefined;
+	const d = round ? round.portrait.w : pictureSize(geo);
+	const armsW = Math.max(round ? round.arms.w : PICTURE_EM.armsAspect * d, legendArms?.w ?? 0);
+	const armsH = Math.max(round ? round.arms.h : d, legendArms?.h ?? 0);
 	const wanted: { key: string; link: string; w: number; h: number; fit: 'meet' | 'portrait'; crop?: CropFraction }[] = [];
 	const houses = new Set<string>();
 	for (const box of laid.layout.persons.values()) {

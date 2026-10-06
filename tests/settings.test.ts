@@ -9,10 +9,10 @@ describe('normaliseSettings', () => {
 	});
 
 	it('keeps valid values', () => {
-		const s = { embedHeightDesktop: 800, embedHeightPhone: 70, cardSize: 'compact', showDates: false, showRelations: false, showPortraits: false, showHouseGeneration: false, focusGenerations: 0, updateLinks: false, phoneCardStyle: 'whole', breakWords: 'Long-na-munda', reduceMotion: 'on' };
+		const s = { embedHeightDesktop: 800, cardSize: 'compact', showDates: false, showRelations: false, showPortraits: false, showHouseGeneration: false, focusGenerations: 0, updateLinks: false, breakWords: 'Long-na-munda', reduceMotion: 'on', phoneDirection: 'down' };
 		expect(normaliseSettings(s)).toEqual(s);
-		expect(normaliseSettings({ embedHeightDesktop: 100, embedHeightPhone: 40, focusGenerations: 10 })).toMatchObject({ embedHeightDesktop: 100, embedHeightPhone: 40, focusGenerations: 10 });
-		expect(normaliseSettings({ embedHeightDesktop: 5000, embedHeightPhone: 80 })).toMatchObject({ embedHeightDesktop: 5000, embedHeightPhone: 80 });
+		expect(normaliseSettings({ embedHeightDesktop: 100, focusGenerations: 10 })).toMatchObject({ embedHeightDesktop: 100, focusGenerations: 10 });
+		expect(normaliseSettings({ embedHeightDesktop: 5000 })).toMatchObject({ embedHeightDesktop: 5000 });
 	});
 
 	it('"Show generation on the house page" (D113 item 4) is on by default; a stored false stays; a wrong type is on', () => {
@@ -23,20 +23,20 @@ describe('normaliseSettings', () => {
 	});
 
 	it('replaces each bad value by its own default and keeps the others', () => {
-		const s = normaliseSettings({ embedHeightDesktop: 99, embedHeightPhone: 81, cardSize: 'huge', showDates: 'no', showRelations: 'yes', focusGenerations: 11, updateLinks: 1 });
+		const s = normaliseSettings({ embedHeightDesktop: 99, cardSize: 'huge', showDates: 'no', showRelations: 'yes', focusGenerations: 11, updateLinks: 1 });
 		expect(s).toEqual(DEFAULT_SETTINGS);
 		expect(normaliseSettings({ embedHeightDesktop: 5001, cardSize: 'compact' })).toEqual({ ...DEFAULT_SETTINGS, cardSize: 'compact' });
-		expect(normaliseSettings({ embedHeightPhone: 39, showDates: false })).toEqual({ ...DEFAULT_SETTINGS, showDates: false });
+		expect(normaliseSettings({ embedHeightDesktop: 5001, showDates: false })).toEqual({ ...DEFAULT_SETTINGS, showDates: false });
 	});
 
 	it('refuses numbers written as text, NaN, infinity and negative numbers', () => {
-		const s = normaliseSettings({ embedHeightDesktop: '600', embedHeightPhone: Number.NaN, focusGenerations: -1 });
+		const s = normaliseSettings({ embedHeightDesktop: '600', focusGenerations: -1 });
 		expect(s).toEqual(DEFAULT_SETTINGS);
 		expect(normaliseSettings({ embedHeightDesktop: Number.POSITIVE_INFINITY }).embedHeightDesktop).toBe(500);
 	});
 
 	it('rounds heights, but refuses a generations number that is not whole', () => {
-		expect(normaliseSettings({ embedHeightDesktop: 480.4, embedHeightPhone: 64.6 })).toMatchObject({ embedHeightDesktop: 480, embedHeightPhone: 65 });
+		expect(normaliseSettings({ embedHeightDesktop: 480.4 })).toMatchObject({ embedHeightDesktop: 480 });
 		expect(normaliseSettings({ embedHeightDesktop: 99.6 }).embedHeightDesktop).toBe(100);
 		expect(normaliseSettings({ focusGenerations: 2.5 }).focusGenerations).toBe(3);
 	});
@@ -72,7 +72,7 @@ describe('parseDesktopHeight', () => {
 describe('settingsChanges', () => {
 	it('lists the keys that differ', () => {
 		expect(settingsChanges(DEFAULT_SETTINGS, { ...DEFAULT_SETTINGS })).toEqual([]);
-		expect(settingsChanges(DEFAULT_SETTINGS, { ...DEFAULT_SETTINGS, cardSize: 'compact', embedHeightPhone: 70 }).sort()).toEqual(['cardSize', 'embedHeightPhone']);
+		expect(settingsChanges(DEFAULT_SETTINGS, { ...DEFAULT_SETTINGS, cardSize: 'compact', embedHeightDesktop: 700 }).sort()).toEqual(['cardSize', 'embedHeightDesktop']);
 	});
 });
 
@@ -81,7 +81,7 @@ describe('pending renames in data.json', () => {
 	const entry = { oldPath: 'A/Old.md', newPath: 'A/New.md', others: ['B/Old.md'] };
 
 	it('normaliseSettings ignores them: the settings are the same with or without the key', () => {
-		const s = { embedHeightDesktop: 800, embedHeightPhone: 70, cardSize: 'compact', showDates: false, showRelations: false, showPortraits: false, showHouseGeneration: false, focusGenerations: 0, updateLinks: false, phoneCardStyle: 'whole', breakWords: 'Long-na-munda', reduceMotion: 'on' };
+		const s = { embedHeightDesktop: 800, cardSize: 'compact', showDates: false, showRelations: false, showPortraits: false, showHouseGeneration: false, focusGenerations: 0, updateLinks: false, breakWords: 'Long-na-munda', reduceMotion: 'on', phoneDirection: 'down' };
 		expect(PENDING_KEY).toBe('pendingRenames');
 		expect(normaliseSettings({ ...s, [PENDING_KEY]: [entry] })).toEqual(s);
 		expect(normaliseSettings({ [PENDING_KEY]: [entry] })).toEqual(DEFAULT_SETTINGS);

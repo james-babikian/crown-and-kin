@@ -17,6 +17,7 @@ import { FEl, clock, fakeWin, installDom, resetDom, settle } from './acceptance/
 import { openModals, resetObsidian } from './acceptance/fake-obsidian';
 import { fakeApp, openFullScreen } from './acceptance/tree-view-fakes';
 import { click, stripNotDisabled, type, writingHandle } from './s113-c-support';
+import { backToList, openPage, pageOf } from './lw-support';
 
 /*
  * Version 0.2.3, fix round "windows, texts, house page" (review of 0.2.3: RB1, RB2, spec review items 2 and 15, the
@@ -173,15 +174,17 @@ describe('Small items of review B', () => {
 		const win = HousesWindow.create(fakeApp() as never, { handle: h as never, sourcePath: 'n.md' })!;
 		win.open();
 		const content = (win as unknown as { contentEl: FEl }).contentEl;
-		await click(content.querySelector('.dynasty-house-row[data-house="valmont"] .dynasty-id-open'));
+		// 0.2.5 (D134): Change ID is on the edit page of the house; a refused Save opens that page and shows the reason there.
+		await click(openPage(content, 'valmont').querySelector('.dynasty-id-open'));
 		const idWin = (openModals[openModals.length - 1] as unknown as { modalEl: FEl }).modalEl;
 		type(idWin.querySelector('.dynasty-id-input')!, 'house-valmont');
 		await click(idWin.querySelector('.dynasty-id-use'));
+		backToList(content);
 		await click(content.querySelector('.dynasty-house-add'));
-		type(content.querySelectorAll('.dynasty-house-row').pop()!.querySelector('input')!, 'House Valmont');
+		type(pageOf(content).querySelector('textarea')!, 'House Valmont');
 		(win as unknown as { showError(t: string): void }).showError(UI.HOUSES.stale);
 		await click(content.querySelector('.dynasty-sheet-save'));
-		expect(content.querySelector('.dynasty-house-row[data-house="valmont"] .dynasty-id-new-problem')!.getText()).toBe(UI.ID_UI.taken);
+		expect(content.querySelector('.dynasty-lw-page[data-house="valmont"] .dynasty-id-new-problem')!.getText()).toBe(UI.ID_UI.taken);
 		expect(content.querySelector('.dynasty-sheet-error')!.getText()).toBe(UI.HOUSES.stale);
 	});
 });

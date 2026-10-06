@@ -7,7 +7,7 @@ import { measuredLayout } from '../src/obsidian/measured-layout';
 import { parseBreakList } from '../src/render/break-words';
 import { build } from './helpers';
 
-// 0.2.4 (contract 8.3, 6.1): `measuredLayout` takes `showArms`, `breaks`, `marked` and `relations`, and returns `lifted` on every path,
+// 0.2.4 (contract 8.3, 6.1): `measuredLayout` takes `breaks`, `marked` and `relations`, and returns `lifted` on every path,
 // also when no card is tall (a lift needs no taller card).
 
 const FONTS = { text: 'serif', ui: 'sans', bold: '700' };
@@ -50,13 +50,6 @@ describe('measuredLayout: lifted on every path', () => {
 		expect(lay(SRC, { relations: new Map([['bo', { text: WIDE }]]) }).lifted.size).toBe(0);
 	});
 
-	it('showArms false: no arms box, so nothing lifts and the layout key has no arms', () => {
-		const r = lay(SRC, { showArms: false, relations: new Map([['bo', { text: WIDE.slice(0, 22) }]]) });
-		expect(r.lifted.size).toBe(0);
-		expect(r.settings.arms).toBeUndefined();
-		expect(lay(SRC).settings.arms).toEqual(['v']);
-	});
-
 	it('the break list reaches the fit: a word with no break place of its own is cut with "…" and stays one line; the list gives it a break and a second line', () => {
 		const src = 'people:\n  - {id: a, name: Placeholder}\n';
 		const word = 'Bcdfghjklmnpqrstvwxzbcdf';
@@ -71,8 +64,7 @@ describe('measuredLayout: lifted on every path', () => {
 	});
 });
 
-describe('measuredLayout: a names-only card has no title line (contract 4.1)', () => {
-	// A long title with a reign takes two text lines on a whole card (D61); the names-only kind draws no title, so it never needs the line.
+describe('measuredLayout: a long title with a reign (D61)', () => {
 	const labels = new Map([['ann', { holdings: [], selected: false, name: 'Ann', title: 'Duke of a very long place with many words in its name', reign: '1131–1160' } as unknown as CardLabel]]);
 	const g = build(SRC).g;
 	const run = (geo: typeof GEO, relationLine: boolean) => {
@@ -80,8 +72,7 @@ describe('measuredLayout: a names-only card has no title line (contract 4.1)', (
 		return measuredLayout(g, geo, { ...BASE, relationLine }, { fonts: FONTS, measure, labels, showDates: true, showPortraits: true });
 	};
 
-	it('the whole kind makes the title card tall, the names-only kind does not', () => {
+	it('takes two text lines, so the card is tall', () => {
 		expect(run(GEO, true).settings.tallTitles).toEqual(['ann']);
-		expect(run({ ...GEO, namesOnly: true }, false).settings.tallTitles).toBeUndefined();
 	});
 });

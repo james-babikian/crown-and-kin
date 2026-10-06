@@ -31,6 +31,7 @@ import { build } from './helpers';
 import { FEl, clock, device, fakeWin, installDom, resetDom } from './acceptance/fake-dom';
 import { openModals, resetObsidian } from './acceptance/fake-obsidian';
 import { embed, fakeHost, type Host } from './acceptance/tree-view-fakes';
+import { openPage } from './lw-support';
 import { click, stripNotDisabled, type, writingHandle } from './s113-c-support';
 
 /*
@@ -170,15 +171,16 @@ describe('D122: the holder lists', () => {
 		await click(el.querySelector('.dynasty-more-titles'));
 		const win = openModals.find((m) => (m as unknown) instanceof TitlesWindow) as unknown as { contentEl: FEl };
 		expect(win).toBeDefined();
-		// The window draws again after the click, so the box is looked up again.
-		const box = () => win.contentEl.querySelector('.dynasty-title-box[data-title="duke"]')!;
-		await click(box().querySelector('.dynasty-title-toggle'));
-		const names = box().querySelectorAll('.dynasty-holder-name').map((n) => n.getText());
+		// The holders show on the edit page of the title (D134).
+		const page = openPage(win.contentEl, 'duke');
+		const names = page.querySelectorAll('.dynasty-holder-name').map((n) => n.getText());
 		expect(names).toEqual(['Aldric II “the Wise”', 'Bran I', 'Orso the Old I', 'Aldric “the Wise”']);
-		const sob = box().querySelector('.dynasty-holder-name .dynasty-picker-sob')!;
+		const sob = page.querySelector('.dynasty-holder-name .dynasty-picker-sob')!;
 		expect(sob.getText()).toBe(' “the Wise”');
+		// D130 item 8: the label span holds the ruler text and the sobriquet, so the space before the sobriquet is kept.
+		expect(sob.parentElement!.hasClass('dynasty-holder-label')).toBe(true);
 		// The name button keeps its own label (the plugin does not say the sobriquet to a screen reader).
-		expect(box().querySelector('button.dynasty-holder-name')!.getAttribute('aria-label')).not.toMatch(/Wise/);
+		expect(page.querySelector('button.dynasty-holder-name')!.getAttribute('aria-label')).not.toMatch(/Wise/);
 	});
 });
 
@@ -286,34 +288,49 @@ const REL = (extra: string[]) =>
 		'',
 	].join('\n');
 
-const relationBox = (modal: FEl) => modal.querySelector('.dynasty-relation-summary')!;
+// D146, D147: on a computer the box is in the portrait row; on a phone the strip is closed and holds the open part in the page.
+const relationBox = (modal: FEl) => modal.querySelector('.dynasty-relinfo')!;
+const widths = [
+	['computer', 1280],
+	['phone', 390],
+] as const;
 
-describe('D123: the edit sheet shows what a rumoured link could change', () => {
+describe.each(widths)('D123: the edit sheet shows what a rumoured link could change (%s)', (_name, width) => {
+	const phone = width < 600;
+	/** The text of the relation: the whole sentence in the strip, the value in the box. */
+	const relationText = (box: FEl) => box.querySelector(phone ? '.dynasty-relinfo-text' : '.dynasty-relinfo-value')!.getText();
+
+	beforeEach(() => {
+		device.width = width;
+	});
+
 	it('half-brother who would be a full brother: the paragraph follows the relation to you', () => {
 		const { modal } = open(REL(['  - {id: gareth, name: Gareth, sex: m, parents: [roland, mara]}']), 'gareth');
 		const box = relationBox(modal);
-		expect(box.querySelector('.dynasty-relation-main')!.getText()).toBe('Relation to you: Half-brother.');
-		expect(box.querySelector('.dynasty-relation-maybe')!.getText()).toBe(MAYBE_TEXT.sheet('brother'));
-		// Under the relation, before the button that shows the line.
-		const kids = box.children.map((c) => c.getAttribute('class') ?? [...c.classes].join(' '));
-		expect(kids.findIndex((k) => k.includes('dynasty-relation-maybe'))).toBeGreaterThan(kids.findIndex((k) => k.includes('dynasty-relation-main')));
+		expect(relationText(box)).toBe(phone ? 'Relation to you: Half-brother.' : 'Half-brother');
+		if (!phone) expect(box.querySelector('.dynasty-relinfo-title')!.getText()).toBe('Relation to you');
+		expect(box.querySelector('.dynasty-relinfo-maybe')!.getText()).toBe(MAYBE_TEXT.sheet('brother'));
+		// Under the relation.
+		const order = box.all().map((c) => [...c.classes].join(' '));
+		const at = (cls: string) => order.findIndex((k) => k.includes(cls));
+		expect(at('dynasty-relinfo-maybe')).toBeGreaterThan(at(phone ? 'dynasty-relinfo-text' : 'dynasty-relinfo-value'));
 	});
 
 	it('a sister who would be a half-sister (two different rumoured fathers): the same paragraph, the other word', () => {
 		const { modal } = open(REL(['  - {id: sibyl, name: Sibyl, sex: f, parents: [mara, {id: quinn, type: rumoured}]}']), 'sibyl');
 		const box = relationBox(modal);
-		expect(box.querySelector('.dynasty-relation-main')!.getText()).toBe('Relation to you: Sister.');
-		expect(box.querySelector('.dynasty-relation-maybe')!.getText()).toBe(MAYBE_TEXT.sheet('half-sister'));
+		expect(relationText(box)).toBe(phone ? 'Relation to you: Sister.' : 'Sister');
+		expect(box.querySelector('.dynasty-relinfo-maybe')!.getText()).toBe(MAYBE_TEXT.sheet('half-sister'));
 	});
 
 	it('no rumour that matters: no paragraph', () => {
 		const { modal } = open(REL(['  - {id: alis, name: Alis, sex: f, parents: [mara]}']), 'alis');
-		expect(relationBox(modal).querySelector('.dynasty-relation-maybe')).toBeNull();
+		expect(relationBox(modal).querySelector('.dynasty-relinfo-maybe')).toBeNull();
 	});
 
 	it('the marked person has no paragraph', () => {
 		const { modal } = open(REL([]), 'edda');
-		expect(relationBox(modal).querySelector('.dynasty-relation-maybe')).toBeNull();
-		expect(relationBox(modal).querySelector('.dynasty-relation-main')!.getText()).toBe('This is you.');
+		expect(relationBox(modal).querySelector('.dynasty-relinfo-maybe')).toBeNull();
+		expect(relationBox(modal).querySelector('.dynasty-relinfo-value, .dynasty-relinfo-text')!.getText()).toBe('This is you.');
 	});
 });

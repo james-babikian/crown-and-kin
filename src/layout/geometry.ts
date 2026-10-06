@@ -9,9 +9,15 @@
  * D78 made the arms and the portrait the same height: 1.25 line heights (1.5 em on normal cards).
  * 0.2.4 (D117): all card text is 0.85 em; both boxes sit at the lower right, the arms left of the
  * portrait, and a text line that their height reaches is narrower. No picture changes a card's
- * height, so pictures never move a card. `namesOnlyGeometry` is the phone preview card (D119).
+ * height, so pictures never move a card.
+ * 0.2.5 (CONTRACT section B): a card has one of three forms, set by `cardForm` (`Geometry.form`). The classic card (no form) is the
+ * 0.2.4 card: arms and portrait at the lower right, and it stays for card size Compact in a top-to-bottom tree. The Roundel
+ * (`form: 'roundel'`, down and Normal size) has a round portrait on its top edge, its text centred on an axis, and a footer plate
+ * for the relation word. The text card (`form: 'text'`, sideways) is the classic card with no pictures, plus the plate. The forms
+ * are opt-in, so every old caller keeps its numbers. `withRelationLine` sets every height that depends on the tree (plate, crown,
+ * reach); `cardText`, `nameRoom`, `roundelPics` and `youTabRect` place what the scene and the saved picture draw.
  */
-import type { CardSize, Geometry, GeometryFor, LayoutSettings, LowerRightBox, NameLineCount, NameRoom, Rect, SidewaysCards } from './model';
+import type { CardSize, Geometry, GeometryFor, LayoutSettings, LowerRightBox, NameLineCount, NameRoom, Orientation, Rect } from './model';
 
 /** Obsidian's default note font size; the card geometry (180×64 cards) was tuned at this size. */
 export const BASE_FONT_PX = 16;
@@ -140,23 +146,8 @@ export const NORMAL_GEOMETRY: Geometry = geometryFor(BASE_FONT_PX, 'normal');
 
 // D24 sideways spacing, in em of the note font (owner's answers to the preview).
 const SIDE_COLUMN_EM = 3.5;
-const SIDE_NARROW_COLUMN_EM = 3;
 const SIDE_STACK_EM = 1.5;
 const SIDE_PARTNER_EM = 1.5;
-// The widest narrow card (the renderer asks for less in a smaller note box), and the narrowest.
-const SIDE_NARROW_CARD_EM = 10.25;
-const SIDE_NARROW_MIN_EM = 8;
-
-/**
- * The width of a `narrow` sideways card: the renderer's `narrowCardW`, rounded to 0.5 px
- * (the cache key's precision, so one key never stands for two layouts) and clamped to
- * [8 em, 10.25 em]; 10.25 em when it is absent or not a number.
- */
-export function narrowWidth(geo: Geometry, narrowCardW?: number): number {
-	const max = Math.round(SIDE_NARROW_CARD_EM * geo.fontPx);
-	if (typeof narrowCardW !== 'number' || !Number.isFinite(narrowCardW)) return max;
-	return Math.min(max, Math.max(Math.round(SIDE_NARROW_MIN_EM * geo.fontPx), Math.round(narrowCardW * 2) / 2));
-}
 /** 0.2.1: the clear space, in px, a partnership sign keeps from both cards of its couple in a `sideways` layout. */
 export const SIGN_CLEAR_PX = 3;
 
@@ -178,19 +169,16 @@ export function sidewaysPartnerGap(side: Geometry, unions: number): number {
 const TURNED_TAG_EM = 0.375;
 
 /**
- * The geometry a sideways layout (D24) draws with. Cards keep their height and text; `narrow`
- * cards take `narrowWidth` (8 to 10.25 em, never wider than `geo`'s). The gaps take their sideways meaning:
+ * The geometry a sideways layout (D24) draws with. Cards keep their size and text. The gaps take their sideways meaning:
  * `rowGap` is the smallest gap between generation columns, `nodeGap` the gap between stacked cards,
  * `coupleGap` the gap between stacked partners (0.2.1: the layout widens it, with `sidewaysPartnerGap`, for a tree
- * with a couple of two or more partnerships; `drawnGeometry` does not know the tree, so it keeps the narrow value).
+ * with a couple of two or more partnerships; `drawnGeometry` does not know the tree, so it keeps the one-partnership value).
  */
-export function sidewaysGeometry(geo: Geometry, cards: SidewaysCards, narrowCardW?: number): Geometry {
+export function sidewaysGeometry(geo: Geometry): Geometry {
 	const f = geo.fontPx;
-	const narrow = cards === 'narrow';
 	return {
 		...geo,
-		cardW: narrow ? Math.min(geo.cardW, narrowWidth(geo, narrowCardW)) : geo.cardW,
-		rowGap: Math.round((narrow ? SIDE_NARROW_COLUMN_EM : SIDE_COLUMN_EM) * f),
+		rowGap: Math.round(SIDE_COLUMN_EM * f),
 		nodeGap: Math.round(SIDE_STACK_EM * f),
 		coupleGap: Math.round(SIDE_PARTNER_EM * f),
 	};
@@ -199,20 +187,61 @@ export function sidewaysGeometry(geo: Geometry, cards: SidewaysCards, narrowCard
 /** D40: how much taller every card is when the tree has a mark: one small (0.85 em) text line, whole px. */
 export const relationExtra = (geo: Geometry) => Math.round(EMS[geo.cardSize].lineHeight * 0.85 * geo.fontPx);
 
+/** 0.2.5 (B.2): true for the Roundel, the top-to-bottom card with a medallion on its top edge (`cardForm`). */
+export const isRoundel = (geo: Geometry): boolean => geo.form === 'roundel';
+
+/** 0.2.5 (B.2): true for the text card, the sideways card with no pictures (`cardForm`). */
+export const isTextCard = (geo: Geometry): boolean => geo.form === 'text';
+
 /**
- * D40: `geo` with the relation text line (`LayoutSettings.relationLine`). A geometry that already
- * has it is returned as it is, so a drawn geometry passed back in does not grow a second time.
+ * D40, 0.2.5: `geo` with everything that depends on the tree and the settings, in ONE place: the plate or relation text line
+ * (`LayoutSettings.relationLine`, one small text line taller), the Roundel's crown when the tree has a picture (`settings.arms` or
+ * `settings.portraits` not empty; the text card has none) and `reach`, the space the first row keeps for what sticks out above
+ * a card (B.3.4: the medallion's halo, or the "You" tab of `settings.youTab`). A geometry that already has `relationLine`, `crown`
+ * or `reach` is returned as it is, so a drawn geometry passed back in does not grow a second time; a value that is 0 is never stored.
  */
 export function withRelationLine(geo: Geometry, settings: LayoutSettings): Geometry {
-	if (!settings.relationLine || geo.relationLine) return geo;
-	return { ...geo, cardH: geo.cardH + relationExtra(geo), relationLine: true };
+	if (geo.relationLine || geo.crown !== undefined || geo.reach !== undefined) return geo;
+	const f = geo.fontPx;
+	const roundel = isRoundel(geo);
+	const crown = roundel && (settings.arms?.length || settings.portraits?.length) ? Math.round(ROUNDEL_EM.crown * f) : 0;
+	const plate = settings.relationLine === true;
+	// The tab's top with its stroke must lie inside the reach, so the first row never starts above the drawing's edge.
+	const reach = crown ? Math.ceil(ROUNDEL_EM.reach * f) : settings.youTab !== undefined ? Math.ceil((roundel ? ROUNDEL_EM.tabAbove : ROUNDEL_EM.tabAboveText) * f + TAB_REACH_PAD_PX) : 0;
+	if (!crown && !reach && !plate) return geo;
+	return { ...geo, cardH: geo.cardH + crown + (plate ? relationExtra(geo) : 0), ...(crown ? { crown } : {}), ...(reach ? { reach } : {}), ...(plate ? { relationLine: true as const } : {}) };
 }
 
 /** `TreeLayout.geometry` of a layout with `settings`, known before the layout runs (renderers measure names with it). */
 export function drawnGeometry(geo: Geometry, settings: LayoutSettings): Geometry {
 	const g = withRelationLine(geo, settings);
-	return settings.orientation === 'sideways' ? sidewaysGeometry(g, settings.sidewaysCards ?? 'normal', settings.narrowCardW) : g;
+	return settings.orientation === 'sideways' ? sidewaysGeometry(g) : g;
 }
+
+/**
+ * 0.2.5 (D143, D150): the card form for an orientation. Down and Normal size gives 'roundel'; sideways (any size) gives 'text';
+ * down and Compact size stays the classic card (no `form`). It changes no number (no `cardH`, `crown` or `reach`) and is idempotent.
+ */
+export function cardForm(geo: Geometry, orientation: Orientation): Geometry {
+	const form = orientation === 'sideways' ? 'text' : geo.cardSize === 'normal' ? 'roundel' : undefined;
+	if (form === undefined || geo.form === form) return geo;
+	return { ...geo, form };
+}
+
+/** px: how far the plate's right end and bottom lie inside the card edge (an unmarked card; the marked card's word is "You" and is short). */
+export const PLATE_INSET_PX = 1;
+
+/** em: the room that a relation word keeps from the colour bar and from the plate's right end, so a cut word never touches them. */
+export const WORD_CLEAR_EM = 0.125;
+
+/** 0.2.5 (B.2): the sizes of the Roundel card, in em of the note font; the layout, the scene and the saved picture read these and no other number. */
+export const ROUNDEL_EM = { crown: 0.75, reach: 1.6, medal: 1, ring: 0.15, halo: 0.2, above: 0.25, column: 10, plateMore: 0.25, armsGap: 0.25, tabW: 2.3, tabH: 1.15, tabAbove: 0.55, tabAboveText: 0.9, wordRaise: 0.15 } as const;
+
+/** px: the margin a "You" tab adds to its height above the card top when `reach` is computed (half of its 1.5 px stroke, rounded up). */
+export const TAB_REACH_PAD_PX = 1;
+
+/** px: a Roundel name line gets the full 10 em column only if its box top is at least this far below the D14 sign bar (B.3.2). */
+export const SIGN_LINE_CLEAR_PX = 5;
 
 /** Smallest tappable size in px (spec §7.5). */
 export const MIN_HIT = 44;
@@ -252,25 +281,12 @@ export const tallExtra = (geo: Geometry) => Math.round(EMS[geo.cardSize].lineHei
 /** The name text size in em of the note font (D117: one size for all card text). */
 const NAME_EM = 0.85;
 
-/** D119: the name size of the phone preview's first view, in px; equal to `READABLE_NAME_PX` in `render/view-math.ts` (a test pins that). */
-export const NAMES_ONLY_NAME_PX = 14;
-
 /**
- * D119: the card height of the names-only card: a finger (44 px) at the 14 px first view, whole px.
- * 51 px at 16 px, 38 px at 12 px.
- */
-export const namesOnlyCardH = (fontPx: number): number => Math.ceil((MIN_HIT * fontPx) / NAMES_ONLY_NAME_PX);
-
-/** D119: `geo` for the names-only card. `relationLine` stays false: the card has no relation text line. */
-export const namesOnlyGeometry = (geo: Geometry): Geometry => ({ ...geo, cardH: namesOnlyCardH(geo.fontPx), namesOnly: true });
-
-/**
- * D126 (3), D129: the name slots of a card. A names-only card that has the D14 sign and a one-line name has two slots (the
- * second is empty), so the arms box and the portrait stay clear of the sign. The marked person's Compact card that has the sign
- * gets the same one text line more (`marked`): its pushed-down sign, the ring and the boxes then stay clear at every note font.
+ * D126 (3), D129: the name slots of a card. The marked person's Compact card that has the sign and a one-line name gets one text
+ * line more (`marked`): its pushed-down sign, the ring and the boxes then stay clear at every note font.
  */
 export const nameSlots = (geo: Geometry, lines: NameLineCount, signed: boolean, marked = false): NameLineCount =>
-	signed && lines === 1 && (geo.namesOnly || (marked && geo.cardSize === 'compact')) ? 2 : lines;
+	signed && lines === 1 && marked && geo.cardSize === 'compact' ? 2 : lines;
 
 /** Where card text goes, so every renderer lays out the Full level of detail the same way. */
 export interface CardText {
@@ -313,6 +329,26 @@ export interface CardText {
 	 * bottom sits here.
 	 */
 	textBottom: number;
+	/** 0.2.5, Roundel and text card: the x of the text anchor from the card's left edge (the card axis for the Roundel, `padX` for the text card). */
+	anchorX?: number;
+	/** 0.2.5, Roundel only: the text lines are centred on `anchorX` (SVG `text-anchor: middle`). */
+	middle?: true;
+	/**
+	 * 0.2.5, Roundel and text card: the card axis and the crown height (card-relative px), and the footer plate when the card has
+	 * one (`Geometry.relationLine`): its top `y` and height `h`. The relation word sits on the plate at `relationBaseline`.
+	 */
+	r1?: { axis: number; crown: number; plate?: { y: number; h: number } };
+	/**
+	 * 0.2.5 (B7), Roundel and text card with a plate: the width the relation word may use. The Roundel centres it on the axis inside the
+	 * plate; the text card starts it at `padX` and ends it at the plate's end. Wider than `textW`, which every other text line keeps.
+	 */
+	relationW?: number;
+}
+
+/** 0.2.5: which small text lines a Roundel or text card has, so the lines that exist are centred in the body. */
+export interface ShownLines {
+	title: boolean;
+	dates: boolean;
 }
 
 /**
@@ -320,9 +356,11 @@ export interface CardText {
  * 1, 2 or 3; a card with more has `tallExtra` more height for each, and the title and dates sit one
  * name text line lower for each. A boolean is still accepted (true is 2, false is 1). `tallTitle` (D61)
  * for a card that is `relationExtra` taller: two title text lines, and the dates and relation text
- * one small text line lower. The text block stays centred.
+ * one small text line lower. The text block stays centred. 0.2.5: the Roundel and the text card (`Geometry.form`) centre the lines
+ * that exist (`shown`; absent means a title and a dates line) in the body between the crown and the plate.
  */
-export function cardText(geo: Geometry, nameCount: boolean | NameLineCount = 1, tallTitle = false): CardText {
+export function cardText(geo: Geometry, nameCount: boolean | NameLineCount = 1, tallTitle = false, shown?: ShownLines): CardText {
+	if (isRoundel(geo) || isTextCard(geo)) return formText(geo, nameCount === true ? 2 : nameCount === false ? 1 : nameCount, tallTitle, shown);
 	const f = geo.fontPx;
 	const lh = EMS[geo.cardSize].lineHeight;
 	const nameSize = NAME_EM * f;
@@ -330,12 +368,10 @@ export function cardText(geo: Geometry, nameCount: boolean | NameLineCount = 1, 
 	const nameLine = lh * nameSize;
 	const smallLine = lh * smallSize;
 	const names: NameLineCount = nameCount === true ? 2 : nameCount === false ? 1 : nameCount;
-	// D119: the names-only card has the years line only: no title, no second title text line, no relation text line.
-	const only = geo.namesOnly === true;
-	const tall = tallTitle && !only;
-	const relation = geo.relationLine === true && !only;
+	const tall = tallTitle;
+	const relation = geo.relationLine === true;
 	// D40: `cardH` already holds the relation text line, the third small line.
-	const smalls = only ? 1 : (relation ? 3 : 2) + (tall ? 1 : 0);
+	const smalls = (relation ? 3 : 2) + (tall ? 1 : 0);
 	const cardH = geo.cardH + (names - 1) * tallExtra(geo) + (tall ? relationExtra(geo) : 0);
 	const top = (cardH - names * nameLine - smalls * smallLine) / 2;
 	// Baseline of a line box: its middle plus about a third of the font size (Latin cap height ≈ 0.7 em).
@@ -365,7 +401,7 @@ export function cardText(geo: Geometry, nameCount: boolean | NameLineCount = 1, 
 		...(names > 2 ? { name3Baseline: baseline(top + 2 * nameLine, nameLine, nameSize) } : {}),
 		titleBaseline: baseline(small, smallLine, smallSize),
 		...(tall ? { title2Baseline: baseline(small + smallLine, smallLine, smallSize) } : {}),
-		datesBaseline: baseline(small + (only ? 0 : titles) * smallLine, smallLine, smallSize),
+		datesBaseline: baseline(small + titles * smallLine, smallLine, smallSize),
 		...(relation ? { relationBaseline: baseline(small + (titles + 1) * smallLine, smallLine, smallSize) } : {}),
 		sign: { x1: signRight, y1: signTop, x2: signRight - signSize, y2: signTop + signSize, width: 0.15625 * f, dash: [signDash, signGap] },
 		nameWithSignW: textW - signSize - 0.5 * f,
@@ -381,6 +417,8 @@ export function cardText(geo: Geometry, nameCount: boolean | NameLineCount = 1, 
  */
 export function relationY(t: CardText, hasTitle: boolean, hasDates: boolean): number | undefined {
 	if (t.relationBaseline === undefined) return undefined;
+	// The word sits on the plate whatever other lines the card has.
+	if (t.r1) return t.relationBaseline;
 	const two = t.title2Baseline !== undefined;
 	const lines = two ? [t.titleBaseline, t.title2Baseline!, t.datesBaseline, t.relationBaseline] : [t.titleBaseline, t.datesBaseline, t.relationBaseline];
 	return lines[(hasTitle ? (two ? 2 : 1) : 0) + (hasDates ? 1 : 0)];
@@ -491,23 +529,47 @@ export function roomAt(geo: Geometry, t: CardText, baseline: number, size: numbe
  * D125 a: the room of the name text lines of a card (see `NameRoom`). `full` is the text width, less the D14 sign's room when
  * the card `signed`. `last` is the room of the card's final name slot. The text block is centred, so the final line has the same
  * place whatever the number of lines, and `last` is the same for a card of one, two or three slots. `only` (a name that stays on one
- * line) equals `last`, except on a names-only card that has the sign: it has two slots (D126 3), its one line sits in slot 1 above the
- * boxes, so `only` is `full`. `t` is the card's own text; a one-slot `t` of such a card is moved to the two-slot card here (the
- * boxes shift with the bottom of the text block).
+ * line) equals `last`. `t` is the card's own text.
  */
-export function nameRoom(geo: Geometry, t: CardText, signed: boolean, boxes: readonly LowerRightBox[]): NameRoom {
-	const full = signed ? t.nameWithSignW : t.textW;
-	let text = t;
-	let at = boxes;
-	const twoSlot = geo.namesOnly === true && signed;
-	if (twoSlot && t.name2Baseline === undefined) {
-		text = cardText(geo, 2);
-		const dy = text.textBottom - t.textBottom;
-		at = boxes.map((b) => ({ gap: b.gap, r: { ...b.r, y: b.r.y + dy } }));
+export function nameRoom(geo: Geometry, t: CardText, signed: boolean, boxes: readonly LowerRightBox[], ring?: number): NameRoom {
+	// 0.2.5: the Roundel and the text card have no boxes beside the text, so only the D14 sign narrows a line.
+	if (isTextCard(geo)) return signed ? { full: t.nameWithSignW, last: t.nameWithSignW, only: t.nameWithSignW } : { full: t.textW, last: t.textW, only: t.textW };
+	if (isRoundel(geo)) {
+		if (!signed) return { full: t.textW, last: t.textW, only: t.textW };
+		const last = lastLineClearsSign(geo, ring) ? t.textW : t.nameWithSignW;
+		return { full: t.nameWithSignW, last, only: t.nameWithSignW };
 	}
-	const finalBaseline = text.name3Baseline ?? text.name2Baseline ?? text.nameBaseline;
-	const last = Math.min(full, roomAt(geo, text, finalBaseline, text.nameSize, at));
-	return { full, last, only: twoSlot ? full : last };
+	const full = signed ? t.nameWithSignW : t.textW;
+	const finalBaseline = t.name3Baseline ?? t.name2Baseline ?? t.nameBaseline;
+	const last = Math.min(full, roomAt(geo, t, finalBaseline, t.nameSize, boxes));
+	return { full, last, only: last };
+}
+
+/** The lowest point of the stroked D14 sign: its lower end, plus the corner of the flat end of the bar. */
+export const signBottomOf = (s: CardText['sign']): number => Math.max(s.y1, s.y2) + s.width / (2 * Math.SQRT2);
+
+/** The answers of `lastLineClearsSign`, per geometry object and per ring (-1 = no ring): one `cardText(geo, 2)` for every card of a tree, not one per card. */
+const clearAnswers = new WeakMap<Geometry, Map<number, boolean>>();
+
+/**
+ * B.3.2: true when line 2 of a two-line name (the card's last line) has its box top at least `SIGN_LINE_CLEAR_PX` below the D14 sign,
+ * so it may take the whole text column. It is decided once per geometry and ring from the default two-slot text (a two-line title or a
+ * missing small line moves line 2 by less than 0.6 px); a three-line name's line 3 is lower still. `ring` is the marked card's
+ * inner ring edge: its sign moves below the ring (`signBelowRing`).
+ */
+function lastLineClearsSign(geo: Geometry, ring?: number): boolean {
+	let byRing = clearAnswers.get(geo);
+	if (!byRing) clearAnswers.set(geo, (byRing = new Map()));
+	const key = ring ?? -1;
+	let answer = byRing.get(key);
+	if (answer === undefined) {
+		const two = cardText(geo, 2);
+		const sign = ring === undefined ? two.sign : signBelowRing(two.sign, ring);
+		const line2Top = two.name2Baseline! - 0.35 * two.nameSize - (EMS[geo.cardSize].lineHeight * two.nameSize) / 2;
+		answer = line2Top - signBottomOf(sign) >= SIGN_LINE_CLEAR_PX;
+		byRing.set(key, answer);
+	}
+	return answer;
 }
 
 /** The height of one small (0.85 em) text line in px, not rounded: the lift of rule B (D126 4). */
@@ -571,3 +633,132 @@ export function boxesClear(geo: Geometry, t: CardText, boxes: readonly Rect[], o
 
 /** D29, D81: the number of name text lines a card was made for (`tallName`, `longName`). */
 export const nameCountOf = (box: { tallName?: true; longName?: true }): NameLineCount => (box.longName ? 3 : box.tallName ? 2 : 1);
+
+// ---------- 0.2.5: the Roundel (top-to-bottom) and the text card (sideways), the 0.2.5 contract section B ----------
+
+/** 0.2.5: the card axis of the Roundel, card-relative: the middle of the area right of the colour strip (0.25 em right of the card's middle). */
+export const roundelAxis = (geo: Geometry): number => 0.5 * geo.fontPx + (geo.cardW - 0.5 * geo.fontPx) / 2;
+
+/**
+ * 0.2.5 (B.3.5): how far right of its card's middle a line from the parents lands. The Roundel takes its line on the axis; every other
+ * form takes it at the middle. The layout adds it when it centres a sibling group under its parents, so an only child drops straight.
+ */
+export const childAttach = (geo: Geometry): number => (isRoundel(geo) ? roundelAxis(geo) - geo.cardW / 2 : 0);
+
+/**
+ * Text positions of a Roundel or a text card (B.3.2, B.3.10). The lines that exist are centred between the crown and the plate;
+ * the Roundel centres them on its axis in a 10 em column, the text card keeps them at `padX`. `nameCount`, `tall` and `shown` are as for `cardText`.
+ */
+function formText(geo: Geometry, names: NameLineCount, tall: boolean, shown?: ShownLines): CardText {
+	const f = geo.fontPx;
+	const roundel = isRoundel(geo);
+	const lh = EMS[geo.cardSize].lineHeight;
+	const nameSize = NAME_EM * f;
+	const smallSize = 0.85 * f;
+	const nameLine = lh * nameSize;
+	const smallLine = lh * smallSize;
+	const crown = geo.crown ?? 0;
+	const cardH = geo.cardH + (names - 1) * tallExtra(geo) + (tall ? relationExtra(geo) : 0);
+	const plateH = geo.relationLine === true ? relationExtra(geo) + ROUNDEL_EM.plateMore * f : 0;
+	const titles = shown ? (shown.title ? (tall ? 2 : 1) : 0) : tall ? 2 : 1;
+	const smalls = titles + (shown ? (shown.dates ? 1 : 0) : 1);
+	const top = crown + (cardH - plateH - crown - names * nameLine - smalls * smallLine) / 2;
+	// Baseline of a line box: its middle plus about a third of the font size (Latin cap height is about 0.7 em).
+	const baseline = (lineTop: number, line: number, size: number) => lineTop + line / 2 + 0.35 * size;
+	const stripW = 0.5 * f;
+	const axis = roundelAxis(geo);
+	const padX = roundel ? axis - (ROUNDEL_EM.column * f) / 2 : 0.875 * f;
+	const textW = roundel ? ROUNDEL_EM.column * f : geo.cardW - padX - 0.5 * f;
+	const signSize = 1.125 * f;
+	const signRight = geo.cardW - 0.5 * f;
+	// With a crown the sign sits near the top edge. Without one the text block starts at about 3 px, and a sign there would touch the
+	// second name line: it keeps its 0.2.4 place, level with the middle of name line 1.
+	const nameBase = baseline(top, nameLine, nameSize);
+	const signTop = roundel && crown > 0 ? f / 3 : nameBase - 0.35 * nameSize - signSize / 2;
+	const signGap = 0.25 * f;
+	const signDash = (Math.SQRT2 * signSize - signGap) / 2;
+	const small = top + names * nameLine;
+	// The word may use the plate: the Roundel centres it on the axis, so the nearer plate end (the right one) sets the width on both sides.
+	const wordClear = WORD_CLEAR_EM * f;
+	const relationW = roundel ? 2 * (geo.cardW - PLATE_INSET_PX - axis - wordClear) : geo.cardW - PLATE_INSET_PX - wordClear - padX;
+	return {
+		stripW,
+		padX,
+		textW,
+		nameSize,
+		smallSize,
+		nameBaseline: nameBase,
+		...(names > 1 ? { name2Baseline: baseline(top + nameLine, nameLine, nameSize) } : {}),
+		...(names > 2 ? { name3Baseline: baseline(top + 2 * nameLine, nameLine, nameSize) } : {}),
+		titleBaseline: baseline(small, smallLine, smallSize),
+		...(tall && titles === 2 ? { title2Baseline: baseline(small + smallLine, smallLine, smallSize) } : {}),
+		datesBaseline: baseline(small + titles * smallLine, smallLine, smallSize),
+		// Raised, so a descender of the word stays above the pill of a far-couple tag that hangs into the plate (B.3.2).
+		...(plateH > 0 ? { relationBaseline: cardH - plateH / 2 + 0.35 * smallSize + 0.5 - ROUNDEL_EM.wordRaise * f, relationW } : {}),
+		sign: { x1: signRight, y1: signTop, x2: signRight - signSize, y2: signTop + signSize, width: 0.15625 * f, dash: [signDash, signGap] },
+		nameWithSignW: roundel ? 2 * (signRight - signSize - 0.25 * f - axis) : textW - signSize - 0.5 * f,
+		textBottom: small + smalls * smallLine,
+		anchorX: roundel ? axis : padX,
+		...(roundel ? { middle: true as const } : {}),
+		r1: { axis, crown, ...(plateH > 0 ? { plate: { y: cardH - plateH, h: plateH } } : {}) },
+	};
+}
+
+/** Where the medallion and the arms of a Roundel card go, card-relative layout px. */
+export interface RoundelPics {
+	/** The portrait's picture square (2 em across). */
+	portrait?: Rect;
+	/** The arms box: 1.25 x 1.5 em beside the medallion, or 1.67 x 2 em in the medallion's place. */
+	arms?: Rect;
+	/** The ring's outer radius, the halo's radius and the medallion's centre. */
+	ringR: number;
+	haloR: number;
+	cx: number;
+	cy: number;
+}
+
+/** 0.2.5 (B.3.3): the places of the medallion and the arms of a Roundel card: on the top edge, centred on the axis. */
+export function roundelPics(geo: Geometry, o: { arms: boolean; portrait: boolean }): RoundelPics {
+	const f = geo.fontPx;
+	const E = ROUNDEL_EM;
+	const cx = roundelAxis(geo);
+	const cy = -E.above * f;
+	const r = E.medal * f;
+	const ringR = r + E.ring * f;
+	const haloR = ringR + E.halo * f;
+	const portrait = o.portrait ? { x: cx - r, y: cy - r, w: 2 * r, h: 2 * r } : undefined;
+	let arms: Rect | undefined;
+	if (o.arms) {
+		if (o.portrait) {
+			const h = pictureSize(geo);
+			const w = PICTURE_EM.armsAspect * h;
+			arms = { x: cx + ringR + E.armsGap * f, y: cy - h / 2, w, h };
+		} else {
+			const h = 2 * r;
+			const w = PICTURE_EM.armsAspect * h;
+			arms = { x: cx - w / 2, y: cy - h / 2, w, h };
+		}
+	}
+	return { ...(portrait ? { portrait } : {}), ...(arms ? { arms } : {}), ringR, haloR, cx, cy };
+}
+
+/** 0.2.5 (B.3.5): how far above the card top a line from the parents stops: at the ring of a portrait, at the top of arms alone, or 0 with no picture. */
+export function roundelLineEnd(geo: Geometry, o: { arms?: boolean; portrait?: boolean }): number {
+	const f = geo.fontPx;
+	const E = ROUNDEL_EM;
+	if (o.portrait) return (E.above + E.medal + E.ring) * f;
+	if (o.arms) return (E.above + E.medal) * f;
+	return 0;
+}
+
+/**
+ * 0.2.5 (B.3.4): the small "You" tab of the marked person, card-relative. The Roundel puts it on the top edge left of the medallion
+ * (`hasPictures`) or of the axis; the text card and the classic card put it above the text's left edge.
+ */
+export function youTabRect(geo: Geometry, hasPictures: boolean): Rect {
+	const f = geo.fontPx;
+	const w = ROUNDEL_EM.tabW * f;
+	const h = ROUNDEL_EM.tabH * f;
+	if (isRoundel(geo)) return { x: roundelAxis(geo) - (hasPictures ? 1.45 : 0.4) * f - w, y: -ROUNDEL_EM.tabAbove * f, w, h };
+	return { x: 0.875 * f, y: -ROUNDEL_EM.tabAboveText * f, w, h };
+}

@@ -10,7 +10,7 @@ import { foldControls, foldFamilies, hiddenPartners, pruneGraph, type FoldContro
 import { computeModelOrder } from '../core/order';
 import { routeEdges } from './edges';
 import type { FoldInput } from './fold-spots';
-import { narrowWidth } from './geometry';
+import { withRelationLine } from './geometry';
 import { layoutFamilies } from './layout';
 import type { Geometry, LaidOut, LayoutSettings, LayoutTree } from './model';
 
@@ -29,21 +29,26 @@ const cache = new Map<string, LaidOut>();
  * House and sex stay in: they decide which parent anchors a family and which side a spouse sits.
  */
 export function layoutKey(g: FamilyGraph, geo: Geometry, settings: LayoutSettings, fontFamily: string): string {
-	// An absent orientation is `down`, and card width only matters sideways: equal layouts share a key.
-	// A narrow card's width goes in as the layout will use it (rounded to 0.5 px, clamped).
+	// An absent orientation is `down`: equal layouts share a key.
 	const sideways = settings.orientation === 'sideways';
-	const narrow = sideways && settings.sidewaysCards === 'narrow';
 	// D29, D37: only people of this tree count, once each, in a stable order; none leaves the key as before.
 	const tall = [...new Set(settings.tallCards ?? [])].filter((id) => g.byId.has(id)).sort();
 	// D81: the same for three-line names; none leaves the key as before.
 	const long = [...new Set(settings.longNames ?? [])].filter((id) => g.byId.has(id)).sort();
 	// D61: the same for two-line title text lines; none leaves the key as before.
 	const tallT = [...new Set(settings.tallTitles ?? [])].filter((id) => g.byId.has(id)).sort();
+	// 0.2.5: the "You" tab counts only for a person of this graph, as the layout sees it; the card form is in `geo`.
+	const youTab = settings.youTab !== undefined && g.byId.has(settings.youTab) ? settings.youTab : undefined;
 	// D40: only a relation line changes the key; without one the key is as before.
-	const rel = settings.relationLine ? { relationLine: true } : {};
+	const rel = { ...(settings.relationLine ? { relationLine: true } : {}), ...(youTab !== undefined ? { youTab } : {}) };
+	// The crown and the reach come from the picture lists as given (`drawnGeometry` has no graph), so a list of ids that are not in this graph still moves the layout.
+	const drawn = withRelationLine(geo, { ...settings, youTab });
+	const heights = { ...(drawn.crown ? { crown: drawn.crown } : {}), ...(drawn.reach ? { reach: drawn.reach } : {}) };
+	// 0.2.5: the text card shows no picture, so the picture lists never change a sideways text layout.
+	const textCard = geo.form === 'text';
 	// M9 (L3): the picture sets, filtered, once each and sorted; none leaves the key as in M8.
-	const arms = [...new Set(settings.arms ?? [])].filter((id) => g.houses.has(id)).sort();
-	const portraits = [...new Set(settings.portraits ?? [])].filter((id) => g.byId.has(id)).sort();
+	const arms = textCard ? [] : [...new Set(settings.arms ?? [])].filter((id) => g.houses.has(id)).sort();
+	const portraits = textCard ? [] : [...new Set(settings.portraits ?? [])].filter((id) => g.byId.has(id)).sort();
 	// M10 (L3, F1): the people that folds hide, the folded families and the controls; empty or absent leaves the key as before.
 	const hidden = [...new Set(settings.foldHidden ?? [])].filter((id) => g.byId.has(id)).sort();
 	const folded = [...new Set(settings.foldedFamilies ?? [])].sort();
@@ -61,8 +66,8 @@ export function layoutKey(g: FamilyGraph, geo: Geometry, settings: LayoutSetting
 		fontFamily,
 		geo,
 		sideways
-			? { sweeps: settings.sweeps, far: settings.far, orientation: 'sideways', sidewaysCards: narrow ? 'narrow' : 'normal', ...(narrow ? { narrowCardW: narrowWidth(geo, settings.narrowCardW) } : {}), ...tallParts, ...rel }
-			: { sweeps: settings.sweeps, far: settings.far, ...tallParts, ...rel },
+			? { sweeps: settings.sweeps, far: settings.far, orientation: 'sideways', ...tallParts, ...rel, ...heights }
+			: { sweeps: settings.sweeps, far: settings.far, ...tallParts, ...rel, ...heights },
 		g.people.map((p) => [p.id, p.sex ?? '', p.house ?? '', p.illegitimate ? 1 : 0, g.placementParents.get(p.id) ?? [], g.placementType.get(p.id) ?? '', g.primaryUnion.get(p.id) ?? '']),
 		g.unions.map((u) => [u.key, u.partners, u.type, u.implicit ? 1 : 0, u.children]),
 		[...g.unionsOf],

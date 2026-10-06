@@ -345,11 +345,12 @@ describe('P4: without `saved` (and without `pictures`), renderSvg draws exactly 
 	// because these trees have far couples with no children, whose tags now carry the partnership sign.
 		// 0.2.2 (D108): the hashes of 07 and 07b were recorded again (ring and open triangle keep the dot's gap before the name).
 		// 0.2.4: all 16 were recorded again for the card geometry (card 61 px high, name text 0.85 em, boxes at the lower right).
+		// 0.2.5 (D140, WP-A1): 04 (a rumoured father is seated beside his child's parent) and 12 (partners on one row) were recorded again.
 	const M8_SVG: Record<string, string> = {
 		'01': '3cd017b8964acae4',
 		'02': '80646b0e0f77bcdd',
 		'03': 'fe3824ac60454583',
-		'04': 'e5904c56484e3ce6',
+		'04': '31aae5404e0e571e',
 		'05': '14b66bb8799df29d',
 		'06': 'e89860b7a3d19c45',
 		'07': '9a9471e459c3cb0f',
@@ -358,7 +359,7 @@ describe('P4: without `saved` (and without `pictures`), renderSvg draws exactly 
 		'09': '95f43e80a3dd21c4',
 		'10': 'd471d3aa1c57d8ad',
 		'11': '2ecf7dc5003a58e6',
-		'12': 'e84bff7d7cdd1b6a',
+		'12': 'adc45337207bb9c8',
 		'13': '7c4d84eb85d2362c',
 		'14': 'fc6b084470e7219a',
 		'15': '7883e14d94949d4e',

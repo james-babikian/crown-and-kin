@@ -10,8 +10,7 @@ import { block15, graphOf } from './acceptance/m10-support';
 const g = graphOf(block15(0));
 const VIEWS: [string, LayoutSettings][] = [
 	['down', DEFAULT_LAYOUT_SETTINGS],
-	['sideways', { ...DEFAULT_LAYOUT_SETTINGS, orientation: 'sideways', sidewaysCards: 'normal' }],
-	['narrow', { ...DEFAULT_LAYOUT_SETTINGS, orientation: 'sideways', sidewaysCards: 'narrow', narrowCardW: 158.5 }],
+	['sideways', { ...DEFAULT_LAYOUT_SETTINGS, orientation: 'sideways' }],
 ];
 const SETS: [string, string[][]][] = [
 	['A', [['osric', 'mathilde']]],

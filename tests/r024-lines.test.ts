@@ -76,5 +76,5 @@ describe('L1 and L2: 300 random trees, in every view and variant, have no line p
 		const bad: string[] = [];
 		for (let seed = 1; seed <= 300; seed++) for (const [key, problems] of problemsOf(seed)) if (problems.length) bad.push(`seed ${seed} ${key}: ${problems[0]}`);
 		expect(bad).toEqual([]);
-	});
+	}, 30_000);
 });

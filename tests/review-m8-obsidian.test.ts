@@ -18,6 +18,7 @@ import { FEl, clock, dispatch, fakeWin, installDom, resetDom, runTimers, settle 
 import { notices, openModals, resetObsidian } from './acceptance/fake-obsidian';
 import { BODY_13 } from './acceptance/titles-support';
 import { embed, fakeHandle, fakeHost, openSheetOn, type FakeHandle, type Host } from './acceptance/tree-view-fakes';
+import { openPage } from './lw-support';
 import { cardLabels } from '../src/core/titles';
 
 /*
@@ -129,8 +130,9 @@ const BODY = [
 describe('review M8 obsidian: Titles window, Add holder of a person with no id', () => {
 	it('F1: Save writes the holder (the person gets an id in the same write), not a false stale message', async () => {
 		const { handle, content } = await openTitles(BODY);
-		const box = () => content.querySelector('.dynasty-title-box[data-title="duke"]')!;
-		await click(box().querySelector('.dynasty-title-toggle'));
+		// The holders show on the edit page of the title (D134); the window draws it again after each step.
+		const box = () => content.querySelector('.dynasty-lw-page[data-title="duke"]')!;
+		openPage(content, 'duke');
 		await click(box().querySelector('.dynasty-holder-add'));
 		await pick('~2');
 		// The holder form: Save it as it is.
@@ -148,8 +150,8 @@ describe('review M8 obsidian: Titles window, Add holder of a person with no id',
 describe('review M8 obsidian: the holder form keeps `as` when only the name changes', () => {
 	it('F2: a new name for a holder who is not in the tree keeps its written `as` (spec §13.5)', async () => {
 		const { handle, content } = await openTitles(BODY);
-		const box = () => content.querySelector('.dynasty-title-box[data-title="duke"]')!;
-		await click(box().querySelector('.dynasty-title-toggle'));
+		const box = () => content.querySelector('.dynasty-lw-page[data-title="duke"]')!;
+		openPage(content, 'duke');
 		await click(box().querySelectorAll('.dynasty-holder-edit')[1]);
 		const form = top();
 		const ruler = form.contentEl.querySelector('[data-field="ruler"] input')!;

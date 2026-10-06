@@ -155,17 +155,22 @@ describe('M9: with "Reduce movement" on the scroll jumps at once', () => {
 });
 
 describe('M1: the scroll place is kept over every redraw of the window', () => {
-	it('a redraw by a colour choice keeps the scrollTop of the body', async () => {
+	it('a redraw by a colour choice keeps the scrollTop of the page, and Back puts the list at its place again (0.2.5, D134)', async () => {
 		const handle = writingHandle(body(12));
 		const win = HousesWindow.create({} as never, { handle: handle as never })!;
 		win.open();
 		const content = (win as unknown as { contentEl: FEl }).contentEl;
+		content.querySelector('.dynasty-sheet-body')!.scrollTop = 310;
+		await click(content.querySelector('button.dynasty-lw-row'));
 		const before = content.querySelector('.dynasty-sheet-body')!;
-		before.scrollTop = 310;
-		await click(content.querySelector('.dynasty-house-swatch'));
+		expect(before.scrollTop).toBe(0);
+		before.scrollTop = 120;
+		await click(content.querySelector('.dynasty-house-colour'));
 		await settle();
 		const after = content.querySelector('.dynasty-sheet-body')!;
 		expect(after).not.toBe(before);
-		expect(after.scrollTop).toBe(310);
+		expect(after.scrollTop).toBe(120);
+		await click(content.querySelector('button[data-focus="back"]'));
+		expect(content.querySelector('.dynasty-sheet-body')!.scrollTop).toBe(310);
 	});
 });

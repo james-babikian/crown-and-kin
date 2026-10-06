@@ -30,9 +30,9 @@ import { specModel } from './spec-model';
 // Milestone 6 layout contract (src/layout/model.ts):
 // - D26 (spec §0, §5.3): `EdgeMarker.unionType` — for a `union` marker, the partnership type as
 //   written (§4.1: `type`, default `marriage`; an unknown value is kept as written). Implicit
-//   union markers and rumour markers have none. In every layout (down, sideways, narrow).
-// - D29 (spec §0, §5.2, D24), D37: `LayoutSettings.tallCards` — in every layout (down, sideways
-//   normal and narrow cards), exactly the listed people's cards are one name text line taller;
+//   union markers and rumour markers have none. In every layout (down, sideways).
+// - D29 (spec §0, §5.2, D24), D37: `LayoutSettings.tallCards` — in every layout (down, sideways),
+//   exactly the listed people's cards are one name text line taller;
 //   every other card keeps its size. It is part of the cache key (sorted).
 //
 // The expected union types are read from the block text with the `yaml` package, not from the
@@ -40,8 +40,7 @@ import { specModel } from './spec-model';
 
 const GEO = geometryFor(16, 'normal');
 const DOWN: LayoutSettings = SETTINGS;
-const SIDE: LayoutSettings = { ...SETTINGS, orientation: 'sideways', sidewaysCards: 'normal' };
-const NARROW: LayoutSettings = { ...SETTINGS, orientation: 'sideways', sidewaysCards: 'narrow' };
+const SIDE: LayoutSettings = { ...SETTINGS, orientation: 'sideways' };
 const E = 0.5;
 
 /** Time limit for tests that lay out sample tree 7 several times. */
@@ -130,7 +129,6 @@ function unionTypeProblems(source: string, l: { g: FamilyGraph; layout: TreeLayo
 const LAYOUTS: [string, LayoutSettings][] = [
 	['down', DOWN],
 	['sideways', SIDE],
-	['sideways narrow', NARROW],
 ];
 
 describe('D26: a union marker carries the written partnership type (contract EdgeMarker.unionType)', () => {
@@ -304,13 +302,13 @@ function tallSets(tree: Tree): [string, string[]][] {
 	];
 }
 
-describe('D29: tallCards makes exactly those narrow sideways cards one name text line taller', () => {
+describe('D29: tallCards makes exactly those sideways cards one name text line taller', () => {
 	for (const f of allFixtures()) {
 		it(`sample tree ${f.id}`, { timeout: HEAVY_MS }, () => {
-			const base = lay(f.source, NARROW);
+			const base = lay(f.source, SIDE);
 			expect(structure(base, GEO), 'without tall cards').toEqual(NONE);
 			for (const [label, ids] of tallSets(base.tree)) {
-				const l = lay(f.source, { ...NARROW, tallCards: ids });
+				const l = lay(f.source, { ...SIDE, tallCards: ids });
 				expect(l.layout.orientation, label).toBe('sideways');
 				expect(l.layout.geometry, label).toEqual(base.layout.geometry);
 				expect(first(sizeProblems(l, base, new Set(ids))), label).toEqual([]);
@@ -325,23 +323,19 @@ describe('D29: tallCards makes exactly those narrow sideways cards one name text
 	it('the drawn size: a tall card is 16 px taller at 16 px (1.2 × 0.85 × 16 = 16.3, whole px allowed)', () => {
 		const src = allFixtures().find((f) => f.id === '01')!.source;
 		const id = parse(src).people[0].id;
-		const base = lay(src, NARROW);
-		const l = lay(src, { ...NARROW, tallCards: [id] });
+		const base = lay(src, SIDE);
+		const l = lay(src, { ...SIDE, tallCards: [id] });
 		const extra = l.layout.persons.get(id)!.h - base.layout.persons.get(id)!.h;
 		expect(extra).toBeGreaterThanOrEqual(15.8);
 		expect(extra).toBeLessThanOrEqual(16.8);
 	});
 
-	for (const [geo, narrowCardW] of [
-		[geometryFor(16, 'compact'), undefined],
-		[geometryFor(12, 'normal'), 120],
-		[geometryFor(20, 'normal'), 150],
-	] as [Geometry, number | undefined][]) {
+	for (const geo of [geometryFor(16, 'compact'), geometryFor(12, 'normal'), geometryFor(20, 'normal')] as Geometry[]) {
 		for (const id of ['03', '06']) {
-			const at = `${id} at ${geo.fontPx} px ${geo.cardSize}, narrow ${narrowCardW ?? 'default'}`;
-			it(`compact cards, other fonts and a renderer-chosen narrow width (WP5.5c): sample tree ${at}`, () => {
+			const at = `${id} at ${geo.fontPx} px ${geo.cardSize}`;
+			it(`compact cards and other fonts: sample tree ${at}`, () => {
 				const src = allFixtures().find((f) => f.id === id)!.source;
-				const settings: LayoutSettings = { ...NARROW, narrowCardW };
+				const settings: LayoutSettings = SIDE;
 				const base = lay(src, settings, geo);
 				expect(structure(base, geo), 'without tall cards').toEqual(NONE);
 				const ids = base.tree.people.filter((_, i) => i % 3 === 0).map((p) => p.id);
@@ -368,12 +362,12 @@ describe('D29: tallCards makes exactly those narrow sideways cards one name text
 			'  - {id: k, name: K, parents: [x, z]}',
 		];
 		const src = ['people:', ...people, 'unions:', '  - {partners: [r1, r2]}', '  - {partners: [s1, s2]}', '  - {partners: [x, z]}', '  - {partners: [x, y]}'].join('\n');
-		const base = lay(src, NARROW);
+		const base = lay(src, SIDE);
 		expect(base.layout.farTags.get('x')?.spouses).toEqual(['y']);
 		const xz = base.g.unions.find((u) => u.partners.includes('x') && u.partners.includes('z'))!;
 		expect(base.layout.unions.get(xz.key)?.bar).toBe(true);
 		for (const ids of [['x'], ['z'], ['x', 'z', 'y'], ['k', 'r1']]) {
-			const l = lay(src, { ...NARROW, tallCards: ids });
+			const l = lay(src, { ...SIDE, tallCards: ids });
 			expect(first(sizeProblems(l, base, new Set(ids))), ids.join()).toEqual([]);
 			expect(structure(l, GEO), ids.join()).toEqual(NONE);
 		}
@@ -381,10 +375,10 @@ describe('D29: tallCards makes exactly those narrow sideways cards one name text
 
 	it('an id that names nobody changes nothing; an empty list is the same as none', () => {
 		const src = allFixtures().find((f) => f.id === '06')!.source;
-		const base = lay(src, NARROW);
+		const base = lay(src, SIDE);
 		for (const tallCards of [[], ['nobody'], ['nobody', 'else']]) {
 			clearLayoutCache();
-			const l = lay(src, { ...NARROW, tallCards });
+			const l = lay(src, { ...SIDE, tallCards });
 			expect(recordLayout(l), JSON.stringify(tallCards)).toBe(recordLayout(base));
 		}
 	});
@@ -529,7 +523,7 @@ describe('D37: tallCards makes exactly those sideways normal cards one name text
 });
 
 describe('D37: drawnGeometry is the geometry the layout draws with', () => {
-	for (const [name, settings] of [...LAYOUTS, ['sideways narrow 130', { ...NARROW, narrowCardW: 130 }]] as [string, LayoutSettings][]) {
+	for (const [name, settings] of LAYOUTS) {
 		it(name, () => {
 			const src = allFixtures().find((f) => f.id === '01')!.source;
 			expect(drawnGeometry(GEO, settings)).toEqual(lay(src, settings).layout.geometry);
@@ -558,9 +552,9 @@ describe('D29: tallCards is part of the layout cache key, sorted (contract Layou
 
 	it('a repeat call with an equal list returns the cached layout; another list does not', () => {
 		clearLayoutCache();
-		const one = layoutTree(g, GEO, { ...NARROW, tallCards: [a, b] }, FONT_FAMILY);
-		expect(layoutTree(g, GEO, { ...NARROW, tallCards: [b, a] }, FONT_FAMILY)).toBe(one);
-		const other = layoutTree(g, GEO, { ...NARROW, tallCards: [a, c] }, FONT_FAMILY);
+		const one = layoutTree(g, GEO, { ...SIDE, tallCards: [a, b] }, FONT_FAMILY);
+		expect(layoutTree(g, GEO, { ...SIDE, tallCards: [b, a] }, FONT_FAMILY)).toBe(one);
+		const other = layoutTree(g, GEO, { ...SIDE, tallCards: [a, c] }, FONT_FAMILY);
 		expect(other).not.toBe(one);
 		expect(other.layout.persons.get(c)!.h).toBeGreaterThan(one.layout.persons.get(c)!.h);
 	});

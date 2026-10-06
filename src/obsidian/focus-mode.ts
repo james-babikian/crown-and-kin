@@ -6,11 +6,12 @@
 
 import type { Orientation, Rect } from '../layout/model';
 import { COMPACT_NAME_EM } from '../render/dom/scene';
+import type { PhoneDirection } from './settings';
 import { FIT_MIN_NAME_PX, MIN_HIT_PX, READABLE_NAME_PX, START_TOP_GAP, chooseLod, fitScale, fitView, type Size, type View } from '../render/view-math';
 
 /**
- * What the user chose for this block in this session (Focus, Focus here, a `+` badge, Show all
- * people). `id: null` is "show all people". Kept in the block's view state until the note closes.
+ * What the user chose for this block in this session (Focus, Focus here, a `+` badge, Clear focus).
+ * `id: null` is the whole tree (Clear focus). Kept in the block's view state until the note closes.
  */
 export interface SessionFocus {
 	id: string | null;
@@ -28,16 +29,21 @@ export function isPhoneWindow(coarse: boolean, innerWidth: number, innerHeight: 
 }
 
 /**
- * D24: the tree is drawn sideways only on a phone in portrait: height greater than width. A phone's
- * keyboard makes the window lower but never wider: a window exactly as wide as the screen's short side
- * also counts as portrait (on a small phone the keyboard can leave less height than width, and the
- * tree under an edit sheet must not turn). Any other window, for example a landscape-shaped window
- * on a tablet, follows height > width.
+ * D24 and D150: the tree is drawn sideways only on a phone held upright, and only if the setting
+ * `direction` says Sideways. The window must be a phone window, and when the screen size is known the
+ * screen must be a phone too: an iPad in a narrow Split View window is a tablet and stays top to
+ * bottom. This is the same test as `TreeView.isPhone()`. A phone's keyboard makes the window lower but
+ * never wider: a window exactly as wide as the screen's short side also counts as upright (on a small
+ * phone the keyboard can leave less height than width, and the tree under an edit sheet must not
+ * turn). Any other window follows height > width.
  */
-export function orientationFor(coarse: boolean, innerWidth: number, innerHeight: number, screen?: { width: number; height: number } | null): Orientation {
+export function orientationFor(coarse: boolean, innerWidth: number, innerHeight: number, screen?: { width: number; height: number } | null, direction: PhoneDirection = 'sideways'): Orientation {
 	if (!isPhoneWindow(coarse, innerWidth, innerHeight)) return 'down';
+	const known = !!screen && screen.width > 0 && screen.height > 0;
+	if (known && !isPhoneWindow(coarse, screen.width, screen.height)) return 'down';
+	if (direction === 'down') return 'down';
 	if (innerHeight > innerWidth) return 'sideways';
-	const short = screen && screen.width > 0 && screen.height > 0 ? Math.min(screen.width, screen.height) : 0;
+	const short = known ? Math.min(screen.width, screen.height) : 0;
 	return short > 0 && Math.abs(innerWidth - short) <= 1 && Math.max(screen!.width, screen!.height) > short + 1 ? 'sideways' : 'down';
 }
 
@@ -50,21 +56,8 @@ export interface FocusFacts {
 	phone: boolean;
 	/** The focus the phone rule chose earlier for this block (kept so an edit does not move it). */
 	auto: string | null;
-	/** The marked person (`options.me`) that was valid when `auto` was chosen; null if none was. */
-	autoMark?: string | null;
-	/**
-	 * Set only for the note preview (spec §13.18 rule 5): its marked person now, or null if the tree has none.
-	 * Then a remembered `auto` ends when the mark changed or the phone rule no longer applies. The
-	 * full-screen view leaves it unset and never ends the remembered family of the preview.
-	 */
-	mark?: string | null;
 	has(id: string): boolean;
-	/**
-	 * D111: the tree has a valid `options.me` and this view is the note preview (not the full-screen
-	 * view). Then the phone rule applies to a tree of any size.
-	 */
-	marked?: boolean;
-	/** D20: the whole tree has more than PHONE_FOCUS_MIN_PEOPLE people (distinct ids). Called only on a phone, and not when `marked`. */
+	/** D20: the whole tree has more than PHONE_FOCUS_MIN_PEOPLE people (distinct ids). Called only on a phone. */
 	large(): boolean;
 	/** The start person of the whole tree (spec §5.5). Called only when the phone rule decides. */
 	start(): string | null;
@@ -80,32 +73,25 @@ export interface FocusChoice {
 	dropSession: boolean;
 	/** The phone rule's choice to remember (unchanged when the rule did not run). */
 	auto: string | null;
-	/** The marked person to remember with `auto` (see `FocusFacts.autoMark`). */
-	autoMark: string | null;
 }
 
 /**
- * Priority order: the session focus; the pin; on a phone, a large tree (D20: more than 100 people) or a
- * tree with a marked person (D111) opens as the focus family of the start person; else the whole tree. A reference to a person who is not in the tree
- * counts as absent (the pin's missing reference is one of the tree's problems, spec §8).
+ * Priority order: the session focus; the pin; on a phone, a large tree (D20: more than 100 people) opens as the focus family of the
+ * start person; else the whole tree. Only the full-screen view asks on a phone: a tree in a note on a phone is a list (D144). A reference
+ * to a person who is not in the tree counts as absent (the pin's missing reference is one of the tree's problems, spec §8).
  */
 export function chooseFocus(f: FocusFacts): FocusChoice {
 	let dropSession = false;
-	const preview = f.mark !== undefined;
-	// A family that came from a mark that is gone or moved is not kept (spec §13.18 rule 5); an edit of another person does not end it.
-	const kept = f.auto !== null && !(preview && f.mark !== (f.autoMark ?? null)) ? f.auto : null;
-	const same = { auto: f.auto, autoMark: f.autoMark ?? null };
 	if (f.session) {
-		if (f.session.id === null) return { id: null, from: 'session', dropSession, ...same };
-		if (f.has(f.session.id)) return { id: f.session.id, from: 'session', dropSession, ...same };
+		if (f.session.id === null) return { id: null, from: 'session', dropSession, auto: f.auto };
+		if (f.has(f.session.id)) return { id: f.session.id, from: 'session', dropSession, auto: f.auto };
 		dropSession = true;
 	}
-	if (f.pin !== undefined && f.has(f.pin)) return { id: f.pin, from: 'pin', dropSession, ...same };
-	if (!f.phone || !(f.marked || f.large())) return { id: null, from: 'none', dropSession, ...(preview ? { auto: null, autoMark: null } : same) };
-	if (kept !== null && f.has(kept)) return { id: kept, from: 'phone', dropSession, ...same };
+	if (f.pin !== undefined && f.has(f.pin)) return { id: f.pin, from: 'pin', dropSession, auto: f.auto };
+	if (!f.phone || !f.large()) return { id: null, from: 'none', dropSession, auto: f.auto };
+	if (f.auto !== null && f.has(f.auto)) return { id: f.auto, from: 'phone', dropSession, auto: f.auto };
 	const auto = f.start();
-	const autoMark = preview ? f.mark ?? null : null;
-	return auto !== null && f.has(auto) ? { id: auto, from: 'phone', dropSession, auto, autoMark } : { id: null, from: 'none', dropSession, auto: null, autoMark: null };
+	return auto !== null && f.has(auto) ? { id: auto, from: 'phone', dropSession, auto } : { id: null, from: 'none', dropSession, auto: null };
 }
 
 /** Screen px kept free at each side of the cards that the focus view moves into sight. */
@@ -278,32 +264,6 @@ export function clearToolbar(view: View, size: Size, bar: { left: number; right:
 		v = { scale: v.scale, cx: v.cx, cy: v.cy - shift / v.scale };
 	}
 	return v;
-}
-
-/** The smallest gap between two sideways columns of narrow cards, in em. */
-export const NARROW_GAP_EM = 3;
-/** Narrow card widths the layout accepts, in em; matches `LayoutSettings.narrowCardW`. */
-export const NARROW_MIN_EM = 8;
-/** The widest narrow card width the layout accepts, in em; `narrowCardWidth` clamps to it. */
-export const NARROW_MAX_EM = 10.25;
-/**
- * Screen px kept free right of the children's column: a `+` badge's reach past its card corner at 14 px
- * names (0.9 em), so the column does not touch the box edge.
- */
-const NARROW_RIGHT_ROOM = 0.9 * READABLE_NAME_PX;
-
-/**
- * The narrow card width (layout px, to 0.5 px) at which the person's column (8 screen px from
- * the left) and the children's column fit whole side by side in a note preview `box` screen px wide,
- * at the first view's 14 px names: (box − 8 − badge room − 3 em gap) / 2. Clamped as the layout
- * clamps it; undefined while the box has no width.
- */
-export function narrowCardWidth(box: number, fontPx: number): number | undefined {
-	if (!(box > 0)) return undefined;
-	const f = fontPx > 0 ? fontPx : 16;
-	const scale = READABLE_NAME_PX / f;
-	const w = ((box - FOCUS_SIDE_PAD - NARROW_RIGHT_ROOM) / scale - NARROW_GAP_EM * f) / 2;
-	return Math.round(Math.min(NARROW_MAX_EM * f, Math.max(NARROW_MIN_EM * f, w)) * 2) / 2;
 }
 
 /** The cards the sideways first view places (D24). */

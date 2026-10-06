@@ -8,7 +8,7 @@ import type { TreeView } from '../../src/obsidian/tree-view';
 import { FEl, clock, fakeWin, flushFrames, installDom, resetDom, settle } from './fake-dom';
 import { resetObsidian } from './fake-obsidian';
 import { block15, comments15 } from './m10-support';
-import { desktop, embed, fakeHandle, fullViews, phone } from './tree-view-fakes';
+import { desktop, embed, fakeHandle, fullViews, tabletDevice } from './tree-view-fakes';
 
 /*
  * Adopted from the M10 review B (`m10/review-b`): folds in the Obsidian views (spec §13.10, F11, F12).
@@ -53,9 +53,9 @@ const run = async () => {
 const cardCount = (el: FEl) => el.querySelectorAll('.dynasty-card').length;
 const inner = (view: TreeView) => view as unknown as { focusOn(id: string | null): void; showFound(id: string): void };
 
-describe('static phone preview never applies folds, so it must not end them', () => {
+describe('static touch preview (a tablet) never applies folds, so it must not end them', () => {
 	it('Focus on a person in the static preview leaves the block folds (made in the full-screen view) as they are', async () => {
-		phone();
+		tabletDevice();
 		const handle = handleWith('A');
 		const { el, view } = await embed(SOURCE, { handle });
 		expect(cardCount(el)).toBe(96);
@@ -66,9 +66,9 @@ describe('static phone preview never applies folds, so it must not end them', ()
 	});
 });
 
-describe('static phone preview: a sheet write', () => {
+describe('static touch preview (a tablet): a sheet write', () => {
 	it('an ok write in the static preview leaves the block folds as they are (the preview shows none)', async () => {
-		phone();
+		tabletDevice();
 		const handle = handleWith('A');
 		const { view } = await embed(SOURCE, { handle });
 		const c = view.constructor as unknown as { unfoldAfterWrite(host: unknown, st: unknown, full: boolean, ids: string[], body: string): void };

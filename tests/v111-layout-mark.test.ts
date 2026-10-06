@@ -107,8 +107,8 @@ function svgParts(g: FamilyGraph, laid: LaidOut, me: string | undefined): { arms
 }
 
 describe('D96 geometry', () => {
-	it('the ring edge is taken from ME_LOOK: half the border and the whole ring', () => {
-		expect(ME_RING_INNER).toBe(ME_LOOK.border / 2 + ME_LOOK.ring);
+	it('the ring edge is taken from ME_LOOK: half the border (the one border is the whole mark, D153)', () => {
+		expect(ME_RING_INNER).toBe(ME_LOOK.border / 2);
 		expect(MARK_CLEAR_PX).toBe(1.5);
 	});
 

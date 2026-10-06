@@ -13,7 +13,7 @@ const A = foldKey(['osric', 'mathilde']);
 
 function lay(orientation: 'down' | 'sideways', folded: string[]) {
 	const hidden = foldHidden(g, new Set(folded));
-	const settings: LayoutSettings = { ...DEFAULT_LAYOUT_SETTINGS, ...(orientation === 'sideways' ? { orientation, sidewaysCards: 'normal' as const } : {}), foldHidden: [...hidden].sort(), foldedFamilies: folded, foldControls: true };
+	const settings: LayoutSettings = { ...DEFAULT_LAYOUT_SETTINGS, ...(orientation === 'sideways' ? { orientation } : {}), foldHidden: [...hidden].sort(), foldedFamilies: folded, foldControls: true };
 	clearLayoutCache();
 	return layoutTree(g, GEO, settings, 'font');
 }

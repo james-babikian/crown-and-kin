@@ -46,8 +46,9 @@ function body(n: number): string {
 	return `${lines.join('\n')}\n`;
 }
 
-describe('Houses window redraw keeps the scroll position of its body', () => {
-	it('Add house keeps the scrollTop that the body had before the redraw', async () => {
+// 0.2.5 (D134): the window is a list and an edit page. A page opens at the top, and Back puts the list at its place again.
+describe('Houses window keeps the scroll position of its list', () => {
+	it('a page opens at the top, and Back puts the list at the scrollTop that it had; Add house opens its page at the top too', async () => {
 		const handle = writingHandle(body(12));
 		const e = await embed(handle.body, { handle });
 		dispatch(e.el.querySelector('.dynasty-houses-button')!, 'click');
@@ -56,9 +57,14 @@ describe('Houses window redraw keeps the scroll position of its body', () => {
 		expect(win).toBeDefined();
 		const before = win.contentEl.querySelector('.dynasty-sheet-body')!;
 		before.scrollTop = 420;
-		await click(win.contentEl.querySelector('.dynasty-house-add'));
+		await click(win.contentEl.querySelector('button.dynasty-lw-row'));
 		const after = win.contentEl.querySelector('.dynasty-sheet-body')!;
 		expect(after).not.toBe(before);
-		expect(after.scrollTop).toBe(420);
+		expect(after.scrollTop).toBe(0);
+		await click(win.contentEl.querySelector('button[data-focus="back"]'));
+		expect(win.contentEl.querySelector('.dynasty-sheet-body')!.scrollTop).toBe(420);
+		win.contentEl.querySelector('.dynasty-sheet-body')!.scrollTop = 420;
+		await click(win.contentEl.querySelector('.dynasty-house-add'));
+		expect(win.contentEl.querySelector('.dynasty-sheet-body')!.scrollTop).toBe(0);
 	});
 });

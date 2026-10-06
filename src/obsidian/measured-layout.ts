@@ -35,8 +35,6 @@ export interface MeasuredOptions {
 	 * the settings or the cache key. Not the same as `hidden` (the focus badge counts). Absent = the `foldHidden` of `base`.
 	 */
 	foldHidden?: ReadonlySet<string>;
-	/** Whether the cards show the arms box (default true). A names-only style that shows portraits only sets it false (contract 6.1). */
-	showArms?: boolean;
 	/** The user's break places for names (D118). */
 	breaks?: BreakList;
 	/** The marked person (D41): the arms box, the portrait and the D14 sign keep clear of its ring. */
@@ -63,8 +61,7 @@ export interface MeasuredResult {
  * people that folds hide are skipped in steps 3 and 4. Step 4 also decides rule B, which boxes lift one text line (`lifted`).
  */
 export function measuredLayout(g: FamilyGraph, geo: Geometry, base: LayoutSettings, o: MeasuredOptions): MeasuredResult {
-	const picked = pictureSets(g, o.showPortraits);
-	const sets = o.showArms === false ? { ...picked, arms: [] } : picked;
+	const sets = pictureSets(g, o.showPortraits);
 	const plain: LayoutSettings = { ...base };
 	delete plain.tallCards;
 	delete plain.longNames;
@@ -85,7 +82,7 @@ export function measuredLayout(g: FamilyGraph, geo: Geometry, base: LayoutSettin
 	if (sets.portraits.length) plain.portraits = sets.portraits;
 	const drawn = drawnGeometry(geo, plain);
 	const arms = sets.arms.length ? armsCards(g, sets.arms) : undefined;
-	const titles = o.labels && !drawn.namesOnly ? tallTitlesFor(g, o.labels, drawn, o.showDates, titleMeasure(drawn, o.fonts, o.measure)).filter((id) => !skip.has(id)) : [];
+	const titles = o.labels ? tallTitlesFor(g, o.labels, drawn, o.showDates, titleMeasure(drawn, o.fonts, o.measure)).filter((id) => !skip.has(id)) : [];
 	const titled: LayoutSettings = titles.length ? { ...plain, tallTitles: titles } : plain;
 	const skipping = skip.size ? skip : undefined;
 	const extra = {

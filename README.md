@@ -18,26 +18,26 @@ You can also type the code block yourself. See "The tree text" below.
 
 - **Edit a person.** On the computer, click a card. On a phone, tap a card. The edit sheet opens. Change the fields. Then select Save.
 - **Add relatives.** In the edit sheet, use Add parent, Add child or Add partner.
-- **Move and zoom.** On the computer, drag the tree. To zoom, hold Ctrl and turn the mouse wheel. On a phone, the tree in a note does not move. Tap Expand to open the full-screen view. Move the tree with one finger. Zoom with two fingers.
+- **Move and zoom.** On the computer, drag the tree. To zoom, hold Ctrl and turn the mouse wheel.
+- **Move and zoom on a phone or a tablet.** On a phone, a tree in a note is a list (see "The tree in a note on a phone"). On a tablet, the tree in a note does not move. Tap Expand to open the full-screen view. Move the tree with one finger. Zoom with two fingers.
 - **Full-screen view.** Select Expand. Select the X button to close it. You can also push Esc.
 - **Find.** In the full-screen view, select Find. Type a name. Find ignores capital letters, accents and the look of the apostrophe.
-- **Focus.** Select Focus. Choose a person. The tree shows only the family of that person. A "+" sign on a card shows that the person has more relatives outside the view. Select Show all people to see the whole tree.
-- **Pin.** In the edit sheet, select "Pin focus here". The tree then always opens on the family of that person. Select "Remove pin" to stop this.
-- **Houses.** Select the Houses button (the castle) to add, rename, recolour or delete a house. You can also change the ID of a house there (see "Change the ID of a house or a title"). On a phone, the Houses button is only in the full-screen view.
+- **Focus.** Select Focus. Choose a person. The tree shows only the family of that person. While a focus shows, Focus opens a short list with two items. Select Choose a person to focus on another person. Select Clear focus to see the whole tree.
+- **The "+" sign.** A "+" sign on a card shows that the person has more relatives outside the view. Select the sign to show the family of that person.
+- **Pin.** In the edit sheet, select "Pin focus here". The tree then always opens on the family of that person. Select "Remove pin" to stop this. Clear focus does not remove a pin. The pin applies again when you close the note.
+- **Houses.** Select the Houses button (the castle). The Houses window shows a list of the houses. You can search the list and add a house. Select a house to change its name, arms or colour, or to delete it (see "The Houses window"). On a phone, the Houses button is only in the full-screen view.
 - **The buttons.** The toolbar of a tree has these buttons:
   - **Add person** adds a person.
   - **Houses** (the castle) opens the Houses window.
-  - **Focus** shows the family of one person.
-  - **Show all people** shows the whole tree again while focus mode is on.
+  - **Focus** shows the family of one person. While a focus shows, it opens a list with Choose a person and Clear focus.
   - **Find** is in the full-screen view only.
   - **Fit** fits the whole tree in the window.
   - **Legend** shows the line styles and the houses.
   - **More** (the "⋯" button) opens a list with Relation, Titles and Save as picture.
-  - **Height** (two arrows, one above the other) is only in a tree in a note on a phone. It changes the height of the tree (see "The tree in a note on a phone").
   - **Expand** opens the full-screen view. **Close** closes it.
   - A **warning button** shows when the tree has problems. Select it to see the list.
 
-  On a phone, a tree in a note has only Add person, Height and Expand. If the tree has problems, it also has the warning button. In the full-screen view on a phone, Fit and Legend are in the More list. A tree that you cannot edit shows Open note instead of Add person and Houses.
+  On a phone, a tree in a note is a list with a bar of Add person, Find, Back and Expand (see "The tree in a note on a phone"). If the tree has problems, the bar also has the warning button. In the full-screen view on a phone, Fit and Legend are in the More list. A tree that you cannot edit shows Open note instead of Add person and Houses.
 - **Commands.** The command list has four commands:
   - **Insert family tree** puts a new tree in the note at the cursor.
   - **Undo last tree edit** reverses the last edit of a tree.
@@ -46,53 +46,70 @@ You can also type the code block yourself. See "The tree text" below.
 - **Undo.** After you delete a person, a partnership or a house, the plugin shows a message with Undo. To undo a different tree edit, use the command "Undo last tree edit".
 - **Keyboard.** Push Tab to go to the toolbar buttons, the cards, the tags, the fold buttons and the "+ N" signs. Push Enter to open a card. Push Esc to close a list or a window.
 
-If you hold the phone upright, the tree turns sideways. The generations go from left to right. You scroll down to see more of the tree.
+If you hold the phone upright, the tree in the full-screen view turns sideways. The generations go from left to right. Scroll down to see more of the tree.
+
+To change this:
+
+1. Open the settings.
+2. Select "Tree direction on a phone held upright".
+3. Select "Like the computer".
+
+The generations then go from top to bottom. The setting is the same for all trees.
+
+If you change the setting while the full-screen view is open, the tree turns at once. A phone on its side, a tablet and a computer always show the tree from top to bottom.
 
 On a phone, the full-screen view has no Fit button and no Legend button. Select More (the "⋯" button) in the toolbar. The list has "Fit the tree in the view" and "Show the line styles". This keeps the toolbar in one row, so the Close button is always on the screen.
 
 ## The tree in a note on a phone
 
-The tree in a note on a phone is a small preview. It shows names only, so that more cards fit on the screen.
+On a phone, a tree in a note is a list. The list shows one person and the family of that person. The list has its own height, and the note scrolls over it. You cannot move or zoom the list.
 
-- **Names only.** Each card shows the name, the years, the colour bar of the house and the mark "You". It does not show the title or the relation word. The plugin does not find the relation words for this preview.
-- **Choose the style.** Open the settings. Select "Card style in the phone preview". There are three choices. "Names only, with the arms" is the first choice. "Names only, with the portrait" shows the portrait and not the arms. "Whole card" shows the same card as the full-screen view.
-- **The full-screen view and the saved picture.** The full-screen view always shows whole cards. "Save as picture" always saves whole cards, with the relation words.
-- **Change the height.** Tap the Height button in the toolbar of the tree. The tree gets the next height. The order is lower, start, upper, and then lower again. The tree keeps its centre when the height changes.
-- **The three heights.** The start height is the setting "Height on a phone". The lower height is 20 points of the screen height less than the start height. The upper height is 20 points more. For example, if the start height is 60%, the three heights are 40%, 60% and 80% of the screen height. The height is never below 30% or above 90%.
-- **How long the height stays.** The plugin keeps the height until you close the note. When you open the note again, the tree has the start height.
+- **What the list shows.** The section "Parents" shows the parents of the person. The next section shows the person and each partner. The section "Children" shows the children, one group for each partner. A child with no partner in the list is under "No partner listed". A child that has only an adoptive, ward or rumoured link is under "Other children".
+- **A row.** A row shows the name, the years, the title and the colour bar of the house. If the house has arms or the person has a portrait, the row shows them small. If the tree has a mark, a row also shows how the person is related to you. This needs "Show relation names on cards" to be on. The marked person shows "You".
+- **Move the list.** Tap a name. The list then shows the family of that person. Tap **Back** to show the person before. Tap **Find** to select any person in the tree. If you move the list, the plugin writes nothing to the note.
+- **Edit a person.** Tap the pencil at the right of a row. The edit sheet opens. For the person in the middle, tap the whole row.
+- **Where the list starts.** The plugin picks the start person in this order. First is the person that you chose last in this note. Next are the pin, then the marked person, then the person that you edited last. Then comes the oldest person who has children. The last choice is the first person in the tree.
+- **The bar.** Above the list are **Add person**, **Find**, **Back** (after you move the list), the warning button (if the tree has problems) and **Expand**.
+- **Expand.** Tap **Expand** to open the full-screen view. It shows the family of the person that the list shows. You can move the tree there. To see all people, select Focus. Then select Clear focus.
+- **After you save a person.** The list does not move. If the person is in the list, the row has a thin outline for two seconds. If the person is not in the list, a message tells you to tap Find.
+- **A tablet** does not show the list. It shows the tree in the note, and you cannot move or zoom this tree. Tap Expand to move the tree.
+- **Settings.** The list follows "Show dates on cards", "Show relation names on cards" and "Show portraits on cards". The card size and the height of a tree in a note do not change the list.
+
+"Save as picture" and the full-screen view always show the tree, not the list.
 
 ## Change the ID of a house or a title
 
 The ID is a short name. The plugin uses it to find a house or a title. You rarely need to change it.
 
 1. Open the window of the house or the title. For a house, select the Houses button (the castle). For a title, select More (the "⋯" button), then select Titles.
-2. Select **Change ID** beside the house or the title. A small window opens.
-3. Type the new ID, or select **Make ID from the name**.
-4. Select **Use this ID**.
-5. Select **Save**. The plugin asks you to confirm the change.
-6. Select **Change the ID**. The plugin changes the ID in the text of each person who uses the house, or who chose the title with "Show on the card".
+2. Select the house or the title in the list. The edit page opens.
+3. At the end of the page, under "Other actions", select **Change ID**. A small window opens.
+4. Type the new ID, or select **Make ID from the name**.
+5. Select **Use this ID**.
+6. Select **Save**. The plugin asks you to confirm the change.
+7. Select **Change the ID**. The plugin changes the ID in the text of each person who uses the house. It also changes the text of each person who chose the title with "Show on the card".
 
-To keep the old ID, select **Keep old ID** before you select Save.
+To keep the old ID, select **Keep old ID** on the edit page before you select Save. A new house or title has no Change ID until you save it.
 
 ## This is me and relations
 
 You can mark one person in the tree as you. Each card then shows the relation of that person to you.
 
 - **Mark a person as you.** Open the edit sheet of the person. In Actions, select "This is me". If another person has the mark, the mark moves to this person.
-- **The card "You".** The card of the marked person shows "You". It also has a thicker border in the accent colour of your theme.
-- **Relation names on the cards.** When the tree has a mark, each card gets one more small text line at the bottom. This text line shows the relation to you, for example "Father", "Half-sister" or "Second cousin once removed". All cards get a little taller. A card of a person with no relation to you has no relation name. If the tree is very small on the screen, the cards do not show the relation names.
-- **The edit sheet.** The Family section starts with "Relation to you:" and the relation name. A person can have more than one relation to you, for example after a marriage between cousins. Then the next text line starts with "Also:" and gives the other relations.
-- **A rumoured parent.** A rumoured parent is a parent link that you mark as a rumour. If the rumour is true, two people can be full brothers or sisters. Then the card can say "Half-brother, maybe full". The edit sheet has one more paragraph: "If every rumoured link is true, this person is your …", and the relation name. The list "Also" can say "Rumoured brother".
-- **Show the line.** In the edit sheet, select "Show the line". The relation finder opens with the line from you to the person (see "Relation finder").
+- **The card "You".** The card of the marked person shows "You". It also has a thicker border in the colour of the text. The border does not use the accent colour of your theme.
+- **Relation names on the cards.** When the tree has a mark, each card gets a band at the bottom of the card. The band shows the relation to you, for example "Father", "Half-sister" or "Second cousin once removed". On a card of the size Compact, there is no band. The relation is one more small text line at the bottom. All cards get a little taller. A card of a person with no relation to you has no relation name. If the tree is very small on the screen, the cards do not show the relation names.
+- **The edit sheet.** On a computer, a box at the top of the sheet shows "Relation to you" and the relation name. A person can have more than one relation to you, for example after a marriage between cousins. Then the next text line starts with "Also:" and gives the other relations. The box of the marked person says "This is you." If the tree has no mark, the sheet shows no box.
+- **The strip on a phone.** On a phone, a strip under the header of the sheet shows the relation name. If the person has other relations, the strip also shows how many, for example "7 more". Tap the strip to open it. The open strip shows the "Also:" text line and the button Show the line. The strip stays open or closed until you close Obsidian. The strip of the marked person says "This is you." and does not open.
+- **A rumoured parent.** A rumoured parent is a parent link that you mark as a rumour. If the rumour is true, two people can be full brothers or sisters. Then the card can say "Half-brother, maybe full". The box or the strip then has one more paragraph: "If every rumoured link is true, this person is your …", and the relation name. The list "Also" can say "Rumoured brother".
+- **Show the line.** In the edit sheet, select the button "Show the line" in the box, or in the open strip. The relation finder opens with the line from you to the person (see "Relation finder").
 - **Remove the mark.** Open the edit sheet of the marked person. Select Remove "This is me".
-- **Hide the relation names.** In the settings, turn off "Show relation names on cards". The cards keep their size. The edit sheet still shows the relation.
+- **Hide the relation names.** In the settings, turn off "Show relation names on cards". The cards are then shorter, and the marked person has a small "You" tab on the card. The edit sheet still shows the relation.
+- **The small label.** A small label can show the relation of a person. It shows only if the tree has a mark and "Show relation names on cards" is off. On a computer, rest the pointer on a card for a short time. You can also push Tab to go to the card. The label then shows the relation of that person. The marked person has no label. A pointer on a linked name shows no label. A phone shows no label.
 - **Undo.** The command "Undo last tree edit" undoes "This is me" and Remove "This is me". If the note is open in Live Preview, Ctrl+Z (Cmd+Z on a Mac) also undoes them.
 
 The mark is in the tree text. All your devices show the same mark.
 
-On a phone, the tree in a note opens on the family of the marked person. If the tree has a pin, the tree does not open on that family. The same is true if you selected Show all people. If you edit another person, the family of the marked person stays.
-
-It stays until you close the note, or until you move or remove the mark. On a phone, the parents are on the left and the children are on the right. If the marked person has children, the parents are a little outside the view, on the left. Drag the tree to the right to see them.
+On a phone, the list in a note starts on the marked person. If the tree has a pin, or if you chose another person in the list, the list starts there. If you edit another person, the list stays on the marked person. The list stays on the marked person until you choose another person, or until you move or remove the mark. Your choice of another person holds until you close the note.
 
 ## Relation finder
 
@@ -130,33 +147,50 @@ The result stays until you select Close or close the note. If you edit the tree,
 
 A title (for example "Duke of Valmont") has a list of holders. The list starts with the first holder and ends with the newest holder. A holder can have a number (for example "II") and a reign (the years of the holder).
 
-- **The card.** The card of a holder shows the title with the reign, for example "Duke of Valmont (r. 1175–1207)". If the text is too long for one text line, it continues on a second text line. Then only that card is taller. If the holder has a number, the name text line shows the ruler name and number, for example "Aldric II". The edit sheet and the list of holders show the full name.
+- **The card.** The card of a holder shows the title with the reign, for example "Duke of Valmont (r. 1175–1207)". If the text is too long for one text line, it continues on a second text line. Then only that card is taller. If the holder has a number or a ruler name that you wrote, the card shows the ruler name instead of the name. A number follows it, for example "Aldric II". The edit sheet and the list of holders show the full name.
 - **Two or more titles.** The card shows the first title of the person in the list of titles. To show another title, open the edit sheet. In Titles, select "Show on the card" at that title. The title that the card shows says "On the card".
 - **Your own title text.** If a holder has your text in the field Title text on the card, the card shows that text. The reign of the first title follows it. If you select "Show on the card" at a title, the card shows that title instead of your text.
 - **The edit sheet.** The Titles section is between the fields and Family. It shows each title of the person with the number and the reign. Select **Edit** to change the number, the ruler name, From or Until. A text line under the fields shows the result, for example "Ser Darian Harrow shows as: Darian II". Select **Add title** to add the person as the newest holder of a title, or of a new title.
 - **Remove.** In the edit sheet, each reign of a title has its own **Remove**. **Remove** removes only that reign from the holders. If the person has other reigns of that title, they stay.
-- **The Titles window.** In the toolbar, select More (the "⋯" button). Then select Titles. The window lists the titles of the tree. Select **Show holders** to see the holders of a title. In this window, you can rename or delete a title. You can also change the ID of a title (see "Change the ID of a house or a title"). In "Name for a man", you can type the name for a man, for example "King of the Isles". In "Name for a woman", you can type the name for a woman, for example "Duchess of Valmont". The card and the edit sheet of a man show the name for a man. The card and the edit sheet of a woman show the name for a woman. If this name is empty, the card and the edit sheet show the title name. The card of a holder whose sex is not male or female also shows the title name. In "Name of the list", you can type a name for the list of holders, for example "Dukes of Valmont". You can also add, edit, move or remove a holder.
-- **A holder who is not in the tree.** A holder who is not in the tree shows in pale text. To add such a holder, select Add holder. Then select "A holder who is not in the tree". Select a holder's name to see the card in the tree.
-- **Save and Cancel.** The Titles window changes nothing until you select Save. Save makes one change, which one Undo reverses. Cancel discards your changes.
-- **A note with the list.** At the end of the holders of a title, select "Make a note with this table". The plugin makes a new note with a table of the holders. The note has the name of the list, for example "Dukes of Valmont". The note is in the folder that Obsidian uses for new notes. The note does not change when the tree changes.
+- **The Titles window.** In the toolbar, select More (the "⋯" button). Then select Titles. The window shows a list of the titles of the tree. Each row shows the name of the title, the number of holders and the newest holder. Select a row to open the edit page of that title.
+- **Search and Add.** Type in the search field to find a title. A title matches by its names, its ID or the name of a holder. Select Add title, beside the search field, to add a title. The edit page of the new title opens.
+- **The edit page of a title.** The page has four name fields. They are "Name of the title", "Name for a man", "Name for a woman" and "Name of the list". Under them is the list of holders. At the end of the page, under "Other actions", are **Change ID** and **Delete**. You can change the ID of a saved title (see "Change the ID of a house or a title"). If you delete a title that you saved, the plugin asks you first.
+- **Names for a man and a woman.** In "Name for a man", you can type the name for a man, for example "King of the Isles". In "Name for a woman", you can type the name for a woman, for example "Duchess of Valmont". The card and the edit sheet of a man show the name for a man. The card and the edit sheet of a woman show the name for a woman. If this name is empty, the card and the edit sheet show the title name. The card of a holder whose sex is not male or female also shows the title name.
+- **Name of the list.** In "Name of the list", you can type a name for the list of holders, for example "Dukes of Valmont". The list of holders on the edit page has this name.
+- **Holders.** Each holder has the buttons Move earlier, Move later, Edit and Remove. Select **Add holder** to add a holder. Select the name of a holder who is in the tree to see the card in the tree. The window then closes. If you did not save your changes, the plugin asks you first.
+- **A holder who is not in the tree.** A holder who is not in the tree shows in pale text. To add such a holder, select Add holder. Then select "A holder who is not in the tree".
+- **Save and Cancel.** The Titles window changes nothing until you select Save. Save makes one change, which one Undo reverses. Cancel discards your changes. Back, to the list of titles, keeps your changes in the window.
+- **A note with the list.** On the edit page of a title that you saved, select "Make a note with this table", under the holders. The plugin makes a new note with a table of the holders. The note has the name of the list, for example "Dukes of Valmont". The note is in the folder that Obsidian uses for new notes. The note does not change when the tree changes.
 - **Find.** Find and the other person lists also find a holder by the ruler name and number, for example "Aldric II".
 - **Dates.** If you turn off "Show dates on cards", the cards also do not show the reigns.
 
 On a phone, the tree in a note has no More button. First tap Expand to open the full-screen view.
 
+## The Houses window
+
+A house has a name and a colour. It can also have arms. The colour of a house shows on the cards of the people of that house.
+
+- **The list.** Select the Houses button (the castle). The window shows a list of the houses. Each row shows the colour, the arms, the name and the number of people. Select a row to open the page of that house.
+- **Search and Add.** Type in the search field to find a house. A house matches by its name, its ID or the name of a person of the house. Select Add house, beside the search field, to add a house. The page of the new house opens.
+- **The page of a house.** The page has the field "Name of the house" and the number of people. It has the button **People** (see "House page"), the arms and the colours. At the end, under "Other actions", are **Change ID** and **Delete**. A house that you did not save has no People and no Change ID.
+- **The colour.** Select one of the 12 house colours. Select "Other colour" to use the colour window of your device. If the house has arms, the colours start with "Colours from the arms" (see "Coats of arms").
+- **Delete a house.** If people have the house, the plugin asks you. You can remove the house from these people, or keep the house for them. If you keep the house, the tree shows a warning for each of these people. After you select Save, a message with Undo shows.
+- **Save and Cancel.** The Houses window changes nothing until you select Save. Save makes one change, which one Undo reverses. Cancel discards your changes. Back, to the list of houses, keeps your changes in the window.
+
 ## Coats of arms
 
-A house can have arms (a coat of arms). The arms are a picture in your vault. They show on the cards of the people of the house, in the Houses window and in the legend.
+A house can have arms (a coat of arms). The arms are a picture in your vault. They show on the cards of the people of the house, in the Houses window, in the legend and in the list on a phone.
 
 To give a house its arms:
 
 1. Select the Houses button (the castle).
-2. Select the arms picture before the name of the house. If the house has no arms, the picture is an empty frame with a dashed border.
-3. In the picture list, select a picture. To see the pictures, open a folder or type a part of the name.
-4. Select the same picture again, or select **Select**.
-5. Select **Save**.
+2. Select the house in the list. The page of the house opens.
+3. Under "Arms", select the arms picture. If the house has no arms, the picture is an empty frame with a dashed border.
+4. In the picture list, select a picture. To see the pictures, open a folder or type a part of the name.
+5. Select the same picture again, or select **Select**.
+6. Select **Save**.
 
-You can also select the colour of the house in the Houses window. The colour choice has **Select arms** and **Remove arms**.
+On the page of the house, the button **Select arms** does the same as the arms picture. The button **Remove arms** shows only if the house has arms.
 
 If the house has arms, the picture list starts with **Remove arms**. Select it to clear the arms in the window. Then select Save.
 
@@ -168,8 +202,8 @@ If the house has arms, the picture list starts with **Remove arms**. Select it t
 - **The copy.** The plugin copies the picture at once. If you then select Cancel, the picture stays in the vault.
 - **Colours from the arms.** If a house has arms, the colour choice starts with "Colours from the arms". These are the main colours of the picture, at most 5. Select one of them to make it the house colour. The label "House colours" and the 12 house colours come after them. The plugin never changes the colour of a house by itself.
 - **If the colours cannot be read.** If the plugin cannot read the colours of a picture, the window tells you. Then select one of the house colours.
-- **Save and Cancel.** The Houses window changes nothing until you select Save. Save makes one change, which one Undo reverses. Cancel discards your changes.
-- **The card.** The arms show at the lower right of the card, to the left of the portrait. On a whole card, the arms do not make the name text line shorter. On a names-only card, the last name text line is a little shorter beside the arms and the portrait. The other small text lines next to the arms and the portrait are also a little shorter. If the tree is very small on the screen, the cards do not show the arms.
+- **The card.** In a tree from top to bottom, the arms show beside the round portrait on the top edge of the card. If the person has no portrait, the arms stand alone there. The arms do not make the text shorter. A sideways tree shows no arms on the cards. If the tree is very small on the screen, the cards do not show the arms.
+- **The card size Compact.** On a card of the size Compact, the arms show at the lower right of the card, to the left of the portrait. The name text line does not become shorter there. The other small text lines next to the arms and the portrait are a little shorter.
 - **The look of the arms.** The arms keep the shape of the picture. The plugin does not cut the picture and does not add a border or a background. On the card of a person who is dead, the arms are a little pale, like the house colour.
 - **Arms in the dark theme.** The plugin shows the arms as they are, in the light theme and in the dark theme. Black parts of arms are difficult to see on a dark card. Give such arms a light border in the picture itself. Use a picture with a transparent background, for example a PNG picture.
 
@@ -177,7 +211,7 @@ On a phone, the tree in a note has no Houses button. First tap Expand to open th
 
 ## Portraits
 
-A person can have a portrait (a picture). The portrait shows in a small circle in the lower right corner of the card.
+A person can have a portrait (a picture). In a tree from top to bottom, the portrait is a round picture on the top edge of the card. A sideways tree shows no portrait on the cards. On a card of the size Compact, the portrait is a small circle in the lower right corner of the card.
 
 To give a person a portrait:
 
@@ -189,11 +223,12 @@ To give a person a portrait:
 
 To remove the portrait, select **Remove portrait** in the edit sheet, or at the top of the picture list. Then select Save.
 
-- **The part of the picture.** The circle shows a square part of the picture. For a tall picture, this part is at the top and has the full width of the picture. For a wide picture, it is the middle part. A portrait photo usually has the face in its upper part. To show a different part, see "Select the part of a portrait".
-- **The card.** The portrait does not make the card larger. The text lines next to the portrait become shorter. If a text is then too long, it ends with "…". On the card of a person who is dead, the portrait is a little pale. The cards show the portraits only when they show all of their text. If you zoom out, the cards show less text and no portraits.
+- **The part of the picture.** The round picture shows a square part of the picture. For a tall picture, this part is at the top and has the full width of the picture. For a wide picture, it is the middle part. A portrait photo usually has the face in its upper part. To show a different part, see "Select the part of a portrait".
+- **The card.** The portrait does not make the card larger. In a tree from top to bottom, the portrait is on the edge of the card, and the text does not become shorter. On the card of a person who is dead, the portrait is a little pale. If you zoom out, the cards show less text. If you zoom far out, the cards show no portraits.
+- **The card size Compact.** On a card of the size Compact, the text lines next to the portrait become shorter. If a text is then too long, it ends with "…". This card shows the portrait only when it shows all of its text.
 - **The edit sheet.** The edit sheet shows a larger portrait at the top. Select portrait and Remove portrait change the sheet only. Save writes them into the tree text, with the other fields.
 - **Select the part of a portrait.** In the edit sheet, select **Select the part** under the portrait. The tool shows the whole picture with a round frame. The area outside the frame is darker. Move the picture under the frame. On a phone, move the picture with one finger. Zoom with two fingers. On the computer, drag the picture to move it. Zoom with the mouse wheel. The zoom slider and the zoom buttons work on every device. With the keyboard, use the arrow keys to move the picture. Use "+" and "−" to zoom. Select **Save** to keep the part. Select **Cancel** to discard it. Select **Reset** to return to the automatic part. Then select Save in the edit sheet. On a phone, the tool fills the screen. The button shows only when the plugin can show the portrait. If you select a new picture, the portrait starts again with the automatic part.
-- **Hide the portraits.** In the settings, turn off "Show portraits on cards". The cards then show no portraits, and the text lines have their full width. The edit sheet still shows the portrait.
+- **Hide the portraits.** In the settings, turn off "Show portraits on cards". The cards then show no portraits. On a card of the size Compact, the text lines have their full width. The edit sheet still shows the portrait.
 
 ## Pictures in the tree
 
@@ -222,7 +257,8 @@ You can save the tree as a picture, for example to send it to a friend or to pri
 4. Select **Save**.
 
 - **PNG or SVG.** PNG is a picture that most apps and devices can open. SVG is a picture that stays sharp at every size.
-- **What the picture shows.** The picture shows the people that the tree shows now: the whole tree, or the family in focus mode. Each card shows all of its text lines, and its arms and portrait if it has them. As on the screen, a text line next to a portrait can end with "…". If the relation finder shows a result, the picture also shows its line. The picture does not show the toolbar or the buttons.
+- **What the picture shows.** The picture shows the people that the tree shows now: the whole tree, or the family in focus mode. Each card shows all of its text lines, and its arms and portrait if it has them. If the relation finder shows a result, the picture also shows its line. The picture does not show the toolbar or the buttons.
+- **Direction and relation names.** The picture has the same direction as the tree on the screen. If the tree is sideways, the cards show no portraits and no arms. The picture follows the setting "Show relation names on cards". If you turn it off, the picture has no relation names.
 - **Note name and legend.** The name of the note is at the top of the picture. The legend is at the bottom. It shows the line styles and the houses of the people in the picture.
 - **Colours.** The picture always has light colours on a white background, also if you use a dark theme.
 - **Where the picture goes.** The plugin saves the picture in the attachment folder of the note. A message tells you the name of the picture and its folder. The name is the name of the note and "tree", for example "Valmont tree.png". In focus mode, the name also tells the family, for example "Valmont tree, family of Roderick Valmont.png". If a picture with this name exists, the plugin adds a number to the name.
@@ -289,20 +325,19 @@ In the edit sheet, select **Make a note**. The plugin makes a new note with the 
 
 The house page shows the people of one house in a table: generation, name, title, born and died. Generation 1 is the oldest generation with a person of the house. The table lists all the people of the house, even in focus mode and with folds.
 
-- **Open it.** In the Houses window, select **People** next to a house. You can also select a house in the legend.
+- **Open it.** In the Houses window, select the house in the list. On the page of the house, select **People**. You can also select a house in the legend.
 - **Show a person.** Select a row. The window closes, and the tree shows the card of the person.
 - **Close it.** Select **Close**, or push Esc.
 - **Make a note with this table.** The plugin makes a new note with the table. The note does not change when the tree changes.
-- If the window is narrow or the text is large, each row has two text lines. This is usual on a phone. The first text line has the name and the title. The second has the generation and the dates. The house page is in the full-screen view, not in the tree in a note.
+- If the window is narrow or the text is large, each row has two text lines. This is usual on a phone. The first text line has the name and the title. The second has the generation and the dates. On a phone, the house page is only in the full-screen view.
 
 ## Settings
 
 Open Settings. Select Dynasty Tree. You can set:
 
 - the height of a tree in a note, on a computer or tablet;
-- the height of a tree in a note, on a phone;
 - the card size (Normal or Compact);
-- the card style in the phone preview (see "The tree in a note on a phone");
+- the tree direction on a phone held upright (Sideways or Like the computer);
 - the break places in long names (see "Long names");
 - the setting "Reduce movement" (Follow the device, On or Off; see "Reduce movement");
 - dates on the cards and reigns (on or off; see "Titles and reigns");
@@ -311,6 +346,8 @@ Open Settings. Select Dynasty Tree. You can set:
 - the generation of each person on the house page (on or off);
 - the number of generations in focus mode;
 - the update of tree links when you rename a note or a picture.
+
+Older versions had two more settings, "Height on a phone" and "Card style in the phone preview". They are gone, because a tree in a note on a phone is a list now. The plugin ignores the old values.
 
 If a tree looks wrong, select the button **Arrange again**. The plugin will arrange each tree again when it shows the tree.
 

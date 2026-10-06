@@ -219,7 +219,7 @@ export class PanZoom {
 		this.off.push(() => el.removeEventListener(type, safe, opts));
 	}
 
-	/** The tree was laid out again with other card sizes (the note preview's narrow cards). */
+	/** The tree was laid out again with other bounds (the note preview is drawn again in place after a fold or an edit). */
 	setBounds(bounds: Rect): void {
 		this.o.bounds = bounds;
 	}

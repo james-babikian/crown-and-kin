@@ -6,7 +6,7 @@
  */
 
 import type { FoldKey } from '../core/folds';
-import type { Orientation, SidewaysCards } from '../layout/model';
+import type { Orientation } from '../layout/model';
 import type { View } from '../render/view-math';
 import type { SessionFocus } from './focus-mode';
 
@@ -32,8 +32,6 @@ export interface BlockState {
 	focus: SessionFocus | null;
 	/** The focus the phone rule chose, kept so that an edit does not move it; until the note closes. */
 	autoFocus: string | null;
-	/** The marked person (`options.me`) that was valid when `autoFocus` was chosen; the family ends when the mark changes (spec §13.18 rule 5). */
-	autoMark: string | null;
 	/**
 	 * A person just saved, to show once (§5.5): the first view of `place` (the kind of view whose
 	 * sheet or toolbar wrote) that renders after the write takes it, and shows all people if its
@@ -52,10 +50,10 @@ export interface BlockState {
 	 */
 	folds: Set<FoldKey>;
 	/**
-	 * D120: the step of the height button of the phone preview (0 lower, 1 start, 2 upper). `undefined` means untouched, so
-	 * the effective step is `heightStep ?? 1`. Never stored in the note or in `data.json`; cleared when the note closes.
+	 * D144: the Back stack of the phone list, newest last, at most 20 entries (the oldest drops out). Session only: cleared
+	 * when the note closes. Optional so that `newBlockState()` stays as it is.
 	 */
-	heightStep?: 0 | 1 | 2;
+	listBack?: string[];
 }
 
 /** What the relation finder shows (spec §13.2, D47, D48); it writes nothing to the note. */
@@ -75,26 +73,22 @@ export interface FinderState {
 export type ViewKind = 'embed' | 'full';
 
 /** A fresh, empty `BlockState` for a block that has not drawn yet. */
-export const newBlockState = (): BlockState => ({ view: null, lastEdited: null, highlight: null, viewFor: '', views: {}, focus: null, autoFocus: null, autoMark: null, shown: null, finder: null, folds: new Set() });
+export const newBlockState = (): BlockState => ({ view: null, lastEdited: null, highlight: null, viewFor: '', views: {}, focus: null, autoFocus: null, shown: null, finder: null, folds: new Set() });
 
 /**
  * The key of a drawn tree for `BlockState.viewFor`: the focus person and the generations, or '' for
- * the whole tree; `sideways` trees (D24) have their own keys, by card kind too (the note preview's narrow
- * cards, the full-screen view's normal cards), so a view never moves to another layout of the family.
+ * the whole tree; `sideways` trees (D24) have their own keys, so a view never moves to another layout of the family.
  */
-export const focusKey = (id: string | null, n = 0, orientation: Orientation = 'down', cards: SidewaysCards = 'normal') =>
-	(orientation === 'sideways' ? (cards === 'narrow' ? 'sideways-narrow|' : 'sideways|') : '') + (id === null ? '' : `focus:${id}:${n}`);
+export const focusKey = (id: string | null, n = 0, orientation: Orientation = 'down') => (orientation === 'sideways' ? 'sideways|' : '') + (id === null ? '' : `focus:${id}:${n}`);
 
 /** The note closed: the session focus, the folds and the finder's result end (spec §5.6, §13.2, §13.10). The rest of the view state stays for the session (§5.5). */
 export function endSessionFocus(st: BlockState): void {
 	st.focus = null;
 	st.autoFocus = null;
-	st.autoMark = null;
 	st.shown = null;
 	st.finder = null;
 	st.folds.clear();
-	// D120: the height button starts again at the middle step.
-	st.heightStep = undefined;
+	st.listBack = undefined;
 }
 
 /**
@@ -112,13 +106,9 @@ export function carryState(from: BlockState, to: BlockState): void {
 	to.lastEdited ??= from.lastEdited;
 	to.highlight ??= from.highlight;
 	to.focus ??= from.focus;
-	if (to.autoFocus === null) {
-		to.autoFocus = from.autoFocus;
-		to.autoMark = from.autoMark;
-	}
+	to.autoFocus ??= from.autoFocus;
 	to.shown ??= from.shown;
 	to.finder ??= from.finder;
 	if (!to.folds.size) to.folds = new Set(from.folds);
-	// D120: a step the user chose goes with the block; a step the new state already has stays (`undefined` is "untouched", `1` is "chose the middle").
-	if (to.heightStep === undefined) to.heightStep = from.heightStep;
+	to.listBack ??= from.listBack;
 }

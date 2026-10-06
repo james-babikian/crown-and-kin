@@ -9,8 +9,7 @@ import { build, fixture } from './helpers';
 // on lines and markers, the finder's small-tree patches (rumoured placement, childless implicit union).
 
 const ALL = ['01', '02', '03', '04', '05', '06', '07', '08', '10', '11'];
-const SIDE: LayoutSettings = { ...DEFAULT_LAYOUT_SETTINGS, orientation: 'sideways', sidewaysCards: 'normal' };
-const NARROW: LayoutSettings = { ...DEFAULT_LAYOUT_SETTINGS, orientation: 'sideways', sidewaysCards: 'narrow', narrowCardW: 140 };
+const SIDE: LayoutSettings = { ...DEFAULT_LAYOUT_SETTINGS, orientation: 'sideways' };
 
 describe('D40: the relation text line makes every card one small text line taller', () => {
 	it('relationExtra is one 0.85 em text line at the card line height, whole px', () => {
@@ -26,7 +25,7 @@ describe('D40: the relation text line makes every card one small text line talle
 		expect(on.relationLine).toBe(true);
 		expect(withRelationLine(on, { ...DEFAULT_LAYOUT_SETTINGS, relationLine: true })).toBe(on);
 		expect(withRelationLine(geo, DEFAULT_LAYOUT_SETTINGS)).toBe(geo);
-		for (const s of [DEFAULT_LAYOUT_SETTINGS, SIDE, NARROW]) {
+		for (const s of [DEFAULT_LAYOUT_SETTINGS, SIDE]) {
 			const d = drawnGeometry(geo, { ...s, relationLine: true });
 			expect(d.cardH).toBe(geo.cardH + relationExtra(geo));
 			expect(d.relationLine).toBe(true);
@@ -38,7 +37,6 @@ describe('D40: the relation text line makes every card one small text line talle
 	for (const [name, settings] of [
 		['down', DEFAULT_LAYOUT_SETTINGS],
 		['sideways', SIDE],
-		['sideways narrow', NARROW],
 	] as const) {
 		for (const size of ['normal', 'compact'] as const) {
 			it(`${name}, ${size} cards: every card is taller by relationExtra; a tall card stays tall`, () => {
@@ -237,7 +235,6 @@ describe('the finder\'s small tree: a rumoured placement is drawn as a rumoured 
 	for (const [name, settings] of [
 		['down', DEFAULT_LAYOUT_SETTINGS],
 		['sideways', SIDE],
-		['sideways narrow', NARROW],
 	] as const) {
 		it(name, () => {
 			const g = rumouredPlacement(build(src).g, 'r', 'g');

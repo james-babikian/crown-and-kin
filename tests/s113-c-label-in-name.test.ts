@@ -12,12 +12,13 @@ import { fixture } from './helpers';
 import { FEl, clock, fakeWin, installDom, resetDom } from './acceptance/fake-dom';
 import { resetObsidian } from './acceptance/fake-obsidian';
 import { fakeApp } from './acceptance/tree-view-fakes';
-import { click, stripNotDisabled, writingHandle } from './s113-c-support';
+import { backToList, listRows, openPage } from './lw-support';
+import { stripNotDisabled, writingHandle } from './s113-c-support';
 
 /*
  * Search round 0.2.3, area C. WCAG 2.5.3 (Label in Name): the accessible name of a button contains its
  * visible text, so that Voice Control on the iPhone ("Tap Change id") and speech software find it. The
- * convention of the Titles window is "visible text: longer sentence" ("Show holders: show the holders of X").
+ * convention of the windows is "visible text: longer sentence" ("Change ID: change the ID of X").
  */
 
 beforeAll(() => {
@@ -53,21 +54,32 @@ function mismatches(root: FEl): string[] {
 }
 
 describe('label in name', () => {
-	it('Houses window and the Titles window', async () => {
+	it('Houses window and the Titles window: the list and every edit page', () => {
 		const h = writingHandle(fixture('13'));
+		// The labels differ only by the name, so one message of each kind is enough.
+		const seen = new Set<string>();
+		const fresh = (found: string[]) => found.filter((m) => !seen.has(m.replace(/ in ".*"/, '')) && (seen.add(m.replace(/ in ".*"/, '')), true));
+		const scan = (modal: FEl, content: FEl): string[] => {
+			const out = fresh(mismatches(modal));
+			// The list rows have no label of their own; their visible text is their name. Every page is scanned.
+			expect(listRows(content).length).toBeGreaterThan(0);
+			const keys = listRows(content).map((r) => r.getAttribute('data-focus')!.slice('row:'.length));
+			for (const key of keys) {
+				const page = openPage(content, key);
+				// A page without a labelled button would make the scan prove nothing.
+				expect(page.querySelectorAll('button').some((b) => b.getAttribute('aria-label') && b.getText().trim())).toBe(true);
+				out.push(...fresh(mismatches(modal)));
+				backToList(content);
+			}
+			return out;
+		};
 		const hw = HousesWindow.create(fakeApp() as never, { handle: h as never, sourcePath: 'n.md' })!;
 		hw.open();
-		const hm = (hw as unknown as { modalEl: FEl }).modalEl;
-		await click(hm.querySelector('.dynasty-house-swatch'));
-		// One row of each kind is enough: the labels differ only by the house name.
-		const seen = new Set<string>();
-		const out = mismatches(hm).filter((m) => !seen.has(m.replace(/ in ".*"/, '')) && (seen.add(m.replace(/ in ".*"/, '')), true));
+		const out = scan((hw as unknown as { modalEl: FEl }).modalEl, (hw as unknown as { contentEl: FEl }).contentEl);
 		closePluginModals();
 		const tw = TitlesWindow.create(fakeApp() as never, { handle: h as never, sourcePath: 'n.md' })!;
 		tw.open();
-		const tm = (tw as unknown as { modalEl: FEl }).modalEl;
-		await click(tm.querySelector('.dynasty-title-toggle'));
-		out.push(...mismatches(tm).filter((m) => !seen.has(m.replace(/ in ".*"/, '')) && (seen.add(m.replace(/ in ".*"/, '')), true)));
+		out.push(...scan((tw as unknown as { modalEl: FEl }).modalEl, (tw as unknown as { contentEl: FEl }).contentEl));
 		expect(out).toEqual([]);
 	});
 

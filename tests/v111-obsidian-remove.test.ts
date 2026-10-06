@@ -13,6 +13,7 @@ import { pickPicture, type PickResult } from '../src/obsidian/picture-picker';
 import { createPictureStore, type PictureCopy, type PictureIO, type PictureStore } from '../src/obsidian/picture-store';
 import { PICTURES_UI } from '../src/render/ui-text';
 import { FEl, device, dispatch, fakeDoc, fakeWin, installDom, resetDom, runTimers, settle } from './acceptance/fake-dom';
+import { openPage } from './lw-support';
 import { openModals, resetObsidian } from './acceptance/fake-obsidian';
 import { fakeHandle, type FakeHandle } from './acceptance/tree-view-fakes';
 
@@ -262,7 +263,8 @@ describe('D97: the Houses window uses the Remove row', () => {
 		const win = HousesWindow.create(a as never, { handle: handle as never, sourcePath: 'Tree.md', pictures: store })!;
 		win.open();
 		const content = (win as unknown as { contentEl: FEl }).contentEl;
-		const row = (id: string) => content.querySelector(`.dynasty-house-row[data-house="${id}"]`)!;
+		// 0.2.5 (D134): the arms box button is on the edit page of the house.
+		const row = (id: string) => openPage(content, id);
 		return { content, row, handle };
 	}
 
@@ -275,7 +277,7 @@ describe('D97: the Houses window uses the Remove row', () => {
 		dispatch(removeRow(picker)!, 'click');
 		await settle();
 		expect(openModals.length).toBe(1);
-		expect(row('valmont').querySelector('.dynasty-house-arms')!.hasClass('is-empty')).toBe(true);
+		expect(content.querySelector('.dynasty-lw-page button.dynasty-house-arms')!.hasClass('is-empty')).toBe(true);
 		// Nothing is written until Save.
 		expect(handle.write).not.toHaveBeenCalled();
 		dispatch(content.querySelector('.dynasty-sheet-save')!, 'click');
@@ -294,12 +296,12 @@ describe('D97: the Houses window uses the Remove row', () => {
 	it('Cancel in the list changes nothing; the Remove arms button stays', async () => {
 		const { content, row } = open();
 		await settle();
-		dispatch(row('valmont').querySelector('.dynasty-house-swatch')!, 'click');
+		row('valmont');
 		expect(content.querySelector('.dynasty-house-remove-arms')!.getText()).toBe(PICTURES_UI.removeArms);
-		dispatch(row('valmont').querySelector('.dynasty-house-arms')!, 'click');
+		dispatch(content.querySelector('.dynasty-lw-page button.dynasty-house-arms')!, 'click');
 		dispatch(openPicker().contentEl.querySelector('.dynasty-sheet-cancel')!, 'click');
 		await settle();
-		expect(row('valmont').querySelector('.dynasty-house-arms')!.hasClass('is-empty')).toBe(false);
+		expect(content.querySelector('.dynasty-lw-page button.dynasty-house-arms')!.hasClass('is-empty')).toBe(false);
 	});
 });
 

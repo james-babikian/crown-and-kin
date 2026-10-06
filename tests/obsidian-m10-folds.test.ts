@@ -13,13 +13,13 @@ import type { TreeView } from '../src/obsidian/tree-view';
 import { FEl, clock, dispatch, fakeDoc, fakeWin, flushFrames, installDom, resetDom, resizeAll, settle } from './acceptance/fake-dom';
 import { resetObsidian } from './acceptance/fake-obsidian';
 import { block15, comments15 } from './acceptance/m10-support';
-import { desktop, embed, fakeHandle, fullViews, openSheetOn, phone, sheets } from './acceptance/tree-view-fakes';
+import { desktop, embed, fakeHandle, fullViews, openSheetOn, sheets, tabletDevice } from './acceptance/tree-view-fakes';
 
 /*
  * WP 10.3c (M10 rules F7, F10–F12, F14, F15): the tree view's folds beyond the acceptance file
  * `m10-fold-view`: opening a hidden person for Find, Focus and a far-couple tag (only the folds that hide
  * them), the control staying at the same screen point, the tap areas, the unfold after a sheet write,
- * the sheet in the static phone preview, and the saved picture with the view's folds.
+ * the sheet in the static touch preview (a tablet), and the saved picture with the view's folds.
  */
 
 beforeAll(() => {
@@ -196,9 +196,9 @@ describe('F7: the tap areas', () => {
 	});
 });
 
-describe('F15: the sheet in the static phone preview (D85)', () => {
+describe('F15: the sheet in the static touch preview (a tablet) (D85)', () => {
 	it('has Hide descendants and no Show descendants; it folds in the block state, opens the full-screen view and leaves the preview as it is', async () => {
-		phone();
+		tabletDevice();
 		const handle = handleWith('TWO1');
 		const { el } = await embed(SOURCE, { handle });
 		expect(cardCount(el)).toBe(96);

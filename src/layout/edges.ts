@@ -6,13 +6,16 @@
  * compute geometry.
  */
 import type { FamilyGraph, FamilyUnion } from '../core/derive';
-import { lineMetrics } from './geometry';
+import { isRoundel, lineMetrics, roundelAxis, roundelLineEnd } from './geometry';
 import type { LineExtras } from './fold-spots';
 import { addTo, planLines, type Leg } from './lines';
 import type { EdgeDrawing, EdgeMarker, EdgePath, FoldSpot, Geometry, Rect, StrokeKind, TreeLayout } from './model';
 import { turnBack, turnEdges } from './turn';
 
 const r = (n: number) => Math.round(n * 10) / 10;
+
+/** em: how far right of the card middle a dotted side link lands on a Roundel card (B.3.3). */
+const SIDE_LINK_EM = 3.4;
 
 // The thin "implicit" style is only for unions that are not listed; a listed union with an
 // unknown type (even the text `implicit`) draws like a marriage (spec §5.3).
@@ -57,7 +60,7 @@ function route(g: FamilyGraph, layout: TreeLayout, anchors: Map<string, string>,
 	const box = (id: string) => layout.persons.get(id)!;
 	const geo = layout.geometry;
 	const m = lineMetrics(geo);
-	const plan = planLines({ g, persons: layout.persons, rows: layout.rows, unions: layout.unions, anchors, geo, side, extras });
+	const plan = planLines({ g, persons: layout.persons, rows: layout.rows, unions: layout.unions, anchors, geo, side, extras, youTab: layout.youTab });
 
 	// Below the last row: under its tallest card (D37).
 	const last = layout.rows[layout.rows.length - 1] ?? [];
@@ -105,6 +108,15 @@ function route(g: FamilyGraph, layout: TreeLayout, anchors: Map<string, string>,
 		markers.push(fu.implicit ? { x: u.x, y: u.y, kind: 'implicit-union', union: fu.key } : { x: u.x, y: u.y, kind: 'union', unionType: fu.type, union: fu.key });
 	}
 
+	// 0.2.5 (B.3.5): a drop that lands on the Roundel's axis stops at the ring of the medallion, or at the top of the arms, and never
+	// reaches into them. A drop off the axis, and every drop of another card form, ends on the top edge as before.
+	const roundel = !side && isRoundel(geo);
+	const dropEnd = (id: string, x: number): number => {
+		if (!roundel) return 0;
+		const b = box(id);
+		return Math.abs(x - (b.x + roundelAxis(geo))) < 0.5 ? roundelLineEnd(geo, { arms: !!b.arms, portrait: !!b.portrait }) : 0;
+	};
+
 	// Descent: a trunk to the family's sibling bar, then a drop to each child.
 	// A child placed under adoptive or ward parents hangs by a line in that parent type's style;
 	// `illegitimate` applies to birth parents only (spec §4.1).
@@ -130,12 +142,13 @@ function route(g: FamilyGraph, layout: TreeLayout, anchors: Map<string, string>,
 		const trunkAt = paths.length;
 		paths.push({ d: trunk, kind: trunkKind, people: [...f.parents, ...f.kids], ...family });
 		f.kids.forEach((k, i) => {
-			paths.push({ d: `M${r(f.dropX[i])} ${r(barY)}V${r(box(k).y)}`, kind: kinds[i], people: [k, ...f.parents], ...family, parents: [...f.parents], child: k });
+			const end = box(k).y - dropEnd(k, f.dropX[i]);
+			paths.push({ d: `M${r(f.dropX[i])} ${r(barY)}V${r(end)}`, kind: kinds[i], people: [k, ...f.parents], ...family, parents: [...f.parents], child: k });
 			if (kinds[i] !== 'rumoured') return;
 			// A drop in line with its trunk: the "?" may sit anywhere from the parents down to the child.
 			const straight = Math.abs(f.dropX[i] - f.fromX) < 0.5;
 			const y0 = straight ? fromY : barY;
-			const y1 = box(k).y;
+			const y1 = end;
 			const curve: Curve = [f.dropX[i], y0, (y0 + y1) / 2, f.dropX[i], y1];
 			if (straight) {
 				rumours.push({ path: paths.length - 1, curve, from: trunkAt });
@@ -166,7 +179,8 @@ function route(g: FamilyGraph, layout: TreeLayout, anchors: Map<string, string>,
 	for (const s of g.secondary) {
 		const cb = box(s.child);
 		// Sideways the edge is only a card height long: at small fonts 14 px would reach its corner.
-		const tx = cb.x + cb.w / 2 + (side ? Math.min(14, cb.w / 2 - m.tagInset) : 14);
+		// 0.2.5 (B.3.3): in the Roundel the link lands right of the shield and the arms, 7 px left of the D14 sign.
+		const tx = cb.x + cb.w / 2 + (side ? Math.min(14, cb.w / 2 - m.tagInset) : roundel ? SIDE_LINK_EM * geo.fontPx : 14);
 		const ty = cb.y;
 		const sources: { x: number; y: number; drop?: number; people: string[] }[] = [];
 		if (s.unionKey) {

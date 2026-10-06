@@ -8,7 +8,7 @@
 import { partnerOf, placedChildren, type FamilyGraph, type FamilyUnion } from '../core/derive';
 import type { ModelOrder } from '../core/order';
 import type { FarCoupleRule, FarTag, Geometry, LayoutSettings, PersonBox, PlacedFoldControl, Rect, TreeLayout, UnionPoint } from './model';
-import { MIN_HIT, barClear, tagHit, gapHeight, lineMetrics, relationExtra, sideTagDepth, sidewaysGeometry, sidewaysPartnerGap, tagTop, tallExtra, turnedGeometry, withRelationLine } from './geometry';
+import { MIN_HIT, barClear, childAttach, tagHit, gapHeight, lineMetrics, relationExtra, sideTagDepth, sidewaysGeometry, sidewaysPartnerGap, tagTop, tallExtra, turnedGeometry, withRelationLine } from './geometry';
 import { foldExtent, foldSpots, turnSpots, type FoldInput } from './fold-spots';
 import { addTo, planLines, type LinePlan } from './lines';
 import { placeInOrder } from './pava';
@@ -126,12 +126,15 @@ export function layoutFamilies(
 	initialX?: Map<string, number>,
 	fold?: FoldInput,
 ): TreeLayout {
+	// 0.2.5: the "You" tab belongs to a person of the drawn graph; any other id gives no tab and no reach (the finder's small tree).
+	const youTab = settings.youTab !== undefined && g.byId.has(settings.youTab) ? settings.youTab : undefined;
+	if (youTab === undefined && settings.youTab !== undefined) settings = { ...settings, youTab: undefined };
 	// D40: the relation text line makes every card taller before anything is sized from the card.
 	const given = withRelationLine(plain, settings);
 	// D24 sideways: everything below runs in the turned frame (`turn.ts`) and is turned at the end.
-	const narrowSide = settings.orientation === 'sideways' ? sidewaysGeometry(given, settings.sidewaysCards ?? 'normal', settings.narrowCardW) : undefined;
+	const sideBase = settings.orientation === 'sideways' ? sidewaysGeometry(given) : undefined;
 	// 0.2.1: a couple with two or more partnerships has several signs in its gap; only then is the gap wider.
-	const side = narrowSide && g.unions.length > 1 ? { ...narrowSide, coupleGap: sidewaysPartnerGap(narrowSide, mostUnionsOfOneCouple(g)) } : narrowSide;
+	const side = sideBase && g.unions.length > 1 ? { ...sideBase, coupleGap: sidewaysPartnerGap(sideBase, mostUnionsOfOneCouple(g)) } : sideBase;
 	const geo = side ? turnedGeometry(side) : given;
 	// D11 keeps its length in px: 3 widths of a `down` card, measured along the column.
 	const farRule = side ? { ...settings.far, maxCardWidths: (settings.far.maxCardWidths * given.cardW) / side.cardH } : settings.far;
@@ -151,8 +154,10 @@ export function layoutFamilies(
 	const cw = (id: string) => (wide ? geo.cardW + more(id) : geo.cardW);
 	const ch = (id: string) => (!side && extra ? geo.cardH + more(id) : geo.cardH);
 	// M9: which cards show arms or a portrait. Flags only: the pictures never change a box.
-	const withArms = armsCards(g, settings.arms);
-	const withPortrait = new Set(settings.portraits ?? []);
+	// 0.2.5: the text card shows no picture, so the setting never changes (or flags) a sideways layout.
+	const noPictures = given.form === 'text';
+	const withArms = noPictures ? new Set<string>() : armsCards(g, settings.arms);
+	const withPortrait = noPictures ? new Set<string>() : new Set(settings.portraits ?? []);
 	// Set only when true, so boxes of a tree with no tall cards and no pictures stay as they were.
 	const flags = (id: string) => ({
 		...(tall.has(id) ? { tallName: true as const } : {}),
@@ -271,8 +276,10 @@ export function layoutFamilies(
 	});
 
 	const centreX = (id: string) => persons.get(id)!.x + cw(id) / 2;
+	// 0.2.5 (B.3.5): a sibling group is centred by its children's axes (the Roundel's line lands 0.25 em right of the middle), so an only child drops straight.
+	const attach = childAttach(geo);
 	const span = (ids: string[]) => {
-		const xs = ids.map(centreX);
+		const xs = ids.map((id) => centreX(id) + attach);
 		return (Math.min(...xs) + Math.max(...xs)) / 2;
 	};
 
@@ -338,8 +345,8 @@ export function layoutFamilies(
 			upSweep();
 			downSweep();
 		}
-		// Normalise x to start at 0.
-		const minX = Math.min(...[...persons.values()].map((p) => p.x));
+		// Normalise x to start at 0. Sideways, x is the stack axis (real y): the first card of a stack starts `reach` in, for a "You" tab above it.
+		const minX = Math.min(...[...persons.values()].map((p) => p.x)) - (side ? (geo.reach ?? 0) : 0);
 		for (const p of persons.values()) p.x -= minX;
 		unions = placeUnions();
 		markFarCouples(g, persons, unions, blockOf, farRule, geo.cardW);
@@ -355,12 +362,13 @@ export function layoutFamilies(
 
 	// Gaps between rows grow to hold the lanes their lines need; y is set only now. The plan may
 	// move a dot sideways (never a card), so that no two trunks share a line.
-	const plan = planLines({ g, persons, rows, unions, anchors: order.anchors, geo, side, extras: fold?.lines });
+	const plan = planLines({ g, persons, rows, unions, anchors: order.anchors, geo, side, extras: fold?.lines, youTab });
 	for (const [key, x] of plan.dotX) unions.get(key)!.x = x;
 	const m = lineMetrics(geo);
 	// Cards in a row share their top edge; the gap below starts under the row's tallest card.
 	const rowH = rows.map((ids) => (extra && !side ? Math.max(...ids.map(ch)) : geo.cardH));
-	const rowTop: number[] = [0];
+	// 0.2.5: the first row starts `reach` in, for the medallions and the "You" tab above it (sideways, `reach` shifts x above instead).
+	const rowTop: number[] = [side ? 0 : (geo.reach ?? 0)];
 	for (let r = 1; r < rows.length; r++) rowTop[r] = rowTop[r - 1] + rowH[r - 1] + Math.max(gapHeight(geo, plan.coupleLanes[r - 1], plan.barLanes[r - 1]), plan.stemNeed[r - 1]);
 	for (const p of persons.values()) p.y = rowTop[p.gen];
 	const gapTop = (k: number) => rowTop[k] + rowH[k];
@@ -372,7 +380,7 @@ export function layoutFamilies(
 		if (u.bar) u.y = a.y + (barAt.get(fu.key) ?? Math.min(a.h, b.h) / 2);
 		else u.y = gapTop(dot?.gap ?? a.gen) + m.coupleLane0 + (dot?.lane ?? 0) * m.coupleLaneStep;
 	}
-	if (side) return turnLayout(g, persons, unions, rows, rows.slice(1).map((_, r) => ({ top: gapTop(r), bottom: rowTop[r + 1] })), plan, geo, side, fold);
+	if (side) return turnLayout(g, persons, unions, rows, rows.slice(1).map((_, r) => ({ top: gapTop(r), bottom: rowTop[r + 1] })), plan, geo, side, fold, youTab);
 	const farTags = buildFarTags(g, persons, unions, plan, geo, fold);
 
 	const rowGaps = rows.slice(1).map((_, r) => ({ top: gapTop(r), bottom: rowTop[r + 1] }));
@@ -384,7 +392,7 @@ export function layoutFamilies(
 		...[...plan.dots.keys()].map((k) => unions.get(k)!.y + geo.unionSize / 2),
 		...[...farTags.values()].map((t) => tagTop(geo, t.y) + geo.tagH),
 	);
-	const done: TreeLayout = { persons, unions, rows, rowGaps, farTags, width, height, geometry: geo, orientation: 'down' };
+	const done: TreeLayout = { persons, unions, rows, rowGaps, farTags, width, height, geometry: geo, orientation: 'down', ...(youTab !== undefined ? { youTab } : {}) };
 	return fold?.controls ? withFolds(done, foldSpots(fold.controls, persons, unions, rowGaps, geo.fontPx, { tags: new Map([...farTags].map(([k, t]) => [k, t.hit])), soloX: plan.soloExits })) : done;
 }
 
@@ -581,6 +589,7 @@ function turnLayout(
 	geo: Geometry,
 	side: Geometry,
 	fold?: FoldInput,
+	youTab?: string,
 ): TreeLayout {
 	const persons = new Map<string, PersonBox>();
 	for (const b of turnedPersons.values()) persons.set(b.id, turnBox(b));
@@ -610,7 +619,7 @@ function turnLayout(
 		...[...persons.values()].map((p) => p.y + p.h),
 		...[...farTags.values()].map((t) => Math.max(tagTop(side, t.y) + side.tagH, t.hit.y + t.hit.h)),
 	);
-	const done: TreeLayout = { persons, unions, rows, rowGaps, farTags, width, height, geometry: side, orientation: 'sideways' };
+	const done: TreeLayout = { persons, unions, rows, rowGaps, farTags, width, height, geometry: side, orientation: 'sideways', ...(youTab !== undefined ? { youTab } : {}) };
 	// The spots follow the rules of the turned frame (`down` rules on the turned numbers); their sign then grows to the right.
 	return fold?.controls ? withFolds(done, turnSpots(foldSpots(fold.controls, turnedPersons, turnedUnions, rowGaps, geo.fontPx, { turned: true, soloX: plan.soloExits }))) : done;
 }

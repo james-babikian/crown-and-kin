@@ -1,6 +1,7 @@
 /*
- * The holder form (spec §13.5): Number (placeholder "II"), Ruler name (filled with the ruler name
- * that the plugin uses), From and Until, and a live preview ("Ser Gareth Orsini shows as: Gareth I").
+ * The holder form (spec §13.5): Number (placeholder "II"), Ruler name (empty unless the entry has a
+ * written ruler name; the default shows as a hint), From and Until, and a live preview ("Ser Gareth
+ * Orsini shows as: Gareth I").
  * For a holder who is not in the tree it also asks for the name; for "New title…" in the edit sheet it
  * also asks for the title's name. It looks like the edit sheet and has its commit model: Save hands the
  * values to the caller (the sheet writes them, the Titles window keeps them in its draft), Cancel
@@ -12,7 +13,7 @@ import { SHEET, TITLES_UI } from '../render/ui-text';
 import { ignoreGhostClick, phoneLayout } from './modal-layout';
 import { trackModal } from './plugin-modals';
 import { nameDialog, revealFocused, sheetField, showErrorLine } from './sheet-parts';
-import { formResult, formStart, previewParts, rulerOf, type HolderFormFields, type HolderValues } from './titles-draft';
+import { formResult, formStart, previewParts, rulerHint, type HolderFormFields, type HolderValues } from './titles-draft';
 
 /** What the holder form shows and where its values go. */
 export interface HolderFormSpec {
@@ -48,8 +49,6 @@ class HolderFormModal extends Modal {
 	private readonly fields: HolderFormFields;
 	private readonly startTitle: string | undefined;
 	private titleName: string | undefined;
-	/** The ruler name follows the holder's name until the owner types in it; a written `as` counts as typed. */
-	private rulerTouched = false;
 
 	constructor(
 		app: App,
@@ -58,8 +57,6 @@ class HolderFormModal extends Modal {
 		super(app);
 		this.start = formStart(spec.values, spec.personName, !!spec.askName);
 		this.fields = { ...this.start };
-		// A written `as` is the owner's own ruler name: a new holder name must not replace it (§13.5).
-		this.rulerTouched = spec.values.as !== undefined;
 		this.startTitle = spec.titleName;
 		this.titleName = spec.titleName;
 	}
@@ -92,21 +89,18 @@ class HolderFormModal extends Modal {
 		if (this.fields.name !== undefined) {
 			const name = this.input(body, TITLES_UI.holderName, 'holder-name', this.fields.name, (v) => {
 				this.fields.name = v;
-				// Until the owner types a ruler name, it is the holder's name (§13.5).
-				if (!this.rulerTouched && ruler) {
-					this.fields.ruler = rulerOf({ name: v.trim() }, undefined);
-					ruler.value = this.fields.ruler;
-				}
+				// The empty ruler field shows the holder's name as its hint (§13.5, D131); typed text is never replaced.
+				ruler?.setAttribute('placeholder', rulerHint(undefined, v));
 			}, { autocapitalize: 'words' });
 			first ??= name;
 		}
 		const row = body.createDiv({ cls: 'dynasty-holder-form-row' });
 		const number = this.input(row, TITLES_UI.number, 'number', this.fields.number, (v) => (this.fields.number = v), { placeholder: TITLES_UI.numberPlaceholder });
 		first ??= number;
-		ruler = this.input(row, TITLES_UI.ruler, 'ruler', this.fields.ruler, (v) => {
-			this.fields.ruler = v;
-			this.rulerTouched = true;
-		}, { autocapitalize: 'words' });
+		ruler = this.input(row, TITLES_UI.ruler, 'ruler', this.fields.ruler, (v) => (this.fields.ruler = v), {
+			autocapitalize: 'words',
+			placeholder: rulerHint(this.spec.personName, this.fields.name),
+		});
 		const dates = body.createDiv({ cls: 'dynasty-holder-form-row' });
 		// Free text (fictional calendars): never a numeric keyboard (spec §7.4).
 		this.input(dates, TITLES_UI.from, 'from', this.fields.from, (v) => (this.fields.from = v));
@@ -131,7 +125,7 @@ class HolderFormModal extends Modal {
 	}
 
 	private updatePreview(): void {
-		const p = previewParts(this.spec.personName, this.fields);
+		const p = previewParts(this.spec.personName, this.fields, this.spec.values);
 		this.previewEl?.setText(p.full ? TITLES_UI.preview(p.full, p.shown) : p.shown);
 	}
 

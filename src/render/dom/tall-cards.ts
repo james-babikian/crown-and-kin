@@ -5,12 +5,14 @@
  * `settings.tallCards` and `settings.tallTitles` so the layout makes exactly these cards taller; `sameTall` lets it
  * skip a re-layout when an answer has not changed. 0.2.4: the name is broken with `cardNameLines` and the room that the
  * arms box and the portrait leave (`nameRoom`), the same call that `scene.ts` and `svg-string.ts` make to draw it.
+ * 0.2.5: the Roundel and the text card have no boxes at the lower right, so no picture narrows a name, the inner edge of the mark's border is
+ * passed to `nameRoom` (the Roundel's room depends on it), and rule B (the lift) and the second slot of D129 do not apply.
  */
 
 import type { FamilyGraph } from '../../core/derive';
 import type { CardLabel } from '../../core/titles';
 import type { Person } from '../../core/types';
-import { boxesClear, boxesShown, cardBoxes, cardText, nameRoom, nameSlots, relationY, roomAt, smallLineOf, tallExtra, type CardText } from '../../layout/geometry';
+import { boxesClear, boxesShown, cardBoxes, cardText, isRoundel, isTextCard, nameRoom, nameSlots, relationY, roomAt, smallLineOf, tallExtra, type CardText } from '../../layout/geometry';
 import { couldBeSigned } from '../../layout/illegitimate-sign';
 import type { Geometry, NameLineCount, NameRoom } from '../../layout/model';
 import type { BreakList } from '../break-words';
@@ -21,8 +23,7 @@ import { relationFont, type Measure, type SceneFonts } from './scene';
 
 /**
  * D29, D81: the people whose name needs two or three text lines (`tall`) and the ones that need three (`long`, a subset of `tall`), both sorted.
- * `slots` holds the name slots of each tall card (2 or 3): a names-only card with the D14 sign and a one-line name has two (D126 3), and so
- * has the marked person's Compact card with the sign (D129).
+ * `slots` holds the name slots of each tall card (2 or 3): the marked person's Compact card with the D14 sign and a one-line name has two (D129).
  * `lifted` (rule B, D126 4) holds the people whose arms box and portrait move one small text line up so that the relation text fits.
  */
 export interface TallNames {
@@ -38,7 +39,7 @@ export interface TallExtra {
 	portraits?: ReadonlySet<string>;
 	/** The user's break places (D118). */
 	breaks?: BreakList;
-	/** The marked person (D41): the card has a ring that the arms box, the portrait and the D14 sign keep clear of. */
+	/** The marked person (D41): the card has a border (D153) whose inner edge the arms box, the portrait and the D14 sign keep clear of. */
 	marked?: string;
 	/** The relation text of each card, only when the words show (the setting on and the card whole): rule B reads it. Absent: nothing lifts. */
 	relations?: ReadonlyMap<string, { text: string }>;
@@ -76,6 +77,7 @@ export function tallCardsFor(
 	const regular = `400 ${t1.nameSize}px ${fonts.text}`;
 	const nameMeasure: NameMeasure = (s, sob) => measure(s, sob ? regular : bold);
 	// The text positions of a card depend on its slot count only; the name room of a card with no marked ring is the same for every such person.
+	const formed = isRoundel(geo) || isTextCard(geo);
 	const texts = new Map<number, CardText>([[1, t1]]);
 	const textFor = (slots: number): CardText => {
 		let t = texts.get(slots);
@@ -89,26 +91,26 @@ export function tallCardsFor(
 		const ring = isMe ? ME_RING_INNER : undefined;
 		// E4: a marked Normal card with the D14 sign shows no arms and no portrait below 11 px: the boxes and the pushed-down sign would touch.
 		const show = boxesShown(geo, isMe, isSigned);
-		const wantArms = show && !!arms?.has(p.id);
-		const wantPortrait = show && !!extra?.portraits?.has(p.id);
-		// D126 3, D129: a names-only card with the sign, and the marked Compact card with the sign, have a second name slot.
-		const twoSlot = nameSlots(geo, 1, isSigned, isMe) === 2;
+		const wantArms = !formed && show && !!arms?.has(p.id);
+		const wantPortrait = !formed && show && !!extra?.portraits?.has(p.id);
+		// D129: the marked Compact card with the sign has a second name slot. A card with no boxes needs none.
+		const twoSlot = !formed && nameSlots(geo, 1, isSigned, isMe) === 2;
 		const t = textFor(twoSlot ? 2 : 1);
 		const boxH = geo.cardH + (twoSlot ? tallExtra(geo) : 0);
 		const key = `${wantArms ? 1 : 0}${wantPortrait ? 1 : 0}${isSigned ? 1 : 0}`;
 		let room = ring === undefined ? rooms.get(key) : undefined;
 		if (!room) {
-			room = nameRoom(geo, t, isSigned, wantArms || wantPortrait ? cardBoxes(geo, t, boxH, { arms: wantArms, portrait: wantPortrait, ...(ring === undefined ? {} : { ring }) }).boxes : []);
+			room = nameRoom(geo, t, isSigned, wantArms || wantPortrait ? cardBoxes(geo, t, boxH, { arms: wantArms, portrait: wantPortrait, ...(ring === undefined ? {} : { ring }) }).boxes : [], ring);
 			if (ring === undefined) rooms.set(key, room);
 		}
 		const lines = cardNameLines(name, sob, room, nameMeasure, 3, extra?.breaks).length as NameLineCount;
-		const slots = nameSlots(geo, lines, isSigned, isMe);
+		const slots = formed ? lines : nameSlots(geo, lines, isSigned, isMe);
 		return { slots, lifted: wantLift(p, slots, isSigned, wantArms, wantPortrait, ring, isMe) };
 	};
 
 	/** Rule B (D126 4): true when the relation text is wider than the room beside the boxes but fits the text width, and the lifted boxes keep clear (E4). */
 	const wantLift = (p: Person, slots: NameLineCount, isSigned: boolean, wantArms: boolean, wantPortrait: boolean, ring: number | undefined, isMe: boolean): boolean => {
-		if (geo.namesOnly || !geo.relationLine || !(wantArms || wantPortrait)) return false;
+		if (formed || !geo.relationLine || !(wantArms || wantPortrait)) return false;
 		const text = extra?.relations?.get(p.id)?.text;
 		if (!text) return false;
 		const t = textFor(slots);

@@ -4,6 +4,7 @@ vi.mock('obsidian', () => import('./acceptance/fake-obsidian'));
 vi.mock('@codemirror/language', () => ({ forceParsing: () => false, syntaxTree: () => ({ length: 0 }) }));
 vi.mock('@codemirror/view', () => ({ ViewPlugin: { fromClass: () => ({}) } }));
 
+import { geometryFor, smallLineOf } from '../src/layout/geometry';
 import { FullScreenModal } from '../src/obsidian/full-screen';
 import { clearRelationCache } from '../src/obsidian/relation-cache';
 import { clearMeasureCache } from '../src/render/dom/measure';
@@ -15,6 +16,9 @@ import { DEFAULT_SETTINGS } from '../src/obsidian/settings';
 // 0.2.4 (contract 4.3 B, 8.3): rule B lifts the arms box and the portrait when the relation text does not fit beside them but fits the text width. The
 // decision is part of the fit (`tallCardsFor`), so the view keeps it (`lastLayout.opts.lifted`), compares it in `recheckTall` after a font refit, and
 // draws again when it changed: the boxes then move and the live scene agrees with the saved picture.
+// 0.2.5 (D143, R-compact): the Roundel of the Normal size has no arms box at the lower right and no rule B, so these checks use the classic card, which the
+// Compact size keeps in a top-to-bottom tree. The font widths that cross the two limits (the room beside the box, the text width) are found by a scan:
+// on the compact card Di's text (16 characters) is already wider than the text width at the width 1, so it is cut and never lifts; a narrower font puts it between the limits.
 
 const canvas = { wide: 1 };
 
@@ -68,13 +72,24 @@ interface Peek {
 async function open(source = SRC) {
 	desktop();
 	const host = fakeHost() as ReturnType<typeof fakeHost> & { settings?: unknown };
-	host.settings = { ...DEFAULT_SETTINGS };
+	host.settings = { ...DEFAULT_SETTINGS, cardSize: 'compact' };
 	const handle = fakeHandle('n.md', source);
 	const out = await embed(source, { host, handle });
 	return { ...out, peek: out.view as unknown as Peek, host };
 }
 
 const counts = (el: FEl) => el.querySelectorAll('.dynasty-card').length;
+
+/** Changes the canvas font width in small steps until the longest relation text (Di's) no longer fits beside the arms box and lifts; true when it did. */
+function widenUntilLifted(peek: Peek): boolean {
+	for (let wide = 0.5; wide < 1; wide += 0.02) {
+		canvas.wide = wide;
+		clearMeasureCache();
+		peek.recheckTall(true);
+		if (peek.lastLayout.opts.lifted?.has('di')) return true;
+	}
+	return false;
+}
 
 describe('rule B: the lift is kept by the view and redrawn after a font refit (contract 4.3 B)', () => {
 	it('the view keeps the set of lifted people and the relation words it was decided with', async () => {
@@ -84,20 +99,12 @@ describe('rule B: the lift is kept by the view and redrawn after a font refit (c
 		expect(peek.lastLayout.opts.lifted ?? new Set()).toBeInstanceOf(Set);
 	});
 
-	it('with the fallback measure no card lifts; after the font gets wider the relation text of one card no longer fits beside the arms box and the set changes: recheckTall draws again', async () => {
+	it('with the fallback measure no card lifts; after the font changes the relation text of one card no longer fits beside the arms box and the set changes: recheckTall draws again', async () => {
 		const { peek, view } = await open();
 		const before = peek.lastLayout.opts.lifted ?? new Set<string>();
-		const text = peek.lastLayout.opts.relations!.get('di')!.text;
-		// The text is measured with the italic small text font (13.6 px at 16 px): 0.6 em a character with this canvas.
-		const px = [...text].length * 0.6 * 13.6;
-		console.log(`relation text of di: "${text}", ${px.toFixed(1)} px`);
 		expect(before.has('di')).toBe(false);
-		canvas.wide = 150 / px; // wider than the room beside the arms box, narrower than the text width of 158 px
-		clearMeasureCache();
 		const scene = (view as unknown as { scene: unknown }).scene;
-		const changed = peek.recheckTall(true);
-		expect(changed).toBe(true);
-		expect(peek.lastLayout.opts.lifted?.has('di')).toBe(true);
+		expect(widenUntilLifted(peek)).toBe(true);
 		// The scene was built again: the live boxes follow the new set.
 		expect((view as unknown as { scene: unknown }).scene).not.toBe(scene);
 	});
@@ -110,35 +117,29 @@ describe('rule B: the lift reaches the live scene, follows the setting that show
 		const { peek, view } = await open();
 		const lower = armsRect(view, 'di').y;
 		const other = armsRect(view, 'cy').y;
-		canvas.wide = 150 / ([...peek.lastLayout.opts.relations!.get('di')!.text].length * 0.6 * 13.6);
-		clearMeasureCache();
-		peek.recheckTall(true);
-		// "Grandchild" (10 characters) still fits beside the box at this width, so only the card of the longest text lifts.
+		// The text of Cy is shorter than the text of Di, so at the first width that lifts Di it still fits beside the box and only Di lifts.
+		expect(widenUntilLifted(peek)).toBe(true);
 		expect(peek.lastLayout.opts.lifted?.has('di')).toBe(true);
 		expect(peek.lastLayout.opts.lifted?.has('cy')).toBe(false);
-		expect(lower - armsRect(view, 'di').y).toBeCloseTo(0.85 * 16 * 1.2, 6);
+		expect(lower - armsRect(view, 'di').y).toBeCloseTo(smallLineOf(geometryFor(16, 'compact')), 6);
 		expect(armsRect(view, 'cy').y).toBe(other);
 	});
 
-	it('a font that gets narrower again takes the lift back, and a second refit with no change draws nothing', async () => {
+	it('a font that goes back takes the lift back, and a second refit with no change draws nothing', async () => {
 		const { peek, view } = await open();
-		canvas.wide = 150 / ([...peek.lastLayout.opts.relations!.get('di')!.text].length * 0.6 * 13.6);
-		clearMeasureCache();
-		expect(peek.recheckTall(true)).toBe(true);
+		expect(widenUntilLifted(peek)).toBe(true);
 		const scene = (view as unknown as { scene: unknown }).scene;
 		expect(peek.recheckTall(true)).toBe(false);
 		expect((view as unknown as { scene: unknown }).scene).toBe(scene);
-		canvas.wide = 1;
+		canvas.wide = 0.5;
 		clearMeasureCache();
 		expect(peek.recheckTall(true)).toBe(true);
 		expect(peek.lastLayout.opts.lifted?.size ?? 0).toBe(0);
 	});
 
-	it('with "Show relation names on cards" off nothing lifts; turning it on lifts again (the cards keep their size)', async () => {
+	it('with "Show relation names on cards" off nothing lifts (there is no word, D145); turning it on lifts again', async () => {
 		const { peek, view, host } = await open();
-		canvas.wide = 150 / ([...peek.lastLayout.opts.relations!.get('di')!.text].length * 0.6 * 13.6);
-		clearMeasureCache();
-		peek.recheckTall(true);
+		expect(widenUntilLifted(peek)).toBe(true);
 		expect(peek.lastLayout.opts.lifted?.has('di')).toBe(true);
 		const prev = { ...(host.settings as typeof DEFAULT_SETTINGS) };
 		(host.settings as typeof DEFAULT_SETTINGS).showRelations = false;

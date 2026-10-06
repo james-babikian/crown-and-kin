@@ -26,12 +26,12 @@ const HALF_HIT = 22;
 
 type Settings = LayoutSettings;
 type Laid = LaidOut;
-type Mode = 'down' | 'wide' | 'narrow';
+type Mode = 'down' | 'wide';
 
 const settingsFor = (mode: Mode, hidden: readonly string[], folded: readonly string[], more: object = {}): Settings =>
 	({
 		...DEFAULT_LAYOUT_SETTINGS,
-		...(mode === 'down' ? {} : { orientation: 'sideways', sidewaysCards: mode === 'narrow' ? 'narrow' : 'normal' }),
+		...(mode === 'down' ? {} : { orientation: 'sideways' }),
 		foldHidden: [...hidden].sort(),
 		foldedFamilies: [...folded].sort(),
 		foldControls: true,
@@ -118,7 +118,7 @@ describe('F2: rows (spec §13.10 "Rows")', () => {
 	it('fully hidden last generation with a tall card: every position, gap and size is finite', () => {
 		// The people of the last rows are all hidden; one of them is in `tallCards` (a stale answer) and one name is long.
 		const hiddenTall = F.folds.get('A')!.hides.filter((id) => !['osric'].includes(id)).slice(-3);
-		for (const mode of ['down', 'wide', 'narrow'] as const) {
+		for (const mode of ['down', 'wide'] as const) {
 			const { layout } = lay('A', mode, { tallCards: hiddenTall, longNames: hiddenTall.slice(0, 1) });
 			for (const b of layout.persons.values()) for (const v of [b.x, b.y, b.w, b.h, b.gen]) expect(Number.isFinite(v), `${mode} ${b.id}`).toBe(true);
 			for (const gap of layout.rowGaps) expect(Number.isFinite(gap.top) && Number.isFinite(gap.bottom), mode).toBe(true);
@@ -199,7 +199,7 @@ describe('F3: tags to hidden partners (spec §13.10 "People drawn elsewhere stay
 			'  - partners: [p, q]',
 			'',
 		].join('\n');
-		for (const mode of ['down', 'narrow'] as const) {
+		for (const mode of ['down', 'wide'] as const) {
 			const g = graphOf(text);
 			clearLayoutCache();
 			const before = layoutTree(g, GEO, settingsFor(mode, [], []), 'font') as Laid;
@@ -218,7 +218,7 @@ describe('F3: tags to hidden partners (spec §13.10 "People drawn elsewhere stay
 });
 
 describe('F5: the controls of the layout and their spots', () => {
-	const MODES: Mode[] = ['down', 'wide', 'narrow'];
+	const MODES: Mode[] = ['down', 'wide'];
 
 	it('`TreeLayout.folds` is the controls of the comments, each with a spot; open ones have count 0, folded ones the N of the comment', () => {
 		const named = new Map([...F.folds.values()].map((f) => [f.key, f.name]));
@@ -283,7 +283,7 @@ describe('F5: the controls of the layout and their spots', () => {
 		return spot;
 	}
 
-	it('the spot of every control follows rule F5 (down, sideways, sideways narrow; a bar, a dot below the anchor, a far pair, one parent)', () => {
+	it('the spot of every control follows rule F5 (down, sideways; a bar, a dot below the anchor, a far pair, one parent)', () => {
 		let bars = 0;
 		let dots = 0;
 		let solos = 0;
@@ -364,7 +364,7 @@ describe('F5: the controls of the layout and their spots', () => {
 
 describe('F5b: width and height include every mark and every hit area (spec §13.10 "Hit areas")', () => {
 	it('right and below: the largest mark (the Overview sign) and the hit area of 44 px at scale 1 lie inside the layout', () => {
-		for (const mode of ['down', 'wide', 'narrow'] as const) {
+		for (const mode of ['down', 'wide'] as const) {
 			for (const label of ['none', 'A', 'B', 'A+B', 'NEST+IMPL', 'R']) {
 				const { layout } = lay(label, mode);
 				for (const c of layout.folds!) {
@@ -384,7 +384,7 @@ describe('F5b: width and height include every mark and every hit area (spec §13
 	});
 
 	it('left and above: nothing lies at a negative coordinate (the layout moves everything by the same amount)', () => {
-		for (const mode of ['down', 'wide', 'narrow'] as const) {
+		for (const mode of ['down', 'wide'] as const) {
 			for (const label of ['none', 'A', 'B', 'R']) {
 				const { layout, laid } = lay(label, mode);
 				for (const b of layout.persons.values()) {
@@ -426,7 +426,7 @@ describe('F4: a folded family keeps its couple line and its stem (spec §13.10 "
 		laid.edges.paths.filter((p) => p.kind === 'descent' && p.child === undefined && p.parents !== undefined && [...p.parents].sort().join() === [...c.parents].sort().join() && (c.union ? p.union === c.union : p.union === undefined));
 
 	it('each folded family with shown parents has one stem of kind `descent` with `union` and `parents`, ending at its spot, and no drop', () => {
-		for (const mode of ['down', 'wide', 'narrow'] as const) {
+		for (const mode of ['down', 'wide'] as const) {
 			for (const label of ['A', 'B', 'A+B', 'TWO2+BQ', 'NEST+IMPL', 'COUSIN', 'R']) {
 				const { laid, layout } = lay(label, mode);
 				const folded = layout.folds!.filter((c) => c.folded);
@@ -450,7 +450,7 @@ describe('F4: a folded family keeps its couple line and its stem (spec §13.10 "
 	});
 
 	it('the couple line of a folded pair stays: the dot (or bar) and the marker are still there, also for a far pair and a pair that is not adjacent', () => {
-		for (const mode of ['down', 'wide', 'narrow'] as const) {
+		for (const mode of ['down', 'wide'] as const) {
 			for (const [label, names] of [
 				['A', ['A']],
 				['TWO2+BQ', ['TWO2', 'BQ']],
@@ -494,7 +494,7 @@ describe('F4: a folded family keeps its couple line and its stem (spec §13.10 "
 	it('children of one parent (SOLO): the stem leaves the card of the parent and ends at the spot', () => {
 		const key = F.folds.get('SOLO')!.key;
 		const hides = F.folds.get('SOLO')!.hides;
-		for (const mode of ['down', 'wide', 'narrow'] as const) {
+		for (const mode of ['down', 'wide'] as const) {
 			clearLayoutCache();
 			const g = graphOf(SOURCE);
 			const laid = layoutTree(g, GEO, settingsFor(mode, hides, [key]), 'font') as Laid;
@@ -528,7 +528,7 @@ describe('toggles and the cache key (spec §13.10 acceptance; F1)', () => {
 		const g = graphOf(SOURCE);
 		const key = F.folds.get('A')!.key;
 		const hides = F.folds.get('A')!.hides;
-		for (const mode of ['down', 'wide', 'narrow'] as const) {
+		for (const mode of ['down', 'wide'] as const) {
 			clearLayoutCache();
 			const first = layoutTree(g, GEO, settingsFor(mode, [], []), 'font');
 			const folded = layoutTree(g, GEO, settingsFor(mode, hides, [key]), 'font');

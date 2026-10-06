@@ -8,7 +8,7 @@ import { DEFAULT_LAYOUT_SETTINGS, clearLayoutCache, layoutTree } from '../src/la
 import type { LaidOut, LayoutSettings } from '../src/layout/model';
 import { buildScene, type SceneOptions } from '../src/render/dom/scene';
 import { lineLook, type LineMarks } from '../src/render/line-highlight';
-import { DEFAULT_DARK, DEFAULT_LIGHT, FADED_OPACITY, ME_LOOK, ME_RING_INSET, ON_LINE_EXTRA, STROKES } from '../src/render/styles';
+import { DEFAULT_DARK, DEFAULT_LIGHT, FADED_OPACITY, ME_LOOK, ON_LINE_EXTRA, STROKES } from '../src/render/styles';
 import { renderSvg } from '../src/render/svg-string';
 import { cardLabel, finderSentence, relationSummary, stepSentences } from '../src/render/tree-info';
 import { FEl, installDom } from './acceptance/fake-dom';
@@ -134,7 +134,7 @@ describe('D47: lineLook marks the finder\'s line (design-gate rules)', () => {
 	});
 
 	it('sideways: the same parts are on, turned', () => {
-		const side = lay(g, { ...DEFAULT_LAYOUT_SETTINGS, orientation: 'sideways', sidewaysCards: 'normal' });
+		const side = lay(g, { ...DEFAULT_LAYOUT_SETTINGS, orientation: 'sideways' });
 		const s = lineLook(g, side.layout, side.edges, COUSIN);
 		const onLen = (ps: { d: string; state: unknown }[]) => ps.filter((p) => p.state === 'on').length;
 		expect(onLen(s.paths)).toBe(on.length);
@@ -245,7 +245,7 @@ describe('D40, D41: the scene draws the relation text and the marked card', () =
 	const { g } = build(fixture('03'));
 	const on = lay(g, { ...DEFAULT_LAYOUT_SETTINGS, relationLine: true });
 
-	it('each card has its relation on the relation line; "You" on the marked card, which has the ring', () => {
+	it('each card has its relation on the relation line; "You" on the marked card, which has the class', () => {
 		const { root } = scene(g, on, { relations: CONRAD, me: 'conrad' });
 		const t = cardText(on.layout.geometry);
 		for (const [id, r] of CONRAD) {
@@ -258,14 +258,11 @@ describe('D40, D41: the scene draws the relation text and the marked card', () =
 			// Inside the Full level of detail only (spec §5.4: Compact and Overview do not show it).
 			expect(all(card).find((e) => e.hasClass('dynasty-card-full'))!.children).toContain(text[0]);
 			expect(card.hasClass('dynasty-card-me')).toBe(id === 'conrad');
-			expect(all(card).some((e) => e.hasClass('dynasty-card-me-ring'))).toBe(id === 'conrad');
+			// D153: the mark is the border alone; no second ring element.
+			expect(all(card).some((e) => e.hasClass('dynasty-card-me-ring'))).toBe(false);
 		}
 		// Aurel has a title and dates: the third small line. Rosamund has only dates: the second.
 		expect(relationY(t, true, true)).toBe(t.relationBaseline);
-		const ring = all(cardEl(root, 'conrad')).find((e) => e.hasClass('dynasty-card-me-ring'))!;
-		const box = on.layout.persons.get('conrad')!;
-		expect(Number(ring.getAttribute('x'))).toBe(box.x + ME_RING_INSET);
-		expect(Number(ring.getAttribute('width'))).toBe(box.w - 2 * ME_RING_INSET);
 		for (const e of all(root)) expect(e.attrs.has('fill') || e.attrs.has('stroke') || e.attrs.has('style')).toBe(false);
 	});
 
@@ -362,15 +359,14 @@ describe('the headless SVG draws the same (spike pictures)', () => {
 		expect(plain).not.toContain('opacity="0.25"');
 	});
 
-	it('relation texts, the marked card, and the line in the accent colour', () => {
+	it('relation texts, the marked card (text colour, D153), and the line in the accent colour', () => {
 		const on = lay(g, { ...DEFAULT_LAYOUT_SETTINGS, relationLine: true });
 		for (const palette of [DEFAULT_LIGHT, DEFAULT_DARK]) {
 			const svg = renderSvg(g, on.layout, on.edges, { palette, relations: CONRAD, me: 'conrad', line: COUSIN });
 			// D117: every relation text is italic, "You" too (bold and italic).
 			expect(svg.match(/font-style="italic"/g)).toHaveLength(CONRAD.size);
 			expect(svg).toContain(`font-style="italic" font-weight="600" fill="${palette.text}">You</text>`);
-			expect(svg).toContain(`stroke="${palette.accent}" stroke-width="${ME_LOOK.border}"`);
-			expect(svg).toContain(`stroke="${palette.text}" stroke-width="${ME_LOOK.ring}"`);
+			expect(svg).toContain(`stroke="${palette.text}" stroke-width="${ME_LOOK.border}"`);
 			const onPaths = svg.match(new RegExp(`<path d="[^"]*" fill="none" stroke="${palette.accent}" stroke-width="${STROKES.marriage.width + ON_LINE_EXTRA}"`, 'g')) ?? [];
 			expect(onPaths.length).toBeGreaterThan(0);
 			expect(svg).toContain(`opacity="${FADED_OPACITY}"`);
@@ -403,13 +399,9 @@ describe('styles.css: the M7 looks use theme variables and match styles.ts', () 
 		expect(Number(rule('.dynasty-faded')!.opacity)).toBe(FADED_OPACITY);
 		expect(rule('.dynasty-card-relation')).toEqual({ 'font-size': 'calc(var(--dynasty-font-size) * 0.85)', 'font-style': 'italic', fill: 'var(--text-normal)' });
 		expect(rule('.dynasty-card-me .dynasty-card-relation')).toEqual({ 'font-style': 'italic', 'font-weight': 'var(--bold-weight, 600)' });
-		expect(rule('.dynasty-no-relations .dynasty-card-relation')).toEqual({ display: 'none' });
-		expect(rule('.dynasty-card-me .dynasty-card-bg')).toEqual({ stroke: 'var(--interactive-accent)', 'stroke-width': String(ME_LOOK.border) });
-		const ring = rule('.dynasty-card-me-ring')!;
-		expect(ring.stroke).toBe('var(--text-normal)');
-		expect(Number(ring['stroke-width'])).toBe(ME_LOOK.ring);
-		// The ring lies inside the accent border, touching its inner edge.
-		expect(ME_RING_INSET).toBe(ME_LOOK.border / 2 + ME_LOOK.ring / 2);
+		expect(rule('.dynasty-no-relations .dynasty-card-relation')).toBeNull();
+		expect(rule('.dynasty-card-me .dynasty-card-bg')).toEqual({ stroke: 'var(--text-normal)', 'stroke-width': String(ME_LOOK.border) });
+		expect(rule('.dynasty-card-me-ring')).toBeNull();
 		// No fixed colours in the M7 rules (spec §5.8).
 		const m7 = css.slice(css.indexOf('.dynasty-card-relation {'), css.indexOf('.dynasty-faded {') + 40);
 		expect(m7).not.toMatch(/#[0-9a-f]{3,6}\b|rgb\(/i);

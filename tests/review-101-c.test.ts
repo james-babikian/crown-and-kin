@@ -78,7 +78,8 @@ unions:
 });
 
 describe('C3: a far couple with no children shows its union sign (spec §5.3 "also for far couples")', () => {
-	// a and z are two generations apart (D11: far) and have no children. No dot is drawn, so the
+	// a and z are two generations apart (D11: far) and have no children. Since 0.2.5 (D140) the rows put the two partners of a
+	// partnership on one row where this can be solved; a and z share the tight ancestor r1, so no row can join them. No dot is drawn, so the
 	// betrothal ring shows nowhere; the tags say only "⚭ Name".
 	const src = `people:
   - {id: r1, name: R1, sex: m}
@@ -86,12 +87,9 @@ describe('C3: a far couple with no children shows its union sign (spec §5.3 "al
   - {id: k, name: K, sex: m, parents: [r1, r2]}
   - {id: gk, name: GK, sex: m, parents: [k]}
   - {id: z, name: Z, sex: f, parents: [gk]}
-  - {id: s1, name: S1, sex: m}
-  - {id: s2, name: S2, sex: f}
-  - {id: a, name: A, sex: m, parents: [s1, s2]}
+  - {id: a, name: A, sex: m, parents: [r1, r2]}
 unions:
   - {partners: [r1, r2]}
-  - {partners: [s1, s2]}
   - {partners: [a, z], type: betrothal}
 `;
 	// In the downward layout a far betrothal with no children has no union dot, so no marker. Since 0.2.1 its sign
@@ -131,8 +129,8 @@ unions:
   - {partners: [p10, p1]}
   - {partners: [p15, p3], type: affair}
 `;
-	it('narrow cards at 9 px', () => {
-		const { g, layout, edges } = lay(src, { ...SIDE, sidewaysCards: 'narrow' }, geometryFor(9, 'normal'));
+	it('sideways cards at 9 px', () => {
+		const { g, layout, edges } = lay(src, SIDE, geometryFor(9, 'normal'));
 		expect(S.lineProblems(g, layout, edges)).toEqual([]);
 	});
 });

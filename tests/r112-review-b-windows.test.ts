@@ -16,6 +16,7 @@ import { ID_UI, WRITE_TEXT } from '../src/render/ui-text';
 import { FEl, clock, dispatch, installDom, resetDom, settle, fakeWin } from './acceptance/fake-dom';
 import { notices, openModals, resetObsidian } from './acceptance/fake-obsidian';
 import { embed, fakeHandle, fakeHost, type FakeHandle, type Host } from './acceptance/tree-view-fakes';
+import { backToList, openPage } from './lw-support';
 
 /*
  * Review round 0.2.2, area B (windows). Each test is the smallest sequence of user actions that shows
@@ -104,11 +105,9 @@ async function openHouses(handle: Writing = writingHandle(HOUSES_BODY)) {
 	return { handle, win, content: (win as unknown as { contentEl: FEl }).contentEl, modal: (win as unknown as { modalEl: FEl }).modalEl };
 }
 
-const houseRow = (content: FEl, id: string) => content.querySelector(`.dynasty-house-row[data-house="${id}"]`)!;
-
-/** Taps "Change id" of a row, types the id into the small window and taps "Use this id" (D110). */
-async function setId(row: FEl, value: string): Promise<void> {
-	await click(row.querySelector('.dynasty-id-open'));
+/** Taps "Change id" on the open edit page, types the id into the small window and taps "Use this id" (D110). */
+async function setId(page: FEl, value: string): Promise<void> {
+	await click(page.querySelector('.dynasty-id-open'));
 	const w = (openModals[openModals.length - 1] as unknown as { modalEl: FEl }).modalEl;
 	type(w.querySelector('.dynasty-id-input')!, value);
 	await click(w.querySelector('.dynasty-id-use'));
@@ -139,12 +138,10 @@ async function openTitles(handle: Writing) {
 	return { handle, win, content: (win as unknown as { contentEl: FEl }).contentEl, modal: (win as unknown as { modalEl: FEl }).modalEl };
 }
 
-const titleBox = (content: FEl, id: string) => content.querySelector(`.dynasty-title-box[data-title="${id}"]`)!;
-
 describe('R1: the note changes while the id question is open (§13.17 rule 5: a stale body refuses the whole write)', () => {
 	it('Houses: Save, the note gets one more person of the house, "Change the id" must not write on the new body', async () => {
 		const { content, modal, handle } = await openHouses();
-		await setId(houseRow(content, 'valmont'), 'crown');
+		await setId(openPage(content, 'valmont'), 'crown');
 		await click(content.querySelector('.dynasty-sheet-save'));
 		// The question says "1 person". Now a sync adds a second person of the house.
 		expect(confirmOf(modal)!.querySelectorAll('.dynasty-sheet-confirm-text')[0].getText()).toContain('1 person');
@@ -158,7 +155,7 @@ describe('R1: the note changes while the id question is open (§13.17 rule 5: a 
 	it('Titles: Save, the note gets one more person with the title, "Change the id" must not write on the new body', async () => {
 		const handle = writingHandle(TITLES_BODY);
 		const { content, modal } = await openTitles(handle);
-		await setId(titleBox(content, 'baron'), 'count');
+		await setId(openPage(content, 'baron'), 'count');
 		await click(content.querySelector('.dynasty-sheet-save'));
 		expect(confirmOf(modal)).not.toBeNull();
 		handle.body = `${handle.body}  - {id: c, name: Cora, card-title: baron}\n`;
@@ -186,9 +183,10 @@ people:
 		const handle = writingHandle(body);
 		const { content, modal } = await openTitles(handle);
 		// Remove the second holder of Duke (a holder list written as an alias cannot be edited) and also change the id of Baron.
-		await click(titleBox(content, 'duke').querySelector('.dynasty-title-toggle'));
-		await click(titleBox(content, 'duke').querySelectorAll('.dynasty-holder-remove')[1]);
-		await setId(titleBox(content, 'baron'), 'count');
+		const duke = openPage(content, 'duke');
+		await click(duke.querySelectorAll('.dynasty-holder-remove')[1]);
+		backToList(content);
+		await setId(openPage(content, 'baron'), 'count');
 		await click(content.querySelector('.dynasty-sheet-save'));
 		await click(confirmOf(modal)!.querySelector('.dynasty-id-change'));
 		expect(handle.ops).toHaveLength(1);

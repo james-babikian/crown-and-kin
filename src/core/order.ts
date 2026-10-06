@@ -2,10 +2,12 @@
  * Works out the left-to-right order of people and unions on each row (spec §5.1 step 2): a
  * depth-first walk from the founders that keeps spouses beside each other and siblings in the
  * order of the `people` list (D2). The layout code calls `computeModelOrder` with the family graph
- * from `derive.ts` and the generations from `generations.ts`.
+ * from `derive.ts` and the generations from `generations.ts`. A man who is only a rumoured parent
+ * (`rumoured-roots.ts`, D140) is seated at the right end of the block of his child's parent.
  */
 
 import { partnerOf, type FamilyGraph } from './derive';
+import { loneRumouredRoots } from './rumoured-roots';
 
 /** One entry of the left-to-right order: a person card, or a union's dot. */
 export type OrderItem = { kind: 'person'; id: string } | { kind: 'union'; key: string };
@@ -36,6 +38,19 @@ export function computeModelOrder(g: FamilyGraph, gen: Map<string, number>): Mod
 	const visited = new Set<string>();
 	const emittedUnions = new Set<string>();
 	const anchors = new Map<string, string>();
+
+	// D140: a lone rumoured parent stands beside the placement parent of his child who is in his row. The parent is
+	// looked up in this graph, so a man whose child or parent is folded away is placed like a founder.
+	const seatedAfter = new Map<string, string[]>();
+	const seated = new Set<string>();
+	for (const [root, kids] of loneRumouredRoots(g)) {
+		const parent = (g.placementParents.get(kids[0]) ?? []).find((q) => gen.get(q) === gen.get(root));
+		if (parent === undefined) continue;
+		seated.add(root);
+		const list = seatedAfter.get(parent);
+		if (list) list.push(root);
+		else seatedAfter.set(parent, [root]);
+	}
 
 	const emitUnion = (key: string, anchor?: string) => {
 		if (emittedUnions.has(key)) return;
@@ -98,6 +113,14 @@ export function computeModelOrder(g: FamilyGraph, gen: Map<string, number>): Mod
 			const s = spouses[0];
 			const spouseLeft = g.byId.get(id)!.sex === 'f' && g.byId.get(s)!.sex !== 'f';
 			row = spouseLeft ? [...others.get(s)!.slice().reverse(), s, id] : [id, s, ...others.get(s)!];
+			if (spouseLeft && others.get(s)!.length) {
+				// D142: the partners of the husband s stand in the order of his unions, so that the groups of children, which
+				// follow that order (spec §4.3), do not cross. She keeps her place beside him; a later partner stands on his far side.
+				const unionIndex = (p: string) => unionsOf(s).findIndex((k) => g.unionByKey.get(k)!.partners.includes(p));
+				const ordered = [id, ...others.get(s)!].sort((x, y) => unionIndex(x) - unionIndex(y));
+				const at = ordered.indexOf(id);
+				if (at < ordered.length - 1) row = [...ordered.slice(0, at + 1), s, ...ordered.slice(at + 1)];
+			}
 		} else if (spouses.length > 1) {
 			const [first, ...rest] = spouses;
 			row = [...others.get(first)!.slice().reverse(), first, id];
@@ -105,6 +128,8 @@ export function computeModelOrder(g: FamilyGraph, gen: Map<string, number>): Mod
 		} else {
 			row = [id];
 		}
+		// The newcomers stand at the right end, so that the bar of a couple is never cut.
+		for (const p of [...row]) for (const r of seatedAfter.get(p) ?? []) if (!visited.has(r) && !row.includes(r)) row.push(r);
 		for (const p of row) {
 			visited.add(p);
 			items.push({ kind: 'person', id: p });
@@ -136,9 +161,11 @@ export function computeModelOrder(g: FamilyGraph, gen: Map<string, number>): Mod
 		}
 	};
 
-	// Founders first (roots not married to someone with parents), then anyone left over.
+	// Founders first (roots not married to someone with parents), then anyone left over. A seated man waits for his
+	// parent's block; if that is never reached, the last loop still draws him.
 	const hasBloodPartner = (id: string) => unionsOf(id).some((k) => !isRoot(partnerOf(g.unionByKey.get(k)!, id)));
-	for (const p of g.people) if (isRoot(p.id) && !hasBloodPartner(p.id)) visit(p.id);
+	for (const p of g.people) if (isRoot(p.id) && !hasBloodPartner(p.id) && !seated.has(p.id)) visit(p.id);
+	for (const p of g.people) if (!seated.has(p.id)) visit(p.id);
 	for (const p of g.people) visit(p.id);
 	for (const u of g.unions) emitUnion(u.key);
 

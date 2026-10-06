@@ -12,8 +12,11 @@ import { resetObsidian } from './acceptance/fake-obsidian';
 import { desktop, embed, fakeHandle, openFullScreen, phone } from './acceptance/tree-view-fakes';
 
 /*
- * Review round 0.2.3, area C, spec §13.18 rule 5 ("Start on me"): every combination of device, place, pin, session focus,
- * edited person, options.start, options.me and tree size against a model written from the spec.
+ * Review round 0.2.3, area C, spec §13.18 rule 5 ("Start on me"), moved to 0.2.5 (D144): every combination of device, place, pin, session focus,
+ * edited person, options.start, options.me and tree size against a model written from the spec. A tree in a note on a phone is a list that
+ * stands on the person of the start chain (the session choice, the pin, the marked person, the person edited last, the oldest person who has
+ * children, the first root; `options.start` is not in it). The full-screen view on a phone keeps the rule of D20; the computer and the tablet
+ * show the whole tree or the pin.
  */
 
 beforeAll(() => {
@@ -57,20 +60,30 @@ const setDevice = (d: Device) => {
 	}
 };
 
-/** The spec §13.18 rule 5 and §5.5: the person of the family that opens, or null for the whole tree. */
-function expected(o: { device: Device; place: 'preview' | 'full'; size: number; pin?: string; session?: 'all'; edited?: string; start?: string; me?: string }): string | null {
+type Case = { device: Device; place: 'preview' | 'full'; size: number; pin?: string; session?: 'all'; edited?: string; start?: string; me?: string };
+
+/** The spec §5.5, §13.18 and D20: the person of the family that opens in a view that draws cards, or null for the whole tree. */
+function expected(o: Case): string | null {
 	const has = (id?: string) => id !== undefined && /^p\d+$/.test(id) && Number(id.slice(1)) < o.size;
 	if (o.session === 'all') return null;
 	if (has(o.pin)) return o.pin!;
 	if (o.device !== 'phone') return null;
-	const marked = o.place === 'preview' && has(o.me);
-	if (!marked && o.size <= 100) return null;
-	const order = o.place === 'preview' ? [o.edited, o.start, o.me] : [o.edited, o.start];
-	return order.find(has) ?? 'p0';
+	if (o.size <= 100) return null;
+	return [o.edited, o.start].find(has) ?? 'p0';
+}
+
+/** D144: the person that the list of a phone note stands on, and the rung of the start chain that chose the person. */
+function expectedList(o: Case): { id: string; from: string } {
+	const has = (id?: string) => id !== undefined && /^p\d+$/.test(id) && Number(id.slice(1)) < o.size;
+	if (has(o.pin)) return { id: o.pin!, from: 'pin' };
+	if (has(o.me)) return { id: o.me!, from: 'me' };
+	if (has(o.edited)) return { id: o.edited!, from: 'edited' };
+	// A line has a child for every person but the last: p0 is the oldest parent, and a tree of one person starts at its first root.
+	return { id: 'p0', from: o.size >= 2 ? 'oldest' : 'first' };
 }
 
 const SIZES = [1, 7, 100, 101];
-const cases: Parameters<typeof expected>[0][] = [];
+const cases: Case[] = [];
 for (const device of ['phone', 'tablet', 'desktop'] as Device[])
 	for (const size of SIZES)
 		for (const pin of [undefined, 'p2', 'nobody'])
@@ -92,6 +105,15 @@ describe('spec §13.18 rule 5: the first view against a model of the spec', () =
 			setDevice(c.device);
 			const opts = [c.pin ? `focus: ${c.pin}` : '', c.start ? `start: ${c.start}` : '', c.me ? `me: ${c.me}` : ''].filter(Boolean);
 			const src = line(c.size, ...opts);
+			if (c.place === 'preview' && c.device === 'phone') {
+				const handle = fakeHandle('n.md', src);
+				if (c.edited) handle.state.lastEdited = c.edited;
+				const root = (await embed(src, { handle })).el.querySelector('.dynasty-root')!;
+				const gotList = { id: root.getAttribute('data-dynasty-focus'), from: root.getAttribute('data-dynasty-list-from') };
+				const wantList = expectedList(c);
+				if (JSON.stringify(gotList) !== JSON.stringify(wantList)) bad.push(`${JSON.stringify(c)}: the list stands on ${JSON.stringify(gotList)}, the spec says ${JSON.stringify(wantList)}`);
+				continue;
+			}
 			const want = expected(c);
 			let got: string[];
 			if (c.place === 'full') {
@@ -102,14 +124,13 @@ describe('spec §13.18 rule 5: the first view against a model of the spec', () =
 				got = drawn((await embed(src, { handle })).el);
 			}
 			const n = c.size;
-			// D23: the note preview on a phone shows 1 generation up and down; every other view the setting (3).
-			const exp = want === null ? ids(src) : family(src, want, c.place === 'preview' && c.device === 'phone' ? 1 : 3);
+			const exp = want === null ? ids(src) : family(src, want, 3);
 			// On a tablet or the desktop the whole tree shows, unless it is cut by its own focus rules; compare whole-tree runs by size.
 			if (JSON.stringify(got) !== JSON.stringify(exp)) bad.push(`${JSON.stringify(c)}: drew ${got.length} people ${got.slice(0, 4).join(',')}…, the spec says ${want === null ? 'the whole tree (' + n + ')' : 'the family of ' + want + ' (' + exp.join(',') + ')'}`);
 		}
 		expect(bad.join('\n')).toBe('');
 	};
-	it('every combination of the note preview opens the family that the spec names', run(cases.filter((c) => c.place === 'preview')), 120000);
-	// Spec 13.18 rule 5 and 5.5 item 3 name the phone preview only: the full-screen view does not change.
+	it('every combination of the note opens the person that the spec names: the list stands on the start chain, the other devices draw the whole tree or the pin', run(cases.filter((c) => c.place === 'preview')), 120000);
+	// The full-screen view on a phone does not use the marked person as its start person (D20).
 	it('the full-screen view on a phone does not use the marked person as its start person', run(cases.filter((c) => c.place === 'full')), 120000);
 });

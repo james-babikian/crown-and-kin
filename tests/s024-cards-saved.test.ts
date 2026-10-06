@@ -4,7 +4,6 @@ vi.mock('obsidian', () => import('./acceptance/fake-obsidian'));
 vi.mock('@codemirror/language', () => ({ forceParsing: () => false, syntaxTree: () => ({ length: 0 }) }));
 vi.mock('@codemirror/view', () => ({ ViewPlugin: { fromClass: () => ({}) } }));
 
-import { namesOnlyGeometry } from '../src/layout/geometry';
 import type { Geometry } from '../src/layout/model';
 import { FullScreenModal } from '../src/obsidian/full-screen';
 import { clearRelationCache } from '../src/obsidian/relation-cache';
@@ -14,11 +13,12 @@ import { parseBreakList } from '../src/render/break-words';
 import { clearMeasureCache } from '../src/render/dom/measure';
 import { clock, installDom, resetDom } from './acceptance/fake-dom';
 import { resetObsidian } from './acceptance/fake-obsidian';
-import { desktop, embed, fakeHandle, fakeHost, phone } from './acceptance/tree-view-fakes';
+import { desktop, embed, fakeHandle, fakeHost } from './acceptance/tree-view-fakes';
 
-// Contract 6.2: "Save as picture" from the phone preview always draws whole cards with the relation words, whatever style the preview shows
-// (D119). `saveSource()` makes the geometry again (no `namesOnly` flag) and takes the relation line from the mark and not from the preview's
-// geometry; `relations` go in only while "Show relation names on cards" is on. The setting only hides the text (D40), so the card keeps its height.
+// "Save as picture" (contract 6.2): `saveSource()` makes the geometry again and takes the relation line from the mark and the setting `showRelations`;
+// `relations` go in only while the setting is on. 0.2.5 (D145): with the setting off the plate goes, so the cards of the picture are one small text line
+// shorter and the marked person has the You tab. The phone preview of 0.2.4 (D119) is gone with the list (D144); the picture comes from the computer.
+// The card form and the tab are in s025-view-card.test.ts.
 
 beforeAll(() => {
 	installDom();
@@ -40,20 +40,6 @@ interface Peek {
 	lastLayout: { geo: Geometry; settings: { relationLine?: boolean }; opts: { relations?: unknown } };
 }
 
-/** What the phone's view holds after the step "names-only style" draws it: the names-only geometry, no relation text line, no relation words. */
-async function namesOnlyPreview(showRelations: boolean) {
-	phone();
-	const host = fakeHost() as ReturnType<typeof fakeHost> & { settings?: unknown };
-	host.settings = { ...DEFAULT_SETTINGS, showRelations };
-	const handle = fakeHandle('n.md', SRC);
-	const { view } = await embed(SRC, { host, handle });
-	const peek = view as unknown as Peek;
-	peek.lastLayout.geo = namesOnlyGeometry(peek.lastLayout.geo);
-	delete peek.lastLayout.settings.relationLine;
-	delete peek.lastLayout.opts.relations;
-	return peek;
-}
-
 /** The height of each card of the saved SVG, by person. */
 function cardHeights(svg: string): Map<string, number> {
 	const out = new Map<string, number>();
@@ -61,35 +47,37 @@ function cardHeights(svg: string): Map<string, number> {
 	return out;
 }
 
-describe('save from a phone preview: whole cards with relation words (contract 6.2)', () => {
-	it('with the default style (names only) and "Show relation names on cards" on: the source has whole-card geometry, the relation line and the words; the picture has cards of 77 px and the words', async () => {
-		const peek = await namesOnlyPreview(true);
-		expect(peek.lastLayout.geo.namesOnly).toBe(true);
-		const src = peek.saveSource()!;
-		expect(src.geo.namesOnly).toBeUndefined();
-		expect(src.geo.cardH).toBe(61);
+describe('save as picture: the plate follows the mark and the setting (contract 6.2, D145)', () => {
+	it('with a mark and "Show relation names on cards" on: the relation line, the words, cards of 77 px', async () => {
+		desktop();
+		const host = fakeHost() as ReturnType<typeof fakeHost> & { settings?: unknown };
+		host.settings = { ...DEFAULT_SETTINGS };
+		const { view } = await embed(SRC, { host, handle: fakeHandle('n.md', SRC) });
+		const src = (view as unknown as Peek).saveSource()!;
 		expect(src.relationLine).toBe(true);
 		expect(src.relations?.get('bo')?.text).toBe('Child');
-		const made = await makePicture(undefined, src, 'svg');
-		const svg = new TextDecoder().decode(made.bytes);
+		const svg = new TextDecoder().decode((await makePicture(undefined, src, 'svg')).bytes);
 		expect([...cardHeights(svg).values()]).toEqual([77, 77]);
 		expect(svg).toMatch(/data-item="relation:bo"[^>]*>Child</);
 		expect(svg).toMatch(/data-item="relation:ann"[^>]*>You</);
 	});
 
-	it('with "Show relation names on cards" off: the cards keep their height 77 and the words are not in the picture', async () => {
-		const peek = await namesOnlyPreview(false);
-		const src = peek.saveSource()!;
-		expect(src.geo.namesOnly).toBeUndefined();
-		expect(src.relationLine).toBe(true);
+	it('with "Show relation names on cards" off: no relation line, no words, cards of 61 px (D145)', async () => {
+		desktop();
+		const host = fakeHost() as ReturnType<typeof fakeHost> & { settings?: unknown };
+		host.settings = { ...DEFAULT_SETTINGS, showRelations: false };
+		const { view } = await embed(SRC, { host, handle: fakeHandle('n.md', SRC) });
+		const src = (view as unknown as Peek).saveSource()!;
+		expect(src.relationLine).toBe(false);
 		expect(src.relations).toBeUndefined();
+		expect(src.youTab).toBe('ann');
 		const svg = new TextDecoder().decode((await makePicture(undefined, src, 'svg')).bytes);
-		expect([...cardHeights(svg).values()]).toEqual([77, 77]);
+		expect([...cardHeights(svg).values()]).toEqual([61, 61]);
 		expect(svg).not.toContain('data-item="relation:bo"');
 	});
 
 	it('a tree with no mark has no relation line: cards of 61 px', async () => {
-		phone();
+		desktop();
 		const plain = SRC.replace('  me: ann\n', '').replace('options:\n', '');
 		const host = fakeHost() as ReturnType<typeof fakeHost> & { settings?: unknown };
 		host.settings = { ...DEFAULT_SETTINGS };

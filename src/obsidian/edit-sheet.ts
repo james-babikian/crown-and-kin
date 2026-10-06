@@ -30,7 +30,7 @@ import { newHouseId } from '../core/yaml-edit';
 import { parseBody, readTree, referencedIds } from '../core/parse';
 import { isMap, str, type Raw } from '../core/tolerate';
 import { PARENT_TYPES, PLACEMENT_TYPES, UNION_TYPES, type Person, type Tree } from '../core/types';
-import { linkTarget, relationSummary } from '../render/tree-info';
+import { linkTarget, relationInfo } from '../render/tree-info';
 import { CROP_UI, FAMILY, FINDER_UI, FOCUS_UI, FOLD_UI, ME_UI, NEW_SHEET, NOTE_UI, PICTURES_UI, REMOVE, SHEET, UI, UNION_EDIT, UNION_TYPE_TEXT, WRITE_TEXT, deleteText, parentTypeText, partnerDetail, unionTypeText } from '../render/ui-text';
 import { linkedNotePath, personNoteName } from '../core/note-make';
 import { makePersonNote, openMadeNote, type MakeNoteMode, type MakePersonNoteOutcome, type SameNameAnswer } from './make-note';
@@ -46,6 +46,7 @@ import { currentPictureOf, pickPicture } from './picture-picker';
 import type { PictureCopy, PictureStore } from './picture-store';
 import { relationsFor, validMe } from './relation-cache';
 import { freshOrStale, nameDialog, onWriteFailed, sheetField, showErrorLine } from './sheet-parts';
+import { renderRelationBox, renderRelationStrip, type RelationView } from './sheet-relation';
 import { titlesSection, type TitlesHost } from './sheet-titles';
 import { undoNotice } from './undo-notice';
 import { editUnion } from './union-edit';
@@ -384,6 +385,9 @@ export class EditSheet extends Modal {
 	private portraitHint: HTMLElement | null = null;
 	/** Spec §13.13: the Select the part button; it shows when the portrait can show. */
 	private partButton: HTMLButtonElement | null = null;
+	/** D146, D147: what the relation infobox shows for this build (null: nothing), and whether that build drew the phone strip. */
+	private relView: RelationView | null = null;
+	private relPhone = false;
 	/** Spec §13.11: the slot in the Actions list for Make a note, what it shows now, and the busy flag of the flow (N2). */
 	private noteSlot: HTMLElement | null = null;
 	private noteKey = '';
@@ -435,7 +439,12 @@ export class EditSheet extends Modal {
 		if (this.isNew) this.modalEl.addClass('is-new');
 		if (this.o.fromTap) this.cleanup.push(ignoreGhostClick(this));
 		// On a phone the visible area shrinks when the keyboard opens; the header stays in it (spec §7.4).
-		this.cleanup.push(phoneLayout(this, () => this.revealFocused()));
+		this.cleanup.push(
+			phoneLayout(this, () => {
+				this.relLayout();
+				this.revealFocused();
+			}),
+		);
 		this.cleanup.push(trackModal(this, () => this.finish()));
 		const store = this.o.pictures;
 		if (store) this.cleanup.push(store.onChange((paths) => this.portraitFilesChanged(paths)));
@@ -534,6 +543,8 @@ export class EditSheet extends Modal {
 		el.addClass('dynasty-sheet-content');
 		const ro = this.readOnly;
 		this.modalEl.toggleClass('is-read-only', ro);
+		this.relView = this.makeRelationView();
+		this.relPhone = this.modalEl.hasClass('is-phone');
 
 		const header = el.createDiv({ cls: 'dynasty-sheet-header' });
 		nameDialog(this.modalEl, header.createDiv({ cls: 'dynasty-sheet-title', text: this.title() }));
@@ -553,6 +564,8 @@ export class EditSheet extends Modal {
 		const body = el.createDiv({ cls: 'dynasty-sheet-body' });
 		this.bodyEl = body;
 		body.addEventListener('focusin', () => this.revealFocused(300));
+		// D147: the strip is the first child, so it is right under the header and before the portrait in the reading order.
+		if (this.relView && this.relPhone) renderRelationStrip(body, this.relView);
 		if (ro) {
 			const banner = body.createDiv({ cls: ['callout', 'dynasty-sheet-banner'], attr: { 'data-callout': 'warning' } });
 			banner.createDiv({ cls: 'callout-title' }).createDiv({ cls: 'callout-title-inner', text: UI.bannerTitle });
@@ -572,6 +585,8 @@ export class EditSheet extends Modal {
 		if (this.isNew) this.relationBox(body);
 
 		this.portraitField(body);
+		// A read-only sheet with no portrait has no portrait row; the box then stands alone where the row would be.
+		if (this.relView && !this.relPhone && !this.portraitEl) renderRelationBox(body, this.relView);
 		this.textField(body, 'name', SHEET.name, { autocapitalize: 'words' });
 		// D122: the card adds the quote marks, so the hint says so; a sobriquet usually starts with a small letter.
 		const sobInput = this.textField(body, 'sobriquet', SHEET.sobriquet, { autocapitalize: 'none' });
@@ -598,7 +613,7 @@ export class EditSheet extends Modal {
 			// Spec §13.4: between the fields and Family.
 			titlesSection(body, this.titlesHost());
 			const me = this.me();
-			this.familySection(body, me);
+			this.familySection(body);
 			this.actionsSection(body, me);
 			if (!ro) this.deleteSection(body);
 			this.idLine(body);
@@ -804,6 +819,11 @@ export class EditSheet extends Modal {
 				this.partButton = part;
 				if (focus === 'part') part.focus();
 			}
+		}
+		// Last in the row: the box stands right of the frame and the buttons (D146). This part builds the row again, so it builds the box again.
+		if (this.relView && !this.relPhone) {
+			row.addClass('has-relinfo');
+			renderRelationBox(row, this.relView);
 		}
 		this.paintPortrait();
 	}
@@ -1073,14 +1093,13 @@ export class EditSheet extends Modal {
 		return b;
 	}
 
-	/** The Family section (spec §6.3); `me` is the marked person (spec §13.1), or null. */
-	private familySection(parent: HTMLElement, me: string | null): void {
+	/** The Family section (spec §6.3). */
+	private familySection(parent: HTMLElement): void {
 		const fam = this.data.fam;
 		if (!fam) return;
 		const ro = this.readOnly;
 		const sec = parent.createDiv({ cls: 'dynasty-sheet-section dynasty-family' });
 		sec.createDiv({ cls: 'dynasty-sheet-section-title', text: FAMILY.heading });
-		this.relationLines(sec, me);
 
 		const parents = sec.createDiv({ cls: 'dynasty-family-group', attr: { 'data-family': 'parents' } });
 		parents.createDiv({ cls: 'dynasty-sheet-label', text: FAMILY.parents });
@@ -1111,23 +1130,27 @@ export class EditSheet extends Modal {
 	}
 
 	/**
-	 * Spec §13.1: at the top of the Family section, the relation to the marked person ("Relation to
-	 * you: …", "Also: …"), and Show the line (not on the marked person's own sheet). The names come
-	 * from the whole tree, as on the cards.
+	 * Spec §13.1, D146: what the infobox shows for this person, or null when nothing shows (a new person, a tree with no mark).
+	 * The names come from the whole tree, as on the cards. Show the line is not on the marked person's own sheet.
 	 */
-	private relationLines(sec: HTMLElement, me: string | null): void {
-		if (me === null) return;
+	private makeRelationView(): RelationView | null {
+		if (this.isNew || !this.data.fam) return null;
+		const me = this.me();
+		if (me === null) return null;
 		const p = this.data.person;
-		const isMe = p.id === me;
-		const sum = relationSummary(relationsFor(this.data.g, me).all.get(p.id), isMe);
-		const box = sec.createDiv({ cls: 'dynasty-relation-summary' });
-		box.createDiv({ cls: 'dynasty-relation-main', text: sum.main });
-		if (sum.also) box.createDiv({ cls: 'dynasty-relation-also', text: sum.also });
-		// D123: what a rumoured link could change; it has the look of the "Also" line. `relationSummary` gives it for the first relation only.
-		if (sum.maybe) box.createDiv({ cls: ['dynasty-relation-also', 'dynasty-relation-maybe'], text: sum.maybe });
+		const v: RelationView = relationInfo(relationsFor(this.data.g, me).all.get(p.id), p.id === me);
 		const finder = this.o.finder;
-		if (isMe || !finder || this.gone) return;
-		this.button(box, ME_UI.showLine, 'dynasty-show-line', () => this.leaveFor(() => finder.show(me, p.id)), ME_UI.showLineLabel(p.name || p.id));
+		if (v.kind !== 'me' && finder && !this.gone) {
+			v.addLineButton = (parent) => void this.button(parent, ME_UI.showLine, 'dynasty-show-line', () => this.leaveFor(() => finder.show(me, p.id)), ME_UI.showLineLabel(p.name || p.id));
+		}
+		return v;
+	}
+
+	/** D147: a window that crosses 600 px (a turn, a resize) swaps the box and the strip. The build keeps the draft and the focus. */
+	private relLayout(): void {
+		// The first layout runs inside `phoneLayout`, before the first build.
+		if (this.bodyEl === null || this.closed || this.relView === null) return;
+		if (this.modalEl.hasClass('is-phone') !== this.relPhone) this.build();
 	}
 
 	private parentRow(parent: HTMLElement, fam: FamilyView, link: ParentLink): void {

@@ -26,10 +26,12 @@ import {
 	listName,
 	previewParts,
 	rebase,
+	rulerHint,
 	savedListName,
 	titleRows,
 	windowOps,
 	type HolderRow,
+	type HolderValues,
 	type TitleRow,
 } from '../src/obsidian/titles-draft';
 import { TitlesWindow } from '../src/obsidian/titles-window';
@@ -39,6 +41,7 @@ import { notices, openModals, resetObsidian } from './acceptance/fake-obsidian';
 import { golden, replaceOnce } from './acceptance/golden';
 import { BODY_13 } from './acceptance/titles-support';
 import { embed, fakeHandle, fakeHost, fillAllCards, openSheetOn, type FakeHandle, type Host } from './acceptance/tree-view-fakes';
+import { backButton, backToList, openPage, rowNames, rowTexts } from './lw-support';
 
 /*
  * WP 8.3 (spec §13.3–§13.5, §13.0 items 6–8; D54–D63): the Titles window's draft and the one batch
@@ -110,10 +113,16 @@ describe('holder rows of the Titles window (spec §13.4)', () => {
 });
 
 describe('the holder form (spec §13.5): the ruler name and the preview', () => {
-	it('starts with the ruler name that the plugin uses', () => {
-		expect(formStart({ person: 'roderick', from: '1150' }, 'Roderick Valmont', false)).toEqual({ number: '', ruler: 'Roderick', from: '1150', to: '' });
+	it('starts with the written ruler name; the field is empty when the entry has no `as` (D131)', () => {
+		expect(formStart({ person: 'roderick', from: '1150' }, 'Roderick Valmont', false)).toEqual({ number: '', ruler: '', from: '1150', to: '' });
 		expect(formStart({ person: 'gareth', as: 'Gareth', number: 'I' }, 'Ser Gareth Orsini', false).ruler).toBe('Gareth');
-		expect(formStart({ name: 'Aldric', number: 'I' }, undefined, true)).toEqual({ number: 'I', ruler: 'Aldric', from: '', to: '', name: 'Aldric' });
+		expect(formStart({ name: 'Aldric', number: 'I' }, undefined, true)).toEqual({ number: 'I', ruler: '', from: '', to: '', name: 'Aldric' });
+	});
+
+	it('the hint of the ruler field is the first word of the name, or the typed name of a holder who is not in the tree', () => {
+		expect(rulerHint('Ser Gareth Orsini', undefined)).toBe('Ser');
+		expect(rulerHint(undefined, 'Cosimo Orsini ')).toBe('Cosimo Orsini');
+		expect(rulerHint(undefined, undefined)).toBe('');
 	});
 
 	it('a ruler name that did not change writes no `as` (and keeps a written one)', () => {
@@ -123,14 +132,25 @@ describe('the holder form (spec §13.5): the ruler name and the preview', () => 
 		expect(g).toEqual({ person: 'gareth', as: 'Gareth', number: 'II' });
 	});
 
-	it('a changed ruler name writes `as`; the default or an empty field removes it', () => {
+	it('a changed ruler name writes `as` (with no number also the default); an empty field removes it; with a number the default removes it', () => {
 		expect(formResult({ person: 'darian' }, 'Ser Darian Harrow', { number: 'II', ruler: 'Darian', from: '', to: '' }).as).toBe('Darian');
-		expect(formResult({ person: 'gareth', as: 'Gareth' }, 'Ser Gareth Orsini', { number: '', ruler: 'Ser', from: '', to: '' }).as).toBeUndefined();
+		expect(formResult({ person: 'gareth', as: 'Gareth' }, 'Ser Gareth Orsini', { number: '', ruler: 'Ser', from: '', to: '' }).as).toBe('Ser');
+		expect(formResult({ person: 'gareth', as: 'Gareth' }, 'Ser Gareth Orsini', { number: 'II', ruler: 'Ser', from: '', to: '' }).as).toBeUndefined();
 		expect(formResult({ person: 'gareth', as: 'Gareth' }, 'Ser Gareth Orsini', { number: '', ruler: ' ', from: '', to: '' }).as).toBeUndefined();
 	});
 
+	it('D131: with no number a typed text writes `as` even when it is the first word; the text of the start writes nothing', () => {
+		const typed = (before: HolderValues, ruler: string, number = '') => formResult(before, 'Marta de Calvera', { number, ruler, from: '', to: '' });
+		expect(typed({ person: 'marta' }, 'Marta').as).toBe('Marta');
+		expect(typed({ person: 'marta' }, '').as).toBeUndefined();
+		expect(typed({ person: 'marta', as: 'Marta Q' }, 'Marta Q')).toEqual({ person: 'marta', as: 'Marta Q' });
+		expect(typed({ person: 'marta', as: 'Marta Q' }, 'Marta').as).toBe('Marta');
+		expect(typed({ person: 'marta', as: 'Marta Q' }, 'Marta', 'II').as).toBeUndefined();
+		expect(typed({ person: 'marta', number: 'I' }, 'Marta', 'I').as).toBeUndefined();
+	});
+
 	it('empty fields remove their keys; text is trimmed', () => {
-		expect(formResult({ person: 'a', number: 'I', from: '1100', to: '1110' }, 'Aldo X', { number: ' ', ruler: 'Aldo', from: ' 1101 ', to: '' })).toEqual({ person: 'a', from: '1101' });
+		expect(formResult({ person: 'a', number: 'I', from: '1100', to: '1110' }, 'Aldo X', { number: ' ', ruler: '', from: ' 1101 ', to: '' })).toEqual({ person: 'a', from: '1101' });
 	});
 
 	it('the live preview: "Ser Darian Harrow shows as: Darian II"', () => {
@@ -138,6 +158,19 @@ describe('the holder form (spec §13.5): the ruler name and the preview', () => 
 		expect(previewParts('Ser Gareth Orsini', { number: 'II', ruler: 'Ser', from: '', to: '' }).shown).toBe('Ser II');
 		// A holder who is not in the tree: the typed name, and the ruler name falls back to it.
 		expect(previewParts(undefined, { number: 'I', ruler: '', from: '', to: '', name: 'Orso' })).toEqual({ full: 'Orso', shown: 'Orso I' });
+	});
+
+	it('D131: with no number the preview shows the written ruler name, else the full name, as the card will', () => {
+		const none = { number: '', ruler: '', from: '', to: '' };
+		expect(previewParts('Marta de Calvera', { ...none, ruler: 'Marta' }, { as: 'Marta' })).toEqual({ full: 'Marta de Calvera', shown: 'Marta' });
+		expect(previewParts('Marta de Calvera', none)).toEqual({ full: 'Marta de Calvera', shown: 'Marta de Calvera' });
+		expect(previewParts('Ser Gareth Orsini', none, {}).shown).toBe('Ser Gareth Orsini');
+		// A typed text that differs from the start text is written, so the card will show it.
+		expect(previewParts('Marta de Calvera', { ...none, ruler: 'Marta' }, {}).shown).toBe('Marta');
+		// An empty field removes a written `as`.
+		expect(previewParts('Marta de Calvera', none, { as: 'Marta' }).shown).toBe('Marta de Calvera');
+		// With a number the empty field still shows the first word.
+		expect(previewParts('Marta de Calvera', { ...none, number: 'II' }, {}).shown).toBe('Marta II');
 	});
 
 	it('changedFields: only changed keys, null for a removed key', () => {
@@ -447,19 +480,21 @@ async function openTitles(handle = writingHandle()) {
 	return { el, host, handle, win: win!, content: win!.contentEl };
 }
 
-const titleBox = (content: FEl, id: string) => content.querySelector(`.dynasty-title-box[data-title="${id}"]`)!;
+/** The edit page of a title: the window opens on the list, and a page is a second step (D134). */
+const titleBox = (content: FEl, id: string) => {
+	if (backButton(content)) backToList(content);
+	return openPage(content, id);
+};
 
 describe('the Titles window on the fakes (spec §13.4)', () => {
 	it('opens from More → Titles; lists the titles of the tree with their holder counts', async () => {
 		const { content } = await openTitles();
-		const names = content.querySelectorAll('.dynasty-title-row input').map((i) => i.value);
-		expect(names).toEqual(G13.titles.map((t) => t.name));
-		expect(titleBox(content, 'duke-of-valmont').querySelector('.dynasty-title-count')!.getText()).toBe(TITLES_UI.count(7));
+		expect(rowNames(content)).toEqual(G13.titles.map((t) => t.name));
+		expect(rowTexts(content).find((t) => t.startsWith('Duke of Valmont'))).toContain(TITLES_UI.count(7));
 	});
 
 	it('Show holders lists the holders in order; a move and Save make one write, which one undo restores', async () => {
 		const { content, handle } = await openTitles();
-		await click(titleBox(content, 'king-of-the-vale').querySelector('.dynasty-title-toggle'));
 		const rows = titleBox(content, 'king-of-the-vale').querySelectorAll('.dynasty-holder-row');
 		expect(rows.map((r) => r.querySelector('.dynasty-holder-name')!.getText())).toEqual(['Aldric III', 'Edmund I', 'Roderick']);
 		expect(titleBox(content, 'king-of-the-vale').querySelector('.dynasty-holder-heading')!.getText()).toBe('Kings of the Vale');
@@ -467,7 +502,7 @@ describe('the Titles window on the fakes (spec §13.4)', () => {
 		expect(rows[0].querySelector('.dynasty-holder-earlier')!.disabled).toBe(true);
 		expect(rows[2].querySelector('.dynasty-holder-later')!.disabled).toBe(true);
 		await click(rows[0].querySelector('.dynasty-holder-later'));
-		const after = titleBox(content, 'king-of-the-vale').querySelectorAll('.dynasty-holder-name').map((n) => n.getText());
+		const after = content.querySelectorAll('.dynasty-lw-page .dynasty-holder-name').map((n) => n.getText());
 		expect(after).toEqual(['Edmund I', 'Aldric III', 'Roderick']);
 		expect(handle.ops).toHaveLength(0);
 		await click(content.querySelector('.dynasty-sheet-save'));
@@ -485,19 +520,18 @@ describe('the Titles window on the fakes (spec §13.4)', () => {
 		const field = box.querySelector('.dynasty-title-plural')!;
 		expect(field.tag).toBe('label');
 		expect(field.querySelector('.dynasty-sheet-label')!.getText()).toBe(TITLES_UI.pluralLabel);
-		const input = field.querySelector('input')!;
+		const input = field.querySelector('textarea')!;
 		expect(input.value).toBe('Dukes of Valmont');
 		expect(input.getAttribute('placeholder')).toBe(TITLES_UI.pluralPlaceholder);
 		expect(input.getAttribute('aria-label')!.startsWith(TITLES_UI.pluralLabel)).toBe(true);
-		expect(titleBox(content, 'warden-of-the-marches').querySelector('.dynasty-title-plural input')!.value).toBe('');
-		await click(box.querySelector('.dynasty-title-toggle'));
-		const plural = titleBox(content, 'duke-of-valmont').querySelector('.dynasty-title-plural input')!;
+		expect(titleBox(content, 'warden-of-the-marches').querySelector('.dynasty-title-plural textarea')!.value).toBe('');
+		const plural = titleBox(content, 'duke-of-valmont').querySelector('.dynasty-title-plural textarea')!;
 		plural.value = 'Grand Dukes of Valmont';
 		dispatch(plural, 'input');
-		expect(titleBox(content, 'duke-of-valmont').querySelector('.dynasty-holder-heading')!.getText()).toBe('Grand Dukes of Valmont');
+		expect(content.querySelector('.dynasty-holder-heading')!.getText()).toBe('Grand Dukes of Valmont');
 		plural.value = '';
 		dispatch(plural, 'input');
-		expect(titleBox(content, 'duke-of-valmont').querySelector('.dynasty-holder-heading')!.getText()).toBe('Duke of Valmont');
+		expect(content.querySelector('.dynasty-holder-heading')!.getText()).toBe('Duke of Valmont');
 		plural.value = 'Grand Dukes of Valmont';
 		dispatch(plural, 'input');
 		await click(content.querySelector('.dynasty-sheet-save'));
@@ -509,9 +543,12 @@ describe('the Titles window on the fakes (spec §13.4)', () => {
 
 	it('Cancel with changes writes nothing; Esc with changes asks first', async () => {
 		const { content, handle, win } = await openTitles();
-		const name = titleBox(content, 'duke-of-valmont').querySelector('.dynasty-title-row input')!;
+		const name = titleBox(content, 'duke-of-valmont').querySelector('.dynasty-title-name textarea')!;
 		name.value = 'Grand Duke of Valmont';
 		dispatch(name, 'input');
+		// The first close leaves the page (D.3.8); the second one asks.
+		(win as unknown as { close(): void }).close();
+		expect(win.modalEl.querySelector('.dynasty-sheet-confirm')).toBeNull();
 		(win as unknown as { close(): void }).close();
 		expect(win.modalEl.querySelector('.dynasty-sheet-confirm')!.getText()).toContain(TITLES_UI.discardText);
 		await click(win.modalEl.querySelector('.dynasty-sheet-discard'));
@@ -527,7 +564,7 @@ describe('the Titles window on the fakes (spec §13.4)', () => {
 		expect(ask).toContain(TITLES_UI.deleteHolders(4));
 		expect(ask).toContain(TITLES_UI.deleteCards(2));
 		await click(win.modalEl.querySelector('.dynasty-confirm-delete-title'));
-		expect(content.querySelector('.dynasty-title-box[data-title="king-of-the-vale"]')).toBeNull();
+		expect(content.querySelector('.dynasty-lw-row[data-title="king-of-the-vale"]')).toBeNull();
 		await click(content.querySelector('.dynasty-sheet-save'));
 		expect(handle.ops).toHaveLength(1);
 		const g = graph(handle.body);
@@ -542,7 +579,6 @@ describe('the Titles window on the fakes (spec §13.4)', () => {
 		const create = vi.fn(async () => ({}));
 		(host.app.vault as unknown as Record<string, unknown>).create = create;
 		host.app.fileManager = { getNewFileParent: () => ({ isRoot: () => false, path: 'Lists', children: [{ name: 'Dukes of Valmont.md' }] }) };
-		await click(titleBox(content, 'duke-of-valmont').querySelector('.dynasty-title-toggle'));
 		await click(titleBox(content, 'duke-of-valmont').querySelector('.dynasty-title-note'));
 		expect(create).toHaveBeenCalledWith('Lists/Dukes of Valmont 1.md', holderTable(G13, G13.titles[0]));
 		expect(notices).toContain(TITLES_UI.noteMade('Dukes of Valmont 1'));
@@ -554,9 +590,8 @@ describe('the Titles window on the fakes (spec §13.4)', () => {
 		const create = vi.fn(async () => ({}));
 		(host.app.vault as unknown as Record<string, unknown>).create = create;
 		host.app.fileManager = { getNewFileParent: () => ({ isRoot: () => true, path: '/', children: [] }) };
-		await click(titleBox(content, 'duke-of-valmont').querySelector('.dynasty-title-toggle'));
 		await click(titleBox(content, 'duke-of-valmont').querySelector('.dynasty-holder-remove'));
-		await click(titleBox(content, 'duke-of-valmont').querySelector('.dynasty-title-note'));
+		await click(content.querySelector('.dynasty-lw-page .dynasty-title-note'));
 		expect(create).not.toHaveBeenCalled();
 		expect(win.modalEl.querySelector('.dynasty-sheet-confirm')!.getText()).toContain(TITLES_UI.noteText);
 		await click(win.modalEl.querySelector('.dynasty-confirm-note'));
@@ -566,21 +601,43 @@ describe('the Titles window on the fakes (spec §13.4)', () => {
 
 	it('Edit opens the holder form; its Save changes the draft only', async () => {
 		const { content, handle } = await openTitles();
-		await click(titleBox(content, 'duke-of-valmont').querySelector('.dynasty-title-toggle'));
 		await click(titleBox(content, 'duke-of-valmont').querySelectorAll('.dynasty-holder-edit')[2]);
 		const form = top();
 		expect(form.modalEl.hasClass('dynasty-holder-form')).toBe(true);
 		const number = form.contentEl.querySelector('[data-field="number"] input')!;
-		expect(form.contentEl.querySelector('[data-field="ruler"] input')!.value).toBe('Roderick');
+		// D131: the field is empty when the entry has no `as`; the first word is its hint.
+		const ruler = form.contentEl.querySelector('[data-field="ruler"] input')!;
+		expect(ruler.value).toBe('');
+		expect(ruler.getAttribute('placeholder')).toBe('Roderick');
 		number.value = 'I';
 		dispatch(number, 'input');
 		expect(form.contentEl.querySelector('.dynasty-holder-preview')!.getText()).toBe(TITLES_UI.preview('Roderick Valmont', 'Roderick I'));
 		await click(form.contentEl.querySelector('.dynasty-sheet-save'));
 		expect(handle.ops).toHaveLength(0);
-		expect(titleBox(content, 'duke-of-valmont').querySelectorAll('.dynasty-holder-name')[2].getText()).toBe('Roderick I');
+		expect(content.querySelectorAll('.dynasty-lw-page .dynasty-holder-name')[2].getText()).toBe('Roderick I');
 		await click(content.querySelector('.dynasty-sheet-save'));
 		expect(handle.ops).toHaveLength(1);
 		expect(handle.body).toBe(BODY_13.replace('      - {person: roderick, from: 1150, to: 1158}\n', '      - {person: roderick, number: I, from: 1150, to: 1158}\n'));
+	});
+
+	it('D131: a holder who is not in the tree: the ruler field stays empty and its hint follows the name field; a typed ruler name is kept', async () => {
+		const { content } = await openTitles();
+		await click(titleBox(content, 'count-of-orsini').querySelectorAll('.dynasty-holder-edit')[0]);
+		const form = top();
+		const ruler = form.contentEl.querySelector('[data-field="ruler"] input')!;
+		const name = form.contentEl.querySelector('[data-field="holder-name"] input')!;
+		expect(ruler.value).toBe('');
+		expect(ruler.getAttribute('placeholder')).toBe('Orso the Old');
+		name.value = 'Orso the Elder';
+		dispatch(name, 'input');
+		expect(ruler.value).toBe('');
+		expect(ruler.getAttribute('placeholder')).toBe('Orso the Elder');
+		ruler.value = 'Orso';
+		dispatch(ruler, 'input');
+		name.value = 'Orso the Eldest';
+		dispatch(name, 'input');
+		expect(ruler.value).toBe('Orso');
+		expect(form.contentEl.querySelector('.dynasty-holder-preview')!.getText()).toBe(TITLES_UI.preview('Orso the Eldest', 'Orso'));
 	});
 });
 

@@ -49,9 +49,10 @@ describe('speed 1: only the dots a sweep reads are placed', () => {
 describe('speed 2: the "?" search looks only near its curve', () => {
 	it('a 400-person tree with a rumoured link on every person: few distance tests, same pictures', () => {
 		for (const [settings, hashed] of [
-			[{ sweeps: 4, far: FAR }, '91078463'],
+			[{ sweeps: 4, far: FAR }, '6f98b12'],
 			// The speed fix alone gave 9b7d65c9 here (commit 8566006); the L2 fix then moved the exit of a few lines that touched a dot.
-			[{ sweeps: 4, far: FAR, orientation: 'sideways' as const }, '6ca9d6b9'],
+			// 0.2.5 (D140, WP-A1): both hashes were recorded again; the rows step keeps 2 moves of 207 tries and moves 14 people.
+			[{ sweeps: 4, far: FAR, orientation: 'sideways' as const }, 'c0d0197b'],
 		] as const) {
 			rumourWork.distances = 0;
 			const { hash: h } = picture(rumourTree(400), settings);

@@ -9,7 +9,7 @@
  * own lane.
  */
 import type { FamilyGraph } from '../core/derive';
-import { barClear, lineMetrics, sideTagDepth, tagHit, tagTop, type LineMetrics } from './geometry';
+import { barClear, isRoundel, lineMetrics, roundelAxis, sideTagDepth, tagHit, tagTop, type LineMetrics } from './geometry';
 import { FOLD_EM, placeFoldSpots, type LineExtras } from './fold-spots';
 import type { Geometry, PersonBox, Rect, UnionPoint } from './model';
 
@@ -109,13 +109,20 @@ export interface PlanInput {
 	side?: Geometry;
 	/** M10 (F3, F4): people tagged for a hidden partner, and the folded families that keep a stem. */
 	extras?: LineExtras;
+	/**
+	 * 0.2.5 (B.3.3): the person who has the "You" tab (`TreeLayout.youTab`). The tab lies where the two off-axis drop places left of the
+	 * axis would land, so that card takes neither. The layout and the router must give the same value, or they plan different bar lanes.
+	 */
+	youTab?: string;
 }
 
 /** Plans every leg, sibling bar, dot position and tag zone of a tree: see the file header. */
-export function planLines({ g, persons, rows, unions, anchors, geo, side, extras }: PlanInput): LinePlan {
+export function planLines({ g, persons, rows, unions, anchors, geo, side, extras, youTab }: PlanInput): LinePlan {
 	const m = lineMetrics(geo);
 	const box = (id: string) => persons.get(id)!;
 	const centre = (b: PersonBox) => b.x + b.w / 2;
+	// The Roundel is a top-to-bottom card; a sideways tree has the text card, whose lines are as they were in 0.2.4.
+	const roundel = !side && isRoundel(geo);
 	// Two vertical lines closer than this would touch a union dot (or each other).
 	const near = geo.unionSize / 2 + 2;
 	const dotUsed = new Set(g.secondary.flatMap((s) => (s.unionKey ? [s.unionKey] : [])));
@@ -399,6 +406,18 @@ export function planLines({ g, persons, rows, unions, anchors, geo, side, extras
 		// A child sits under another family's trunk: its drop meets the card beside the centre.
 		const dropX = kids.map((k) => {
 			const b = box(k);
+			if (roundel) {
+				// 0.2.5 (B.3.3): the Roundel takes its line on the axis. If another family's trunk is there, the places left of the axis come
+				// first, then one right of the arms; if all are taken the line stays on the axis. The marked card's tab lies left of the axis.
+				const axis = b.x + roundelAxis(geo);
+				const em = geo.fontPx;
+				const places = k === youTab ? [0, 3 * em] : [0, -1.75 * em, -2.5 * em, 3 * em];
+				for (const off of places) {
+					const x = axis + off;
+					if (!others.some((t) => Math.abs(t - x) < near)) return x;
+				}
+				return axis;
+			}
 			// Sideways the edge a drop meets is only a card height long.
 			const offsets = side ? [0, -m.legStep, -2 * m.legStep, 2 * m.legStep].filter((o) => Math.abs(o) <= b.w / 2 - m.tagInset) : [0, -m.legStep, -2 * m.legStep, 2 * m.legStep, 3 * m.legStep];
 			for (const off of offsets) {

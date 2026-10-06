@@ -38,7 +38,7 @@ export interface CardLabel {
 	shown?: Holding;
 	/** True when `card-title` is valid (then `title` is the shown title's name, D63). */
 	selected: boolean;
-	/** The name text line (D58): the ruler name and number of the first numbered entry of `shown` ("Roderick II"), else `Person.name`. */
+	/** The name text line (D58, D131): the ruler name and number of the first numbered entry of `shown` ("Roderick II"), else the written ruler name of its first entry with an `as` ("Marta"), else `Person.name`. */
 	name: string;
 	/** D122: the person's sobriquet (bare text, no marks). The card adds it after `name`; the screen-reader label does not (D127). */
 	sobriquet?: string;
@@ -50,6 +50,8 @@ export interface CardLabel {
 	title?: string;
 	/** `reignText(shown.entries)`, or undefined. */
 	reign?: string;
+	/** D131: set only when true. `name` came from an entry that has a number (not from a written `as` alone). */
+	numbered?: true;
 }
 
 /** One entry's reign without "r." and parentheses: "1131–1160", "from 1131", "until 1160", or undefined. */
@@ -92,6 +94,11 @@ export function titleNameFor(title: Title, person: Pick<Person, 'sex'> | undefin
 	return title.name;
 }
 
+/** D131: the text of one holder entry, the ruler name and then the number if the entry has one ("Aldric II", "Marta"). It does not decide whether a card shows it. */
+export function entryRulerText(entry: Holder, personName: string | undefined): string {
+	return entry.number === undefined ? rulerName(entry, personName) : `${rulerName(entry, personName)} ${entry.number}`;
+}
+
 /** "Aldric II" for a numbered entry, else undefined. */
 const numbered = (entry: Holder, personName: string): string | undefined => (entry.number === undefined ? undefined : `${rulerName(entry, personName)} ${entry.number}`);
 
@@ -127,11 +134,12 @@ export function cardLabels(g: FamilyGraph): ReadonlyMap<string, CardLabel> {
 		if (p.sobriquet !== undefined) label.sobriquet = p.sobriquet;
 		if (shown) {
 			label.shown = shown;
-			for (const e of shown.entries) {
-				const text = numbered(e, p.name);
-				if (text === undefined) continue;
+			// D131: a number comes first; with none, a written `as` counts. An entry with neither keeps the full name.
+			const entry = shown.entries.find((e) => e.number !== undefined) ?? shown.entries.find((e) => e.as !== undefined);
+			const text = entry ? entryRulerText(entry, p.name) : '';
+			if (entry && text.trim() !== '') {
 				label.name = text;
-				break;
+				if (entry.number !== undefined) label.numbered = true;
 			}
 		}
 		const title = chosen ? titleNameFor(chosen.title, p) : p.title ?? (shown ? titleNameFor(shown.title, p) : undefined);
@@ -144,12 +152,12 @@ export function cardLabels(g: FamilyGraph): ReadonlyMap<string, CardLabel> {
 	return out;
 }
 
-/** The extra texts the picker and Find match for a person (§13.5): "Aldric II" for every numbered entry, once each. */
+/** The extra texts the picker and Find match for a person (§13.5, D131): "Aldric II" for every numbered entry and the written `as` of an unnumbered entry, once each. */
 export function searchNames(label: CardLabel, personName: string): string[] {
 	const out: string[] = [];
 	for (const h of label?.holdings ?? []) {
 		for (const e of h.entries) {
-			const text = numbered(e, personName);
+			const text = numbered(e, personName) ?? (e.as !== undefined && e.as.trim() !== '' ? e.as : undefined);
 			if (text !== undefined && !out.includes(text)) out.push(text);
 		}
 	}

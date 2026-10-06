@@ -12,6 +12,7 @@ import { SHEET } from '../../src/render/ui-text';
 import { FEl, clock, device, dispatch, fakeDoc, fakeWin, flushFrames, installDom, resetDom, resizeAll, settle } from './fake-dom';
 import { openModals, resetObsidian } from './fake-obsidian';
 import { embed, fakeHandle, type FakeHandle } from './tree-view-fakes';
+import { openPage } from '../lw-support';
 
 /*
  * Review of WP6.3 (code-reviewer): proof tests for the Houses window. Each test states the
@@ -76,7 +77,8 @@ async function openWindow(handle = writingHandle()) {
 	return { handle, win, content, modal };
 }
 
-const row = (content: FEl, id: string) => content.querySelector(`.dynasty-house-row[data-house="${id}"]`)!;
+// 0.2.5 (D134): the fields and Delete are on the edit page of a house.
+const page = (content: FEl, id: string) => openPage(content, id);
 const byText = (el: FEl, sel: string, text: string) => el.querySelectorAll(sel).find((b) => b.getText() === text) ?? null;
 /** The focus is on a control that is still in the window (not on a removed element, not outside). */
 const focusInWindow = (modal: FEl) => fakeDoc.activeElement !== null && modal.contains(fakeDoc.activeElement);
@@ -89,7 +91,9 @@ function type(input: FEl, text: string): void {
 describe('review 6.3: keyboard focus in the Houses window (spec §5.2, the decision notes keyboard DoD)', () => {
 	it('"Continue to edit" in the "Discard changes?" question gives the focus back to the window', async () => {
 		const { content, modal, win } = await openWindow();
-		type(row(content, 'valmont').querySelector('input')!, 'Changed');
+		type(page(content, 'valmont').querySelector('textarea')!, 'Changed');
+		// The first close goes back from the page to the list.
+		win.close();
 		win.close();
 		const keep = byText(modal, 'button', SHEET.keepEditing)!;
 		expect(fakeDoc.activeElement).toBe(keep);
@@ -100,7 +104,8 @@ describe('review 6.3: keyboard focus in the Houses window (spec §5.2, the decis
 
 	it('Esc in the "Discard changes?" question gives the focus back to the window', async () => {
 		const { content, modal, win } = await openWindow();
-		type(row(content, 'valmont').querySelector('input')!, 'Changed');
+		type(page(content, 'valmont').querySelector('textarea')!, 'Changed');
+		win.close();
 		win.close();
 		win.close();
 		expect(modal.querySelector('.dynasty-sheet-confirm')).toBeNull();
@@ -110,7 +115,7 @@ describe('review 6.3: keyboard focus in the Houses window (spec §5.2, the decis
 	it('after a stale Save the focus stays in the window', async () => {
 		const handle = writingHandle();
 		const { content, modal } = await openWindow(handle);
-		type(row(content, 'valmont').querySelector('input')!, 'My Valmont');
+		type(page(content, 'valmont').querySelector('textarea')!, 'My Valmont');
 		handle.body = SOURCE.replace('  - id: brand\n    name: Brand\n', '  - id: brand\n    name: Brand the Bold\n');
 		const saveButton = content.querySelector('.dynasty-sheet-save')!;
 		saveButton.focus();
@@ -126,7 +131,7 @@ describe('review 6.3: a delete with no question, then a stale reload (D32)', () 
 		const handle = writingHandle();
 		const { content, modal } = await openWindow(handle);
 		// Thorne has no people: Delete removes it from the draft with no question (D32 asks only for a house with people).
-		dispatch(row(content, 'thorne').querySelector('.dynasty-house-delete')!, 'click');
+		dispatch(page(content, 'thorne').querySelector('.dynasty-house-delete')!, 'click');
 		expect(modal.querySelector('.dynasty-sheet-confirm')).toBeNull();
 		// Meanwhile (sync, another pane) Brand gets house Thorne.
 		handle.body = SOURCE.replace('  - id: brand\n    name: Brand\n', '  - id: brand\n    name: Brand\n    house: thorne\n');

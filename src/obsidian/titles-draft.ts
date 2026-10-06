@@ -91,9 +91,18 @@ export interface HolderFormFields {
 	name?: string;
 }
 
-/** What the form shows first: the values, and the ruler name that the plugin uses now (§13.5). */
+/**
+ * What the form shows first: the values, and the written ruler name (§13.5, D131). The field is empty
+ * when the entry has no `as`, so typed text can be told from the default, which `rulerHint` gives.
+ */
 export function formStart(v: HolderValues, personName: string | undefined, askName: boolean): HolderFormFields {
-	return { number: v.number ?? '', ruler: rulerOf(v, personName), from: v.from ?? '', to: v.to ?? '', ...(askName ? { name: v.name ?? '' } : {}) };
+	return { number: v.number ?? '', ruler: v.as ?? '', from: v.from ?? '', to: v.to ?? '', ...(askName ? { name: v.name ?? '' } : {}) };
+}
+
+/** The default ruler name that the empty form field shows as a hint: the first word of the person's name, or the typed name of a holder who is not in the tree. */
+export function rulerHint(personName: string | undefined, name: string | undefined): string {
+	const typed = clean(name);
+	return rulerOf({ ...(typed !== undefined ? { name: typed } : {}) }, personName);
 }
 
 const clean = (s: string | undefined) => {
@@ -102,9 +111,11 @@ const clean = (s: string | undefined) => {
 };
 
 /**
- * The holder values after the form (spec §13.5). `as` changes only when the owner changed the ruler
- * name: the same text as at the start keeps `as` as it was; the default ruler name (the first word
- * of the person's name, or the holder's name) or an empty field removes it; any other text is `as`.
+ * The holder values after the form (spec §13.5, D131). `as` changes only when the owner changed the
+ * ruler name: the same text as at the start keeps `as` as it was; an empty field removes it; any
+ * other text is `as`. The exception: with a number, the default ruler name (the first word of the
+ * person's name, or the holder's name) removes it, because the card shows it anyway. With no number
+ * the default is kept, because only a written `as` makes the card show the ruler name.
  */
 export function formResult(before: HolderValues, personName: string | undefined, f: HolderFormFields): HolderValues {
 	const out: HolderValues = { ...before };
@@ -117,21 +128,28 @@ export function formResult(before: HolderValues, personName: string | undefined,
 	set('to', clean(f.to));
 	if (f.name !== undefined) set('name', clean(f.name));
 	const ruler = f.ruler.trim();
-	const atStart = rulerOf(before, personName);
+	const atStart = formStart(before, personName, false).ruler.trim();
 	const plain = rulerOf({ ...out, as: undefined }, personName);
 	if (ruler === atStart) set('as', before.as);
-	else if (ruler === '' || ruler === plain) set('as', undefined);
+	else if (ruler === '' || (out.number !== undefined && ruler === plain)) set('as', undefined);
 	else set('as', ruler);
 	return out;
 }
 
-/** The live preview under the form's fields (§13.5): "Ser Gareth Orsini shows as: Gareth I". */
-export function previewParts(personName: string | undefined, f: HolderFormFields): { full: string; shown: string } {
+/**
+ * The live preview under the form's fields (§13.5, D131): "Ser Gareth Orsini shows as: Gareth I".
+ * With no number it shows what the card will show: the ruler name that Save will write as `as`, else
+ * the full name. `before` is the entry as it was, so a typed text can be told from the start text.
+ */
+export function previewParts(personName: string | undefined, f: HolderFormFields, before: HolderValues = {}): { full: string; shown: string } {
 	const name = clean(f.name);
-	const plain = rulerOf({ ...(name !== undefined ? { name } : {}) }, personName);
-	const ruler = f.ruler.trim() || plain;
+	const full = personName ?? name ?? '';
 	const number = f.number.trim();
-	return { full: personName ?? name ?? '', shown: number ? `${ruler} ${number}` : ruler };
+	if (number) {
+		const plain = rulerOf({ ...(name !== undefined ? { name } : {}) }, personName);
+		return { full, shown: `${f.ruler.trim() || plain} ${number}` };
+	}
+	return { full, shown: formResult(before, personName, f).as ?? full };
 }
 
 /** The fields an edit writes: only the changed ones, `null` for a removed key. */

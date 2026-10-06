@@ -75,7 +75,9 @@ describe('the delete question of the Houses window with a large house', () => {
 		await settle();
 		const win = openModals.find((m) => (m as unknown) instanceof HousesWindow) as unknown as { modalEl: FEl; contentEl: FEl };
 		expect(win).toBeDefined();
-		await click(win.contentEl.querySelector('.dynasty-house-row[data-house="valmont"] .dynasty-house-delete'));
+		// 0.2.5 (D134): Delete is on the edit page of the house.
+		await click(win.contentEl.querySelector('button.dynasty-lw-row[data-house="valmont"]'));
+		await click(win.contentEl.querySelector('.dynasty-lw-page .dynasty-house-delete'));
 		const layer = win.modalEl.querySelector('.dynasty-sheet-confirm')!;
 		const lines = layer.querySelectorAll('.dynasty-sheet-confirm-text').map((t) => t.getText());
 		const chars = lines.join(' ').length;

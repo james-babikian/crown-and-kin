@@ -18,6 +18,7 @@ import { openModals, resetObsidian } from './acceptance/fake-obsidian';
 import { replaceOnce } from './acceptance/golden';
 import { BODY_13 } from './acceptance/titles-support';
 import { embed, fakeHandle, fakeHost, openSheetOn, type FakeHandle, type Host } from './acceptance/tree-view-fakes';
+import { backButton, backToList, openPage } from './lw-support';
 
 /*
  * D66 (spec §13.4): the "Name for a man" field of the Titles window (the draft, its ops together
@@ -199,37 +200,41 @@ async function openTitles(handle = writingHandle()) {
 	return { handle, content: win!.contentEl };
 }
 
-const titleBox = (content: FEl, id: string) => content.querySelector(`.dynasty-title-box[data-title="${id}"]`)!;
+/** The edit page of a title: the window opens on the list, and a page is a second step (D134). */
+const pageFor = (content: FEl, id: string) => {
+	if (backButton(content)) backToList(content);
+	return openPage(content, id);
+};
 
 describe('"Name for a man" in the Titles window on the fakes (D66)', () => {
 	it('the field: a label with the visible text, the placeholder, an accessible name that starts with the visible text', async () => {
 		const { content } = await openTitles(writingHandle(BODY_MF));
-		const field = titleBox(content, 'duke-of-valmont').querySelector('.dynasty-title-male')!;
+		const field = pageFor(content, 'duke-of-valmont').querySelector('.dynasty-title-male')!;
 		expect(field.tag).toBe('label');
 		expect(field.getAttribute('data-field')).toBe('male-name');
 		expect(field.querySelector('.dynasty-sheet-label')!.getText()).toBe(TITLES_UI.maleLabel);
-		const input = field.querySelector('input')!;
+		const input = field.querySelector('textarea')!;
 		expect(input.value).toBe('Prince of Valmont');
 		expect(input.getAttribute('placeholder')).toBe(TITLES_UI.malePlaceholder);
 		expect(input.getAttribute('aria-label')).toBe(TITLES_UI.maleAria('Duke of Valmont'));
 		expect(input.getAttribute('aria-label')!.startsWith(TITLES_UI.maleLabel)).toBe(true);
-		expect(titleBox(content, 'count-of-orsini').querySelector('.dynasty-title-male input')!.value).toBe('');
-		const fields = titleBox(content, 'duke-of-valmont').querySelector('.dynasty-title-fields')!;
-		expect(fields.children.map((c) => c.getAttribute('data-field'))).toEqual(['male-name', 'female-name', 'plural']);
+		const page = pageFor(content, 'duke-of-valmont');
+		expect(page.querySelectorAll('label.dynasty-sheet-field').map((c) => c.getAttribute('data-field'))).toEqual([null, 'male-name', 'female-name', 'plural']);
+		expect(pageFor(content, 'count-of-orsini').querySelector('.dynasty-title-male textarea')!.value).toBe('');
 	});
 
 	it('a rename updates the accessible name of the field', async () => {
 		const { content } = await openTitles();
-		const box = titleBox(content, 'duke-of-valmont');
-		const name = box.querySelector('.dynasty-title-row input')!;
+		const box = pageFor(content, 'duke-of-valmont');
+		const name = box.querySelector('.dynasty-title-name textarea')!;
 		name.value = 'Prince of Valmont';
 		dispatch(name, 'input');
-		expect(box.querySelector('.dynasty-title-male input')!.getAttribute('aria-label')).toBe(TITLES_UI.maleAria('Prince of Valmont'));
+		expect(box.querySelector('.dynasty-title-male textarea')!.getAttribute('aria-label')).toBe(TITLES_UI.maleAria('Prince of Valmont'));
 	});
 
 	it('Save writes male-name in one write after the name and before female-name; one undo restores the text', async () => {
 		const { content, handle } = await openTitles(writingHandle(BODY_F));
-		const input = titleBox(content, 'duke-of-valmont').querySelector('.dynasty-title-male input')!;
+		const input = pageFor(content, 'duke-of-valmont').querySelector('.dynasty-title-male textarea')!;
 		input.value = 'Prince of Valmont';
 		dispatch(input, 'input');
 		await click(content.querySelector('.dynasty-sheet-save'));

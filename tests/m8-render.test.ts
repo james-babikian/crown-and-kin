@@ -23,12 +23,10 @@ beforeAll(() => {
 });
 
 const GEO = geometryFor(16, 'normal');
-const SIDE: LayoutSettings = { ...DEFAULT_LAYOUT_SETTINGS, orientation: 'sideways', sidewaysCards: 'normal' };
-const NARROW: LayoutSettings = { ...DEFAULT_LAYOUT_SETTINGS, orientation: 'sideways', sidewaysCards: 'narrow', narrowCardW: 140 };
+const SIDE: LayoutSettings = { ...DEFAULT_LAYOUT_SETTINGS, orientation: 'sideways' };
 const VIEWS = [
 	['down', DEFAULT_LAYOUT_SETTINGS],
 	['sideways', SIDE],
-	['sideways narrow', NARROW],
 ] as const;
 const measure = (text: string, font: string) => text.length * (Number(/(\d+(?:\.\d+)?)px/.exec(font)?.[1] ?? 16) * 0.55);
 const fonts = { text: 'serif', ui: 'sans', bold: '700' };
@@ -118,14 +116,13 @@ describe('D61: a card in tallTitles is one small text line taller, in every layo
 		}
 	});
 
-	it('card sizes at 16 px: plain 61, two-line name 77, two-line title 77, both 93; narrow cards the same heights (D117: 3.8 em cards, 16 px per name text line)', () => {
+	it('card sizes at 16 px: plain 61, two-line name 77, two-line title 77, both 93, in every view (D117: 3.8 em cards, 16 px per name text line)', () => {
 		const { g } = build('people:\n  - {id: a, name: A}\n  - {id: b, name: B}\n  - {id: c, name: C}\n  - {id: d, name: D}\n');
 		for (const [view, settings] of VIEWS) {
 			const { layout } = lay(g, { ...settings, tallCards: ['b', 'd'], tallTitles: ['c', 'd'] });
 			const h = (id: string) => layout.persons.get(id)!.h;
 			expect([h('a'), h('b'), h('c'), h('d')], view).toEqual([61, 77, 77, 93]);
 		}
-		expect(lay(g, NARROW).layout.geometry.cardW).toBe(140);
 	});
 
 	it('random trees, a third of the people with a tall title and a fifth with a tall name: no line problems, no overlaps', () => {
@@ -164,7 +161,7 @@ describe('D61: the cache key holds both tall sets', () => {
 		expect(key({ tallTitles: [a] })).not.toBe(key({ tallCards: [a] }));
 		expect(key({ tallTitles: [a], tallCards: [b] })).not.toBe(key({ tallTitles: [b], tallCards: [a] }));
 		expect(key({ tallTitles: [a], tallCards: [a] })).not.toBe(key({ tallCards: [a] }));
-		expect(layoutKey(g, GEO, { ...NARROW, tallTitles: [a] }, 'f')).not.toBe(layoutKey(g, GEO, NARROW, 'f'));
+		expect(layoutKey(g, GEO, { ...SIDE, tallTitles: [a] }, 'f')).not.toBe(layoutKey(g, GEO, SIDE, 'f'));
 	});
 
 	it('the cache keeps the layouts apart', () => {
@@ -369,8 +366,7 @@ unions:
 				const dates = texts(root, id, 'dynasty-card-dates');
 				if (dates.length) expect(Number(dates[0].getAttribute('y')), id).toBe(box.y + (want.length ? t.datesBaseline : t.titleBaseline));
 			}
-			// Narrow cards (D24) are too narrow for "Lord of the Keep" alone: it breaks inside the title.
-			expect(texts(root, 'aldric', 'dynasty-card-title').map((e) => e.text)).toEqual(view === 'sideways narrow' ? ['Lord of the', 'Keep (r. 1131–1160)'.slice(0, 14) + '…'] : ['Lord of the Keep', '(r. 1131–1160)']);
+			expect(texts(root, 'aldric', 'dynasty-card-title').map((e) => e.text)).toEqual(['Lord of the Keep', '(r. 1131–1160)']);
 			expect(texts(root, 'kit', 'dynasty-card-title').map((e) => e.text)).toEqual(['Count (r. 1175)']);
 			expect(texts(root, 'rod', 'dynasty-card-compact')[0].text).toBe('Roderick');
 			expect(texts(root, 'aldric', 'dynasty-card-compact')[0].text).toBe('Aldric II');
