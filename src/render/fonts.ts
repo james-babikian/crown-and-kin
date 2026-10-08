@@ -32,7 +32,7 @@ export function parsePx(value: string): number | null {
  * bold weight. Anything else (a theme or colour change) is left to CSS.
  */
 export function fontsChanged(a: FontState, b: FontState): boolean {
-	return geometryFor(a.px, 'normal').fontPx !== geometryFor(b.px, 'normal').fontPx || a.text !== b.text || a.ui !== b.ui || a.bold !== b.bold;
+	return geometryFor(a.px).fontPx !== geometryFor(b.px).fontPx || a.text !== b.text || a.ui !== b.ui || a.bold !== b.bold;
 }
 
 /** Family names in a CSS font-family list, without quotes, in lower case. */

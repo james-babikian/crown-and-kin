@@ -10,12 +10,11 @@ import { sampleSources } from './acceptance/m11-support';
 describe('childAttach', () => {
 	it('is 0.25 em for the Roundel and 0 for every other form', () => {
 		for (const f of [12, 16]) {
-			const normal = geometryFor(f, 'normal');
+			const normal = geometryFor(f);
 			expect(childAttach(cardForm(normal, 'down'))).toBeCloseTo(0.25 * f, 9);
 			expect(childAttach(cardForm(normal, 'down'))).toBeCloseTo(roundelAxis(normal) - normal.cardW / 2, 9);
 			expect(childAttach(normal)).toBe(0);
 			expect(childAttach(cardForm(normal, 'sideways'))).toBe(0);
-			expect(childAttach(cardForm(geometryFor(f, 'compact'), 'down'))).toBe(0);
 		}
 	});
 });
@@ -29,7 +28,7 @@ function straightDrops(f: number, roundel: boolean) {
 		if (!parsed.ok) continue;
 		const g = deriveFamilies(parsed.tree);
 		clearLayoutCache();
-		const geo = roundel ? cardForm(geometryFor(f, 'normal'), 'down') : geometryFor(f, 'normal');
+		const geo = roundel ? cardForm(geometryFor(f), 'down') : geometryFor(f);
 		const L = layoutTree(g, geo, { ...DEFAULT_LAYOUT_SETTINGS }, 'font').layout;
 		width += L.width;
 		const attach = roundel ? 0.25 * f : 0;
@@ -56,17 +55,14 @@ describe('children are attached by their axis (B.3.5)', () => {
 		});
 	}
 
-	it('the classic layout does not change: no attach, no reach', () => {
+	it('a plain geometry (no form) has no attach and no reach', () => {
 		const s = sampleSources().find((x) => x.id === '07')!;
 		const parsed = parseDynasty(s.source);
 		if (!parsed.ok) throw new Error('parse');
 		const g = deriveFamilies(parsed.tree);
 		clearLayoutCache();
-		const classic = layoutTree(g, geometryFor(12, 'normal'), { ...DEFAULT_LAYOUT_SETTINGS }, 'font').layout;
-		clearLayoutCache();
-		const compact = layoutTree(g, cardForm(geometryFor(12, 'compact'), 'down'), { ...DEFAULT_LAYOUT_SETTINGS }, 'font').layout;
+		const classic = layoutTree(g, geometryFor(12), { ...DEFAULT_LAYOUT_SETTINGS }, 'font').layout;
 		expect(Math.min(...[...classic.persons.values()].map((p) => p.y))).toBe(0);
-		expect(Math.min(...[...compact.persons.values()].map((p) => p.y))).toBe(0);
 		expect(classic.geometry.reach).toBeUndefined();
 	});
 });

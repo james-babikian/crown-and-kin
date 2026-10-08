@@ -24,7 +24,7 @@ import { graphOf, lowers, relationsModule, relationText, sample12, SPEC_4, type 
  *   child of Fenna, who married Gwen's father, but he shares Alan with Gwen, so no step-sibling.
  * - Tamsin (Gwen): a child of Fenna by Rolf, Fenna married Alan, and she shares no parent with Gwen:
  *   "Stepsister" (rule 3). For Leo she has no name: Fenna married his grandfather, not a parent.
- * - Mabel and Nia list only Kester, so they are full sisters; for Gwen X = Alan and the children of
+ * - Mabel and Nia list only Kester, so they are full sisters (setting off; half-sisters with it on); for Gwen X = Alan and the children of
  *   Alan where the paths leave are Gwen and Kester (half): "Half-niece"; Nia has no sex, so the
  *   neutral form carries "half" on the inner word: "Half-sibling’s child". For Leo X = Alan,
  *   c1 = Harold, c2 = Kester: "Half first cousin". Mabel married her father Kester, but she is a blood
@@ -294,9 +294,9 @@ unions:
 	.concat('  - partners: [aldous, agnes]\n  - partners: [maud, osric]\n  - partners: [elinor, piers]\n  - partners: [roderick, mira]\n');
 
 describe('the §13.1 examples', () => {
-	const cards = async (source: string, marked: string) => {
+	const cards = async (source: string, marked: string, options?: { oneParentUnknown: boolean }) => {
 		const { computeRelations } = await relationsModule();
-		const rels = computeRelations(graphOf(source), marked);
+		const rels = computeRelations(graphOf(source), marked, options);
 		return (id: string) => rels.get(id)?.[0]?.text;
 	};
 
@@ -330,10 +330,15 @@ describe('the §13.1 examples', () => {
 		expect(card('piers')).toBe('Brother-in-law');
 		// The husband of his father's sister.
 		expect(card('osric')).toBe('Uncle by marriage');
-		// A grandson of his grandfather's brother: a = b = 3.
-		expect(card('ivo')).toBe('Second cousin');
+		// A grandson of his grandfather's brother: a = b = 3. In this tree Aldous and Godric list only
+		// Edwin, so with the setting "Assume an unknown second parent" on (the default, D174) they are
+		// half-brothers; the spec's words hold with the setting off.
+		expect(card('ivo')).toBe('Half second cousin');
 		// His father's first cousin: a = 3, b = 2.
-		expect(card('hamo')).toBe('First cousin once removed');
+		expect(card('hamo')).toBe('Half first cousin once removed');
+		const off = await cards(SPEC_4_WIDER, 'roderick', { oneParentUnknown: false });
+		expect(off('ivo')).toBe('Second cousin');
+		expect(off('hamo')).toBe('First cousin once removed');
 		expect(card('mira')).toBe('Wife');
 		expect(card('hal')).toBe('Father-in-law');
 		// The first examples still hold in the wider tree.

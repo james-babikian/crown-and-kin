@@ -33,8 +33,7 @@ export function illegitimateSigns(g: FamilyGraph, edges: EdgeDrawing): Set<strin
 /**
  * A cheap superset of `illegitimateSigns`, from the graph alone (no lines needed): `illegitimate: true` and no birth-type placement parent,
  * or placement parents that are adoptive or ward. A person with birth parents always has the dashed illegitimate line, so is never in the real
- * set. `tallCardsFor` asks this before it asks for a second layout pass: the sign narrows the name room (and gives the marked Compact card
- * a second name slot, D129), so the signs of every illegitimate person matter, and most of them are not signed.
+ * set. `tallCardsFor` asks this before it asks for a second layout pass: the sign narrows the name room, so the signs of every illegitimate person matter, and most of them are not signed.
  */
 export function couldBeSigned(g: FamilyGraph, p: Person): boolean {
 	return !!p.illegitimate && g.placementType.get(p.id) !== 'birth';

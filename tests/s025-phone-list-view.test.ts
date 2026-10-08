@@ -235,19 +235,22 @@ describe('the start chain (D144)', () => {
 describe('the bar', () => {
 	it('Add person, Find, Expand; Back only after a move', async () => {
 		const { el } = await open(PLAIN);
-		expect(tools(el)).toEqual(['dynasty-add-person', 'dynasty-list-find', 'dynasty-expand']);
+		expect(tools(el)).toEqual(['dynasty-add-person', 'dynasty-show-text', 'dynasty-list-find', 'dynasty-expand']);
 		await tapName(el, 'roderick');
-		expect(tools(el)).toEqual(['dynasty-add-person', 'dynasty-list-find', 'dynasty-list-back', 'dynasty-expand']);
+		expect(tools(el)).toEqual(['dynasty-add-person', 'dynasty-show-text', 'dynasty-list-find', 'dynasty-list-back', 'dynasty-expand']);
 	});
 
-	it('Add person has a visible text; every button has a label', async () => {
+	it('the bar buttons show icons only (D182); every button has a label', async () => {
 		const { el } = await open(PLAIN);
 		const bar = el.querySelector('.dynasty-toolbar')!;
-		expect(bar.querySelector('.dynasty-add-person .dynasty-tool-text')?.getText()).toBe(PHONE_LIST_UI.addPerson);
+		expect(bar.querySelector('.dynasty-add-person .dynasty-tool-icon')).not.toBeNull();
+		expect(bar.querySelector('.dynasty-add-person .dynasty-tool-text')).toBeNull();
 		expect(bar.querySelector('.dynasty-add-person')!.getAttribute('aria-label')).toBe(PHONE_LIST_UI.addPersonLabel);
-		expect(bar.querySelector('.dynasty-list-find .dynasty-tool-text')?.getText()).toBe(PHONE_LIST_UI.find);
+		expect(bar.querySelector('.dynasty-list-find .dynasty-tool-icon')).not.toBeNull();
+		expect(bar.querySelector('.dynasty-list-find .dynasty-tool-text')).toBeNull();
 		expect(bar.querySelector('.dynasty-list-find')!.getAttribute('aria-label')).toBe(PHONE_LIST_UI.findLabel);
-		expect(bar.querySelector('.dynasty-expand .dynasty-tool-text')?.getText()).toBe(PHONE_LIST_UI.expand);
+		expect(bar.querySelector('.dynasty-expand .dynasty-tool-icon')).not.toBeNull();
+		expect(bar.querySelector('.dynasty-expand .dynasty-tool-text')).toBeNull();
 		expect(bar.querySelector('.dynasty-expand')!.getAttribute('aria-label')).toBe(PHONE_LIST_UI.expandLabel);
 	});
 
@@ -513,11 +516,11 @@ describe('the relation word on a row', () => {
 		expect(row(el, 'aldric').querySelector('.dynasty-list-years')).toBeNull();
 	});
 
-	it('a change of the card size, the direction or Reduce movement does not draw the list again', async () => {
+	it('a change of the direction, Reduce movement or the break list does not draw the list again', async () => {
 		const settings = { ...DEFAULT_SETTINGS };
 		const { el, view, host } = await open(PLAIN, { settings });
 		const before = (host as { renders?: number }).renders;
-		for (const patch of [{ cardSize: 'compact' }, { phoneDirection: 'down' }, { reduceMotion: 'on' }, { breakWords: 'Long-name' }] as Partial<DynastySettings>[]) {
+		for (const patch of [{ phoneDirection: 'down' }, { reduceMotion: 'on' }, { breakWords: 'Long-name' }] as Partial<DynastySettings>[]) {
 			const prev = { ...host.settings } as DynastySettings;
 			Object.assign(host.settings as DynastySettings, patch);
 			view.onSettingsChange(prev);
@@ -584,7 +587,7 @@ describe('the problem badge in the list bar', () => {
 
 	it('stands before Expand; a tap opens the problem list; a name in it opens the full-screen view on that person', async () => {
 		const { el } = await open(WARN);
-		expect(tools(el)).toEqual(['dynasty-add-person', 'dynasty-list-find', 'dynasty-warning-badge', 'dynasty-expand']);
+		expect(tools(el)).toEqual(['dynasty-add-person', 'dynasty-show-text', 'dynasty-list-find', 'dynasty-warning-badge', 'dynasty-expand']);
 		click(el.querySelector('.dynasty-warning-badge')!);
 		const problem = el.querySelector('.dynasty-problem-button');
 		expect(problem).not.toBeNull();

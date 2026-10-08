@@ -2,11 +2,17 @@ import { describe, expect, it } from 'vitest';
 import { deriveFamilies, drawnParents, type FamilyGraph } from '../src/core/derive';
 import { parseDynasty } from '../src/core/parse';
 import { computeRelations, findRelation, lineSubgraph, relationsKey } from '../src/core/relations';
-import type { RelationLine } from '../src/core/relations';
+import type { RelationLine, RelationOptions } from '../src/core/relations';
 import { geometryFor } from '../src/layout/geometry';
 import { layoutTree } from '../src/layout/index';
 
 const NEVER_FAR = { sweeps: 4, far: { maxCardWidths: Infinity, maxGenerations: Infinity } };
+
+// D174: the setting "Assume an unknown second parent". These tests were written for the rule of
+// the setting off (one listed parent counts as the whole list); each runs with OFF to keep its
+// meaning, and the oracle and the targeted cases also run with ON (spec §13.1 "Half").
+const OFF: RelationOptions = { oneParentUnknown: false };
+const ON: RelationOptions = { oneParentUnknown: true };
 
 // Adversarial review of M7 core (code-reviewer, scratch branch). An independent oracle of the
 // §13.1 blood rules on random birth-only trees, and targeted cases.
@@ -93,8 +99,11 @@ function oracleName(a: number, b: number, s: S, half: boolean): string {
 	return withHalf(w, half);
 }
 
-/** All blood names of p to m, by brute-force path enumeration (§13.1 steps 1–3, D50, doubles). */
-function oracle(parents: number[][], sex: S[], m: number, p: number): Set<string> {
+/**
+ * All blood names of p to m, by brute-force path enumeration (§13.1 steps 1–3, D50, doubles).
+ * `on`: the D174 setting; a child with fewer than two (birth) parents is incomplete, so never full.
+ */
+function oracle(parents: number[][], sex: S[], m: number, p: number, on = false): Set<string> {
 	const n = parents.length;
 	const children: number[][] = Array.from({ length: n }, () => []);
 	parents.forEach((ps, c) => ps.forEach((q) => children[q].push(c)));
@@ -163,7 +172,8 @@ function oracle(parents: number[][], sex: S[], m: number, p: number): Set<string
 			}
 			if (!ok) continue;
 			const set = (c: number) => [...new Set(parents[c])].sort((i, j) => i - j).join(',');
-			const half = set(c1) !== set(c2);
+			const incomplete = (c: number) => on && new Set(parents[c]).size < 2;
+			const half = set(c1) !== set(c2) || incomplete(c1) || incomplete(c2);
 			const couple = half ? `${x}` : set(c1);
 			const key = `${half ? 'H' : 'F'}:${couple}:${best[0]}:${best[1]}`;
 			if (!cands.has(key)) cands.set(key, { key, a: best[0], b: best[1], half, couple });
@@ -181,69 +191,74 @@ function oracle(parents: number[][], sex: S[], m: number, p: number): Set<string
 }
 
 describe('oracle: blood names on random birth-only trees', () => {
-	it('every name of every pair matches the §13.1 oracle (600 trees)', () => {
-		const bad: string[] = [];
-		for (let seed = 1; seed <= 600 && bad.length < 5; seed++) {
-			const size = 6 + (seed % 30);
-			const t = randomBirthTree(seed, size);
-			const g = graph(t.yaml);
-			const idx = new Map(g.people.map((p, i) => [p.id, i]));
-			const parents = t.parents.map((ps) => [...new Set(ps.map((q) => idx.get(q)!))]);
-			const sex = t.sex.map(sexOf);
-			for (let m = 0; m < size && bad.length < 5; m++) {
-				const rels = computeRelations(g, `p${m}`);
-				for (let p = 0; p < size; p++) {
-					if (p === m) continue;
-					// Implicit unions (co-parents) are partners; leave them out of the comparison.
-					const got = new Set((rels.get(`p${p}`) ?? []).filter((r) => r.kind === 'blood').map((r) => r.lower));
-					const want = oracle(parents, sex, m, p);
-					const same = got.size === want.size && [...got].every((w) => want.has(w));
-					if (!same) bad.push(`seed ${seed} me p${m} p${p}: got [${[...got].join('; ')}] want [${[...want].join('; ')}]`);
-				}
-			}
-		}
-		expect(bad).toEqual([]);
-	}, 120_000);
-
-	// Closed populations make the two first paths meet often, so these trees reach the exact search
-	// for a disjoint pair (both first paths change) hundreds of times, with and without a result.
-	it('every name of every pair matches the §13.1 oracle (40 small inbred populations)', () => {
-		const bad: string[] = [];
-		for (let seed = 1; seed <= 40 && bad.length < 5; seed++) {
-			const rand = rng(seed);
-			const [gens, width] = [6, 5];
-			const parents: number[][] = [];
-			const lines: string[] = [];
-			for (let gen = 0; gen < gens; gen++) {
-				for (let i = 0; i < width; i++) {
-					const ps: number[] = [];
-					if (gen > 0) {
-						const a = Math.floor(rand() * width);
-						let b = Math.floor(rand() * width);
-						if (b === a) b = (a + 1) % width;
-						ps.push((gen - 1) * width + a);
-						if (rand() < 0.85) ps.push((gen - 1) * width + b);
+	for (const [label, options] of [
+		['setting off', OFF],
+		['setting on', ON],
+	] as const) {
+		it(`every name of every pair matches the §13.1 oracle (600 trees, ${label})`, () => {
+			const bad: string[] = [];
+			for (let seed = 1; seed <= 600 && bad.length < 5; seed++) {
+				const size = 6 + (seed % 30);
+				const t = randomBirthTree(seed, size);
+				const g = graph(t.yaml);
+				const idx = new Map(g.people.map((p, i) => [p.id, i]));
+				const parents = t.parents.map((ps) => [...new Set(ps.map((q) => idx.get(q)!))]);
+				const sex = t.sex.map(sexOf);
+				for (let m = 0; m < size && bad.length < 5; m++) {
+					const rels = computeRelations(g, `p${m}`, options);
+					for (let p = 0; p < size; p++) {
+						if (p === m) continue;
+						// Implicit unions (co-parents) are partners; leave them out of the comparison.
+						const got = new Set((rels.get(`p${p}`) ?? []).filter((r) => r.kind === 'blood').map((r) => r.lower));
+						const want = oracle(parents, sex, m, p, options.oneParentUnknown);
+						const same = got.size === want.size && [...got].every((w) => want.has(w));
+						if (!same) bad.push(`seed ${seed} me p${m} p${p}: got [${[...got].join('; ')}] want [${[...want].join('; ')}]`);
 					}
-					parents.push(ps);
-					lines.push(`  - {id: p${gen * width + i}, name: P, sex: m${ps.length ? `, parents: [${ps.map((q) => `p${q}`).join(', ')}]` : ''}}`);
 				}
 			}
-			const g = graph(`people:\n${lines.join('\n')}\n`);
-			const n = gens * width;
-			const sex = parents.map(() => 0 as S);
-			for (let m = 0; m < n && bad.length < 5; m++) {
-				const rels = computeRelations(g, `p${m}`);
-				for (let p = 0; p < n; p++) {
-					if (p === m) continue;
-					const got = new Set((rels.get(`p${p}`) ?? []).filter((r) => r.kind === 'blood').map((r) => r.lower));
-					const want = oracle(parents, sex, m, p);
-					const same = got.size === want.size && [...got].every((w) => want.has(w));
-					if (!same) bad.push(`inbred seed ${seed} me p${m} p${p}: got [${[...got].join('; ')}] want [${[...want].join('; ')}]`);
+			expect(bad).toEqual([]);
+		}, 120_000);
+
+		// Closed populations make the two first paths meet often, so these trees reach the exact search
+		// for a disjoint pair (both first paths change) hundreds of times, with and without a result.
+		it(`every name of every pair matches the §13.1 oracle (40 small inbred populations, ${label})`, () => {
+			const bad: string[] = [];
+			for (let seed = 1; seed <= 40 && bad.length < 5; seed++) {
+				const rand = rng(seed);
+				const [gens, width] = [6, 5];
+				const parents: number[][] = [];
+				const lines: string[] = [];
+				for (let gen = 0; gen < gens; gen++) {
+					for (let i = 0; i < width; i++) {
+						const ps: number[] = [];
+						if (gen > 0) {
+							const a = Math.floor(rand() * width);
+							let b = Math.floor(rand() * width);
+							if (b === a) b = (a + 1) % width;
+							ps.push((gen - 1) * width + a);
+							if (rand() < 0.85) ps.push((gen - 1) * width + b);
+						}
+						parents.push(ps);
+						lines.push(`  - {id: p${gen * width + i}, name: P, sex: m${ps.length ? `, parents: [${ps.map((q) => `p${q}`).join(', ')}]` : ''}}`);
+					}
+				}
+				const g = graph(`people:\n${lines.join('\n')}\n`);
+				const n = gens * width;
+				const sex = parents.map(() => 0 as S);
+				for (let m = 0; m < n && bad.length < 5; m++) {
+					const rels = computeRelations(g, `p${m}`, options);
+					for (let p = 0; p < n; p++) {
+						if (p === m) continue;
+						const got = new Set((rels.get(`p${p}`) ?? []).filter((r) => r.kind === 'blood').map((r) => r.lower));
+						const want = oracle(parents, sex, m, p, options.oneParentUnknown);
+						const same = got.size === want.size && [...got].every((w) => want.has(w));
+						if (!same) bad.push(`inbred seed ${seed} me p${m} p${p}: got [${[...got].join('; ')}] want [${[...want].join('; ')}]`);
+					}
 				}
 			}
-		}
-		expect(bad).toEqual([]);
-	}, 120_000);
+			expect(bad).toEqual([]);
+		}, 120_000);
+	}
 });
 
 // ---------------------------------------------------------------------------------------------
@@ -341,7 +356,7 @@ describe('random trees with every link and union type', () => {
 					for (const rel of rels) {
 						const why = lineProblem(g, rel.line, me.id, id);
 						if (why) bad.push(`seed ${seed} me ${me.id} ${id} "${rel.lower}": ${why}`);
-						const { layout } = layoutTree(lineSubgraph(g, rel.line), geometryFor(16, 'normal'), NEVER_FAR, 'sans-serif');
+						const { layout } = layoutTree(lineSubgraph(g, rel.line), geometryFor(16), NEVER_FAR, 'sans-serif');
 						if (layout.persons.size !== new Set(rel.line.people).size) bad.push(`seed ${seed} me ${me.id} ${id} "${rel.lower}": small tree has ${layout.persons.size} cards`);
 					}
 				}
@@ -422,8 +437,17 @@ describe('D50 / ruling 5: PATH_CAP drops a candidate that has a disjoint pair of
 		const parents = lines.map((l) => l.split(' ').slice(1).map((q) => idx.get(q)!));
 		const want = oracle(parents, lines.map(() => 0 as S), idx.get('M')!, idx.get('P')!);
 		expect(want.has('third cousin 6 times removed')).toBe(true);
-		const got = (computeRelations(g, 'M').get('P') ?? []).map((r) => r.lower);
+		const got = (computeRelations(g, 'M', OFF).get('P') ?? []).map((r) => r.lower);
 		expect(got).toContain('third cousin 6 times removed');
+	});
+	it('setting on: c1 and c2 list only X, so the candidate is "half third cousin 6 times removed"; computeRelations must list it', () => {
+		const g = graph(birthTree(lines));
+		const idx = new Map(g.people.map((p, i) => [p.id, i]));
+		const parents = lines.map((l) => l.split(' ').slice(1).map((q) => idx.get(q)!));
+		const want = oracle(parents, lines.map(() => 0 as S), idx.get('M')!, idx.get('P')!, true);
+		expect(want.has('half third cousin 6 times removed')).toBe(true);
+		const got = (computeRelations(g, 'M', ON).get('P') ?? []).map((r) => r.lower);
+		expect(got).toContain('half third cousin 6 times removed');
 	});
 });
 
@@ -437,7 +461,7 @@ describe('the names must not depend on the order of siblings (D2 "move sibling" 
 				return `  - {id: ${id}, name: ${id}, sex: ${sex}${refs.length ? `, parents: [${refs.join(', ')}]` : ''}}`;
 			})
 			.join('\n')}\n`;
-	const lowers = (yaml: string, me: string, p: string) => (computeRelations(graph(yaml), me).get(p) ?? []).map((r) => r.lower);
+	const lowers = (yaml: string, me: string, p: string, options?: RelationOptions) => (computeRelations(graph(yaml), me, options).get(p) ?? []).map((r) => r.lower);
 
 	it('a birth cousin shows "First cousin once removed", not "Adoptive first cousin once removed", whichever sibling is listed first', () => {
 		// X adopted c2 and fathered c1 and c3. M is c1's son. P's parents are c2's son and c3's
@@ -446,8 +470,12 @@ describe('the names must not depend on the order of siblings (D2 "move sibling" 
 		const rest = ['M m c1', 'c2s m c2', 'c3d f c3', 'P m c2s c3d'];
 		const c2First = typed(['X m', 'c1 m X', 'c2 f X:adoptive', 'c3 m X', ...rest]);
 		const c3First = typed(['X m', 'c1 m X', 'c3 m X', 'c2 f X:adoptive', ...rest]);
-		expect(lowers(c3First, 'M', 'P')[0]).toBe('first cousin once removed');
-		expect(lowers(c2First, 'M', 'P')[0]).toBe('first cousin once removed');
+		expect(lowers(c3First, 'M', 'P', OFF)[0]).toBe('first cousin once removed');
+		expect(lowers(c2First, 'M', 'P', OFF)[0]).toBe('first cousin once removed');
+		// D174, setting on: c1 and c3 list only X, so the birth cousin is half; still not "adoptive", in either order.
+		expect(lowers(c3First, 'M', 'P', ON)[0]).toBe('half first cousin once removed');
+		expect(lowers(c2First, 'M', 'P', ON)[0]).toBe('half first cousin once removed');
+		expect(lowers(c2First, 'M', 'P', ON)).toEqual(lowers(c3First, 'M', 'P', ON));
 	});
 
 	it('a parent listed first by "placement: adoptive" does not make a birth cousin "adoptive"', () => {
@@ -457,7 +485,9 @@ describe('the names must not depend on the order of siblings (D2 "move sibling" 
 		const yaml =
 			typed(['X m', 'c1 m X', 'c2 m X', 'M m c1', 'A2 m c2', 'B2 m c2', 'P m K']) +
 			'  - {id: K, name: K, sex: m, parents: [A2, {id: B2, type: adoptive}], placement: adoptive}\n';
-		expect(lowers(yaml, 'M', 'P')[0]).toBe('first cousin twice removed');
+		expect(lowers(yaml, 'M', 'P', OFF)[0]).toBe('first cousin twice removed');
+		// D174, setting on: c1 and c2 list only X, so the cousin is half, still by birth links.
+		expect(lowers(yaml, 'M', 'P', ON)[0]).toBe('half first cousin twice removed');
 	});
 
 	it('a birth grandson adopted by his uncle ("placement: adoptive") is "Grandson", not "Adopted grandson"', () => {

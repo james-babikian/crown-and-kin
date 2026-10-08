@@ -25,7 +25,7 @@ function hits(): { tags: string[]; signs: string[]; cards: number } {
 		for (const view of ['down', 'sideways'] as const) {
 			const settings: LayoutSettings = { ...DEFAULT_LAYOUT_SETTINGS, ...(view === 'down' ? {} : { orientation: 'sideways' }) } as LayoutSettings;
 			clearLayoutCache();
-			const geo = geometryFor(16, 'normal');
+			const geo = geometryFor(16);
 			const { layout, edges } = layoutTree(g, geo, settings, 'font');
 			const r = BADGE_RADIUS_EM * 16 + 2;
 			for (const box of layout.persons.values()) {

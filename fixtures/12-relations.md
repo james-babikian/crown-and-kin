@@ -4,7 +4,7 @@ Every relation kind of spec §13.1 ("This is me" and relation names) and the rel
 
 - Double first cousins: the brothers Alan and Brand married the sisters Dana and Edith, so Gwen and Harold are double first cousins of Ivo.
 - Half relations: Kester (Alan and Fenna) is the half-brother of Gwen and Harold, the half-uncle of Leo; his daughters Mabel and Nia are Gwen's half-nieces and Leo's half first cousins.
-- Two children who each list only one shared parent: Jory and Kit list only Cora, Mabel and Nia list only Kester (full sisters).
+- Two children who each list only one shared parent: Jory and Kit list only Cora, Mabel and Nia list only Kester (full sisters if the setting "Assume an unknown second parent" is off; half-sisters if it is on, D174).
 - Parent types: Cora adopted Nell; Wat and Pim are wards of Alan, Cai is a ward of Leo; Harold is the rumoured father of Wynn.
 - Step relations: Fenna (Alan's second wife) is Gwen's stepmother; Tamsin (Fenna's daughter by Rolf) is Gwen's stepsister and Alan's stepdaughter; Pim is Alan's step-grandson.
 - Marriages: Ivo married his first cousin Kit (a betrothal first, then a marriage); Kester married his daughter Mabel; Orla married Kester, then Jory. Alan also had an affair with Yara; Nora and Zed have a child with no recorded partnership.

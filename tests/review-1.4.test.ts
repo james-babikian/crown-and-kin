@@ -26,7 +26,7 @@ describe('review 1.4: a font size read again never causes another render', () =>
 	});
 
 	it('the clamped sizes are the same layout, so they are no change either', () => {
-		expect(geometryFor(50, 'normal').fontPx).toBe(geometryFor(60, 'normal').fontPx);
+		expect(geometryFor(50).fontPx).toBe(geometryFor(60).fontPx);
 		expect(fontsChanged(state(50), state(60))).toBe(false);
 		expect(fontsChanged(state(6), state(7))).toBe(false);
 	});

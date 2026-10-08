@@ -38,6 +38,7 @@ import { normBody } from '../core/block-match';
 import type { Handle, HandleWriteOutcome, Written } from './block-handle';
 import type { ViewKind } from './block-state';
 import { describeDelete, familyOf, type FamilyView, type ParentLink, type PartnerLink } from '../core/family-query';
+import type { RelationOptions } from '../core/relations';
 import { openCropTool, startCropOf } from './crop-tool';
 import { addChild, addParent, addPartner, autoUnionNotice, unionOp, type FlowHost, type NewRelation } from './family-flows';
 import { ignoreGhostClick, phoneLayout } from './modal-layout';
@@ -316,6 +317,8 @@ interface SheetBase {
 	place?: ViewKind;
 	/** The plugin's picture store (M9 contract O3): the portrait picture and the picker's preview. */
 	pictures?: PictureStore;
+	/** D174: the sibling setting of the plugin, so the sheet names the relation as the cards do. Absent: the defaults. */
+	relationOptions?: RelationOptions;
 }
 
 /** A sheet for a person of the tree. */
@@ -1138,7 +1141,7 @@ export class EditSheet extends Modal {
 		const me = this.me();
 		if (me === null) return null;
 		const p = this.data.person;
-		const v: RelationView = relationInfo(relationsFor(this.data.g, me).all.get(p.id), p.id === me);
+		const v: RelationView = relationInfo(relationsFor(this.data.g, me, this.o.relationOptions).all.get(p.id), p.id === me);
 		const finder = this.o.finder;
 		if (v.kind !== 'me' && finder && !this.gone) {
 			v.addLineButton = (parent) => void this.button(parent, ME_UI.showLine, 'dynasty-show-line', () => this.leaveFor(() => finder.show(me, p.id)), ME_UI.showLineLabel(p.name || p.id));
@@ -1496,7 +1499,7 @@ export class EditSheet extends Modal {
 	}
 
 	private openNew(rel: NewRelation, name?: string): void {
-		const sheet = EditSheet.createNew(this.app, { handle: this.o.handle, sourcePath: this.o.sourcePath, beforeWrite: this.o.beforeWrite, openNote: this.o.openNote, newPerson: rel, initialName: name, parentSheet: this, place: this.o.place, pictures: this.o.pictures, folds: this.o.folds });
+		const sheet = EditSheet.createNew(this.app, { handle: this.o.handle, sourcePath: this.o.sourcePath, beforeWrite: this.o.beforeWrite, openNote: this.o.openNote, newPerson: rel, initialName: name, parentSheet: this, place: this.o.place, pictures: this.o.pictures, folds: this.o.folds, relationOptions: this.o.relationOptions });
 		sheet?.open();
 	}
 

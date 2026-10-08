@@ -17,6 +17,7 @@ vi.mock('@codemirror/view', () => ({ ViewPlugin: { fromClass: () => ({}) } }));
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { deriveFamilies } from '../src/core/derive';
+import type { RelationOptions } from '../src/core/relations';
 import { parseDynasty } from '../src/core/parse';
 import { EditSheet } from '../src/obsidian/edit-sheet';
 import { closePluginModals } from '../src/obsidian/plugin-modals';
@@ -186,9 +187,9 @@ describe('D122: the holder lists', () => {
 
 // ---------- the edit sheet ----------
 
-function open(body: string, personId: string) {
+function open(body: string, personId: string, relationOptions?: RelationOptions) {
 	const h = writingHandle(body);
-	const s = EditSheet.create({} as never, { handle: h as never, personId, sourcePath: 'n.md' })!;
+	const s = EditSheet.create({} as never, { handle: h as never, personId, sourcePath: 'n.md', ...(relationOptions ? { relationOptions } : {}) })!;
 	s.open();
 	const modal = (s as unknown as { modalEl: FEl }).modalEl;
 	return { h, s, modal };
@@ -316,15 +317,48 @@ describe.each(widths)('D123: the edit sheet shows what a rumoured link could cha
 		expect(at('dynasty-relinfo-maybe')).toBeGreaterThan(at(phone ? 'dynasty-relinfo-text' : 'dynasty-relinfo-value'));
 	});
 
-	it('a sister who would be a half-sister (two different rumoured fathers): the same paragraph, the other word', () => {
+	// D174 rule 3: Edda and Sibyl each list one birth parent and a rumoured parent, so both are incomplete: half-sisters, and two
+	// different rumoured fathers change nothing (before D174: "Sister" with a "maybe half" paragraph).
+	it('two different rumoured fathers (D174 rule 3): Half-sister and no paragraph', () => {
 		const { modal } = open(REL(['  - {id: sibyl, name: Sibyl, sex: f, parents: [mara, {id: quinn, type: rumoured}]}']), 'sibyl');
 		const box = relationBox(modal);
+		expect(relationText(box)).toBe(phone ? 'Relation to you: Half-sister.' : 'Half-sister');
+		expect(box.querySelector('.dynasty-relinfo-maybe')).toBeNull();
+	});
+
+	it('a sister who would be a half-sister (one rumoured third parent, D174 rule 4): the same paragraph, the other word', () => {
+		const body = ['options:', '  me: fenna', 'people:', '  - {id: mara, name: Mara, sex: f}', '  - {id: dov, name: Dov, sex: m}', '  - {id: yann, name: Yann, sex: m}', '  - {id: fenna, name: Fenna, sex: f, parents: [dov, mara]}', '  - {id: elin, name: Elin, sex: f, parents: [dov, mara, {id: yann, type: rumoured}]}', ''].join('\n');
+		const box = relationBox(open(body, 'elin').modal);
 		expect(relationText(box)).toBe(phone ? 'Relation to you: Sister.' : 'Sister');
 		expect(box.querySelector('.dynasty-relinfo-maybe')!.getText()).toBe(MAYBE_TEXT.sheet('half-sister'));
 	});
 
-	it('no rumour that matters: no paragraph', () => {
-		const { modal } = open(REL(['  - {id: alis, name: Alis, sex: f, parents: [mara]}']), 'alis');
+	// D174: Alis lists only Mara; Edda lists Mara and a rumoured Roland. Setting on: half, and "maybe full" with the cause 'unlisted' (the
+	// two sets with the rumour, {Mara} and {Mara, Roland}, differ). Off: half, with no paragraph (before D174: "Sister" with no paragraph).
+	it('one listed parent against a rumoured parent: on, the paragraph for a parent who is not listed; off, Half-sister and no paragraph', () => {
+		const body = REL(['  - {id: alis, name: Alis, sex: f, parents: [mara]}']);
+		const on = relationBox(open(body, 'alis').modal);
+		expect(relationText(on)).toBe(phone ? 'Relation to you: Half-sister.' : 'Half-sister');
+		expect(on.querySelector('.dynasty-relinfo-maybe')!.getText()).toBe(MAYBE_TEXT.sheetUnlisted('sister'));
+		closePluginModals();
+		const off = relationBox(open(body, 'alis', { oneParentUnknown: false }).modal);
+		expect(relationText(off)).toBe(phone ? 'Relation to you: Half-sister.' : 'Half-sister');
+		expect(off.querySelector('.dynasty-relinfo-maybe')).toBeNull();
+	});
+
+	it('D174: two people who list only Mara: on, the paragraph for a parent who is not listed; off, Sister and no paragraph', () => {
+		const body = ['options:', '  me: hild', 'people:', '  - {id: mara, name: Mara, sex: f}', '  - {id: hild, name: Hild, sex: f, parents: [mara]}', '  - {id: ines, name: Ines, sex: f, parents: [mara]}', ''].join('\n');
+		const on = relationBox(open(body, 'ines').modal);
+		expect(relationText(on)).toBe(phone ? 'Relation to you: Half-sister.' : 'Half-sister');
+		expect(on.querySelector('.dynasty-relinfo-maybe')!.getText()).toBe(MAYBE_TEXT.sheetUnlisted('sister'));
+		closePluginModals();
+		const off = relationBox(open(body, 'ines', { oneParentUnknown: false }).modal);
+		expect(relationText(off)).toBe(phone ? 'Relation to you: Sister.' : 'Sister');
+		expect(off.querySelector('.dynasty-relinfo-maybe')).toBeNull();
+	});
+
+	it('no rumour and both parents listed: no paragraph', () => {
+		const { modal } = open(REL(['  - {id: ari, name: Ari, sex: f}', '  - {id: bea, name: Bea, sex: f, parents: [mara, ari]}', '  - {id: cil, name: Cil, sex: f, parents: [mara, ari]}']), 'cil');
 		expect(relationBox(modal).querySelector('.dynasty-relinfo-maybe')).toBeNull();
 	});
 

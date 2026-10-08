@@ -19,9 +19,9 @@ function hash(s: string): string {
 }
 
 /** The whole picture of a tree (cards, dots, row gaps, size, lines) as one hash, with no cache and no folds. */
-function picture(src: string, settings: LayoutSettings, size: 'normal' | 'compact' = 'normal') {
+function picture(src: string, settings: LayoutSettings) {
 	const { g, gen, order } = build(src);
-	const layout = layoutFamilies(g, gen, order, { ...geometryFor(16, size) }, settings);
+	const layout = layoutFamilies(g, gen, order, { ...geometryFor(16) }, settings);
 	const edges = routeEdges(g, layout, order.anchors);
 	return { g, hash: hash(JSON.stringify([[...layout.persons], [...layout.unions], layout.rowGaps, layout.width, layout.height, edges])) };
 }
@@ -49,10 +49,11 @@ describe('speed 1: only the dots a sweep reads are placed', () => {
 describe('speed 2: the "?" search looks only near its curve', () => {
 	it('a 400-person tree with a rumoured link on every person: few distance tests, same pictures', () => {
 		for (const [settings, hashed] of [
-			[{ sweeps: 4, far: FAR }, '6f98b12'],
+			[{ sweeps: 4, far: FAR }, '5cae6622'],
 			// The speed fix alone gave 9b7d65c9 here (commit 8566006); the L2 fix then moved the exit of a few lines that touched a dot.
+			// 0.2.6 (D177 item 9, cross): both hashes were recorded again (random tree: crossings 164 to 154 down, 74 to 58 sideways).
 			// 0.2.5 (D140, WP-A1): both hashes were recorded again; the rows step keeps 2 moves of 207 tries and moves 14 people.
-			[{ sweeps: 4, far: FAR, orientation: 'sideways' as const }, 'c0d0197b'],
+			[{ sweeps: 4, far: FAR, orientation: 'sideways' as const }, '47946eea'],
 		] as const) {
 			rumourWork.distances = 0;
 			const { hash: h } = picture(rumourTree(400), settings);

@@ -40,16 +40,19 @@ describe('texts the plugin shows (the sure names are as in 0.2.3; the rumoured n
 	it('a: G, A, S', () => {
 		expect(names(a, 'G')).toEqual(['Half-brother', 'Rumoured brother']);
 		expect(names(a, 'A')).toEqual(['Half-brother']);
-		expect(names(a, 'S')).toEqual(['Sister', 'Rumoured sister']);
+		// D174: E and S both list only M and a rumoured parent, so both are incomplete: half, maybe full.
+		expect(names(a, 'S')).toEqual(['Half-sister', 'Rumoured sister']);
 	});
-	it('b: S', () => expect(names(b, 'S')).toEqual(['Sister']));
+	// D174: E has a rumoured parent and one birth parent, so E is incomplete: half (the maybe is "unlisted", no extra name).
+	it('b: S', () => expect(names(b, 'S')).toEqual(['Half-sister']));
 	it('c: S', () => expect(names(c, 'S')).toEqual(['Half-sister', 'Rumoured sister']));
 	it("c': no rumour, A is full, G is half", () => {
 		expect(names(c2, 'A')).toEqual(['Brother']);
 		expect(names(c2, 'G')).toEqual(['Half-brother']);
 		expect(names(c2, 'S')).toEqual(['Sister']);
 	});
-	it('d: S', () => expect(names(d, 'S')).toEqual(['Sister', 'Rumoured half-sister']));
+	// D174: both are incomplete (half), and two different rumoured fathers change nothing.
+	it('d: S', () => expect(names(d, 'S')).toEqual(['Half-sister']));
 });
 
 describe('S024 defects (failed before D123)', () => {
@@ -63,7 +66,7 @@ describe('S024 defects (failed before D123)', () => {
 	it('a: the rumoured line to G is never worded "half" when the rumour would make the pair full', () => {
 		expect(names(a, 'G')).not.toContain('Rumoured half-brother');
 	});
-	it('d: E (rumoured R) and S (rumoured Q) are half-sisters if both rumours are true; "Sister" alone hides this', () => {
-		expect(names(d, 'S').map((t) => t.toLowerCase())).toContain('rumoured half-sister');
+	it('d: E (rumoured R) and S (rumoured Q) are half-sisters, not "Sister" (D174: the sure name is half; the rumours change nothing)', () => {
+		expect(names(d, 'S')).toEqual(['Half-sister']);
 	});
 });

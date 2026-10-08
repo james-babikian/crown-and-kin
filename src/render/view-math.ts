@@ -544,3 +544,42 @@ export function livePictureSlots(slots: readonly { kind: 'arms' | 'portrait'; lo
 	near.sort((a, b) => a.d - b.d);
 	return near.slice(0, max).map((n) => n.i);
 }
+
+/** The tail that a cut card text with a maybe keeps (D176 5): the word is cut, the question mark stays. */
+export const MAYBE_CUT_TAIL = ' ?';
+
+/**
+ * Cuts a card relation text that has a maybe suffix (D176 5). If `word + suffix` fits, it is whole. If not, the relation word is cut
+ * and the text ends with "… ?", so a maybe never disappears. The word keeps its own "…" also when it fits alone, so the cut shows.
+ */
+export function truncateWithMaybe(word: string, suffix: string, maxW: number, measure: (s: string) => number): string {
+	if (!suffix) return truncate(word, maxW, measure);
+	const whole = word + suffix;
+	if (measure(whole) <= maxW) return whole;
+	const tail = '…' + MAYBE_CUT_TAIL;
+	const chars = Array.from(word);
+	let n = chars.length;
+	while (n > 0 && measure(chars.slice(0, n).join('').trimEnd() + tail) > maxW) n--;
+	// Not even one letter fits with the tail: fall back to the plain cut.
+	return n > 0 ? chars.slice(0, n).join('').trimEnd() + tail : truncate(whole, maxW, measure);
+}
+
+/**
+ * The path of the house bar of the marked card (D176 1): the left part of the inner shape of the thick border. The bar starts at the
+ * inner border edge, its outer corners follow the inner curve (radius `outerR` minus half the border) and its inner edge is square.
+ */
+export function markedBarPath(x: number, y: number, h: number, stripW: number, border: number, outerR: number): string {
+	const half = border / 2;
+	const x0 = x + half;
+	const y0 = y + half;
+	const y1 = y + h - half;
+	const xe = x + stripW;
+	const w = xe - x0;
+	const r = Math.max(0, Math.min(outerR - half, (y1 - y0) / 2));
+	if (r <= w) return `M${x0 + r} ${y0}H${xe}V${y1}H${x0 + r}A${r} ${r} 0 0 1 ${x0} ${y1 - r}V${y0 + r}A${r} ${r} 0 0 1 ${x0 + r} ${y0}Z`;
+	// A corner wider than the strip: the bar is cut off at its inner edge, so the arcs end there and still lie on the border's curve.
+	const dy = Math.sqrt(r * r - (r - w) * (r - w));
+	const yt = y0 + r - dy;
+	const yb = y1 - r + dy;
+	return `M${xe} ${yt}V${yb}A${r} ${r} 0 0 1 ${x0} ${y1 - r}V${y0 + r}A${r} ${r} 0 0 1 ${xe} ${yt}Z`;
+}

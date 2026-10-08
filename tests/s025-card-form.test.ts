@@ -4,8 +4,8 @@ import { ROUNDEL_EM, SIGN_LINE_CLEAR_PX, TAB_REACH_PAD_PX, cardForm, geometryFor
 // 0.2.5 (B.2): `cardForm` only sets `form`; it changes no number, so no old picture or cache key moves.
 
 describe('cardForm', () => {
-	it('down and Normal size gives the Roundel; nothing else changes', () => {
-		const geo = geometryFor(16, 'normal');
+	it('down gives the Roundel; nothing else changes', () => {
+		const geo = geometryFor(16);
 		const out = cardForm(geo, 'down');
 		expect(out).toEqual({ ...geo, form: 'roundel' });
 		expect(out.cardH).toBe(geo.cardH);
@@ -13,24 +13,24 @@ describe('cardForm', () => {
 		expect(out.reach).toBeUndefined();
 	});
 
-	it('sideways, in any card size, gives the text card', () => {
-		for (const size of ['normal', 'compact'] as const) expect(cardForm(geometryFor(16, size), 'sideways').form).toBe('text');
+	it('sideways gives the text card', () => {
+		expect(cardForm(geometryFor(16), 'sideways').form).toBe('text');
 	});
 
-	it('down and Compact size keeps the classic card: the same object, no form key', () => {
-		const geo = geometryFor(16, 'compact');
-		const out = cardForm(geo, 'down');
-		expect(out).toBe(geo);
-		expect('form' in out).toBe(false);
+	it('every direction has a form (0.2.6, D179: no card size keeps the classic card)', () => {
+		for (const f of [8, 12, 16, 48]) {
+			expect(cardForm(geometryFor(f), 'down').form).toBe('roundel');
+			expect(cardForm(geometryFor(f), 'sideways').form).toBe('text');
+		}
 	});
 
 	it('is idempotent', () => {
-		const once = cardForm(geometryFor(12, 'normal'), 'down');
+		const once = cardForm(geometryFor(12), 'down');
 		expect(cardForm(once, 'down')).toBe(once);
 	});
 
 	it('a geometry with no form is unchanged by the new optional fields (no key appears)', () => {
-		const geo = geometryFor(16, 'normal');
+		const geo = geometryFor(16);
 		expect(Object.keys(geo)).not.toContain('form');
 		expect(Object.keys(geo)).not.toContain('crown');
 		expect(Object.keys(geo)).not.toContain('reach');

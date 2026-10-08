@@ -4,42 +4,29 @@
  * and place cards; `render/dom/scene.ts` and `render/svg-string.ts` call `cardText` (with the
  * card's `PersonBox.tallName` and `tallTitle`) and `tagTop` to draw and measure the same card the
  * layout used, so every level of detail agrees on where the text sits (spec §5.4). `NORMAL_GEOMETRY` is used only by scripts and tests.
- * M9: the places of the arms and the portrait on a card (`armsPlace`, `portraitBox`) and the room
- * that they leave a text line (`roomAt`, `nameRoom`), shared by the same renderers. Owner decision
- * D78 made the arms and the portrait the same height: 1.25 line heights (1.5 em on normal cards).
- * 0.2.4 (D117): all card text is 0.85 em; both boxes sit at the lower right, the arms left of the
- * portrait, and a text line that their height reaches is narrower. No picture changes a card's
- * height, so pictures never move a card.
- * 0.2.5 (CONTRACT section B): a card has one of three forms, set by `cardForm` (`Geometry.form`). The classic card (no form) is the
- * 0.2.4 card: arms and portrait at the lower right, and it stays for card size Compact in a top-to-bottom tree. The Roundel
- * (`form: 'roundel'`, down and Normal size) has a round portrait on its top edge, its text centred on an axis, and a footer plate
- * for the relation word. The text card (`form: 'text'`, sideways) is the classic card with no pictures, plus the plate. The forms
- * are opt-in, so every old caller keeps its numbers. `withRelationLine` sets every height that depends on the tree (plate, crown,
+ * D78 made the arms and the portrait the same height: 1.25 line heights (1.5 em).
+ * 0.2.5 (CONTRACT section B): a card has one of two forms, set by `cardForm` (`Geometry.form`). The Roundel (`form: 'roundel'`, a tree
+ * from top to bottom) has a round portrait on its top edge, its text centred on an axis, and a footer plate for the relation word.
+ * The text card (`form: 'text'`, a sideways tree) has its text at the left, no pictures, and the same plate. 0.2.6 (D179): the card
+ * size setting and the classic card (arms and portrait at the lower right) are gone. A geometry with no form (tests, the layout) has
+ * the numbers and the text places of the text card. `withRelationLine` sets every height that depends on the tree (plate, crown,
  * reach); `cardText`, `nameRoom`, `roundelPics` and `youTabRect` place what the scene and the saved picture draw.
  */
-import type { CardSize, Geometry, GeometryFor, LayoutSettings, LowerRightBox, NameLineCount, NameRoom, Orientation, Rect } from './model';
+import type { Geometry, GeometryFor, LayoutSettings, NameLineCount, NameRoom, Orientation, Rect } from './model';
 
 /** Obsidian's default note font size; the card geometry (180×64 cards) was tuned at this size. */
 export const BASE_FONT_PX = 16;
 
 // Sizes in em of the note font (spec §5.8: geometry follows the font).
-interface Ems {
-	cardW: number;
-	cardH: number;
-	coupleGap: number;
-	nodeGap: number;
-	/** Line height of the card text, as a multiple of each line's font size. */
-	lineHeight: number;
-}
+// D117: all text is 0.85 em, so 3 lines at 1.2 line height take 3.06 em; 3.8 em keeps the padding of 0.2.3.
+const CARD_W_EM = 11.25;
+const CARD_H_EM = 3.8;
+const COUPLE_GAP_EM = 2.25;
+const NODE_GAP_EM = 1.25;
+/** Line height of the card text, as a multiple of each line's font size. */
+const LINE_HEIGHT = 1.2;
 
-const EMS: Record<CardSize, Ems> = {
-	// D117: all text is 0.85 em, so 3 lines at 1.2 line height take 3.06 em; 3.8 em keeps the padding of 0.2.3.
-	normal: { cardW: 11.25, cardH: 3.8, coupleGap: 2.25, nodeGap: 1.25, lineHeight: 1.2 },
-	// Narrower, tighter cards (spec §9 "Card size: compact"); still 3 lines at 1.1 line height (D126: 3.35 em).
-	compact: { cardW: 9, cardH: 3.35, coupleGap: 2, nodeGap: 1, lineHeight: 1.1 },
-};
-
-// The same for both card sizes: the gap between rows must hold union dots, far-couple tags
+// The gap between rows must hold union dots, far-couple tags
 // with the dot below them, and up to 4 sibling-bar lanes (spec §5.3), none of which shrink with
 // the card. An earlier, smaller value (5.625 em, 90 px) let the lowest lane meet a far couple's dot.
 const UNION_EM = 0.625;
@@ -122,27 +109,24 @@ function sanitize(fontPx: number): number {
 	return Number.isFinite(fontPx) && fontPx > 0 ? Math.min(Math.max(fontPx, 8), 48) : BASE_FONT_PX;
 }
 
-/** Builds the `down` geometry for a note font size and card size: see `GeometryFor`. */
-export const geometryFor: GeometryFor = (fontPx, cardSize) => {
+/** Builds the `down` geometry for a note font size: see `GeometryFor`. */
+export const geometryFor: GeometryFor = (fontPx) => {
 	const f = sanitize(fontPx);
-	const size: CardSize = cardSize === 'compact' ? 'compact' : 'normal';
-	const e = EMS[size];
 	const px = (em: number) => Math.round(em * f);
 	return {
 		fontPx: f,
-		cardSize: size,
-		cardW: px(e.cardW),
-		cardH: px(e.cardH),
+		cardW: px(CARD_W_EM),
+		cardH: px(CARD_H_EM),
 		unionSize: px(UNION_EM),
-		coupleGap: px(e.coupleGap),
-		nodeGap: px(e.nodeGap),
+		coupleGap: px(COUPLE_GAP_EM),
+		nodeGap: px(NODE_GAP_EM),
 		rowGap: px(ROW_GAP_EM),
 		tagH: px(TAG_EM),
 	};
 };
 
-/** The `normal`-size geometry at the default note font size, for tests and the spike. */
-export const NORMAL_GEOMETRY: Geometry = geometryFor(BASE_FONT_PX, 'normal');
+/** The geometry at the default note font size, for tests and the spike. */
+export const NORMAL_GEOMETRY: Geometry = geometryFor(BASE_FONT_PX);
 
 // D24 sideways spacing, in em of the note font (owner's answers to the preview).
 const SIDE_COLUMN_EM = 3.5;
@@ -185,7 +169,7 @@ export function sidewaysGeometry(geo: Geometry): Geometry {
 }
 
 /** D40: how much taller every card is when the tree has a mark: one small (0.85 em) text line, whole px. */
-export const relationExtra = (geo: Geometry) => Math.round(EMS[geo.cardSize].lineHeight * 0.85 * geo.fontPx);
+export const relationExtra = (geo: Geometry) => Math.round(LINE_HEIGHT * 0.85 * geo.fontPx);
 
 /** 0.2.5 (B.2): true for the Roundel, the top-to-bottom card with a medallion on its top edge (`cardForm`). */
 export const isRoundel = (geo: Geometry): boolean => geo.form === 'roundel';
@@ -219,13 +203,12 @@ export function drawnGeometry(geo: Geometry, settings: LayoutSettings): Geometry
 }
 
 /**
- * 0.2.5 (D143, D150): the card form for an orientation. Down and Normal size gives 'roundel'; sideways (any size) gives 'text';
- * down and Compact size stays the classic card (no `form`). It changes no number (no `cardH`, `crown` or `reach`) and is idempotent.
+ * 0.2.5 (D143, D150): the card form for an orientation. Down gives 'roundel'; sideways gives 'text' (D179: no card size is left).
+ * It changes no number (no `cardH`, `crown` or `reach`) and is idempotent.
  */
 export function cardForm(geo: Geometry, orientation: Orientation): Geometry {
-	const form = orientation === 'sideways' ? 'text' : geo.cardSize === 'normal' ? 'roundel' : undefined;
-	if (form === undefined || geo.form === form) return geo;
-	return { ...geo, form };
+	const form = orientation === 'sideways' ? 'text' : 'roundel';
+	return geo.form === form ? geo : { ...geo, form };
 }
 
 /** px: how far the plate's right end and bottom lie inside the card edge (an unmarked card; the marked card's word is "You" and is short). */
@@ -276,17 +259,10 @@ export function turnedGeometry(side: Geometry): Geometry {
  * three-line name twice this (`PersonBox.h`, `PersonBox.tallName`, `PersonBox.longName`);
  * `cardText(geo, 2)` and `cardText(geo, 3)` place its text. A card with a two-line title text line (D61) is `relationExtra` taller.
  */
-export const tallExtra = (geo: Geometry) => Math.round(EMS[geo.cardSize].lineHeight * 0.85 * geo.fontPx);
+export const tallExtra = (geo: Geometry) => Math.round(LINE_HEIGHT * 0.85 * geo.fontPx);
 
 /** The name text size in em of the note font (D117: one size for all card text). */
 const NAME_EM = 0.85;
-
-/**
- * D126 (3), D129: the name slots of a card. The marked person's Compact card that has the sign and a one-line name gets one text
- * line more (`marked`): its pushed-down sign, the ring and the boxes then stay clear at every note font.
- */
-export const nameSlots = (geo: Geometry, lines: NameLineCount, signed: boolean, marked = false): NameLineCount =>
-	signed && lines === 1 && marked && geo.cardSize === 'compact' ? 2 : lines;
 
 /** Where card text goes, so every renderer lays out the Full level of detail the same way. */
 export interface CardText {
@@ -360,146 +336,47 @@ export interface ShownLines {
  * that exist (`shown`; absent means a title and a dates line) in the body between the crown and the plate.
  */
 export function cardText(geo: Geometry, nameCount: boolean | NameLineCount = 1, tallTitle = false, shown?: ShownLines): CardText {
-	if (isRoundel(geo) || isTextCard(geo)) return formText(geo, nameCount === true ? 2 : nameCount === false ? 1 : nameCount, tallTitle, shown);
-	const f = geo.fontPx;
-	const lh = EMS[geo.cardSize].lineHeight;
-	const nameSize = NAME_EM * f;
-	const smallSize = 0.85 * f;
-	const nameLine = lh * nameSize;
-	const smallLine = lh * smallSize;
-	const names: NameLineCount = nameCount === true ? 2 : nameCount === false ? 1 : nameCount;
-	const tall = tallTitle;
-	const relation = geo.relationLine === true;
-	// D40: `cardH` already holds the relation text line, the third small line.
-	const smalls = (relation ? 3 : 2) + (tall ? 1 : 0);
-	const cardH = geo.cardH + (names - 1) * tallExtra(geo) + (tall ? relationExtra(geo) : 0);
-	const top = (cardH - names * nameLine - smalls * smallLine) / 2;
-	// Baseline of a line box: its middle plus about a third of the font size (Latin cap height ≈ 0.7 em).
-	const baseline = (lineTop: number, line: number, size: number) => lineTop + line / 2 + 0.35 * size;
-	const stripW = 0.5 * f;
-	const padX = 0.875 * f;
-	const textW = geo.cardW - padX - 0.5 * f;
-	// Centred on the name's capitals and level with the text's right edge. Big and thick enough to
-	// read as a bar at true size: two long dashes with one gap, not a row of dots (visual QA 3.4).
-	const signSize = 1.125 * f;
-	const signRight = geo.cardW - 0.5 * f;
-	// Level with the middle of the first name text line, as in 0.2.3 (the name is 0.85 em now, so the sign sits 1.6 px higher at 16 px).
-	const signTop = baseline(top, nameLine, nameSize) - 0.35 * nameSize - signSize / 2;
-	const signGap = 0.25 * f;
-	const signDash = (Math.SQRT2 * signSize - signGap) / 2;
-	const small = top + names * nameLine;
-	// D61: the title's second text line pushes every small line below it down by one.
-	const titles = tall ? 2 : 1;
+	return formText(geo, nameCount === true ? 2 : nameCount === false ? 1 : nameCount, tallTitle, shown);
+}
+
+/**
+ * 0.2.6 (D177 item 10, B7): the text of a card that has no relation word, in a tree whose cards have a relation line. The card keeps its
+ * height; the text block moves down by half of the empty strip (the plate), so it is centred in the whole card. A Roundel with a crown keeps its sign at the top edge. The text card: the sign moves with the name.
+ */
+export function centredWithoutWord(geo: Geometry, t: CardText): CardText {
+	if (geo.relationLine !== true) return t;
+	const dy = (t.r1?.plate?.h ?? 0) / 2;
+	if (dy === 0) return t;
+	const signDy = isRoundel(geo) && t.r1 && t.r1.crown > 0 ? 0 : dy;
 	return {
-		stripW,
-		padX,
-		textW,
-		nameSize,
-		smallSize,
-		nameBaseline: baseline(top, nameLine, nameSize),
-		...(names > 1 ? { name2Baseline: baseline(top + nameLine, nameLine, nameSize) } : {}),
-		...(names > 2 ? { name3Baseline: baseline(top + 2 * nameLine, nameLine, nameSize) } : {}),
-		titleBaseline: baseline(small, smallLine, smallSize),
-		...(tall ? { title2Baseline: baseline(small + smallLine, smallLine, smallSize) } : {}),
-		datesBaseline: baseline(small + titles * smallLine, smallLine, smallSize),
-		...(relation ? { relationBaseline: baseline(small + (titles + 1) * smallLine, smallLine, smallSize) } : {}),
-		sign: { x1: signRight, y1: signTop, x2: signRight - signSize, y2: signTop + signSize, width: 0.15625 * f, dash: [signDash, signGap] },
-		nameWithSignW: textW - signSize - 0.5 * f,
-		textBottom: small + smalls * smallLine,
+		...t,
+		nameBaseline: t.nameBaseline + dy,
+		...(t.name2Baseline !== undefined ? { name2Baseline: t.name2Baseline + dy } : {}),
+		...(t.name3Baseline !== undefined ? { name3Baseline: t.name3Baseline + dy } : {}),
+		titleBaseline: t.titleBaseline + dy,
+		...(t.title2Baseline !== undefined ? { title2Baseline: t.title2Baseline + dy } : {}),
+		datesBaseline: t.datesBaseline + dy,
+		textBottom: t.textBottom + dy,
+		sign: { ...t.sign, y1: t.sign.y1 + signDy, y2: t.sign.y2 + signDy },
 	};
 }
 
 /**
- * D40: the baseline of a card's relation text, from its top edge. Like the dates, it moves up one
- * small text line for each of the title and dates lines that the card does not show; on a card with
- * a two-line title text line (`title2Baseline`, D61) the title counts as two. Undefined when the
- * cards have no relation line (`Geometry.relationLine`).
+ * D40: the baseline of a card's relation text, from its top edge: the word sits on the plate whatever other lines the card has.
+ * Undefined when the cards have no relation line (`Geometry.relationLine`).
  */
-export function relationY(t: CardText, hasTitle: boolean, hasDates: boolean): number | undefined {
-	if (t.relationBaseline === undefined) return undefined;
-	// The word sits on the plate whatever other lines the card has.
-	if (t.r1) return t.relationBaseline;
-	const two = t.title2Baseline !== undefined;
-	const lines = two ? [t.titleBaseline, t.title2Baseline!, t.datesBaseline, t.relationBaseline] : [t.titleBaseline, t.datesBaseline, t.relationBaseline];
-	return lines[(hasTitle ? (two ? 2 : 1) : 0) + (hasDates ? 1 : 0)];
-}
-
+export const relationY = (t: CardText): number | undefined => t.relationBaseline;
 
 /**
- * M9 picture sizes (D78, which replaced the first contract values): arms and portrait are both
- * `sizeLines` line heights high; the arms box is `armsAspect` of that wide; `armsGap` (em) is
- * the gap between the arms box and the portrait (D117: they sit side by side at the lower right); the Compact arms box is
- * `compactArmsW` × `compactArmsH` em (C4); `portraitGap` (em) is the gap between a narrowed text line and the portrait.
+ * M9 picture sizes (D78): arms and portrait are both `sizeLines` line heights high; the arms box is `armsAspect` of that wide.
  */
-export const PICTURE_EM = { sizeLines: 1.25, armsAspect: 5 / 6, armsGap: 0.3, compactArmsW: 1.5, compactArmsH: 1.8, portraitGap: 0.25 } as const;
+export const PICTURE_EM = { sizeLines: 1.25, armsAspect: 5 / 6 } as const;
 
-/** G3: a text line is beside a box only when its line box overlaps the box's height by more than this, in px. */
-export const PORTRAIT_OVERLAP_PX = 0.5;
+/** D78: the height of the arms box and the portrait's diameter: 1.25 line heights (24 px at 16 px). */
+export const pictureSize = (geo: Geometry) => PICTURE_EM.sizeLines * LINE_HEIGHT * geo.fontPx;
 
-/** D78: the height of the arms box and the portrait's diameter: 1.25 line heights (24 px on normal cards at 16 px). */
-export const pictureSize = (geo: Geometry) => PICTURE_EM.sizeLines * EMS[geo.cardSize].lineHeight * geo.fontPx;
-
-/** The arms boxes of one card (D67, D78, G2, D117). */
-export interface ArmsPlace {
-	/** Full level, card-relative: at the lower right, left of the portrait when the card has one; the box's bottom is the portrait's bottom. */
-	full: Rect;
-	/** Compact level, card-relative: at the right of the card, centred on its height. */
-	compact: Rect;
-	/** Compact: how far the Compact D14 sign moves left (1.8 em, B7). */
-	compactShift: number;
-}
-
-/** D96: the clear space, in px, between the marked card's inner ring and the arms box, the portrait or the D14 sign. */
+/** D96: the clear space, in px, between the marked card's inner ring and the D14 sign. */
 export const MARK_CLEAR_PX = 1.5;
-
-/**
- * E4 (contract 4.2): the note font size from which a marked Normal card that has a D14 sign shows the arms and the portrait. The sign
- * is pushed down below the ring (`signBelowRing`) while the boxes stay at the bottom; below this size the two would come
- * within `MARK_CLEAR_PX` of each other, so such a card shows neither. The Compact card has no limit (D129): it is one text line higher.
- */
-export const MARKED_SIGNED_BOX_MIN_FONT = 11;
-
-/** False for a marked Normal card with the D14 sign at a note font below the limit (E4): it shows no arms box and no portrait. */
-export const boxesShown = (geo: Geometry, marked: boolean, signed: boolean): boolean => !(marked && signed && geo.cardSize === 'normal' && geo.fontPx < MARKED_SIGNED_BOX_MIN_FONT);
-
-/**
- * The bottom of the text block, from the card's top edge, less `lift`: where the portrait and the arms box end.
- * D96: on the marked card (`ring`, the ring's inner edge from the card's edge) it stays `MARK_CLEAR_PX` above the ring.
- */
-const boxBottom = (t: CardText, boxH: number, ring: number | undefined, lift: number) => (ring === undefined ? t.textBottom : Math.min(t.textBottom, boxH - ring - MARK_CLEAR_PX)) - lift;
-
-/**
- * The arms places of a card with text positions `t` and height `boxH` (D117). The Full box has the width 5/6 of
- * `pictureSize`, ends at the bottom of the portrait (`portrait`, from `portraitBox`) or, with none, at the bottom
- * of the text block, and its right edge is the portrait's left edge less `armsGap`, or the text's right edge. D96: for
- * the "This is me" card, `ring` is how far the inner edge of the ring lies inside the card's edge. `lift` (px, rule B) raises
- * the box. The arms no longer narrow the name or move the D14 sign.
- */
-export function armsPlace(geo: Geometry, t: CardText, boxH: number, ring?: number, portrait?: Rect, lift = 0): ArmsPlace {
-	const f = geo.fontPx;
-	const h = pictureSize(geo);
-	const w = PICTURE_EM.armsAspect * h;
-	const cw = PICTURE_EM.compactArmsW * f;
-	const ch = PICTURE_EM.compactArmsH * f;
-	const floor = ring === undefined ? -Infinity : ring + MARK_CLEAR_PX;
-	const right = portrait ? portrait.x - PICTURE_EM.armsGap * f : t.padX + t.textW;
-	const bottom = portrait ? portrait.y + portrait.h : boxBottom(t, boxH, ring, lift);
-	return {
-		full: { x: right - w, y: bottom - h, w, h },
-		compact: { x: geo.cardW - 0.5 * f - cw, y: Math.max(boxH / 2 - ch / 2, floor), w: cw, h: ch },
-		compactShift: cw + PICTURE_EM.armsGap * f,
-	};
-}
-
-/**
- * D76, D78: the portrait's square, card-relative: right edge at the text's right edge, bottom at the text block's bottom,
- * less `lift` (px, rule B). D96: for the "This is me" card, `mark` gives the card's height and the ring's inner edge; the
- * bottom then stays `MARK_CLEAR_PX` above the ring.
- */
-export function portraitBox(geo: Geometry, t: CardText, mark?: { boxH: number; ring: number }, lift = 0): Rect {
-	const d = pictureSize(geo);
-	return { x: t.padX + t.textW - d, y: boxBottom(t, mark ? mark.boxH : 0, mark?.ring, lift) - d, w: d, h: d };
-}
 
 /**
  * D96: the D14 sign of the "This is me" card, moved down if its top edge would come closer than `MARK_CLEAR_PX`
@@ -513,36 +390,15 @@ export function signBelowRing(sign: CardText['sign'], ring: number): CardText['s
 }
 
 /**
- * D117, D125: the width of a text line (name or small) with its baseline at `baseline` and font size `size`, card-relative from
- * `padX`. It is the text width, less what the lower-right boxes take from a line that their height reaches: a box narrows the
- * line when their heights overlap by more than `PORTRAIT_OVERLAP_PX`; the line then ends a gap before the box.
- */
-export function roomAt(geo: Geometry, t: CardText, baseline: number, size: number, boxes: readonly LowerRightBox[]): number {
-	const line = EMS[geo.cardSize].lineHeight * size;
-	const top = baseline - 0.35 * size - line / 2;
-	let right = t.padX + t.textW;
-	for (const b of boxes) if (Math.min(top + line, b.r.y + b.r.h) - Math.max(top, b.r.y) > PORTRAIT_OVERLAP_PX) right = Math.min(right, b.r.x - b.gap);
-	return right - t.padX;
-}
-
-/**
  * D125 a: the room of the name text lines of a card (see `NameRoom`). `full` is the text width, less the D14 sign's room when
- * the card `signed`. `last` is the room of the card's final name slot. The text block is centred, so the final line has the same
- * place whatever the number of lines, and `last` is the same for a card of one, two or three slots. `only` (a name that stays on one
- * line) equals `last`. `t` is the card's own text.
+ * the card `signed`. `last` is the room of the card's final name slot. `only` (a name that stays on one line) equals `last`. `t` is
+ * the card's own text; `ring` is the marked card's ring edge (the Roundel's room depends on it). No picture narrows a line (D179).
  */
-export function nameRoom(geo: Geometry, t: CardText, signed: boolean, boxes: readonly LowerRightBox[], ring?: number): NameRoom {
-	// 0.2.5: the Roundel and the text card have no boxes beside the text, so only the D14 sign narrows a line.
-	if (isTextCard(geo)) return signed ? { full: t.nameWithSignW, last: t.nameWithSignW, only: t.nameWithSignW } : { full: t.textW, last: t.textW, only: t.textW };
-	if (isRoundel(geo)) {
-		if (!signed) return { full: t.textW, last: t.textW, only: t.textW };
-		const last = lastLineClearsSign(geo, ring) ? t.textW : t.nameWithSignW;
-		return { full: t.nameWithSignW, last, only: t.nameWithSignW };
-	}
-	const full = signed ? t.nameWithSignW : t.textW;
-	const finalBaseline = t.name3Baseline ?? t.name2Baseline ?? t.nameBaseline;
-	const last = Math.min(full, roomAt(geo, t, finalBaseline, t.nameSize, boxes));
-	return { full, last, only: last };
+export function nameRoom(geo: Geometry, t: CardText, signed: boolean, ring?: number): NameRoom {
+	if (!isRoundel(geo)) return signed ? { full: t.nameWithSignW, last: t.nameWithSignW, only: t.nameWithSignW } : { full: t.textW, last: t.textW, only: t.textW };
+	if (!signed) return { full: t.textW, last: t.textW, only: t.textW };
+	const last = lastLineClearsSign(geo, ring) ? t.textW : t.nameWithSignW;
+	return { full: t.nameWithSignW, last, only: t.nameWithSignW };
 }
 
 /** The lowest point of the stroked D14 sign: its lower end, plus the corner of the flat end of the bar. */
@@ -565,70 +421,11 @@ function lastLineClearsSign(geo: Geometry, ring?: number): boolean {
 	if (answer === undefined) {
 		const two = cardText(geo, 2);
 		const sign = ring === undefined ? two.sign : signBelowRing(two.sign, ring);
-		const line2Top = two.name2Baseline! - 0.35 * two.nameSize - (EMS[geo.cardSize].lineHeight * two.nameSize) / 2;
+		const line2Top = two.name2Baseline! - 0.35 * two.nameSize - (LINE_HEIGHT * two.nameSize) / 2;
 		answer = line2Top - signBottomOf(sign) >= SIGN_LINE_CLEAR_PX;
 		byRing.set(key, answer);
 	}
 	return answer;
-}
-
-/** The height of one small (0.85 em) text line in px, not rounded: the lift of rule B (D126 4). */
-export const smallLineOf = (geo: Geometry) => EMS[geo.cardSize].lineHeight * 0.85 * geo.fontPx;
-
-/** The lower-right boxes of one card, with the gaps that `roomAt` needs (the arms box 0.3 em from the portrait, the portrait 0.25 em from the text). */
-export interface CardBoxes {
-	arms?: ArmsPlace;
-	portrait?: Rect;
-	boxes: LowerRightBox[];
-}
-
-/**
- * The portrait and the arms box of a Full card in one call, so the layout, the scene and the saved picture place them alike. `boxH` is the
- * card's height, `ring` the "This is me" ring's inner edge (D96), `lift` the rule B lift in px. A box that is not wanted is left out.
- */
-export function cardBoxes(geo: Geometry, t: CardText, boxH: number, o: { arms: boolean; portrait: boolean; ring?: number; lift?: number }): CardBoxes {
-	const f = geo.fontPx;
-	const lift = o.lift ?? 0;
-	const portrait = o.portrait ? portraitBox(geo, t, o.ring === undefined ? undefined : { boxH, ring: o.ring }, lift) : undefined;
-	const arms = o.arms ? armsPlace(geo, t, boxH, o.ring, portrait, lift) : undefined;
-	return {
-		...(arms ? { arms } : {}),
-		...(portrait ? { portrait } : {}),
-		boxes: [...(arms ? [{ r: arms.full, gap: PICTURE_EM.armsGap * f }] : []), ...(portrait ? [{ r: portrait, gap: PICTURE_EM.portraitGap * f }] : [])],
-	};
-}
-
-/** Radius of the focus-mode "+" badge in em; the same number as `BADGE_RADIUS_EM` in `render/dom/scene.ts` (a test pins it). */
-const BADGE_EM = 0.6;
-
-/** The distance from the stroked D14 sign (its bar, less half its width) to a rectangle, sampled along the bar. */
-function signGap(s: CardText['sign'], r: Rect): number {
-	const n = Math.max(1, Math.ceil(Math.hypot(s.x2 - s.x1, s.y2 - s.y1) / 0.1));
-	let best = Infinity;
-	for (let i = 0; i <= n; i++) {
-		const x = s.x1 + ((s.x2 - s.x1) * i) / n;
-		const y = s.y1 + ((s.y2 - s.y1) * i) / n;
-		best = Math.min(best, Math.hypot(Math.max(r.x - x, 0, x - (r.x + r.w)), Math.max(r.y - y, 0, y - (r.y + r.h))));
-	}
-	return best - s.width / 2;
-}
-
-/**
- * E4 (contract 4.2): true when the boxes keep `MARK_CLEAR_PX` from the D14 sign (when the card is `signed`; on the marked card the sign is
- * the one below the ring), from the disc of the "+" badge at the card's top right corner, and (marked card) from the ring's inner edge.
- * `tallCardsFor` asks it before it lifts the boxes (rule B): a lift that would fail it is not made.
- */
-export function boxesClear(geo: Geometry, t: CardText, boxes: readonly Rect[], o: { signed: boolean; ring?: number }): boolean {
-	const sign = o.ring === undefined ? t.sign : signBelowRing(t.sign, o.ring);
-	const r = BADGE_EM * geo.fontPx;
-	for (const b of boxes) {
-		if (o.signed && signGap(sign, b) < MARK_CLEAR_PX) return false;
-		const dx = Math.max(b.x - geo.cardW, 0, geo.cardW - (b.x + b.w));
-		const dy = Math.max(b.y, 0, -(b.y + b.h));
-		if (Math.hypot(dx, dy) - r < MARK_CLEAR_PX) return false;
-		if (o.ring !== undefined && b.y - o.ring < MARK_CLEAR_PX) return false;
-	}
-	return true;
 }
 
 /** D29, D81: the number of name text lines a card was made for (`tallName`, `longName`). */
@@ -652,7 +449,7 @@ export const childAttach = (geo: Geometry): number => (isRoundel(geo) ? roundelA
 function formText(geo: Geometry, names: NameLineCount, tall: boolean, shown?: ShownLines): CardText {
 	const f = geo.fontPx;
 	const roundel = isRoundel(geo);
-	const lh = EMS[geo.cardSize].lineHeight;
+	const lh = LINE_HEIGHT;
 	const nameSize = NAME_EM * f;
 	const smallSize = 0.85 * f;
 	const nameLine = lh * nameSize;
@@ -753,7 +550,7 @@ export function roundelLineEnd(geo: Geometry, o: { arms?: boolean; portrait?: bo
 
 /**
  * 0.2.5 (B.3.4): the small "You" tab of the marked person, card-relative. The Roundel puts it on the top edge left of the medallion
- * (`hasPictures`) or of the axis; the text card and the classic card put it above the text's left edge.
+ * (`hasPictures`) or of the axis; the text card puts it above the text's left edge.
  */
 export function youTabRect(geo: Geometry, hasPictures: boolean): Rect {
 	const f = geo.fontPx;

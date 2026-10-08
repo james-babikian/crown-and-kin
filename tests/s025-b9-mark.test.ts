@@ -67,12 +67,10 @@ interface Look {
 	over: Partial<LayoutSettings>;
 }
 const LOOKS: Look[] = [
-	{ name: 'Roundel, plate on', geo: cardForm(geometryFor(12, 'normal'), 'down'), over: { relationLine: true } },
-	{ name: 'Roundel, You tab', geo: cardForm(geometryFor(12, 'normal'), 'down'), over: { youTab: 'c' } },
-	{ name: 'text card, plate on', geo: cardForm(geometryFor(12, 'normal'), 'sideways'), over: { relationLine: true } },
-	{ name: 'text card, You tab', geo: cardForm(geometryFor(12, 'normal'), 'sideways'), over: { youTab: 'c' } },
-	{ name: 'Compact classic, You tab', geo: geometryFor(12, 'compact'), over: { youTab: 'c' } },
-	{ name: 'Compact classic, plate on', geo: geometryFor(12, 'compact'), over: { relationLine: true } },
+	{ name: 'Roundel, plate on', geo: cardForm(geometryFor(12), 'down'), over: { relationLine: true } },
+	{ name: 'Roundel, You tab', geo: cardForm(geometryFor(12), 'down'), over: { youTab: 'c' } },
+	{ name: 'text card, plate on', geo: cardForm(geometryFor(12), 'sideways'), over: { relationLine: true } },
+	{ name: 'text card, You tab', geo: cardForm(geometryFor(12), 'sideways'), over: { youTab: 'c' } },
 ];
 function svgOf(src: string, look: Look, o: { dark?: boolean; saved?: boolean; accent?: string; line?: boolean; me?: string } = {}): string {
 	const { g, labels } = parse(src);
@@ -166,7 +164,8 @@ describe('D153: no accent colour in the mark (saved picture)', () => {
 		const marked = svgOf(srcOf('#1e5a8b'), roundel);
 		const plain = svgOf(srcOf('#1e5a8b'), roundel, { me: 'zzz' });
 		expect(marked).toContain(`stroke="${DEFAULT_LIGHT.text}" stroke-width="${ME_LOOK.border}"`);
-		expect((marked.match(/<rect /g) ?? []).length).toBe((plain.match(/<rect /g) ?? []).length);
+		// D176 (1): the house bar of the marked card is a path (inside the border) in place of a rect.
+		expect((marked.match(/<rect /g) ?? []).length).toBe((plain.match(/<rect /g) ?? []).length - 1);
 	});
 
 	for (const dark of [false, true]) {

@@ -5,7 +5,7 @@ import { readFileSync } from 'node:fs';
 import { beforeAll, describe, expect, it } from 'vitest';
 import type { FamilyGraph } from '../src/core/derive';
 import type { CardLabel } from '../src/core/titles';
-import { cardForm, cardText, geometryFor, nameRoom, roundelAxis, roundelPics, youTabRect } from '../src/layout/geometry';
+import { cardForm, cardText, centredWithoutWord, geometryFor, nameRoom, roundelAxis, roundelPics, youTabRect } from '../src/layout/geometry';
 import { DEFAULT_LAYOUT_SETTINGS, clearLayoutCache, layoutTree, pictureSets } from '../src/layout/index';
 import type { Geometry, LaidOut, LayoutSettings } from '../src/layout/model';
 import { cardNameLines } from '../src/render/name-lines';
@@ -44,9 +44,8 @@ const SRC = [
 ].join('\n');
 const g: FamilyGraph = build(SRC).g;
 
-const ROUNDEL = cardForm(geometryFor(12, 'normal'), 'down');
-const TEXT = cardForm(geometryFor(12, 'normal'), 'sideways');
-const CLASSIC = geometryFor(12, 'compact');
+const ROUNDEL = cardForm(geometryFor(12), 'down');
+const TEXT = cardForm(geometryFor(12), 'sideways');
 
 function lay(geo: Geometry, over: Partial<LayoutSettings> = {}, graph: FamilyGraph = g): LaidOut {
 	clearLayoutCache();
@@ -146,15 +145,6 @@ describe('the "You" tab (B.3.4): one condition, the id in `TreeLayout.youTab`', 
 		const { root } = scene(laid, { me: 'c' });
 		const [group] = withClass(card(root, 'c'), 'dynasty-r1-tab-group');
 		expect(group.parentElement!.hasClass('dynasty-card-full')).toBe(true);
-	});
-
-	it('the classic card (Compact size) gets the tab at the text left, 0.9 em above the card', () => {
-		const laid = lay(CLASSIC, { youTab: 'c' });
-		const { root } = scene(laid, { me: 'c' });
-		const box = laid.layout.persons.get('c')!;
-		const [tab] = withClass(root, 'dynasty-r1-tab');
-		expect([num(tab, 'x'), num(tab, 'y')]).toEqual([box.x + 0.875 * 12, box.y - 0.9 * 12]);
-		expect(withClass(card(root, 'c'), 'dynasty-r1-plate')).toHaveLength(0);
 	});
 });
 
@@ -256,10 +246,9 @@ describe('the crown tap area (B.3.6)', () => {
 		}
 	});
 
-	it('a Roundel card with no picture and no tab has none; the classic card has none', () => {
+	it('a Roundel card with no picture and no tab has none', () => {
 		const { root } = scene(lay(ROUNDEL, { youTab: 'c' }), { lazyCards: true });
 		expect(withClass(card(root, 'd'), 'dynasty-card-crown-hit')).toHaveLength(0);
-		expect(withClass(scene(lay(CLASSIC)).root, 'dynasty-card-crown-hit')).toHaveLength(0);
 	});
 
 	it('it never sits in the Full group, so a lazy card has it before its content is filled', () => {
@@ -313,12 +302,13 @@ describe('the text is centred on the axis (B.3.2) and the lines that exist are c
 		expect(num(dName, 'y')).toBeCloseTo(dBox.y + cardText(geo, 1, false, { title: false, dates: false }).nameBaseline, 9);
 		const aBox = laid.layout.persons.get('a')!;
 		const [aName] = withClass(card(root, 'a'), 'dynasty-card-name');
-		expect(num(aName, 'y')).toBeCloseTo(aBox.y + cardText(geo, 1, false, { title: true, dates: true }).nameBaseline, 9);
+		// `a` has no relation word, so its text is centred in the whole card (D177 item 10).
+		expect(num(aName, 'y')).toBeCloseTo(aBox.y + centredWithoutWord(geo, cardText(geo, 1, false, { title: true, dates: true })).nameBaseline, 9);
 		// The title and dates lines of `a` sit one small line apart.
 		const [title] = withClass(card(root, 'a'), 'dynasty-card-title');
 		const [dates] = withClass(card(root, 'a'), 'dynasty-card-dates');
-		expect(num(title, 'y')).toBeCloseTo(aBox.y + cardText(geo, 1, false, { title: true, dates: true }).titleBaseline, 9);
-		expect(num(dates, 'y')).toBeCloseTo(aBox.y + cardText(geo, 1, false, { title: true, dates: true }).datesBaseline, 9);
+		expect(num(title, 'y')).toBeCloseTo(aBox.y + centredWithoutWord(geo, cardText(geo, 1, false, { title: true, dates: true })).titleBaseline, 9);
+		expect(num(dates, 'y')).toBeCloseTo(aBox.y + centredWithoutWord(geo, cardText(geo, 1, false, { title: true, dates: true })).datesBaseline, 9);
 	});
 
 	it('the text card keeps its text at the left (padX) and has no centring class', () => {
@@ -348,7 +338,7 @@ describe('the name breaks in the room of `nameRoom` (B.3.2)', () => {
 		const geo = lay(ROUNDEL, { relationLine: true }).layout.geometry;
 		const t2 = cardText(geo, 2);
 		const nm = (s: string, sob?: boolean) => measure(s, `${sob ? 400 : 700} ${t2.nameSize}px serif`);
-		const lines = (n: string, ring?: number) => cardNameLines(n, undefined, nameRoom(geo, t2, true, [], ring), nm, 3).length;
+		const lines = (n: string, ring?: number) => cardNameLines(n, undefined, nameRoom(geo, t2, true, ring), nm, 3).length;
 		// Since D153 the mark is one 3 px border, so its inner edge is 1.5 px in and the D14 sign stays clear of it: the marked card has the
 		// room of the other cards. The test pins that both read the same room (and would show a difference if the border grew again).
 		let name = 'Aaaaaaaaaaaa Bbbbbbbbbbbbbbbbb Ccccccccccc';
@@ -366,27 +356,35 @@ people:
   - {id: p, name: "${name}", illegitimate: true}
   - {id: m, name: "${name}", illegitimate: true}
 `).g;
-		const out = tallCardsFor(people, geo, FONTS, measure, new Set(['p', 'm']), undefined, undefined, undefined, { marked: 'm' })!;
-		expect(out.slots.get('p') ?? 1).toBe(wide);
-		expect(out.slots.get('m') ?? 1).toBe(narrow);
+		const out = tallCardsFor(people, geo, FONTS, measure, new Set(['p', 'm']), undefined, undefined, { marked: 'm' })!;
+		const slotsOf = (id: string) => (out.long.includes(id) ? 3 : out.tall.includes(id) ? 2 : 1);
+		expect(slotsOf('p')).toBe(wide);
+		expect(slotsOf('m')).toBe(narrow);
 	});
 
-	it('pictures never narrow a Roundel name, and rule B never lifts: the same slots with and without pictures', () => {
+	it('pictures never narrow a Roundel name: the same slots with and without pictures', () => {
 		const geo = lay(ROUNDEL, { relationLine: true }).layout.geometry;
 		const name = 'Aaaaaaaaaaaa Bbbbbbbbbbbbbbbbb Ccccccccccc';
-		const people = build(`houses:\n  - {id: v, name: V, color: "#8b1e3f", arms: "[[v.png]]"}\npeople:\n  - {id: p, name: "${name}", house: v, portrait: "[[p.png]]"}\n  - {id: q, name: "${name}"}\n`).g;
-		const out = tallCardsFor(people, geo, FONTS, measure, undefined, undefined, new Set(['p']), undefined, { portraits: new Set(['p']), relations: new Map([['p', { text: 'A long relation word here' }]]) })!;
-		expect(out.slots.get('p')).toBe(out.slots.get('q'));
-		expect(out.lifted.size).toBe(0);
+		const people = build(`houses:
+  - {id: v, name: V, color: "#8b1e3f", arms: "[[v.png]]"}
+people:
+  - {id: p, name: "${name}", house: v, portrait: "[[p.png]]"}
+  - {id: q, name: "${name}"}
+`).g;
+		const out = tallCardsFor(people, geo, FONTS, measure)!;
+		expect(out.tall.includes('p')).toBe(out.tall.includes('q'));
+		expect(out.long.includes('p')).toBe(out.long.includes('q'));
 	});
 
-	it('the text card gives the marked, signed card no second slot (no picture boxes, so D129 does not apply)', () => {
-		const people = build('options:\n  me: p\npeople:\n  - {id: q, name: Quentin}\n  - {id: p, name: Pip, illegitimate: true}\n').g;
-		const text = tallCardsFor(people, cardForm(geometryFor(12, 'compact'), 'sideways'), FONTS, measure, new Set(['p']), undefined, undefined, undefined, { marked: 'p' })!;
-		expect(text.slots.get('p')).toBeUndefined();
-		// The classic Compact card keeps its second slot (D129).
-		const classic = tallCardsFor(people, geometryFor(12, 'compact'), FONTS, measure, new Set(['p']), undefined, undefined, undefined, { marked: 'p' })!;
-		expect(classic.slots.get('p')).toBe(2);
+	it('the text card gives the marked, signed card no second slot (no picture boxes)', () => {
+		const people = build(`options:
+  me: p
+people:
+  - {id: q, name: Quentin}
+  - {id: p, name: Pip, illegitimate: true}
+`).g;
+		const text = tallCardsFor(people, cardForm(geometryFor(12), 'sideways'), FONTS, measure, new Set(['p']), undefined, undefined, { marked: 'p' })!;
+		expect(text.tall).not.toContain('p');
 	});
 });
 
@@ -453,7 +451,7 @@ describe('the sideways text card (B.3.10)', () => {
 		expect(laid.layout.persons.get('d')!.h).toBe(46);
 	});
 
-	it('its Compact level is the classic one: the name at the left, centred on the card height', () => {
+	it('its Compact level has the name at the left, centred on the card height', () => {
 		const laid = lay(TEXT, { relationLine: true });
 		const { root } = scene(laid, {});
 		const box = laid.layout.persons.get('a')!;
@@ -478,14 +476,5 @@ describe('refit (S4)', () => {
 		const before = serial(root);
 		s.refit();
 		expect(serial(root)).toBe(before);
-	});
-});
-
-describe('the classic card is unchanged', () => {
-	it('with no `form` and no `youTab` a card has no r1 class, no plate, no tab, no halo, no crown tap area', () => {
-		const { root } = scene(lay(CLASSIC), { relations: RELATIONS, me: 'c' });
-		for (const e of all(root)) {
-			expect([...e.classes].filter((c) => /^dynasty-(r1|card-r1|card-tc|card-crown)/.test(c)), e.tag).toEqual([]);
-		}
 	});
 });

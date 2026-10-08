@@ -42,7 +42,7 @@ function graph(source: string): FamilyGraph {
 
 function lay(g: FamilyGraph, font = 16): LaidOut {
 	clearLayoutCache();
-	return layoutTree(g, geometryFor(font, 'normal'), FAR, 'test');
+	return layoutTree(g, geometryFor(font), FAR, 'test');
 }
 
 const TYPES: [string, string | undefined, UnionShape][] = [

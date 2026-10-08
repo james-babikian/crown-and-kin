@@ -18,7 +18,7 @@
  */
 import type { FamilyGraph } from '../core/derive';
 import type { CardLabel } from '../core/titles';
-import { ROUNDEL_EM, boxesShown, cardBoxes, cardText, isRoundel, isTextCard, nameCountOf, nameRoom, relationY, roomAt, roundelPics, signBelowRing, smallLineOf, tagTop, youTabRect, type CardBoxes, type CardText, type ShownLines } from '../layout/geometry';
+import { ROUNDEL_EM, centredWithoutWord, cardText, isRoundel, nameCountOf, nameRoom, relationY, roundelPics, signBelowRing, tagTop, youTabRect, type CardText, type ShownLines } from '../layout/geometry';
 import { farTagSigns } from '../layout/far-tag-sign';
 import { illegitimateSigns } from '../layout/illegitimate-sign';
 import { FOLD_EM } from '../layout/fold-spots';
@@ -31,8 +31,8 @@ import type { BreakList } from './break-words';
 import { cardNameLines, titleLines, type NameMeasure, type NameRun } from './name-lines';
 import { fixedColour, fontOf, savedFrame, xmlText, type PictureMap, type SavedFrame, type SavedParts } from './saved-picture';
 import { DEAD_STRIP_OPACITY, DEFAULT_DARK, DEFAULT_LIGHT, FADED_OPACITY, ME_LOOK, ME_RING_INNER, ON_LINE_EXTRA, ROUNDEL_LOOK, STROKES, TAG_MARK, UNION_MARKS, stripColour, tagMarkSlot, unionMark, unionShape, type Palette, type UnionShape } from './styles';
-import { LEGEND_LABELS, SIGN_LEGEND_LABEL, dateLine, farTagName } from './tree-info';
-import { truncate } from './view-math';
+import { LEGEND_LABELS, SIGN_LEGEND_LABEL, dateLine, farTagName, splitMaybe } from './tree-info';
+import { markedBarPath, truncate, truncateWithMaybe } from './view-math';
 
 /** The fade of a part beside the finder's line, as an SVG attribute (D47). */
 const fadeAttr = (s: LineState) => (s === 'faded' ? ` opacity="${FADED_OPACITY}"` : '');
@@ -110,8 +110,6 @@ export interface SvgOptions {
 	folds?: SvgFolds;
 	/** D118: the user's break places for long names, as `SceneOptions.breaks`. */
 	breaks?: BreakList;
-	/** Rule B (D126 4): the people whose arms box and portrait are one small text line higher, as `SceneOptions.lifted`. */
-	lifted?: ReadonlySet<string>;
 }
 
 /** D40: the font of the relation text, as `relationFont` in `dom/scene.ts`: italic, "You" bold italic (D117). */
@@ -173,15 +171,18 @@ export function renderSvg(g: FamilyGraph, layout: TreeLayout, edges: EdgeDrawing
 	// D29, D61: text positions of the tall cards, one per kind of tall card.
 	const tallTexts = new Map<string, CardText>();
 	// The Roundel and the text card centre the lines that exist, so their text also depends on `shown`; the key is the scene's.
-	const textOf = (count: NameLineCount, tallTitle?: true, shown?: ShownLines): CardText => {
-		if (count === 1 && !tallTitle && !shown) return base;
-		const key = `${count}${tallTitle ? 1 : 0}${shown ? `${shown.title ? 1 : 0}${shown.dates ? 1 : 0}` : ''}`;
+	const textOf = (count: NameLineCount, tallTitle?: true, shown?: ShownLines, wordless = false): CardText => {
+		if (count === 1 && !tallTitle && !shown && !wordless) return base;
+		const key = `${count}${tallTitle ? 1 : 0}${shown ? `${shown.title ? 1 : 0}${shown.dates ? 1 : 0}` : ''}${wordless ? 'w' : ''}`;
 		let t = tallTexts.get(key);
-		if (!t) tallTexts.set(key, (t = cardText(geo, count, tallTitle, shown)));
+		if (!t) {
+			t = cardText(geo, count, tallTitle, shown);
+			if (wordless) t = centredWithoutWord(geo, t);
+			tallTexts.set(key, t);
+		}
 		return t;
 	};
 	const roundel = isRoundel(geo);
-	const formed = roundel || isTextCard(geo);
 	const signed = illegitimateSigns(g, edges);
 	const nameWeight = opts.fonts ? fonts.bold : '600';
 	let clips = 0;
@@ -199,38 +200,35 @@ export function renderSvg(g: FamilyGraph, layout: TreeLayout, edges: EdgeDrawing
 		const titleText = cl ? cl.title : p.title;
 		const reign = cl && opts.showDates !== false ? cl.reign : undefined;
 		// B.3.2: the scene passes the same lines, and the dates line counts even when "Show dates on cards" is off (the scene hides it by a class and keeps its room).
-		const shown: ShownLines | undefined = formed ? { title: !!(titleText || reign), dates: !!dateLine(p) } : undefined;
-		const t = textOf(count, box.tallTitle, shown);
+		const shown: ShownLines = { title: !!(titleText || reign), dates: !!dateLine(p) };
+		// D177 (10): a card with no relation word, in a tree with relation words, centres its text in the whole card.
+		const t = textOf(count, box.tallTitle, shown, geo.relationLine === true && !!opts.relations && !opts.relations.get(p.id)?.text);
 		const tx = box.x + (t.anchorX ?? t.padX);
 		// The Roundel centres every text line on its axis.
 		const anchor = t.middle ? ' text-anchor="middle"' : '';
-		// D117: the arms box and the portrait sit at the lower right, the arms left of the portrait; the name and the D14 sign do not give way to them.
 		const isMe = opts.me !== undefined && p.id === opts.me;
-		// D96: on the marked card the pictures and the sign keep clear of the mark's inner ring.
+		// D96: on the marked card the sign keeps clear of the mark's inner ring.
 		const ring = isMe ? ME_RING_INNER : undefined;
-		// E4: a marked Normal card with the D14 sign shows no arms and no portrait below 11 px.
-		const showBoxes = boxesShown(geo, isMe, signed.has(p.id));
 		const hasArms = !!(box.arms && house);
-		// The Roundel and the text card have no boxes at the lower right: the Roundel's pictures stand on its top edge (`rp`), the text card has none.
-		const cb: CardBoxes = formed ? { boxes: [] } : cardBoxes(geo, t, box.h, { arms: showBoxes && hasArms, portrait: showBoxes && !!box.portrait, ...(ring === undefined ? {} : { ring }), lift: opts.lifted?.has(p.id) ? smallLineOf(geo) : 0 });
+		// The Roundel's pictures stand on its top edge (`rp`); the text card has none.
 		const rp = roundel ? roundelPics(geo, { arms: hasArms, portrait: !!box.portrait }) : undefined;
 		const tab = layout.youTab === p.id ? youTabRect(geo, !!(rp?.portrait || rp?.arms)) : undefined;
-		const portrait = cb.portrait;
-		const place = cb.arms;
-		const widthAt = (baseline: number) => roomAt(geo, t, baseline, t.smallSize, cb.boxes);
 		const nameFont = fontOf(fonts.bold, t.nameSize, fonts.text);
 		const sobFont = fontOf('400', t.nameSize, fonts.text);
 		const smallFont = fontOf('400', t.smallSize, fonts.text);
 		const cutSmall = (text: string, px: number) => (measured ? cutWith(text, px, smallFont) : fit(text, px, t.smallSize));
 		// D122: the sobriquet follows the name, in regular weight.
 		const nameMeasure: NameMeasure = measured ? (s, sob) => measured(s, sob ? sobFont : nameFont) : (s, sob) => textWidth(s, t.nameSize, !sob);
-		const names = cardNameLines(shownName, cl?.sobriquet ?? p.sobriquet, nameRoom(geo, t, signed.has(p.id), cb.boxes, ring), nameMeasure, count, opts.breaks);
+		const names = cardNameLines(shownName, cl?.sobriquet ?? p.sobriquet, nameRoom(geo, t, signed.has(p.id), ring), nameMeasure, count, opts.breaks);
 		out.push(`<g${di(`card:${p.id}`)}${fadeAttr(look.card(p.id))}>`);
 		// D41, D153: the marked card has one thicker border in the text colour; no theme accent colour is used.
 		const border = isMe ? `stroke="${c.text}" stroke-width="${ME_LOOK.border}"` : `stroke="${c.cardBorder}"`;
 		out.push(`<rect x="${box.x}" y="${box.y}" width="${box.w}" height="${box.h}" rx="6" fill="${c.cardFill}" ${border}/>`);
-		out.push(`<rect x="${box.x}" y="${box.y}" width="${t.stripW}" height="${box.h}" rx="3" fill="${esc(accent)}"${dead ? ` fill-opacity="${DEAD_STRIP_OPACITY}"` : ''}/>`);
-		if (formed && t.r1?.plate && opts.relations?.get(p.id)?.text) {
+		const barFill = `fill="${esc(accent)}"${dead ? ` fill-opacity="${DEAD_STRIP_OPACITY}"` : ''}`;
+		// D176 (1): on the marked card the bar lies inside the thick border (it starts at the inner edge and follows the inner corners); other cards keep the bar at the card edge.
+		if (isMe) out.push(`<path d="${markedBarPath(box.x, box.y, box.h, t.stripW, ME_LOOK.border, 6)}" ${barFill}/>`);
+		else out.push(`<rect x="${box.x}" y="${box.y}" width="${t.stripW}" height="${box.h}" rx="3" ${barFill}/>`);
+		if (t.r1?.plate && opts.relations?.get(p.id)?.text) {
 			// The footer plate of the relation word, made first so the word lies over it (as in the scene): the house colour, also on the marked card (D153).
 			// A person with no relation word has no plate.
 			const ins = isMe ? ME_RING_INNER : 1;
@@ -258,29 +256,26 @@ export function renderSvg(g: FamilyGraph, layout: TreeLayout, edges: EdgeDrawing
 		if (cl && reign) {
 			// D61: two text lines only on a card the layout made taller for them; else one, cut with "…".
 			titles = titleLines(titleText, reign, t.textW, smallMeasure);
-			if (titles.length > 1 && t.title2Baseline === undefined) titles = [cutSmall([titleText, reign].filter(Boolean).join(' '), widthAt(t.titleBaseline))];
-		} else if (titleText) titles = [cutSmall(titleText, widthAt(t.titleBaseline))];
-		if (cb.boxes.length) {
-			// G3: the break is made at the normal width; a text line beside a box is then cut shorter.
-			titles = titles.map((line, i) => {
-				const w = widthAt(i ? t.title2Baseline! : t.titleBaseline);
-				return w < t.textW ? cutSmall(line, w) : line;
-			});
-		}
+			if (titles.length > 1 && t.title2Baseline === undefined) titles = [cutSmall([titleText, reign].filter(Boolean).join(' '), t.textW)];
+		} else if (titleText) titles = [cutSmall(titleText, t.textW)];
 		titles.forEach((line, i) => {
 			out.push(`<text x="${tx}" y="${box.y + (i ? t.title2Baseline! : t.titleBaseline)}"${anchor} font-size="${t.smallSize}" fill="${c.textMuted}">${esc(line)}</text>`);
 		});
 		const dates = dateLine(p);
 		const datesY = hasTitle ? t.datesBaseline : t.titleBaseline;
 		const showYears = !!dates && !(saved && opts.showDates === false);
-		if (showYears) out.push(`<text x="${tx}" y="${box.y + datesY}"${anchor} font-size="${t.smallSize}" fill="${c.dates}">${esc(cutSmall(dates!, widthAt(datesY)))}</text>`);
+		if (showYears) out.push(`<text x="${tx}" y="${box.y + datesY}"${anchor} font-size="${t.smallSize}" fill="${c.dates}">${esc(cutSmall(dates!, t.textW))}</text>`);
 		const relation = opts.relations?.get(p.id)?.text;
-		const relY = relationY(t, hasTitle, !!dates);
+		const relY = relationY(t);
 		if (relation && relY !== undefined) {
 			const style = isMe ? `font-style="italic" font-weight="${esc(nameWeight)}"` : 'font-style="italic"';
 			// The word may use the plate's width; every other line keeps its column.
-			const relW = t.relationW ?? widthAt(relY);
-			const relText = measured ? cutWith(relation, relW, relationFontOf(t.smallSize, fonts.text, isMe, fonts.bold)) : fit(relation, relW, t.smallSize, isMe);
+			const relW = t.relationW ?? t.textW;
+			const { word, suffix } = splitMaybe(relation);
+			const relFont = relationFontOf(t.smallSize, fonts.text, isMe, fonts.bold);
+			const relText = suffix
+				? truncateWithMaybe(word, suffix, relW, (s) => (measured ? measured(s, relFont) : textWidth(s, t.smallSize, isMe)))
+				: measured ? cutWith(relation, relW, relFont) : fit(relation, relW, t.smallSize, isMe);
 			out.push(`<text x="${tx}" y="${box.y + relY}"${anchor} font-size="${t.smallSize}" ${style} fill="${c.text}"${di(`relation:${p.id}`)}>${esc(relText)}</text>`);
 		}
 		// M9: the pictures. Arms with a problem show nothing; a portrait always has its frame (B1, B9).
@@ -309,28 +304,6 @@ export function renderSvg(g: FamilyGraph, layout: TreeLayout, edges: EdgeDrawing
 				const paint = uri === 'missing' ? `fill="${c.cardBorder}" stroke="${esc(accent)}" stroke-dasharray="3 2"` : `fill="none" stroke="${esc(accent)}"`;
 				out.push(`<circle cx="${cx}" cy="${cy}" r="${rp.ringR - ringW / 2}" ${paint} stroke-width="${ringW}"${di(`frame:${p.id}`)}/>`);
 			}
-		}
-		if (place) {
-			const uri = pics?.get(`arms:${house!.id}`);
-			const r = place.full;
-			if (isUri(uri)) out.push(`<image href="${esc(uri)}" x="${box.x + r.x}" y="${box.y + r.y}" width="${r.w}" height="${r.h}" preserveAspectRatio="xMidYMid meet"${muted}${di(`arms:${p.id}`)}/>`);
-		}
-		if (portrait) {
-			const uri = pics?.get(`portrait:${p.id}`);
-			const rad = portrait.w / 2;
-			const cx = box.x + portrait.x + rad;
-			const cy = box.y + portrait.y + rad;
-			if (isUri(uri)) {
-				// The upper-centre square of the picture (§13.7), cut round; a saved picture's copy already is.
-				const id = `dynasty-portrait-clip-${clips++}`;
-				out.push(`<clipPath id="${id}"><circle cx="${cx}" cy="${cy}" r="${rad}"/></clipPath>`);
-				out.push(`<image href="${esc(uri)}" x="${box.x + portrait.x}" y="${box.y + portrait.y}" width="${portrait.w}" height="${portrait.h}" preserveAspectRatio="xMidYMin slice" clip-path="url(#${id})"${muted}${di(`portrait:${p.id}`)}/>`);
-			}
-			// B1: dashed with a grey fill only for a missing file; else the solid empty frame (or the ring round the picture).
-			const missing = uri === 'missing';
-			// The frame uses the muted text colour, as the live CSS does since M9 G5: the faint colour is under 3:1 on the card.
-			const paint = missing ? `fill="${c.cardBorder}" stroke="${c.textMuted}" stroke-dasharray="3 2"` : `fill="none" stroke="${isUri(uri) ? c.cardBorder : c.textMuted}"`;
-			out.push(`<circle cx="${cx}" cy="${cy}" r="${rad - 0.5}" ${paint} stroke-width="1"${di(`frame:${p.id}`)}/>`);
 		}
 		if (tab) {
 			// D148: the small "You" tab on the top edge of the person that `TreeLayout.youTab` names; the Full level only, so no other level hides it.

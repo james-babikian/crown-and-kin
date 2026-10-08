@@ -1,14 +1,14 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import type { FamilyGraph } from '../src/core/derive';
 import type { CardLabel } from '../src/core/titles';
-import { cardText, drawnGeometry, geometryFor, relationExtra, relationY, tallExtra, withRelationLine } from '../src/layout/geometry';
+import { cardText, centredWithoutWord, drawnGeometry, geometryFor, relationExtra, relationY, tallExtra, withRelationLine } from '../src/layout/geometry';
 import { DEFAULT_LAYOUT_SETTINGS, clearLayoutCache, layoutKey, layoutTree } from '../src/layout/index';
 import type { LaidOut, LayoutSettings, PersonBox } from '../src/layout/model';
 import { buildScene, type SceneOptions } from '../src/render/dom/scene';
 import { tallCardsFor, tallTitlesFor, titleMeasure } from '../src/render/dom/tall-cards';
 import { titleLines } from '../src/render/name-lines';
 import { renderSvg } from '../src/render/svg-string';
-import { cardLabel } from '../src/render/tree-info';
+import { cardLabel, dateLine } from '../src/render/tree-info';
 import { FEl, installDom } from './acceptance/fake-dom';
 import { build, fixture } from './helpers';
 import { lineProblems, randomTree } from './random-trees';
@@ -22,7 +22,7 @@ beforeAll(() => {
 	(globalThis as Record<string, unknown>).CSS = { supports: (_p: string, v: string) => /^#[0-9a-f]{6}$/i.test(v) };
 });
 
-const GEO = geometryFor(16, 'normal');
+const GEO = geometryFor(16);
 const SIDE: LayoutSettings = { ...DEFAULT_LAYOUT_SETTINGS, orientation: 'sideways' };
 const VIEWS = [
 	['down', DEFAULT_LAYOUT_SETTINGS],
@@ -51,34 +51,32 @@ const overlaps = (boxes: PersonBox[]) => {
 const label = (name: string, title?: string, reign?: string): CardLabel => ({ holdings: [], selected: false, name, ...(title !== undefined ? { title } : {}), ...(reign !== undefined ? { reign } : {}) });
 
 describe('D61: a card in tallTitles is one small text line taller, in every layout', () => {
-	for (const size of ['normal', 'compact'] as const) {
-		for (const [view, settings] of VIEWS) {
-			it(`${view}, ${size} cards: own heights (plain, name, title, both), flags only when true, rows and order kept`, () => {
-				const { g } = build(fixture('07'));
-				const geo = geometryFor(16, size);
-				const ids = g.people.map((p) => p.id);
-				const tallCards = ids.filter((_, i) => i % 5 === 0 || i % 5 === 1);
-				const tallTitles = ids.filter((_, i) => i % 5 === 1 || i % 5 === 2);
-				const plain = lay(g, settings, geo);
-				const tall = lay(g, { ...settings, tallCards, tallTitles }, geo);
-				const cardH = tall.layout.geometry.cardH;
-				expect(cardH).toBe(plain.layout.geometry.cardH);
-				for (const [id, box] of tall.layout.persons) {
-					const name = tallCards.includes(id);
-					const title = tallTitles.includes(id);
-					expect(box.h, id).toBe(cardH + (name ? tallExtra(geo) : 0) + (title ? relationExtra(geo) : 0));
-					expect(box.w, id).toBe(tall.layout.geometry.cardW);
-					expect(box.tallName, id).toBe(name ? true : undefined);
-					expect(box.tallTitle, id).toBe(title ? true : undefined);
-					expect('tallName' in box, id).toBe(name);
-					expect('tallTitle' in box, id).toBe(title);
-				}
-				expect(overlaps([...tall.layout.persons.values()])).toEqual([]);
-				expect(lineProblems(g, tall.layout, tall.edges)).toEqual([]);
-				// D2: rows and sibling order are the same.
-				expect(tall.layout.rows).toEqual(plain.layout.rows);
-			});
-		}
+	for (const [view, settings] of VIEWS) {
+		it(`${view}, cards: own heights (plain, name, title, both), flags only when true, rows and order kept`, () => {
+			const { g } = build(fixture('07'));
+			const geo = geometryFor(16);
+			const ids = g.people.map((p) => p.id);
+			const tallCards = ids.filter((_, i) => i % 5 === 0 || i % 5 === 1);
+			const tallTitles = ids.filter((_, i) => i % 5 === 1 || i % 5 === 2);
+			const plain = lay(g, settings, geo);
+			const tall = lay(g, { ...settings, tallCards, tallTitles }, geo);
+			const cardH = tall.layout.geometry.cardH;
+			expect(cardH).toBe(plain.layout.geometry.cardH);
+			for (const [id, box] of tall.layout.persons) {
+				const name = tallCards.includes(id);
+				const title = tallTitles.includes(id);
+				expect(box.h, id).toBe(cardH + (name ? tallExtra(geo) : 0) + (title ? relationExtra(geo) : 0));
+				expect(box.w, id).toBe(tall.layout.geometry.cardW);
+				expect(box.tallName, id).toBe(name ? true : undefined);
+				expect(box.tallTitle, id).toBe(title ? true : undefined);
+				expect('tallName' in box, id).toBe(name);
+				expect('tallTitle' in box, id).toBe(title);
+			}
+			expect(overlaps([...tall.layout.persons.values()])).toEqual([]);
+			expect(lineProblems(g, tall.layout, tall.edges)).toEqual([]);
+			// D2: rows and sibling order are the same.
+			expect(tall.layout.rows).toEqual(plain.layout.rows);
+		});
 	}
 
 	it('down: a row starts under the tallest card of the row above it', () => {
@@ -174,32 +172,31 @@ describe('D61: the cache key holds both tall sets', () => {
 });
 
 describe('D61: cardText with a two-line title text line', () => {
-	for (const size of ['normal', 'compact'] as const) {
-		for (const relation of [false, true]) {
-			for (const tallName of [false, true]) {
-				it(`${size}${relation ? ', relation line' : ''}${tallName ? ', two-line name' : ''}`, () => {
-					const plain = geometryFor(16, size);
-					const geo = relation ? withRelationLine(plain, { ...DEFAULT_LAYOUT_SETTINGS, relationLine: true }) : plain;
-					const lh = size === 'normal' ? 1.2 : 1.1;
-					const t = cardText(geo, tallName);
-					const tt = cardText(geo, tallName, true);
-					const smallLine = lh * tt.smallSize;
-					const h = geo.cardH + (tallName ? tallExtra(geo) : 0) + relationExtra(geo);
-					expect(t.title2Baseline).toBeUndefined();
-					expect(tt.title2Baseline! - tt.titleBaseline).toBeCloseTo(smallLine, 6);
-					expect(tt.datesBaseline - tt.title2Baseline!).toBeCloseTo(smallLine, 6);
-					if (relation) expect(tt.relationBaseline! - tt.datesBaseline).toBeCloseTo(smallLine, 6);
-					else expect(tt.relationBaseline).toBeUndefined();
-					expect(tt.name2Baseline === undefined).toBe(!tallName);
-					// The block stays centred, up to the rounding of the extra height.
-					expect(Math.abs(tt.nameBaseline - t.nameBaseline)).toBeLessThanOrEqual(0.5);
-					const last = tt.relationBaseline ?? tt.datesBaseline;
-					const top = tt.nameBaseline - (lh * tt.nameSize) / 2 - 0.35 * tt.nameSize;
-					const bottom = h - (last - 0.35 * tt.smallSize + smallLine / 2);
-					expect(Math.abs(top - bottom)).toBeLessThanOrEqual(1);
-					expect([tt.stripW, tt.padX, tt.textW, tt.nameWithSignW]).toEqual([t.stripW, t.padX, t.textW, t.nameWithSignW]);
-				});
-			}
+	for (const relation of [false, true]) {
+		for (const tallName of [false, true]) {
+			it(`${relation ? 'relation line' : 'plain'}${tallName ? ', two-line name' : ''}`, () => {
+				const plain = geometryFor(16);
+				const geo = relation ? withRelationLine(plain, { ...DEFAULT_LAYOUT_SETTINGS, relationLine: true }) : plain;
+				const lh = 1.2;
+				const t = cardText(geo, tallName);
+				const tt = cardText(geo, tallName, true);
+				const smallLine = lh * tt.smallSize;
+				const h = geo.cardH + (tallName ? tallExtra(geo) : 0) + relationExtra(geo);
+				expect(t.title2Baseline).toBeUndefined();
+				expect(tt.title2Baseline! - tt.titleBaseline).toBeCloseTo(smallLine, 6);
+				expect(tt.datesBaseline - tt.title2Baseline!).toBeCloseTo(smallLine, 6);
+				// The relation word sits on the plate below the text block (0.2.5 B7).
+				if (relation) expect(tt.relationBaseline!).toBeGreaterThan(tt.datesBaseline);
+				else expect(tt.relationBaseline).toBeUndefined();
+				expect(tt.name2Baseline === undefined).toBe(!tallName);
+				// The block stays centred, up to the rounding of the extra height.
+				expect(Math.abs(tt.nameBaseline - t.nameBaseline)).toBeLessThanOrEqual(0.5);
+				const last = tt.datesBaseline;
+				const top = tt.nameBaseline - (lh * tt.nameSize) / 2 - 0.35 * tt.nameSize;
+				const bottom = (relation ? tt.r1!.plate!.y : h) - (last - 0.35 * tt.smallSize + smallLine / 2);
+				expect(Math.abs(top - bottom)).toBeLessThanOrEqual(1);
+				expect([tt.stripW, tt.padX, tt.textW, tt.nameWithSignW]).toEqual([t.stripW, t.padX, t.textW, t.nameWithSignW]);
+			});
 		}
 	}
 
@@ -209,14 +206,11 @@ describe('D61: cardText with a two-line title text line', () => {
 		expect(cardText(GEO, true, false)).toEqual(cardText(GEO, true));
 	});
 
-	it('relationY counts a two-line title as two text lines', () => {
+	it('relationY gives the baseline on the plate, whatever the title takes', () => {
 		const geo = withRelationLine(GEO, { ...DEFAULT_LAYOUT_SETTINGS, relationLine: true });
 		const t = cardText(geo, false, true);
-		expect(relationY(t, true, true)).toBe(t.relationBaseline);
-		expect(relationY(t, true, false)).toBe(t.datesBaseline);
-		expect(relationY(t, false, true)).toBe(t.title2Baseline);
-		expect(relationY(t, false, false)).toBe(t.titleBaseline);
-		expect(relationY(cardText(GEO, false, true), true, true)).toBeUndefined();
+		expect(relationY(t)).toBe(t.relationBaseline);
+		expect(relationY(cardText(GEO, false, true))).toBeUndefined();
 	});
 });
 
@@ -353,7 +347,10 @@ unions:
 			const root = scene(laid, { labels, relations });
 			for (const [id, l] of labels) {
 				const box = laid.layout.persons.get(id)!;
-				const t = cardText(laid.layout.geometry, box.tallName, box.tallTitle);
+				// D177 (10): in the relation view, a card with no relation word centres its text.
+				// The card form centres the lines that exist (B.3.2): the scene passes which small lines this person has.
+				const plain = cardText(laid.layout.geometry, box.tallName, box.tallTitle, { title: !!(l.title || l.reign), dates: !!dateLine(g.byId.get(id)!) });
+				const t = relationLine && !relations.has(id) ? centredWithoutWord(laid.layout.geometry, plain) : plain;
 				expect(texts(root, id, 'dynasty-card-name').map((e) => e.text), id).toEqual([l.name]);
 				// Compact names are 1.5 times larger, so a long one ends with "…".
 				const compact = texts(root, id, 'dynasty-card-compact').map((e) => e.text);
@@ -375,7 +372,7 @@ unions:
 				const rel = texts(root, 'aldric', 'dynasty-card-relation')[0];
 				const t = cardText(laid.layout.geometry, false, true);
 				expect(Number(rel.getAttribute('y'))).toBe(box.y + t.relationBaseline!);
-				expect(t.relationBaseline).toBe(relationY(t, true, true));
+				expect(t.relationBaseline).toBe(relationY(t));
 			}
 		});
 	}
@@ -417,7 +414,7 @@ unions:
 		const root = scene(laid, { labels: long });
 		const names = texts(root, 'kit', 'dynasty-card-name');
 		expect(names.map((e) => e.text)).toEqual(['Kit Aurelian', 'Maximilian IV']);
-		const t = cardText(laid.layout.geometry, true);
+		const t = cardText(laid.layout.geometry, true, false, { title: true, dates: !!dateLine(g.byId.get('kit')!) });
 		expect(names.map((e) => Number(e.getAttribute('y')))).toEqual([t.nameBaseline, t.name2Baseline!].map((y) => laid.layout.persons.get('kit')!.y + y));
 		expect(Number(texts(root, 'kit', 'dynasty-card-title')[0].getAttribute('y'))).toBe(laid.layout.persons.get('kit')!.y + t.titleBaseline);
 	});

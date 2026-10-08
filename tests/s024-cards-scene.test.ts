@@ -1,7 +1,7 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import type { FamilyGraph } from '../src/core/derive';
 import { cardLabels, type CardLabel } from '../src/core/titles';
-import { cardText, geometryFor, nameCountOf, smallLineOf, tallExtra } from '../src/layout/geometry';
+import { cardText, geometryFor, nameCountOf, tallExtra } from '../src/layout/geometry';
 import { DEFAULT_LAYOUT_SETTINGS, clearLayoutCache, layoutTree, pictureSets } from '../src/layout/index';
 import type { LaidOut, LayoutSettings } from '../src/layout/model';
 import { measuredLayout } from '../src/obsidian/measured-layout';
@@ -25,7 +25,7 @@ beforeAll(() => {
 const FONTS = { text: 'serif', ui: 'sans', bold: '700' };
 /** Every character is 0.55 em wide: 7.48 px at 13.6 px. */
 const measure = (s: string, font: string) => [...s].length * 0.55 * Number(/(\d+(?:\.\d+)?)px/.exec(font)![1]);
-const WHOLE = geometryFor(16, 'normal');
+const WHOLE = geometryFor(16);
 const all = (el: FEl): FEl[] => [el, ...el.children.flatMap(all)];
 
 function graph(src: string): FamilyGraph {
@@ -148,41 +148,6 @@ describe('the "+" badge on the corner of the card, in every layout (D117 4)', ()
 		const withBadge = scene(laid, g, { badges: { hidden: new Map([['a', 2]]), label: () => 'More' } });
 		const strip = (root: FEl) => all(card(root, 'a')).map((e) => [e.tag, [...e.attrs].join(','), e.getText()].join('|'));
 		expect(strip(withBadge.root)).toEqual(strip(without.root));
-	});
-});
-
-describe('rule B in the scene: the lifted set moves both boxes one small text line up (D126 4)', () => {
-	const g = graph('houses:\n  - {id: v, name: V, color: "#8b1e3f", arms: "[[v.png]]"}\npeople:\n  - {id: a, name: Aldric, house: v, portrait: "[[a.png]]", born: 1100, title: Duke}\n');
-	const REL = { ...DEFAULT_LAYOUT_SETTINGS, relationLine: true } as LayoutSettings;
-
-	it('the scene reads the set and never decides it: with `lifted` both boxes are one small line higher and the text lines stay', () => {
-		const laid = lay(g, REL);
-		const plain = scene(laid, g);
-		const lifted = scene(laid, g, { lifted: new Set(['a']) });
-		const rect = (s: Scene, kind: string) => s.pictures.find((p) => p.kind === kind && p.lod === 'full')!.rect;
-		const dy = smallLineOf(laid.layout.geometry);
-		expect(rect(plain.scene, 'arms').y - rect(lifted.scene, 'arms').y).toBeCloseTo(dy, 9);
-		expect(rect(plain.scene, 'portrait').y - rect(lifted.scene, 'portrait').y).toBeCloseTo(dy, 9);
-		expect(rect(plain.scene, 'arms').x).toBe(rect(lifted.scene, 'arms').x);
-		// The Compact arms box is not lifted.
-		const compact = (s: Scene) => s.pictures.find((p) => p.kind === 'arms' && p.lod === 'compact')!.rect;
-		expect(compact(plain.scene)).toEqual(compact(lifted.scene));
-	});
-
-	it('the headless picture places the lifted boxes where the scene does', () => {
-		const laid = lay(g, REL);
-		const { scene: s } = scene(laid, g, { lifted: new Set(['a']) });
-		const pictures = new Map<string, string | 'missing' | null>([['arms:v', 'data:image/png;base64,AAAA'], ['portrait:a', 'data:image/png;base64,AAAA']]);
-		const svg = renderSvg(g, laid.layout, laid.edges, { palette: DEFAULT_LIGHT, measure, fonts: FONTS, pictures, lifted: new Set(['a']) });
-		const images = [...svg.matchAll(/<image [^>]*>/g)].map((m) => m[0]);
-		const num = (tag: string, name: string) => Number(new RegExp(` ${name}="([^"]+)"`).exec(tag)![1]);
-		const arms = images.find((t) => t.includes('meet'))!;
-		const portrait = images.find((t) => t.includes('slice'))!;
-		const liveArms = s.pictures.find((p) => p.kind === 'arms' && p.lod === 'full')!.rect;
-		const livePortrait = s.pictures.find((p) => p.kind === 'portrait')!.rect;
-		expect(num(arms, 'y')).toBeCloseTo(liveArms.y, 9);
-		expect(num(arms, 'x')).toBeCloseTo(liveArms.x, 9);
-		expect(num(portrait, 'y')).toBeCloseTo(livePortrait.y, 9);
 	});
 });
 

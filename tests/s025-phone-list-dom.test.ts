@@ -157,7 +157,7 @@ describe('sections, headings and rows', () => {
 		const { list } = make();
 		const r = row(list, 'roderick');
 		expect(r.querySelector('.dynasty-list-name')!.getText()).toBe(`Roderick ${'“'}the Bold${'”'}`);
-		expect(r.querySelector('.dynasty-list-sob')!.getText()).toBe(` “the Bold”`);
+		expect(r.querySelector('.dynasty-list-sob')!.getText()).toBe('“the Bold”');
 		expect(r.querySelector('.dynasty-list-meta')!.getText()).toBe('You · 1131–1190');
 		const a = row(list, 'aldric');
 		expect(a.querySelector('.dynasty-list-meta')!.getText()).toBe('Father · b. 1102');

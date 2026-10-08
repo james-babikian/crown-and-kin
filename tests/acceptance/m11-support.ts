@@ -10,7 +10,7 @@ import type * as PictureList from '../../src/core/picture-list';
 import type { PictureFileLike } from '../../src/core/picture-list';
 import type { createParseCache } from '../../src/core/parse-cache';
 import { parseDynasty } from '../../src/core/parse';
-import { geometryFor } from '../../src/layout/geometry';
+import { cardForm, geometryFor } from '../../src/layout/geometry';
 import { DEFAULT_LAYOUT_SETTINGS, clearLayoutCache, layoutTree } from '../../src/layout/index';
 import { DEFAULT_DARK } from '../../src/render/styles';
 import { approxMeasure, renderSvg } from '../../src/render/svg-string';
@@ -104,7 +104,8 @@ export function serial(el: FEl): string {
 
 // ---------- The headless picture hashes (spike 1 to 15 byte-identical, spec §13.15) ----------
 
-const GEO = geometryFor(16, 'normal');
+// 0.2.6 (D179): the picture is drawn with the Roundel (the classic card is gone).
+const GEO = cardForm(geometryFor(16), 'down');
 const FONTS = { text: 'serif', ui: 'sans', bold: '700' };
 
 /**

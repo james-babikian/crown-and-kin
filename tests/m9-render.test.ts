@@ -2,7 +2,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import { deriveFamilies, type FamilyGraph } from '../src/core/derive';
 import { parseDynasty } from '../src/core/parse';
 import type { Tree } from '../src/core/types';
-import { PICTURE_EM, armsPlace, cardText, geometryFor, pictureSize, portraitBox, roomAt } from '../src/layout/geometry';
+import { PICTURE_EM, cardForm, geometryFor, pictureSize } from '../src/layout/geometry';
 import { DEFAULT_LAYOUT_SETTINGS, armsCards, clearLayoutCache, layoutTree, pictureSets } from '../src/layout/index';
 import type { LaidOut, LayoutSettings } from '../src/layout/model';
 import { buildScene, type Scene } from '../src/render/dom/scene';
@@ -24,7 +24,8 @@ beforeAll(() => {
 
 const FONTS = { text: 'serif', ui: 'sans', bold: '700' };
 const measure = (s: string) => [...s].length * 8;
-const GEO = geometryFor(16, 'normal');
+// 0.2.6 (D179): the pictures are drawn on the Roundel (the classic card with the boxes at the lower right is gone).
+const GEO = cardForm(geometryFor(16), 'down');
 const URI = 'data:image/png;base64,AAAA';
 
 const SOURCE = `houses:
@@ -70,12 +71,14 @@ describe('picture sets and flags (L1, L2)', () => {
 		expect(armsCards(g, []).size).toBe(0);
 	});
 
-	it('the flags follow the sets and every box keeps its size and place, in every layout', () => {
+	it('the flags follow the sets and every box keeps its size and place, in every layout of a plain geometry (the Roundel gives a card with a picture a crown: B.3.4)', () => {
 		const g = graph();
+		const PLAIN = geometryFor(16);
 		for (const settings of [DEFAULT_LAYOUT_SETTINGS, { ...DEFAULT_LAYOUT_SETTINGS, orientation: 'sideways' } as LayoutSettings]) {
 			clearLayoutCache();
-			const plain = layoutTree(g, GEO, settings, 'test');
-			const pics = lay(g, settings);
+			const plain = layoutTree(g, PLAIN, settings, 'test');
+			clearLayoutCache();
+			const pics = layoutTree(g, PLAIN, { ...settings, ...pictureSets(g, true) }, 'test');
 			for (const [id, b] of pics.layout.persons) {
 				const p = plain.layout.persons.get(id)!;
 				expect([b.x, b.y, b.w, b.h]).toEqual([p.x, p.y, p.w, p.h]);
@@ -87,37 +90,9 @@ describe('picture sets and flags (L1, L2)', () => {
 });
 
 describe('geometry (D78, G2, G3)', () => {
-	it('arms and portrait are both 1.25 text lines; the arms are 5/6 of that wide; the arms no longer shift the name or the sign (D117)', () => {
-		const t = cardText(GEO);
+	it('arms and portrait are both 1.25 text lines; the arms are 5/6 of that wide', () => {
 		expect(pictureSize(GEO)).toBeCloseTo(24, 9);
-		const place = armsPlace(GEO, t, GEO.cardH);
-		expect(place.full.w).toBeCloseTo(20, 9);
-		expect('shift' in place).toBe(false);
-		expect(place.compactShift).toBeCloseTo(1.8 * 16, 9);
-		expect(place.compact.x + place.compact.w).toBeCloseTo(GEO.cardW - 8, 9);
-	});
-
-	it('the arms and the portrait sit side by side at the lower right, end at the bottom of the text block, and never meet (D117)', () => {
-		for (const size of ['normal', 'compact'] as const) {
-			const geo = geometryFor(16, size);
-			const t = cardText(geo);
-			const portrait = portraitBox(geo, t);
-			const arms = armsPlace(geo, t, geo.cardH, undefined, portrait).full;
-			expect(portrait.x - (arms.x + arms.w), size).toBeCloseTo(PICTURE_EM.armsGap * 16, 9);
-			expect(arms.y + arms.h, size).toBeCloseTo(portrait.y + portrait.h, 9);
-			expect(portrait.y + portrait.h).toBeCloseTo(t.textBottom, 9);
-		}
-	});
-
-	it('the name text line is not beside the portrait; the title narrows only without a relation line (D77)', () => {
-		const t = cardText(GEO);
-		const p = portraitBox(GEO, t);
-		const boxes = (r: typeof p) => [{ r, gap: PICTURE_EM.portraitGap * 16 }];
-		expect(roomAt(GEO, t, t.nameBaseline, t.nameSize, boxes(p))).toBe(t.textW);
-		expect(roomAt(GEO, t, t.titleBaseline, t.smallSize, boxes(p))).toBeLessThan(t.textW);
-		const rel = { ...GEO, cardH: GEO.cardH + 16, relationLine: true };
-		const tr = cardText(rel);
-		expect(roomAt(rel, tr, tr.titleBaseline, tr.smallSize, boxes(portraitBox(rel, tr)))).toBe(tr.textW);
+		expect(PICTURE_EM.armsAspect * pictureSize(GEO)).toBeCloseTo(20, 9);
 	});
 });
 
@@ -125,7 +100,7 @@ describe('slots and the legend (S1, S2, S4)', () => {
 	it('a deceased card keeps its class, so the pictures can be muted by styles.css (G4); slots carry the house', () => {
 		const g = graph();
 		const s = scene(g, lay(g)) as Scene;
-		expect(s.pictures.map((x) => `${x.person}:${x.kind}:${x.lod}:${x.house ?? ''}`)).toEqual(['a:arms:full:v', 'a:portrait:full:', 'a:arms:compact:v', 'b:arms:full:v', 'b:arms:compact:v', 'c:portrait:full:']);
+		expect(s.pictures.map((x) => `${x.person}:${x.kind}:${x.lod}:${x.house ?? ''}`)).toEqual(['a:arms:full:v', 'a:portrait:full:', 'a:arms:compact:v', 'a:portrait:compact:', 'b:arms:full:v', 'b:arms:compact:v', 'c:portrait:full:', 'c:portrait:compact:']);
 		expect((s.cards.get('a') as unknown as FEl).hasClass('dynasty-deceased')).toBe(true);
 	});
 

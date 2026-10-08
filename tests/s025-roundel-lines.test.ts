@@ -90,7 +90,7 @@ interface Variant {
 }
 
 function lay(g: FamilyGraph, v: Variant): Layouts {
-	const base = cardForm(geometryFor(v.f, 'normal'), v.orientation);
+	const base = cardForm(geometryFor(v.f), v.orientation);
 	const real = pictureSets(g, true);
 	const pics = v.pictures === 'all' ? { arms: [...g.houses.keys()].sort(), portraits: g.people.map((p) => p.id).sort() } : real;
 	const folded = v.folds
@@ -327,7 +327,7 @@ describe('B.3.3: dotted side links that cross a picture are counted', () => {
 describe('B.3.3, B.3.5: where the lines meet the Roundel', () => {
 	it('the drop ends at the ring (portrait), at the top of the arms, or at the top edge (no picture, or off the axis)', () => {
 		for (const f of [12, 16]) {
-			const geo = cardForm(geometryFor(f, 'normal'), 'down');
+			const geo = cardForm(geometryFor(f), 'down');
 			expect(roundelLineEnd(geo, { portrait: true })).toBeCloseTo(1.4 * f, 9);
 			expect(roundelLineEnd(geo, { arms: true })).toBeCloseTo(1.25 * f, 9);
 			expect(roundelLineEnd(geo, {})).toBe(0);
@@ -340,7 +340,7 @@ describe('B.3.3, B.3.5: where the lines meet the Roundel', () => {
 			[16, 7.6, 4.4],
 		];
 		for (const [f, ring, halo] of want) {
-			const geo = cardForm(geometryFor(f, 'normal'), 'down');
+			const geo = cardForm(geometryFor(f), 'down');
 			const drop = lineMetrics(geo).barDrop;
 			expect(drop - roundelLineEnd(geo, { portrait: true })).toBeCloseTo(ring, 6);
 			expect(drop - ROUNDEL_EM.reach * f).toBeCloseTo(halo, 6);
@@ -361,7 +361,7 @@ describe('B.3.3, B.3.5: where the lines meet the Roundel', () => {
 				expect(Number(m[4])).toBeCloseTo(b.y, 0);
 			}
 			clearLayoutCache();
-			const classic = layoutTree(g, geometryFor(f, 'normal'), { ...DEFAULT_LAYOUT_SETTINGS }, 'font');
+			const classic = layoutTree(g, geometryFor(f), { ...DEFAULT_LAYOUT_SETTINGS }, 'font');
 			for (const p of classic.edges.paths.filter((x) => x.d.includes('C'))) {
 				const b = classic.layout.persons.get(p.child!)!;
 				const m = /C[\d.-]+ [\d.-]+ ([\d.-]+) ([\d.-]+) ([\d.-]+) ([\d.-]+)$/.exec(p.d)!;
@@ -370,11 +370,11 @@ describe('B.3.3, B.3.5: where the lines meet the Roundel', () => {
 		}
 	});
 
-	it('the classic card (card size Compact, top to bottom) draws its drops at the card middle, ending on the top edge', () => {
+	it('a plain geometry (no form) draws its drops at the card middle, ending on the top edge', () => {
 		const s = ids().find((x) => x.id === '07')!;
 		const g = parse(s.source);
 		clearLayoutCache();
-		const classic = layoutTree(g, cardForm(geometryFor(12, 'compact'), 'down'), { ...DEFAULT_LAYOUT_SETTINGS }, 'font');
+		const classic = layoutTree(g, geometryFor(12), { ...DEFAULT_LAYOUT_SETTINGS }, 'font');
 		for (const p of classic.edges.paths) {
 			const m = /^M([\d.-]+) ([\d.-]+)V([\d.-]+)$/.exec(p.d);
 			if (!m || p.child === undefined) continue;

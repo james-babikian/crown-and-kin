@@ -17,7 +17,7 @@ beforeAll(() => {
 });
 
 const FONTS = { text: 'serif', ui: 'sans', bold: '700' };
-const GEO = geometryFor(16, 'normal');
+const GEO = geometryFor(16);
 // Built with fromCharCode so no editor or tool turns them into raw characters in this file.
 const CONTROL = [0x00, 0x01, 0x08, 0x0b, 0x0c, 0x0e, 0x1f, 0xfffe, 0xffff].map((n) => String.fromCharCode(n));
 const NOT_XML = new RegExp(`[${CONTROL.join('')}]|[\\u0000-\\u0008\\u000B\\u000C\\u000E-\\u001F\\uFFFE\\uFFFF]`);

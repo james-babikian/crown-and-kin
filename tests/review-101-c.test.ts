@@ -16,7 +16,7 @@ import { build } from './helpers';
 const FAR = { maxCardWidths: 3, maxGenerations: 1 };
 const DOWN: LayoutSettings = { sweeps: 4, far: FAR };
 const SIDE: LayoutSettings = { sweeps: 4, far: FAR, orientation: 'sideways' };
-const GEO = geometryFor(16, 'normal');
+const GEO = geometryFor(16);
 
 function lay(src: string, settings: LayoutSettings, geo = GEO) {
 	const { g } = build(src);
@@ -130,13 +130,13 @@ unions:
   - {partners: [p15, p3], type: affair}
 `;
 	it('sideways cards at 9 px', () => {
-		const { g, layout, edges } = lay(src, SIDE, geometryFor(9, 'normal'));
+		const { g, layout, edges } = lay(src, SIDE, geometryFor(9));
 		expect(S.lineProblems(g, layout, edges)).toEqual([]);
 	});
 });
 
 describe('C5: down at a small font, a far tag is drawn over lines that leave its card', () => {
-	// At 8 px compact the free part of p4's bottom edge (the tag zone) is narrower than 44 px, so
+	// At 8 px the free part of p4's bottom edge (the tag zone) is narrower than 44 px, so
 	// `tagHit` makes hit.w 44 px. `down` tags have no `zoneW`, and renderers draw the pill up to
 	// `zoneW ?? hit.w` wide (scene.ts, svg-string.ts): the pill then covers the start of p4's leg to
 	// the dot of p4+p7 (x 266) and of the adoptive curve to p6 (x 306).
@@ -153,8 +153,8 @@ describe('C5: down at a small font, a far tag is drawn over lines that leave its
   - {id: p10, name: P10, sex: m, parents: [p3, p2]}
   - {id: p14, name: P14, sex: m, parents: [p7, p4], illegitimate: true}
 `;
-	it('8 px compact', () => {
-		const { layout, edges } = lay(src, DOWN, geometryFor(8, 'compact'));
+	it('8 px', () => {
+		const { layout, edges } = lay(src, DOWN, geometryFor(8));
 		const bad: string[] = [];
 		for (const t of layout.farTags.values()) {
 			const card = layout.persons.get(t.person)!;

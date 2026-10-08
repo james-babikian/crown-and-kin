@@ -23,7 +23,7 @@ beforeAll(() => {
 	(globalThis as Record<string, unknown>).CSS = { supports: (_p: string, v: string) => /^#[0-9a-f]{6}$/i.test(v) };
 });
 
-const GEO = geometryFor(16, 'normal');
+const GEO = geometryFor(16);
 const measure = (text: string, font: string) => text.length * (Number(/(\d+(?:\.\d+)?)px/.exec(font)?.[1] ?? 16) * 0.55);
 const fonts = { text: 'serif', ui: 'sans', bold: '700' };
 const all = (el: FEl): FEl[] => [el, ...el.children.flatMap(all)];
@@ -250,11 +250,10 @@ describe('D40, D41: the scene draws the relation text and the marked card', () =
 		const t = cardText(on.layout.geometry);
 		for (const [id, r] of CONRAD) {
 			const card = cardEl(root, id);
-			const p = g.byId.get(id)!;
 			const text = all(card).filter((e) => e.hasClass('dynasty-card-relation'));
 			expect(text, id).toHaveLength(1);
 			expect(text[0].text).toBe(r.text);
-			expect(Number(text[0].getAttribute('y'))).toBeCloseTo(on.layout.persons.get(id)!.y + relationY(t, !!p.title, !!(p.born || p.died))!, 6);
+			expect(Number(text[0].getAttribute('y'))).toBeCloseTo(on.layout.persons.get(id)!.y + relationY(t)!, 6);
 			// Inside the Full level of detail only (spec §5.4: Compact and Overview do not show it).
 			expect(all(card).find((e) => e.hasClass('dynasty-card-full'))!.children).toContain(text[0]);
 			expect(card.hasClass('dynasty-card-me')).toBe(id === 'conrad');
@@ -262,7 +261,7 @@ describe('D40, D41: the scene draws the relation text and the marked card', () =
 			expect(all(card).some((e) => e.hasClass('dynasty-card-me-ring'))).toBe(false);
 		}
 		// Aurel has a title and dates: the third small line. Rosamund has only dates: the second.
-		expect(relationY(t, true, true)).toBe(t.relationBaseline);
+		expect(relationY(t)).toBe(t.relationBaseline);
 		for (const e of all(root)) expect(e.attrs.has('fill') || e.attrs.has('stroke') || e.attrs.has('style')).toBe(false);
 	});
 

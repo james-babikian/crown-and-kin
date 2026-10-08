@@ -13,7 +13,8 @@ describe('0.2.4 settings keys', () => {
 		const s = normaliseSettings({ embedHeightDesktop: 500, cardSize: 'compact' });
 		expect(s.breakWords).toBe('');
 		expect(s.reduceMotion).toBe('system');
-		expect(s.cardSize).toBe('compact');
+		// 0.2.6 (D179): the stored card size is ignored.
+		expect('cardSize' in s).toBe(false);
 	});
 
 	it('keeps a valid value and replaces a wrong one', () => {

@@ -283,7 +283,7 @@ describe('F14: the saved picture keeps the view\'s folds', () => {
 		return {
 			g,
 			orientation: 'down' as const,
-			geo: geometryFor(16, 'normal'),
+			geo: geometryFor(16),
 			relationLine: false,
 			fonts: { text: 'serif', ui: 'sans-serif', bold: '600' },
 			showDates: true,

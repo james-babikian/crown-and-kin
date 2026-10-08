@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_LAYOUT_SETTINGS, clearLayoutCache, layoutTree } from '../src/layout/index';
-import { cardText, geometryFor, nameCountOf, roomAt, tallExtra } from '../src/layout/geometry';
+import { geometryFor, nameCountOf, tallExtra } from '../src/layout/geometry';
 import type { LayoutSettings } from '../src/layout/model';
 import { nameLines } from '../src/render/name-lines';
 import { graphOf } from './acceptance/m10-support';
@@ -10,7 +10,7 @@ import { graphOf } from './acceptance/m10-support';
  * does not make: the gap under a three-line card, `longNames` alone, and the box-to-count helper.
  */
 
-const GEO = geometryFor(16, 'normal');
+const GEO = geometryFor(16);
 const source = ['people:', ...['a', 'b', 'c'].flatMap((id) => [`  - id: ${id}`, `    name: Person ${id}`, ...(id === 'a' ? [] : [`    parents: [${id === 'b' ? 'a' : 'b'}]`])]), ''].join('\n');
 const graph = () => graphOf(source);
 
@@ -39,12 +39,6 @@ describe('name text line helpers', () => {
 		expect(nameCountOf({})).toBe(1);
 		expect(nameCountOf({ tallName: true })).toBe(2);
 		expect(nameCountOf({ tallName: true, longName: true })).toBe(3);
-	});
-
-	it('roomAt leaves a name text line that no box reaches at the normal width', () => {
-		const t = cardText(GEO, 2);
-		const portrait = { x: t.padX + t.textW - 24, y: t.textBottom - 24, w: 24, h: 24 };
-		expect(roomAt(GEO, t, t.nameBaseline, t.nameSize, [{ r: portrait, gap: 4 }])).toBe(t.textW);
 	});
 
 	it('an empty name is one empty text line', () => {

@@ -72,7 +72,7 @@ describe('styles.css cards and union signs (D26, D27)', () => {
 	});
 
 	it('house strips: 0.5 em wide, lifted in the dark theme, less faded when dead', () => {
-		expect(cardText(geometryFor(16, 'normal')).stripW).toBe(8);
+		expect(cardText(geometryFor(16)).stripW).toBe(8);
 		expect(values('.theme-dark .dynasty-has-house .dynasty-card-strip', 'fill')).toEqual([
 			'var(--dynasty-house-color)',
 			`color-mix(in srgb, var(--dynasty-house-color) ${Math.round((1 - HOUSE_DARK_LIFT) * 100)}%, var(--text-normal))`,
@@ -99,7 +99,7 @@ describe('styles.css cards and union signs (D26, D27)', () => {
 // Text sizes live in styles.css (spec §5.8); truncation measures with the constants in code.
 describe('styles.css text sizes match what the renderer measures', () => {
 	const times = (k: number) => (k === 1 ? 'var(--dynasty-font-size)' : `calc(var(--dynasty-font-size) * ${k})`);
-	const t = cardText(geometryFor(16, 'normal'));
+	const t = cardText(geometryFor(16));
 
 	it.each([
 		['.dynasty-card-name', t.nameSize / 16],

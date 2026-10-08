@@ -1,60 +1,46 @@
 /*
  * Finds which cards need two or three text lines for their name (D29, D37, D81) or two for their title text line with
- * a reign (D61) instead of one truncated line, and which cards lift their arms box and portrait (rule B, D126 4).
+ * a reign (D61) instead of one truncated line.
  * `tree-view.ts` calls `tallCardsFor` and `tallTitlesFor` before layout, and passes their answers in as
  * `settings.tallCards` and `settings.tallTitles` so the layout makes exactly these cards taller; `sameTall` lets it
- * skip a re-layout when an answer has not changed. 0.2.4: the name is broken with `cardNameLines` and the room that the
- * arms box and the portrait leave (`nameRoom`), the same call that `scene.ts` and `svg-string.ts` make to draw it.
- * 0.2.5: the Roundel and the text card have no boxes at the lower right, so no picture narrows a name, the inner edge of the mark's border is
- * passed to `nameRoom` (the Roundel's room depends on it), and rule B (the lift) and the second slot of D129 do not apply.
+ * skip a re-layout when an answer has not changed. The name is broken with `cardNameLines` and the room that `nameRoom` gives,
+ * the same call that `scene.ts` and `svg-string.ts` make to draw it. 0.2.6 (D179): no picture narrows a name (the classic card is gone),
+ * so rule B (the lift) and the second name slot of D129 are gone too; the inner edge of the mark's border is passed to `nameRoom`
+ * (the Roundel's room depends on it).
  */
 
 import type { FamilyGraph } from '../../core/derive';
 import type { CardLabel } from '../../core/titles';
 import type { Person } from '../../core/types';
-import { boxesClear, boxesShown, cardBoxes, cardText, isRoundel, isTextCard, nameRoom, nameSlots, relationY, roomAt, smallLineOf, tallExtra, type CardText } from '../../layout/geometry';
+import { cardText, nameRoom } from '../../layout/geometry';
 import { couldBeSigned } from '../../layout/illegitimate-sign';
 import type { Geometry, NameLineCount, NameRoom } from '../../layout/model';
 import type { BreakList } from '../break-words';
 import { cardNameLines, titleLines, type NameMeasure } from '../name-lines';
 import { ME_RING_INNER } from '../styles';
-import { dateLine } from '../tree-info';
-import { relationFont, type Measure, type SceneFonts } from './scene';
+import type { Measure, SceneFonts } from './scene';
 
-/**
- * D29, D81: the people whose name needs two or three text lines (`tall`) and the ones that need three (`long`, a subset of `tall`), both sorted.
- * `slots` holds the name slots of each tall card (2 or 3): the marked person's Compact card with the D14 sign and a one-line name has two (D129).
- * `lifted` (rule B, D126 4) holds the people whose arms box and portrait move one small text line up so that the relation text fits.
- */
+/** D29, D81: the people whose name needs two or three text lines (`tall`) and the ones that need three (`long`, a subset of `tall`), both sorted. */
 export interface TallNames {
 	tall: string[];
 	long: string[];
-	slots: ReadonlyMap<string, NameLineCount>;
-	lifted: ReadonlySet<string>;
 }
 
 /** What `tallCardsFor` reads besides the graph and the geometry. */
 export interface TallExtra {
-	/** The people whose card shows a portrait ("Show portraits on cards" on and the style shows it). */
-	portraits?: ReadonlySet<string>;
 	/** The user's break places (D118). */
 	breaks?: BreakList;
-	/** The marked person (D41): the card has a border (D153) whose inner edge the arms box, the portrait and the D14 sign keep clear of. */
+	/** The marked person (D41): the card has a border (D153) whose inner edge the D14 sign keeps clear of. */
 	marked?: string;
-	/** The relation text of each card, only when the words show (the setting on and the card whole): rule B reads it. Absent: nothing lifts. */
-	relations?: ReadonlyMap<string, { text: string }>;
-	/** "Show dates on cards" (spec §13.3): off leaves the reign out of the title text line, which moves the relation text line. Absent = on. */
-	showDates?: boolean;
 }
 
 /**
  * D29, D37, D81: the people whose name needs two or three text lines on their card (`tall`) and those
  * that need three (`long`; a name that needs more is cut with "…" on the third), in every layout.
  * `geo` is the geometry the cards are drawn with (`drawnGeometry`); the width is the one `buildScene`
- * gives the name: the card's text width, less the D14 sign, and for the final text line the room that the arms box and the portrait
- * leave (`nameRoom`, spec §13.9). The name is measured in the note font's bold name font, the sobriquet in regular weight. With `labels`
+ * gives the name: the card's text width, less the D14 sign (`nameRoom`, spec §13.9). The name is measured in the note font's bold name font, the sobriquet in regular weight. With `labels`
  * (M8), the name measured is the card's name text line (`CardLabel.name`, "Roderick II", D58) and the sobriquet follows it (D122).
- * `arms` is the people of `armsCards` (M9). People in `skip` (hidden by folds) are left out. The layout then makes exactly these
+ * People in `skip` (hidden by folds) are left out. The layout then makes exactly these
  * cards taller. Both lists are sorted, so equal sets compare equal. Pure but for `measure`.
  *
  * The D14 sign comes from the lines (`illegitimateSigns`). Without `signed`, the answer is `undefined` when the sign changes the
@@ -68,7 +54,6 @@ export function tallCardsFor(
 	measure: Measure,
 	signed?: ReadonlySet<string>,
 	labels?: ReadonlyMap<string, CardLabel>,
-	arms?: ReadonlySet<string>,
 	skip?: ReadonlySet<string>,
 	extra?: TallExtra,
 ): TallNames | undefined {
@@ -76,93 +61,41 @@ export function tallCardsFor(
 	const bold = `${fonts.bold} ${t1.nameSize}px ${fonts.text}`;
 	const regular = `400 ${t1.nameSize}px ${fonts.text}`;
 	const nameMeasure: NameMeasure = (s, sob) => measure(s, sob ? regular : bold);
-	// The text positions of a card depend on its slot count only; the name room of a card with no marked ring is the same for every such person.
-	const formed = isRoundel(geo) || isTextCard(geo);
-	const texts = new Map<number, CardText>([[1, t1]]);
-	const textFor = (slots: number): CardText => {
-		let t = texts.get(slots);
-		if (!t) texts.set(slots, (t = cardText(geo, slots as NameLineCount)));
-		return t;
-	};
-	const rooms = new Map<string, NameRoom>();
+	// The name room of a card with no marked ring is the same for every such person.
+	const rooms = new Map<boolean, NameRoom>();
 
-	const plan = (p: Person, name: string, sob: string | undefined, isSigned: boolean): { slots: NameLineCount; lifted: boolean } => {
-		const isMe = extra?.marked === p.id;
-		const ring = isMe ? ME_RING_INNER : undefined;
-		// E4: a marked Normal card with the D14 sign shows no arms and no portrait below 11 px: the boxes and the pushed-down sign would touch.
-		const show = boxesShown(geo, isMe, isSigned);
-		const wantArms = !formed && show && !!arms?.has(p.id);
-		const wantPortrait = !formed && show && !!extra?.portraits?.has(p.id);
-		// D129: the marked Compact card with the sign has a second name slot. A card with no boxes needs none.
-		const twoSlot = !formed && nameSlots(geo, 1, isSigned, isMe) === 2;
-		const t = textFor(twoSlot ? 2 : 1);
-		const boxH = geo.cardH + (twoSlot ? tallExtra(geo) : 0);
-		const key = `${wantArms ? 1 : 0}${wantPortrait ? 1 : 0}${isSigned ? 1 : 0}`;
-		let room = ring === undefined ? rooms.get(key) : undefined;
+	const plan = (p: Person, name: string, sob: string | undefined, isSigned: boolean): NameLineCount => {
+		const ring = extra?.marked === p.id ? ME_RING_INNER : undefined;
+		let room = ring === undefined ? rooms.get(isSigned) : undefined;
 		if (!room) {
-			room = nameRoom(geo, t, isSigned, wantArms || wantPortrait ? cardBoxes(geo, t, boxH, { arms: wantArms, portrait: wantPortrait, ...(ring === undefined ? {} : { ring }) }).boxes : [], ring);
-			if (ring === undefined) rooms.set(key, room);
+			room = nameRoom(geo, t1, isSigned, ring);
+			if (ring === undefined) rooms.set(isSigned, room);
 		}
-		const lines = cardNameLines(name, sob, room, nameMeasure, 3, extra?.breaks).length as NameLineCount;
-		const slots = formed ? lines : nameSlots(geo, lines, isSigned, isMe);
-		return { slots, lifted: wantLift(p, slots, isSigned, wantArms, wantPortrait, ring, isMe) };
-	};
-
-	/** Rule B (D126 4): true when the relation text is wider than the room beside the boxes but fits the text width, and the lifted boxes keep clear (E4). */
-	const wantLift = (p: Person, slots: NameLineCount, isSigned: boolean, wantArms: boolean, wantPortrait: boolean, ring: number | undefined, isMe: boolean): boolean => {
-		if (formed || !geo.relationLine || !(wantArms || wantPortrait)) return false;
-		const text = extra?.relations?.get(p.id)?.text;
-		if (!text) return false;
-		const t = textFor(slots);
-		const label = labels?.get(p.id);
-		const title = label ? label.title : p.title;
-		const reign = label && extra?.showDates !== false ? label.reign : undefined;
-		const y = relationY(t, !!title || !!reign, !!dateLine(p));
-		if (y === undefined) return false;
-		const boxH = geo.cardH + (slots - 1) * tallExtra(geo);
-		const o = { arms: wantArms, portrait: wantPortrait, ...(ring === undefined ? {} : { ring }) };
-		const w = measure(text, relationFont(t.smallSize, fonts.text, isMe, fonts.bold));
-		if (w > t.textW || w <= roomAt(geo, t, y, t.smallSize, cardBoxes(geo, t, boxH, o).boxes)) return false;
-		const up = cardBoxes(geo, t, boxH, { ...o, lift: smallLineOf(geo) });
-		// A lift that leaves the text beside a box (a card with no title line has its relation text one line higher) helps nothing.
-		if (w > roomAt(geo, t, y, t.smallSize, up.boxes)) return false;
-		return boxesClear(geo, t, [...(up.arms ? [up.arms.full] : []), ...(up.portrait ? [up.portrait] : [])], { signed: isSigned, ...(ring === undefined ? {} : { ring }) });
+		return cardNameLines(name, sob, room, nameMeasure, 3, extra?.breaks).length as NameLineCount;
 	};
 
 	const tall: string[] = [];
 	const long: string[] = [];
-	const slotsOf = new Map<string, NameLineCount>();
-	const lifted = new Set<string>();
 	for (const p of g.people) {
 		if (skip?.has(p.id)) continue;
 		const label = labels?.get(p.id);
 		const name = label?.name ?? p.name;
 		if (!name) continue;
 		const sob = label?.sobriquet ?? p.sobriquet;
-		let result = plan(p, name, sob, false);
+		let slots = plan(p, name, sob, false);
 		if (couldBeSigned(g, p)) {
 			if (signed) {
-				if (signed.has(p.id)) result = plan(p, name, sob, true);
-			} else {
-				const withSign = plan(p, name, sob, true);
-				if (withSign.slots !== result.slots || withSign.lifted !== result.lifted) return undefined;
-			}
+				if (signed.has(p.id)) slots = plan(p, name, sob, true);
+			} else if (plan(p, name, sob, true) !== slots) return undefined;
 		}
-		if (result.slots > 1) {
-			tall.push(p.id);
-			slotsOf.set(p.id, result.slots);
-		}
-		if (result.slots > 2) long.push(p.id);
-		if (result.lifted) lifted.add(p.id);
+		if (slots > 1) tall.push(p.id);
+		if (slots > 2) long.push(p.id);
 	}
-	return { tall: tall.sort(), long: long.sort(), slots: slotsOf, lifted };
+	return { tall: tall.sort(), long: long.sort() };
 }
 
 /** Same people, same order (both lists from `tallCardsFor`, or none). */
 export const sameTall = (a: readonly string[] | undefined, b: readonly string[] | undefined) => (a ?? []).length === (b ?? []).length && (a ?? []).every((id, i) => id === b![i]);
-
-/** The same people in two `lifted` sets (or none). */
-export const sameLifted = (a: ReadonlySet<string> | undefined, b: ReadonlySet<string> | undefined) => (a?.size ?? 0) === (b?.size ?? 0) && [...(a ?? [])].every((id) => b!.has(id));
 
 /**
  * D61 (spec §13.3): the people whose title text line (`titleLines`) takes two text lines, sorted.

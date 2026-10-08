@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { deriveFamilies, type FamilyGraph } from '../src/core/derive';
 import { parseDynasty } from '../src/core/parse';
-import { computeRelations, findRelation, relationRunStats, type Relation } from '../src/core/relations';
+import { computeRelations, findRelation, relationRunStats, type Relation, type RelationOptions } from '../src/core/relations';
 import { cardRelationText, MAYBE_TEXT, relationSummary, spokenRelation } from '../src/render/tree-info';
 import { relationsFor, clearRelationCache } from '../src/obsidian/relation-cache';
 import { build, fixture } from './helpers';
@@ -29,8 +29,11 @@ function tree(people: string[], me?: string): FamilyGraph {
 	return deriveFamilies(r.tree);
 }
 
-const rels = (g: FamilyGraph, id: string, me = 'E'): readonly Relation[] => computeRelations(g, me).get(id) ?? [];
-const names = (g: FamilyGraph, id: string, me = 'E') => rels(g, id, me).map((r) => r.text);
+const rels = (g: FamilyGraph, id: string, me = 'E', options?: RelationOptions): readonly Relation[] => computeRelations(g, me, options).get(id) ?? [];
+const names = (g: FamilyGraph, id: string, me = 'E', options?: RelationOptions) => rels(g, id, me, options).map((r) => r.text);
+/** D174: the setting "Assume an unknown second parent" off (the default is on). */
+const OFF: RelationOptions = { oneParentUnknown: false };
+const ON: RelationOptions = { oneParentUnknown: true };
 
 const base = ['M f', 'R m', 'F m', 'E m M R:rumoured', 'G m R M', 'A m F M'];
 const a = tree([...base, 'S f M R:rumoured']);
@@ -42,7 +45,7 @@ describe('D123: cards and sheet words (contract 2.2 and 2.4)', () => {
 	it('case a: the card of the half-brother says ", maybe full"; the maybe is full with the name Brother', () => {
 		const g = rels(a, 'G');
 		expect(g[0].text).toBe('Half-brother');
-		expect(g[0].maybe).toEqual({ effect: 'full', text: 'Brother', lower: 'brother' });
+		expect(g[0].maybe).toEqual({ effect: 'full', text: 'Brother', lower: 'brother', cause: 'rumoured' });
 		expect(cardRelationText(g[0])).toBe('Half-brother, maybe full');
 		expect(cardRelationText(g[0])).toBe(`${g[0].text}${MAYBE_TEXT.cardFull}`);
 		expect(spokenRelation(g[0])).toBe('half-brother, or brother if the rumoured links are true');
@@ -50,28 +53,28 @@ describe('D123: cards and sheet words (contract 2.2 and 2.4)', () => {
 	it('case a: the rumoured line says brother, not half-brother', () => {
 		expect(names(a, 'G')).toEqual(['Half-brother', 'Rumoured brother']);
 	});
-	it('case a: A (no rumoured link at all) and S (full by sure and by rumoured parents) get no maybe', () => {
+	it('case a: A (no rumoured link at all) gets no maybe; S (D174: both incomplete) is half, maybe full', () => {
 		expect(rels(a, 'A')[0].maybe).toBeUndefined();
-		expect(rels(a, 'S')[0].maybe).toBeUndefined();
+		expect(rels(a, 'S')[0].maybe).toEqual({ effect: 'full', text: 'Sister', lower: 'sister', cause: 'rumoured' });
 	});
-	it('case b (no father listed for S): Sister, no maybe, no extra name', () => {
-		expect(names(b, 'S')).toEqual(['Sister']);
-		expect(rels(b, 'S')[0].maybe).toBeUndefined();
+	it('case b (no father listed for S; D174, setting on): Half-sister, maybe full with cause unlisted, no extra name', () => {
+		expect(names(b, 'S')).toEqual(['Half-sister']);
+		expect(rels(b, 'S')[0].maybe).toEqual({ effect: 'full', text: 'Sister', lower: 'sister', cause: 'unlisted' });
 	});
 	it('case c: Half-sister, maybe full', () => {
 		const s = rels(c, 'S');
 		expect(s[0].text).toBe('Half-sister');
-		expect(s[0].maybe).toEqual({ effect: 'full', text: 'Sister', lower: 'sister' });
+		expect(s[0].maybe).toEqual({ effect: 'full', text: 'Sister', lower: 'sister', cause: 'rumoured' });
 		expect(names(c, 'S')).toEqual(['Half-sister', 'Rumoured sister']);
 		expect(cardRelationText(s[0])).toBe('Half-sister, maybe full');
 	});
-	it('case d: Sister with maybe half; the list holds Rumoured half-sister; the card and the spoken text add nothing', () => {
+	it('case d (D174): both are incomplete, so Half-sister; two different rumoured fathers change nothing', () => {
 		const s = rels(d, 'S');
-		expect(s[0].text).toBe('Sister');
-		expect(s[0].maybe).toEqual({ effect: 'half', text: 'Half-sister', lower: 'half-sister' });
-		expect(s.map((r) => r.text)).toEqual(['Sister', 'Rumoured half-sister']);
-		expect(cardRelationText(s[0])).toBe('Sister');
-		expect(spokenRelation(s[0])).toBe('sister');
+		expect(s[0].text).toBe('Half-sister');
+		expect(s[0].maybe).toBeUndefined();
+		expect(s.map((r) => r.text)).toEqual(['Half-sister']);
+		expect(cardRelationText(s[0])).toBe('Half-sister');
+		expect(spokenRelation(s[0])).toBe('half-sister');
 	});
 	it("case c': no rumoured link, no maybe anywhere", () => {
 		const c2 = tree(['M f', 'R m', 'F m', 'E m F M', 'G m R M', 'A m F M', 'S f F M']);
@@ -84,9 +87,9 @@ describe('D123: cards and sheet words (contract 2.2 and 2.4)', () => {
 			also: 'Also: rumoured brother.',
 			maybe: 'If every rumoured link is true, this person is your brother.',
 		});
-		const s = rels(d, 'S');
-		expect(relationSummary(s, false).maybe).toBe('If every rumoured link is true, this person is your half-sister.');
-		expect(relationSummary(rels(b, 'S'), false).maybe).toBeUndefined();
+		// D174: case d has no maybe now, and case b has one (cause unlisted); A has none in every case.
+		expect(relationSummary(rels(d, 'S'), false).maybe).toBeUndefined();
+		expect(relationSummary(rels(a, 'A'), false).maybe).toBeUndefined();
 		expect(relationSummary(undefined, false).maybe).toBeUndefined();
 		expect(relationSummary(g, true).maybe).toBeUndefined();
 	});
@@ -108,10 +111,13 @@ describe('D123: cards and sheet words (contract 2.2 and 2.4)', () => {
 
 describe('D123: the oracle is not "every rumoured parent becomes birth" (gate proofs)', () => {
 	const caseB = ['M f', 'R m', 'F m', 'E m M R:rumoured', 'G m R M', 'A m F M', 'S f M'];
-	it('case b says Sister (the oracle with rumoured links as birth links must also say Sister)', () => {
+	it('case b (D174): Half-sister, and with rumoured links as birth links also Half-sister; only the cause of the maybe tells them apart', () => {
 		const asBirth = tree(caseB.map((l) => l.replace(':rumoured', '')));
-		expect(names(tree(caseB), 'S')).toEqual(['Sister']);
+		expect(names(tree(caseB), 'S')).toEqual(['Half-sister']);
 		expect(names(asBirth, 'S')).toEqual(['Half-sister']);
+		expect(names(tree(caseB), 'S', 'E', OFF)).toEqual(['Half-sister']);
+		expect(rels(tree(caseB), 'S', 'E', OFF)[0].maybe).toBeUndefined();
+		expect(names(asBirth, 'S', 'E', OFF)).toEqual(['Half-sister']);
 	});
 	const cousins = ['g1 m', 'g2 f', 'g3 f', 'g4 m', 'g5 m', 'f1 m g1 g2', 'f2 m g1 g2', 'm1 f g3 g4', 'm2 f g3 g5', 'E m f1 m1', 'P m f2 m2'];
 	it('cousins: First cousin and Half first cousin, with no rumour', () => {
@@ -171,7 +177,7 @@ describe('D123: equal names merge and keep the maybe, in both person orders', ()
 		const list = rels(g, 'P');
 		const half = list.filter((r) => r.lower === 'half first cousin');
 		expect(half).toHaveLength(1);
-		expect(half[0].maybe).toEqual({ effect: 'full', text: 'First cousin', lower: 'first cousin' });
+		expect(half[0].maybe).toEqual({ effect: 'full', text: 'First cousin', lower: 'first cousin', cause: 'rumoured' });
 		expect(list[0]).toBe(half[0]);
 		expect(list.map((r) => r.text)).toContain('Rumoured first cousin');
 		const found = findRelation(g, 'E', 'P');
@@ -230,11 +236,11 @@ describe('D123: the finder step word of a sibling step with a rumoured link', ()
 		if (found.kind !== 'named') throw new Error('named');
 		expect(found.relations.map((x) => x.steps.map((s) => s.word))).toEqual([['half-sister'], ['rumoured sister']]);
 	});
-	it('case d: E (rumoured R) and S (rumoured Q): both names show the sure line, so both steps say sister', () => {
+	it('case d (D174): E (rumoured R) and S (rumoured Q): one name, half-sister, and the step says half-sister', () => {
 		const found = findRelation(d, 'E', 'S');
 		if (found.kind !== 'named') throw new Error('named');
-		expect(found.relations.map((x) => x.relation.lower)).toEqual(['sister', 'rumoured half-sister']);
-		expect(found.relations.map((x) => x.steps.map((s) => s.word))).toEqual([['sister'], ['sister']]);
+		expect(found.relations.map((x) => x.relation.lower)).toEqual(['half-sister']);
+		expect(found.relations.map((x) => x.steps.map((s) => s.word))).toEqual([['half-sister']]);
 	});
 	it('a step with no rumoured link keeps the sure half word', () => {
 		const found = findRelation(b, 'E', 'G');
@@ -244,14 +250,14 @@ describe('D123: the finder step word of a sibling step with a rumoured link', ()
 });
 
 describe('D123: the second comparison runs only where a rumoured link lies in the ancestry', () => {
-	it('a tree with no rumoured link: zero extra work', () => {
+	it('a tree with no rumoured link, setting off: zero extra work (D174: with the setting on, the second test may run where the sure test gives half)', () => {
 		const g = build(fixture('03')).g;
 		relationRunStats.second = 0;
-		for (const p of g.people) computeRelations(g, p.id);
+		for (const p of g.people) computeRelations(g, p.id, OFF);
 		expect(relationRunStats.second).toBe(0);
 		const cousins = tree(['g1 m', 'g2 f', 'g3 f', 'g4 m', 'g5 m', 'f1 m g1 g2', 'f2 m g1 g2', 'm1 f g3 g4', 'm2 f g3 g5', 'E m f1 m1', 'P m f2 m2']);
-		for (const p of cousins.people) computeRelations(cousins, p.id);
-		findRelation(cousins, 'E', 'P');
+		for (const p of cousins.people) computeRelations(cousins, p.id, OFF);
+		findRelation(cousins, 'E', 'P', OFF);
 		expect(relationRunStats.second).toBe(0);
 	});
 	it('a tree with a rumoured link counts the comparisons', () => {
@@ -276,75 +282,115 @@ function rng(seed: number): () => number {
 	};
 }
 
-describe('D123: random trees against an independent brute force (rules 1 to 5)', () => {
+describe('D123 and D174: random trees against an independent brute force (spec §13.1 "Sure and maybe", both settings)', () => {
 	// Children C0..Cn of up to four parents. For every pair (me, p) and every common parent X, the sets S (birth parents), R (rumoured
-	// parents) and the two comparisons are worked out here, with no use of the plugin's search.
+	// parents), A = S + R and the two tests are worked out here, with no use of the plugin's search (D174 rules, spec fix of 2026-10-06).
 	type Kid = { id: string; sex: string; parents: { id: string; type: 'birth' | 'rumoured' }[] };
+	type Maybe = { effect: 'full' | 'half'; cause: 'rumoured' | 'unlisted' } | undefined;
 	const sib = (sex: string, half: boolean) => `${half ? 'half-' : ''}${sex === 'm' ? 'brother' : sex === 'f' ? 'sister' : 'sibling'}`;
-	function expected(kids: Kid[], me: Kid, p: Kid): Map<string, 'full' | 'half' | undefined> {
-		const out = new Map<string, 'full' | 'half' | undefined>();
-		const idsOf = (k: Kid, t: 'birth' | 'rumoured') => k.parents.filter((x) => x.type === t).map((x) => x.id);
-		const sure = (k: Kid) => [...idsOf(k, 'birth')].sort().join(',');
-		const all = (k: Kid) => k.parents.map((x) => x.id).sort().join(',');
-		const rum = (k: Kid) => idsOf(k, 'rumoured').sort().join(',');
-		const add = (name: string, effect?: 'full' | 'half') => {
-			if (!out.has(name)) out.set(name, effect);
-			else if (effect && (out.get(name) === undefined || (effect === 'full' && out.get(name) === 'half'))) out.set(name, effect);
+	function expected(me: Kid, p: Kid, on: boolean): Map<string, Maybe> {
+		const out = new Map<string, Maybe>();
+		const idsOf = (k: Kid, t: 'birth' | 'rumoured') => k.parents.filter((x) => x.type === t).map((x) => x.id).sort();
+		const key = (xs: string[]) => [...new Set(xs)].sort().join(',');
+		const S = (k: Kid) => idsOf(k, 'birth');
+		const R = (k: Kid) => idsOf(k, 'rumoured');
+		const A = (k: Kid) => [...S(k), ...R(k)];
+		// Sure test: a child is incomplete with fewer than two birth parents, if the setting is on or it has a rumoured parent.
+		const incomplete = (k: Kid) => S(k).length < 2 && (on || R(k).length > 0);
+		// D176: a child with at most one birth parent and three or more listed parents could have any pair of rumoured parents
+		// beside its birth parent; it keeps also the whole set. Every other child has the one set A.
+		const choices = (k: Kid): string[][] => {
+			const sure = S(k);
+			const rum = R(k);
+			if (sure.length >= 2 || sure.length + rum.length <= 2 || rum.length > 8) return [A(k)];
+			const out: string[][] = [A(k)];
+			for (let mask = 0; mask < 1 << rum.length; mask++) {
+				const q = rum.filter((_, i) => mask & (1 << i));
+				if (sure.length + q.length === 2) out.push([...sure, ...q]);
+			}
+			return out;
+		};
+		// Second test: two equal choices, neither of fewer than two people where the setting is on.
+		const secondFull = choices(me).some((t1) => choices(p).some((t2) => key(t1) === key(t2) && !(on && t1.length < 2)));
+		// A maybe of a half pair by rumour: two equal choices of any size; by unlisted parent: two choices of at most two people together.
+		const equalChoice = choices(me).some((t1) => choices(p).some((t2) => key(t1) === key(t2)));
+		const fewTogether = choices(me).some((t1) => choices(p).some((t2) => key([...t1, ...t2]).split(',').length <= 2));
+		const sureHalf = key(S(me)) !== key(S(p)) || incomplete(me) || incomplete(p);
+		const sameA = key(A(me)) === key(A(p));
+		const secondHalf = !secondFull;
+		const rumourIn = R(me).length + R(p).length > 0;
+		const add = (name: string, m: Maybe) => {
+			const old = out.get(name);
+			// Rule 6: keep the maybe of any; full beats half, then rumoured beats unlisted.
+			const rank = (x: Maybe) => (x ? (x.effect === 'full' ? 2 : 0) + (x.cause === 'rumoured' ? 1 : 0) + 1 : 0);
+			if (!out.has(name) || rank(m) > rank(old)) out.set(name, m);
 		};
 		for (const x of me.parents) {
 			const link = p.parents.find((y) => y.id === x.id);
 			if (!link) continue;
 			if (x.type === 'birth' && link.type === 'birth') {
-				const half = sure(me) !== sure(p);
-				let effect: 'full' | 'half' | undefined;
-				if (half && (rum(me) !== '' || rum(p) !== '') && all(me) === all(p)) effect = 'full';
-				if (!half && rum(me) !== '' && rum(p) !== '' && rum(me) !== rum(p)) effect = 'half';
-				add(sib(p.sex, half), effect);
-				if (effect) add(`rumoured ${sib(p.sex, effect === 'full' ? false : true)}`);
+				let m: Maybe;
+				if (sureHalf) {
+					if (equalChoice && rumourIn) m = { effect: 'full', cause: 'rumoured' };
+					else if (on && fewTogether) m = { effect: 'full', cause: 'unlisted' };
+				} else if (!sameA) m = { effect: 'half', cause: 'rumoured' };
+				add(sib(p.sex, sureHalf), m);
+				if (m?.cause === 'rumoured') add(`rumoured ${sib(p.sex, m.effect === 'half')}`, undefined);
 			} else {
-				add(`rumoured ${sib(p.sex, all(me) !== all(p))}`);
+				add(`rumoured ${sib(p.sex, secondHalf)}`, undefined);
 			}
 		}
-		void kids;
 		return out;
 	}
-	it('300 random trees', () => {
-		const rand = rng(20261004);
-		let checked = 0;
-		let withMaybe = 0;
-		for (let round = 0; round < 300; round++) {
-			const nParents = 2 + Math.floor(rand() * 3);
-			const nKids = 3 + Math.floor(rand() * 4);
-			const parents = Array.from({ length: nParents }, (_, i) => `P${i}`);
-			const kids: Kid[] = [];
-			for (let i = 0; i < nKids; i++) {
-				const chosen = parents.filter(() => rand() < 0.55);
-				kids.push({
-					id: `C${i}`,
-					sex: ['m', 'f', '-'][Math.floor(rand() * 3)],
-					parents: chosen.map((id) => ({ id, type: rand() < 0.4 ? ('rumoured' as const) : ('birth' as const) })),
-				});
-			}
-			const lines = [...parents.map((id) => `${id} ${rand() < 0.5 ? 'm' : 'f'}`), ...kids.map((k) => `${k.id} ${k.sex} ${k.parents.map((x) => (x.type === 'birth' ? x.id : `${x.id}:rumoured`)).join(' ')}`.trim())];
-			const g = tree(lines);
-			for (const me of kids) {
-				const all = computeRelations(g, me.id);
-				for (const other of kids) {
-					if (other === me) continue;
-					const want = expected(kids, me, other);
-					const got = all.get(other.id) ?? [];
-					expect(got.map((r) => r.lower).sort(), `round ${round} ${me.id}>${other.id}\n${lines.join('\n')}`).toEqual([...want.keys()].sort());
-					for (const r of got) {
-						expect(r.maybe?.effect, `round ${round} ${me.id}>${other.id} ${r.lower}\n${lines.join('\n')}`).toBe(want.get(r.lower));
-						if (r.maybe) withMaybe++;
+	for (const [label, on] of [
+		['setting on', true],
+		['setting off', false],
+	] as const) {
+		it(`300 random trees, ${label}`, () => {
+			const rand = rng(20261004);
+			const options: RelationOptions = on ? ON : OFF;
+			let checked = 0;
+			let withMaybe = 0;
+			let unlisted = 0;
+			for (let round = 0; round < 300; round++) {
+				const nParents = 2 + Math.floor(rand() * 3);
+				const nKids = 3 + Math.floor(rand() * 4);
+				const parents = Array.from({ length: nParents }, (_, i) => `P${i}`);
+				const kids: Kid[] = [];
+				for (let i = 0; i < nKids; i++) {
+					const chosen = parents.filter(() => rand() < 0.55);
+					kids.push({
+						id: `C${i}`,
+						sex: ['m', 'f', '-'][Math.floor(rand() * 3)],
+						parents: chosen.map((id) => ({ id, type: rand() < 0.4 ? ('rumoured' as const) : ('birth' as const) })),
+					});
+				}
+				const lines = [...parents.map((id) => `${id} ${rand() < 0.5 ? 'm' : 'f'}`), ...kids.map((k) => `${k.id} ${k.sex} ${k.parents.map((x) => (x.type === 'birth' ? x.id : `${x.id}:rumoured`)).join(' ')}`.trim())];
+				const g = tree(lines);
+				for (const me of kids) {
+					const all = computeRelations(g, me.id, options);
+					for (const other of kids) {
+						if (other === me) continue;
+						const want = expected(me, other, on);
+						const got = all.get(other.id) ?? [];
+						const where = `round ${round} ${me.id}>${other.id}\n${lines.join('\n')}`;
+						expect(got.map((r) => r.lower).sort(), where).toEqual([...want.keys()].sort());
+						for (const r of got) {
+							const w = want.get(r.lower);
+							expect(r.maybe ? { effect: r.maybe.effect, cause: r.maybe.cause } : undefined, `${where}\n${r.lower}`).toEqual(w);
+							if (r.maybe) withMaybe++;
+							if (r.maybe?.cause === 'unlisted') unlisted++;
+						}
+						checked++;
 					}
-					checked++;
 				}
 			}
-		}
-		expect(checked).toBeGreaterThan(1000);
-		expect(withMaybe).toBeGreaterThan(50);
-	});
+			expect(checked).toBeGreaterThan(1000);
+			expect(withMaybe).toBeGreaterThan(50);
+			if (on) expect(unlisted).toBeGreaterThan(20);
+			else expect(unlisted).toBe(0);
+		});
+	}
 });
 
 describe('D123: timing with a rumoured link on every person (contract 2.3)', () => {

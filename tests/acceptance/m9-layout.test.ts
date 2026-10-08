@@ -1,17 +1,15 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import { deriveFamilies, type FamilyGraph } from '../../src/core/derive';
 import { focusSubgraph } from '../../src/core/focus-subgraph';
-import type { CardLabel } from '../../src/core/titles';
-import { cardText, geometryFor, type CardText } from '../../src/layout/geometry';
-import { DEFAULT_LAYOUT_SETTINGS, clearLayoutCache, illegitimateSigns, layoutKey, layoutTree } from '../../src/layout/index';
-import type { CardSize, Geometry, LaidOut, LayoutSettings, Rect } from '../../src/layout/model';
+import { cardForm, geometryFor } from '../../src/layout/geometry';
+import { DEFAULT_LAYOUT_SETTINGS, clearLayoutCache, layoutKey, layoutTree } from '../../src/layout/index';
+import type { Geometry, LaidOut, LayoutSettings, Rect } from '../../src/layout/model';
 import type { PictureSlot, setPicture, setSlotProblem } from '../../src/render/dom/pictures';
 import type { LegendHouse } from '../../src/render/legend';
 import { buildLegend, buildScene, type Scene, type SceneOptions } from '../../src/render/dom/scene';
-import { tallCardsFor } from '../../src/render/dom/tall-cards';
 import { FEl, installDom } from './fake-dom';
 import { allFixtures } from './load';
-import { block14, graphOf, layoutPictures, livePictureSlotsOf, roomAtOf, treeOf, type PictureBox, type PictureSettings } from './m9-support';
+import { block14, graphOf, layoutPictures, livePictureSlotsOf, treeOf, type PictureBox, type PictureSettings } from './m9-support';
 
 /*
  * Spec §13.6 "Cards" and "Card geometry", §13.7 "Portrait on the card" and "Text beside the
@@ -31,9 +29,8 @@ const FONT = 'test';
 const FONTS = { text: 'serif', ui: 'sans', bold: '700' };
 /** 10 px per character in every font, so a text of n characters is 10 n px wide. */
 const measure = (s: string) => [...s].length * 10;
-const LINE_HEIGHT: Record<CardSize, number> = { normal: 1.2, compact: 1.1 };
-/** D78 (C1): the size of the arms and the portrait, in px. */
-const sizeOf = (geo: Geometry) => 1.25 * LINE_HEIGHT[geo.cardSize] * geo.fontPx;
+/** 0.2.6 (D179): the pictures are drawn on the Roundel. */
+const ROUNDEL = cardForm(geometryFor(16), 'down');
 const all = (el: FEl): FEl[] => [el, ...el.children.flatMap(all)];
 
 const lay = (g: FamilyGraph, settings: LayoutSettings, geo: Geometry): LaidOut => layoutTree(g, geo, settings, FONT);
@@ -43,12 +40,6 @@ function scene(laid: LaidOut, g: FamilyGraph, extra: Partial<SceneOptions> = {})
 	const s = buildScene(root as unknown as SVGGElement, g, laid, { fonts: FONTS, measure, link: () => null, ...extra });
 	return { root, scene: s as Scene & { pictures: PictureSlot[] } };
 }
-
-const cardEl = (root: FEl, id: string) => all(root).find((e) => e.hasClass('dynasty-card') && e.getAttribute('data-person') === id)!;
-const textOf = (root: FEl, id: string, cls: string) =>
-	all(cardEl(root, id))
-		.filter((e) => e.hasClass(cls))
-		.map((e) => e.getText());
 
 /** A small tree whose text widths are chosen for the 10 px measure (textW is 158 px on normal cards at 16 px). */
 function sample(mark: boolean): string {
@@ -132,7 +123,7 @@ describe('L1 pictureSets and L2 armsCards (spec §13.6, §13.7 "Rules")', () => 
 });
 
 describe('L2 box flags and L3 the cache key (spec §13.6 "Card geometry", §13.7 "Card geometry")', () => {
-	const GEO = geometryFor(16, 'normal');
+	const GEO = geometryFor(16);
 
 	it('flags are set exactly when true; no box changes size or place; lines are the same', async () => {
 		const { armsCards } = await layoutPictures();
@@ -160,23 +151,24 @@ describe('L2 box flags and L3 the cache key (spec §13.6 "Card geometry", §13.7
 	// Recorded from the M8 build (milestone-9 at a01649a): `layoutKey` of each sample tree with
 	// DEFAULT_LAYOUT_SETTINGS at 16 px (a relation line for 14 and 07b). Without pictures the key must not change.
 	// 0.2.4: recorded again, because the key hashes the geometry and the card is 61 px high now (was 64).
+	// 0.2.6 (D179): recorded again, because the geometry has no `cardSize` field now (the key is a cache key in memory; it is never stored).
 	const M8_KEYS: Record<string, string> = {
-		'01': '5neqw57anh',
-		'02': 'jxcbm33luf',
-		'03': 'ukuh7j04by',
-		'04': '1x6f8wut5gg',
-		'05': '1cg245yx7ef',
-		'06': 'u3ykc5w5fb',
-		'07': 'tk6rajii8',
-		'07b': 'xwe8dd997c',
-		'08': '1vjfibgx5g1',
-		'09': '464cgr7hbx',
-		'10': '1o2783om77a',
-		'11': 'c6pnstqo2d',
-		'12': 'sozqubcvyn',
-		'13': 'k0xlu4o7f0',
-		'14': '168mucfhw7',
-		'15': '11thu0thtz0',
+	'01': '26rdua8jkpx',
+	'02': 'oiccpt0myx',
+	'03': '2f5qia4arx5',
+	'04': '29tq8qb3siu',
+	'05': '18yfw8atptg',
+	'06': 'pn1kh06q9l',
+	'07': '21z9zid1qap',
+	'07b': 'jmxs70n8lx',
+	'08': '38nj5i53ub',
+	'09': '1e1ypoo2sub',
+	'10': '1n4f4oh8uja',
+	'11': '27osp76dpru',
+	'12': '119hgvre1c4',
+	'13': '1n0agy2xyvo',
+	'14': '17giyycopo2',
+	'15': '8zpi4kocop',
 	};
 
 	it('with neither set, and with empty sets, the key equals the M8 key', () => {
@@ -204,333 +196,34 @@ describe('L2 box flags and L3 the cache key (spec §13.6 "Card geometry", §13.7
 	});
 });
 
-describe('D78 (C1, C2): the arms box on a Full card', () => {
-	for (const size of ['normal', 'compact'] as const) {
-		for (const mark of [false, true]) {
-			it(`${size} cards, ${mark ? 'with' : 'without'} a relation text line: ${size === 'normal' ? '1.25 × 1.5 em' : '5/6 × 1.375 em by 1.375 em'}, left of the portrait, bottom at the bottom of the text block (D117)`, () => {
-				clearLayoutCache();
-				const g = graphOf(sample(mark));
-				const geo = geometryFor(16, size);
-				const laid = lay(g, { ...DEFAULT_LAYOUT_SETTINGS, relationLine: mark, ...SETS } as PictureSettings, geo);
-				const { scene: s } = scene(laid, g);
-				const s1 = sizeOf(laid.layout.geometry);
-				for (const id of ['a', 'b']) {
-					const box = laid.layout.persons.get(id)!;
-					const t = cardText(laid.layout.geometry, box.tallName, box.tallTitle);
-					const slot = s.pictures.find((x) => x.kind === 'arms' && x.lod === 'full' && x.person === id)!;
-					expect(slot, id).toBeDefined();
-					expect(slot.house).toBe('v');
-					// D117: at the lower right; with a portrait (card a) the box ends 0.3 em before it, else at the text's right edge.
-					const right = box.x + t.padX + t.textW - (id === 'a' ? s1 + 0.3 * geo.fontPx : 0);
-					const want: Rect = { x: right - (5 / 6) * s1, y: box.y + t.textBottom - s1, w: (5 / 6) * s1, h: s1 };
-					for (const k of ['x', 'y', 'w', 'h'] as const) expect(slot.rect[k], `${id} ${k}`).toBeCloseTo(want[k], 6);
-				}
-				// Cards of a house with no arms have no arms slot.
-				expect(s.pictures.filter((x) => x.kind === 'arms' && (x.person === 'c' || x.person === 'd'))).toEqual([]);
-			});
-		}
-	}
-
-	it('normal cards at 16 px: the numbers of D78 (20 × 24 px; the name 24.8 px narrower)', () => {
-		const geo = geometryFor(16, 'normal');
-		expect(sizeOf(geo)).toBeCloseTo(24, 9);
-		expect((5 / 6) * sizeOf(geo) + 0.3 * 16).toBeCloseTo(1.55 * 16, 9);
-	});
-
-	it('a two-line name: the box stays at the bottom of the text block', () => {
-		clearLayoutCache();
-		const g = graphOf(sample(false));
-		const geo = geometryFor(16, 'normal');
-		const laid = lay(g, { ...DEFAULT_LAYOUT_SETTINGS, ...SETS, tallCards: ['a'] } as PictureSettings, geo);
-		const { scene: s } = scene(laid, g);
-		const box = laid.layout.persons.get('a')!;
-		expect(box.tallName).toBe(true);
-		const t = cardText(laid.layout.geometry, true, false);
-		const slot = s.pictures.find((x) => x.kind === 'arms' && x.lod === 'full' && x.person === 'a')!;
-		expect(slot.rect.y + slot.rect.h).toBeCloseTo(box.y + t.textBottom, 6);
-	});
-
-	it('sideways with a `+` badge: the badge sits on the card corner (D117), so neither the arms nor the portrait move', () => {
-		clearLayoutCache();
-		const g = graphOf(sample(false));
-		const geo = geometryFor(16, 'normal');
-		const laid = lay(g, { ...DEFAULT_LAYOUT_SETTINGS, orientation: 'sideways', ...SETS } as PictureSettings, geo);
-		const withBadge = scene(laid, g, { badges: { hidden: new Map([['a', 2], ['b', 1]]), label: () => 'More' } });
-		const without = scene(laid, g);
-		const rects = (s: Scene) => s.pictures.map((x) => `${x.person}:${x.kind}:${x.lod}:${JSON.stringify(x.rect)}`);
-		expect(rects(withBadge.scene)).toEqual(rects(without.scene));
-		const box = laid.layout.persons.get('a')!;
-		const badge = withBadge.scene.badges.find((b) => b.person === 'a')!;
-		expect(badge.mark.x + badge.mark.w / 2).toBeCloseTo(box.x + box.w, 6);
-		expect(badge.mark.y + badge.mark.h / 2).toBeCloseTo(box.y, 6);
-	});
-});
-
-describe('D117 (D78 C2 replaced): the arms box sits at the lower right; it narrows no name text line the box does not reach, and does not move the D14 sign', () => {
-	it('on a whole card the name keeps its full width beside the arms: the 14 characters fit (140 of 158 px), as without arms', () => {
-		clearLayoutCache();
-		const g = graphOf(sample(false));
-		const geo = geometryFor(16, 'normal');
-		const laid = lay(g, { ...DEFAULT_LAYOUT_SETTINGS, ...SETS } as PictureSettings, geo);
-		const { root } = scene(laid, g);
-		expect(textOf(root, 'a', 'dynasty-card-name')).toEqual(['Aldric Valmont']);
-		expect(illegitimateSigns(g, laid.edges).has('b')).toBe(true);
-		const plainLaid = lay(g, DEFAULT_LAYOUT_SETTINGS, geo);
-		expect(textOf(scene(plainLaid, g).root, 'a', 'dynasty-card-name')).toEqual(['Aldric Valmont']);
-	});
-
-	it('the D14 sign does not move for the arms (it moved 24.8 px left at 16 px in 0.2.3)', () => {
-		clearLayoutCache();
-		const g = graphOf(sample(false));
-		const geo = geometryFor(16, 'normal');
-		const laid = lay(g, { ...DEFAULT_LAYOUT_SETTINGS, ...SETS } as PictureSettings, geo);
-		const { root } = scene(laid, g);
-		const box = laid.layout.persons.get('b')!;
-		const t = cardText(laid.layout.geometry);
-		const full = all(cardEl(root, 'b')).find((e) => e.hasClass('dynasty-card-full'))!;
-		const sign = all(full).find((e) => e.hasClass('dynasty-sign'))!;
-		expect(Number(sign.getAttribute('x1'))).toBeCloseTo(box.x + t.sign.x1, 6);
-		expect(Number(sign.getAttribute('x2'))).toBeCloseTo(box.x + t.sign.x2, 6);
-	});
-
-	it('a card with arms and no portrait: the title and dates lines that the box reaches are narrower by the box and 0.3 em (20 + 4.8 px); the name is not', () => {
-		clearLayoutCache();
-		const g = graphOf(sample(false));
-		const laid = lay(g, { ...DEFAULT_LAYOUT_SETTINGS, arms: ['v'] } as PictureSettings, geometryFor(16, 'normal'));
-		const { root } = scene(laid, g);
-		const [title] = textOf(root, 'a', 'dynasty-card-title');
-		const [dates] = textOf(root, 'a', 'dynasty-card-dates');
-		for (const s of [title, dates]) {
-			expect(s).toMatch(/…$/);
-			expect(measure(s)).toBeLessThanOrEqual(158 - 20 - 4.8);
-		}
-		expect(textOf(root, 'a', 'dynasty-card-name')).toEqual(['Aldric Valmont']);
-	});
-
-	it('tallCardsFor: the arms add no text line to a whole card (only the D14 sign does: Bastien, 150 px, needs two text lines in 132 px)', () => {
-		const g = graphOf(sample(false));
-		const geo = geometryFor(16, 'normal');
-		const m = (s: string) => measure(s);
-		expect(tallCardsFor(g, geo, FONTS, m, new Set(['b']))?.tall).toEqual(['b']);
-		expect(tallCardsFor(g, geo, FONTS, m, new Set(['b']), undefined, new Set(['a', 'b', 'c', 'd']))?.tall).toEqual(['b']);
-	});
-});
-
-describe('G2, C4, B7: the arms at the Compact level of detail', () => {
-	it('1.5 × 1.8 em at the right of the card, centred on its height, in the group `dynasty-card-compact-arms`', () => {
+// 0.2.6 (D179): the tests of the classic card's pictures (the arms box and the portrait at the lower right, the text lines beside them, the
+// Compact arms box) are gone with that card. The places of the Roundel's medallion and arms are tested in `s025-roundel-geometry.test.ts`
+// and `s025-roundel-scene.test.ts`; here a Roundel scene gives the slots that the tests below fill.
+describe('S1: the slots of a Roundel card come in card order: Full arms, portrait, Compact arms, portrait; buildScene makes no <image>', () => {
+	it('the order and the Full group', () => {
 		clearLayoutCache();
 		const g = graphOf(sample(true));
-		const geo = geometryFor(16, 'normal');
-		const laid = lay(g, { ...DEFAULT_LAYOUT_SETTINGS, relationLine: true, ...SETS } as PictureSettings, geo);
-		const { scene: s } = scene(laid, g);
-		for (const id of ['a', 'b']) {
-			const box = laid.layout.persons.get(id)!;
-			const slot = s.pictures.find((x) => x.kind === 'arms' && x.lod === 'compact' && x.person === id)!;
-			expect(slot, id).toBeDefined();
-			const want = { x: box.x + box.w - 0.5 * 16 - 1.5 * 16, y: box.y + box.h / 2 - 0.9 * 16, w: 24, h: 28.8 };
-			for (const k of ['x', 'y', 'w', 'h'] as const) expect(slot.rect[k], `${id} ${k}`).toBeCloseTo(want[k], 6);
-			const group = (slot.el as unknown as FEl).closest('.dynasty-card-compact-arms');
-			expect(group, id).not.toBeNull();
-		}
-	});
-
-	it('the Compact name ends 0.3 em before the arms; with the D14 sign, 0.5 em before the sign', () => {
-		clearLayoutCache();
-		const g = graphOf(sample(false));
-		const geo = geometryFor(16, 'normal');
-		const laid = lay(g, { ...DEFAULT_LAYOUT_SETTINGS, ...SETS } as PictureSettings, geo);
-		const { root, scene: s } = scene(laid, g);
-		const compactName = (id: string) => all(cardEl(root, id)).find((e) => e.hasClass('dynasty-card-compact'))!;
-		const a = compactName('a');
-		const armsA = s.pictures.find((x) => x.kind === 'arms' && x.lod === 'compact' && x.person === 'a')!;
-		const room = armsA.rect.x - 0.3 * 16 - Number(a.getAttribute('x'));
-		expect(measure(a.getText())).toBeLessThanOrEqual(room + 1e-6);
-		const b = compactName('b');
-		const armsB = s.pictures.find((x) => x.kind === 'arms' && x.lod === 'compact' && x.person === 'b')!;
-		const sign = all(cardEl(root, 'b')).find((e) => e.hasClass('dynasty-card-compact-sign'))!;
-		const line = all(sign).find((e) => e.hasClass('dynasty-sign'))!;
-		const signRight = Math.max(Number(line.getAttribute('x1')), Number(line.getAttribute('x2')));
-		const signLeft = Math.min(Number(line.getAttribute('x1')), Number(line.getAttribute('x2')));
-		expect(signRight).toBeCloseTo(armsB.rect.x - 0.3 * 16, 6);
-		expect(measure(b.getText())).toBeLessThanOrEqual(signLeft - 0.5 * 16 - Number(b.getAttribute('x')) + 1e-6);
-	});
-});
-
-describe('D76, D78 (C3): the portrait circle, lower right, bottom at the bottom of the text block', () => {
-	const blockH = (geo: Geometry, tallName: boolean, tallTitle: boolean) => {
-		const lh = LINE_HEIGHT[geo.cardSize];
-		// D117: the name line is 0.85 em like the small lines.
-		return (tallName ? 2 : 1) * lh * 0.85 * geo.fontPx + ((geo.relationLine ? 3 : 2) + (tallTitle ? 1 : 0)) * lh * 0.85 * geo.fontPx;
-	};
-
-	for (const size of ['normal', 'compact'] as const) {
-		for (const mark of [false, true]) {
-			for (const [tallName, tallTitle] of [
-				[false, false],
-				[true, false],
-				[false, true],
-				[true, true],
-			] as const) {
-				it(`${size}, ${mark ? 'relation line' : 'no relation line'}, ${tallName ? 'two-line name' : 'one-line name'}, ${tallTitle ? 'two-line title' : 'one-line title'}`, () => {
-					clearLayoutCache();
-					const g = graphOf(sample(mark));
-					const geo = geometryFor(16, size);
-					const settings = { ...DEFAULT_LAYOUT_SETTINGS, relationLine: mark, ...SETS, ...(tallName ? { tallCards: ['a'] } : {}), ...(tallTitle ? { tallTitles: ['a'] } : {}) };
-					const laid = lay(g, settings as PictureSettings, geo);
-					const { scene: s } = scene(laid, g);
-					const box = laid.layout.persons.get('a')!;
-					const drawn = laid.layout.geometry;
-					const t = cardText(drawn, box.tallName, box.tallTitle);
-					const d = sizeOf(drawn);
-					const bottom = (box.h + blockH(drawn, tallName, tallTitle)) / 2;
-					const slot = s.pictures.find((x) => x.kind === 'portrait' && x.person === 'a')!;
-					expect(slot.lod).toBe('full');
-					const want = { x: box.x + t.padX + t.textW - d, y: box.y + bottom - d, w: d, h: d };
-					for (const k of ['x', 'y', 'w', 'h'] as const) expect(slot.rect[k], k).toBeCloseTo(want[k], 6);
-					expect((slot.frame as unknown as FEl | undefined)?.hasClass('dynasty-portrait-frame')).toBe(true);
-					// The contract's `textBottom` (C3) is the same place.
-					expect((t as CardText & { textBottom?: number }).textBottom).toBeCloseTo(bottom, 6);
-				});
-			}
-		}
-	}
-
-	it('S1: the slots of a card come in card order: Full arms, portrait, Compact arms; buildScene makes no <image>', () => {
-		clearLayoutCache();
-		const g = graphOf(sample(true));
-		const laid = lay(g, { ...DEFAULT_LAYOUT_SETTINGS, relationLine: true, ...SETS } as PictureSettings, geometryFor(16, 'normal'));
+		const laid = lay(g, { ...DEFAULT_LAYOUT_SETTINGS, relationLine: true, ...SETS } as PictureSettings, ROUNDEL);
 		const { root, scene: s } = scene(laid, g);
 		const order = [...laid.layout.persons.keys()];
 		const got = s.pictures.map((x) => `${x.person}:${x.kind}:${x.lod}`);
-		const want = order.flatMap((id) => [...(['a', 'b'].includes(id) ? [`${id}:arms:full`] : []), ...(['a', 'c'].includes(id) ? [`${id}:portrait:full`] : []), ...(['a', 'b'].includes(id) ? [`${id}:arms:compact`] : [])]);
+		const want = order.flatMap((id) => {
+			const arms = ['a', 'b'].includes(id);
+			const portrait = ['a', 'c'].includes(id);
+			return [...(arms ? [`${id}:arms:full`] : []), ...(portrait ? [`${id}:portrait:full`] : []), ...(arms ? [`${id}:arms:compact`] : []), ...(portrait ? [`${id}:portrait:compact`] : [])];
+		});
 		expect(got).toEqual(want);
 		expect(all(root).filter((e) => e.tag === 'image')).toEqual([]);
 		for (const x of s.pictures.filter((p) => p.lod === 'full')) expect((x.el as unknown as FEl).closest('.dynasty-card-full'), x.person).not.toBeNull();
 	});
 
-	it('the setting off (no portraits in the sets): no portrait and no room for one (spec §13.7 acceptance)', () => {
+	it('the setting off (no portraits in the sets): no portrait slot and no frame (spec §13.7 acceptance)', () => {
 		clearLayoutCache();
 		const g = graphOf(sample(false));
-		const laid = lay(g, { ...DEFAULT_LAYOUT_SETTINGS, arms: ['v'] } as PictureSettings, geometryFor(16, 'normal'));
+		const laid = lay(g, { ...DEFAULT_LAYOUT_SETTINGS, arms: ['v'] } as PictureSettings, ROUNDEL);
 		const { root, scene: s } = scene(laid, g);
 		expect(s.pictures.filter((x) => x.kind === 'portrait')).toEqual([]);
 		expect(all(root).filter((e) => e.hasClass('dynasty-portrait-frame'))).toEqual([]);
-		// Card c has no arms and no portrait room: its lines keep the whole width. Card a has the arms box (D117), which narrows the dates line by 24.8 px.
-		expect(textOf(root, 'c', 'dynasty-card-dates')).toEqual(['c. 1130–c. 1190']);
-		expect(textOf(root, 'c', 'dynasty-card-title')).toEqual(['Lady of Thornby']);
-		expect(measure(textOf(root, 'a', 'dynasty-card-dates')[0])).toBeLessThanOrEqual(158 - 24.8);
-	});
-});
-
-describe('G3, D76, D77: text lines beside the portrait are narrower by the portrait and 0.25 em; the name never narrows', () => {
-	it('roomAt: only a line box that overlaps the circle by more than 0.5 px is narrower (relation line: dates and relation)', async () => {
-		const roomAt = await roomAtOf();
-		clearLayoutCache();
-		const g = graphOf(sample(true));
-		const geo = geometryFor(16, 'normal');
-		const laid = lay(g, { ...DEFAULT_LAYOUT_SETTINGS, relationLine: true, ...SETS } as PictureSettings, geo);
-		const drawn = laid.layout.geometry;
-		const t = cardText(drawn);
-		const d = sizeOf(drawn);
-		const bottom = (drawn.cardH + 1.2 * 0.85 * 16 + 3 * 1.2 * 0.85 * 16) / 2;
-		const portrait: Rect = { x: t.padX + t.textW - d, y: bottom - d, w: d, h: d };
-		const boxes = [{ r: portrait, gap: 0.25 * 16 }];
-		const narrow = t.textW - d - 0.25 * 16;
-		expect(roomAt(drawn, t, t.titleBaseline, t.smallSize, boxes)).toBeCloseTo(t.textW, 9);
-		expect(roomAt(drawn, t, t.datesBaseline, t.smallSize, boxes)).toBeCloseTo(narrow, 9);
-		expect(roomAt(drawn, t, t.relationBaseline!, t.smallSize, boxes)).toBeCloseTo(narrow, 9);
-		expect(roomAt(drawn, t, t.datesBaseline, t.smallSize, [])).toBeCloseTo(t.textW, 9);
-		// The 0.5 px rule: a line box that only touches the circle keeps its width.
-		const smallLine = 1.2 * 0.85 * 16;
-		const lineTop = t.titleBaseline - 0.35 * 0.85 * 16 - smallLine / 2;
-		const touching: Rect = { ...portrait, y: lineTop + smallLine - 0.4 };
-		const over: Rect = { ...portrait, y: lineTop + smallLine - 0.6 };
-		expect(roomAt(drawn, t, t.titleBaseline, t.smallSize, [{ r: touching, gap: 4 }])).toBeCloseTo(t.textW, 9);
-		expect(roomAt(drawn, t, t.titleBaseline, t.smallSize, [{ r: over, gap: 4 }])).toBeCloseTo(narrow, 9);
-	});
-
-	it('a tree with a mark: the dates and the relation text are cut; the name and the title keep their width', () => {
-		clearLayoutCache();
-		const g = graphOf(sample(true));
-		const laid = lay(g, { ...DEFAULT_LAYOUT_SETTINGS, relationLine: true, ...SETS } as PictureSettings, geometryFor(16, 'normal'));
-		const relations = new Map([
-			['a', { text: 'You', lower: 'you' }],
-			['c', { text: 'Great-grandson', lower: 'great-grandson' }],
-			['d', { text: 'Great-grandson', lower: 'great-grandson' }],
-		]);
-		const { root } = scene(laid, g, { relations, me: 'a' });
-		// Narrow width 158 − 24 − 4 = 130 px.
-		const [dates] = textOf(root, 'a', 'dynasty-card-dates');
-		expect(dates).toMatch(/…$/);
-		expect(measure(dates)).toBeLessThanOrEqual(130);
-		expect(textOf(root, 'a', 'dynasty-card-title')).toEqual(['Duke of Valmont']);
-		const [rel] = textOf(root, 'c', 'dynasty-card-relation');
-		expect(rel).toMatch(/…$/);
-		expect(measure(rel)).toBeLessThanOrEqual(130);
-		expect(textOf(root, 'c', 'dynasty-card-title')).toEqual(['Lady of Thornby']);
-		// Dorian has no portrait: the same texts keep their width.
-		expect(textOf(root, 'd', 'dynasty-card-relation')).toEqual(['Great-grandson']);
-		expect(textOf(root, 'd', 'dynasty-card-dates')).toEqual(['c. 1128–c. 1180']);
-	});
-
-	it('D77, a tree with no mark: the card keeps its size; the title and the dates beside the portrait are cut with "…"', () => {
-		clearLayoutCache();
-		const g = graphOf(sample(false));
-		const geo = geometryFor(16, 'normal');
-		const plain = lay(g, DEFAULT_LAYOUT_SETTINGS, geo);
-		const laid = lay(g, { ...DEFAULT_LAYOUT_SETTINGS, ...SETS } as PictureSettings, geo);
-		expect(laid.layout.persons.get('a')!.h).toBe(plain.layout.persons.get('a')!.h);
-		const { root } = scene(laid, g);
-		for (const id of ['a', 'c']) {
-			const [title] = textOf(root, id, 'dynasty-card-title');
-			const [dates] = textOf(root, id, 'dynasty-card-dates');
-			for (const s of [title, dates]) {
-				expect(s, id).toMatch(/…$/);
-				expect(measure(s), id).toBeLessThanOrEqual(130);
-			}
-		}
-		expect(textOf(root, 'd', 'dynasty-card-title')).toEqual(['Lord of Thornby']);
-		expect(textOf(root, 'd', 'dynasty-card-dates')).toEqual(['c. 1128–c. 1180']);
-		// The name never narrows because of a portrait (Clarice's house has no arms).
-		expect(textOf(root, 'c', 'dynasty-card-name')).toEqual(['Clarice Thornes']);
-	});
-
-	it('D77: a card with no title has its dates on the title line, beside the portrait', () => {
-		clearLayoutCache();
-		const body = sample(false).replace('    title: Lady of Thornby\n', '');
-		const g = graphOf(body);
-		const laid = lay(g, { ...DEFAULT_LAYOUT_SETTINGS, ...SETS } as PictureSettings, geometryFor(16, 'normal'));
-		const { root } = scene(laid, g);
-		const [dates] = textOf(root, 'c', 'dynasty-card-dates');
-		expect(dates).toMatch(/…$/);
-		expect(measure(dates)).toBeLessThanOrEqual(130);
-	});
-
-	it('a two-line title: the break is made at the normal width, then the second text line beside the portrait is cut', () => {
-		clearLayoutCache();
-		const g = graphOf(sample(false));
-		const labels = new Map<string, CardLabel>(g.people.map((p) => [p.id, { holdings: [], selected: false, name: p.name, ...(p.title ? { title: p.title } : {}) }]));
-		labels.set('a', { holdings: [], selected: false, name: 'Aldric Valmont', title: 'Duke of Valmont', reign: '(r. 1102–1161)' });
-		const laid = lay(g, { ...DEFAULT_LAYOUT_SETTINGS, ...SETS, tallTitles: ['a'] } as PictureSettings, geometryFor(16, 'normal'));
-		const { root } = scene(laid, g, { labels });
-		const titles = textOf(root, 'a', 'dynasty-card-title');
-		expect(titles.length).toBe(2);
-		expect(titles[0]).toBe('Duke of Valmont');
-		expect(titles[1]).toMatch(/^\(r\. .*…$/);
-		expect(measure(titles[1])).toBeLessThanOrEqual(130);
-		// The portrait never adds a text line: the same labels with no picture give the same two lines, uncut.
-		const plain = lay(g, { ...DEFAULT_LAYOUT_SETTINGS, tallTitles: ['a'] } as PictureSettings, geometryFor(16, 'normal'));
-		expect(textOf(scene(plain, g, { labels }).root, 'a', 'dynasty-card-title')).toEqual(['Duke of Valmont', '(r. 1102–1161)']);
-	});
-
-	it('compact card size: the circle is 1.375 em; the narrow width is textW − 1.375 em − 0.25 em', async () => {
-		const roomAt = await roomAtOf();
-		const geo = geometryFor(16, 'compact');
-		const t = cardText(geo);
-		const d = 1.375 * 16;
-		const bottom = (geo.cardH + 1.1 * 0.85 * 16 + 2 * 1.1 * 0.85 * 16) / 2;
-		const portrait: Rect = { x: t.padX + t.textW - d, y: bottom - d, w: d, h: d };
-		expect(roomAt(geo, t, t.datesBaseline, t.smallSize, [{ r: portrait, gap: 4 }])).toBeCloseTo(t.textW - d - 4, 9);
 	});
 });
 
@@ -545,7 +238,7 @@ describe('S2, B1: pictures and problems in a slot (render/dom/pictures.ts)', () 
 	const slots = () => {
 		clearLayoutCache();
 		const g = graphOf(sample(false));
-		const laid = lay(g, { ...DEFAULT_LAYOUT_SETTINGS, ...SETS } as PictureSettings, geometryFor(16, 'normal'));
+		const laid = lay(g, { ...DEFAULT_LAYOUT_SETTINGS, ...SETS } as PictureSettings, ROUNDEL);
 		return scene(laid, g).scene.pictures;
 	};
 

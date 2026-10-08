@@ -50,8 +50,8 @@ const RELATIONS = new Map([
 	['c', { text: 'You', lower: 'you' }],
 	['d', { text: 'Half-sister', lower: 'half-sister' }],
 ]);
-const ROUNDEL = cardForm(geometryFor(12, 'normal'), 'down');
-const TEXT = cardForm(geometryFor(12, 'normal'), 'sideways');
+const ROUNDEL = cardForm(geometryFor(12), 'down');
+const TEXT = cardForm(geometryFor(12), 'sideways');
 
 function lay(geo: Geometry, over: Partial<LayoutSettings> = {}): LaidOut {
 	clearLayoutCache();
@@ -68,8 +68,11 @@ describe('B8 1: the elements of a card that has nothing to draw', () => {
 	it('a card with no picture, no plate and no tab makes exactly: ring, bg, strip, the Full group with its name, the Compact name', () => {
 		const { root } = scene(lay(ROUNDEL));
 		const kids = card(root, 'd').children.map((e) => [...e.classes]);
-		expect(kids).toEqual([['dynasty-card-ring'], ['dynasty-card-bg'], ['dynasty-card-strip'], ['dynasty-card-full'], ['dynasty-card-compact']]);
-		expect(card(root, 'd').children[3].children.map((e) => [...e.classes])).toEqual([['dynasty-card-name']]);
+		// R026 fit: the bar, the Full group and the Compact name are in one body group (one element for the Overview level to hide); the picture is the same.
+		expect(kids).toEqual([['dynasty-card-ring'], ['dynasty-card-bg'], ['dynasty-card-body']]);
+		const body = card(root, 'd').children[2];
+		expect(body.children.map((e) => [...e.classes])).toEqual([['dynasty-card-strip'], ['dynasty-card-full'], ['dynasty-card-compact']]);
+		expect(body.children[1].children.map((e) => [...e.classes])).toEqual([['dynasty-card-name']]);
 	});
 
 	it('a filled lazy scene is the eager scene, byte for byte, with and without the group', () => {
@@ -92,7 +95,7 @@ describe('B8 2: the plate has no group around its path and its line', () => {
 		for (const geo of [ROUNDEL, TEXT]) {
 			const { root } = scene(lay(geo, { relationLine: true }), { relations: RELATIONS, me: 'c' });
 			for (const id of ['b', 'c', 'd']) {
-				const full = card(root, id).children.find((e) => e.hasClass('dynasty-card-full'))!;
+				const full = card(root, id).children.find((e) => e.hasClass('dynasty-card-body'))!.children.find((e) => e.hasClass('dynasty-card-full'))!;
 				expect(withClass(card(root, id), 'dynasty-r1-plate-group'), id).toHaveLength(0);
 				const kids = full.children.filter((e) => e.hasClass('dynasty-r1-plate') || e.hasClass('dynasty-r1-plate-line'));
 				expect(kids.map((e) => e.tag), id).toEqual(['path', 'line']);
@@ -140,7 +143,7 @@ describe('B8 3: the focus ring is made when a person is asked for, not when a ca
 	});
 
 	it('fillAll makes every ring, and then the lazy scene is the eager scene byte for byte', () => {
-		for (const geo of [ROUNDEL, TEXT, cardForm(geometryFor(12, 'compact'), 'down')]) {
+		for (const geo of [ROUNDEL, TEXT]) {
 			const laid = lay(geo, { relationLine: true });
 			const eager = scene(laid, { relations: RELATIONS, me: 'c' });
 			const lazy = scene(laid, { relations: RELATIONS, me: 'c', lazyCards: true });

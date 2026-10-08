@@ -14,7 +14,7 @@ beforeAll(() => {
 	(globalThis as Record<string, unknown>).CSS = { supports: (_p: string, v: string) => /^#[0-9a-f]{6}$/i.test(v) };
 });
 
-const GEO = geometryFor(16, 'normal');
+const GEO = geometryFor(16);
 const measure = (text: string, font: string) => text.length * (Number(/(\d+(?:\.\d+)?)px/.exec(font)?.[1] ?? 16) * 0.55);
 const fonts = { text: 'serif', ui: 'sans', bold: '700' };
 
@@ -97,7 +97,7 @@ describe('scene: D27 and D29 cards', () => {
 		const b = all(root).find((e) => e.hasClass('dynasty-card') && e.getAttribute('data-person') === 'b')!;
 		const names = all(b).filter((e) => e.hasClass('dynasty-card-name'));
 		expect(names).toHaveLength(1);
-		expect(Number(names[0].getAttribute('y'))).toBe(laid.layout.persons.get('b')!.y + cardText(laid.layout.geometry).nameBaseline);
+		expect(Number(names[0].getAttribute('y'))).toBe(laid.layout.persons.get('b')!.y + cardText(laid.layout.geometry, 1, false, { title: false, dates: false }).nameBaseline);
 	});
 });
 

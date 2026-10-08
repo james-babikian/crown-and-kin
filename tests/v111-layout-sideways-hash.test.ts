@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 import { deriveFamilies } from '../src/core/derive';
 import { parseDynasty } from '../src/core/parse';
-import { geometryFor } from '../src/layout/geometry';
+import { cardForm, geometryFor } from '../src/layout/geometry';
 import { DEFAULT_LAYOUT_SETTINGS, clearLayoutCache, layoutTree } from '../src/layout/index';
 import type { LayoutSettings } from '../src/layout/model';
 import { DEFAULT_DARK } from '../src/render/styles';
@@ -15,10 +15,11 @@ import { sampleSources } from './acceptance/m11-support';
  * The values are recorded from the code of the 0.2.1 fix round: a later change of the sideways layout or of its
  * drawing must change them on purpose. 0.2.2 (D108): the values of 07 and 07b were recorded again, because their far-couple
  * tags show a ring or an open triangle, which now keep the same gap before the name as the dot. 0.2.4: recorded again for the card geometry (the card is 61 px
- * high, the name text 0.85 em, the arms box and portrait at the lower right; the sideways layout has the same columns and card widths). 0.2.5 (D140, WP-A1): the keys '12 normal' and '12 narrow' were recorded again (partners on one row). Run: npx vitest run tests/v111-layout-sideways-hash.test.ts
+ * high, the name text 0.85 em, the arms box and portrait at the lower right; the sideways layout has the same columns and card widths). 0.2.5 (D140, WP-A1): the keys '12 normal' and '12 narrow' were recorded again (partners on one row). 0.2.6 (D179): all four were recorded again for the text card; the same values come from the code of 0.2.5 with `cardForm(geometryFor(16, 'normal'), 'sideways')`. Run: npx vitest run tests/v111-layout-sideways-hash.test.ts
  */
 
-const GEO = geometryFor(16, 'normal');
+// 0.2.6 (D179): the sideways tree has the text card (the classic card is gone).
+const GEO = cardForm(geometryFor(16), 'sideways');
 const FONTS = { text: 'serif', ui: 'sans', bold: '700' };
 const IDS = ['07', '07b', '12', '15'];
 
@@ -36,10 +37,10 @@ function sidewaysHash(source: string): string {
 }
 
 const RECORDED: Record<string, string> = {
-	'07': 'a9f8c65621db91477b07594b8fbf56b475af864ae9eb7c8472b7b5a9159b4003',
-	'07b': 'a9f8c65621db91477b07594b8fbf56b475af864ae9eb7c8472b7b5a9159b4003',
-	'12': '7cbeee9d51be9e2e64f461cd7fc18c31027fb36ddfedac038936698fe4d3f299',
-	'15': '36b4a682672b36b4051c2a61517ceed8243f2ed0958f37e7a98f158a0de93f90',
+	'07': 'dfb0a378549771f6016c792e41eddd85a414e5c827996ff24f45b235d14e8370',
+	'07b': 'dfb0a378549771f6016c792e41eddd85a414e5c827996ff24f45b235d14e8370',
+	'12': 'f2afff1cd278d1453f93b8964bf0a1a6de99f5532dffc0f9fee989109e24a478',
+	'15': 'c34eed37ab54c2199b666b839fe6f1cb8167ae7f0bac01bd2fe60b44aaa5c302',
 };
 
 const SAMPLES = sampleSources().filter((s) => IDS.includes(s.id));

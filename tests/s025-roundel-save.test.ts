@@ -39,7 +39,7 @@ const heights = (svg: string) => [...svg.matchAll(/<g[^>]*data-item="card:([^"]+
 
 describe('makePicture follows the card form of the source', () => {
 	it('Roundel, plate on: a plate and the word on every card; the crown makes the card 67 px high at 12 px', async () => {
-		const svg = await svgOf(source(cardForm(geometryFor(12, 'normal'), 'down'), 'down', { relationLine: true, relations: RELATIONS }));
+		const svg = await svgOf(source(cardForm(geometryFor(12), 'down'), 'down', { relationLine: true, relations: RELATIONS }));
 		expect(svg).toContain('data-item="plate:a"');
 		expect(svg).toContain('data-item="plate:c"');
 		expect(svg).toMatch(/data-item="relation:c"[^>]*>You</);
@@ -49,7 +49,7 @@ describe('makePicture follows the card form of the source', () => {
 	});
 
 	it('Roundel, plate off, `youTab` set: no plate, no word, a tab for the marked person, and the cards are shorter', async () => {
-		const svg = await svgOf(source(cardForm(geometryFor(12, 'normal'), 'down'), 'down', { youTab: 'c' }));
+		const svg = await svgOf(source(cardForm(geometryFor(12), 'down'), 'down', { youTab: 'c' }));
 		expect(svg).not.toContain('data-item="plate:');
 		expect(svg).not.toContain('data-item="relation:');
 		expect(svg).toContain('data-item="tab:c"');
@@ -58,7 +58,7 @@ describe('makePicture follows the card form of the source', () => {
 	});
 
 	it('a sideways tree with a text card: no picture at all, the plate on, the tab when it is off, without narrow-card settings', async () => {
-		const geo = cardForm(geometryFor(12, 'normal'), 'sideways');
+		const geo = cardForm(geometryFor(12), 'sideways');
 		const on = await svgOf(source(geo, 'sideways', { relationLine: true, relations: RELATIONS }));
 		expect(on).toContain('data-item="plate:a"');
 		expect(on).not.toMatch(/data-item="(frame|arms|portrait):/);
@@ -67,13 +67,6 @@ describe('makePicture follows the card form of the source', () => {
 		const off = await svgOf(source(geo, 'sideways', { youTab: 'c' }));
 		expect(off).toContain('data-item="tab:c"');
 		expect(heights(off).map(([, h]) => h)).toEqual([46, 46]);
-	});
-
-	it('a source with the classic geometry and no tab is drawn as before: no plate, no tab, no centred text', async () => {
-		const svg = await svgOf(source(geometryFor(12, 'normal'), 'down', { relationLine: true, relations: RELATIONS }));
-		expect(svg).not.toMatch(/data-item="(plate|tab):/);
-		expect(svg).not.toContain('text-anchor="middle"');
-		expect(svg).toMatch(/data-item="relation:c"[^>]*>You</);
 	});
 });
 
@@ -89,26 +82,24 @@ describe('the picture copies of a Roundel tree are made at the size of the medal
 	};
 	const sizes = (path: string) => exports.filter((x) => x.startsWith(`${path}|`)).map((x) => x.split('|').slice(1, 3).map(Number));
 
-	it('a portrait is 2 em across and the arms are 2 em high in the Roundel; the classic card keeps its smaller picture', async () => {
+	it('a portrait is 2 em across and the arms are 2 em high in the Roundel', async () => {
 		const run = async (geo: Geometry) => {
 			exports.length = 0;
 			await makePicture(store as never, source(geo, 'down', { relationLine: true, relations: RELATIONS }), 'svg');
 			return { portrait: sizes('a.png')[0], arms: sizes('v.png')[0] };
 		};
 		const scale = (4 * 14) / 12;
-		const classic = await run(geometryFor(12, 'normal'));
-		const roundel = await run(cardForm(geometryFor(12, 'normal'), 'down'));
+		const roundel = await run(cardForm(geometryFor(12), 'down'));
 		// 2 em at 12 px is 24 layout px; the copy has `scale` image px for each.
 		expect(roundel.portrait[0]).toBeGreaterThanOrEqual(Math.floor(24 * scale));
 		expect(roundel.portrait[0]).toBeLessThanOrEqual(Math.ceil(24 * scale) + 1);
 		expect(roundel.arms[1]).toBeGreaterThanOrEqual(Math.floor(24 * scale));
 		expect(roundel.arms[0]).toBeGreaterThanOrEqual(Math.floor(20 * scale));
-		expect(roundel.portrait[0]).toBeGreaterThan(classic.portrait[0]);
 	});
 
 	it('a sideways text card asks for no picture file at all', async () => {
 		exports.length = 0;
-		await makePicture(store as never, source(cardForm(geometryFor(12, 'normal'), 'sideways'), 'sideways', { relationLine: true, relations: RELATIONS }), 'svg');
+		await makePicture(store as never, source(cardForm(geometryFor(12), 'sideways'), 'sideways', { relationLine: true, relations: RELATIONS }), 'svg');
 		expect(exports).toEqual([]);
 	});
 });

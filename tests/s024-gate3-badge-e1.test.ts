@@ -27,7 +27,7 @@ describe('badgeHit against cards and tag tap areas on real layouts (E1)', () => 
 					if (!parsed.ok) continue;
 					const g = deriveFamilies(parsed.tree);
 					clearLayoutCache();
-					const base = geometryFor(font, 'normal');
+					const base = geometryFor(font);
 					const settings: LayoutSettings = { ...DEFAULT_LAYOUT_SETTINGS, orientation };
 					const L = layoutTree(g, base, settings, 'font').layout;
 					const persons = [...L.persons.values()];

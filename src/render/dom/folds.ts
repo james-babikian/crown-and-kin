@@ -55,6 +55,8 @@ export interface FoldDrawing {
 	controls: SVGGElement;
 	/** The layer of the tap areas (below the cards). */
 	hits: SVGGElement;
+	/** A group inside the tap-area layer for the open buttons: the Overview level hides it as one element (R026 fit). Without it, an open button's tap area goes into `hits`. */
+	openHits?: SVGGElement;
 	fonts: SceneFonts;
 	measure: Measure;
 	/** Layout px of one em. */
@@ -132,7 +134,7 @@ export function drawFold(d: FoldDrawing, control: PlacedFoldControl): FoldRef {
 		ref.filled = true;
 		inner();
 		const box = foldHit(mark, 1);
-		ref.hit = d.hits.createSvg('rect', { cls: 'dynasty-fold-hit', attr: { x: box.x, y: box.y, width: box.w, height: box.h, 'data-fold': key } });
+		ref.hit = (control.folded ? d.hits : (d.openHits ?? d.hits)).createSvg('rect', { cls: 'dynasty-fold-hit', attr: { x: box.x, y: box.y, width: box.w, height: box.h, 'data-fold': key } });
 		d.wire?.(ref);
 	};
 	// A sign stays eager: it is the only sign of a hidden family, and it is few.

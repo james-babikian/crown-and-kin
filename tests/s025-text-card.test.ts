@@ -16,9 +16,9 @@ const graphs = sampleSources().flatMap((s) => {
 });
 
 describe('the text card heights', () => {
-	it('Normal ON 58 / 77, OFF 46 / 61; Compact ON 51 / 69, OFF 40 / 54', () => {
-		for (const [size, f, on, off] of [['normal', 12, 58, 46], ['normal', 16, 77, 61], ['compact', 12, 51, 40], ['compact', 16, 69, 54]] as const) {
-			const geo = cardForm(geometryFor(f, size), 'sideways');
+	it('ON 58 / 77, OFF 46 / 61', () => {
+		for (const [f, on, off] of [[12, 58, 46], [16, 77, 61]] as const) {
+			const geo = cardForm(geometryFor(f), 'sideways');
 			const s = (o: Partial<LayoutSettings>): LayoutSettings => ({ ...DEFAULT_LAYOUT_SETTINGS, orientation: 'sideways', ...o });
 			expect(drawnGeometry(geo, s({ relationLine: true })).cardH).toBe(on);
 			expect(drawnGeometry(geo, s({})).cardH).toBe(off);
@@ -29,7 +29,7 @@ describe('the text card heights', () => {
 		for (const { id, g } of graphs.filter((x) => ['07b', '14'].includes(x.id))) {
 			const lists = pictureSets(g, true);
 			expect(lists.arms.length + lists.portraits.length, `${id} has pictures`).toBeGreaterThan(0);
-			const geo = cardForm(geometryFor(12, 'normal'), 'sideways');
+			const geo = cardForm(geometryFor(12), 'sideways');
 			clearLayoutCache();
 			const withLists = layoutTree(g, geo, { ...DEFAULT_LAYOUT_SETTINGS, orientation: 'sideways', ...lists }, 'font');
 			clearLayoutCache();
@@ -47,10 +47,9 @@ describe('the text card heights', () => {
 
 type FormCase = { name: string; geo: (f: number) => Geometry; settings: (g: FamilyGraph) => Partial<LayoutSettings>; pictures: boolean; sideways: boolean };
 const cases: FormCase[] = [
-	{ name: 'Roundel with pictures', geo: (f) => cardForm(geometryFor(f, 'normal'), 'down'), settings: () => ({ portraits: ['x'], arms: ['y'] }), pictures: true, sideways: false },
-	{ name: 'Roundel without pictures', geo: (f) => cardForm(geometryFor(f, 'normal'), 'down'), settings: () => ({}), pictures: false, sideways: false },
-	{ name: 'classic Compact (down)', geo: (f) => cardForm(geometryFor(f, 'compact'), 'down'), settings: () => ({}), pictures: false, sideways: false },
-	{ name: 'text card (sideways)', geo: (f) => cardForm(geometryFor(f, 'normal'), 'sideways'), settings: () => ({ orientation: 'sideways' }), pictures: false, sideways: true },
+	{ name: 'Roundel with pictures', geo: (f) => cardForm(geometryFor(f), 'down'), settings: () => ({ portraits: ['x'], arms: ['y'] }), pictures: true, sideways: false },
+	{ name: 'Roundel without pictures', geo: (f) => cardForm(geometryFor(f), 'down'), settings: () => ({}), pictures: false, sideways: false },
+	{ name: 'text card (sideways)', geo: (f) => cardForm(geometryFor(f), 'sideways'), settings: () => ({ orientation: 'sideways' }), pictures: false, sideways: true },
 ];
 
 describe('tab rect inside the drawing bounds', () => {
@@ -103,7 +102,7 @@ describe('tab rect inside the drawing bounds', () => {
 describe('the reach is a uniform shift', () => {
 	it('sideways: the tab only moves every card, union and tag by `reach` along the stack axis; routing is the same', () => {
 		for (const { id, g } of graphs.filter((x) => ['07', '04', '12'].includes(x.id))) {
-			const geo = cardForm(geometryFor(12, 'normal'), 'sideways');
+			const geo = cardForm(geometryFor(12), 'sideways');
 			const s: LayoutSettings = { ...DEFAULT_LAYOUT_SETTINGS, orientation: 'sideways', foldControls: true };
 			clearLayoutCache();
 			const plain = layoutTree(g, geo, s, 'font');
@@ -127,7 +126,7 @@ describe('the reach is a uniform shift', () => {
 
 	it('down: the Roundel with a tab moves every card down by `reach` and nothing sideways', () => {
 		for (const { id, g } of graphs.filter((x) => ['07', '04', '12'].includes(x.id))) {
-			const geo = cardForm(geometryFor(12, 'normal'), 'down');
+			const geo = cardForm(geometryFor(12), 'down');
 			clearLayoutCache();
 			const plain = layoutTree(g, geo, { ...DEFAULT_LAYOUT_SETTINGS }, 'font');
 			clearLayoutCache();
@@ -186,7 +185,7 @@ describe('the sideways text card tab (plate OFF) against union signs, fold spots
 			let checked = 0;
 			let tags = 0;
 			for (const { id, g } of graphs) {
-				const geo = cardForm(geometryFor(f, 'normal'), 'sideways');
+				const geo = cardForm(geometryFor(f), 'sideways');
 				clearLayoutCache();
 				const L = layoutTree(g, geo, { ...DEFAULT_LAYOUT_SETTINGS, orientation: 'sideways', foldControls: true, youTab: g.people[0].id }, 'font').layout;
 				const r = youTabRect(L.geometry, false);

@@ -25,22 +25,44 @@ export interface RelationTexts {
 	relationSummary(rels: readonly Relation[] | undefined, isMe: boolean): { main: string; also?: string; maybe?: string };
 }
 
-/** D123: the texts of a relation that a rumoured link could change (contract 2.4). */
+/**
+ * D123, D174: the texts of a relation that a rumoured link, or a parent who is not listed, could
+ * change (spec §13.1). The cause picks the sheet and spoken words; the effect picks the card words.
+ */
 export const MAYBE_TEXT = {
 	/** Appended to `Relation.text` on the card when `maybe.effect` is 'full'. */
 	cardFull: ', maybe full',
+	/** Appended to `Relation.text` on the card when `maybe.effect` is 'half' (D174 rule 4). */
+	cardHalf: ', maybe half',
+	/** The sheet paragraph when a rumoured link is part of the doubt. */
 	sheet: (lower: string) => `If every rumoured link is true, this person is your ${lower}.`,
+	/** The sheet paragraph when only a parent who is not listed is the doubt (D174). */
+	sheetUnlisted: (lower: string) => `If both people have the same parent who is not listed, this person is your ${lower}.`,
+	/** D176 (4): the sheet paragraph when only some of the rumoured links can be true together (`maybe.some`). */
+	sheetSome: (lower: string) => `If some of the rumoured links are true, this person is your ${lower}.`,
 	spoken: (lower: string) => `or ${lower} if the rumoured links are true`,
+	spokenUnlisted: (lower: string) => `or ${lower} if both people have the same parent who is not listed`,
+	spokenSome: (lower: string) => `or ${lower} if some rumoured links are true`,
 } as const;
 
-/** The relation text of a card: "Half-brother, maybe full" when a rumoured parent would make the relation full; else `rel.text`. */
+/** The relation text of a card: "Half-brother, maybe full" or "Sister, maybe half" when the relation has a maybe; else `rel.text`. */
 export function cardRelationText(rel: Relation): string {
-	return rel.maybe?.effect === 'full' ? `${rel.text}${MAYBE_TEXT.cardFull}` : rel.text;
+	if (!rel.maybe) return rel.text;
+	return `${rel.text}${rel.maybe.effect === 'full' ? MAYBE_TEXT.cardFull : MAYBE_TEXT.cardHalf}`;
 }
 
-/** The relation as the screen-reader label says it. The rare "maybe half" case adds nothing; the sheet and the "Also" list carry it. */
+/** Splits a card relation text into the relation word and its maybe suffix (D176 5); the suffix is '' when there is none. */
+export function splitMaybe(text: string): { word: string; suffix: string } {
+	for (const suffix of [MAYBE_TEXT.cardFull, MAYBE_TEXT.cardHalf]) if (text.endsWith(suffix) && text.length > suffix.length) return { word: text.slice(0, -suffix.length), suffix };
+	return { word: text, suffix: '' };
+}
+
+/** The relation as the screen-reader label says it: "half-brother, or brother if the rumoured links are true" when the relation has a maybe. */
 export function spokenRelation(rel: Relation): string {
-	return rel.maybe?.effect === 'full' ? `${rel.lower}, ${MAYBE_TEXT.spoken(rel.maybe.lower)}` : rel.lower;
+	if (!rel.maybe) return rel.lower;
+	const m = rel.maybe;
+	const tail = m.cause === 'unlisted' ? MAYBE_TEXT.spokenUnlisted(m.lower) : m.some ? MAYBE_TEXT.spokenSome(m.lower) : MAYBE_TEXT.spoken(m.lower);
+	return `${rel.lower}, ${tail}`;
 }
 
 /**
@@ -271,7 +293,8 @@ export const relationSummary: RelationTexts['relationSummary'] = (rels: readonly
 	if (!rels?.length) return { main: 'No relation to you in this tree.' };
 	const main = `${RELINFO.title}: ${rels[0].text}.`;
 	// The card shows the first relation only, so the sheet explains the maybe of that one only.
-	const maybe = rels[0].maybe ? { maybe: MAYBE_TEXT.sheet(rels[0].maybe.lower) } : {};
+	const m = rels[0].maybe;
+	const maybe = m ? { maybe: m.cause === 'unlisted' ? MAYBE_TEXT.sheetUnlisted(m.lower) : m.some ? MAYBE_TEXT.sheetSome(m.lower) : MAYBE_TEXT.sheet(m.lower) } : {};
 	const others = rels.slice(1);
 	if (!others.length) return { main, ...maybe };
 	const names = others.slice(0, ALSO_SHOWN).map((r) => r.lower);

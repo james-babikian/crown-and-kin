@@ -320,7 +320,7 @@ describe('the small tree of the line (D47, LineSubgraph)', () => {
 			['u5', ['alan', 'dana']],
 		]);
 		expect(g.secondary).toEqual([]);
-		const { layout } = layoutTree(g, geometryFor(16, 'normal'), NEVER_FAR, 'sans-serif');
+		const { layout } = layoutTree(g, geometryFor(16), NEVER_FAR, 'sans-serif');
 		expect([...layout.persons.keys()].sort()).toEqual([...line.people].sort());
 	});
 
@@ -331,7 +331,7 @@ describe('the small tree of the line (D47, LineSubgraph)', () => {
 		expect(g.placementType.get('wynn')).toBe('rumoured');
 		expect(g.placementParents.get('leo')).toEqual(['harold']);
 		expect(g.unions).toEqual([]);
-		layoutTree(g, geometryFor(16, 'normal'), NEVER_FAR, 'sans-serif');
+		layoutTree(g, geometryFor(16), NEVER_FAR, 'sans-serif');
 	});
 
 	it('an implicit union with no shared child stays as a plain connector (nora > zed)', async () => {
@@ -339,7 +339,7 @@ describe('the small tree of the line (D47, LineSubgraph)', () => {
 		expect(g.people.map((p) => p.id).sort()).toEqual(['nora', 'zed']);
 		expect(g.unions).toHaveLength(1);
 		expect(g.unions[0]).toMatchObject({ key: 'i:["nora","zed"]', implicit: true, children: [] });
-		layoutTree(g, geometryFor(16, 'normal'), NEVER_FAR, 'sans-serif');
+		layoutTree(g, geometryFor(16), NEVER_FAR, 'sans-serif');
 	});
 
 	it('a chain (gwen > rolf) and a full relation (ivo > kit) lay out with exactly their people', async () => {
@@ -349,7 +349,7 @@ describe('the small tree of the line (D47, LineSubgraph)', () => {
 			['gwen', 'tamsin', 0],
 		] as const) {
 			const { line, g } = await small(first, second, index);
-			const { layout } = layoutTree(g, geometryFor(16, 'normal'), NEVER_FAR, 'sans-serif');
+			const { layout } = layoutTree(g, geometryFor(16), NEVER_FAR, 'sans-serif');
 			expect([...layout.persons.keys()].sort(), `${first} > ${second}`).toEqual([...line.people].sort());
 		}
 	});

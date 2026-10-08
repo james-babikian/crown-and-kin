@@ -21,7 +21,7 @@ import { FAR, desktop, embed, fakeApp, fakeHandle, fullViews, openFullScreen, ph
 const last = <T>(a: T[]): T | undefined => a[a.length - 1];
 
 /*
- * WP6.3: the settings tab (spec §9, D33) wired into the views (D30 heights, card size, dates, focus
+ * WP6.3: the settings tab (spec §9, D33) wired into the views (D30 heights, dates, focus
  * generations), the command Insert family tree (spec §5.9, D34) and keyboard access (spec §5.2:
  * Tab order, Esc on the legend and the partner list). The real plugin (main.ts) and TreeView run on the fakes.
  */
@@ -97,8 +97,8 @@ describe('the settings tab (spec §9, D33)', () => {
 		// 0.2.5 (D144): a tree in a note on a phone is a list with its natural height, so only the computer row stays.
 		expect(names(0)).toEqual([SETTINGS_UI.heightDesktop]);
 		// M7 (spec §13.1): the relation names are in the Cards group.
-		// 0.2.4 (D118, D126): the break list and "Reduce movement" follow "Card size"; 0.2.5 (D150): the direction row comes right after it, and the card style of the phone preview is gone (D144).
-		expect(names(1)).toEqual([SETTINGS_UI.cardSize, SETTINGS_UI.phoneDirection, SETTINGS_UI.breakWords, SETTINGS_UI.reduceMotion, SETTINGS_UI.dates, SETTINGS_UI.relations, SETTINGS_UI.portraits]);
+		// 0.2.4 (D118, D126): 0.2.5 (D150): the direction row comes first, then the break list and "Reduce movement"; the card style of the phone preview is gone (D144), and 0.2.6 (D179) removes "Card size".
+		expect(names(1)).toEqual([SETTINGS_UI.phoneDirection, SETTINGS_UI.breakWords, SETTINGS_UI.reduceMotion, SETTINGS_UI.dates, SETTINGS_UI.relations, SETTINGS_UI.oneParentUnknown, SETTINGS_UI.portraits]);
 		// D113 item 4: the house page has its own group.
 		expect(names(2)).toEqual([SETTINGS_UI.houseGeneration]);
 		expect(names(3)).toEqual([SETTINGS_UI.generations]);
@@ -111,10 +111,9 @@ describe('the settings tab (spec §9, D33)', () => {
 	it('shows the stored values; a bad stored value shows its default', async () => {
 		// The stored data of 0.2.4 still has the phone height and the card style: both are dropped (D144).
 		const { fake, plugin } = await loadPlugin({ embedHeightDesktop: 640, embedHeightPhone: 70, phoneCardStyle: 'whole', cardSize: 'compact', showDates: false, focusGenerations: 99, updateLinks: false });
-		expect(plugin.settings).toEqual({ embedHeightDesktop: 640, cardSize: 'compact', showDates: false, showRelations: true, showPortraits: true, showHouseGeneration: true, focusGenerations: 3, updateLinks: false, breakWords: '', reduceMotion: 'system', phoneDirection: 'sideways' });
+		expect(plugin.settings).toEqual({ embedHeightDesktop: 640, showDates: false, showRelations: true, oneParentUnknown: true, showPortraits: true, showHouseGeneration: true, focusGenerations: 3, updateLinks: false, breakWords: '', reduceMotion: 'system', phoneDirection: 'sideways' });
 		openTab(fake);
 		expect(control<TextComponent>(SETTINGS_UI.heightDesktop).getValue()).toBe('640');
-		expect(control<DropdownComponent>(SETTINGS_UI.cardSize).getValue()).toBe('compact');
 		expect(control<ToggleComponent>(SETTINGS_UI.dates).getValue()).toBe(false);
 		expect(control<ToggleComponent>(SETTINGS_UI.relations).getValue()).toBe(true);
 		expect(control<DropdownComponent>(SETTINGS_UI.generations).getValue()).toBe('3');
@@ -126,8 +125,8 @@ describe('the settings tab (spec §9, D33)', () => {
 		const { fake } = await loadPlugin();
 		openTab(fake);
 		expect(control<TextComponent>(SETTINGS_UI.heightDesktop).inputEl.getAttribute('aria-label')).toBe(SETTINGS_UI.heightDesktop);
-		for (const name of [SETTINGS_UI.cardSize, SETTINGS_UI.generations]) expect(control<DropdownComponent>(name).selectEl.getAttribute('aria-label')).toBe(name);
-		for (const name of [SETTINGS_UI.dates, SETTINGS_UI.relations, SETTINGS_UI.portraits, SETTINGS_UI.houseGeneration, SETTINGS_UI.links]) expect(control<ToggleComponent>(name).toggleEl.getAttribute('aria-label')).toBe(name);
+		for (const name of [SETTINGS_UI.phoneDirection, SETTINGS_UI.generations]) expect(control<DropdownComponent>(name).selectEl.getAttribute('aria-label')).toBe(name);
+		for (const name of [SETTINGS_UI.dates, SETTINGS_UI.relations, SETTINGS_UI.oneParentUnknown, SETTINGS_UI.portraits, SETTINGS_UI.houseGeneration, SETTINGS_UI.links]) expect(control<ToggleComponent>(name).toggleEl.getAttribute('aria-label')).toBe(name);
 	});
 
 	it('"Show generation on the house page" is on by default and stores its change', async () => {
@@ -296,33 +295,16 @@ describe('height of a tree in a note (spec §7.5, §9, D30)', () => {
 
 });
 
-describe('card size, dates and generations (spec §9)', () => {
+describe('dates and generations (spec §9)', () => {
 	const cardW = (el: FEl) => Number(el.querySelector('.dynasty-card-bg')!.getAttribute('width'));
 
-	it('compact cards come from the setting, at load and after a change', async () => {
-		const { host, fake } = await loadPlugin({ cardSize: 'compact' });
+	it('a stored card size is ignored (D179): the cards have the width of the Normal size and the settings tab has no such row', async () => {
+		const { host, fake, plugin } = await loadPlugin({ cardSize: 'compact' });
+		expect('cardSize' in plugin.settings).toBe(false);
 		const t = await tree(TREE, host);
-		expect(cardW(t.el)).toBe(geometryFor(16, 'compact').cardW);
+		expect(cardW(t.el)).toBe(geometryFor(16).cardW);
 		openTab(fake);
-		control<DropdownComponent>(SETTINGS_UI.cardSize).fire('normal');
-		await settle();
-		resizeAll();
-		flushFrames();
-		expect(cardW(t.el)).toBe(geometryFor(16, 'normal').cardW);
-	});
-
-	it('a new card size does not reuse a view saved for the other size', async () => {
-		const { host, fake } = await loadPlugin();
-		const t = await tree(TREE, host);
-		const st = (t.view as unknown as { ensureState(): { views: Record<string, { viewFor: string }> } }).ensureState();
-		st.views.down = { view: { scale: 3, cx: -999, cy: -999 }, viewFor: '' } as never;
-		openTab(fake);
-		control<DropdownComponent>(SETTINGS_UI.cardSize).fire('compact');
-		await settle();
-		resizeAll();
-		flushFrames();
-		const tf = t.el.querySelector('.dynasty-scene')!.getAttribute('transform')!;
-		expect(tf).not.toContain('scale(3)');
+		expect(settingRows.some((r) => r.nameEl.getText() === 'Card size')).toBe(false);
 	});
 
 	it('dates off: the dates hide and the tree is not laid out again', async () => {

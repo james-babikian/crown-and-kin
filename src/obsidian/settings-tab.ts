@@ -83,16 +83,6 @@ export class DynastySettingTab extends PluginSettingTab {
 		});
 		this.group(el, t.groups.cards, (add) => {
 			add((row) => {
-				row.setName(t.cardSize).setDesc(t.cardSizeDesc);
-				row.addDropdown((d) => {
-					name(d.selectEl, t.cardSize);
-					d.addOption('normal', t.cardNormal);
-					d.addOption('compact', t.cardCompact);
-					d.setValue(s.cardSize);
-					d.onChange((v) => void this.host.changeSettings({ cardSize: v === 'compact' ? 'compact' : 'normal' }));
-				});
-			});
-			add((row) => {
 				row.setName(t.phoneDirection).setDesc(t.phoneDirectionDesc);
 				row.addDropdown((d) => {
 					name(d.selectEl, t.phoneDirection);
@@ -146,6 +136,15 @@ export class DynastySettingTab extends PluginSettingTab {
 					name(tg.toggleEl.querySelector('input'), t.relations);
 					tg.setValue(s.showRelations);
 					tg.onChange((v) => void this.host.changeSettings({ showRelations: v }));
+				});
+			});
+			add((row) => {
+				row.setName(t.oneParentUnknown).setDesc(t.oneParentUnknownDesc);
+				row.addToggle((tg) => {
+					name(tg.toggleEl, t.oneParentUnknown);
+					name(tg.toggleEl.querySelector('input'), t.oneParentUnknown);
+					tg.setValue(s.oneParentUnknown);
+					tg.onChange((v) => void this.host.changeSettings({ oneParentUnknown: v }));
 				});
 			});
 			add((row) => {

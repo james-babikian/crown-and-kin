@@ -2,7 +2,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import { deriveFamilies, type FamilyGraph } from '../src/core/derive';
 import { parseDynasty } from '../src/core/parse';
 import type { Tree } from '../src/core/types';
-import { geometryFor } from '../src/layout/geometry';
+import { cardForm, geometryFor } from '../src/layout/geometry';
 import { DEFAULT_LAYOUT_SETTINGS, clearLayoutCache, layoutTree, pictureSets } from '../src/layout/index';
 import type { LaidOut } from '../src/layout/model';
 import type { SceneFill } from '../src/render/dom/scene';
@@ -30,7 +30,9 @@ beforeAll(() => {
 	g.createSvg = (tag: string, o?: unknown) => new FEl(tag, typeof o === 'string' ? { cls: o } : (o as never));
 });
 
-const GEO = geometryFor(16, 'normal');
+// 0.2.6 (D179): the classic card with the pictures at the lower right is gone. The pictures stand on the Roundel (`ROUNDEL`); a plain geometry draws the text card, which has none.
+const GEO = geometryFor(16);
+const ROUNDEL = cardForm(geometryFor(16), 'down');
 const FONTS = { text: 'serif', ui: 'sans', bold: '700' };
 
 /** The measure of a test: one factor for every text, so a test can make every name wider and refit. */
@@ -54,9 +56,9 @@ function graph(): FamilyGraph {
 	return deriveFamilies(tree);
 }
 
-function lay(g: FamilyGraph): LaidOut {
+function lay(g: FamilyGraph, geo = GEO): LaidOut {
 	clearLayoutCache();
-	return layoutTree(g, GEO, { ...DEFAULT_LAYOUT_SETTINGS, ...pictureSets(g, true) }, 'test');
+	return layoutTree(g, geo, { ...DEFAULT_LAYOUT_SETTINGS, ...pictureSets(g, true) }, 'test');
 }
 
 interface Built {
@@ -71,9 +73,9 @@ interface Built {
 }
 
 /** Builds a scene, eager or lazy, on the same graph and layout. */
-function build(lazy: boolean, o: { relations?: boolean } = {}): Built {
+function build(lazy: boolean, o: { relations?: boolean; pictures?: boolean } = {}): Built {
 	const g = graph();
-	const laid = lay(g);
+	const laid = lay(g, o.pictures ? ROUNDEL : GEO);
 	const ids = [...laid.layout.persons.keys()];
 	const tagPeople = [...laid.layout.farTags.values()].map((t) => t.person);
 	const badgePeople = [...new Set([...ids.slice(0, 3), ...tagPeople.slice(0, 2), ids[Math.floor(ids.length / 2)], ids[ids.length - 1]])];
@@ -105,13 +107,15 @@ function build(lazy: boolean, o: { relations?: boolean } = {}): Built {
 
 const el = (x: unknown) => x as FEl;
 const classesOf = (e: FEl) => e.children.map((c) => [...c.classes][0] ?? c.tag);
+/** R026 fit: a card's bar, Full group, Compact name, sign and arms are children of its body group; this lists the card's children with the body's children in its place. */
+const flatClassesOf = (e: FEl) => e.children.flatMap((c) => (c.hasClass('dynasty-card-body') ? classesOf(c) : [[...c.classes][0] ?? c.tag]));
 
 /** The card elements in card order. */
 const cardsOf = (b: Built) => [...b.s.cards.values()].map(el);
 
 describe('the sample scene has every kind of item (precondition of the tests below)', () => {
 	it('cards with a house colour, a sign, the marked person, arms and portraits; badges; far-couple tags', () => {
-		const b = build(false);
+		const b = build(false, { pictures: true });
 		const cards = cardsOf(b);
 		expect(cards.length).toBeGreaterThan(50);
 		expect(cards.some((c) => c.hasClass('dynasty-has-house'))).toBe(true);
@@ -129,10 +133,14 @@ describe('an eager scene is the M10 scene (S1, S4)', () => {
 	it('a card has its children in the M10 order: ring, bg, strip, full, compact, [compact-sign], [compact-arms]', () => {
 		const b = build(false);
 		for (const c of cardsOf(b)) {
-			const names = classesOf(c);
+			const names = flatClassesOf(c);
+			expect(c.children.filter((k) => k.hasClass('dynasty-card-body'))).toHaveLength(1);
+			expect(c.children[c.children.length - 1].hasClass('dynasty-card-body')).toBe(true);
 			const expected = ['dynasty-card-ring', 'dynasty-card-bg', 'dynasty-card-strip', 'dynasty-card-full', 'dynasty-card-compact'];
-			expect(names.slice(0, expected.length)).toEqual(expected);
-			const rest = names.slice(expected.length);
+			const crown = names.filter((n) => n === 'dynasty-card-crown-hit').length;
+			expect(names.filter((n) => n !== 'dynasty-card-crown-hit').slice(0, expected.length)).toEqual(expected);
+			expect(crown).toBeLessThanOrEqual(1);
+			const rest = names.filter((n) => n !== 'dynasty-card-crown-hit').slice(expected.length);
 			expect(rest.every((n) => n === 'dynasty-card-compact-sign' || n === 'dynasty-card-compact-arms')).toBe(true);
 			expect(rest.filter((n) => n === 'dynasty-card-compact-sign').length).toBe(c.hasClass('dynasty-signed') ? 1 : 0);
 		}
@@ -333,13 +341,13 @@ describe('S3, S4: fillNear', () => {
 		const lazy = build(true);
 		lazy.fill.fillNear(view);
 		const id = [...lazy.s.cards.keys()].find((k) => near(lazy.laid.layout.persons.get(k)!, view))!;
-		const names = classesOf(el(lazy.s.cards.get(id)));
+		const names = flatClassesOf(el(lazy.s.cards.get(id)));
 		expect(names).toContain('dynasty-card-full');
 		expect(names).toContain('dynasty-card-compact');
 		// WP-B8 3: `fillNear` makes no ring; `fillPerson` does, before the bg rect.
 		expect(names).not.toContain('dynasty-card-ring');
 		lazy.fill.fillPerson(id);
-		const asked = classesOf(el(lazy.s.cards.get(id)));
+		const asked = flatClassesOf(el(lazy.s.cards.get(id)));
 		expect(asked.indexOf('dynasty-card-ring')).toBe(0);
 		expect(asked.indexOf('dynasty-card-bg')).toBe(1);
 	});
@@ -443,8 +451,8 @@ describe('S2: refit, picture slots and the detached content', () => {
 	});
 
 	it('the picture slots exist for every card from the build on, in the same order, and their elements are not in the tree until the card is filled', () => {
-		const eager = build(false);
-		const lazy = build(true);
+		const eager = build(false, { pictures: true });
+		const lazy = build(true, { pictures: true });
 		expect(lazy.s.pictures.length).toBeGreaterThan(0);
 		expect(lazy.s.pictures.map((p) => [p.kind, p.lod, p.person, p.rect])).toEqual(eager.s.pictures.map((p) => [p.kind, p.lod, p.person, p.rect]));
 		const inTree = new Set(lazy.root.all());
@@ -458,7 +466,7 @@ describe('S2: refit, picture slots and the detached content', () => {
 	});
 
 	it('a portrait frame set before the fill is in the card after it', () => {
-		const lazy = build(true);
+		const lazy = build(true, { pictures: true });
 		const slot = lazy.s.pictures.find((p) => p.kind === 'portrait')!;
 		el(slot.frame!).addClass('is-problem');
 		lazy.fill.fillPerson(slot.person);
@@ -467,8 +475,9 @@ describe('S2: refit, picture slots and the detached content', () => {
 	});
 
 	it('the near margin (one view) is larger than the live pictures margin (half a view): a card that owns a live slot is attached by fillNear', () => {
-		const lazy = build(true);
-		const view: Rect = { x: 600, y: 100, w: 500, h: 300 };
+		const lazy = build(true, { pictures: true });
+		const first = lazy.s.pictures[0].rect;
+		const view: Rect = { x: first.x - 200, y: first.y - 100, w: 500, h: 300 };
 		const slots = lazy.s.pictures.map((p) => ({ kind: p.kind, lod: p.lod, rect: p.rect }));
 		const live = livePictureSlots(slots, view, 'full');
 		expect(live.length).toBeGreaterThan(0);

@@ -44,7 +44,7 @@ beforeEach(() => {
 	vi.spyOn(performance, 'now').mockImplementation(() => clock.now);
 });
 
-const DOWN = geometryFor(16, 'normal');
+const DOWN = geometryFor(16);
 const TALL_H = DOWN.cardH + tallExtra(DOWN);
 
 const NAMES = [

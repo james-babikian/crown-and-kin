@@ -20,7 +20,7 @@ unions:
 function lay(settings: LayoutSettings, font = 16) {
 	const { g } = build(SRC);
 	clearLayoutCache();
-	return { g, ...layoutTree(g, geometryFor(font, 'normal'), settings, 'test') };
+	return { g, ...layoutTree(g, geometryFor(font), settings, 'test') };
 }
 
 describe('two unions of one side-by-side couple', () => {

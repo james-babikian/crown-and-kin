@@ -11,7 +11,7 @@ import { lineProblems, randomTree } from './random-trees';
 
 // WP5.5a internals: the turned frame, exits on a card's short edge, tags between stacked cards.
 
-const GEO = geometryFor(16, 'normal');
+const GEO = geometryFor(16);
 const DEFAULT: FarCoupleRule = { maxCardWidths: 3, maxGenerations: 1 };
 const TIGHT: FarCoupleRule = { maxCardWidths: 0, maxGenerations: 0 };
 const LOOSE: FarCoupleRule = { maxCardWidths: Infinity, maxGenerations: Infinity };
@@ -59,7 +59,7 @@ describe('turned frame', () => {
 	it('sideways geometry: cards keep their size, gaps take the sideways sizes', () => {
 		const normal = sidewaysGeometry(GEO);
 		expect([normal.cardW, normal.cardH, normal.rowGap, normal.nodeGap, normal.coupleGap]).toEqual([180, 61, 56, 24, 24]);
-		expect(sidewaysGeometry(geometryFor(16, 'compact')).cardW).toBe(geometryFor(16, 'compact').cardW);
+		expect(sidewaysGeometry(geometryFor(16)).cardW).toBe(geometryFor(16).cardW);
 		const turned = turnedGeometry(normal);
 		expect([turned.cardW, turned.cardH, turned.tagH]).toEqual([61, 180, 6]);
 		// The first couple lane sits just clear of the card edge: no tag hangs into the gap between columns.
@@ -99,7 +99,7 @@ describe('lines leave a sideways card from its right edge', () => {
 
 	it('crowded edges keep lines off dots and other trunks (random trees 639 and 794)', () => {
 		expect(lineProblems(...pick(lay(randomTree(639), side(LOOSE))))).toEqual([]);
-		expect(lineProblems(...pick(lay(randomTree(794), side(TIGHT), geometryFor(12, 'compact'))))).toEqual([]);
+		expect(lineProblems(...pick(lay(randomTree(794), side(TIGHT), geometryFor(12))))).toEqual([]);
 	});
 
 	it('no line leaves a card from its top or bottom edge except a bar between stacked partners', () => {
@@ -129,7 +129,7 @@ describe('far tags between stacked cards', () => {
 		expect(sideTagDepth(geo)).toBe(51);
 		expect(sideTagHit({ x: 90, w: 164 }, 100, Infinity, geo)).toEqual({ x: 8, y: 100, w: 164, h: 51 });
 		// Never less than 44 layout px, at the smallest font.
-		const small = sidewaysGeometry(geometryFor(8, 'compact'));
+		const small = sidewaysGeometry(geometryFor(8));
 		expect(sideTagDepth(small)).toBe(MIN_HIT);
 	});
 
@@ -163,8 +163,8 @@ unions:
   - {partners: [x, z]}
   - {partners: [x, y]}
 `;
-		for (const [px, size] of [[9, 'compact'], [8, 'compact']] as const) {
-			const { g, layout, edges } = lay(src, side(), geometryFor(px, size));
+		for (const px of [9, 8]) {
+			const { g, layout, edges } = lay(src, side(), geometryFor(px));
 			const t = layout.farTags.get('x')!;
 			const card = layout.persons.get('x')!;
 			const u = layout.unions.get(g.unions.find((fu) => fu.partners.includes('z'))!.key)!;

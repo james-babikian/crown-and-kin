@@ -41,6 +41,11 @@ export const PROBLEMS_HINT = 'Select a problem to show the people it is about.';
 export const BLOCK_UI = {
 	openSource: 'Open note',
 	openSourceLabel: 'Open the note that contains this tree.',
+	// D176 (2): the same result as the hidden "Edit this block" button of Obsidian.
+	showText: 'Show the tree text',
+	/** D180: the shorter text of the button in the phone list bar, so the bar fits in one row. */
+	showTextShort: 'Tree text',
+	showTextLabel: 'Show the tree text: open the note for edits and show the text of this tree.',
 	readOnly: 'Read only',
 	resizeLabel: 'Drag to change the height of the tree.',
 } as const;
@@ -521,10 +526,6 @@ export const SETTINGS_UI = {
 	groups: { height: 'Height in a note', cards: 'Cards', housePage: 'House page', focus: 'Focus mode', links: 'Links', repair: 'Repair' },
 	heightDesktop: 'Height on a computer or tablet',
 	heightDesktopDesc: 'This is the height of a tree in a note, in pixels. The default is 500. If you drag the bottom edge of a tree, that tree keeps its new height.',
-	cardSize: 'Card size',
-	cardSizeDesc: 'Compact cards show more people on the screen. Normal cards show more of each name.',
-	cardNormal: 'Normal',
-	cardCompact: 'Compact',
 	/** D118: the user's own break places in long names. */
 	breakWords: 'Break places in long names',
 	breakWordsDesc: `The plugin can break a long word into parts. Write one word on each text line. Put a hyphen at each place where the word can break. An example is ${quote('Long-na-munda')}. If a name has a hyphen, write each part on its own text line. The plugin breaks a word from this list only at your places.`,
@@ -543,6 +544,10 @@ export const SETTINGS_UI = {
 	directionSideways: 'Sideways',
 	directionDown: 'Like the computer',
 	phoneDirectionDesc: 'This is how the tree looks in the full-screen view on a phone that you hold upright. If you choose Sideways, the generations go from left to right. If you choose Like the computer, the generations go from top to bottom. A phone on its side, a tablet and a computer always show the tree from top to bottom. The setting is the same for all trees.',
+	/** D174 (spec §9): the text is the spec's, word for word. */
+	oneParentUnknown: 'Assume an unknown second parent',
+	oneParentUnknownDesc:
+		'If this setting is on, a person with one listed parent has a second parent who is not known. Two people with the same listed parent show as half-siblings. If this setting is off, two people who list only the same parent show as full siblings. If a person lists fewer than two other parents, a rumoured parent shows that a parent is not known.',
 	/** Spec §13.7 (M9 contract O10). */
 	portraits: 'Show portraits on cards',
 	portraitsDesc: 'If this is on, the cards show the portraits of the people.',

@@ -19,11 +19,20 @@
  *   parent in the child's `drawnParents` list that lies on such a line, and at X the first pair of
  *   children (c1, c2) in `down` order. For a full relation, X is the member of the couple first in
  *   c1's list, and the union is c1's `primaryUnion` if it is the couple's, else the couple's
- *   last-listed union, else their implicit key. A double relation takes the line of its first couple.
+ *   last-listed union, else their implicit key. A line uses a couple only if the two share a union
+ *   of the tree (listed, or implicit through a child placed under both); else it passes X alone
+ *   (two rumoured parents, an adoptive couple beside birth parents). A full line of rule 1 below
+ *   follows rule 1. A double relation takes the line of its first couple (the lowest X).
  * - Partner: M and P, with the pair's last-listed union, or their implicit key.
  * - Guardian and ward: M and P, with the one ward link.
  * - By marriage, rule 1: the blood line from M to R, then P, with the last-listed marriage of R and P.
  * - By marriage, rule 2: M, then M's spouse S, then S's blood line to P; the M–S marriage comes first.
+ *   The name needs a line that does not pass M. Any line of the name will do: its own, one joined into
+ *   it (rule 6 of "Half or full"), or one of the other couple of a double name. The first that avoids
+ *   M is shown, so the name does not depend on which line was found first. A candidate keeps these
+ *   other lines (`also`: one flat list, each line once, only its people) and the line of its maybe
+ *   (`maybeFrom`) only until the names of its person are made; then `forget` drops them, so a result
+ *   keeps only the one line that each name shows.
  * - Step-sibling: M, N, Q, P, with the links N→M and Q→P and the N–Q marriage. N is the first
  *   parent of M (in `drawnParents` order) with such a marriage.
  * - Chain: the people of a breadth-first search in order. It counts raw links; from each person it
@@ -36,6 +45,18 @@
  * full or half result at X (full: one per couple) is one candidate (D50), so the names never depend
  * on the order of siblings; each takes the line with the best link type, as above.
  *
+ * Double (D175). Full cousin candidates of one name and one link word make a "double" name only if two
+ * of them come from two couples. Not if one is a couple of the second test (rule 1 below) and a
+ * couple of two or more people of one is part of the couple of the other: a sure couple plus a
+ * rumoured parent is one couple. A parent alone is never part of another couple, so one parent and a
+ * couple with that parent (setting off) are two couples, as are two couples that share one person
+ * (a man and his two wives). And not if every line of the two, of that word, leaves through the same
+ * two children. Each candidate keeps every pair of children that gave it a line, also the pairs the
+ * search passed over because the key was taken, so the first pair found never decides it and the names
+ * do not depend on the order of the people. A passed-over pair is searched only for a group of names
+ * that the lines found so far do not settle and the couple test alone does not settle either, and only
+ * if its key could be one of that group.
+ *
  * Order. Names come best first by §13.1 "Which name wins", rules 1–4. A name by marriage of a person
  * who also has a blood name comes after all other names. The last tie-breaks are the document index
  * of the common ancestor (for a couple, its first member), then `lower`. Each distinct `lower` is
@@ -44,21 +65,58 @@
  *
  * Steps (the finder and "Show the steps"). There is one step per link, except that a step up to a
  * parent followed by a step down to another child of that parent is one sibling step ("brother",
- * "half-brother" by the §13.1 half rule, "sibling"); a ward link never joins a sibling step. A step
- * carries the type of its links: "adoptive father", "adopted son", "rumoured father", "rumoured
- * son", "guardian", "ward", and for a sibling step "rumoured brother" or "rumoured half-brother" (half or
- * full by rule 1 of the D123 paragraph below) if one of its two links is rumoured, else "adoptive brother"
- * if one is adoptive. A partner step uses the §13.1 partner table.
- * "Through N other people" counts `line.people.length − 2`.
+ * "half-brother" by the sure test of "Half or full" below, "sibling"); a ward link never joins a
+ * sibling step. A step carries the type of its links: "adoptive father", "adopted son", "rumoured
+ * father", "rumoured son", "guardian", "ward", and for a sibling step "rumoured brother" or "rumoured
+ * half-brother" (half or full by rule 1 of "Half or full") if one of its two links is rumoured, else
+ * "adoptive brother" if one is adoptive. The sibling steps of a rumoured name (a rumoured line, or
+ * the extra "Rumoured X" name) all take half or full from rule 1, so the steps agree with the name;
+ * a sibling step whose half or full the second test changes is "rumoured" also over two birth links.
+ * A partner step uses the §13.1 partner table. "Through N other people" counts `line.people.length − 2`.
  *
- * D123 (rumoured parents). The sure names ignore a rumoured parent that is not on the line (spec §13.1:
- * a parent that is not listed adds nothing). Per candidate (X, c1, c2), with c1 and c2 the children of X on
- * the two paths: S_i are the sure parents of c_i of the type of c_i's link to X, R_i the rumoured parents of
- * c_i counted as birth parents (none when the link is adoptive). (1) A candidate on a rumoured line takes
- * half or full from S1 + R1 against S2 + R2. (2) A sure half candidate gets `maybe` 'full' if R1 or R2 is not
- * empty and S1 + R1 equals S2 + R2. (3) A sure full candidate gets `maybe` 'half' if R1 and R2 are both not
- * empty and differ and S1 equals S2. A `double` name never has a `maybe`; equal names keep the `maybe` of
- * any of them. The comparison runs only where a rumoured link lies in the blood ancestry of either person.
+ * Half or full (D123, D174). Per candidate (X, c1, c2), with c1 and c2 the children of X on the two
+ * paths: S_i are the parents of c_i of the type of c_i's link to X; R_i are the rumoured parents of c_i
+ * that are not in S_i (none when the link is adoptive); A_i is S_i plus R_i. The setting
+ * `oneParentUnknown` (on by default) says if a person who lists one parent has an unknown second parent.
+ * - The sure test. A child is incomplete if its link is not adoptive, S_i has fewer than two people, and
+ *   the setting is on or the child has a rumoured parent who is not also a birth parent. The pair is full only if S1 equals S2 and
+ *   neither child is incomplete. A rumoured parent is never in the S_i of a birth link. The finder's
+ *   sibling steps use the same test.
+ * - The second test counts every rumoured link like a birth link: compare A1 with A2. With the setting
+ *   on, an A_i of fewer than two people (not for an adoptive link) makes the pair half.
+ * - D176, the choices. A child with at most one sure parent and three or more listed parents (S + R) could have
+ *   any two of them, since one of the rumours may be false: its `choices` are S plus each set of rumoured parents
+ *   that makes two people, and also the whole S + R (without it, a person who lists all of three parents would
+ *   lose a maybe). Every other child has one choice, S + R; so has a child of an adoptive link, and one with more
+ *   than eight rumoured parents. The second test is `secondHalf` alone: the pair is full if a choice of one child
+ *   equals a choice of the other and that set is not one that the setting calls incomplete. The card, the sheet,
+ *   rule 1 and the steps of the finder all use it, so they cannot disagree. With one choice each it is the
+ *   comparison of A1 and A2 above.
+ * (1) A candidate on a rumoured line takes half or full from the second test; it is a candidate of its
+ * own, apart from the sure candidate of the same pair (other key). If that makes it half, its line
+ * passes X alone. If it makes it full, its couple is A1 (with several choices: the people of all the
+ * equal choices) and its key is that set, so Xan and a rumoured Zoe give one candidate, found at both of them (D175). Its line must keep a rumoured link,
+ * so that the steps say "rumoured" (§13.2): it passes the first two members of A1 (c1's list order)
+ * that share a union of the tree and give the line a rumoured link (below c1 and c2, from c1 up to the
+ * first, or from the second down to c2); else the first member with a rumoured link to c1 or c2,
+ * alone, so the line has a "rumoured" sibling step. Siblings keep X alone, as their one sibling step
+ * shows the rumoured link (D174 ruling 8). (2) A sure half candidate
+ * gets `maybe` 'full' if R1 or R2 is not empty and a choice of one equals a choice of the other (any size; D176);
+ * with the setting on, also if two choices together have at most two people. The `some` flag (D176) says that
+ * an equal choice leaves out a rumoured parent of either person, so one rumoured link is enough. (3) With the setting off, a parent who is not listed adds no maybe.
+ * (4) A sure full candidate gets `maybe` 'half' if R1 and R2 differ; one rumoured parent is enough.
+ * (5) No maybe on a rumoured line, on a `double` name, or where the link of c1 or c2 to X is adoptive.
+ * The `cause` of a maybe is 'rumoured' for rule 4 and for rule 2 with equal A1 and A2; else 'unlisted'
+ * (rule 2 by the count of two, setting on). Only a rumoured cause adds the extra name ("Rumoured
+ * brother"), with the line of the pair of children that gave the maybe, so that a step says "rumoured"
+ * in any order of the people; the half name's line passes the top alone (D176): the rumoured parent is not an
+ * ancestor of the other person, so the sibling step says "rumoured half-sister"; not if the list has the "double" form of it ("Rumoured double first
+ * cousin" already says that the rumours make the two full cousins). (6) Equal names keep the maybe of
+ * any of them: 'full' over 'half', then 'rumoured' over
+ * 'unlisted'; this holds also for two pairs of children at one X with one sure key (cousin
+ * marriage), so the names never depend on the order of the children. The second test runs only
+ * where a rumoured link lies in the blood ancestry of either person, or where the setting is on and
+ * the sure test gives half, so a tree with no doubt does no extra work. The setting lives on the `Kin` of one call, so no memo mixes the two modes.
  *
  * Results are deep-frozen, like layout results, because the views share them.
  */
@@ -88,17 +146,33 @@ export interface RelationLine {
 	unions: string[];
 }
 
+/**
+ * D174: the one switch of the sibling rule. `oneParentUnknown` on (the default): a person who lists
+ * fewer than two birth parents has an unknown parent, so two such people are at most half
+ * (spec §13.1). Off: a person with one listed parent and no rumoured parent is complete.
+ */
+export interface RelationOptions {
+	oneParentUnknown: boolean;
+}
+
+/** The options of a fresh install (D174). The functions below use them when the caller passes none. */
+export const DEFAULT_RELATION_OPTIONS: Readonly<RelationOptions> = Object.freeze({ oneParentUnknown: true });
+
 /** D123: what rumoured links could change in a blood relation. */
 export interface RelationMaybe {
-	/** 'full': the sure relation is half and the rumour would make it full (card text ", maybe full"). 'half': the sure relation is full and two different rumoured parents would make it half (edit sheet and "Also" list only). */
+	/** 'full': the sure relation is half and the doubt could make it full (card text ", maybe full"). 'half': the sure relation is full and a rumoured parent would make it half (card text ", maybe half"; D174). */
 	effect: 'full' | 'half';
 	/** The name if the rumoured links are true, with no word "rumoured": "Brother". */
 	text: string;
 	/** The same name in lower case: "brother". */
 	lower: string;
+	/** D174: 'rumoured' if the second test settles it (the rumoured links make the sets equal, or any maybe half); 'unlisted' if the pair is full only when a parent who is not listed is the same person (setting on only). */
+	cause: 'rumoured' | 'unlisted';
+	/** D176: only with effect 'full' and cause 'rumoured'. True if the set of parents that makes the pair full leaves out a rumoured parent of either person: then not every rumoured link need be true ("If some of the rumoured links are true", D176 fix round). Absent if every rumoured link must be true. */
+	some?: true;
 }
 
-/** D123: counts the second comparison run (the one that counts a rumoured link like a birth link). A tree with no rumoured link must leave it at 0. */
+/** D123: counts the second comparison run (the one that counts a rumoured link like a birth link). A tree with no rumoured link leaves it at 0 if the setting of D174 is off or no pair is half. */
 export const relationRunStats = { second: 0 };
 
 /** One name of a person's relation to the marked person (or to the finder's first person). */
@@ -111,7 +185,7 @@ export interface Relation {
 	/** §13.1 "Which name wins", rule 3; the values per kind are in the file header. */
 	distance: number;
 	line: RelationLine;
-	/** D123: only on `kind: 'blood'`, only when a rumoured link could change the relation. */
+	/** D123: only on `kind: 'blood'`, only when a rumoured link or (D174) a parent who is not listed could change the relation. */
 	maybe?: RelationMaybe;
 }
 
@@ -120,7 +194,7 @@ export interface Relation {
  * A person with no relation of §13.1 is absent. Returns an empty map if `me` is not a person of `g`.
  * Pure; it always ends. Each `line` is built the first time it is read.
  */
-export type ComputeRelations = (g: FamilyGraph, me: string) => ReadonlyMap<string, readonly Relation[]>;
+export type ComputeRelations = (g: FamilyGraph, me: string, options?: RelationOptions) => ReadonlyMap<string, readonly Relation[]>;
 
 /** One step of a chain or of "Show the steps": `person` is `of`'s `word` ("Isolde is Roderick's wife."). */
 export interface RelationStep {
@@ -150,7 +224,7 @@ export type FinderResult =
 	| { kind: 'none'; first: string; second: string };
 
 /** Pure. `first` and `second` are different people of `g`; otherwise `kind: 'none'`. */
-export type FindRelation = (g: FamilyGraph, first: string, second: string) => FinderResult;
+export type FindRelation = (g: FamilyGraph, first: string, second: string, options?: RelationOptions) => FinderResult;
 
 /**
  * The small tree of D47: a `FamilyGraph` with only the people of `line.people`, ready for
@@ -169,7 +243,7 @@ export type LineSubgraph = (g: FamilyGraph, line: RelationLine) => FamilyGraph;
  * links with their types, the unions (key, partners, type, order) and `me`; not names. The view
  * keeps one result per key of the WHOLE tree and never uses a focus subgraph for names.
  */
-export type RelationsKey = (g: FamilyGraph, me: string) => string;
+export type RelationsKey = (g: FamilyGraph, me: string, options?: RelationOptions) => string;
 
 /** The most relations the finder cycles through (§13.2): no limit, as the owner decided (D53). A number caps the list. */
 export const FINDER_LIMIT: number = Infinity;
@@ -296,10 +370,10 @@ function partnerWord(type: string, implicit: boolean, sex: Sex): string {
 	return WORDS.spouse[sex];
 }
 
-/** A sibling step's word: "rumoured" if one of its two links is rumoured, else "adoptive" if one is adoptive (as a blood name). */
-function siblingStepWord(sex: Sex, half: boolean, up: ParentType, down: ParentType): string {
+/** A sibling step's word: "rumoured" if one of its two links is rumoured or the rumours change its half or full (`rumour`), else "adoptive" if one is adoptive (as a blood name). */
+function siblingStepWord(sex: Sex, half: boolean, up: ParentType, down: ParentType, rumour: boolean): string {
 	const word = siblingWord(sex, half);
-	if (up === 'rumoured' || down === 'rumoured') return `${WORDS.rumoured} ${word}`;
+	if (rumour || up === 'rumoured' || down === 'rumoured') return `${WORDS.rumoured} ${word}`;
 	if (up === 'adoptive' || down === 'adoptive') return `${WORDS.adoptive} ${word}`;
 	return word;
 }
@@ -351,8 +425,33 @@ interface Blood {
 	/** From the second person up to `x`, both included. */
 	pathP: number[];
 	key: string;
-	/** D123: the effect a rumoured parent could have on this sure candidate (rules 2 and 3 of the file header). */
+	/** The people of the key: the couple of a full candidate (all of it, also a third parent), else `x`. The "double" test compares them. */
+	couple: number[];
+	/** Every pair of children of the key's couple that gave a line, with the line's word: the "double" test needs them all (D175). */
+	via: Via[];
+	/** D123: the effect a rumoured parent or (D174) a parent who is not listed could have on this sure candidate (file header). */
 	maybe?: 'full' | 'half';
+	/** D174: set with `maybe`; 'rumoured' if the second test settles the doubt, else 'unlisted' (file header). */
+	cause?: RelationMaybe['cause'];
+	/** D176: set with `maybe`; true if the matching set leaves out a rumoured parent of either person (`RelationMaybe.some`). */
+	some?: true;
+	/** The line of the pair of children that gave `maybe`, if it is not this candidate's own line (rule 6): the extra "Rumoured X" name takes it. */
+	maybeFrom?: BloodLine;
+	/**
+	 * Other lines of this name, of the same word, each once and none equal to its own: those of the candidates
+	 * joined into it (rule 6) or merged into its "double" name. Rule 2 by marriage reads them; `forget` drops them.
+	 */
+	also?: BloodLine[];
+}
+
+/** What the line of a blood candidate reads (`bloodWalk`). `also` and `maybeFrom` keep only this of a candidate they drop. */
+type BloodLine = Pick<Blood, 'a' | 'b' | 'x' | 'y' | 'pathF' | 'pathP'>;
+
+/** One line of a blood candidate at its common ancestor: the children `c1` (first person's side) and `c2`, and the word of the line. */
+interface Via {
+	c1: number;
+	c2: number;
+	word: Blood['word'];
 }
 
 /** Half or full for two children of a common ancestor, the couple of a full relation (else the ancestor), and the candidate key. */
@@ -384,6 +483,8 @@ interface Cand {
 	after?: number;
 	/** D123: set on a sure blood name that a rumoured parent could change. */
 	maybe?: RelationMaybe;
+	/** A rumoured blood name: its sibling steps take half or full from the second test (spec §13.2), as the name does. */
+	second?: boolean;
 	/** Builds the line and the walk; only the names that are kept need them. */
 	make: () => { line: Line; walk: Walk };
 }
@@ -397,6 +498,18 @@ interface Counted {
 	/** The rumoured parents alone; empty for an adoptive link. */
 	rumoured: string;
 	hasRumoured: boolean;
+	/** The people of `all`, for the D174 count of both sets together. */
+	allList: number[];
+	/** False for an adoptive link: it never makes a child incomplete (D174). */
+	canLack: boolean;
+	/** The rumoured parents alone, as people (the people of `rumoured`). */
+	rumouredList: number[];
+	/**
+	 * D176: the parent sets that this child could have if some rumoured links are true. One set (`allList`) unless the child
+	 * has at most one sure parent and three or more listed parents: then the sure parents plus each set of rumoured parents
+	 * that makes two, and also the whole `allList`.
+	 */
+	choices: number[][];
 }
 
 /** Supervisor ruling on rule 3: step-siblings come through birth and adoptive parents only. */
@@ -427,6 +540,8 @@ class Kin {
 	/** `blood` results by `f * n + p`. */
 	private readonly bloodMemo = new Map<number, Blood[]>();
 	private readonly spouseMemo: (number[] | undefined)[] = [];
+	/** `sharesUnion`: by person, both partners of each of its unions (-1 for an unknown id). It runs for every full candidate. */
+	private readonly unionPeople: (number[] | undefined)[] = [];
 	/** `path` results without `blocked`, by `(v * n + t) * 3 + level`. Never changed after. */
 	private readonly firstPaths = new Map<number, number[] | null>();
 	/** `below` maps by `v * n + t`, kept for the people relations are counted from. */
@@ -437,11 +552,17 @@ class Kin {
 	private readonly typedParents = new Map<number, { list: number[]; sig: string }>();
 	/** `counted` results by `child * 2 + (adoptive ? 1 : 0)`. */
 	private readonly countedMemo = new Map<number, Counted>();
+	/** `incomplete` results by `child * 4 + type`: 0 not known yet, 1 no, 2 yes. It reads the setting, as does every `Kin`. */
+	private readonly lackMemo: Uint8Array;
 	/** `dagOf` results, kept like `belowMemo` and `belowScratch`. */
 	private readonly dagMemo = new Map<number, Dag>();
 	private readonly dagScratch = new Map<number, Dag>();
 
-	constructor(readonly g: FamilyGraph) {
+	constructor(
+		readonly g: FamilyGraph,
+		/** D174: the sibling rule switch; the half and full tests read it. */
+		readonly options: Readonly<RelationOptions> = DEFAULT_RELATION_OPTIONS,
+	) {
 		const n = g.people.length;
 		this.ids = g.people.map((p) => p.id);
 		this.ids.forEach((id, i) => this.idx.set(id, i));
@@ -477,6 +598,7 @@ class Kin {
 		this.tau = new Int32Array(n);
 		this.topRank = new Uint8Array(n);
 		this.stamps = new Int32Array(n);
+		this.lackMemo = new Uint8Array(n * 4);
 		const waiting = this.up.map((u) => u.length);
 		const order: number[] = [];
 		for (let i = 0; i < n; i++) if (!waiting[i]) order.push(i);
@@ -532,9 +654,29 @@ class Kin {
 		return out;
 	}
 
-	/** §13.1 half rule: `c1` (linked by `t1`) and `c2` (by `t2`) have different parents of their link's type. */
+	/** True if `child` has a rumoured parent who is not also a birth parent (spec §13.1 "Half": that parent does not count). */
+	private hasRumouredBeyondBirth(child: number): boolean {
+		const birth = this.parentsOfType(child, 'birth').list;
+		return this.drawn[child].some((l) => l.type === 'rumoured' && !birth.includes(l.p));
+	}
+
+	/**
+	 * D174, the sure test: `child`, linked to the common ancestor by `t`, may have a parent that the
+	 * tree does not list. An adoptive or ward link never; else fewer than two parents of the link's
+	 * type (its sure set), and the setting is on or the child has a rumoured parent.
+	 */
+	incomplete(child: number, t: ParentType): boolean {
+		const key = child * 4 + PARENT_TYPES.indexOf(t);
+		if (!this.lackMemo[key]) {
+			const lacks = t !== 'adoptive' && t !== 'ward' && this.parentsOfType(child, t).list.length < 2 && (this.options.oneParentUnknown || this.hasRumouredBeyondBirth(child));
+			this.lackMemo[key] = lacks ? 2 : 1;
+		}
+		return this.lackMemo[key] === 2;
+	}
+
+	/** §13.1 half rule, the sure test: `c1` (linked by `t1`) and `c2` (by `t2`) have different parents of their link's type, or one of them is incomplete (D174). */
 	isHalf(c1: number, t1: ParentType, c2: number, t2: ParentType): boolean {
-		return this.parentsOfType(c1, t1).sig !== this.parentsOfType(c2, t2).sig;
+		return this.parentsOfType(c1, t1).sig !== this.parentsOfType(c2, t2).sig || this.incomplete(c1, t1) || this.incomplete(c2, t2);
 	}
 
 	/** D123: the parent sets of `child` for a link of type `t` (an adoptive link counts adoptive parents only; birth and rumoured links count birth parents and rumoured parents). */
@@ -546,16 +688,62 @@ class Kin {
 			const sure = this.parentsOfType(child, adoptive ? 'adoptive' : 'birth');
 			const rumoured = adoptive ? [] : this.up[child].filter((l) => l.type === 'rumoured' && !sure.list.includes(l.p)).map((l) => l.p);
 			const text = (list: number[]) => [...list].sort((i, j) => i - j).join(',');
-			out = { sure: sure.sig, all: text([...sure.list, ...rumoured]), rumoured: text(rumoured), hasRumoured: rumoured.length > 0 };
+			const allList = [...sure.list, ...rumoured];
+			let choices: number[][] = [allList];
+			// With more than eight rumoured parents the sets would grow too fast, so the one set stays.
+			if (!adoptive && sure.list.length < 2 && allList.length > 2 && rumoured.length <= 8) {
+				const need = 2 - sure.list.length;
+				choices = [];
+				const pick = (start: number, acc: number[]) => {
+					if (acc.length === need) {
+						choices.push([...sure.list, ...acc]);
+						return;
+					}
+					for (let i = start; i < rumoured.length; i++) pick(i + 1, [...acc, rumoured[i]]);
+				};
+				pick(0, []);
+				// The whole set stays a choice: without it a person who lists all three parents loses a maybe.
+				choices.push(allList);
+			}
+			out = { sure: sure.sig, all: text(allList), rumoured: text(rumoured), hasRumoured: rumoured.length > 0, allList, canLack: !adoptive, rumouredList: rumoured, choices };
 			this.countedMemo.set(key, out);
 		}
 		return out;
 	}
 
-	/** D123 rule 1: half or full for two children with a link of `t1` and `t2`, every rumoured parent counted as a birth parent. */
+	/** D123 rule 1: half or full for two children with a link of `t1` and `t2`, every rumoured parent counted as a birth parent; with the setting on, a set of fewer than two people is half (D174). */
 	halfCounted(c1: number, t1: ParentType, c2: number, t2: ParentType): boolean {
 		relationRunStats.second++;
-		return this.counted(c1, t1).all !== this.counted(c2, t2).all;
+		return this.secondHalf(c1, t1, c2, t2);
+	}
+
+	/** `halfCounted` without the count, for the search to know a key before it looks for paths. This is the one place that decides the second test (D176). */
+	private secondHalf(c1: number, t1: ParentType, c2: number, t2: ParentType): boolean {
+		const [s1, s2] = [this.counted(c1, t1), this.counted(c2, t2)];
+		if (s1.choices.length === 1 && s2.choices.length === 1) return s1.all !== s2.all || this.lacks(s1) || this.lacks(s2);
+		return this.matches(s1, s2, true).length === 0;
+	}
+
+	/**
+	 * D176: the sets that both children could have (a choice of one equal to a choice of the other). `sure`: a set of
+	 * fewer than two people does not count where the setting says it lacks a parent (the second test); else any size
+	 * (the maybe of a half pair).
+	 */
+	private matches(s1: Counted, s2: Counted, sure: boolean): number[][] {
+		const sig = (l: number[]) => [...l].sort((i, j) => i - j).join(',');
+		const other = new Set(s2.choices.map(sig));
+		return s1.choices.filter((t) => other.has(sig(t)) && !(sure && t.length < 2 && (this.lacks(s1, t) || this.lacks(s2, t))));
+	}
+
+	/** The people of all the matching sets, for the couple and key of a full line of rule 1 (the sets of one choice: A1, as before D176). */
+	private matchedPeople(s1: Counted, s2: Counted): number[] {
+		if (s1.choices.length === 1 && s2.choices.length === 1) return s1.allList;
+		return [...new Set(this.matches(s1, s2, true).flat())].sort((i, j) => i - j);
+	}
+
+	/** D174, the second test: a set of fewer than two people is incomplete when the setting is on. */
+	private lacks(s: Counted, set: number[] = s.allList): boolean {
+		return this.options.oneParentUnknown && s.canLack && set.length < 2;
 	}
 
 	/**
@@ -653,16 +841,19 @@ class Kin {
 		const ordered = Int32Array.from(common).sort();
 
 		const found = new Map<string, Blood>();
+		const pending: number[] = [];
 		for (const x of ordered) {
-			const cs = x === f ? [this.direct(f, p, aP, 0)] : x === p ? [this.direct(f, p, aF, 1)] : this.collateral(f, p, x, aF, aP);
+			const cs = x === f ? [this.direct(f, p, aP, 0)] : x === p ? [this.direct(f, p, aF, 1)] : this.collateral(f, p, x, aF, aP, pending);
 			for (const c of cs) {
 				if (!c) continue;
-				// A full relation is found at both members of its couple; keep the better word.
+				// A full relation is found at both members of its couple; keep the better word, and the better maybe (rule 6).
 				const old = found.get(c.key);
-				if (!old || WORD_RANK[c.word] < WORD_RANK[old.word]) found.set(c.key, c);
+				found.set(c.key, old ? joinCandidates(old, c) : c);
 			}
 		}
-		const out = this.mergeDoubles([...found.values()]);
+		const list = [...found.values()];
+		// Most pairs of people have fewer than two full cousin names, so nothing can be "double".
+		const out = cousinCount(list) < 2 ? list : this.mergeDoubles(list, (keys) => this.searchPending(f, p, aF, aP, pending, list, keys));
 		this.bloodMemo.set(memoKey, out);
 		return out;
 	}
@@ -676,7 +867,7 @@ class Kin {
 		const pathP = side === 0 ? path : [p];
 		const a = pathF.length - 1;
 		const b = pathP.length - 1;
-		return { a, b, x: to, y: -1, half: false, double: false, word: this.wordOf(pathF, pathP, -1), pathF, pathP, key: `D:${a}:${b}` };
+		return { a, b, x: to, y: -1, half: false, double: false, word: this.wordOf(pathF, pathP, -1), pathF, pathP, key: `D:${a}:${b}`, couple: [to], via: [] };
 	}
 
 	/**
@@ -685,9 +876,10 @@ class Kin {
 	 * other common ancestor below `x`; it stays if one pair of shortest paths shares nobody below
 	 * `x` (a person on both paths is a common ancestor, or one of the two people). Each distinct
 	 * full or half result is one candidate (D50), so the names never depend on the order of the
-	 * children; each takes the pair with the lowest link rank, then the first in list order.
+	 * children; each takes the pair with the lowest link rank, then the first in list order. A cousin pair
+	 * that is passed over because its key is taken goes to `pending` (x, c1, c2): the "double" test may need its line.
 	 */
-	private collateral(f: number, p: number, x: number, aF: Map<number, number>, aP: Map<number, number>): Blood[] {
+	private collateral(f: number, p: number, x: number, aF: Map<number, number>, aP: Map<number, number>, pending: number[]): Blood[] {
 		const kids = this.down[x];
 		let bestF = -1;
 		let bestP = -1;
@@ -704,24 +896,45 @@ class Kin {
 			}
 		}
 		if (bestF < 0) return [];
-		const pairs: { c1: number; c2: number; lo: number; hi: number; shape?: Shape }[] = [];
+		const pairs: { c1: number; c2: number; lo: number; hi: number; shape?: Shape; done: boolean }[] = [];
 		for (const c1 of kids) {
 			if (aF.get(c1) !== bestF) continue;
 			for (const c2 of kids) {
 				if (aP.get(c2) !== bestP || c1 === c2) continue;
-				pairs.push({ c1, c2, lo: Math.max(RANK[this.typeOf(c1, x)], RANK[this.typeOf(c2, x)]), hi: -1 });
+				pairs.push({ c1, c2, lo: Math.max(RANK[this.typeOf(c1, x)], RANK[this.typeOf(c2, x)]), hi: -1, done: false });
 			}
 		}
 		const shapeOf = (pair: (typeof pairs)[number]) => (pair.shape ??= this.pairShape(x, pair.c1, pair.c2, bestF + 1, bestP + 1));
 		// D123: a rumoured link can matter only if one lies in the blood ancestry of either person (that covers c1 and c2 too).
-		const second = this.topRank[f] === 2 || this.topRank[p] === 2;
+		const rumour = this.topRank[f] === 2 || this.topRank[p] === 2;
 		const out: Blood[] = [];
 		const has = (key: string) => out.some((b) => b.key === key);
+		// Only a cousin name can be "double".
+		const cousins = bestF >= 1 && bestP >= 1;
 		for (let level = 0; level <= 2; level++) {
 			for (const pair of pairs) {
 				const { c1, c2, lo } = pair;
-				// With one pair (nearly always) the key is needed only for a found candidate.
-				if (level < lo || ((pairs.length > 1 || pair.shape) && has(shapeOf(pair).key))) continue;
+				// A pair that gave a candidate gives no better one at a higher level. Rule 1 can give it a key other
+				// than its sure shape's (D174 makes that common), so the key test alone would search it again.
+				if (level < lo || pair.done) continue;
+				// With one pair (nearly always) the key is needed only for a found candidate. A pair whose sure key
+				// another pair took is searched only if it could add to the names (rule 6): a better maybe, or a
+				// rule 1 name that no pair gave yet. So the names never depend on the order of the children (D2).
+				if (pairs.length > 1 || pair.shape) {
+					const shape = shapeOf(pair);
+					const taken = out.find((b) => b.key === shape.key);
+					if (taken && !this.couldAdd(taken, shape, x, c1, c2, rumour, has)) {
+						// Neither can change later: the taken maybe only gets better, and keys are only added.
+						pair.done = true;
+						if (cousins) pending.push(x, c1, c2);
+						continue;
+					}
+				}
+				// A line found at level 2 has a rumoured link (no lower level had one), so it takes rule 1 and its key is known now.
+				if (level === 2 && pairs.length > 1 && out.some(isRuleOne) && has(this.ruleOneKey(shapeOf(pair), x, c1, c2, bestF + 1, bestP + 1))) {
+					if (cousins) pending.push(x, c1, c2);
+					continue;
+				}
 				// A higher level changes the answer only if the shortest-path graphs have a link of that rank.
 				if (level > lo) {
 					if (level > Math.max(lo, this.topRank[f], this.topRank[p])) continue;
@@ -729,10 +942,55 @@ class Kin {
 					if (level > pair.hi) continue;
 				}
 				const paths = this.disjointPair(f, c1, aF, p, c2, aP, level);
-				if (paths) out.push(this.collateralCandidate(shapeOf(pair), paths[0], paths[1], x, c1, c2, second));
+				if (!paths) continue;
+				pair.done = true;
+				const c = this.collateralCandidate(shapeOf(pair), paths[0], paths[1], x, c1, c2, rumour);
+				const k = out.findIndex((b) => b.key === c.key);
+				if (k < 0) out.push(c);
+				else out[k] = joinCandidates(out[k], c);
 			}
 		}
 		return out;
+	}
+
+	/**
+	 * Rule 6 for a pair whose sure key the candidate `taken` already has: true if the pair could add to
+	 * the names, so it must be searched. Its sure line could bring a better maybe (not to a rumoured
+	 * line, which has no maybe; a pair with a sure line was found before a rumoured one at a higher
+	 * level), or its rumoured line a rule 1 key that no pair gave yet.
+	 */
+	private couldAdd(taken: Blood, shape: Shape, x: number, c1: number, c2: number, rumour: boolean, has: (key: string) => boolean): boolean {
+		if (!rumour && !(shape.half && this.options.oneParentUnknown)) return false;
+		const doubt = this.doubtOf(shape, x, c1, c2);
+		if (doubt && taken.word !== 'rumoured' && (!taken.maybe || doubtRank(doubt.maybe, doubt.cause, doubt.some) < doubtRank(taken.maybe, taken.cause!, taken.some))) return true;
+		return rumour && !has(this.ruleOneKey(shape, x, c1, c2, taken.a, taken.b));
+	}
+
+	/**
+	 * D175: searches the cousin pairs that `collateral` passed over (`pending`: x, c1, c2) whose key could
+	 * be one of `keys`, as it would have searched them, and adds each line found to the candidate of `list`
+	 * with its key. Only the "double" test reads these lines, and only for a group of `keys` that the lines
+	 * it has cannot decide, so the result never depends on which pair of children was searched first.
+	 */
+	private searchPending(f: number, p: number, aF: Map<number, number>, aP: Map<number, number>, pending: number[], list: Blood[], keys: Set<string>): void {
+		const rumour = this.topRank[f] === 2 || this.topRank[p] === 2;
+		for (let k = 0; k < pending.length; k += 3) {
+			const [x, c1, c2] = [pending[k], pending[k + 1], pending[k + 2]];
+			if (x < 0) continue;
+			// A line takes the sure key of its pair, or on a rumoured line the key of the second test: no other.
+			const [a, b] = [aF.get(c1)! + 1, aP.get(c2)! + 1];
+			const shape = this.pairShape(x, c1, c2, a, b);
+			if (!keys.has(shape.key) && !(rumour && keys.has(this.ruleOneKey(shape, x, c1, c2, a, b)))) continue;
+			pending[k] = -1;
+			for (let level = Math.max(RANK[this.typeOf(c1, x)], RANK[this.typeOf(c2, x)]); level <= 2; level++) {
+				const paths = this.disjointPair(f, c1, aF, p, c2, aP, level);
+				if (!paths) continue;
+				const c = this.collateralCandidate(shape, paths[0], paths[1], x, c1, c2, rumour);
+				const owner = list.find((d) => d.key === c.key);
+				if (owner) for (const v of c.via) addVia(owner, v);
+				break;
+			}
+		}
 	}
 
 	/** The people of `list` as a set, valid until the next call; this runs for most pairs, so it builds no `Set`. */
@@ -853,31 +1111,136 @@ class Kin {
 	private pairShape(x: number, c1: number, c2: number, a: number, b: number): Shape {
 		const t1 = this.typeOf(c1, x);
 		const own = this.parentsOfType(c1, t1);
-		const half = own.sig !== this.parentsOfType(c2, this.typeOf(c2, x)).sig;
+		const half = this.isHalf(c1, t1, c2, this.typeOf(c2, x));
 		return half ? { half, couple: [x], key: `H:${x}:${a}:${b}` } : { half, couple: own.list, key: `F:${own.sig}:${a}:${b}` };
 	}
 
-	private collateralCandidate(shape: Shape, pf: number[], pp: number[], x: number, c1: number, c2: number, second: boolean): Blood {
+	/**
+	 * The blood candidate of one pair of paths, with the second test of D123 and D174 (file header):
+	 * it runs if a rumoured link lies in the ancestry (`rumour`), or if the setting is on and the
+	 * sure test gives half. Else the candidate is the sure one, as in a tree with no doubt.
+	 */
+	private collateralCandidate(shape: Shape, pf: number[], pp: number[], x: number, c1: number, c2: number, rumour: boolean): Blood {
 		const lx = shape.couple[0];
-		const y = shape.couple.length > 1 ? shape.couple[1] : -1;
+		// A couple with no union in the tree (two rumoured parents, an adoptive couple beside birth parents) is not
+		// drawn: the line passes `lx` alone. Every member has the same link type, so the word stays the same.
+		const y = shape.couple.length > 1 && this.sharesUnion(lx, shape.couple[1]) ? shape.couple[1] : -1;
 		const pathF = [...pf, lx];
 		const pathP = [...pp, lx];
 		const word = this.wordOf(pathF, pathP, y);
-		const out: Blood = { a: pathF.length - 1, b: pathP.length - 1, x: lx, y, half: shape.half, double: false, word, pathF, pathP, key: shape.key };
-		if (!second) return out;
+		const out: Blood = { a: pathF.length - 1, b: pathP.length - 1, x: lx, y, half: shape.half, double: false, word, pathF, pathP, key: shape.key, couple: shape.couple, via: [{ c1, c2, word }] };
+		if (!rumour && !(shape.half && this.options.oneParentUnknown)) return out;
 		const [t1, t2] = [this.typeOf(c1, x), this.typeOf(c2, x)];
 		if (word === 'rumoured') {
-			// Rule 1. When the word changes, the line passes `x` alone (a half name has no couple); the new key keeps it apart from the sure shape of the pair.
+			// Rule 1. When the result changes, the new key keeps the line apart from the sure shape of the pair.
 			const half = this.halfCounted(c1, t1, c2, t2);
-			if (half !== shape.half) Object.assign(out, { half, x, y: -1, pathF: [...pf, x], pathP: [...pp, x], key: `${half ? 'H' : 'F'}R:${x}:${out.a}:${out.b}` });
+			if (half !== shape.half) {
+				const s1 = this.counted(c1, t1);
+				out.half = half;
+				// A half key holds no set, so the set of the matching choices is built only for a full line.
+				const setList = half ? [x] : this.matchedPeople(s1, this.counted(c2, t2));
+				out.key = ruleOneKey(half, x, half ? '' : setList === s1.allList ? s1.all : setList.join(','), out.a, out.b);
+				out.couple = setList;
+				// A half line passes `x` alone. A full line passes the couple of the second test (D175), the same at
+				// each of its members, so a couple with a rumoured parent stays one couple and never makes a "double".
+				// Siblings keep `x` alone: their one sibling step shows the rumoured link (D174 ruling 8), and they are never double.
+				const [nx, ny] = half || (out.a === 1 && out.b === 1) ? [x, -1] : this.ruleOneTop(pf, pp, x, c1, c2, setList);
+				if (nx !== lx || ny !== y) {
+					out.x = nx;
+					out.y = ny;
+					out.pathF = [...pf, nx];
+					out.pathP = [...pp, nx];
+				}
+			}
 			return out;
 		}
+		// Rule 5: no maybe where the link of c1 or c2 to `x` is adoptive (ward links make no blood line).
+		if (t1 === 'adoptive' || t2 === 'adoptive') return out;
 		relationRunStats.second++;
-		const [s1, s2] = [this.counted(c1, t1), this.counted(c2, t2)];
-		if (shape.half) {
-			if ((s1.hasRumoured || s2.hasRumoured) && s1.all === s2.all) out.maybe = 'full';
-		} else if (s1.hasRumoured && s2.hasRumoured && s1.rumoured !== s2.rumoured) out.maybe = 'half';
+		const doubt = this.doubtOf(shape, x, c1, c2);
+		if (doubt) {
+			out.maybe = doubt.maybe;
+			out.cause = doubt.cause;
+			if (doubt.some) out.some = true;
+		}
 		return out;
+	}
+
+	/**
+	 * Rule 1, a full line through the couple `set` of the second test (D175): the top of the line, `x`
+	 * and `y` of the candidate. Two members of the couple, in c1's list order, that have a union in the
+	 * tree, such that the line keeps a rumoured link (below c1 and c2, or from c1 up to the first member,
+	 * or from the second member down to c2): the name says "rumoured", so its steps must too (§13.2).
+	 * Else the first member with a rumoured link to c1 or c2, alone: the line then has a sibling step
+	 * through a rumoured link and draws no couple that the tree does not have.
+	 */
+	private ruleOneTop(pf: number[], pp: number[], x: number, c1: number, c2: number, set: number[]): [number, number] {
+		const below = this.hasRumouredLink(pf) || this.hasRumouredLink(pp);
+		const members = this.up[c1].filter((l) => set.includes(l.p));
+		for (const top of members) {
+			for (const other of members) {
+				if (other === top || (!below && top.type !== 'rumoured' && this.typeOf(c2, other.p) !== 'rumoured')) continue;
+				if (this.sharesUnion(top.p, other.p)) return [top.p, other.p];
+			}
+		}
+		const alone = members.find((l) => l.type === 'rumoured' || this.typeOf(c2, l.p) === 'rumoured');
+		return [alone ? alone.p : x, -1];
+	}
+
+	/** True if `x` and `y` share a union of the tree, listed or implicit: then `coupleUnion` gives a key of the tree (contract "unknown union"). */
+	private sharesUnion(x: number, y: number): boolean {
+		let partners = this.unionPeople[x];
+		if (!partners) {
+			partners = [];
+			for (const key of this.g.unionsOf.get(this.ids[x]) ?? []) {
+				const fu = this.g.unionByKey.get(key);
+				if (fu) for (const id of fu.partners) partners.push(this.idx.get(id) ?? -1);
+			}
+			this.unionPeople[x] = partners;
+		}
+		return partners.includes(y);
+	}
+
+	/** True if a link of the path (each person up to the next) is rumoured. */
+	private hasRumouredLink(path: number[]): boolean {
+		for (let i = 0; i + 1 < path.length; i++) if (this.typeOf(path[i], path[i + 1]) === 'rumoured') return true;
+		return false;
+	}
+
+	/** The maybe of a sure line of the pair (`c1`, `c2`) at `x` (file header, rules 2 to 5), if any. */
+	private doubtOf(shape: Shape, x: number, c1: number, c2: number): { maybe: 'full' | 'half'; cause: RelationMaybe['cause']; some?: true } | undefined {
+		const [t1, t2] = [this.typeOf(c1, x), this.typeOf(c2, x)];
+		if (t1 === 'adoptive' || t2 === 'adoptive') return undefined;
+		const [s1, s2] = [this.counted(c1, t1), this.counted(c2, t2)];
+		const rumoured = s1.hasRumoured || s2.hasRumoured;
+		if (shape.half) {
+			// Rule 2: the rumour gives equal sets (the second test says full), or (setting on) an unknown parent could make them equal.
+			if (rumoured) {
+				// One choice each (nearly always): the sets are equal or not, and equal sets hold every rumoured parent.
+				const single = s1.choices.length === 1 && s2.choices.length === 1;
+				if (single && s1.all === s2.all) return { maybe: 'full', cause: 'rumoured' };
+				const equal = single ? [] : this.matches(s1, s2, false);
+				if (equal.length) {
+					// D176: the sheet says "one of the links" if some matching set leaves out a rumoured parent of either person.
+					const all = [...s1.rumouredList, ...s2.rumouredList];
+					return { maybe: 'full', cause: 'rumoured', ...(equal.some((t) => all.some((r) => !t.includes(r))) ? { some: true as const } : {}) };
+				}
+			}
+			if (this.options.oneParentUnknown && s1.choices.some((a) => s2.choices.some((b) => joinedSize(a, b) <= 2))) return { maybe: 'full', cause: 'unlisted' };
+			return undefined;
+		}
+		return s1.rumoured !== s2.rumoured ? { maybe: 'half', cause: 'rumoured' } : undefined;
+	}
+
+	/** The key of a candidate on a rumoured line of the pair (`c1`, `c2`) at `x`: its sure key, or the rule 1 key if the second test differs. */
+	private ruleOneKey(shape: Shape, x: number, c1: number, c2: number, a: number, b: number): string {
+		const t1 = this.typeOf(c1, x);
+		const half = this.secondHalf(c1, t1, c2, this.typeOf(c2, x));
+		if (half === shape.half) return shape.key;
+		if (half) return ruleOneKey(true, x, '', a, b);
+		const q1 = this.counted(c1, t1);
+		const setList = this.matchedPeople(q1, this.counted(c2, this.typeOf(c2, x)));
+		return ruleOneKey(false, x, setList === q1.allList ? q1.all : setList.join(','), a, b);
 	}
 
 	/** "rumoured" if a link of the line is rumoured, else "adoptive" if one is adoptive, else "birth". */
@@ -895,18 +1258,35 @@ class Kin {
 		return adoptive ? 'adoptive' : 'birth';
 	}
 
-	/** §13.1 "Double": one cousin name from two different couples is one "double" name, with the first couple's line. */
-	private mergeDoubles(list: Blood[]): Blood[] {
+	/**
+	 * §13.1 "Double": one cousin name from two different couples is one "double" name, with the first
+	 * couple's line; the other lines stay in `also`. `more(keys)` adds the lines of the pairs that the
+	 * search passed over and that could have one of `keys`; it runs for a group only if the lines found
+	 * so far say "one couple" and the couple test alone does not (D175).
+	 */
+	private mergeDoubles(list: Blood[], more: (keys: Set<string>) => void): Blood[] {
 		const groups = new Map<string, Blood[]>();
-		for (const c of list) if (!c.half && c.a >= 2 && c.b >= 2) push(groups, `${c.word}:${cousinWord(c.a, c.b, false)}`, c);
+		for (const c of list) if (isFullCousin(c)) push(groups, `${c.word}:${cousinWord(c.a, c.b, false)}`, c);
 		const drop = new Set<Blood>();
 		for (const group of groups.values()) {
 			if (group.length < 2) continue;
+			if (!anyPair(group, twoCouples)) {
+				// More lines change nothing where every pair of the group is one couple by the couple test alone.
+				if (!anyPair(group, notOneCouple)) continue;
+				more(new Set(group.map((c) => c.key)));
+				if (!anyPair(group, twoCouples)) continue;
+			}
 			group.sort((i, j) => i.x - j.x);
 			group[0].double = true;
 			// A double name is one name from two couples; no rumour is compared against it (rule 5).
 			delete group[0].maybe;
-			for (const c of group.slice(1)) drop.add(c);
+			delete group[0].cause;
+			delete group[0].some;
+			group[0].maybeFrom = undefined;
+			for (const c of group.slice(1)) {
+				drop.add(c);
+				addLines(group[0], c);
+			}
 		}
 		return list.filter((c) => !drop.has(c));
 	}
@@ -924,7 +1304,7 @@ class Kin {
 	 * The walk of a blood candidate (file header, "Lines", blood): up from the first person to `x`;
 	 * for a full relation across the couple to `x`'s partner; then down to the second person.
 	 */
-	bloodWalk(c: Blood): Walk {
+	bloodWalk(c: BloodLine): Walk {
 		const nodes = [...c.pathF];
 		const edges: Edge[] = [];
 		for (let i = 0; i + 1 < c.pathF.length; i++) edges.push({ k: 'up', type: this.typeOf(c.pathF[i], c.pathF[i + 1]) });
@@ -942,7 +1322,7 @@ class Kin {
 	}
 
 	/** The line of a blood candidate. */
-	bloodLine(c: Blood): Line {
+	bloodLine(c: BloodLine): Line {
 		return walkLine(this.bloodWalk(c));
 	}
 
@@ -1028,6 +1408,7 @@ class Kin {
 				kind: 'blood',
 				distance: c.a + c.b,
 				cat: c.word === 'rumoured' ? 4 : c.word === 'adoptive' ? 1 : 0,
+				second: c.word === 'rumoured',
 				direct: c.a === 0 || c.b === 0 ? 0 : 1,
 				half: c.half ? 1 : 0,
 				removal: Math.abs(c.a - c.b),
@@ -1037,22 +1418,31 @@ class Kin {
 		}
 
 		// D123: the name that the rumoured parents would make true is also a relation, with the word "rumoured", unless a rumoured line already gave it.
+		// A doubt of only a parent who is not listed adds no name (D174).
 		const have = new Set(cands.map((c) => c.lower));
 		for (const c of blood) {
-			if (!c.maybe) continue;
+			if (!c.maybe || c.cause !== 'rumoured') continue;
 			const lower = this.bloodLower({ ...c, half: !c.half, word: 'rumoured' }, sexP);
-			if (have.has(lower)) continue;
+			// A "double" name of the rumoured lines already says that the rumours make them full cousins, and more.
+			if (have.has(lower) || have.has(this.bloodLower({ ...c, half: !c.half, word: 'rumoured', double: true }, sexP))) continue;
 			have.add(lower);
+			// The line of the pair of children that the rumour concerns, so that a step says "rumoured" whatever the order of the people.
+			const source = c.maybeFrom ?? c;
 			cands.push({
 				lower,
 				kind: 'blood',
 				distance: c.a + c.b,
 				cat: 4,
+				second: true,
 				direct: 1,
 				half: c.half ? 0 : 1,
 				removal: Math.abs(c.a - c.b),
 				anc: c.x,
-				make: () => ({ line: this.bloodLine(c), walk: this.bloodWalk(c) }),
+				// A half name passes the top of its line alone (D176 item 7): the rumoured parent is not an ancestor of the other person, so a couple would be false.
+				make: () => {
+					const top = c.half ? source : { ...source, y: -1 };
+					return { line: this.bloodLine(top), walk: this.bloodWalk(top) };
+				},
 			});
 		}
 
@@ -1078,18 +1468,22 @@ class Kin {
 		}
 
 		// By marriage, rule 2: P is a blood relative of M's spouse S.
+		const avoids = (d: BloodLine) => d.y !== m && !d.pathF.includes(m) && !d.pathP.includes(m);
 		for (const s of this.spouses(m)) {
 			if (s === p) continue;
 			const marriage = this.lastUnion(m, s, true)!;
-			for (const c of this.blood(s, p, aP)) {
+			const ofS = this.blood(s, p, aP);
+			for (const c of ofS) {
 				// A descendant of S through M's own child is M's own descendant, not a step-relation.
 				if (c.a === 0 && this.up[c.pathP[c.pathP.length - 2]].some((l) => l.p === m)) continue;
-				// The line lists each person once, so a relation to S that runs through M is not one by marriage.
-				if (c.y === m || c.pathF.includes(m) || c.pathP.includes(m)) continue;
+				// The line lists each person once, so a relation to S that runs through M is not one by marriage. Any line
+				// of the name that avoids M will do (the first one found depends on the order of the people), and is shown.
+				const via = avoids(c) ? c : c.also?.find(avoids);
+				if (!via) continue;
 				cands.push(
 					this.marriageCand(this.rule2Word(c, sexP, this.sex[s]), c, () => {
-						const inner = this.bloodLine(c);
-						const walk = this.bloodWalk(c);
+						const inner = this.bloodLine(via);
+						const walk = this.bloodWalk(via);
 						return {
 							line: { people: [m, ...inner.people], links: inner.links, unions: [marriage.key, ...inner.unions] },
 							walk: { nodes: [m, ...walk.nodes], edges: [{ k: 'partner', union: marriage.key }, ...walk.edges] },
@@ -1097,7 +1491,10 @@ class Kin {
 					}),
 				);
 			}
+			forget(ofS);
 		}
+		// Only this call reads the other lines of these lists; rule 1 reads none.
+		forget(blood);
 
 		const step = this.stepSibling(m, p);
 		if (step) cands.push(step);
@@ -1112,16 +1509,16 @@ class Kin {
 				seen.set(c.lower, c);
 				return true;
 			}
-			// Equal names keep the maybe of any of them ('full' wins), so it never depends on the order of the people.
-			if (c.maybe && first.kind === 'blood' && c.kind === 'blood' && (!first.maybe || (c.maybe.effect === 'full' && first.maybe.effect === 'half'))) first.maybe = c.maybe;
+			// Equal names keep the maybe of any of them ('full' wins, then a rumoured cause), so it never depends on the order of the people.
+			if (c.maybe && first.kind === 'blood' && c.kind === 'blood' && (!first.maybe || maybeRank(c.maybe) < maybeRank(first.maybe))) first.maybe = c.maybe;
 			return false;
 		});
 	}
 
-	/** D123: the name a sure blood candidate would have if every rumoured link were true. */
+	/** D123: the name a sure blood candidate would have if every rumoured link were true (or, D174, if the parent who is not listed is the same person). */
 	private maybeOf(c: Blood, sex: Sex): RelationMaybe {
 		const lower = this.bloodLower({ ...c, half: !c.half }, sex);
-		return Object.freeze({ effect: c.maybe!, text: capital(lower), lower });
+		return Object.freeze({ effect: c.maybe!, text: capital(lower), lower, cause: c.cause ?? 'rumoured', ...(c.some ? { some: true as const } : {}) });
 	}
 
 	private wardCand(m: number, p: number, kind: 'guardian' | 'ward'): Cand {
@@ -1223,8 +1620,8 @@ class Kin {
 		return { nodes: nodes.reverse(), edges: edges.reverse() };
 	}
 
-	/** The steps of a walk (file header, "Steps"): an up step then a down step to another child is one sibling step (not through a ward link). */
-	steps(walk: Walk): RelationStep[] {
+	/** The steps of a walk (file header, "Steps"): an up step then a down step to another child is one sibling step (not through a ward link). `second`: the walk of a rumoured name. */
+	steps(walk: Walk, second = false): RelationStep[] {
 		const out: RelationStep[] = [];
 		const { nodes, edges } = walk;
 		for (let i = 0; i < edges.length; i++) {
@@ -1235,8 +1632,11 @@ class Kin {
 			// A ward is not a sibling: a ward link stays a step of its own.
 			if (e.k === 'up' && after?.k === 'down' && nodes[i + 2] !== from && e.type !== 'ward' && after.type !== 'ward') {
 				const sib = nodes[i + 2];
-				const half = e.type === 'rumoured' || after.type === 'rumoured' ? this.halfCounted(from, e.type, sib, after.type) : this.isHalf(from, e.type, sib, after.type);
-				out.push({ person: this.ids[sib], of: this.ids[from], word: siblingStepWord(this.sex[sib], half, e.type, after.type) });
+				// The steps of a rumoured name follow its second test; a chain's step follows its own links.
+				const sure = this.isHalf(from, e.type, sib, after.type);
+				const half = second || e.type === 'rumoured' || after.type === 'rumoured' ? this.halfCounted(from, e.type, sib, after.type) : sure;
+				// A step that only the rumours make full (or half) says so, also over two birth links.
+				out.push({ person: this.ids[sib], of: this.ids[from], word: siblingStepWord(this.sex[sib], half, e.type, after.type, half !== sure) });
 				i++;
 				continue;
 			}
@@ -1283,6 +1683,7 @@ class Kin {
 		this.belowScratch.clear();
 		this.dagMemo.clear();
 		this.dagScratch.clear();
+		this.unionPeople.length = 0;
 	}
 
 	lineIds(line: Line): RelationLine {
@@ -1300,6 +1701,141 @@ function better(d1: number, d2: number, b1: number, b2: number): boolean {
 	if (Math.abs(d1 - d2) !== Math.abs(b1 - b2)) return Math.abs(d1 - d2) < Math.abs(b1 - b2);
 	return d1 < b1;
 }
+
+/** Rule 6 order of a maybe: 'full' first, then a rumoured cause, then one with `some` (D176), so the flag never depends on the order of the people. */
+const doubtRank = (maybe: 'full' | 'half', cause: RelationMaybe['cause'], some?: true) => ((maybe === 'full' ? 0 : 2) + (cause === 'rumoured' ? 0 : 1)) * 2 + (some ? 0 : 1);
+
+/**
+ * Two candidates with one key: the one with the better word (the first if equal), with the better
+ * maybe of the two if their words are equal (rule 6), so the result never depends on their order.
+ */
+function joinCandidates(old: Blood, c: Blood): Blood {
+	const keep = WORD_RANK[c.word] < WORD_RANK[old.word] ? c : old;
+	for (const v of (keep === c ? old : c).via) addVia(keep, v);
+	if (WORD_RANK[c.word] !== WORD_RANK[old.word]) return keep;
+	if (c.maybe && (!old.maybe || doubtRank(c.maybe, c.cause!, c.some) < doubtRank(old.maybe, old.cause!, old.some))) {
+		old.maybe = c.maybe;
+		old.cause = c.cause;
+		if (c.some) old.some = true;
+		else delete old.some;
+		const from = c.maybeFrom ?? c;
+		old.maybeFrom = sameLine(old, from) ? undefined : (c.maybeFrom ?? lineOf(c));
+	}
+	addLines(old, c);
+	return old;
+}
+
+/**
+ * Adds the lines of `c`, which is dropped for `old`, to `old.also`: one flat list, each line once and not
+ * `old`'s own (a full line is often found the same at both members of its couple), so the list stays short.
+ */
+function addLines(old: Blood, c: Blood): void {
+	if (isNewLine(old, c)) (old.also ??= []).push(lineOf(c));
+	if (c.also) for (const d of c.also) if (isNewLine(old, d)) (old.also ??= []).push(d);
+}
+
+/** True if `d` is neither the line of `c` nor one of its other lines. */
+function isNewLine(c: Blood, d: BloodLine): boolean {
+	if (sameLine(c, d)) return false;
+	if (c.also) for (const e of c.also) if (sameLine(e, d)) return false;
+	return true;
+}
+
+/** The line of a candidate alone, so that a list of lines does not keep the rest of a dropped candidate. */
+const lineOf = (c: BloodLine): BloodLine => ({ a: c.a, b: c.b, x: c.x, y: c.y, pathF: c.pathF, pathP: c.pathP });
+
+/** True if two lines have the same people in the same places: `bloodWalk` makes the same walk of them. */
+function sameLine(c: BloodLine, d: BloodLine): boolean {
+	return c === d || (c.x === d.x && c.y === d.y && sameList(c.pathF, d.pathF) && sameList(c.pathP, d.pathP));
+}
+
+function sameList(s: number[], t: number[]): boolean {
+	if (s === t) return true;
+	if (s.length !== t.length) return false;
+	for (let i = 0; i < s.length; i++) if (s[i] !== t[i]) return false;
+	return true;
+}
+
+/** Drops the other lines of the candidates of `list` once the names of one person are made: their closures keep the line they show, and a result keeps every candidate it names. */
+function forget(list: Blood[]): void {
+	// Only where set: a new property on every candidate would cost memory.
+	for (const c of list) {
+		if (c.also) c.also = undefined;
+		if (c.maybeFrom) c.maybeFrom = undefined;
+	}
+}
+
+/** Adds the line `v` to the candidate `c` once. */
+function addVia(c: Blood, v: Via): void {
+	if (!c.via.some((w) => w.c1 === v.c1 && w.c2 === v.c2 && w.word === v.word)) c.via.push(v);
+}
+
+/**
+ * §13.1 "Double" (D175): two full candidates of one name and one word come from two couples, unless
+ * one is a couple of the second test (an FR key) and a couple of two or more people of one is part of
+ * the couple of the other (a sure couple plus a rumoured parent), or every line of both, of that word,
+ * leaves through the same two children. Two couples that share one person (a man with two wives) are
+ * still two couples, and so are one parent alone and a couple with that parent (setting off).
+ */
+function twoCouples(c: Blood, d: Blood): boolean {
+	if (oneCouple(c, d)) return false;
+	// Any two different lines will do: one line for each couple.
+	const lines = [...c.via, ...d.via].filter((v) => v.word === c.word);
+	return lines.some((v) => v.c1 !== lines[0].c1 || v.c2 !== lines[0].c2);
+}
+
+/** The couple test of `twoCouples`, which reads no line: one is a couple of the second test and a couple of two or more people of one is part of the couple of the other. */
+function oneCouple(c: Blood, d: Blood): boolean {
+	return (isFullRuleOne(c) || isFullRuleOne(d)) && (inside(c.couple, d.couple) || inside(d.couple, c.couple));
+}
+
+const notOneCouple = (c: Blood, d: Blood) => !oneCouple(c, d);
+
+/** True if `s` has two or more people and all are in `t`. */
+function inside(s: number[], t: number[]): boolean {
+	if (s.length < 2) return false;
+	for (const v of s) if (!t.includes(v)) return false;
+	return true;
+}
+
+/** True if `test` holds for two different candidates of `group` (the first before the second). */
+function anyPair(group: Blood[], test: (c: Blood, d: Blood) => boolean): boolean {
+	for (let i = 0; i < group.length; i++) for (let j = i + 1; j < group.length; j++) if (test(group[i], group[j])) return true;
+	return false;
+}
+
+/** A full cousin candidate: only these can make a "double" name. */
+const isFullCousin = (c: Blood) => !c.half && c.a >= 2 && c.b >= 2;
+
+/** The number of full cousin candidates of `list`, up to 2. */
+function cousinCount(list: Blood[]): number {
+	let n = 0;
+	for (const c of list) if (isFullCousin(c) && ++n === 2) break;
+	return n;
+}
+
+/** True for a full candidate whose couple comes from the second test (rule 1, `ruleOneKey`). */
+const isFullRuleOne = (c: Blood) => c.key.startsWith('FR');
+
+/** True for a candidate that has a rule 1 key (`ruleOneKey`). */
+const isRuleOne = (c: Blood) => c.key.charCodeAt(1) === 82;
+
+/**
+ * The key of a rule 1 candidate whose half or full differs from the sure test: a half one passes `x`
+ * alone; a full one is its couple of the second test (`set`, sorted), as a sure full key is its couple
+ * (D175). The "R" keeps it apart from a sure key, so a rumoured line never joins a sure one.
+ */
+const ruleOneKey = (half: boolean, x: number, set: string, a: number, b: number) => (half ? `HR:${x}:${a}:${b}` : `FR:${set}:${a}:${b}`);
+
+/** The number of different people in two short lists (the two parent sets of D174 rule 2). */
+function joinedSize(a: number[], b: number[]): number {
+	let n = a.length;
+	for (const v of b) if (!a.includes(v)) n++;
+	return n;
+}
+
+/** Which of two maybes of one name is kept: 'full' first, then a rumoured cause. */
+const maybeRank = (m: RelationMaybe) => doubtRank(m.effect, m.cause, m.some);
 
 /** The line of a walk: its people, its parent links and its partnerships, in step order. */
 function walkLine(walk: Walk): Line {
@@ -1349,9 +1885,9 @@ function deepFreeze<T>(value: T): T {
 // Public functions
 
 /** Implements `ComputeRelations`: every person's relations to `me`, best first. */
-export const computeRelations: ComputeRelations = (g, me) => {
+export const computeRelations: ComputeRelations = (g, me, options = DEFAULT_RELATION_OPTIONS) => {
 	const out = new Map<string, readonly Relation[]>();
-	const kin = new Kin(g);
+	const kin = new Kin(g, options);
 	const m = kin.idx.get(me);
 	if (m === undefined) return freezeMap(out);
 	const self: Relation = { text: capital(WORDS.you), lower: WORDS.you, kind: 'self', distance: 0, line: { people: [me], links: [], unions: [] } };
@@ -1368,9 +1904,9 @@ export const computeRelations: ComputeRelations = (g, me) => {
 };
 
 /** Implements `FindRelation`: the second person as a relative of the first (§13.2). */
-export const findRelation: FindRelation = (g, first, second) => {
+export const findRelation: FindRelation = (g, first, second, options = DEFAULT_RELATION_OPTIONS) => {
 	const none: FinderResult = { kind: 'none', first, second };
-	const kin = new Kin(g);
+	const kin = new Kin(g, options);
 	const f = kin.idx.get(first);
 	const s = kin.idx.get(second);
 	if (f === undefined || s === undefined || f === s) return deepFreeze(none);
@@ -1378,7 +1914,7 @@ export const findRelation: FindRelation = (g, first, second) => {
 	if (cands.length) {
 		const relations = cands.slice(0, FINDER_LIMIT).map((c) => {
 			const { line, walk } = c.make();
-			return { relation: kin.relation(c, line), steps: kin.steps(walk) };
+			return { relation: kin.relation(c, line), steps: kin.steps(walk, c.second) };
 		});
 		return deepFreeze({ kind: 'named', first, second, relations });
 	}
@@ -1479,9 +2015,9 @@ function parsePair(json: string): [string, string] | undefined {
 }
 
 /** Implements `RelationsKey`: what `computeRelations(g, me)` depends on, not names. */
-export const relationsKey: RelationsKey = (g, me) => {
+export const relationsKey: RelationsKey = (g, me, options = DEFAULT_RELATION_OPTIONS) => {
 	const drawn = drawnParentMap(g);
 	const people = g.people.map((p) => [p.id, p.sex ?? null, g.primaryUnion.get(p.id) ?? null, (drawn.get(p.id) ?? []).map((d: DrawnParent) => [d.id, d.type])]);
 	const unions = g.unions.map((u) => [u.key, u.partners, u.type]);
-	return JSON.stringify([me, people, unions]);
+	return JSON.stringify([me, people, unions, options.oneParentUnknown]);
 };

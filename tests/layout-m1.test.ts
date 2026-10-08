@@ -90,64 +90,51 @@ unions:
 
 describe('geometryFor', () => {
 	it('matches the cards at the default 16 px font (card height 61 px since 0.2.4, D117)', () => {
-		expect(geometryFor(16, 'normal')).toMatchObject({ fontPx: 16, cardSize: 'normal', cardW: 180, cardH: 61, unionSize: 10, coupleGap: 36, nodeGap: 20, rowGap: 100 });
-		expect(NORMAL_GEOMETRY).toEqual(geometryFor(16, 'normal'));
+		expect(geometryFor(16)).toMatchObject({ fontPx: 16, cardW: 180, cardH: 61, unionSize: 10, coupleGap: 36, nodeGap: 20, rowGap: 100 });
+		expect(NORMAL_GEOMETRY).toEqual(geometryFor(16));
 	});
 
 	it('scales with the font size', () => {
-		const big = geometryFor(32, 'normal');
+		const big = geometryFor(32);
 		expect(big.cardW).toBe(360);
 		expect(big.cardH).toBe(122);
 		expect(big.rowGap).toBe(200);
-		expect(geometryFor(12, 'normal').cardW).toBe(135);
-	});
-
-	it('makes compact cards smaller than normal ones at the same font', () => {
-		for (const f of [12, 16, 20]) {
-			const n = geometryFor(f, 'normal');
-			const c = geometryFor(f, 'compact');
-			expect(c.cardSize).toBe('compact');
-			expect(c.cardW).toBeLessThan(n.cardW);
-			expect(c.cardH).toBeLessThan(n.cardH);
-			expect(c.rowGap).toBe(n.rowGap);
-		}
+		expect(geometryFor(12).cardW).toBe(135);
 	});
 
 	it('falls back to 16 px for a missing or silly font size', () => {
-		expect(geometryFor(NaN, 'normal').fontPx).toBe(16);
-		expect(geometryFor(0, 'normal').fontPx).toBe(16);
-		expect(geometryFor(1000, 'normal').fontPx).toBe(48);
+		expect(geometryFor(NaN).fontPx).toBe(16);
+		expect(geometryFor(0).fontPx).toBe(16);
+		expect(geometryFor(1000).fontPx).toBe(48);
 	});
 
-	for (const size of ['normal', 'compact'] as const) {
-		for (const f of [10, 14, 16, 18, 24, 32]) {
-			it(`${size} ${f} px: name, title and dates fit inside the card`, () => {
-				const geo = geometryFor(f, size);
-				const t = cardText(geo);
-				// D117: one size for all card text.
-				expect(t.nameSize).toBeCloseTo(0.85 * f);
-				expect(t.smallSize).toBeCloseTo(0.85 * f);
-				// Top of the name's capitals and bottom of the dates' descenders stay inside.
-				expect(t.nameBaseline - 0.75 * t.nameSize).toBeGreaterThan(0);
-				expect(t.datesBaseline + 0.25 * t.smallSize).toBeLessThan(geo.cardH);
-				expect(t.titleBaseline).toBeGreaterThan(t.nameBaseline);
-				expect(t.datesBaseline).toBeGreaterThan(t.titleBaseline);
-				expect(t.textW).toBeGreaterThan(0.5 * geo.cardW);
-			});
+	for (const f of [10, 14, 16, 18, 24, 32]) {
+		it(`${f} px: name, title and dates fit inside the card`, () => {
+			const geo = geometryFor(f);
+			const t = cardText(geo);
+			// D117: one size for all card text.
+			expect(t.nameSize).toBeCloseTo(0.85 * f);
+			expect(t.smallSize).toBeCloseTo(0.85 * f);
+			// Top of the name's capitals and bottom of the dates' descenders stay inside.
+			expect(t.nameBaseline - 0.75 * t.nameSize).toBeGreaterThan(0);
+			expect(t.datesBaseline + 0.25 * t.smallSize).toBeLessThan(geo.cardH);
+			expect(t.titleBaseline).toBeGreaterThan(t.nameBaseline);
+			expect(t.datesBaseline).toBeGreaterThan(t.titleBaseline);
+			expect(t.textW).toBeGreaterThan(0.5 * geo.cardW);
+		});
 
-			it(`${size} ${f} px: a gap between rows holds a tag, its couple lanes and its sibling-bar lanes`, () => {
-				const geo = geometryFor(f, size);
-				const m = lineMetrics(geo);
-				expect(m.coupleLane0 - geo.unionSize / 2).toBeGreaterThan(tagTop(geo, 0) + geo.tagH);
-				expect(gapHeight(geo, 1, 1)).toBe(geo.rowGap);
-				for (const [couples, bars] of [[1, 4], [3, 2], [8, 4]]) {
-					const h = gapHeight(geo, couples, bars);
-					const lowestDot = m.coupleLane0 + (couples - 1) * m.coupleLaneStep + geo.unionSize / 2;
-					const highestBar = h - m.barDrop - (bars - 1) * laneStep(geo);
-					expect(lowestDot + m.clearance).toBeLessThanOrEqual(highestBar + 1e-9);
-				}
-			});
-		}
+		it(`${f} px: a gap between rows holds a tag, its couple lanes and its sibling-bar lanes`, () => {
+			const geo = geometryFor(f);
+			const m = lineMetrics(geo);
+			expect(m.coupleLane0 - geo.unionSize / 2).toBeGreaterThan(tagTop(geo, 0) + geo.tagH);
+			expect(gapHeight(geo, 1, 1)).toBe(geo.rowGap);
+			for (const [couples, bars] of [[1, 4], [3, 2], [8, 4]]) {
+				const h = gapHeight(geo, couples, bars);
+				const lowestDot = m.coupleLane0 + (couples - 1) * m.coupleLaneStep + geo.unionSize / 2;
+				const highestBar = h - m.barDrop - (bars - 1) * laneStep(geo);
+				expect(lowestDot + m.clearance).toBeLessThanOrEqual(highestBar + 1e-9);
+			}
+		});
 	}
 });
 
@@ -241,7 +228,7 @@ unions:
 	});
 
 	it('tags hang from the card bottom with hit areas of at least 44×44 px that do not overlap', () => {
-		for (const geo of [NORMAL_GEOMETRY, geometryFor(12, 'compact'), geometryFor(24, 'normal')]) {
+		for (const geo of [NORMAL_GEOMETRY, geometryFor(12), geometryFor(24)]) {
 			const { layout } = lay(fixture('07'), { maxCardWidths: 0, maxGenerations: 0 }, geo);
 			const tags = [...layout.farTags.values()];
 			expect(tags.length).toBeGreaterThan(30);
@@ -275,8 +262,8 @@ describe('lines never pass behind cards', () => {
 				expect(cardCrossings(layout, edges)).toEqual([]);
 			});
 		}
-		it(`fixture ${f}, compact cards at 12 px`, () => {
-			const { layout, edges } = lay(fixture(f), LOOSE, geometryFor(12, 'compact'));
+		it(`fixture ${f}, 12 px`, () => {
+			const { layout, edges } = lay(fixture(f), LOOSE, geometryFor(12));
 			expect(cardCrossings(layout, edges)).toEqual([]);
 		});
 	}
@@ -372,7 +359,7 @@ describe('layoutTree cache', () => {
 	it('returns the cached object for the same input', () => {
 		clearLayoutCache();
 		const a = layoutTree(graph(src), NORMAL_GEOMETRY, settings, 'Inter');
-		const b = layoutTree(graph(src), geometryFor(16, 'normal'), { sweeps: 4, far: { ...DEFAULT_FAR_RULE } }, 'Inter');
+		const b = layoutTree(graph(src), geometryFor(16), { sweeps: 4, far: { ...DEFAULT_FAR_RULE } }, 'Inter');
 		expect(b).toBe(a);
 	});
 
@@ -392,8 +379,7 @@ describe('layoutTree cache', () => {
 		clearLayoutCache();
 		const a = layoutTree(graph(src), NORMAL_GEOMETRY, settings, 'Inter');
 		const changes = [
-			() => layoutTree(graph(src), geometryFor(18, 'normal'), settings, 'Inter'),
-			() => layoutTree(graph(src), geometryFor(16, 'compact'), settings, 'Inter'),
+			() => layoutTree(graph(src), geometryFor(18), settings, 'Inter'),
 			() => layoutTree(graph(src), NORMAL_GEOMETRY, settings, 'Georgia'),
 			() => layoutTree(graph(src), NORMAL_GEOMETRY, { ...settings, far: { maxCardWidths: 5, maxGenerations: 1 } }, 'Inter'),
 			() => layoutTree(graph(src), NORMAL_GEOMETRY, { ...settings, sweeps: 2 }, 'Inter'),

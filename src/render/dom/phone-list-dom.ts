@@ -151,7 +151,11 @@ export function buildPhoneList(parent: HTMLElement, spec: PhoneListSpec): PhoneL
 		const name = text.createSpan({ cls: 'dynasty-list-name' });
 		name.appendText(nameOf(id));
 		const sob = label?.sobriquet ?? p.sobriquet;
-		if (sob) name.createSpan({ cls: 'dynasty-list-sob', text: ` ${quote(sob)}` });
+		if (sob) {
+			// The space is outside the span: it is the only place where the line can break, so the sobriquet moves whole (D173 item 2).
+			name.appendText(' ');
+			name.createSpan({ cls: 'dynasty-list-sob', text: quote(sob) });
+		}
 		const years = spec.showDates ? dateLine(p) : undefined;
 		if (word || years) {
 			const meta = text.createSpan({ cls: 'dynasty-list-meta' });

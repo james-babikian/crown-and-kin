@@ -8,7 +8,7 @@ import { TFile as VaultFile } from 'obsidian';
 import { deriveFamilies } from '../src/core/derive';
 import { parseDynasty } from '../src/core/parse';
 import type { PictureProblem } from '../src/core/pictures';
-import { geometryFor } from '../src/layout/geometry';
+import { cardForm, geometryFor } from '../src/layout/geometry';
 import { createLivePictures, zoomStep } from '../src/obsidian/live-pictures';
 import type { CopyBox, PictureCopy, PictureStore } from '../src/obsidian/picture-store';
 import { makePicture, savePicture, type SaveSource } from '../src/obsidian/save-picture';
@@ -297,7 +297,7 @@ describe('Save as picture (O11, P1–P6)', () => {
 			g,
 			me: 'roderick',
 			orientation: 'down',
-			geo: geometryFor(16, 'normal'),
+			geo: cardForm(geometryFor(16), 'down'),
 			relationLine: true,
 			fonts: { text: 'serif', ui: 'sans-serif', bold: '600' },
 			showDates: true,
@@ -330,9 +330,9 @@ describe('Save as picture (O11, P1–P6)', () => {
 		expect(svg).not.toContain('blob:');
 		expect(svg.match(/data-item="arms:/g)).toHaveLength(12);
 		expect(/<circle[^>]*stroke-dasharray[^>]*data-item="frame:oswin"/.test(svg)).toBe(true);
-		// P5: pictures at 4 × their CSS size in an SVG (14 px names at 16 px text: scale 0.875).
+		// P5: pictures at 4 × their CSS size in an SVG (the Roundel's medallion is 2 em = 32 px) (14 px names at 16 px text: scale 0.875).
 		const portrait = log.exports.find((x) => x.startsWith('aldric.jpg'))!;
-		expect(portrait).toBe(`aldric.jpg@${Math.ceil(24 * 4 * 0.875)}x${Math.ceil(24 * 4 * 0.875)}:portrait`);
+		expect(portrait).toBe(`aldric.jpg@${Math.ceil(32 * 4 * 0.875)}x${Math.ceil(32 * 4 * 0.875)}:portrait`);
 	});
 
 	it('focus mode names the family in the file name (P6)', async () => {

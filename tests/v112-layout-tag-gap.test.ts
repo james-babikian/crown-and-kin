@@ -45,7 +45,7 @@ function graph(type: string, name?: string): FamilyGraph {
 
 function lay(g: FamilyGraph, fontPx: number): LaidOut {
 	clearLayoutCache();
-	return layoutTree(g, geometryFor(fontPx, 'normal'), FAR, 'test');
+	return layoutTree(g, geometryFor(fontPx), FAR, 'test');
 }
 
 /** The largest x in a path's coordinates and the smallest one. */

@@ -26,7 +26,7 @@ function lay(settings: LayoutSettings, parents: string[][]) {
 	const folded = parents.map((p) => foldKey(p));
 	const hidden = foldHidden(g, new Set(folded));
 	clearLayoutCache();
-	return layoutTree(g, geometryFor(16, 'normal'), { ...settings, foldHidden: [...hidden].sort(), foldedFamilies: folded, foldControls: true }, 'font');
+	return layoutTree(g, geometryFor(16), { ...settings, foldHidden: [...hidden].sort(), foldedFamilies: folded, foldControls: true }, 'font');
 }
 
 const meet = (a: Rect, b: Rect) => a.x < b.x + b.w - 1e-6 && b.x < a.x + a.w - 1e-6 && a.y < b.y + b.h - 1e-6 && b.y < a.y + a.h - 1e-6;

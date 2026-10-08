@@ -18,11 +18,12 @@ export const BREAK_WORDS_MAX = 20000;
 export interface DynastySettings {
 	/** Height of a tree in a note on a computer or tablet, in px (spec §7.5), 100–5000. Default 500. `options.height` wins. */
 	embedHeightDesktop: number;
-	cardSize: 'normal' | 'compact';
 	/** Dates on cards, and the reigns in the title text line (spec §13.3). Born and died do not change the card height; a reign can make the title two text lines, so the card can get taller (D61). */
 	showDates: boolean;
 	/** D40, D145 (spec §13.1): relation names on cards. Off removes the word and its plate, so the cards are shorter and the marked person gets the You tab; the screen-reader label keeps the relation. The list in a note on a phone follows it. */
 	showRelations: boolean;
+	/** D174 (spec §9, §13.1): a person with one listed birth parent has a second parent who is not known, so two such people are at most half-siblings. One setting for every tree in the vault. Default on. */
+	oneParentUnknown: boolean;
 	/** Spec §13.7 (M9 contract O10): portraits on cards. Off: no card shows a portrait or its room; a change lays the trees out again. */
 	showPortraits: boolean;
 	/** Focus mode default generations (§5.6, §9), a whole number 0–10. Default 3; `options.generations` wins. */
@@ -42,9 +43,9 @@ export interface DynastySettings {
 /** The settings a fresh install starts with. */
 export const DEFAULT_SETTINGS: DynastySettings = {
 	embedHeightDesktop: 500,
-	cardSize: 'normal',
 	showDates: true,
 	showRelations: true,
+	oneParentUnknown: true,
 	showPortraits: true,
 	showHouseGeneration: true,
 	focusGenerations: 3,
@@ -57,7 +58,7 @@ export const DEFAULT_SETTINGS: DynastySettings = {
 /*
  * How views get the settings: `TreeHost` has `readonly settings: DynastySettings`; when a setting
  * changes, the plugin calls `onSettingsChange()` on every view (as for `css-change`), and the view
- * draws again (a card-size change drops the carried view). Embed height rule (D30, D144): `options.height`, else
+ * draws again. Embed height rule (D30, D144): `options.height`, else
  * `${embedHeightDesktop}px`; a tree in a note on a phone is a list with its natural height and has no height setting.
  */
 
@@ -76,9 +77,9 @@ export const normaliseSettings = (raw: unknown): DynastySettings => {
 	const desktop = typeof s.embedHeightDesktop === 'number' && Number.isFinite(s.embedHeightDesktop) ? Math.round(s.embedHeightDesktop) : NaN;
 	return {
 		embedHeightDesktop: wholeIn(desktop, DESKTOP_HEIGHT) ? desktop : d.embedHeightDesktop,
-		cardSize: s.cardSize === 'compact' || s.cardSize === 'normal' ? s.cardSize : d.cardSize,
 		showDates: typeof s.showDates === 'boolean' ? s.showDates : d.showDates,
 		showRelations: typeof s.showRelations === 'boolean' ? s.showRelations : d.showRelations,
+		oneParentUnknown: typeof s.oneParentUnknown === 'boolean' ? s.oneParentUnknown : d.oneParentUnknown,
 		showPortraits: typeof s.showPortraits === 'boolean' ? s.showPortraits : d.showPortraits,
 		showHouseGeneration: typeof s.showHouseGeneration === 'boolean' ? s.showHouseGeneration : d.showHouseGeneration,
 		focusGenerations: wholeIn(s.focusGenerations, GENERATIONS) ? s.focusGenerations : d.focusGenerations,

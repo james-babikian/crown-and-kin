@@ -43,7 +43,7 @@ afterEach(() => vi.restoreAllMocks());
 
 const F = comments15();
 const SOURCE = block15(0);
-const GEO = geometryFor(16, 'normal');
+const GEO = geometryFor(16);
 const EM = 16;
 const FONTS = { text: 'serif', ui: 'sans', bold: '600' };
 /** 10 px per character in every font. */

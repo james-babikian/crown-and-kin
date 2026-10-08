@@ -12,7 +12,7 @@ import { randomTree } from './random-trees';
 // Code review of M7 layout and render (scratch branch scratch/review-m7-render). Each test fails on
 // milestone-7 99c53ad and shows one defect of the relation finder's line or the "?" marker.
 
-const GEO = geometryFor(16, 'normal');
+const GEO = geometryFor(16);
 const SIDE: LayoutSettings = { ...DEFAULT_LAYOUT_SETTINGS, orientation: 'sideways' };
 
 const marks = (line: RelationLine, fade: boolean): LineMarks => ({
@@ -209,7 +209,7 @@ describe('review M7: the "?" of a rumoured parent in the finder\'s small tree (D
 		const over: string[] = [];
 		for (const font of [12, 16, 20]) {
 			clearLayoutCache();
-			const laid = layoutTree(small, geometryFor(font, 'normal'), { ...SIDE, far: NEVER_FAR_RULE }, 'test');
+			const laid = layoutTree(small, geometryFor(font), { ...SIDE, far: NEVER_FAR_RULE }, 'test');
 			// buildScene draws the marker as a circle of radius 0.5 em (renderSvg: 8 px).
 			const r = 0.5 * font;
 			for (const m of laid.edges.markers.filter((x) => x.kind === 'rumour')) {

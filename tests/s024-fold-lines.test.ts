@@ -43,26 +43,26 @@ unions:
   - {partners: [p3, p1]}
 `;
 
-function problems(src: string, folded: string[], orientation: 'down' | 'sideways', controls: boolean, size: 'normal' | 'compact' = 'normal') {
+function problems(src: string, folded: string[], orientation: 'down' | 'sideways', controls: boolean) {
 	const { g } = build(src);
 	const hidden = foldHidden(g, new Set(folded));
 	const s: LayoutSettings = { sweeps: 4, far: F, orientation, foldHidden: [...hidden].sort(), foldedFamilies: folded, ...(controls ? { foldControls: true as const } : {}) };
 	clearLayoutCache();
-	const { layout, edges } = layoutTree(g, geometryFor(16, size), s, 'x');
+	const { layout, edges } = layoutTree(g, geometryFor(16), s, 'x');
 	return lineProblems(pruneGraph(g, hidden), layout, edges);
 }
 
 describe('s024 L1: folded-family stems and signs keep clear of other lines', () => {
 	it('control: the same trees without fold controls have no line problems', () => {
 		expect(problems(STEM_ON_TRUNK, ['["p8"]'], 'down', false)).toEqual([]);
-		expect(problems(DOT_ON_STEM, ['["p0"]'], 'down', false, 'compact')).toEqual([]);
+		expect(problems(DOT_ON_STEM, ['["p0"]'], 'down', false)).toEqual([]);
 		expect(problems(SIDE_DOT_ON_STEM, ['["p1"]'], 'sideways', false)).toEqual([]);
 	});
 	it('down: the stem of a folded family does not share a stretch with another family trunk', () => {
 		expect(problems(STEM_ON_TRUNK, ['["p8"]'], 'down', true)).toEqual([]);
 	});
-	it('down compact: the stem of a folded family does not share a stretch with another trunk', () => {
-		expect(problems(DOT_ON_STEM, ['["p0"]'], 'down', true, 'compact')).toEqual([]);
+	it('down: the stem of a folded family does not share a stretch with another trunk (second tree)', () => {
+		expect(problems(DOT_ON_STEM, ['["p0"]'], 'down', true)).toEqual([]);
 	});
 	it('sideways: no union dot lies on the stem of a folded family', () => {
 		expect(problems(SIDE_DOT_ON_STEM, ['["p1"]'], 'sideways', true)).toEqual([]);

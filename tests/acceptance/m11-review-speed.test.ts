@@ -33,7 +33,8 @@ afterEach(() => {
 });
 
 const SOURCE = block15(0);
-const contentOf = (card: FEl) => card.querySelector('.dynasty-card-full') !== null;
+/** At the Overview level the cards draw no detail and their groups are out of the document (R026 fit), so the level itself says the cards are not empty. */
+const contentOf = (card: FEl, overview: boolean) => overview || card.querySelector('.dynasty-card-full') !== null;
 
 interface Internals {
 	panZoom: { view: { scale: number; cx: number; cy: number }; size: { w: number; h: number } };
@@ -49,10 +50,11 @@ function emptyOnScreen(view: unknown, el: FEl): string[] {
 	const y0 = v.cy - pz.size.h / 2 / v.scale;
 	const y1 = v.cy + pz.size.h / 2 / v.scale;
 	const out: string[] = [];
+	const overview = (view as unknown as { lod: string | null }).lod === 'overview';
 	for (const card of el.querySelectorAll('.dynasty-card')) {
 		const id = card.getAttribute('data-person')!;
 		const b = laid.layout.persons.get(id)!;
-		if (b.x < x1 && b.x + b.w > x0 && b.y < y1 && b.y + b.h > y0 && !contentOf(card)) out.push(id);
+		if (b.x < x1 && b.x + b.w > x0 && b.y < y1 && b.y + b.h > y0 && !contentOf(card, overview)) out.push(id);
 	}
 	return out;
 }

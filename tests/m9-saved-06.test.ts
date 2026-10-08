@@ -10,7 +10,7 @@
 import { Resvg } from '@resvg/resvg-js';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { computeRelations } from '../src/core/relations';
-import { geometryFor } from '../src/layout/geometry';
+import { cardForm, geometryFor } from '../src/layout/geometry';
 import { DEFAULT_LAYOUT_SETTINGS, clearLayoutCache, layoutTree } from '../src/layout/index';
 import type { LayoutSettings } from '../src/layout/model';
 import { buildScene } from '../src/render/dom/scene';
@@ -29,7 +29,7 @@ beforeAll(() => {
 const FONT = 'test';
 const FONTS = { text: 'serif', ui: 'sans', bold: '700' };
 const measure = (s: string) => [...s].length * 8;
-const GEO = geometryFor(16, 'normal');
+const GEO = cardForm(geometryFor(16), 'down');
 const MARK = 'aldric-valmont';
 const all = (el: FEl): FEl[] => [el, ...el.children.flatMap(all)];
 
@@ -98,6 +98,9 @@ function sceneItems(root: FEl, saved: SavedParts): string[] {
 			out.push(`card:${id}`);
 			if (e.hasClass('dynasty-signed')) out.push(`sign:${id}`);
 			if (all(e).some((x) => x.hasClass('dynasty-card-relation'))) out.push(`relation:${id}`);
+			// 0.2.5 (B.3.11): the Roundel's plate and "You" tab are items too.
+			if (all(e).some((x) => x.hasClass('dynasty-r1-plate'))) out.push(`plate:${id}`);
+			if (all(e).some((x) => x.hasClass('dynasty-r1-tab'))) out.push(`tab:${id}`);
 		}
 		if (e.hasClass('dynasty-line') && e.parentElement?.hasClass('dynasty-lines')) out.push(`line:${[...e.classes].find((c) => c.startsWith('dynasty-line-'))!.slice('dynasty-line-'.length)}`);
 		// 0.2.1: a far-couple tag draws its partnership sign in the Full and in the Compact pill; the saved picture has the Full one only.

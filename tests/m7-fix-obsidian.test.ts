@@ -13,7 +13,7 @@ import { FullScreenModal } from '../src/obsidian/full-screen';
 import { closePluginModals } from '../src/obsidian/plugin-modals';
 import { clearRelationCache } from '../src/obsidian/relation-cache';
 import { COMPACT_NAME_EM } from '../src/render/dom/scene';
-import { FINDER_UI, UI } from '../src/render/ui-text';
+import { BLOCK_UI, FINDER_UI, UI } from '../src/render/ui-text';
 import { FEl, clock, dispatch, dispatchWindow, fakeDoc, fakeWin, flushFrames, installDom, resetDom, resizeAll, runTimers, settle } from './acceptance/fake-dom';
 import { openModals, resetObsidian } from './acceptance/fake-obsidian';
 import { sample12 } from './acceptance/relations-support';
@@ -233,8 +233,8 @@ describe('D52: on a phone, Fit and the legend are items of the More list', () =>
 		expect(t[t.length - 1]).toBe('dynasty-close');
 		await press(root, '.dynasty-more');
 		const items = root.querySelectorAll('.dynasty-popover-more .dynasty-more-item');
-		expect(items.map((i) => [...i.classes].find((c) => c.startsWith('dynasty-more-') && c !== 'dynasty-more-item'))).toEqual(['dynasty-more-relation', 'dynasty-more-titles', 'dynasty-more-save', 'dynasty-more-fit', 'dynasty-more-legend']);
-		expect(items.map((i) => i.querySelector('.dynasty-more-text')!.getText())).toEqual([FINDER_UI.relation, 'Titles', 'Save as picture', UI.fit, UI.legend]);
+		expect(items.map((i) => [...i.classes].find((c) => c.startsWith('dynasty-more-') && c !== 'dynasty-more-item'))).toEqual(['dynasty-more-relation', 'dynasty-more-titles', 'dynasty-more-save', 'dynasty-more-fit', 'dynasty-more-legend', 'dynasty-more-text-source']);
+		expect(items.map((i) => i.querySelector('.dynasty-more-text')!.getText())).toEqual([FINDER_UI.relation, 'Titles', 'Save as picture', UI.fit, UI.legend, BLOCK_UI.showText]);
 		// The texts are the whole names: no label that differs from them.
 		expect(items[3].getAttribute('aria-label')).toBeNull();
 		expect(items[4].getAttribute('aria-label')).toBeNull();
@@ -269,8 +269,8 @@ describe('D52: on a phone, Fit and the legend are items of the More list', () =>
 		const { root } = await openFullScreen(F12);
 		expect(tools(root)).toEqual(['dynasty-add-person', 'dynasty-houses-button', 'dynasty-focus', 'dynasty-find', 'dynasty-fit', 'dynasty-legend-button', 'dynasty-more', 'dynasty-close']);
 		await press(root, '.dynasty-more');
-		// M9 (spec §13.8, O11): Relation, Titles and Save as picture.
-		expect(root.querySelectorAll('.dynasty-popover-more .dynasty-more-item')).toHaveLength(3);
+		// M9 (spec §13.8, O11): Relation, Titles and Save as picture; D176: Show the tree text is the last.
+		expect(root.querySelectorAll('.dynasty-popover-more .dynasty-more-item')).toHaveLength(4);
 	});
 
 	it('styles.css: the phone toolbar keeps one row and Close stays on the screen', () => {

@@ -135,10 +135,11 @@ describe('the plate and the "You" tab follow the setting (D145, D148)', () => {
 		expect(host.renders).toBe(before);
 	});
 
-	it('the classic card of the Compact size keeps its form and gets the plate and the tab by the same rule', async () => {
-		const { el, peek } = await drawn(MARKED, { ...DEFAULT_SETTINGS, cardSize: 'compact', showRelations: false });
-		expect(peek.lastLayout.geo.form).toBeUndefined();
-		expect(count(el, '.dynasty-card-r1')).toBe(0);
+	it('a stored card size is ignored (D179): the tree draws the Roundel', async () => {
+		const stored = { ...DEFAULT_SETTINGS, cardSize: 'compact', showRelations: false } as unknown as DynastySettings;
+		const { el, peek } = await drawn(MARKED, stored);
+		expect(peek.lastLayout.geo.form).toBe('roundel');
+		expect(count(el, '.dynasty-card-r1')).toBeGreaterThan(0);
 		expect(tabs(el)).toBe(1);
 	});
 });

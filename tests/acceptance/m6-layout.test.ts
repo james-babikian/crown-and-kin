@@ -38,7 +38,7 @@ import { specModel } from './spec-model';
 // The expected union types are read from the block text with the `yaml` package, not from the
 // plugin's parser, so this test does not trust the implementation's own reading.
 
-const GEO = geometryFor(16, 'normal');
+const GEO = geometryFor(16);
 const DOWN: LayoutSettings = SETTINGS;
 const SIDE: LayoutSettings = { ...SETTINGS, orientation: 'sideways' };
 const E = 0.5;
@@ -228,11 +228,11 @@ describe('D26: a union marker carries the written partnership type (contract Edg
 
 /**
  * One name text line: the card text line height times the name size (1 em), from the card
- * geometry of spec §5.8 (`src/layout/geometry.ts`: 1.2 for normal cards, 1.1 for compact). The
+ * geometry of spec §5.8 (`src/layout/geometry.ts`: 1.2). The
  * layout may round it to whole px.
  */
 // D117: the name text line is 0.85 em of the note font, like every other line of the card (0.2.3: 1 em).
-const nameLine = (geo: Geometry) => (geo.cardSize === 'compact' ? 1.1 : 1.2) * 0.85 * geo.fontPx;
+const nameLine = (geo: Geometry) => 1.2 * 0.85 * geo.fontPx;
 
 /** Where each person's own drop line ends, if it has one: the child first, then its placement parents. */
 function dropEnds(l: Laid): Map<string, { x: number; y: number }[]> {
@@ -330,10 +330,10 @@ describe('D29: tallCards makes exactly those sideways cards one name text line t
 		expect(extra).toBeLessThanOrEqual(16.8);
 	});
 
-	for (const geo of [geometryFor(16, 'compact'), geometryFor(12, 'normal'), geometryFor(20, 'normal')] as Geometry[]) {
+	for (const geo of [geometryFor(12), geometryFor(20)] as Geometry[]) {
 		for (const id of ['03', '06']) {
-			const at = `${id} at ${geo.fontPx} px ${geo.cardSize}`;
-			it(`compact cards and other fonts: sample tree ${at}`, () => {
+			const at = `${id} at ${geo.fontPx} px`;
+			it(`other fonts: sample tree ${at}`, () => {
 				const src = allFixtures().find((f) => f.id === id)!.source;
 				const settings: LayoutSettings = SIDE;
 				const base = lay(src, settings, geo);
@@ -466,8 +466,8 @@ describe('D37: tallCards makes exactly those cards one name text line taller in 
 		});
 	}
 
-	for (const geo of [geometryFor(16, 'compact'), geometryFor(12, 'normal'), geometryFor(20, 'normal')]) {
-		it(`compact cards and other fonts: sample trees 03 and 07 at ${geo.fontPx} px ${geo.cardSize}`, { timeout: HEAVY_MS }, () => {
+	for (const geo of [geometryFor(12), geometryFor(20)]) {
+		it(`other fonts: sample trees 03 and 07 at ${geo.fontPx} px`, { timeout: HEAVY_MS }, () => {
 			for (const id of ['03', '07']) {
 				const src = allFixtures().find((f) => f.id === id)!.source;
 				const base = lay(src, DOWN, geo);

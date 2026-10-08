@@ -3,7 +3,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import { deriveFamilies, type FamilyGraph } from '../../src/core/derive';
 import { focusSubgraph } from '../../src/core/focus-subgraph';
 import { computeRelations } from '../../src/core/relations';
-import { geometryFor } from '../../src/layout/geometry';
+import { cardForm, geometryFor } from '../../src/layout/geometry';
 import { DEFAULT_LAYOUT_SETTINGS, clearLayoutCache, illegitimateSigns, layoutTree } from '../../src/layout/index';
 import type { LaidOut, LayoutSettings, StrokeKind } from '../../src/layout/model';
 import type { PictureSlot } from '../../src/render/dom/pictures';
@@ -32,7 +32,8 @@ beforeAll(() => {
 const FONT = 'test';
 const FONTS = { text: 'serif', ui: 'sans', bold: '700' };
 const measure = (s: string) => [...s].length * 8;
-const GEO = geometryFor(16, 'normal');
+// 0.2.6 (D179): the classic card is gone; the saved picture of a tree from top to bottom has the Roundel.
+const GEO = cardForm(geometryFor(16), 'down');
 const PNG_URI = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
 const all = (el: FEl): FEl[] => [el, ...el.children.flatMap(all)];
 
@@ -125,6 +126,9 @@ function sceneItems(d: Drawn, saved: SavedParts): string[] {
 			out.push(`card:${id}`);
 			if (e.hasClass('dynasty-signed')) out.push(`sign:${id}`);
 			if (all(e).some((x) => x.hasClass('dynasty-card-relation'))) out.push(`relation:${id}`);
+			// 0.2.5 (B.3.11): the Roundel's plate and "You" tab are items too.
+			if (all(e).some((x) => x.hasClass('dynasty-r1-plate'))) out.push(`plate:${id}`);
+			if (all(e).some((x) => x.hasClass('dynasty-r1-tab'))) out.push(`tab:${id}`);
 		}
 		if (e.hasClass('dynasty-line') && e.parentElement?.hasClass('dynasty-lines')) out.push(`line:${[...e.classes].find((c) => c.startsWith('dynasty-line-'))!.slice('dynasty-line-'.length)}`);
 		if (e.hasClass('dynasty-union-dot')) out.push(`union:${[...e.classes].find((c) => c.startsWith('dynasty-union-') && c !== 'dynasty-union-dot')?.slice('dynasty-union-'.length) ?? 'dot'}`);
@@ -346,23 +350,24 @@ describe('P4: without `saved` (and without `pictures`), renderSvg draws exactly 
 		// 0.2.2 (D108): the hashes of 07 and 07b were recorded again (ring and open triangle keep the dot's gap before the name).
 		// 0.2.4: all 16 were recorded again for the card geometry (card 61 px high, name text 0.85 em, boxes at the lower right).
 		// 0.2.5 (D140, WP-A1): 04 (a rumoured father is seated beside his child's parent) and 12 (partners on one row) were recorded again.
+		// 0.2.6 (D179): all 16 were recorded again, because the picture is drawn with the Roundel (the classic card is gone). The same hashes come from the code of 0.2.5 with `cardForm(geometryFor(16, 'normal'), 'down')`.
 	const M8_SVG: Record<string, string> = {
-		'01': '3cd017b8964acae4',
-		'02': '80646b0e0f77bcdd',
-		'03': 'fe3824ac60454583',
-		'04': '31aae5404e0e571e',
-		'05': '14b66bb8799df29d',
-		'06': 'e89860b7a3d19c45',
-		'07': '9a9471e459c3cb0f',
-		'07b': '8f74091d524b6417',
-		'08': 'd7a77a2c8c85e2b2',
-		'09': '95f43e80a3dd21c4',
-		'10': 'd471d3aa1c57d8ad',
-		'11': '2ecf7dc5003a58e6',
-		'12': 'adc45337207bb9c8',
-		'13': '7c4d84eb85d2362c',
-		'14': 'fc6b084470e7219a',
-		'15': '7883e14d94949d4e',
+		'01': '75582d61e6438f28',
+		'02': 'ad2b0b4a9061ab79',
+		'03': '4fa78b6958a6d140',
+		'04': '10810bb976a08dab',
+		'05': 'f190fe145ad363f3',
+		'06': '87d7a4f1cb97ba4b',
+		'07': '2b6ecbbb0091d6eb',
+		'07b': '415e860d115f0669',
+		'08': 'b37a80331e4579fb',
+		'09': '318b2e5e35be818f',
+		'10': 'f98cb38e609e5d55',
+		'11': 'df929a1903c8998b',
+		'12': 'ef3438a883cb56b2',
+		'13': '5b84823e6f9c2fad',
+		'14': '27aef842d4b5e0d0',
+		'15': '269044aebd6a206b',
 	};
 	for (const f of allFixtures()) {
 		it(`sample tree ${f.id}`, () => {

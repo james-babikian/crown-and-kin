@@ -371,6 +371,59 @@ export class HandleRegistry {
 	}
 
 	/**
+	 * "Show the tree text" (D176 item 2): makes the editor of the note show the text of block `ordinal`, the same
+	 * result as Obsidian's hidden "Edit this block" button. The note switches to Live Preview if it is in Reading view,
+	 * and the cursor goes to the start of the block text, which makes the editor show the source of a rendered block.
+	 * Returns false if the note or the block is gone.
+	 */
+	async showSource(path: string, ordinal: number): Promise<boolean> {
+		const file = this.file(path);
+		if (!file) return false;
+		const ws = this.app.workspace;
+		const mine = (v: unknown): v is MarkdownView => v instanceof MarkdownView && v.file?.path === path;
+		const active = ws.getActiveViewOfType(MarkdownView);
+		let leaf = mine(active) ? active.leaf : (ws.getLeavesOfType('markdown').find((l) => mine(l.view)) ?? null);
+		if (!leaf) {
+			leaf = ws.getLeaf(false);
+			await leaf.openFile(file, { state: { mode: 'source', source: false } });
+		}
+		let view = leaf.view;
+		if (!mine(view)) return false;
+		let switched = false;
+		if (view.getMode() !== 'source') {
+			await view.setState({ ...view.getState(), mode: 'source', source: false }, { history: false });
+			switched = true;
+			view = leaf.view;
+			if (!mine(view)) return false;
+		}
+		const editor = view.editor;
+		const block = findBlocks(editor.getValue())[ordinal];
+		if (!block) return false;
+		const put = (b: { bodyStart: number }) => {
+			const pos = editor.offsetToPos(b.bodyStart);
+			editor.setCursor(pos);
+			editor.scrollIntoView({ from: pos, to: pos }, true);
+			editor.focus();
+		};
+		void ws.revealLeaf(leaf);
+		put(block);
+		// A view that just switched mode can lay out its editor after this call; the cursor goes in again once. The text can have changed by then, so the block is found again, and a closed leaf or a lost block is skipped.
+		if (switched) {
+			const leafNow = leaf;
+			setTimeout(() => {
+				try {
+					if (leafNow.view !== view || !mine(leafNow.view) || leafNow.view.editor !== editor) return;
+					const again = findBlocks(editor.getValue())[ordinal];
+					if (again) put(again);
+				} catch {
+					// The view closed in between: no second cursor.
+				}
+			}, 120);
+		}
+		return true;
+	}
+
+	/**
 	 * The note text a write starts from: the Live Preview or source editor if one shows the note
 	 * (it can be newer than the file), else the file. A view in Reading view can lag behind the file.
 	 */

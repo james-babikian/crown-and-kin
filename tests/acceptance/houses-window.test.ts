@@ -161,7 +161,7 @@ describe('the Houses button (D36, spec §6.10)', () => {
 		phone();
 		const still = await embed(SOURCE, { handle: writingHandle() });
 		// D144: the bar above the list of a phone note is Add person, Find and Expand (Back comes after a move).
-		expect(toolbar(still.el)).toEqual(['dynasty-add-person', 'dynasty-list-find', 'dynasty-expand']);
+		expect(toolbar(still.el)).toEqual(['dynasty-add-person', 'dynasty-show-text', 'dynasty-list-find', 'dynasty-expand']);
 		resetDom();
 		const ro = await embed(SOURCE);
 		expect(ro.el.querySelector('.dynasty-houses-button')).toBeNull();

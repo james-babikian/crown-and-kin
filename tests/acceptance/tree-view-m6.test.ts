@@ -26,7 +26,7 @@ import { FAR, embed, fakeHandle, fakeHost, fullViews, tabletDevice, type Host } 
  * refit and the hint at the note's toolbar are gone; the full-screen view and the tablet keep every check below.
  */
 
-const DOWN = geometryFor(16, 'normal');
+const DOWN = geometryFor(16);
 const TALL_H = DOWN.cardH + tallExtra(DOWN);
 
 beforeAll(() => installDom());

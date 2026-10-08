@@ -10,7 +10,7 @@ export const SETTINGS: LayoutSettings = { sweeps: 4, far: { maxCardWidths: 3, ma
 export const FONT_FAMILY = 'sans-serif';
 
 let geo: Geometry | undefined;
-export const geometry = (): Geometry => (geo ??= geometryFor(16, 'normal'));
+export const geometry = (): Geometry => (geo ??= geometryFor(16));
 
 export interface Built {
 	tree: Tree;

@@ -22,7 +22,7 @@ function rng(seed: number) {
 }
 
 /**
- * The line problems of one random tree in 16 views: down and sideways, normal and compact, and four variants (plain, long names,
+ * The line problems of one random tree in 8 views: down and sideways, and four variants (plain, long names,
  * folds, both). The folds and the long names are drawn from one generator in a fixed order, so a key names the same picture every time.
  */
 function problemsOf(seed: number): Map<string, string[]> {
@@ -30,22 +30,20 @@ function problemsOf(seed: number): Map<string, string[]> {
 	const rand = rng(seed * 7919);
 	const out = new Map<string, string[]>();
 	for (const orientation of ['down', 'sideways'] as const) {
-		for (const size of ['normal', 'compact'] as const) {
-			for (const variant of ['plain', 'long', 'fold', 'both'] as const) {
-				const folded = variant === 'fold' || variant === 'both' ? foldFamilies(g).filter(() => rand() < 0.4).map((f) => f.key) : [];
-				const hidden = foldHidden(g, new Set(folded));
-				const long = variant === 'long' || variant === 'both' ? g.people.map((p) => p.id).filter(() => rand() < 0.3) : [];
-				const settings: LayoutSettings = {
-					sweeps: 4,
-					far: FAR,
-					orientation,
-					...(long.length ? { tallCards: long, longNames: long } : {}),
-					...(variant === 'fold' || variant === 'both' ? { foldControls: true, foldHidden: [...hidden].sort(), foldedFamilies: folded } : {}),
-				};
-				clearLayoutCache();
-				const { layout, edges } = layoutTree(g, geometryFor(16, size), settings, 'x');
-				out.set(`${orientation} ${size} ${variant}`, lineProblems(folded.length ? pruneGraph(g, hidden) : g, layout, edges));
-			}
+		for (const variant of ['plain', 'long', 'fold', 'both'] as const) {
+			const folded = variant === 'fold' || variant === 'both' ? foldFamilies(g).filter(() => rand() < 0.4).map((f) => f.key) : [];
+			const hidden = foldHidden(g, new Set(folded));
+			const long = variant === 'long' || variant === 'both' ? g.people.map((p) => p.id).filter(() => rand() < 0.3) : [];
+			const settings: LayoutSettings = {
+				sweeps: 4,
+				far: FAR,
+				orientation,
+				...(long.length ? { tallCards: long, longNames: long } : {}),
+				...(variant === 'fold' || variant === 'both' ? { foldControls: true, foldHidden: [...hidden].sort(), foldedFamilies: folded } : {}),
+			};
+			clearLayoutCache();
+			const { layout, edges } = layoutTree(g, geometryFor(16), settings, 'x');
+			out.set(`${orientation} ${variant}`, lineProblems(folded.length ? pruneGraph(g, hidden) : g, layout, edges));
 		}
 	}
 	return out;
@@ -56,15 +54,15 @@ describe('L1: a folded family keeps its lines apart', () => {
 	// Some had a sign or a stem on another trunk; some were planned twice with different places for a leg, because the
 	// layout moved every card right by the room of a fold control after the first plan.
 	const found: [number, string][] = [
-		[12, 'down compact both'],
-		[12, 'sideways normal fold'],
-		[49, 'sideways normal fold'],
-		[71, 'sideways normal both'],
-		[15, 'down normal both'],
-		[89, 'down normal fold'],
-		[627, 'down compact both'],
-		[1673, 'down compact fold'],
-		[1985, 'down compact both'],
+		[12, 'down both'],
+		[12, 'sideways fold'],
+		[49, 'sideways fold'],
+		[71, 'sideways both'],
+		[15, 'down both'],
+		[89, 'down fold'],
+		[627, 'down both'],
+		[1673, 'down fold'],
+		[1985, 'down both'],
 	];
 	it.each(found)('seed %i, %s', (seed, key) => {
 		expect(problemsOf(seed).get(key)).toEqual([]);

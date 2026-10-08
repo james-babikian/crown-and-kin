@@ -669,7 +669,7 @@ function runPipeline(text: string) {
 		const want = BLOCKING.includes(i.code) ? 'blocking' : 'warning';
 		if (i.level !== want) fail(`issue ${i.code} has level ${i.level}, expected ${want}`);
 	}
-	const { layout, edges } = layoutTree(g, geometryFor(16, 'normal'), SETTINGS, 'sans-serif');
+	const { layout, edges } = layoutTree(g, geometryFor(16), SETTINGS, 'sans-serif');
 	if (layout.persons.size !== g.people.length) fail(`${g.people.length} people but ${layout.persons.size} cards`);
 	for (const b of layout.persons.values()) {
 		if (![b.x, b.y, b.w, b.h].every(Number.isFinite)) fail(`card ${b.id} has a non-finite position`);
@@ -698,7 +698,7 @@ function runFocus(text: string, rng: Rng) {
 		}
 		if (!exists) fail(`focusSubgraph returned a family for unknown id ${JSON.stringify(id)}`);
 		const g = deriveFamilies(res.tree);
-		const { layout } = layoutTree(g, geometryFor(16, 'normal'), SETTINGS, 'sans-serif');
+		const { layout } = layoutTree(g, geometryFor(16), SETTINGS, 'sans-serif');
 		if (layout.persons.size !== g.people.length) fail(`focus ${id}: ${g.people.length} people but ${layout.persons.size} cards`);
 		for (const b of layout.persons.values()) {
 			if (![b.x, b.y, b.w, b.h].every(Number.isFinite)) fail(`focus ${id}: card ${b.id} has a non-finite position`);
@@ -731,12 +731,12 @@ function runRelations(text: string, rng: Rng) {
 				if (rel.line.people.some((p) => !ids.includes(p))) fail(`a line through someone not in the tree: ${rel.line.people.join(', ')}`);
 				if (new Set(rel.line.people).size !== rel.line.people.length) fail(`a line with repeats: ${rel.line.people.join(', ')}`);
 			}
-			if (list.length && drawn++ < 3) layoutTree(lineSubgraph(g, list[list.length - 1].line), geometryFor(16, 'normal'), NEVER_FAR, 'sans-serif');
+			if (list.length && drawn++ < 3) layoutTree(lineSubgraph(g, list[list.length - 1].line), geometryFor(16), NEVER_FAR, 'sans-serif');
 		}
 	}
 	for (let k = 0; k < 3 && ids.length; k++) {
 		const f = findRelation(g, rng.pick(ids), rng.pick(ids));
-		if (f.kind === 'chain') layoutTree(lineSubgraph(g, f.line), geometryFor(16, 'normal'), NEVER_FAR, 'sans-serif');
+		if (f.kind === 'chain') layoutTree(lineSubgraph(g, f.line), geometryFor(16), NEVER_FAR, 'sans-serif');
 		if (f.kind === 'named' && f.relations.length < 1) fail('a named finder result with no relation');
 	}
 }
@@ -818,7 +818,7 @@ ${text.slice(0, 3000)}`,
 				const res = focusSubgraph(r.tree, p.id, n);
 				if (!res) fail(`null for ${p.id}`);
 				const g = deriveFamilies(res.tree);
-				const { layout } = layoutTree(g, geometryFor(16, 'normal'), SETTINGS, 'sans-serif');
+				const { layout } = layoutTree(g, geometryFor(16), SETTINGS, 'sans-serif');
 				if (layout.persons.size !== g.people.length) fail(`focus ${p.id}, n = ${n}: ${g.people.length} people but ${layout.persons.size} cards`);
 			}
 		}
@@ -1050,7 +1050,7 @@ function runPictures(text: string, rng: Rng, m: PicturesModule, sets: PictureSet
 			if ([...list].sort().join('\n') !== list.join('\n')) fail('a picture set is not sorted');
 		}
 		if (!show && s.portraits.length) fail('portraits with the setting off');
-		const { layout } = layoutTree(g, geometryFor(16, 'normal'), { ...SETTINGS, ...s } as LayoutSettings, 'sans-serif');
+		const { layout } = layoutTree(g, geometryFor(16), { ...SETTINGS, ...s } as LayoutSettings, 'sans-serif');
 		if (layout.persons.size !== g.people.length) fail(`${g.people.length} people but ${layout.persons.size} cards with pictures`);
 		for (const b of layout.persons.values()) {
 			if (![b.x, b.y, b.w, b.h].every(Number.isFinite)) fail(`card ${b.id} has a non-finite position with pictures`);
@@ -1237,7 +1237,7 @@ function runFolds(text: string, rng: Rng, m: FoldsModule) {
 		// The folded tree lays out with finite numbers, down and sideways, and hides the hidden people.
 		for (const side of [false, true]) {
 			const settings = { ...SETTINGS, ...(side ? { orientation: 'sideways' } : {}), foldHidden: [...hidden].sort(), foldedFamilies: [...set].sort(), foldControls: true } as LayoutSettings;
-			const { layout, edges } = layoutTree(g, geometryFor(16, 'normal'), settings, 'sans-serif');
+			const { layout, edges } = layoutTree(g, geometryFor(16), settings, 'sans-serif');
 			for (const b of layout.persons.values()) if (![b.x, b.y, b.w, b.h].every(Number.isFinite)) fail(`folded layout: card ${b.id} has a non-finite position`);
 			if (!Number.isFinite(layout.width) || !Number.isFinite(layout.height)) fail('folded layout: size is not finite');
 			for (const p of edges.paths) if (/NaN|Infinity|undefined/.test(p.d)) fail(`folded layout: bad path ${p.kind}: ${p.d.slice(0, 200)}`);

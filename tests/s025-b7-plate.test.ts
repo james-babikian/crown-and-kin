@@ -52,8 +52,8 @@ const RELATIONS = new Map([
 	['e', { text: word(24), lower: word(24) }],
 ]);
 
-const ROUNDEL = cardForm(geometryFor(12, 'normal'), 'down');
-const TEXT = cardForm(geometryFor(12, 'normal'), 'sideways');
+const ROUNDEL = cardForm(geometryFor(12), 'down');
+const TEXT = cardForm(geometryFor(12), 'sideways');
 
 function lay(geo: Geometry, over: Partial<LayoutSettings> = {}): LaidOut {
 	clearLayoutCache();
@@ -131,7 +131,7 @@ describe('fault 1: a card with no relation word draws no plate', () => {
 describe('fault 2: the relation word may use the plate\'s inner width', () => {
 	it('Roundel: `relationW` is twice the distance from the axis to the plate end, less the clearance; wider than the 10 em column', () => {
 		for (const f of [8, 10, 12, 14, 16, 20, 24, 32, 48]) {
-			const geo = cardForm({ ...geometryFor(f, 'normal'), relationLine: true }, 'down');
+			const geo = cardForm({ ...geometryFor(f), relationLine: true }, 'down');
 			const t = cardText(geo, 1);
 			const clear = WORD_CLEAR_EM * f;
 			expect(t.relationW, `f${f}`).toBeCloseTo(2 * (geo.cardW - PLATE_INSET_PX - roundelAxis(geo) - clear), 9);
@@ -146,7 +146,7 @@ describe('fault 2: the relation word may use the plate\'s inner width', () => {
 
 	it('text card: the word starts at `padX` and may reach the plate end less the clearance; wider than the text width', () => {
 		for (const f of [8, 12, 16, 24, 48]) {
-			const geo = cardForm({ ...geometryFor(f, 'normal'), relationLine: true }, 'sideways');
+			const geo = cardForm({ ...geometryFor(f), relationLine: true }, 'sideways');
 			const t = cardText(geo, 1);
 			expect(t.relationW, `f${f}`).toBeCloseTo(geo.cardW - PLATE_INSET_PX - WORD_CLEAR_EM * f - t.padX, 9);
 			expect(t.relationW!, `f${f}`).toBeGreaterThan(t.textW);
@@ -154,11 +154,10 @@ describe('fault 2: the relation word may use the plate\'s inner width', () => {
 		}
 	});
 
-	it('no plate, no `relationW`; the classic card has none either; the other text lines keep their column', () => {
-		const noPlate = cardText(cardForm(geometryFor(12, 'normal'), 'down'), 1);
+	it('no plate, no `relationW`; the other text lines keep their column', () => {
+		const noPlate = cardText(cardForm(geometryFor(12), 'down'), 1);
 		expect(noPlate.relationW).toBeUndefined();
-		expect(cardText({ ...geometryFor(12, 'compact'), relationLine: true }, 1).relationW).toBeUndefined();
-		const withPlate = cardText(cardForm({ ...geometryFor(12, 'normal'), relationLine: true }, 'down'), 1);
+		const withPlate = cardText(cardForm({ ...geometryFor(12), relationLine: true }, 'down'), 1);
 		expect(withPlate.textW).toBe(120);
 	});
 

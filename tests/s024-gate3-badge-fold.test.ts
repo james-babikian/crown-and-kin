@@ -26,7 +26,7 @@ describe('badge square and disc against the tap squares of the fold controls', (
 				const g = deriveFamilies(parsed.tree);
 				clearLayoutCache();
 				const settings: LayoutSettings = { ...DEFAULT_LAYOUT_SETTINGS, orientation, foldControls: true };
-				const L = layoutTree(g, geometryFor(F, 'normal'), settings, 'font').layout;
+				const L = layoutTree(g, geometryFor(F), settings, 'font').layout;
 				const tags = [...L.farTags.values()];
 				for (const p of L.persons.values()) {
 					const cap = orientation === 'sideways' ? L.geometry.nodeGap : p.h / 2;

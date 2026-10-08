@@ -136,7 +136,8 @@ export function computeModelOrder(g: FamilyGraph, gen: Map<string, number>): Mod
 		}
 		blocks.push(row);
 
-		then([id, ...row.filter((p) => p !== id)].map((p) => ({ kind: 'family', id: p })));
+		// Row order (not the focus person first), so the groups of children follow the partnership dots left to right (spec §4.3).
+		then(row.map((p) => ({ kind: 'family', id: p })));
 	};
 
 	const visit = (id: string) => {

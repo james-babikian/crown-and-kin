@@ -43,14 +43,14 @@ describe('relationInfo (E.2)', () => {
 	});
 
 	it('a relation with maybe carries the D123 paragraph, from the first relation only', () => {
-		const first = rel('Half-brother', { effect: 'half', text: 'Half-brother', lower: 'half-brother' });
+		const first = rel('Half-brother', { effect: 'half', text: 'Half-brother', lower: 'half-brother', cause: 'rumoured' });
 		const info = relationInfo([first, rel('Rumoured brother')], false);
 		expect(info.maybe).toBe('If every rumoured link is true, this person is your half-brother.');
 		expect(relationInfo([rel('Brother'), first], false).maybe).toBeUndefined();
 	});
 
 	it('sentence, also and maybe equal relationSummary for every case; value has no full stop for a relation', () => {
-		const maybe = rel('Brother', { effect: 'full', text: 'Brother', lower: 'brother' });
+		const maybe = rel('Brother', { effect: 'full', text: 'Brother', lower: 'brother', cause: 'rumoured' });
 		const cases: [readonly Relation[] | undefined, boolean][] = [
 			[undefined, false],
 			[[], false],

@@ -275,9 +275,8 @@
 	display: inline;
 }
 
-.dynasty-lod-overview .dynasty-card-full,
-.dynasty-lod-overview .dynasty-card-compact,
-.dynasty-lod-overview .dynasty-card-strip {
+/* R026 fit: one rule hides the group that holds the bar, the Full group and the Compact text of a card. A rule on each part made the browser restyle about 3 000 elements at a level change (108 ms at 4x CPU in the first frame of Fit). */
+.dynasty-lod-overview .dynasty-card-body {
 	display: none;
 }
 
@@ -2683,15 +2682,6 @@ body.dynasty-fullscreen-open .popover.hover-popover {
 	pointer-events: none;
 }
 
-/* D75: the arms show as the picture is, with no frame, edge or background. The Compact arms show only at the Compact level (C4). */
-.dynasty-card-compact-arms {
-	display: none;
-}
-
-.dynasty-lod-compact .dynasty-card-compact-arms {
-	display: inline;
-}
-
 /* D76, B1: the portrait's frame, a thin ring in theme colours; empty and solid while the picture loads or when it cannot show. --text-muted: --text-faint is under 3:1 on the card in the default and Minimal themes. */
 .dynasty-portrait-frame {
 	fill: none;
@@ -3292,7 +3282,7 @@ body.dynasty-fullscreen-open .popover.hover-popover {
 
 /* A hidden control is not in the Tab order, and its tap area does not take presses. */
 .dynasty-lod-overview .dynasty-fold.is-open,
-.dynasty-lod-overview .dynasty-fold-hit.is-open {
+.dynasty-lod-overview .dynasty-fold-hits-open {
 	display: none;
 }
 
@@ -3612,7 +3602,7 @@ body.dynasty-fullscreen-open .popover.hover-popover {
  */
 
 .dynasty-viewport.dynasty-list-viewport {
-	/* The bar keeps its button texts: there is no narrow-tree rule for a list. */
+	/* No narrow-tree rule for a list. */
 	container-type: normal;
 	height: auto;
 	overflow: visible;
@@ -3623,10 +3613,13 @@ body.dynasty-fullscreen-open .popover.hover-popover {
 	cursor: default;
 }
 
-/* The bar above the list: a full-width row of buttons, Add person at the left. */
+/* The bar above the list: a full-width row of icon buttons (D182), Add person at the left. */
 .dynasty-list-viewport > .dynasty-toolbar {
 	/* Own layer above Obsidian's invisible "Edit this block" button (32 x 28 px, top right of the block): a tap on it shows the YAML source in Live Preview. */
 	position: relative;
+	/* The desktop bar (above) sets top and right for position: absolute. On a relative box they would move the bar 4 px down and 4 px left, out of line with the rows. */
+	top: auto;
+	right: auto;
 	z-index: 1;
 	display: flex;
 	flex-wrap: wrap;
@@ -3635,13 +3628,6 @@ body.dynasty-fullscreen-open .popover.hover-popover {
 	box-sizing: border-box;
 	width: 100%;
 	margin: 0 0 var(--size-4-2) 0;
-}
-
-.dynasty-list-viewport > .dynasty-toolbar .dynasty-tool-text {
-	display: inline;
-	color: var(--text-normal);
-	font-size: var(--font-ui-small);
-	white-space: nowrap;
 }
 
 .dynasty-list-viewport > .dynasty-toolbar .dynasty-add-person {
@@ -3753,6 +3739,8 @@ body.dynasty-fullscreen-open .popover.hover-popover {
 	align-items: center;
 	gap: var(--size-4-3);
 	min-width: 0;
+	/* D173 (1): a gap between the last picture and the divider before the pencil button, in every row kind. */
+	padding-right: 0.5em;
 }
 
 .dynasty-list button.dynasty-list-edit:not(.dynasty-list-whole) {
@@ -3831,6 +3819,10 @@ body.dynasty-fullscreen-open .popover.hover-popover {
 
 .dynasty-list-sob {
 	font-weight: 400;
+	/* D173 (2), D122: one part. An inline box that is as wide as its text moves whole to the next text line; if the text is wider than the row, the box is as wide as the row and the text wraps inside it. */
+	display: inline-block;
+	max-width: 100%;
+	vertical-align: top;
 }
 
 .dynasty-list-meta,

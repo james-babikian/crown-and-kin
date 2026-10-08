@@ -3,7 +3,7 @@ import { deriveFamilies, type FamilyGraph } from '../src/core/derive';
 import { parseDynasty } from '../src/core/parse';
 import { SIGN_CLEAR_PX, drawnGeometry, geometryFor, sidewaysGeometry, sidewaysPartnerGap } from '../src/layout/geometry';
 import { DEFAULT_LAYOUT_SETTINGS, clearLayoutCache, layoutKey, layoutTree } from '../src/layout/index';
-import type { CardSize, LaidOut, LayoutSettings } from '../src/layout/model';
+import type { LaidOut, LayoutSettings } from '../src/layout/model';
 import { UNION_MARKS, unionShape, type UnionShape } from '../src/render/styles';
 import { allFixtures } from './acceptance/load';
 
@@ -20,9 +20,9 @@ function graph(source: string): FamilyGraph {
 	return deriveFamilies(r.tree);
 }
 
-function lay(g: FamilyGraph, settings: LayoutSettings, font = 16, size: CardSize = 'normal'): LaidOut {
+function lay(g: FamilyGraph, settings: LayoutSettings, font = 16): LaidOut {
 	clearLayoutCache();
-	return layoutTree(g, geometryFor(font, size), settings, 'test');
+	return layoutTree(g, geometryFor(font), settings, 'test');
 }
 
 /** A couple with the given partnership types, and a child for the first one. */
@@ -61,21 +61,19 @@ const TYPES: string[][] = [['betrothal', 'marriage'], ['marriage', 'affair'], ['
 const FONTS = [12, 14, 16, 18, 20];
 
 describe('sideways, a couple with two or more partnerships', () => {
-	for (const size of ['normal', 'compact'] as const) {
-		for (const types of TYPES) {
-			it(`${size} size, ${types.join(' + ')}: every sign keeps 3 px clear of both cards at 12 to 20 px`, () => {
-				const g = graph(couple(types));
-				for (const font of FONTS) {
-					const laid = lay(g, SIDE, font, size);
-					const marks = clearances(laid);
-					expect(marks, `${font} px`).toHaveLength(types.length);
-					for (const [above, below] of marks) {
-						expect(above, `${font} px, above`).toBeGreaterThanOrEqual(SIGN_CLEAR_PX - EPS);
-						expect(below, `${font} px, below`).toBeGreaterThanOrEqual(SIGN_CLEAR_PX - EPS);
-					}
+	for (const types of TYPES) {
+		it(`${types.join(' + ')}: every sign keeps 3 px clear of both cards at 12 to 20 px`, () => {
+			const g = graph(couple(types));
+			for (const font of FONTS) {
+				const laid = lay(g, SIDE, font);
+				const marks = clearances(laid);
+				expect(marks, `${font} px`).toHaveLength(types.length);
+				for (const [above, below] of marks) {
+					expect(above, `${font} px, above`).toBeGreaterThanOrEqual(SIGN_CLEAR_PX - EPS);
+					expect(below, `${font} px, below`).toBeGreaterThanOrEqual(SIGN_CLEAR_PX - EPS);
 				}
-			});
-		}
+			}
+		});
 	}
 
 	it('the signs of one couple do not touch each other', () => {
@@ -90,7 +88,7 @@ describe('sideways, a couple with two or more partnerships', () => {
 	it('the gap is the wider value for the couple, and the layout geometry carries it', () => {
 		const g = graph(couple(['betrothal', 'marriage']));
 		const laid = lay(g, SIDE);
-		const side = sidewaysGeometry(geometryFor(16, 'normal'));
+		const side = sidewaysGeometry(geometryFor(16));
 		expect(side.coupleGap).toBe(24);
 		expect(sidewaysPartnerGap(side, 2)).toBe(41);
 		expect(laid.layout.geometry.coupleGap).toBe(41);
@@ -101,7 +99,7 @@ describe('sideways, a couple with two or more partnerships', () => {
 
 	it('sidewaysPartnerGap: one partnership or none keeps the gap; more partnerships give more room, never less', () => {
 		for (const font of FONTS) {
-			const side = sidewaysGeometry(geometryFor(font, 'normal'));
+			const side = sidewaysGeometry(geometryFor(font));
 			expect(sidewaysPartnerGap(side, 0)).toBe(side.coupleGap);
 			expect(sidewaysPartnerGap(side, 1)).toBe(side.coupleGap);
 			expect(sidewaysPartnerGap(side, 2)).toBeGreaterThan(side.coupleGap);
@@ -110,7 +108,7 @@ describe('sideways, a couple with two or more partnerships', () => {
 	});
 
 	it('the reach used for the gap covers every sign shape (styles.ts UNION_MARKS)', () => {
-		const side = sidewaysGeometry(geometryFor(16, 'normal'));
+		const side = sidewaysGeometry(geometryFor(16));
 		const widest = Math.max(...(Object.keys(UNION_MARKS) as UnionShape[]).map((s) => Math.max(reach(s, side.unionSize).up, reach(s, side.unionSize).down)));
 		// With two signs the gap is two sign sizes plus two reaches plus two clear spaces, rounded up.
 		expect(sidewaysPartnerGap(side, 2)).toBeGreaterThanOrEqual(2 * side.unionSize + 2 * (widest + SIGN_CLEAR_PX));
@@ -121,7 +119,7 @@ describe('every other layout is as it was', () => {
 	it('the down layout of a couple with two partnerships keeps its geometry and gap', () => {
 		const g = graph(couple(['betrothal', 'marriage']));
 		const laid = lay(g, DEFAULT_LAYOUT_SETTINGS);
-		expect(laid.layout.geometry).toEqual(geometryFor(16, 'normal'));
+		expect(laid.layout.geometry).toEqual(geometryFor(16));
 		const [a, b] = ['a', 'b'].map((id) => laid.layout.persons.get(id)!);
 		expect(Math.abs(a.x - b.x) - a.w).toBe(36);
 	});
@@ -131,7 +129,7 @@ describe('every other layout is as it was', () => {
 			const g = graph(f.source);
 			const laid = lay(g, SIDE);
 			expect(laid.layout.geometry.coupleGap, f.id).toBe(24);
-			expect(drawnGeometry(geometryFor(16, 'normal'), SIDE), f.id).toEqual(laid.layout.geometry);
+			expect(drawnGeometry(geometryFor(16), SIDE), f.id).toEqual(laid.layout.geometry);
 		}
 	});
 
@@ -150,7 +148,7 @@ unions:
 	it('the cache key already holds the partnerships, so one key never stands for two gaps', () => {
 		const one = graph(couple(['marriage']));
 		const two = graph(couple(['marriage', 'marriage']));
-		const geo = geometryFor(16, 'normal');
+		const geo = geometryFor(16);
 		expect(layoutKey(one, geo, SIDE, 'x')).not.toBe(layoutKey(two, geo, SIDE, 'x'));
 	});
 });

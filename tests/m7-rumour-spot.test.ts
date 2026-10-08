@@ -92,7 +92,7 @@ describe('the "?" of a rumoured parent in the finder\'s small tree keeps clear o
 			for (const font of [12, 16, 20]) {
 				for (const [pair, small] of smalls) {
 					clearLayoutCache();
-					const laid = layoutTree(small, geometryFor(font, 'normal'), { ...settings, far: NEVER_FAR_RULE }, 'test');
+					const laid = layoutTree(small, geometryFor(font), { ...settings, far: NEVER_FAR_RULE }, 'test');
 					for (const f of [...covered(laid, room(font)), ...astray(laid)]) found.push(`${font} px, ${pair}: ${f}`);
 				}
 			}
@@ -104,7 +104,7 @@ describe('the "?" of a rumoured parent in the finder\'s small tree keeps clear o
 		const r = findRelation(g, 'leo', 'wynn');
 		const line = r.kind === 'named' ? r.relations[0].relation.line : r.kind === 'chain' ? r.line : undefined;
 		clearLayoutCache();
-		const laid = layoutTree(lineSubgraph(g, line!), geometryFor(16, 'normal'), { ...SIDE, far: NEVER_FAR_RULE }, 'test');
+		const laid = layoutTree(lineSubgraph(g, line!), geometryFor(16), { ...SIDE, far: NEVER_FAR_RULE }, 'test');
 		const drop = laid.edges.paths.find((p) => p.kind === 'rumoured' && p.child === 'wynn')!;
 		const trunk = laid.edges.paths.find((p) => p.child === undefined && p.people.includes('wynn'))!;
 		const [m] = laid.edges.markers.filter((x) => x.kind === 'rumour');
@@ -126,7 +126,7 @@ describe('the "?" of a rumoured side link keeps clear of every card (random tree
 			const found: string[] = [];
 			for (let seed = 1; seed <= 80; seed++) {
 				clearLayoutCache();
-				const laid = layoutTree(build(randomTree(seed)).g, geometryFor(16, 'normal'), settings, 'test');
+				const laid = layoutTree(build(randomTree(seed)).g, geometryFor(16), settings, 'test');
 				for (const f of [...covered(laid, room(16) - 1), ...astray(laid)]) found.push(`random ${seed}: ${f}`);
 			}
 			expect(found.slice(0, 8)).toEqual([]);

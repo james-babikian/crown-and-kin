@@ -5,7 +5,7 @@ import { DEFAULT_LAYOUT_SETTINGS, NEVER_FAR_RULE, clearLayoutCache, layoutKey, l
 import type { EdgeDrawing, EdgePath, LayoutSettings } from '../src/layout/model';
 import { build, fixture } from './helpers';
 
-// WP7.2 (spec §13.1 D40, §13.2 D47): the relation text line in every layout and card size, the M7 fields
+// WP7.2 (spec §13.1 D40, §13.2 D47): the relation text line in every layout, the M7 fields
 // on lines and markers, the finder's small-tree patches (rumoured placement, childless implicit union).
 
 const ALL = ['01', '02', '03', '04', '05', '06', '07', '08', '10', '11'];
@@ -13,13 +13,12 @@ const SIDE: LayoutSettings = { ...DEFAULT_LAYOUT_SETTINGS, orientation: 'sideway
 
 describe('D40: the relation text line makes every card one small text line taller', () => {
 	it('relationExtra is one 0.85 em text line at the card line height, whole px', () => {
-		expect(relationExtra(geometryFor(16, 'normal'))).toBe(Math.round(1.2 * 0.85 * 16));
-		expect(relationExtra(geometryFor(16, 'compact'))).toBe(Math.round(1.1 * 0.85 * 16));
-		expect(relationExtra(geometryFor(20, 'normal'))).toBe(Math.round(1.2 * 0.85 * 20));
+		expect(relationExtra(geometryFor(16))).toBe(Math.round(1.2 * 0.85 * 16));
+		expect(relationExtra(geometryFor(20))).toBe(Math.round(1.2 * 0.85 * 20));
 	});
 
 	it('withRelationLine and drawnGeometry add it once, in every orientation', () => {
-		const geo = geometryFor(16, 'normal');
+		const geo = geometryFor(16);
 		const on = withRelationLine(geo, { ...DEFAULT_LAYOUT_SETTINGS, relationLine: true });
 		expect(on.cardH).toBe(geo.cardH + relationExtra(geo));
 		expect(on.relationLine).toBe(true);
@@ -38,34 +37,32 @@ describe('D40: the relation text line makes every card one small text line talle
 		['down', DEFAULT_LAYOUT_SETTINGS],
 		['sideways', SIDE],
 	] as const) {
-		for (const size of ['normal', 'compact'] as const) {
-			it(`${name}, ${size} cards: every card is taller by relationExtra; a tall card stays tall`, () => {
-				const { g } = build(fixture('07'));
-				const geo = geometryFor(16, size);
-				const tallCards = g.people.slice(0, 5).map((p) => p.id);
-				clearLayoutCache();
-				const off = layoutTree(g, geo, { ...settings, tallCards }, 'test');
-				const on = layoutTree(g, geo, { ...settings, tallCards, relationLine: true }, 'test');
-				expect(on.layout.geometry.relationLine).toBe(true);
-				expect(on.layout.geometry.cardH).toBe(off.layout.geometry.cardH + relationExtra(geo));
-				expect(on.layout.geometry.cardW).toBe(off.layout.geometry.cardW);
-				for (const [id, box] of on.layout.persons) {
-					const before = off.layout.persons.get(id)!;
-					expect(box.gen).toBe(before.gen);
-					// Sideways a tall card is also taller: its column runs from top to bottom.
-					expect(box.h, id).toBe(before.h + relationExtra(geo));
-					expect(!!box.tallName, id).toBe(tallCards.includes(id));
-					expect(box.tallTitle, id).toBeUndefined();
-				}
-				// D2: sibling order and rows are the same.
-				expect(on.layout.rows).toEqual(off.layout.rows);
-			});
-		}
+		it(`${name}, cards: every card is taller by relationExtra; a tall card stays tall`, () => {
+			const { g } = build(fixture('07'));
+			const geo = geometryFor(16);
+			const tallCards = g.people.slice(0, 5).map((p) => p.id);
+			clearLayoutCache();
+			const off = layoutTree(g, geo, { ...settings, tallCards }, 'test');
+			const on = layoutTree(g, geo, { ...settings, tallCards, relationLine: true }, 'test');
+			expect(on.layout.geometry.relationLine).toBe(true);
+			expect(on.layout.geometry.cardH).toBe(off.layout.geometry.cardH + relationExtra(geo));
+			expect(on.layout.geometry.cardW).toBe(off.layout.geometry.cardW);
+			for (const [id, box] of on.layout.persons) {
+				const before = off.layout.persons.get(id)!;
+				expect(box.gen).toBe(before.gen);
+				// Sideways a tall card is also taller: its column runs from top to bottom.
+				expect(box.h, id).toBe(before.h + relationExtra(geo));
+				expect(!!box.tallName, id).toBe(tallCards.includes(id));
+				expect(box.tallTitle, id).toBeUndefined();
+			}
+			// D2: sibling order and rows are the same.
+			expect(on.layout.rows).toEqual(off.layout.rows);
+		});
 	}
 
 	it('relationLine false or absent gives the layout of today, and the cache key of today', () => {
 		const { g } = build(fixture('03'));
-		const geo = geometryFor(16, 'normal');
+		const geo = geometryFor(16);
 		clearLayoutCache();
 		const a = layoutTree(g, geo, DEFAULT_LAYOUT_SETTINGS, 'test');
 		clearLayoutCache();
@@ -82,35 +79,26 @@ describe('D40: the relation text line makes every card one small text line talle
 	});
 });
 
-describe('D40: cardText centres three small text lines; relationY moves up like the dates', () => {
-	for (const size of ['normal', 'compact'] as const) {
-		for (const tall of [false, true]) {
-			it(`${size}${tall ? ', tall' : ''}`, () => {
-				const plain = geometryFor(16, size);
-				const geo = withRelationLine(plain, { ...DEFAULT_LAYOUT_SETTINGS, relationLine: true });
-				const t = cardText(geo, tall);
-				const lh = size === 'normal' ? 1.2 : 1.1;
-				const smallLine = lh * t.smallSize;
-				const h = geo.cardH + (tall ? tallExtra(geo) : 0);
-				expect(t.relationBaseline).toBeCloseTo(t.datesBaseline + smallLine, 6);
-				expect(t.datesBaseline).toBeCloseTo(t.titleBaseline + smallLine, 6);
-				// Centred: the space above the name's line box equals the space below the relation's.
-				const top = t.nameBaseline - lh * t.nameSize / 2 - 0.35 * t.nameSize;
-				const bottom = h - (t.relationBaseline! - 0.35 * t.smallSize + smallLine / 2);
-				expect(top).toBeCloseTo(bottom, 6);
-				expect(relationY(t, true, true)).toBe(t.relationBaseline);
-				expect(relationY(t, false, true)).toBe(t.datesBaseline);
-				expect(relationY(t, true, false)).toBe(t.datesBaseline);
-				expect(relationY(t, false, false)).toBe(t.titleBaseline);
-				// Without the relation line, nothing changes.
-				expect(cardText(plain, tall).relationBaseline).toBeUndefined();
-				expect(relationY(cardText(plain, tall), true, true)).toBeUndefined();
-			});
-		}
+describe('D40: the relation word sits on the plate; relationY returns its baseline', () => {
+	for (const tall of [false, true]) {
+		it(tall ? 'tall' : 'one name line', () => {
+			const plain = geometryFor(16);
+			const geo = withRelationLine(plain, { ...DEFAULT_LAYOUT_SETTINGS, relationLine: true });
+			const t = cardText(geo, tall);
+			const h = geo.cardH + (tall ? tallExtra(geo) : 0);
+			// The plate is the bottom strip of the card (0.25 em more than one small line, 0.2.5 B7); the word is centred in it, a little raised.
+			expect(t.r1!.plate!.y + t.r1!.plate!.h).toBe(h);
+			expect(t.relationBaseline!).toBeGreaterThan(t.datesBaseline);
+			expect(t.relationBaseline!).toBeLessThan(h);
+			expect(relationY(t)).toBe(t.relationBaseline);
+			// Without the relation line, nothing changes.
+			expect(cardText(plain, tall).relationBaseline).toBeUndefined();
+			expect(relationY(cardText(plain, tall))).toBeUndefined();
+		});
 	}
 
 	it('without a relation line cardText is as before (the text block of two small lines)', () => {
-		const geo = geometryFor(16, 'normal');
+		const geo = geometryFor(16);
 		const t = cardText(geo);
 		expect(Object.keys(t)).not.toContain('relationBaseline');
 		// D117: card 61 px, three text lines of 16.32 px (all text is 0.85 em); the name's baseline is 0.35 of its 13.6 px below the middle.
@@ -130,8 +118,8 @@ unions:
   - {partners: [a, d]}
 `;
 		const { g } = build(src);
-		const far = layoutTree(g, geometryFor(16, 'normal'), DEFAULT_LAYOUT_SETTINGS, 'test');
-		const never = layoutTree(g, geometryFor(16, 'normal'), { ...DEFAULT_LAYOUT_SETTINGS, far: NEVER_FAR_RULE }, 'test');
+		const far = layoutTree(g, geometryFor(16), DEFAULT_LAYOUT_SETTINGS, 'test');
+		const never = layoutTree(g, geometryFor(16), { ...DEFAULT_LAYOUT_SETTINGS, far: NEVER_FAR_RULE }, 'test');
 		expect(NEVER_FAR_RULE).toEqual({ maxCardWidths: Infinity, maxGenerations: Infinity });
 		expect([...far.layout.unions.values()].some((u) => u.far)).toBe(true);
 		expect([...never.layout.unions.values()].some((u) => u.far)).toBe(false);
@@ -194,7 +182,7 @@ describe('M7 fields on every line and marker (EdgePath.union/parents/child, Edge
 		] as const) {
 			it(`sample tree ${id}, ${name}`, () => {
 				const { g } = build(fixture(id));
-				const { edges } = layoutTree(g, geometryFor(16, 'normal'), settings, 'test');
+				const { edges } = layoutTree(g, geometryFor(16), settings, 'test');
 				checkFields(g, edges);
 			});
 		}
@@ -208,7 +196,7 @@ unions:
   - {partners: [a, b], type: betrothal}
   - {partners: [a, b]}
 `);
-		const { edges } = layoutTree(g, geometryFor(16, 'normal'), DEFAULT_LAYOUT_SETTINGS, 'test');
+		const { edges } = layoutTree(g, geometryFor(16), DEFAULT_LAYOUT_SETTINGS, 'test');
 		const bars = edges.paths.filter((p) => role(p) === 'bar');
 		expect(bars).toHaveLength(1);
 		expect(bars[0].union).toBe('u1');
@@ -239,7 +227,7 @@ describe('the finder\'s small tree: a rumoured placement is drawn as a rumoured 
 		it(name, () => {
 			const g = rumouredPlacement(build(src).g, 'r', 'g');
 			clearLayoutCache();
-			const { layout, edges } = layoutTree(g, geometryFor(16, 'normal'), { ...settings, far: NEVER_FAR_RULE }, 'test');
+			const { layout, edges } = layoutTree(g, geometryFor(16), { ...settings, far: NEVER_FAR_RULE }, 'test');
 			expect(layout.persons.get('r')!.gen).toBe(layout.persons.get('g')!.gen + 1);
 			const drop = edges.paths.find((p) => p.child === 'r')!;
 			const trunk = edges.paths.find((p) => p.child === undefined && p.parents?.[0] === 'g')!;
@@ -271,7 +259,7 @@ describe('the finder\'s small tree: a rumoured placement is drawn as a rumoured 
 			'r',
 			'g',
 		);
-		const { edges } = layoutTree(g, geometryFor(16, 'normal'), { ...DEFAULT_LAYOUT_SETTINGS, far: NEVER_FAR_RULE }, 'test');
+		const { edges } = layoutTree(g, geometryFor(16), { ...DEFAULT_LAYOUT_SETTINGS, far: NEVER_FAR_RULE }, 'test');
 		expect(edges.paths.find((p) => p.child === 'r')!.kind).toBe('rumoured');
 		expect(edges.paths.find((p) => p.child === 'a')!.kind).toBe('descent');
 		expect(edges.paths.find((p) => p.child === undefined && p.parents?.[0] === 'g')!.kind).toBe('descent');
@@ -302,7 +290,7 @@ describe('the finder\'s small tree: an implicit union with no child is a plain c
 			it(`${name}, ${orientation}`, () => {
 				const g = childless(src);
 				clearLayoutCache();
-				const { edges } = layoutTree(g, geometryFor(16, 'normal'), { ...settings, far: NEVER_FAR_RULE }, 'test');
+				const { edges } = layoutTree(g, geometryFor(16), { ...settings, far: NEVER_FAR_RULE }, 'test');
 				const lines = edges.paths.filter((p) => p.union === 'i:["a","b"]');
 				expect(lines.length).toBeGreaterThan(0);
 				for (const p of lines) expect(p.kind).toBe('implicit');

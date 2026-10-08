@@ -25,7 +25,7 @@ beforeAll(() => {
 	g.createSvg = (tag: string, o?: unknown) => new FEl(tag, typeof o === 'string' ? { cls: o } : (o as never));
 });
 
-const GEO = geometryFor(16, 'normal');
+const GEO = geometryFor(16);
 const FONTS = { text: 'serif', ui: 'sans', bold: '700' };
 const measure = (text: string, font: string) => text.length * (Number(/(\d+(?:\.\d+)?)px/.exec(font)?.[1] ?? 16) * 0.55);
 

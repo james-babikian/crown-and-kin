@@ -73,7 +73,7 @@ import type { ParseCache } from '../core/parse-cache';
 import { parseDynasty } from '../core/parse';
 import { portraitCropOf } from '../core/portrait-crop';
 import { pictureIssue, type PictureOwner, type PictureProblem } from '../core/pictures';
-import { findRelation, lineSubgraph } from '../core/relations';
+import { findRelation, lineSubgraph, type RelationOptions } from '../core/relations';
 import type { FinderResult, RelationLine } from '../core/relations';
 import { cardLabels, needsLabels, type CardLabel } from '../core/titles';
 import type { ParseResult, Person, Tree } from '../core/types';
@@ -87,8 +87,8 @@ import { calloutBackdrop, plusChoice } from '../render/dom/theme-read';
 import { wireCardTips, type CardTips } from '../render/dom/card-tip';
 import { PanZoom, visibleRect } from '../render/dom/pan-zoom';
 import { setLegendArms, type PictureSlot } from '../render/dom/pictures';
-import { FILL_ALL_EVENT, buildLegend, buildScene, discPath, lodClass, type CardLink, type Scene, type SceneOptions } from '../render/dom/scene';
-import { sameLifted, sameTall } from '../render/dom/tall-cards';
+import { FILL_ALL_EVENT, buildLegend, buildScene, discPath, lodClass, parsePxRadius, type CardLink, type Scene, type SceneOptions } from '../render/dom/scene';
+import { sameTall } from '../render/dom/tall-cards';
 import { parseBreakList } from '../render/break-words';
 import { buildPhoneList, setListEditable, showListPicture, type ListPictureSlots } from '../render/dom/phone-list-dom';
 import { buildCallout, Popover } from '../render/dom/widgets';
@@ -524,9 +524,13 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 		return this.host.settings ?? DEFAULT_SETTINGS;
 	}
 
+	/** D174: the options of every relation call of this view (cards, finder, sheet, saved picture), from the settings. */
+	private get relationOptions(): RelationOptions {
+		return { oneParentUnknown: this.settings.oneParentUnknown };
+	}
+
 	/**
-	 * A setting changed (spec §9): the view draws again with it. A new card size gives a new layout,
-	 * so the view starts at its first view; other changes keep the tree point at the centre. The
+	 * A setting changed (spec §9): the view draws again with it; the tree point at the centre is kept. The
 	 * dates only change a class, and the heights only the box (D30).
 	 */
 	onSettingsChange(prev: DynastySettings): void {
@@ -538,9 +542,11 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 				this.checkTurn();
 				return;
 			}
-			// D144: a list follows only the three settings that it shows; a new card size, direction or break list changes nothing in it.
+			// D144: a list follows only the three settings that it shows, and the sibling setting (D174) when a mark gives relation words;
+			// a new direction or break list changes nothing in it.
 			if (this.listMode) {
-				if (prev.showDates !== now.showDates || prev.showRelations !== now.showRelations || prev.showPortraits !== now.showPortraits) this.render(this.fonts);
+				const kinWords = prev.oneParentUnknown !== now.oneParentUnknown && this.meId !== null;
+				if (prev.showDates !== now.showDates || prev.showRelations !== now.showRelations || prev.showPortraits !== now.showPortraits || kinWords) this.render(this.fonts);
 				return;
 			}
 			const root = this.viewport?.parentElement ?? null;
@@ -553,13 +559,16 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 			const breaks = prev.breakWords !== now.breakWords;
 			// D145: with a mark the plate with the relation word is part of the card, so the setting changes the card height: the tree is laid out again.
 			const plate = prev.showRelations !== now.showRelations && this.meId !== null;
+			// D174: the sibling setting gives other relation names. The card texts, the plate (D145), the list and the finder's result are made at a render,
+			// so the view draws again; the new layout measures the new texts. A view with no mark and no finder shows none.
+			const kin = prev.oneParentUnknown !== now.oneParentUnknown && (this.finderDrawn !== null || this.meId !== null);
 			// D126 (1): "Reduce movement" is read when a movement starts, so a change needs no redraw.
-			if (!reigns && !portraits && !breaks && !plate && prev.cardSize === now.cardSize && (prev.focusGenerations === now.focusGenerations || this.focusId === null)) {
+			if (!reigns && !portraits && !breaks && !plate && !kin && (prev.focusGenerations === now.focusGenerations || this.focusId === null)) {
 				root?.toggleClass('dynasty-no-dates', !now.showDates);
 				this.updateHeight();
 				return;
 			}
-			this.carry = prev.cardSize === now.cardSize ? this.keptAnchor() : null;
+			this.carry = this.keptAnchor();
 			this.render(this.fonts);
 		});
 	}
@@ -615,6 +624,9 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 		// O9: a picture file changed, came or went: the pictures of this tree follow (no new layout).
 		const store = this.host.pictures;
 		if (store) this.unsubPictures = store.onChange((paths) => this.guard(() => this.picturesChanged(paths)));
+		// The metadata cache indexes a new picture file late: a list with a missing link looks again when it has resolved.
+		const mc = this.host.app?.metadataCache;
+		if (store && mc && typeof mc.on === 'function') this.registerEvent(mc.on('resolved', () => this.guard(() => this.linksResolved())));
 		// D7: a view that gave up finding its block tries again when the note changes (the pasted copy is deleted).
 		if (this.info && !this.full) this.unwatch = this.host.handles.watchNote?.((path) => this.guard(() => this.noteModified(path))) ?? null;
 		this.guard(() => this.render(null));
@@ -867,9 +879,33 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 		});
 	}
 
+	/** The theme corner radius (px, `--radius-s`), read from the connected view; 4 when unknown. Only a tree with a marked card needs it. */
+	private themeRadius(): number {
+		const el = this.viewport ?? this.containerEl;
+		return el.isConnected ? parsePxRadius(getComputedStyle(el).getPropertyValue('--radius-s'), 4) : 4;
+	}
+
+	/** The view is in the document only after the scene is built, so the radius is read at the first fill that finds it connected (the marked bar needs it). */
+	private learnRadius(): void {
+		const o = this.lastLayout?.opts;
+		if (o && o.cornerRadius === undefined && this.meId !== null && this.viewport?.isConnected) this.scene?.setCornerRadius(this.themeRadius());
+	}
+
+	/** A theme change can change the corner radius; the marked bar (at most one) is then drawn again. */
+	private recheckRadius(): void {
+		const last = this.lastLayout;
+		if (this.meId === null || !last || !this.g || !this.laid) return;
+		const r = this.themeRadius();
+		if (r === (last.opts.cornerRadius ?? 4)) return;
+		this.scene?.setCornerRadius(r);
+	}
+
 	/** Called by the plugin `THEME_RECHECK_MS` after `css-change`: a theme can change its colours a frame later (its style sheet still loads). */
 	recheckTheme(): void {
-		this.guard(() => this.readTheme());
+		this.guard(() => {
+			this.readTheme();
+			this.recheckRadius();
+		});
 	}
 
 	/** The fonts at the block's place in the note. */
@@ -1072,7 +1108,7 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 		}
 		const fonts = fontsOverride ?? readFonts(el);
 		// D143, D150: the card form of the direction (the Roundel top to bottom, the text card sideways).
-		const geo = cardForm(geometryFor(fonts.px, this.settings.cardSize), orientation);
+		const geo = cardForm(geometryFor(fonts.px), orientation);
 		const base: LayoutSettings = orientation === 'sideways' ? { sweeps: 4, far: DEFAULT_FAR_RULE, orientation } : { sweeps: 4, far: DEFAULT_FAR_RULE };
 		const focus = this.updateFocus(parsed.tree, whole);
 		const st = this.ensureState();
@@ -1121,7 +1157,7 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 		// mark (relation-cache.ts). Their time counts in the §7.7 time: it is in the layout part.
 		const me = validMe(whole, parsed.tree.options.me);
 		this.meId = me;
-		const rel = me !== null && !small ? relationsFor(whole, me) : null;
+		const rel = me !== null && !small ? relationsFor(whole, me, this.relationOptions) : null;
 		// M10 (F1, F8): the computer and the full-screen view apply the folds; the static phone preview never does.
 		const canFold = !!this.full || !this.coarse;
 		let plan = planFolds(g, whole, st.folds, canFold, finder?.line?.people ?? null);
@@ -1141,22 +1177,20 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 		const laidBase: LayoutSettings = withFolds(shaped(small ? { ...base, far: NEVER_FAR_RULE } : base), plan, canFold);
 		// Spec §13.3, §13.5: the card labels of the drawn graph. A tree with no titles draws as in M7 (no labels).
 		const labels = needsLabels(g) ? cardLabels(g) : undefined;
-		const { laid, settings, lifted } = this.layOut(g, geo, laidBase, fonts, sub?.hidden, labels, plan.hidden, rel?.cards);
+		const { laid, settings } = this.layOut(g, geo, laidBase, fonts, sub?.hidden, labels, plan.hidden);
 		// D51: on an upright phone the small tree is also laid out top to bottom. The first view, which
 		// knows the free area between the result bar and the toolbar, draws the direction with larger names.
 		// The other direction has its own card form (the Roundel), so it gets its own geometry; `geo` has the text card.
-		const altGeo = cardForm(geometryFor(fonts.px, this.settings.cardSize), 'down');
+		const altGeo = cardForm(geometryFor(fonts.px), 'down');
 		this.finderAlt = small && orientation === 'sideways' ? { ...this.layOut(g, altGeo, withFolds(shaped({ sweeps: 4, far: NEVER_FAR_RULE }), plan, canFold), fonts, undefined, labels, plan.hidden), geo: altGeo } : null;
 		const t2 = performance.now();
-		// A saved view of normal cards means nothing on compact cards (spec §9 card size).
-		const size = geo.cardSize === 'compact' ? '|compact' : '';
 		// The finder's tree has its own key: its views never replace the saved view of the family.
 		const finderKey = finder?.line ? `finder:${finder.state.first}>${finder.state.second}:${finder.state.index}:${finder.state.whole ? 'whole' : 'line'}|` : '';
-		const family = finderKey + focusKey(sub ? focus : null, n) + size;
+		const family = finderKey + focusKey(sub ? focus : null, n);
 		// A view of one family means nothing in another: the new family gets its own first view.
 		if (this.familyKey !== null && this.familyKey !== family) this.carry = null;
 		this.familyKey = family;
-		this.drawnKey = finderKey + focusKey(sub ? focus : null, n, orientation) + size;
+		this.drawnKey = finderKey + focusKey(sub ? focus : null, n, orientation);
 		this.focusId = sub ? focus : null;
 		this.focusStale = false;
 		this.g = g;
@@ -1208,7 +1242,6 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 			fonts,
 			measure: measureText,
 			...(breaks.size ? { breaks } : {}),
-			...(lifted.size ? { lifted } : {}),
 			link: (p) => this.cardLink(p),
 			badges: sub ? { hidden: sub.hidden, label: (p, n) => FOCUS_UI.badgeLabel(p.name, n) } : undefined,
 			...(rel ? { relations: rel.cards } : {}),
@@ -1351,7 +1384,7 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 		const t2 = performance.now();
 
 		const labels = needsLabels(whole) ? cardLabels(whole) : undefined;
-		const rel = me !== null && this.settings.showRelations ? relationsFor(whole, me) : null;
+		const rel = me !== null && this.settings.showRelations ? relationsFor(whole, me, this.relationOptions) : null;
 		const ctl = new AbortController();
 		this.listAbort = ctl;
 		const token = this.pictureToken;
@@ -1404,20 +1437,20 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 		const bar = viewport.createDiv({ cls: 'dynasty-toolbar' });
 		// First in the viewport, so Tab reaches the bar before the list.
 		viewport.prepend(bar);
-		const button = (icon: string, text: string, label: string, cls: string) => {
+		// D182: the phone bar shows icons only; the full text is in the aria-label.
+		const button = (icon: string, label: string, cls: string) => {
 			const b = bar.createEl('button', { cls: ['clickable-icon', 'dynasty-tool', cls], attr: { 'aria-label': label, type: 'button' } });
 			setIcon(b.createSpan({ cls: 'dynasty-tool-icon' }), icon);
-			b.createSpan({ cls: 'dynasty-tool-text', text });
 			return b;
 		};
-		button('search', PHONE_LIST_UI.find, PHONE_LIST_UI.findLabel, 'dynasty-list-find').addEventListener('click', () => this.guard(() => void this.listFind()));
+		button('search', PHONE_LIST_UI.findLabel, 'dynasty-list-find').addEventListener('click', () => this.guard(() => void this.listFind()));
 		const back = st.listBack?.length ? popTrail(st.listBack, (id) => !!this.whole?.byId.has(id)) : null;
 		if (back) {
 			const name = this.whole?.byId.get(back.id)?.name ?? back.id;
-			button('arrow-left', PHONE_LIST_UI.back, PHONE_LIST_UI.backLabel(name), 'dynasty-list-back').addEventListener('click', () => this.guard(() => this.listBackTap()));
+			button('arrow-left', PHONE_LIST_UI.backLabel(name), 'dynasty-list-back').addEventListener('click', () => this.guard(() => this.listBackTap()));
 		}
 		this.updateBadge(bar);
-		button('maximize', PHONE_LIST_UI.expand, PHONE_LIST_UI.expandLabel, 'dynasty-expand').addEventListener('click', () => this.guard(() => void this.openFull(null)));
+		button('maximize', PHONE_LIST_UI.expandLabel, 'dynasty-expand').addEventListener('click', () => this.guard(() => void this.openFull(null)));
 	}
 
 	/** A tap on a name of the list: the list moves to that person and the old person goes on the Back trail. */
@@ -1703,10 +1736,8 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 		hidden?: ReadonlyMap<string, number>,
 		labels?: ReadonlyMap<string, CardLabel>,
 		foldHidden?: ReadonlySet<string>,
-		relations?: ReadonlyMap<string, { text: string }>,
 	): MeasuredResult {
 		const breaks = this.breakList();
-		// Rule B reads the relation words only when they show (D126 4); the setting also hides them by a class, so it is read here.
 		return measuredLayout(g, geo, base, {
 			fonts,
 			measure: measureText,
@@ -1717,7 +1748,6 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 			...(foldHidden?.size ? { foldHidden } : {}),
 			...(breaks.size ? { breaks } : {}),
 			...(this.meId !== null ? { marked: this.meId } : {}),
-			...(relations && this.settings.showRelations ? { relations } : {}),
 		});
 	}
 
@@ -1726,12 +1756,11 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 		return parseBreakList(this.settings.breakWords);
 	}
 
-	/** Draws a new layout of the note preview in place (D29): the viewport, toolbar and observers stay. `lifted` is rule B's set of the layout. */
-	private redraw(g: FamilyGraph, laid: LaidOut, lifted: ReadonlySet<string>): void {
+	/** Draws a new layout of the note preview in place (D29): the viewport, toolbar and observers stay. */
+	private redraw(g: FamilyGraph, laid: LaidOut): void {
 		const last = this.lastLayout;
 		if (!last || !this.panZoom) return;
 		this.laid = laid;
-		last.opts.lifted = lifted;
 		this.bounds = treeBounds(laid.layout.width, laid.layout.height);
 		this.panZoom.setBounds(this.bounds);
 		this.popover?.close();
@@ -1764,16 +1793,15 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 		if (!last || !g || !this.panZoom) return false;
 		// css-change: the widths cached for the same font text can belong to the face that was in use before.
 		if (fresh) clearMeasureCache();
-		const next = this.layOut(g, last.geo, last.settings, last.opts.fonts, last.opts.badges?.hidden, last.opts.labels, undefined, last.opts.relations);
+		const next = this.layOut(g, last.geo, last.settings, last.opts.fonts, last.opts.badges?.hidden, last.opts.labels);
 		const sameCards = sameTall(next.settings.tallCards, last.settings.tallCards) && sameTall(next.settings.tallTitles, last.settings.tallTitles) && sameTall(next.settings.longNames, last.settings.longNames);
-		// Rule B: a refit can move a relation text across the room beside the boxes. The layout does not change (card heights are the same), but the boxes move.
-		if (sameCards && sameLifted(next.lifted, last.opts.lifted)) {
+		if (sameCards) {
 			if (fresh) this.scene?.refit();
 			return false;
 		}
 		const keep = this.keptAnchor();
 		last.settings = next.settings;
-		this.redraw(g, next.laid, next.lifted);
+		this.redraw(g, next.laid);
 		if (keep) this.carry = keep;
 		this.resized();
 		return true;
@@ -1947,7 +1975,7 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 		last.settings = alt.settings;
 		// The geometry follows the direction too: a later layout of this tree (a font change) must not mix the text card with a top-to-bottom tree.
 		last.geo = alt.geo;
-		this.redraw(g, alt.laid, alt.lifted);
+		this.redraw(g, alt.laid);
 		this.firstDue = false;
 		this.viewport?.parentElement?.setAttribute('data-dynasty-orientation', alt.laid.layout.orientation);
 	}
@@ -2072,8 +2100,11 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 		if (!svg || !laid) return false;
 		const lod = chooseLod(this.lod, view.scale * laid.layout.geometry.fontPx);
 		if (lod === this.lod) return false;
+		// R026 fit: the groups leave first, so the class change below has nothing to restyle in them (and a lazy card that fills at Overview does not put its group back).
+		if (lod === 'overview') this.scene?.setDetail(false);
 		if (this.lod) svg.removeClass(lodClass(this.lod));
 		svg.addClass(lodClass(lod));
+		if (this.lod === 'overview' || this.lod === null) this.scene?.setDetail(true);
 		this.lod = lod;
 		return true;
 	}
@@ -2176,6 +2207,8 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 					this.syncPending();
 				}
 				if (this.idleWork(scene)) later(step);
+				// R026 fit: the work can come back (a level change puts the card groups back), so the next start must not be blocked.
+				else this.idleScene = null;
 			});
 		};
 		later(step);
@@ -2183,6 +2216,7 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 
 	/** The delayed card content near `view` (S3, S5a, S5b). A view with no size has no near part: the first draw or settle fills it. */
 	private fillNear(view: View): void {
+		this.learnRadius();
 		const pz = this.panZoom;
 		const scene = this.scene;
 		if (!pz || !scene) return;
@@ -2193,6 +2227,7 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 
 	/** The content of one person's card, badge and tags now (S5c to S5f): before a focus, a highlight, a reveal or the sheet. */
 	private fillPerson(id: string): void {
+		this.learnRadius();
 		this.scene?.fill.fillPerson(id);
 		this.syncPending();
 	}
@@ -2571,6 +2606,7 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 			finder: { show: (first, second) => TreeView.showFinder(this.host, h.state, first, second, this) },
 			folds: this.sheetFolds(h),
 			pictures: this.host.pictures,
+			relationOptions: this.relationOptions,
 		});
 		if (!sheet) {
 			new Notice(WRITE_TEXT.personNotFound);
@@ -2592,6 +2628,7 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 			place: this.full ? 'full' : 'embed',
 			openNote: (open) => this.openNote(open),
 			pictures: this.host.pictures,
+			relationOptions: this.relationOptions,
 		});
 		if (!sheet) {
 			new Notice(WRITE_TEXT.invalid);
@@ -2758,12 +2795,21 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 		if (canAdd && !add) {
 			add = bar.createEl('button', { cls: ['clickable-icon', 'dynasty-tool', 'dynasty-add-person'], attr: { 'aria-label': this.listMode ? PHONE_LIST_UI.addPersonLabel : ADD_UI.addPerson, type: 'button' } });
 			setIcon(add.createSpan({ cls: 'dynasty-tool-icon' }), 'user-plus');
-			// The bar above a list shows its button texts (D144).
-			if (this.listMode) add.createSpan({ cls: 'dynasty-tool-text', text: PHONE_LIST_UI.addPerson });
 			add.addEventListener('click', () => this.guard(() => void this.openNewPerson()));
 		} else if (!canAdd && add) {
 			add.remove();
 			add = null;
+		}
+		// D176 (2): in the list (no More list) the button for the tree text sits next to Add person.
+		const canText = this.listMode && this.canShowText();
+		let text = bar.querySelector<HTMLElement>('.dynasty-show-text');
+		if (canText && !text) {
+			text = bar.createEl('button', { cls: ['clickable-icon', 'dynasty-tool', 'dynasty-show-text'], attr: { 'aria-label': BLOCK_UI.showTextLabel, type: 'button' } });
+			setIcon(text.createSpan({ cls: 'dynasty-tool-icon' }), 'code');
+			text.addEventListener('click', () => this.guard(() => void this.showText()));
+		} else if (!canText && text) {
+			text.remove();
+			text = null;
 		}
 		// D36: Houses next to Add person, on the computer and in the full-screen view; not in the static touch embed (D1).
 		const canHouses = canAdd && (!!this.full || !this.coarse);
@@ -2776,7 +2822,7 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 			houses.remove();
 			houses = null;
 		}
-		orderFirst(bar, [label, open, add, houses]);
+		orderFirst(bar, [label, open, add, text, houses]);
 		if (!bar.childElementCount) bar.remove();
 		// The toolbar can be wider now (Add person): the D28 hint stays left of it.
 		this.placeHints();
@@ -2784,6 +2830,22 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 		let grip = root.querySelector<HTMLElement>(':scope > .dynasty-resize');
 		if (resizable && !grip) grip = this.buildResizeHandle(root, vp);
 		else if (!resizable && grip) grip.remove();
+	}
+
+	/** The block can be edited here (the same test as for "Add person" in the bar): the item "Show the tree text" needs it. */
+	private canShowText(): boolean {
+		return !this.readOnly && !this.blocked && !this.inForeignView() && !!this.handle;
+	}
+
+	/**
+	 * "Show the tree text" (D176 item 2): the note opens for edits with the cursor at the start of the block text. The
+	 * full-screen view closes first (`openNote`), so the note is visible. The block comes from the handle, which tracks it.
+	 */
+	private async showText(): Promise<void> {
+		const handle = await this.validHandle();
+		if (!handle || this.unloaded) return;
+		const { path, ordinal } = handle.key;
+		this.openNote(() => this.host.handles.showSource(path, ordinal).then(() => undefined));
 	}
 
 	private openSource(e: MouseEvent): void {
@@ -3314,9 +3376,9 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 		const focused = active?.closest?.('.dynasty-fold')?.getAttribute('data-fold') ?? null;
 		const plan = planFolds(g, whole, this.ensureState().folds, true, this.finderDrawn?.line?.people ?? null);
 		this.foldPlan = plan;
-		const next = this.layOut(g, last.geo, withFolds(last.settings, plan, true), last.opts.fonts, last.opts.badges?.hidden, last.opts.labels, plan.hidden, last.opts.relations);
+		const next = this.layOut(g, last.geo, withFolds(last.settings, plan, true), last.opts.fonts, last.opts.badges?.hidden, last.opts.labels, plan.hidden);
 		last.settings = next.settings;
-		this.redraw(g, next.laid, next.lifted);
+		this.redraw(g, next.laid);
 		// `redraw` asks for a first view; a fold keeps the view.
 		this.firstDue = false;
 		const to = anchor?.kind === 'spot' ? next.laid.layout.folds?.find((c) => c.key === anchor.key)?.spot : undefined;
@@ -3654,7 +3716,56 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 		this.resolvePictures(whole);
 		this.updateBadge();
 		this.live?.refresh(paths);
+		this.refillList();
 		if (this.picturesOn) this.checkPictures();
+	}
+
+	/**
+	 * The metadata cache finished indexing. Only a list that has a link to a missing picture looks again, and
+	 * only the links that were missing are asked: nothing else costs time when every picture is found.
+	 */
+	private linksResolved(): void {
+		const info = this.pictureInfo;
+		const whole = this.whole;
+		const store = this.host.pictures;
+		if (!info || !whole || !store || this.unloaded || !this.listEl) return;
+		let late = false;
+		for (const [link, r] of info.resolved) {
+			if (!r.ok && r.code === 'missing-picture' && store.resolve(link, this.sourcePath).ok) {
+				late = true;
+				break;
+			}
+		}
+		if (!late) return;
+		this.resolvePictures(whole);
+		this.updateBadge();
+		this.refillList();
+		if (this.picturesOn) this.checkPictures();
+	}
+
+	/**
+	 * The rows of the list get their picture copies again, in place: no new draw, so the scroll place and the
+	 * focus stay. The old copies go back to the store once.
+	 */
+	private refillList(): void {
+		const list = this.listEl;
+		const whole = this.whole;
+		if (!list || !whole || !list.isConnected) return;
+		this.listAbort?.abort();
+		for (const c of this.listCopies.splice(0)) c.release();
+		const ctl = new AbortController();
+		this.listAbort = ctl;
+		const token = this.pictureToken;
+		for (const row of Array.from(list.querySelectorAll<HTMLElement>('.dynasty-list-row[data-person]'))) {
+			const arms = row.querySelector<HTMLElement>('.dynasty-list-arms');
+			const portrait = row.querySelector<HTMLElement>('.dynasty-list-portrait');
+			if (!arms || !portrait) continue;
+			for (const slot of [arms, portrait]) {
+				slot.removeClass('has-picture');
+				for (const img of Array.from(slot.querySelectorAll('img'))) img.remove();
+			}
+			this.listPictures(whole, { arms, portrait }, row.getAttribute('data-person') ?? '', ctl.signal, token);
+		}
 	}
 
 	/** S4, O3: the legend's arms, from small copies held while the legend may show them. */
@@ -3746,7 +3857,7 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 		// The saved picture shows the card form of the direction it is drawn in, whole cards (D148 2A, D150 5): the geometry is made again, with no flag of the view.
 		// The plate follows the mark, the finder's small tree and the setting, as at the draw; with no plate a marked person gets the "You" tab.
 		const small = this.finderDrawn?.line && !this.finderDrawn.state.whole;
-		const rel = this.meId !== null && !small && this.whole ? relationsFor(this.whole, this.meId) : null;
+		const rel = this.meId !== null && !small && this.whole ? relationsFor(this.whole, this.meId, this.relationOptions) : null;
 		const relationLine = rel !== null && this.settings.showRelations;
 		const orientation = laid.layout.orientation ?? 'down';
 		const breaks = this.breakList();
@@ -3757,7 +3868,7 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 			...(opts.me !== undefined ? { me: opts.me } : {}),
 			...(opts.line ? { line: opts.line } : {}),
 			orientation,
-			geo: cardForm(geometryFor(last.geo.fontPx, last.geo.cardSize), orientation),
+			geo: cardForm(geometryFor(last.geo.fontPx), orientation),
 			relationLine,
 			...(this.meId !== null && !relationLine ? { youTab: this.meId } : {}),
 			...(breaks.size ? { breaks } : {}),
@@ -3786,7 +3897,7 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 			return null;
 		}
 		if (!this.full && this.coarse) return null;
-		const result = findRelation(whole, f.first, f.second);
+		const result = findRelation(whole, f.first, f.second, this.relationOptions);
 		const count = result.kind === 'named' ? result.relations.length : 1;
 		// An edit can leave fewer relations than the one that showed.
 		if (!(f.index >= 0 && f.index < count)) f.index = 0;
@@ -3919,6 +4030,8 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 					item('shrink', UI.fit, 'dynasty-more-fit', () => this.fit());
 					item('info', UI.legend, 'dynasty-more-legend', () => this.toggleLegend(opener));
 				}
+				// D176 (2): the last item, where the block can be edited.
+				if (this.canShowText()) item('code', BLOCK_UI.showText, 'dynasty-more-text-source', () => void this.showText(), BLOCK_UI.showTextLabel);
 				// Enter or Space on More moves the focus into the list (spec §5.2).
 				if (keyboard) first.focus();
 			},

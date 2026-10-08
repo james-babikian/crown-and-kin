@@ -19,7 +19,7 @@ import { block15, comments15, graphOf, sorted } from './m10-support';
 
 const F = comments15();
 const SOURCE = block15(0);
-const GEO = geometryFor(16, 'normal');
+const GEO = geometryFor(16);
 const EM = 16;
 /** Half of a hit area of 44 px at scale 1. */
 const HALF_HIT = 22;

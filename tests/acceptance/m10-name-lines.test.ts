@@ -1,6 +1,6 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import { DEFAULT_LAYOUT_SETTINGS, clearLayoutCache, layoutKey, layoutTree } from '../../src/layout/index';
-import { cardText, geometryFor, portraitBox, roomAt, tallExtra } from '../../src/layout/geometry';
+import { cardText, geometryFor, tallExtra } from '../../src/layout/geometry';
 import type { Geometry, LayoutSettings, PersonBox } from '../../src/layout/model';
 import { buildScene, type Scene } from '../../src/render/dom/scene';
 import { tallCardsFor } from '../../src/render/dom/tall-cards';
@@ -223,7 +223,7 @@ describe('sample tree 15, block 2: the names chosen by measurement (spec §13.9 
 
 describe('L2: `tallCardsFor` answers `tall` (2 or 3 text lines) and `long` (3), sorted', () => {
 	const FONTS = { text: 'serif', ui: 'sans', bold: '700' };
-	const GEO = geometryFor(16, 'normal');
+	const GEO = geometryFor(16);
 	/** 16 px normal card: the text is 158 px wide, so 15 characters of 10 px fit; with the D14 sign 132 px (13). */
 	const m = (s: string) => [...s].length * 10;
 	const tree = (people: [string, string, string?][]) =>
@@ -247,15 +247,13 @@ describe('L2: `tallCardsFor` answers `tall` (2 or 3 text lines) and `long` (3), 
 		expect(subset).toBe(true);
 	});
 
-	it('the arms box and the "+" badge no longer narrow a name on a whole card (D117); the D14 sign room still does', () => {
+	it('a name on a whole card has the full width (D117); the D14 sign room still narrows it', () => {
 		const g = tree([
 			['a', 'Aldrimonalotte'], // 14 characters, 140 px
 			['b', 'Bbbbbbbbbbbbbb'],
 			['c', 'Cccccccccccccc'],
 		]);
 		expect(tallFor(g, GEO, FONTS, (s) => m(s), new Set())).toEqual({ tall: [], long: [] });
-		const withArms = tallFor(g, GEO, FONTS, (s) => m(s), new Set(), undefined, new Set(['a', 'b', 'c']), undefined, { portraits: new Set(['a', 'b', 'c']) })!;
-		expect(withArms).toEqual({ tall: [], long: [] });
 	});
 
 	it('the name of the card is measured (D58): the regnal name, with the number', () => {
@@ -273,8 +271,8 @@ describe('L2: `tallCardsFor` answers `tall` (2 or 3 text lines) and `long` (3), 
 		]);
 		expect(tallFor(g, GEO, FONTS, (s) => m(s))).toEqual({ tall: ['a', 'b'], long: ['a'] });
 		const skip = new Set(['a']);
-		expect(tallFor(g, GEO, FONTS, (s) => m(s), undefined, undefined, undefined, skip)).toEqual({ tall: ['b'], long: [] });
-		expect(tallFor(g, GEO, FONTS, (s) => m(s), undefined, undefined, undefined, new Set(['a', 'b']))).toEqual({ tall: [], long: [] });
+		expect(tallFor(g, GEO, FONTS, (s) => m(s), undefined, undefined, skip)).toEqual({ tall: ['b'], long: [] });
+		expect(tallFor(g, GEO, FONTS, (s) => m(s), undefined, undefined, new Set(['a', 'b']))).toEqual({ tall: [], long: [] });
 	});
 
 	it('the D14 two-pass rule: the count without the sign room (n1) and with it (n2)', () => {
@@ -326,7 +324,7 @@ describe('L2: `tallCardsFor` answers `tall` (2 or 3 text lines) and `long` (3), 
 });
 
 describe('L3: card heights, the box flags and the cache key', () => {
-	const GEO = geometryFor(16, 'normal');
+	const GEO = geometryFor(16);
 	const EXTRA = tallExtra(GEO);
 	const source = ['people:', ...['a', 'b', 'c', 'd'].flatMap((id) => [`  - id: ${id}`, `    name: Person ${id}`, ...(id === 'a' ? [] : ['    parents: [a]'])]), ''].join('\n');
 	const settings = (extra: object = {}): Settings => ({ ...DEFAULT_LAYOUT_SETTINGS, ...extra }) as Settings;
@@ -392,7 +390,7 @@ describe('L3: card heights, the box flags and the cache key', () => {
 });
 
 describe('L4: `cardText` with one, two or three name text lines', () => {
-	const GEO = geometryFor(16, 'normal');
+	const GEO = geometryFor(16);
 	const pitch = 1.2 * 0.85 * 16; // the line height of the name text line (spec §5.4: 1.2 on normal cards; the name is 0.85 em, D117)
 
 	it('a boolean is still accepted: true = 2, false = 1, absent = 1', () => {
@@ -436,7 +434,7 @@ describe('L4: `cardText` with one, two or three name text lines', () => {
 });
 
 describe('the scene and the saved SVG draw the third name text line like the second (L4, spec §13.9)', () => {
-	const GEO = geometryFor(16, 'normal');
+	const GEO = geometryFor(16);
 	const FONTS = { text: 'Segoe UI, sans-serif', ui: 'Segoe UI, sans-serif', bold: '600' };
 	const facts = comments15().names;
 	const g = graphOf(block15(1));
@@ -490,28 +488,8 @@ describe('the scene and the saved SVG draw the third name text line like the sec
 	});
 });
 
-describe('L5: a name text line beside a portrait (spec §13.9, §13.7 D76, D77)', () => {
-	const GEO = geometryFor(16, 'normal');
-	const lineBox = (t: Text3, line: 1 | 2 | 3) => {
-		const baseline = [t.nameBaseline, t.name2Baseline!, t.name3Baseline!][line - 1];
-		const height = 1.2 * t.nameSize;
-		const top = baseline - 0.35 * t.nameSize - height / 2;
-		return { top, bottom: top + height };
-	};
-
-	it('the room of a name text line: the text width; less the box and its gap when the line box overlaps the circle by more than 0.5 px (roomAt)', () => {
-		const t = textFor(GEO, 3) as Text3;
-		const l3 = lineBox(t, 3);
-		const portrait = (overlap: number) => [{ r: { x: t.padX + t.textW - 24, y: l3.bottom - overlap, w: 24, h: 24 }, gap: 0.25 * 16 }];
-		const at = (line: 1 | 2 | 3, boxes: ReturnType<typeof portrait>) => roomAt(GEO, t, [t.nameBaseline, t.name2Baseline!, t.name3Baseline!][line - 1], t.nameSize, boxes);
-		expect(at(3, [])).toBe(t.textW);
-		expect(at(3, portrait(5))).toBeCloseTo(t.textW - 24 - 0.25 * 16, 9);
-		expect(at(3, portrait(0.6))).toBeCloseTo(t.textW - 24 - 0.25 * 16, 9);
-		expect(at(3, portrait(0.4))).toBe(t.textW);
-		// A text line above the portrait is not narrowed.
-		expect(at(1, portrait(5))).toBe(t.textW);
-	});
-
+describe('L5: a portrait adds no text line (spec §13.9, §13.7 D76, D77; the classic card with the box at the lower right is gone, D179)', () => {
+	const GEO = geometryFor(16);
 	it('a portrait does not add a text line or make a card taller: the layout with `portraits` has the same boxes', () => {
 		const g = graphOf(['people:', '  - id: a', '    name: Aaa', '  - id: b', '    name: Bbb', '    parents: [a]', ''].join('\n'));
 		clearLayoutCache();
@@ -523,15 +501,5 @@ describe('L5: a name text line beside a portrait (spec §13.9, §13.7 D76, D77)'
 			const y = withPortrait.layout.persons.get(id)!;
 			expect([y.x, y.y, y.w, y.h], id).toEqual([x.x, x.y, x.w, x.h]);
 		}
-	});
-
-	it('a card with a portrait: the breaks are made at the normal width, not the narrower one (the portrait never adds a text line)', () => {
-		// portraitBox is the M9 circle: 24 px at 16 px, at the lower right of the text block.
-		const t = textFor(GEO, 3) as Text3;
-		const p = portraitBox(GEO, t);
-		expect(p.w).toBe(24);
-		expect(p.y + p.h).toBeCloseTo(t.textBottom, 9);
-		// The third name text line ends above the circle on a normal card, so it keeps the full width.
-		expect(lineBox(t, 3).bottom).toBeLessThan(p.y);
 	});
 });

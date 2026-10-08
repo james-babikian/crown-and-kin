@@ -18,7 +18,7 @@ const g = graph('01');
 const me = g.people[g.people.length - 1].id;
 const other = g.people[0].id;
 const base = (o: Partial<LayoutSettings> = {}): LayoutSettings => ({ ...DEFAULT_LAYOUT_SETTINGS, ...o });
-const normal = geometryFor(12, 'normal');
+const normal = geometryFor(12);
 const key = (geo = cardForm(normal, 'down'), o: Partial<LayoutSettings> = {}) => layoutKey(g, geo, base(o), 'font');
 
 describe('layoutKey (0.2.5)', () => {
@@ -40,7 +40,6 @@ describe('layoutKey (0.2.5)', () => {
 	it('differs for youTab, and for two ids', () => {
 		expect(key(cardForm(normal, 'down'), { youTab: me })).not.toBe(key());
 		expect(key(cardForm(normal, 'down'), { youTab: me })).not.toBe(key(cardForm(normal, 'down'), { youTab: other }));
-		expect(key(cardForm(geometryFor(12, 'compact'), 'down'), { youTab: me })).not.toBe(key(cardForm(geometryFor(12, 'compact'), 'down')));
 	});
 
 	it('a youTab that is not a person of the graph leaves the key as it was', () => {

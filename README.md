@@ -33,11 +33,11 @@ You can also type the code block yourself. See "The tree text" below.
   - **Find** is in the full-screen view only.
   - **Fit** fits the whole tree in the window.
   - **Legend** shows the line styles and the houses.
-  - **More** (the "⋯" button) opens a list with Relation, Titles and Save as picture.
+  - **More** (the "⋯" button) opens a list with Relation, Titles and Save as picture, and "Show the tree text" as the last item. "Show the tree text" opens the note for edits and shows the text of the tree. It shows only if you can edit the note.
   - **Expand** opens the full-screen view. **Close** closes it.
   - A **warning button** shows when the tree has problems. Select it to see the list.
 
-  On a phone, a tree in a note is a list with a bar of Add person, Find, Back and Expand (see "The tree in a note on a phone"). If the tree has problems, the bar also has the warning button. In the full-screen view on a phone, Fit and Legend are in the More list. A tree that you cannot edit shows Open note instead of Add person and Houses.
+  On a phone, a tree in a note is a list with a bar of icon buttons: Add person, Tree text, Find, Back and Expand (see "The tree in a note on a phone"). The buttons show an icon and no words. A screen reader says the full name of each button. The Tree text button does the same as "Show the tree text". If the tree has problems, the bar also has the warning button. In the full-screen view on a phone, Fit and Legend are in the More list. A tree that you cannot edit shows Open note instead of Add person and Houses.
 - **Commands.** The command list has four commands:
   - **Insert family tree** puts a new tree in the note at the cursor.
   - **Undo last tree edit** reverses the last edit of a tree.
@@ -69,11 +69,11 @@ On a phone, a tree in a note is a list. The list shows one person and the family
 - **Move the list.** Tap a name. The list then shows the family of that person. Tap **Back** to show the person before. Tap **Find** to select any person in the tree. If you move the list, the plugin writes nothing to the note.
 - **Edit a person.** Tap the pencil at the right of a row. The edit sheet opens. For the person in the middle, tap the whole row.
 - **Where the list starts.** The plugin picks the start person in this order. First is the person that you chose last in this note. Next are the pin, then the marked person, then the person that you edited last. Then comes the oldest person who has children. The last choice is the first person in the tree.
-- **The bar.** Above the list are **Add person**, **Find**, **Back** (after you move the list), the warning button (if the tree has problems) and **Expand**.
+- **The bar.** The bar above the list has icon buttons and no words. The buttons are Add person (a person with a plus), Tree text (code), Find (a magnifier), Back (an arrow, after you move the list), the warning button (if the tree has problems) and Expand (arrows that point out). A screen reader says the full name of each button.
 - **Expand.** Tap **Expand** to open the full-screen view. It shows the family of the person that the list shows. You can move the tree there. To see all people, select Focus. Then select Clear focus.
 - **After you save a person.** The list does not move. If the person is in the list, the row has a thin outline for two seconds. If the person is not in the list, a message tells you to tap Find.
 - **A tablet** does not show the list. It shows the tree in the note, and you cannot move or zoom this tree. Tap Expand to move the tree.
-- **Settings.** The list follows "Show dates on cards", "Show relation names on cards" and "Show portraits on cards". The card size and the height of a tree in a note do not change the list.
+- **Settings.** The list follows "Show dates on cards", "Show relation names on cards", "Show portraits on cards" and "Assume an unknown second parent". The height of a tree in a note does not change the list.
 
 "Save as picture" and the full-screen view always show the tree, not the list.
 
@@ -96,11 +96,12 @@ To keep the old ID, select **Keep old ID** on the edit page before you select Sa
 You can mark one person in the tree as you. Each card then shows the relation of that person to you.
 
 - **Mark a person as you.** Open the edit sheet of the person. In Actions, select "This is me". If another person has the mark, the mark moves to this person.
-- **The card "You".** The card of the marked person shows "You". It also has a thicker border in the colour of the text. The border does not use the accent colour of your theme.
-- **Relation names on the cards.** When the tree has a mark, each card gets a band at the bottom of the card. The band shows the relation to you, for example "Father", "Half-sister" or "Second cousin once removed". On a card of the size Compact, there is no band. The relation is one more small text line at the bottom. All cards get a little taller. A card of a person with no relation to you has no relation name. If the tree is very small on the screen, the cards do not show the relation names.
+- **The card "You".** The card of the marked person shows "You". It also has a thicker border in the colour of the text. The border goes around the house colour bar. The border does not use the accent colour of your theme.
+- **Relation names on the cards.** When the tree has a mark, each card gets a band at the bottom of the card. The band shows the relation to you, for example "Father", "Half-sister" or "Second cousin once removed". All cards get a little taller. A card of a person with no relation to you has no relation name. The text of that card is in the middle of the card. If the tree is very small on the screen, the cards do not show the relation names.
 - **The edit sheet.** On a computer, a box at the top of the sheet shows "Relation to you" and the relation name. A person can have more than one relation to you, for example after a marriage between cousins. Then the next text line starts with "Also:" and gives the other relations. The box of the marked person says "This is you." If the tree has no mark, the sheet shows no box.
 - **The strip on a phone.** On a phone, a strip under the header of the sheet shows the relation name. If the person has other relations, the strip also shows how many, for example "7 more". Tap the strip to open it. The open strip shows the "Also:" text line and the button Show the line. The strip stays open or closed until you close Obsidian. The strip of the marked person says "This is you." and does not open.
-- **A rumoured parent.** A rumoured parent is a parent link that you mark as a rumour. If the rumour is true, two people can be full brothers or sisters. Then the card can say "Half-brother, maybe full". The box or the strip then has one more paragraph: "If every rumoured link is true, this person is your …", and the relation name. The list "Also" can say "Rumoured brother".
+- **A rumoured parent.** A rumoured parent is a parent that you mark as a rumour. If a person has a rumoured parent and fewer than two other parents, a parent is not known. Two such people show as half-siblings, because the rumour is not sure. If the rumour is true, they can be full brothers or sisters. Then the card says "Half-brother, maybe full". If a rumour can make two full siblings into half-siblings, the card says "Sister, maybe half". The box or the strip then has one more paragraph: "If every rumoured link is true, this person is your …", and the relation name. A person has only two parents. If a person has two or more rumoured parents, only some of the rumoured links can be true. Then the paragraph says "If some of the rumoured links are true, this person is your …". The list "Also" can say "Rumoured brother". If a relation name with "maybe" is too long for the card, the card cuts the name. The card shows " ?" at the end. The edit sheet shows the whole name.
+- **One listed parent.** If you list only one parent for a person, the second parent is not known. By default, two people who list only the same parent show as half-siblings. The card says "Half-sister, maybe full". The same rule applies to a half first cousin and to other half relations. If you list only fathers, turn off the setting "Assume an unknown second parent" (group Cards). Then two people who list only the same parent show as full siblings.
 - **Show the line.** In the edit sheet, select the button "Show the line" in the box, or in the open strip. The relation finder opens with the line from you to the person (see "Relation finder").
 - **Remove the mark.** Open the edit sheet of the marked person. Select Remove "This is me".
 - **Hide the relation names.** In the settings, turn off "Show relation names on cards". The cards are then shorter, and the marked person has a small "You" tab on the card. The edit sheet still shows the relation.
@@ -203,7 +204,6 @@ If the house has arms, the picture list starts with **Remove arms**. Select it t
 - **Colours from the arms.** If a house has arms, the colour choice starts with "Colours from the arms". These are the main colours of the picture, at most 5. Select one of them to make it the house colour. The label "House colours" and the 12 house colours come after them. The plugin never changes the colour of a house by itself.
 - **If the colours cannot be read.** If the plugin cannot read the colours of a picture, the window tells you. Then select one of the house colours.
 - **The card.** In a tree from top to bottom, the arms show beside the round portrait on the top edge of the card. If the person has no portrait, the arms stand alone there. The arms do not make the text shorter. A sideways tree shows no arms on the cards. If the tree is very small on the screen, the cards do not show the arms.
-- **The card size Compact.** On a card of the size Compact, the arms show at the lower right of the card, to the left of the portrait. The name text line does not become shorter there. The other small text lines next to the arms and the portrait are a little shorter.
 - **The look of the arms.** The arms keep the shape of the picture. The plugin does not cut the picture and does not add a border or a background. On the card of a person who is dead, the arms are a little pale, like the house colour.
 - **Arms in the dark theme.** The plugin shows the arms as they are, in the light theme and in the dark theme. Black parts of arms are difficult to see on a dark card. Give such arms a light border in the picture itself. Use a picture with a transparent background, for example a PNG picture.
 
@@ -211,7 +211,7 @@ On a phone, the tree in a note has no Houses button. First tap Expand to open th
 
 ## Portraits
 
-A person can have a portrait (a picture). In a tree from top to bottom, the portrait is a round picture on the top edge of the card. A sideways tree shows no portrait on the cards. On a card of the size Compact, the portrait is a small circle in the lower right corner of the card.
+A person can have a portrait (a picture). In a tree from top to bottom, the portrait is a round picture on the top edge of the card. A sideways tree shows no portrait on the cards.
 
 To give a person a portrait:
 
@@ -225,10 +225,9 @@ To remove the portrait, select **Remove portrait** in the edit sheet, or at the 
 
 - **The part of the picture.** The round picture shows a square part of the picture. For a tall picture, this part is at the top and has the full width of the picture. For a wide picture, it is the middle part. A portrait photo usually has the face in its upper part. To show a different part, see "Select the part of a portrait".
 - **The card.** The portrait does not make the card larger. In a tree from top to bottom, the portrait is on the edge of the card, and the text does not become shorter. On the card of a person who is dead, the portrait is a little pale. If you zoom out, the cards show less text. If you zoom far out, the cards show no portraits.
-- **The card size Compact.** On a card of the size Compact, the text lines next to the portrait become shorter. If a text is then too long, it ends with "…". This card shows the portrait only when it shows all of its text.
 - **The edit sheet.** The edit sheet shows a larger portrait at the top. Select portrait and Remove portrait change the sheet only. Save writes them into the tree text, with the other fields.
 - **Select the part of a portrait.** In the edit sheet, select **Select the part** under the portrait. The tool shows the whole picture with a round frame. The area outside the frame is darker. Move the picture under the frame. On a phone, move the picture with one finger. Zoom with two fingers. On the computer, drag the picture to move it. Zoom with the mouse wheel. The zoom slider and the zoom buttons work on every device. With the keyboard, use the arrow keys to move the picture. Use "+" and "−" to zoom. Select **Save** to keep the part. Select **Cancel** to discard it. Select **Reset** to return to the automatic part. Then select Save in the edit sheet. On a phone, the tool fills the screen. The button shows only when the plugin can show the portrait. If you select a new picture, the portrait starts again with the automatic part.
-- **Hide the portraits.** In the settings, turn off "Show portraits on cards". The cards then show no portraits. On a card of the size Compact, the text lines have their full width. The edit sheet still shows the portrait.
+- **Hide the portraits.** In the settings, turn off "Show portraits on cards". The cards then show no portraits. The edit sheet still shows the portrait.
 
 ## Pictures in the tree
 
@@ -336,12 +335,12 @@ The house page shows the people of one house in a table: generation, name, title
 Open Settings. Select Dynasty Tree. You can set:
 
 - the height of a tree in a note, on a computer or tablet;
-- the card size (Normal or Compact);
 - the tree direction on a phone held upright (Sideways or Like the computer);
 - the break places in long names (see "Long names");
 - the setting "Reduce movement" (Follow the device, On or Off; see "Reduce movement");
 - dates on the cards and reigns (on or off; see "Titles and reigns");
 - relation names on the cards (on or off; see "This is me and relations");
+- the setting "Assume an unknown second parent" (on or off; see "One listed parent" in "This is me and relations");
 - portraits on the cards (on or off; see "Portraits");
 - the generation of each person on the house page (on or off);
 - the number of generations in focus mode;

@@ -17,7 +17,7 @@ beforeAll(() => {
 });
 
 const FONTS = { text: 'serif', ui: 'sans', bold: '700' };
-const GEO = geometryFor(16, 'normal');
+const GEO = geometryFor(16);
 
 function graphOf(source: string): FamilyGraph {
 	const r = parseDynasty(source);

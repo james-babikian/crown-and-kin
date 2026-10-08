@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { deriveFamilies, type FamilyGraph } from '../src/core/derive';
 import { parseDynasty } from '../src/core/parse';
 import { computeRelations, FINDER_LIMIT, findRelation, lineSubgraph, relationsKey } from '../src/core/relations';
-import type { FinderResult, Relation, RelationStep } from '../src/core/relations';
+import type { FinderResult, Relation, RelationOptions, RelationStep } from '../src/core/relations';
 import { fixture } from './helpers';
 
 // Unit tests for src/core/relations.ts (spec §13.1, §13.2; the rules in the relations.ts header and
@@ -40,11 +40,14 @@ function tree(people: string[], unions: string[] = []): FamilyGraph {
 }
 
 /** Every person's names for `me`, best first. */
-function names(g: FamilyGraph, me: string): Record<string, string[]> {
-	return Object.fromEntries([...computeRelations(g, me)].map(([id, rels]) => [id, rels.map((r) => r.lower)]));
+function names(g: FamilyGraph, me: string, options?: RelationOptions): Record<string, string[]> {
+	return Object.fromEntries([...computeRelations(g, me, options)].map(([id, rels]) => [id, rels.map((r) => r.lower)]));
 }
 
-const first = (g: FamilyGraph, me: string, id: string) => computeRelations(g, me).get(id)?.[0]?.lower;
+const first = (g: FamilyGraph, me: string, id: string, options?: RelationOptions) => computeRelations(g, me, options).get(id)?.[0]?.lower;
+
+/** D174: the setting "Assume an unknown second parent" off; the default (no options) is on. */
+const OFF: RelationOptions = { oneParentUnknown: false };
 
 const named = (r: FinderResult) => {
 	if (r.kind !== 'named') throw new Error(`expected named, got ${r.kind}`);
@@ -221,10 +224,12 @@ describe('half relations (§13.1 half rule, D45, ruling 3)', () => {
 		expect(first(g, 'x', 'kid')).toBe('great-grandson');
 	});
 
-	it('two children who each list only X are full siblings', () => {
+	it('two children who each list only X are full siblings with the setting off, half with it on (D174)', () => {
 		const h = tree(['x m', 's1 f x', 's2 m x', 'k1 m s1', 'k2 f s2']);
-		expect(first(h, 's1', 's2')).toBe('brother');
-		expect(first(h, 'k1', 'k2')).toBe('first cousin');
+		expect(first(h, 's1', 's2', OFF)).toBe('brother');
+		expect(first(h, 'k1', 'k2', OFF)).toBe('first cousin');
+		expect(first(h, 's1', 's2')).toBe('half-brother');
+		expect(first(h, 'k1', 'k2')).toBe('half first cousin');
 	});
 
 	it('the link type does not make a relation half: adoptive parents who are the birth parents give a full relation', () => {
@@ -418,8 +423,11 @@ describe('relations by marriage (§13.1 rules 1–4, D43)', () => {
 		expect(n.wbro).toEqual(['brother-in-law']);
 		expect(n.wstep).toEqual(['stepdaughter']);
 		expect(n.wstepk).toEqual(['step-grandson']);
-		expect(n.waunt).toEqual(["wife’s aunt"]);
-		expect(n.wcousin).toEqual(["wife’s first cousin"]);
+		// D174 (setting on): wf and waunt list only wgf, so they are half; the "’s" form keeps "half".
+		expect(n.waunt).toEqual(["wife’s half-aunt"]);
+		expect(n.wcousin).toEqual(["wife’s half first cousin"]);
+		expect(names(g, 'me', OFF).waunt).toEqual(["wife’s aunt"]);
+		expect(names(g, 'me', OFF).wcousin).toEqual(["wife’s first cousin"]);
 	});
 
 	it('rule 2: a child of the spouse who is also the marked person\'s child is only a child', () => {
@@ -536,8 +544,9 @@ describe('which name wins (§13.1, ruling 1)', () => {
 
 	it('at equal distance: the smaller removal first', () => {
 		// Through x1: a = b = 3 (second cousin). Through x2: a = 2, b = 4 (first cousin twice removed).
+		// Every child lists one parent: the setting off keeps both names full (D174).
 		const g = tree(['x1 m', 'a1 m x1', 'c1 m x1', 'x2 m', 'bb m x2', 'd2 m x2', 'a m a1', 'd1 m d2', 'c m c1', 'd m d1', 'me m a bb', 'p m c d']);
-		expect(names(g, 'me').p).toEqual(['second cousin', 'first cousin twice removed']);
+		expect(names(g, 'me', OFF).p).toEqual(['second cousin', 'first cousin twice removed']);
 	});
 
 	it('at equal distance: full before half', () => {
@@ -578,8 +587,9 @@ describe('the choice of lines: link type first, then list order (M7 code check r
 	it('when both first paths meet, the exact search finds two shortest paths that share nobody below X', () => {
 		// M's only parent Q is on P's first path (through V1); P's other path (V2, w1) reaches T1, which
 		// is on M's first path. The pair M-Q-T2-c1-X and P-V2-w1-T1-c2-X shares nobody below X.
+		// The setting off (D174): with it on, the nephew and third-cousin names are half, since M, V1, c1 and c2 list one parent.
 		const g = tree(['X m', 'c1 m X', 'c2 m X', 'T1 m c1 c2', 'T2 m c1 c2', 'Q m T1 T2', 'M m Q', 'V1 m Q', 'w1 m T1', 'V2 m w1', 'P m V1 V2']);
-		const rels = computeRelations(g, 'M').get('P')!;
+		const rels = computeRelations(g, 'M', OFF).get('P')!;
 		expect(rels.map((r) => r.lower)).toEqual(['nephew', 'half first cousin once removed', 'second cousin once removed', 'third cousin once removed']);
 		expect(rels[3].line.people).toEqual(['M', 'Q', 'T2', 'c1', 'X', 'c2', 'T1', 'w1', 'V2', 'P']);
 	});
@@ -666,8 +676,8 @@ describe('findRelation (§13.2)', () => {
 
 	it('a sibling step carries the type word of its links, like the relation name (finishing-round ruling 3)', () => {
 		const g = tree(['x m', 'y f', 'z f', 'a m x y', 'h f x z', 'ad f x:adoptive', 'ru m x:rumoured'], ['x y', 'x z']);
-		const sibling = (from: string, to: string) => {
-			const { relation, steps } = named(findRelation(g, from, to)).relations[0];
+		const sibling = (from: string, to: string, options?: RelationOptions) => {
+			const { relation, steps } = named(findRelation(g, from, to, options)).relations[0];
 			expect(steps).toHaveLength(1);
 			// The step word and the relation name agree for a half-sibling.
 			expect(steps[0].word).toBe(relation.lower);
@@ -678,8 +688,10 @@ describe('findRelation (§13.2)', () => {
 		expect(sibling('ad', 'a')).toEqual(step('a', 'ad', 'adoptive half-brother'));
 		expect(sibling('a', 'ru')).toEqual(step('ru', 'a', 'rumoured half-brother'));
 		expect(sibling('ru', 'a')).toEqual(step('a', 'ru', 'rumoured half-brother'));
-		// A rumoured link and an adoptive link to the same one parent (full by the half rule): "rumoured" wins, as in the name.
-		expect(sibling('ad', 'ru')).toEqual(step('ru', 'ad', 'rumoured brother'));
+		// A rumoured link and an adoptive link to the same one parent (full by the half rule with the setting off): "rumoured" wins, as in the name.
+		expect(sibling('ad', 'ru', OFF)).toEqual(step('ru', 'ad', 'rumoured brother'));
+		// D174, setting on: ru's set in the second test is {x}, one person, so the rumoured line is half.
+		expect(sibling('ad', 'ru')).toEqual(step('ru', 'ad', 'rumoured half-brother'));
 		// A neutral sex keeps the neutral word.
 		const n = tree(['x m', 'y f', 'a - x y', 'b - x:adoptive']);
 		expect(named(findRelation(n, 'a', 'b')).relations[0].steps).toEqual([step('b', 'a', 'adoptive half-sibling')]);
@@ -817,14 +829,14 @@ describe('the small tree of every relation lays out (fixtures 3, 5, 11, 12)', as
 				for (const [, rels] of computeRelations(g, me.id)) {
 					for (const rel of rels as readonly Relation[]) {
 						const sub = lineSubgraph(g, rel.line);
-						const { layout } = layoutTree(sub, geometryFor(16, 'normal'), NEVER_FAR, 'sans-serif');
+						const { layout } = layoutTree(sub, geometryFor(16), NEVER_FAR, 'sans-serif');
 						expect([...layout.persons.keys()].sort()).toEqual([...new Set(rel.line.people)].sort());
 						count++;
 					}
 				}
 				for (const other of g.people) {
 					const r = findRelation(g, me.id, other.id);
-					if (r.kind === 'chain') layoutTree(lineSubgraph(g, r.line), geometryFor(16, 'normal'), NEVER_FAR, 'sans-serif');
+					if (r.kind === 'chain') layoutTree(lineSubgraph(g, r.line), geometryFor(16), NEVER_FAR, 'sans-serif');
 				}
 			}
 			expect(count).toBeGreaterThan(g.people.length);

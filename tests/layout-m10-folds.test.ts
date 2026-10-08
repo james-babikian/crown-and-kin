@@ -7,7 +7,7 @@ import { block15, graphOf } from './acceptance/m10-support';
 
 /* WP 10.2b, own checks: the sideways gap holds the whole "+ N" pill, hidden people never change the cache, extents and spots. */
 
-const GEO = geometryFor(16, 'normal');
+const GEO = geometryFor(16);
 const g = graphOf(block15(0));
 const A = foldKey(['osric', 'mathilde']);
 

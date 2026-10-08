@@ -1,12 +1,12 @@
 // 0.2.5 WP-B4 (CONTRACT B.3.11, B.5 test 6): the saved picture follows the card form. `renderSvg` draws what the live scene draws for the
 // Roundel, the sideways text card and the "You" tab: the same elements, the same text places, the plate with the numbers of
-// `ROUNDEL_LOOK`, the tab in the house colour (D153), no picture in a sideways tree, and the Full level only. The classic card is not touched.
+// `ROUNDEL_LOOK`, the tab in the house colour (D153), no picture in a sideways tree, and the Full level only.
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { beforeAll, describe, expect, it } from 'vitest';
 import type { FamilyGraph } from '../src/core/derive';
 import { cardLabels } from '../src/core/titles';
-import { ROUNDEL_EM, cardForm, cardText, geometryFor, roundelAxis, roundelPics, youTabRect } from '../src/layout/geometry';
+import { ROUNDEL_EM, cardForm, cardText, centredWithoutWord, geometryFor, roundelAxis, roundelPics, youTabRect } from '../src/layout/geometry';
 import { DEFAULT_LAYOUT_SETTINGS, clearLayoutCache, layoutTree, pictureSets } from '../src/layout/index';
 import type { Geometry, LaidOut, LayoutSettings } from '../src/layout/model';
 import { TAB_TEXT_EM, buildScene, type Scene } from '../src/render/dom/scene';
@@ -47,9 +47,8 @@ const labels = cardLabels(g);
 const RELATIONS = new Map([['b', { text: 'Half-brother', lower: 'half-brother' }], ['c', { text: 'You', lower: 'you' }], ['d', { text: 'Half-sister', lower: 'half-sister' }]]);
 const PICTURES = new Map<string, string | 'missing' | null>([['arms:v', PNG_URI], ['portrait:a', PNG_URI], ['portrait:c', 'missing']]);
 
-const ROUNDEL = cardForm(geometryFor(12, 'normal'), 'down');
-const TEXT = cardForm(geometryFor(12, 'normal'), 'sideways');
-const CLASSIC_COMPACT = geometryFor(12, 'compact');
+const ROUNDEL = cardForm(geometryFor(12), 'down');
+const TEXT = cardForm(geometryFor(12), 'sideways');
 
 function lay(geo: Geometry, over: Partial<LayoutSettings> = {}): LaidOut {
 	clearLayoutCache();
@@ -121,7 +120,6 @@ describe('B.3.11: the saved picture has the elements of the live scene, for each
 		['Roundel, plate off, tab on the marked card', ROUNDEL, { youTab: 'c' }],
 		['text card (sideways), plate on', TEXT, { relationLine: true }],
 		['text card (sideways), plate off, tab', TEXT, { youTab: 'c' }],
-		['classic Compact card, plate off, tab', CLASSIC_COMPACT, { youTab: 'c' }],
 	];
 	for (const [name, geo, over] of cases) {
 		it(`${name}: same cards, plates, tabs, relation words and pictures`, () => {
@@ -180,7 +178,9 @@ describe('B.3.11: the saved picture has the elements of the live scene, for each
 		const shown: Record<string, { title: boolean; dates: boolean }> = { a: { title: true, dates: true }, b: { title: false, dates: false }, c: { title: false, dates: true }, e: { title: true, dates: false } };
 		for (const [id, s] of Object.entries(shown)) {
 			const box = laid.layout.persons.get(id)!;
-			const ct = cardText(geo, 1, false, s);
+			// a and e have no relation word: their text is centred in the whole card (D177 item 10).
+			const plain = cardText(geo, 1, false, s);
+			const ct = RELATIONS.has(id) ? plain : centredWithoutWord(geo, plain);
 			expect(Number(textsOf(cardNode(svg, id))[0].attrs.y), id).toBeCloseTo(box.y + ct.nameBaseline, 9);
 		}
 	});
@@ -285,8 +285,8 @@ describe('B.3.4: the plate and the "You" tab in the saved picture', () => {
 		expect(nodes(parseSvg(other)).filter((n) => /^tab:/.test(n.attrs['data-item'] ?? '')).map((n) => n.attrs['data-item'])).toEqual(['tab:b']);
 	});
 
-	it('the classic Compact card and the text card carry the tab above the text\'s left edge', () => {
-		for (const geo of [CLASSIC_COMPACT, TEXT]) {
+	it('the text card carries the tab above the text\'s left edge', () => {
+		for (const geo of [TEXT]) {
 			const laid = lay(geo, { youTab: 'c' });
 			const svg = svgOf(laid);
 			const box = laid.layout.persons.get('c')!;
@@ -362,15 +362,6 @@ describe('B.3.3, B.3.10: pictures in the saved picture', () => {
 		expect(Number(word.attrs.x)).toBe(box.x + 0.875 * 12);
 		expect(word.attrs['text-anchor']).toBeUndefined();
 		expect(Number(word.attrs.y)).toBeCloseTo(box.y + t.relationBaseline!, 9);
-	});
-});
-
-describe('the classic card is not changed', () => {
-	it('a classic tree with no tab draws no plate, no tab and no centred text', () => {
-		const laid = lay(geometryFor(12, 'normal'), { relationLine: true });
-		const svg = svgOf(laid);
-		expect(nodes(parseSvg(svg)).some((n) => /^(plate|tab):/.test(n.attrs['data-item'] ?? ''))).toBe(false);
-		expect(svg).not.toContain('text-anchor="middle"');
 	});
 });
 

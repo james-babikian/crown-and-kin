@@ -9,7 +9,7 @@ vi.mock('@codemirror/view', () => ({ ViewPlugin: { fromClass: () => ({}) } }));
 import { TFile as VaultFile } from 'obsidian';
 import { deriveFamilies } from '../../src/core/derive';
 import { parseDynasty } from '../../src/core/parse';
-import { geometryFor } from '../../src/layout/geometry';
+import { cardForm, geometryFor } from '../../src/layout/geometry';
 import { DEFAULT_LAYOUT_SETTINGS, clearLayoutCache, layoutTree, pictureSets } from '../../src/layout/index';
 import { makePicture, type SaveSource } from '../../src/obsidian/save-picture';
 import type { PictureStore } from '../../src/obsidian/picture-store';
@@ -68,7 +68,7 @@ const sourceOf = (body: string, more: Partial<SaveSource> = {}): SaveSource => {
 	return {
 		g: deriveFamilies(parsed.tree),
 		orientation: 'down',
-		geo: geometryFor(16, 'normal'),
+		geo: cardForm(geometryFor(16), 'down'),
 		relationLine: false,
 		fonts: { text: 'serif', ui: 'sans-serif', bold: '600' },
 		showDates: true,
@@ -281,7 +281,7 @@ describe('spec §13.13 acceptance: the headless SVG shows the selected part (a d
 		for (const p of g.people) if (p.portrait) pictures.set(`portrait:${p.id}`, p.id === 'roderick' ? uri(crop) : uri(auto));
 		const sets = pictureSets(g, true);
 		clearLayoutCache();
-		const laid = layoutTree(g, geometryFor(16, 'normal'), { ...DEFAULT_LAYOUT_SETTINGS, ...(sets.portraits.length ? { portraits: sets.portraits } : {}) }, 'spike');
+		const laid = layoutTree(g, cardForm(geometryFor(16), 'down'), { ...DEFAULT_LAYOUT_SETTINGS, ...(sets.portraits.length ? { portraits: sets.portraits } : {}) }, 'spike');
 		const svg = renderSvg(g, laid.layout, laid.edges, { palette: DEFAULT_LIGHT, pictures });
 		const at = (u: string) => {
 			const out: { x: number; y: number }[] = [];
@@ -298,7 +298,8 @@ describe('spec §13.13 acceptance: the headless SVG shows the selected part (a d
 		const box = laid.layout.persons.get('roderick')!;
 		expect(mine[0].x).toBeGreaterThanOrEqual(box.x);
 		expect(mine[0].x).toBeLessThan(box.x + box.w);
-		expect(mine[0].y).toBeGreaterThanOrEqual(box.y);
+		// The Roundel's medallion stands on the top edge of the card, so it starts above the card (in the crown).
+		expect(mine[0].y).toBeGreaterThanOrEqual(box.y - laid.layout.geometry.reach!);
 		expect(mine[0].y).toBeLessThan(box.y + box.h);
 		const others = g.people.filter((p) => p.portrait && p.id !== 'roderick').length;
 		expect(at(uri(auto))).toHaveLength(others);

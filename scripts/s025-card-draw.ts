@@ -8,7 +8,7 @@ import { computeRelations } from '../src/core/relations';
 import { cardLabels } from '../src/core/titles';
 import { cardForm, geometryFor } from '../src/layout/geometry';
 import { DEFAULT_FAR_RULE } from '../src/layout/index';
-import type { CardSize, LaidOut, LayoutSettings } from '../src/layout/model';
+import type { LaidOut, LayoutSettings } from '../src/layout/model';
 import { measuredLayout } from '../src/obsidian/measured-layout';
 import type { PictureMap } from '../src/render/saved-picture';
 import { DEFAULT_DARK, DEFAULT_LIGHT } from '../src/render/styles';
@@ -29,8 +29,6 @@ export interface DrawOptions {
 	theme: CardTheme;
 	/** Note font in px (default 16, as the older golden hashes). */
 	px?: number;
-	/** Card size setting (default 'normal'; 'compact' keeps the classic card in a top-to-bottom tree, B.3.8). */
-	size?: CardSize;
 	/** The pictures to embed (the spike); the hashes leave them out so that no picture file can move a hash. */
 	pictures?: (g: FamilyGraph) => PictureMap;
 	/** A title in the picture (the spike). */
@@ -66,7 +64,7 @@ export function drawCard(source: string, o: DrawOptions): DrawnCard | undefined 
 	const sideways = o.variant.startsWith('side');
 	const on = o.variant.endsWith('-on');
 	const me = markOf(g);
-	const geo = cardForm(geometryFor(o.px ?? 16, o.size ?? 'normal'), sideways ? 'sideways' : 'down');
+	const geo = cardForm(geometryFor(o.px ?? 16), sideways ? 'sideways' : 'down');
 	const labels = cardLabels(g);
 	const relations = me !== undefined && on ? new Map([...computeRelations(g, me)].filter(([, r]) => r.length).map(([id, r]) => [id, { text: r[0].text, lower: r[0].lower }])) : undefined;
 	// As `saveSource`: the plate needs a mark; with no plate a marked person gets the tab.
@@ -78,14 +76,13 @@ export function drawCard(source: string, o: DrawOptions): DrawnCard | undefined 
 		...(relationLine ? { relationLine: true } : {}),
 		...(me !== undefined && !relationLine ? { youTab: me } : {}),
 	};
-	const { laid, lifted } = measuredLayout(g, geo, base, {
+	const { laid } = measuredLayout(g, geo, base, {
 		fonts: FONTS,
 		measure: o.measure ?? approxMeasure,
 		labels,
 		showDates: true,
 		showPortraits: true,
 		...(me !== undefined ? { marked: me } : {}),
-		...(relations ? { relations } : {}),
 	});
 	const dark = o.theme === 'dark';
 	const pictures = o.pictures?.(g);
@@ -100,7 +97,6 @@ export function drawCard(source: string, o: DrawOptions): DrawnCard | undefined 
 		...(o.title !== undefined ? { title: o.title } : {}),
 		...(me !== undefined ? { me } : {}),
 		...(relations ? { relations } : {}),
-		...(lifted.size ? { lifted } : {}),
 		...(pictures ? { pictures } : {}),
 	});
 	return { svg, g, laid, me };

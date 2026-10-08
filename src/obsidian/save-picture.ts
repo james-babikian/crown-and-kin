@@ -42,7 +42,7 @@ export interface SaveSource {
 	/** The relation finder's line; `fade` for "Show in the whole tree". */
 	line?: LineMarks;
 	orientation: Orientation;
-	/** `cardForm(geometryFor(fontPx, cardSize), orientation)`: the saved picture has the card form of the view, with all its text (D148 2A). The save adds the relation line. */
+	/** `cardForm(geometryFor(fontPx), orientation)`: the saved picture has the card form of the view, with all its text (D148 2A). The save adds the relation line. */
 	geo: Geometry;
 	/** The tree has a mark and "Show relation names on cards" is on: every card has the plate with the relation word (D40, D145). */
 	relationLine: boolean;
@@ -215,8 +215,7 @@ export async function makePicture(store: PictureStore | undefined, src: SaveSour
 	};
 	// P2: the canvas measures every text with the font strings the file names.
 	const measure = measureText;
-	// The relation words (when they show) decide rule B in the fit, so the picture lifts the boxes as the screen does.
-	const { laid, lifted } = measuredLayout(g, src.geo, base, {
+	const { laid } = measuredLayout(g, src.geo, base, {
 		fonts: src.fonts,
 		measure,
 		labels: src.labels,
@@ -225,7 +224,6 @@ export async function makePicture(store: PictureStore | undefined, src: SaveSour
 		...(folds?.hidden.length ? { foldHidden: new Set(folds.hidden) } : {}),
 		...(src.breaks ? { breaks: src.breaks } : {}),
 		...(src.me !== undefined ? { marked: src.me } : {}),
-		...(src.relations ? { relations: src.relations } : {}),
 	});
 	const fontPx = laid.layout.geometry.fontPx;
 	const legend = savedLegend(g, laid);
@@ -242,7 +240,6 @@ export async function makePicture(store: PictureStore | undefined, src: SaveSour
 		...(src.line ? { line: src.line } : {}),
 		...(src.labels ? { labels: src.labels } : {}),
 		...(src.breaks ? { breaks: src.breaks } : {}),
-		...(lifted.size ? { lifted } : {}),
 		showDates: src.showDates,
 		measure,
 		fonts: src.fonts,
@@ -269,7 +266,7 @@ async function picturesFor(store: PictureStore | undefined, src: SaveSource, lai
 	if (!store) return out;
 	const { g } = src;
 	const geo = laid.layout.geometry;
-	// The Roundel's medallion is 2 em across and its arms alone 2 em high (B.3.3): larger than the classic card's pictures, so the copies are made at that size.
+	// The Roundel's medallion is 2 em across and its arms alone 2 em high (B.3.3): so the copies are made at that size.
 	const round = isRoundel(geo) ? { portrait: roundelPics(geo, { arms: false, portrait: true }).portrait!, arms: roundelPics(geo, { arms: true, portrait: false }).arms! } : undefined;
 	const d = round ? round.portrait.w : pictureSize(geo);
 	const armsW = Math.max(round ? round.arms.w : PICTURE_EM.armsAspect * d, legendArms?.w ?? 0);

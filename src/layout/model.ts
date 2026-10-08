@@ -8,9 +8,6 @@
 import type { FamilyGraph } from '../core/derive';
 import type { FoldControl, FoldKey } from '../core/folds';
 
-/** Card size a tree draws with (spec §9 "Card size"); `compact` is narrower and tighter. */
-export type CardSize = 'normal' | 'compact';
-
 /**
  * D24. `down`: generations are rows from top to bottom (every layout before D24). `sideways`:
  * generations are columns from left to right (ancestors left); siblings and children stack from
@@ -42,7 +39,6 @@ export interface Rect {
 export interface Geometry {
 	/** Resolved note font size in px that the geometry was built for (spec §5.8). */
 	fontPx: number;
-	cardSize: CardSize;
 	cardW: number;
 	cardH: number;
 	unionSize: number;
@@ -55,13 +51,13 @@ export interface Geometry {
 	/** Height of a far-couple tag drawn at a card's bottom edge (its hit area is larger). */
 	tagH: number;
 	/**
-	 * D40 (M7): set by the layout from `LayoutSettings.relationLine`, in every layout and card size;
+	 * D40 (M7): set by the layout from `LayoutSettings.relationLine`, in every layout;
 	 * `cardH` then already includes one small text line (`relationExtra(geo)` = round(line height ×
 	 * 0.85 × fontPx)), so `cardText`, `tagTop` and the lines need no other change. `drawnGeometry` and
 	 * `layoutFamilies` apply it before anything else. `cardText` then centres three small lines.
 	 */
 	relationLine?: boolean;
-	/** 0.2.5 (D143, D150): the card form. 'roundel' = the top-to-bottom card with a medallion; 'text' = the sideways text card. Absent = the classic card. Set by `cardForm` only, never by `withRelationLine`. */
+	/** 0.2.5 (D143, D150): the card form. 'roundel' = the top-to-bottom card with a medallion; 'text' = the sideways text card. Absent = a plain geometry (tests): the numbers of the text card. Set by `cardForm` only, never by `withRelationLine`. */
 	form?: 'roundel' | 'text';
 	/** 0.2.5: the empty space above every card of a Roundel tree that has a picture, in px. Set only when more than 0, so old keys stay. */
 	crown?: number;
@@ -70,16 +66,10 @@ export interface Geometry {
 }
 
 /** `geometry.ts` exports `geometryFor: GeometryFor`. Card size scales with the font. */
-export type GeometryFor = (fontPx: number, cardSize: CardSize) => Geometry;
+export type GeometryFor = (fontPx: number) => Geometry;
 
 /** How many text lines a name takes on a card (D29, D81). */
 export type NameLineCount = 1 | 2 | 3;
-
-/** A lower-right box of a card (the arms box or the portrait) and its gap to the text (D117, contract 4.2). */
-export interface LowerRightBox {
-	r: Rect;
-	gap: number;
-}
 
 /** Room for the text lines of a name (px, from the text's left edge). `full`: any line before the last. `last`: the final line of a name of 2 or 3 lines. `only`: the line of a name that stays on ONE line. */
 export interface NameRoom {
@@ -239,7 +229,7 @@ export interface LayoutSettings {
 	 * D29, D37: people whose card is one name text line taller (the renderer found with
 	 * `nameLines` that the name does not fit on one text line). In every layout: `down` (the cards of
 	 * a row share their top edge; the gap below starts under the row's tallest card) and `sideways`
-	 * (longer along the column), normal and compact cards. Part of the cache key (sorted).
+	 * (longer along the column). Part of the cache key (sorted).
 	 * Every consumer uses `PersonBox.h`, never `geometry.cardH`, for a card's height;
 	 * `cardText(geo, box.tallName, box.tallTitle)` gives the text positions of a tall card (two name
 	 * baselines; title and dates one text line lower).
@@ -260,7 +250,7 @@ export interface LayoutSettings {
 	tallTitles?: readonly string[];
 	/**
 	 * D40 (spec §13.1): the tree has a mark and relation names show on cards, so every card is one
-	 * small text line (0.85 em × line height) taller, in every layout and card size; the relation text
+	 * small text line (0.85 em × line height) taller, in every layout; the relation text
 	 * sits on that line after the card's other text lines (`CardText.relationBaseline`). The setting
 	 * "Show relation names on cards" off keeps the height (like "Show dates on cards"), so this is
 	 * true whenever the tree has a valid mark. Part of the cache key. The layout applies it to

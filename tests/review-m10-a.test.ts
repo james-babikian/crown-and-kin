@@ -33,7 +33,7 @@ describe('review A: folds', () => {
 		expect(hidden.has('a')).toBe(false);
 		expect(foldControls(g, folds, hidden).some((c) => c.key === foldKey(['a']))).toBe(true);
 		clearLayoutCache();
-		const { layout } = layoutTree(g, geometryFor(16, 'normal'), { ...DEFAULT_LAYOUT_SETTINGS, foldHidden: [...hidden], foldedFamilies: [...folds], foldControls: true }, 'f');
+		const { layout } = layoutTree(g, geometryFor(16), { ...DEFAULT_LAYOUT_SETTINGS, foldHidden: [...hidden], foldedFamilies: [...folds], foldControls: true }, 'f');
 		expect(layout.persons.size).toBeGreaterThan(0);
 		expect(layout.rows.every((r) => r.length > 0)).toBe(true);
 	});

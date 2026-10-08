@@ -19,7 +19,7 @@ export function recordLayout({ layout, edges }: LaidOut): string {
 	const out: string[] = [
 		`orientation ${layout.orientation}`,
 		`size ${n(layout.width)} ${n(layout.height)}`,
-		`geometry font ${n(g.fontPx)} ${g.cardSize} card ${n(g.cardW)}x${n(g.cardH)} union ${n(g.unionSize)} couple ${n(g.coupleGap)} node ${n(g.nodeGap)} row ${n(g.rowGap)} tag ${n(g.tagH)}`,
+		`geometry font ${n(g.fontPx)} normal card ${n(g.cardW)}x${n(g.cardH)} union ${n(g.unionSize)} couple ${n(g.coupleGap)} node ${n(g.nodeGap)} row ${n(g.rowGap)} tag ${n(g.tagH)}`,
 	];
 	layout.rows.forEach((row, i) => out.push(`row ${i}: ${row.join(' ')}`));
 	layout.rowGaps.forEach((gap, i) => out.push(`gap ${i}: ${n(gap.top)} ${n(gap.bottom)}`));

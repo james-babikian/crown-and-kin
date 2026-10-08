@@ -76,19 +76,17 @@ describe('illegitimateSigns (D14)', () => {
 });
 
 describe('the sign on the card', () => {
-	for (const size of ['normal', 'compact'] as const) {
-		for (const f of [8, 12, 16, 24, 48]) {
-			it(`${size} ${f} px: inside the card, clear of the strip and of the shortened name`, () => {
-				const geo = geometryFor(f, size);
-				const t = cardText(geo);
-				const s = t.sign;
-				for (const x of [s.x1, s.x2]) expect(x).toBeGreaterThan(t.padX + t.nameWithSignW);
-				expect(s.x1).toBeLessThan(geo.cardW);
-				expect(Math.min(s.y1, s.y2)).toBeGreaterThan(0);
-				// Above the second text line's capitals.
-				expect(Math.max(s.y1, s.y2)).toBeLessThan(t.titleBaseline - 0.7 * t.smallSize);
-				expect(t.nameWithSignW).toBeGreaterThan(0.5 * t.textW);
-			});
-		}
+	for (const f of [8, 12, 16, 24, 48]) {
+		it(`${f} px: inside the card, clear of the strip and of the shortened name`, () => {
+			const geo = geometryFor(f);
+			const t = cardText(geo);
+			const s = t.sign;
+			for (const x of [s.x1, s.x2]) expect(x).toBeGreaterThan(t.padX + t.nameWithSignW);
+			expect(s.x1).toBeLessThan(geo.cardW);
+			expect(Math.min(s.y1, s.y2)).toBeGreaterThan(0);
+			// Above the second text line's capitals.
+			expect(Math.max(s.y1, s.y2)).toBeLessThan(t.titleBaseline - 0.7 * t.smallSize);
+			expect(t.nameWithSignW).toBeGreaterThan(0.5 * t.textW);
+		});
 	}
 });

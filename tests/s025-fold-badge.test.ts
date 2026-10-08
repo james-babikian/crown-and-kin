@@ -24,7 +24,7 @@ function lay(source: string, f: number, orientation: 'down' | 'sideways', form: 
 		.filter((_, i) => i % 5 === 2)
 		.map((x) => x.key);
 	const hidden = foldHidden(g, new Set(folded));
-	const base = geometryFor(f, 'normal');
+	const base = geometryFor(f);
 	const settings: LayoutSettings = { ...DEFAULT_LAYOUT_SETTINGS, ...(orientation === 'sideways' ? { orientation } : {}), foldHidden: [...hidden].sort(), foldedFamilies: folded, foldControls: true };
 	clearLayoutCache();
 	return layoutTree(g, form ? cardForm(base, orientation) : base, settings, 'font').layout;

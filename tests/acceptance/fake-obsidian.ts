@@ -96,6 +96,7 @@ export class MarkdownRenderChild {
 		el.addEventListener(type, fn as never, opts);
 		this.cleanups.push(() => el.removeEventListener(type, fn as never, opts));
 	}
+	registerEvent(): void {}
 	register(fn: () => void): void {
 		this.cleanups.push(fn);
 	}

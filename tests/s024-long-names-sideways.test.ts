@@ -4,7 +4,7 @@ import { clearLayoutCache, layoutTree } from '../src/layout/index';
 import { build } from './helpers';
 import { lineProblems } from './random-trees';
 
-// s024 L2: sideways compact cards with three-line names put a union dot on another couple's line.
+// s024 L2: sideways cards with three-line names put a union dot on another couple's line.
 
 const SRC = `people:
   - {id: p0, sex: m}
@@ -35,17 +35,17 @@ unions:
 const FAR = { maxCardWidths: 3, maxGenerations: 1 };
 const LONG = ['p0', 'p6', 'p12', 'p18'];
 
-describe('s024 L2: three-line names in sideways compact cards', () => {
+describe('s024 L2: three-line names in sideways cards', () => {
 	it('control: without long names there is no line problem', () => {
 		const { g } = build(SRC);
 		clearLayoutCache();
-		const { layout, edges } = layoutTree(g, geometryFor(16, 'compact'), { sweeps: 4, far: FAR, orientation: 'sideways' }, 'x');
+		const { layout, edges } = layoutTree(g, geometryFor(16), { sweeps: 4, far: FAR, orientation: 'sideways' }, 'x');
 		expect(lineProblems(g, layout, edges)).toEqual([]);
 	});
 	it('no union dot lies on the line of another couple', () => {
 		const { g } = build(SRC);
 		clearLayoutCache();
-		const { layout, edges } = layoutTree(g, geometryFor(16, 'compact'), { sweeps: 4, far: FAR, orientation: 'sideways', tallCards: LONG, longNames: LONG }, 'x');
+		const { layout, edges } = layoutTree(g, geometryFor(16), { sweeps: 4, far: FAR, orientation: 'sideways', tallCards: LONG, longNames: LONG }, 'x');
 		expect(lineProblems(g, layout, edges)).toEqual([]);
 	});
 });
