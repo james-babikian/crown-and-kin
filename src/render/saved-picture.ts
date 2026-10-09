@@ -157,6 +157,8 @@ export interface SavedFrame {
 	w: number;
 	h: number;
 	heading: SavedText;
+	/** 0.2.7 (F.5): the bar sentence of the Show view, a second text line under the heading; absent when there is none. */
+	sentence?: SavedText;
 	/** The tree's top left corner. */
 	tree: { x: number; y: number };
 	/** The legend's top left corner and its parts; absent when there is nothing to explain. */
@@ -196,9 +198,9 @@ export const fontOf = (weight: string, size: number, family: string) => `${weigh
  * P3, B4: the places of the heading, the tree and the legend of a saved picture of a `treeW` ×
  * `treeH` tree. Text is measured with `measure` in the interface font (heading and legend). A heading
  * wider than the tree makes the picture wider; with `scale`, it is cut with "…" only where the
- * picture would pass 8192 px.
+ * picture would pass 8192 px. 0.2.7 (F.5): with `barSentence` the Show view's sentence is a second, smaller text line under the heading (cut the same way).
  */
-export function savedFrame(tree: { width: number; height: number }, legend: SavedLegendContent, heading: string, fontPx: number, rawMeasure: Measure, fonts: SceneFonts, scale?: number, cut?: (text: string, maxW: number, font: string) => string): SavedFrame {
+export function savedFrame(tree: { width: number; height: number }, legend: SavedLegendContent, heading: string, fontPx: number, rawMeasure: Measure, fonts: SceneFonts, scale?: number, cut?: (text: string, maxW: number, font: string) => string, barSentence?: string): SavedFrame {
 	// R1: measure the text as it is written, so `savedExtent` and `renderSvg` get the same size.
 	const measure: Measure = (text, font) => rawMeasure(xmlText(text), font);
 	const f = fontPx;
@@ -218,8 +220,29 @@ export function savedFrame(tree: { width: number; height: number }, legend: Save
 	const treeW = Math.max(0, tree.width);
 	const treeH = Math.max(0, tree.height);
 	const headH = 1.25 * headSize;
-	const treeTop = pad + headH + gap;
-	const content = Math.max(treeW, headW);
+	// F.5: the sentence is 1 em, regular, 0.25 em under the heading's line box; the tree starts below it.
+	let sentence: SavedText | undefined;
+	let sentW = 0;
+	let sentH = 0;
+	if (barSentence) {
+		const size = TITLE_EM * f;
+		const font = fontOf('400', size, fonts.ui);
+		let text = barSentence;
+		sentW = measure(text, font);
+		if (scale && scale > 0 && cut) {
+			const max = SAVED_PNG_MAX_SIDE / scale - 2 * pad;
+			if (sentW > max) {
+				text = cut(text, max, font);
+				sentW = measure(text, font);
+			}
+		}
+		const lineH = 1.25 * size;
+		const top = pad + headH + 0.25 * f;
+		sentence = { text, x: pad, y: top + lineH / 2 + 0.35 * size, size, weight: '400', font };
+		sentH = 0.25 * f + lineH;
+	}
+	const treeTop = pad + headH + sentH + gap;
+	const content = Math.max(treeW, headW, sentW);
 
 	const k = f / 16;
 	const rowH = ROW_EM * f;
@@ -281,13 +304,14 @@ export function savedFrame(tree: { width: number; height: number }, legend: Save
 		w,
 		h,
 		heading: { text: headText, x: pad, y: pad + headH / 2 + 0.35 * headSize, size: headSize, weight: fonts.bold, font: headFont },
+		...(sentence ? { sentence } : {}),
 		tree: { x: pad, y: treeTop },
 		...(legendPart ? { legend: legendPart } : {}),
 	};
 }
 
 /** B4: the size in layout px of the whole saved picture (heading, tree and legend), as `renderSvg` draws it with `saved`. */
-export function savedExtent(laid: LaidOut, legend: SavedLegendContent, heading: string, fontPx: number, measure: Measure, fonts: SceneFonts): { w: number; h: number } {
-	const frame = savedFrame(laid.layout, legend, heading, fontPx, measure, fonts);
+export function savedExtent(laid: LaidOut, legend: SavedLegendContent, heading: string, fontPx: number, measure: Measure, fonts: SceneFonts, barSentence?: string): { w: number; h: number } {
+	const frame = savedFrame(laid.layout, legend, heading, fontPx, measure, fonts, undefined, undefined, barSentence);
 	return { w: frame.w, h: frame.h };
 }

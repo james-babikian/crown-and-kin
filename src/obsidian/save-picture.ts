@@ -60,6 +60,11 @@ export interface SaveSource {
 	focusName?: string;
 	/** M10 (F14): the view's folds, when a family is folded: the hidden people and the folded families, both sorted. */
 	folds?: { hidden: readonly string[]; folded: readonly FoldKey[] };
+	/**
+	 * 0.2.7 F.5: the Show view of a line of succession is open. The picture has the ordinal tabs (`ordinalCards`, with the texts in `ordinals`), the
+	 * outline of each heir and the bar sentence as a second text line under the heading, all in the fixed colours.
+	 */
+	succession?: { ordinalCards: readonly string[]; heirs: readonly string[]; ordinals: ReadonlyMap<string, string>; sentence: string };
 }
 
 /** The kinds of file a save can make (D72). */
@@ -210,6 +215,7 @@ export async function makePicture(store: PictureStore | undefined, src: SaveSour
 		...(sideways ? { orientation: 'sideways' as const } : {}),
 		...(src.relationLine ? { relationLine: true } : {}),
 		...(src.youTab !== undefined ? { youTab: src.youTab } : {}),
+		...(src.succession ? { ordinalCards: src.succession.ordinalCards } : {}),
 		// The picture shows the view's folds: the same people are hidden, and each folded family has its "+ N" sign (spec §13.8).
 		...(folds ? { foldHidden: folds.hidden, foldedFamilies: folds.folded, foldControls: true as const } : {}),
 	};
@@ -228,7 +234,7 @@ export async function makePicture(store: PictureStore | undefined, src: SaveSour
 	const fontPx = laid.layout.geometry.fontPx;
 	const legend = savedLegend(g, laid);
 	const heading = src.note;
-	const extent = savedExtent(laid, legend, heading, fontPx, measure, src.fonts);
+	const extent = savedExtent(laid, legend, heading, fontPx, measure, src.fonts, src.succession?.sentence);
 	const sc = savedScale(extent, fontPx, kind);
 	const pictures = await picturesFor(store, src, laid, sc.pictureScale, savedFrame(laid.layout, legend, heading, fontPx, measure, src.fonts).legend?.arms);
 	const svg = renderSvg(g, laid.layout, laid.edges, {
@@ -240,6 +246,7 @@ export async function makePicture(store: PictureStore | undefined, src: SaveSour
 		...(src.line ? { line: src.line } : {}),
 		...(src.labels ? { labels: src.labels } : {}),
 		...(src.breaks ? { breaks: src.breaks } : {}),
+		...(src.succession ? { heirs: src.succession.heirs, ordinals: src.succession.ordinals, barSentence: src.succession.sentence } : {}),
 		showDates: src.showDates,
 		measure,
 		fonts: src.fonts,

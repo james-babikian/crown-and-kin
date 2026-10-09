@@ -6,6 +6,7 @@
 import type { FamilyGraph } from '../core/derive';
 import { linkText } from '../core/link-text';
 import { CURLY_APOSTROPHE } from '../core/quote';
+import { isDead } from '../core/succession-keys';
 import type { FinderResult, Relation, RelationStep } from '../core/relations';
 import type { CardLabel } from '../core/titles';
 import type { Person } from '../core/types';
@@ -95,11 +96,12 @@ export function familyOf(g: FamilyGraph, id: string): { partners: string[]; chil
 	return { partners: [...partners], children: [...children] };
 }
 
-/** The dates text line of a card: "born–died", "b. born" or "d. died"; none without dates. */
+/** The dates text line of a card: "born–died", "b. born" or "d. died"; none without dates. A `died` that means alive (K.7: "no", "false") counts as no death date. */
 export function dateLine(p: Person): string | undefined {
-	if (p.born && p.died) return `${p.born}–${p.died}`;
+	const died = isDead(p) ? p.died : undefined;
+	if (p.born && died) return `${p.born}–${died}`;
 	if (p.born) return `b. ${p.born}`;
-	if (p.died) return `d. ${p.died}`;
+	if (died) return `d. ${died}`;
 	return undefined;
 }
 
@@ -108,11 +110,12 @@ export function dateLine(p: Person): string | undefined {
  * marked person in lower case ("half-sister"; "you" on the marked card). With the card's `label`
  * (M8, spec §13.3, §13.5) the name and title are the card's: "Roderick II, Duke of Valmont (r.
  * 1160–1190), 1140–1190". The reign stays also when "Show dates on cards" hides it, like the dates.
+ * 0.2.7 (F.4): while the Show view of a line of succession is open, `inLine` ("2nd in line", "open branch") comes last.
  */
-export function cardLabel(p: Person, relation?: string, label?: CardLabel): string {
+export function cardLabel(p: Person, relation?: string, label?: CardLabel, inLine?: string): string {
 	const name = label ? label.name : p.name;
 	const title = label ? [label.title, label.reign].filter((x) => x !== undefined && x !== '').join(' ') : p.title;
-	return [name, title, dateLine(p), relation].filter((x) => x !== undefined && x !== '').join(', ');
+	return [name, title, dateLine(p), relation, inLine].filter((x) => x !== undefined && x !== '').join(', ');
 }
 
 /**

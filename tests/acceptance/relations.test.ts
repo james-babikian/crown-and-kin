@@ -385,12 +385,13 @@ describe('words for each sex (spec §13.1, D12)', () => {
 		}
 	});
 
-	it('no sex, or any other value, gives the neutral words and no warning', async () => {
+	it('no sex, or any other value, gives the neutral words; only the spellings of contract 0.2.7 J.4 give a warning (K.9)', async () => {
 		const { computeRelations } = await relationsModule();
 		for (const sex of ['', '    sex: x\n', '    sex: M\n', '    sex: other\n']) {
 			const source = SAMPLE.source.replace('  - id: nia\n    name: Nia\n', `  - id: nia\n    name: Nia\n${sex}`);
 			const g = graphOf(source);
-			expect(g.issues, JSON.stringify(sex)).toEqual([]);
+			// `M` is a spelling of "man": one warning for Nia, and the words do not change.
+			expect(g.issues.map((i) => [i.code, i.ids]), JSON.stringify(sex)).toEqual(sex === '    sex: M\n' ? [['sex-spelling', ['nia']]] : []);
 			expect(computeRelations(g, 'gwen').get('nia')?.[0].text, JSON.stringify(sex)).toBe("Half-sibling’s child");
 			expect(computeRelations(g, 'alan').get('nia')?.[0].text, JSON.stringify(sex)).toBe('Grandchild');
 		}

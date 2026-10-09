@@ -7,6 +7,7 @@
 
 import { codedIssue, type CodedIssue, type IssueCode, type IssueParams } from './messages';
 import { readPortraitCrop } from './portrait-crop';
+import { DOUBTFUL_DIED, isDead, readInherit, readRule, yearOf } from './succession-keys';
 import { isParentType, isPlacementType, isUnionType, parentKind, type Holder, type House, type ParentRef, type ParentType, type Person, type Title, type Tree, type Union } from './types';
 
 /** The parts of a tree that are safe to draw, and every problem found on the way (spec §8, §4.1). */
@@ -70,6 +71,9 @@ export function cleanParents(
 	}
 	return out;
 }
+
+/** J.4: the lower case texts of `sex` that mean a man or a woman but are not `m` or `f` (`M` and `F` are caught as not equal to `m` and `f`). */
+const SEX_SPELLINGS: ReadonlySet<string> = new Set(['m', 'f', 'male', 'man', 'female', 'woman', 'm.', 'f.']);
 
 class Collector {
 	readonly issues: CodedIssue[] = [];
@@ -213,6 +217,19 @@ export function validateTree(tree: Tree): Validated {
 		}
 		// A crop with no portrait does nothing and gives no warning (spec §13.13).
 		if (p.portrait !== undefined && readPortraitCrop(p.portraitCrop).kind === 'bad') out.warn('bad-portrait-crop', who, [p.id]);
+		// J.4, J.7: a spelling of a value the plugin reads, and a doubt where a date should be. The values keep their meaning.
+		if (p.sex !== undefined && p.sex !== 'm' && p.sex !== 'f' && SEX_SPELLINGS.has(p.sex.toLowerCase())) out.warn('sex-spelling', { ...who, value: p.sex }, [p.id]);
+		if (p.died !== undefined && DOUBTFUL_DIED.includes(p.died.trim().toLowerCase())) out.warn('died-doubtful', { ...who, value: p.died }, [p.id]);
+	}
+
+	// M.6: `childless: true` on a dead person who has a birth child. The first child in written order is named.
+	const birthChild = new Map<string, Person>();
+	for (const p of people) {
+		for (const r of refs.get(p.id)!) if (r.type === 'birth' && !birthChild.has(r.id)) birthChild.set(r.id, p);
+	}
+	for (const p of people) {
+		const child = p.childless ? birthChild.get(p.id) : undefined;
+		if (child && isDead(p)) out.warn('childless-has-child', { person: p.name, child: child.name }, [p.id]);
 	}
 
 	// Unions: one issue per union for its shape, then one per missing partner.
@@ -265,6 +282,7 @@ function validateTitles(written: readonly Title[], people: Person[], byId: Map<s
 			}
 			holders.push(h);
 		}
+		successionWarnings(t, byId, out);
 		const title = { ...t, holders };
 		byTitleId.set(t.id, title);
 		titles.push(title);
@@ -274,4 +292,24 @@ function validateTitles(written: readonly Title[], people: Person[], byId: Map<s
 		if (!byTitleId.get(p.cardTitle)?.holders.some((h) => h.person === p.id)) out.warn('card-title-not-held', { person: p.name, ref: p.cardTitle }, [p.id]);
 	}
 	return titles;
+}
+
+/** Contract 0.2.7 A.5, K.3, K.4: the warnings about the succession keys of one title (the first title with its id). */
+function successionWarnings(t: Title, byId: Map<string, Person>, out: Collector) {
+	const bad = t.badKeys ?? {};
+	const at = (code: IssueCode, value: string, key: 'value' | 'ref' = 'value') => out.warn(code, { title: t.name, [key]: value });
+	const rule = bad.succession ?? (t.succession !== undefined && readRule(t.succession) === undefined ? t.succession : undefined);
+	if (rule !== undefined) at('unknown-succession', rule);
+	const inherit = bad.inherit ?? (t.inherit !== undefined && readInherit(t.inherit) === undefined ? t.inherit : undefined);
+	if (inherit !== undefined) at('unknown-inherit', inherit);
+	if (bad['inherit-through'] !== undefined) at('unknown-inherit-through', bad['inherit-through']);
+	if (bad['inherit-illegitimate'] !== undefined) at('unknown-inherit-illegitimate', bad['inherit-illegitimate']);
+	const year = bad.year ?? (t.year !== undefined && yearOf(t.year) === undefined ? t.year : undefined);
+	if (year !== undefined && (t.succession !== undefined || t.heirs !== undefined)) at('year-unreadable', year);
+	const missing = (ids: readonly string[] | undefined, text: string | undefined, code: IssueCode) => {
+		for (const id of new Set((ids ?? []).filter((x) => !byId.has(x)))) at(code, id, 'ref');
+		if (text !== undefined) at(code, text, 'ref');
+	};
+	missing(t.heirs, bad.heir, 'missing-heir');
+	missing(t.exclude, bad.exclude, 'missing-excluded');
 }

@@ -86,6 +86,8 @@ export interface PhoneListSpec {
 	pictures?(slots: ListPictureSlots, id: string): void;
 	onGo(id: string): void;
 	onEdit(id: string, fromTap: boolean): void;
+	/** 0.2.7 F.6: while the Show view of a line of succession is open, the bar at the top of the list: the sentence and an icon-only Close (D182). */
+	bar?: { sentence: string; closeLabel: string; onClose(): void };
 }
 
 /** What `buildPhoneList` gives back. */
@@ -135,6 +137,16 @@ export function buildPhoneList(parent: HTMLElement, spec: PhoneListSpec): PhoneL
 	const nameOf = (id: string): string => labels?.get(id)?.name ?? g.byId.get(id)?.name ?? id;
 	const list = parent.createDiv({ cls: 'dynasty-list', attr: { role: 'region', 'aria-label': PHONE_LIST_UI.region(nameOf(data.centre)) } });
 	let rows = 0;
+
+	if (spec.bar) {
+		const bar = spec.bar;
+		const el = list.createDiv({ cls: 'dynasty-succession-bar dynasty-list-succession', attr: { role: 'group' } });
+		el.createDiv({ cls: 'dynasty-succession-text', text: bar.sentence });
+		// D182: an icon with an aria-label, 44 px; the sentence is the visible text.
+		const close = el.createEl('button', { cls: ['clickable-icon', 'dynasty-succession-close', 'dynasty-succession-close-icon'], attr: { type: 'button', 'aria-label': bar.closeLabel } });
+		setIcon(close.createSpan({ cls: 'dynasty-tool-icon', attr: { 'aria-hidden': 'true' } }), 'x');
+		close.addEventListener('click', () => bar.onClose());
+	}
 
 	const section = (kind: 'parents' | 'person' | 'children', title: string) => {
 		const el = list.createDiv({ cls: 'dynasty-list-section', attr: { 'data-section': kind } });

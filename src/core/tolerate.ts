@@ -136,7 +136,12 @@ export function unwrapCurlyKeys(data: Raw): void {
 		unwrapKey(u, 'id');
 		unwrapRefs(u, 'partners', undefined);
 	});
-	each(data.titles, (t) => unwrapRefs(t, 'holders', 'person'));
+	each(data.titles, (t) => {
+		unwrapRefs(t, 'holders', 'person');
+		// Contract 0.2.7 K.3: the ids of a named heir and of excluded people, one id or a list.
+		unwrapRefs(t, 'heir', undefined);
+		unwrapRefs(t, 'exclude', undefined);
+	});
 }
 
 /** True if `v` is a YAML mapping (and not a list, a scalar, or a `Date`). */

@@ -76,7 +76,8 @@ describe('reading female-name (D65)', () => {
 
 	it('gives no warning', () => {
 		expect(tree(TREE).issues).toEqual([]);
-		expect(graph(TREE).issues).toEqual([]);
+		// Contract 0.2.7 K.9: `sex: F` (a capital letter) is the one thing the graph warns about, and it names Ines.
+		expect(graph(TREE).issues.map((i) => [i.code, i.ids])).toEqual([['sex-spelling', ['ines']]]);
 	});
 });
 

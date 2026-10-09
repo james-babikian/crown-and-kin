@@ -93,8 +93,8 @@ import { parseBreakList } from '../render/break-words';
 import { buildPhoneList, setListEditable, showListPicture, type ListPictureSlots } from '../render/dom/phone-list-dom';
 import { buildCallout, Popover } from '../render/dom/widgets';
 import { legendHouses } from '../render/legend';
-import { familyOf, finderSentence, linkTarget, startPerson, stepSentences, type RenderTiming } from '../render/tree-info';
-import { ADD_UI, BLOCK_UI, FINDER_UI, FOCUS_UI, FOLD_UI, FULL_UI, HINT_UI, HOUSES, PHONE_LIST_UI, PROBLEMS_HINT, SAVE_UI, TITLES_UI, UI, WRITE_TEXT, problemsLabel, problemsTitle } from '../render/ui-text';
+import { SIGN_CARD_LABEL, cardLabel, familyOf, finderSentence, linkTarget, startPerson, stepSentences, type RenderTiming } from '../render/tree-info';
+import { ADD_UI, BLOCK_UI, FINDER_UI, FOCUS_UI, FOLD_UI, FULL_UI, HINT_UI, HOUSES, PHONE_LIST_UI, PROBLEMS_HINT, SAVE_UI, SUCCESSION_UI, TITLES_UI, UI, WRITE_TEXT, problemsLabel, problemsTitle } from '../render/ui-text';
 import {
 	centreOn,
 	isPan,
@@ -133,6 +133,7 @@ import { pluginModalOpen } from './plugin-modals';
 import { relationsFor, validMe } from './relation-cache';
 import { SaveWindow, savePicture, type SaveSource } from './save-picture';
 import { DEFAULT_SETTINGS, reducedMotion, type DynastySettings } from './settings';
+import { PHONE_MIN_SCALE, cardPosition, lineWords, linePeople, successionDrawn, successionFirstView, type SuccessionDrawn } from './succession-view';
 import { TitlesWindow } from './titles-window';
 
 /** D144: after a move the keyboard focus (and so a screen reader) goes to the heading of the centre section of the list. */
@@ -434,6 +435,8 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 	private meId: string | null = null;
 	/** The relation finder's result that this view draws (spec §13.2), or null. */
 	private finderDrawn: FinderDrawn | null = null;
+	/** The Show view of a line of succession that this view draws (contract 0.2.7 F), or null. Only one of the two temporary views shows at a time. */
+	private successionDrawn: SuccessionDrawn | null = null;
 	/**
 	 * After the next first view, the keyboard focus goes here: the result's sentence, or a button by its
 	 * class. Only the view the user acted in (or the full-screen view it opened) sets it, so a view that
@@ -542,6 +545,12 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 				this.checkTurn();
 				return;
 			}
+			// 0.2.7 F.1: an open Show view draws again for the length of the line and the age for open branches (the age of the warning needs no redraw, K.10).
+			if ((prev.successionLength !== now.successionLength || prev.youngDeathAge !== now.youngDeathAge) && (this.successionDrawn !== null || (this.listMode && !!this.peekState()?.succession))) {
+				if (!this.listMode) this.carry = this.keptAnchor();
+				this.render(this.fonts);
+				return;
+			}
 			// D144: a list follows only the three settings that it shows, and the sibling setting (D174) when a mark gives relation words;
 			// a new direction or break list changes nothing in it.
 			if (this.listMode) {
@@ -606,18 +615,18 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 			portrait.addEventListener('change', turned);
 			this.register(() => portrait.removeEventListener('change', turned));
 		}
-		// Esc closes the relation finder's result and gives the focus back (spec §13.2). The window hears
+		// Esc closes the relation finder's result or the Show view of a line of succession and gives the focus back (spec §13.2, contract 0.2.7 F.1). The window hears
 		// it first, as for the popovers, so a full-screen view around the tree stays open.
 		this.registerDomEvent(
 			win,
 			'keydown',
 			(e) => {
-				if (e.key !== 'Escape' || !this.finderDrawn || this.popover?.isOpen) return;
+				if (e.key !== 'Escape' || !(this.finderDrawn || this.successionDrawn) || this.popover?.isOpen) return;
 				const active = this.containerEl.doc?.activeElement ?? null;
 				if (!active || !this.viewport?.contains(active)) return;
 				e.stopPropagation();
 				e.preventDefault();
-				this.guard(() => this.closeFinder());
+				this.guard(() => (this.successionDrawn ? this.closeSuccession() : this.closeFinder()));
 			},
 			{ capture: true },
 		);
@@ -1078,6 +1087,7 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 		this.hintOn = false;
 		this.hintKids = [];
 		this.finderDrawn = null;
+		this.successionDrawn = null;
 		this.finderAlt = null;
 		// D24: sideways on a phone in portrait. Set first, so a block with no tree follows a turn too.
 		const orientation = this.orientationNow();
@@ -1117,7 +1127,10 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 		if (kept !== st.folds) st.folds = new Set(kept);
 		// Spec §13.2: the finder's result is computed again from the new text at each render; with a
 		// line it replaces the focus family (the search uses the whole tree), and Close brings it back.
-		const finder = this.finderFor(st, whole);
+		// 0.2.7 F.1: the Show view of a line of succession is computed from the new text too; it replaces the finder's result (one temporary view at a time).
+		const succession = this.successionFor(st, whole);
+		this.successionDrawn = succession;
+		const finder = succession ? null : this.finderFor(st, whole);
 		this.finderDrawn = finder;
 		// A tag or a problem in the static preview opened this view on a person (D17). If the small tree
 		// of the line does not draw them, the result shows in the whole tree, so the person can be centred.
@@ -1127,7 +1140,7 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 		// Focus mode (spec §5.6): only the focus family is laid out and drawn; the whole tree's
 		// problems stay on the badge, and every edit reads the whole block.
 		const n = focusGenerationsFor(parsed.tree.options, this.settings.focusGenerations);
-		let sub = focus !== null && !finder?.line ? focusSubgraph(parsed.tree, focus, n) : null;
+		let sub = focus !== null && !finder?.line && !succession ? focusSubgraph(parsed.tree, focus, n) : null;
 		// A tag or a problem in the static preview opened this view on a person its family does not draw:
 		// this view shows all people (D21: its own focus), so the person can be centred.
 		if (this.full && sub && target && whole.byId.has(target) && !sub.tree.people.some((p) => p.id === target)) {
@@ -1160,20 +1173,23 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 		const rel = me !== null && !small ? relationsFor(whole, me, this.relationOptions) : null;
 		// M10 (F1, F8): the computer and the full-screen view apply the folds; the static phone preview never does.
 		const canFold = !!this.full || !this.coarse;
-		let plan = planFolds(g, whole, st.folds, canFold, finder?.line?.people ?? null);
+		const lineIds = this.linePeopleNow();
+		let plan = planFolds(g, whole, st.folds, canFold, lineIds);
 		// F11: a person that a flow asked for (a tag or a problem in the preview, Find outside the focus family) is shown.
 		if (canFold && plan.hidden.size) {
 			const asked = (this.full?.target ? [this.full.target] : (this.pendingTarget ?? [])).filter((id) => plan.hidden.has(id));
 			if (asked.length) {
 				st.folds = new Set(unfoldFor(g, whole, st.folds, asked));
-				plan = planFolds(g, whole, st.folds, canFold, finder?.line?.people ?? null);
+				plan = planFolds(g, whole, st.folds, canFold, lineIds);
 			}
 		}
 		this.foldPlan = plan;
 		// D145: the plate with the relation word is part of the card only while the setting shows it, so the setting changes the layout.
 		// Without the plate a marked person gets the "You" tab; so does the finder's small tree, which has no relation words (`rel` is null there).
 		const relationLine = rel !== null && this.settings.showRelations;
-		const shaped = (s: LayoutSettings): LayoutSettings => (relationLine ? { ...s, relationLine: true } : me !== null ? { ...s, youTab: me } : s);
+		const marked = (s: LayoutSettings): LayoutSettings => (relationLine ? { ...s, relationLine: true } : me !== null ? { ...s, youTab: me } : s);
+		// 0.2.7 F.4: the heirs and the open branches get a tab above their cards; the ids only, never the texts (a cached layout would keep a stale text).
+		const shaped = (s: LayoutSettings): LayoutSettings => (succession ? { ...marked(s), ordinalCards: [...succession.ordinals.keys()] } : marked(s));
 		const laidBase: LayoutSettings = withFolds(shaped(small ? { ...base, far: NEVER_FAR_RULE } : base), plan, canFold);
 		// Spec §13.3, §13.5: the card labels of the drawn graph. A tree with no titles draws as in M7 (no labels).
 		const labels = needsLabels(g) ? cardLabels(g) : undefined;
@@ -1185,7 +1201,7 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 		this.finderAlt = small && orientation === 'sideways' ? { ...this.layOut(g, altGeo, withFolds(shaped({ sweeps: 4, far: NEVER_FAR_RULE }), plan, canFold), fonts, undefined, labels, plan.hidden), geo: altGeo } : null;
 		const t2 = performance.now();
 		// The finder's tree has its own key: its views never replace the saved view of the family.
-		const finderKey = finder?.line ? `finder:${finder.state.first}>${finder.state.second}:${finder.state.index}:${finder.state.whole ? 'whole' : 'line'}|` : '';
+		const finderKey = succession ? `succession:${succession.titleId}|` : finder?.line ? `finder:${finder.state.first}>${finder.state.second}:${finder.state.index}:${finder.state.whole ? 'whole' : 'line'}|` : '';
 		const family = finderKey + focusKey(sub ? focus : null, n);
 		// A view of one family means nothing in another: the new family gets its own first view.
 		if (this.familyKey !== null && this.familyKey !== family) this.carry = null;
@@ -1209,6 +1225,7 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 		const root = el.createDiv({ cls: 'dynasty-root', attr: { 'data-dynasty-people': String(g.people.length), 'data-dynasty-section': this.sectionNote, 'data-dynasty-orientation': orientation } });
 		if (this.focusId !== null) root.setAttribute('data-dynasty-focus', this.focusId);
 		if (finder) root.setAttribute('data-dynasty-finder', !finder.line ? 'none' : finder.state.whole ? 'whole' : 'line');
+		if (succession) root.setAttribute('data-dynasty-succession', succession.titleId);
 		this.placeClasses(root);
 		// Spec §9: the dates hide, the cards keep their size (the layout does not change). The same for the relation names (D40).
 		root.toggleClass('dynasty-no-dates', !this.settings.showDates);
@@ -1247,12 +1264,14 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 			...(rel ? { relations: rel.cards } : {}),
 			...(me !== null ? { me } : {}),
 			...(finder?.line ? { line: lineMarks(finder.line, finder.state.whole) } : {}),
+			...(succession ? { heirs: succession.heirs, ordinals: succession.ordinals } : {}),
 			...(labels ? { labels } : {}),
 			showDates: this.settings.showDates,
 			...(canFold ? { folds: { buttons: true, label: foldLabel, lazy: true, wire: (f: FoldRef) => this.wireFoldHit(f) } } : {}),
 		};
 		this.scene = buildScene(sceneEl, g, laid, opts);
 		this.lastLayout = { geo, settings, sceneEl, opts };
+		this.markPositions();
 		this.wireScene(this.scene);
 		// D145: the tip of a card (relation text) with the setting "Show relation names on cards" off. The marked card has its "You" tab.
 		this.tips = wireCardTips({
@@ -1280,6 +1299,7 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 		this.popover = new Popover(viewport);
 		this.buildToolbar(viewport);
 		if (finder) this.buildResultBar(viewport, canvas, finder, whole);
+		if (succession) this.buildSuccessionBar(viewport, canvas, succession);
 		this.wireCardPresses(viewport);
 		this.updateEditUi();
 
@@ -1385,6 +1405,10 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 
 		const labels = needsLabels(whole) ? cardLabels(whole) : undefined;
 		const rel = me !== null && this.settings.showRelations ? relationsFor(whole, me, this.relationOptions) : null;
+		// 0.2.7 F.6: while the Show view is open, the list has the bar at its top, and each heir (each open branch) says its place in the place of the relation word.
+		const succession = this.successionFor(st, whole);
+		this.successionDrawn = succession;
+		const words = succession ? lineWords(succession) : null;
 		const ctl = new AbortController();
 		this.listAbort = ctl;
 		const token = this.pictureToken;
@@ -1394,7 +1418,8 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 			me,
 			showDates: this.settings.showDates,
 			editable: !this.readOnly && !this.blocked && !this.inForeignView(),
-			word: (id) => listWord(id, { me, showRelations: this.settings.showRelations, cards: rel?.cards }),
+			word: (id) => words?.get(id) ?? listWord(id, { me, showRelations: this.settings.showRelations, cards: rel?.cards }),
+			...(succession ? { bar: { sentence: succession.sentence, closeLabel: SUCCESSION_UI.barCloseLabel, onClose: () => this.guard(() => this.closeSuccession()) } } : {}),
 			...(labels ? { labels } : {}),
 			pictures: (slots, id) => this.listPictures(whole, slots, id, ctl.signal, token),
 			onGo: (id) => this.guard(() => this.listMove(id)),
@@ -1402,6 +1427,7 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 		});
 		this.listEl = result.list;
 		root.setAttribute('data-dynasty-people', String(result.rows));
+		if (succession) root.setAttribute('data-dynasty-succession', succession.titleId);
 		// A second build soon after the save (a note change event) must keep the flash, so the flash lives in the block state, not in this build.
 		const flash = savedFlashes.get(st);
 		const left = flash ? flash.until - performance.now() : 0;
@@ -1497,6 +1523,7 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 		st.focus = { id };
 		st.shown = null;
 		st.finder = null;
+		st.succession = null;
 		TreeView.redrawState(host, st, { origin });
 	}
 
@@ -1654,9 +1681,10 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 		st.focus = { id };
 		// Any other change of the family starts a new Back trail of the phone list (D144).
 		st.listBack = undefined;
-		// A choice of the user replaces a pending "show the saved person", and the finder's result (spec §13.2).
+		// A choice of the user replaces a pending "show the saved person", the finder's result (spec §13.2) and the Show view of a line of succession (contract 0.2.7 F.1).
 		st.shown = null;
 		st.finder = null;
+		st.succession = null;
 		TreeView.redrawState(host, st, { target, origin });
 	}
 
@@ -1769,6 +1797,7 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 		this.live = null;
 		last.sceneEl.empty();
 		this.scene = buildScene(last.sceneEl, g, laid, last.opts);
+		this.markPositions();
 		this.wireScene(this.scene);
 		this.makeLive();
 		if (this.lod && this.svg) this.svg.removeClass(lodClass(this.lod));
@@ -2017,6 +2046,7 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 	/** The view a tree opens with: the focus view (D18, §5.6) in focus mode, else the default view (§5.5). */
 	private firstView(laid: LaidOut, size: Size): View {
 		if (this.finderDrawn?.line) return this.finderView(laid, size, this.finderDrawn);
+		if (this.successionDrawn) return this.successionView(laid, size, this.successionDrawn);
 		const id = this.focusId;
 		if (laid.layout.orientation === 'sideways') return this.sidewaysFirst(laid, size, id ?? this.startId());
 		if (id === null) return this.defaultViewFor(laid, size);
@@ -2394,8 +2424,8 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 	}
 
 	private storeView(view: View): void {
-		// The finder's tree is not the family: after Close the family's own saved view comes back (spec §13.2).
-		if (this.finderDrawn?.line) return;
+		// The finder's tree and the Show view are not the family: after Close the family's own saved view comes back (spec §13.2, contract 0.2.7 F.2).
+		if (this.finderDrawn?.line || this.successionDrawn) return;
 		const st = this.ensureState();
 		st.view = view;
 		st.viewFor = this.drawnKey ?? '';
@@ -2519,7 +2549,12 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 						return;
 					}
 					const st = this.peekState();
-					if (st) st.finder = null;
+					if (st) {
+						const hadShow = st.succession !== null;
+						st.finder = null;
+						st.succession = null;
+						if (hadShow) TreeView.listRedraw(this.host, st);
+					}
 					void this.openFull(null, b.person);
 				});
 			};
@@ -2655,6 +2690,13 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 			onClosed: () => TreeView.refocusButton(host, st, full, '.dynasty-more'),
 			show: (id) => TreeView.showFound(host, st, full, id),
 			reduced: () => this.reduced(),
+			// Contract 0.2.7 E.4, K.10, M.7: Show opens the view of the line; the settings come from the host, because this view can be drawn again after a Save.
+			showLine: (title) => TreeView.showSuccession(host, st, title, this.unloaded ? null : this),
+			succession: {
+				limit: () => (host.settings ?? DEFAULT_SETTINGS).successionLength,
+				oldAge: () => (host.settings ?? DEFAULT_SETTINGS).oldAge,
+				youngDeathAge: () => (host.settings ?? DEFAULT_SETTINGS).youngDeathAge,
+			},
 		});
 		win?.open();
 	}
@@ -3207,7 +3249,7 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 
 	/**
 	 * Closes an open popover (legend, partner list, problems, More) with the focus back on its opener,
-	 * else the relation finder's result (spec §13.2); false if neither was open. The full-screen view
+	 * else the relation finder's result (spec §13.2) or the Show view of a line of succession; false if none was open. The full-screen view
 	 * asks first when Obsidian closes it (Esc, Android back).
 	 */
 	closePopover(): boolean {
@@ -3216,7 +3258,12 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 			pop.close(true);
 			return true;
 		}
-		if (!this.finderDrawn || this.unloaded) return false;
+		if (this.unloaded) return false;
+		if (this.successionDrawn) {
+			this.closeSuccession();
+			return true;
+		}
+		if (!this.finderDrawn) return false;
 		this.closeFinder();
 		return true;
 	}
@@ -3374,7 +3421,7 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 		const fallback = near ?? this.keptAnchor();
 		const active = this.containerEl.doc?.activeElement as Element | null | undefined;
 		const focused = active?.closest?.('.dynasty-fold')?.getAttribute('data-fold') ?? null;
-		const plan = planFolds(g, whole, this.ensureState().folds, true, this.finderDrawn?.line?.people ?? null);
+		const plan = planFolds(g, whole, this.ensureState().folds, true, this.linePeopleNow());
 		this.foldPlan = plan;
 		const next = this.layOut(g, last.geo, withFolds(last.settings, plan, true), last.opts.fonts, last.opts.badges?.hidden, last.opts.labels, plan.hidden);
 		last.settings = next.settings;
@@ -3879,6 +3926,8 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 			note: name.replace(/\.md$/i, ''),
 			...(focus !== undefined ? { focusName: focus } : {}),
 			...(this.foldPlan?.foldedList.length ? { folds: { hidden: this.foldPlan.hiddenList, folded: this.foldPlan.foldedList } } : {}),
+			// F.5: while the Show view is open, the saved picture has the tabs, the outlines and the bar sentence.
+			...(this.successionDrawn ? { succession: { ordinalCards: [...this.successionDrawn.ordinals.keys()], heirs: this.successionDrawn.heirs, ordinals: this.successionDrawn.ordinals, sentence: this.successionDrawn.sentence } } : {}),
 		};
 	}
 
@@ -3965,6 +4014,124 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 		st.finder = null;
 		this.focusDue = '.dynasty-more';
 		TreeView.finderRedraw(this.host, st);
+	}
+
+	// ---------- the Show view of a line of succession (contract 0.2.7 F) ----------
+
+	/**
+	 * The Show view to draw, from the block state and the whole tree: computed again at each render, so it follows every edit (F.7). A
+	 * title that is gone, or a saved line that is not `kind: 'line'` any more, ends the view (F.1). The static touch preview never
+	 * draws the tree view (D1); the list on a phone draws the bar (F.6).
+	 */
+	private successionFor(st: BlockState, whole: FamilyGraph): SuccessionDrawn | null {
+		const s = st.succession;
+		if (!s) return null;
+		const set = this.host.settings ?? DEFAULT_SETTINGS;
+		const d = successionDrawn(whole, s.title, { limit: set.successionLength, oldAge: set.oldAge, youngDeathAge: set.youngDeathAge });
+		if (!d) {
+			st.succession = null;
+			return null;
+		}
+		if (!this.full && this.coarse && !this.isPhone()) return null;
+		return d;
+	}
+
+	/** The people that the folds must show: the finder's line, or the ruler, the heirs and the open branches of the Show view (F.2, M.9). */
+	private linePeopleNow(): string[] | null {
+		if (this.successionDrawn) return linePeople(this.successionDrawn);
+		return this.finderDrawn?.line?.people ?? null;
+	}
+
+	/** The bar above the tree (F.3): the sentence and Close. It reuses the look and the place of the finder's result bar. */
+	private buildSuccessionBar(viewport: HTMLElement, before: HTMLElement, d: SuccessionDrawn): void {
+		const id = `dynasty-result-${++resultIds}`;
+		const bar = viewport.createDiv({ cls: ['dynasty-result', 'dynasty-succession-bar'], attr: { role: 'group', 'aria-labelledby': id } });
+		// After the toolbar and before the cards in the Tab order, like the finder's bar.
+		viewport.insertBefore(bar, before);
+		bar.createDiv({ cls: ['dynasty-result-text', 'dynasty-succession-text'], text: d.sentence, attr: { id, role: 'status', tabindex: -1 } });
+		const row = bar.createDiv({ cls: 'dynasty-result-buttons' });
+		const close = row.createEl('button', { cls: ['dynasty-result-button', 'dynasty-succession-close'], text: SUCCESSION_UI.barClose, attr: { type: 'button', 'aria-label': SUCCESSION_UI.barCloseLabel } });
+		close.addEventListener('click', () => this.guard(() => this.closeSuccession()));
+	}
+
+	/** The cards of heirs and branches say their place in the screen-reader label (F.4). The scene's own text has none: it does not know the line. */
+	private markPositions(): void {
+		const d = this.successionDrawn;
+		const scene = this.scene;
+		const g = this.g;
+		const opts = this.lastLayout?.opts;
+		if (!d || !scene || !g || !opts) return;
+		for (const id of d.ordinals.keys()) {
+			const card = scene.cards.get(id);
+			const p = g.byId.get(id);
+			if (!card || !p) continue;
+			const label = cardLabel(p, opts.me === id ? 'you' : opts.relations?.get(id)?.lower, opts.labels?.get(id), cardPosition(d, id));
+			card.setAttribute('aria-label', card.hasClass('dynasty-signed') ? `${label}, ${SIGN_CARD_LABEL}` : label);
+		}
+	}
+
+	/** Close, Esc: the views show what they showed before; the focus goes back to More (the list: to Find). */
+	private closeSuccession(): void {
+		const st = this.ensureState();
+		st.succession = null;
+		this.focusDue = this.listMode ? '.dynasty-list-find' : '.dynasty-more';
+		TreeView.successionRedraw(this.host, st);
+	}
+
+	/**
+	 * Show (Titles window, contract E.4): opens the view of the line of `title` in every view of the block that can draw it. It writes
+	 * nothing. If only a phone list or a static preview shows the block, the full-screen view opens with it, as for the finder.
+	 */
+	static showSuccession(host: TreeHost, st: BlockState, title: string, origin: TreeView | null): void {
+		st.succession = { title };
+		// One temporary view at a time (F.1).
+		st.finder = null;
+		const views = [...host.views].filter((v) => !v.unloaded && v.peekState() === st);
+		const shows = views.filter((v) => v.full || !v.coarse);
+		if (shows.length) {
+			const same = shows.filter((v) => !origin || !!v.full === !!origin.full);
+			const at = origin && shows.includes(origin) ? origin : same.length === 1 ? same[0] : null;
+			if (at) at.focusDue = '.dynasty-succession-text';
+			TreeView.successionRedraw(host, st);
+			return;
+		}
+		TreeView.successionRedraw(host, st);
+		const preview = origin && views.includes(origin) ? origin : views[0];
+		if (preview) void preview.openFull(null, null, '.dynasty-succession-text');
+	}
+
+	/**
+	 * Every phone list of the block draws again at once, also under an open full-screen view (a list is cheap to draw). Esc in that view
+	 * ends the finder first and leaves the view open, so a list that waited for the view to close would keep the old bar.
+	 */
+	private static listRedraw(host: TreeHost, st: BlockState): void {
+		for (const v of [...host.views]) {
+			if (v.unloaded || v.peekState() !== st || v.full || !v.coarse || !v.isPhone()) continue;
+			v.pendingTarget = null;
+			v.syncFocus(true);
+		}
+	}
+
+	/** Every view of the block that can show the Show view or its bar draws again (F.2: this includes the phone list; never the static tablet preview, D1). */
+	private static successionRedraw(host: TreeHost, st: BlockState): void {
+		for (const v of [...host.views]) {
+			if (v.unloaded || v.peekState() !== st || (!v.full && v.coarse && !v.isPhone())) continue;
+			v.pendingTarget = null;
+			v.syncFocus();
+		}
+	}
+
+	/**
+	 * The first view of the Show view (F.2): the ruler and the heirs below the bar. The open branches are not fitted. On a phone it
+	 * never goes below the scale `PHONE_MIN_SCALE`: it starts at the ruler (prototype finding 2).
+	 */
+	private successionView(laid: LaidOut, size: Size, d: SuccessionDrawn): View {
+		const persons = laid.layout.persons;
+		const ruler = persons.get(d.ruler);
+		const heirs = boxesOf(persons, d.heirs);
+		if (!ruler) return this.defaultViewFor(laid, size);
+		const bounds = around([ruler, ...heirs]);
+		return this.aboveBottomBar(size, (area) => successionFirstView(bounds, area, laid.layout.geometry.fontPx, this.insetTop, ruler, heirs, laid.layout.orientation, this.isPhone() ? PHONE_MIN_SCALE : 0));
 	}
 
 	/**
@@ -4077,6 +4244,10 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 	 */
 	static showFinder(host: TreeHost, st: BlockState, first: string, second: string, origin: TreeView | null): void {
 		st.finder = { first, second, index: 0, whole: false, steps: false };
+		// One temporary view at a time (contract 0.2.7 F.1). The finder skips the phone list, so a list under a Show view that ends here draws again.
+		const hadShow = st.succession !== null;
+		st.succession = null;
+		if (hadShow) TreeView.listRedraw(host, st);
 		const views = [...host.views].filter((v) => !v.unloaded && v.peekState() === st);
 		const shows = views.filter((v) => v.full || !v.coarse);
 		if (shows.length) {

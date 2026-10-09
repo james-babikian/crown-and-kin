@@ -11,8 +11,9 @@ import { personIdSource } from './id-gen';
 import { codedIssue, type CodedIssue, type HardError } from './messages';
 import { cropValue } from './portrait-crop';
 import { normaliseSobriquet } from './sobriquet';
+import { readIllegitimate, readThrough } from './succession-keys';
 import { blankPlainNulls, bool, int, isEmpty, isMap, linkValue, list, str, tolerateEmbeds, unwrapCurlyKeys, type Raw, type RawMap } from './tolerate';
-import type { Holder, House, ParentRef, ParseResult, Person, Title, Tree, TreeOptions, Union } from './types';
+import type { BadKey, Holder, House, ParentRef, ParseResult, Person, Title, Tree, TreeOptions, Union } from './types';
 
 type Section = 'people' | 'houses' | 'unions' | 'titles';
 
@@ -112,6 +113,7 @@ class Reader {
 				holders: this.holders(holders, index, name ?? id),
 				index,
 				items,
+				...successionKeys(t),
 			});
 		});
 		return titles;
@@ -222,6 +224,8 @@ class Reader {
 				parents: this.parents(p.parents, id, name ?? id),
 				placement: str(p.placement),
 				illegitimate: bool(p.illegitimate),
+				// Only when true, so a tree without the key reads exactly as before.
+				...(bool(p.childless) ? { childless: true as const } : {}),
 				union: str(p.union),
 				link: linkValue(p.link, () => this.sourceText(['people', index, 'link'])),
 				// Only when written, like `card-title` (spec §13.7).
@@ -274,6 +278,69 @@ class Reader {
 	}
 }
 
+/** A.1: the text of a list or map value as `badKeys` keeps it: `[a, b]`, `[a, …]` for an item that is not text, `{…}` for a map. */
+function flowText(v: Raw): string {
+	if (Array.isArray(v)) return `[${v.map((x) => str(x) ?? '…').join(', ')}]`;
+	return '{…}';
+}
+
+/** K.3: the ids of `heir` or `exclude`: one id, or a list; an item that is not text is skipped and noted in `bad`. */
+function idList(v: Raw, key: 'heir' | 'exclude', bad: Partial<Record<BadKey, string>>): string[] | undefined {
+	if (isEmpty(v)) return undefined;
+	const items = Array.isArray(v) ? v : [v];
+	const ids: string[] = [];
+	let skipped = false;
+	for (const x of items) {
+		const id = str(x);
+		if (id === undefined) skipped = skipped || !isEmpty(x);
+		else ids.push(id);
+	}
+	if (skipped) bad[key] = flowText(v);
+	return ids.length ? ids : undefined;
+}
+
+/**
+ * Contract 0.2.7 A, K.1, K.3: the succession keys of one title. Every field is present only when written, so a tree
+ * without these keys reads exactly as before. A list or map value goes to `badKeys`, never into a field.
+ */
+function successionKeys(t: RawMap): Partial<Title> {
+	const out: Partial<Title> = {};
+	const bad: Partial<Record<BadKey, string>> = {};
+	// A text key: the trimmed text, or undefined (and a note in `bad`) when the value is a list or a map.
+	const text = (key: BadKey, v: Raw): string | undefined => {
+		if (isEmpty(v)) return undefined;
+		const s = str(v);
+		if (s === undefined) bad[key] = flowText(v);
+		return s;
+	};
+	const succession = text('succession', t.succession);
+	if (succession !== undefined) out.succession = succession;
+	const inherit = text('inherit', t.inherit);
+	if (inherit !== undefined) out.inherit = inherit;
+	const through = text('inherit-through', t['inherit-through']);
+	if (through !== undefined) {
+		const read = readThrough(through);
+		if (read) out.inheritThrough = read;
+		else bad['inherit-through'] = through;
+	}
+	const ill = text('inherit-illegitimate', t['inherit-illegitimate']);
+	if (ill !== undefined) {
+		const read = readIllegitimate(ill);
+		if (read === 'after' || read === 'equal') out.inheritIllegitimate = read;
+		else if (read === undefined) bad['inherit-illegitimate'] = ill;
+	}
+	if (bool(t['inherit-adopted'])) out.inheritAdopted = true;
+	if (bool(t['heirs-of-body'])) out.heirsOfBody = true;
+	const year = text('year', t.year);
+	if (year !== undefined) out.year = year;
+	const heirs = idList(t.heir, 'heir', bad);
+	if (heirs) out.heirs = heirs;
+	const exclude = idList(t.exclude, 'exclude', bad);
+	if (exclude) out.exclude = exclude;
+	if (Object.keys(bad).length) out.badKeys = bad;
+	return out;
+}
+
 /**
  * YAML text without its comments, whitespace runs as one space. Comment-like text in scalars
  * stays, and quoted scalars keep their inner spaces (they are part of the value).
@@ -312,6 +379,8 @@ export function referencedIds(data: RawMap): Set<string> {
 	for (const u of Array.isArray(data.unions) ? data.unions : []) if (isMap(u)) list(u.partners).forEach(add);
 	// Spec §13.4: a holder's `person` refers to a person, even one who does not exist yet.
 	for (const t of Array.isArray(data.titles) ? data.titles : []) {
+		// K.3: a named heir and an excluded person are references too, so a new person id never takes one.
+		if (isMap(t)) for (const key of ['heir', 'exclude']) for (const x of list(t[key])) if (!isMap(x)) add(x);
 		if (!isMap(t) || isMap(t.holders)) continue;
 		for (const h of list(t.holders)) {
 			const s = str(isMap(h) ? h.person : h);

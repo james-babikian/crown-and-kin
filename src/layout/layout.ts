@@ -10,7 +10,7 @@ import type { ModelOrder } from '../core/order';
 import type { FarCoupleRule, FarTag, Geometry, LayoutSettings, PersonBox, PlacedFoldControl, Rect, TreeLayout, UnionPoint } from './model';
 import { MIN_HIT, barClear, childAttach, tagHit, gapHeight, lineMetrics, relationExtra, sideTagDepth, sidewaysGeometry, sidewaysPartnerGap, tagTop, tallExtra, turnedGeometry, withRelationLine } from './geometry';
 import { foldExtent, foldSpots, turnSpots, type FoldInput } from './fold-spots';
-import { addTo, planLines, type LinePlan } from './lines';
+import { addTo, planLines, tabbedCards, type LinePlan } from './lines';
 import { placeInOrder } from './pava';
 import { soloFamiliesOutside } from './solo-side';
 import { turnBox, turnUnion } from './turn';
@@ -129,6 +129,10 @@ export function layoutFamilies(
 	// 0.2.5: the "You" tab belongs to a person of the drawn graph; any other id gives no tab and no reach (the finder's small tree).
 	const youTab = settings.youTab !== undefined && g.byId.has(settings.youTab) ? settings.youTab : undefined;
 	if (youTab === undefined && settings.youTab !== undefined) settings = { ...settings, youTab: undefined };
+	// 0.2.7 (F.4): the same for the ordinal tabs: only people of the drawn graph count, once each and sorted; none gives no tab and no reach.
+	const ordinalCards = [...new Set(settings.ordinalCards ?? [])].filter((id) => g.byId.has(id)).sort();
+	if (settings.ordinalCards !== undefined) settings = { ...settings, ordinalCards: ordinalCards.length ? ordinalCards : undefined };
+	const tabbed = tabbedCards(youTab, ordinalCards);
 	// D40: the relation text line makes every card taller before anything is sized from the card.
 	const given = withRelationLine(plain, settings);
 	// D24 sideways: everything below runs in the turned frame (`turn.ts`) and is turned at the end.
@@ -362,7 +366,7 @@ export function layoutFamilies(
 
 	// Gaps between rows grow to hold the lanes their lines need; y is set only now. The plan may
 	// move a dot sideways (never a card), so that no two trunks share a line.
-	const plan = planLines({ g, persons, rows, unions, anchors: order.anchors, geo, side, extras: fold?.lines, youTab });
+	const plan = planLines({ g, persons, rows, unions, anchors: order.anchors, geo, side, extras: fold?.lines, tabbed });
 	for (const [key, x] of plan.dotX) unions.get(key)!.x = x;
 	const m = lineMetrics(geo);
 	// Cards in a row share their top edge; the gap below starts under the row's tallest card.
@@ -380,7 +384,7 @@ export function layoutFamilies(
 		if (u.bar) u.y = a.y + (barAt.get(fu.key) ?? Math.min(a.h, b.h) / 2);
 		else u.y = gapTop(dot?.gap ?? a.gen) + m.coupleLane0 + (dot?.lane ?? 0) * m.coupleLaneStep;
 	}
-	if (side) return turnLayout(g, persons, unions, rows, rows.slice(1).map((_, r) => ({ top: gapTop(r), bottom: rowTop[r + 1] })), plan, geo, side, fold, youTab);
+	if (side) return turnLayout(g, persons, unions, rows, rows.slice(1).map((_, r) => ({ top: gapTop(r), bottom: rowTop[r + 1] })), plan, geo, side, fold, youTab, ordinalCards);
 	const farTags = buildFarTags(g, persons, unions, plan, geo, fold);
 
 	const rowGaps = rows.slice(1).map((_, r) => ({ top: gapTop(r), bottom: rowTop[r + 1] }));
@@ -392,7 +396,7 @@ export function layoutFamilies(
 		...[...plan.dots.keys()].map((k) => unions.get(k)!.y + geo.unionSize / 2),
 		...[...farTags.values()].map((t) => tagTop(geo, t.y) + geo.tagH),
 	);
-	const done: TreeLayout = { persons, unions, rows, rowGaps, farTags, width, height, geometry: geo, orientation: 'down', ...(youTab !== undefined ? { youTab } : {}) };
+	const done: TreeLayout = { persons, unions, rows, rowGaps, farTags, width, height, geometry: geo, orientation: 'down', ...(youTab !== undefined ? { youTab } : {}), ...(ordinalCards.length ? { ordinalCards } : {}) };
 	return fold?.controls ? withFolds(done, foldSpots(fold.controls, persons, unions, rowGaps, geo.fontPx, { tags: new Map([...farTags].map(([k, t]) => [k, t.hit])), soloX: plan.soloExits })) : done;
 }
 
@@ -590,6 +594,7 @@ function turnLayout(
 	side: Geometry,
 	fold?: FoldInput,
 	youTab?: string,
+	ordinalCards: readonly string[] = [],
 ): TreeLayout {
 	const persons = new Map<string, PersonBox>();
 	for (const b of turnedPersons.values()) persons.set(b.id, turnBox(b));
@@ -619,7 +624,7 @@ function turnLayout(
 		...[...persons.values()].map((p) => p.y + p.h),
 		...[...farTags.values()].map((t) => Math.max(tagTop(side, t.y) + side.tagH, t.hit.y + t.hit.h)),
 	);
-	const done: TreeLayout = { persons, unions, rows, rowGaps, farTags, width, height, geometry: side, orientation: 'sideways', ...(youTab !== undefined ? { youTab } : {}) };
+	const done: TreeLayout = { persons, unions, rows, rowGaps, farTags, width, height, geometry: side, orientation: 'sideways', ...(youTab !== undefined ? { youTab } : {}), ...(ordinalCards.length ? { ordinalCards } : {}) };
 	// The spots follow the rules of the turned frame (`down` rules on the turned numbers); their sign then grows to the right.
 	return fold?.controls ? withFolds(done, turnSpots(foldSpots(fold.controls, turnedPersons, turnedUnions, rowGaps, geo.fontPx, { turned: true, soloX: plan.soloExits }))) : done;
 }

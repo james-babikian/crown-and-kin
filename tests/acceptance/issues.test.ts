@@ -98,13 +98,18 @@ describe('any sex value is valid (D12): spec §4.1, §8', () => {
 
 	for (const [label, sex] of [
 		['x', 'x'],
-		['M', 'M'],
 		['empty string', '""'],
 	] as const) {
 		it(`sex: ${label} produces no issue`, () => {
 			expect(issuesOf(withSex(sex))).toEqual([]);
 		});
 	}
+
+	// Contract 0.2.7 J.4, K.9: a capital letter is a spelling of "man" that the plugin does not read, so it gets the warning sex-spelling.
+	it('sex: M produces one warning, sex-spelling, and the value is kept', () => {
+		const issues = issuesOf(withSex('M'));
+		expect(issues.map((i) => [i.code, i.level, i.params.person, i.params.value, i.ids])).toEqual([['sex-spelling', 'warning', 'Test Person', 'M', ['p1']]]);
+	});
 });
 
 describe('fixture 10 (hand-typing): spec §3, §8 "Tolerated silently", §10 item 10', () => {

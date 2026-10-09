@@ -68,6 +68,8 @@ interface Draft {
 	born: string;
 	died: string;
 	illegitimate: boolean;
+	/** M.5: the person died with no children (`childless`); the line of succession then shows no open branch for the person. */
+	childless: boolean;
 	link: string;
 	/** Spec §13.7: the portrait link; '' = none. */
 	portrait: string;
@@ -123,6 +125,7 @@ function draftOf(l: Loaded): Draft {
 		born: p.born ?? '',
 		died: p.died ?? '',
 		illegitimate: p.illegitimate,
+		childless: p.childless === true,
 		link: p.link ?? '',
 		portrait: p.portrait ?? '',
 		portraitCrop: p.portraitCrop ?? '',
@@ -521,6 +524,7 @@ export class EditSheet extends Modal {
 		}
 		if (this.draft.house !== this.base.house && this.draft.house !== NEW_HOUSE) out.house = this.draft.house === '' ? null : this.draft.house;
 		if (this.draft.illegitimate !== this.base.illegitimate) out.illegitimate = this.draft.illegitimate;
+		if (this.draft.childless !== this.base.childless) out.childless = this.draft.childless;
 		// Spec §13.7: Select portrait and Remove portrait are draft edits; Save writes them with the other fields.
 		const portrait = this.draft.portrait.trim();
 		if (portrait !== this.base.portrait.trim()) out.portrait = portrait === '' ? null : portrait;
@@ -607,7 +611,8 @@ export class EditSheet extends Modal {
 		this.sexField(body);
 		this.textField(body, 'born', SHEET.born);
 		this.textField(body, 'died', SHEET.died);
-		this.checkField(body);
+		this.checkField(body, 'illegitimate', SHEET.illegitimate);
+		this.checkField(body, 'childless', SHEET.childless, SHEET.childlessHint);
 		this.textField(body, 'link', SHEET.link, { placeholder: SHEET.linkPlaceholder });
 		this.textField(body, 'notes', SHEET.notes, {}, true);
 		this.placementField(body);
@@ -1059,14 +1064,21 @@ export class EditSheet extends Modal {
 		sel.addEventListener('change', () => (this.draft.sex = sel.value));
 	}
 
-	private checkField(parent: HTMLElement): void {
+	private checkField(parent: HTMLElement, field: 'illegitimate' | 'childless', text: string, hint?: string): void {
+		// With a hint, the label and the hint stand in one box, so the hint stays under its box.
+		const host = hint ? parent.createDiv({ cls: 'dynasty-sheet-check-pair' }) : parent;
 		// The whole row is the label, so the hit area is the full row (spec §7.5).
-		const row = parent.createEl('label', { cls: 'dynasty-sheet-field dynasty-sheet-check', attr: { 'data-field': 'illegitimate' } });
-		const box = row.createEl('input', { attr: { type: 'checkbox', 'data-focus': 'field:illegitimate' } });
-		box.checked = this.draft.illegitimate;
+		const row = host.createEl('label', { cls: 'dynasty-sheet-field dynasty-sheet-check', attr: { 'data-field': field } });
+		const box = row.createEl('input', { attr: { type: 'checkbox', 'data-focus': `field:${field}` } });
+		box.checked = this.draft[field];
 		box.disabled = this.readOnly;
-		row.createSpan({ cls: 'dynasty-sheet-label', text: SHEET.illegitimate });
-		box.addEventListener('change', () => (this.draft.illegitimate = box.checked));
+		row.createSpan({ cls: 'dynasty-sheet-label', text });
+		if (hint) {
+			const id = `dynasty-sheet-${field}-hint`;
+			host.createDiv({ cls: 'dynasty-sheet-hint', text: hint, attr: { id } });
+			box.setAttribute('aria-describedby', id);
+		}
+		box.addEventListener('change', () => (this.draft[field] = box.checked));
 	}
 
 	private placementField(parent: HTMLElement): void {

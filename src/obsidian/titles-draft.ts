@@ -7,9 +7,11 @@
  */
 
 import type { FamilyGraph } from '../core/derive';
-import type { HolderFields, HolderRef, Op } from '../core/edit';
+import type { EditTitle, HolderFields, HolderRef, Op } from '../core/edit';
 import { nextPersonId } from '../core/id-gen';
 import { referencedIds } from '../core/parse';
+import type { SuccessionSpec } from '../core/succession';
+import { readInherit, readRule, type InheritIllegitimate, type InheritRule, type InheritThrough, type SuccessionRule } from '../core/succession-keys';
 import { entryReign, rulerName } from '../core/titles';
 import { isMap, str, type Raw } from '../core/tolerate';
 import type { Holder, Title } from '../core/types';
@@ -177,6 +179,54 @@ export interface HolderRow {
 	values: HolderValues;
 }
 
+/**
+ * The succession keys of one title in the window's draft (contract 0.2.7 E.2). An empty text means "not written". `'?'` is
+ * a written value that the plugin cannot read: it stays as it is until the owner chooses another value.
+ */
+export interface SuccessionDraft {
+	rule: SuccessionRule | '' | '?';
+	inherit: InheritRule | '' | '?';
+	through: InheritThrough | '' | '?';
+	illegitimate: InheritIllegitimate | '?';
+	adopted: boolean;
+	body: boolean;
+	year: string;
+	/**
+	 * The text of a `year` that the plugin cannot read (a list or a map). The Year field is empty then, as `specOf` reads no
+	 * year; the text is only a hint. Not a field of its own: it never counts as a change.
+	 */
+	yearBad?: string;
+	heirs: string[];
+	exclude: string[];
+}
+
+/** The fields of `SuccessionDraft`, in the order the window shows them. */
+export const SUCCESSION_FIELDS = ['rule', 'inherit', 'through', 'illegitimate', 'adopted', 'body', 'year', 'heirs', 'exclude'] as const;
+/** One field name of `SuccessionDraft`. */
+export type SuccessionField = (typeof SUCCESSION_FIELDS)[number];
+
+/** The draft of a title with no succession key written. */
+export const emptySuccession = (): SuccessionDraft => ({ rule: '', inherit: '', through: '', illegitimate: 'no', adopted: false, body: false, year: '', heirs: [], exclude: [] });
+
+/** The succession keys of a title as read. */
+export function successionOf(t: Title): SuccessionDraft {
+	const bad = t.badKeys ?? {};
+	return {
+		rule: readRule(t.succession) ?? (t.succession !== undefined || bad.succession !== undefined ? '?' : ''),
+		inherit: readInherit(t.inherit) ?? (t.inherit !== undefined || bad.inherit !== undefined ? '?' : ''),
+		through: t.inheritThrough ?? (bad['inherit-through'] !== undefined ? '?' : ''),
+		illegitimate: t.inheritIllegitimate ?? (bad['inherit-illegitimate'] !== undefined ? '?' : 'no'),
+		adopted: t.inheritAdopted === true,
+		body: t.heirsOfBody === true,
+		year: t.year ?? '',
+		...(t.year === undefined && bad.year !== undefined ? { yearBad: bad.year } : {}),
+		heirs: [...(t.heirs ?? [])],
+		exclude: [...(t.exclude ?? [])],
+	};
+}
+
+const copySuccession = (s: SuccessionDraft): SuccessionDraft => ({ ...s, heirs: [...s.heirs], exclude: [...s.exclude] });
+
 /** One title of the window's draft. `id` null: a title added in this window. */
 export interface TitleRow {
 	key: string;
@@ -205,6 +255,10 @@ export interface TitleRow {
 	holders: HolderRow[];
 	/** The holders as read, in order (copies): a move, a removal or an edit changes the list. */
 	baseRows: HolderRow[];
+	/** The succession keys as typed (contract 0.2.7 E.2); absent for a title that is new in the draft. */
+	succ?: SuccessionDraft;
+	/** The succession keys as read; absent for a title that is new in the draft. */
+	baseSucc?: SuccessionDraft;
 }
 
 /** The window's rows for the titles of a tree (the titles the tree uses, spec §13.4). */
@@ -218,7 +272,25 @@ function rowOf(t: Title, key: () => string): TitleRow {
 	const plural = t.plural.trim() === t.name.trim() ? '' : t.plural;
 	const maleName = t.maleName ?? '';
 	const femaleName = t.femaleName ?? '';
-	return { key: key(), id: t.id, idDraft: t.id, name: t.name, baseName: t.name, plural, basePlural: plural, maleName, baseMaleName: maleName, femaleName, baseFemaleName: femaleName, deleted: false, holders, baseRows: holders.map((h) => ({ ...h, values: { ...h.values } })) };
+	const succ = successionOf(t);
+	return {
+		key: key(),
+		id: t.id,
+		idDraft: t.id,
+		name: t.name,
+		baseName: t.name,
+		plural,
+		basePlural: plural,
+		maleName,
+		baseMaleName: maleName,
+		femaleName,
+		baseFemaleName: femaleName,
+		deleted: false,
+		holders,
+		baseRows: holders.map((h) => ({ ...h, values: { ...h.values } })),
+		succ,
+		baseSucc: copySuccession(succ),
+	};
 }
 
 /** The row as the Id logic sees it. */
@@ -272,9 +344,90 @@ const maleChanged = (t: TitleRow) => t.baseMaleName !== null && maleNameOf(t) !=
 const femaleEdited = (t: TitleRow) => t.baseFemaleName !== null && t.femaleName.trim() !== t.baseFemaleName.trim();
 const femaleChanged = (t: TitleRow) => t.baseFemaleName !== null && femaleNameOf(t) !== (t.baseFemaleName.trim() || null);
 
+const sameList = (a: readonly string[], b: readonly string[]) => a.length === b.length && a.every((x, i) => x === b[i]);
+
+/**
+ * True when one succession field differs from the field as read. "Not written" and "No preference" for `inherit` are the
+ * same value (E.3), and the year compares without the spaces around it.
+ */
+function successionDiffers(f: SuccessionField, s: SuccessionDraft, b: SuccessionDraft): boolean {
+	if (f === 'heirs' || f === 'exclude') return !sameList(s[f], b[f]);
+	if (f === 'year') return s.year.trim() !== b.year.trim();
+	if (f === 'inherit') return s.inherit !== b.inherit && !(b.inherit === '' && s.inherit === 'no-preference');
+	return s[f] !== b[f];
+}
+
+/** The succession fields that the owner changed in the draft of a saved title (the `*Changed` flags of E.2). */
+export function successionChanges(t: TitleRow): SuccessionField[] {
+	if (!t.succ || !t.baseSucc) return [];
+	const s = t.succ;
+	const b = t.baseSucc;
+	return SUCCESSION_FIELDS.filter((f) => successionDiffers(f, s, b));
+}
+
+/** The keys of an `edit-title` for the changed succession fields: only the changed ones, `null` for a removed key. */
+export function successionEdit(t: TitleRow): Partial<EditTitle> {
+	const out: Partial<EditTitle> = {};
+	const s = t.succ;
+	if (!s) return out;
+	for (const f of successionChanges(t)) {
+		if (f === 'rule') out.succession = s.rule === '' || s.rule === '?' ? null : s.rule;
+		else if (f === 'inherit') out.inherit = s.inherit === '' || s.inherit === '?' ? null : s.inherit;
+		else if (f === 'through') out.inheritThrough = s.through === '' || s.through === '?' ? null : s.through;
+		else if (f === 'illegitimate') out.inheritIllegitimate = s.illegitimate === '?' ? 'no' : s.illegitimate;
+		else if (f === 'adopted') out.inheritAdopted = s.adopted;
+		else if (f === 'body') out.heirsOfBody = s.body;
+		else if (f === 'year') out.year = s.year.trim() === '' ? null : s.year.trim();
+		else if (f === 'heirs') out.heirs = s.heirs.length ? [...s.heirs] : null;
+		else out.exclude = s.exclude.length ? [...s.exclude] : null;
+	}
+	// E.3: None removes the rule and the choice of who can inherit together, whatever the window did with the second.
+	if (out.succession === null && t.baseSucc && t.baseSucc.inherit !== '') out.inherit = null;
+	return out;
+}
+
+/** The draft as the line engine reads it (the same shape as `specOf` gives for a saved title). */
+export function draftSpec(s: SuccessionDraft): SuccessionSpec {
+	const spec: SuccessionSpec = {
+		inherit: s.inherit === '' || s.inherit === '?' ? 'no-preference' : s.inherit,
+		illegitimate: s.illegitimate === '?' ? 'no' : s.illegitimate,
+		adopted: s.adopted,
+	};
+	if (s.rule !== '' && s.rule !== '?') spec.rule = s.rule;
+	if (s.through !== '' && s.through !== '?') spec.inheritThrough = s.through;
+	if (s.body) spec.body = true;
+	if (s.year.trim() !== '') spec.year = s.year.trim();
+	if (s.heirs.length) spec.heirs = [...s.heirs];
+	if (s.exclude.length) spec.exclude = [...s.exclude];
+	if (s.rule === '?') spec.bad = 'succession';
+	else if (s.inherit === '?') spec.bad = 'inherit';
+	else if (s.through === '?') spec.bad = 'inherit-through';
+	else if (s.illegitimate === '?') spec.bad = 'inherit-illegitimate';
+	return spec;
+}
+
+/**
+ * The title as the line engine reads it for the draft: the saved title with the draft's holders. An entry that validation
+ * would drop (a person who is not in the tree and has no name, or an empty entry) is left out, as in `g.titles`.
+ */
+export function draftTitle(g: FamilyGraph, t: TitleRow): Title | null {
+	const saved = t.id !== null ? g.titles?.find((x) => x.id === t.id) : undefined;
+	if (!saved) return null;
+	const holders: Holder[] = [];
+	t.holders.forEach((h, i) => {
+		const v = h.values;
+		if (v.person !== undefined && !g.byId.has(v.person) && v.name === undefined) return;
+		if (v.person === undefined && v.name === undefined) return;
+		holders.push({ index: i, ...v });
+	});
+	return { ...saved, holders };
+}
+
 /** True when Save has something to write. */
 export function draftChanged(rows: readonly TitleRow[]): boolean {
-	return rows.some((t) => (t.id === null ? !t.deleted : t.deleted || idChanged(titleIdRow(t)) || nameChanged(t) || maleChanged(t) || femaleChanged(t) || pluralChanged(t) || holdersChanged(t)));
+	return rows.some((t) =>
+		t.id === null ? !t.deleted : t.deleted || idChanged(titleIdRow(t)) || nameChanged(t) || maleChanged(t) || femaleChanged(t) || pluralChanged(t) || holdersChanged(t) || successionChanges(t).length > 0,
+	);
 }
 
 /**
@@ -313,8 +466,10 @@ export function windowOps(rows: readonly TitleRow[], newId: (name: string, taken
 		}
 		// After its id op the title has its new id.
 		const id = idChanged(titleIdRow(t)) ? draftId(titleIdRow(t)) : t.id;
-		if (nameChanged(t) || maleChanged(t) || femaleChanged(t) || pluralChanged(t)) {
+		const succession = successionEdit(t);
+		if (nameChanged(t) || maleChanged(t) || femaleChanged(t) || pluralChanged(t) || Object.keys(succession).length) {
 			// `null` removes the key: an empty field writes no male-name or female-name (D65, D66); an empty field or the title name writes no plural (D64).
+			// The succession keys are only the ones the owner changed, so an unrelated Save never touches a hand-written key (A.3).
 			edits.push({
 				kind: 'edit-title',
 				id,
@@ -322,6 +477,7 @@ export function windowOps(rows: readonly TitleRow[], newId: (name: string, taken
 				...(maleChanged(t) ? { maleName: maleNameOf(t) } : {}),
 				...(femaleChanged(t) ? { femaleName: femaleNameOf(t) } : {}),
 				...(pluralChanged(t) ? { plural: pluralOf(t) } : {}),
+				...succession,
 			});
 		}
 		if (!holdersChanged(t)) continue;
@@ -364,8 +520,9 @@ export function rebase(rows: readonly TitleRow[], fresh: readonly TitleRow[]): T
 		const plural = pluralEdited(was) ? was.plural : f.plural;
 		const maleName = maleEdited(was) ? was.maleName : f.maleName;
 		const femaleName = femaleEdited(was) ? was.femaleName : f.femaleName;
+		const succ = rebaseSuccession(was, f);
 		if (!holdersChanged(was)) {
-			out.push({ ...f, key: was.key, idDraft, name, plural, maleName, femaleName, deleted: was.deleted });
+			out.push({ ...f, key: was.key, idDraft, name, plural, maleName, femaleName, deleted: was.deleted, ...(succ ? { succ } : {}) });
 			continue;
 		}
 		// Every holder as read is found again first, also those the draft removed: they stay removed.
@@ -403,9 +560,28 @@ export function rebase(rows: readonly TitleRow[], fresh: readonly TitleRow[]): T
 		holders.push(...pool);
 		const keyOf = (fh: HolderRow) => [...hits].find(([, v]) => v === fh)?.[0] ?? fh.key;
 		const baseRows = f.holders.map((fh) => ({ ...fh, key: keyOf(fh), values: { ...fh.values } }));
-		out.push({ ...f, key: was.key, idDraft, name, plural, maleName, femaleName, deleted: was.deleted, holders, baseRows });
+		out.push({ ...f, key: was.key, idDraft, name, plural, maleName, femaleName, deleted: was.deleted, holders, baseRows, ...(succ ? { succ } : {}) });
 	}
 	out.push(...rows.filter((t) => t.id === null));
+	return out;
+}
+
+/** The succession keys on a tree that changed under the window: a field the owner changed keeps the owner's value; the others take the new text. */
+function rebaseSuccession(was: TitleRow, fresh: TitleRow): SuccessionDraft | undefined {
+	if (!fresh.succ) return undefined;
+	const changed = new Set<SuccessionField>(successionChanges(was));
+	if (!was.succ || !changed.size) return fresh.succ;
+	const out = copySuccession(fresh.succ);
+	const mine = was.succ;
+	for (const f of changed) {
+		if (f === 'heirs' || f === 'exclude') out[f] = [...mine[f]];
+		else if (f === 'adopted' || f === 'body') out[f] = mine[f];
+		else if (f === 'year') out.year = mine.year;
+		else if (f === 'rule') out.rule = mine.rule;
+		else if (f === 'inherit') out.inherit = mine.inherit;
+		else if (f === 'through') out.through = mine.through;
+		else out.illegitimate = mine.illegitimate;
+	}
 	return out;
 }
 
@@ -419,7 +595,7 @@ function matchHolder(pool: readonly HolderRow[], b: HolderRow, bySameText: boole
 }
 
 /**
- * Save's ops, with an id for each holder person who has no written id (spec §8: the tree names them
+ * Save's ops, with an id for each holder person, named heir and excluded person who has no written id (spec §8: the tree names them
  * `~N` after their place in the list, and a `~N` written in `holders` names nobody). Like the edit
  * sheet, the same write first gives each such person an id (`set-person-fields`), then names them by
  * it. `data` is the body as plain data (`parseBody`).
@@ -440,12 +616,23 @@ export function withHolderIds(ops: readonly Op[], g: FamilyGraph, data: unknown)
 		used.add(next);
 		ids.set(person, next);
 	};
-	for (const op of ops) if (op.kind === 'set-holders') for (const item of op.items) see('add' in item ? item.add.person : item.fields?.person);
+	for (const op of ops) {
+		if (op.kind === 'set-holders') for (const item of op.items) see('add' in item ? item.add.person : item.fields?.person);
+		// A named heir and an excluded person are written by id too (K.3): a person with no written id gets one first.
+		else if (op.kind === 'edit-title') for (const id of [...(op.heirs ?? []), ...(op.exclude ?? [])]) see(id);
+	}
 	if (!ids.size) return [...ops];
+	const mapIds = (list: string[] | null | undefined) => (list ? list.map((id) => ids.get(id) ?? id) : list);
 	const map = (fields: HolderFields): HolderFields => (typeof fields.person === 'string' && ids.has(fields.person) ? { ...fields, person: ids.get(fields.person)! } : fields);
 	const give = [...ids].map(([id, next]): Op => ({ kind: 'set-person-fields', id, fields: { id: next } }));
 	// The id changes of titles stay first (§13.17 rule 5); they name no holder person.
 	const lead = ops.filter(isIdOp);
-	const named = ops.filter((op) => !isIdOp(op)).map((op): Op => (op.kind === 'set-holders' ? { ...op, items: op.items.map((item) => ('add' in item ? { add: map(item.add) } : item.fields ? { ...item, fields: map(item.fields) } : item)) } : op));
+	const named = ops
+		.filter((op) => !isIdOp(op))
+		.map((op): Op => {
+			if (op.kind === 'set-holders') return { ...op, items: op.items.map((item) => ('add' in item ? { add: map(item.add) } : item.fields ? { ...item, fields: map(item.fields) } : item)) };
+			if (op.kind === 'edit-title' && (op.heirs || op.exclude)) return { ...op, ...(op.heirs ? { heirs: mapIds(op.heirs) } : {}), ...(op.exclude ? { exclude: mapIds(op.exclude) } : {}) };
+			return op;
+		});
 	return [...lead, ...give, ...named];
 }

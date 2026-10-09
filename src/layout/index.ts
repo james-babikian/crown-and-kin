@@ -39,10 +39,12 @@ export function layoutKey(g: FamilyGraph, geo: Geometry, settings: LayoutSetting
 	const tallT = [...new Set(settings.tallTitles ?? [])].filter((id) => g.byId.has(id)).sort();
 	// 0.2.5: the "You" tab counts only for a person of this graph, as the layout sees it; the card form is in `geo`.
 	const youTab = settings.youTab !== undefined && g.byId.has(settings.youTab) ? settings.youTab : undefined;
+	// 0.2.7 (F.4): the ordinal tabs are ids, once each and sorted, of people of this graph. An array, not a `Map` or `Set`: those serialise to `{}` and would drop out of the key.
+	const ordinals = [...new Set(settings.ordinalCards ?? [])].filter((id) => g.byId.has(id)).sort();
 	// D40: only a relation line changes the key; without one the key is as before.
-	const rel = { ...(settings.relationLine ? { relationLine: true } : {}), ...(youTab !== undefined ? { youTab } : {}) };
+	const rel = { ...(settings.relationLine ? { relationLine: true } : {}), ...(youTab !== undefined ? { youTab } : {}), ...(ordinals.length ? { ordinalCards: ordinals } : {}) };
 	// The crown and the reach come from the picture lists as given (`drawnGeometry` has no graph), so a list of ids that are not in this graph still moves the layout.
-	const drawn = withRelationLine(geo, { ...settings, youTab });
+	const drawn = withRelationLine(geo, { ...settings, youTab, ordinalCards: ordinals });
 	const heights = { ...(drawn.crown ? { crown: drawn.crown } : {}), ...(drawn.reach ? { reach: drawn.reach } : {}) };
 	// 0.2.5: the text card shows no picture, so the picture lists never change a sideways text layout.
 	const textCard = geo.form === 'text';

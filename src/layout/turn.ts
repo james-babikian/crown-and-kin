@@ -50,5 +50,7 @@ export function turnBack(layout: TreeLayout): TreeLayout {
 		width: layout.height,
 		height: layout.width,
 		geometry: turnedGeometry(layout.geometry),
+		...(layout.youTab !== undefined ? { youTab: layout.youTab } : {}),
+		...(layout.ordinalCards ? { ordinalCards: layout.ordinalCards } : {}),
 	};
 }

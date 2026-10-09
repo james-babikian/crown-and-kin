@@ -10,7 +10,9 @@
  * The text card (`form: 'text'`, a sideways tree) has its text at the left, no pictures, and the same plate. 0.2.6 (D179): the card
  * size setting and the classic card (arms and portrait at the lower right) are gone. A geometry with no form (tests, the layout) has
  * the numbers and the text places of the text card. `withRelationLine` sets every height that depends on the tree (plate, crown,
- * reach); `cardText`, `nameRoom`, `roundelPics` and `youTabRect` place what the scene and the saved picture draw.
+ * reach); `cardText`, `nameRoom`, `roundelPics`, `youTabRect` and `ordinalTabRect` place what the scene and the saved picture draw.
+ * 0.2.7 (F.4): a card of the Show view of a line of succession can carry an ordinal tab ("2nd") on its top edge, as the marked card
+ * carries its "You" tab; `LayoutSettings.ordinalCards` makes the reach for it and the line planner keeps the drop places clear of it.
  */
 import type { Geometry, GeometryFor, LayoutSettings, NameLineCount, NameRoom, Orientation, Rect } from './model';
 
@@ -181,7 +183,7 @@ export const isTextCard = (geo: Geometry): boolean => geo.form === 'text';
  * D40, 0.2.5: `geo` with everything that depends on the tree and the settings, in ONE place: the plate or relation text line
  * (`LayoutSettings.relationLine`, one small text line taller), the Roundel's crown when the tree has a picture (`settings.arms` or
  * `settings.portraits` not empty; the text card has none) and `reach`, the space the first row keeps for what sticks out above
- * a card (B.3.4: the medallion's halo, or the "You" tab of `settings.youTab`). A geometry that already has `relationLine`, `crown`
+ * a card (B.3.4: the medallion's halo, or the "You" tab of `settings.youTab`, or the ordinal tab of `settings.ordinalCards`: both stand at the same height). A geometry that already has `relationLine`, `crown`
  * or `reach` is returned as it is, so a drawn geometry passed back in does not grow a second time; a value that is 0 is never stored.
  */
 export function withRelationLine(geo: Geometry, settings: LayoutSettings): Geometry {
@@ -191,7 +193,7 @@ export function withRelationLine(geo: Geometry, settings: LayoutSettings): Geome
 	const crown = roundel && (settings.arms?.length || settings.portraits?.length) ? Math.round(ROUNDEL_EM.crown * f) : 0;
 	const plate = settings.relationLine === true;
 	// The tab's top with its stroke must lie inside the reach, so the first row never starts above the drawing's edge.
-	const reach = crown ? Math.ceil(ROUNDEL_EM.reach * f) : settings.youTab !== undefined ? Math.ceil((roundel ? ROUNDEL_EM.tabAbove : ROUNDEL_EM.tabAboveText) * f + TAB_REACH_PAD_PX) : 0;
+	const reach = crown ? Math.ceil(ROUNDEL_EM.reach * f) : settings.youTab !== undefined || settings.ordinalCards?.length ? Math.ceil((roundel ? ROUNDEL_EM.tabAbove : ROUNDEL_EM.tabAboveText) * f + TAB_REACH_PAD_PX) : 0;
 	if (!crown && !reach && !plate) return geo;
 	return { ...geo, cardH: geo.cardH + crown + (plate ? relationExtra(geo) : 0), ...(crown ? { crown } : {}), ...(reach ? { reach } : {}), ...(plate ? { relationLine: true as const } : {}) };
 }
@@ -219,6 +221,13 @@ export const WORD_CLEAR_EM = 0.125;
 
 /** 0.2.5 (B.2): the sizes of the Roundel card, in em of the note font; the layout, the scene and the saved picture read these and no other number. */
 export const ROUNDEL_EM = { crown: 0.75, reach: 1.6, medal: 1, ring: 0.15, halo: 0.2, above: 0.25, column: 10, plateMore: 0.25, armsGap: 0.25, tabW: 2.3, tabH: 1.15, tabAbove: 0.55, tabAboveText: 0.9, wordRaise: 0.15 } as const;
+
+/**
+ * 0.2.7 (F.4): the sizes of the ordinal tab, in em of the note font. Its width is fixed by the number of characters, so the live scene and the
+ * saved picture agree with no measure function; it is wider than the "You" tab because its text is 0.85 em and bold. The `right...` numbers are how far
+ * the tab's right edge lies left of the card axis (Roundel): 1.6 em keeps 0.25 em from the portrait's halo (1.35 em). `textCardLeft` is its left edge in a text card.
+ */
+export const ORDINAL_EM = { width3: 2.3, width4: 2.7, widthMore: 0.4, text: 0.85, corner: 0.2, rightPortrait: 1.6, rightArms: 1.45, rightNone: 0.4, textCardLeft: 0.875 } as const;
 
 /** px: the margin a "You" tab adds to its height above the card top when `reach` is computed (half of its 1.5 px stroke, rounded up). */
 export const TAB_REACH_PAD_PX = 1;
@@ -558,4 +567,23 @@ export function youTabRect(geo: Geometry, hasPictures: boolean): Rect {
 	const h = ROUNDEL_EM.tabH * f;
 	if (isRoundel(geo)) return { x: roundelAxis(geo) - (hasPictures ? 1.45 : 0.4) * f - w, y: -ROUNDEL_EM.tabAbove * f, w, h };
 	return { x: 0.875 * f, y: -ROUNDEL_EM.tabAboveText * f, w, h };
+}
+
+/**
+ * 0.2.7 (F.4): the ordinal tab ("2nd") of a card in the Show view, card-relative, on the top edge at the height of the "You" tab. The width follows
+ * `chars`, the length of the text (2.3 em for 3 characters, 2.7 em for 4, 0.4 em more for each further character, at most 6 are counted). The Roundel
+ * puts the right edge 1.6 em left of the axis when the card has a portrait (halo 1.35 em + 0.25 em), 1.45 em with arms alone, 0.4 em with no picture;
+ * the text card starts it at 0.875 em. The "You" tab keeps only 0.1 em from the halo, so it cannot give these numbers.
+ */
+export function ordinalTabRect(geo: Geometry, hasPortrait: boolean, hasArms: boolean, chars: number): Rect {
+	const f = geo.fontPx;
+	const E = ORDINAL_EM;
+	const n = Math.min(6, Math.max(3, Math.round(chars) || 3));
+	const w = (n === 3 ? E.width3 : E.width4 + (n - 4) * E.widthMore) * f;
+	const h = ROUNDEL_EM.tabH * f;
+	if (isRoundel(geo)) {
+		const right = roundelAxis(geo) - (hasPortrait ? E.rightPortrait : hasArms ? E.rightArms : E.rightNone) * f;
+		return { x: right - w, y: -ROUNDEL_EM.tabAbove * f, w, h };
+	}
+	return { x: E.textCardLeft * f, y: -ROUNDEL_EM.tabAboveText * f, w, h };
 }

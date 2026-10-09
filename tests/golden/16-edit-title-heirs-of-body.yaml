@@ -1,0 +1,22 @@
+titles:
+  - id: duke-of-valmont
+    name: Duke of Valmont
+    plural: Dukes of Valmont
+    succession: eldest-child
+    inherit: men-only
+    inherit-through: men
+    inherit-illegitimate: after
+    inherit-adopted: true
+    heirs-of-body: true
+    year: 1210
+    heir: hugo
+    exclude: aldric
+    holders:
+      - {person: aldric, number: II, from: 1175}
+people:
+  - id: aldric
+    name: Aldric Valmont
+    sex: m
+  - id: hugo
+    name: Hugo Valmont
+    sex: m

@@ -79,6 +79,10 @@ export interface DeleteSummary {
 	 * (`titles`; a title with a duplicate id counts on its own). Set only when the tree has titles.
 	 */
 	holders?: { titles: number; entries: number };
+	/** Contract 0.2.7 K.3: the titles that name the person as an heir. Absent when 0. */
+	heirs?: number;
+	/** The titles that list the person as an excluded person. Absent when 0. */
+	excluded?: number;
 }
 
 /** Builds the `DeleteSummary` for deleting one person. */
@@ -207,5 +211,9 @@ export const describeDelete: DescribeDelete = (g, id, options) => {
 		entries += n;
 	}
 	if (g.writtenTitles?.length) summary.holders = { titles, entries };
+	const heirs = (g.writtenTitles ?? []).filter((t) => t.heirs?.includes(id)).length;
+	const excluded = (g.writtenTitles ?? []).filter((t) => t.exclude?.includes(id)).length;
+	if (heirs) summary.heirs = heirs;
+	if (excluded) summary.excluded = excluded;
 	return summary;
 };

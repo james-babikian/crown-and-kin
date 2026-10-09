@@ -110,14 +110,21 @@ export interface PlanInput {
 	/** M10 (F3, F4): people tagged for a hidden partner, and the folded families that keep a stem. */
 	extras?: LineExtras;
 	/**
-	 * 0.2.5 (B.3.3): the person who has the "You" tab (`TreeLayout.youTab`). The tab lies where the two off-axis drop places left of the
-	 * axis would land, so that card takes neither. The layout and the router must give the same value, or they plan different bar lanes.
+	 * 0.2.7 (F.4): the people who have a tab on their top edge: the ordinal cards and the "You" card (`tabbedCards`). A tab lies where the two off-axis
+	 * drop places left of the axis would land, so such a card takes neither. The layout and the router must give the same set, or they plan different bar lanes.
 	 */
+	tabbed?: ReadonlySet<string>;
+	/** 0.2.5 (B.3.3): the person who has the "You" tab (`TreeLayout.youTab`); counts as one more `tabbed` card. */
 	youTab?: string;
 }
 
+/** 0.2.7 (F.4): the cards that have a tab on the top edge: the "You" card and the ordinal cards of a layout. */
+export function tabbedCards(youTab: string | undefined, ordinalCards: readonly string[] | undefined): ReadonlySet<string> {
+	return new Set([...(ordinalCards ?? []), ...(youTab !== undefined ? [youTab] : [])]);
+}
+
 /** Plans every leg, sibling bar, dot position and tag zone of a tree: see the file header. */
-export function planLines({ g, persons, rows, unions, anchors, geo, side, extras, youTab }: PlanInput): LinePlan {
+export function planLines({ g, persons, rows, unions, anchors, geo, side, extras, tabbed, youTab }: PlanInput): LinePlan {
 	const m = lineMetrics(geo);
 	const box = (id: string) => persons.get(id)!;
 	const centre = (b: PersonBox) => b.x + b.w / 2;
@@ -408,10 +415,10 @@ export function planLines({ g, persons, rows, unions, anchors, geo, side, extras
 			const b = box(k);
 			if (roundel) {
 				// 0.2.5 (B.3.3): the Roundel takes its line on the axis. If another family's trunk is there, the places left of the axis come
-				// first, then one right of the arms; if all are taken the line stays on the axis. The marked card's tab lies left of the axis.
+				// first, then one right of the arms; if all are taken the line stays on the axis. A card with a tab (the marked card's "You", an ordinal) has it left of the axis.
 				const axis = b.x + roundelAxis(geo);
 				const em = geo.fontPx;
-				const places = k === youTab ? [0, 3 * em] : [0, -1.75 * em, -2.5 * em, 3 * em];
+				const places = tabbed?.has(k) || k === youTab ? [0, 3 * em] : [0, -1.75 * em, -2.5 * em, 3 * em];
 				for (const off of places) {
 					const x = axis + off;
 					if (!others.some((t) => Math.abs(t - x) < near)) return x;

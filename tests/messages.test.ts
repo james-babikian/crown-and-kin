@@ -39,10 +39,33 @@ const SAMPLES: Record<IssueCode, IssueParams> = {
 	'picture-not-image': { owner: 'portrait', person: 'Wren', file: 'wren-photo.jpg', format: 'HEIC' },
 	'picture-too-large': { owner: 'arms', house: 'House Greymane', file: 'huge-banner.png', pixels: 54 },
 	'bad-portrait-crop': { person: 'Bertrand Valmont' },
+	// Contract 0.2.7 A.5, K.4 (J.4, J.7): the succession keys, the sex spellings and the doubtful death texts.
+	'unknown-succession': { title: 'Duke of Valmont', value: 'primogenitor' },
+	'unknown-inherit': { title: 'Duke of Valmont', value: 'sideways' },
+	'unknown-inherit-through': { title: 'Duke of Valmont', value: 'sideways' },
+	'unknown-inherit-illegitimate': { title: 'Duke of Valmont', value: 'maybe' },
+	'year-unreadable': { title: 'Duke of Valmont', value: 'the old days' },
+	'missing-heir': { title: 'Duke of Valmont', ref: 'hugo' },
+	'missing-excluded': { title: 'Duke of Valmont', ref: 'wren' },
+	'sex-spelling': { person: 'Wren Valmont', value: 'F' },
+	'died-doubtful': { person: 'Hugo Valmont', value: 'maybe' },
+	// Contract 0.2.7 M.6: the person key `childless` on a person who has a birth child.
+	'childless-has-child': { person: 'Aldric Valmont', child: 'Hugo Valmont' },
 };
 
 /** Spec §13.3 gives this warning three short sentences, §13.6 the HEIC text four (checked by ste-editor). */
-const MOST_SENTENCES: Partial<Record<IssueCode, number>> = { 'card-title-not-held': 3, 'picture-not-image': 4 };
+const MOST_SENTENCES: Partial<Record<IssueCode, number>> = {
+	'card-title-not-held': 3,
+	'picture-not-image': 4,
+	// Contract 0.2.7 A.5: the name of the title, what the plugin does, and the values to use (with the Salic hint: four).
+	'unknown-succession': 4,
+	'unknown-inherit': 3,
+	'unknown-inherit-through': 3,
+	'unknown-inherit-illegitimate': 3,
+	'year-unreadable': 3,
+	'sex-spelling': 3,
+	'died-doubtful': 3,
+};
 
 /** Picture warnings name a picture file, which is not a note, so the word list allows "file" there (spec §13.6). */
 const FILE_WORD: IssueCode[] = ['missing-picture', 'picture-not-image'];
@@ -183,6 +206,74 @@ describe('issueText: title warnings (spec §13.3, §13.4)', () => {
 		checkText(text('entry-not-map', { section: 'titles', index: 2 }));
 		checkText(text('entry-not-map', { section: 'holders', index: 2, title: 'Duke of Valmont' }));
 		checkText(text('missing-id', { section: 'titles', index: 2, name: 'Duke of Valmont' }));
+	});
+});
+
+describe('issueText: succession warnings (contract 0.2.7 A.5, J.4, J.7, K.4)', () => {
+	const text = (code: IssueCode, params: IssueParams) => issueText(issue(code, params));
+	const RULES = 'Use one of these rules: eldest-child, youngest-child, siblings-first, nearest-relative, born-in-reign.';
+
+	it('unknown-succession lists the five rules', () => {
+		expect(text('unknown-succession', { title: 'Duke of Valmont', value: 'primogenitor' })).toBe(
+			`The title Duke of Valmont has “succession: primogenitor”. The plugin does not know this rule, so it shows no line of succession. ${RULES}`,
+		);
+	});
+
+	it('unknown-succession with the value salic or semi-salic adds the hint sentence', () => {
+		expect(text('unknown-succession', { title: 'Duke of Valmont', value: 'salic' })).toBe(
+			`The title Duke of Valmont has “succession: salic”. The plugin does not know this rule, so it shows no line of succession. ${RULES} For the Salic law, use “succession: eldest-child” with “inherit: men-only”.`,
+		);
+		expect(text('unknown-succession', { title: 'Duke of Valmont', value: 'semi-salic' })).toBe(
+			`The title Duke of Valmont has “succession: semi-salic”. The plugin does not know this rule, so it shows no line of succession. ${RULES} For the semi-Salic law, use “succession: eldest-child” with “inherit: men-first-in-house”.`,
+		);
+	});
+
+	it('unknown-inherit lists the seven values', () => {
+		expect(text('unknown-inherit', { title: 'Duke of Valmont', value: 'sideways' })).toBe(
+			'The title Duke of Valmont has “inherit: sideways”. The plugin does not know this rule, so it shows no line of succession. Use one of these rules: men-only, men-first-in-house, men-first, no-preference, women-first, women-first-in-house, women-only.',
+		);
+	});
+
+	it('unknown-inherit-through names the key and the three values (J.1, K.1)', () => {
+		const t = text('unknown-inherit-through', { title: 'Duke of Valmont', value: 'sideways' });
+		expect(t).toMatch(/^The title Duke of Valmont has “inherit-through: sideways”\. /);
+		expect(t).toContain('shows no line of succession');
+		expect(t).toContain('men, women, anyone');
+	});
+
+	it('unknown-inherit-illegitimate lists the three values', () => {
+		expect(text('unknown-inherit-illegitimate', { title: 'Duke of Valmont', value: 'maybe' })).toBe(
+			'The title Duke of Valmont has “inherit-illegitimate: maybe”. The plugin does not know this value, so it shows no line of succession. Use one of these values: no, after, equal.',
+		);
+	});
+
+	it('year-unreadable says that the end of the last reign is used', () => {
+		expect(text('year-unreadable', { title: 'Duke of Valmont', value: 'the old days' })).toBe(
+			'The title Duke of Valmont has “year: the old days”. The plugin cannot find a year in it, so the line of succession uses the end of the last reign. Write the year as a number, for example “year: 1210”.',
+		);
+	});
+
+	it('missing-heir and missing-excluded name the key and the ID', () => {
+		expect(text('missing-heir', { title: 'Duke of Valmont', ref: 'hugo' })).toBe('The title Duke of Valmont has “heir: hugo”, but no person has this ID. Correct the ID, or remove it.');
+		expect(text('missing-excluded', { title: 'Duke of Valmont', ref: 'wren' })).toBe('The title Duke of Valmont has “exclude: wren”, but no person has this ID. Correct the ID, or remove it.');
+	});
+
+	it('sex-spelling tells the user to write m or f', () => {
+		expect(text('sex-spelling', { person: 'Wren Valmont', value: 'F' })).toBe(
+			'Wren Valmont has “sex: F”. The plugin reads only “m” and “f” as a man and a woman. If you mean a man or a woman, write “sex: m” or “sex: f”.',
+		);
+	});
+
+	it('childless-has-child names the person and the child, and gives two ways to fix it', () => {
+		expect(text('childless-has-child', { person: 'Aldric Valmont', child: 'Hugo Valmont' })).toBe(
+			'Aldric Valmont has “childless: true”, but Hugo Valmont is a child of Aldric Valmont in the tree. Remove “childless: true”, or correct the parents of Hugo Valmont.',
+		);
+	});
+
+	it('died-doubtful says that the person counts as dead', () => {
+		expect(text('died-doubtful', { person: 'Hugo Valmont', value: 'maybe' })).toBe(
+			'Hugo Valmont has “died: maybe”. The plugin counts Hugo Valmont as dead. If Hugo Valmont is alive, remove “died: maybe” from the note.',
+		);
 	});
 });
 

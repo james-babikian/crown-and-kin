@@ -38,6 +38,12 @@ export interface DynastySettings {
 	reduceMotion: ReduceMotion;
 	/** D150: the direction of the full-screen tree on a phone held upright. Default 'sideways' (D24 as before). */
 	phoneDirection: PhoneDirection;
+	/** Contract 0.2.7 E.6: the number of people in the line of succession, a whole number 1–20. Default 5. */
+	successionLength: number;
+	/** Contract 0.2.7 J.8: the line warns about a person older than this many years with no death date, 0–1000; 0 gives no warning. Default 110. */
+	oldAge: number;
+	/** Contract 0.2.7 M.7: a person who died younger than this age opens no branch in the line, 0–1000; 0 shows every open branch. Default 0. */
+	youngDeathAge: number;
 }
 
 /** The settings a fresh install starts with. */
@@ -53,6 +59,9 @@ export const DEFAULT_SETTINGS: DynastySettings = {
 	breakWords: '',
 	reduceMotion: 'system',
 	phoneDirection: 'sideways',
+	successionLength: 5,
+	oldAge: 110,
+	youngDeathAge: 0,
 };
 
 /*
@@ -66,6 +75,12 @@ export const DEFAULT_SETTINGS: DynastySettings = {
 export const DESKTOP_HEIGHT = { min: 100, max: 5000 } as const;
 /** Valid range for `focusGenerations`. */
 export const GENERATIONS = { min: 0, max: 10 } as const;
+/** Valid range for `successionLength`. */
+export const SUCCESSION_LENGTH = { min: 1, max: 20 } as const;
+/** Valid range for `oldAge`; 0 stops the warning. */
+export const OLD_AGE = { min: 0, max: 1000 } as const;
+/** Valid range for `youngDeathAge`; 0 shows every open branch. */
+export const YOUNG_DEATH_AGE = { min: 0, max: 1000 } as const;
 
 const wholeIn = (v: unknown, r: { min: number; max: number }): v is number => typeof v === 'number' && Number.isInteger(v) && v >= r.min && v <= r.max;
 
@@ -87,6 +102,9 @@ export const normaliseSettings = (raw: unknown): DynastySettings => {
 		breakWords: typeof s.breakWords === 'string' ? s.breakWords.slice(0, BREAK_WORDS_MAX) : d.breakWords,
 		reduceMotion: REDUCE_MOTIONS.find((v) => v === s.reduceMotion) ?? d.reduceMotion,
 		phoneDirection: PHONE_DIRECTIONS.find((v) => v === s.phoneDirection) ?? d.phoneDirection,
+		successionLength: wholeIn(s.successionLength, SUCCESSION_LENGTH) ? s.successionLength : d.successionLength,
+		oldAge: wholeIn(s.oldAge, OLD_AGE) ? s.oldAge : d.oldAge,
+		youngDeathAge: wholeIn(s.youngDeathAge, YOUNG_DEATH_AGE) ? s.youngDeathAge : d.youngDeathAge,
 	};
 };
 
@@ -102,6 +120,14 @@ export function parseDesktopHeight(text: string): number | null {
 	if (!m) return null;
 	const n = Number(m[1]);
 	return wholeIn(n, DESKTOP_HEIGHT) ? n : null;
+}
+
+/** A whole number in `range` from a typed text (spaces around it are fine), or null. Used by the number settings of the line of succession. */
+export function parseWhole(text: string, range: { min: number; max: number }): number | null {
+	const m = /^\s*(\d{1,5})\s*$/.exec(text);
+	if (!m) return null;
+	const n = Number(m[1]);
+	return wholeIn(n, range) ? n : null;
 }
 
 /** What changed between two settings, for the views (a card-size change drops the carried view). */

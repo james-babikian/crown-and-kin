@@ -169,6 +169,8 @@ describe('L2 box flags and L3 the cache key (spec §13.6 "Card geometry", §13.7
 	'13': '1n0agy2xyvo',
 	'14': '17giyycopo2',
 	'15': '8zpi4kocop',
+	// Sample tree 16 (0.2.7): recorded from the 0.2.6 build; the succession keys do not enter the layout key.
+	'16': '37ncghx67d',
 	};
 
 	it('with neither set, and with empty sets, the key equals the M8 key', () => {

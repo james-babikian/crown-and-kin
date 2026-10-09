@@ -171,6 +171,8 @@ export interface TreeLayout {
 	folds?: PlacedFoldControl[];
 	/** 0.2.5 (D148): a copy of `LayoutSettings.youTab`, set by `layoutTree` only when that id is a person of the drawn graph. The scene and the saved picture read the tab from here. */
 	youTab?: string;
+	/** 0.2.7 (F.4): a copy of `LayoutSettings.ordinalCards` that are people of the drawn graph, sorted; absent when none. The scene and the saved picture read the ordinal tabs from here. */
+	ordinalCards?: readonly string[];
 }
 
 /** Every kind of line the tree draws (spec §5.3). `render/styles.ts` gives each one its `STROKES` style. */
@@ -283,6 +285,12 @@ export interface LayoutSettings {
 	foldControls?: true;
 	/** 0.2.5 (D148): the id of the person who gets the "You" tab. Set whenever the tree has a mark and `relationLine` is false (also in the small tree of the relation finder). Part of the cache key. */
 	youTab?: string;
+	/**
+	 * 0.2.7 (F.4): the ids of the people who get an ordinal tab (the heirs of the Show view). Ids only, never texts: a text in a cached layout would
+	 * go stale (the texts are `SceneOptions.ordinals`). Each such card has the reach of a tab above it and keeps the drop places of the
+	 * "You" tab clear. Part of the cache key when not empty (sorted, only people of the graph); omitted when empty.
+	 */
+	ordinalCards?: readonly string[];
 }
 
 /** A tree layout together with its routed lines: what `layoutTree` returns and the cache stores. */

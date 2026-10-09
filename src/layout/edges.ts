@@ -8,7 +8,7 @@
 import type { FamilyGraph, FamilyUnion } from '../core/derive';
 import { isRoundel, lineMetrics, roundelAxis, roundelLineEnd } from './geometry';
 import type { LineExtras } from './fold-spots';
-import { addTo, planLines, type Leg } from './lines';
+import { addTo, planLines, tabbedCards, type Leg } from './lines';
 import type { EdgeDrawing, EdgeMarker, EdgePath, FoldSpot, Geometry, Rect, StrokeKind, TreeLayout } from './model';
 import { turnBack, turnEdges } from './turn';
 
@@ -60,7 +60,7 @@ function route(g: FamilyGraph, layout: TreeLayout, anchors: Map<string, string>,
 	const box = (id: string) => layout.persons.get(id)!;
 	const geo = layout.geometry;
 	const m = lineMetrics(geo);
-	const plan = planLines({ g, persons: layout.persons, rows: layout.rows, unions: layout.unions, anchors, geo, side, extras, youTab: layout.youTab });
+	const plan = planLines({ g, persons: layout.persons, rows: layout.rows, unions: layout.unions, anchors, geo, side, extras, tabbed: tabbedCards(layout.youTab, layout.ordinalCards) });
 
 	// Below the last row: under its tallest card (D37).
 	const last = layout.rows[layout.rows.length - 1] ?? [];

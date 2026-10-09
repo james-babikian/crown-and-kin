@@ -5,7 +5,7 @@
 
 import { Notice, PluginSettingTab, Setting, SettingGroup, debounce, type App, type Plugin } from 'obsidian';
 import { SETTINGS_UI } from '../render/ui-text';
-import { GENERATIONS, PHONE_DIRECTIONS, REDUCE_MOTIONS, parseDesktopHeight, type DynastySettings, type PhoneDirection, type ReduceMotion } from './settings';
+import { GENERATIONS, OLD_AGE, PHONE_DIRECTIONS, REDUCE_MOTIONS, SUCCESSION_LENGTH, YOUNG_DEATH_AGE, parseDesktopHeight, parseWhole, type DynastySettings, type PhoneDirection, type ReduceMotion } from './settings';
 
 /** What the tab needs from the plugin. */
 export interface SettingsHost extends Plugin {
@@ -37,6 +37,8 @@ export class DynastySettingTab extends PluginSettingTab {
 	private pending: (() => void) | null = null;
 	/** The same for the break list. */
 	private pendingBreaks: (() => void) | null = null;
+	/** The same for the number fields of the line of succession. */
+	private pendingNumbers: (() => void)[] = [];
 
 	constructor(
 		app: App,
@@ -49,6 +51,7 @@ export class DynastySettingTab extends PluginSettingTab {
 		const el = this.containerEl;
 		el.empty();
 		el.addClass('dynasty-settings');
+		this.pendingNumbers = [];
 		const t = SETTINGS_UI;
 		const s = this.host.settings;
 		this.group(el, t.groups.height, (add) => {
@@ -156,6 +159,18 @@ export class DynastySettingTab extends PluginSettingTab {
 					tg.onChange((v) => void this.host.changeSettings({ showPortraits: v }));
 				});
 			});
+			add((row) => {
+				row.setName(t.successionLength).setDesc(t.successionLengthDesc);
+				this.numberField(row, 'dynasty-setting-succession-length', t.successionLength, () => this.host.settings.successionLength, SUCCESSION_LENGTH, (n) => void this.host.changeSettings({ successionLength: n }));
+			});
+			add((row) => {
+				row.setName(t.oldAge).setDesc(t.oldAgeDesc);
+				this.numberField(row, 'dynasty-setting-old-age', t.oldAge, () => this.host.settings.oldAge, OLD_AGE, (n) => void this.host.changeSettings({ oldAge: n }));
+			});
+			add((row) => {
+				row.setName(t.youngDeathAge).setDesc(t.youngDeathAgeDesc);
+				this.numberField(row, 'dynasty-setting-young-death-age', t.youngDeathAge, () => this.host.settings.youngDeathAge, YOUNG_DEATH_AGE, (n) => void this.host.changeSettings({ youngDeathAge: n }));
+			});
 		});
 		this.group(el, t.groups.housePage, (add) => {
 			add((row) => {
@@ -209,7 +224,40 @@ export class DynastySettingTab extends PluginSettingTab {
 		this.pending = null;
 		this.pendingBreaks?.();
 		this.pendingBreaks = null;
+		for (const run of this.pendingNumbers.splice(0)) run();
 		super.hide();
+	}
+
+	/**
+	 * A text field for a whole number in a range. The number is stored when the typing stops or the field loses the focus;
+	 * a text out of range is not stored, and the field shows the stored number again.
+	 */
+	private numberField(row: Setting, cls: string, label: string, current: () => number, range: { min: number; max: number }, store: (n: number) => void): void {
+		row.addText((text) => {
+			text.inputEl.addClass(cls);
+			name(text.inputEl, label);
+			text.inputEl.setAttribute('inputmode', 'numeric');
+			text.setValue(String(current()));
+			const save = () => {
+				const n = parseWhole(text.getValue(), range);
+				if (n !== null && n !== current()) store(n);
+			};
+			const later = debounce(save, HEIGHT_TYPING_MS, true);
+			const flush = () => {
+				later.cancel?.();
+				save();
+				text.setValue(String(current()));
+			};
+			this.pendingNumbers.push(() => {
+				later.cancel?.();
+				save();
+			});
+			text.onChange(() => void Promise.resolve().then(() => later()));
+			text.inputEl.addEventListener('blur', flush);
+			text.inputEl.addEventListener('keydown', (e: KeyboardEvent) => {
+				if (e.key === 'Enter') flush();
+			});
+		});
 	}
 
 	/** One group under a heading (D33). */

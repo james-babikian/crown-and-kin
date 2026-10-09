@@ -219,7 +219,7 @@ describe('"Name for a man" in the Titles window on the fakes (D66)', () => {
 		expect(input.getAttribute('aria-label')).toBe(TITLES_UI.maleAria('Duke of Valmont'));
 		expect(input.getAttribute('aria-label')!.startsWith(TITLES_UI.maleLabel)).toBe(true);
 		const page = pageFor(content, 'duke-of-valmont');
-		expect(page.querySelectorAll('label.dynasty-sheet-field').map((c) => c.getAttribute('data-field'))).toEqual([null, 'male-name', 'female-name', 'plural']);
+		expect(page.children.filter((c) => c.tag === 'label' && c.hasClass('dynasty-sheet-field')).map((c) => c.getAttribute('data-field'))).toEqual([null, 'male-name', 'female-name', 'plural']);
 		expect(pageFor(content, 'count-of-orsini').querySelector('.dynasty-title-male textarea')!.value).toBe('');
 	});
 

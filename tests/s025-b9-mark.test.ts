@@ -95,7 +95,8 @@ describe('D153: no accent colour in the mark (CSS)', () => {
 	const MARK = /dynasty-card-me|dynasty-r1-plate|dynasty-r1-tab|dynasty-list-me/;
 
 	it('no marked-card, plate, tab or marked-row rule names the accent or the text-on-accent colour', () => {
-		const found = rules.filter((r) => MARK.test(r.selector));
+		// 0.2.7: the ring of a marked heir takes the accent (the Show view's heir outline, not the mark), so the heir rules are another thing.
+		const found = rules.filter((r) => MARK.test(r.selector) && !/dynasty-heir/.test(r.selector));
 		// The scan sees the rules it is meant to see.
 		for (const s of ['.dynasty-card-me .dynasty-card-bg', '.dynasty-r1-plate', '.dynasty-r1-plate-line', '.dynasty-r1-tab', '.dynasty-r1-tab-text', '.dynasty-list-me']) expect(found.map((r) => r.selector), s).toContain(s);
 		const bad = found.filter((r) => /interactive-accent|text-on-accent|accent/.test(r.body)).map((r) => r.selector);

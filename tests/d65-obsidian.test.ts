@@ -206,7 +206,7 @@ describe('"Name for a woman" in the Titles window on the fakes (D65)', () => {
 		expect(input.getAttribute('aria-label')!.startsWith(TITLES_UI.femaleLabel)).toBe(true);
 		// The fields follow the order of the text: "Name for a man" (D66), "Name for a woman", then the plural.
 		const page = pageFor(content, 'duke-of-valmont');
-		expect(page.querySelectorAll('label.dynasty-sheet-field').map((c) => c.getAttribute('data-field'))).toEqual([null, 'male-name', 'female-name', 'plural']);
+		expect(page.children.filter((c) => c.tag === 'label' && c.hasClass('dynasty-sheet-field')).map((c) => c.getAttribute('data-field'))).toEqual([null, 'male-name', 'female-name', 'plural']);
 		expect(pageFor(content, 'count-of-orsini').querySelector('.dynasty-title-female textarea')!.value).toBe('');
 	});
 

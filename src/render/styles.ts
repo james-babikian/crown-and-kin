@@ -285,6 +285,11 @@ export const ROUNDEL_LOOK = {
 	corner: 3,
 	tabStroke: 1.5,
 } as const;
+/**
+ * 0.2.7 (F.2, F.4, F.5): how the heir's outline and the ordinal tab look in the saved picture, which has no page CSS. `ring` is the width of the ring in the
+ * text colour round an heir's card and `border` the width of its accent border (the numbers of `.dynasty-highlight` in styles.css, held still); `tabBorder` is the ordinal tab's 1 px border.
+ */
+export const HEIR_LOOK = { ring: 6, border: 3, tabBorder: 1 } as const;
 /** D96, D153: how far the marked card's border edge lies inside the card's edge, in px: half the border (the stroke is centred on the edge). */
 export const ME_RING_INNER = ME_LOOK.border / 2;
 

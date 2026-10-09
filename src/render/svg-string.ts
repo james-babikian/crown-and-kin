@@ -17,8 +17,9 @@
  * The look numbers of the plate and the tab are `ROUNDEL_LOOK` (`styles.ts`); the colours are the palette's.
  */
 import type { FamilyGraph } from '../core/derive';
+import { isDead } from '../core/succession-keys';
 import type { CardLabel } from '../core/titles';
-import { ROUNDEL_EM, centredWithoutWord, cardText, isRoundel, nameCountOf, nameRoom, relationY, roundelPics, signBelowRing, tagTop, youTabRect, type CardText, type ShownLines } from '../layout/geometry';
+import { ORDINAL_EM, ROUNDEL_EM, centredWithoutWord, cardText, isRoundel, nameCountOf, nameRoom, ordinalTabRect, relationY, roundelPics, signBelowRing, tagTop, youTabRect, type CardText, type ShownLines } from '../layout/geometry';
 import { farTagSigns } from '../layout/far-tag-sign';
 import { illegitimateSigns } from '../layout/illegitimate-sign';
 import { FOLD_EM } from '../layout/fold-spots';
@@ -30,7 +31,7 @@ import { lineLook, type LineMarks, type LineState } from './line-highlight';
 import type { BreakList } from './break-words';
 import { cardNameLines, titleLines, type NameMeasure, type NameRun } from './name-lines';
 import { fixedColour, fontOf, savedFrame, xmlText, type PictureMap, type SavedFrame, type SavedParts } from './saved-picture';
-import { DEAD_STRIP_OPACITY, DEFAULT_DARK, DEFAULT_LIGHT, FADED_OPACITY, ME_LOOK, ME_RING_INNER, ON_LINE_EXTRA, ROUNDEL_LOOK, STROKES, TAG_MARK, UNION_MARKS, stripColour, tagMarkSlot, unionMark, unionShape, type Palette, type UnionShape } from './styles';
+import { DEAD_STRIP_OPACITY, DEFAULT_DARK, DEFAULT_LIGHT, FADED_OPACITY, HEIR_LOOK, ME_LOOK, ME_RING_INNER, ON_LINE_EXTRA, ROUNDEL_LOOK, STROKES, TAG_MARK, UNION_MARKS, stripColour, tagMarkSlot, unionMark, unionShape, type Palette, type UnionShape } from './styles';
 import { LEGEND_LABELS, SIGN_LEGEND_LABEL, dateLine, farTagName, splitMaybe } from './tree-info';
 import { markedBarPath, truncate, truncateWithMaybe } from './view-math';
 
@@ -110,6 +111,12 @@ export interface SvgOptions {
 	folds?: SvgFolds;
 	/** D118: the user's break places for long names, as `SceneOptions.breaks`. */
 	breaks?: BreakList;
+	/** 0.2.7 (F.5): the heirs of the Show view, as `SceneOptions.heirs`; each gets the still outline (`HEIR_LOOK`) in the fixed colours. */
+	heirs?: Iterable<string>;
+	/** 0.2.7 (F.4, F.5): the ordinal texts, as `SceneOptions.ordinals`; the layout names the cards (`TreeLayout.ordinalCards`). */
+	ordinals?: ReadonlyMap<string, string>;
+	/** 0.2.7 (F.5): with `saved`, the bar sentence of the Show view ("Line of succession: Duke of Valmont, 1210"), the second text line under the heading. Pass the same text to `savedExtent`. */
+	barSentence?: string;
 }
 
 /** D40: the font of the relation text, as `relationFont` in `dom/scene.ts`: italic, "You" bold italic (D117). */
@@ -134,7 +141,7 @@ export function renderSvg(g: FamilyGraph, layout: TreeLayout, edges: EdgeDrawing
 	const out: string[] = [];
 	let frame: SavedFrame | undefined;
 	if (saved) {
-		frame = savedFrame(layout, saved.legend, saved.heading, layout.geometry.fontPx, measured!, fonts, saved.scale, cutWith);
+		frame = savedFrame(layout, saved.legend, saved.heading, layout.geometry.fontPx, measured!, fonts, saved.scale, cutWith, opts.barSentence);
 		const W = frame.w;
 		const H = frame.h;
 		const scale = saved.scale > 0 ? saved.scale : 1;
@@ -143,6 +150,8 @@ export function renderSvg(g: FamilyGraph, layout: TreeLayout, edges: EdgeDrawing
 		out.push(`<rect width="${W}" height="${H}" fill="#ffffff"/>`);
 		const h = frame.heading;
 		out.push(`<text x="${h.x}" y="${h.y}" font-size="${h.size}" font-weight="${esc(h.weight)}" font-family="${esc(fonts.ui)}" fill="${c.text}"${di('heading')}>${esc(h.text)}</text>`);
+		const sentence = frame.sentence;
+		if (sentence) out.push(`<text x="${sentence.x}" y="${sentence.y}" font-size="${sentence.size}" font-weight="${esc(sentence.weight)}" font-family="${esc(fonts.ui)}" fill="${c.text}"${di('heading-sentence')}>${esc(sentence.text)}</text>`);
 		out.push(`<g transform="translate(${frame.tree.x} ${frame.tree.y})">`);
 	} else {
 		const m = opts.margin ?? 24;
@@ -186,13 +195,15 @@ export function renderSvg(g: FamilyGraph, layout: TreeLayout, edges: EdgeDrawing
 	const signed = illegitimateSigns(g, edges);
 	const nameWeight = opts.fonts ? fonts.bold : '600';
 	let clips = 0;
+	const heirIds = new Set(opts.heirs ?? []);
+	const ordinalIds = new Set(layout.ordinalCards ?? []);
 	for (const box of layout.persons.values()) {
 		const p = g.byId.get(box.id)!;
 		const house = p.house ? g.houses.get(p.house) : undefined;
 		const hex = house?.color && /^#[0-9a-f]{3}([0-9a-f]{3})?$/i.test(house.color) ? house.color : undefined;
 		// R2: a saved file has no page to resolve a `var()` or an unknown word, so it draws only fixed colours.
 		const accent = hex ? stripColour(hex, c, dark) : saved ? (fixedColour(house?.color) ?? c.noHouse) : (house?.color ?? c.noHouse);
-		const dead = p.died !== undefined;
+		const dead = isDead(p);
 		const count = nameCountOf(box);
 		// M8: the card's name and title text lines; without a label, the person's own (M7).
 		const cl = opts.labels?.get(p.id);
@@ -212,7 +223,10 @@ export function renderSvg(g: FamilyGraph, layout: TreeLayout, edges: EdgeDrawing
 		const hasArms = !!(box.arms && house);
 		// The Roundel's pictures stand on its top edge (`rp`); the text card has none.
 		const rp = roundel ? roundelPics(geo, { arms: hasArms, portrait: !!box.portrait }) : undefined;
-		const tab = layout.youTab === p.id ? youTabRect(geo, !!(rp?.portrait || rp?.arms)) : undefined;
+		// F.4: the ordinal tab replaces the "You" tab of the same card.
+		const ordinal = ordinalIds.has(p.id) ? opts.ordinals?.get(p.id) : undefined;
+		const tab = layout.youTab === p.id && !ordinal ? youTabRect(geo, !!(rp?.portrait || rp?.arms)) : undefined;
+		const ordTab = ordinal ? ordinalTabRect(geo, !!rp?.portrait, !!rp?.arms, [...ordinal].length) : undefined;
 		const nameFont = fontOf(fonts.bold, t.nameSize, fonts.text);
 		const sobFont = fontOf('400', t.nameSize, fonts.text);
 		const smallFont = fontOf('400', t.smallSize, fonts.text);
@@ -221,8 +235,11 @@ export function renderSvg(g: FamilyGraph, layout: TreeLayout, edges: EdgeDrawing
 		const nameMeasure: NameMeasure = measured ? (s, sob) => measured(s, sob ? sobFont : nameFont) : (s, sob) => textWidth(s, t.nameSize, !sob);
 		const names = cardNameLines(shownName, cl?.sobriquet ?? p.sobriquet, nameRoom(geo, t, signed.has(p.id), ring), nameMeasure, count, opts.breaks);
 		out.push(`<g${di(`card:${p.id}`)}${fadeAttr(look.card(p.id))}>`);
+		// F.2, F.5: the heir's still outline, as the highlight of the screen at rest: a wide ring in the text colour under the card, and an accent border. The marked heir keeps its border in the text colour (D153), so its ring takes the accent.
+		const heir = heirIds.has(p.id);
+		if (heir) out.push(`<rect x="${box.x}" y="${box.y}" width="${box.w}" height="${box.h}" rx="6" fill="none" stroke="${isMe ? c.accent : c.text}" stroke-width="${HEIR_LOOK.ring}"${di(`heir:${p.id}`)}/>`);
 		// D41, D153: the marked card has one thicker border in the text colour; no theme accent colour is used.
-		const border = isMe ? `stroke="${c.text}" stroke-width="${ME_LOOK.border}"` : `stroke="${c.cardBorder}"`;
+		const border = isMe ? `stroke="${c.text}" stroke-width="${ME_LOOK.border}"` : heir ? `stroke="${c.accent}" stroke-width="${HEIR_LOOK.border}"` : `stroke="${c.cardBorder}"`;
 		out.push(`<rect x="${box.x}" y="${box.y}" width="${box.w}" height="${box.h}" rx="6" fill="${c.cardFill}" ${border}/>`);
 		const barFill = `fill="${esc(accent)}"${dead ? ` fill-opacity="${DEAD_STRIP_OPACITY}"` : ''}`;
 		// D176 (1): on the marked card the bar lies inside the thick border (it starts at the inner edge and follows the inner corners); other cards keep the bar at the card edge.
@@ -313,6 +330,14 @@ export function renderSvg(g: FamilyGraph, layout: TreeLayout, edges: EdgeDrawing
 			out.push(`<rect ${spot} fill="${c.cardFill}" stroke="${c.cardFill}" stroke-width="${ROUNDEL_LOOK.tabStroke}"/>`);
 			out.push(`<rect ${spot} fill="${esc(accent)}" fill-opacity="${tabOpacity}" stroke="${esc(accent)}" stroke-opacity="${ROUNDEL_LOOK.hairline.opacity}" stroke-width="${ROUNDEL_LOOK.hairline.width}"${di(`tab:${p.id}`)}/>`);
 			out.push(`<text x="${box.x + tab.x + tab.w / 2}" y="${box.y + tab.y + tab.h / 2 + 0.35 * TAB_TEXT_EM * geo.fontPx}" font-size="${TAB_TEXT_EM * geo.fontPx}" font-style="italic" font-weight="${esc(nameWeight)}" text-anchor="middle" fill="${c.text}">${ME_WORD}</text>`);
+		}
+		if (ordTab) {
+			// F.4: the ordinal tab, in the fixed colours: a card-colour base, the house tint of the plate, a 1 px border and the text in the text colour, bold, not italic.
+			const spot = `x="${box.x + ordTab.x}" y="${box.y + ordTab.y}" width="${ordTab.w}" height="${ordTab.h}" rx="${ORDINAL_EM.corner * geo.fontPx}"`;
+			const tabOpacity = dark ? ROUNDEL_LOOK.plate.dark : ROUNDEL_LOOK.plate.light;
+			out.push(`<rect ${spot} fill="${c.cardFill}"/>`);
+			out.push(`<rect ${spot} fill="${esc(accent)}" fill-opacity="${tabOpacity}" stroke="${c.text}" stroke-width="${HEIR_LOOK.tabBorder}"${di(`ordinal:${p.id}`)}/>`);
+			out.push(`<text x="${box.x + ordTab.x + ordTab.w / 2}" y="${box.y + ordTab.y + ordTab.h / 2 + 0.35 * ORDINAL_EM.text * geo.fontPx}" font-size="${ORDINAL_EM.text * geo.fontPx}" font-weight="${esc(nameWeight)}" text-anchor="middle" fill="${c.text}">${esc(ordinal!)}</text>`);
 		}
 		out.push(`</g>`);
 	}

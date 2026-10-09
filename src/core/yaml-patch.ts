@@ -15,11 +15,14 @@ import { REFUSAL_TEXT } from './refusal-text';
 import { normaliseSobriquet } from './sobriquet';
 
 /** §4.1 and §13.0 field order; a new key goes after the nearest earlier key that is present. */
-export const PERSON_ORDER = ['id', 'name', 'sobriquet', 'title', 'card-title', 'house', 'sex', 'born', 'died', 'parents', 'placement', 'illegitimate', 'union', 'link', 'portrait', 'portrait-crop', 'notes'];
+export const PERSON_ORDER = ['id', 'name', 'sobriquet', 'title', 'card-title', 'house', 'sex', 'born', 'died', 'parents', 'placement', 'illegitimate', 'childless', 'union', 'link', 'portrait', 'portrait-crop', 'notes'];
 /** §4.1 and §13.0 order of the `options` keys. */
 export const OPTION_ORDER = ['start', 'focus', 'me', 'generations', 'height'];
 /** §4.1 and §13.0 order of the top-level sections. */
 export const TOP_ORDER = ['options', 'houses', 'titles', 'people', 'unions'];
+
+/** The person fields that hold a yes or no: `illegitimate` and `childless` (M.5). */
+export const isBooleanField = (field: string): boolean => field === 'illegitimate' || field === 'childless';
 
 /**
  * Fields read as text whatever YAML would type them as (spec §3, §6.8): a new `1103` is written
@@ -28,7 +31,7 @@ export const TOP_ORDER = ['options', 'houses', 'titles', 'people', 'unions'];
 export const TEXT_FIELDS = new Set(['id', 'house', 'card-title', 'born', 'died', 'union', 'start', 'focus', 'me', 'end']);
 
 /** The person fields `personValue` and `sameValue` handle. */
-export const PERSON_FIELDS: readonly PersonField[] = ['name', 'sobriquet', 'title', 'card-title', 'house', 'sex', 'born', 'died', 'illegitimate', 'link', 'portrait', 'portrait-crop', 'notes', 'placement'];
+export const PERSON_FIELDS: readonly PersonField[] = ['name', 'sobriquet', 'title', 'card-title', 'house', 'sex', 'born', 'died', 'illegitimate', 'childless', 'link', 'portrait', 'portrait-crop', 'notes', 'placement'];
 
 /**
  * Picture keys (spec §13.0 item 3): always written in double quotes, whatever the text is, so a
@@ -748,10 +751,10 @@ export function addSection(p: Parsed, key: string, value: Extract<NewValue, { bl
 
 /** Checks and normalises one person field's new value, or refuses it (spec §4.1). */
 export function personValue(field: PersonField, value: FieldValue): { write: string | null } | Refusal {
-	if (field === 'illegitimate') {
+	if (isBooleanField(field)) {
 		if (value === null || value === false) return { write: null };
 		if (value === true) return { write: 'true' };
-		return refuse('bad-value', 'illegitimate must be true, false or null.');
+		return refuse('bad-value', `${field} must be true, false or null.`);
 	}
 	// Callers outside TypeScript can pass anything (spec §8: refuse, never throw).
 	if (value !== null && typeof value !== 'string') return refuse('bad-value', `${field} must be text.`);
@@ -768,7 +771,7 @@ export function personValue(field: PersonField, value: FieldValue): { write: str
  * the value's source text: `parse.ts` reads an unquoted [[x,y]] as that text, so it is compared so here.
  */
 export function sameValue(field: PersonField, raw: Raw, write: string | null, written?: () => string | undefined): boolean {
-	if (field === 'illegitimate') return bool(raw) === (write === 'true');
+	if (isBooleanField(field)) return bool(raw) === (write === 'true');
 	// Two parts are the same when their numbers agree at 4 decimals, whatever the source text (spec §13.13).
 	if (field === 'portrait-crop') return sameCropText(cropValue(raw), write === null ? undefined : write);
 	// The model unwraps a pair of marks around a sobriquet, so the old and the new text are compared the way the model reads them.

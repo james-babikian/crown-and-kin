@@ -233,16 +233,17 @@ describe('the search of the list (D.3.3)', () => {
 // ---------- the edit page ----------
 
 describe('the edit page of a title (D.3.5, D.3.7)', () => {
-	it('has the four fields, the holder panel and Other actions, in this order', () => {
+	it('has the four fields, the holder panel, the Succession section (0.2.7) and Other actions, in this order', () => {
 		const o = openWin();
 		const page = openPage(o.content, 'duke-of-valmont');
 		expect(page.getAttribute('data-title')).toBe('duke-of-valmont');
-		expect(page.children.map((c) => (c.hasClass('dynasty-sheet-field') ? [...c.classes].find((x) => /^dynasty-title-/.test(x))! : [...c.classes].find((x) => /^dynasty-(holder-panel|lw-actions)$/.test(x))!))).toEqual([
+		expect(page.children.map((c) => (c.hasClass('dynasty-sheet-field') ? [...c.classes].find((x) => /^dynasty-title-/.test(x))! : [...c.classes].find((x) => /^dynasty-(holder-panel|succ|lw-actions)$/.test(x))!))).toEqual([
 			'dynasty-title-name',
 			'dynasty-title-male',
 			'dynasty-title-female',
 			'dynasty-title-plural',
 			'dynasty-holder-panel',
+			'dynasty-succ',
 			'dynasty-lw-actions',
 		]);
 		expect(page.children[page.children.length - 1]!.hasClass('dynasty-lw-actions')).toBe(true);

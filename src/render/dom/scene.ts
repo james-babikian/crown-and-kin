@@ -45,8 +45,9 @@
 
 import type { FamilyGraph } from '../../core/derive';
 import type { CardLabel } from '../../core/titles';
+import { isDead } from '../../core/succession-keys';
 import type { Person } from '../../core/types';
-import { ROUNDEL_EM, centredWithoutWord, cardText, isRoundel, nameCountOf, nameRoom, relationY, roundelPics, signBelowRing, signBottomOf, tagTop, youTabRect, type CardText, type ShownLines } from '../../layout/geometry';
+import { ORDINAL_EM, ROUNDEL_EM, centredWithoutWord, cardText, isRoundel, nameCountOf, nameRoom, ordinalTabRect, relationY, roundelPics, signBelowRing, signBottomOf, tagTop, youTabRect, type CardText, type ShownLines } from '../../layout/geometry';
 import { farTagSigns } from '../../layout/far-tag-sign';
 import { illegitimateSigns } from '../../layout/index';
 import type { FarTag, LaidOut, NameLineCount, PersonBox, PlacedFoldControl, Rect } from '../../layout/model';
@@ -125,6 +126,16 @@ export interface SceneOptions {
 	lazyCards?: boolean;
 	/** D118: the user's break places for long names (`parseBreakList`); `tallCardsFor` and the saved picture read the same list. */
 	breaks?: BreakList;
+	/**
+	 * 0.2.7 (F.2): the heirs of the Show view of a line of succession (ids). Each such card gets the class `dynasty-heir` when it is made (cards are
+	 * lazy, so a class added later would miss the cards not built yet). The look is in styles.css.
+	 */
+	heirs?: Iterable<string>;
+	/**
+	 * 0.2.7 (F.4): the ordinal text of each heir ("2nd"), by person id. A card gets the ordinal tab only if its id is also in `TreeLayout.ordinalCards`
+	 * (the layout made room for it); the tab replaces the "You" tab of the same card. The texts are never part of the layout.
+	 */
+	ordinals?: ReadonlyMap<string, string>;
 }
 
 /** The DOM event that makes the tree view attach all delayed content at once (for the harness and the tests). */
@@ -584,6 +595,8 @@ export function buildScene(parent: SVGGElement, g: FamilyGraph, laid: LaidOut, o
 		fitters.push(run);
 	};
 
+	const heirIds = new Set(opts.heirs ?? []);
+	const ordinalIds = new Set(layout.ordinalCards ?? []);
 	for (const box of layout.persons.values()) {
 		const p = g.byId.get(box.id);
 		if (!p) continue;
@@ -595,7 +608,7 @@ export function buildScene(parent: SVGGElement, g: FamilyGraph, laid: LaidOut, o
 		const shownName = cl ? cl.name : p.name;
 		// §13.1: the label names the relation, also when a class hides the text on the card.
 		const label = cardLabel(p, isMe ? 'you' : relation?.lower, cl);
-		const cls = ['dynasty-card', ...(roundel ? ['dynasty-card-r1'] : ['dynasty-card-tc']), ...(p.died !== undefined ? ['dynasty-deceased'] : []), ...(isMe ? ['dynasty-card-me'] : []), ...stateCls(look.card(p.id))];
+		const cls = ['dynasty-card', ...(roundel ? ['dynasty-card-r1'] : ['dynasty-card-tc']), ...(isDead(p) ? ['dynasty-deceased'] : []), ...(heirIds.has(p.id) ? ['dynasty-heir'] : []), ...(isMe ? ['dynasty-card-me'] : []), ...stateCls(look.card(p.id))];
 		const card = cardsEl.createSvg('g', {
 			cls: cls.length === 1 ? 'dynasty-card' : cls,
 			attr: { tabindex: 0, role: 'group', 'aria-label': label, 'data-person': p.id },
@@ -612,18 +625,25 @@ export function buildScene(parent: SVGGElement, g: FamilyGraph, laid: LaidOut, o
 		// A lazy card keeps only its bg rect (its size and hit area). Its ring is made by `fillPerson` and `fillAll` only (B8 3): the ring shows only
 		// for the keyboard focus and the highlight, and both ask for the person first.
 		const ringInfo = { cls: 'dynasty-card-ring', attr: { x: box.x, y: box.y, width: box.w, height: box.h } };
-		if (!lazy) card.createSvg('rect', ringInfo);
+		// An heir of the Show view has its outline ring in the shell: the ring is part of the outline that shows at once (F.2), so a lazy fill must not wait for it.
+		const ringNow = !lazy || heirIds.has(p.id);
+		if (ringNow) card.createSvg('rect', ringInfo);
 		const bg = card.createSvg('rect', { cls: 'dynasty-card-bg', attr: { x: box.x, y: box.y, width: box.w, height: box.h } });
 		// B.3.3: the Roundel's medallion and arms stand on the top edge; the text card has none (it never reads the picture flags).
 		const hasArms = !!(box.arms && house);
 		const rp = roundel ? roundelPics(geo, { arms: hasArms, portrait: !!box.portrait }) : undefined;
-		const hasTab = layout.youTab === p.id;
+		// F.4: the ordinal tab replaces the "You" tab of the same card.
+		const ordinal = ordinalIds.has(p.id) ? opts.ordinals?.get(p.id) : undefined;
+		const hasTab = layout.youTab === p.id && !ordinal;
 		// B.3.6: a press on the part that sticks out above the card (the halo, the arms, the tab) opens the sheet and never pans; it is in the shell, so a card that is not filled yet has it.
 		const above: number[] = [];
 		if (rp?.portrait) above.push(rp.cx - rp.haloR, rp.cx + rp.haloR);
 		if (rp?.arms) above.push(rp.arms.x, rp.arms.x + rp.arms.w);
 		const tab = hasTab ? youTabRect(geo, !!(rp?.portrait || rp?.arms)) : undefined;
 		if (tab) above.push(tab.x, tab.x + tab.w);
+		const ordTab = ordinal ? ordinalTabRect(geo, !!rp?.portrait, !!rp?.arms, [...ordinal].length) : undefined;
+		// F.4: the ordinal tab has no tap target of its own; a press on it is a press on the card, through the same crown area as the "You" tab.
+		if (ordTab) above.push(ordTab.x, ordTab.x + ordTab.w);
 		if (above.length && geo.reach) {
 			const x0 = Math.min(...above);
 			card.createSvg('rect', { cls: 'dynasty-card-crown-hit', attr: { x: box.x + x0, y: box.y - geo.reach, width: Math.max(...above) - x0, height: geo.reach } });
@@ -750,6 +770,14 @@ export function buildScene(parent: SVGGElement, g: FamilyGraph, laid: LaidOut, o
 			tabEl.createSvg('rect', { cls: 'dynasty-r1-tab', attr: { x: box.x + tab.x, y: box.y + tab.y, width: tab.w, height: tab.h, rx: tab.h / 2 } });
 			tabEl.createSvg('text', { cls: 'dynasty-r1-tab-text', attr: { x: box.x + tab.x + tab.w / 2, y: box.y + tab.y + tab.h / 2 + 0.35 * TAB_TEXT_EM * f } }).setText(ME_WORD);
 		}
+		if (ordTab) {
+			// F.4: the ordinal tab, at the Full level only like the "You" tab. A card-colour base under the tint keeps the border and the line above the card from showing through.
+			const tabEl = full.createSvg('g', { cls: 'dynasty-ordinal-tab-group', attr: { 'aria-hidden': 'true' } });
+			const rect = { x: box.x + ordTab.x, y: box.y + ordTab.y, width: ordTab.w, height: ordTab.h, rx: ORDINAL_EM.corner * f };
+			tabEl.createSvg('rect', { cls: 'dynasty-ordinal-tab-base', attr: rect });
+			tabEl.createSvg('rect', { cls: 'dynasty-ordinal-tab', attr: rect });
+			tabEl.createSvg('text', { cls: 'dynasty-ordinal-tab-text', attr: { x: box.x + ordTab.x + ordTab.w / 2, y: box.y + ordTab.y + ordTab.h / 2 + 0.35 * ORDINAL_EM.text * f } }).setText(ordinal!);
+		}
 
 		const compact = body.createSvg('text', {
 			cls: 'dynasty-card-compact',
@@ -766,7 +794,7 @@ export function buildScene(parent: SVGGElement, g: FamilyGraph, laid: LaidOut, o
 		fitted(compact, shownName, compactNameW, compactFont);
 		if (shownCs) drawSign(body.createSvg('g', { cls: 'dynasty-card-compact-sign' }), box.x, box.y, shownCs);
 		if (lazy) {
-			let ringMade = false;
+			let ringMade = ringNow;
 			rings.set(p.id, () => {
 				if (ringMade) return;
 				ringMade = true;

@@ -9,6 +9,7 @@
 
 import { slugify } from './id-gen';
 import { quote } from './quote';
+import { INHERIT_ILLEGITIMATE, INHERIT_RULES, INHERIT_THROUGH, SUCCESSION_RULES } from './succession-keys';
 
 /** Tree not rendered (spec §8). */
 export type HardErrorCode =
@@ -88,6 +89,27 @@ export type WarningCode =
 	| 'picture-not-image'
 	/** A picture of more than 40 million pixels. params: owner, house or person, file; pixels (millions, rounded up) when known */
 	| 'picture-too-large'
+	// Succession keys on a title (contract 0.2.7 A.5, K.4). Found by `validate.ts`.
+	/** `succession` names no rule. params: title (name), value (as written, or the flow text of a list or map) */
+	| 'unknown-succession'
+	/** `inherit` names no rule. params: title (name), value */
+	| 'unknown-inherit'
+	/** `inherit-through` is not men, women or anyone. params: title (name), value */
+	| 'unknown-inherit-through'
+	/** `inherit-illegitimate` is not no, after or equal. params: title (name), value */
+	| 'unknown-inherit-illegitimate'
+	/** `year` has no year in it, and the title has a rule or a named heir. params: title (name), value */
+	| 'year-unreadable'
+	/** `heir` names nobody. params: title (name), ref */
+	| 'missing-heir'
+	/** `exclude` names nobody. params: title (name), ref */
+	| 'missing-excluded'
+	/** A `sex` that is a spelling of m or f, but not m or f. params: person (name), value */
+	| 'sex-spelling'
+	/** A `died` that is a doubt, not a date; the plugin counts the person as dead. params: person (name), value */
+	| 'died-doubtful'
+	/** A dead person with `childless: true` who is the birth parent of another person (M.6). params: person (name), child (name) */
+	| 'childless-has-child'
 	// Portrait crop (spec §13.13). Found by `validate.ts`: it needs no vault.
 	/** A `portrait-crop` that is not three numbers, on a person with a `portrait`. params: person (name) */
 	| 'bad-portrait-crop'
@@ -365,6 +387,41 @@ const ISSUE_TEXT: { [C in IssueCode]: (p: P) => string } = {
 	'picture-too-large': pictureTooLarge,
 	'bad-portrait-crop': (p) =>
 		`The plugin cannot read the selected part of the portrait of ${s(p, 'person', 'a person')}, so the card shows the automatic part. Select the part again, or remove ${quote('portrait-crop')}.`,
+
+	'unknown-succession': (p) => {
+		const value = s(p, 'value', '?');
+		const lower = value.trim().toLowerCase();
+		const hint =
+			lower === 'salic'
+				? ' For the Salic law, use “succession: eldest-child” with “inherit: men-only”.'
+				: lower === 'semi-salic'
+					? ' For the semi-Salic law, use “succession: eldest-child” with “inherit: men-first-in-house”.'
+					: '';
+		return `${cap(titleOf(p))} has “succession: ${value}”. The plugin does not know this rule, so it shows no line of succession. Use one of these rules: ${SUCCESSION_RULES.join(', ')}.${hint}`;
+	},
+	'unknown-inherit': (p) =>
+		`${cap(titleOf(p))} has “inherit: ${s(p, 'value', '?')}”. The plugin does not know this rule, so it shows no line of succession. Use one of these rules: ${INHERIT_RULES.join(', ')}.`,
+	'unknown-inherit-through': (p) =>
+		`${cap(titleOf(p))} has “inherit-through: ${s(p, 'value', '?')}”. The plugin does not know this rule, so it shows no line of succession. Use one of these rules: ${INHERIT_THROUGH.join(', ')}.`,
+	'unknown-inherit-illegitimate': (p) =>
+		`${cap(titleOf(p))} has “inherit-illegitimate: ${s(p, 'value', '?')}”. The plugin does not know this value, so it shows no line of succession. Use one of these values: ${INHERIT_ILLEGITIMATE.join(', ')}.`,
+	'year-unreadable': (p) =>
+		`${cap(titleOf(p))} has “year: ${s(p, 'value', '?')}”. The plugin cannot find a year in it, so the line of succession uses the end of the last reign. Write the year as a number, for example “year: 1210”.`,
+	'missing-heir': (p) => `${cap(titleOf(p))} has “heir: ${s(p, 'ref', '?')}”, but no person has this ID. Correct the ID, or remove it.`,
+	'missing-excluded': (p) => `${cap(titleOf(p))} has “exclude: ${s(p, 'ref', '?')}”, but no person has this ID. Correct the ID, or remove it.`,
+	'sex-spelling': (p) => {
+		const value = s(p, 'value', '?');
+		return `${person(p)} has “sex: ${value}”. The plugin reads only “m” and “f” as a man and a woman. If you mean a man or a woman, write “sex: m” or “sex: f”.`;
+	},
+	'died-doubtful': (p) => {
+		const value = s(p, 'value', '?');
+		return `${person(p)} has “died: ${value}”. The plugin counts ${person(p)} as dead. If ${person(p)} is alive, remove “died: ${value}” from the note.`;
+	},
+
+	'childless-has-child': (p) => {
+		const name = person(p);
+		return `${name} has “childless: true”, but ${s(p, 'child', 'a person')} is a child of ${name} in the tree. Remove “childless: true”, or correct the parents of ${s(p, 'child', 'a person')}.`;
+	},
 
 	'entry-not-map': entryNotMap,
 	'missing-id': missingId,

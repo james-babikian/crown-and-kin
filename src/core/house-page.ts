@@ -22,6 +22,7 @@ import type { FamilyGraph } from './derive';
 import { computeGenerations } from './generations';
 import { computeModelOrder } from './order';
 import { withSobriquet } from './sobriquet';
+import { isDead } from './succession-keys';
 import { cardLabels, noteName, tableCell } from './titles';
 import type { House } from './types';
 
@@ -72,7 +73,8 @@ export function housePage(g: FamilyGraph, houseId: string): HousePage | null {
 			name: withSobriquet(label?.numbered ? label.name : p.name, p.sobriquet),
 			title: [label?.title, label?.reign].filter((x) => x !== undefined && x !== '').join(' '),
 			born: p.born ?? '',
-			died: p.died ?? '',
+			// K.7: an alive word (`died: no`) is not a date, so the cell stays empty.
+			died: isDead(p) ? p.died ?? '' : '',
 		};
 	});
 	return { house: head, count: rows.length, rows };

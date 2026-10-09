@@ -1038,6 +1038,12 @@ textarea.dynasty-sheet-input {
 	min-height: 5em;
 }
 
+/* M.8: a checkbox with a hint under it (No children): the box and its hint stand in one column. */
+.dynasty-sheet-check-pair {
+	display: flex;
+	flex-direction: column;
+}
+
 .dynasty-sheet-check {
 	flex-direction: row;
 	align-items: center;
@@ -2336,6 +2342,212 @@ body.dynasty-fullscreen-open .popover.hover-popover {
 	width: 100%;
 }
 
+/*
+ * The Succession section of the Titles window (contract 0.2.7 E). One field under the other. On a computer the choices are
+ * dropdowns; on a phone they are columns of buttons, because the long names with their terms do not fit a closed dropdown at 390 px.
+ */
+.dynasty-lw .dynasty-succ {
+	display: flex;
+	flex-direction: column;
+	gap: var(--size-4-3);
+	margin-top: var(--size-4-4);
+	padding-top: var(--size-4-3);
+	border-top: 1px solid var(--background-modifier-border);
+}
+
+.dynasty-succ-body {
+	display: flex;
+	flex-direction: column;
+	gap: var(--size-4-3);
+}
+
+.dynasty-succ-pair {
+	display: flex;
+	flex-direction: column;
+	gap: var(--size-4-1);
+}
+
+.dynasty-succ-body select.dynasty-sheet-input,
+.dynasty-succ-body input.dynasty-succ-year {
+	min-height: 44px;
+}
+
+.dynasty-sheet.is-phone .dynasty-succ-body select.dynasty-sheet-input,
+.dynasty-sheet.is-phone .dynasty-succ-body input.dynasty-succ-year {
+	/* A field under 16 px makes iOS zoom into the page. */
+	font-size: max(16px, var(--font-ui-medium));
+}
+
+.dynasty-succ-choices {
+	display: flex;
+	flex-direction: column;
+	gap: var(--size-4-1);
+}
+
+.dynasty-sheet button.dynasty-succ-choice {
+	justify-content: flex-start;
+	width: 100%;
+	height: auto;
+	min-height: 44px;
+	padding: var(--size-4-1) var(--size-4-3);
+	text-align: left;
+	white-space: normal;
+	border: 1px solid var(--background-modifier-border);
+}
+
+/* The chosen button shows a check mark and a thick edge, so colour is not the only sign. */
+.dynasty-succ-choice::before {
+	content: '';
+	flex: none;
+	width: 1.5em;
+}
+
+.dynasty-sheet button.dynasty-succ-choice.is-selected {
+	font-weight: var(--font-semibold);
+	box-shadow: inset 0 0 0 2px var(--interactive-accent);
+}
+
+.dynasty-succ-choice.is-selected::before {
+	content: '\2713';
+}
+
+.dynasty-succ-switch {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--size-4-3);
+	min-height: 44px;
+	cursor: pointer;
+}
+
+.dynasty-succ-switch-text {
+	color: var(--text-normal);
+	font-size: var(--font-ui-small);
+	font-weight: var(--font-semibold);
+}
+
+.dynasty-succ-switch .checkbox-container {
+	flex: none;
+}
+
+/* The summary sentence is for a screen reader; it takes no room. */
+.dynasty-succ-live {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	margin: -1px;
+	padding: 0;
+	overflow: hidden;
+	clip-path: inset(50%);
+	white-space: nowrap;
+}
+
+.dynasty-succ-line {
+	display: flex;
+	flex-direction: column;
+	gap: var(--size-4-1);
+	padding: var(--size-4-2) var(--size-4-3);
+	border-radius: var(--radius-m);
+	background: var(--background-secondary);
+}
+
+.dynasty-succ-heading,
+.dynasty-succ-msg {
+	font-weight: var(--font-semibold);
+}
+
+.dynasty-succ-list {
+	display: flex;
+	flex-direction: column;
+}
+
+.dynasty-succ-item + .dynasty-succ-item {
+	border-top: 1px solid var(--background-modifier-border);
+}
+
+/* M.8: a grey row of an open branch stands between the heirs, in the same rhythm as an heir's row. */
+.dynasty-succ-item + .dynasty-succ-branch,
+.dynasty-succ-branch + .dynasty-succ-item,
+.dynasty-succ-branch + .dynasty-succ-branch {
+	border-top: 1px solid var(--background-modifier-border);
+}
+
+.dynasty-succ-row,
+.dynasty-succ-branch-row {
+	display: flex;
+	align-items: center;
+	gap: var(--size-4-2);
+	min-height: 44px;
+}
+
+.dynasty-succ-branch-row .dynasty-succ-ord,
+.dynasty-succ-branch .dynasty-holder-label {
+	color: var(--text-muted);
+}
+
+.dynasty-succ-branch-note {
+	margin-top: var(--size-4-1);
+}
+
+.dynasty-succ-ord {
+	flex: none;
+	min-width: 2.6em;
+	font-variant-numeric: tabular-nums;
+	font-weight: var(--font-semibold);
+}
+
+.dynasty-succ-note,
+.dynasty-succ-subnote {
+	display: flex;
+	align-items: flex-start;
+	gap: var(--size-4-2);
+	color: var(--text-normal);
+	font-size: var(--font-ui-small);
+}
+
+.dynasty-succ-subnote {
+	margin: 0 0 var(--size-4-2) calc(2.6em + var(--size-4-2));
+}
+
+.dynasty-succ-note-icon {
+	display: inline-flex;
+	flex: none;
+	margin-top: 2px;
+	color: var(--text-warning);
+}
+
+.dynasty-succ-note-icon .svg-icon {
+	width: 16px;
+	height: 16px;
+}
+
+.dynasty-succ-more {
+	color: var(--text-muted);
+	font-size: var(--font-ui-small);
+}
+
+.dynasty-succ-buttons {
+	display: flex;
+	margin-top: var(--size-4-2);
+}
+
+.dynasty-sheet .dynasty-succ-buttons .dynasty-sheet-action,
+.dynasty-sheet .dynasty-succ-people .dynasty-succ-add {
+	width: auto;
+	min-height: 44px;
+}
+
+.dynasty-sheet.is-phone .dynasty-succ-buttons .dynasty-sheet-action,
+.dynasty-sheet.is-phone .dynasty-succ-people .dynasty-succ-add {
+	width: 100%;
+}
+
+/* On a phone Obsidian paints a button with a flat fill and no shadow. In the light default theme and in Minimal that fill equals the fill of the panel, so the button is not visible as a button. A thin edge in a text colour of the theme shows it. The computer keeps the shadow of the theme. */
+.dynasty-sheet.is-phone .dynasty-succ-buttons .dynasty-sheet-action,
+.dynasty-sheet.is-phone .dynasty-succ-people .dynasty-sheet-action {
+	border: 1px solid var(--text-faint);
+}
+
 /* The holder form: Number beside Ruler name, From beside Until; the live preview below them (spec §13.5). */
 .dynasty-holder-form-row {
 	display: grid;
@@ -3478,7 +3690,8 @@ body.dynasty-fullscreen-open .popover.hover-popover {
 .dynasty-lod-compact .dynasty-card-r1 .dynasty-card-full > .dynasty-r1-plate,
 .dynasty-lod-compact .dynasty-card-r1 .dynasty-card-full > .dynasty-r1-plate-line,
 .dynasty-lod-compact .dynasty-card-r1 .dynasty-card-full > .dynasty-sign,
-.dynasty-lod-compact .dynasty-card-r1 .dynasty-card-full > .dynasty-r1-tab-group {
+.dynasty-lod-compact .dynasty-card-r1 .dynasty-card-full > .dynasty-r1-tab-group,
+.dynasty-lod-compact .dynasty-card-r1 .dynasty-card-full > .dynasty-ordinal-tab-group {
 	display: none;
 }
 
@@ -3763,7 +3976,13 @@ body.dynasty-fullscreen-open .popover.hover-popover {
 	gap: var(--size-4-3);
 	width: 100%;
 	min-width: 0;
-	padding-right: var(--size-4-3);
+	/*
+	 * D184: the other rows keep a 1 px border, a 44 px pencil column (its centre is 22.5 px from the edge) and 0.5 em before the pictures.
+	 * This row keeps a 2 px border (D153), so the room is made up inside the row: the pencil stands where the other pencils stand, and the
+	 * pictures end where the other pictures end. The icon size is --icon-size, which is --icon-m (18 px on a computer, 20 px on Obsidian mobile, scaled by the
+	 * text scale), so the padding and the icon margin are worked from it: 2 + padding + icon / 2 = 22.5, and 2 + padding + icon + 12 (gap) + margin = 45 + 0.5em.
+	 */
+	padding-right: calc(20.5px - var(--icon-size, var(--icon-m, 18px)) / 2);
 }
 
 .dynasty-list button.dynasty-list-edit.dynasty-list-whole:disabled {
@@ -3775,6 +3994,19 @@ body.dynasty-fullscreen-open .popover.hover-popover {
 	display: flex;
 	flex: none;
 	color: var(--text-muted);
+}
+
+.dynasty-list button.dynasty-list-edit.dynasty-list-whole .dynasty-list-edit-icon {
+	margin-left: calc(10.5px + 0.5em - var(--icon-size, var(--icon-m, 18px)) / 2);
+}
+
+/* D184: the house bar and the text start where they start in the other rows (the bar covers the extra pixel of the border). */
+.dynasty-list-me button.dynasty-list-whole .dynasty-list-strip {
+	margin-left: -1px;
+}
+
+.dynasty-list.is-read-only .dynasty-list-me button.dynasty-list-whole {
+	padding-right: calc(0.5em - 1px);
 }
 
 .dynasty-list.is-read-only .dynasty-list-edit:not(.dynasty-list-whole),
@@ -3929,6 +4161,147 @@ body.dynasty-fullscreen-open .popover.hover-popover {
 }
 
 
+
+/* ---------- Version 0.2.7: the Show view of a line of succession (contract F, M.9) ---------- */
+
+/*
+ * An heir's card has the still outline of the highlight look (the pulse is never used): an accent border and a text-colour ring outside it,
+ * lighter than the highlight (6 px ring, 3 px border instead of 9 and 5) because a line of 20 heirs shows many outlines at once. The ring is
+ * a stroke centred on the card's edge, so the card covers its inner half. The marked heir keeps its 3 px text-colour border (D153); its ring
+ * takes the accent instead.
+ */
+.dynasty-card.dynasty-heir .dynasty-card-ring {
+	display: inline;
+	stroke-width: 6;
+}
+
+.dynasty-card.dynasty-heir .dynasty-card-bg {
+	stroke: var(--interactive-accent);
+	stroke-width: 3;
+}
+
+.dynasty-card.dynasty-heir.dynasty-card-me .dynasty-card-bg {
+	stroke: var(--text-normal);
+}
+
+.dynasty-card.dynasty-heir.dynasty-card-me .dynasty-card-ring {
+	stroke: var(--interactive-accent);
+}
+
+/* A highlight on an heir (Find, a tap on a name of the window) is the strong ring while it lasts. */
+.dynasty-card.dynasty-heir.dynasty-highlight .dynasty-card-ring {
+	stroke-width: 9;
+}
+
+.dynasty-card.dynasty-heir.dynasty-highlight .dynasty-card-bg {
+	stroke-width: 5;
+}
+
+/*
+ * The ordinal tab of an heir ("2nd") and of an open branch ("?"): a small plate on the top edge of the card, left of the medallion. The plate's
+ * background (the house colour tint, as the footer plate and the "You" tab have it), a 1 px border in the text colour and 0.2 em corners (the rx
+ * attribute). The text is 0.85 em, bold, upright. The card-colour base under the tint keeps the card border and the line above from showing through.
+ * The tab takes no press; the crown area holds it. It shows at the Full level only; the outline shows at every level.
+ */
+.dynasty-ordinal-tab-base {
+	fill: var(--background-primary-alt);
+	stroke: var(--background-primary-alt);
+	stroke-width: 1.5;
+	pointer-events: none;
+}
+
+.dynasty-ordinal-tab {
+	fill: var(--dynasty-house-color, var(--background-modifier-border));
+	fill-opacity: 0.17;
+	stroke: var(--text-normal);
+	stroke-width: 1;
+	pointer-events: none;
+}
+
+.theme-dark .dynasty-ordinal-tab {
+	fill-opacity: 0.26;
+}
+
+.theme-dark .dynasty-has-house .dynasty-ordinal-tab {
+	fill: var(--dynasty-house-color);
+	fill: color-mix(in srgb, var(--dynasty-house-color) 70%, var(--text-normal));
+}
+
+.dynasty-ordinal-tab-text {
+	font-size: calc(var(--dynasty-font-size) * 0.85);
+	font-style: normal;
+	font-weight: var(--bold-weight, 700);
+	fill: var(--text-normal);
+	text-anchor: middle;
+	pointer-events: none;
+}
+
+/* The bar of the Show view on the tree has the look and the place of the finder's result bar (.dynasty-result); only the text is its own. */
+.dynasty-succession-text {
+	overflow-wrap: anywhere;
+}
+
+.dynasty-succession-text:focus {
+	outline: none;
+}
+
+/*
+ * D192: on a computer the bar of the Show view puts the sentence on the left and Close on the right, in one row, centred; a long sentence wraps
+ * beside the button. The phone full-screen view (`.modal.dynasty-fullscreen.is-phone`) keeps the stacked bar. The phone list bar has no `dynasty-result`
+ * class, and the finder's result bar has no `dynasty-succession-bar` class, so neither matches.
+ */
+.dynasty-result.dynasty-succession-bar:not(.modal.dynasty-fullscreen.is-phone *) {
+	display: flex;
+	align-items: center;
+	gap: var(--size-4-4);
+}
+
+.dynasty-result.dynasty-succession-bar:not(.modal.dynasty-fullscreen.is-phone *) .dynasty-succession-text {
+	flex: 1 1 auto;
+	min-width: 0;
+}
+
+.dynasty-result.dynasty-succession-bar:not(.modal.dynasty-fullscreen.is-phone *) .dynasty-result-buttons {
+	flex: none;
+	margin: 0;
+}
+
+/*
+ * The same bar at the top of the phone list (F.6, D182): the sentence, and an icon-only Close with a 44 × 44 px target. In the flow of the
+ * list, not on a tree, so it has no absolute place.
+ */
+.dynasty-list-succession {
+	display: flex;
+	align-items: center;
+	gap: var(--size-4-2);
+	margin-bottom: var(--size-4-2);
+	padding: var(--size-4-2) var(--size-4-3);
+	background: var(--background-primary);
+	border: 1px solid var(--background-modifier-border);
+	border-radius: var(--radius-m);
+	font-family: var(--font-interface);
+	color: var(--text-normal);
+}
+
+.dynasty-list-succession .dynasty-succession-text {
+	flex: 1 1 auto;
+	min-width: 0;
+	font-size: var(--font-ui-medium);
+	font-weight: var(--font-semibold);
+	line-height: 1.35;
+}
+
+.dynasty-list-succession .dynasty-succession-close {
+	flex: none;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 44px;
+	height: 44px;
+	min-width: 44px;
+	min-height: 44px;
+	padding: 0;
+}
 
 /* ===== list windows (0.2.5, D134) ===== */
 

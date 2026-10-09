@@ -15,13 +15,15 @@
  *   file exists.
  */
 
+import type { InheritIllegitimate, InheritRule, InheritThrough, SuccessionRule } from './succession-keys';
+
 /**
  * Person fields the edit sheet can set (§6.3 "Fields"); `card-title` is written by "Show on the
  * card" (§13.3, D62), `portrait` by Select portrait and Remove portrait (§13.7).
  */
-export type PersonField = 'name' | 'sobriquet' | 'title' | 'card-title' | 'house' | 'sex' | 'born' | 'died' | 'illegitimate' | 'link' | 'portrait' | 'portrait-crop' | 'notes' | 'placement';
+export type PersonField = 'name' | 'sobriquet' | 'title' | 'card-title' | 'house' | 'sex' | 'born' | 'died' | 'illegitimate' | 'childless' | 'link' | 'portrait' | 'portrait-crop' | 'notes' | 'placement';
 
-/** A value an edit can write for a person field: text, a boolean (`illegitimate` only), or `null` to remove the key. */
+/** A value an edit can write for a person field: text, a boolean (`illegitimate` and `childless` only), or `null` to remove the key. */
 export type FieldValue = string | boolean | null;
 
 /** Sets or clears one or more fields of an existing person (§6.3 "Fields"). */
@@ -29,7 +31,7 @@ export interface SetPersonFields {
 	kind: 'set-person-fields';
 	id: string;
 	/**
-	 * Only the fields that changed. `null` removes the key. `illegitimate: false` removes the key.
+	 * Only the fields that changed. `null` removes the key. `illegitimate: false` and `childless: false` remove the key.
 	 * `id` gives a person with no written id that id: refused with `id-taken` if a person or a
 	 * reference uses it, `bad-value` if the person has a written id.
 	 */
@@ -264,7 +266,11 @@ export interface AddTitle {
 	plural?: string;
 }
 
-/** Rename a title or change its male name, female name or plural; `null` (or empty text) removes the key. The id changes only with `set-title-id` (§13.17). */
+/**
+ * Rename a title or change its male name, female name, plural or succession keys; `null` (or empty text) removes the key.
+ * The id changes only with `set-title-id` (§13.17). The succession fields (contract 0.2.7 A.3, K.3, K.4) must hold a canonical
+ * value, else `bad-value`; a person id in `heirs` or `exclude` that is not already written must name a person, else `unknown-person`.
+ */
 export interface EditTitle {
 	kind: 'edit-title';
 	id: string;
@@ -272,6 +278,19 @@ export interface EditTitle {
 	maleName?: string | null;
 	femaleName?: string | null;
 	plural?: string | null;
+	succession?: SuccessionRule | null;
+	inherit?: InheritRule | null;
+	inheritThrough?: InheritThrough | null;
+	/** `'no'` removes the key; a value that the written text already reads as keeps the text. */
+	inheritIllegitimate?: InheritIllegitimate;
+	/** `true` writes `true` unless the written text already reads as true; `false` removes the key. */
+	inheritAdopted?: boolean;
+	/** L.1: as `inheritAdopted`, for the key `heirs-of-body`; `null` removes the key like `false`. */
+	heirsOfBody?: boolean | null;
+	year?: string | null;
+	/** The named heirs in order; one id is written as a scalar, several as a flow list; `null` or `[]` removes the key. */
+	heirs?: string[] | null;
+	exclude?: string[] | null;
 }
 
 /** Delete a title with its holders (the `card-title` cleanup removes the `card-title`s that name it). */

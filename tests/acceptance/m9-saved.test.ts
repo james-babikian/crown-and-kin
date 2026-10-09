@@ -368,6 +368,8 @@ describe('P4: without `saved` (and without `pictures`), renderSvg draws exactly 
 		'13': '5b84823e6f9c2fad',
 		'14': '27aef842d4b5e0d0',
 		'15': '269044aebd6a206b',
+		// Sample tree 16 (0.2.7): recorded from the 0.2.6 build.
+		'16': 'ac75971a60fa2260',
 	};
 	for (const f of allFixtures()) {
 		it(`sample tree ${f.id}`, () => {

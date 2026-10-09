@@ -96,9 +96,9 @@ describe('the settings tab (spec §9, D33)', () => {
 		const names = (i: number) => settingGroups[i].listEl.querySelectorAll('.setting-item-name').map((n) => n.getText());
 		// 0.2.5 (D144): a tree in a note on a phone is a list with its natural height, so only the computer row stays.
 		expect(names(0)).toEqual([SETTINGS_UI.heightDesktop]);
-		// M7 (spec §13.1): the relation names are in the Cards group.
+		// M7 (spec §13.1): the relation names are in the Cards group. 0.2.7 (E.6, J.8): the settings of the line of succession come last.
 		// 0.2.4 (D118, D126): 0.2.5 (D150): the direction row comes first, then the break list and "Reduce movement"; the card style of the phone preview is gone (D144), and 0.2.6 (D179) removes "Card size".
-		expect(names(1)).toEqual([SETTINGS_UI.phoneDirection, SETTINGS_UI.breakWords, SETTINGS_UI.reduceMotion, SETTINGS_UI.dates, SETTINGS_UI.relations, SETTINGS_UI.oneParentUnknown, SETTINGS_UI.portraits]);
+		expect(names(1)).toEqual([SETTINGS_UI.phoneDirection, SETTINGS_UI.breakWords, SETTINGS_UI.reduceMotion, SETTINGS_UI.dates, SETTINGS_UI.relations, SETTINGS_UI.oneParentUnknown, SETTINGS_UI.portraits, SETTINGS_UI.successionLength, SETTINGS_UI.oldAge, SETTINGS_UI.youngDeathAge]);
 		// D113 item 4: the house page has its own group.
 		expect(names(2)).toEqual([SETTINGS_UI.houseGeneration]);
 		expect(names(3)).toEqual([SETTINGS_UI.generations]);
@@ -111,7 +111,7 @@ describe('the settings tab (spec §9, D33)', () => {
 	it('shows the stored values; a bad stored value shows its default', async () => {
 		// The stored data of 0.2.4 still has the phone height and the card style: both are dropped (D144).
 		const { fake, plugin } = await loadPlugin({ embedHeightDesktop: 640, embedHeightPhone: 70, phoneCardStyle: 'whole', cardSize: 'compact', showDates: false, focusGenerations: 99, updateLinks: false });
-		expect(plugin.settings).toEqual({ embedHeightDesktop: 640, showDates: false, showRelations: true, oneParentUnknown: true, showPortraits: true, showHouseGeneration: true, focusGenerations: 3, updateLinks: false, breakWords: '', reduceMotion: 'system', phoneDirection: 'sideways' });
+		expect(plugin.settings).toEqual({ embedHeightDesktop: 640, showDates: false, showRelations: true, oneParentUnknown: true, showPortraits: true, showHouseGeneration: true, focusGenerations: 3, updateLinks: false, breakWords: '', reduceMotion: 'system', phoneDirection: 'sideways', successionLength: 5, oldAge: 110, youngDeathAge: 0 });
 		openTab(fake);
 		expect(control<TextComponent>(SETTINGS_UI.heightDesktop).getValue()).toBe('640');
 		expect(control<ToggleComponent>(SETTINGS_UI.dates).getValue()).toBe(false);

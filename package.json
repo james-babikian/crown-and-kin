@@ -1,6 +1,6 @@
 {
   "name": "dynasty-tree",
-  "version": "0.2.6",
+  "version": "0.2.7",
   "description": "Obsidian plugin: editable family trees for fictional dynasties",
   "scripts": {
     "test": "vitest run",

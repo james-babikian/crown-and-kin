@@ -107,11 +107,30 @@ describe('validateTree: values', () => {
 		]);
 	});
 
-	it('any sex value is valid and kept, without an issue (D12)', () => {
+	it('any sex value is valid and kept; only the spellings of contract 0.2.7 J.4 give the warning sex-spelling (D12, K.9)', () => {
 		const src = `people:\n${p('a', '    sex: m\n')}${p('b', '    sex: f\n')}${p('c', '    sex: x\n')}${p('d', '    sex: M\n')}${p('e', '    sex: nonbinary\n')}${p('f', '    sex: 3\n')}`;
 		const g = deriveFamilies(tree(src));
-		expect(g.issues).toEqual([]);
+		// `M` is the only spelling here: one warning, naming D with the written value; every value stays as written.
+		expect(g.issues.map((i) => [i.code, i.params.person, i.params.value, i.ids])).toEqual([['sex-spelling', 'D', 'M', ['d']]]);
 		expect(g.people.map((x) => x.sex)).toEqual(['m', 'f', 'x', 'M', 'nonbinary', '3']);
+	});
+
+	it('sex-spelling: M, F, male, man, female, woman, m. and f. in any case; no other value, and no m or f', () => {
+		for (const sex of ['M', 'F', 'male', 'Male', 'MALE', 'man', 'Man', 'female', 'Female', 'woman', 'm.', 'f.']) {
+			const g = deriveFamilies(tree(`people:\n${p('a', `    sex: "${sex}"\n`)}`));
+			expect(g.issues.map((i) => [i.code, i.params.value, i.ids]), sex).toEqual([['sex-spelling', sex, ['a']]]);
+			expect(g.people[0].sex, sex).toBe(sex);
+		}
+		for (const sex of ['m', 'f', 'x', 'nonbinary', 'other', '3', 'mf', 'boy']) {
+			expect(all(`people:\n${p('a', `    sex: "${sex}"\n`)}`), sex).toEqual([]);
+		}
+	});
+
+	it('sex-spelling: one warning for each person, none for a duplicate person that is skipped', () => {
+		const src = `people:\n${p('a', '    sex: male\n')}${p('b', '    sex: Female\n')}  - id: a\n    name: Second\n    sex: man\n`;
+		const issues = all(src);
+		expect(issues.filter((i) => i.code === 'sex-spelling').map((i) => i.ids)).toEqual([['a'], ['b']]);
+		expect(issues.map((i) => i.code).sort()).toEqual(['duplicate-person-id', 'sex-spelling', 'sex-spelling']);
 	});
 
 	it('an unknown parent type counts as birth, also for the parent limit', () => {

@@ -44,6 +44,11 @@ export interface BlockState {
 	 */
 	finder: FinderState | null;
 	/**
+	 * The Show view of a line of succession (contract 0.2.7 F.1): the title that the tree shows the line of, until Close, Esc, a focus
+	 * choice or the note closes. It is a temporary view like the finder's result, and only one of the two shows at a time. It writes nothing.
+	 */
+	succession: SuccessionState | null;
+	/**
 	 * The folded families of the block (spec §13.10, D84): until the note closes, like the session focus. The
 	 * view drops the keys of families that no longer exist after each parse of the whole tree. They are never
 	 * written to the note.
@@ -69,11 +74,16 @@ export interface FinderState {
 	steps: boolean;
 }
 
+/** What the Show view of the line of succession shows (contract 0.2.7 F.1): the id of the title. */
+export interface SuccessionState {
+	title: string;
+}
+
 /** An embed in a note, or the full-screen view. */
 export type ViewKind = 'embed' | 'full';
 
 /** A fresh, empty `BlockState` for a block that has not drawn yet. */
-export const newBlockState = (): BlockState => ({ view: null, lastEdited: null, highlight: null, viewFor: '', views: {}, focus: null, autoFocus: null, shown: null, finder: null, folds: new Set() });
+export const newBlockState = (): BlockState => ({ view: null, lastEdited: null, highlight: null, viewFor: '', views: {}, focus: null, autoFocus: null, shown: null, finder: null, succession: null, folds: new Set() });
 
 /**
  * The key of a drawn tree for `BlockState.viewFor`: the focus person and the generations, or '' for
@@ -81,12 +91,13 @@ export const newBlockState = (): BlockState => ({ view: null, lastEdited: null, 
  */
 export const focusKey = (id: string | null, n = 0, orientation: Orientation = 'down') => (orientation === 'sideways' ? 'sideways|' : '') + (id === null ? '' : `focus:${id}:${n}`);
 
-/** The note closed: the session focus, the folds and the finder's result end (spec §5.6, §13.2, §13.10). The rest of the view state stays for the session (§5.5). */
+/** The note closed: the session focus, the folds and the finder's result and the Show view of the line of succession end (spec §5.6, §13.2, §13.10). The rest of the view state stays for the session (§5.5). */
 export function endSessionFocus(st: BlockState): void {
 	st.focus = null;
 	st.autoFocus = null;
 	st.shown = null;
 	st.finder = null;
+	st.succession = null;
 	st.folds.clear();
 	st.listBack = undefined;
 }
@@ -108,7 +119,11 @@ export function carryState(from: BlockState, to: BlockState): void {
 	to.focus ??= from.focus;
 	to.autoFocus ??= from.autoFocus;
 	to.shown ??= from.shown;
-	to.finder ??= from.finder;
+	// One temporary view at a time (F.1): the one that `to` holds wins, and then `from` gives neither.
+	if (!to.finder && !to.succession) {
+		to.finder = from.finder;
+		to.succession = from.finder ? null : from.succession;
+	}
 	if (!to.folds.size) to.folds = new Set(from.folds);
 	to.listBack ??= from.listBack;
 }

@@ -1,0 +1,51 @@
+# The Valmont line, as kept by the archivist.
+people:
+  - id: wulf
+    name: Wulf Valmont
+    sex: m
+    born: 1070
+    died: 1130
+  - id: mara
+    name: Mara Valmont
+    sex: f
+  - id: aldric
+    name: Aldric Valmont
+    sex: m
+    born: 1100
+    died: 1105
+    parents: [wulf, mara]
+    placement: birth
+    illegitimate: true        # claimed by his father
+    union: wed
+    link: "[[Aldric of Valmont]]"
+    notes: Died as a boy.
+  - id: bryn
+    name: Bryn Valmont
+    sex: m
+    died: 1108
+    parents: [wulf]
+  # The next two have no children and few keys.
+  - id: dag
+    name: Dag Valmont
+    died: 1110
+    childless: true
+    notes: A monk.
+  - id: eli
+    name: Eli Valmont
+  - id: fenn
+    name: Fenn Valmont
+    link: "[[Fenn]]"
+  - id: gwen
+    name: Gwen Valmont
+    died: 1120
+    childless: yes            # written by hand
+  - id: hale
+    name: Hale Valmont
+    died: 1121
+    childless: true
+    notes: Left no heir.
+
+unions:
+  - id: wed
+    partners: [wulf, mara]
+    type: marriage

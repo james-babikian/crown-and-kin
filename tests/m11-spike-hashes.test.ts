@@ -15,8 +15,9 @@ const RECORDED = JSON.parse(readFileSync('tests/acceptance/m11-spike-hashes.json
 const SAMPLES = sampleSources();
 
 describe('the headless pictures of the sample trees are byte-identical to the M10 build', () => {
-	it('every sample tree 01 to 15 and 07b has a recorded hash', () => {
-		expect(SAMPLES.map((s) => s.id).sort()).toEqual(['01', '02', '03', '04', '05', '06', '07', '07b', '08', '09', '10', '11', '12', '13', '14', '15']);
+	it('every sample tree 01 to 16 and 07b has a recorded hash', () => {
+		// Tree 16 (version 0.2.7) has the hash of the 0.2.6 build: the succession keys draw nothing (contract D.2).
+		expect(SAMPLES.map((s) => s.id).sort()).toEqual(['01', '02', '03', '04', '05', '06', '07', '07b', '08', '09', '10', '11', '12', '13', '14', '15', '16']);
 		expect(Object.keys(RECORDED).sort()).toEqual(SAMPLES.map((s) => s.id).sort());
 	});
 

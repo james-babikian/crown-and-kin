@@ -95,7 +95,8 @@ describe('reading male-name (D66)', () => {
 
 	it('gives no warning', () => {
 		expect(tree(TREE).issues).toEqual([]);
-		expect(graph(TREE).issues).toEqual([]);
+		// Contract 0.2.7 K.9: `sex: M` (a capital letter) is the one thing the graph warns about, and it names Fin.
+		expect(graph(TREE).issues.map((i) => [i.code, i.ids])).toEqual([['sex-spelling', ['fin']]]);
 	});
 });
 
@@ -174,7 +175,8 @@ describe('card labels with male-name (D66)', () => {
 	it('a holder not in the tree has no card and changes no label', () => {
 		const ghost = TREE.replace('      - {name: Harald, from: 1180}\n', '      - {name: Harald, from: 1180}\n      - {person: ghost, name: Ghost, from: 1190}\n');
 		const g = graph(ghost);
-		expect(g.issues.map((i) => i.code)).toEqual(['missing-holder']);
+		// Contract 0.2.7 K.9: Fin has `sex: M`, which gives the warning sex-spelling.
+		expect(g.issues.map((i) => i.code).sort()).toEqual(['missing-holder', 'sex-spelling']);
 		const withGhost = cardLabels(g);
 		expect(withGhost.has('ghost')).toBe(false);
 		expect(withGhost.has('Harald')).toBe(false);

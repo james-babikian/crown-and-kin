@@ -13,12 +13,12 @@ import type {
 import { descendantsOf, siblingGroup, writtenParents } from './family-query';
 import { newIdIn } from './id-gen';
 import { parseBody, readTree, textWithoutComments } from './parse';
-import { dropHolderPatches, dropHolders } from './title-ops';
+import { dropHolderPatches, dropHolders, dropIdPatches, dropIds } from './title-ops';
 import { isEmpty, isMap as isRawMap, list, str, unwrapCurly, type Raw, type RawMap } from './tolerate';
 import { isParentType, isPlacementType, isUnionType, parentKind, PLACEMENT_TYPES, type Tree } from './types';
 import { dashOf, flowComment, insertItem, itemEnd, itemStart, removeFromSection, removeItems, section, type Where } from './yaml-list';
 import {
-	addPair, clone, commentsOf, doubleQuoted, findPair, finish, finishTogether, insertAt, isRefusal, layoutOf, PERSON_FIELDS, PERSON_ORDER, personNode, personValue,
+	addPair, clone, commentsOf, doubleQuoted, findPair, finish, finishTogether, insertAt, isBooleanField, isRefusal, layoutOf, PERSON_FIELDS, PERSON_ORDER, personNode, personValue,
 	QUOTED_FIELDS, refuse, removePair, renderScalar, setPairValue, TEXT_FIELDS, topMap, type Parsed, type Patch, type Refusal, Source, type Step,
 } from './yaml-patch';
 import { REFUSAL_TEXT } from './refusal-text';
@@ -175,7 +175,7 @@ function addPerson(ctx: OpContext, op: AddPerson): EditResult {
 	}
 
 	const person: RawMap = { id: op.id };
-	const render = (key: string, v: string, flow: boolean) => (QUOTED_FIELDS.has(key) ? doubleQuoted(v) : renderScalar(v, null, { flow, text: TEXT_FIELDS.has(key) || key === 'illegitimate', indent: '' }));
+	const render = (key: string, v: string, flow: boolean) => (QUOTED_FIELDS.has(key) ? doubleQuoted(v) : renderScalar(v, null, { flow, text: TEXT_FIELDS.has(key) || isBooleanField(key), indent: '' }));
 	const blockValue = (key: string, v: string) => render(key, v, false);
 	const flowValue = (key: string, v: string) => render(key, v, true);
 	const block: string[] = [`id: ${blockValue('id', op.id)}`];
@@ -841,6 +841,8 @@ function deletePerson(ctx: OpContext, op: DeletePerson): EditResult {
 	if (options && clear.length && Object.keys(options).length === 0) delete expected.options;
 	// D57: the person's holder entries go in the same write; their titles stay.
 	const holders = dropHolders(expected, id);
+	// Contract 0.2.7 K.3: the person is no longer a named heir or an excluded person, in the same write.
+	const named = dropIds(expected, id);
 
 	const step: Step = (p) => {
 		const patches: Patch[] = [];
@@ -862,6 +864,9 @@ function deletePerson(ctx: OpContext, op: DeletePerson): EditResult {
 		const titles = dropHolderPatches(p, holders);
 		if (isRefusal(titles)) return titles;
 		patches.push(...titles);
+		const ids = dropIdPatches(p, named);
+		if (isRefusal(ids)) return ids;
+		patches.push(...ids);
 		if (clear.length) {
 			const top = topMap(p) as YAMLMap;
 			const optionsPair = findPair(top, 'options')!;

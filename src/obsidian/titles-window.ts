@@ -18,7 +18,7 @@ import { parseBody, readTree } from '../core/parse';
 import { quotedSobriquet } from '../core/sobriquet';
 import { newTitleId } from '../core/title-ops';
 import { describeDeleteTitle, describeTitleIdChange } from '../core/titles';
-import { HOUSES, ID_UI, REMOVE, TITLES_UI, WIN_LIST_UI, WRITE_TEXT } from '../render/ui-text';
+import { HOUSES, ID_UI, REMOVE, SUCCESSION_UI, TITLES_UI, WIN_LIST_UI, WRITE_TEXT } from '../render/ui-text';
 import type { Handle, HandleWriteOutcome } from './block-handle';
 import { holderForm } from './holder-form';
 import { danglingIds, draftId, idChanged, idFromName, idProblemFor, idProblems, idRefusalText, isIdOp, reasonText } from './id-draft';
@@ -28,6 +28,7 @@ import { ListEditWindow, type ListRowView } from './list-window';
 import { matchesAll } from './list-search';
 import { pickPerson } from './person-picker';
 import { freshOrStale, onWriteFailed } from './sheet-parts';
+import { successionSection, type SuccessionView } from './succession-section';
 import { makeTableNote } from './table-note';
 import { draftChanged, emptyNames, holderText, listName, personNameOf, rebase, savedListName, titleIdRow, titleRows, windowOps, withHolderIds, type HolderRow, type HolderValues, type TitleRow } from './titles-draft';
 import { undoNotice } from './undo-notice';
@@ -64,7 +65,15 @@ export interface TitlesOptions {
 	show?: (id: string) => void;
 	/** True when the owner asks the system for less motion (D126): a field is then scrolled into view at once. Default: false. */
 	reduced?: () => boolean;
+	/** Contract 0.2.7 E.4: shows the line of succession of a title in the tree; the window has closed. */
+	showLine?: (titleId: string) => void;
+	/** Contract 0.2.7 K.10, M.7: the length of the line, the age of the warning and the age for open branches (the settings). Defaults: 5, 110 and 0. */
+	succession?: { limit: () => number; oldAge: () => number; youngDeathAge?: () => number };
 }
+
+/** The settings of the line when the caller gives none (K.10). */
+const DEFAULT_LIMIT = 5;
+const DEFAULT_OLD_AGE = 110;
 
 /** The modal that lists a tree's titles and edits them and their holders (spec §13.4). */
 export class TitlesWindow extends ListEditWindow {
@@ -75,6 +84,8 @@ export class TitlesWindow extends ListEditWindow {
 	private sentIds = false;
 	/** The ID notes of the page on screen now. */
 	private pageViews: IdRowView[] = [];
+	/** The Succession section of the page on screen now (a saved title only). */
+	private section: SuccessionView | null = null;
 
 	/** Null, with a Notice, if the block cannot be edited now. */
 	static create(app: App, o: TitlesOptions): TitlesWindow | null {
@@ -111,7 +122,17 @@ export class TitlesWindow extends ListEditWindow {
 		return this.o.reduced?.() ?? false;
 	}
 
+	protected override opened(): void {
+		// A turn of the phone or a resize can change the layout; the section then draws its choices as buttons or as dropdowns.
+		const win = this.modalEl.win ?? window;
+		const relayout = () => this.guard(() => this.section?.relayout());
+		win.addEventListener('resize', relayout);
+		this.cleanup.push(() => win.removeEventListener('resize', relayout));
+	}
+
 	protected released(): void {
+		this.section?.dispose();
+		this.section = null;
 		try {
 			this.o.onClosed?.();
 		} catch (e) {
@@ -196,6 +217,8 @@ export class TitlesWindow extends ListEditWindow {
 		const t = this.byKey(key);
 		if (!t) return;
 		this.pageViews = [];
+		this.section?.dispose();
+		this.section = null;
 		const problem = idProblems('title', this.rows.map(titleIdRow), this.data.dangling).get(t.key);
 		let heading: HTMLElement | null = null;
 		// The heading of the holder list and the accessible names show the draft's names at once.
@@ -295,7 +318,68 @@ export class TitlesWindow extends ListEditWindow {
 			const note = buttons.createEl('button', { cls: ['dynasty-sheet-action', 'dynasty-title-note'], text: TITLES_UI.makeNote, attr: { type: 'button', 'aria-label': TITLES_UI.makeNoteLabel(savedListName(t)), 'data-focus': `note:${t.key}` } });
 			note.addEventListener('click', () => this.guard(() => this.askNote(id, `note:${t.key}`)));
 		}
+		this.successionPart(page, t);
 		this.otherActions(page, t.key, 'dynasty-title-delete', (name) => TITLES_UI.deleteLabel(name));
+	}
+
+	// ---------- the Succession section (contract 0.2.7 E) ----------
+
+	/** The section after the holder list and before Other actions. A title that is not saved yet shows only the "new title" text. */
+	private successionPart(page: HTMLElement, t: TitleRow): void {
+		if (t.id === null || !t.succ) {
+			const box = page.createDiv({ cls: 'dynasty-succ', attr: { role: 'group', 'aria-label': SUCCESSION_UI.heading, 'data-section': 'succession' } });
+			box.createDiv({ cls: 'dynasty-sheet-section-title', text: SUCCESSION_UI.heading });
+			box.createDiv({ cls: 'dynasty-sheet-hint', text: SUCCESSION_UI.newTitle, attr: { 'data-hint': 'new-title' } });
+			return;
+		}
+		const settings = this.o.succession;
+		this.section = successionSection(page, {
+			g: () => this.data.g,
+			row: t,
+			limit: () => settings?.limit() ?? DEFAULT_LIMIT,
+			oldAge: () => settings?.oldAge() ?? DEFAULT_OLD_AGE,
+			youngDeathAge: () => settings?.youngDeathAge?.() ?? 0,
+			phone: () => this.modalEl.hasClass('is-phone'),
+			win: () => this.modalEl.win ?? window,
+			edited: () => this.clearError(),
+			guard: (fn) => this.guard(fn),
+			showCard: (id) => this.showCard(id),
+			show: () => this.showLine(t),
+			pick: (kind, skip) => this.pickForSection(kind, skip),
+		});
+	}
+
+	/** The picker of a named heir or an excluded person: no "Create new person" row, and the people in `skip` are not offered. */
+	private async pickForSection(kind: 'heir' | 'exclude', skip: ReadonlySet<string>): Promise<string | null> {
+		if (this.busy) return null;
+		this.busy = true;
+		try {
+			const picked = await pickPerson(this.app, this.data.g, new Set(skip), SUCCESSION_UI.pickerPlaceholder, kind === 'heir' ? SUCCESSION_UI.heirPickerTitle : SUCCESSION_UI.excludePickerTitle, false);
+			return picked?.kind === 'person' && !this.closing ? picked.id : null;
+		} finally {
+			this.busy = false;
+		}
+	}
+
+	/** Show (E.4): with no changes the window closes and the tree shows the line; with changes it asks first. */
+	private showLine(t: TitleRow): void {
+		if (!this.isDirty()) {
+			const id = t.id;
+			this.finish();
+			if (id !== null) this.o.showLine?.(id);
+			return;
+		}
+		this.showConfirm(SUCCESSION_UI.unsavedTitle, [SUCCESSION_UI.unsaved], 'succ-show', [
+			{ label: REMOVE.cancel, cls: 'dynasty-sheet-keep', run: () => this.hideConfirm() },
+			{
+				label: SUCCESSION_UI.saveAndShow,
+				cls: 'mod-cta dynasty-confirm-show',
+				run: () => {
+					this.hideConfirm();
+					void this.save(null, t.key).catch((e) => console.error('Dynasty Tree: the Titles window could not save', e));
+				},
+			},
+		]);
 	}
 
 	private holderRow(list: HTMLElement, t: TitleRow, h: HolderRow, i: number): void {
@@ -518,8 +602,11 @@ export class TitlesWindow extends ListEditWindow {
 		return freshOrStale(this.o.handle, this.data.body, (body) => this.stale(body));
 	}
 
-	/** Save. `asked` is the ID change that the owner just answered: the answer runs Save again on the draft as it is then (C4). */
-	protected async save(asked: string | null = null): Promise<void> {
+	/**
+	 * Save. `asked` is the ID change that the owner just answered: the answer runs Save again on the draft as it is then (C4).
+	 * `show` is the row key of the title that "Save and show" opens in the tree after a successful write (E.4).
+	 */
+	protected async save(asked: string | null = null, show: string | null = null): Promise<void> {
 		if (this.saving || this.busy) return;
 		const empty = emptyNames(this.rows)[0];
 		if (empty) {
@@ -554,10 +641,10 @@ export class TitlesWindow extends ListEditWindow {
 		const what = changed.map((t) => `${t.key}:${t.id}>${draftId(titleIdRow(t))}`).join('|');
 		if (changed.length && what !== asked) {
 			// The note can change while the question is open (sync, another pane): the answer checks the body again.
-			this.askIds(changed, () => void this.save(what));
+			this.askIds(changed, () => void this.save(what, show));
 			return;
 		}
-		await this.commit(ops);
+		await this.commit(ops, show);
 	}
 
 	/** The one question before Save changes an id: what changes, and how many people. Closing it is Cancel. */
@@ -577,8 +664,11 @@ export class TitlesWindow extends ListEditWindow {
 	}
 
 	/** Writes the ops of the draft as one batch (one Undo step) and closes the window when it works. */
-	private async commit(ops: Op[]): Promise<void> {
+	private async commit(ops: Op[], show: string | null = null): Promise<void> {
 		if (this.saving) return;
+		// The id the title has after the write, for "Save and show".
+		const showRow = show !== null ? this.byKey(show) : undefined;
+		const showId = showRow && showRow.id !== null ? (idChanged(titleIdRow(showRow)) ? draftId(titleIdRow(showRow)) : showRow.id) : null;
 		const deleted = this.rows.filter((t) => t.id !== null && t.deleted).map((t) => t.baseName || t.id!);
 		const idCount = ops.filter(isIdOp).length;
 		const h = this.o.handle;
@@ -603,6 +693,13 @@ export class TitlesWindow extends ListEditWindow {
 			return;
 		}
 		this.finish();
+		if (showId !== null) {
+			try {
+				this.o.showLine?.(showId);
+			} catch (e) {
+				console.error('Dynasty Tree: cannot show the line of succession', e);
+			}
+		}
 		if (deleted.length) {
 			const others = ops.length > deleted.length;
 			undoNotice(others ? `${TITLES_UI.deleted(deleted)} ${REMOVE.undoAlso}` : TITLES_UI.deleted(deleted), h, out.body);

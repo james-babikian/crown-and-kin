@@ -16,6 +16,7 @@
 
 import { drawnParents, partnerOf, placedChildren, type FamilyGraph } from '../core/derive';
 import { computeGenerations } from '../core/generations';
+import { yearOf } from '../core/succession-keys';
 import { parentKind } from '../core/types';
 import type { ListData, ListGroup, ListRow, ListWord } from '../render/dom/phone-list-dom';
 import { startPerson } from '../render/tree-info';
@@ -30,14 +31,8 @@ export type ListFrom = 'session' | 'pin' | 'me' | 'edited' | 'oldest' | 'first';
 /** The most people that the Back trail keeps; the oldest is dropped. */
 export const BACK_LIMIT = 20;
 
-/** The year of a person for the "oldest" order: the first run of three or four digits in `born`; undefined when there is none. */
-function birthYear(born: string | undefined): number | undefined {
-	const m = born === undefined ? null : /(?<!\d)\d{3,4}(?!\d)/.exec(born);
-	return m ? Number(m[0]) : undefined;
-}
-
 /**
- * The oldest person who has a child: the smallest generation (0 is the top row), then the earliest birth year (a person
+ * The oldest person who has a child: the smallest generation (0 is the top row), then the earliest birth year (`yearOf` of `born`; a person
  * with no year comes last), then document order. Null when nobody has a child.
  */
 export function oldestParent(g: FamilyGraph): string | null {
@@ -47,7 +42,7 @@ export function oldestParent(g: FamilyGraph): string | null {
 		if (placedChildren(g, p.id).length === 0) continue;
 		gens ??= computeGenerations(g);
 		const gen = gens.get(p.id) ?? 0;
-		const year = birthYear(p.born) ?? Number.POSITIVE_INFINITY;
+		const year = yearOf(p.born) ?? Number.POSITIVE_INFINITY;
 		// Strictly smaller wins, so a tie keeps the person who comes first in the note.
 		if (!best || gen < best.gen || (gen === best.gen && year < best.year)) best = { id: p.id, gen, year };
 	}

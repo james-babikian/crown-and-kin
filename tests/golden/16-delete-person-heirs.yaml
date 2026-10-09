@@ -1,0 +1,27 @@
+titles:
+  - id: duke
+    name: Duke of Valmont
+    succession: eldest-child
+    exclude: [wren, tom]
+    holders:
+      - {person: aldric, from: 1175}
+  - id: count
+    name: Count of Orsini
+    heir: [tom]
+    exclude: wren
+    holders: []
+  - id: duke
+    name: Duke again
+  - id: baron
+    name: Baron
+    exclude: [wren]
+people:
+  - id: aldric
+    name: Aldric Valmont
+    sex: m
+  - id: wren
+    name: Wren Valmont
+    sex: f
+  - id: tom
+    name: Tom Valmont
+    sex: m

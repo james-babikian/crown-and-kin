@@ -13,7 +13,8 @@
  * Rules of the M8 titles contract (rules 1–5 are in `titles.ts`):
  * 6. Writes: values are quoted only when plain YAML would not read them back as the same text.
  *    Title keys go in the order `id`, `name`, `male-name`, `female-name`, `plural`, `numbering`,
- *    `count-with`, `holders`;
+ *    `count-with`, `succession`, `inherit`, `inherit-through`, `inherit-illegitimate`, `inherit-adopted`,
+ *    `heirs-of-body`, `year`, `heir`, `exclude`, `holders` (contract 0.2.7 A.3, K.4);
  *    `card-title` goes after `title`, else after `name`. A new `titles` section goes after `houses`,
  *    else before `people`, else at the end. Ops on a `holders` map are refused `bad-value`. Unknown
  *    keys stay. Title ops act on the first title with the id.
@@ -29,7 +30,8 @@ import type { AddHolder, AddTitle, DeleteTitle, EditHolder, EditResult, EditTitl
 import { changeItemId } from './id-change';
 import { uniqueTitleId } from './id-gen';
 import { parseBody, textWithoutComments } from './parse';
-import { isEmpty, isMap as isRawMap, str, type Raw, type RawMap } from './tolerate';
+import { INHERIT_ILLEGITIMATE, INHERIT_RULES, INHERIT_THROUGH, readIllegitimate, readInherit, readRule, readThrough, SUCCESSION_RULES } from './succession-keys';
+import { bool, isEmpty, isMap as isRawMap, list, str, unwrapCurly, type Raw, type RawMap } from './tolerate';
 import type { Tree } from './types';
 import { dashOf, itemEnd, itemStart, removeFromSection, removeItems, section } from './yaml-list';
 import {
@@ -39,15 +41,27 @@ import {
 import { REFUSAL_TEXT } from './refusal-text';
 
 /** §13.0 key order of a title and of a holder. */
-const TITLE_ORDER = ['id', 'name', 'male-name', 'female-name', 'plural', 'numbering', 'count-with', 'holders'];
+const TITLE_ORDER = ['id', 'name', 'male-name', 'female-name', 'plural', 'numbering', 'count-with', 'succession', 'inherit', 'inherit-through', 'inherit-illegitimate', 'inherit-adopted', 'heirs-of-body', 'year', 'heir', 'exclude', 'holders'];
 const HOLDER_ORDER = ['person', 'name', 'as', 'number', 'from', 'to'] as const;
 type HolderKey = (typeof HOLDER_ORDER)[number];
 type Changes = [HolderKey, string | null][];
 
 /** Ids and free text are written plain when plain YAML reads them back as the same text (§6.2); names are quoted like person names. */
-const TEXT_KEYS = new Set(['id', 'person', 'number', 'from', 'to']);
+const TEXT_KEYS = new Set(['id', 'person', 'number', 'from', 'to', 'year', 'heir', 'exclude', 'inherit-adopted', 'heirs-of-body', 'inherit-illegitimate']);
 
 const HOLDERS_MAP = 'The holders of this title are not a list. Edit the note text.';
+const NOT_A_LIST = 'This value is not a list. Edit the note text.';
+
+/** The refusal texts of the succession keys (STE; contract 0.2.7 A.3). */
+const SUCCESSION_REFUSAL = {
+	rule: 'The succession rule is not a rule that the plugin knows.',
+	inherit: 'The rule for who can inherit is not a rule that the plugin knows.',
+	through: 'The rule for who passes the right to inherit is not a rule that the plugin knows.',
+	illegitimate: 'The value for children marked as illegitimate is not a value that the plugin knows.',
+	switch: 'The switch must be true or false.',
+	year: 'The year must be text.',
+	ids: 'The people must be a list of IDs.',
+} as const;
 
 /** The parsed body and graph a title op needs. */
 export interface TitleContext {
@@ -188,14 +202,14 @@ interface HoldersAt {
 	scalar?: Scalar;
 }
 
-function holdersAt(p: Parsed, index: number): HoldersAt | Refusal {
+function holdersAt(p: Parsed, index: number, key = 'holders'): HoldersAt | Refusal {
 	const title = titleNode(p, index);
 	if (isRefusal(title)) return title;
-	const pair = findPair(title, 'holders');
+	const pair = findPair(title, key);
 	const v = pair?.value;
-	if (isAlias(v)) return refuse('bad-value', 'The holders are written as a YAML alias. Edit the note text.');
+	if (isAlias(v)) return refuse('bad-value', key === 'holders' ? 'The holders are written as a YAML alias. Edit the note text.' : 'This value is written as a YAML alias. Edit the note text.');
 	if (isSeq(v)) return { title, pair, seq: v };
-	if (isMap(v)) return refuse('bad-value', HOLDERS_MAP);
+	if (isMap(v)) return refuse('bad-value', key === 'holders' ? HOLDERS_MAP : NOT_A_LIST);
 	if (isScalar(v) && !isEmpty(v.value)) return { title, pair, scalar: v };
 	return { title, pair };
 }
@@ -204,9 +218,9 @@ function holdersAt(p: Parsed, index: number): HoldersAt | Refusal {
 const scalarFlowText = (node: Scalar) => flowScalar('person', String(node.value), node);
 
 /** A new holder list: a block list of one-line flow maps (or a flow list inside a flow map). */
-function newList(src: Source, at: HoldersAt, flows: string[], layout: Layout): Patch {
+function newList(src: Source, at: HoldersAt, flows: string[], layout: Layout, key = 'holders'): Patch {
 	const value: NewValue = { block: flows.map((f) => `${' '.repeat(layout.seqIndent)}- ${f}`), flow: `[${flows.join(', ')}]` };
-	if (!at.pair) return addPair(src, at.title, 'holders', value, TITLE_ORDER, layout);
+	if (!at.pair) return addPair(src, at.title, key, value, TITLE_ORDER, layout);
 	const v = at.pair.value;
 	// `holders: []` with a comment after it stays a flow list, so the comment keeps its line.
 	if (isSeq(v) && v.flow && /\S/.test(src.text.slice(src.nodeEnd(v), src.lineEnd(src.nodeEnd(v))))) return insertAt(src.text.indexOf('[', v.range![0]) + 1, flows.join(', '));
@@ -239,13 +253,13 @@ type FinalItem = { from: number; value: Raw; changed: Changes } | { value: RawMa
  * With no move, items are removed and added in place; a move rebuilds the list from the items'
  * texts (a block list keeps the gaps between items, a flow list becomes one line).
  */
-function listPatches(p: Parsed, t: number, final: Final[]): Patch[] | Refusal {
-	const at = holdersAt(p, t);
+function listPatches(p: Parsed, t: number, final: Final[], key = 'holders'): Patch[] | Refusal {
+	const at = holdersAt(p, t, key);
 	if (isRefusal(at)) return at;
 	const src = p.src;
 	const layout = layoutOf(src);
 	const kept = final.flatMap((f) => ('from' in f ? [f.from] : []));
-	if ((!at.seq || !at.seq.items.length) && !at.scalar) return final.length ? [newList(src, at, final.map((f) => ('flow' in f ? f.flow : '')), layout)] : [];
+	if ((!at.seq || !at.seq.items.length) && !at.scalar) return final.length ? [newList(src, at, final.map((f) => ('flow' in f ? f.flow : '')), layout, key)] : [];
 	if (!final.length) return emptyList(src, at);
 	if (at.scalar) {
 		// §13.0 item 6: `holders: aldric` first becomes a flow list.
@@ -506,34 +520,166 @@ function editTitle(ctx: TitleContext, op: EditTitle): EditResult {
 	if (op.maleName !== undefined && op.maleName !== null && typeof op.maleName !== 'string') return refuse('bad-value', REFUSAL_TEXT.maleNameText);
 	if (op.femaleName !== undefined && op.femaleName !== null && typeof op.femaleName !== 'string') return refuse('bad-value', REFUSAL_TEXT.femaleNameText);
 	if (op.plural !== undefined && op.plural !== null && typeof op.plural !== 'string') return refuse('bad-value', REFUSAL_TEXT.pluralText);
+	if (op.year !== undefined && op.year !== null && typeof op.year !== 'string') return refuse('bad-value', SUCCESSION_REFUSAL.year);
 	const expected = clone(ctx.data) as RawMap;
 	const title = rawTitles(expected)[index] as RawMap;
 	const changes: [string, string | null][] = [];
-	if (op.name !== undefined && str(title.name) !== str(op.name)) {
-		title.name = op.name;
-		changes.push(['name', op.name]);
-	}
+	const has = (key: string) => Object.prototype.hasOwnProperty.call(title, key);
+	const remove = (key: string) => {
+		if (!has(key)) return;
+		delete title[key];
+		changes.push([key, null]);
+	};
 	// Optional text keys: null or empty text removes the key.
 	const optional = (key: string, v: string | null | undefined) => {
 		if (v === undefined) return;
 		const write = v === null || v.trim() === '' ? null : v;
-		if (write === null && Object.prototype.hasOwnProperty.call(title, key)) {
-			delete title[key];
-			changes.push([key, null]);
-		} else if (write !== null && str(title[key]) !== str(write)) {
+		if (write === null) remove(key);
+		else if (str(title[key]) !== str(write)) {
 			title[key] = write;
 			changes.push([key, write]);
 		}
 	};
+	if (op.name !== undefined && str(title.name) !== str(op.name)) {
+		title.name = op.name;
+		changes.push(['name', op.name]);
+	}
 	optional('male-name', op.maleName);
 	optional('female-name', op.femaleName);
 	optional('plural', op.plural);
-	if (!changes.length) return { ok: true, body: ctx.first.src.text, created: [] };
+
+	// Contract 0.2.7 A.3, K.4: a rule is written as its canonical word; a written text that already reads as the same rule stays.
+	const word = (key: string, v: string | null | undefined, canonical: readonly string[], read: (t: string | undefined) => string | undefined, message: string): Refusal | undefined => {
+		if (v === undefined) return undefined;
+		if (v === null || (typeof v === 'string' && v.trim() === '')) return void remove(key);
+		if (typeof v !== 'string' || !canonical.includes(v)) return refuse('bad-value', message);
+		if (read(str(title[key])) === v) return undefined;
+		title[key] = v;
+		changes.push([key, v]);
+		return undefined;
+	};
+	const refusal =
+		word('succession', op.succession, SUCCESSION_RULES, readRule, SUCCESSION_REFUSAL.rule) ??
+		word('inherit', op.inherit, INHERIT_RULES, readInherit, SUCCESSION_REFUSAL.inherit) ??
+		word('inherit-through', op.inheritThrough, INHERIT_THROUGH, readThrough, SUCCESSION_REFUSAL.through);
+	if (refusal) return refusal;
+	if (op.inheritIllegitimate !== undefined) {
+		const v: unknown = op.inheritIllegitimate;
+		if (typeof v !== 'string' || !(INHERIT_ILLEGITIMATE as readonly string[]).includes(v)) return refuse('bad-value', SUCCESSION_REFUSAL.illegitimate);
+		if (v === 'no') remove('inherit-illegitimate');
+		else if (readIllegitimate(str(title['inherit-illegitimate'])) !== v) {
+			title['inherit-illegitimate'] = v;
+			changes.push(['inherit-illegitimate', v]);
+		}
+	}
+	if (op.inheritAdopted !== undefined) {
+		const v: unknown = op.inheritAdopted;
+		if (typeof v !== 'boolean') return refuse('bad-value', SUCCESSION_REFUSAL.switch);
+		if (!v) remove('inherit-adopted');
+		else if (!bool(title['inherit-adopted'])) {
+			title['inherit-adopted'] = 'true';
+			changes.push(['inherit-adopted', 'true']);
+		}
+	}
+	if (op.heirsOfBody !== undefined) {
+		const v: unknown = op.heirsOfBody;
+		if (v !== null && typeof v !== 'boolean') return refuse('bad-value', SUCCESSION_REFUSAL.switch);
+		if (!v) remove('heirs-of-body');
+		else if (!bool(title['heirs-of-body'])) {
+			title['heirs-of-body'] = 'true';
+			changes.push(['heirs-of-body', 'true']);
+		}
+	}
+	optional('year', op.year);
+
+	// The named heirs and the excluded people: lists of person ids (K.3).
+	const lists: Step[] = [];
+	for (const [key, want] of [['heir', op.heirs], ['exclude', op.exclude]] as const) {
+		const planned = idListEdit(ctx, index, title, key, want);
+		if (isRefusal(planned)) return planned;
+		if (planned) lists.push(planned);
+	}
+	if (!changes.length && !lists.length) return { ok: true, body: ctx.first.src.text, created: [] };
 	const change = (c: [string, string | null]): Step => (p) => {
 		const node = titleNode(p, index);
 		return isRefusal(node) ? node : mapChanges(p.src, node, [c], TITLE_ORDER);
 	};
-	return finishTogether(ctx.first, changes.map(change), expected, []);
+	// `heir` and `exclude` come last among the keys, as in the key order, so keys added at one place come out in that order.
+	return finishTogether(ctx.first, [...changes.map(change), ...lists], expected, []);
+}
+
+/** The ids that a `heir` or `exclude` value names as scalars, in written order. */
+const writtenIds = (v: Raw): string[] => list(v).flatMap((x) => (isRawMap(x) || Array.isArray(x) ? [] : [str(x)].filter((y): y is string => y !== undefined)));
+
+/**
+ * K.3: the step that makes the ids of `heir` or `exclude` equal `want` (undefined: no change), and the expected data. A list
+ * equal to the written ids is no change. Ids already written need no check; a new id must be a person (`unknown-person`).
+ * One id is written as a scalar and several as a flow list. A written list that holds comments is changed item by item, so
+ * its comments stay (it stays a list).
+ */
+function idListEdit(ctx: TitleContext, index: number, title: RawMap, key: 'heir' | 'exclude', want: string[] | null | undefined): Step | Refusal | undefined {
+	if (want === undefined) return undefined;
+	if (want !== null && (!Array.isArray(want) || want.some((x) => typeof x !== 'string' || str(x) !== x))) return refuse('bad-value', SUCCESSION_REFUSAL.ids);
+	const ids = [...new Set(want ?? [])];
+	const written = writtenIds(title[key]);
+	const present = Object.prototype.hasOwnProperty.call(title, key);
+	if (!ids.length) {
+		if (!present) return undefined;
+		delete title[key];
+		return (p) => {
+			const node = titleNode(p, index);
+			if (isRefusal(node)) return node;
+			const pair = findPair(node, key);
+			return pair ? removePair(p.src, node, pair) : null;
+		};
+	}
+	if (present && ids.length === written.length && ids.every((x, i) => x === written[i])) return undefined;
+	for (const id of ids) if (!written.includes(id) && !inTree(ctx, id)) return refuse('unknown-person', id);
+
+	// Is the written value a list with comments in it (or between the key and the list)?
+	const parsedNode = titleNode(ctx.first, index);
+	if (isRefusal(parsedNode)) return parsedNode;
+	const pair = findPair(parsedNode, key);
+	const old = pair?.value;
+	const src = ctx.first.src;
+	const commented = !!pair && isSeq(old) && old.items.length > 0 && commentsOf(src.text).some((c) => c.offset >= src.colonEnd(pair) && c.offset < src.nodeEnd(old));
+	if (commented) {
+		title[key] = ids;
+		return (p) => {
+			const at = holdersAt(p, index, key);
+			if (isRefusal(at)) return at;
+			if (!at.seq) return refuse('bad-value', NOT_A_LIST);
+			const used = new Set<number>();
+			const final: Final[] = ids.map((id) => {
+				const from = at.seq!.items.findIndex((it, k) => !used.has(k) && isScalar(it) && str(unwrapCurly(it.value)) === id);
+				if (from < 0) return { flow: flowScalar('person', id) };
+				used.add(from);
+				return { from };
+			});
+			return listPatches(p, index, final, key);
+		};
+	}
+	title[key] = ids.length === 1 ? ids[0] : ids;
+	return (p) => {
+		const node = titleNode(p, index);
+		if (isRefusal(node)) return node;
+		const layout = layoutOf(p.src);
+		const at = findPair(node, key);
+		const current = at?.value;
+		if (isAlias(current)) return refuse('bad-value', 'This value is written as a YAML alias. Edit the note text.');
+		const value: NewValue =
+			ids.length === 1
+				? { scalar: ids[0], old: isScalar(current) ? current : null, text: true }
+				: { raw: `[${ids.map((id) => idText(current, id)).join(', ')}]` };
+		return at ? setPairValue(p.src, node, at, value, layout) : addPair(p.src, node, key, value, TITLE_ORDER, layout);
+	};
+}
+
+/** An id as a flow list item: the text of the written item with this id if there is one, else the id written as a person id. */
+function idText(old: Raw | Node | null | undefined, id: string): string {
+	if (isSeq(old)) for (const it of old.items) if (isScalar(it) && str(unwrapCurly(it.value)) === id) return flowScalar('person', id, it);
+	if (isScalar(old) && str(unwrapCurly(old.value)) === id) return flowScalar('person', id, old);
+	return flowScalar('person', id);
 }
 
 function deleteTitle(ctx: TitleContext, op: DeleteTitle): EditResult {
@@ -720,6 +866,62 @@ export function dropHolderPatches(p: Parsed, removals: Map<number, Set<number>>)
 		const n = at.seq ? at.seq.items.length : at.scalar ? 1 : 0;
 		if (drop.size >= n) out.push(...emptyList(p.src, at));
 		else if (at.seq) out.push(...removeItems(p.src, at.seq, drop, true));
+	}
+	return out;
+}
+
+/** One removal of a person id from the `heir` or `exclude` of a title: the whole key, or some items of its list. */
+export interface IdRemoval {
+	title: number;
+	key: 'heir' | 'exclude';
+	/** The indices of the list items to remove; absent when the key goes whole. */
+	items?: Set<number>;
+}
+
+/**
+ * K.3: removes, in the expected data, `id` from the `heir` and `exclude` of every title with an id (also one that loses to
+ * a duplicate id). A scalar that is the id removes the key; a list loses its items with the id and stays a list, also of
+ * one; a list with no item left removes the key.
+ */
+export function dropIds(expected: RawMap, id: string): IdRemoval[] {
+	const out: IdRemoval[] = [];
+	rawTitles(expected).forEach((t, k) => {
+		if (!isRawMap(t) || str(t.id) === undefined) return;
+		for (const key of ['heir', 'exclude'] as const) {
+			const v = t[key];
+			if (Array.isArray(v)) {
+				const drop = new Set<number>();
+				v.forEach((x, i) => {
+					if (!isRawMap(x) && !Array.isArray(x) && str(x) === id) drop.add(i);
+				});
+				if (!drop.size) continue;
+				if (drop.size >= v.length) {
+					delete t[key];
+					out.push({ title: k, key });
+				} else {
+					t[key] = v.filter((_, i) => !drop.has(i));
+					out.push({ title: k, key, items: drop });
+				}
+			} else if (!isRawMap(v) && str(v) === id) {
+				delete t[key];
+				out.push({ title: k, key });
+			}
+		}
+	});
+	return out;
+}
+
+/** The patches for `dropIds`, on a parse of the same body. */
+export function dropIdPatches(p: Parsed, removals: IdRemoval[]): Patch[] | Refusal {
+	const out: Patch[] = [];
+	for (const r of removals) {
+		const node = titleNode(p, r.title);
+		if (isRefusal(node)) return node;
+		const pair = findPair(node, r.key);
+		if (!pair) return refuse('bad-value', REFUSAL_TEXT.otherValuesWouldChange);
+		if (!r.items) out.push(removePair(p.src, node, pair));
+		else if (isSeq(pair.value)) out.push(...removeItems(p.src, pair.value, r.items, true));
+		else return refuse('bad-value', NOT_A_LIST);
 	}
 	return out;
 }

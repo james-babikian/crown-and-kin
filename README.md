@@ -167,6 +167,73 @@ A title (for example "Duke of Valmont") has a list of holders. The list starts w
 
 On a phone, the tree in a note has no More button. First tap Expand to open the full-screen view.
 
+## Succession
+
+A title can have a line of succession. The line is the list of people who come after the ruler of the title, in order. You choose the rule in the Titles window. The plugin works out the line from the tree.
+
+1. In the toolbar, select More (the "⋯" button). Then select Titles.
+2. Select a title that you saved.
+3. Find the section **Succession**, under the holders.
+4. Select a rule. The line shows under the choices at once.
+5. Select **Save** to keep your choices. Select **Cancel** to discard them.
+
+A title that you did not save yet shows the text "Save the title first". The section has these choices.
+
+- **Rule.** The rule gives the order of the people. "None" means that the title has no rule.
+- **Eldest child first** (`eldest-child`). The eldest child of the ruler comes first. If that child is dead, the children of that child come before the next child.
+- **Youngest child first** (`youngest-child`). This is the same rule, but the youngest child comes first.
+- **Siblings before children** (`siblings-first`). The oldest generation of the house comes first: aunts and uncles, then brothers, sisters and cousins, then children.
+- **Nearest relative first** (`nearest-relative`). Nearness is the number of steps through the family. A child is 1, a brother or sister is 2, an aunt, uncle, niece or nephew is 3, and a cousin is 4.
+- **Born during the reign first** (`born-in-reign`). A child that was born while a parent held the title comes before the other children.
+- **Who can inherit.** Choose "Men only", "Men first", "No preference", "Women first" or "Women only". "Men first in the whole house" puts all men of the house before all women. "Women first in the whole house" does the opposite.
+- **The right to inherit comes from.** This choice says through whom a claim passes: "Men", "Women" or "Anyone". The first choice, "The same as Who can inherit", writes nothing. "Eldest child first" with "Men only" and "Men" is the Salic law.
+- **Year.** The line is for this year. If you leave the field empty, the line is for the end of the last reign. If the last reign has no end, the line is for now. A child born after this year is not in the line.
+- **Children marked as illegitimate.** The mark `illegitimate: true` on a person is the person's own mark. It is not the type of a partnership. The mark applies to both birth parents. You have three choices. These children cannot inherit. They inherit after all people who are not marked. Or they have the same right as the other children. "After" means after every person who is not marked, of any degree.
+- **Adopted children can inherit.** If this switch is off, an adopted child has no claim in the adoptive family. The adopted child keeps the claim in the birth family. Wards and rumoured children never inherit.
+- **Only descendants of the first holder can inherit.** If the switch is on, the line has only the descendants of the first holder in the tree. The descendants are the children, the grandchildren and so on. The search for relatives stops at the first holder. Named heirs stay in the line. For a new house, make a new title.
+- **Named heirs.** A named heir comes before the people that the rule gives. You can name more than one heir, and you can move them. A named heir who is dead, who is not born yet or who rules now is not in the line. The window tells you why.
+- **Excluded people.** An excluded person is never in the line. The children of an excluded person stay in the line. To exclude a branch, add each person of the branch.
+- **The line.** The window shows "Line of succession after" the ruler and the year. Each row has a place, for example "1st", and a name. Select a name to see the card in the tree. A row can have a note. An example is a person who is older than the age in the settings and has no death date. The setting "Length of the line of succession" gives the number of people.
+- **Grey rows.** A grey row is an open branch. An open branch is a person who died and has no children in the tree. The person may have children that are not in the tree yet. The row stands in the place of the children of the person.
+- **What an open branch is not.** An open branch is not an heir. It does not use a place in the line. A former holder is never an open branch. A person who is alive in the year of the line is never an open branch. A person who is not born yet in that year is never an open branch.
+- **What closes an open branch.** Any child in the tree closes an open branch. This includes an adopted child, a rumoured child and a child marked illegitimate. A ward of the person does not close it. A partnership does not close it. The box **No children** closes it too.
+- **No children.** If the person had no children, open the edit sheet of the person. Then tick **No children**.
+- **Age for open branches.** The setting “Age for open branches” hides the open branch of a person who died younger than this age. The notes must show a birth year and a death year. If a year is missing, the branch stays.
+- **Show.** The button **Show** is for a title that has a line of succession. If you did not save your changes, the plugin asks you first. Then the plugin shows the whole tree with the line. The first view shows the ruler and the heirs. A bar above the tree says “Line of succession”, the title and the year.
+- **Outlines and tabs.** Each heir has an outline and a small tab with the place, for example “2nd”. An open branch has a tab with “?”. The tabs show when the cards are large enough to read. The outline shows at every size.
+- **Close.** To leave the line, select **Close** or push Esc. If you choose a person in focus mode, or you use the relation finder, the line also closes.
+- **On a phone.** The list in the note shows the same bar, with a small Close button. The row of each heir says "2nd in line" in place of the relation word. The row of an open branch says "Open branch". After you select **Close**, the list is as it was before, with the relation words.
+- **Save as picture.** While the line shows, the picture has the outlines, the tabs and the text of the bar.
+
+The tree text keys are `succession`, `inherit`, `inherit-through`, `inherit-illegitimate`, `inherit-adopted`, `heirs-of-body`, `year`, `heir` and `exclude`. The window writes only the keys that you changed. A key that you wrote by hand stays as you wrote it.
+
+The person key `childless: true` closes the open branch of a person who died with no children. The edit sheet writes it when you tick **No children**.
+
+````markdown
+```dynasty
+titles:
+  - id: duke-of-valmont
+    name: Duke of Valmont
+    succession: eldest-child
+    inherit: men-only
+    inherit-through: men
+    year: 1210
+    heir: hugo
+    exclude: [osric]
+    holders:
+      - {person: aldric, from: 1175}
+```
+````
+
+Some limits of the line:
+
+- **The search for relatives goes to the top of the tree.** The plugin looks at the relatives of the ruler, up to the oldest person in the tree. To stop at the first holder, use the switch "Only descendants of the first holder can inherit".
+- **The order of brothers and sisters is the written order.** The order of the `people` list gives the order of the children of one parent. Birth years do not change it. The same is true for the children of different partners. The tree groups the children by partnership. So the cards can stand in another order than the line.
+- **Two parents.** If you choose "No preference", the order of `parents` in the note gives the order of the two sides of the family. Half blood and whole blood have the same rank.
+- **A husband who holds the title through his wife.** The plugin does not do this. Use a named heir.
+- **Only the year of a date counts.** If a date is only a number, the plugin reads it as the year, for example "12" or "1203". If a number has BC, BCE, AD or CE beside it, the plugin reads that year, for example "200 BC". In other dates, the plugin reads the first number with three or four digits, for example "c. 1203". If a date has no year, the window shows a note.
+- **Old versions.** A phone with plugin version 0.2.6 or 0.1.x keeps these keys in the tree text. It does not show the line.
+
 ## The Houses window
 
 A house has a name and a colour. It can also have arms. The colour of a house shows on the cards of the people of that house.
@@ -344,6 +411,9 @@ Open Settings. Select Dynasty Tree. You can set:
 - portraits on the cards (on or off; see "Portraits");
 - the generation of each person on the house page (on or off);
 - the number of generations in focus mode;
+- the length of the line of succession (1 to 20 people, 5 at first; see "Succession");
+- the age from which the line warns about a person with no death date (110 years at first; 0 stops the warning);
+- the age for open branches (0 at first). The line shows no open branch for a person who died younger than this age;
 - the update of tree links when you rename a note or a picture.
 
 Older versions had two more settings, "Height on a phone" and "Card style in the phone preview". They are gone, because a tree in a note on a phone is a list now. The plugin ignores the old values.
@@ -407,6 +477,7 @@ The example uses the pictures `valmont-arms.png` and `roderick.jpg`. If your vau
 - Each person has an `id` (a short name that the plugin uses to find the person). When you add a person, the plugin gives an ID such as `p12`. The plugin makes the ID of a new house or title from its name. If you rename a person, a house or a title, the ID stays the same. The edit sheet of a person shows the ID in a small grey text line at the end, for example "ID: p12".
 - A parent can be a birth, adoptive, ward or rumoured parent, for example `parents: [{id: aldric, type: adoptive}]`.
 - A partnership (in the `unions` list) can be a marriage, a betrothal, a concubinage or an affair.
+- A title can also have the keys of the line of succession (see "Succession").
 - A title has an `id`, a `name`, a `plural` (the name of its list) and `holders`. A holder has `person` (a person ID) or `name` (a holder who is not in the tree). A holder can also have `number`, `from`, `to` and `as`. `as` is the ruler name, if it is not the first word of the name.
 - `sobriquet: the Wise` on a person is a short extra name. The card shows it after the name (see "Sobriquet").
 - `card-title: king-of-the-vale` on a person selects the title that the card shows. "Show on the card" writes this text line.

@@ -21,7 +21,7 @@ import { isEmpty, isMap as isRawMap, str, type Raw, type RawMap } from './tolera
 import type { Tree } from './types';
 import { itemEnd } from './yaml-list';
 import {
-	addPair, addSection, appendItem, clone, doubleQuoted, findPair, finish, finishTogether, isRefusal, itemBlock, layoutOf, OPTION_ORDER, PERSON_FIELDS, PERSON_ORDER, personNode,
+	addPair, addSection, appendItem, clone, doubleQuoted, findPair, finish, finishTogether, isBooleanField, isRefusal, itemBlock, layoutOf, OPTION_ORDER, PERSON_FIELDS, PERSON_ORDER, personNode,
 	personValue, forget, QUOTED_FIELDS, refuse, remember, removePair, renderScalar, sameValue, setPairValue, Source, sourceText, TEXT_FIELDS, topMap, type NewValue, type Parsed,
 	type Step,
 } from './yaml-patch';
@@ -73,7 +73,7 @@ function setPersonFields(first: Parsed, op: SetPersonFields, data: RawMap, index
 				return pair ? setPairValue(p.src, item, pair, quoted, layout) : addPair(p.src, item, field, quoted, PERSON_ORDER, layout);
 			}
 			const nv: NewValue = { scalar: write, old: pair?.value as Node | null, text: TEXT_FIELDS.has(field) };
-			if (field === 'illegitimate') return pair ? setPairValue(p.src, item, pair, { ...nv, old: null, text: true }, layout) : addPair(p.src, item, field, { ...nv, text: true }, PERSON_ORDER, layout);
+			if (isBooleanField(field)) return pair ? setPairValue(p.src, item, pair, { ...nv, old: null, text: true }, layout) : addPair(p.src, item, field, { ...nv, text: true }, PERSON_ORDER, layout);
 			return pair ? setPairValue(p.src, item, pair, nv, layout) : addPair(p.src, item, field, nv, PERSON_ORDER, layout);
 		});
 	}
