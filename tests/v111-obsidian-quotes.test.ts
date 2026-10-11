@@ -71,7 +71,7 @@ function texts(v: unknown): string[] {
 	return strings(v);
 }
 
-const SKIP = new Set<string>(['deleteText', 'RELATION_TEXTS']);
+const SKIP = new Set<string>(['deleteText']);
 
 const STRAIGHT = /["']/;
 const NOTE_TEXT = new Set<string>([UI_TEXT.INSERT_UI.noteHint]);
@@ -130,7 +130,7 @@ describe('plugin texts use curly quote marks (D99)', () => {
 
 	it('the text files hold no straight double quote mark in code', () => {
 		// A straight " in these files would be a plugin text written by hand; texts go through quote().
-		for (const file of ['src/render/ui-text.ts', 'src/render/tree-info.ts']) {
+		for (const file of ['src/render/ui-text.ts', 'src/render/view-text.ts', 'src/render/succession-text.ts', 'src/render/tree-info.ts', 'src/render/legend-text.ts']) {
 			const code = readFileSync(file, 'utf8')
 				.split('\n')
 				.filter((l) => !/^\s*(\/\/|\*|\/\*)/.test(l))

@@ -34,7 +34,7 @@ afterEach(() => {
 const SRC = 'people:\n  - id: aldric\n    name: Aldric Valmont\n  - id: roderick\n    name: Roderick Valmont\n    parents: [aldric]\n';
 
 describe('D3: a retired view', () => {
-	for (const cls of ['dynasty-focus', 'dynasty-more', 'dynasty-fit', 'dynasty-legend-button', 'dynasty-expand']) {
+	for (const cls of ['dynasty-focus', 'dynasty-more', 'dynasty-fit', 'dynasty-find', 'dynasty-expand']) {
 		it(`the button .${cls} on the picture of a retired view opens no window of the plugin and keeps the picture`, async () => {
 			desktop();
 			const { el, view } = await embed(SRC, { handle: fakeHandle('n.md', SRC) });

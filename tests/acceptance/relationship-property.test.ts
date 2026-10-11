@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { deriveFamilies } from '../../src/core/derive';
-import type { ApplyOp, EditRefusal, NewPersonId, Op, ParentKind, UnionKind, UnionRef } from '../../src/core/edit';
+import type { ApplyOp, EditRefusal, Op, ParentKind, UnionKind, UnionRef } from '../../src/core/edit';
 import type { IssueCode } from '../../src/core/messages';
 import { parseDynasty } from '../../src/core/parse';
 import type { Tree } from '../../src/core/types';
 import * as edit from '../../src/core/yaml-edit';
 import { fixtureNote, fixtureSource, topLevelBlocks } from './load';
+import { nextIdFor } from '../helpers';
 
 /*
  * Property (spec §8 "nothing may throw", §6.6 no cycles, §6.1 the stored body is always valid):
@@ -20,7 +21,6 @@ import { fixtureNote, fixtureSource, topLevelBlocks } from './load';
  */
 
 const applyOp: ApplyOp = edit.applyOp;
-const newPersonId: NewPersonId = edit.newPersonId;
 
 const STARTS: { label: string; body: string }[] = [
 	...['01', '02', '08', '11'].map((f) => ({ label: `fixture ${f}`, body: fixtureSource(f).replace(/\n$/, '') })),
@@ -128,7 +128,7 @@ function unionRef(t: Tree, r: Rng): UnionRef | null {
 
 function newPerson(body: string, t: Tree, r: Rng): Extract<Op, { kind: 'add-person' }> {
 	const name = r.pick(NAMES);
-	const id = r.chance(0.05) ? r.pick(ids(t)) : newPersonId(body, name);
+	const id = r.chance(0.05) ? r.pick(ids(t)) : nextIdFor(body);
 	const parents: { id: string; type: ParentKind }[] = [];
 	const n = r.int(3);
 	for (let i = 0; i < n; i++) {

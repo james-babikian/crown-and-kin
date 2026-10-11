@@ -9,7 +9,7 @@
 
 import { codedIssue, type CodedIssue } from './messages';
 import { isPlacementType, parentKind, PLACEMENT_TYPES, type House, type ParentType, type Person, type Title, type Tree } from './types';
-import { push, validateTree } from './validate';
+import { push, validateTree, type ValidateOptions } from './validate';
 
 /** One partnership as it is drawn: a union listed in the block, or one inferred from shared children. */
 export interface FamilyUnion {
@@ -75,8 +75,8 @@ export const pairKey = (a: string, b: string) => {
 };
 
 /** Validates `tree`, then builds its `FamilyGraph`: placement parents, primary unions and side links (spec §4.3). */
-export function deriveFamilies(tree: Tree): FamilyGraph {
-	const v = validateTree(tree);
+export function deriveFamilies(tree: Tree, options: ValidateOptions = {}): FamilyGraph {
+	const v = validateTree(tree, options);
 	const { people, byId, houses, refs } = v;
 	const issues: CodedIssue[] = [...tree.issues, ...v.issues];
 

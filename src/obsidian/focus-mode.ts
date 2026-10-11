@@ -7,7 +7,7 @@
 import type { Orientation, Rect } from '../layout/model';
 import { COMPACT_NAME_EM } from '../render/dom/scene';
 import type { PhoneDirection } from './settings';
-import { FIT_MIN_NAME_PX, MIN_HIT_PX, READABLE_NAME_PX, START_TOP_GAP, chooseLod, fitScale, fitView, type Size, type View } from '../render/view-math';
+import { FIT_MIN_NAME_PX, HIT_EM, MIN_HIT_PX, READABLE_NAME_PX, START_TOP_GAP, chooseLod, fitScale, fitView, type Size, type View } from '../render/view-math';
 
 /**
  * What the user chose for this block in this session (Focus, Focus here, a `+` badge, Clear focus).
@@ -172,7 +172,7 @@ export const BADGE_WIN_MARGIN_PX = 6;
 
 /** The tap shape of one badge at one zoom, in layout px: its square, and the disc in which it wins over its own card. */
 export interface BadgeTap {
-	/** The square of `badgeHit`, after the cap and the clip. */
+	/** The square of the badge tap area, after the cap and the clip. */
 	square: Rect;
 	/** The disc around the badge centre in which the badge wins a tap over its own card. Nothing above `top` belongs to it. */
 	disc: { cx: number; cy: number; r: number; top: number };
@@ -181,8 +181,8 @@ export interface BadgeTap {
 /** The half side of the tap square, before the clip. Low zoom: only the badge circle, so the cards keep the space. */
 function badgeHalf(r: number, scale: number, fontPx: number, capPx: number): number {
 	if (!(scale > 0) || scale * fontPx < FIT_MIN_NAME_PX) return r;
-	// The cap never takes the square off the visible badge.
-	return Math.min(Math.max(MIN_HIT_PX / (2 * scale), r), Math.max(capPx, r));
+	// 0.2.8 (G.13): the square is at least 3 em, as the fold controls' tap area; the cap never takes it off the visible badge.
+	return Math.min(Math.max(MIN_HIT_PX / (2 * scale), (HIT_EM * fontPx) / 2, r), Math.max(capPx, r));
 }
 
 /**
@@ -217,24 +217,6 @@ export function badgeTap(mark: Rect, scale: number, fontPx: number, capPx: numbe
 		square: { x: x0, y: cy - up, w: 2 * half, h: up + half },
 		disc: { cx, cy, r: grown ? r + BADGE_WIN_MARGIN_PX / scale : r, top: cy - up },
 	};
-}
-
-/** The square of `badgeTap`: the tap area of the badge outside its own card. */
-export function badgeHit(mark: Rect, scale: number, fontPx: number, capPx: number, avoid: readonly Rect[]): Rect {
-	return badgeTap(mark, scale, fontPx, capPx, avoid).square;
-}
-
-/**
- * Does the badge win a tap at `point` (layout px)? One rule, like §13.10 for the fold controls. The part of the square outside
- * its own card (above its top edge or right of its right edge) is the badge. Over its own card the card wins, except inside the
- * disc of radius `r + 6 px` around the badge centre. The strip a tag tap area covers is not in the square, so the tag wins there.
- */
-export function badgeTapWins(mark: Rect, point: { x: number; y: number }, scale: number, fontPx: number, capPx: number, avoid: readonly Rect[]): boolean {
-	const { square, disc } = badgeTap(mark, scale, fontPx, capPx, avoid);
-	const inSquare = point.x >= square.x && point.x <= square.x + square.w && point.y >= square.y && point.y <= square.y + square.h;
-	const overOwnCard = point.x <= disc.cx && point.y >= disc.cy;
-	if (inSquare && !overOwnCard) return true;
-	return point.y >= disc.top && Math.hypot(point.x - disc.cx, point.y - disc.cy) <= disc.r;
 }
 
 /**
@@ -420,4 +402,83 @@ export function finderFirstView(bounds: Rect, size: Size, fontPx: number, insetT
 		cx = along(x0, x1, first.x, first.w, bounds.x, bounds.w, halfW);
 	}
 	return { scale, cx, cy: cy - top / 2 / scale };
+}
+
+/**
+ * 0.2.8 (G.4): the readable first view of a note shows the start person with the row of their parents above. `view` is the view that
+ * `defaultView` chose for the free area below `insetTop`; with the person's card at the top of the area the parents are cut off. The view moves up, just enough that the
+ * top of the parents' row (with the tree's own margin) is at the top of the area, but only when the start card is still whole at the foot of the area then. Never
+ * moves down, and never changes the zoom: a view that already shows the parents, or that has no room for both, stays as it is.
+ */
+export function parentsAbove(view: View, size: Size, insetTop: number, start: Rect, parents: readonly Rect[]): View {
+	if (!parents.length || !(view.scale > 0)) return view;
+	const top = Math.max(0, Math.min(insetTop, size.h - 1));
+	const s = view.scale;
+	const areaTop = view.cy - size.h / 2 / s + top / s;
+	const areaBottom = view.cy + size.h / 2 / s;
+	const parentsTop = Math.min(...parents.map((p) => p.y));
+	// The parents' row is whole in the area already.
+	if (areaTop <= parentsTop) return view;
+	const up = areaTop - (parentsTop - START_TOP_GAP);
+	// The start card must stay whole at the foot of the area after the move.
+	if (start.y + start.h > areaBottom - up) return view;
+	return { scale: s, cx: view.cx, cy: view.cy - up };
+}
+
+/** Screen places of a layout box in `view` (px, from the top left of the box that the view is drawn in). */
+function onScreen(view: View, size: Size, b: Rect): { left: number; right: number; top: number; bottom: number } {
+	const left = size.w / 2 + (b.x - view.cx) * view.scale;
+	const top = size.h / 2 + (b.y - view.cy) * view.scale;
+	return { left, right: left + b.w * view.scale, top, bottom: top + b.h * view.scale };
+}
+
+/**
+ * 0.2.8 (D212 `bars-in-flow`): every view that the plugin chooses keeps the top card whole. A card that the top edge of the drawing area, or the band over it
+ * (the toolbar and the banner of the full-screen view, `insetTop`; 0 in a note), cuts in two is made whole: the view moves down until the card is under the band, or, when that would push a `keys` card (the ruler, the line, the start person)
+ * out at the foot, up until the card is out from under the band entirely. A card that lies wholly under the band, or wholly below it, is not touched. The view never
+ * zooms. A view that no move can improve stays as it is, and a result never has more cut cards than the view it was given (a move that only swaps one cut card for another is dropped).
+ * After the first move down, a further move stops as soon as it would cut a card that is whole at the foot (a staircase of cut cards would push the whole tree down).
+ * `bottom` is the foot of the free area (the box height, or the top of a bottom toolbar).
+ */
+export function keepTopCardWhole(view: View, size: Size, insetTop: number, bottom: number, boxes: Iterable<Rect>, keys: readonly Rect[]): View {
+	if (!(insetTop >= 0) || !(view.scale > 0) || !(size.w > 0)) return view;
+	const all = [...boxes];
+	const cut = (v: View) => all.map((b) => onScreen(v, size, b)).filter((s) => s.right > 0 && s.left < size.w && s.top < insetTop - 0.5 && s.bottom > insetTop + 0.5);
+	const before = cut(view).length;
+	// A result with more cut cards than the given view is worse than no move.
+	const settle = (v: View): View => (cut(v).length > before ? view : v);
+	// A card that is whole between the band and the foot now, and is not any more after the move.
+	const footLost = (from: View, to: View): boolean =>
+		all.some((b) => {
+			const a = onScreen(from, size, b);
+			if (!(a.right > 0 && a.left < size.w) || a.top < insetTop - 0.5 || a.bottom > bottom + 0.5) return false;
+			return onScreen(to, size, b).bottom > bottom + 0.5;
+		});
+	let v = view;
+	// A move down can bring a card from above under the band, so it takes a few rounds, as `clearBand` does.
+	for (let i = 0; i < 4; i++) {
+		const cuts = cut(v);
+		if (!cuts.length) return settle(v);
+		const down = Math.max(...cuts.map((s) => insetTop - s.top));
+		const moved: View = { scale: v.scale, cx: v.cx, cy: v.cy - down / v.scale };
+		// A key card that is whole at the foot now must still be whole after the move; from the second move on, every card that is whole at the foot.
+		const keepsFoot = keys.every((k) => onScreen(v, size, k).bottom > bottom || onScreen(moved, size, k).bottom <= bottom);
+		if (i > 0 && footLost(v, moved)) return settle(v);
+		if (keepsFoot) {
+			v = moved;
+			continue;
+		}
+		// Raise the view until the cut cards are out from under the band entirely; a card that the raise cuts in its turn goes the same way.
+		let r = v;
+		for (let j = 0; j < 4; j++) {
+			const rc = cut(r);
+			if (!rc.length) break;
+			const up = Math.max(...rc.map((s) => s.bottom - insetTop));
+			r = { scale: r.scale, cx: r.cx, cy: r.cy + up / r.scale };
+		}
+		// Every key card must stay whole at the top.
+		const keepsTop = keys.every((k) => onScreen(v, size, k).top < insetTop || onScreen(r, size, k).top >= insetTop);
+		return keepsTop ? settle(r) : view;
+	}
+	return settle(v);
 }

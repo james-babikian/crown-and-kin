@@ -8,6 +8,7 @@ import { findBlocks } from '../src/core/block-locate';
 import { HandleRegistry } from '../src/obsidian/block-handle';
 import { LinkUpdater, nameForms, type LinkHooks, type RenameTiming } from '../src/obsidian/rename-links';
 import { RENAME_UI } from '../src/render/ui-text';
+import { VIEW_NOTICE } from '../src/render/view-text';
 import { noticeList, notices, resetObsidian } from './acceptance/fake-obsidian';
 
 /*
@@ -533,6 +534,17 @@ describe('Rename, fix round after the M6 iPhone test (the decision notes "M6 iPh
 			expect(err).toHaveBeenCalled();
 			err.mockRestore();
 		});
+	});
+
+	it('F-VIEW-04: a note that stays busy gives a Notice that names the note and the link, not a silent gap', async () => {
+		const s = setup({ 'T.md': tree(person('a', '"[[Old]]"')), 'Old.md': '' });
+		vi.spyOn(s.handles, 'forBlock').mockImplementation(async (_p: string, _o: number, onBusy?: () => void) => {
+			onBusy?.();
+			return null;
+		});
+		await s.rename(['Old.md', 'New.md']);
+		expect(notices).toEqual([VIEW_NOTICE.renameGaveUp('T', 'Old', 'New')]);
+		expect(s.updater.last?.failed).toEqual(['T']);
 	});
 
 	describe('the command "Show the last link update"', () => {

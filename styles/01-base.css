@@ -1,0 +1,245 @@
+/*
+ * Dynasty Tree styles.
+ * Every class starts with `dynasty-`. Colours come only from Obsidian CSS variables (the roles in
+ * THEME_VARS, src/render/styles.ts), so the tree follows the theme and light/dark mode live.
+ * A house colour reaches the SVG only through the `--dynasty-house-color` custom property (spec §5.8).
+ * Line rules must match STROKES in src/render/styles.ts; tests/render-styles.test.ts checks them.
+ * Every `color-mix()` follows a plain `var()` of its first colour: engines without `color-mix()`
+ * (iOS before 16.2) drop the second declaration and keep the first.
+ */
+
+/* ---------- Tokens (0.2.8 contract C, G.12) ---------- */
+
+/*
+ * Static colours of the new look, from measured tokens. They sit on `body`, because
+ * the windows are not inside a tree root. Each is a mix of Obsidian's own roles, so the theme still decides.
+ * Targets: text 4.5:1 and a control edge 3:1 on the window and card surfaces of the default theme, light and dark
+ * (visual-qa checks the other themes in G3). Nothing uses them yet; the packages P4 to P6 do.
+ * A custom property takes any text, so the two-declaration rule above does not work here: the plain role
+ * is the value first, and `@supports` replaces it where `color-mix()` works.
+ */
+body {
+	--dynasty-edge: var(--text-muted);
+	--dynasty-btn-edge: var(--text-muted);
+	--dynasty-muted: var(--text-muted);
+	--dynasty-link: var(--text-accent);
+	--dynasty-error: var(--text-error);
+	/* The text on the accent: the theme's own pair. The theme reader replaces it at run time with black or white where the pair is under 4.5:1. */
+	--dynasty-on-accent: var(--text-on-accent);
+}
+
+@supports (color: color-mix(in srgb, red 50%, blue)) {
+	body {
+		--dynasty-edge: color-mix(in srgb, var(--text-normal) 55%, var(--modal-background));
+		--dynasty-btn-edge: var(--dynasty-edge);
+		--dynasty-error: color-mix(in srgb, var(--text-error) 85%, var(--text-normal));
+		/* The accent, pulled toward the text colour so that a link reaches 4.5:1 (5.6:1 or more on the surfaces of the default light and dark themes). */
+		--dynasty-link: color-mix(in srgb, var(--text-accent) 70%, var(--text-normal));
+	}
+
+	body.theme-dark {
+		--dynasty-edge: color-mix(in srgb, var(--text-normal) 45%, var(--modal-background));
+		--dynasty-btn-edge: color-mix(in srgb, var(--text-normal) 62%, var(--modal-background));
+		--dynasty-error: color-mix(in srgb, var(--text-error) 90%, var(--text-normal));
+	}
+}
+
+/* ---------- Block ---------- */
+
+.dynasty-root {
+	position: relative;
+	/* Transparent: the note, a callout tint or a theme background shows through (spec §5.8). */
+	background: transparent;
+	font-family: var(--font-text);
+	font-size: var(--font-text-size);
+}
+
+.dynasty-viewport {
+	position: relative;
+	/* The toolbar hides its button texts when the tree is narrow (a Canvas card, a phone). */
+	container-type: inline-size;
+	height: var(--dynasty-height, 500px);
+	overflow: hidden;
+	background: transparent;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: var(--radius-m);
+	/* A finger or pen drag always scrolls the note: an embedded tree pans only with a mouse
+	   (spec §7.2; gestures follow PointerEvent.pointerType, also on a laptop with a touchscreen). */
+	touch-action: pan-y;
+	user-select: none;
+	-webkit-user-select: none;
+	cursor: grab;
+}
+
+.dynasty-viewport.dynasty-panning {
+	cursor: grabbing;
+}
+
+/* Touch-first device: a static preview (D1, spec §7.2). */
+.dynasty-static .dynasty-viewport {
+	cursor: default;
+}
+
+/* Reads the resolved font size and family (spec §5.8); added and removed at once. */
+.dynasty-font-probe {
+	position: absolute;
+	visibility: hidden;
+	pointer-events: none;
+	font-family: var(--font-text);
+	font-size: var(--font-text-size);
+}
+
+.dynasty-svg {
+	display: block;
+	width: 100%;
+	height: 100%;
+	overflow: hidden;
+	font-family: var(--font-text);
+}
+
+/*
+ * During a pinch the wrapper scales the picture it already has (WP5.3, spec §7.6): its own layer, so
+ * the browser moves the drawn picture and does not lay out or draw the cards again. The wrapper is
+ * HTML: a transform on the <svg> itself makes the browser lay out every SVG text again. The value is
+ * not inherited, so a new one restyles only the wrapper, not the 400 cards in it.
+ */
+@property --dynasty-gesture-transform {
+	syntax: '*';
+	inherits: false;
+}
+
+.dynasty-canvas {
+	width: 100%;
+	height: 100%;
+}
+
+.dynasty-canvas.dynasty-gesture {
+	transform: var(--dynasty-gesture-transform);
+	transform-origin: 0 0;
+	will-change: transform;
+}
+
+/*
+ * In the full-screen view on a device with a touch screen, the wrapper keeps its layer all the
+ * time: to make the layer when a pinch or a double-tap starts, and to remove it after, made the
+ * browser lay out every SVG text again (a 350 ms and a 630 ms frame on a slow phone, WP5.3). A
+ * mouse-only computer does not pinch, and keeps the sharper text of a page without extra layers.
+ */
+@media (any-pointer: coarse) {
+	.dynasty-full .dynasty-canvas {
+		will-change: transform;
+	}
+}
+
+.dynasty-banner {
+	margin: 0 0 var(--size-4-2) 0;
+}
+
+.dynasty-banner ul {
+	margin: var(--size-4-1) 0 0 0;
+}
+
+.dynasty-error-detail {
+	white-space: pre-wrap;
+}
+
+
+/* ---------- Shared parts of the window family (0.2.8 contract C, G.2, G.8) ---------- */
+
+/*
+ * A text for a screen reader only: it takes no room. It is absolute, so its box stands at its place in the text and counts for the scroll area of its
+ * containing block. If that block is a window outside a scroller or a clipped box, the text escapes the clip and the window gets a scroll area of
+ * thousands of pixels (iOS then scrolls it to show the field). So each parent of such a text is its containing block (an explicit list: a `:has()` rule would be checked on every element of Obsidian). The rule sits in the first chunk,
+ * so a later rule that places one of these parents wins.
+ */
+.dynasty-picker-row,
+.dynasty-add-link,
+.dynasty-chip-select,
+.dynasty-list-go,
+.dynasty-list-edit {
+	position: relative;
+}
+
+.dynasty-sr-only {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	margin: -1px;
+	padding: 0;
+	overflow: hidden;
+	clip-path: inset(50%);
+	white-space: nowrap;
+}
+
+/*
+ * Joined text lines (src/render/text-join.ts, G.2). The "·" belongs to the item after it. When an item starts a wrapped text line,
+ * the script hides its "·" (`is-lead`) and puts a line break before it, so a text line never starts or ends with "·".
+ */
+.dynasty-joined {
+	display: block;
+}
+
+.dynasty-jitem {
+	display: inline-block;
+	vertical-align: top;
+	max-width: 100%;
+}
+
+.dynasty-jmark {
+	margin-right: 0.4em;
+	color: var(--dynasty-muted);
+}
+
+.dynasty-jitem.is-lead > .dynasty-jmark {
+	display: none;
+}
+
+/* Links in a window (G.8, D218 rule 5): the link colour of the tokens, regular weight, no underline at rest. */
+.dynasty-link {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--size-4-1);
+	height: auto;
+	padding: 0;
+	border: 0;
+	background: none;
+	box-shadow: none;
+	color: var(--dynasty-link);
+	font-family: var(--font-interface);
+	font-size: inherit;
+	font-weight: var(--font-normal);
+	cursor: pointer;
+	text-decoration: none;
+}
+
+/* D218 rule 5: on a computer a link gets a thin underline under the pointer; a touch screen has no hover. */
+@media (hover: hover) {
+	.dynasty-link:hover {
+		background: none;
+		text-decoration: underline solid;
+		text-decoration-thickness: 1px;
+		text-underline-offset: 3px;
+	}
+}
+
+/*
+ * D218 (typography, rule 2): five text sizes for the whole plugin. On a computer they follow Obsidian's own interface sizes,
+ * with nothing under 12 px; on a phone they are fixed. Every window, list and bar takes its sizes from these roles.
+ */
+body {
+	--dynasty-type-title: var(--font-ui-large);
+	--dynasty-type-heading: var(--font-ui-medium);
+	--dynasty-type-control: var(--font-ui-small);
+	--dynasty-type-text: var(--font-ui-small);
+	--dynasty-type-small: max(12px, var(--font-ui-smaller));
+}
+/* A window or a prompt that is narrower than 600 px has the phone layout on any device, so it takes the phone sizes too (the class is set by modal-layout.ts). */
+body.is-phone,
+.modal.is-phone,
+.prompt.dynasty-picker.is-phone {
+	--dynasty-type-title: 22px;
+	--dynasty-type-heading: 17px;
+	--dynasty-type-control: 16px;
+	--dynasty-type-text: 15px;
+	--dynasty-type-small: 13px;
+}

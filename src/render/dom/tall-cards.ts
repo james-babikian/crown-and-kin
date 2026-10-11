@@ -10,6 +10,7 @@
  */
 
 import type { FamilyGraph } from '../../core/derive';
+import { sameList } from '../../core/same-list';
 import type { CardLabel } from '../../core/titles';
 import type { Person } from '../../core/types';
 import { cardText, nameRoom } from '../../layout/geometry';
@@ -95,7 +96,7 @@ export function tallCardsFor(
 }
 
 /** Same people, same order (both lists from `tallCardsFor`, or none). */
-export const sameTall = (a: readonly string[] | undefined, b: readonly string[] | undefined) => (a ?? []).length === (b ?? []).length && (a ?? []).every((id, i) => id === b![i]);
+export const sameTall = (a: readonly string[] | undefined, b: readonly string[] | undefined) => sameList(a ?? [], b ?? []);
 
 /**
  * D61 (spec §13.3): the people whose title text line (`titleLines`) takes two text lines, sorted.

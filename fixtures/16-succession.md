@@ -5,7 +5,7 @@ The line of succession of version 0.2.7 (spec §13.21, decisions D170 to D188). 
 - Four houses, four titles. Each title uses a different rule, so a test can check each rule on a tree that a person can read.
 - **Duke of Carrowmere** (House Carrow): the Salic law: `eldest-child` with `men-only` and `inherit-through: men`. A dead elder son passes the claim to his son; a daughter and her son are out; the brother of the duke and his son come last. Cedric was born more than 110 years before the last year in the tree and has no death date, so the line shows the warning `old` for him.
 - **Countess of Harrowfen** (House Harrow): `youngest-child` with `women-first` and `inherit-illegitimate: after`, for the year 1215 (a Year field). Edda is born in 1216, so she is not in the line of 1215. Bede is marked illegitimate, so he comes after all the other people. The countess has a sixth person in her line, so the line stops at five and shows "and more people".
-- **Margrave of the Salt Coast** (House Saltmarsh): `siblings-first` (the oldest generation first) with `men-first-in-house` (every man of the house before every woman) and `inherit-adopted: true`. Hale is the adopted son of the margrave and has the claim of a child.
+- **Margrave of the Salt Coast** (House Saltmarsh): `siblings-first` (the oldest generation first) with `men-first-in-house` (every man of the house before every woman) and `inherit-adopted: true`. Hale is the adopted son of the margrave and has the claim of a child. Hale is born in 1214 and Finn in 1215, so Hale comes before Finn although the note lists Finn first (birth year first, D193).
 - **Lord of Wetherby** (House Wether): a matrilineal house: `nearest-relative` with `men-only` and `inherit-through: women`. The sons of the lord and of his brother do not pass the claim; the sons of his sister do. The lord names two heirs (`heir`, the first comes first) and excludes Osric (`exclude`); the sons of an excluded person would keep their claim, but Osric has none.
 - Three marriages (Bertram and Cecily, Bram and Wenna, Edith and Pell) are listed in `unions`, so the tree has partnership dots. The other children have one parent in the tree. The second parent of a child never changes a line here.
 - The tree has no warning.
@@ -78,7 +78,7 @@ titles:
     inherit-adopted: true
     # ruler: bram-saltmarsh
     # year: now
-    # line: dorian-saltmarsh, leif-saltmarsh, finn-saltmarsh, hale-saltmarsh, elowen-saltmarsh
+    # line: dorian-saltmarsh, leif-saltmarsh, hale-saltmarsh, finn-saltmarsh, elowen-saltmarsh
     # more: yes
     # named: none
     # old: none
@@ -127,7 +127,7 @@ people:
   - {id: edda-harrow, name: Edda Harrow, house: harrow, sex: f, born: 1216, parents: [matilda-harrow]}
   - {id: tilde-harrow, name: Tilde Harrow, house: harrow, sex: f, born: 1195, parents: [sunniva-harrow]}
 
-  # House Saltmarsh: every man of the house before every woman. Bram's children in written order: Finn, Greta, Hale (adopted).
+  # House Saltmarsh: every man of the house before every woman. Bram's children in written order: Finn 1215, Greta 1217, Hale 1214 (adopted). By birth year: Hale, Finn, Greta (D193).
   - {id: corvin-saltmarsh, name: Corvin Saltmarsh, house: saltmarsh, sex: m, born: 1140, died: 1195}
   - {id: ansel-saltmarsh, name: Ansel Saltmarsh, house: saltmarsh, sex: m, born: 1165, died: 1220, parents: [corvin-saltmarsh]}
   - {id: dorian-saltmarsh, name: Dorian Saltmarsh, house: saltmarsh, sex: m, born: 1168, parents: [corvin-saltmarsh]}

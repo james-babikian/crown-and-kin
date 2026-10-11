@@ -51,8 +51,8 @@ describe('fixture 5 (malformed): spec §8, §10 item 5', () => {
 		{ code: 'cycle', level: 'warning', exactIds: ['arn', 'bram', 'col'] },
 		{ code: 'placement-without-parents', level: 'warning', ids: ['piers'], params: { placement: 'ward' } },
 		{ code: 'house-color-null', level: 'warning' },
-		// Unknown values.
-		{ code: 'unknown-union-type', level: 'warning', params: { value: 'handfasting' } },
+		// Unknown values. D188 item 12 (0.2.8): the unknown partnership word `handfasting` gives no warning (it is drawn
+		// as a marriage), so there is no `unknown-union-type` here. Only a near-typo warns (tested below).
 		{ code: 'unknown-placement', level: 'warning', ids: ['tilda'], params: { value: 'fostered' } },
 		{ code: 'unknown-parent-type', level: 'warning', ids: ['edda'], params: { value: 'godfather' } },
 	];
@@ -63,6 +63,10 @@ describe('fixture 5 (malformed): spec §8, §10 item 5', () => {
 
 	it('reports exactly the expected codes and levels', () => {
 		expect(tally(issuesOf(fixtureSource('05')))).toEqual(tally(expected));
+	});
+
+	it('handfasting (an unknown partnership word) gives no warning (D188 item 12, D205)', () => {
+		expect(issuesOf(fixtureSource('05')).filter((i) => i.code === 'unknown-union-type')).toEqual([]);
 	});
 
 	it('has at least one blocking issue, so editing is off and the banner shows', () => {
@@ -91,6 +95,32 @@ describe('fixture 5 (malformed): spec §8, §10 item 5', () => {
 		expect([...rotations(loop), ...rotations([...loop].reverse())]).toContain(names.join(' > '));
 		expect(['Arn Marsh', 'Bram Marsh', 'Col Marsh']).toContain(cycle.params.dropped);
 	});
+});
+
+describe('partnership words: D188 item 12, D205', () => {
+	const two = (type: string) => `people:
+  - {id: a, name: A, sex: m}
+  - {id: b, name: B, sex: f}
+unions:
+  - {partners: [a, b], type: ${type}}
+`;
+	const warned = (type: string) => issuesOf(two(type)).filter((i) => i.code === 'unknown-union-type');
+
+	// Hand derivation: distance from "marriag" to "marriage" is 1 and from "betrothel" to "betrothal" is 1 (both <= 2).
+	for (const [typo, suggestion] of [['marriag', 'marriage'], ['betrothel', 'betrothal']] as const) {
+		it(`a near-typo (${typo}) warns and suggests ${suggestion}`, () => {
+			const w = warned(typo);
+			expect(w).toHaveLength(1);
+			expect(w[0].level).toBe('warning');
+			expect(w[0].params).toMatchObject({ value: typo, suggestion });
+		});
+	}
+
+	for (const word of ['handfasting', 'wedlock', 'cohabitation']) {
+		it(`a far word (${word}) gives no warning`, () => {
+			expect(issuesOf(two(word))).toEqual([]);
+		});
+	}
 });
 
 describe('any sex value is valid (D12): spec §4.1, §8', () => {

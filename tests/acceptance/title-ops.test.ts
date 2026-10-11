@@ -5,7 +5,7 @@ import type { EditResult } from '../../src/core/edit';
 import { describeDelete, type DeleteSummary } from '../../src/core/family-query';
 import type { HolderRef } from '../../src/core/edit';
 import { golden, replaceOnce } from './golden';
-import { applyTitleOp, bodyOf, BODY_13, graphOf, holderRef, NOTE_13, refusal, titleOf, titleOpsModule, titlesModule, type AnyOp } from './titles-support';
+import { applyTitleOp, bodyOf, BODY_13, graphOf, holderRef, NOTE_13, refusal, titleOf, titleOpsModule, type AnyOp } from './titles-support';
 
 /*
  * Spec §13.3 ("Show on the card", `card-title` cleanup), §13.4 (the Titles window and the sheet's
@@ -26,6 +26,8 @@ function expectGolden(r: EditResult, file: string, created: string[] = []): void
 const G = () => graphOf(BODY_13);
 const ref = (title: string, index: number): HolderRef => holderRef(G(), title, index);
 const apply = (op: AnyOp, body = BODY_13) => applyTitleOp(body, op);
+/** The op that "Show on the card" writes (D62): `null` removes the key. */
+const cardTitle = (id: string, title: string | null): AnyOp => ({ kind: 'set-person-fields', id, fields: { 'card-title': title } });
 const batch = (...ops: AnyOp[]): AnyOp => ({ kind: 'batch', ops });
 
 const YA_CARD = '    name: Aldric Valmont\n    card-title: king-of-the-vale\n';
@@ -404,21 +406,18 @@ describe('card-title cleanup once per write, after all ops of a batch (contract 
 });
 
 describe('"Show on the card" writes only the card-title line (§13.3 acceptance)', () => {
-	it('after name when there is no written title', async () => {
-		const { cardTitleOp } = await titlesModule();
-		expectGolden(apply(cardTitleOp(G(), 'edmund', 'king-of-the-vale')), '13-card-title-edmund.yaml');
+	it('after name when there is no written title', () => {
+		expectGolden(apply(cardTitle('edmund', 'king-of-the-vale')), '13-card-title-edmund.yaml');
 	});
 
-	it('after title when there is one (D63)', async () => {
-		const { cardTitleOp } = await titlesModule();
-		expect(bodyOf(apply(cardTitleOp(G(), 'bertrand', 'count-of-orsini')))).toBe(
+	it('after title when there is one (D63)', () => {
+		expect(bodyOf(apply(cardTitle('bertrand', 'count-of-orsini')))).toBe(
 			replaceOnce(BODY_13, '    title: Count Palatine of Orsini\n', '    title: Count Palatine of Orsini\n    card-title: count-of-orsini\n'),
 		);
 	});
 
-	it('selecting the first title, with no written title, removes the key', async () => {
-		const { cardTitleOp } = await titlesModule();
-		expect(bodyOf(apply(cardTitleOp(G(), 'young-aldric', 'duke-of-valmont')))).toBe(replaceOnce(BODY_13, YA_CARD, '    name: Aldric Valmont\n'));
+	it('selecting the first title, with no written title, removes the key', () => {
+		expect(bodyOf(apply(cardTitle('young-aldric', null)))).toBe(replaceOnce(BODY_13, YA_CARD, '    name: Aldric Valmont\n'));
 	});
 
 	it('set-person-fields card-title: null removes it; the same value again changes nothing', () => {

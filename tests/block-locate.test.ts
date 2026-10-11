@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { LocatedBlock } from '../src/core/block-locate';
-import { findBlocks, locateBlock, ordinalForSection, replaceBody } from '../src/core/block-locate';
+import { findBlocks, ordinalForSection, replaceBody } from '../src/core/block-locate';
 
 const shape = (b: LocatedBlock) => ({ openLine: b.openLine, closeLine: b.closeLine, prefix: b.prefix, body: b.body });
 const only = (text: string) => {
@@ -120,13 +120,8 @@ describe('CRLF notes', () => {
 	});
 });
 
-describe('locateBlock and ordinalForSection', () => {
+describe('ordinalForSection', () => {
 	const text = '```dynasty\na\n```\n\n> [!note]\n> ```dynasty\n> b\n> ```\n>\n> ```dynasty\n> c\n> ```\n>\n> ```dynasty\n> c\n> ```\n';
-	it('finds a block by ordinal', () => {
-		expect(locateBlock(text, 1)?.body).toBe('b');
-		expect(locateBlock(text, 4)).toBeNull();
-	});
-
 	it('one block in the section: that block', () => {
 		expect(ordinalForSection(text, 0, 2, 'anything')).toBe(0);
 		expect(ordinalForSection(text, 5, 5, '')).toBe(1);

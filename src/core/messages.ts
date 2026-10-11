@@ -10,6 +10,7 @@
 import { slugify } from './id-gen';
 import { quote } from './quote';
 import { INHERIT_ILLEGITIMATE, INHERIT_RULES, INHERIT_THROUGH, SUCCESSION_RULES } from './succession-keys';
+import { PARENT_LIMIT } from './types';
 
 /** Tree not rendered (spec §8). */
 export type HardErrorCode =
@@ -55,7 +56,7 @@ export type WarningCode =
 	/** `options.me` is a list or a map, not one person id (spec §13.1). No params. */
 	| 'me-not-id'
 	// Structure.
-	/** params: person, type, count */
+	/** More parents of one type than `PARENT_LIMIT` allows. params: person, type, count; limit (2, or 8 for rumoured) */
 	| 'too-many-parents'
 	/** params: union (label), partners (names), count */
 	| 'union-partner-count'
@@ -110,15 +111,30 @@ export type WarningCode =
 	| 'died-doubtful'
 	/** A dead person with `childless: true` who is the birth parent of another person (M.6). params: person (name), child (name) */
 	| 'childless-has-child'
+	// Holding a title through the spouse (0.2.8 contract A.2, D195). Only for a title with `succession` or `heir`; the key is then ignored.
+	/** The holder has no partner. params: person, title (name) */
+	| 'through-spouse-no-partner'
+	/** The holder has partners, but all are betrothals, concubines or affairs (D205). params: person, title (name) */
+	| 'through-spouse-no-marriage'
+	/** Several candidates, none an ancestor or a descendant of another holder. params: person, title, count, partners (names), example (an id) */
+	| 'through-spouse-no-claim'
+	/** Several candidates, more than one an ancestor or a descendant of another holder. params: person, title, count, partners (names), example (an id) */
+	| 'through-spouse-several-claims'
+	/** The written id is the holder. params: person, title (name) */
+	| 'through-spouse-self'
+	/** The written id is a person who is not a partner. params: person, title, ref, other (name) */
+	| 'through-spouse-not-partner'
+	/** The written id names nobody. params: person, title, ref */
+	| 'through-spouse-unknown-person'
 	// Portrait crop (spec §13.13). Found by `validate.ts`: it needs no vault.
 	/** A `portrait-crop` that is not three numbers, on a person with a `portrait`. params: person (name) */
 	| 'bad-portrait-crop'
 	// Unknown values: kept in the YAML, drawn with default styling.
-	/** params: union (label), partners (names), value */
+	/** Only a near-typo of a known type (0.2.8 I13); any other word is drawn as a marriage with no warning. params: union (label), partners (names), value, suggestion */
 	| 'unknown-union-type'
 	/** params: person, value */
 	| 'unknown-placement'
-	/** params: person, value, parent (name) */
+	/** params: person, value, parent (name); suggestion when the value is a near-typo of a known type */
 	| 'unknown-parent-type'
 	// Shape problems that are not silently tolerated (spec §8 "Tolerated silently" is not reported).
 	/**
@@ -283,6 +299,8 @@ function sectionWrongShape(p: P): string {
  * that agree with it: "The arms of House Valmont use", "The portrait of Aldric Valmont uses".
  */
 function pictureOwner(p: P): { who: string; uses: string; is: string; other: string } {
+	// 0.2.8 contract A.1: the personal arms of a person.
+	if (s(p, 'owner', '') === 'person-arms') return { who: `The personal arms of ${s(p, 'person', 'a person')}`, uses: 'use', is: 'are', other: 'select other arms' };
 	if (s(p, 'owner', '') === 'portrait' || (s(p, 'owner', '') === '' && s(p, 'person', '') !== '')) {
 		return { who: `The portrait of ${s(p, 'person', 'a person')}`, uses: 'uses', is: 'is', other: 'select another portrait' };
 	}
@@ -335,23 +353,31 @@ const ISSUE_TEXT: { [C in IssueCode]: (p: P) => string } = {
 	},
 	'me-not-id': () => '“me” in the options does not name one person. Write one person ID after “me:”.',
 
-	'too-many-parents': (p) =>
-		`${person(p)} has ${n(p, 'count')} ${s(p, 'type', 'birth')} parents, but a person can have only 2 of each type. Remove the extra parents, or change their type.`,
+	'too-many-parents': (p) => {
+		const type = s(p, 'type', 'birth');
+		const limit = n(p, 'limit') || (type === 'rumoured' ? PARENT_LIMIT.rumoured : PARENT_LIMIT.birth);
+		if (type === 'rumoured') {
+			return `${person(p)} has ${n(p, 'count')} rumoured parents, but a person can have only ${limit} of this type. If a person has more than ${limit}, a relation name can lack a “maybe”. Remove the extra parents, or change their type.`;
+		}
+		return `${person(p)} has ${n(p, 'count')} ${type} parents, but a person can have only ${limit} of each type. Remove the extra parents, or change their type.`;
+	},
 	'union-partner-count': (p) => {
 		const partners = strings(p, 'partners');
 		const what = partners.length
 			? `a partnership with ${plural(partners.length, 'person', 'people')}: ${andList(partners)}`
 			: `${byLabel(p)}, because it has ${plural(n(p, 'count'), 'person', 'people')}`;
-		return `The tree does not show ${what}. Give each partnership exactly 2 people.`;
+		// A partnership of 3 or more people gets an example of the right form (I12).
+		const example = n(p, 'count') >= 3 ? ' Write one partnership for each pair, for example “- partners: [aldric, isolde]”.' : '';
+		return `The tree does not show ${what}. Give each partnership exactly 2 people.${example}`;
 	},
 	'union-same-partner': (p) =>
 		`The tree does not show ${byLabel(p)}, because it has ${s(p, 'person', 'the same person')} two times. Change one partner to a different person.`,
 	'cycle': (p) => {
 		const people = strings(p, 'people');
 		const who = people.length ? andList(people) : 'Some people';
-		return `${who} are ancestors of each other. If you do not correct their parents, the tree does not show the line from ${s(p, 'parent', 'one parent')} to ${s(p, 'dropped', 'one child')}.`;
+		return `${who} are ancestors of each other, so the tree has a time loop. The tree does not show the line from ${s(p, 'parent', 'one parent')} to ${s(p, 'dropped', 'one child')}. If this is a mistake, correct the parents.`;
 	},
-	'self-parent': (p) => `The parents of ${person(p)} include ${person(p)}. Remove ${person(p)} from these parents.`,
+	'self-parent': (p) => `The parents of ${person(p)} include ${person(p)}. If this is a mistake, remove ${person(p)} from these parents.`,
 	'placement-without-parents': (p) => {
 		const t = s(p, 'placement', '?');
 		return `${person(p)} has “placement: ${t}”, but has no ${t} parents. Add ${t} parents, or remove “placement: ${t}”.`;
@@ -369,11 +395,18 @@ const ISSUE_TEXT: { [C in IssueCode]: (p: P) => string } = {
 	'card-title-not-held': (p) =>
 		`${person(p)} has “card-title: ${s(p, 'ref', '?')}”, but ${person(p)} does not hold a title with this ID. The card shows the first title instead. Correct the ID, or remove it.`,
 
-	'unknown-union-type': (p) =>
-		`${cap(partnership(p))} has the unknown type ${quote(s(p, 'value', '?'))}. Use marriage, betrothal, concubinage or affair.`,
+	'unknown-union-type': (p) => {
+		const suggestion = s(p, 'suggestion', '');
+		const hint = suggestion ? ` If you mean ${quote(suggestion)}, write ${quote(`type: ${suggestion}`)}.` : '';
+		return `${cap(partnership(p))} has the type ${quote(s(p, 'value', '?'))}. The plugin shows it as a marriage.${hint}`;
+	},
 	'unknown-placement': (p) => `${person(p)} has the unknown placement ${quote(s(p, 'value', '?'))}. Use birth, adoptive or ward.`,
-	'unknown-parent-type': (p) =>
-		`${person(p)} has the parent ${s(p, 'parent', 'a parent')} with the unknown type ${quote(s(p, 'value', '?'))}. Use birth, adoptive, ward or rumoured.`,
+	'unknown-parent-type': (p) => {
+		const suggestion = s(p, 'suggestion', '');
+		const hint = suggestion ? ` If you mean ${quote(suggestion)}, write ${quote(`type: ${suggestion}`)}.` : '';
+		const parent = s(p, 'parent', 'a parent');
+		return `${person(p)} has the parent ${parent} with the type ${quote(s(p, 'value', '?'))}, which the plugin does not know. The plugin counts ${parent} as a birth parent of ${person(p)}. Use birth, adoptive, ward or rumoured.${hint}`;
+	},
 
 	'missing-picture': (p) => {
 		const o = pictureOwner(p);
@@ -381,7 +414,7 @@ const ISSUE_TEXT: { [C in IssueCode]: (p: P) => string } = {
 	},
 	'picture-web': (p) => {
 		const o = pictureOwner(p);
-		return `${o.who} ${o.is} a web address. The plugin shows only pictures from the vault.`;
+		return `${o.who} ${o.is} a web address. The plugin shows only pictures from the vault. Save the picture in the vault. Then select it again.`;
 	},
 	'picture-not-image': pictureNotImage,
 	'picture-too-large': pictureTooLarge,
@@ -406,7 +439,7 @@ const ISSUE_TEXT: { [C in IssueCode]: (p: P) => string } = {
 	'unknown-inherit-illegitimate': (p) =>
 		`${cap(titleOf(p))} has “inherit-illegitimate: ${s(p, 'value', '?')}”. The plugin does not know this value, so it shows no line of succession. Use one of these values: ${INHERIT_ILLEGITIMATE.join(', ')}.`,
 	'year-unreadable': (p) =>
-		`${cap(titleOf(p))} has “year: ${s(p, 'value', '?')}”. The plugin cannot find a year in it, so the line of succession uses the end of the last reign. Write the year as a number, for example “year: 1210”.`,
+		`${cap(titleOf(p))} has “year: ${s(p, 'value', '?')}”. The plugin cannot find a year in it. The line of succession uses the end of the last reign. If the last reign has no end, the line is for now. Write the year as a number, for example “year: 1210”.`,
 	'missing-heir': (p) => `${cap(titleOf(p))} has “heir: ${s(p, 'ref', '?')}”, but no person has this ID. Correct the ID, or remove it.`,
 	'missing-excluded': (p) => `${cap(titleOf(p))} has “exclude: ${s(p, 'ref', '?')}”, but no person has this ID. Correct the ID, or remove it.`,
 	'sex-spelling': (p) => {
@@ -421,6 +454,27 @@ const ISSUE_TEXT: { [C in IssueCode]: (p: P) => string } = {
 	'childless-has-child': (p) => {
 		const name = person(p);
 		return `${name} has “childless: true”, but ${s(p, 'child', 'a person')} is a child of ${name} in the tree. Remove “childless: true”, or correct the parents of ${s(p, 'child', 'a person')}.`;
+	},
+
+	'through-spouse-no-partner': (p) =>
+		`${person(p)} holds ${titleOf(p)} with “through-spouse”, but ${person(p)} has no partner in the tree. The plugin ignores “through-spouse”. Add a partnership for ${person(p)}, or remove “through-spouse”.`,
+	'through-spouse-no-marriage': (p) =>
+		`${person(p)} holds ${titleOf(p)} with “through-spouse”, but the tree shows no marriage for ${person(p)}. The plugin ignores “through-spouse”. Add a marriage, write the ID of a partner, or remove “through-spouse”.`,
+	'through-spouse-no-claim': (p) => {
+		const count = n(p, 'count');
+		const none = count === 2 ? 'Neither is' : 'None of them is';
+		return `${person(p)} has ${count} partners: ${andList(strings(p, 'partners'))}. ${none} an ancestor or a descendant of a holder of ${titleOf(p)}. As a result, the plugin cannot choose a partner and ignores “through-spouse”. Write the ID of one partner, for example “through-spouse: ${s(p, 'example', 'anna')}”.`;
+	},
+	'through-spouse-several-claims': (p) =>
+		`${person(p)} has ${n(p, 'count')} partners who are ancestors or descendants of a holder of ${titleOf(p)}: ${andList(strings(p, 'partners'))}. The plugin cannot choose a partner, so it ignores “through-spouse”. Write the ID of one partner, for example “through-spouse: ${s(p, 'example', 'anna')}”.`,
+	'through-spouse-self': (p) => `${person(p)} holds ${titleOf(p)} with “through-spouse”, but the ID after it is the ID of ${person(p)}. The plugin ignores “through-spouse”. Write the ID of a partner, or remove “through-spouse”.`,
+	'through-spouse-not-partner': (p) => {
+		const ref = s(p, 'ref', '?');
+		return `${person(p)} holds ${titleOf(p)} with “through-spouse: ${ref}”, but ${s(p, 'other', ref)} is not a partner of ${person(p)}. The plugin ignores “through-spouse”. Write the ID of a partner, or remove “through-spouse: ${ref}”.`;
+	},
+	'through-spouse-unknown-person': (p) => {
+		const ref = s(p, 'ref', '?');
+		return `${person(p)} holds ${titleOf(p)} with “through-spouse: ${ref}”, but no person has the ID ${quote(ref)}. The plugin ignores “through-spouse”. Write the ID of a partner, or remove “through-spouse: ${ref}”.`;
 	},
 
 	'entry-not-map': entryNotMap,

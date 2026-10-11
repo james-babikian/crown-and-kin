@@ -1,6 +1,8 @@
 import esbuild from 'esbuild';
+import fs from 'node:fs';
 import process from 'node:process';
 import { builtinModules } from 'node:module';
+import { writeStyles } from './styles/concat.mjs';
 
 const banner = `/*
 Dynasty Tree: generated file. Do not edit. Source: src/obsidian/main.ts.
@@ -45,9 +47,21 @@ const context = await esbuild.context({
 	plugins: [noElk],
 });
 
+// styles.css is the join of the numbered chunks in styles/ (styles/README.md). Builders edit chunks only.
+const joinStyles = () => {
+	if (writeStyles('styles.css')) console.log('styles.css joined from styles/');
+};
+joinStyles();
+
 if (prod) {
 	await context.rebuild();
 	await context.dispose();
 } else {
 	await context.watch();
+	// esbuild watches only the script entry, so a chunk change needs its own watcher (one join per burst of events).
+	let timer;
+	fs.watch('styles', () => {
+		clearTimeout(timer);
+		timer = setTimeout(joinStyles, 50);
+	});
 }

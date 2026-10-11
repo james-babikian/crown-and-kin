@@ -1,0 +1,163 @@
+/* ---------- Cards ---------- */
+
+/* Cards and tags carry aria-label for screen readers. Obsidian shows a tooltip for aria-label,
+   but its tooltip code works only on HTML elements and fails on SVG; this turns it off. */
+.dynasty-card,
+.dynasty-tag {
+	--no-tooltip: true;
+}
+
+.dynasty-card {
+	outline: none;
+}
+
+/*
+ * 0.2.8 (contract C, I17): the card corner is the theme's `--radius-m`, at most 1.5 em so that a large radius never rounds a small card into a pill. The
+ * ribbon path (`ribbonPath`, `render/view-math.ts`) uses the number that the scene reads back from this rule (`readCornerRadius`).
+ */
+.dynasty-card-bg {
+	fill: var(--background-primary-alt);
+	stroke: var(--background-modifier-border);
+	stroke-width: 1;
+	rx: var(--radius-m);
+	ry: var(--radius-m);
+	rx: min(var(--radius-m), calc(var(--dynasty-font-size) * 1.5));
+	ry: min(var(--radius-m), calc(var(--dynasty-font-size) * 1.5));
+}
+
+@media (hover: hover) {
+	.dynasty-card:hover .dynasty-card-bg {
+		stroke: var(--background-modifier-border-focus);
+	}
+}
+
+/* The house ribbon: on the top edge of a top-to-bottom card, on the left edge of a sideways one (D197 Q1 A). A path with the card's rounded corners. */
+.dynasty-card-ribbon {
+	fill: var(--dynasty-house-color, var(--background-modifier-border-hover));
+}
+
+/* D117: one size for all card text (0.85 of the note font); the weight carries the difference. */
+.dynasty-card-name {
+	font-size: calc(var(--dynasty-font-size) * 0.85);
+	fill: var(--text-normal);
+	font-weight: var(--bold-weight, 600);
+}
+
+/* D122: the sobriquet after the name is in regular weight. */
+.dynasty-card-sob {
+	font-weight: 400;
+}
+
+/* The grey of the second lines is the plugin's own token (D212, contrast-tokens): the theme's raw grey is too faint in some themes. It is computed at start (`--dynasty-muted`). */
+.dynasty-card-title {
+	font-size: calc(var(--dynasty-font-size) * 0.85);
+	fill: var(--dynasty-muted, var(--text-muted));
+}
+
+.dynasty-card-dates {
+	font-size: calc(var(--dynasty-font-size) * 0.85);
+	fill: var(--dynasty-muted, var(--text-muted));
+}
+
+/* D203: a long name shrinks from 1.5 em down to 1.05 em before it is cut; the scene sets --dynasty-compact-em on the text. */
+.dynasty-card-compact {
+	display: none;
+	font-size: calc(var(--dynasty-font-size) * var(--dynasty-compact-em, 1.5));
+	fill: var(--text-normal);
+	font-weight: var(--bold-weight, 600);
+}
+
+/* Deceased people are slightly muted (spec §5.2). */
+.dynasty-deceased .dynasty-card-name,
+.dynasty-deceased .dynasty-card-compact {
+	fill: var(--dynasty-muted, var(--text-muted));
+}
+
+/* D27: a house colour is lighter in the dark theme (0.2.8: 60 % of the colour), so a dark house still shows on a dark card. */
+.theme-dark .dynasty-has-house .dynasty-card-ribbon {
+	fill: var(--dynasty-house-color);
+	fill: color-mix(in srgb, var(--dynasty-house-color) 60%, var(--text-normal));
+}
+
+.dynasty-deceased .dynasty-card-ribbon {
+	opacity: 0.7;
+}
+
+/* D218: the contrast-safe link colour of the tokens, not the theme's raw link colour; the hover shows only an underline. */
+.dynasty-name-link {
+	fill: var(--dynasty-link, var(--link-color));
+	cursor: pointer;
+}
+
+.dynasty-name-link:hover {
+	text-decoration: underline;
+}
+
+.dynasty-name-link.is-unresolved {
+	fill: var(--link-unresolved-color);
+	opacity: var(--link-unresolved-opacity);
+}
+
+/*
+ * Keyboard focus and the find/focus highlight: the accent ring on the card's edge, and outside it a
+ * 2 px ring in the text colour. A theme's accent can be pale (2:1 on the note); the text colour is
+ * always strong, so the ring never depends on the accent alone (WP6.5). The outer ring is a wider
+ * stroke of a rect under the card: the card covers its inner half, the accent covers 1 px more.
+ */
+.dynasty-card-ring {
+	display: none;
+	fill: none;
+	stroke: var(--text-normal);
+	rx: var(--radius-m);
+	ry: var(--radius-m);
+	pointer-events: none;
+}
+
+.dynasty-card:focus-visible .dynasty-card-ring {
+	display: inline;
+	stroke-width: 6;
+}
+
+.dynasty-card:focus-visible .dynasty-card-bg {
+	stroke: var(--interactive-accent);
+	stroke-width: 2;
+}
+
+/*
+ * The highlight pulse (M7, M8). Only the outer ring pulses, and only its opacity: a change of stroke-width makes the browser measure the
+ * shape again at each step. It is `stroke-opacity`, not `opacity`: the browser does not move an `opacity` animation of an SVG shape to its own
+ * layer in a way that suits a tree whose view moves at the same time (Find); it laid out the layers of all cards again at each move frame
+ * (harness step "r024 anim"). The accent border has a fixed width; the ring stays 2 px outside it.
+ * `.dynasty-reduce-motion` (D126) stops the pulse: the ring then stays as a still outline.
+ */
+.dynasty-card.dynasty-highlight .dynasty-card-ring {
+	display: inline;
+	stroke-width: 9;
+	animation: dynasty-pulse-ring 0.5s ease-in-out 4 alternate;
+}
+
+.dynasty-card.dynasty-highlight .dynasty-card-bg {
+	stroke: var(--interactive-accent);
+	stroke-width: 5;
+}
+
+@keyframes dynasty-pulse-ring {
+	from {
+		stroke-opacity: 0;
+	}
+	to {
+		stroke-opacity: 1;
+	}
+}
+
+/* The "illegitimate" sign (spec D14): a dashed bar in the line colour, fainter on a deceased card. */
+.dynasty-sign {
+	fill: none;
+	stroke: var(--text-muted);
+	stroke-linecap: butt;
+}
+
+.dynasty-deceased .dynasty-sign {
+	opacity: 0.6;
+}
+

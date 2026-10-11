@@ -1,0 +1,151 @@
+/* ---------- The banner of the relation finder and of the Show view (spec §13.1, §13.2; D47–D49; 0.2.8 contract C and G.13) ---------- */
+
+/*
+ * One design for both (`dynasty-banner`): a row under the toolbar with the sentence at the left and the links at the right. Its own
+ * background, like the toolbar: the tree shows under it only after a pan. On a computer the links are Show the steps, Other relation, Show in
+ * the whole tree and Close; on a phone Close is an X of 44 px. Every link has a hit area of at least 44 × 44 px (spec §7.5, §13.0 item 8).
+ * The first view measures the banner and keeps the tree clear of it.
+ */
+.dynasty-result {
+	position: absolute;
+	z-index: 2;
+	top: 44px;
+	left: 0;
+	right: 0;
+	width: auto;
+	box-sizing: border-box;
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0 8px;
+	min-height: 44px;
+	padding: 0 4px 0 14px;
+	background: var(--background-secondary);
+	border-bottom: 1px solid var(--background-modifier-border);
+	font-family: var(--font-interface);
+	font-size: var(--dynasty-type-text);
+	color: var(--text-normal);
+	cursor: default;
+	user-select: text;
+	-webkit-user-select: text;
+}
+
+/* Opaque in every theme (as the sheets, D212): Cupertino makes the secondary background 75 % see-through, and the tree would show through the text. */
+@supports (color: rgb( from red r g b)) {
+	.dynasty-result {
+		background: rgb(from var(--background-secondary) r g b);
+	}
+}
+
+.dynasty-full .dynasty-result {
+	top: calc(max(0px, env(safe-area-inset-top)) + 44px);
+	padding-left: max(14px, env(safe-area-inset-left));
+	padding-right: max(4px, env(safe-area-inset-right));
+}
+
+/* Phone: the bar is at the bottom, so the banner is at the top, inside the safe area (spec §13.2). */
+.modal.dynasty-fullscreen.is-phone .dynasty-full .dynasty-result {
+	top: max(0px, env(safe-area-inset-top));
+	min-height: 52px;
+	padding: 4px 0 4px 16px;
+}
+
+.dynasty-result-text {
+	order: 1;
+	flex: 1 1 12em;
+	min-width: 0;
+	padding: 6px 0;
+	line-height: 1.35;
+	overflow-wrap: anywhere;
+}
+
+/* The sentence takes the focus only so that a screen reader reads it; it is not a control. */
+.dynasty-result-text:focus {
+	outline: none;
+}
+
+.dynasty-result-buttons {
+	order: 2;
+	flex: none;
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: flex-end;
+	gap: 0;
+	margin: 0;
+}
+
+/* Spec §7.5, §13.0 item 8: every link of the banner has a hit area of at least 44 × 44 px. */
+.dynasty-result .dynasty-result-button {
+	min-height: 44px;
+	min-width: 44px;
+	height: auto;
+	padding: 0 8px;
+	justify-content: center;
+	font-family: var(--font-interface);
+	font-size: var(--dynasty-type-control);
+	white-space: nowrap;
+	box-shadow: none;
+}
+
+/* The X of a phone: an icon in the text colour, a square of 44 px. */
+.dynasty-result .dynasty-result-button.dynasty-bar-x {
+	width: 44px;
+	padding: 0;
+	border: 0;
+	background: transparent;
+	box-shadow: none;
+	color: var(--text-normal);
+}
+
+/* On a phone the banner is one row (D212, phone-banner-row): the sentence, the link "Options" with a chevron, and the X. The steps open under the row. */
+.dynasty-result-phone .dynasty-result-buttons {
+	display: contents;
+}
+
+.dynasty-result-phone .dynasty-result-button.dynasty-result-options {
+	order: 2;
+	flex: none;
+	gap: 2px;
+	padding: 0 6px;
+	font-weight: var(--font-normal);
+}
+
+.dynasty-result-options .svg-icon {
+	width: 14px;
+	height: 14px;
+}
+
+.dynasty-result-phone .dynasty-result-button.dynasty-bar-x {
+	order: 3;
+}
+
+.dynasty-result .dynasty-result-button.dynasty-bar-x:hover {
+	background: var(--background-modifier-hover);
+}
+
+/* The steps of the finder's relation open as a list under the row. */
+.dynasty-result-steps {
+	order: 5;
+	flex: 1 1 100%;
+	margin: 0 0 var(--size-4-2) 0;
+	padding-left: 1.4em;
+	font-size: var(--dynasty-type-text);
+	line-height: 1.45;
+	max-height: 40vh;
+	overflow-y: auto;
+}
+
+.dynasty-result-more-steps {
+	list-style: none;
+	color: var(--text-muted);
+}
+
+/* The bar of the Show view has the look and the place of the finder's banner (.dynasty-result); only the text is its own. */
+.dynasty-succession-text {
+	overflow-wrap: anywhere;
+}
+
+.dynasty-succession-text:focus {
+	outline: none;
+}

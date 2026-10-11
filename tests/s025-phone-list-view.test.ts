@@ -70,9 +70,15 @@ async function open(src: string, o: { handle?: FakeHandle | null; settings?: Dyn
 const rootOf = (el: FEl) => el.querySelector('.dynasty-root')!;
 const row = (el: FEl, id: string) => el.querySelector(`.dynasty-list-row[data-person="${id}"]`)!;
 const ids = (el: FEl) => el.querySelectorAll('.dynasty-list-row').map((r) => r.getAttribute('data-person')!);
-const tools = (el: FEl) => el.querySelector('.dynasty-toolbar')!.children.map((c) => [...c.classes].find((x) => x.startsWith('dynasty-') && x !== 'dynasty-tool')!);
+const tools = (el: FEl) =>
+	el
+		.querySelector('.dynasty-toolbar')!
+		.children.map((c) => [...c.classes].find((x) => x.startsWith('dynasty-') && x !== 'dynasty-tool')!)
+		// The free room between the buttons is no button.
+		.filter((c) => c !== 'dynasty-grow');
 const click = (target: FEl, init: Record<string, unknown> = {}) => dispatch(target, 'click', { button: 0, detail: 1, pointerType: 'touch', ...init });
 const wordOf = (el: FEl, id: string) => row(el, id).querySelector('.dynasty-list-word')?.getText() ?? null;
+const linkOf = (el: FEl, id: string) => row(el, id).querySelector('.dynasty-list-link')?.getText() ?? null;
 
 async function tapName(root: FEl, id: string): Promise<void> {
 	click(row(root, id).querySelector('.dynasty-list-go')!);
@@ -286,7 +292,7 @@ describe('a tap on a name moves the list, Back returns', () => {
 		expect(rootOf(el).getAttribute('data-dynasty-focus')).toBe('roderick');
 		expect(st.focus).toEqual({ id: 'roderick' });
 		expect(st.listBack).toEqual(['aldric']);
-		expect(ids(el)).toEqual(['aldric', 'isolde', 'gareth', 'roderick', 'marta', 'lena', 'kit', 'pia']);
+		expect(ids(el)).toEqual(['roderick', 'aldric', 'isolde', 'gareth', 'marta', 'lena', 'kit', 'pia']);
 	});
 
 	it('Back pops the trail and names the person it returns to', async () => {
@@ -483,8 +489,12 @@ describe('the relation word on a row', () => {
 		const cards = relationsFor(build(src).g, 'roderick').cards;
 		for (const id of ids(el)) {
 			if (id === 'roderick') expect(wordOf(el, id)).toBe('You');
+			// D210: in a list about You the word for the kind of link takes the place of the relation word.
+			else if (linkOf(el, id) !== null) expect(wordOf(el, id)).toBeNull();
 			else expect(wordOf(el, id)).toBe(cards.get(id)?.text ?? null);
 		}
+		expect(linkOf(el, 'gareth')).toBe('Rumoured father');
+		expect(linkOf(el, 'pia')).toBe('Adopted daughter');
 		expect(wordOf(el, 'aldric')).not.toBeNull();
 		expect(row(el, 'roderick').hasClass('dynasty-list-me')).toBe(true);
 	});
@@ -679,23 +689,48 @@ people:
 		return { ...e, handle };
 	}
 
-	it('a row gets the arms of the house and the portrait of the person, as small copies', async () => {
+	it('the large row gets the arms of the house and the portrait of the person, as small copies; a child of the same house gets no arms (D206)', async () => {
 		const o = store();
 		const { el } = await withStore(o);
-		expect(row(el, 'ann').querySelector('.dynasty-list-arms.has-picture img')).not.toBeNull();
-		expect(row(el, 'ann').querySelector('.dynasty-list-portrait.has-picture img')).not.toBeNull();
-		expect(row(el, 'bo').querySelector('.dynasty-list-arms.has-picture')).not.toBeNull();
-		expect(row(el, 'bo').querySelector('.dynasty-list-portrait.has-picture')).toBeNull();
-		expect(o.asks.filter((a) => a.fit === 'meet').every((a) => a.w === 56)).toBe(true);
+		// 0.2.8 (D209): the large row of the person in the centre has a column with the portrait and the arms under it.
+		expect(row(el, 'ann').querySelector('.dynasty-hero-arms.has-picture img')).not.toBeNull();
+		expect(row(el, 'ann').querySelector('.dynasty-hero-portrait.has-picture img')).not.toBeNull();
+		// Rule A: no other row shows arms, and Bo has no portrait, so his row has no picture place at all (D213).
+		expect(row(el, 'bo').querySelector('.dynasty-hero-arms')).toBeNull();
+		expect(row(el, 'bo').querySelector('.dynasty-list-pics')).toBeNull();
+		expect(o.asks.filter((a) => a.fit === 'meet')).toHaveLength(1);
+		expect(o.asks.filter((a) => a.fit === 'meet').every((a) => a.w === 96)).toBe(true);
 		expect(o.asks.filter((a) => a.fit === 'portrait')).toHaveLength(1);
+		expect(o.asks.filter((a) => a.fit === 'portrait').every((a) => a.w === 128)).toBe(true);
+	});
+
+	it('the list does not follow "Arms on cards" (D209 rule A): "every card" gives the child row no arms', async () => {
+		const o = store();
+		const { el } = await withStore(o, { ...DEFAULT_SETTINGS, armsOnCards: 'all' });
+		expect(row(el, 'bo').querySelector('.dynasty-hero-arms')).toBeNull();
+		expect(o.asks.filter((a) => a.fit === 'meet')).toHaveLength(1);
+	});
+
+	it('a child with a portrait has a 36 px place for it at the right of the row, and no arms', async () => {
+		const o = store();
+		const src = PICS.replace('parents: [ann]}', 'parents: [ann], portrait: "[[bo.png]]"}');
+		phone();
+		const host = fakeHost(DEFAULT_SETTINGS);
+		(host as unknown as { pictures: unknown }).pictures = o.s;
+		const { el } = await embed(src, { host, handle: noteHandle(src) });
+		await settle();
+		expect(row(el, 'bo').querySelector('.dynasty-list-portrait.has-picture img')).not.toBeNull();
+		expect(row(el, 'bo').querySelector('.dynasty-hero-arms')).toBeNull();
+		expect(o.asks.filter((a) => a.fit === 'portrait').map((a) => a.w).sort((x, y) => x - y)).toEqual([96, 128]);
 	});
 
 	it('"Show portraits on cards" off: no portrait is asked for', async () => {
 		const o = store();
 		const { el } = await withStore(o, { ...DEFAULT_SETTINGS, showPortraits: false });
 		expect(o.asks.some((a) => a.fit === 'portrait')).toBe(false);
-		expect(row(el, 'ann').querySelector('.dynasty-list-portrait.has-picture')).toBeNull();
-		expect(row(el, 'ann').querySelector('.dynasty-list-arms.has-picture')).not.toBeNull();
+		expect(row(el, 'ann').querySelector('.dynasty-hero-portrait')).toBeNull();
+		expect(row(el, 'ann').querySelector('.dynasty-hero-arms.has-picture')).not.toBeNull();
+		expect(row(el, 'ann').querySelector('.dynasty-hero-col.no-portrait')).not.toBeNull();
 	});
 
 	it('the copies go back to the store when the list is drawn again and when the view ends', async () => {
@@ -705,7 +740,7 @@ people:
 		handle.change(`${PICS}# edited\n`);
 		await settle();
 		const first = o.released.length;
-		expect(first).toBe(3);
+		expect(first).toBe(2);
 		(view as unknown as { onunload(): void }).onunload();
 		expect(o.released.length).toBeGreaterThan(first);
 		expect(new Set(o.released).size).toBe(o.released.length);
@@ -715,14 +750,14 @@ people:
 	it('a copy that arrives after the list was drawn again is released at once, never shown', async () => {
 		const o = store(true);
 		const { el, handle } = await withStore(o);
-		expect(o.asks).toHaveLength(3);
+		expect(o.asks).toHaveLength(2);
 		handle.change(`${PICS}# edited\n`);
 		await settle();
 		const late = o.pending.splice(0);
-		// The first draw's three requests answer now; the second draw's three are still waiting.
-		for (const answer of late.slice(0, 3)) answer();
+		// The first draw's two requests answer now; the second draw's two are still waiting.
+		for (const answer of late.slice(0, 2)) answer();
 		await settle();
-		expect(o.released).toHaveLength(3);
+		expect(o.released).toHaveLength(2);
 		expect(el.querySelector('.dynasty-picture')).toBeNull();
 	});
 });

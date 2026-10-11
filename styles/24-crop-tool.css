@@ -1,0 +1,229 @@
+/* ---------- The portrait crop tool (spec §13.13, D79, D90; 0.2.8 contract G.9, D196 item 4) ---------- */
+
+/*
+ * The picture is not part of the theme, so the tool has a dark surface in both themes: the title at the top, the picture under a round
+ * frame, an instruction text, the slider with its zoom icons, and the buttons (Cancel and Reset at the left, Save at the right). The
+ * part outside the frame is darker with black, and the ring is white with a dark line. These colours are fixed on purpose and written as colour keywords, so no colour value stands in the file.
+ */
+.modal.dynasty-crop {
+	background: black;
+	color: white;
+	--dynasty-crop-ring: white;
+}
+
+/*
+ * F3 item 1: the surface stays dark on every device and in every theme. The window also holds the class `dynasty-sheet`, so the phone sheet rule
+ * (`.modal-container .modal.dynasty-sheet.dynasty-sheet.is-phone`, page colour) and the opaque-window rule of Cupertino outrank the rule above.
+ * A theme rule for `.modal` can hold `!important`, so the properties that make the surface carry it too.
+ */
+.modal-container .modal.dynasty-sheet.dynasty-crop.dynasty-crop {
+	background: black !important;
+	color: white !important;
+	backdrop-filter: none !important;
+	-webkit-backdrop-filter: none !important;
+}
+
+/* D212 crop-tool: a large window, 48 px from the edges of the screen, so the portrait is big while it is cropped. */
+.modal.dynasty-crop:not(.is-phone) {
+	width: min(900px, calc(100vw - 96px));
+	height: calc(100vh - 96px);
+	max-height: none;
+	margin-top: 48px;
+}
+
+.modal.dynasty-crop.is-phone {
+	width: 100vw;
+}
+
+.dynasty-crop-title {
+	flex: none;
+	padding: 14px 18px 0;
+	font-size: var(--dynasty-type-heading);
+	font-weight: var(--font-semibold);
+}
+
+.dynasty-crop.is-phone .dynasty-crop-title {
+	padding-top: max(8px, env(safe-area-inset-top));
+	text-align: center;
+}
+
+.dynasty-crop-body {
+	flex: 1 1 auto;
+	align-items: center;
+	justify-content: center;
+	padding: 8px 16px 12px;
+	gap: 10px;
+}
+
+.dynasty-crop-hint,
+.dynasty-crop-status {
+	text-align: center;
+	color: silver;
+	font-size: var(--dynasty-type-small);
+}
+
+/* The area is a square a little larger than the round frame; what lies outside the frame is dimmed. */
+.dynasty-crop-area {
+	position: relative;
+	flex: none;
+	box-sizing: border-box;
+	width: var(--dynasty-crop-area, 336px);
+	height: var(--dynasty-crop-area, 336px);
+	overflow: hidden;
+	/* No inner frame: the area has the colour of the window, and only the round frame shows (D212). */
+	background: black;
+	/* The picture area takes every touch and pointer gesture itself (spec §13.13). */
+	touch-action: none;
+	user-select: none;
+	-webkit-user-select: none;
+	cursor: grab;
+}
+
+.dynasty-crop-area:active {
+	cursor: grabbing;
+}
+
+.dynasty-crop-img {
+	position: absolute;
+	left: 0;
+	top: 0;
+	display: none;
+	width: var(--dynasty-crop-w, 0);
+	height: var(--dynasty-crop-h, 0);
+	max-width: none;
+	transform-origin: 0 0;
+	transform: translate(var(--dynasty-crop-tx, 0), var(--dynasty-crop-ty, 0)) scale(var(--dynasty-crop-scale, 1));
+	-webkit-user-drag: none;
+	pointer-events: none;
+}
+
+.dynasty-crop-area.has-picture .dynasty-crop-img {
+	display: block;
+}
+
+.dynasty-crop-frame {
+	position: absolute;
+	left: 50%;
+	top: 50%;
+	box-sizing: border-box;
+	width: var(--dynasty-crop-frame, 240px);
+	height: var(--dynasty-crop-frame, 240px);
+	transform: translate(-50%, -50%);
+	border-radius: 50%;
+	border: 2px solid var(--dynasty-crop-ring);
+	box-shadow: 0 0 0 1px black;
+	pointer-events: none;
+}
+
+/* The dim part is a huge shadow that the round frame cuts out; it starts outside the ring. Black at 62 % opacity. */
+.dynasty-crop-frame::before {
+	content: '';
+	position: absolute;
+	inset: -2px;
+	border-radius: 50%;
+	box-shadow: 0 0 0 999px black;
+	opacity: 0.62;
+}
+
+.dynasty-crop-area:focus-visible {
+	outline: 2px solid var(--interactive-accent);
+	outline-offset: 2px;
+}
+
+.dynasty-crop-zoom {
+	display: flex;
+	align-items: center;
+	gap: var(--size-4-2);
+	width: var(--dynasty-crop-area, 336px);
+	max-width: 100%;
+}
+
+.dynasty-crop-zoom .dynasty-icon-btn {
+	color: gainsboro;
+}
+
+/* Cupertino sizes icon svgs on the phone; the zoom icons shrank to dots (G3, 2026-10-10). */
+.dynasty-crop .dynasty-crop-zoom .dynasty-icon-btn svg {
+	width: 18px;
+	height: 18px;
+	flex: none;
+}
+
+/* A thin track and a round white knob in place of the browser's slider (D212). */
+.dynasty-crop input.dynasty-crop-slider {
+	flex: 1 1 auto;
+	min-width: 0;
+	height: 44px;
+	min-height: 44px;
+	background: transparent;
+	-webkit-appearance: none;
+	appearance: none;
+}
+
+.dynasty-crop input.dynasty-crop-slider::-webkit-slider-runnable-track {
+	height: 3px;
+	border-radius: 2px;
+	background: gray;
+}
+
+.dynasty-crop input.dynasty-crop-slider::-webkit-slider-thumb {
+	-webkit-appearance: none;
+	width: 22px;
+	height: 22px;
+	margin-top: -9.5px;
+	border-radius: 50%;
+	background: white;
+	box-shadow: 0 1px 3px black;
+}
+
+/* The buttons of the tool: a grey fill with a light edge on the dark surface. */
+.dynasty-crop .dynasty-btn.dynasty-crop-button {
+	flex: none;
+	min-width: 44px;
+	min-height: 44px;
+	padding: 0 var(--size-4-4);
+	background: transparent;
+	color: white;
+	border-color: gray;
+}
+
+.dynasty-crop .dynasty-btn.dynasty-crop-button.mod-cta {
+	background: var(--interactive-accent);
+	color: var(--dynasty-on-accent);
+	border-color: transparent;
+}
+
+.dynasty-crop .dynasty-btn.dynasty-crop-button:disabled {
+	opacity: 0.5;
+}
+
+.dynasty-crop-bar {
+	display: flex;
+	align-items: center;
+	gap: var(--size-4-2);
+	width: var(--dynasty-crop-area, 336px);
+	max-width: 100%;
+}
+
+.dynasty-crop-spacer {
+	flex: 1 1 auto;
+}
+
+/* On a phone the picture area takes the full width, and the buttons sit at the bottom (D90, D212). */
+.dynasty-crop.is-phone .dynasty-crop-body {
+	padding-left: 0;
+	padding-right: 0;
+}
+
+.dynasty-crop.is-phone .dynasty-crop-zoom,
+.dynasty-crop.is-phone .dynasty-crop-bar {
+	box-sizing: border-box;
+	width: 100%;
+	padding-left: max(16px, env(safe-area-inset-left));
+	padding-right: max(16px, env(safe-area-inset-right));
+}
+
+.dynasty-crop.is-phone .dynasty-crop-bar {
+	margin-top: auto;
+	padding-bottom: env(safe-area-inset-bottom);
+}

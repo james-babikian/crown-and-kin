@@ -1,0 +1,205 @@
+/* ---------- Full-screen view (spec §7.1, §7.2, §7.5, §6.10) ---------- */
+
+/* The modal fills the viewport; the tree background is the note background. */
+.modal-container.dynasty-fullscreen-container {
+	touch-action: none;
+	overscroll-behavior: none;
+}
+
+.modal-container.dynasty-fullscreen-container .modal-bg {
+	background-color: var(--background-primary);
+	backdrop-filter: none;
+	-webkit-backdrop-filter: none;
+	opacity: 1;
+}
+
+/* Opaque in every theme (D212, sheet-opaque): the @supports rule drops the alpha of a translucent theme colour where the browser can. */
+@supports (color: rgb( from red r g b)) {
+	.modal-container.dynasty-fullscreen-container .modal-bg {
+		background-color: rgb(from var(--background-primary) r g b);
+	}
+}
+
+.modal-container .modal.dynasty-fullscreen {
+	position: fixed;
+	inset: 0;
+	width: 100vw;
+	height: 100%;
+	max-width: none;
+	max-height: none;
+	min-width: 0;
+	margin: 0;
+	padding: 0;
+	border: none;
+	border-radius: 0;
+	box-shadow: none;
+	transform: none;
+	background: var(--background-primary);
+	backdrop-filter: none;
+	-webkit-backdrop-filter: none;
+	display: flex;
+	flex-direction: column;
+	overflow: hidden;
+}
+
+@supports (color: rgb( from red r g b)) {
+	.modal-container .modal.dynasty-fullscreen {
+		background: rgb(from var(--background-primary) r g b);
+	}
+}
+
+/* Obsidian's own close control and header: the view has its own Close in the toolbar. Obsidian
+   1.12 makes a `.modal-close-button`, 1.13 a `.modal-header-button` (both an X at the top right,
+   which on a phone lay under the tree and did nothing). Any other part Obsidian adds next to the
+   content is hidden too. */
+.modal.dynasty-fullscreen > :not(.modal-content),
+.modal.dynasty-fullscreen .modal-close-button,
+.modal.dynasty-fullscreen .modal-header-button,
+.modal.dynasty-fullscreen .modal-header,
+.modal.dynasty-fullscreen .modal-title {
+	display: none;
+}
+
+.modal.dynasty-fullscreen .modal-content.dynasty-fullscreen-content {
+	flex: 1 1 auto;
+	min-height: 0;
+	margin: 0;
+	padding: 0;
+	display: flex;
+	flex-direction: column;
+	overflow: hidden;
+}
+
+.dynasty-fullscreen-tree {
+	flex: 1 1 auto;
+	min-height: 0;
+	display: flex;
+	flex-direction: column;
+}
+
+.dynasty-root.dynasty-full {
+	flex: 1 1 auto;
+	min-height: 0;
+	display: flex;
+	flex-direction: column;
+}
+
+.dynasty-full .dynasty-banner {
+	flex: none;
+	margin: max(var(--size-4-2), env(safe-area-inset-top)) max(var(--size-4-2), env(safe-area-inset-right)) var(--size-4-2) max(var(--size-4-2), env(safe-area-inset-left));
+}
+
+/* Every gesture belongs to the tree (spec §7.2): no page scroll, no browser zoom. */
+.dynasty-full .dynasty-viewport {
+	flex: 1 1 auto;
+	min-height: 0;
+	height: auto;
+	border: none;
+	border-radius: 0;
+	touch-action: none;
+}
+
+/* The toolbar of the full-screen view keeps clear of the notch (spec §7.5); on a computer the safe area is 0. */
+.dynasty-full .dynasty-toolbar {
+	box-sizing: border-box;
+	height: calc(44px + env(safe-area-inset-top, 0px));
+	padding: env(safe-area-inset-top, 0px) max(2px, env(safe-area-inset-right)) 0 max(2px, env(safe-area-inset-left));
+}
+
+.dynasty-full .dynasty-popover:not(.is-sheet) {
+	top: calc(env(safe-area-inset-top, 0px) + 44px + 4px);
+	right: max(var(--size-4-1), env(safe-area-inset-right));
+}
+
+.dynasty-full .dynasty-popover.is-anchored {
+	top: var(--dynasty-pop-y);
+	right: auto;
+}
+
+.dynasty-full .dynasty-empty {
+	flex: 1 1 auto;
+	margin: max(var(--size-4-4), env(safe-area-inset-top)) var(--size-4-4);
+}
+
+/* The empty full-screen view keeps its toolbar (Close) clear of the empty box. */
+.dynasty-full.dynasty-empty-root .dynasty-empty {
+	margin-top: calc(env(safe-area-inset-top, 0px) + 44px + var(--size-4-3));
+}
+
+.modal.dynasty-fullscreen.is-phone .dynasty-full.dynasty-empty-root .dynasty-empty {
+	margin-top: max(var(--size-4-4), env(safe-area-inset-top));
+	margin-bottom: calc(44px + env(safe-area-inset-bottom) + var(--size-4-4));
+}
+
+/*
+ * Phone layout (0.2.8, G.13): the bar sits at the bottom, flat, with a hairline above it and the safe area under it (spec §7.5): Add person, Houses,
+ * Focus, Find, More, Close, spread over the width. Fit, Titles and the legend are in More.
+ */
+.modal.dynasty-fullscreen.is-phone .dynasty-full .dynasty-toolbar {
+	top: auto;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	height: calc(52px + env(safe-area-inset-bottom));
+	align-items: flex-start;
+	justify-content: space-between;
+	padding: 4px max(8px, env(safe-area-inset-right)) env(safe-area-inset-bottom) max(8px, env(safe-area-inset-left));
+	border-width: 1px 0 0 0;
+	border-style: solid;
+	border-color: var(--background-modifier-border);
+	border-radius: 0;
+}
+
+.modal.dynasty-fullscreen.is-phone .dynasty-full .dynasty-toolbar .dynasty-tool {
+	color: var(--text-normal);
+}
+
+/*
+ * D52: one row, and Close always on the screen. The buttons keep 44 px (spec §7.5); the "Read only"
+ * text gives up its width first. If the buttons are still wider than the phone, Close stays at the
+ * right edge over the others (sticky in the row, which clips instead of wrapping).
+ */
+.modal.dynasty-fullscreen.is-phone .dynasty-full .dynasty-toolbar {
+	flex-wrap: nowrap;
+	overflow-x: auto;
+	overflow-y: hidden;
+	scrollbar-width: none;
+}
+
+.modal.dynasty-fullscreen.is-phone .dynasty-full .dynasty-toolbar .dynasty-read-only-label {
+	flex: 0 1 auto;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.modal.dynasty-fullscreen.is-phone .dynasty-full .dynasty-toolbar .dynasty-close {
+	position: sticky;
+	right: 0;
+	background-color: var(--background-primary);
+}
+
+/* The problem list (not a sheet) stands above the phone's bar. */
+.modal.dynasty-fullscreen.is-phone .dynasty-full .dynasty-popover:not(.is-anchored):not(.is-sheet) {
+	top: auto;
+	left: var(--size-4-2);
+	right: var(--size-4-2);
+	bottom: calc(52px + env(safe-area-inset-bottom) + var(--size-4-2));
+	max-width: none;
+	max-height: calc(100% - 52px - env(safe-area-inset-bottom) - 4 * var(--size-4-2));
+}
+
+/* The page preview of a linked name shows above the full-screen view, not behind it (spec §5.2).
+   A body class, not body:has(): :has() on the body made Live Preview lose its scroll position. */
+body.dynasty-fullscreen-open .popover.hover-popover {
+	z-index: calc(var(--layer-modal) + 1);
+}
+
+/* Reads env(safe-area-inset-top) for the default view on a phone; added and removed at once. */
+.dynasty-safe-probe {
+	position: absolute;
+	visibility: hidden;
+	pointer-events: none;
+	padding-top: env(safe-area-inset-top, 0px);
+}
+

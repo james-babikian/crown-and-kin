@@ -1,0 +1,1567 @@
+/* ---------- The window family (0.2.8 contract C, G.13) ---------- */
+
+/*
+ * One shell for every window of the plugin (src/obsidian/window-shell.ts). On a computer: Obsidian's own modal, 620 px wide and anchored
+ * at the top, so a section that opens never moves the header; the footer has Cancel and Save, with a hairline only while the body
+ * scrolls; there is no X in the corner (C04). On a phone: the window fills the visible area, with a bar of Cancel, the title and Save,
+ * and the title fades in when the header has scrolled away. The colours are the tokens of 01-base.css.
+ */
+
+.modal.dynasty-sheet {
+	width: min(620px, calc(100vw - 2 * var(--size-4-4)));
+	max-width: none;
+	max-height: calc(100vh - 112px);
+	/* Anchored at the top: the container centres its box, and `align-self` takes this one to the top. */
+	align-self: flex-start;
+	margin-top: 56px;
+	padding: 0;
+	display: flex;
+	flex-direction: column;
+	overflow: hidden;
+	/* D218 rule 2: plain sentences in a window (a banner, a question) take the Text size; every part below names its own role. */
+	font-size: var(--dynasty-type-text);
+}
+
+.dynasty-sheet .modal-header {
+	display: none;
+}
+
+/* C04: no X in the corner on a computer. Esc and a press outside still close the window, and Cancel is in the footer. 1.13 names the X `.modal-header-button`. */
+.dynasty-sheet .modal-close-button,
+.dynasty-sheet > .modal-header-button {
+	display: none;
+}
+
+.dynasty-sheet .modal-content.dynasty-sheet-content {
+	display: flex;
+	flex-direction: column;
+	flex: 1 1 auto;
+	min-height: 0;
+	padding: 0;
+}
+
+/* The body scrolls; the header of the page is its first part. */
+.dynasty-sheet-body {
+	flex: 1 1 auto;
+	min-height: 0;
+	overflow-y: auto;
+	overflow-x: hidden;
+	overscroll-behavior: contain;
+	padding: 22px 24px 12px;
+	display: flex;
+	flex-direction: column;
+	gap: var(--size-4-3);
+}
+
+/* Sections stand edge to edge; the other parts of a body get their own space. */
+.dynasty-sheet .has-sections {
+	gap: 0;
+}
+
+.has-sections > .dynasty-sheet-banner,
+.has-sections > .dynasty-sheet-relation {
+	margin-bottom: var(--size-4-3);
+}
+
+.has-sections > .dynasty-sheet-status,
+.has-sections > .dynasty-sheet-error {
+	margin-bottom: var(--size-4-2);
+}
+
+.has-sections > .dynasty-openall {
+	margin-bottom: 4px;
+}
+
+/* The footer: Cancel and Save at the right; the "extra" button (Save and add another child) at the left. */
+.dynasty-foot {
+	flex: none;
+	display: flex;
+	align-items: center;
+	justify-content: flex-end;
+	gap: var(--size-4-2);
+	padding: 12px 24px 16px;
+	border-top: 1px solid transparent;
+}
+
+.dynasty-sheet.has-overflow .dynasty-foot {
+	border-top-color: var(--background-modifier-border);
+}
+
+.dynasty-foot-left {
+	margin-right: auto;
+}
+
+/* The title of the window is for a screen reader on a computer, and for the bar on a phone. */
+.dynasty-sheet-title {
+	font-weight: var(--font-semibold);
+}
+
+/* Buttons: Obsidian's own shapes, with an edge that reaches 3:1 on the window (I39, token --dynasty-btn-edge). */
+.dynasty-sheet-actions button,
+.dynasty-sheet-confirm-actions button,
+.dynasty-btn,
+.dynasty-sheet button.dynasty-sheet-save-another {
+	min-height: 30px;
+	min-width: 44px;
+	height: auto;
+	padding: 0 14px;
+	border: 1px solid var(--dynasty-btn-edge);
+	box-shadow: none;
+	/* D218 rules 2 and 3: a button is a Control, regular; only the main button of a place (mod-cta) is semibold. */
+	font-size: var(--dynasty-type-control);
+	font-weight: var(--font-normal);
+	white-space: normal;
+	overflow-wrap: break-word;
+}
+
+.dynasty-btn {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 6px;
+	cursor: pointer;
+}
+
+.dynasty-btn .svg-icon,
+.dynasty-btn-icon .svg-icon {
+	width: 15px;
+	height: 15px;
+	color: var(--text-muted);
+}
+
+.dynasty-btn-icon {
+	display: inline-flex;
+}
+
+.dynasty-sheet button.mod-cta,
+.dynasty-btn.mod-cta {
+	border-color: transparent;
+	color: var(--dynasty-on-accent);
+	font-weight: var(--font-semibold);
+}
+
+/*
+ * G3 fix: the error text sits on a fill that the run-time pick of `--dynasty-error` checks (`--interactive-normal`, `--interactive-hover`). Obsidian
+ * paints `button.mod-warning` red, and `.is-mobile button.mod-warning` with `--interactive-normal`; with the error colour on the red fill a button could not be read.
+ */
+.dynasty-sheet button.mod-warning,
+.dynasty-btn.mod-warning {
+	background-color: var(--interactive-normal);
+	color: var(--dynasty-error);
+}
+
+.dynasty-sheet button.mod-warning:hover,
+.dynasty-btn.mod-warning:hover {
+	background-color: var(--interactive-hover);
+}
+
+.dynasty-icon-btn {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 30px;
+	height: 30px;
+	min-height: 30px;
+	padding: 0;
+	border: 0;
+	border-radius: var(--radius-s);
+	background: none;
+	box-shadow: none;
+	color: var(--icon-color);
+	cursor: pointer;
+	flex: 0 0 auto;
+}
+
+.dynasty-icon-btn:hover {
+	background: var(--background-modifier-hover);
+	color: var(--text-normal);
+}
+
+.dynasty-icon-btn .svg-icon {
+	width: 17px;
+	height: 17px;
+}
+
+/* A visible focus ring in every theme: the accent outside, a ring in the text colour inside it. */
+.dynasty-sheet button:focus-visible,
+.dynasty-sheet [tabindex]:focus-visible {
+	outline: 2px solid var(--background-modifier-border-focus);
+	outline-offset: 1px;
+	box-shadow: 0 0 0 2px var(--interactive-accent);
+}
+
+/*
+ * Quiet controls (D212 quiet-controls). Obsidian styles every `button:not(.clickable-icon)` with a box, a border and a fill, and that
+ * selector outranks a single class. So the controls of a window that are not real buttons (a section head, the back link, an icon
+ * button, a text link, the picture of a header, the "Open all" link) repeat the `.dynasty-sheet` prefix, which wins.
+ * They show a soft tint only while the pointer is over them. A real button (Add, Save, Cancel) keeps the theme's look.
+ */
+.dynasty-sheet button:is(.dynasty-section-head, .dynasty-back, .dynasty-icon-btn, .dynasty-link, .dynasty-pic, .dynasty-arms-mark),
+.dynasty-sheet .dynasty-openall button,
+.dynasty-sheet button:is(.dynasty-section-head, .dynasty-back, .dynasty-icon-btn, .dynasty-link, .dynasty-pic, .dynasty-arms-mark):is(:hover, :active, :focus),
+.dynasty-sheet .dynasty-openall button:is(:hover, :active, :focus) {
+	border: 0;
+	background: none;
+	box-shadow: none;
+}
+
+.dynasty-sheet button:is(.dynasty-back, .dynasty-icon-btn):hover,
+.dynasty-sheet .dynasty-openall button:hover {
+	background: var(--background-modifier-hover);
+}
+
+/* A text link: no padding, the link colour and the font of the window; the theme gives a button a height, padding and the text colour. Regular, never bold (D218 rule 5). */
+.dynasty-sheet .dynasty-link {
+	height: auto;
+	min-height: 0;
+	padding: 0;
+	color: var(--dynasty-link);
+	font-family: var(--font-interface);
+	font-size: inherit;
+	font-weight: var(--font-normal);
+}
+
+/* The keyboard ring stays: the quiet rules above are more specific than the general ring. */
+.dynasty-sheet button:is(.dynasty-section-head, .dynasty-back, .dynasty-icon-btn, .dynasty-link, .dynasty-pic, .dynasty-arms-mark):focus-visible,
+.dynasty-sheet .dynasty-openall button:focus-visible {
+	box-shadow: 0 0 0 2px var(--interactive-accent);
+}
+
+/* The banner of a read-only window keeps its full height. */
+.dynasty-sheet-banner {
+	flex: none;
+	margin: 0;
+}
+
+.dynasty-sheet-banner ul {
+	margin: var(--size-4-1) 0 0 0;
+}
+
+.dynasty-sheet-error {
+	color: var(--dynasty-error);
+	font-weight: var(--font-semibold);
+}
+
+.dynasty-sheet-status {
+	color: var(--text-success, var(--dynasty-link));
+	font-weight: var(--font-semibold);
+}
+
+/* The back link above the header of a second page (G.7); a phone has "‹ Name" in the bar instead. */
+.dynasty-back-row {
+	flex: none;
+}
+
+.dynasty-sheet button.dynasty-back {
+	display: inline-flex;
+	align-items: center;
+	gap: 2px;
+	height: 28px;
+	min-height: 28px;
+	margin: -8px 0 4px -6px;
+	padding: 0 8px 0 2px;
+	border: 0;
+	border-radius: var(--radius-s);
+	background: none;
+	box-shadow: none;
+	color: var(--dynasty-muted);
+	font-size: var(--dynasty-type-control);
+	font-weight: var(--font-normal);
+	cursor: pointer;
+}
+
+.dynasty-sheet button.dynasty-back:hover {
+	background: var(--background-modifier-hover);
+	color: var(--text-normal);
+}
+
+.dynasty-back .svg-icon {
+	width: 16px;
+	height: 16px;
+}
+
+/* ---------- the header: one anatomy for a person, a title and a house ---------- */
+
+.dynasty-head {
+	flex: none;
+	display: grid;
+	grid-template-columns: auto minmax(0, 1fr) auto;
+	gap: 0 16px;
+	align-items: start;
+	padding: 0 0 8px;
+}
+
+/* The person window: the text at the left, the portrait at the right (D209 item 4). With no portrait the text has the whole width. */
+.dynasty-person-head {
+	grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.dynasty-head-text {
+	min-width: 0;
+	display: flex;
+	flex-direction: column;
+	gap: 3px;
+	padding-top: 2px;
+}
+
+.dynasty-head-name {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	min-width: 0;
+	/* D218 rules 1 to 3: the name of a person, a house or a title is the Title role, in the text font, semibold. */
+	font-family: var(--font-text);
+	font-size: var(--dynasty-type-title);
+	font-weight: var(--font-semibold);
+	line-height: 1.2;
+	letter-spacing: 0;
+}
+
+.dynasty-head-name > span:first-child {
+	min-width: 0;
+	overflow-wrap: anywhere;
+}
+
+.dynasty-head-name .dynasty-sob {
+	font-weight: var(--font-normal);
+	color: var(--dynasty-muted);
+}
+
+.dynasty-head-name .is-empty {
+	color: var(--text-faint);
+}
+
+/* The text line under the name (house, years): the Text role in the text font. */
+.dynasty-head-meta {
+	display: block;
+	color: var(--dynasty-muted);
+	font-family: var(--font-text);
+	font-size: var(--dynasty-type-text);
+	line-height: 1.45;
+}
+
+.dynasty-house {
+	display: inline-flex;
+	align-items: center;
+	gap: 5px;
+	vertical-align: top;
+	margin-right: 1px;
+}
+
+.dynasty-head-meta .dynasty-house {
+	height: 1.45em;
+}
+
+.dynasty-house-armsmark {
+	display: inline-flex;
+}
+
+.dynasty-house-armsmark img {
+	display: block;
+	height: 15px;
+	width: auto;
+}
+
+.dynasty-house-dot {
+	width: 9px;
+	height: 9px;
+	border-radius: 50%;
+	background: var(--dynasty-house-color, var(--background-modifier-border-hover));
+}
+
+body.theme-dark .dynasty-house-dot {
+	background: var(--dynasty-house-color, var(--text-normal));
+	background: color-mix(in srgb, var(--dynasty-house-color, var(--text-normal)) 60%, var(--text-normal));
+}
+
+.dynasty-head-rel {
+	color: var(--text-normal);
+	font-size: var(--dynasty-type-text);
+	line-height: 1.45;
+}
+
+.dynasty-head-rel .dynasty-link {
+	position: relative;
+}
+
+/*
+ * D218 rule 5: a link inside a sentence ("Show the line", "4 more") keeps one thin underline at rest, in a light tint of the link colour, the
+ * same for both (the solid and the dotted underline of G.8 are gone). The plain colour comes first for engines without `color-mix()`.
+ */
+.dynasty-head-rel .dynasty-showline,
+.dynasty-head-rel .dynasty-more {
+	color: var(--dynasty-link);
+	font-weight: var(--font-normal);
+	text-decoration: underline solid;
+	text-decoration-thickness: 1px;
+	text-underline-offset: 3px;
+	text-decoration-color: var(--dynasty-link);
+	text-decoration-color: color-mix(in srgb, var(--dynasty-link) 45%, transparent);
+}
+
+.dynasty-head-rel .dynasty-showline:hover,
+.dynasty-head-rel .dynasty-more:hover {
+	text-decoration-color: var(--dynasty-link);
+}
+
+.dynasty-head-maybe {
+	font-size: var(--dynasty-type-small);
+	color: var(--dynasty-muted);
+}
+
+.dynasty-head-problem {
+	flex: none;
+	color: var(--dynasty-muted);
+	font-size: var(--dynasty-type-small);
+}
+
+/*
+ * The portrait of the header (D209 items 3 to 5): 64 px at the right of the name, with a faint 1 px outline in the line colour, which keeps a pale
+ * portrait round. No house ring. With no portrait there is no circle (D213); the text link "Add portrait" stands in the row of "Open all".
+ * The theme's own border of a button is taken away by the quiet rules above.
+ */
+.dynasty-pic {
+	position: relative;
+	width: 64px;
+	height: 64px;
+	min-height: 0;
+	padding: 0;
+	border-radius: 50%;
+	cursor: pointer;
+	flex: 0 0 auto;
+	align-self: start;
+}
+
+.dynasty-sheet button.dynasty-pic.has-picture {
+	box-shadow: 0 0 0 1px var(--background-modifier-border);
+}
+
+.dynasty-sheet button.dynasty-pic.has-picture:focus-visible {
+	box-shadow: 0 0 0 2px var(--interactive-accent);
+}
+
+.dynasty-pic img.dynasty-pic-img {
+	display: block;
+	width: 100%;
+	height: 100%;
+	border-radius: 50%;
+	object-fit: cover;
+	object-position: 50% 20%;
+}
+
+.dynasty-pic:hover::after {
+	content: '';
+	position: absolute;
+	inset: 0;
+	border-radius: 50%;
+	background: var(--background-modifier-hover);
+}
+
+.dynasty-pic.is-none {
+	display: none;
+}
+
+/* Arms: the personal arms are a small shield after the name; the house arms a small mark before the house name (Q6H A). */
+.dynasty-arms-mark {
+	position: relative;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	height: auto;
+	min-height: 0;
+	padding: 0;
+	border: 0;
+	background: none;
+	box-shadow: none;
+	cursor: pointer;
+	flex: 0 0 auto;
+}
+
+.dynasty-arms-mark img {
+	display: block;
+	width: auto;
+	height: 22px;
+}
+
+/* The hit area is at least 44 px, by an invisible extension. */
+.dynasty-arms-mark::after {
+	content: '';
+	position: absolute;
+	left: 50%;
+	top: 50%;
+	width: max(44px, calc(100% + 20px));
+	height: max(44px, calc(100% + 20px));
+	transform: translate(-50%, -50%);
+}
+
+/* ---------- "Open all" and the collapsible sections ---------- */
+
+.dynasty-openall {
+	flex: none;
+	display: flex;
+	/* A phone row can hold three controls (a saved person with no portrait and a linked note): the last one moves to a second row. */
+	flex-wrap: wrap;
+	justify-content: flex-end;
+	margin: 0 0 4px;
+}
+
+/* Quiet controls (D218 rule 5): muted text with an icon, the same on a computer and on a phone. Control role, regular. */
+.dynasty-openall button {
+	display: inline-flex;
+	align-items: center;
+	gap: 5px;
+	height: 26px;
+	min-height: 26px;
+	padding: 0 6px;
+	border: 0;
+	border-radius: var(--radius-s);
+	background: none;
+	box-shadow: none;
+	color: var(--dynasty-muted);
+	font-size: var(--dynasty-type-control);
+	font-weight: var(--font-normal);
+	cursor: pointer;
+}
+
+.dynasty-openall button:hover {
+	background: var(--background-modifier-hover);
+	color: var(--text-normal);
+}
+
+.dynasty-openall .svg-icon {
+	width: 14px;
+	height: 14px;
+}
+
+/*
+ * G3 fix: the links of this row ("Add portrait or arms", "Add arms", "Open linked note") take the box and the size of "Open all". The general window link
+ * rule `.dynasty-sheet .dynasty-link` (0,2,0) outranks `.dynasty-openall button` (0,1,1), so it gave them the size of the window text, no padding and,
+ * on a touch screen of any width, no 44 px height. This rule (0,3,1) comes after it. The phone rule below (same weight, later) sets the 44 px height.
+ */
+.dynasty-sheet .dynasty-openall button.dynasty-link {
+	height: 26px;
+	min-height: 26px;
+	padding: 0 6px;
+	font-size: var(--dynasty-type-control);
+	font-weight: var(--font-normal);
+}
+
+/* D209 item 5, D218 item 8: "Add portrait or arms" stands at the left of the row, a text link in the link colour. */
+.dynasty-sheet .dynasty-openall button.dynasty-add-portrait {
+	margin-right: auto;
+	color: var(--dynasty-link);
+}
+
+/* D218 item 9 (N23): "Open linked note" stands left of "Open all", a text link in the link colour. */
+.dynasty-sheet .dynasty-openall button.dynasty-open-note {
+	color: var(--dynasty-link);
+}
+
+.dynasty-section {
+	flex: none;
+	border-top: 1px solid var(--background-modifier-border);
+}
+
+.dynasty-section:last-of-type {
+	border-bottom: 1px solid var(--background-modifier-border);
+}
+
+/* The whole title row is the button (52 px high, 60 px on a phone): plain text with a chevron on the window, with one hairline above it. */
+.dynasty-sheet button.dynasty-section-head {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) auto;
+	align-items: center;
+	gap: 2px 12px;
+	width: 100%;
+	min-height: 52px;
+	height: auto;
+	padding: 11px 0;
+	border-radius: 0;
+	color: var(--text-normal);
+	text-align: left;
+	cursor: pointer;
+}
+
+.dynasty-section-title {
+	font-size: var(--dynasty-type-heading);
+	font-weight: var(--font-semibold);
+	line-height: 1.3;
+}
+
+.dynasty-section-sum {
+	grid-column: 1;
+	font-size: var(--dynasty-type-text);
+	font-weight: var(--font-normal);
+	color: var(--dynasty-muted);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	line-height: 1.35;
+}
+
+/* D218 rule 6: a summary that is empty takes no row (the Actions section has none). */
+.dynasty-section-sum:empty {
+	display: none;
+}
+
+.dynasty-section-chevron {
+	grid-column: 2;
+	grid-row: 1 / span 2;
+	display: inline-flex;
+	color: var(--text-faint);
+	transition: transform 180ms ease;
+}
+
+.dynasty-section-chevron .svg-icon {
+	width: 18px;
+	height: 18px;
+}
+
+.dynasty-section.is-open .dynasty-section-chevron {
+	transform: rotate(180deg);
+}
+
+.dynasty-section.is-open .dynasty-section-sum {
+	display: none;
+}
+
+.dynasty-sheet button.dynasty-section-head:hover .dynasty-section-chevron {
+	color: var(--text-muted);
+}
+
+.dynasty-section-wrap {
+	display: grid;
+	grid-template-rows: 0fr;
+	transition: grid-template-rows 200ms ease;
+}
+
+.dynasty-section.is-open .dynasty-section-wrap {
+	grid-template-rows: 1fr;
+}
+
+.dynasty-section-inner {
+	min-height: 0;
+	overflow: hidden;
+}
+
+.dynasty-section.is-open .dynasty-section-inner {
+	overflow: visible;
+}
+
+.dynasty-section-body {
+	display: grid;
+	gap: 14px;
+	padding: 2px 0 22px;
+}
+
+/* A closed section is not read and not focused. */
+.dynasty-section:not(.is-open) .dynasty-section-body {
+	visibility: hidden;
+}
+
+.dynasty-reduce-motion .dynasty-section-wrap,
+.dynasty-reduce-motion .dynasty-section-chevron {
+	transition: none;
+}
+
+/* Sub-heading (D218 rule 2): Small, semibold, muted. */
+.dynasty-sub {
+	font-size: var(--dynasty-type-small);
+	font-weight: var(--font-semibold);
+	color: var(--dynasty-muted);
+	margin: 4px 0 -8px;
+}
+
+/* A group heading of the Family section with its "+ Add" link at the right (D212 family-add-links). */
+.dynasty-sheet-body .dynasty-sub-row {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	margin: 4px 0 -8px;
+}
+
+.dynasty-sub-row .dynasty-sub {
+	margin: 0;
+}
+
+.dynasty-sheet button.dynasty-add-link {
+	gap: 3px;
+	height: 26px;
+	min-height: 26px;
+	padding: 0 6px;
+	font-size: var(--dynasty-type-control);
+	font-weight: var(--font-normal);
+}
+
+.dynasty-add-link .svg-icon {
+	width: 14px;
+	height: 14px;
+	color: inherit;
+}
+
+/* ---------- fields (I18: the edge is the measured token, 3:1 on the window) ---------- */
+
+.dynasty-grid {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 14px 16px;
+}
+
+.dynasty-grid > .is-wide {
+	grid-column: 1 / -1;
+}
+
+.dynasty-stack {
+	display: grid;
+	gap: 14px;
+}
+
+.dynasty-sheet-field {
+	display: flex;
+	flex-direction: column;
+	gap: 5px;
+	min-width: 0;
+}
+
+.dynasty-sheet-label {
+	color: var(--dynasty-muted);
+	font-size: var(--dynasty-type-small);
+	font-weight: var(--font-normal);
+}
+
+.dynasty-sheet .dynasty-input,
+.dynasty-sheet input.dynasty-sheet-input,
+.dynasty-sheet select.dynasty-sheet-input,
+.dynasty-sheet textarea.dynasty-sheet-input {
+	width: 100%;
+	min-height: var(--input-height);
+	padding: 0 10px;
+	border: 1px solid var(--dynasty-edge);
+	border-radius: var(--input-radius);
+	background: var(--background-modifier-form-field);
+	color: var(--text-normal);
+	font-family: var(--font-interface);
+	font-size: var(--dynasty-type-control);
+	/* The theme set a field to bold on a phone (Minimal). */
+	font-weight: var(--font-normal);
+	box-shadow: none;
+}
+
+.dynasty-sheet .dynasty-input::placeholder {
+	color: var(--text-faint);
+}
+
+.dynasty-sheet .dynasty-input:focus,
+.dynasty-sheet .dynasty-sheet-input:focus {
+	border-color: var(--interactive-accent);
+	box-shadow: 0 0 0 1px var(--interactive-accent);
+}
+
+.dynasty-sheet textarea.dynasty-sheet-input {
+	height: auto;
+	min-height: 72px;
+	padding: 7px 10px;
+	line-height: 1.45;
+	resize: vertical;
+}
+
+/* A select has its own chevron, not the one of the system. */
+.dynasty-select {
+	position: relative;
+}
+
+.dynasty-sheet .dynasty-select select {
+	padding-right: 30px;
+	cursor: pointer;
+	-webkit-appearance: none;
+	appearance: none;
+	background-image: none;
+}
+
+.dynasty-select-chevron {
+	position: absolute;
+	right: 9px;
+	top: 50%;
+	display: inline-flex;
+	margin-top: -7px;
+	color: var(--dynasty-muted);
+	pointer-events: none;
+}
+
+.dynasty-select-chevron .svg-icon {
+	width: 14px;
+	height: 14px;
+}
+
+/*
+ * Help texts in a window (D212 window-hints): a quiet grey text line in the flow, under the thing it explains (at least 12 px, I40). A hint with
+ * `is-on-focus` shows while its field has the focus. The names are the window's own: the tree has a floating `dynasty-hint` label and a dashed
+ * `dynasty-empty` box, and a window must never use them.
+ */
+.dynasty-sheet-hint {
+	color: var(--dynasty-muted);
+	font-size: var(--dynasty-type-small);
+	line-height: 1.4;
+}
+
+.dynasty-sheet-hint.is-on-focus {
+	display: none;
+}
+
+.dynasty-sheet-field:focus-within > .dynasty-sheet-hint.is-on-focus {
+	display: block;
+}
+
+/* An empty list in a window is a plain grey text line, not a dashed box. */
+.dynasty-sheet-none {
+	padding: 4px 0;
+	font-size: var(--dynasty-type-text);
+	color: var(--dynasty-muted);
+}
+
+/* The tick boxes (I40): a square box of 18 px with a muted 1.5 px border; the mark is the text colour on the accent. */
+.dynasty-checks {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 4px 24px;
+}
+
+.dynasty-sheet-check,
+.dynasty-check {
+	display: inline-flex;
+	flex-direction: row;
+	align-items: center;
+	gap: 9px;
+	min-height: 30px;
+	cursor: pointer;
+	font-size: var(--dynasty-type-control);
+}
+
+.dynasty-sheet .dynasty-check input[type='checkbox'] {
+	-webkit-appearance: none;
+	appearance: none;
+	width: 18px;
+	height: 18px;
+	min-height: 18px;
+	margin: 0;
+	border: 1.5px solid var(--dynasty-muted);
+	border-radius: var(--checkbox-radius, 4px);
+	background: var(--background-modifier-form-field);
+	display: inline-grid;
+	place-content: center;
+	cursor: pointer;
+	box-shadow: none;
+}
+
+.dynasty-sheet .dynasty-check input[type='checkbox']:checked {
+	background: var(--interactive-accent);
+	border-color: var(--interactive-accent);
+}
+
+.dynasty-sheet .dynasty-check input[type='checkbox']:checked::after {
+	content: '';
+	width: 9px;
+	height: 5px;
+	border: 2px solid var(--dynasty-on-accent);
+	border-top: 0;
+	border-right: 0;
+	transform: rotate(-45deg) translate(1px, -1px);
+}
+
+.dynasty-sheet .dynasty-check input[type='checkbox']:disabled {
+	opacity: 0.5;
+	cursor: not-allowed;
+}
+
+.dynasty-sheet-subform {
+	display: flex;
+	flex-direction: column;
+	gap: var(--size-4-2);
+	padding: var(--size-4-2) var(--size-4-3);
+	border-left: 3px solid var(--background-modifier-border);
+}
+
+/* The choices of a new person (the partnership of the parents, the type of a new partnership). */
+.dynasty-sheet-relation {
+	flex: none;
+	display: flex;
+	flex-direction: column;
+	gap: var(--size-4-2);
+	padding: var(--size-4-2) var(--size-4-3);
+	border-radius: var(--radius-m);
+	background: var(--background-secondary);
+}
+
+/* Obsidian styles colour inputs as a small dot; the window needs a full 44 px swatch. */
+.modal.dynasty-sheet input[type='color'].dynasty-sheet-colour {
+	width: 88px;
+	height: 44px;
+	min-height: 44px;
+	padding: 3px;
+	border: 1px solid var(--dynasty-edge);
+	border-radius: var(--radius-s);
+	background: var(--background-primary);
+	cursor: pointer;
+}
+
+.modal.dynasty-sheet input[type='color'].dynasty-sheet-colour::-webkit-color-swatch-wrapper {
+	padding: 0;
+}
+
+.modal.dynasty-sheet input[type='color'].dynasty-sheet-colour::-webkit-color-swatch {
+	border: none;
+	border-radius: calc(var(--radius-s) - 2px);
+}
+
+/* A read-only window: the fields show text that can be copied, not boxes to type in. */
+.dynasty-sheet.is-read-only .dynasty-sheet-input,
+.dynasty-sheet.is-read-only .dynasty-sheet-input:hover,
+.dynasty-sheet.is-read-only .dynasty-sheet-input:focus {
+	border-color: transparent;
+	background: var(--background-secondary);
+	box-shadow: none;
+	color: var(--dynasty-muted);
+	opacity: 1;
+	cursor: text;
+}
+
+.dynasty-sheet.is-read-only select.dynasty-sheet-input {
+	cursor: default;
+}
+
+.dynasty-sheet.is-read-only .dynasty-sheet-check {
+	cursor: default;
+	color: var(--dynasty-muted);
+}
+
+.dynasty-sheet.is-saving .dynasty-sheet-body,
+.dynasty-sheet.is-saving .dynasty-foot,
+.dynasty-sheet.is-saving .dynasty-bar {
+	opacity: 0.6;
+	pointer-events: none;
+}
+
+/* ---------- rows: one anatomy (lead, title and detail, actions) ---------- */
+
+.dynasty-rows {
+	display: grid;
+}
+
+/* Every row has one height, with or without a picture (D213): 48 px on a computer, 52 px on a phone. */
+.dynasty-row {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	min-height: 48px;
+	padding: 5px 0;
+}
+
+.dynasty-row.is-tap {
+	width: calc(100% + 16px);
+	height: auto;
+	margin: 0 -8px;
+	padding: 5px 8px;
+	border: 0;
+	border-radius: var(--radius-m);
+	background: none;
+	box-shadow: none;
+	color: inherit;
+	font: inherit;
+	text-align: left;
+	white-space: normal;
+	cursor: pointer;
+}
+
+/* The theme paints a shadow on a button under the pointer; a tappable row shows only the soft tint. */
+.dynasty-row.is-tap:hover,
+.dynasty-row.is-tap:active {
+	border: 0;
+	background: var(--background-modifier-hover);
+	box-shadow: none;
+}
+
+/* The lead of a row: a round portrait at the right of the text (D213), or the mark of an action at the left. It has no grey fill and no initials. */
+.dynasty-row-lead {
+	width: 32px;
+	height: 32px;
+	flex: 0 0 auto;
+	border-radius: 50%;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	overflow: hidden;
+	color: var(--dynasty-muted);
+}
+
+.dynasty-row-lead.is-large {
+	width: 36px;
+	height: 36px;
+}
+
+/* A faint outline in the line colour keeps a pale portrait round (D209 item 3). */
+.dynasty-row-lead.has-picture:not(.is-arms) {
+	box-shadow: 0 0 0 1px var(--background-modifier-border);
+}
+
+/* A picture that could not be made leaves no mark. */
+.dynasty-row-lead.is-failed {
+	display: none;
+}
+
+.dynasty-row-lead img {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+	object-position: 50% 20%;
+}
+
+/* Arms: a shield is taller than wide. */
+.dynasty-row-lead.is-arms {
+	width: 30px;
+	height: 34px;
+	border-radius: 0;
+}
+
+.dynasty-row-lead.is-arms img {
+	object-fit: contain;
+}
+
+.dynasty-row-lead.is-icon {
+	background: none;
+	color: var(--icon-color);
+}
+
+.dynasty-row-lead.is-icon .svg-icon {
+	width: 18px;
+	height: 18px;
+}
+
+.dynasty-row-text {
+	flex: 1 1 auto;
+	min-width: 0;
+	display: block;
+}
+
+/* The text of a row that does something (an action row, a position): the Control role, regular (D218 rules 2 and 3). */
+.dynasty-row-title {
+	display: block;
+	font-size: var(--dynasty-type-control);
+	font-weight: var(--font-normal);
+	line-height: 1.3;
+	overflow-wrap: anywhere;
+}
+
+/* The name of a person or a title in a row: the Heading role in the text font, semibold (D218 rules 1 to 3). Rows of the other windows set their own names in their chunks. */
+.dynasty-row-title.dynasty-family-name {
+	font-family: var(--font-text);
+	font-size: var(--dynasty-type-heading);
+	font-weight: var(--font-semibold);
+	line-height: 1.25;
+}
+
+.dynasty-row-title .dynasty-sob {
+	font-weight: var(--font-normal);
+	color: var(--dynasty-muted);
+}
+
+/* The title name inside a Titles row takes the semibold of the row (20-titles-holders.css still sets the old medium weight on the span). */
+.dynasty-row-title .dynasty-title-holding-name {
+	font-weight: inherit;
+}
+
+/* The text line under a name: the Text role, muted. The Family rows show people and titles, so there it is in the text font. */
+.dynasty-row-sub {
+	display: block;
+	margin-top: 1px;
+	font-size: var(--dynasty-type-text);
+	color: var(--dynasty-muted);
+	line-height: 1.35;
+	overflow-wrap: anywhere;
+}
+
+.dynasty-family-row .dynasty-row-sub {
+	font-family: var(--font-text);
+}
+
+/* Italic marks a relation word only (D218 rule 4); the mark "You" is semibold, not bold. */
+.dynasty-row-sub i {
+	font-style: italic;
+}
+
+.dynasty-row-sub b {
+	font-weight: var(--font-semibold);
+}
+
+.dynasty-row-actions {
+	display: flex;
+	align-items: center;
+	gap: 2px;
+	flex: 0 0 auto;
+}
+
+.dynasty-row-actions .dynasty-link {
+	height: 30px;
+	padding: 0 8px;
+	font-size: var(--dynasty-type-control);
+}
+
+.dynasty-row-chev {
+	display: inline-flex;
+	color: var(--text-faint);
+}
+
+.dynasty-row-chev .svg-icon {
+	width: 16px;
+	height: 16px;
+}
+
+.dynasty-row.is-danger .dynasty-row-title,
+.dynasty-row.is-danger .dynasty-row-lead {
+	color: var(--dynasty-error);
+}
+
+/* G3 fix: a danger row is a row, not a button with a fill. `.is-mobile button.mod-warning` of Obsidian (0,2,1) gave "Delete person" a grey fill that the error colour was not checked on. */
+.dynasty-sheet button.dynasty-row.is-tap.mod-warning {
+	background: none;
+}
+
+.dynasty-sheet button.dynasty-row.is-tap.mod-warning:hover,
+.dynasty-sheet button.dynasty-row.is-tap.mod-warning:active {
+	background: var(--background-modifier-hover);
+}
+
+.dynasty-row .dynasty-ord {
+	width: 30px;
+	flex: 0 0 auto;
+	font-size: var(--dynasty-type-small);
+	font-weight: var(--font-semibold);
+	color: var(--dynasty-muted);
+	font-variant-numeric: tabular-nums;
+}
+
+.dynasty-tag {
+	display: inline-block;
+	margin-left: 6px;
+	padding: 0 6px;
+	border: 1px solid var(--dynasty-edge);
+	border-radius: 999px;
+	font-size: var(--dynasty-type-small);
+	font-weight: var(--font-normal);
+	color: var(--dynasty-muted);
+	vertical-align: 1px;
+}
+
+/* The type of a parent: a small chip with the chevron; it is a drop-down list under the chip. */
+.dynasty-chip-select {
+	position: relative;
+	display: inline-flex;
+	align-items: center;
+	height: 26px;
+	border: 1px solid var(--dynasty-edge);
+	border-radius: 999px;
+	color: var(--dynasty-muted);
+}
+
+.dynasty-sheet .dynasty-chip-select select.dynasty-family-select {
+	height: 24px;
+	min-height: 24px;
+	padding: 0 22px 0 8px;
+	border: 0;
+	background: none;
+	box-shadow: none;
+	color: var(--dynasty-muted);
+	font-size: var(--dynasty-type-small);
+	font-weight: var(--font-normal);
+	-webkit-appearance: none;
+	appearance: none;
+	cursor: pointer;
+}
+
+.dynasty-chip-chevron {
+	position: absolute;
+	right: 6px;
+	display: inline-flex;
+	pointer-events: none;
+}
+
+.dynasty-chip-chevron .svg-icon {
+	width: 12px;
+	height: 12px;
+}
+
+.dynasty-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+}
+
+.dynasty-id {
+	margin-top: -4px;
+	font-size: var(--dynasty-type-small);
+	color: var(--dynasty-muted);
+	user-select: all;
+}
+
+/* "On the card": a label, not a button; it has a border in the text colour, so it does not rely on colour alone. */
+.dynasty-title-on-card {
+	white-space: nowrap;
+}
+
+/* A question over the window ("Discard changes?"). */
+.dynasty-sheet-confirm {
+	position: absolute;
+	inset: 0;
+	z-index: 2;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: var(--size-4-4);
+	/* A phone window reaches under the status bar and the home bar: the box keeps clear of them (D113 item 1). */
+	padding-top: max(var(--size-4-4), env(safe-area-inset-top, 0px));
+	padding-bottom: max(var(--size-4-4), env(safe-area-inset-bottom, 0px));
+	background: var(--background-modifier-cover);
+}
+
+/* The box is never taller than the layer; in the question of the Houses window the buttons stay outside the part that scrolls (D113 item 1). */
+.dynasty-sheet-confirm-box {
+	display: flex;
+	flex-direction: column;
+	box-sizing: border-box;
+	max-width: 400px;
+	max-height: 100%;
+	/* A question with no scrolling part of its own (a long text on a small screen) scrolls as a whole, so no button is cut off. */
+	overflow-y: auto;
+	padding: var(--size-4-4);
+	background: var(--modal-background, var(--background-primary));
+	border: 1px solid var(--background-modifier-border);
+	border-radius: var(--radius-l);
+	box-shadow: var(--shadow-l);
+}
+
+/* Title and text of a question: the only part of the box that scrolls. */
+.dynasty-sheet-confirm-scroll {
+	flex: 0 1 auto;
+	min-height: 0;
+	overflow-y: auto;
+}
+
+.dynasty-sheet-confirm-box > * {
+	flex-shrink: 0;
+}
+
+.dynasty-sheet-confirm-box > .dynasty-sheet-confirm-scroll {
+	flex-shrink: 1;
+}
+
+.dynasty-sheet-confirm-title {
+	font-size: var(--dynasty-type-heading);
+	font-weight: var(--font-semibold);
+	margin-bottom: var(--size-4-2);
+}
+
+.dynasty-sheet-confirm-actions {
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: flex-end;
+	gap: var(--size-4-2);
+	margin-top: var(--size-4-4);
+}
+
+/* ---------- phone (a window narrower than 600 px; spec §7.4) ---------- */
+
+.modal.dynasty-sheet.is-phone {
+	width: 100vw;
+	max-width: 100vw;
+	height: var(--dynasty-sheet-height, 100%);
+	max-height: var(--dynasty-sheet-height, 100%);
+	align-self: flex-start;
+	margin-top: var(--dynasty-sheet-top, 0);
+	border-radius: 0;
+	border: none;
+	font-size: var(--dynasty-type-text);
+}
+
+/*
+ * D212 sheet-opaque, F3 item 5: a window of the plugin uses the plain page background in every theme, on a phone and on a computer. Cupertino
+ * makes the background of its windows translucent and blurs it, so the note showed through the text. The class is repeated to outrank a theme
+ * rule for `.modal`. The second background (in @supports) drops any transparency of the theme's colour. It must sit in the block: an engine
+ * without relative colours would make the whole declaration invalid at computed-value time and leave the window transparent.
+ */
+/* `!important`: Cupertino sets `body.mod-windows:not(.adaptive-mode-off) .modal { background-color: var(--modal-background) !important }` (G3, 2026-10-10). */
+.modal-container .modal.dynasty-sheet.dynasty-sheet {
+	background: var(--background-primary) !important;
+	backdrop-filter: none;
+	-webkit-backdrop-filter: none;
+}
+
+/* The probe is split over lines on purpose: the proof test reads every "rgb(from" as a use. */
+@supports (color: rgb(
+	from red r g b
+)) {
+	.modal-container .modal.dynasty-sheet.dynasty-sheet {
+		background: rgb(from var(--background-primary) r g b) !important;
+	}
+}
+
+/* P1, modal-layout.ts: a closing window keeps its content size and gets the room that the keyboard took as padding at the bottom, so Obsidian's slide takes the whole box off the screen. */
+.modal.dynasty-sheet.is-holding {
+	padding-bottom: var(--dynasty-sheet-extra, 0px);
+}
+
+/* Obsidian's phone prompt already has the safe area as padding at the bottom. */
+.prompt.dynasty-picker.is-holding {
+	padding-bottom: calc(var(--safe-area-inset-bottom, 0px) + var(--dynasty-sheet-extra, 0px));
+}
+
+/* The bar: Cancel (or "‹ Name"), the title, and Save; the title fades in when the header has scrolled away. */
+.dynasty-bar {
+	flex: none;
+	display: grid;
+	grid-template-columns: minmax(80px, auto) 1fr minmax(80px, auto);
+	align-items: center;
+	min-height: 54px;
+	padding: max(0px, env(safe-area-inset-top)) max(6px, env(safe-area-inset-right)) 0 max(6px, env(safe-area-inset-left));
+	border-bottom: 1px solid transparent;
+	transition: border-color 150ms;
+}
+
+.dynasty-bar.is-scrolled {
+	border-bottom-color: var(--background-modifier-border);
+}
+
+.dynasty-sheet .dynasty-bar button.dynasty-bar-btn {
+	display: inline-flex;
+	align-items: center;
+	gap: 2px;
+	min-height: 44px;
+	min-width: 44px;
+	height: auto;
+	padding: 0 10px;
+	border: 0;
+	background: none;
+	box-shadow: none;
+	color: var(--dynasty-link);
+	font-family: var(--font-interface);
+	font-size: var(--dynasty-type-control);
+	font-weight: var(--font-normal);
+	cursor: pointer;
+}
+
+.dynasty-sheet .dynasty-bar button.dynasty-bar-btn.is-main {
+	font-weight: var(--font-semibold);
+	justify-self: end;
+}
+
+.dynasty-bar-chevron .svg-icon {
+	width: 24px;
+	height: 24px;
+	margin-left: -6px;
+}
+
+.dynasty-bar .dynasty-bar-title {
+	text-align: center;
+	font-size: var(--dynasty-type-heading);
+	font-weight: var(--font-semibold);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	opacity: 0;
+	transition: opacity 150ms;
+}
+
+.dynasty-bar.is-scrolled .dynasty-bar-title,
+.dynasty-bar.is-titled .dynasty-bar-title {
+	opacity: 1;
+}
+
+.dynasty-sheet .dynasty-bar button.dynasty-bar-extra {
+	grid-column: 1 / -1;
+	min-height: 44px;
+	margin: 0 10px 6px;
+	border: 1px solid var(--dynasty-btn-edge);
+	border-radius: 10px;
+	justify-content: center;
+	font-size: var(--dynasty-type-control);
+}
+
+.dynasty-sheet.is-phone .dynasty-sheet-body {
+	padding: 4px max(16px, env(safe-area-inset-right)) max(32px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+	flex: 1 1 auto;
+}
+
+.dynasty-sheet.is-phone .dynasty-head {
+	gap: 0 14px;
+	padding: 8px 0 4px;
+}
+
+/* The name leads the page; its sizes come from the phone values of the five roles (D212 phone-header-size, D218 rule 2). */
+.dynasty-sheet.is-phone .dynasty-head-text {
+	gap: 4px;
+}
+
+/*
+ * "Show the line" and "4 more" are links in the text line; on a phone their tap area is 44 px high with no button look (D197 Q8 A).
+ * F3 item 6: the box itself is 44 px high (the check measures the box), and the negative margin gives the height back to the text line.
+ */
+.dynasty-sheet.is-phone .dynasty-head-rel .dynasty-link {
+	min-height: 44px;
+	margin-block: -12px;
+}
+
+.dynasty-sheet.is-phone .dynasty-head-rel .dynasty-link::after {
+	content: '';
+	position: absolute;
+	left: -8px;
+	right: -8px;
+	top: 0;
+	height: 44px;
+}
+
+.dynasty-sheet.is-phone .dynasty-openall {
+	margin: 0 -8px 0;
+}
+
+.dynasty-sheet.is-phone .dynasty-openall button {
+	height: 44px;
+	padding: 0 8px;
+}
+
+.dynasty-sheet.is-phone button.dynasty-section-head {
+	min-height: 60px;
+	padding: 13px 0;
+}
+
+.dynasty-sheet.is-phone .dynasty-grid.is-stack {
+	grid-template-columns: 1fr;
+}
+
+/* At least 16 px, so iOS does not zoom the page when a field gets focus (spec §7.4). The Control role is 16 px here; the floor stays as a guard. */
+.dynasty-sheet.is-phone input,
+.dynasty-sheet.is-phone select,
+.dynasty-sheet.is-phone textarea {
+	font-size: max(16px, var(--dynasty-type-control));
+	font-weight: var(--font-normal);
+	min-height: 44px;
+	border-radius: 10px;
+}
+
+.dynasty-sheet.is-phone input[type='checkbox'] {
+	min-height: 18px;
+}
+
+.dynasty-sheet.is-phone .dynasty-check {
+	min-height: 44px;
+}
+
+.dynasty-sheet.is-phone .dynasty-btn {
+	min-height: 44px;
+	padding: 0 16px;
+	border-radius: 10px;
+}
+
+.dynasty-sheet.is-phone .dynasty-actions .dynasty-btn {
+	flex: 0 1 auto;
+	padding: 0 14px;
+	/* A button never splits its words on a phone; a row of buttons moves the last one to the next row (D212 phone-action-buttons). */
+	white-space: nowrap;
+}
+
+.dynasty-sheet.is-phone .dynasty-icon-btn {
+	width: 44px;
+	height: 44px;
+	min-height: 44px;
+	border-radius: 10px;
+}
+
+.dynasty-sheet.is-phone .dynasty-icon-btn .svg-icon {
+	width: 21px;
+	height: 21px;
+}
+
+.dynasty-sheet.is-phone .dynasty-row {
+	min-height: 52px;
+}
+
+.dynasty-sheet.is-phone .dynasty-sub-row {
+	margin: 0 0 -10px;
+}
+
+.dynasty-sheet.is-phone button.dynasty-add-link {
+	height: 44px;
+	min-height: 44px;
+}
+
+.dynasty-sheet.is-phone .dynasty-row-lead:not(.is-arms) {
+	width: 36px;
+	height: 36px;
+}
+
+.dynasty-sheet.is-phone .dynasty-row-actions .dynasty-link {
+	height: 44px;
+	min-width: 44px;
+	justify-content: center;
+}
+
+/*
+ * F3 item 6: the chip looks 32 px high but its box and its list are 44 px high. The border is drawn by ::before inside the box, so the look
+ * stays the same and the whole box takes the tap.
+ */
+.dynasty-sheet.is-phone .dynasty-chip-select {
+	position: relative;
+	height: 44px;
+	border: 0;
+}
+
+.dynasty-sheet.is-phone .dynasty-chip-select::before {
+	content: '';
+	position: absolute;
+	inset: 6px 0;
+	border: 1px solid var(--dynasty-edge);
+	border-radius: 999px;
+	pointer-events: none;
+}
+
+/* 16 px, so iOS does not zoom the page when the chip opens (D212 phone-family-rows); the Control role is 16 px on a phone. */
+.dynasty-sheet.is-phone .dynasty-chip-select select.dynasty-family-select {
+	height: 44px;
+	min-height: 44px;
+	font-size: max(16px, var(--dynasty-type-control));
+	border-radius: 999px;
+}
+
+.dynasty-sheet.is-phone .dynasty-sheet-confirm-actions button {
+	flex: 1 1 100%;
+	min-height: 44px;
+}
+
+/* A touch screen of any width (an iPad, a laptop with a touch screen): every button and link of a window has a hit area of at least 44 px (spec §7.5). */
+@media (pointer: coarse) {
+	.dynasty-sheet-actions button,
+	.dynasty-sheet-confirm-actions button,
+	.dynasty-btn,
+	.dynasty-icon-btn,
+	.dynasty-sheet button.dynasty-sheet-save-another,
+	.dynasty-sheet button.dynasty-back,
+	.dynasty-sheet button.dynasty-add-link,
+	.dynasty-openall button {
+		min-height: 44px;
+		min-width: 44px;
+	}
+
+	.dynasty-icon-btn {
+		width: 44px;
+		height: 44px;
+	}
+
+	.dynasty-row-actions .dynasty-link {
+		height: 44px;
+		min-width: 44px;
+		justify-content: center;
+	}
+
+	/* After the 26 px rule of the links in the "Open all" row, which has the same weight. */
+	.dynasty-sheet .dynasty-openall button.dynasty-link {
+		min-height: 44px;
+		min-width: 44px;
+	}
+}

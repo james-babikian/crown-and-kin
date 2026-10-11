@@ -412,7 +412,7 @@ describe('pictureIssue: params, ids, level and texts (spec §13.6, §13.7 warnin
 		expect(await text(valmont, { ok: false, code: 'missing-picture', file: 'x.png' })).toBe(
 			'The arms of House Valmont use the picture “x.png”, but the vault has no file with this name. Correct the link, or select other arms.',
 		);
-		expect(await text(valmont, { ok: false, code: 'picture-web' })).toBe('The arms of House Valmont are a web address. The plugin shows only pictures from the vault.');
+		expect(await text(valmont, { ok: false, code: 'picture-web' })).toBe('The arms of House Valmont are a web address. The plugin shows only pictures from the vault. Save the picture in the vault. Then select it again.');
 		expect(await text(valmont, { ok: false, code: 'picture-not-image', file: 'x.heic', format: 'HEIC' })).toBe(
 			'The arms of House Valmont use the picture “x.heic”. The plugin cannot show HEIC pictures. Save the picture as PNG or JPEG. Then select it again.',
 		);
@@ -435,7 +435,7 @@ describe('pictureIssue: params, ids, level and texts (spec §13.6, §13.7 warnin
 		expect(await text(aldric, { ok: false, code: 'missing-picture', file: 'aldric.jpg' })).toBe(
 			'The portrait of Aldric Valmont uses the picture “aldric.jpg”, but the vault has no file with this name. Correct the link, or select another portrait.',
 		);
-		expect(await text(aldric, { ok: false, code: 'picture-web' })).toBe('The portrait of Aldric Valmont is a web address. The plugin shows only pictures from the vault.');
+		expect(await text(aldric, { ok: false, code: 'picture-web' })).toBe('The portrait of Aldric Valmont is a web address. The plugin shows only pictures from the vault. Save the picture in the vault. Then select it again.');
 		expect(await text(aldric, { ok: false, code: 'picture-not-image', file: 'x.avif', format: 'AVIF' })).toBe(
 			'The portrait of Aldric Valmont uses the picture “x.avif”. The plugin cannot show AVIF pictures. Save the picture as PNG or JPEG. Then select it again.',
 		);
@@ -550,13 +550,13 @@ describe('sample tree 14: the listed picture warnings and no others (spec §13.6
 		const texts = pictureProblems(m, treeOf(block14(0))).map(issueText);
 		expect(texts).toEqual([
 			'The arms of House Harrow use the picture “harrow-arms.png”, but the vault has no file with this name. Correct the link, or select other arms.',
-			'The arms of House Drakemoor are a web address. The plugin shows only pictures from the vault.',
+			'The arms of House Drakemoor are a web address. The plugin shows only pictures from the vault. Save the picture in the vault. Then select it again.',
 			'The arms of House Veyle use the picture “veyle-arms.heic”. The plugin cannot show HEIC pictures. Save the picture as PNG or JPEG. Then select it again.',
 			'The arms of House Ashby use the file “ashby-charter.pdf”, which is not a picture. Select a PNG, JPEG, WebP, GIF, BMP or SVG picture.',
 			'The arms of House Greymane use the picture “huge-banner.png”, which is too large (54 million pixels). Use a picture with 40 million pixels or less.',
 			'The portrait of Wren uses the picture “wren-photo.jpg”. The plugin cannot show HEIC pictures. Save the picture as PNG or JPEG. Then select it again.',
 			'The portrait of Oswin Valmont uses the picture “oswin.jpg”, but the vault has no file with this name. Correct the link, or select another portrait.',
-			'The portrait of Darian Drakemoor is a web address. The plugin shows only pictures from the vault.',
+			'The portrait of Darian Drakemoor is a web address. The plugin shows only pictures from the vault. Save the picture in the vault. Then select it again.',
 			'The portrait of Felicia Veyle uses the picture “felicia.heic”. The plugin cannot show HEIC pictures. Save the picture as PNG or JPEG. Then select it again.',
 			'The portrait of Cedric Ashby uses the file “ashby-charter.pdf”, which is not a picture. Select a PNG, JPEG, WebP, GIF, BMP or SVG picture.',
 			'The portrait of Adela Greymane uses the picture “huge-banner.png”, which is too large (54 million pixels). Use a picture with 40 million pixels or less.',

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createUndoStack, planWrite, UNDO_LIMIT } from '../src/core/block-write';
-import { findBlocks, locateBlock } from '../src/core/block-locate';
+import { findBlocks } from '../src/core/block-locate';
 import { applyOp } from '../src/core/yaml-edit';
 
 const NOTE = '# N\n```dynasty\na: 1\n```\n\n> ```dynasty\n> b: 1\n> ```\n';
@@ -15,7 +15,7 @@ describe('planWrite', () => {
 		const r = planWrite(NOTE, 0, 'a: 1', () => ({ ok: true, body: 'a: 2\r\nb: 3' }));
 		if (!r.ok) throw new Error(r.code);
 		expect(r.newBody).toBe('a: 2\nb: 3');
-		expect(locateBlock(r.newText, 0)?.body).toBe(r.newBody);
+		expect(findBlocks(r.newText)[0]?.body).toBe(r.newBody);
 	});
 
 	it('stale gives the current body and does not call the edit', () => {
@@ -86,12 +86,12 @@ describe('planWrite checks the written note (review F1)', () => {
 	const note = 'Intro\n\n```dynasty\npeople:\n- id: a\n  name: A\n  notes: |\n   old\n```\n\nMy prose.\n\n```dynasty\npeople:\n- id: z\n```\n';
 
 	it('refuses a body whose line would close the fence and spill the tree into the note', () => {
-		const r = planWrite(note, 0, locateBlock(note, 0)!.body, (b) => ({ ok: true, body: b.replace('   old', '   see:\n   ```\n   end') }));
+		const r = planWrite(note, 0, findBlocks(note)[0]!.body, (b) => ({ ok: true, body: b.replace('   old', '   see:\n   ```\n   end') }));
 		expect(r).toMatchObject({ ok: false, code: 'rejected' });
 	});
 
 	it('the same change through applyOp is written safely', () => {
-		const r = planWrite(note, 0, locateBlock(note, 0)!.body, (b) => {
+		const r = planWrite(note, 0, findBlocks(note)[0]!.body, (b) => {
 			const e = applyOp(b, { kind: 'set-person-fields', id: 'a', fields: { notes: 'see:\n```\nend' } });
 			return e.ok ? { ok: true, body: e.body } : { ok: false, reason: e.code };
 		});

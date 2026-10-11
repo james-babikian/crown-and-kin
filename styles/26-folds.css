@@ -1,0 +1,108 @@
+/* ---------- Fold a branch (M10: spec §13.10, D83–D85) ---------- */
+
+/* The open button ("−") and the folded sign ("+ N"). The tooltip is the <title> child; Obsidian's aria-label tooltip fails on SVG. */
+.dynasty-fold {
+	--no-tooltip: true;
+	cursor: pointer;
+	outline: none;
+	font-family: var(--font-interface);
+}
+
+/* The tap area is invisible and lies below the cards, so a card wins where they meet (F7). */
+.dynasty-fold-hit {
+	cursor: pointer;
+	fill: none;
+	stroke: none;
+	pointer-events: all;
+}
+
+/* 0.2.8 (C01): a small square chip; the "−" is a round-capped line in the text colour. */
+.dynasty-fold-button,
+.dynasty-fold-pill,
+.dynasty-fold-pill-big {
+	fill: var(--background-primary);
+	stroke: var(--dynasty-muted, var(--text-muted));
+	stroke-width: 1;
+}
+
+.dynasty-fold-minus {
+	fill: none;
+	stroke: var(--text-normal);
+	stroke-linecap: round;
+}
+
+@media (hover: hover) {
+	.dynasty-fold:hover .dynasty-fold-button,
+	.dynasty-fold:hover .dynasty-fold-pill,
+	.dynasty-fold:hover .dynasty-fold-pill-big {
+		fill: var(--background-secondary);
+	}
+}
+
+.dynasty-fold-text {
+	font-size: calc(var(--dynasty-font-size) * 0.8);
+	font-weight: 600;
+	fill: var(--text-normal);
+	pointer-events: none;
+}
+
+.dynasty-fold:hover .dynasty-fold-button,
+.dynasty-fold:hover .dynasty-fold-pill,
+.dynasty-fold:hover .dynasty-fold-pill-big,
+.dynasty-fold.is-hover .dynasty-fold-button,
+.dynasty-fold.is-hover .dynasty-fold-pill,
+.dynasty-fold.is-hover .dynasty-fold-pill-big {
+	stroke: var(--interactive-accent);
+	stroke-width: 2;
+}
+
+/* Keyboard focus: a thick edge in the accent colour, as on the tags. */
+.dynasty-fold:focus-visible .dynasty-fold-button,
+.dynasty-fold:focus-visible .dynasty-fold-pill,
+.dynasty-fold:focus-visible .dynasty-fold-pill-big {
+	stroke: var(--interactive-accent);
+	stroke-width: 3;
+}
+
+/* Levels of detail: Full and Compact draw the same size in em; Overview draws only signs, in the larger pill (F6). */
+.dynasty-fold-pill-big {
+	display: none;
+}
+
+.dynasty-lod-overview .dynasty-fold-pill {
+	display: none;
+}
+
+.dynasty-lod-overview .dynasty-fold-pill-big {
+	display: inline;
+}
+
+.dynasty-lod-overview .dynasty-fold-text {
+	font-size: calc(var(--dynasty-font-size) * 1.5);
+}
+
+/* D207: the Overview sign of a sideways tree starts 0.15 em before the Full sign, so its text moves with it and keeps 0.45 em at each side. */
+.dynasty-lod-overview .dynasty-fold-text.is-sideways {
+	transform: translateX(calc(var(--dynasty-font-size) * -0.15));
+}
+
+/* A hidden control is not in the Tab order, and its tap area does not take presses. */
+.dynasty-lod-overview .dynasty-fold.is-open,
+.dynasty-lod-overview .dynasty-fold-hits-open {
+	display: none;
+}
+
+
+/*
+ * 0.2.8 (I01, C01): the `+` badge of focus mode is an outline disc: the card colour inside a ring in the text colour, with the plus in the text
+ * colour.
+ */
+.dynasty-focus-badge-mark {
+	fill: var(--background-primary-alt);
+	stroke: var(--text-normal);
+	stroke-width: 1.25;
+}
+
+.dynasty-focus-badge-plus {
+	stroke: var(--text-normal);
+}

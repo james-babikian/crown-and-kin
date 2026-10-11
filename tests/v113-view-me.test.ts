@@ -96,7 +96,7 @@ describe('the list of a phone note stands on the marked person when nothing befo
 		const { el } = await embed(src, { handle: fakeHandle('n.md', src) });
 		expect(stands(el)).toEqual(['p3', 'me']);
 		expect(drawn(el)).toEqual([]);
-		expect(el.querySelectorAll('.dynasty-list-row').map((r) => r.getAttribute('data-person'))).toEqual(['p2', 'p3', 'p4']);
+		expect(el.querySelectorAll('.dynasty-list-row').map((r) => r.getAttribute('data-person'))).toEqual(['p3', 'p2', 'p4']);
 	});
 
 	it('options.start is not in the chain: the marked person comes first, and with no mark the oldest person who has children', async () => {

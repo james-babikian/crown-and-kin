@@ -31,9 +31,9 @@ const ANCHOR = 'A value of this id is a YAML anchor or alias. Edit the note text
  * whose value is `id`. `newId` equal to `id` is a no-op, before every other check.
  */
 export function changeItemId(first: Parsed, data: RawMap, change: IdChange, id: unknown, newId: unknown): EditResult {
-	if (typeof newId !== 'string') return refuse('bad-value', 'The new id must be text.');
+	if (typeof newId !== 'string') return refuse('bad-value', REFUSAL_TEXT.idNotText);
 	if (typeof id === 'string' && id === newId) return { ok: true, body: first.src.text, created: [] };
-	if (checkNewId(newId, new Set()) !== null) return refuse('bad-value', 'An id has the letters a to z, digits and hyphens only.');
+	if (checkNewId(newId, new Set()) !== null) return refuse('bad-value', REFUSAL_TEXT.idCharacters);
 	if (typeof id !== 'string') return refuse(change.unknown);
 
 	const items: Raw[] = Array.isArray(data[change.section]) ? (data[change.section] as Raw[]) : [];

@@ -1,0 +1,42 @@
+/* ---------- Focus mode (spec §5.6) ---------- */
+
+/* The `+` badge of a card with relatives who are not shown. It follows its card; its centre is the
+   card's top right corner in every layout (D117); its invisible tap area grows to 44 px only while names are at least 11 px. */
+.dynasty-focus-badge {
+	--no-tooltip: true;
+	cursor: pointer;
+	outline: none;
+}
+
+/* The tap square lies below the cards (its own layer); the disc is the part that wins over the badge's own card. */
+.dynasty-focus-badge-hit,
+.dynasty-focus-badge-disc {
+	fill: none;
+	stroke: none;
+	pointer-events: all;
+	cursor: pointer;
+}
+
+.dynasty-focus-badge-plus {
+	fill: none;
+	stroke-linecap: round;
+}
+
+.dynasty-focus-badge:hover .dynasty-focus-badge-mark,
+.dynasty-focus-badge.is-hover .dynasty-focus-badge-mark,
+.dynasty-focus-badge:focus-visible .dynasty-focus-badge-mark {
+	stroke: var(--text-normal);
+	stroke-width: 2.5;
+}
+
+/* The Focus button shows that the tree shows one family: pressed, not by colour alone. */
+.dynasty-toolbar .dynasty-focus.is-active {
+	background-color: var(--background-modifier-active-hover);
+	box-shadow: inset 0 0 0 1px var(--interactive-accent);
+}
+
+.dynasty-toolbar .dynasty-focus.is-active,
+.dynasty-toolbar .dynasty-focus.is-active .dynasty-tool-icon {
+	color: var(--interactive-accent);
+}
+

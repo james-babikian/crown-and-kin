@@ -1,0 +1,22 @@
+/* ---------- Make a note (spec §13.11) and the house page notes (spec §13.12), M10 ---------- */
+
+/* The same-name question has three buttons: on a wide window they sit in a row, on a phone one under the other. */
+.dynasty-sheet-confirm-actions .dynasty-note-ask-link,
+.dynasty-sheet-confirm-actions .dynasty-note-ask-new {
+	flex: 0 1 auto;
+}
+
+.dynasty-hp-none {
+	color: var(--dynasty-muted);
+}
+
+.dynasty-sheet button.dynasty-hp-make-note {
+	min-height: 44px;
+	/* Like the other sheet buttons: at 320 px and large text the label wraps and the button grows with it. */
+	height: auto;
+	white-space: normal;
+	overflow-wrap: break-word;
+	/* The body is a flex column; a `min-height` that is set shrinks the button below its wrapped text in a long list. */
+	flex: none;
+	margin-bottom: var(--size-4-3);
+}

@@ -1,5 +1,5 @@
 // 0.2.5 WP-B9 (D153): the marked ("This is me") card, the marked row of the phone list and the saved picture use no theme accent colour.
-// The mark is one border in the text colour; the plate and the "You" tab take the house colour like every other plate; the relation
+// The mark is one border in the text colour; the ribbon is the house colour of every card and the "You" tab is the card colour with a text-colour border (0.2.8); the relation
 // finder's line keeps the accent. The tests scan the CSS rules and the SVG text, so a new rule or a new element that brings the accent
 // back fails here.
 import { readFileSync } from 'node:fs';
@@ -12,7 +12,7 @@ import { DEFAULT_LAYOUT_SETTINGS, clearLayoutCache, layoutTree, pictureSets } fr
 import type { Geometry, LaidOut, LayoutSettings } from '../src/layout/model';
 import { contrastRatio } from '../src/render/dom/theme-read';
 import { buildScene } from '../src/render/dom/scene';
-import { DEFAULT_DARK, DEFAULT_LIGHT, HOUSE_PALETTE, ME_LOOK, ME_RING_INNER, ROUNDEL_LOOK, mixHex, stripColour, type Palette } from '../src/render/styles';
+import { DEFAULT_DARK, DEFAULT_LIGHT, HEIR_LOOK, HOUSE_PALETTE, ME_LOOK, ME_RING_INNER, mixHex, type Palette } from '../src/render/styles';
 import { renderSvg } from '../src/render/svg-string';
 import { FEl, installDom } from './acceptance/fake-dom';
 import { build } from './helpers';
@@ -98,7 +98,7 @@ describe('D153: no accent colour in the mark (CSS)', () => {
 		// 0.2.7: the ring of a marked heir takes the accent (the Show view's heir outline, not the mark), so the heir rules are another thing.
 		const found = rules.filter((r) => MARK.test(r.selector) && !/dynasty-heir/.test(r.selector));
 		// The scan sees the rules it is meant to see.
-		for (const s of ['.dynasty-card-me .dynasty-card-bg', '.dynasty-r1-plate', '.dynasty-r1-plate-line', '.dynasty-r1-tab', '.dynasty-r1-tab-text', '.dynasty-list-me']) expect(found.map((r) => r.selector), s).toContain(s);
+		for (const s of ['.dynasty-card-me .dynasty-card-bg', '.dynasty-r1-tab, .dynasty-ordinal-tab', '.dynasty-r1-tab-text, .dynasty-ordinal-tab-text', '.dynasty-list-me']) expect(found.map((r) => r.selector), s).toContain(s);
 		const bad = found.filter((r) => /interactive-accent|text-on-accent|accent/.test(r.body)).map((r) => r.selector);
 		expect(bad).toEqual([]);
 	});
@@ -120,26 +120,25 @@ describe('D153: no accent colour in the mark (CSS)', () => {
 		expect(ME_RING_INNER).toBe(ME_LOOK.border / 2);
 	});
 
-	it('the plate of the marked card has no rule of its own: it follows the house colour like every plate', () => {
+	it('the foot hairline of the marked card has no rule of its own: it is the card\'s edge colour on every card', () => {
 		for (const r of rules) {
-			if (/dynasty-card-me/.test(r.selector)) expect(r.selector, 'a marked-card rule for the plate').not.toMatch(/r1-plate/);
+			if (/dynasty-card-me/.test(r.selector)) expect(r.selector, 'a marked-card rule for the foot hairline').not.toMatch(/foot-line/);
 		}
-		expect(ROUNDEL_LOOK.plate).toEqual({ light: 0.17, dark: 0.26 });
+		expect(decl('.dynasty-card-foot-line').stroke).toBe('var(--background-modifier-border)');
 	});
 
-	it('the tab takes the house colour like the plate, with the text colour for its word', () => {
-		const tab = decl('.dynasty-r1-tab');
-		expect(tab.fill).toBe('var(--dynasty-house-color, var(--background-modifier-border))');
-		expect(Number(tab['fill-opacity'])).toBe(ROUNDEL_LOOK.plate.light);
-		expect(decl('.theme-dark .dynasty-r1-tab')['fill-opacity']).toBe(String(ROUNDEL_LOOK.plate.dark));
-		expect(decl('.theme-dark .dynasty-has-house .dynasty-r1-tab').fill).toContain('color-mix(in srgb, var(--dynasty-house-color) 70%, var(--text-normal))');
-		expect(decl('.dynasty-r1-tab-text').fill).toBe('var(--text-normal)');
-		expect(decl('.dynasty-r1-tab-base').fill).toBe('var(--background-primary-alt)');
+	it('the tab is the card colour inside a text-colour border (0.2.8), with the text colour for its word; no house tint', () => {
+		const tab = decl('.dynasty-r1-tab,.dynasty-ordinal-tab');
+		expect(tab.fill).toBe('var(--background-primary-alt)');
+		expect(tab.stroke).toBe('var(--text-normal)');
+		expect(Number(tab['stroke-width'])).toBe(HEIR_LOOK.tabBorder);
+		expect(decl('.dynasty-r1-tab-text,.dynasty-ordinal-tab-text').fill).toBe('var(--text-normal)');
+		expect(decl('.dynasty-r1-tab-base,.dynasty-ordinal-tab-base').fill).toBe('var(--background-primary-alt)');
 	});
 
-	it('the marked row of the phone list has a 2 px border in the text colour and no inset ring', () => {
+	it('the marked row of the phone list has no visible frame (D209 item 1) and no ring: a transparent border keeps its content where the other rows have it', () => {
 		const row = decl('.dynasty-list-me');
-		expect(row.border).toBe('2px solid var(--text-normal)');
+		expect(row.border).toBe('2px solid transparent');
 		expect(row['box-shadow']).toBeUndefined();
 	});
 });
@@ -165,22 +164,17 @@ describe('D153: no accent colour in the mark (saved picture)', () => {
 		const marked = svgOf(srcOf('#1e5a8b'), roundel);
 		const plain = svgOf(srcOf('#1e5a8b'), roundel, { me: 'zzz' });
 		expect(marked).toContain(`stroke="${DEFAULT_LIGHT.text}" stroke-width="${ME_LOOK.border}"`);
-		// D176 (1): the house bar of the marked card is a path (inside the border) in place of a rect.
-		expect((marked.match(/<rect /g) ?? []).length).toBe((plain.match(/<rect /g) ?? []).length - 1);
+		// 0.2.8: every ribbon is a path, so the marked card has the same rects as the plain one: the card rect, and no second ring rect.
+		expect((marked.match(/<rect /g) ?? []).length).toBe((plain.match(/<rect /g) ?? []).length);
 	});
 
 	for (const dark of [false, true]) {
 		const c = dark ? DEFAULT_DARK : DEFAULT_LIGHT;
-		const opacity = dark ? ROUNDEL_LOOK.plate.dark : ROUNDEL_LOOK.plate.light;
-		it(`${dark ? 'dark' : 'light'}: the plate of the marked card is the plate of every card, in the house colour; with no house the neutral`, () => {
+		it(`${dark ? 'dark' : 'light'}: the ribbon of the marked card is the ribbon of every card, in the house colour; with no house the neutral`, () => {
 			const roundel = LOOKS[0];
-			const withHouse = svgOf(srcOf('#1e5a8b'), roundel, { dark });
-			const plate = /<path d="[^"]*" fill="([^"]+)" fill-opacity="([^"]+)" data-item="plate:c"/.exec(withHouse)!;
-			expect(plate[1].toLowerCase()).toBe(dark ? mixHex('#1e5a8b', 0.7, c.text) : '#1e5a8b');
-			expect(Number(plate[2])).toBe(opacity);
-			const without = /<path d="[^"]*" fill="([^"]+)" fill-opacity="([^"]+)" data-item="plate:c"/.exec(svgOf(srcOf('none'), roundel, { dark }))!;
-			expect(without[1].toLowerCase()).toBe(c.noHouse);
-			expect(Number(without[2])).toBe(opacity);
+			const ribbon = (svg: string) => /<path d="M[^"]*Z" fill="([^"]+)"[^>]*\/>\s*<line [^>]*data-item="foot:c"/.exec(svg)![1];
+			expect(ribbon(svgOf(srcOf('#1e5a8b'), roundel, { dark })).toLowerCase()).toBe(dark ? mixHex('#1e5a8b', 0.6, c.text) : '#1e5a8b');
+			expect(ribbon(svgOf(srcOf('none'), roundel, { dark })).toLowerCase()).toBe(c.noHouse);
 		});
 	}
 });
@@ -189,30 +183,28 @@ describe('D153: the "You" tab and its word are readable on every house colour', 
 	const hexes = [...HOUSE_PALETTE, 'none'];
 	const rgb = (hex: string) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
 
-	/** The tab of the marked card as the saved picture draws it: [base fill, tab fill, tab opacity, word fill]. */
+	/** The tab of the marked card as the saved picture draws it: [base fill, tab fill, word fill]. */
 	function tabOf(house: string, dark: boolean) {
 		const svg = svgOf(srcOf(house), LOOKS[1], { dark });
 		// The base is the rect before the tab's own rect.
 		const at = svg.indexOf('data-item="tab:c"');
 		const tabStart = svg.lastIndexOf('<rect ', at);
 		const base = /fill="([^"]+)"/.exec(svg.slice(svg.lastIndexOf('<rect ', tabStart - 1), tabStart));
-		const tab = /fill="([^"]+)" fill-opacity="([^"]+)"/.exec(svg.slice(tabStart, at + 20))!;
+		const tab = /fill="([^"]+)"/.exec(svg.slice(tabStart, at + 20))!;
 		const word = /<text [^>]*fill="([^"]+)">You<\/text>/.exec(svg.slice(svg.indexOf('data-item="tab:c"')))!;
-		return { base: base?.[1], fill: tab[1], opacity: Number(tab[2]), word: word[1] };	}
+		return { base: base?.[1], fill: tab[1], word: word[1] };
+	}
 
 	for (const dark of [false, true]) {
-		it(`${dark ? 'dark' : 'light'}: the tab is a house-colour tint over the card colour and the word is the text colour, at least 4.5:1`, () => {
+		it(`${dark ? 'dark' : 'light'}: the tab is the card colour (the same on every house) and the word is the text colour, at least 4.5:1`, () => {
 			const c = dark ? DEFAULT_DARK : DEFAULT_LIGHT;
 			for (const house of hexes) {
 				const t = tabOf(house, dark);
 				expect(t.base?.toLowerCase(), house).toBe(c.cardFill);
 				expect(t.word.toLowerCase(), house).toBe(c.text);
-				const ink = house === 'none' ? c.noHouse : stripColour(house, c, dark);
-				expect(t.fill.toLowerCase(), house).toBe(ink.toLowerCase());
-				expect(t.opacity).toBe(dark ? ROUNDEL_LOOK.plate.dark : ROUNDEL_LOOK.plate.light);
-				const shown = mixHex(t.fill, t.opacity, t.base!);
-				const ratio = contrastRatio(rgb(c.text), rgb(shown));
-				expect(ratio, `${house} ${shown}`).toBeGreaterThanOrEqual(4.5);
+				expect(t.fill.toLowerCase(), house).toBe(c.cardFill);
+				const ratio = contrastRatio(rgb(c.text), rgb(c.cardFill));
+				expect(ratio, house).toBeGreaterThanOrEqual(4.5);
 			}
 		});
 	}

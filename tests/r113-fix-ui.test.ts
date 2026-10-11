@@ -5,13 +5,10 @@ vi.mock('obsidian', () => import('./acceptance/fake-obsidian'));
 vi.mock('@codemirror/language', () => ({ forceParsing: () => false, syntaxTree: () => ({ length: 0 }) }));
 vi.mock('@codemirror/view', () => ({ ViewPlugin: { fromClass: () => ({}) } }));
 
-import { deriveFamilies } from '../src/core/derive';
-import { parseDynasty } from '../src/core/parse';
 import * as UI from '../src/render/ui-text';
 import { EditSheet } from '../src/obsidian/edit-sheet';
 import { FullScreenModal } from '../src/obsidian/full-screen';
 import { HousesWindow } from '../src/obsidian/houses-window';
-import { openHousePage } from '../src/obsidian/house-page-window';
 import { closePluginModals } from '../src/obsidian/plugin-modals';
 import { FEl, clock, fakeWin, installDom, resetDom, settle } from './acceptance/fake-dom';
 import { openModals, resetObsidian } from './acceptance/fake-obsidian';
@@ -82,27 +79,6 @@ describe('RB1 and C8: the name of a button starts with its visible text', () => 
 	});
 });
 
-describe('RB2: the house page row gets its name from its text', () => {
-	it('has no aria-label, and a title that says what a tap does', () => {
-		const parsed = parseDynasty(BODY);
-		if (!parsed.ok) throw new Error('bad body');
-		const win = openHousePage(fakeApp() as never, { app: fakeApp() as never, houseId: 'valmont', whole: deriveFamilies(parsed.tree), sourcePath: 'n.md', show: () => {}, openNote: () => {} })!;
-		const row = (win as unknown as { contentEl: FEl }).contentEl.querySelector('.dynasty-hp-row')!;
-		expect(row.getAttribute('aria-label')).toBeNull();
-		expect(row.getAttribute('title')).toBe(UI.HOUSE_PAGE_UI.rowHint);
-		expect(row.getAttribute('title')).toBe('Show in the tree');
-	});
-
-	it('with no showGeneration the page shows the generation (the plugin settings are not read any more)', () => {
-		const parsed = parseDynasty(BODY);
-		if (!parsed.ok) throw new Error('bad body');
-		const app = { plugins: { plugins: { 'dynasty-tree': { settings: { showHouseGeneration: false } } } } };
-		const win = openHousePage(app as never, { app: app as never, houseId: 'valmont', whole: deriveFamilies(parsed.tree), sourcePath: 'n.md', show: () => {}, openNote: () => {} })!;
-		const content = (win as unknown as { contentEl: FEl }).contentEl;
-		expect(content.querySelector('.dynasty-hp-table')!.hasClass('has-no-generation')).toBe(false);
-	});
-});
-
 describe('The house page button and the ID line (visual-qa)', () => {
 	it('the Make a note button wraps its text and grows, like the other sheet buttons', () => {
 		const r = rule('.dynasty-sheet button.dynasty-hp-make-note');
@@ -115,7 +91,9 @@ describe('The house page button and the ID line (visual-qa)', () => {
 	});
 
 	it('the ID line is never smaller than 12 px', () => {
-		expect(rule('.dynasty-sheet-id')).toMatch(/font-size:\s*max\(12px,\s*var\(--font-ui-smaller\)\)/);
+		// D218: the Small role, which keeps a 12 px floor on a computer (01-base.css).
+		expect(rule('.dynasty-sheet-id')).toContain('font-size: var(--dynasty-type-small)');
+		expect(css).toContain('--dynasty-type-small: max(12px, var(--font-ui-smaller))');
 	});
 });
 
@@ -145,7 +123,7 @@ describe('X10: one constant for a text that two places show', () => {
 	});
 
 	it('the source has each of these strings one time', () => {
-		const src = readFileSync(new URL('../src/render/ui-text.ts', import.meta.url), 'utf8');
+		const src = ['ui-text', 'view-text', 'succession-text'].map((f) => readFileSync(new URL(`../src/render/${f}.ts`, import.meta.url), 'utf8')).join(' ');
 		for (const s of ['The tree changed after you opened this window.', "'Make a note with this table'", "'Type the name of the person'", 'The plugin updates the tree links to the renamed note.', 'The trees have no links to the renamed note.']) {
 			expect(src.split(s).length - 1, s).toBe(1);
 		}

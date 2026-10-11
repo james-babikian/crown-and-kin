@@ -14,9 +14,9 @@ import { HousesWindow, type HousesOptions } from '../src/obsidian/houses-window'
 import { closePluginModals } from '../src/obsidian/plugin-modals';
 import type { PictureCopy, PictureStore } from '../src/obsidian/picture-store';
 import { HOUSE_PALETTE } from '../src/render/styles';
-import { HOUSES, HOUSE_PAGE_UI, ID_UI, PICTURES_UI, SHEET, WIN_LIST_UI } from '../src/render/ui-text';
+import { HOUSES, HOUSE_PAGE_UI, ID_UI, PICTURES_UI, WIN_LIST_UI, WINDOW_UI } from '../src/render/ui-text';
 import { FEl, clock, dispatch, fakeDoc, fakeWin, installDom, resetDom, runTimers, settle } from './acceptance/fake-dom';
-import { noticeList, notices, openModals, resetObsidian } from './acceptance/fake-obsidian';
+import { lastMenu, noticeList, notices, openModals, resetObsidian } from './acceptance/fake-obsidian';
 import { fakeApp } from './acceptance/tree-view-fakes';
 import { backButton, backToList, listRows, openPage, pageOf, press, rowNames, rowOf, rowTexts, searchBox, searchFor } from './lw-support';
 import { click, stripNotDisabled, type, writingHandle, type Writing } from './s113-c-support';
@@ -143,15 +143,23 @@ describe('open: a list of the houses (D134)', () => {
 		expect(first.getAttribute('data-focus')).toBe('row:h0');
 	});
 
-	it('shows the colour square through the house colour property only, the arms box and the number of people', async () => {
+	it('shows the house colour as a dot before the count, through the house colour property only; the arms box only for a house with arms (D213, D214)', async () => {
 		const { store } = fakeStore();
 		const { content } = open({ pictures: store });
 		await settle();
 		const valmont = rowOf(content, 'valmont');
-		expect(valmont.querySelector('.dynasty-lw-swatch')!.style.getPropertyValue('--dynasty-house-color')).toBe(P[0]);
-		expect(rowOf(content, 'thorne').querySelector('.dynasty-lw-swatch')!.hasClass('is-none')).toBe(true);
+		// The colour is the dot in the second text line; the lead is the arms, and a house with no arms has no lead at all.
+		const dot = valmont.querySelector('.dynasty-lw-dot')!;
+		expect(dot.style.getPropertyValue('--dynasty-house-color')).toBe(P[0]);
+		expect(dot.getAttribute('aria-hidden')).toBe('true');
+		expect(valmont.querySelector('.dynasty-lw-armsbox')!.style.getPropertyValue('--dynasty-house-color')).toBe('');
 		expect(valmont.querySelector('.dynasty-lw-armsbox')!.querySelector('img')?.getAttribute('src')).toMatch(/^blob:/);
-		expect(rowOf(content, 'thorne').querySelector('.dynasty-lw-armsbox')!.hasClass('is-empty')).toBe(true);
+		// A house with no colour written has no dot; a house with no arms has no box, no swatch and no lead.
+		const thorne = rowOf(content, 'thorne');
+		expect(thorne.querySelector('.dynasty-lw-dot')).toBeNull();
+		expect(thorne.querySelector('.dynasty-lw-armsbox')).toBeNull();
+		expect(thorne.querySelector('.dynasty-row-lead')).toBeNull();
+		expect(rowOf(content, 'orsini').querySelector('.dynasty-lw-dot')!.style.getPropertyValue('--dynasty-house-color')).toBe(P[8]);
 		expect(rowTexts(content)[0]).toBe(`House Valmont | ${HOUSES.count(1)}`);
 		expect(rowTexts(content)[1]).toBe(`House Orsini | ${HOUSES.count(2)}`);
 		expect(rowTexts(content)[2]).toBe(`House Thorne | ${HOUSES.count(0)}`);
@@ -163,7 +171,7 @@ describe('open: a list of the houses (D134)', () => {
 		expect(bar.children[0]!.hasClass('dynasty-lw-searchwrap')).toBe(true);
 		const add = bar.children[1]!;
 		expect(add.getText()).toBe(HOUSES.add);
-		for (const c of ['dynasty-sheet-action', 'dynasty-lw-add', 'dynasty-house-add']) expect(add.hasClass(c)).toBe(true);
+		for (const c of ['dynasty-btn', 'dynasty-lw-add', 'dynasty-house-add']) expect(add.hasClass(c)).toBe(true);
 		expect(add.getAttribute('data-focus')).toBe('add');
 		expect(searchBox(content).getAttribute('placeholder')).toBe(WIN_LIST_UI.searchHouses);
 		// The old intro hint is on the page, not on the list.
@@ -257,17 +265,22 @@ describe('the edit page (D.3.6, D.3.7)', () => {
 		expect(page.getAttribute('aria-label')).toBe(WIN_LIST_UI.editPage('House Orsini'));
 		expect(content.querySelector('.dynasty-lw-back-name')!.getText()).toBe('House Orsini');
 		expect(content.querySelector('.dynasty-lw-bar')).toBeNull();
+		// The way back is a link above the header (G.7).
+		expect(content.querySelector('.dynasty-back')!.getText()).toBe(HOUSES.title);
 		expect(field(content).value).toBe('House Orsini');
 		expect(field(content).getAttribute('data-focus')).toBe('name:h1');
 		expect(field(content).getAttribute('aria-label')).toBe(HOUSES.nameLabel);
 		expect(page.querySelector('label.dynasty-house-name')).not.toBeNull();
 	});
 
-	it('shows the number of people, the intro hint and the whole palette with no toggle', () => {
+	it('shows the number of people once, in the summary of the closed People section and not in the header (D216 item 2), and the whole palette with no toggle', () => {
 		const { content } = open();
 		const page = openPage(content, 'orsini');
-		expect(page.querySelector('.dynasty-house-count')!.getText()).toBe(HOUSES.count(2));
-		expect(page.querySelector('.dynasty-sheet-hint')!.getText()).toBe(HOUSES.intro);
+		expect(page.querySelector('.dynasty-lw-pagemeta')).toBeNull();
+		expect(page.querySelector('[data-section="people"] .dynasty-section-sum')!.getText()).toBe(WINDOW_UI.sumPeopleHeader(2, 1));
+		expect(page.querySelector('.dynasty-house-count')).toBeNull();
+		expect(page.getText()).not.toContain(HOUSES.intro);
+		expect(page.querySelectorAll('section.dynasty-section').map((x) => x.getAttribute('data-section'))).toEqual(['details', 'people', 'more']);
 		expect(page.querySelector('.dynasty-house-palette')).not.toBeNull();
 		expect(page.querySelectorAll('.dynasty-house-colour')).toHaveLength(12);
 		expect(page.querySelector('.dynasty-house-colour[data-colour="' + P[8] + '"]')!.getAttribute('aria-pressed')).toBe('true');
@@ -279,10 +292,12 @@ describe('the edit page (D.3.6, D.3.7)', () => {
 		const { content } = open();
 		const page = openPage(content, 'orsini');
 		const last = page.children[page.children.length - 1]!;
-		expect(last.hasClass('dynasty-lw-actions')).toBe(true);
-		expect(last.querySelector('.dynasty-sheet-label')!.getText()).toBe(WIN_LIST_UI.otherActions);
-		const buttons = last.querySelectorAll('button');
-		expect(buttons.map((b) => b.getText())).toEqual([ID_UI.open, HOUSES.delete]);
+		expect(last.getAttribute('data-section')).toBe('more');
+		expect(last.querySelector('.dynasty-section-title')!.getText()).toBe(WINDOW_UI.sectionOther);
+		// D218 item 6: a list of commands previews nothing, so the closed section has no summary.
+		expect(last.querySelector('.dynasty-section-sum')!.getText()).toBe('');
+		const buttons = last.querySelectorAll('.dynasty-lw-actions-row button');
+		expect(buttons.map((b) => b.querySelector('.dynasty-row-title')!.getText())).toEqual([ID_UI.open, HOUSES.delete]);
 		expect(buttons[0]!.hasClass('dynasty-id-open')).toBe(true);
 		expect(buttons[0]!.getAttribute('aria-label')).toBe(ID_UI.openAria('House Orsini'));
 		expect(buttons[1]!.hasClass('dynasty-house-delete')).toBe(true);
@@ -290,19 +305,20 @@ describe('the edit page (D.3.6, D.3.7)', () => {
 		expect(buttons[1]!.getAttribute('aria-label')).toBe(HOUSES.deleteLabel('House Orsini'));
 	});
 
-	it('shows the People button of a saved house only when the tree view gives the option, and a new house has no Change ID and no People', () => {
+	it('shows the button "Make a note with this table" of a saved house only when the tree view gives the option, and a new house has no Change ID and no People', () => {
 		const a = open();
-		expect(openPage(a.content, 'orsini').querySelector('.dynasty-house-people')).toBeNull();
+		expect(openPage(a.content, 'orsini').querySelector('.dynasty-hp-make-note')).toBeNull();
 		a.win.close();
 		const b = open({ people: { show: () => undefined, openNote: () => undefined } });
 		const page = openPage(b.content, 'orsini');
-		const people = page.querySelector('.dynasty-house-people')!;
-		expect(people.getText()).toBe(HOUSE_PAGE_UI.people);
-		expect(people.getAttribute('aria-label')).toBe(HOUSE_PAGE_UI.peopleLabel('House Orsini'));
+		const note = page.querySelector('.dynasty-hp-make-note')!;
+		expect(note.getText()).toBe(HOUSE_PAGE_UI.makeNote);
+		expect(note.getAttribute('aria-label')).toBe(HOUSE_PAGE_UI.makeNoteLabel('House Orsini'));
 		backToList(b.content);
 		click(b.content.querySelector('button[data-focus="add"]'));
 		const fresh = pageOf(b.content);
-		expect(fresh.querySelector('.dynasty-house-people')).toBeNull();
+		expect(fresh.querySelector('[data-section="people"]')).toBeNull();
+		expect(fresh.querySelector('.dynasty-hp-make-note')).toBeNull();
 		expect(fresh.querySelector('.dynasty-id-open')).toBeNull();
 		expect(fresh.querySelector('.dynasty-house-delete')).not.toBeNull();
 	});
@@ -326,22 +342,56 @@ describe('the edit page (D.3.6, D.3.7)', () => {
 		await settle();
 		const box = page.querySelector('button.dynasty-house-arms')!;
 		expect(box.getAttribute('data-focus')).toBe('arms:h0');
-		expect(box.getAttribute('aria-label')).toBe(PICTURES_UI.armsLabel('House Valmont'));
+		expect(box.getAttribute('aria-label')).toBe(PICTURES_UI.armsButtonLabel('House Valmont'));
+		expect(box.getAttribute('aria-haspopup')).toBe('menu');
+		expect(box.hasClass('is-add')).toBe(false);
 		expect(box.querySelector('img')?.getAttribute('src')).toMatch(/^blob:/);
-		expect(page.querySelector('.dynasty-house-arms-colour')!.getAttribute('data-colour')).toBe('#ffffff');
-		expect(page.querySelector('.dynasty-house-remove-arms')).not.toBeNull();
-		expect(page.querySelector('.dynasty-house-select-arms')).not.toBeNull();
+		const fromArms = page.querySelector('.dynasty-house-arms-colour')!;
+		expect(fromArms.getAttribute('data-colour')).toBe('#ffffff');
+		// The colours of the arms are round swatches like the house colours (a small dot is drawn by the style sheet).
+		expect(fromArms.hasClass('dynasty-swatch')).toBe(true);
+		// A tap on the arms opens the short menu: Select arms, and Remove arms because the house has arms.
+		click(box);
+		expect(lastMenu()!.items.filter((i) => i !== 'sep').map((i) => (i as { title: string }).title)).toEqual([PICTURES_UI.selectArms, PICTURES_UI.removeArms]);
+		// One label "Colour" for the whole choice (arms-colours): no label over the colours of the arms, none over the house colours.
 		const labels = page.querySelectorAll('.dynasty-house-palette .dynasty-sheet-label').map((l) => l.getText());
-		expect(labels).toEqual([PICTURES_UI.armsHeading, 'Colour of House Valmont', PICTURES_UI.coloursFromArms, PICTURES_UI.houseColours]);
+		expect(labels).toEqual([WINDOW_UI.colour]);
+		// The colours of the arms come after the twelve house colours and the swatch "Other colour".
+		const palette = page.querySelector('.dynasty-house-palette')!;
+		const groups = palette.querySelectorAll(':scope > .dynasty-swatches');
+		expect(groups).toHaveLength(2);
+		expect(groups[0]!.querySelectorAll('.dynasty-house-colour')).toHaveLength(12);
+		expect(groups[1]!.hasClass('dynasty-house-arms-colours')).toBe(true);
 	});
 
-	it('shows the text that says the colours of the arms are unknown when the plugin cannot read the pixels', async () => {
+	it('shows no colours of the arms, and no text and no empty box, when the plugin cannot read the pixels (arms-colours)', async () => {
 		const { store } = fakeStore({ pixels: null });
 		const { content } = open({ pictures: store });
 		const page = openPage(content, 'valmont');
 		await settle();
-		expect(page.querySelector('.dynasty-house-arms-none')!.getText()).toBe(PICTURES_UI.noArmsColours);
+		expect(page.querySelector('.dynasty-house-arms-none')).toBeNull();
+		expect(page.querySelectorAll('.dynasty-house-arms-colour')).toHaveLength(0);
+		expect(page.querySelector('.dynasty-house-arms-colours')!.children).toHaveLength(0);
 		expect(page.querySelectorAll('.dynasty-house-colour')).toHaveLength(12);
+	});
+
+	it('shows the colours of the arms only after the picture is read, and no label or box before (arms-colours)', async () => {
+		const { store } = fakeStore();
+		const { content } = open({ pictures: store });
+		const page = openPage(content, 'valmont');
+		// Before the pixels arrive the group is there but empty and marked as loading, so the style sheet shows nothing.
+		const group = page.querySelector('.dynasty-house-arms-colours')!;
+		expect(group.hasClass('is-loading')).toBe(true);
+		expect(group.children).toHaveLength(0);
+		await settle();
+		expect(group.hasClass('is-loading')).toBe(false);
+		expect(group.children.length).toBeGreaterThan(0);
+	});
+
+	it('a house with no arms has no group of arms colours', () => {
+		const { content } = open();
+		const page = openPage(content, 'thorne');
+		expect(page.querySelector('.dynasty-house-arms-colours')).toBeNull();
 	});
 });
 
@@ -391,8 +441,10 @@ describe('the draft: edit, Save, Cancel and close (D.3.8)', () => {
 		expect(openModals).toHaveLength(0);
 	});
 
-	it('Save with no change closes the window and writes nothing', async () => {
+	it('Save with no change closes the window and writes nothing (from a page: the list has Close only)', async () => {
 		const { content, handle } = open();
+		expect(content.querySelector('button[data-focus="save"]')).toBeNull();
+		openPage(content, 'thorne');
 		await save(content);
 		expect(handle.write).not.toHaveBeenCalled();
 		expect(openModals).toHaveLength(0);
@@ -502,7 +554,16 @@ describe('arms in the draft (spec §13.6)', () => {
 		const { content, handle } = open({ pictures: store });
 		openPage(content, 'thorne');
 		picks.push({ kind: 'choose', link: '[[thorne.png]]' });
-		await click(pageOf(content).querySelector('.dynasty-house-select-arms'));
+		// A house with no arms has no button in the header; the text link "Add arms" stands at the left of "Open all" (D216 item 1). A tap opens the picker at once, with no menu.
+		const head = pageOf(content).querySelector('button.dynasty-house-arms')!;
+		expect(head.hasClass('is-add')).toBe(true);
+		expect(head.getText()).toBe('');
+		expect(head.querySelector('img')).toBeNull();
+		const add = pageOf(content).querySelector('.dynasty-openall .dynasty-add-arms')!;
+		expect(add.getText()).toBe('Add arms');
+		expect(add.getAttribute('aria-haspopup')).toBeNull();
+		expect(add.parentElement!.children[0]).toBe(add);
+		await click(add);
 		await settle();
 		expect(pageOf(content).querySelector('button.dynasty-house-arms')!.querySelector('img')).not.toBeNull();
 		backToList(content);
@@ -512,26 +573,35 @@ describe('arms in the draft (spec §13.6)', () => {
 		expect(handle.ops[0]).toEqual({ kind: 'batch', ops: [{ kind: 'edit-house', id: 'thorne', arms: '[[thorne.png]]' }] });
 	});
 
-	it('the arms box of the page opens the picker too, and Remove arms takes the arms out of the draft', async () => {
+	it('the picker answers "remove" too, and Remove arms of the menu takes the arms out of the draft', async () => {
 		const { store } = fakeStore();
 		const { content, handle } = open({ pictures: store });
 		openPage(content, 'valmont');
 		await settle();
 		picks.push({ kind: 'remove' });
 		await click(pageOf(content).querySelector('button.dynasty-house-arms'));
-		expect(pageOf(content).querySelector('button.dynasty-house-arms')!.hasClass('is-empty')).toBe(true);
-		expect(pageOf(content).querySelector('.dynasty-house-remove-arms')).toBeNull();
+		lastMenu()!.item(PICTURES_UI.selectArms)!.click();
+		await settle();
+		// With the arms gone the header has no button, and the text link "Add arms" shows in the "Open all" row, not an empty ring or initials.
+		expect(pageOf(content).querySelector('button.dynasty-house-arms')!.hasClass('is-add')).toBe(true);
+		expect(pageOf(content).querySelector('.dynasty-openall .dynasty-add-arms')!.getText()).toBe('Add arms');
+		expect(pageOf(content).querySelector('.dynasty-openall .dynasty-add-arms')!.getAttribute('style') ?? '').not.toContain('display: none');
+		// A tap on it opens the picker (it answers "cancel" now), not a menu.
+		const menu = lastMenu();
+		await click(pageOf(content).querySelector('.dynasty-openall .dynasty-add-arms'));
+		expect(lastMenu()).toBe(menu);
 		await save(content);
 		expect(handle.ops[0]).toEqual({ kind: 'batch', ops: [{ kind: 'edit-house', id: 'valmont', arms: null }] });
 	});
 
-	it('the Remove arms button keeps the focus in the window', async () => {
+	it('Remove arms of the menu moves the focus to the link "Add arms", which takes the place of the button', async () => {
 		const { store } = fakeStore();
 		const { content } = open({ pictures: store });
 		openPage(content, 'valmont');
 		await settle();
-		await click(pageOf(content).querySelector('.dynasty-house-remove-arms'));
-		expect(active()).toBe('select-arms:h0');
+		await click(pageOf(content).querySelector('button.dynasty-house-arms'));
+		lastMenu()!.item(PICTURES_UI.removeArms)!.click();
+		expect(active()).toBe('add-arms:h0');
 	});
 
 	it('a change of the picture files redraws the box of the row and of the page (store.onChange)', async () => {
@@ -543,6 +613,7 @@ describe('arms in the draft (spec §13.6)', () => {
 		const box = () => rowOf(content, 'valmont').querySelector('.dynasty-lw-armsbox')!;
 		expect(box().querySelector('img')).toBeNull();
 		expect(box().hasClass('is-empty')).toBe(false);
+		expect(box().hasClass('is-loading')).toBe(true);
 		store.changed(['Pictures/valmont-arms.png']);
 		await settle();
 		expect(box().querySelector('img')?.getAttribute('src')).toMatch(/^blob:/);
@@ -830,81 +901,97 @@ describe('stale write and reload (spec §6.1)', () => {
 	});
 });
 
-describe('People opens the house page (spec §13.12, D.3.8 leaveThen)', () => {
+describe('the People section (D202, G.10; replaces the house page window)', () => {
 	function peopleApp() {
 		return {
 			fileManager: { getNewFileParent: () => ({ path: '/', name: '', isRoot: () => true, children: [] }), generateMarkdownLink: () => '' },
-			vault: { create: vi.fn(), createFolder: vi.fn(), getAbstractFileByPath: () => null, getRoot: () => ({ path: '/', children: [] }) },
+			vault: { create: vi.fn(async (path: string) => ({ path, name: path, basename: path.replace(/\.md$/, '') })), createFolder: vi.fn(), getAbstractFileByPath: () => null, getRoot: () => ({ path: '/', children: [] }) },
 		};
 	}
 
-	function withPeople() {
-		const shown: string[] = [];
-		const handle = writingHandle(twelve());
+	function withPeople(body = twelve()) {
+		const app = peopleApp();
+		const opened: (() => Promise<void>)[] = [];
+		const handle = writingHandle(body);
 		const closed: string[] = [];
-		const win = HousesWindow.create(peopleApp() as never, {
+		const win = HousesWindow.create(app as never, {
 			handle: handle as never,
 			sourcePath: 'n.md',
 			onClosed: () => closed.push('closed'),
-			people: { show: (id: string) => shown.push(id), openNote: () => undefined },
+			people: { show: () => undefined, openNote: (open) => void opened.push(open) },
 		})!;
 		win.open();
 		const o = win as unknown as { contentEl: FEl; modalEl: FEl };
-		return { win, shown, handle, closed, content: o.contentEl, modal: o.modalEl };
+		return { win, app, opened, handle, closed, content: o.contentEl, modal: o.modalEl };
 	}
 
-	const housePage = () => openModals[openModals.length - 1] as unknown as { contentEl: FEl };
+	/** A house with ten people, so that the section has more than its eight rows. */
+	function crowded(): string {
+		const lines = ['houses:', '  - id: crowd', '    name: House Crowd', '', 'people:'];
+		for (let i = 0; i < 10; i++) lines.push(`  - id: p${i}`, `    name: Person ${i} Crowd`, '    house: crowd', '    born: ' + String(1100 + i));
+		lines.push('');
+		return lines.join('\n');
+	}
 
-	it('a tap on a name with no changes closes the house page and the window, then shows the card', async () => {
-		const { content, shown, closed } = withPeople();
+	it('shows the people of the saved house as rows (a tap shows the card when the tree view gives a way), with the generation and the years', () => {
+		const { content } = withPeople();
+		const page = openPage(content, 'orsini');
+		const section = page.querySelector('[data-section="people"]')!;
+		const rows = section.querySelectorAll('.dynasty-hp-row');
+		expect(rows.map((r) => r.querySelector('.dynasty-hp-name')!.getText())).toEqual(['Isolde Orsini', 'Lucan Orsini']);
+		expect(rows.every((r) => r.tag === 'button')).toBe(true);
+		expect(rows[0]!.querySelector('.dynasty-row-sub')!.getText()).toBe(WINDOW_UI.personRowSub(1, '', ''));
+		expect(section.querySelector('.dynasty-section-sum')!.getText()).toBe(WINDOW_UI.sumPeopleHeader(2, 1));
+	});
+
+	it('draws a plain full-width row: the bold name, the second text line, no chevron, no portrait box and no picture at all (people-rows, D213)', () => {
+		const { content } = withPeople();
+		const page = openPage(content, 'orsini');
+		const rows = page.querySelector('[data-section="people"]')!.querySelectorAll('.dynasty-hp-row');
+		for (const r of rows) {
+			expect(r.querySelector('.dynasty-row-chev'), 'no chevron').toBeNull();
+			expect(r.querySelector('.dynasty-row-lead'), 'no lead').toBeNull();
+			expect(r.querySelector('b.dynasty-hp-name')).not.toBeNull();
+		}
+		// The row has its name from its two text lines; there is no floating label (aria-label) on it.
+		expect(rows[0]!.getAttribute('aria-label')).toBeNull();
+		expect(rows[0]!.getAttribute('aria-labelledby')).toBeTruthy();
+	});
+
+	it('shows eight rows, then "and N more", and the summary of the closed section with the count and the generations (D216 item 2)', () => {
+		const { content } = withPeople(crowded());
+		const page = openPage(content, 'crowd');
+		const section = page.querySelector('[data-section="people"]')!;
+		expect(section.querySelectorAll('.dynasty-hp-row')).toHaveLength(8);
+		expect(section.querySelector('.dynasty-hp-more')!.getText()).toBe(WINDOW_UI.andMore(2));
+		expect(section.querySelector('.dynasty-section-sum')!.getText()).toBe(WINDOW_UI.sumPeopleHeader(10, 1));
+		expect(page.querySelector('.dynasty-lw-pagemeta')).toBeNull();
+	});
+
+	it('makes a note with the table, then closes the window and opens the note', async () => {
+		const { content, app, opened, closed } = withPeople();
 		openPage(content, 'orsini');
-		await click(pageOf(content).querySelector('.dynasty-house-people'));
-		expect(openModals).toHaveLength(2);
-		dispatch(housePage().contentEl.querySelectorAll('.dynasty-hp-row')[0]!, 'click');
+		await click(pageOf(content).querySelector('.dynasty-hp-make-note'));
 		await settle();
-		expect(shown).toHaveLength(1);
+		expect(app.vault.create).toHaveBeenCalledTimes(1);
+		expect(notices[notices.length - 1]).toContain(HOUSE_PAGE_UI.noteMade('House Orsini').slice(0, 20));
+		expect(opened).toHaveLength(1);
 		expect(openModals).toHaveLength(0);
 		expect(closed).toEqual(['closed']);
 	});
 
-	it('with a changed draft the question shows; Keep editing shows the LIST, drops the card, and Esc then asks Discard changes', async () => {
-		const { content, modal, shown, win } = withPeople();
+	it('with a changed draft the question shows first; Keep editing keeps the window and drops the note action', async () => {
+		const { content, modal, opened } = withPeople();
 		openPage(content, 'orsini');
 		type(field(content), 'House Orsini Changed');
-		await click(pageOf(content).querySelector('.dynasty-house-people'));
-		dispatch(housePage().contentEl.querySelectorAll('.dynasty-hp-row')[0]!, 'click');
+		await click(pageOf(content).querySelector('.dynasty-hp-make-note'));
 		await settle();
 		expect(confirmOf(modal)).not.toBeNull();
-		expect(backButton(content)).toBeNull();
 		await click(confirmOf(modal)!.querySelector('.dynasty-sheet-keep'));
 		expect(confirmOf(modal)).toBeNull();
-		expect(backButton(content)).toBeNull();
+		expect(opened).toEqual([]);
+		expect(openModals).toHaveLength(1);
 		expect(names(content)).toContain('House Orsini Changed');
-		expect(shown).toEqual([]);
-		win.close();
-		expect(confirmOf(modal)!.querySelector('.dynasty-sheet-confirm-title')!.getText()).toBe(SHEET.discardTitle);
-		expect(shown).toEqual([]);
-	});
-
-	it('with a changed draft, Discard changes shows the card', async () => {
-		const { content, modal, shown } = withPeople();
-		openPage(content, 'orsini');
-		type(field(content), 'House Orsini Changed');
-		await click(pageOf(content).querySelector('.dynasty-house-people'));
-		dispatch(housePage().contentEl.querySelectorAll('.dynasty-hp-row')[0]!, 'click');
-		await settle();
-		await click(confirmOf(modal)!.querySelector('.dynasty-sheet-discard'));
-		expect(shown).toHaveLength(1);
-		expect(openModals).toHaveLength(0);
-	});
-
-	it('the focus goes back to People when the house page closes without a choice', async () => {
-		const { content } = withPeople();
-		openPage(content, 'orsini');
-		await click(pageOf(content).querySelector('.dynasty-house-people'));
-		(housePage() as unknown as { close(): void }).close();
-		await settle();
-		expect(active()).toBe('people:h1');
 	});
 });
 
@@ -925,5 +1012,95 @@ describe('texts and the speed of the list', () => {
 		expect(names(content)).toEqual(['House Number 77']);
 		expect(content.querySelector('.dynasty-lw-bar')).toBe(bar);
 		runTimers(100);
+	});
+});
+
+describe('the house page after the typography round (D216 items 1 and 2, D218 items 6 and 11)', () => {
+	/** The "Open all" row of the open page and the link "Add arms" in it. */
+	const rowOfPage = (content: FEl) => pageOf(content).querySelector('.dynasty-openall')!;
+	const linkOf = (content: FEl) => rowOfPage(content).querySelector('.dynasty-add-arms')!;
+
+	it('puts the link "Add arms" first in the "Open all" row, where "Add portrait" stands in the person window, and keeps it a tap target of the same kind', () => {
+		const { content } = open();
+		openPage(content, 'thorne');
+		const link = linkOf(content);
+		expect(rowOfPage(content).children[0]).toBe(link);
+		expect(rowOfPage(content).children[1]!.hasClass('dynasty-openall-button')).toBe(true);
+		expect(link.tag).toBe('button');
+		expect(link.getText()).toBe(WINDOW_UI.addArms);
+		expect(link.hidden).toBe(false);
+		// The look is the one of "Add portrait" (10-edit-sheet.css): the same two classes.
+		expect(link.hasClass('dynasty-link')).toBe(true);
+		expect(link.hasClass('dynasty-add-portrait')).toBe(true);
+		expect(link.getAttribute('data-focus')).toBe('add-arms:h2');
+	});
+
+	it('hides the link while the house has arms to show, and shows it for arms that cannot show', async () => {
+		const { store } = fakeStore();
+		const { content } = open({ pictures: store });
+		openPage(content, 'valmont');
+		await settle();
+		expect(linkOf(content).hidden).toBe(true);
+		expect(pageOf(content).querySelector('button.dynasty-house-arms')!.hasClass('is-add')).toBe(false);
+		// The same page without a picture store: the arms cannot be found, so the link shows.
+		backToList(content);
+		const none = open();
+		openPage(none.content, 'valmont');
+		expect(linkOf(none.content).hidden).toBe(false);
+		expect(pageOf(none.content).querySelector('button.dynasty-house-arms')!.hasClass('is-add')).toBe(true);
+	});
+
+	it('shows the link on the page of a new house too, and keeps the line "New house" under its name', async () => {
+		const { content } = open();
+		await click(content.querySelector('button[data-focus="add"]'));
+		expect(linkOf(content).hidden).toBe(false);
+		expect(pageOf(content).querySelector('.dynasty-lw-pagemeta')!.getText()).toBe(HOUSES.newHouse);
+	});
+
+	it('moves the focus to the arms button after the link chose arms, and back to the link when they are removed', async () => {
+		const { store } = fakeStore();
+		const { content } = open({ pictures: store });
+		openPage(content, 'thorne');
+		picks.push({ kind: 'choose', link: '[[thorne.png]]' });
+		await click(linkOf(content));
+		await settle();
+		expect(active()).toBe('arms:h2');
+		expect(linkOf(content).hidden).toBe(true);
+		picks.push({ kind: 'remove' });
+		await click(pageOf(content).querySelector('button.dynasty-house-arms'));
+		lastMenu()!.item(PICTURES_UI.selectArms)!.click();
+		await settle();
+		expect(linkOf(content).hidden).toBe(false);
+		expect(active()).toBe('add-arms:h2');
+	});
+
+	it('has no header line for a saved house; the count of the people and the generations is the summary of the closed People section', () => {
+		const { content } = open();
+		const page = openPage(content, 'orsini');
+		expect(page.querySelector('.dynasty-lw-pagehead .dynasty-head-meta')).toBeNull();
+		expect(page.querySelector('[data-section="people"] .dynasty-section-sum')!.getText()).toBe('2 people in 1 generation');
+		// A house with no people says so in the same place.
+		expect(openPageSummary(content, 'thorne')).toBe('No people');
+	});
+
+	/** The summary of the People section of a house: the page of another house opens first. */
+	function openPageSummary(content: FEl, key: string): string {
+		backToList(content);
+		return openPage(content, key).querySelector('[data-section="people"] .dynasty-section-sum')!.getText();
+	}
+
+	it('keeps the title on the name line of a People row (11B), with the generation and the years on the text line', () => {
+		const body = ['houses:', '  - id: orsini', '    name: House Orsini', 'titles:', '  - id: duke', '    name: Duke of Orsini', '    holders:', '      - {person: isolde}', 'people:', '  - id: isolde', '    name: Isolde Orsini', '    house: orsini', '    born: 1100', ''].join('\n');
+		const app = {
+			fileManager: { getNewFileParent: () => ({ path: '/', name: '', isRoot: () => true, children: [] }), generateMarkdownLink: () => '' },
+			vault: { create: vi.fn(), createFolder: vi.fn(), getAbstractFileByPath: () => null, getRoot: () => ({ path: '/', children: [] }) },
+		};
+		const win = HousesWindow.create(app as never, { handle: writingHandle(body) as never, sourcePath: 'n.md', people: { show: () => undefined, openNote: () => undefined } })!;
+		win.open();
+		const content = (win as unknown as { contentEl: FEl }).contentEl;
+		const row = openPage(content, 'orsini').querySelector('.dynasty-hp-row')!;
+		expect(row.querySelector('.dynasty-row-title .dynasty-hp-name')!.getText()).toBe('Isolde Orsini');
+		expect(row.querySelector('.dynasty-row-title .dynasty-sob')!.getText()).toContain('Duke of Orsini');
+		expect(row.querySelector('.dynasty-row-sub')!.getText()).not.toContain('Duke');
 	});
 });

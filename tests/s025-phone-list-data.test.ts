@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { listData, listStart, listWord, oldestParent, BACK_LIMIT, popTrail, pushTrail } from '../src/obsidian/phone-list';
+import { linkWord, listData, listStart, listWord, oldestParent, BACK_LIMIT, popTrail, pushTrail } from '../src/obsidian/phone-list';
 import type { ListGroup, ListRow } from '../src/render/dom/phone-list-dom';
-import { build } from './helpers';
+import { build, fixture } from './helpers';
 
 /*
  * 0.2.5, WP-C2a (D144; contract C.3.1): the pure parts of the phone list. The start chain, the oldest parent, the
@@ -270,7 +270,7 @@ describe('listWord: the relation word of a row', () => {
 
 	it('gives the real relation word from the cache, and "You" for the marked person', () => {
 		expect(listWord('kit', { me: 'lena', showRelations: true, cards })).toEqual({ text: 'Half-brother, maybe full', lower: 'half-brother' });
-		expect(listWord('lena', { me: 'lena', showRelations: true, cards })).toEqual({ text: 'You', lower: 'you' });
+		expect(listWord('lena', { me: 'lena', showRelations: true, cards })).toEqual({ text: 'You', lower: 'you', strong: true });
 	});
 
 	it('gives no word for a person that the cache does not know', () => {
@@ -279,7 +279,60 @@ describe('listWord: the relation word of a row', () => {
 
 	it('gives only "You" when the setting is off', () => {
 		expect(listWord('kit', { me: 'lena', showRelations: false, cards })).toBeNull();
-		expect(listWord('lena', { me: 'lena', showRelations: false, cards })).toEqual({ text: 'You', lower: 'you' });
+		expect(listWord('lena', { me: 'lena', showRelations: false, cards })).toEqual({ text: 'You', lower: 'you', strong: true });
+	});
+});
+
+// D210, D214: the sample tree 08 (parent types) is the case table of the genealogy check.
+describe('linkWord and the side link of a partnership (D210, D214)', () => {
+	const g8 = build(fixture('08')).g;
+	const word = (centre: string, id: string) => {
+		const d = listData(g8, centre);
+		const row = [...d.parents, ...d.groups.flatMap((gr) => gr.rows)].find((r) => r.id === id)!;
+		return linkWord(g8, d, row)?.text ?? null;
+	};
+
+	it('parent rows: the kind of link, with Birth only beside an adoptive parent', () => {
+		expect(['aldric', 'isolde', 'marek', 'anna'].map((p) => word('tomas', p))).toEqual(['Adoptive father', 'Adoptive mother', 'Birth father', 'Birth mother']);
+		expect(['aldric', 'gareth', 'odette'].map((p) => word('piers', p))).toEqual(['Guardian', null, null]);
+		expect(['gareth', 'marek'].map((p) => word('roderick', p))).toEqual([null, 'Rumoured father']);
+		expect(word('jasper', 'marek')).toBeNull();
+	});
+
+	it('child rows: the kind of link, none for a birth child', () => {
+		expect(['tomas', 'piers'].map((c) => word('aldric', c))).toEqual(['Adopted son', 'Ward']);
+		expect(word('marek', 'roderick')).toBe('Rumoured son');
+		expect(word('marek', 'jasper')).toBeNull();
+		expect(word('marek', 'tomas')).toBeNull();
+	});
+
+	it('gives the neutral word to a person with no sex, and none to the centre or a partner', () => {
+		const g = build(`
+people:
+  - {id: a, name: A, sex: m}
+  - {id: k, name: K, parents: [{id: a, type: adoptive}]}
+  - {id: w, name: W, sex: f, parents: [{id: a, type: ward}]}
+`).g;
+		const d = listData(g, 'a');
+		expect(d.groups.flatMap((gr) => gr.rows).map((r) => linkWord(g, d, r)?.text)).toEqual(['Adopted child', 'Ward']);
+		expect(linkWord(g, d, d.person[0])).toBeNull();
+		const dk = listData(g, 'k');
+		expect(linkWord(g, dk, dk.parents[0])).toEqual({ text: 'Adoptive father', lower: 'adoptive father' });
+	});
+
+	it('lists a birth child drawn under adoptive parents in the partnership with the other birth parent, not under Other children', () => {
+		const d = listData(g8, 'marek');
+		expect(groupsOf(d.groups)).toEqual([
+			{ heading: { kind: 'partner', partner: 'anna' }, rows: ['jasper', 'tomas'] },
+			{ heading: { kind: 'other' }, rows: ['roderick'] },
+		]);
+		expect(d.groups[0].rows.map((r) => r.link)).toEqual(['birth', 'birth']);
+		expect(groupsOf(listData(g8, 'anna').groups)).toEqual([{ heading: { kind: 'partner', partner: 'marek' }, rows: ['jasper', 'tomas'] }]);
+		// Aldric's list keeps Tomas as the adopted son in the partnership with Isolde.
+		expect(groupsOf(listData(g8, 'aldric').groups)).toEqual([
+			{ heading: { kind: 'partner', partner: 'isolde' }, rows: ['tomas'] },
+			{ heading: { kind: 'other' }, rows: ['piers'] },
+		]);
 	});
 });
 

@@ -284,6 +284,7 @@ describe('the note tree under a full-screen view (fix round)', () => {
 	});
 });
 
+// 0.2.8 (D196 item 3, contract A.1): the live legend has no house rows, so it holds no arms copy any more; what it holds it still gives back when it closes.
 describe('the legend gives back its arms copies when it closes (fix round)', () => {
 	async function legendOpen() {
 		const src = fixtureSource('07b');
@@ -295,10 +296,11 @@ describe('the legend gives back its arms copies when it closes (fix round)', () 
 		await drain();
 		const releasedBefore = log.released;
 		const heldBefore = log.held;
-		dispatch(el.querySelector('.dynasty-legend-button')!, 'click', { button: 0 });
+		dispatch(el.querySelector('.dynasty-more')!, 'click', { button: 0 });
+		dispatch(el.querySelector('.dynasty-more-legend')!, 'click', { button: 0 });
 		await drain();
 		const legendHeld = log.held - heldBefore;
-		expect(legendHeld).toBeGreaterThan(0);
+		expect(legendHeld).toBe(0);
 		expect(el.querySelector('.dynasty-popover-legend')).not.toBeNull();
 		return { el, view, log, releasedBefore, legendHeld };
 	}
@@ -312,6 +314,7 @@ describe('the legend gives back its arms copies when it closes (fix round)', () 
 
 	it('another popover (More) replaces the legend and the legend releases its arms copies', async () => {
 		const { el, log, releasedBefore, legendHeld } = await legendOpen();
+		// The legend closes with its opener (More): a second press on More opens the menu again.
 		dispatch(el.querySelector('.dynasty-more')!, 'click', { button: 0 });
 		await drain();
 		expect(el.querySelector('.dynasty-popover-legend')).toBeNull();

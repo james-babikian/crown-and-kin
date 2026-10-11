@@ -13,8 +13,11 @@
  * Behaviour (C1 to C8):
  * - Save gives a clamped `CropFraction`, or `null` when it is the automatic part. Cancel, Escape and a
  *   press outside give `cancel` and ask nothing.
- * - On a phone-width screen (`isPhoneWidth`) the tool fills the visible area with Save, Cancel and
- *   Reset in a bottom bar of 44 px buttons; otherwise it is a window like the edit sheet.
+ * - 0.2.8 contract G.9, D196 item 4: the tool has a dark surface in both themes. The title is at the top, the picture is under a
+ *   circle in the middle, then the instruction text, the slider with its zoom icons, and the buttons: Cancel and Reset at the left, Save at
+ *   the right. The edit sheet opens it at once after a new portrait; if the user closes it, the part that the plugin chose by itself stays.
+ * - On a phone-width screen (`isPhoneWidth`) the tool fills the visible area with its buttons in a bottom bar of 44 px
+ *   buttons and the title in the middle; otherwise it is a large window, 48 px from the edges of the screen (D212: no inner frame).
  * - One pointer drags (move). Two pointers move by the midpoint and zoom by the distance ratio about
  *   the midpoint. The wheel zooms by `exp(-deltaY * WHEEL_RATE)` about the pointer. The buttons zoom
  *   about the frame centre. The slider sets `side = 10^(-z)` (1 to 0.1). Keys (the picture area has
@@ -96,8 +99,10 @@ export function toolSizes(phone: boolean, width: number, height: number): { fram
 	const safe = (v: number, fallback: number) => (Number.isFinite(v) && v > 0 ? v : fallback);
 	const w = safe(width, 360);
 	const h = safe(height, 640);
-	// The rest of the window (title, hint, zoom row and buttons) takes about 320 px on a phone and 380 px on a computer.
-	const frame = phone ? Math.min(260, (w - 24) / AREA_RATIO, Math.max(140, (h - 320) / AREA_RATIO)) : Math.min(280, Math.max(160, (h - 380) / AREA_RATIO));
+	// D212 crop-tool: the picture is as large as the window allows. A phone: the area takes the full width, and the rest of the window (title,
+	// hint, zoom row and buttons) takes about 320 px. A computer: the window is 48 px from the edges of the screen and at most 900 px wide, and
+	// the rest of the window takes about 280 px.
+	const frame = phone ? Math.min(w / AREA_RATIO, Math.max(140, (h - 320) / AREA_RATIO)) : Math.min(480, Math.max(160, Math.min(Math.min(900, w - 96) - 48, h - 96 - 280) / AREA_RATIO));
 	const f = Math.floor(frame);
 	return { frame: f, area: Math.round(f * AREA_RATIO) };
 }
@@ -171,17 +176,16 @@ class CropModal extends Modal {
 	private build(): void {
 		const el = this.contentEl;
 		el.addClass('dynasty-sheet-content');
-		const header = el.createDiv({ cls: 'dynasty-sheet-header' });
-		nameDialog(this.modalEl, header.createDiv({ cls: 'dynasty-sheet-title', text: CROP_UI.title(this.o.personName) }));
+		nameDialog(this.modalEl, el.createDiv({ cls: ['dynasty-sheet-title', 'dynasty-crop-title'], text: CROP_UI.title(this.o.personName) }));
 		const body = el.createDiv({ cls: ['dynasty-sheet-body', 'dynasty-crop-body'] });
-		body.createDiv({ cls: 'dynasty-crop-hint', text: this.coarse() ? CROP_UI.hintTouch : CROP_UI.hintMouse, attr: { id: 'dynasty-crop-hint' } });
-		this.statusEl = body.createDiv({ cls: 'dynasty-crop-status', attr: { role: 'status' }, text: CROP_UI.loading });
 
 		// The hint names the area for a screen reader. An aria-label would also show as a tooltip over the picture while it is dragged.
 		this.areaEl = body.createDiv({ cls: 'dynasty-crop-area', attr: { tabindex: '0', role: 'group', 'aria-labelledby': 'dynasty-crop-hint' } });
 		this.imgEl = this.areaEl.createEl('img', { cls: 'dynasty-crop-img', attr: { alt: '', draggable: 'false' } });
 		this.areaEl.createDiv({ cls: 'dynasty-crop-frame', attr: { 'aria-hidden': 'true' } });
 		this.wireArea();
+		this.statusEl = body.createDiv({ cls: 'dynasty-crop-status', attr: { role: 'status' }, text: CROP_UI.loading });
+		body.createDiv({ cls: 'dynasty-crop-hint', text: this.coarse() ? CROP_UI.hintTouch : CROP_UI.hintMouse, attr: { id: 'dynasty-crop-hint' } });
 
 		const zoom = body.createDiv({ cls: 'dynasty-crop-zoom' });
 		this.iconButton(zoom, '', CROP_UI.zoomOut, () => this.zoom(ZOOM_OUT_STEP), 'zoom-out');
@@ -190,10 +194,11 @@ class CropModal extends Modal {
 		this.iconButton(zoom, '', CROP_UI.zoomIn, () => this.zoom(ZOOM_IN_STEP), 'zoom-in');
 
 		const bar = body.createDiv({ cls: 'dynasty-crop-bar' });
-		const reset = this.iconButton(bar, CROP_UI.reset, CROP_UI.resetLabel, () => this.reset());
-		reset.addClass('dynasty-crop-reset');
 		const cancel = this.iconButton(bar, CROP_UI.cancel, CROP_UI.cancel, () => this.finish({ kind: 'cancel' }));
 		cancel.addClass('dynasty-crop-cancel');
+		const reset = this.iconButton(bar, CROP_UI.reset, CROP_UI.resetLabel, () => this.reset());
+		reset.addClass('dynasty-crop-reset');
+		bar.createSpan({ cls: 'dynasty-crop-spacer', attr: { 'aria-hidden': 'true' } });
 		this.saveEl = this.iconButton(bar, CROP_UI.save, CROP_UI.save, () => this.save());
 		this.saveEl.addClass('mod-cta', 'dynasty-crop-save');
 		this.saveEl.disabled = true;
@@ -201,7 +206,7 @@ class CropModal extends Modal {
 
 	/** A button of at least 44 × 44 px with a label and the same text as its tooltip (spec §7.5). */
 	private iconButton(parent: HTMLElement, text: string, label: string, run: () => void, icon?: string): HTMLButtonElement {
-		const b = parent.createEl('button', { cls: 'dynasty-crop-button', text, attr: { type: 'button', 'aria-label': label } });
+		const b = parent.createEl('button', { cls: text ? ['dynasty-btn', 'dynasty-crop-button'] : ['dynasty-icon-btn', 'dynasty-crop-button'], text, attr: { type: 'button', 'aria-label': label } });
 		if (icon) setIcon(b, icon);
 		b.addEventListener('click', () => {
 			try {

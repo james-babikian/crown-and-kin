@@ -136,7 +136,7 @@ describe('an eager scene is the M10 scene (S1, S4)', () => {
 			const names = flatClassesOf(c);
 			expect(c.children.filter((k) => k.hasClass('dynasty-card-body'))).toHaveLength(1);
 			expect(c.children[c.children.length - 1].hasClass('dynasty-card-body')).toBe(true);
-			const expected = ['dynasty-card-ring', 'dynasty-card-bg', 'dynasty-card-strip', 'dynasty-card-full', 'dynasty-card-compact'];
+			const expected = ['dynasty-card-ring', 'dynasty-card-bg', 'dynasty-card-ribbon', 'dynasty-card-full', 'dynasty-card-compact'];
 			const crown = names.filter((n) => n === 'dynasty-card-crown-hit').length;
 			expect(names.filter((n) => n !== 'dynasty-card-crown-hit').slice(0, expected.length)).toEqual(expected);
 			expect(crown).toBeLessThanOrEqual(1);
@@ -435,7 +435,25 @@ describe('S4, S5g: fillChunk', () => {
 });
 
 describe('S2: refit, picture slots and the detached content', () => {
-	it('refit() before a fill changes the detached text, so the card is the eager card refitted after the fill', () => {
+	it('the text of a lazy card is cut to fit when the card is filled, not at the build (the first view fills a few of many cards)', () => {
+		width.factor = 0.55;
+		const lazy = build(true);
+		const ids = [...lazy.s.cards.keys()];
+		const texts = (id: string) => el(lazy.s.cards.get(id)!).all().filter((e) => e.tag === 'text');
+		// Before the fill the detached group of a card has its text elements, and they hold no text yet.
+		const detached = (id: string) => texts(id).map((e) => e.text);
+		const before = detached(ids[0]!).join('');
+		lazy.fill.fillPerson(ids[0]!);
+		const after = texts(ids[0]!).map((e) => e.text).join('');
+		expect(before).toBe('');
+		expect(after.length).toBeGreaterThan(0);
+		// A card that was not filled stays empty; the eager scene fits every card at the build.
+		expect(texts(ids[ids.length - 1]!).map((e) => e.text).join('')).toBe('');
+		lazy.fill.fillAll();
+		expect(serial(lazy.root)).toBe(serial(build(false).root));
+	});
+
+	it('a lazy card fits its text when it is filled, with the measures of that moment, so the fill comes before the measures change back', () => {
 		width.factor = 0.55;
 		const eager = build(false);
 		const lazy = build(true);
@@ -444,10 +462,11 @@ describe('S2: refit, picture slots and the detached content', () => {
 		width.factor = 1.4;
 		eager.s.refit();
 		lazy.s.refit();
-		width.factor = 0.55;
 		expect(serial(el(eager.s.cards.get(id)))).not.toBe(beforeText);
+		// 0.2.8 speed repair: a lazy card fits its text when it is filled, with the measures of that moment, so the fill comes before the measures change back.
 		lazy.fill.fillAll();
 		expect(serial(lazy.root)).toBe(serial(eager.root));
+		width.factor = 0.55;
 	});
 
 	it('the picture slots exist for every card from the build on, in the same order, and their elements are not in the tree until the card is filled', () => {

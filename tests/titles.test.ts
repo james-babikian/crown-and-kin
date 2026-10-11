@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { deriveFamilies, type FamilyGraph } from '../src/core/derive';
 import { parseDynasty } from '../src/core/parse';
-import { cardLabels, cardTitleOp, describeDeleteTitle, entryReign, holderTable, noteName, pickerSuffix, reignText, rulerName, searchNames } from '../src/core/titles';
+import { cardLabels, describeDeleteTitle, entryReign, holderTable, noteName, pickerSuffix, reignText, rulerName, searchNames } from '../src/core/titles';
 import type { Holder } from '../src/core/types';
 import { applyOp } from '../src/core/yaml-edit';
 import { fixture } from './helpers';
@@ -190,21 +190,9 @@ describe('picker and Find texts (§13.5)', () => {
 	});
 });
 
-describe('cardTitleOp (D62, §13.3)', () => {
-	const g = graph(TREE);
-
-	it('the first title with no written title removes card-title', () => {
-		expect(cardTitleOp(g, 'aldric', 'duke')).toEqual({ kind: 'set-person-fields', id: 'aldric', fields: { 'card-title': null } });
-		expect(cardTitleOp(g, 'wren', 'count')).toEqual({ kind: 'set-person-fields', id: 'wren', fields: { 'card-title': null } });
-	});
-
-	it('another title, or any title with a written title, writes card-title', () => {
-		expect(cardTitleOp(g, 'wren', 'king')).toEqual({ kind: 'set-person-fields', id: 'wren', fields: { 'card-title': 'king' } });
-		expect(cardTitleOp(g, 'roderick', 'duke')).toEqual({ kind: 'set-person-fields', id: 'roderick', fields: { 'card-title': 'duke' } });
-	});
-
+describe('set-person-fields card-title (D62, §13.3)', () => {
 	it('the op writes only the card-title line', () => {
-		const r = applyOp(TREE, cardTitleOp(g, 'roderick', 'count'));
+		const r = applyOp(TREE, { kind: 'set-person-fields', id: 'roderick', fields: { 'card-title': 'count' } });
 		if (!r.ok) throw new Error(r.code);
 		expect(r.body).toBe(TREE.replace('title: Lord Protector}', 'title: Lord Protector, card-title: count}'));
 	});
@@ -250,7 +238,6 @@ describe('bad input (spec §8: nothing throws)', () => {
 		expect(describeDeleteTitle(none, 'x')).toEqual({ holders: 0, cards: 0 });
 		expect(noteName(none, 'x')).toBe('x');
 		expect(holderTable(none, none)).toBe('| Ruler | Name | Reign |\n| --- | --- | --- |\n');
-		expect(cardTitleOp(none, 'a', 't')).toEqual({ kind: 'set-person-fields', id: 'a', fields: { 'card-title': 't' } });
 	});
 
 	it('title ops with malformed fields are refused, not thrown', () => {

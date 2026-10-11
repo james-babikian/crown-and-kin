@@ -1,7 +1,7 @@
 /*
  * Link maintenance (spec §6.9, D6, §13.0 item 3). The core only reads and rewrites link text; the
  * plugin resolves targets against the vault and passes the old → new map. The values it handles
- * are a person's `link` and `portrait` and a house's `arms`. A link is read in the forms the
+ * are a person's `link`, `portrait` and `arms` and a house's `arms`. A link is read in the forms the
  * renderer opens (`linkTarget` in `src/render/tree-info.ts`): `[[Note#Heading|Alias]]`,
  * `[Alias](Note.md#Heading)`, `[Alias](<Note.md>)` and a bare `Note#Heading`, each with an
  * optional `!`. `parsePictureLink` is shared with `pictures.ts`, so a rename and the picture lookup
@@ -15,7 +15,7 @@ import { parseBody } from './parse';
 import { pictureFormat } from './pictures';
 import { curlyParts, isMap as isRawMap, linkValue, type Raw, type RawMap } from './tolerate';
 import { section } from './yaml-list';
-import { clone, doubleQuoted, findPair, finish, layoutOf, refuse, renderScalar, setPairValue, sourceText, type Parsed, type Patch, type Step } from './yaml-patch';
+import { clone, doubleQuoted, findPair, finish, layoutOf, refuse, renderScalar, setPairValue, sourceText, type Parsed, type Patch, type Source, type Step } from './yaml-patch';
 
 /** A link's text split around its target: `head + written target + tail` is the whole text. */
 export interface LinkParts {
@@ -105,7 +105,7 @@ export function matchKey(target: string): string {
 }
 
 /** The keys `linkTargets` and `rewrite-links` read in each list section (spec §6.9, §13.0 item 3). */
-const LINK_FIELDS: Record<'houses' | 'people', readonly string[]> = { houses: ['arms'], people: ['link', 'portrait'] };
+const LINK_FIELDS: Record<'houses' | 'people', readonly string[]> = { houses: ['arms'], people: ['link', 'portrait', 'arms'] };
 
 /**
  * The link targets of every person `link`, person `portrait` and house `arms` in a tree body, in
@@ -177,13 +177,21 @@ function nestedReadsBack(text: string, inner: string, flow: boolean): boolean {
 	}
 }
 
-/** The inner scalar of an unquoted `[[Note]]` value. */
-function nestedInner(node: Node): Scalar | null {
+/**
+ * The text inside an unquoted `[[Note]]` value and the style of its scalar. A comma in the name
+ * (`[[Smith, John]]`) makes YAML read several items, so then the text as written is the link.
+ */
+function nestedInner(src: Source, node: Node): { value: string; type: Scalar.Type | undefined } | null {
 	if (!isSeq(node) || node.items.length !== 1) return null;
 	const mid = node.items[0];
-	if (!isSeq(mid) || mid.items.length !== 1) return null;
-	const inner = mid.items[0];
-	return isScalar(inner) && typeof inner.value === 'string' ? inner : null;
+	if (!isSeq(mid) || mid.items.length < 1) return null;
+	if (mid.items.length === 1) {
+		const inner = mid.items[0];
+		return isScalar(inner) && typeof inner.value === 'string' ? { value: inner.value, type: inner.type } : null;
+	}
+	if (!mid.items.every((x) => isScalar(x) && typeof x.value === 'string')) return null;
+	const written = src.text.slice(node.range![0], src.nodeEnd(node)).trim();
+	return /^\[\[[^\r\n]*\]\]$/.test(written) ? { value: written.slice(2, -2), type: Scalar.PLAIN } : null;
 }
 
 /** The patch and the new data for one `link`, `portrait` or `arms` value, or null if it does not change. */
@@ -203,11 +211,11 @@ function linkPatch(p: Parsed, item: YAMLMap, key: string, map: Map<string, strin
 		const written = curly ? curly.open + text + curly.close : text;
 		return { patch: setPairValue(src, item, pair, { scalar: written, old: node, text: false }, layoutOf(src)), raw: written };
 	}
-	const inner = nestedInner(node);
+	const inner = nestedInner(src, node);
 	if (!inner) return null;
-	const text = rewritten(`[[${inner.value as string}]]`, map, parserFor(key));
+	const text = rewritten(`[[${inner.value}]]`, map, parserFor(key));
 	if (text === 'refused') return text;
-	if (text === null || text === `[[${inner.value as string}]]`) return null;
+	if (text === null || text === `[[${inner.value}]]`) return null;
 	const newInner = text.slice(2, -2);
 	const nested =
 		inner.type === Scalar.QUOTE_DOUBLE ? `[[${doubleQuoted(newInner)}]]` : inner.type === Scalar.QUOTE_SINGLE ? `[['${newInner.replace(/'/g, "''")}']]` : `[[${newInner}]]`;

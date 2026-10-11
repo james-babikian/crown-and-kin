@@ -38,29 +38,29 @@ async function svgOf(src: SaveSource): Promise<string> {
 const heights = (svg: string) => [...svg.matchAll(/<g[^>]*data-item="card:([^"]+)"[^>]*>\s*<rect[^>]*?height="([\d.]+)"/g)].map((m) => [m[1], Number(m[2])] as const);
 
 describe('makePicture follows the card form of the source', () => {
-	it('Roundel, plate on: a plate and the word on every card; the crown makes the card 67 px high at 12 px', async () => {
+	it('Roundel, plate on: a foot hairline and the word on every card; the crown makes the card 67 px high at 12 px', async () => {
 		const svg = await svgOf(source(cardForm(geometryFor(12), 'down'), 'down', { relationLine: true, relations: RELATIONS }));
-		expect(svg).toContain('data-item="plate:a"');
-		expect(svg).toContain('data-item="plate:c"');
+		expect(svg).toContain('data-item="foot:a"');
+		expect(svg).toContain('data-item="foot:c"');
 		expect(svg).toMatch(/data-item="relation:c"[^>]*>You</);
 		expect(svg).not.toContain('data-item="tab:c"');
 		// No picture store: no arms or portrait is embedded, but the rings (missing files) have their room.
 		expect(heights(svg).map(([, h]) => h)).toEqual([67, 67]);
 	});
 
-	it('Roundel, plate off, `youTab` set: no plate, no word, a tab for the marked person, and the cards are shorter', async () => {
+	it('Roundel, plate off, `youTab` set: no foot hairline, no word, a tab for the marked person, and the cards are shorter', async () => {
 		const svg = await svgOf(source(cardForm(geometryFor(12), 'down'), 'down', { youTab: 'c' }));
-		expect(svg).not.toContain('data-item="plate:');
+		expect(svg).not.toContain('data-item="foot:');
 		expect(svg).not.toContain('data-item="relation:');
 		expect(svg).toContain('data-item="tab:c"');
 		expect(svg).not.toContain('data-item="tab:a"');
 		expect(heights(svg).map(([, h]) => h)).toEqual([55, 55]);
 	});
 
-	it('a sideways tree with a text card: no picture at all, the plate on, the tab when it is off, without narrow-card settings', async () => {
+	it('a sideways tree with a text card: no picture at all, the hairline on, the tab when it is off, without narrow-card settings', async () => {
 		const geo = cardForm(geometryFor(12), 'sideways');
 		const on = await svgOf(source(geo, 'sideways', { relationLine: true, relations: RELATIONS }));
-		expect(on).toContain('data-item="plate:a"');
+		expect(on).toContain('data-item="foot:a"');
 		expect(on).not.toMatch(/data-item="(frame|arms|portrait):/);
 		expect(on).not.toContain('<circle');
 		expect(heights(on).map(([, h]) => h)).toEqual([58, 58]);
@@ -82,7 +82,7 @@ describe('the picture copies of a Roundel tree are made at the size of the medal
 	};
 	const sizes = (path: string) => exports.filter((x) => x.startsWith(`${path}|`)).map((x) => x.split('|').slice(1, 3).map(Number));
 
-	it('a portrait is 2 em across and the arms are 2 em high in the Roundel', async () => {
+	it('a portrait is 2.3 em across (D219: 2 em and the width of the old ring) and the arms are 2 em high in the Roundel', async () => {
 		const run = async (geo: Geometry) => {
 			exports.length = 0;
 			await makePicture(store as never, source(geo, 'down', { relationLine: true, relations: RELATIONS }), 'svg');
@@ -90,9 +90,9 @@ describe('the picture copies of a Roundel tree are made at the size of the medal
 		};
 		const scale = (4 * 14) / 12;
 		const roundel = await run(cardForm(geometryFor(12), 'down'));
-		// 2 em at 12 px is 24 layout px; the copy has `scale` image px for each.
-		expect(roundel.portrait[0]).toBeGreaterThanOrEqual(Math.floor(24 * scale));
-		expect(roundel.portrait[0]).toBeLessThanOrEqual(Math.ceil(24 * scale) + 1);
+		// 2.3 em at 12 px is 27.6 layout px, 2 em is 24; the copy has `scale` image px for each.
+		expect(roundel.portrait[0]).toBeGreaterThanOrEqual(Math.floor(27.6 * scale));
+		expect(roundel.portrait[0]).toBeLessThanOrEqual(Math.ceil(27.6 * scale) + 1);
 		expect(roundel.arms[1]).toBeGreaterThanOrEqual(Math.floor(24 * scale));
 		expect(roundel.arms[0]).toBeGreaterThanOrEqual(Math.floor(20 * scale));
 	});

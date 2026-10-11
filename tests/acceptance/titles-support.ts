@@ -8,35 +8,23 @@ import { deriveFamilies, type FamilyGraph } from '../../src/core/derive';
 import type { ApplyOp, EditResult, HolderRef, NewTitleId, Op, TitleOp } from '../../src/core/edit';
 import type { CodedIssue } from '../../src/core/messages';
 import { parseDynasty } from '../../src/core/parse';
-import type {
-	CardLabel,
-	CardLabels,
-	CardTitleOp,
-	DescribeDeleteTitle,
-	EntryReign,
-	HolderTable,
-	NoteName,
-	PickerSuffix,
-	ReignText,
-	RulerName,
-	SearchNames,
-} from '../../src/core/titles';
+import type * as Titles from '../../src/core/titles';
+import type { CardLabel } from '../../src/core/titles';
 import type { Person, Title, Tree } from '../../src/core/types';
 import * as edit from '../../src/core/yaml-edit';
 import { fixtureNote, topLevelBlocks } from './load';
 
 /** The frozen export names of `src/core/titles.ts`. */
 export interface TitlesModule {
-	cardLabels: CardLabels;
-	reignText: ReignText;
-	entryReign: EntryReign;
-	rulerName: RulerName;
-	searchNames: SearchNames;
-	pickerSuffix: PickerSuffix;
-	cardTitleOp: CardTitleOp;
-	describeDeleteTitle: DescribeDeleteTitle;
-	noteName: NoteName;
-	holderTable: HolderTable;
+	cardLabels: typeof Titles.cardLabels;
+	reignText: typeof Titles.reignText;
+	entryReign: typeof Titles.entryReign;
+	rulerName: typeof Titles.rulerName;
+	searchNames: typeof Titles.searchNames;
+	pickerSuffix: typeof Titles.pickerSuffix;
+	describeDeleteTitle: typeof Titles.describeDeleteTitle;
+	noteName: typeof Titles.noteName;
+	holderTable: typeof Titles.holderTable;
 }
 
 /** The frozen export names of `src/core/title-ops.ts` that tests call directly. */
@@ -70,7 +58,6 @@ export const titlesModule = () =>
 		'rulerName',
 		'searchNames',
 		'pickerSuffix',
-		'cardTitleOp',
 		'describeDeleteTitle',
 		'noteName',
 		'holderTable',

@@ -1,0 +1,14 @@
+/* The break list of the settings tab (D118): a wide field, and 16 px text on a touch screen like the other fields (P7). */
+.dynasty-settings .dynasty-setting-break-words {
+	width: 18em;
+	max-width: 100%;
+	resize: vertical;
+}
+
+@media (pointer: coarse), (max-width: 599px) {
+	.dynasty-settings textarea {
+		font-size: max(16px, var(--font-ui-medium));
+	}
+}
+
+

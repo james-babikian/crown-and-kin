@@ -51,7 +51,7 @@ describe('the checkbox "No children" of the edit sheet', () => {
 		const row = modal.querySelector('[data-field="childless"]')!;
 		expect(row.getText()).toBe(SHEET.childless);
 		expect(SHEET.childless).toBe('No children');
-		const hint = row.parentElement!.querySelector('.dynasty-sheet-hint')!;
+		const hint = row.parentElement!.parentElement!.querySelector('.dynasty-sheet-hint')!;
 		expect(hint.getText()).toBe(SHEET.childlessHint);
 		expect(row.querySelector('input')!.getAttribute('aria-describedby')).toBe(hint.getAttribute('id'));
 	});
@@ -99,6 +99,6 @@ describe('the setting "Age for open branches"', () => {
 
 	it('has the texts of the contract', () => {
 		expect(SETTINGS_UI.youngDeathAge).toBe('Age for open branches');
-		expect(SETTINGS_UI.youngDeathAgeDesc).toBe('For a person who died younger than this age, the line of succession shows no open branch. The birth year and the death year must be known. Use 0 to show every open branch.');
+		expect(SETTINGS_UI.youngDeathAgeDesc).toBe('For a person who died younger than this age, the line of succession shows no open branch. The note must give the birth year and the death year. Use a number from 0 to 1000. Use 0 to show every open branch.');
 	});
 });

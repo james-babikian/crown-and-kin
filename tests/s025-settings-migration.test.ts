@@ -11,7 +11,7 @@ import { DEFAULT_SETTINGS, normaliseSettings } from '../src/obsidian/settings';
  * file of 0.2.4 or 0.2.5 has no such key and gets the default (on). 0.2.6 (D179): `cardSize` goes too; a stored value is ignored and not written again. 0.2.7: `successionLength` and `oldAge` join them.
  */
 
-const KEYS = ['embedHeightDesktop', 'showDates', 'showRelations', 'oneParentUnknown', 'showPortraits', 'showHouseGeneration', 'focusGenerations', 'updateLinks', 'phoneDirection', 'breakWords', 'reduceMotion', 'successionLength', 'oldAge', 'youngDeathAge'].sort();
+const KEYS = ['embedHeightDesktop', 'showDates', 'showRelations', 'oneParentUnknown', 'showPortraits', 'showHouseGeneration', 'focusGenerations', 'updateLinks', 'phoneDirection', 'breakWords', 'reduceMotion', 'successionLength', 'oldAge', 'youngDeathAge', 'armsOnCards', 'warnManyParents'].sort();
 
 describe('stored settings of 0.2.4', () => {
 	const stored024 = {
@@ -29,7 +29,7 @@ describe('stored settings of 0.2.4', () => {
 		reduceMotion: 'on',
 	};
 
-	it('give the 14 keys of 0.2.7 and none of the removed ones; the values that stay are kept', () => {
+	it('give the 16 keys of 0.2.8 and none of the removed ones; the values that stay are kept', () => {
 		const s = normaliseSettings(stored024);
 		expect(Object.keys(s).sort()).toEqual(KEYS);
 		expect(s).toMatchObject({ embedHeightDesktop: 640, showDates: false, focusGenerations: 2, breakWords: 'Long-na-munda', reduceMotion: 'on', phoneDirection: 'sideways', oneParentUnknown: true });
@@ -38,7 +38,7 @@ describe('stored settings of 0.2.4', () => {
 		expect('embedHeightPhone' in s).toBe(false);
 	});
 
-	it('the defaults have the same 14 keys', () => {
+	it('the defaults have the same 16 keys', () => {
 		expect(Object.keys(DEFAULT_SETTINGS).sort()).toEqual(KEYS);
 	});
 });

@@ -181,7 +181,7 @@ describe('D174: the card texts in the view (needs the D174 rule of the core)', (
 	it('Helen and Ingrid (both list only Mary): on, "Half-sister, maybe full"; off, "Sister"', async () => {
 		const { el, host, peek } = await open(SAMPLE('p12'));
 		expectCard(el, peek, 'p13', 'Half-sister, maybe full');
-		expect(card(el, 'p13').getAttribute('aria-label')).toContain(', half-sister, or sister if both people have the same parent who is not listed');
+		expect(card(el, 'p13').getAttribute('aria-label')).toContain(', half-sister, or sister if the parent that the note does not name is the same person for both');
 		change(host, peek, { oneParentUnknown: false });
 		fillAllCards(el);
 		expectCard(el, peek, 'p13', 'Sister');
@@ -200,8 +200,8 @@ describe('D174: the card texts in the view (needs the D174 rule of the core)', (
 	it('the edit sheet of Ingrid: the paragraph for a parent who is not listed', async () => {
 		const { el } = await open(SAMPLE('p12'));
 		const sheet = await openSheetOn(el, 'p13', 'mouse');
-		const box = (sheet as unknown as { modalEl: FEl }).modalEl.querySelector('.dynasty-relinfo')!;
-		expect(box.querySelector('.dynasty-relinfo-value')!.getText()).toBe('Half-sister');
-		expect(box.querySelector('.dynasty-relinfo-maybe')!.getText()).toBe('If both people have the same parent who is not listed, this person is your sister.');
+		const box = (sheet as unknown as { modalEl: FEl }).modalEl.querySelector('.dynasty-head-text')!;
+		expect(box.querySelector('.dynasty-head-rel .dynasty-jitem')!.getText()).toBe('Your half-sister, maybe full');
+		expect(box.querySelector('.dynasty-relation-maybe')!.getText()).toBe('If the parent that the note does not name is the same person for both, this person is your sister.');
 	});
 });

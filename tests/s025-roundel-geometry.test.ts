@@ -10,8 +10,8 @@ import {
 	drawnGeometry,
 	geometryFor,
 	isRoundel,
-	isTextCard,
 	nameRoom,
+	ribbonWidth,
 	relationExtra,
 	relationY,
 	roundelAxis,
@@ -101,8 +101,8 @@ describe('B.3.1 card heights (Roundel, Normal size)', () => {
 });
 
 describe('B.3.2 text slots', () => {
-	it('axis 0.25 em right of the card middle; column 10 em centred on it', () => {
-		for (const [f, axis, col] of [[12, 70.5, 120], [16, 94, 160]] as const) {
+	it('axis in the card middle (0.2.8; 0.25 em right of it until 0.2.7); column 10 em centred on it', () => {
+		for (const [f, axis, col] of [[12, 67.5, 120], [16, 90, 160]] as const) {
 			const g = roundel(f, { ...pics, relationLine: true });
 			expect(roundelAxis(g)).toBeCloseTo(axis, 9);
 			const t = cardText(g, 1, false, { title: false, dates: true });
@@ -113,15 +113,38 @@ describe('B.3.2 text slots', () => {
 		}
 	});
 
-	it('the lines that exist are centred between the crown and the plate', () => {
+	it('the lines that exist are centred between the halo of the portrait (0.2.8, D212) and the plate', () => {
 		const g = roundel(12, { ...pics, relationLine: true });
 		const nameLine = 1.2 * 0.85 * 12;
 		const smallLine = nameLine;
 		const plateH = relationExtra(g) + 0.25 * 12;
+		// The halo ends at (1 + 0.15 + 0.2 - 0.25) em = 1.1 em below the card top; the crown is only 0.75 em.
+		expect(g.textTop).toBe(13);
 		for (const [shown, smalls] of [[{ title: true, dates: true }, 2], [{ title: false, dates: true }, 1], [{ title: false, dates: false }, 0]] as const) {
 			const t = cardText(g, 1, false, shown);
 			const top = t.nameBaseline - 0.35 * t.nameSize - nameLine / 2;
-			expect(top).toBeCloseTo(g.crown! + (g.cardH - plateH - g.crown! - nameLine - smalls * smallLine) / 2, 9);
+			expect(top).toBeCloseTo(g.textTop! + (g.cardH - plateH - g.textTop! - nameLine - smalls * smallLine) / 2, 9);
+		}
+	});
+
+	it('0.2.8 (D212): the room for the text starts under the halo of the portrait, else under the crown (arms only), else under the colour ribbon; the gaps above and below are equal', () => {
+		for (const f of [8, 12, 16, 24, 48]) {
+			for (const [name, o, lead] of [
+				['portraits', pics, Math.round(1.1 * f)],
+				['arms only', { arms: ['house'] }, Math.round(0.75 * f)],
+				['no picture', {}, ribbonWidth(geometryFor(f))],
+			] as const) {
+				for (const plate of [true, false]) {
+					const g = roundel(f, { ...o, ...(plate ? { relationLine: true } : {}) });
+					expect(g.textTop, `${name} f${f}`).toBe(name === 'portraits' ? lead : undefined);
+					const t = cardText(g, 1, false, { title: true, dates: true });
+					const nameLine = 1.2 * t.nameSize;
+					const first = t.nameBaseline - 0.35 * t.nameSize - nameLine / 2;
+					const last = t.datesBaseline - 0.35 * t.smallSize + (1.2 * t.smallSize) / 2;
+					const bottom = g.cardH - (plate ? relationExtra(g) + 0.25 * f : 0);
+					expect(first - lead, `${name} f${f} gap above`).toBeCloseTo(bottom - last, 6);
+				}
+			}
 		}
 	});
 
@@ -202,14 +225,13 @@ describe('B.3.2 text slots', () => {
 		}
 	});
 
-	it('the decision follows the clearance for every font: yes from 10 px with a crown, no at 8 px', () => {
+	it('the decision follows the clearance for every font: yes at every font with a crown (0.2.8, D212: the text starts lower)', () => {
 		const decide = (f: number, plate: boolean, ring?: number) => {
 			const g = roundel(f, { ...pics, ...(plate ? { relationLine: true } : {}) });
 			const t = cardText(g, 1, false, { title: true, dates: true });
 			return nameRoom(g, t, true, ring).last === t.textW;
 		};
-		expect(decide(8, true)).toBe(false);
-		for (let f = 10; f <= 48; f++) {
+		for (let f = 8; f <= 48; f++) {
 			expect(decide(f, true), `f${f} ON`).toBe(true);
 			expect(decide(f, false), `f${f} OFF`).toBe(true);
 		}
@@ -231,16 +253,16 @@ describe('B.3.2 text slots', () => {
 		}
 	});
 
-	it('the marked card (sign below the ring): narrow room at 12 px ON, full column from 14 px', () => {
-		const ring = 3; // ME_RING_INNER, the ring's inner edge from the card edge
+	it('the marked card (sign below the ring): narrow room at 8 px ON, full column from 9 px', () => {
+		const ring = 1; // ME_RING_INNER, the ring's inner edge from the card edge (a 2 px border)
 		const room = (f: number, plate: boolean) => {
 			const g = roundel(f, { ...pics, ...(plate ? { relationLine: true } : {}) });
 			const t = cardText(g, 1, false, { title: true, dates: true });
 			return [nameRoom(g, t, true, ring).last, t.textW, t.nameWithSignW] as const;
 		};
-		const [l12, , n12] = room(12, true);
-		expect(l12).toBeCloseTo(n12, 9);
-		for (const f of [14, 16]) {
+		const [l8, , n8] = room(8, true);
+		expect(l8).toBeCloseTo(n8, 9);
+		for (const f of [9, 12, 14, 16]) {
 			const [last, textW] = room(f, true);
 			expect(last, `f${f}`).toBe(textW);
 		}
@@ -261,21 +283,24 @@ describe('B.3.2 text slots', () => {
 });
 
 describe('B.3.3 medallion and arms', () => {
-	it('12 px: medallion 24 px at (58.5, -15); arms beside it 15 x 18; arms alone 20 x 24; the line ends 16.8 / 15 px above the card', () => {
+	it('12 px: medallion 27.6 px at (53.7, -16.8) (D219: 24 px and the 1.8 px ring, now all picture); arms beside it 15 x 18; arms alone 20 x 24; the line ends 16.8 / 15 px above the card', () => {
 		const g = roundel(12, { ...pics, relationLine: true });
 		const both = roundelPics(g, { arms: true, portrait: true });
-		expect(both.cx).toBeCloseTo(70.5, 9);
+		expect(both.cx).toBeCloseTo(67.5, 9);
 		expect(both.cy).toBe(-3);
-		expect(both.portrait).toEqual({ x: 58.5, y: -15, w: 24, h: 24 });
+		expect(both.portrait!.x).toBeCloseTo(53.7, 9);
+		expect(both.portrait!.y).toBeCloseTo(-16.8, 9);
+		expect(both.portrait!.w).toBeCloseTo(27.6, 9);
+		expect(both.portrait!.h).toBeCloseTo(27.6, 9);
 		expect(both.ringR).toBeCloseTo(13.8, 9);
 		expect(both.haloR).toBeCloseTo(16.2, 9);
 		expect(both.arms!.w).toBeCloseTo(15, 9);
 		expect(both.arms!.h).toBeCloseTo(18, 9);
-		expect(both.arms!.x).toBeCloseTo(87.3, 9);
+		expect(both.arms!.x).toBeCloseTo(87.9, 9); // 0.2.8 (G.5): 0.55 em from the ring, 0.3 em more than in 0.2.7
 		expect(both.arms!.y + both.arms!.h / 2).toBeCloseTo(-3, 9);
 		const alone = roundelPics(g, { arms: true, portrait: false });
 		expect(alone.portrait).toBeUndefined();
-		expect(alone.arms).toEqual({ x: 70.5 - 10, y: -15, w: 20, h: 24 });
+		expect(alone.arms).toEqual({ x: 67.5 - 10, y: -15, w: 20, h: 24 });
 		expect(roundelLineEnd(g, { portrait: true })).toBeCloseTo(16.8, 9);
 		expect(roundelLineEnd(g, { arms: true, portrait: true })).toBeCloseTo(16.8, 9);
 		expect(roundelLineEnd(g, { arms: true })).toBe(15);
@@ -285,8 +310,8 @@ describe('B.3.3 medallion and arms', () => {
 	it('16 px', () => {
 		const g = roundel(16, { ...pics });
 		const both = roundelPics(g, { arms: true, portrait: true });
-		expect(both.portrait!.w).toBe(32);
-		expect(both.arms!.x).toBeCloseTo(94 + 18.4 + 4, 9);
+		expect(both.portrait!.w).toBeCloseTo(36.8, 9);
+		expect(both.arms!.x).toBeCloseTo(90 + 18.4 + 8.8, 9);
 		expect(roundelLineEnd(g, { portrait: true })).toBeCloseTo(22.4, 9);
 		expect(roundelLineEnd(g, { arms: true })).toBe(20);
 		// the halo reaches exactly `reach` above the card
@@ -322,15 +347,19 @@ describe('B.3.4 reach by form and the "You" tab', () => {
 		}
 	});
 
-	it('the tab rect: Roundel right end 1.45 em left of the axis (0.4 em with no picture), 0.55 em above the edge; text card and plain geometry at padX, 0.9 em above', () => {
+	it('the tab rect: Roundel right end 1.9 em left of the axis with a portrait (1.75 em with arms alone, 0.4 em with no picture: the distances of the ordinal tab, D213), 0.55 em above the edge; text card and plain geometry at padX, 0.9 em above', () => {
 		const g = roundel(12, { ...pics, youTab: 'me' });
 		const withPic = youTabRect(g, true);
 		expect(withPic.w).toBeCloseTo(27.6, 9);
 		expect(withPic.h).toBeCloseTo(13.8, 9);
-		expect(withPic.x + withPic.w).toBeCloseTo(70.5 - 17.4, 9);
+		expect(withPic.x + withPic.w).toBeCloseTo(67.5 - 22.8, 9);
 		expect(withPic.y).toBeCloseTo(-6.6, 9);
+		// A portrait with arms is a portrait.
+		expect(youTabRect(g, true, true)).toEqual(withPic);
+		const armsOnly = youTabRect(g, false, true);
+		expect(armsOnly.x + armsOnly.w).toBeCloseTo(67.5 - 21, 9);
 		const noPic = youTabRect(roundel(12, { youTab: 'me' }), false);
-		expect(noPic.x + noPic.w).toBeCloseTo(70.5 - 4.8, 9);
+		expect(noPic.x + noPic.w).toBeCloseTo(67.5 - 4.8, 9);
 		const text = youTabRect(drawnGeometry(cardForm(geometryFor(12), 'sideways'), settings({ orientation: 'sideways', youTab: 'me' })), false);
 		expect([text.x, text.y]).toEqual([0.875 * 12, -0.9 * 12]);
 		const plain = youTabRect(geometryFor(12), true);
@@ -349,8 +378,7 @@ describe('cardForm and withRelationLine', () => {
 			expect(cardForm(g, o)).toBe(g);
 		}
 		expect(isRoundel(cardForm(normal, 'down'))).toBe(true);
-		expect(isTextCard(cardForm(normal, 'sideways'))).toBe(true);
-		expect(isRoundel(normal) || isTextCard(normal)).toBe(false);
+		expect(normal.form).toBeUndefined();
 	});
 
 	it('withRelationLine is idempotent for every form', () => {

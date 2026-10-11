@@ -39,14 +39,14 @@ function toSegment(px: number, py: number, x1: number, y1: number, x2: number, y
 	return Math.hypot(px - x1 - t * dx, py - y1 - t * dy);
 }
 
-/** The smallest clear gap between a visible mark and a badge circle, over every control and card of `layout` (real frame, so the mark always grows right). */
+/** The smallest clear gap between a visible mark and a badge circle, over every control and card of `layout` (real frame: centred on the spot in a down layout, growing right from it in a sideways layout). */
 function worstGap(layout: TreeLayout): { gap: number; pairs: number } {
 	const f = layout.geometry.fontPx;
 	const need = FOLD_BADGE_GAP_EM * f;
 	let gap = Infinity;
 	let pairs = 0;
 	for (const c of layout.folds ?? []) {
-		const m = foldMark(c, c.spot, f, false);
+		const m = foldMark(c, c.spot, f, false, layout.orientation === 'sideways');
 		for (const p of layout.persons.values()) {
 			// The badge circle is centred on the card's real top right corner in every layout (D117 4).
 			const d = toSegment(p.x + p.w, p.y, m.x1, m.y1, m.x2, m.y2) - m.r - FOLD_BADGE_EM * f;
@@ -63,24 +63,32 @@ describe('B.3.9: the numbers of the rule', () => {
 		expect(FOLD_BADGE_GAP_EM).toBe(0.25);
 	});
 
-	it('an open button is a circle 1.2 em across; a folded sign is a pill 1.25 em high that grows right from the spot', () => {
+	it('an open button is a circle 1.2 em across; a folded sign is a pill 1.25 em high, centred on the spot (D206)', () => {
 		const open: FoldControl = { key: 'a', parents: ['a'], folded: false, count: 0 };
 		const sign: FoldControl = { key: 'b', parents: ['a'], folded: true, count: 12 };
 		const m1 = foldMark(open, { x: 10, y: 20 }, 12, false);
 		expect(m1).toEqual({ x1: 10, y1: 20, x2: 10, y2: 20, r: (FOLD_EM.button / 2) * 12 });
 		const m2 = foldMark(sign, { x: 10, y: 20 }, 12, false);
 		expect(m2.r).toBeCloseTo((FOLD_EM.signHeight / 2) * 12, 9);
-		expect(m2.x1).toBe(10);
 		expect(m2.y1).toBe(20);
 		expect(m2.x2).toBeGreaterThan(m2.x1);
 		expect(m2.y2).toBe(20);
+		expect((m2.x1 + m2.x2) / 2).toBeCloseTo(10, 9);
+		// A sideways layout (D207): the pill starts where the open chip starts, 0.475 em before the spot, and grows right.
+		const m4 = foldMark(sign, { x: 10, y: 20 }, 12, false, true);
+		expect(m4.x1 - m4.r).toBeCloseTo(10 - 0.475 * 12, 9);
+		expect(m4.x2 - m4.x1).toBeCloseTo(m2.x2 - m2.x1, 9);
 		// Turned frame: the same pill grows along y.
 		const m3 = foldMark(sign, { x: 10, y: 20 }, 12, true);
 		expect(m3.x2).toBe(10);
-		expect(m3.y2).toBeCloseTo(20 + (m2.x2 - m2.x1), 9);
+		expect(m3.y1 - m3.r).toBeCloseTo(20 - 0.475 * 12, 9);
+		expect(m3.y2 - m3.y1).toBeCloseTo(m2.x2 - m2.x1, 9);
 		// The sign's mark lies inside the rectangle the layout reserves for it.
 		const ext = foldExtent(sign, { x: 10, y: 20 }, 12);
 		expect(m2.x2 + m2.r).toBeLessThanOrEqual(ext.x + ext.w + 1e-6);
+		expect(m2.x1 - m2.r).toBeGreaterThanOrEqual(ext.x - 1e-6);
+		const anchored = foldExtent(sign, { x: 10, y: 20 }, 12, true);
+		expect(m4.x2 + m4.r).toBeLessThanOrEqual(anchored.x + anchored.w + 1e-6);
 	});
 });
 
@@ -150,7 +158,7 @@ describe('B.3.9: placeFoldSpots on cards that I built', () => {
 		const before = r[0].control.spot;
 		const withBadge = placeFoldSpots([{ ...control, parents: ['a'] }], persons, new Map(), [], f, { soloX: new Map([['a', 100]]) });
 		// The control of card `a` starts at x 100 and y 30 + 1 em; card b's badge is at (100, 50): too close, so it moves.
-		const want = (0.6 + 0.6 + 0.25) * f;
+		const want = (0.55 + 0.6 + 0.25) * f; // the badge is 0.55 em since 0.2.8; the control mark is the 1.2 em circle the layout reserves
 		const m = withBadge[0].control.spot;
 		expect(m.x).toBe(100);
 		expect(m.y).toBeGreaterThanOrEqual(before.y);
@@ -172,7 +180,7 @@ describe('B.3.9: placeFoldSpots on cards that I built', () => {
 		expect(alone).toEqual({ x: 38, y: 60 + f });
 		expect(both.x).toBe(38);
 		expect(both.y).toBeGreaterThan(alone.y);
-		expect(Math.hypot(both.x - 30, both.y - 60)).toBeCloseTo((0.6 + 0.6 + 0.25) * f, 6);
+		expect(Math.hypot(both.x - 30, both.y - 60)).toBeCloseTo((0.55 + 0.6 + 0.25) * f, 6);
 	});
 
 	it('a control that is clear already does not move, and the rule does not depend on whether a badge shows', () => {
@@ -185,9 +193,9 @@ describe('B.3.9: placeFoldSpots on cards that I built', () => {
 		expect(r[0].control.spot).toEqual({ x: 20, y: 30 + f });
 	});
 
-	it('a folded sign grows right and keeps the gap from the badge of a card to its right', () => {
+	it('a folded sign is centred on its spot and keeps the gap from the badge of a card to its right', () => {
 		const sign: FoldControl = { key: 's', parents: ['a'], folded: true, count: 7 };
-		// The sign starts at x 20 and is about 2.7 em long; a badge circle at (60, 40) lies under its middle.
+		// The sign is centred on x 20 and is about 2.7 em long; a badge circle at (60, 40) lies near its right end.
 		const persons = new Map<string, PersonBox>([
 			['a', card('a', 0, 0, 40, 30)],
 			['b', card('b', 20, 40, 40, 30, 1)],
@@ -195,5 +203,46 @@ describe('B.3.9: placeFoldSpots on cards that I built', () => {
 		const spot = placeFoldSpots([sign], persons, new Map(), [], f, {})[0].control.spot;
 		const m = foldMark(sign, spot, f, false);
 		expect(toSegment(60, 40, m.x1, m.y1, m.x2, m.y2) - m.r - 0.6 * f).toBeGreaterThanOrEqual(0.25 * f - 1e-6);
+	});
+});
+
+describe('D206: the "+ N" sign of a folded branch is centred on the line and meets nothing', () => {
+	type R = { x: number; y: number; w: number; h: number };
+	const meets = (a: R, b: R) => a.x < b.x + b.w - 1e-6 && b.x < a.x + a.w - 1e-6 && a.y < b.y + b.h - 1e-6 && b.y < a.y + a.h - 1e-6;
+	/** The Full-level pill of a control as a rectangle, from its capsule. */
+	const pill = (c: FoldControl & { spot: { x: number; y: number } }, f: number): R => {
+		const m = foldMark(c, c.spot, f, false);
+		return { x: m.x1 - m.r, y: m.y1 - m.r, w: m.x2 - m.x1 + 2 * m.r, h: 2 * m.r };
+	};
+	for (const id of IDS) {
+		for (const f of [12, 16]) {
+			it(`sample ${id}, ${f} px, down: each sign is centred on its stem and touches no card, no other control and no far-couple tag`, () => {
+				const s = sampleSources().find((x) => x.id === id)!;
+				const layout = lay(s.source, f, 'down', true);
+				const signs = (layout.folds ?? []).filter((c) => c.folded);
+				expect(signs.length).toBeGreaterThan(0);
+				const all = (layout.folds ?? []).map((c) => pill(c, f));
+				for (const c of signs) {
+					const r = pill(c, f);
+					const self = (layout.folds ?? []).indexOf(c);
+					expect(r.x + r.w / 2, `${c.key} centre`).toBeCloseTo(c.spot.x, 6);
+					expect(r.x, `${c.key} inside the drawing`).toBeGreaterThanOrEqual(-1e-6);
+					expect(r.x + r.w, `${c.key} inside the drawing`).toBeLessThanOrEqual(layout.width + 1e-6);
+					for (const p of layout.persons.values()) expect(meets(r, p), `${c.key} on the card of ${p.id}`).toBe(false);
+					for (const t of layout.farTags.values()) expect(meets(r, t.hit), `${c.key} on the tag of ${t.person}`).toBe(false);
+					all.forEach((o, i) => i !== self && expect(meets(r, o), `${c.key} on another control`).toBe(false));
+				}
+			});
+		}
+	}
+
+	it('a sideways layout starts the sign 0.475 em before its spot, on the line (D207)', () => {
+		const s = sampleSources().find((x) => x.id === '15')!;
+		const layout = lay(s.source, 12, 'sideways', true);
+		for (const c of (layout.folds ?? []).filter((x) => x.folded)) {
+			const m = foldMark(c, c.spot, 12, false, true);
+			expect(m.x1 - m.r).toBeCloseTo(c.spot.x - 0.475 * 12, 9);
+			expect(m.x2).toBeGreaterThan(m.x1);
+		}
 	});
 });

@@ -31,6 +31,12 @@ export const isPlacementType = (t: unknown): t is PlacementType => isOneOf(PLACE
 /** True if `t` is a known union type. */
 export const isUnionType = (t: unknown): t is (typeof UNION_TYPES)[number] => isOneOf(UNION_TYPES, t);
 
+/**
+ * The most parents of each type that a person may have (0.2.8 contract B.3). Birth, adoptive and ward parents warn above 2;
+ * a rumoured parent is a guess, so a person may have more of them. Read by the family query, the warning text and the relation rules.
+ */
+export const PARENT_LIMIT: Record<ParentType, number> = { birth: 2, adoptive: 2, ward: 2, rumoured: 8 };
+
 /** Unknown parent types are read as birth, as validation does (§8). */
 export function parentKind(type: string | undefined): ParentType {
 	return isParentType(type) ? type : 'birth';
@@ -65,6 +71,8 @@ export interface Person {
 	link?: string;
 	/** Spec §13.7: the portrait picture link, as written (flattened like `link`); absent when not written or empty. */
 	portrait?: string;
+	/** 0.2.8 contract A.1: the personal arms picture link, as written (flattened like `link`); absent when not written or empty. Not read yet. */
+	arms?: string;
 	/** Spec §13.13, D79: the text of `portrait-crop` as written (a list or map as JSON text); absent when not written or empty. */
 	portraitCrop?: string;
 	notes?: string;
@@ -105,6 +113,8 @@ export interface Holder {
 	number?: string;
 	from?: string;
 	to?: string;
+	/** 0.2.8 contract A.2, key `through-spouse`: `true` when the person holds the title through a spouse that the plugin finds, or the id of that spouse as written. Absent when not written or off. Not read yet. */
+	throughSpouse?: true | string;
 	/** Position of the item in the written `holders` list, counting skipped items. */
 	index: number;
 	/** The item's source text without comments, whitespace runs as one space (like `Union.text`). */

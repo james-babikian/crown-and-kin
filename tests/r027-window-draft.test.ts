@@ -177,7 +177,7 @@ describe('the draft row', () => {
 
 	it('a title that is new in the draft has no succession keys and writes none', () => {
 		const { rows } = load(BODY);
-		rows.push({ key: 'n', id: null, name: 'Baron', baseName: null, plural: '', basePlural: null, maleName: '', baseMaleName: null, femaleName: '', baseFemaleName: null, deleted: false, holders: [], baseRows: [] });
+		rows.push({ key: 'n', id: null, name: 'Baron', baseName: null, maleName: '', baseMaleName: null, femaleName: '', baseFemaleName: null, deleted: false, holders: [], baseRows: [] });
 		expect(successionChanges(rows[1])).toEqual([]);
 		expect(windowOps(rows, newId)).toEqual([{ kind: 'add-title', id: 'new-title', name: 'Baron' }]);
 	});

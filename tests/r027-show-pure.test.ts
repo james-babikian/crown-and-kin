@@ -179,7 +179,7 @@ describe('the first view (F.2)', () => {
 		expect(inside(card(700, 200), shown(v, big, 60))).toBe(true);
 	});
 
-	it('on a phone, when the fit is below the minimum scale, the view starts at the ruler at that scale', () => {
+	it('on a phone, when the ruler and the 1st heir do not fit at the minimum scale, the view starts at the whole ruler at the readable zoom (G5 fix)', () => {
 		const r = card(0, 0);
 		const heirs = [card(323, 200)];
 		const box = around([r, ...heirs]);
@@ -188,7 +188,7 @@ describe('the first view (F.2)', () => {
 		expect(fit.scale).toBeLessThan(PHONE_MIN_SCALE);
 		expect(inside(heirs[0], shown(fit, size, 60))).toBe(true);
 		const v = successionFirstView(box, size, 16, 60, r, heirs, 'down', PHONE_MIN_SCALE);
-		expect(v.scale).toBeCloseTo(PHONE_MIN_SCALE);
+		expect(v.scale).toBeCloseTo(14 / 16);
 		expect(inside(r, shown(v, size, 60))).toBe(true);
 	});
 
@@ -214,18 +214,20 @@ describe('the first view (F.2)', () => {
 		expect(v.scale).toBeGreaterThan(14 / 16);
 	});
 
-	it('the ruler and the 1st heir do not fit together: both start at the ruler at readable names', () => {
+	it('the ruler and the 1st heir do not fit together: the view starts at the whole ruler at readable names (G5 fix, spec §13.21 rule 35)', () => {
 		const r = card(0, 0);
 		const heirs = [card(3000, 200), card(3300, 200)];
 		const box = around([r, ...heirs]);
 		const computer = successionFirstView(box, size, 16, 60, r, heirs, 'down', 0);
 		expect(computer.scale).toBeCloseTo(14 / 16);
 		expect(inside(r, shown(computer, size, 60))).toBe(true);
-		expect(inside(heirs[0], shown(computer, size, 60))).toBe(false);
 		const phone = successionFirstView(box, size, 16, 60, r, heirs, 'down', PHONE_MIN_SCALE);
 		// 14 px names (0.875) are above the minimum, so the fallback keeps them.
 		expect(phone.scale).toBeGreaterThanOrEqual(PHONE_MIN_SCALE);
 		expect(inside(r, shown(phone, size, 60))).toBe(true);
+		// The G5 case: a ruler far to the left of the 1st heir must not leave the screen on a 390 px phone.
+		const far = successionFirstView(around([r, card(480, 200)]), { w: 390, h: 844 }, 16, 60, r, [card(480, 200)], 'down', PHONE_MIN_SCALE);
+		expect(inside(r, shown(far, { w: 390, h: 844 }, 60))).toBe(true);
 	});
 
 	it('the phone run respects the minimum scale', () => {
@@ -255,52 +257,58 @@ describe('the first view (F.2)', () => {
 });
 
 describe('styles.css', () => {
-	it('D192: on a computer the Show bar is one row; the phone bar and the finder bar are left alone', () => {
-		const sel = '.dynasty-result.dynasty-succession-bar:not(.modal.dynasty-fullscreen.is-phone *)';
-		const bar = rule(sel);
+	it('0.2.8 (G.13, I37 B): the Show bar is the banner of the finder, the sentence and Close in one row; the phone list has its own bar', () => {
+		const bar = rule('.dynasty-result');
 		expect(bar).toContain('display: flex');
 		expect(bar).toContain('align-items: center');
-		expect(rule(`${sel} .dynasty-succession-text`)).toContain('min-width: 0');
-		expect(rule(`${sel} .dynasty-result-buttons`)).toContain('margin: 0');
-		// Every D192 rule needs both classes, so the finder bar (no succession class) and the phone list bar (no result class) never match.
-		expect(css).not.toMatch(/^\.dynasty-succession-bar[^{]*\{[^}]*display: flex/m);
+		expect(rule('.dynasty-result-text')).toContain('min-width: 0');
+		expect(rule('.dynasty-result-buttons')).toContain('margin: 0');
+		// The bar of the phone list is in the flow of the list and has no result class.
+		expect(rule('.dynasty-list-succession')).toContain('display: flex');
 	});
 
-	it('the "You" row of the editable list is worked from the icon size, not from 18 px (D184)', () => {
-		const whole = rule('.dynasty-list button.dynasty-list-edit.dynasty-list-whole');
-		expect(whole).toContain('padding-right: calc(20.5px - var(--icon-size, var(--icon-m, 18px)) / 2)');
-		expect(rule('.dynasty-list button.dynasty-list-edit.dynasty-list-whole .dynasty-list-edit-icon')).toContain('margin-left: calc(10.5px + 0.5em - var(--icon-size, var(--icon-m, 18px)) / 2)');
+	it('the marked row and the large row of the list have a 2 px transparent border (no frame, D209) that leaves the content where the other rows have it (D184, 0.2.8)', () => {
+		const frame = rule('.dynasty-list-hero');
+		expect(frame).toContain('border: 2px solid transparent');
+		// The rows stand 8 px inside the block (the section's padding); the frame reaches the block's edge and keeps 6 px of its own padding (8 px = 2 px border + 6 px).
+		expect(frame).toContain('margin: 4px -8px');
+		expect(rule('.dynasty-list-me')).toContain('padding: 8px 6px');
+		expect(frame).not.toContain('padding');
+		// The large row is taller than the others: its padding is in the last rule of the class.
+		const last = css.lastIndexOf('\n.dynasty-list-hero {');
+		expect(css.slice(last, css.indexOf('}', last))).toContain('padding: 12px 6px');
+		expect(rule('.dynasty-list-me')).toContain('border: 2px solid transparent');
 	});
 
-	it('the heir outline is the still look, lighter than the highlight, and never the pulse', () => {
-		const ring = rule('.dynasty-card.dynasty-heir .dynasty-card-ring');
-		expect(ring).toContain('stroke-width: 6');
-		expect(ring).not.toContain('animation');
+	it('the heir outline is the still look (0.2.8, D212: one accent border 2 px wide, no second ring), lighter than the highlight, and never the pulse', () => {
+		expect(css).not.toContain('dynasty-heir-ring');
 		const bg = rule('.dynasty-card.dynasty-heir .dynasty-card-bg');
 		expect(bg).toContain('var(--interactive-accent)');
-		expect(bg).toContain('stroke-width: 3');
-		// The marked heir keeps its 3 px border in the text colour.
+		expect(bg).toContain('stroke-width: 2;');
+		expect(bg).toContain('non-scaling-stroke');
+		expect(bg).not.toContain('animation');
+		// The marked heir keeps the border of the marked card in the text colour.
 		expect(rule('.dynasty-card.dynasty-heir.dynasty-card-me .dynasty-card-bg')).toContain('var(--text-normal)');
 	});
 
-	it('the ordinal tab: 0.85 em bold upright text, a 1 px border in the text colour, the plate background', () => {
-		const text = rule('.dynasty-ordinal-tab-text');
-		expect(text).toContain('* 0.85');
+	it('the ordinal tab: 0.8 em bold upright text, a 1 px border in the text colour, the card colour inside (0.2.8: no house tint)', () => {
+		const text = rule('.dynasty-r1-tab-text,\n.dynasty-ordinal-tab-text');
+		expect(text).toContain('* 0.8)');
 		expect(text).toContain('font-style: normal');
-		expect(text).toContain('font-weight: var(--bold-weight, 700)');
+		expect(text).toContain('font-weight: var(--font-semibold)');
 		expect(text).toContain('fill: var(--text-normal)');
-		const tab = rule('.dynasty-ordinal-tab');
+		const tab = rule('.dynasty-r1-tab,\n.dynasty-ordinal-tab');
 		expect(tab).toContain('stroke: var(--text-normal)');
 		expect(tab).toContain('stroke-width: 1');
-		expect(tab).toContain('var(--dynasty-house-color');
-		expect(tab).toContain('fill-opacity: 0.17');
-		expect(rule('.theme-dark .dynasty-ordinal-tab')).toContain('fill-opacity: 0.26');
-		expect(rule('.dynasty-ordinal-tab-base')).toContain('var(--background-primary-alt)');
+		expect(tab).toContain('fill: var(--background-primary-alt)');
+		expect(tab).not.toContain('var(--dynasty-house-color');
+		expect(rule('.dynasty-r1-tab-base,\n.dynasty-ordinal-tab-base')).toContain('var(--background-primary-alt)');
 		expect(css).toMatch(/\.dynasty-lod-compact \.dynasty-card-r1 \.dynasty-card-full > \.dynasty-ordinal-tab-group[^{]*\{\s*display: none/);
 	});
 
 	it('the tab and the outline carry no colour value', () => {
-		const block = css.slice(css.indexOf('Version 0.2.7: the Show view'));
+		// The @supports block of the opaque bar (0.2.8) holds a relative colour of a theme role; it is no colour value of the heir.
+		const block = css.slice(css.indexOf('Version 0.2.7: the Show view')).replace(/@supports[^{]*\{[^{}]*\{[^{}]*\}\s*\}/g, '');
 		expect(block).not.toMatch(/#[0-9a-fA-F]{3,8}\b|rgb\(|hsl\(/);
 	});
 
@@ -310,7 +318,7 @@ describe('styles.css', () => {
 		expect(close).toContain('height: 44px');
 	});
 
-	it('the checkbox pair of the edit sheet keeps its row at 44 px', () => {
-		expect(rule('.dynasty-sheet-check')).toContain('min-height: 44px');
+	it('the checkbox pair of the edit sheet keeps its row at 44 px on a phone (a mouse needs 30 px)', () => {
+		expect(rule('.dynasty-sheet.is-phone .dynasty-check')).toContain('min-height: 44px');
 	});
 });

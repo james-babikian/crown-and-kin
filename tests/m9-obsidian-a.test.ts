@@ -9,14 +9,14 @@ import type { Op } from '../src/core/edit';
 import { applyOp } from '../src/core/yaml-edit';
 import { EditSheet } from '../src/obsidian/edit-sheet';
 import { HousesWindow, houseOps, loadHouses, rowsOf } from '../src/obsidian/houses-window';
-import { matchPictures, pickPicture, pictureLink, safePictureName, vaultPictures } from '../src/obsidian/picture-picker';
+import { pickPicture, pictureLink, safePictureName } from '../src/obsidian/picture-picker';
 import { HEADER_STORE_KEY, NO_READ_BYTES, NO_READ_BYTES_COARSE, createPictureStore, type CopyBox, type PictureCopy, type PictureIO, type PictureStore } from '../src/obsidian/picture-store';
 import { LinkUpdater, renameKind } from '../src/obsidian/rename-links';
 import { DEFAULT_SETTINGS, normaliseSettings } from '../src/obsidian/settings';
 import { HandleRegistry } from '../src/obsidian/block-handle';
-import { PICTURES_UI, RENAME_UI, deviceNotice, renamedText } from '../src/render/ui-text';
+import { PICTURES_UI, RENAME_UI, WINDOW_UI, deviceNotice, renamedText } from '../src/render/ui-text';
 import { FEl, dispatch, fakeWin, installDom, resetDom, runTimers, settle } from './acceptance/fake-dom';
-import { notices, openModals, resetObsidian } from './acceptance/fake-obsidian';
+import { lastMenu, notices, openModals, resetObsidian } from './acceptance/fake-obsidian';
 import { isoFile, pngHead } from './acceptance/m9-support';
 import { pickerRowFor } from './acceptance/m11-support';
 import { fakeHandle, type FakeHandle } from './acceptance/tree-view-fakes';
@@ -289,10 +289,8 @@ describe('the picture store (O3, O4, B11–B15)', () => {
 describe('the picture picker (O6, B2)', () => {
 	const pics = [file('Pictures/valmont-arms.png'), file('orsini.svg'), file('Notes/a.md'), file('Pictures/x.heic'), file('Pictures/aldric.jpg')];
 
-	it('lists the pictures the plugin can show, by name; the search needs every word; the link has no "!"', () => {
+	it('the link has no "!"', () => {
 		const app = storeApp(pics);
-		expect(vaultPictures(app as never).map((f) => f.path)).toEqual(['Pictures/aldric.jpg', 'orsini.svg', 'Pictures/valmont-arms.png']);
-		expect(matchPictures(vaultPictures(app as never), 'pict ARMS').map((f) => f.path)).toEqual(['Pictures/valmont-arms.png']);
 		expect(pictureLink(app as never, pics[0], 'Tree.md')).toBe('[[valmont-arms.png]]');
 	});
 
@@ -431,18 +429,19 @@ describe('the Houses window: arms and their colours (spec §13.6, O7, B8)', () =
 		return { app, store, released, handle, win, content, row, page };
 	}
 
-	it('each row shows its arms before the name; a house with no arms has the dashed box, and its page has the button with its accessible name', async () => {
+	it('each row shows its arms; a house with no arms has no box at all, and its page has the text link "Add arms" in the "Open all" row (D213, D216 item 1)', async () => {
 		const { content, row, page } = open();
 		await settle();
 		const arms = row('valmont').querySelector('.dynasty-lw-armsbox')!;
 		expect(arms.querySelector('img')?.getAttribute('src')).toMatch(/^blob:/);
-		const empty = row('thorne').querySelector('.dynasty-lw-armsbox')!;
-		expect(empty.hasClass('is-empty')).toBe(true);
+		expect(row('thorne').querySelector('.dynasty-lw-armsbox')).toBeNull();
 		expect(row('thorne').querySelector('.dynasty-lw-row-name')!.getText()).toBe('House Thorne');
 		expect(content.querySelectorAll('button.dynasty-lw-row').length).toBe(2);
-		const button = page('thorne').querySelector('button.dynasty-house-arms')!;
-		expect(button.hasClass('is-empty')).toBe(true);
-		expect(button.getAttribute('aria-label')).toBe('Select the arms of House Thorne');
+		const thorne = page('thorne');
+		expect(thorne.querySelector('button.dynasty-house-arms')!.hasClass('is-add')).toBe(true);
+		const link = thorne.querySelector('.dynasty-openall .dynasty-add-arms')!;
+		expect(link.getText()).toBe('Add arms');
+		expect(link.parentElement!.children[0]).toBe(link);
 	});
 
 	it('loadHouses and houseOps: Remove arms and Select arms are one batch; a new house can have arms', () => {
@@ -467,9 +466,11 @@ describe('the Houses window: arms and their colours (spec §13.6, O7, B8)', () =
 		const { content, page, handle } = open();
 		await settle();
 		page('valmont');
-		dispatch(content.querySelector('.dynasty-house-remove-arms')!, 'click');
-		expect(content.querySelector('.dynasty-lw-page button.dynasty-house-arms')!.hasClass('is-empty')).toBe(true);
-		dispatch(page('thorne').querySelector('button.dynasty-house-arms')!, 'click');
+		dispatch(content.querySelector('.dynasty-lw-page button.dynasty-house-arms')!, 'click');
+		lastMenu()!.item(PICTURES_UI.removeArms)!.click();
+		expect(content.querySelector('.dynasty-lw-page button.dynasty-house-arms')!.hasClass('is-add')).toBe(true);
+		// A house with no arms: "Add arms" opens the picker at once.
+		dispatch(page('thorne').querySelector('.dynasty-openall .dynasty-add-arms')!, 'click');
 		const picker = openModals[openModals.length - 1] as unknown as { contentEl: FEl };
 		// M11 (D92): this house has no arms yet, so the folder "Pictures" is closed: open it first.
 		const target = pickerRowFor(picker.contentEl, 'Pictures/thorne.png');
@@ -484,13 +485,13 @@ describe('the Houses window: arms and their colours (spec §13.6, O7, B8)', () =
 		expect(handle.body).toBe(before.replace('    arms: "[[valmont-arms.png]]"\n', '').replace('    name: House Thorne\n', '    name: House Thorne\n    arms: "[[thorne.png]]"\n'));
 	});
 
-	it('D68: with arms, "Colours from the arms" comes first with the exact colours, then "House colours"; a colour of the arms is written like D32', async () => {
+	it('D68: with arms, the exact colours follow the 12 house colours under the one label "Colour"; a colour of the arms is written like D32', async () => {
 		const { content, page, handle } = open();
 		await settle();
 		page('valmont');
 		await settle();
 		const labels = content.querySelectorAll('.dynasty-house-palette .dynasty-sheet-label').map((l) => l.getText());
-		expect(labels).toEqual([PICTURES_UI.armsHeading, 'Colour of House Valmont', PICTURES_UI.coloursFromArms, PICTURES_UI.houseColours]);
+		expect(labels).toEqual([WINDOW_UI.colour]);
 		const armsColour = content.querySelector('.dynasty-house-arms-colour')!;
 		expect(armsColour.getAttribute('data-colour')).toBe('#ffffff');
 		expect(armsColour.getAttribute('aria-label')).toBe('Colour 1 from the arms');
@@ -501,12 +502,13 @@ describe('the Houses window: arms and their colours (spec §13.6, O7, B8)', () =
 		expect(handle.ops[0]).toEqual({ kind: 'batch', ops: [{ kind: 'edit-house', id: 'valmont', color: '#ffffff' }] });
 	});
 
-	it('when the plugin cannot read the pixels, the window says so and shows the normal colours', async () => {
+	it('when the plugin cannot read the pixels, the window shows the normal colours and nothing else: no text and no empty box', async () => {
 		const { content, page } = open({ pixels: null });
 		await settle();
 		page('valmont');
 		await settle();
-		expect(content.querySelector('.dynasty-house-arms-none')!.getText()).toBe('The plugin cannot read the colours of this picture.');
+		expect(content.querySelector('.dynasty-house-arms-none')).toBeNull();
+		expect(content.querySelector('.dynasty-house-arms-colours')!.children).toHaveLength(0);
 		expect(content.querySelectorAll('.dynasty-house-colour').length).toBe(12);
 	});
 
@@ -533,10 +535,14 @@ describe('the edit sheet: the portrait (spec §13.7, O7)', () => {
 	it('the portrait is at the top of the sheet, as a transient copy released when the sheet closes', async () => {
 		const { content, sheet, released } = open('aldric');
 		await settle();
-		const fields = content.querySelectorAll('.dynasty-sheet-field').map((f) => f.getAttribute('data-field'));
-		expect(fields.slice(0, 2)).toEqual(['portrait', 'name']);
-		expect(content.querySelector('.dynasty-sheet-portrait-img')!.getAttribute('src')).toMatch(/^blob:/);
-		expect(content.querySelector('.dynasty-remove-portrait')!.getText()).toBe(PICTURES_UI.removePortrait);
+		// 0.2.8 (D209): the portrait is the round button at the right of the header, after the text; a person with a portrait has no "Add portrait" link.
+		const head = content.querySelector('.dynasty-head')!;
+		expect(head.children[0]!.hasClass('dynasty-head-text')).toBe(true);
+		expect(head.children[1]!.hasClass('dynasty-pic')).toBe(true);
+		expect(content.querySelector('.dynasty-pic-img')!.getAttribute('src')).toMatch(/^blob:/);
+		expect(content.querySelector('.dynasty-add-portrait')!.hidden).toBe(true);
+		dispatch(content.querySelector('.dynasty-pic')!, 'click');
+		expect(lastMenu()!.item(PICTURES_UI.removePortrait)).toBeDefined();
 		sheet.close();
 		expect(released).toHaveLength(1);
 	});
@@ -544,8 +550,10 @@ describe('the edit sheet: the portrait (spec §13.7, O7)', () => {
 	it('Remove portrait, then Save: only that person\'s portrait line changes', async () => {
 		const { content, handle } = open('aldric');
 		await settle();
-		dispatch(content.querySelector('.dynasty-remove-portrait')!, 'click');
-		expect(content.querySelector('.dynasty-remove-portrait')).toBeNull();
+		dispatch(content.querySelector('.dynasty-pic')!, 'click');
+		lastMenu()!.item(PICTURES_UI.removePortrait)!.click();
+		dispatch(content.querySelector('.dynasty-pic')!, 'click');
+		expect(lastMenu()!.item(PICTURES_UI.removePortrait)).toBeUndefined();
 		dispatch(content.querySelector('.dynasty-sheet-save')!, 'click');
 		await settle();
 		expect(handle.ops).toEqual([{ kind: 'set-person-fields', id: 'aldric', fields: { portrait: null } }]);
@@ -555,12 +563,21 @@ describe('the edit sheet: the portrait (spec §13.7, O7)', () => {
 	it('Select portrait (the picker), then Save: one text line is added', async () => {
 		const { content, handle } = open('wren');
 		await settle();
-		expect(content.querySelector('.dynasty-sheet-portrait-frame')!.hasClass('is-none')).toBe(true);
-		dispatch(content.querySelector('.dynasty-select-portrait')!, 'click');
+		// D213: no portrait, no circle (no initials, no dashed frame); the text link "Add portrait" opens the picture menu.
+		expect(content.querySelector('.dynasty-pic')!.hasClass('is-none')).toBe(true);
+		expect(content.querySelector('.dynasty-mono')).toBeNull();
+		const add = content.querySelector('.dynasty-openall .dynasty-add-portrait')!;
+		expect(add.hidden).toBe(false);
+		expect(add.getText()).toBe(WINDOW_UI.addPortrait);
+		dispatch(add, 'click');
+		lastMenu()!.item(PICTURES_UI.selectPortrait)!.click();
 		const picker = openModals[openModals.length - 1] as unknown as { contentEl: FEl };
 		// M11 (D92): this person has no portrait yet, so the folder "Pictures" is closed: open it first.
 		dispatch(pickerRowFor(picker.contentEl, 'Pictures/new.png'), 'click');
 		dispatch(pickerRowFor(picker.contentEl, 'Pictures/new.png'), 'click');
+		await settle();
+		// D196 item 4: the crop tool opens at once; Cancel keeps the picture with the part that the plugin chose.
+		dispatch((openModals[openModals.length - 1] as unknown as { contentEl: FEl }).contentEl.querySelector('.dynasty-crop-cancel')!, 'click');
 		await settle();
 		dispatch(content.querySelector('.dynasty-sheet-save')!, 'click');
 		await settle();
@@ -568,14 +585,32 @@ describe('the edit sheet: the portrait (spec §13.7, O7)', () => {
 		expect(handle.body).toBe(HOUSES_BODY.replace('    house: thorne\n', '    house: thorne\n    portrait: "[[new.png]]"\n'));
 	});
 
-	it('B1: a missing file gives the dashed frame and the warning text in the sheet', async () => {
+	it('F3 item 8: "Add portrait" hides itself when a portrait is chosen, and the focus moves to the portrait', async () => {
+		const { content } = open('wren');
+		await settle();
+		const add = content.querySelector('.dynasty-openall .dynasty-add-portrait')!;
+		const pic = content.querySelector('.dynasty-pic')!;
+		const focused = vi.spyOn(pic, 'focus');
+		add.focus();
+		dispatch(add, 'click');
+		lastMenu()!.item(PICTURES_UI.selectPortrait)!.click();
+		const picker = openModals[openModals.length - 1] as unknown as { contentEl: FEl };
+		dispatch(pickerRowFor(picker.contentEl, 'Pictures/new.png'), 'click');
+		dispatch(pickerRowFor(picker.contentEl, 'Pictures/new.png'), 'click');
+		await settle();
+		expect(add.hidden).toBe(true);
+		expect(focused).toHaveBeenCalled();
+	});
+
+	it('B1: a missing file gives no circle, the "Add portrait" link and the warning text in the sheet', async () => {
 		const { app, store } = windowStore([]);
 		const handle = writingHandle(HOUSES_BODY);
 		const sheet = EditSheet.create(app as never, { handle: handle as never, personId: 'aldric', sourcePath: 'Tree.md', pictures: store })!;
 		sheet.open();
 		const content = (sheet as unknown as { contentEl: FEl }).contentEl;
-		expect(content.querySelector('.dynasty-sheet-portrait-frame')!.hasClass('is-missing')).toBe(true);
-		expect(content.querySelector('.dynasty-sheet-portrait-problem')!.getText()).toContain('aldric.jpg');
+		expect(content.querySelector('.dynasty-pic')!.hasClass('is-none')).toBe(true);
+		expect(content.querySelector('.dynasty-add-portrait')!.hidden).toBe(false);
+		expect(content.querySelector('.dynasty-head-problem')!.getText()).toContain('aldric.jpg');
 	});
 });
 

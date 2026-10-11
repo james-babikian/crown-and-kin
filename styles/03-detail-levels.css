@@ -1,0 +1,60 @@
+/* ---------- Level of detail (spec §5.4): same geometry, different content ---------- */
+
+.dynasty-card-compact-sign {
+	display: none;
+}
+
+.dynasty-lod-compact .dynasty-card-compact-sign {
+	display: inline;
+}
+
+.dynasty-lod-compact .dynasty-card-full {
+	display: none;
+}
+
+.dynasty-lod-compact .dynasty-card-compact {
+	display: inline;
+}
+
+/* R026 fit: one rule hides the group that holds the bar, the Full group and the Compact text of a card. A rule on each part made the browser restyle about 3 000 elements at a level change (108 ms at 4x CPU in the first frame of Fit). */
+.dynasty-lod-overview .dynasty-card-body {
+	display: none;
+}
+
+/* Tags: full text, larger text at Compact, only "⚭" at Overview. */
+.dynasty-tag-compact,
+.dynasty-tag-sign,
+.dynasty-lod-compact .dynasty-tag-full,
+.dynasty-lod-compact .dynasty-tag-sign,
+.dynasty-lod-overview .dynasty-tag-full,
+.dynasty-lod-overview .dynasty-tag-compact {
+	display: none;
+}
+
+.dynasty-lod-compact .dynasty-tag-compact,
+.dynasty-lod-overview .dynasty-tag-sign {
+	display: inline;
+}
+
+.dynasty-lod-overview .dynasty-card-bg {
+	fill: var(--dynasty-house-color, var(--background-modifier-border-hover));
+	stroke: none;
+}
+
+.dynasty-lod-overview .dynasty-deceased .dynasty-card-bg {
+	opacity: 0.6;
+}
+
+/* The marked person and the heirs of the Show view stay findable at the Overview level (a text-colour border, an accent fill). */
+.dynasty-lod-overview .dynasty-card-me .dynasty-card-bg {
+	stroke: var(--text-normal);
+	stroke-width: 3;
+	vector-effect: non-scaling-stroke;
+}
+
+.dynasty-lod-overview .dynasty-card.dynasty-heir .dynasty-card-bg {
+	fill: var(--interactive-accent);
+	stroke: var(--text-normal);
+	stroke-width: 2;
+}
+

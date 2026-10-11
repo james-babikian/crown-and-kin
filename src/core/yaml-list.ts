@@ -12,7 +12,7 @@
 import { isMap, isScalar, isSeq, type Node, type Pair, type YAMLMap, type YAMLSeq } from 'yaml';
 import { isEmpty } from './tolerate';
 import {
-	addSection, findPair, insertAt, isRefusal, itemBlock, layoutOf, mergeRemovals, refuse, removePair, setPairValue, topMap, type Parsed, type Patch, type Refusal, type Source,
+	addSection, findPair, flowInsertAfter, insertAt, isRefusal, itemBlock, layoutOf, mergeRemovals, refuse, removePair, setPairValue, topMap, type Parsed, type Patch, type Refusal, type Source,
 } from './yaml-patch';
 
 /** The position of the item's dash (its own start in a flow list). */
@@ -116,8 +116,25 @@ function removeFlowRun(src: Source, seq: YAMLSeq, i: number, j: number): Patch[]
 	}
 	// Items that share lines: only comments on a single removed line may go with them.
 	const allow = src.text.slice(own[0], own[1]).includes('\n') ? undefined : own;
-	if (j + 1 < n) return [{ start: own[0], end: (seq.items[j + 1] as Node).range![0], text: '', allow }];
-	if (i > 0) return [{ start: src.nodeEnd(seq.items[i - 1] as Node), end: own[1], text: '', allow }];
+	if (j + 1 < n) {
+		const next = (seq.items[j + 1] as Node).range![0];
+		// A comment between the item and the next one stays (delete keeps comments): only the item and its comma go.
+		if (src.text.slice(own[1], next).includes('#')) {
+			const comma = /^[ \t]*,/.exec(src.text.slice(own[1], next));
+			return [{ start: own[0], end: own[1] + (comma ? comma[0].length : 0), text: '', allow }];
+		}
+		return [{ start: own[0], end: next, text: '', allow }];
+	}
+	if (i > 0) {
+		const prevEnd = src.nodeEnd(seq.items[i - 1] as Node);
+		if (src.text.slice(prevEnd, own[0]).includes('#')) {
+			const comma = /^[ \t]*,/.exec(src.text.slice(prevEnd, own[0]));
+			const patches: Patch[] = [{ start: own[0], end: own[1], text: '', allow }];
+			if (comma) patches.unshift({ start: prevEnd, end: prevEnd + comma[0].length, text: '' });
+			return patches;
+		}
+		return [{ start: prevEnd, end: own[1], text: '', allow }];
+	}
 	return [{ start: own[0], end: own[1], text: '', allow }];
 }
 
@@ -187,7 +204,7 @@ export function insertItem(p: Parsed, key: 'people' | 'unions', where: Where, bl
 		if (seq.flow) {
 			if (!seq.items.length) return insertAt(src.text.indexOf('[', seq.range![0]) + 1, flow);
 			if (where && 'before' in where) return insertAt((seq.items[where.before] as Node).range![0], `${flow}, `);
-			return insertAt(src.nodeEnd(seq.items[where ? where.after : seq.items.length - 1] as Node), `, ${flow}`);
+			return flowInsertAfter(src, seq, where ? where.after : seq.items.length - 1, [flow]);
 		}
 		const dashCol = src.column(dashOf(src, seq.items[0] as Node));
 		const itemCol = itemColumn(src, seq, dashCol);

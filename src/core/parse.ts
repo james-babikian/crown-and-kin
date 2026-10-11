@@ -3,7 +3,8 @@
  * any shape issues found while reading (spec §4, §8, §13.4). `parseDynasty` is the entry point;
  * `tree-view.ts` and `houses-window.ts` call it. `parseBody` is shared with the edit code in
  * `yaml-patch.ts`, so both work from the same parsed document. Depends on `tolerate.ts` for
- * lenient reads of raw YAML values, among them the curly quote marks around structural values (D103).
+ * lenient reads of raw YAML values, among them the curly quote marks around structural values (D103). From 0.2.8 it also
+ * reads the person key `arms` and the holder key `through-spouse`.
  */
 
 import { isScalar, Lexer, parseDocument, type Document } from 'yaml';
@@ -12,13 +13,59 @@ import { codedIssue, type CodedIssue, type HardError } from './messages';
 import { cropValue } from './portrait-crop';
 import { normaliseSobriquet } from './sobriquet';
 import { readIllegitimate, readThrough } from './succession-keys';
-import { blankPlainNulls, bool, int, isEmpty, isMap, linkValue, list, str, tolerateEmbeds, unwrapCurlyKeys, type Raw, type RawMap } from './tolerate';
+import { blankPlainNulls, bool, int, isEmpty, isMap, linkValue, list, str, tolerateEmbeds, unwrapCurly, unwrapCurlyKeys, type Raw, type RawMap } from './tolerate';
 import type { BadKey, Holder, House, ParentRef, ParseResult, Person, Title, Tree, TreeOptions, Union } from './types';
 
 type Section = 'people' | 'houses' | 'unions' | 'titles';
 
+/** D205: common words that the plugin reads as a known partnership type, with no warning. */
+const UNION_WORDS: Readonly<Record<string, string>> = Object.assign(Object.create(null) as Record<string, string>, {
+	// The four known types in any case (genealogy re-vet of P2: "Concubinage" showed as a marriage).
+	marriage: 'marriage',
+	betrothal: 'betrothal',
+	concubinage: 'concubinage',
+	affair: 'affair',
+	engaged: 'betrothal',
+	mistress: 'affair',
+	lover: 'affair',
+	liaison: 'affair',
+	concubine: 'concubinage',
+});
+
+/**
+ * The type of a partnership as every reader sees it (D205): one of the common words, in any case, is the known type; no type
+ * is a marriage; any other text stays as written (validation warns about a near-typo, and the drawing shows a marriage).
+ * The note keeps the words the user wrote.
+ */
+export function readUnionType(v: Raw): string {
+	const text = str(v);
+	if (text === undefined) return 'marriage';
+	return UNION_WORDS[text.trim().toLowerCase()] ?? text;
+}
+
+/** The type of a parent link: one of the four known types in any case is that type; no type is birth; any other text stays (validation warns). */
+function readParentType(v: Raw): string {
+	const text = str(v);
+	if (text === undefined) return 'birth';
+	const word = text.trim().toLowerCase();
+	return word === 'birth' || word === 'adoptive' || word === 'ward' || word === 'rumoured' ? word : text;
+}
+
 /** Holder keys read as text (spec §13.4); `person` and `name` are read first. */
 const HOLDER_TEXT = ['as', 'number', 'from', 'to'] as const;
+
+/**
+ * 0.2.8 contract A.2: the value of a holder's `through-spouse`. `true` or `yes` (any case) is `true`; `false` or `no` is off
+ * (absent); any other text is the id of the spouse, with a curly pair of quote marks taken off. A list or a map is absent.
+ */
+export function readThroughSpouse(v: Raw): true | string | undefined {
+	const text = str(v);
+	if (text === undefined) return undefined;
+	const word = text.toLowerCase();
+	if (word === 'true' || word === 'yes') return true;
+	if (word === 'false' || word === 'no') return undefined;
+	return str(unwrapCurly(text));
+}
 
 /** Reads one block. Collects shape issues; reference and value checks happen in `validate.ts`. */
 class Reader {
@@ -134,6 +181,8 @@ class Reader {
 			if (isMap(h)) {
 				const fields: Partial<Holder> = { person: str(h.person), name: str(h.name) };
 				for (const key of HOLDER_TEXT) fields[key] = str(h[key]);
+				const throughSpouse = readThroughSpouse(h['through-spouse']);
+				if (throughSpouse !== undefined) fields.throughSpouse = throughSpouse;
 				out.push(this.holder(fields, i, text()));
 			} else if (str(h) !== undefined) out.push(this.holder({ person: str(h) }, i, text()));
 			// An empty item (`-` alone) is not a holder either (supervisor ruling).
@@ -146,6 +195,8 @@ class Reader {
 	private holder(fields: Partial<Holder>, index: number, text: string | undefined): Holder {
 		const out: Holder = { index };
 		for (const key of ['person', 'name', ...HOLDER_TEXT] as const) if (fields[key] !== undefined) out[key] = fields[key];
+		// After `to`, as written (contract A.2); only when written.
+		if (fields.throughSpouse !== undefined) out.throughSpouse = fields.throughSpouse;
 		if (text !== undefined) out.text = text;
 		return out;
 	}
@@ -200,6 +251,8 @@ class Reader {
 			const sobriquet = normaliseSobriquet(str(p.sobriquet));
 			const portrait = linkValue(p.portrait, () => this.sourceText(['people', index, 'portrait']));
 			const portraitCrop = cropValue(p['portrait-crop']);
+			// A curly pair of quote marks is taken off here too, until `unwrapCurlyKeys` (P3) lists the person key `arms`.
+			const arms = linkValue(typeof p.arms === 'string' ? unwrapCurly(p.arms) : p.arms, () => this.sourceText(['people', index, 'arms']));
 			let id = str(p.id);
 			if (!id) {
 				// Still drawn, under an id that nothing in the block uses, so nothing links to it by accident.
@@ -231,6 +284,8 @@ class Reader {
 				// Only when written, like `card-title` (spec §13.7).
 				...(portrait !== undefined ? { portrait } : {}),
 				...(portraitCrop !== undefined ? { portraitCrop } : {}),
+				// 0.2.8 contract A.1: personal arms, read like a portrait link.
+				...(arms !== undefined ? { arms } : {}),
 				notes: str(p.notes),
 				index,
 			});
@@ -247,7 +302,7 @@ class Reader {
 					this.warn('missing-id', { section: 'parents', index: i + 1, person: ownerName }, [owner]);
 					return;
 				}
-				refs.push({ id, type: str(raw.type) ?? 'birth' });
+				refs.push({ id, type: readParentType(raw.type) });
 				return;
 			}
 			const id = str(raw);
@@ -267,7 +322,7 @@ class Reader {
 			unions.push({
 				id: str(u.id),
 				partners: list(u.partners).map(str).filter((s): s is string => s !== undefined),
-				type: str(u.type) ?? 'marriage',
+				type: readUnionType(u.type),
 				start: str(u.start),
 				end: str(u.end),
 				index,

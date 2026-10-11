@@ -6,7 +6,7 @@ vi.mock('@codemirror/view', () => ({ ViewPlugin: { fromClass: () => ({}) } }));
 
 import type { TreeView } from '../../src/obsidian/tree-view';
 import { FEl, clock, dispatch, fakeWin, flushFrames, installDom, resetDom, settle } from './fake-dom';
-import { openModals, resetObsidian } from './fake-obsidian';
+import { resetObsidian } from './fake-obsidian';
 import { block15, comments15 } from './m10-support';
 import DynastyTreePlugin from '../../src/obsidian/main';
 import { newBlockState } from '../../src/obsidian/block-state';
@@ -134,31 +134,6 @@ describe('the relation finder and a hidden person (spec §13.10, §13.2)', () =>
 		await run();
 		expect(card(el, 'lucan')).toBeNull();
 		expect(folds(handle)).toEqual(new Set([key('A'), key('B'), key('NEST')]));
-	});
-});
-
-describe('a tap on a row of a house page (spec §13.12 H3)', () => {
-	it('opens only the folds that hide the person, and centres on the person', async () => {
-		const source = block15(0);
-		const handle = handleFor(source, 'A', 'B', 'NEST');
-		const { el, view } = await embed(source, { handle });
-		expect(card(el, 'lucan')).toBeNull();
-		dispatch(el.querySelector('.dynasty-legend-button')!, 'click');
-		const houseRow = el.querySelector('.dynasty-legend-house[data-house="valmont"]');
-		expect(houseRow).not.toBeNull();
-		dispatch(houseRow!, 'click');
-		await settle();
-		const page = openModals.find((m) => (m as unknown as { contentEl?: FEl }).contentEl?.querySelector('.dynasty-hp-row')) as unknown as { contentEl: FEl };
-		expect(page).toBeDefined();
-		const row = page.contentEl.querySelector('.dynasty-hp-row[data-person="lucan"]');
-		expect(row).not.toBeNull();
-		dispatch(row!, 'click');
-		await run();
-		expect(card(el, 'lucan')).not.toBeNull();
-		expect(folds(handle)).toEqual(new Set([key('NEST')]));
-		const c = centreOf(view, 'lucan');
-		expect(c.view.cx).toBeCloseTo(c.card.x, 0);
-		expect(c.view.cy).toBeCloseTo(c.card.y, 0);
 	});
 });
 

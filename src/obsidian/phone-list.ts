@@ -9,18 +9,19 @@
  *   (`data-dynasty-list-from`). `session` is `st.focus?.id` (null for "all people", which means nothing to a list).
  *   `options.start` is NOT an input: it is not part of the chain.
  * - `listData(g, centre)` gives the sections. `listWord(id, ...)` gives the relation word of a row, from the
- *   relation cache that the caller passes in (`relationsFor(whole, me).cards`).
+ *   relation cache that the caller passes in (`relationsFor(whole, me).cards`). `linkWord(g, data, row)` gives the kind of
+ *   parent or child link (D210), which does not depend on a mark or a setting.
  * - `pushTrail` / `popTrail` keep the Back trail (`st.listBack`) at most `BACK_LIMIT` long. A tap on a name or Find
  *   pushes the old centre; Back pops. `popTrail` skips a person who is not in the tree any more.
  */
 
-import { drawnParents, partnerOf, placedChildren, type FamilyGraph } from '../core/derive';
+import { drawnParents, pairKey, partnerOf, placedChildren, type FamilyGraph } from '../core/derive';
 import { computeGenerations } from '../core/generations';
 import { yearOf } from '../core/succession-keys';
 import { parentKind } from '../core/types';
 import type { ListData, ListGroup, ListRow, ListWord } from '../render/dom/phone-list-dom';
 import { startPerson } from '../render/tree-info';
-import { PHONE_LIST_UI } from '../render/ui-text';
+import { LINK_WORDS, PHONE_LIST_UI } from '../render/view-text';
 import type { CardRelation } from './relation-cache';
 
 export type { ListData, ListGroup, ListHeading, ListRow, ListWord } from '../render/dom/phone-list-dom';
@@ -83,12 +84,19 @@ export function listStart(f: ListStartFacts): { id: string; from: ListFrom } | n
 /**
  * The sections of the list for `centre`: the drawn parents (placement links first, then side links), the centre with each
  * partner once in union order, and the children in groups by partnership, then the children with no listed partner,
- * then the children that only a side link names. A person appears once in the children (the first place wins).
+ * then the children that only a side link names. A person appears once in the children.
+ * A child that is placed under the centre (a partnership or alone) always stays in that group; only then do the side links place the other children.
+ * A side link of a partnership of the centre (a birth child drawn under adoptive parents) stands in the group of that partnership (D214): the partnership
+ * is a written union or the implicit one of two parents that have a placed child (the pair key). A rumoured link never wins over another kind of link
+ * of the same person, whatever the order in the note. Every parent and child row carries the kind of its link to `centre`.
  */
 export function listData(g: FamilyGraph, centre: string): ListData {
 	const parents: ListRow[] = [];
 	for (const dp of drawnParents(g, centre)) {
-		if (g.byId.has(dp.id) && !parents.some((r) => r.id === dp.id)) parents.push({ id: dp.id, role: 'parent', link: dp.type });
+		if (!g.byId.has(dp.id)) continue;
+		const at = parents.findIndex((r) => r.id === dp.id);
+		if (at < 0) parents.push({ id: dp.id, role: 'parent', link: dp.type });
+		else if (parents[at].link === 'rumoured' && dp.type !== 'rumoured') parents[at] = { id: dp.id, role: 'parent', link: dp.type };
 	}
 
 	const person: ListRow[] = [{ id: centre, role: 'centre' }];
@@ -96,32 +104,77 @@ export function listData(g: FamilyGraph, centre: string): ListData {
 	const seen = new Set<string>([centre]);
 	const unionKeys = g.unionsOf.get(centre) ?? [];
 	const child = (id: string, link = parentKind(g.placementType.get(id))): ListRow => ({ id, role: 'child', link });
-	let partnerships = 0;
+
+	// The placed children of every partnership and of the centre alone come first, so that no side link takes one of them away from its confirmed group.
+	const partnerships: { key: string; partner: string; rows: ListRow[] }[] = [];
 	for (const key of unionKeys) {
 		const u = g.unionByKey.get(key);
 		if (!u) continue;
 		const pid = partnerOf(u, centre);
 		if (!g.byId.has(pid)) continue;
-		partnerships++;
 		if (!person.some((r) => r.id === pid)) person.push({ id: pid, role: 'partner' });
-		const rows = u.children.filter((c) => !seen.has(c) && g.byId.has(c));
-		for (const c of rows) seen.add(c);
-		if (rows.length) groups.push({ heading: { kind: 'partner', partner: pid }, rows: rows.map((c) => child(c)) });
+		const rows = u.children.filter((c) => !seen.has(c) && g.byId.has(c)).map((c) => child(c));
+		for (const r of rows) seen.add(r.id);
+		partnerships.push({ key, partner: pid, rows });
 	}
-
 	const solo = (g.soloChildren.get(centre) ?? []).filter((c) => !seen.has(c) && g.byId.has(c));
 	for (const c of solo) seen.add(c);
-	if (solo.length) groups.push({ heading: partnerships ? { kind: 'solo' } : null, rows: solo.map((c) => child(c)) });
 
-	const other: ListRow[] = [];
+	// The side links of the centre, the other kinds before the rumoured ones, each in the order of the note.
+	const side = g.secondary.filter((e) => e.parents.includes(centre) && g.byId.has(e.child));
+	const ordered = [...side.filter((e) => parentKind(e.type) !== 'rumoured'), ...side.filter((e) => parentKind(e.type) === 'rumoured')];
+	// The parents that a child has by side links of one kind: a pair of them is a couple even when no union is written (implicit partnership).
+	const sideParents = new Map<string, Set<string>>();
 	for (const e of g.secondary) {
-		if (!e.parents.includes(centre) || seen.has(e.child) || !g.byId.has(e.child)) continue;
-		seen.add(e.child);
-		other.push(child(e.child, parentKind(e.type)));
+		const k = `${e.child}|${parentKind(e.type)}`;
+		const set = sideParents.get(k) ?? new Set<string>();
+		for (const q of e.parents) set.add(q);
+		sideParents.set(k, set);
 	}
+	const home = (e: (typeof side)[number]) => {
+		if (e.unionKey) return partnerships.find((x) => x.key === e.unionKey);
+		const named = sideParents.get(`${e.child}|${parentKind(e.type)}`);
+		if (!named || named.size !== 2 || !named.has(centre)) return undefined;
+		const [a, b] = [...named];
+		const key = `i:${pairKey(a, b)}`;
+		return partnerships.find((x) => x.key === key);
+	};
+	const other: ListRow[] = [];
+	for (const e of ordered) {
+		if (seen.has(e.child)) continue;
+		seen.add(e.child);
+		const row = child(e.child, parentKind(e.type));
+		const into = home(e);
+		if (into) into.rows.push(row);
+		else other.push(row);
+	}
+
+	for (const x of partnerships) if (x.rows.length) groups.push({ heading: { kind: 'partner', partner: x.partner }, rows: x.rows });
+	if (solo.length) groups.push({ heading: partnerships.length ? { kind: 'solo' } : null, rows: solo.map((c) => child(c)) });
 	if (other.length) groups.push({ heading: { kind: 'other' }, rows: other });
 
 	return { centre, parents, person, groups };
+}
+
+/**
+ * The kind of link of a parent or child row, seen from the person at the top of the list (D210): "Adoptive father", "Guardian", "Rumoured son",
+ * "Adopted daughter", "Ward". A birth parent has a word only when the person also has an adoptive parent; a birth child has none. The centre and a
+ * partner have none. The words are those of the relation finder's steps.
+ */
+export function linkWord(g: FamilyGraph, data: ListData, row: ListRow): ListWord | null {
+	if (row.role !== 'parent' && row.role !== 'child') return null;
+	const link = row.link ?? 'birth';
+	const sex = g.byId.get(row.id)?.sex;
+	const at = sex === 'm' ? 0 : sex === 'f' ? 1 : 2;
+	let text: string;
+	if (row.role === 'parent') {
+		if (link === 'birth' && !data.parents.some((r) => r.link === 'adoptive')) return null;
+		text = LINK_WORDS.parent[link][at];
+	} else {
+		if (link === 'birth') return null;
+		text = LINK_WORDS.child[link][at];
+	}
+	return { text, lower: text.toLowerCase() };
 }
 
 /** What `listWord` reads. */
@@ -139,7 +192,7 @@ export interface ListWordFacts {
  */
 export function listWord(id: string, f: ListWordFacts): ListWord | null {
 	if (f.me === null) return null;
-	if (id === f.me) return { text: PHONE_LIST_UI.you, lower: PHONE_LIST_UI.you.toLowerCase() };
+	if (id === f.me) return { text: PHONE_LIST_UI.you, lower: PHONE_LIST_UI.you.toLowerCase(), strong: true };
 	if (!f.showRelations) return null;
 	return f.cards?.get(id) ?? null;
 }

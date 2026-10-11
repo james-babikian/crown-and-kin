@@ -8,6 +8,7 @@ import { computeRelations } from '../src/core/relations';
 import { cardLabels } from '../src/core/titles';
 import { cardForm, geometryFor } from '../src/layout/geometry';
 import { DEFAULT_FAR_RULE } from '../src/layout/index';
+import type { ArmsOutline } from '../src/layout/arms-outline';
 import type { LaidOut, LayoutSettings } from '../src/layout/model';
 import { measuredLayout } from '../src/obsidian/measured-layout';
 import type { PictureMap } from '../src/render/saved-picture';
@@ -31,6 +32,8 @@ export interface DrawOptions {
 	px?: number;
 	/** The pictures to embed (the spike); the hashes leave them out so that no picture file can move a hash. */
 	pictures?: (g: FamilyGraph) => PictureMap;
+	/** The outline of each arms picture, for the gap round the arms (D219); the spike passes it with `pictures`, the hashes pass neither. */
+	outlines?: (pictures: PictureMap) => Map<string, ArmsOutline>;
 	/** A title in the picture (the spike). */
 	title?: string;
 	/** A text measure for the pictures that people look at (the B7 pictures use a wider one, as the system font of the renderer is wider than `approxMeasure`); the hashes leave it out. */
@@ -86,6 +89,7 @@ export function drawCard(source: string, o: DrawOptions): DrawnCard | undefined 
 	});
 	const dark = o.theme === 'dark';
 	const pictures = o.pictures?.(g);
+	const outlines = pictures ? o.outlines?.(pictures) : undefined;
 	const svg = renderSvg(g, laid.layout, laid.edges, {
 		palette: dark ? DEFAULT_DARK : DEFAULT_LIGHT,
 		dark,
@@ -98,6 +102,7 @@ export function drawCard(source: string, o: DrawOptions): DrawnCard | undefined 
 		...(me !== undefined ? { me } : {}),
 		...(relations ? { relations } : {}),
 		...(pictures ? { pictures } : {}),
+		...(outlines ? { outlines } : {}),
 	});
 	return { svg, g, laid, me };
 }

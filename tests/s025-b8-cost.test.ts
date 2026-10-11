@@ -71,7 +71,7 @@ describe('B8 1: the elements of a card that has nothing to draw', () => {
 		// R026 fit: the bar, the Full group and the Compact name are in one body group (one element for the Overview level to hide); the picture is the same.
 		expect(kids).toEqual([['dynasty-card-ring'], ['dynasty-card-bg'], ['dynasty-card-body']]);
 		const body = card(root, 'd').children[2];
-		expect(body.children.map((e) => [...e.classes])).toEqual([['dynasty-card-strip'], ['dynasty-card-full'], ['dynasty-card-compact']]);
+		expect(body.children.map((e) => [...e.classes])).toEqual([['dynasty-card-ribbon'], ['dynasty-card-full'], ['dynasty-card-compact']]);
 		expect(body.children[1].children.map((e) => [...e.classes])).toEqual([['dynasty-card-name']]);
 	});
 
@@ -90,21 +90,19 @@ describe('B8 1: the elements of a card that has nothing to draw', () => {
 	});
 });
 
-describe('B8 2: the plate has no group around its path and its line', () => {
-	it('a card with a relation word has the plate path and the hairline line as children of the Full group, and no group', () => {
+describe('B8 2: the foot hairline has no group around it', () => {
+	it('a card with a relation word has the hairline as a child of the Full group, the first one, and no group (0.2.8: the plate path is gone)', () => {
 		for (const geo of [ROUNDEL, TEXT]) {
 			const { root } = scene(lay(geo, { relationLine: true }), { relations: RELATIONS, me: 'c' });
 			for (const id of ['b', 'c', 'd']) {
 				const full = card(root, id).children.find((e) => e.hasClass('dynasty-card-body'))!.children.find((e) => e.hasClass('dynasty-card-full'))!;
 				expect(withClass(card(root, id), 'dynasty-r1-plate-group'), id).toHaveLength(0);
-				const kids = full.children.filter((e) => e.hasClass('dynasty-r1-plate') || e.hasClass('dynasty-r1-plate-line'));
-				expect(kids.map((e) => e.tag), id).toEqual(['path', 'line']);
-				// The path is made first, so the relation word lies over it; the line follows it.
+				const kids = full.children.filter((e) => e.hasClass('dynasty-card-foot-line'));
+				expect(kids.map((e) => e.tag), id).toEqual(['line']);
+				// The line is made first, so the relation word lies over it.
 				expect(full.children.indexOf(kids[0]), id).toBe(0);
-				expect(full.children.indexOf(kids[1]), id).toBe(1);
 			}
-			expect(withClass(card(root, 'a'), 'dynasty-r1-plate')).toHaveLength(0);
-			expect(withClass(card(root, 'a'), 'dynasty-r1-plate-line')).toHaveLength(0);
+			expect(withClass(card(root, 'a'), 'dynasty-card-foot-line')).toHaveLength(0);
 		}
 	});
 });

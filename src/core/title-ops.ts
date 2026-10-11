@@ -30,24 +30,25 @@ import type { AddHolder, AddTitle, DeleteTitle, EditHolder, EditResult, EditTitl
 import { changeItemId } from './id-change';
 import { uniqueTitleId } from './id-gen';
 import { parseBody, textWithoutComments } from './parse';
+import { sameList } from './same-list';
 import { INHERIT_ILLEGITIMATE, INHERIT_RULES, INHERIT_THROUGH, readIllegitimate, readInherit, readRule, readThrough, SUCCESSION_RULES } from './succession-keys';
 import { bool, isEmpty, isMap as isRawMap, list, str, unwrapCurly, type Raw, type RawMap } from './tolerate';
 import type { Tree } from './types';
 import { dashOf, itemEnd, itemStart, removeFromSection, removeItems, section } from './yaml-list';
 import {
-	addPair, addSection, appendItem, clone, commentsOf, findPair, finish, finishTogether, insertAt, isRefusal, itemBlock, layoutOf, personNode, recall, refuse, removePair, renderScalar,
+	addPair, addSection, appendItem, clone, commentsOf, findPair, finish, finishTogether, flowInsertAfter, insertAt, isRefusal, itemBlock, layoutOf, personNode, recall, refuse, removePair, renderScalar,
 	setPairValue, Source, topMap, type Layout, type NewValue, type Parsed, type Patch, type Refusal, type Step,
 } from './yaml-patch';
 import { REFUSAL_TEXT } from './refusal-text';
 
 /** §13.0 key order of a title and of a holder. */
 const TITLE_ORDER = ['id', 'name', 'male-name', 'female-name', 'plural', 'numbering', 'count-with', 'succession', 'inherit', 'inherit-through', 'inherit-illegitimate', 'inherit-adopted', 'heirs-of-body', 'year', 'heir', 'exclude', 'holders'];
-const HOLDER_ORDER = ['person', 'name', 'as', 'number', 'from', 'to'] as const;
+const HOLDER_ORDER = ['person', 'name', 'as', 'number', 'from', 'to', 'through-spouse'] as const;
 type HolderKey = (typeof HOLDER_ORDER)[number];
 type Changes = [HolderKey, string | null][];
 
 /** Ids and free text are written plain when plain YAML reads them back as the same text (§6.2); names are quoted like person names. */
-const TEXT_KEYS = new Set(['id', 'person', 'number', 'from', 'to', 'year', 'heir', 'exclude', 'inherit-adopted', 'heirs-of-body', 'inherit-illegitimate']);
+const TEXT_KEYS = new Set(['id', 'person', 'number', 'from', 'to', 'through-spouse', 'year', 'heir', 'exclude', 'inherit-adopted', 'heirs-of-body', 'inherit-illegitimate']);
 
 const HOLDERS_MAP = 'The holders of this title are not a list. Edit the note text.';
 const NOT_A_LIST = 'This value is not a list. Edit the note text.';
@@ -57,7 +58,7 @@ const SUCCESSION_REFUSAL = {
 	rule: 'The succession rule is not a rule that the plugin knows.',
 	inherit: 'The rule for who can inherit is not a rule that the plugin knows.',
 	through: 'The rule for who passes the right to inherit is not a rule that the plugin knows.',
-	illegitimate: 'The value for children marked as illegitimate is not a value that the plugin knows.',
+	illegitimate: 'The value for children with the box “Illegitimate” ticked is not a value that the plugin knows.',
 	switch: 'The switch must be true or false.',
 	year: 'The year must be text.',
 	ids: 'The people must be a list of IDs.',
@@ -144,6 +145,12 @@ function holderChanges(ctx: TitleContext, fields: unknown): Changes | Refusal {
 	return out;
 }
 
+/** True if a `through-spouse` value is on: anything written except nothing, `false` and `no`. */
+const ticked = (v: Raw): boolean => {
+	const s = str(v);
+	return s !== undefined && !/^(false|no)$/i.test(s);
+};
+
 /** A holder item with the changes applied, and the changes that change something. A plain string becomes a map only when something changes. */
 function withFields(raw: Raw, changes: Changes): { value: Raw; changed: Changes } | Refusal {
 	const base: RawMap = isRawMap(raw) ? (clone(raw) as RawMap) : str(raw) !== undefined ? { person: typeof raw === 'string' ? raw : str(raw) } : {};
@@ -151,6 +158,8 @@ function withFields(raw: Raw, changes: Changes): { value: Raw; changed: Changes 
 	for (const [key, write] of changes) {
 		const has = Object.prototype.hasOwnProperty.call(base, key);
 		if (write === null ? !has : str(base[key]) === str(write)) continue;
+		// A box that is ticked already (`true`, `yes` or a person id written by hand) stays as it is when it is ticked again (D195).
+		if (key === 'through-spouse' && write !== null && /^(true|yes)$/i.test(write.trim()) && ticked(base[key])) continue;
 		if (write === null) delete base[key];
 		else base[key] = write;
 		changed.push([key, write]);
@@ -299,7 +308,7 @@ function inPlace(src: Source, seq: YAMLSeq, final: Final[], kept: number[]): Pat
 		last = f.from;
 	}
 	for (const [k, flows] of after) {
-		patches.push(seq.flow ? insertAt(src.nodeEnd(seq.items[k] as Node), flows.map((x) => `, ${x}`).join('')) : insertAt(itemEnd(src, seq, k), flows.map((x) => '\n' + line(x)).join('')));
+		patches.push(seq.flow ? flowInsertAfter(src, seq, k, flows) : insertAt(itemEnd(src, seq, k), flows.map((x) => '\n' + line(x)).join('')));
 	}
 	return patches;
 }
@@ -633,7 +642,7 @@ function idListEdit(ctx: TitleContext, index: number, title: RawMap, key: 'heir'
 			return pair ? removePair(p.src, node, pair) : null;
 		};
 	}
-	if (present && ids.length === written.length && ids.every((x, i) => x === written[i])) return undefined;
+	if (present && sameList(ids, written)) return undefined;
 	for (const id of ids) if (!written.includes(id) && !inTree(ctx, id)) return refuse('unknown-person', id);
 
 	// Is the written value a list with comments in it (or between the key and the list)?

@@ -78,21 +78,11 @@ async function press(root: FEl, sel: string): Promise<void> {
 
 const drawn = (root: FEl) => [...new Set(root.querySelectorAll('.dynasty-card').map((c) => c.getAttribute('data-person')!))].sort();
 const barText = (root: FEl) => root.querySelector('.dynasty-result-text')?.getText() ?? null;
-const tools = (root: FEl) => root.querySelector('.dynasty-toolbar')!.children.map((c) => [...c.classes].find((x) => x.startsWith('dynasty-') && x !== 'dynasty-tool')!);
-/** The cards that the view does not show whole, from the scene's transform and the viewport size. */
-function outside(root: FEl): string[] {
-	const m = /translate\(([-\d.e]+)[ ,]([-\d.e]+)\) scale\(([-\d.e]+)\)/.exec(root.querySelector('.dynasty-scene')?.getAttribute('transform') ?? '');
-	if (!m) throw new Error('no transform');
-	const [tx, ty, s] = [Number(m[1]), Number(m[2]), Number(m[3])];
-	const vp = root.querySelector('.dynasty-viewport')!;
-	return root.querySelectorAll('.dynasty-card').flatMap((card) => {
-		const bg = card.querySelector('.dynasty-card-bg')!;
-		const x = tx + Number(bg.getAttribute('x')) * s;
-		const y = ty + Number(bg.getAttribute('y')) * s;
-		const whole = x >= -0.5 && y >= -0.5 && x + Number(bg.getAttribute('width')) * s <= vp.clientWidth + 0.5 && y + Number(bg.getAttribute('height')) * s <= vp.clientHeight + 0.5;
-		return whole ? [] : [card.getAttribute('data-person')!];
-	});
-}
+const tools = (root: FEl) =>
+	root
+		.querySelector('.dynasty-toolbar')!
+		.children.map((c) => [...c.classes].find((x) => x.startsWith('dynasty-') && x !== 'dynasty-tool')!)
+		.filter((c) => c !== 'dynasty-sep' && c !== 'dynasty-grow');
 const orientation = (root: FEl) => (root.hasClass('dynasty-root') ? root : root.querySelector('.dynasty-root'))!.getAttribute('data-dynasty-orientation');
 
 interface PickerLike {
@@ -188,28 +178,28 @@ describe('D51: the finder small tree in the phone full-screen view', () => {
 		expect(orientation(root)).toBe('down');
 	});
 
-	it('a wide line (a chain of partnerships) stays sideways', async () => {
+	it('a wide line (a chain of partnerships) is drawn top to bottom too (0.2.8, D203 item 2: on a phone the line is always top to bottom)', async () => {
 		const { root } = await phoneFull(chain(11));
 		await finder(root, 'x0', 'x10');
 		expect(drawn(root)).toHaveLength(11);
-		expect(orientation(root)).toBe('sideways');
+		expect(orientation(root)).toBe('down');
 	});
 
-	it('the first view shows the whole line when its names are readable as Compact names (1.5 times, spec §5.4)', async () => {
-		// 14 partners stacked: fitted, the Full names are about 8 px (under 11 px), the Compact names about 12 px.
+	it('a long line drawn top to bottom opens with readable names (D203): the view starts at the oldest generation', async () => {
+		// 14 partners stacked: a fit would give names of about 8 px, so the first view keeps readable names and the user pans.
 		const { root } = await phoneFull(chain(14));
 		await finder(root, 'x0', 'x13');
-		expect(orientation(root)).toBe('sideways');
+		expect(orientation(root)).toBe('down');
 		const scale = Number(/scale\(([-\d.e]+)\)/.exec(root.querySelector('.dynasty-scene')!.getAttribute('transform')!)![1]);
-		expect(scale * 16).toBeLessThan(9);
-		expect(scale * 16 * COMPACT_NAME_EM).toBeGreaterThanOrEqual(11);
-		expect(outside(root)).toEqual([]);
+		expect(scale * 16).toBeGreaterThanOrEqual(11);
 	});
 
 	it('"Show in the whole tree" uses the normal orientation of the phone (sideways)', async () => {
 		const { root } = await phoneFull(LINE);
 		await finder(root, 'p0', 'p8');
 		expect(orientation(root)).toBe('down');
+		// D212 (phone-banner-row): on a phone the link "Options" opens the menu that has the action.
+		await press(root, '.dynasty-result-options');
 		await press(root, '.dynasty-result-whole');
 		expect(root.querySelector('.dynasty-root')!.getAttribute('data-dynasty-finder')).toBe('whole');
 		expect(orientation(root)).toBe('sideways');
@@ -229,15 +219,17 @@ describe('D52: on a phone, Fit and the legend are items of the More list', () =>
 		const t = tools(root);
 		expect(t).not.toContain('dynasty-fit');
 		expect(t).not.toContain('dynasty-legend-button');
+		expect(t).not.toContain('dynasty-titles-button');
 		expect(t).toContain('dynasty-more');
 		expect(t[t.length - 1]).toBe('dynasty-close');
 		await press(root, '.dynasty-more');
 		const items = root.querySelectorAll('.dynasty-popover-more .dynasty-more-item');
-		expect(items.map((i) => [...i.classes].find((c) => c.startsWith('dynasty-more-') && c !== 'dynasty-more-item'))).toEqual(['dynasty-more-relation', 'dynasty-more-titles', 'dynasty-more-save', 'dynasty-more-fit', 'dynasty-more-legend', 'dynasty-more-text-source']);
-		expect(items.map((i) => i.querySelector('.dynasty-more-text')!.getText())).toEqual([FINDER_UI.relation, 'Titles', 'Save as picture', UI.fit, UI.legend, BLOCK_UI.showText]);
+		// 0.2.8 (G.13): the order of the menu: Fit and Titles first (the phone's bar has neither), then the line styles, Relation, Save as picture, the tree text.
+		expect(items.map((i) => [...i.classes].find((c) => c.startsWith('dynasty-more-') && c !== 'dynasty-more-item'))).toEqual(['dynasty-more-fit', 'dynasty-more-titles', 'dynasty-more-legend', 'dynasty-more-relation', 'dynasty-more-save', 'dynasty-more-text-source']);
+		expect(items.map((i) => i.querySelector('.dynasty-more-text')!.getText())).toEqual([UI.fit, 'Titles', UI.legend, FINDER_UI.relation, 'Save as picture', BLOCK_UI.showText]);
 		// The texts are the whole names: no label that differs from them.
-		expect(items[3].getAttribute('aria-label')).toBeNull();
-		expect(items[4].getAttribute('aria-label')).toBeNull();
+		expect(items[0].getAttribute('aria-label')).toBeNull();
+		expect(items[2].getAttribute('aria-label')).toBeNull();
 	});
 
 	it('Fit in the More list fits the tree; the line styles item opens the legend', async () => {
@@ -267,9 +259,9 @@ describe('D52: on a phone, Fit and the legend are items of the More list', () =>
 	it('the computer toolbar does not change: Fit and Legend stay, More lists Relation and Titles (M8)', async () => {
 		desktop();
 		const { root } = await openFullScreen(F12);
-		expect(tools(root)).toEqual(['dynasty-add-person', 'dynasty-houses-button', 'dynasty-focus', 'dynasty-find', 'dynasty-fit', 'dynasty-legend-button', 'dynasty-more', 'dynasty-close']);
+		expect(tools(root)).toEqual(['dynasty-add-person', 'dynasty-find', 'dynasty-focus', 'dynasty-fit', 'dynasty-houses-button', 'dynasty-titles-button', 'dynasty-more', 'dynasty-close']);
 		await press(root, '.dynasty-more');
-		// M9 (spec §13.8, O11): Relation, Titles and Save as picture; D176: Show the tree text is the last.
+		// The line styles, Relation and Save as picture (spec §13.8, O11); D176: Show the tree text is the last. Titles have a button of their own (G.13).
 		expect(root.querySelectorAll('.dynasty-popover-more .dynasty-more-item')).toHaveLength(4);
 	});
 
@@ -289,9 +281,9 @@ describe('D52: on a phone, Fit and the legend are items of the More list', () =>
 });
 
 describe('the result bar on a phone (styles.css)', () => {
-	it('its buttons share one row; a long label breaks inside its button, which stays 44 px', () => {
-		expect(css).toMatch(/\.modal\.dynasty-fullscreen\.is-phone \.dynasty-full \.dynasty-result-buttons \{[^}]*flex-wrap: nowrap/);
-		expect(css).toMatch(/\.modal\.dynasty-fullscreen\.is-phone \.dynasty-full \.dynasty-result \.dynasty-result-button \{[^}]*white-space: normal/);
+	it('Close is an X of 44 px and every link keeps 44 px', () => {
+		// 0.2.8 (G.13, I37 B): the banner is one row, and Close on a phone is an X of 44 px.
+		expect(css).toMatch(/\.dynasty-result \.dynasty-result-button\.dynasty-bar-x \{[^}]*width: 44px/);
 		expect(css).toMatch(/\.dynasty-result \.dynasty-result-button \{[^}]*min-height: 44px/);
 	});
 });

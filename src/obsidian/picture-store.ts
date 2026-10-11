@@ -33,6 +33,7 @@
 import type { App, TFile } from 'obsidian';
 import { fitMeet, judgeHeader, pictureFormat, pictureTarget, readPictureHeader, type PictureProblem, type SupportedFormat } from '../core/pictures';
 import { cropSquare, formatPortraitCrop, type CropFraction } from '../core/portrait-crop';
+import { outlineGrid, traceOutline, type ArmsOutline } from '../layout/arms-outline';
 
 // ---------- Types (M9 contract O1, O3, B15, C14) ----------
 
@@ -110,6 +111,11 @@ export interface PictureStore {
 	 * nothing): a caller that keeps the URL calls `acquire`, which finds the same copy at once.
 	 */
 	peek(file: TFile, box: CopyBox): PictureCopy | null;
+	/**
+	 * D219: the outline of the arms picture of `file` (the shape of its non-transparent pixels), read once while a copy of the file was made; null while it
+	 * is not known, or when the picture shows nothing. The gap round the arms on a card follows it. Optional so that a stand-in store without arms (a test) needs no outline.
+	 */
+	outlineOf?(file: TFile): ArmsOutline | null;
 	/** O7: the 64 × 64 RGBA pixels of arms (fitted, transparent around), or null when the plugin cannot read them. */
 	pixels(file: TFile): Promise<Uint8ClampedArray | null>;
 	/** O4, P3: a PNG data URI at `w` × `h` picture px; the full-size picture is freed before it returns. */
@@ -152,6 +158,11 @@ export const ARMS_PIXELS = 64;
 const PRIORITY_NOW = 0;
 const PRIORITY_LIVE = 1;
 const PRIORITY_CHECK = 2;
+/**
+ * D219: the outlines kept at most (about 2 KB each); the one least recently read leaves first. An outline also leaves with the last copy of its file,
+ * so this cap is a safety net: it is above the number of small copies that the byte limit of the list can hold.
+ */
+const OUTLINE_KEPT = 2000;
 /** An SVG is drawn on a canvas at most this large on its longest side before its copy is made. */
 const SVG_RASTER_MAX = 2048;
 
@@ -161,7 +172,7 @@ type HeaderResult = { ok: true; format: SupportedFormat } | PictureProblem;
 
 const sigOf = (f: TFile) => `${f.stat?.mtime ?? 0}:${f.stat?.size ?? 0}`;
 const notImage = (f: TFile): PictureProblem => ({ ok: false, code: 'picture-not-image', file: f.name });
-const isProblem = (x: unknown): x is PictureProblem => !!x && typeof x === 'object' && (x as { ok?: unknown }).ok === false;
+export const isProblem = (x: unknown): x is PictureProblem => !!x && typeof x === 'object' && (x as { ok?: unknown }).ok === false;
 
 class StepTimeout extends Error {}
 
@@ -415,6 +426,8 @@ export function createPictureStore(app: App, io: PictureIO = defaultIO(app)): Pi
 	const staleInUse = new Set<Entry>();
 	const headers = new Map<string, { sig: string; result: HeaderResult }>();
 	const gens = new Map<string, number>();
+	/** D219: the outline of each arms file as it is now (null = the picture shows nothing or can never be read), by path and signature. */
+	const outlines = new Map<string, ArmsOutline | null>();
 	const reads = new Map<string, Promise<ArrayBuffer>>();
 	const checks = new Map<string, Promise<PictureProblem | null>>();
 	const jobs = new Map<string, { waiters: Set<Waiter> }>();
@@ -592,7 +605,7 @@ export function createPictureStore(app: App, io: PictureIO = defaultIO(app)): Pi
 				}
 			});
 		} catch (e) {
-			return failed(file, e);
+			return failed(file, e, !(e instanceof StepTimeout));
 		}
 		const close = opened(picture);
 		if (!stillWanted() || gen(file.path) !== g || !(picture.width > 0 && picture.height > 0)) {
@@ -602,10 +615,13 @@ export function createPictureStore(app: App, io: PictureIO = defaultIO(app)): Pi
 		return { picture, close };
 	}
 
-	/** A failed step: `picture-not-image`; a timeout is not kept across sessions (B12). */
-	function failed(file: TFile, e: unknown): PictureProblem {
+	/**
+	 * A failed step: `picture-not-image`. F-VIEW-02: only a real decode fault (`fault`: the engine could not decode the bytes) is remembered for the
+	 * file as it is; a read error (a file that a sync has not finished), a timeout or a canvas error is not, so the next draw tries again.
+	 */
+	function failed(file: TFile, e: unknown, fault = false): PictureProblem {
 		const p = notImage(file);
-		remember(file, p, false);
+		if (fault) remember(file, p, false);
 		if (!(e instanceof StepTimeout)) console.warn('Dynasty Tree: cannot read the picture', file.path, e);
 		return p;
 	}
@@ -653,6 +669,51 @@ export function createPictureStore(app: App, io: PictureIO = defaultIO(app)): Pi
 		}
 	}
 
+	// ---------- outlines (D219) ----------
+
+	const outlineKey = (file: TFile) => `${file.path}\u0000${sigOf(file)}`;
+
+	/**
+	 * Reads the shape of an arms picture while its full-size picture is still open (the same decode as the copy, so the outline costs one draw on a
+	 * 128-pixel canvas and no second decode). Gives null when the outline is known already.
+	 */
+	const isTainted = (e: unknown) => !!e && typeof e === 'object' && (e as { name?: unknown }).name === 'SecurityError';
+
+	function startOutline(file: TFile, picture: DecodedPicture): Promise<void> | null {
+		const key = outlineKey(file);
+		if (outlines.has(key)) return null;
+		const keepOutline = (o: ArmsOutline | null) => {
+			outlines.delete(key);
+			outlines.set(key, o);
+			while (outlines.size > OUTLINE_KEPT) outlines.delete(outlines.keys().next().value!);
+		};
+		const grid = outlineGrid(picture.width, picture.height);
+		let pixels: Promise<Uint8ClampedArray>;
+		try {
+			// The draw happens inside the call, before the caller closes the picture.
+			pixels = io.rgba(picture.source, grid.w, grid.h);
+		} catch (e) {
+			if (isTainted(e)) keepOutline(null);
+			return null;
+		}
+		return limited(pixels, STEP_LIMIT_MS).then(
+			(px) => {
+				// A throw in the trace gives "no gap" and must never fail the copy job.
+				let o: ArmsOutline | null;
+				try {
+					o = traceOutline(px, grid.w, grid.h);
+				} catch {
+					return;
+				}
+				keepOutline(o);
+			},
+			// Only a tainted canvas (an SVG with outside content) is a lasting "no outline". After a timeout or another error the entry stays absent, so the next copy tries again.
+			(e) => {
+				if (isTainted(e)) keepOutline(null);
+			},
+		);
+	}
+
 	// ---------- copies (O3) ----------
 
 	function hold(e: Entry): PictureCopy {
@@ -676,6 +737,10 @@ export function createPictureStore(app: App, io: PictureIO = defaultIO(app)): Pi
 	function drop(e: Entry): void {
 		if (lru.get(e.key) === e) lru.delete(e.key);
 		staleInUse.delete(e);
+		// The outline belongs to the file and its signature: it leaves with the last copy of that file.
+		const fileKey = e.key.split('\u0000').slice(0, 2).join('\u0000');
+		const sameFile = (o: Entry) => o !== e && o.key.startsWith(`${fileKey}\u0000`);
+		if (![...lru.values()].some(sameFile) && ![...staleInUse].some(sameFile)) outlines.delete(fileKey);
 		// `bytes` goes to 0, so a second drop of the same copy counts nothing.
 		total -= e.bytes;
 		e.bytes = 0;
@@ -804,7 +869,9 @@ export function createPictureStore(app: App, io: PictureIO = defaultIO(app)): Pi
 					finish(d);
 					return;
 				}
+				const outlining = keep && fit === 'meet' ? startOutline(file, d.picture) : null;
 				const out = await encodeCopy(file, d, px, fit, false, part);
+				await outlining;
 				if (isProblem(out)) {
 					finish(out);
 					return;
@@ -904,6 +971,16 @@ export function createPictureStore(app: App, io: PictureIO = defaultIO(app)): Pi
 			}
 		},
 
+		outlineOf(file) {
+			const key = outlineKey(file);
+			const o = outlines.get(key);
+			if (o === undefined) return null;
+			// A read counts as use, so the outline of a picture on show is the last to leave.
+			outlines.delete(key);
+			outlines.set(key, o);
+			return o;
+		},
+
 		pixels(file) {
 			return new Promise<Uint8ClampedArray | null>((resolve) => {
 				try {
@@ -964,7 +1041,9 @@ export function createPictureStore(app: App, io: PictureIO = defaultIO(app)): Pi
 							if (d === null) return resolve(notImage(file));
 							if (isProblem(d)) return resolve(d);
 							const px = { w: Math.max(1, Math.round(box.w)), h: Math.max(1, Math.round(box.h)) };
+							const outlining = box.fit === 'meet' ? startOutline(file, d.picture) : null;
 							const out = await encodeCopy(file, d, px, box.fit === 'portrait' ? 'portrait' : 'meet', true, box.fit === 'portrait' ? box.crop : undefined);
+							await outlining;
 							if (isProblem(out)) return resolve(out);
 							try {
 								const bytes = new Uint8Array(await limited(out.blob.arrayBuffer(), STEP_LIMIT_MS));
@@ -1007,6 +1086,7 @@ export function createPictureStore(app: App, io: PictureIO = defaultIO(app)): Pi
 			try {
 				gens.set(path, gen(path) + 1);
 				headers.delete(path);
+				for (const k of [...outlines.keys()]) if (k.startsWith(`${path}\u0000`)) outlines.delete(k);
 				for (const e of [...lru.values()]) {
 					if (e.path !== path) continue;
 					if (e.refs === 0) drop(e);

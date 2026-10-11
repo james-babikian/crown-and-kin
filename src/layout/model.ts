@@ -61,6 +61,11 @@ export interface Geometry {
 	form?: 'roundel' | 'text';
 	/** 0.2.5: the empty space above every card of a Roundel tree that has a picture, in px. Set only when more than 0, so old keys stay. */
 	crown?: number;
+	/**
+	 * 0.2.8 (D212 card-text-centre): the px below a Roundel card's top edge where the room for its text starts, when the tree has portraits: the lower edge of the
+	 * medallion's halo, which reaches further down than the crown. Absent: the crown (or, with no crown, the colour ribbon). Set only when more than 0.
+	 */
+	textTop?: number;
 	/** 0.2.5: the px at the start of the first row (down) or the first stack position (sideways) for what sticks out above a card (medallion, "You" tab). Set only when more than 0. */
 	reach?: number;
 }
@@ -268,6 +273,17 @@ export interface LayoutSettings {
 	 * no box changes size or place. Part of the cache key when not empty.
 	 */
 	arms?: readonly string[];
+	/**
+	 * 0.2.8 (D204): the ids of the people whose personal `arms` is written, sorted (`pictureSets`). Their cards always show the personal arms, whatever
+	 * `armsOnCards` says, so each of them also makes the crown (the room above the card). Part of the cache key when not empty.
+	 */
+	personalArms?: readonly string[];
+	/**
+	 * 0.2.8 (D206, contract A.4, G.16): the setting "Arms on cards". Present: a card has `PersonBox.arms` when `armsCardIds` (`core/arms-rule.ts`) names it and its
+	 * house (`arms`) or its own `personalArms` has arms. Absent: the 0.2.7 rule, every person of a
+	 * house in `arms`, plus every person in `personalArms`. Part of the cache key when present.
+	 */
+	armsOnCards?: 'few' | 'all';
 	/**
 	 * Spec §13.7 (D76, D78): ids of the people whose `portrait` is written, sorted; empty or absent
 	 * when "Show portraits on cards" is off (`pictureSets`). These cards get `PersonBox.portrait`; no

@@ -1,0 +1,470 @@
+/* C: phone list */
+
+/*
+ * D144: a tree in a note on a phone is a list of rows (src/render/dom/phone-list-dom.ts). The list has its natural
+ * height and the note scrolls over it. Colours come only from theme variables; a house colour comes only through
+ * --dynasty-house-color, which the code sets on the row.
+ * 0.2.8 (D197 Q5 A, D198, D209, D210, D213, G.2, G.11): the bar is the same flat row as the toolbar of a
+ * computer; the person at the top has a large row with no frame and no heading over it (the name at 21 px, the relation word in italic, the title text line;
+ * at the right a column with a 56 px portrait and under it the 35 px arms); the other rows have a 3 px house strip, the name at 17 px and at the right a 36 px
+ * portrait; the order is the person, Parents, Partners, Children; a missing picture leaves no place holder. "You" is bold in the text colour.
+ */
+
+.dynasty-viewport.dynasty-list-viewport {
+	/* No narrow-tree rule for a list. */
+	container-type: normal;
+	height: auto;
+	overflow: visible;
+	border: none;
+	border-radius: 0;
+	/* A finger drag always scrolls the note. */
+	touch-action: pan-y;
+	cursor: default;
+}
+
+/* The bar above the list: a full-width row of icon buttons (D182), Add person at the left. */
+.dynasty-list-viewport > .dynasty-toolbar {
+	/* Own layer above Obsidian's invisible "Edit this block" button (32 x 28 px, top right of the block): a tap on it shows the YAML source in Live Preview. */
+	position: relative;
+	/* The computer's bar sets its place for position: absolute. On a relative box they would move the bar, out of line with the rows. */
+	top: auto;
+	left: auto;
+	right: auto;
+	z-index: 1;
+	box-sizing: border-box;
+	width: 100%;
+	height: 48px;
+	margin: 0;
+	padding: 0 8px;
+	border-top: 1px solid var(--background-modifier-border);
+}
+
+.dynasty-list-viewport > .dynasty-toolbar .dynasty-tool {
+	color: var(--text-normal);
+}
+
+/*
+ * The rows stand 8 px inside the block, so that the 2 px frame of the large row and of the marked row (which reaches the edge of the block, into the note's margin) is never cut by the block's own box; the content of every row starts at the same place (I38).
+ */
+.dynasty-list-section {
+	padding: 0 8px;
+}
+
+.dynasty-list-head {
+	margin: 18px 0 4px 0;
+	color: var(--dynasty-muted, var(--text-muted));
+	font-family: var(--font-interface);
+	font-size: var(--dynasty-type-small);
+	font-weight: var(--font-semibold);
+}
+
+/* The heading takes the focus after a move so that a screen reader says it; a ring around it would only distract. */
+.dynasty-list-head:focus:not(:focus-visible) {
+	outline: none;
+}
+
+/* D209 item 2: no heading over the person at the top (the large row says who it is). The heading stays for a screen reader and for the focus after a move. */
+.dynasty-list-section[data-section='person'] {
+	position: relative;
+	padding-top: 6px;
+}
+
+.dynasty-list-section[data-section='person'] > .dynasty-list-head {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	margin: -1px;
+	padding: 0;
+	overflow: hidden;
+	clip-path: inset(50%);
+	white-space: nowrap;
+}
+
+.dynasty-list-sub {
+	margin: 10px 0 2px 0;
+	color: var(--dynasty-muted, var(--text-muted));
+	font-family: var(--font-interface);
+	font-size: var(--dynasty-type-small);
+}
+
+.dynasty-list-row {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	box-sizing: border-box;
+	min-height: 60px;
+	padding: 6px 0;
+	border-top: 1px solid var(--background-modifier-border);
+	user-select: none;
+	-webkit-user-select: none;
+}
+
+/* A hairline between rows, none under a heading or a boxed row. */
+.dynasty-list-head + .dynasty-list-row,
+.dynasty-list-sub + .dynasty-list-row,
+.dynasty-list-hero + .dynasty-list-row,
+.dynasty-list-me + .dynasty-list-row {
+	border-top: 0;
+}
+
+/*
+ * The large row and the marked row (D209 item 1): no frame; "You" in bold says who is marked (the 3 px frame of the marked card stays in the tree). The
+ * transparent border keeps the content where the other rows' content is, and the outline of a saved row (below) has room.
+ */
+.dynasty-list-hero {
+	margin: 4px -8px;
+	border: 2px solid transparent;
+	border-radius: var(--radius-m);
+}
+
+.dynasty-list-me {
+	margin: 4px -8px;
+	padding: 8px 6px;
+	border: 2px solid transparent;
+	border-radius: var(--radius-m);
+}
+
+/* The row of a person that a save just changed: a still outline, no animation (Reduce movement has nothing to change). */
+.dynasty-list-flash {
+	outline: 2px solid var(--interactive-accent);
+	outline-offset: 0;
+	border-radius: var(--radius-m);
+}
+
+.dynasty-list-hero {
+	gap: 12px;
+	min-height: 72px;
+	padding: 12px 6px;
+}
+
+/*
+ * The two buttons of a row. Obsidian and the themes style every button (height, padding, shadow, background,
+ * also on hover), so each part is set again here with a rule that is more specific than theirs.
+ */
+.dynasty-list button.dynasty-list-go,
+.dynasty-list button.dynasty-list-edit {
+	-webkit-appearance: none;
+	appearance: none;
+	box-sizing: border-box;
+	height: auto;
+	min-height: 48px;
+	margin: 0;
+	padding: 0;
+	background: transparent;
+	border: none;
+	border-radius: 0;
+	box-shadow: none;
+	color: inherit;
+	font: inherit;
+	line-height: inherit;
+	text-align: left;
+	/* Obsidian sets nowrap on a button; a long name must wrap. */
+	white-space: normal;
+	cursor: pointer;
+	-webkit-tap-highlight-color: transparent;
+}
+
+.dynasty-list button.dynasty-list-go:hover,
+.dynasty-list button.dynasty-list-edit:hover,
+.dynasty-list button.dynasty-list-go:focus,
+.dynasty-list button.dynasty-list-edit:focus {
+	background: transparent;
+	box-shadow: none;
+}
+
+.dynasty-list button.dynasty-list-go:active,
+.dynasty-list button.dynasty-list-edit:active {
+	background: var(--background-modifier-hover);
+}
+
+.dynasty-list button.dynasty-list-go:focus-visible,
+.dynasty-list button.dynasty-list-edit:focus-visible {
+	outline: 2px solid var(--interactive-accent);
+	outline-offset: -2px;
+}
+
+/* The name button fills the row; the pencil is a 44 px square at the right edge, with no divider before it (C03). */
+.dynasty-list button.dynasty-list-go {
+	display: flex;
+	flex: 1 1 auto;
+	align-items: center;
+	gap: 12px;
+	min-width: 0;
+}
+
+.dynasty-list button.dynasty-list-edit:not(.dynasty-list-whole) {
+	display: flex;
+	flex: none;
+	align-items: center;
+	justify-content: center;
+	width: 44px;
+	min-width: 44px;
+	height: 44px;
+	min-height: 44px;
+	margin-right: -8px;
+	border-radius: 10px;
+	color: var(--dynasty-muted, var(--text-muted));
+}
+
+/* The large row has one button that covers the row and edits; the pencil is inside it, at the right. */
+.dynasty-list button.dynasty-list-edit.dynasty-list-whole {
+	display: flex;
+	flex: 1 1 auto;
+	align-items: center;
+	gap: 12px;
+	width: 100%;
+	min-width: 0;
+}
+
+/* The picture column starts level with the first text line of the name; the pencil stays in the middle. */
+.dynasty-list button.dynasty-list-edit.dynasty-list-whole.has-column {
+	align-items: flex-start;
+}
+
+.dynasty-list button.dynasty-list-edit.dynasty-list-whole:disabled {
+	opacity: 1;
+	cursor: default;
+}
+
+.dynasty-list-edit-icon {
+	display: flex;
+	flex: none;
+	align-items: center;
+	justify-content: center;
+	width: 44px;
+	height: 44px;
+	margin-right: -8px;
+	color: var(--dynasty-muted, var(--text-muted));
+}
+
+/* The pencil button is 44 px wide and already reaches 8 px into the margin of the row. The icon inside it must not pull a second 8 px (it stuck out 4 px and made the list scroll sideways). */
+.dynasty-list button.dynasty-list-edit:not(.dynasty-list-whole) .dynasty-list-edit-icon {
+	margin-right: 0;
+}
+
+.dynasty-list-edit-icon .svg-icon {
+	width: 19px;
+	height: 19px;
+}
+
+.dynasty-list-hero .dynasty-list-edit-icon {
+	align-self: center;
+}
+
+.dynasty-list.is-read-only .dynasty-list-edit:not(.dynasty-list-whole),
+.dynasty-list.is-read-only .dynasty-list-edit-icon {
+	display: none;
+}
+
+.dynasty-list.is-read-only .dynasty-list-hero button.dynasty-list-whole {
+	padding-right: 0;
+}
+
+/* The house strip of a row: 3 px, short, inset (the colour only through the custom property). */
+.dynasty-list-strip {
+	flex: none;
+	align-self: stretch;
+	width: 3px;
+	margin: 6px 0;
+	border-radius: 2px;
+	background: var(--dynasty-house-color, var(--background-modifier-border-hover));
+}
+
+/* G.11: as on the cards, a house colour is lighter in the dark theme (60 % of the colour with the text colour). */
+.theme-dark .dynasty-list-row.dynasty-has-house .dynasty-list-strip {
+	background: var(--dynasty-house-color);
+	background: color-mix(in srgb, var(--dynasty-house-color) 60%, var(--text-normal));
+}
+
+.dynasty-list-text {
+	display: block;
+	flex: 1 1 auto;
+	min-width: 0;
+	padding: 0;
+	font-family: var(--font-text);
+	line-height: 1.3;
+}
+
+.dynasty-list-name {
+	display: block;
+	overflow-wrap: anywhere;
+	color: var(--text-normal);
+	/* 17 px, and larger with a larger note font (D144: the list text is never under 15 px). */
+	font-size: max(17px, var(--font-text-size));
+	font-weight: var(--font-semibold);
+	line-height: 1.25;
+}
+
+.dynasty-list-sob {
+	font-weight: var(--font-normal);
+	color: var(--dynasty-muted, var(--text-muted));
+	/* D173 (2), D122: one part. An inline box that is as wide as its text moves whole to the next text line; if the text is wider than the row, the box is as wide as the row and the text wraps inside it. */
+	display: inline-block;
+	max-width: 100%;
+	vertical-align: top;
+}
+
+.dynasty-list-meta,
+.dynasty-list-title {
+	overflow-wrap: anywhere;
+	color: var(--dynasty-muted, var(--text-muted));
+	/* D144 and D218: the text line is never under 15 px, and larger with a larger note font; the large row uses the same size. */
+	font-size: max(15px, calc(var(--font-text-size) * 0.88));
+	line-height: 1.35;
+}
+
+/* The text line of a row is a block of its own; its title is one item of it (inline), except in the large row, where the title is a text line of its own. */
+.dynasty-list-meta {
+	display: block;
+	margin-top: 2px;
+}
+
+.dynasty-list-word,
+.dynasty-list-link {
+	font-style: italic;
+}
+
+/* "You" and the place in a line of succession: semibold in the text colour in every row (D209 items 1 and 8; D218 item 3). The kind of link stays plain italic (D210). */
+.dynasty-list-word.is-strong {
+	color: var(--text-normal);
+	font-weight: var(--font-semibold);
+}
+
+/* The large row (D198 Q5 A, D209). A long name breaks into text lines of near equal length. */
+.dynasty-list-hero .dynasty-list-name {
+	font-size: max(22px, calc(var(--font-text-size) * 1.375));
+	font-weight: var(--font-semibold);
+	line-height: 1.2;
+	letter-spacing: 0;
+	text-wrap: balance;
+}
+
+.dynasty-list-hero .dynasty-list-title.dynasty-hero-title {
+	display: block;
+	margin-top: 3px;
+	color: var(--text-normal);
+	line-height: 1.35;
+}
+
+/* A text line of items with "·" between them (G.2): a mark never starts a wrapped text line, and the mark is gone with its item's line break. */
+.dynasty-list-text .dynasty-jitem {
+	display: inline-block;
+	max-width: 100%;
+	vertical-align: top;
+}
+
+.dynasty-list-text .dynasty-jmark {
+	margin-right: 0.4em;
+	color: var(--dynasty-muted, var(--text-muted));
+}
+
+.dynasty-list-text .dynasty-jitem.is-lead > .dynasty-jmark {
+	display: none;
+}
+
+/* A picture place exists only for a picture the person has (D213); the picture is a circle in every theme (a theme's rule for pictures in a note must not square it). */
+.dynasty-list-pics {
+	display: flex;
+	flex: none;
+	align-items: center;
+}
+
+.dynasty-list-portrait,
+.dynasty-hero-portrait {
+	display: block;
+	flex: none;
+	overflow: hidden;
+	border-radius: 50%;
+}
+
+.dynasty-list-portrait {
+	width: 36px;
+	height: 36px;
+}
+
+.dynasty-hero-portrait {
+	width: 56px;
+	height: 56px;
+}
+
+/* A faint outline in the line colour keeps a pale portrait round (D209 item 3); it shows with the picture only, so a place that waits is not a ring. */
+.dynasty-list-portrait.has-picture,
+.dynasty-hero-portrait.has-picture {
+	box-shadow: 0 0 0 1px var(--background-modifier-border);
+}
+
+.dynasty-list .dynasty-list-portrait > img,
+.dynasty-list .dynasty-hero-portrait > img {
+	display: block;
+	box-sizing: border-box;
+	width: 100%;
+	height: 100%;
+	max-width: none;
+	margin: 0;
+	padding: 0;
+	border: 0;
+	border-radius: 0;
+	box-shadow: none;
+	object-fit: cover;
+	object-position: 50% 20%;
+	pointer-events: none;
+}
+
+/* The column at the right of the large row: the portrait, and under it the arms on one vertical line (D209 item 6). */
+.dynasty-hero-col {
+	display: flex;
+	flex: none;
+	flex-direction: column;
+	align-items: center;
+	gap: 8px;
+	margin-top: 1px;
+}
+
+.dynasty-hero-arms {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 56px;
+	height: 35px;
+}
+
+/* The arms alone are 56 px high. */
+.dynasty-hero-col.no-portrait .dynasty-hero-arms {
+	width: 46px;
+	height: 56px;
+}
+
+/*
+ * The shield stands in its slot, 35 px high under the portrait (56 px alone), with no box of its own. A theme's rule for pictures in a note (Cupertino: a grey
+ * background, a padding and a width of its own) outranks a short selector, so the size, the background and the border are all stated here with a long one.
+ * The slot clips what a theme still adds.
+ */
+.dynasty-hero-arms {
+	overflow: hidden;
+	background: transparent;
+}
+
+body .dynasty-list .dynasty-list-hero .dynasty-hero-col .dynasty-hero-arms > img {
+	display: block;
+	box-sizing: border-box;
+	width: auto;
+	height: 100%;
+	min-width: 0;
+	min-height: 0;
+	max-width: 100%;
+	max-height: 100%;
+	margin: 0;
+	padding: 0;
+	background: transparent;
+	border: 0;
+	border-radius: 0;
+	box-shadow: none;
+	outline: none;
+	object-fit: contain;
+	pointer-events: none;
+}
+
+/* G3 (2026-10-10): the list region is named with aria-label, which Obsidian shows as a tooltip wherever the pointer rests on the list. The list is a phone view with no hover, so its tooltips are off. */
+.dynasty-list {
+	--no-tooltip: true;
+}

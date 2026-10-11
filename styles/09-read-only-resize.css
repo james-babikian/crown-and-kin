@@ -1,0 +1,155 @@
+/* ---------- Read-only trees and the resize handle (spec §6.1, §7.5) ---------- */
+
+.dynasty-toolbar .dynasty-open-source .dynasty-tool-text {
+	white-space: nowrap;
+}
+
+/* The chip has a word next to its icon, so it is wider than the 44 px box of the other tools; its height stays 44 px. The text-hiding rule below is a container query that does not apply in the phone list. */
+.dynasty-toolbar .dynasty-tool.dynasty-open-source {
+	width: auto;
+	padding: 0 10px 0 6px;
+}
+
+.dynasty-toolbar .dynasty-tool.dynasty-open-source::before {
+	inset: 7px 0;
+}
+
+/* Explains why a press on a card does nothing (transclusion, Canvas card, popover, editing off). */
+.dynasty-toolbar .dynasty-read-only-label {
+	display: flex;
+	align-items: center;
+	min-height: 44px;
+	padding: 0 var(--size-4-2);
+	color: var(--text-muted);
+	white-space: nowrap;
+}
+
+/*
+ * 0.2.8 (contract C): the tree box of a note has no frame of its own. The toolbar row has its hairline below, and the box a hairline at its foot.
+ * A rule with a higher specificity than the base rule of the viewport.
+ */
+.dynasty-root .dynasty-viewport {
+	border-width: 0 0 1px 0;
+	border-radius: 0;
+}
+
+.dynasty-root.dynasty-full .dynasty-viewport {
+	border-width: 0;
+}
+
+/*
+ * D212 (bars-in-flow): in a note the toolbar and the banner of the relation finder or of the Show view stand above the tree, in the flow of the box, and the
+ * tree is drawn in what is left below them, so a first view or a Fit never puts a card under a bar. The class `is-flow` is set on the box by the tree view
+ * (the full-screen view keeps its bars over the tree). The pan and zoom code works in the drawing area: `TreeView.frameTop` is the height of the bars.
+ */
+.dynasty-viewport.is-flow {
+	display: flex;
+	flex-direction: column;
+	/* A short box (`height: 100`) with a banner keeps a drawing area of 120 px: the tree view sets --dynasty-bars to the height of the bars. */
+	height: max(var(--dynasty-height, 500px), calc(var(--dynasty-bars, 0px) + 120px));
+}
+
+.dynasty-viewport.is-flow > .dynasty-toolbar,
+.dynasty-viewport.is-flow > .dynasty-result {
+	position: relative;
+	top: auto;
+	left: auto;
+	right: auto;
+	flex: none;
+}
+
+.dynasty-viewport.is-flow > .dynasty-canvas {
+	flex: 1 1 auto;
+	min-height: 0;
+	height: auto;
+}
+
+/* The picture fills the drawing area whatever way a browser resolves a percentage height inside a flex item. */
+.dynasty-viewport.is-flow > .dynasty-canvas {
+	position: relative;
+}
+
+.dynasty-viewport.is-flow > .dynasty-canvas > .dynasty-svg {
+	position: absolute;
+	inset: 0;
+}
+
+/*
+ * D28: "↑ 1 more child" at the top edge (left of the note's toolbar) and "↓ 3 more children" at the
+ * bottom edge. A plain label: a tap goes through it to the tree. Its place comes from the tree view
+ * (--dynasty-hint-*); its height is HINT_HEIGHT in tree-view.ts.
+ */
+.dynasty-hint {
+	position: absolute;
+	right: var(--dynasty-hint-right, var(--size-4-2));
+	z-index: 1;
+	display: flex;
+	align-items: center;
+	box-sizing: border-box;
+	height: 28px;
+	padding: 0 var(--size-4-2);
+	background: var(--background-primary);
+	border: 1px solid var(--background-modifier-border);
+	border-radius: var(--radius-m);
+	color: var(--text-muted);
+	font-family: var(--font-interface);
+	font-size: var(--dynasty-type-small);
+	white-space: nowrap;
+	pointer-events: none;
+}
+
+/* The hint labels stay in the tree (no element is added after the draw); hidden while they count nobody. */
+.dynasty-hint-slot:not(.dynasty-hint) {
+	display: none;
+}
+
+.dynasty-hint-up {
+	top: var(--dynasty-hint-top, var(--size-4-1));
+}
+
+.dynasty-hint-down {
+	bottom: var(--dynasty-hint-bottom, var(--size-4-1));
+}
+
+@container (max-width: 420px) {
+	.dynasty-toolbar .dynasty-tool-text {
+		display: none;
+	}
+}
+
+/* Desktop only: a drag changes the embedded height. The visible bar is thin; the hit area is 44 px high (a 14 px row, a 36 px bar). */
+.dynasty-resize {
+	position: relative;
+	height: 14px;
+	cursor: ns-resize;
+	touch-action: none;
+}
+
+.dynasty-resize::before {
+	content: '';
+	position: absolute;
+	inset: -16px 0;
+}
+
+.dynasty-resize::after {
+	content: '';
+	position: absolute;
+	left: calc(50% - 18px);
+	top: 5px;
+	width: 36px;
+	height: 4px;
+	border-radius: 2px;
+	background: var(--background-modifier-border-hover);
+}
+
+.dynasty-resize:hover::after,
+.dynasty-resizing .dynasty-resize::after {
+	background: var(--interactive-accent);
+}
+
+.dynasty-resizing,
+.dynasty-resizing * {
+	cursor: ns-resize;
+	user-select: none;
+}
+

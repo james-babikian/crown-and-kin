@@ -6,7 +6,7 @@
  * `unionShape`, `UNION_MARKS` and `unionMark`.
  */
 import type { StrokeKind } from '../layout/model';
-import { LEGEND_LABELS } from './tree-info';
+import { LEGEND_LABELS } from './legend-text';
 
 /**
  * Colour roles used by the tree. In the plugin every role is an Obsidian CSS variable, or a mix of
@@ -59,17 +59,6 @@ export const THEME_VARS: { readonly [K in keyof typeof PLAIN_VARS | keyof typeof
 export type ThemeRole = keyof typeof THEME_VARS;
 /** A resolved colour (a hex string) for every role, as the headless renderer and tests use it. */
 export type Palette = Record<ThemeRole, string>;
-
-/**
- * The values styles.css gives a property for `role`, in order: a plain role is one `var()`; a
- * mixed role is the fallback `var()` followed by the `color-mix()`.
- */
-export function roleCss(role: ThemeRole): string[] {
-	const v = THEME_VARS[role];
-	if (typeof v === 'string') return [`var(${v})`];
-	const [a, p, b] = v.mix;
-	return [`var(${PLAIN_VARS[a]})`, `color-mix(in srgb, var(${PLAIN_VARS[a]}) ${p}%, var(${PLAIN_VARS[b]}))`];
-}
 
 const hexRgb = (hex: string): number[] => {
 	const h = hex.replace('#', '');
@@ -141,9 +130,9 @@ export const HOUSE_PALETTE = [
 ] as const;
 
 /** D27: in the dark theme a house strip is its colour moved this far towards the text colour. */
-export const HOUSE_DARK_LIFT = 0.3;
+export const HOUSE_DARK_LIFT = 0.4;
 /** D27: a dead person's house strip (spec §5.2 "slightly muted"). */
-export const DEAD_STRIP_OPACITY = 0.8;
+export const DEAD_STRIP_OPACITY = 0.7;
 
 /** The drawn colour of a house strip (D27), for headless pictures and the contrast test. */
 export function stripColour(house: string, p: Palette, dark: boolean): string {
@@ -270,26 +259,20 @@ export const ON_LINE_EXTRA = 1.5;
 export const FADED_OPACITY = 0.25;
 /**
  * D41, D153: the marked card has one border in the text colour, `border` px wide (`.dynasty-card-me .dynasty-card-bg`). It is the same stroke
- * in the live scene and the saved picture; no theme accent colour is used, so the mark never clashes with a house colour.
+ * in the live scene and the saved picture; no theme accent colour is used, so the mark never clashes with a house colour. 0.2.8 (D212, you-border): 2 px, not 3.
  */
-export const ME_LOOK = { border: 3 } as const;
+export const ME_LOOK = { border: 2 } as const;
 /**
- * 0.2.5 (B.3.4, D153): how the Roundel's footer plate and "You" tab look in the saved picture, which has no page CSS. Each number repeats
- * a rule in the block of styles.css that starts at the marker comment "roundel: card"; `tests/s025-roundel-svg.test.ts` pins that they agree. `plate` is the fill
- * opacity in the light theme and in the dark theme; the marked card's plate and the tab use the same numbers, in the house colour. `corner` is the radius of the plate's
- * bottom-right corner, the same number `scene.ts` draws. `tabStroke` is the card-colour gap round the tab, drawn by the base rect under it.
+ * 0.2.8 (contract C, G.15): the corner radius of a card in a saved picture, which has no theme to read it from. It is the default theme's `--radius-m`; the live tree reads
+ * the radius of the theme at run time (`readCornerRadius`). The ribbon of a saved picture uses it.
  */
-export const ROUNDEL_LOOK = {
-	plate: { light: 0.17, dark: 0.26 },
-	hairline: { opacity: 0.55, width: 1 },
-	corner: 3,
-	tabStroke: 1.5,
-} as const;
+export const SAVED_CARD_RADIUS = 8;
 /**
- * 0.2.7 (F.2, F.4, F.5): how the heir's outline and the ordinal tab look in the saved picture, which has no page CSS. `ring` is the width of the ring in the
- * text colour round an heir's card and `border` the width of its accent border (the numbers of `.dynasty-highlight` in styles.css, held still); `tabBorder` is the ordinal tab's 1 px border.
+ * 0.2.7 (F.2, F.4, F.5); 0.2.8 (I35, D212 heir-outline): how the heir's outline and the tabs look in the saved picture, which has no page CSS. `border` is the width of the heir's
+ * one accent border (`non-scaling` on screen; there is no second ring); `tabBorder` is the 1 px border of the "You" tab and of the ordinal tab, and `tabBase` the wide
+ * card-colour edge round them (the base under them).
  */
-export const HEIR_LOOK = { ring: 6, border: 3, tabBorder: 1 } as const;
+export const HEIR_LOOK = { border: 2, tabBorder: 1, tabBase: 3 } as const;
 /** D96, D153: how far the marked card's border edge lies inside the card's edge, in px: half the border (the stroke is centred on the edge). */
 export const ME_RING_INNER = ME_LOOK.border / 2;
 

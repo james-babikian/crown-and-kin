@@ -195,7 +195,7 @@ describe('D61: cardText with a two-line title text line', () => {
 				const top = tt.nameBaseline - (lh * tt.nameSize) / 2 - 0.35 * tt.nameSize;
 				const bottom = (relation ? tt.r1!.plate!.y : h) - (last - 0.35 * tt.smallSize + smallLine / 2);
 				expect(Math.abs(top - bottom)).toBeLessThanOrEqual(1);
-				expect([tt.stripW, tt.padX, tt.textW, tt.nameWithSignW]).toEqual([t.stripW, t.padX, t.textW, t.nameWithSignW]);
+				expect([tt.padX, tt.textW, tt.nameWithSignW]).toEqual([t.padX, t.textW, t.nameWithSignW]);
 			});
 		}
 	}

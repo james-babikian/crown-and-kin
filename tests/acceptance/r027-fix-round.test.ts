@@ -418,12 +418,12 @@ describe('edit-title keeps the comment of a curly-quoted list item (contract L.9
 describe('the refusal text for a value of inheritIllegitimate that is not known (contract L.9, J.10)', () => {
 	const body = ['titles:', '  - id: duke', '    name: Duke', '    holders: [aldric]', 'people:', '  - {id: aldric, name: Aldric}', ''].join('\n');
 
-	it('is refused as bad-value and the text says "children marked as illegitimate"', () => {
+	it('is refused as bad-value and the text names the box Illegitimate', () => {
 		const r = applyTitleOp(body, { kind: 'edit-title', id: 'duke', inheritIllegitimate: 'maybe' } as unknown as AnyOp);
 		expect(r.ok).toBe(false);
 		if (r.ok) return;
 		expect(r.code).toBe('bad-value');
-		expect(r.detail).toContain('children marked as illegitimate');
+		expect(r.detail).toContain('children with the box “Illegitimate” ticked');
 		expect(r.detail).not.toContain('born outside a marriage');
 	});
 });

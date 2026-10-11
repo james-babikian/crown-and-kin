@@ -80,15 +80,17 @@ describe('D125 (3): no bottom space under the list while the keyboard is up', ()
 });
 
 describe('D125 (3): a lower head and a first row close to the field', () => {
-	it('the head has 4 px under the Cancel button (it was 8 px)', () => {
-		const pad = decl('.dynasty-picker.is-phone .dynasty-picker-head', 'padding');
-		expect(pad).toMatch(/var\(--size-4-1\) max\(var\(--size-4-3\), env\(safe-area-inset-left\)\)$/);
-		// The top still clears the notch.
-		expect(pad).toMatch(/^max\(var\(--size-4-2\), env\(safe-area-inset-top\)\)/);
+	it('the top row (the field and Cancel, D212) has no space above or under it; the gap to the list is the list padding below', () => {
+		const pad = decl('.dynasty-picker.is-phone .prompt-input-container', 'padding');
+		expect(pad).toMatch(/^0 max\(var\(--size-4-3\), env\(safe-area-inset-right\)\) 0 max\(var\(--size-4-3\), env\(safe-area-inset-left\)\)$/);
+	});
+
+	it('the top still clears the notch: the prompt, not the grey pill, keeps the top safe area (0.2.8 iPhone finding)', () => {
+		expect(decl(PHONE, 'padding-top')).toBe('env(safe-area-inset-top)');
 	});
 
 	it('the Cancel button keeps a 44 px hit area', () => {
-		const r = rule('.dynasty-picker.is-phone .dynasty-picker-cancel');
+		const r = rule('.dynasty-picker.is-phone .prompt-input-container button.dynasty-picker-cancel');
 		expect(r).toMatch(/min-height:\s*44px/);
 		expect(r).toMatch(/min-width:\s*44px/);
 	});
@@ -100,7 +102,7 @@ describe('D125 (3): a lower head and a first row close to the field', () => {
 	});
 
 	it('the field of the list is still 44 px high with a 16 px font (no zoom on iOS)', () => {
-		const r = rule('.dynasty-picker.is-phone .prompt-input');
+		const r = rule('.dynasty-picker.is-phone .prompt-input-container input.prompt-input');
 		expect(r).toMatch(/min-height:\s*44px/);
 		expect(r).toMatch(/font-size:\s*max\(16px/);
 	});

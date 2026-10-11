@@ -107,20 +107,19 @@ describe('"Name for a woman" in the Titles window draft (D65)', () => {
 		expect(bodyOf(applyOp(BODY_F, { kind: 'batch', ops: o }))).toBe(replaceOnce(BODY_F, FEMALE_LINE, '    female-name: Grand Duchess of Valmont\n'));
 	});
 
-	it('a rename, a female name and a plural make one edit-title', () => {
+	it('a rename and a female name make one edit-title', () => {
 		const rows = rowsOf();
 		const king = titleOf(rows, 'king-of-the-vale');
 		king.name = 'High King of the Vale';
 		king.femaleName = 'High Queen of the Vale';
-		king.plural = 'High Kings of the Vale';
-		expect(ops(rows)).toEqual([{ kind: 'edit-title', id: 'king-of-the-vale', name: 'High King of the Vale', femaleName: 'High Queen of the Vale', plural: 'High Kings of the Vale' }]);
+		expect(ops(rows)).toEqual([{ kind: 'edit-title', id: 'king-of-the-vale', name: 'High King of the Vale', femaleName: 'High Queen of the Vale' }]);
 		const g = graph(bodyOf(applyOp(BODY_13, { kind: 'batch', ops: ops(rows) })));
 		expect(g.titles.find((t) => t.id === 'king-of-the-vale')?.femaleName).toBe('High Queen of the Vale');
 	});
 
 	it('a new title: add-title with the female name; an empty field writes none', () => {
 		const rows = rowsOf();
-		const blank = { baseName: null, plural: '', basePlural: null, maleName: '', baseMaleName: null, baseFemaleName: null, deleted: false, holders: [], baseRows: [] };
+		const blank = { baseName: null, maleName: '', baseMaleName: null, baseFemaleName: null, deleted: false, holders: [], baseRows: [] };
 		rows.push({ ...blank, key: 'a', id: null, name: 'Baron of Greyfen', femaleName: ' Baroness of Greyfen ' });
 		rows.push({ ...blank, key: 'b', id: null, name: 'Reeve', femaleName: ' ' });
 		expect(ops(rows)).toEqual([
@@ -179,8 +178,7 @@ const cardText = (root: FEl, id: string, cls: string) =>
 async function openTitles(handle = writingHandle()) {
 	const host = fakeHost() as Host & { app: Record<string, unknown> };
 	const { el } = await embed(handle.body, { handle, host });
-	await click(el.querySelector('.dynasty-more'));
-	await click(el.querySelector('.dynasty-more-titles'));
+	await click(el.querySelector('.dynasty-titles-button'));
 	const win = openModals.find((m) => (m as unknown) instanceof TitlesWindow) as unknown as { contentEl: FEl } | undefined;
 	expect(win).toBeDefined();
 	return { handle, content: win!.contentEl };
@@ -204,9 +202,9 @@ describe('"Name for a woman" in the Titles window on the fakes (D65)', () => {
 		expect(input.getAttribute('placeholder')).toBe(TITLES_UI.femalePlaceholder);
 		expect(input.getAttribute('aria-label')).toBe(TITLES_UI.femaleAria('Duke of Valmont'));
 		expect(input.getAttribute('aria-label')!.startsWith(TITLES_UI.femaleLabel)).toBe(true);
-		// The fields follow the order of the text: "Name for a man" (D66), "Name for a woman", then the plural.
+		// The fields follow the order of the text: the name, "Name for a man" (D66), "Name for a woman". No plural field (D201).
 		const page = pageFor(content, 'duke-of-valmont');
-		expect(page.children.filter((c) => c.tag === 'label' && c.hasClass('dynasty-sheet-field')).map((c) => c.getAttribute('data-field'))).toEqual([null, 'male-name', 'female-name', 'plural']);
+		expect(page.querySelector('[data-section="names"] .dynasty-grid')!.children.filter((c) => c.tag === 'label' && c.hasClass('dynasty-sheet-field')).map((c) => c.getAttribute('data-field'))).toEqual([null, 'male-name', 'female-name']);
 		expect(pageFor(content, 'count-of-orsini').querySelector('.dynasty-title-female textarea')!.value).toBe('');
 	});
 
@@ -234,7 +232,7 @@ describe('the edit sheet shows the form of the title that the card uses (D65)', 
 	it('a holder with sex: f sees the female form, like her card; the aria names use it too', async () => {
 		const { el, content } = await sheetOf('elinor', BODY_F);
 		expect(cardText(el, 'elinor', 'dynasty-card-title')).toContain('Duchess of Valmont');
-		const holding = content.querySelector('.dynasty-titles-section .dynasty-title-holding[data-title="duke-of-valmont"]')!;
+		const holding = content.querySelector('[data-section="titles"] .dynasty-title-holding[data-title="duke-of-valmont"]')!;
 		expect(holding.querySelector('.dynasty-title-holding-name')!.getText()).toBe('Duchess of Valmont');
 		expect(holding.querySelector('.dynasty-edit-holder')!.getAttribute('aria-label')).toBe(TITLES_UI.entryEditLabel('Duchess of Valmont', 'from 1228'));
 	});

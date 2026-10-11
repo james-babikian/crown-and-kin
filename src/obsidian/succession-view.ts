@@ -12,7 +12,7 @@ import type { Title } from '../core/types';
 import type { Orientation, Rect } from '../layout/model';
 import type { ListWord } from '../render/dom/phone-list-dom';
 import { SUCCESSION_UI } from '../render/ui-text';
-import { FIT_MIN_NAME_PX, START_TOP_GAP, fitScale, fitView, type Size, type View } from '../render/view-math';
+import { FIT_MIN_NAME_PX, READABLE_NAME_PX, START_TOP_GAP, fitScale, fitView, type Size, type View } from '../render/view-math';
 import { finderFirstView, fittedNamePx } from './focus-mode';
 
 /** The mark on the tab of an open branch (M.9). */
@@ -79,7 +79,8 @@ export function lineWords(d: SuccessionDrawn): Map<string, ListWord> {
 	const out = new Map<string, ListWord>();
 	for (const [id, mark] of d.ordinals) {
 		const text = mark === BRANCH_MARK ? SUCCESSION_UI.openBranchWord : SUCCESSION_UI.inLine(mark);
-		out.set(id, { text, lower: text.toLowerCase() });
+		// D209 item 8: the place in the line is bold in the text colour.
+		out.set(id, { text, lower: text.toLowerCase(), strong: true });
 	}
 	return out;
 }
@@ -88,9 +89,8 @@ export function lineWords(d: SuccessionDrawn): Map<string, ListWord> {
  * The first view of the Show view (F.2): the ruler and the heirs fitted into the free area below `insetTop` (the bar), as
  * `finderFirstView` does it. `bounds` is the box around the ruler and the heirs; the open branches are not in it, so a far branch
  * cannot shrink the view. When the whole line would need names under 11 px, the view fits the ruler and the longest run of heirs
- * (1st, 2nd, ...) that fits with names of 11 px or more. Only when the ruler and the 1st heir do not fit together, the view starts
- * at the ruler. On a phone (`minScale` > 0) no fit goes below `minScale`: the last fallback starts at the ruler at that scale, so
- * the names stay readable and the user pans to the heirs.
+ * (1st, 2nd, ...) that fits with names of 11 px or more. Only when the ruler and the 1st heir do not fit together, the view starts at the
+ * ruler at the readable zoom, whole and on screen (G5 fix; spec §13.21 rule 35). On a phone (`minScale` > 0) no fit goes below `minScale`.
  */
 export function successionFirstView(bounds: Rect, size: Size, fontPx: number, insetTop: number, ruler: Rect, heirs: readonly Rect[], orientation: Orientation, minScale = 0): View {
 	const top = Math.max(0, Math.min(insetTop, size.h - 1));
@@ -107,8 +107,13 @@ export function successionFirstView(bounds: Rect, size: Size, fontPx: number, in
 			const box = { x: run.x - mx, y: run.y - my, w: run.w + 2 * mx, h: run.h + 2 * my };
 			if (fits(box)) return fitView(box, size, insetTop);
 		}
+		// The ruler and the 1st heir do not fit together at readable names: the view starts at the ruler (spec §13.21 rule 35), leaned
+		// towards the 1st heir as far as the ruler stays whole. The user pans to the heirs.
+		const pair = union([ruler, heirs[0]]);
+		const aim = { x: pair.x - mx, y: pair.y - my, w: pair.w + 2 * mx, h: pair.h + 2 * my };
+		return startAt(aim, size, insetTop, ruler, orientation, Math.max(minScale, READABLE_NAME_PX / f));
 	}
-	// The ruler stays first: `finderFirstView` centres on the first card when the cards do not fit side by side.
+	// A line with no heir: the ruler stays first. `finderFirstView` centres on the first card when the cards do not fit side by side.
 	const fit = finderFirstView(bounds, size, fontPx, insetTop, [ruler, ...heirs], orientation);
 	if (!(minScale > 0) || fit.scale >= minScale || !(size.w > 0)) return fit;
 	return startAt(bounds, size, insetTop, ruler, orientation, minScale);

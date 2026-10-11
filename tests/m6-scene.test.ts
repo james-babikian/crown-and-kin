@@ -57,16 +57,23 @@ describe('scene: D27 and D29 cards', () => {
 	const src = `houses:\n  - {id: h, name: House H, color: '#1e4f8b'}\npeople:\n  - {id: a, name: Bartholomew Aldric Penhallow, house: h, born: '1100', title: Lord}\n  - {id: b, name: Bo}`;
 	const settings: LayoutSettings = { sweeps: 4, far: { maxCardWidths: 3, maxGenerations: 1 }, orientation: 'sideways', tallCards: ['a'] };
 
-	it('a card with a house colour gets dynasty-has-house; the strip is 0.5 em wide and as tall as the card', () => {
+	it('a card with a house colour gets dynasty-has-house; the ribbon is a path along the left edge of a sideways card', () => {
 		const { root, laid } = scene(src, settings);
 		const cards = all(root).filter((e) => e.hasClass('dynasty-card'));
 		const a = cards.find((c) => c.getAttribute('data-person') === 'a')!;
 		const b = cards.find((c) => c.getAttribute('data-person') === 'b')!;
 		expect(a.hasClass('dynasty-has-house')).toBe(true);
 		expect(b.hasClass('dynasty-has-house')).toBe(false);
-		const strip = all(a).find((e) => e.hasClass('dynasty-card-strip'))!;
-		expect(Number(strip.getAttribute('width'))).toBe(8);
-		expect(Number(strip.getAttribute('height'))).toBe(laid.layout.persons.get('a')!.h);
+		const ribbon = all(a).find((e) => e.hasClass('dynasty-card-ribbon'))!;
+		// 0.2.8: a path as tall as the card, `ribbonWidth` thick (a sideways card has its ribbon on the left edge), with the card's corners.
+		expect(ribbon.tag).toBe('path');
+		const d = ribbon.getAttribute('d')!;
+		const box = laid.layout.persons.get('a')!;
+		// The straight side of the path ends where the lower corner begins: within one corner radius (at most 8 px) of the card's bottom.
+		const down = Number(/V([-0-9.]+)/.exec(d)![1]);
+		expect(down).toBeGreaterThan(box.y + box.h - 8.1);
+		expect(down).toBeLessThanOrEqual(box.y + box.h);
+		expect(d).toContain('A');
 	});
 
 	it('a tall card draws the name on two text lines at the tall baselines; both lines are the link', () => {
@@ -106,8 +113,9 @@ describe('scene: D25 legend', () => {
 		const list = new FEl('div');
 		buildLegend(list as unknown as HTMLElement);
 		const rows = list.children.filter((c) => c.hasClass('dynasty-legend-row'));
-		expect(rows).toHaveLength(LEGEND_ORDER.length + 1);
-		expect(rows[rows.length - 1].hasClass('dynasty-legend-sign')).toBe(true);
+		// 0.2.8: after the sign row come the two dead signs (I19).
+		expect(rows).toHaveLength(LEGEND_ORDER.length + 3);
+		expect(rows[LEGEND_ORDER.length].hasClass('dynasty-legend-sign')).toBe(true);
 		LEGEND_ORDER.forEach((kind, i) => {
 			expect(all(rows[i]).some((e) => e.hasClass(`dynasty-line-${kind}`)), kind).toBe(true);
 			for (const e of all(rows[i])) for (const k of ['fill', 'stroke', 'style']) expect(e.attrs.has(k), `${kind} ${e.tag} ${k}`).toBe(false);

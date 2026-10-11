@@ -25,7 +25,8 @@
  * - S2 Built detached, attached later. The content is created in a detached holder, `fitted`, the
  *   `fitters`, `links` and `PictureSlot`s are registered as in an eager scene, and the holder's children
  *   move into the shell at fill. After a fill the shell has exactly the eager children in the eager
- *   order, so an eager and a filled lazy scene serialise byte for byte the same.
+ *   order, so an eager and a filled lazy scene serialise byte for byte the same. 0.2.8 (speed repair): the text of a card and of a far-couple tag is cut
+ *   to fit (the `fitters`) at fill, not at build, because nobody sees it before; a refit runs the fits that have run.
  * - S3 Near the view. `boxNearView` (`view-math.ts`) decides which items a fill attaches.
  * - S3b 0.2.1 (spec §13.15 rule 4): lines and partnership signs are delayed too. A lazy scene does not make
  *   their elements at build time; it keeps each one's box (`pathBox`) and builds the element at fill, into its
@@ -47,20 +48,24 @@ import type { FamilyGraph } from '../../core/derive';
 import type { CardLabel } from '../../core/titles';
 import { isDead } from '../../core/succession-keys';
 import type { Person } from '../../core/types';
-import { ORDINAL_EM, ROUNDEL_EM, centredWithoutWord, cardText, isRoundel, nameCountOf, nameRoom, ordinalTabRect, relationY, roundelPics, signBelowRing, signBottomOf, tagTop, youTabRect, type CardText, type ShownLines } from '../../layout/geometry';
+import { ORDINAL_EM, ROUNDEL_EM, centredWithoutWord, cardText, footSpan, isRoundel, nameCountOf, nameRoom, ordinalTabRect, relationY, ribbonWidth, roundelPics, signBelowRing, signBottomOf, tagTop, youTabRect, type CardText, type ShownLines } from '../../layout/geometry';
 import { farTagSigns } from '../../layout/far-tag-sign';
 import { illegitimateSigns } from '../../layout/index';
 import type { FarTag, LaidOut, NameLineCount, PersonBox, PlacedFoldControl, Rect } from '../../layout/model';
 import type { BreakList } from '../break-words';
 import { legendRows, unionMarkClass, type LegendHouse, type LegendPart } from '../legend';
+import { isColour } from '../colour-check';
 import { lineLook, type LineMarks, type LineState } from '../line-highlight';
 import { cardNameLines, titleLines, type NameMeasure, type NameRun } from '../name-lines';
-import { ME_LOOK, ME_RING_INNER, TAG_MARK, UNION_MARKS, tagMarkGap, tagMarkHalfWidth, tagMarkSlot, unionMark, unionShape, type UnionShape } from '../styles';
-import { LEGEND_HOUSES_LABEL, SIGN_CARD_LABEL, cardLabel, dateLine, farTagLabel, farTagName, splitMaybe } from '../tree-info';
-import { HOUSE_PAGE_UI } from '../ui-text';
-import { boxNearView, markedBarPath, pathBox, truncate, truncateWithMaybe } from '../view-math';
+import { ME_RING_INNER, TAG_MARK, UNION_MARKS, tagMarkGap, tagMarkHalfWidth, tagMarkSlot, unionMark, unionShape, type UnionShape } from '../styles';
+import { SIGN_CARD_LABEL, cardLabel, dateLine, farTagLabel, farTagName, splitMaybe } from '../tree-info';
+import { HIT_EM, boxNearView, pathBox, ribbonPath, truncate, truncateWithMaybe } from '../view-math';
+import { ME_WORD } from '../view-text';
 import { drawFold, type FoldRef } from './folds';
-import type { PictureSlot } from './pictures';
+
+// The word moved to view-text.ts (all plugin texts live there); other modules still read it from here.
+export { ME_WORD };
+import type { PictureOwner, PictureSlot } from './pictures';
 
 /** Text width in px for a CSS font shorthand. */
 export type Measure = (text: string, font: string) => number;
@@ -93,7 +98,7 @@ export interface SceneOptions {
 	relations?: ReadonlyMap<string, { text: string; lower: string }>;
 	/** D41: the marked person; the card gets class `dynasty-card-me` (one thicker border in the text colour, no accent, D153). */
 	me?: string;
-	/** 0.2.6: the theme corner radius (px) when the caller knows it; the card bg is not in the document while the scene is built. */
+	/** The card corner radius (px) when the caller knows it; else the scene reads it from the card bg once it is in the document (`syncCornerRadius`). */
 	cornerRadius?: number;
 	/**
 	 * D47 (spec §13.2): the relation finder's line. Lines, union signs and far-couple tags on it get class
@@ -237,8 +242,13 @@ export interface Scene {
 	 * and a running pan or zoom are not disturbed.
 	 */
 	refit: () => void;
-	/** 0.2.6: the theme corner radius became known (or changed) after the scene was built: the marked bar (at most one) is drawn again with it. */
+	/** The card corner radius (px) is known from the caller: the ribbons and badges are drawn again with it. */
 	setCornerRadius: (r: number) => void;
+	/**
+	 * Reads the card's real corner radius (the computed `rx` of the first card bg that is in the document) and draws the ribbons and badges again if it differs from
+	 * what they use. Without `force` it does nothing once the radius is known, so a fill can call it every time; a theme change passes `force`. One read, never one per card.
+	 */
+	syncCornerRadius: (force?: boolean) => void;
 	/**
 	 * R026 fit: false takes the detail group of every card out of the document, true puts it back. The Overview level draws no detail, and leaving the
 	 * groups out is far cheaper than hiding them with a class (about 1.6 ms against 11 ms on sample tree 07b). A lazy scene puts the groups back as
@@ -252,18 +262,47 @@ export interface Scene {
 
 /** Compact names are this much larger than Full names (spec §5.4: a larger font that fills the card). */
 export const COMPACT_NAME_EM = 1.5;
+/** D203: at the Compact level a long name shrinks down to this size, in em, before it is cut. */
+export const COMPACT_NAME_MIN_EM = 1.05;
+/** The sizes a Compact name can have, in em, largest first. The steps are made by repeated subtraction, so the font strings (and the measure cache keys) stay as they were. */
+export const COMPACT_STEPS: readonly number[] = (() => {
+	const steps = [COMPACT_NAME_EM];
+	for (let em = COMPACT_NAME_EM; em > COMPACT_NAME_MIN_EM + 1e-9; ) steps.push((em = Math.max(COMPACT_NAME_MIN_EM, em - 0.05)));
+	return steps;
+})();
+
+/**
+ * The index in `COMPACT_STEPS` of the size of a Compact name: the first size whose width `widthAt(k)` fits in `maxW`, else the smallest. This is the result of a walk down from
+ * the top size, but a canvas measure is the cost, and the width follows the size almost linearly, so the room gives a first guess that one or two measures confirm.
+ */
+export function compactStep(widthAt: (k: number) => number, maxW: number): number {
+	const w0 = widthAt(0);
+	if (!(w0 > maxW)) return 0;
+	const last = COMPACT_STEPS.length - 1;
+	const want = (COMPACT_NAME_EM * maxW) / w0;
+	let k = 1;
+	while (k < last && COMPACT_STEPS[k]! > want + 1e-9) k++;
+	// `misfit` is the largest step that is known not to fit.
+	let misfit = 0;
+	while (k < last && widthAt(k) > maxW) misfit = k++;
+	while (k - 1 > misfit && widthAt(k - 1) <= maxW) k--;
+	return k;
+}
+
 /** Tag text size in em of the note font (matches the headless renderer). */
 export const TAG_FONT_EM = 0.75;
 /** Tag text at the Compact level is as large as the Compact name, so it is as readable. */
 export const TAG_COMPACT_FONT_EM = COMPACT_NAME_EM;
 /** Height of the Compact and Overview tag pill, in em. It grows up into the card, below the Compact name. */
 export const TAG_COMPACT_PILL_EM = 2;
-/** Radius of the focus-mode `+` badge, in em. Its centre is the card's top right corner, in every layout (D117 4). */
-export const BADGE_RADIUS_EM = 0.6;
-/** The word on the "You" tab; the same word as the relation text of the marked person. */
-export const ME_WORD = 'You';
+/** Radius of the focus-mode `+` badge, in em. 0.2.8 (I01): its centre lies on the arc of the card's rounded top right corner, the middle of that arc. */
+export const BADGE_RADIUS_EM = 0.55;
 /** The word on the "You" tab, in em of the note font (B.3.4). */
-export const TAB_TEXT_EM = 0.75;
+export const TAB_TEXT_EM = 0.8;
+/** The baseline of the text of a tab, in em below the middle of the tab (0.3 em). */
+export const TAB_TEXT_BASE_EM = 0.3;
+/** D219: the width of the frame of an empty portrait, in px (the style gives it the same number); the frame lies inside the picture's edge. */
+export const FRAME_STROKE_PX = 1;
 /** "?" of the rumoured-parent marker, in em. */
 export const RUMOUR_FONT_EM = 0.7;
 // All font sizes are set in styles.css from --dynasty-font-size (spec §5.8: nothing that styles
@@ -297,15 +336,6 @@ function setRuns(el: SVGTextElement, runs: readonly NameRun[]): void {
 	for (const r of runs) {
 		if (r.sob) el.createSvg('tspan', { cls: 'dynasty-card-sob' }).setText(r.text);
 		else el.appendText(r.text);
-	}
-}
-
-function isColour(value: string | undefined): value is string {
-	if (!value) return false;
-	try {
-		return CSS.supports('color', value);
-	} catch {
-		return false;
 	}
 }
 
@@ -345,10 +375,15 @@ function orderedLayer(parent: SVGElement): { reserve: () => number; put: (slot: 
 	};
 }
 
-/** Parses a CSS length in px ("8px", "8"); `fallback` for anything else (rem, calc, empty). */
-export function parsePxRadius(value: string | null | undefined, fallback: number): number {
-	const m = /^\s*(\d+(?:\.\d+)?)(?:px)?\s*$/.exec(value ?? '');
-	return m ? parseFloat(m[1]!) : fallback;
+/** The corner radius (px) that ribbons use until the real one is read; it is the `rx` of the narrowest theme look (Cupertino). */
+const CORNER_FALLBACK = 4;
+
+/** The card corner radius that the last scene learned, so the next scene starts with it and has nothing to draw again (a speed gain; it is checked on the first sync). */
+let learnedRadius: number | undefined;
+
+/** Forgets the learned card corner radius (tests; the next scene starts with the fallback). */
+export function resetLearnedCornerRadius(): void {
+	learnedRadius = undefined;
 }
 
 /** Reads the computed corner radius (px) of an SVG rect; `fallback` when the element is detached or the value is unknown. */
@@ -399,17 +434,45 @@ export function buildScene(parent: SVGGElement, g: FamilyGraph, laid: LaidOut, o
 		waiting: boolean;
 	}
 	const bodies: BodyRef[] = [];
-	// The theme sets the card corner (--radius-s) in CSS; the bar path needs the number. One read per render, from the first card bg that is in the document.
-	let cornerR: number | undefined;
+	// The card corner is the `rx` that the style sheet gives the card bg (from --radius-m, capped by the font size); the ribbon and badge paths need the number.
+	// The scene is built before it is in the document. A new scene starts with the radius the last scene learned (the theme rarely changes), or with a fallback
+	// for the very first one; `syncCornerRadius` then reads the first card bg that is in the document, once, and draws again only if the paths differ from it.
+	// Never read per card, and never read a theme variable: the computed `rx` is the one value that is the card's own.
+	let cornerR: number | undefined = opts.cornerRadius ?? learnedRadius;
+	/** True when the radius is known for certain (the caller's, or read from a card bg), not guessed from the last scene. */
+	let verified = opts.cornerRadius !== undefined;
+	let firstBg: Element | undefined;
+	/** The radius of the first path drawn, and whether a later path used another one. */
+	let drawn: number | undefined;
+	let mixed = false;
 	const bars: ((r: number) => void)[] = [];
 	const barRadius = (bg: Element): number => {
-		if (opts.cornerRadius !== undefined) return opts.cornerRadius;
+		firstBg ??= bg;
 		if (cornerR === undefined) {
 			const r = readCornerRadius(bg, -1);
-			if (r >= 0) cornerR = r;
-			else return 4;
+			if (r >= 0) {
+				cornerR = r;
+				verified = true;
+				learnedRadius = r;
+			}
 		}
-		return cornerR;
+		const use = cornerR ?? CORNER_FALLBACK;
+		if (drawn === undefined) drawn = use;
+		else if (use !== drawn) mixed = true;
+		return use;
+	};
+	const syncCornerRadius = (force = false): void => {
+		if (!firstBg || (verified && !force)) return;
+		const r = readCornerRadius(firstBg, -1);
+		if (r < 0) return;
+		verified = true;
+		learnedRadius = r;
+		cornerR = r;
+		if (mixed || r !== drawn) {
+			bars.forEach((draw) => draw(r));
+			drawn = r;
+			mixed = false;
+		}
 	};
 	let detail = true;
 	const delay = (person: string, box: Rect, card: boolean, attach: () => void) => {
@@ -442,11 +505,60 @@ export function buildScene(parent: SVGGElement, g: FamilyGraph, laid: LaidOut, o
 		d.attach();
 		return 1;
 	};
+	/**
+	 * The text fits of the card (or far-couple tag) that is being built in a lazy scene. They run when its content is attached (`fitsOnAttach`): nobody can see the
+	 * text before, and the first view attaches about thirty of 400 cards. An eager scene has no such list and fits at once.
+	 */
+	let pendingFits: (() => void)[] | null = null;
+	const addFit = (run: () => void) => {
+		if (pendingFits) {
+			pendingFits.push(run);
+			return;
+		}
+		run();
+		fitters.push(run);
+	};
+	/** Takes the fits collected since `pendingFits` was set; the returned step runs them once, and from then on a refit runs them too. */
+	const fitsOnAttach = (): (() => void) => {
+		const runs = pendingFits ?? [];
+		pendingFits = null;
+		let done = false;
+		return () => {
+			if (done) return;
+			done = true;
+			for (const run of runs) {
+				run();
+				fitters.push(run);
+			}
+		};
+	};
 	/** Sets `el` to `text` truncated to `maxW`, now and on every refit. */
 	const fitted = (el: SVGTextElement, text: string, maxW: number, font: string, maybe = '') => {
 		const run = () => el.setText(maybe ? truncateWithMaybe(text, maybe, maxW, (s) => opts.measure(s, font)) : fit(text, maxW, font));
-		run();
-		fitters.push(run);
+		addFit(run);
+	};
+
+	/**
+	 * D203: the Compact name is as large as the room allows, from 1.5 em down to 1.05 em in steps of 0.05 em, and is cut with "…" only when even the smallest size does
+	 * not fit. The size goes to the text as the custom property `--dynasty-compact-em` (the style turns it into the font size). Runs again on every refit.
+	 */
+	const fittedShrinking = (el: SVGTextElement, text: string, maxW: number) => {
+		/** True while the text carries a size of its own, so a name that fits again clears it and a name that always fits never touches the style. */
+		let sized = false;
+		const run = () => {
+			const k = compactStep((i) => opts.measure(text, textFont(COMPACT_STEPS[i]! * f, opts.fonts.bold)), maxW);
+			const em = COMPACT_STEPS[k]!;
+			// A name that fits at the top size is not cut, so there is nothing to measure again.
+			el.setText(k === 0 ? text : truncate(text, maxW, (s) => opts.measure(s, textFont(em * f, opts.fonts.bold))));
+			if (k === 0) {
+				if (sized) el.style.removeProperty('--dynasty-compact-em');
+				sized = false;
+			} else {
+				el.style.setProperty('--dynasty-compact-em', String(Math.round(em * 100) / 100));
+				sized = true;
+			}
+		};
+		addFit(run);
 	};
 
 	// D47: the relation finder's line; without one every part is drawn as usual.
@@ -536,7 +648,7 @@ export function buildScene(parent: SVGGElement, g: FamilyGraph, laid: LaidOut, o
 				c,
 				c.parents.map((id) => g.byId.get(id)?.name ?? id),
 			);
-			folds.push(drawFold({ controls: cardsEl, hits: hitsEl, openHits: openFoldHitsEl, fonts: opts.fonts, measure: opts.measure, em: f, label, fitters, ...(opts.folds!.wire ? { wire: opts.folds!.wire } : {}), ...(opts.folds!.lazy ? { lazy: true } : {}) }, c));
+			folds.push(drawFold({ controls: cardsEl, hits: hitsEl, openHits: openFoldHitsEl, fonts: opts.fonts, measure: opts.measure, em: f, label, fitters, ...(layout.orientation === 'sideways' ? { anchored: true } : {}), ...(opts.folds!.wire ? { wire: opts.folds!.wire } : {}), ...(opts.folds!.lazy ? { lazy: true } : {}) }, c));
 		}
 	};
 	const links = new Map<SVGTextElement, string>();
@@ -544,8 +656,8 @@ export function buildScene(parent: SVGGElement, g: FamilyGraph, laid: LaidOut, o
 	const smallFont = textFont(t.smallSize);
 	// The Compact name is 1.5 em of the note font, not of the Full name size (0.85 em): Compact looks as in 0.2.3.
 	const compactSize = COMPACT_NAME_EM * f;
-	const compactFont = textFont(compactSize, opts.fonts.bold);
-	const compactW = geo.cardW - t.stripW - 0.75 * f;
+	// 0.2.8: the sideways card's Compact name starts 0.6 em after the ribbon and ends 0.6 em before the edge.
+	const compactW = geo.cardW - ribbonWidth(geo) - 1.2 * f;
 	const signed = illegitimateSigns(g, edges);
 	// D29, D61: a tall card has two Full name or title text lines; its Compact name stays one line, centred.
 	const tallTexts = new Map<string, CardText>();
@@ -591,8 +703,7 @@ export function buildScene(parent: SVGGElement, g: FamilyGraph, laid: LaidOut, o
 				second.setText(lines[1] ?? '');
 			} else first.setText(lines.length > 1 ? fit([title, reign].filter(Boolean).join(' '), t.textW, smallFont) : (lines[0] ?? ''));
 		};
-		run();
-		fitters.push(run);
+		addFit(run);
 	};
 
 	const heirIds = new Set(opts.heirs ?? []);
@@ -620,17 +731,18 @@ export function buildScene(parent: SVGGElement, g: FamilyGraph, laid: LaidOut, o
 			card.addClass('dynasty-has-house');
 		}
 		cards.set(p.id, card);
+		pendingFits = lazy ? [] : null;
 
 		// The second focus and highlight ring, under the card: the accent alone can be too weak in a theme.
 		// A lazy card keeps only its bg rect (its size and hit area). Its ring is made by `fillPerson` and `fillAll` only (B8 3): the ring shows only
 		// for the keyboard focus and the highlight, and both ask for the person first.
 		const ringInfo = { cls: 'dynasty-card-ring', attr: { x: box.x, y: box.y, width: box.w, height: box.h } };
-		// An heir of the Show view has its outline ring in the shell: the ring is part of the outline that shows at once (F.2), so a lazy fill must not wait for it.
-		const ringNow = !lazy || heirIds.has(p.id);
+		const ringNow = !lazy;
 		if (ringNow) card.createSvg('rect', ringInfo);
 		const bg = card.createSvg('rect', { cls: 'dynasty-card-bg', attr: { x: box.x, y: box.y, width: box.w, height: box.h } });
 		// B.3.3: the Roundel's medallion and arms stand on the top edge; the text card has none (it never reads the picture flags).
-		const hasArms = !!(box.arms && house);
+		// 0.2.8 (I05, D204): a card shows the arms of its person (A.1) or else of its house.
+		const hasArms = !!(box.arms && (p.arms || house));
 		const rp = roundel ? roundelPics(geo, { arms: hasArms, portrait: !!box.portrait }) : undefined;
 		// F.4: the ordinal tab replaces the "You" tab of the same card.
 		const ordinal = ordinalIds.has(p.id) ? opts.ordinals?.get(p.id) : undefined;
@@ -639,7 +751,7 @@ export function buildScene(parent: SVGGElement, g: FamilyGraph, laid: LaidOut, o
 		const above: number[] = [];
 		if (rp?.portrait) above.push(rp.cx - rp.haloR, rp.cx + rp.haloR);
 		if (rp?.arms) above.push(rp.arms.x, rp.arms.x + rp.arms.w);
-		const tab = hasTab ? youTabRect(geo, !!(rp?.portrait || rp?.arms)) : undefined;
+		const tab = hasTab ? youTabRect(geo, !!rp?.portrait, !!rp?.arms) : undefined;
 		if (tab) above.push(tab.x, tab.x + tab.w);
 		const ordTab = ordinal ? ordinalTabRect(geo, !!rp?.portrait, !!rp?.arms, [...ordinal].length) : undefined;
 		// F.4: the ordinal tab has no tap target of its own; a press on it is a press on the card, through the same crown area as the "You" tab.
@@ -653,12 +765,13 @@ export function buildScene(parent: SVGGElement, g: FamilyGraph, laid: LaidOut, o
 		const body = lazy ? createSvg('g', { cls: 'dynasty-card-body' }) : card.createSvg('g', { cls: 'dynasty-card-body' });
 		const bodyRef: BodyRef = { person: p.id, card, body, made: !lazy, in: !lazy, waiting: false };
 		bodies.push(bodyRef);
-		// D176 (1): on the marked card the bar lies inside the thick border, as a path with the inner corners of the border. The class is the same, so the colour rules apply. The corner radius is the Obsidian default of --radius-s (4 px): CSS cannot reach a path.
-		if (isMe) {
-			const strip = body.createSvg('path', { cls: 'dynasty-card-strip', attr: { d: markedBarPath(box.x, box.y, box.h, t.stripW, ME_LOOK.border, barRadius(bg)) } });
-			bars.push((r) => strip.setAttribute('d', markedBarPath(box.x, box.y, box.h, t.stripW, ME_LOOK.border, r)));
-		}
-		else body.createSvg('rect', { cls: 'dynasty-card-strip', attr: { x: box.x, y: box.y, width: t.stripW, height: box.h } });
+		// 0.2.8 (contract C, G.15): the house ribbon is a path with the card's own rounded corners; on the marked card it lies inside the thick border. The radius comes
+		// from the theme at run time (`readCornerRadius`), so the path is made again when it becomes known (`setCornerRadius`).
+		const rib = ribbonWidth(geo);
+		const inset = isMe ? ME_RING_INNER : 0;
+		const ribbonD = (r: number) => ribbonPath(box.x + inset, box.y + inset, roundel ? box.w - 2 * inset : rib, roundel ? rib : box.h - 2 * inset, rib, Math.max(0, r - inset), roundel ? 'top' : 'left');
+		const ribbon = body.createSvg('path', { cls: 'dynasty-card-ribbon', attr: { d: ribbonD(barRadius(bg)) } });
+		bars.push((r) => ribbon.setAttribute('d', ribbonD(r)));
 
 		const tall = !!(box.tallName || box.tallTitle);
 		// B.3.2: the lines that exist are centred in the body, so the text block needs to know which small lines the person has. The dates line counts even when "Show dates on cards" is off (the class hides it), as the saved picture centres it.
@@ -673,18 +786,11 @@ export function buildScene(parent: SVGGElement, g: FamilyGraph, laid: LaidOut, o
 		const sob = cl?.sobriquet ?? p.sobriquet;
 		const full = body.createSvg('g', { cls: 'dynasty-card-full' });
 		if (ct.r1?.plate && relation?.text) {
-			// The footer plate: the relation word's band, in the house colour (also for "You", D153). It is made first, so the word lies over it.
-			// A person with no relation word has no plate (the card keeps its height, so a row keeps one height).
-			const ins = isMe ? ME_RING_INNER : 1;
-			const x0 = box.x + t.stripW;
-			const x1 = box.x + box.w - ins;
-			const y0 = box.y + ct.r1.plate.y;
-			const y1 = box.y + box.h - ins;
-			const rr = 3;
-			// No group around the path and the line (WP-B8): an element costs about 36 us at 4x CPU, even when it is hidden. The line is not a
-			// dashed stroke of the path: that draws the hairline on other pixel rows than a line does (checked on the harness pictures).
-			full.createSvg('path', { cls: 'dynasty-r1-plate', attr: { d: `M${x0} ${y0}H${x1}V${y1 - rr}Q${x1} ${y1} ${x1 - rr} ${y1}H${x0}Z` } });
-			full.createSvg('line', { cls: 'dynasty-r1-plate-line', attr: { x1: x0, y1: y0, x2: x1, y2: y0 } });
+			// 0.2.8: the foot is a hairline over the relation word (there is no footer plate). A person with no relation word has no hairline
+			// (the card keeps its height, so a row keeps one height).
+			const span = footSpan(geo, box.w, isMe ? ME_RING_INNER : 1);
+			const y0 = box.y + ct.r1.plate.y + 0.5;
+			full.createSvg('line', { cls: 'dynasty-card-foot-line', attr: { x1: box.x + span.x0, y1: y0, x2: box.x + span.x1, y2: y0 } });
 		}
 		const link = opts.link(p);
 		const nameEl = (baseline: number) =>
@@ -713,8 +819,7 @@ export function buildScene(parent: SVGGElement, g: FamilyGraph, laid: LaidOut, o
 			const lines = cardNameLines(shownName, sob, room, nameMeasure, names.length as NameLineCount, opts.breaks);
 			names.forEach((el, i) => setRuns(el, lines[i] ?? []));
 		};
-		runNames();
-		fitters.push(runNames);
+		addFit(runNames);
 		if (sign) drawSign(full, box.x, box.y, markRing === undefined ? ct.sign : signBelowRing(ct.sign, markRing));
 		if (link) {
 			for (const el of names) {
@@ -749,15 +854,20 @@ export function buildScene(parent: SVGGElement, g: FamilyGraph, laid: LaidOut, o
 			if (rp.arms) {
 				const r = rp.arms;
 				const el = full.createSvg('g', { cls: 'dynasty-arms' });
-				full2.push({ kind: 'arms', lod: 'full', person: p.id, house: p.house, rect: { x: box.x + r.x, y: box.y + r.y, w: r.w, h: r.h }, el });
+				const rect = { x: box.x + r.x, y: box.y + r.y, w: r.w, h: r.h };
+				// D219: the gap round the arms follows the outline of the picture. It is drawn when the picture and its outline are in the slot (`setArmsGap`), never before.
+				// The slot's owner: the person (personal arms) or the house; `house` stays for a reader that knows no owner.
+				const owner: PictureOwner = p.arms ? { person: p.id } : { house: p.house! };
+				full2.push({ kind: 'arms', lod: 'full', person: p.id, ...(p.house !== undefined ? { house: p.house } : {}), owner, rect, el, gap: ROUNDEL_EM.halo * f });
 			}
 			if (rp.portrait) {
 				const r = rp.portrait;
 				const rect = { x: box.x + r.x, y: box.y + r.y, w: r.w, h: r.h };
 				const el = full.createSvg('g', { cls: 'dynasty-portrait' });
-				// A card-colour halo under the medallion keeps the line and the card edge off the ring; the frame is the ring, drawn on its middle.
+				// D219: a gap in the colour of the page round the picture keeps the line and the card edge off it. The frame is a thin outline on the picture's edge
+				// that shows only while the picture is missing or has not come (the style).
 				el.createSvg('circle', { cls: 'dynasty-r1-halo', attr: { cx: rect.x + rect.w / 2, cy: rect.y + rect.h / 2, r: rp.haloR } });
-				const frame = el.createSvg('circle', { cls: 'dynasty-portrait-frame', attr: { cx: rect.x + rect.w / 2, cy: rect.y + rect.h / 2, r: rp.ringR - (ROUNDEL_EM.ring * f) / 2 } });
+				const frame = el.createSvg('circle', { cls: 'dynasty-portrait-frame', attr: { cx: rect.x + rect.w / 2, cy: rect.y + rect.h / 2, r: rp.ringR - FRAME_STROKE_PX / 2 } });
 				full2.push({ kind: 'portrait', lod: 'full', person: p.id, rect, el, frame });
 			}
 			pictures.push(...full2, ...full2.map((slot): PictureSlot => ({ ...slot, lod: 'compact' })));
@@ -765,23 +875,23 @@ export function buildScene(parent: SVGGElement, g: FamilyGraph, laid: LaidOut, o
 		if (tab) {
 			// D148: the small "You" tab on the top edge. It stands in the Full group, so the Compact and Overview levels hide it; the border still marks the person.
 			const tabEl = full.createSvg('g', { cls: 'dynasty-r1-tab-group' });
-			// D153: the base is a card-colour pill under the tint, so the border and the line above the card do not show through it.
+			// D153: the base is a card-colour pill with a wide edge, so the border and the line above the card do not show through it.
 			tabEl.createSvg('rect', { cls: 'dynasty-r1-tab-base', attr: { x: box.x + tab.x, y: box.y + tab.y, width: tab.w, height: tab.h, rx: tab.h / 2 } });
 			tabEl.createSvg('rect', { cls: 'dynasty-r1-tab', attr: { x: box.x + tab.x, y: box.y + tab.y, width: tab.w, height: tab.h, rx: tab.h / 2 } });
-			tabEl.createSvg('text', { cls: 'dynasty-r1-tab-text', attr: { x: box.x + tab.x + tab.w / 2, y: box.y + tab.y + tab.h / 2 + 0.35 * TAB_TEXT_EM * f } }).setText(ME_WORD);
+			tabEl.createSvg('text', { cls: 'dynasty-r1-tab-text', attr: { x: box.x + tab.x + tab.w / 2, y: box.y + tab.y + tab.h / 2 + TAB_TEXT_BASE_EM * f } }).setText(ME_WORD);
 		}
 		if (ordTab) {
-			// F.4: the ordinal tab, at the Full level only like the "You" tab. A card-colour base under the tint keeps the border and the line above the card from showing through.
+			// F.4: the ordinal tab, at the Full level only like the "You" tab. A card-colour base keeps the border and the line above the card from showing through.
 			const tabEl = full.createSvg('g', { cls: 'dynasty-ordinal-tab-group', attr: { 'aria-hidden': 'true' } });
 			const rect = { x: box.x + ordTab.x, y: box.y + ordTab.y, width: ordTab.w, height: ordTab.h, rx: ORDINAL_EM.corner * f };
 			tabEl.createSvg('rect', { cls: 'dynasty-ordinal-tab-base', attr: rect });
 			tabEl.createSvg('rect', { cls: 'dynasty-ordinal-tab', attr: rect });
-			tabEl.createSvg('text', { cls: 'dynasty-ordinal-tab-text', attr: { x: box.x + ordTab.x + ordTab.w / 2, y: box.y + ordTab.y + ordTab.h / 2 + 0.35 * ORDINAL_EM.text * f } }).setText(ordinal!);
+			tabEl.createSvg('text', { cls: 'dynasty-ordinal-tab-text', attr: { x: box.x + ordTab.x + ordTab.w / 2, y: box.y + ordTab.y + ordTab.h / 2 + TAB_TEXT_BASE_EM * f } }).setText(ordinal!);
 		}
 
 		const compact = body.createSvg('text', {
 			cls: 'dynasty-card-compact',
-			attr: roundel ? { x: box.x + (ct.anchorX ?? t.padX), y: box.y + compactBaseline(box.h, ct.r1?.crown ?? 0) } : { x: box.x + t.stripW + 0.5 * f, y: box.y + compactBaseline(box.h) },
+			attr: roundel ? { x: box.x + (ct.anchorX ?? t.padX), y: box.y + compactBaseline(box.h, ct.r1?.crown ?? 0) } : { x: box.x + rib + 0.6 * f, y: box.y + compactBaseline(box.h) },
 		});
 		// B.3.7: the Roundel's Compact sign is the Full one; its text is centred, so the name stops short of the sign only where the two can meet.
 		const cs = sign ? (roundel ? ct.sign : tall ? compactSign(box.h) : baseCompactSign) : undefined;
@@ -791,8 +901,9 @@ export function buildScene(parent: SVGGElement, g: FamilyGraph, laid: LaidOut, o
 		// Unsigned, the Compact name ends 0.25 em from the card's edge, not 0.5 em like the Full name.
 		// With the sign it ends 0.5 em before the sign.
 		const compactNameW = roundel ? roundelCompactW : sign ? compactWithSignW : compactW;
-		fitted(compact, shownName, compactNameW, compactFont);
+		fittedShrinking(compact, shownName, compactNameW);
 		if (shownCs) drawSign(body.createSvg('g', { cls: 'dynasty-card-compact-sign' }), box.x, box.y, shownCs);
+		const cardFits = fitsOnAttach();
 		if (lazy) {
 			let ringMade = ringNow;
 			rings.set(p.id, () => {
@@ -801,6 +912,7 @@ export function buildScene(parent: SVGGElement, g: FamilyGraph, laid: LaidOut, o
 				card.insertBefore(createSvg('rect', ringInfo), bg);
 			});
 			delay(p.id, box, true, () => {
+				cardFits();
 				bodyRef.made = true;
 				if (detail) {
 					card.appendChild(body);
@@ -813,21 +925,36 @@ export function buildScene(parent: SVGGElement, g: FamilyGraph, laid: LaidOut, o
 		// shows over its own card's corner; a card drawn later still wins where the two meet.
 		if (n && opts.badges) {
 			const r = BADGE_RADIUS_EM * f;
-			const arm = 0.45 * r;
-			// D117 4: the centre of the badge is the card's top right corner, in every layout.
-			const cx = box.x + box.w;
-			const cy = box.y;
-			const mark = { x: cx - r, y: cy - r, w: 2 * r, h: 2 * r };
+			const arm = 0.5 * r;
+			// 0.2.8 (I01): an outline disc whose centre lies on the middle of the arc of the card's rounded top right corner, so the disc sits in the corner
+			// and does not stick out of it. The corner radius comes from the theme at run time, so the places are set again when it becomes known (`setCornerRadius`).
+			const mark = { x: 0, y: 0, w: 2 * r, h: 2 * r };
 			const el = cardsEl.createSvg('g', {
 				cls: 'dynasty-focus-badge',
 				attr: { tabindex: 0, role: 'button', 'aria-label': opts.badges.label(p, n), 'data-person': p.id, 'data-hidden': n },
 			});
-			// The square is below the cards, so the own card wins over it; the disc is the one part of the badge that wins over its card.
-			const hit = badgeHitsEl.createSvg('rect', { cls: 'dynasty-focus-badge-hit', attr: { x: mark.x, y: mark.y, width: mark.w, height: mark.h, 'data-badge': p.id } });
-			const disc = el.createSvg('path', { cls: 'dynasty-focus-badge-disc', attr: { d: discPath(cx, cy, r, cy) } });
+			// The square is below the cards, so the own card wins over it; the disc is the one part of the badge that wins over its card. Its first size is 3 em (G.13); the tree view sizes it again at each settled zoom.
+			const hitSide = HIT_EM * f;
+			const hit = badgeHitsEl.createSvg('rect', { cls: 'dynasty-focus-badge-hit', attr: { x: 0, y: 0, width: hitSide, height: hitSide, 'data-badge': p.id } });
+			const disc = el.createSvg('path', { cls: 'dynasty-focus-badge-disc' });
 			const bb = holderFor(el);
-			bb.createSvg('circle', { cls: 'dynasty-focus-badge-mark', attr: { cx, cy, r } });
-			bb.createSvg('path', { cls: 'dynasty-focus-badge-plus', attr: { d: `M${cx - arm} ${cy}H${cx + arm}M${cx} ${cy - arm}V${cy + arm}`, 'stroke-width': 0.25 * r } });
+			const circle = bb.createSvg('circle', { cls: 'dynasty-focus-badge-mark', attr: { r } });
+			const plus = bb.createSvg('path', { cls: 'dynasty-focus-badge-plus', attr: { 'stroke-width': 0.11 * f } });
+			const place = (cr: number) => {
+				const c = cr > 4 ? cr - cr / Math.SQRT2 : 0;
+				const cx = box.x + box.w - c;
+				const cy = box.y + c;
+				mark.x = cx - r;
+				mark.y = cy - r;
+				hit.setAttribute('x', String(cx + r - hitSide));
+				hit.setAttribute('y', String(cy - hitSide / 2));
+				disc.setAttribute('d', discPath(cx, cy, r, cy));
+				circle.setAttribute('cx', String(cx));
+				circle.setAttribute('cy', String(cy));
+				plus.setAttribute('d', `M${cx - arm} ${cy}H${cx + arm}M${cx} ${cy - arm}V${cy + arm}`);
+			};
+			place(barRadius(bg));
+			bars.push(place);
 			if (lazy) delay(p.id, mark, false, () => attachChildren(bb, el));
 			badges.push({ person: p.id, el, hit, disc, mark });
 		}
@@ -900,14 +1027,19 @@ export function buildScene(parent: SVGGElement, g: FamilyGraph, laid: LaidOut, o
 					}
 				}
 			};
-			run();
-			fitters.push(run);
+			addFit(run);
 		};
 		const farShape = farSigns.has(tag.person) ? unionShape('union', farSigns.get(tag.person)) : null;
+		pendingFits = lazy ? [] : null;
 		pill('dynasty-tag-full', small, TAG_FONT_EM, geo.tagH, '', true, farShape ?? undefined);
 		pill('dynasty-tag-compact', large, TAG_COMPACT_FONT_EM, bigH, '', true, farShape ?? undefined);
 		pill('dynasty-tag-sign', large, TAG_COMPACT_FONT_EM, bigH, '⚭', false);
-		if (lazy) delay(tag.person, tag.hit, false, () => attachChildren(pills, el));
+		const tagFits = fitsOnAttach();
+		if (lazy)
+			delay(tag.person, tag.hit, false, () => {
+				tagFits();
+				attachChildren(pills, el);
+			});
 		tags.push({ tag, el, hit });
 	}
 
@@ -1026,9 +1158,14 @@ export function buildScene(parent: SVGGElement, g: FamilyGraph, laid: LaidOut, o
 
 	return { cards, tags, badges, links, pictures, folds, refit: () => fitters.forEach((run) => run()),
 		setCornerRadius: (r) => {
-			opts.cornerRadius = r;
+			cornerR = r;
+			verified = true;
+			learnedRadius = r;
+			drawn = r;
+			mixed = false;
 			bars.forEach((redraw) => redraw(r));
 		},
+		syncCornerRadius,
 		setDetail,
 		fill,
 	};
@@ -1041,38 +1178,17 @@ function addPart(parent: SVGElement, part: LegendPart): void {
 }
 
 /**
- * Fills the legend popover (D25): one row per line kind and the D14 sign, each sample drawn like the
- * tree. M9 (S4, spec §13.6 "Legend"): then, when `houses` is not empty, the title "Houses" and one row
- * per house in the given order (colour strip, arms slot, name). The rows are not buttons in M9.
- * Returns the arms slots by house id, for `setLegendArms`.
+ * Fills the legend popover (D25): one row per line kind, the D14 sign and the two dead signs, each sample drawn like the tree. 0.2.8 (D196 item 3, contract A.1): the
+ * live legend shows the line styles only; the houses are in the Houses window, and the saved picture keeps its own house legend (`svg-string.ts`). The two extra
+ * parameters of 0.2.7 (the houses and their callback) are still accepted and ignored, so a caller of 0.2.7 keeps working; `arms` is always empty.
  */
-export function buildLegend(list: HTMLElement, houses?: readonly LegendHouse[], onHouse?: (houseId: string) => void): { arms: Map<string, HTMLElement> } {
+export function buildLegend(list: HTMLElement, _houses?: readonly LegendHouse[], _onHouse?: (houseId: string) => void): { arms: Map<string, HTMLElement> } {
+	void [_houses, _onHouse];
 	for (const r of legendRows()) {
 		const row = list.createDiv({ cls: r.kind === 'sign' ? 'dynasty-legend-row dynasty-legend-sign' : 'dynasty-legend-row' });
 		const sample = row.createSvg('svg', { cls: 'dynasty-legend-sample', attr: { width: r.w, height: r.h, viewBox: `0 0 ${r.w} ${r.h}` } });
 		for (const part of r.parts) addPart(sample, part);
 		row.createSpan({ cls: 'dynasty-legend-label', text: r.label });
 	}
-	const arms = new Map<string, HTMLElement>();
-	if (!houses?.length) return { arms };
-	const part = list.createDiv({ cls: 'dynasty-legend-houses' });
-	part.createDiv({ cls: 'dynasty-legend-title', text: LEGEND_HOUSES_LABEL });
-	for (const h of houses) {
-		// M10 (H1): with a callback the row is a button (44 px, see styles.css) that opens the house page; its tooltip is its label.
-		const row = onHouse
-			? part.createEl('button', { cls: ['dynasty-legend-house', 'is-button'], attr: { type: 'button', 'aria-label': HOUSE_PAGE_UI.peopleLabel(h.name), 'data-house': h.id } })
-			: part.createDiv({ cls: 'dynasty-legend-house' });
-		if (onHouse) row.addEventListener('click', () => onHouse(h.id));
-		const strip = row.createSpan({ cls: 'dynasty-legend-strip' });
-		if (isColour(h.color)) {
-			strip.style.setProperty('--dynasty-house-color', h.color);
-			// D27: as on the cards, only a house colour is lifted in the dark theme.
-			strip.addClass('dynasty-has-house');
-		}
-		// Every row keeps the arms place, so the names line up; only houses with arms get a slot to fill.
-		const slot = row.createSpan({ cls: h.arms ? 'dynasty-legend-arms' : ['dynasty-legend-arms', 'is-empty'] });
-		if (h.arms) arms.set(h.id, slot);
-		row.createSpan({ cls: 'dynasty-legend-label', text: h.name });
-	}
-	return { arms };
+	return { arms: new Map() };
 }

@@ -290,8 +290,7 @@ describe('E.4, K.10: the Titles window opens the view', () => {
 			created.push(o);
 			return real(app, o);
 		}) as never);
-		await press(e.root, '.dynasty-more');
-		await press(e.root, '.dynasty-more-titles');
+		await press(e.root, '.dynasty-titles-button');
 		expect(created).toHaveLength(1);
 		const o = created[0];
 		expect([o.succession?.limit(), o.succession?.oldAge(), o.succession?.youngDeathAge?.()]).toEqual([5, 110, 0]);
@@ -311,8 +310,7 @@ describe('E.4, K.10: the Titles window opens the view', () => {
 			created.push(o);
 			return real(app, o);
 		}) as never);
-		await press(e.root, '.dynasty-more');
-		await press(e.root, '.dynasty-more-titles');
+		await press(e.root, '.dynasty-titles-button');
 		expect([created[0].succession?.limit(), created[0].succession?.oldAge(), created[0].succession?.youngDeathAge?.()]).toEqual([3, 60, 12]);
 		host.settings = { ...host.settings!, successionLength: 7 };
 		expect(created[0].succession?.limit()).toBe(7);

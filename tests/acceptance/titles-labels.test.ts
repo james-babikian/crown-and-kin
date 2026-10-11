@@ -223,29 +223,6 @@ describe('ruler name, search names and the picker suffix (spec §13.5)', () => {
 	});
 });
 
-describe('"Show on the card" (D62, §13.3 tree text): cardTitleOp', () => {
-	it('another title: writes card-title', async () => {
-		const { cardTitleOp } = await titlesModule();
-		const g = graphOf(BODY_13);
-		expect(cardTitleOp(g, 'edmund', 'king-of-the-vale')).toEqual({ kind: 'set-person-fields', id: 'edmund', fields: { 'card-title': 'king-of-the-vale' } });
-		expect(cardTitleOp(g, 'young-aldric', 'king-of-the-vale')).toEqual({ kind: 'set-person-fields', id: 'young-aldric', fields: { 'card-title': 'king-of-the-vale' } });
-	});
-
-	it('the first title of a person with no written title: removes card-title instead (same card)', async () => {
-		const { cardTitleOp } = await titlesModule();
-		const g = graphOf(BODY_13);
-		expect(cardTitleOp(g, 'young-aldric', 'duke-of-valmont')).toEqual({ kind: 'set-person-fields', id: 'young-aldric', fields: { 'card-title': null } });
-		expect(cardTitleOp(g, 'edmund', 'duke-of-valmont')).toEqual({ kind: 'set-person-fields', id: 'edmund', fields: { 'card-title': null } });
-	});
-
-	it('the first title of a person with a written title: writes card-title, so the title replaces the written text (D63)', async () => {
-		const { cardTitleOp } = await titlesModule();
-		const g = graphOf(BODY_13);
-		expect(cardTitleOp(g, 'bertrand', 'count-of-orsini')).toEqual({ kind: 'set-person-fields', id: 'bertrand', fields: { 'card-title': 'count-of-orsini' } });
-		expect(cardTitleOp(g, 'king-roderick', 'king-of-the-vale')).toEqual({ kind: 'set-person-fields', id: 'king-roderick', fields: { 'card-title': 'king-of-the-vale' } });
-	});
-});
-
 describe('Delete title confirmation (spec §13.4): describeDeleteTitle', () => {
 	it('holders = the written holder items; cards = the people whose shown title it is', async () => {
 		const { describeDeleteTitle } = await titlesModule();

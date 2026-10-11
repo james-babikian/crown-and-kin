@@ -1,0 +1,26 @@
+/* phone-A: view */
+/* Wave 2 only: new rules for the tree view (height button, reduced movement) go below this line. */
+
+/* D126 (1): reduced movement. The view sets the class on the tree root before it starts a highlight; the highlight then stays as a still outline. */
+.dynasty-reduce-motion .dynasty-card.dynasty-highlight .dynasty-card-ring {
+	animation: none;
+}
+
+
+/* D183: the plugin tells that its style sheet is applied by this custom property on a hidden probe in the page (main.ts `stylesIn`). Nothing else uses it. */
+.dynasty-css-probe {
+	display: none;
+	--dynasty-css-ready: 1;
+}
+
+/* D183: the box that stands in for a tree on a cold start, until the styles, the settings and the block place are in. */
+.dynasty-placeholder {
+	display: block;
+	border: 0;
+	background: transparent;
+}
+
+.dynasty-placeholder-box {
+	display: block;
+	width: 100%;
+}

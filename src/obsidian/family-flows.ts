@@ -7,12 +7,12 @@
 import { Notice, type App } from 'obsidian';
 import type { FamilyGraph } from '../core/derive';
 import type { Op, ParentKind, UnionKind, UnionRef } from '../core/edit';
-import { PARENT_TYPES, UNION_TYPES, type Person } from '../core/types';
+import { PARENT_LIMIT, PARENT_TYPES, UNION_TYPES, type Person } from '../core/types';
 import { FLOW, parentTypeText, partnerDetail, UNION_TYPE_TEXT } from '../render/ui-text';
 import type { Written } from './block-handle';
 import { choose, type Choice } from './choice-modal';
 import { pickerExclusions, type FamilyView } from '../core/family-query';
-import { pickPerson } from './person-picker';
+import { pickPerson, type PickerContext } from './person-picker';
 
 /** How a new person joins the tree: alone, as a parent, as a child, or as a partner. */
 export type NewRelation =
@@ -33,13 +33,15 @@ export interface FlowHost {
 	/** Writes the ops together with the sheet's draft; null if nothing was written. */
 	commit(ops: Op[], highlight: string): Promise<Written | null>;
 	openNew(rel: NewRelation, name?: string): void;
+	/** What the person picker needs for its rows (portraits, the marked person); absent: plain rows. */
+	picker?(): PickerContext;
 }
 
 const NONE = '\u0000none';
 
-/** Types with room for `need` more parents, given the parent entries a person has now. */
+/** Types with room for `need` more parents, given the parent entries a person has now (`PARENT_LIMIT`: 2, and 8 rumoured). */
 function roomFor(links: { id: string; type: string }[], t: string, need: number): boolean {
-	return links.filter((l) => l.type === t).length + need <= 2;
+	return links.filter((l) => l.type === t).length + need <= (PARENT_LIMIT[t as ParentKind] ?? PARENT_LIMIT.birth);
 }
 
 /** The Notice when the write added a marriage by itself (spec §6.4). */
@@ -71,7 +73,7 @@ export async function addParent(host: FlowHost): Promise<void> {
 		text: [FLOW.parentTypeText(p.name)],
 		choices: (PARENT_TYPES as readonly ParentKind[]).map((t) => {
 			const full = host.fam.fullTypes.includes(t);
-			return { value: t, label: parentTypeText(t), detail: full ? FLOW.typeFull : undefined, disabled: full, cta: t === 'birth' && !full };
+			return { value: t, label: parentTypeText(t), detail: full ? FLOW.typeFull(PARENT_LIMIT[t]) : undefined, disabled: full, cta: t === 'birth' && !full };
 		}),
 	});
 	if (!type) return;
@@ -82,7 +84,7 @@ export async function addParent(host: FlowHost): Promise<void> {
 		host.openNew({ kind: 'parent', child: p.id, type });
 		return;
 	}
-	const picked = await pickPerson(host.app, host.g, exclude, FLOW.pickerParent, FLOW.addParentTitle);
+	const picked = await pickPerson(host.app, host.g, exclude, FLOW.pickerParent, FLOW.addParentTitle, true, null, null, host.picker?.());
 	if (!picked) return;
 	if (picked.kind === 'new') {
 		host.openNew({ kind: 'parent', child: p.id, type }, picked.name);
@@ -127,7 +129,7 @@ export async function addChild(host: FlowHost): Promise<void> {
 		host.openNew({ kind: 'child', parent: p.id, other, union });
 		return;
 	}
-	const picked = await pickPerson(host.app, host.g, exclude, FLOW.pickerChild, FLOW.addChildTitle);
+	const picked = await pickPerson(host.app, host.g, exclude, FLOW.pickerChild, FLOW.addChildTitle, true, null, null, host.picker?.());
 	if (!picked) return;
 	if (picked.kind === 'new') {
 		host.openNew({ kind: 'child', parent: p.id, other, union }, picked.name);
@@ -177,7 +179,7 @@ export async function addPartner(host: FlowHost): Promise<void> {
 		host.openNew({ kind: 'partner', partner: p.id });
 		return;
 	}
-	const picked = await pickPerson(host.app, host.g, exclude, FLOW.pickerPartner, FLOW.addPartnerTitle);
+	const picked = await pickPerson(host.app, host.g, exclude, FLOW.pickerPartner, FLOW.addPartnerTitle, true, null, null, host.picker?.());
 	if (!picked) return;
 	if (picked.kind === 'new') {
 		host.openNew({ kind: 'partner', partner: p.id }, picked.name);

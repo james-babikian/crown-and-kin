@@ -373,6 +373,9 @@ export function isPan(dx: number, dy: number): boolean {
 	return Math.hypot(dx, dy) > PAN_THRESHOLD;
 }
 
+/** 0.2.8 (G.13): the tap area of a fold control and of a `+` badge is at least this many em square. */
+export const HIT_EM = 3;
+
 /** Grows `hit` around its centre so that it is at least MIN_HIT_PX on screen at `scale`. */
 export function enlargeHit(hit: Rect, scale: number, minScreen = MIN_HIT_PX): Rect {
 	if (!(scale > 0)) return hit;
@@ -386,9 +389,10 @@ export function enlargeHit(hit: Rect, scale: number, minScreen = MIN_HIT_PX): Re
  * M10 (F7): the tap area of a fold control at zoom `scale`: at least 44 screen px each way (44 / scale layout px),
  * centred on the centre of the `visible` mark. A mark wider than that (a long "+ N" sign) keeps its own width.
  * Where it meets a card, a far-couple tag, a `+` badge or a D14 sign, the tree view cuts it back.
+ * 0.2.8 (G.13): with `em` (the note font in px) the area is also at least 3 em each way, so it is large at the readable zoom and below it.
  */
-export function foldHit(visible: Rect, scale: number): Rect {
-	const min = scale > 0 ? MIN_HIT_PX / scale : MIN_HIT_PX;
+export function foldHit(visible: Rect, scale: number, em = 0): Rect {
+	const min = Math.max(scale > 0 ? MIN_HIT_PX / scale : MIN_HIT_PX, HIT_EM * em);
 	const w = Math.max(visible.w, min);
 	const h = Math.max(visible.h, min);
 	const cx = visible.x + visible.w / 2;
@@ -401,14 +405,42 @@ export function keepSpot(view: View, from: { x: number; y: number }, to: { x: nu
 	return { scale: view.scale, cx: view.cx + (to.x - from.x), cy: view.cy + (to.y - from.y) };
 }
 
+/** The grapheme splitter; undefined until the first need, null when the engine has none (T-X2-01). One instance serves every cut. */
+let splitter: Intl.Segmenter | null | undefined;
+
+/**
+ * The letters of `text` as a reader sees them (T-X2-01): a flag, a joined emoji, an emoji with a skin tone and a letter with marks are one piece each,
+ * so a cut with "…" never falls inside one. Text whose code units are all below U+0300 has no such piece, so it takes the plain path with no segmenter.
+ * An engine with no `Intl.Segmenter` falls back to code points.
+ */
+export function graphemes(text: string): string[] {
+	let plain = true;
+	for (let i = 0; i < text.length; i++) {
+		if (text.charCodeAt(i) >= 0x300) {
+			plain = false;
+			break;
+		}
+	}
+	if (plain) return text.split('');
+	if (splitter === undefined) splitter = typeof Intl !== 'undefined' && typeof Intl.Segmenter === 'function' ? new Intl.Segmenter('en', { granularity: 'grapheme' }) : null;
+	if (!splitter) return Array.from(text);
+	const out: string[] = [];
+	for (const { segment } of splitter.segment(text)) {
+		// A space that a mark follows (a stray joiner or variation selector) stays a space, so a name still breaks there; the mark goes on as a piece of its own.
+		if (segment.length > 1 && segment.charCodeAt(0) === 32) out.push(' ', segment.slice(1));
+		else out.push(segment);
+	}
+	return out;
+}
+
 /**
  * The longest start of `text` that fits `maxW` with an ellipsis, measured by `measure`.
- * Whole text if it fits; an empty string if not even the ellipsis fits.
+ * Whole text if it fits; an empty string if not even the ellipsis fits. The cut falls between letters (`graphemes`).
  */
 export function truncate(text: string, maxW: number, measure: (s: string) => number): string {
 	if (!text) return '';
 	if (measure(text) <= maxW) return text;
-	const chars = Array.from(text);
+	const chars = graphemes(text);
 	const ell = '…';
 	if (measure(ell) > maxW) return '';
 	// Binary search on the number of characters kept.
@@ -557,7 +589,7 @@ export function truncateWithMaybe(word: string, suffix: string, maxW: number, me
 	const whole = word + suffix;
 	if (measure(whole) <= maxW) return whole;
 	const tail = '…' + MAYBE_CUT_TAIL;
-	const chars = Array.from(word);
+	const chars = graphemes(word);
 	let n = chars.length;
 	while (n > 0 && measure(chars.slice(0, n).join('').trimEnd() + tail) > maxW) n--;
 	// Not even one letter fits with the tail: fall back to the plain cut.
@@ -565,21 +597,24 @@ export function truncateWithMaybe(word: string, suffix: string, maxW: number, me
 }
 
 /**
- * The path of the house bar of the marked card (D176 1): the left part of the inner shape of the thick border. The bar starts at the
- * inner border edge, its outer corners follow the inner curve (radius `outerR` minus half the border) and its inner edge is square.
+ * The path of a house ribbon (0.2.8, contract C, G.15): the strip along the top edge (`edge` 'top': a band `w` wide and `t` thick) or the left edge (`edge` 'left': a band
+ * `t` wide and `h` high) of a card with corners of radius `r`. The two corners at the strip's ends follow the card's own corners, so no strip sticks out of
+ * the rounded card. A strip thinner than the radius ends in the arc of the corner circle (no part of it lies outside the card); a thicker one has the arc and a straight foot.
+ * The radius is read from the theme at run time in the live tree (`readCornerRadius`) and fixed in a saved picture.
  */
-export function markedBarPath(x: number, y: number, h: number, stripW: number, border: number, outerR: number): string {
-	const half = border / 2;
-	const x0 = x + half;
-	const y0 = y + half;
-	const y1 = y + h - half;
-	const xe = x + stripW;
-	const w = xe - x0;
-	const r = Math.max(0, Math.min(outerR - half, (y1 - y0) / 2));
-	if (r <= w) return `M${x0 + r} ${y0}H${xe}V${y1}H${x0 + r}A${r} ${r} 0 0 1 ${x0} ${y1 - r}V${y0 + r}A${r} ${r} 0 0 1 ${x0 + r} ${y0}Z`;
-	// A corner wider than the strip: the bar is cut off at its inner edge, so the arcs end there and still lie on the border's curve.
-	const dy = Math.sqrt(r * r - (r - w) * (r - w));
-	const yt = y0 + r - dy;
-	const yb = y1 - r + dy;
-	return `M${xe} ${yt}V${yb}A${r} ${r} 0 0 1 ${x0} ${y1 - r}V${y0 + r}A${r} ${r} 0 0 1 ${xe} ${yt}Z`;
+export function ribbonPath(x: number, y: number, w: number, h: number, t: number, r: number, edge: 'top' | 'left'): string {
+	const n = (v: number) => Math.round(v * 100) / 100;
+	// The long side of the strip sets the largest radius that still fits, the thin side does not (a strip may be thinner than the corner).
+	const long = edge === 'top' ? w : h;
+	const rr = Math.max(0, Math.min(r, long / 2));
+	if (edge === 'top') {
+		if (rr === 0) return `M${n(x)} ${n(y)}H${n(x + w)}V${n(y + t)}H${n(x)}Z`;
+		if (t >= rr) return `M${n(x + rr)} ${n(y)}H${n(x + w - rr)}A${n(rr)} ${n(rr)} 0 0 1 ${n(x + w)} ${n(y + rr)}V${n(y + t)}H${n(x)}V${n(y + rr)}A${n(rr)} ${n(rr)} 0 0 1 ${n(x + rr)} ${n(y)}Z`;
+		const dx = rr - Math.sqrt(rr * rr - (rr - t) * (rr - t));
+		return `M${n(x + rr)} ${n(y)}H${n(x + w - rr)}A${n(rr)} ${n(rr)} 0 0 1 ${n(x + w - dx)} ${n(y + t)}H${n(x + dx)}A${n(rr)} ${n(rr)} 0 0 1 ${n(x + rr)} ${n(y)}Z`;
+	}
+	if (rr === 0) return `M${n(x)} ${n(y)}H${n(x + t)}V${n(y + h)}H${n(x)}Z`;
+	if (t >= rr) return `M${n(x)} ${n(y + rr)}A${n(rr)} ${n(rr)} 0 0 1 ${n(x + rr)} ${n(y)}H${n(x + t)}V${n(y + h)}H${n(x + rr)}A${n(rr)} ${n(rr)} 0 0 1 ${n(x)} ${n(y + h - rr)}Z`;
+	const dy = rr - Math.sqrt(rr * rr - (rr - t) * (rr - t));
+	return `M${n(x)} ${n(y + rr)}A${n(rr)} ${n(rr)} 0 0 1 ${n(x + t)} ${n(y + dy)}V${n(y + h - dy)}A${n(rr)} ${n(rr)} 0 0 1 ${n(x)} ${n(y + h - rr)}Z`;
 }

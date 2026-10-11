@@ -322,43 +322,28 @@ describe('S3: livePictureSlots, the slots to fill for a view (spec §13.0 item 3
 	});
 });
 
-describe('S4: the legend lists the houses after the line styles (spec §13.6 "Legend")', () => {
-	it('a "Houses" title, then one row per house in the given order: colour strip, arms slot, name; the rows are not buttons', () => {
+// 0.2.8 (D196 item 3, contract A.1): the live legend shows the line styles only. The houses are in the Houses window; the saved picture keeps its own house legend.
+describe('S4: the live legend has no house rows (0.2.8, D196 item 3)', () => {
+	it('a houses argument (the 0.2.7 call) adds no row, no title and no arms slot', () => {
 		const list = new FEl('div');
 		const houses: LegendHouse[] = [
 			{ id: 'valmont', name: 'House Valmont', color: '#8b1e3f', arms: true },
 			{ id: 'thorne', name: 'House Thorne', color: '#7a2e6b', arms: false },
-			{ id: 'nocolour', name: 'House Grey', arms: true },
 		];
 		const result = (buildLegend as unknown as (l: FEl, h?: readonly LegendHouse[]) => { arms: Map<string, FEl> })(list, houses);
 		const els = all(list);
-		const part = els.find((e) => e.hasClass('dynasty-legend-houses'))!;
-		expect(part).toBeDefined();
-		expect(part.getText()).toContain('Houses');
-		const rows = els.filter((e) => e.hasClass('dynasty-legend-house'));
-		expect(rows.map((row) => row.getText())).toEqual(['House Valmont', 'House Thorne', 'House Grey']);
-		// Line rows come first.
-		const firstLine = els.findIndex((e) => e.hasClass('dynasty-legend-row'));
-		expect(firstLine).toBeGreaterThanOrEqual(0);
-		expect(firstLine).toBeLessThan(els.indexOf(part));
-		const strip = all(rows[0]).find((e) => e.hasClass('dynasty-legend-strip'))!;
-		expect(strip).toBeDefined();
-		expect(strip.styleProps.get('--dynasty-house-color') ?? rows[0].styleProps.get('--dynasty-house-color')).toBe('#8b1e3f');
-		expect([...result.arms.keys()].sort()).toEqual(['nocolour', 'valmont']);
-		for (const [, el] of result.arms) expect(el.hasClass('dynasty-legend-arms')).toBe(true);
-		for (const row of rows) {
-			expect(row.getAttribute('role')).toBeNull();
-			expect(row.getAttribute('tabindex')).toBeNull();
-		}
+		expect(els.find((e) => e.hasClass('dynasty-legend-houses'))).toBeUndefined();
+		expect(els.filter((e) => e.hasClass('dynasty-legend-house'))).toHaveLength(0);
+		expect(result.arms.size).toBe(0);
 	});
 
-	it('the line rows are the same as without houses (M8)', () => {
+	it('the rows are the same with and without houses (M8)', () => {
 		const a = new FEl('div');
 		const b = new FEl('div');
 		buildLegend(a as unknown as HTMLElement);
 		(buildLegend as unknown as (l: FEl, h?: readonly LegendHouse[]) => void)(b, [{ id: 'valmont', name: 'House Valmont', color: '#8b1e3f', arms: false }]);
 		const shape = (el: FEl) => all(el).map((e) => `${e.tag}.${[...e.classes].join('.')}:${e.text}`);
-		expect(shape(b).slice(0, shape(a).length)).toEqual(shape(a));
-		expect(shape(b).length).toBeGreaterThan(shape(a).length);
+		expect(shape(b)).toEqual(shape(a));
 	});
 });
+

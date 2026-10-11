@@ -434,12 +434,15 @@ export function fitMeet(w: number, h: number, boxW: number, boxH: number): { x: 
 /** The four picture warning codes (spec §13.6, §13.7). */
 export const PICTURE_CODES = ['missing-picture', 'picture-web', 'picture-not-image', 'picture-too-large'] as const;
 
-/** Whose picture a problem is about. */
-export type PictureOwner = { kind: 'arms'; house: Pick<House, 'id' | 'name'> } | { kind: 'portrait'; person: Pick<Person, 'id' | 'name'> };
+/**
+ * Whose picture a problem is about. `arms: true` on a portrait owner means the personal arms of that person (0.2.8 contract
+ * A.1); it is a flag, not a third kind, so callers that tell a house from a person keep compiling until they adopt it.
+ */
+export type PictureOwner = { kind: 'arms'; house: Pick<House, 'id' | 'name'> } | { kind: 'portrait'; person: Pick<Person, 'id' | 'name'>; arms?: true };
 
 /**
  * The warning for a picture problem (rule 12, A1): always `level: 'warning'`, so the tree still
- * draws. params: `owner` ('arms' | 'portrait'), `house` or `person` (the name), and the problem's
+ * draws. params: `owner` ('arms' | 'portrait' | 'person-arms'), `house` or `person` (the name), and the problem's
  * `file`, `format` and `pixels` when it has them. ids: [house id] or [person id]. Every caller
  * builds picture warnings with this, so the params and ids agree everywhere.
  */
@@ -447,7 +450,7 @@ export function pictureIssue(owner: PictureOwner, problem: PictureProblem): Code
 	const params: IssueParams = {};
 	let id = '';
 	if (owner?.kind === 'portrait') {
-		params.owner = 'portrait';
+		params.owner = owner.arms ? 'person-arms' : 'portrait';
 		params.person = String(owner.person?.name ?? '');
 		id = String(owner.person?.id ?? '');
 	} else {

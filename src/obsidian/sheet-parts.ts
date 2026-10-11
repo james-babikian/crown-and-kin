@@ -6,19 +6,11 @@
 
 import { normBody } from '../core/block-match';
 import type { EditResult } from '../core/edit';
+import { isColour } from '../render/colour-check';
 import type { Handle, HandleWriteOutcome } from './block-handle';
 
-const HEX = /^#[0-9a-f]{6}$/i;
-
 /** A value CSS can draw (a house colour can be any CSS colour, spec §4.1); `#rrggbb` where CSS cannot say. */
-export function drawableColour(c: string | null | undefined): c is string {
-	if (!c) return false;
-	try {
-		return CSS.supports('color', c);
-	} catch {
-		return HEX.test(c);
-	}
-}
+export const drawableColour = isColour;
 
 /**
  * Makes a window a dialog that a screen reader can name: role, aria-modal and aria-labelledby (its title). Returns the

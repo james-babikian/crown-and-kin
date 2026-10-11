@@ -5,7 +5,7 @@ import { readFileSync } from 'node:fs';
 import { beforeAll, describe, expect, it } from 'vitest';
 import type { FamilyGraph } from '../src/core/derive';
 import type { CardLabel } from '../src/core/titles';
-import { cardForm, cardText, centredWithoutWord, geometryFor, nameRoom, roundelAxis, roundelPics, youTabRect } from '../src/layout/geometry';
+import { cardForm, cardText, centredWithoutWord, geometryFor, nameRoom, ribbonWidth, roundelAxis, roundelPics, youTabRect } from '../src/layout/geometry';
 import { DEFAULT_LAYOUT_SETTINGS, clearLayoutCache, layoutTree, pictureSets } from '../src/layout/index';
 import type { Geometry, LaidOut, LayoutSettings } from '../src/layout/model';
 import { cardNameLines } from '../src/render/name-lines';
@@ -61,17 +61,17 @@ const withClass = (el: FEl, cls: string) => all(el).filter((e) => e.hasClass(cls
 const num = (el: FEl, k: string) => Number(el.getAttribute(k));
 const RELATIONS = new Map([['b', { text: 'Half-brother', lower: 'half-brother' }], ['c', { text: 'You', lower: 'you' }], ['d', { text: 'Half-sister', lower: 'half-sister' }]]);
 
-describe('the plate (B.3.4)', () => {
-	it('a plate group exists on a Roundel card iff the layout has `relationLine` and the person has a relation word (B7: none for `a`)', () => {
+describe('the foot hairline (B.3.4; 0.2.8: the hairline replaces the plate)', () => {
+	it('a foot hairline exists on a Roundel card iff the layout has `relationLine` and the person has a relation word (B7: none for `a`)', () => {
 		const on = scene(lay(ROUNDEL, { relationLine: true }), { relations: RELATIONS, me: 'c' });
 		const off = scene(lay(ROUNDEL), { relations: RELATIONS, me: 'c' });
 		for (const id of ['a', 'b', 'c', 'd']) {
-			expect(withClass(card(on.root, id), 'dynasty-r1-plate'), id).toHaveLength(id === 'a' ? 0 : 1);
-			expect(withClass(card(off.root, id), 'dynasty-r1-plate'), id).toHaveLength(0);
+			expect(withClass(card(on.root, id), 'dynasty-card-foot-line'), id).toHaveLength(id === 'a' ? 0 : 1);
+			expect(withClass(card(off.root, id), 'dynasty-card-foot-line'), id).toHaveLength(0);
 		}
 	});
 
-	it('the plate lies from the strip to the card edge, bottom-right corner rounded; on the marked card it stays inside the ring', () => {
+	it('the hairline runs from edge to edge, 1 px in (the marked card: inside the ring), over the relation word', () => {
 		const laid = lay(ROUNDEL, { relationLine: true });
 		const { root } = scene(laid, { relations: RELATIONS, me: 'c' });
 		const geo = laid.layout.geometry;
@@ -79,14 +79,11 @@ describe('the plate (B.3.4)', () => {
 			const box = laid.layout.persons.get(id)!;
 			const t = cardText(geo, 1);
 			const ins = id === 'c' ? ME_RING_INNER : 1;
-			const x0 = box.x + t.stripW;
-			const x1 = box.x + box.w - ins;
-			const y0 = box.y + box.h - t.r1!.plate!.h;
-			const y1 = box.y + box.h - ins;
-			const [path] = withClass(card(root, id), 'dynasty-r1-plate');
-			expect(path.getAttribute('d'), id).toBe(`M${x0} ${y0}H${x1}V${y1 - 3}Q${x1} ${y1} ${x1 - 3} ${y1}H${x0}Z`);
-			const [line] = withClass(card(root, id), 'dynasty-r1-plate-line');
-			expect([num(line, 'x1'), num(line, 'y1'), num(line, 'x2'), num(line, 'y2')]).toEqual([x0, y0, x1, y0]);
+			const y = box.y + box.h - t.r1!.plate!.h + 0.5;
+			const [line] = withClass(card(root, id), 'dynasty-card-foot-line');
+			expect([num(line, 'x1'), num(line, 'y1'), num(line, 'x2'), num(line, 'y2')], id).toEqual([box.x + ins, y, box.x + box.w - ins, y]);
+			// No band behind the word any more.
+			expect(withClass(card(root, id), 'dynasty-r1-plate'), id).toHaveLength(0);
 		}
 	});
 
@@ -191,8 +188,8 @@ describe('picture slots (B.3.3, B.3.10)', () => {
 		expect(portrait.rect).toEqual({ x: box.x + rp.portrait!.x, y: box.y + rp.portrait!.y, w: rp.portrait!.w, h: rp.portrait!.h });
 		const arms = s.pictures.find((p) => p.person === 'a' && p.kind === 'arms' && p.lod === 'compact')!;
 		expect(arms.rect).toEqual({ x: box.x + rp.arms!.x, y: box.y + rp.arms!.y, w: rp.arms!.w, h: rp.arms!.h });
-		// The frame circle is the ring: its centre on the medallion, its radius the middle of the ring's width.
-		expect(num(portrait.frame as unknown as FEl, 'r')).toBeCloseTo(rp.ringR - 0.075 * 12 * 1, 9);
+		// D219: the frame circle (shown only while the picture is missing) lies on the picture's edge: its centre on the medallion, its 1 px stroke inside the radius.
+		expect(num(portrait.frame as unknown as FEl, 'r')).toBeCloseTo(rp.ringR - 0.5, 9);
 		expect(num(portrait.frame as unknown as FEl, 'cx')).toBeCloseTo(box.x + rp.cx, 9);
 	});
 
@@ -419,14 +416,16 @@ describe('the Compact level (B.3.7)', () => {
 });
 
 describe('the sideways text card (B.3.10)', () => {
-	it('the plate and the word are left-aligned: the word at `padX`, on the plate, at the raised baseline', () => {
+	it('the hairline and the word are left-aligned: the word at `padX`, over the hairline, at the raised baseline; the hairline starts 0.35 em after the ribbon', () => {
 		const laid = lay(TEXT, { relationLine: true });
 		const { root } = scene(laid, { relations: RELATIONS, me: 'c' });
 		const geo = laid.layout.geometry;
 			for (const id of ['b', 'd']) {
-			expect(withClass(card(root, id), 'dynasty-r1-plate'), id).toHaveLength(1);
+			const [line] = withClass(card(root, id), 'dynasty-card-foot-line');
+			const box = laid.layout.persons.get(id)!;
+			expect([num(line, 'x1'), num(line, 'x2')], id).toEqual([box.x + ribbonWidth(geo) + Math.round(0.35 * 12), box.x + box.w - Math.round(0.35 * 12)]);
 		}
-		expect(withClass(card(root, 'a'), 'dynasty-r1-plate')).toHaveLength(0);
+		expect(withClass(card(root, 'a'), 'dynasty-card-foot-line')).toHaveLength(0);
 		const box = laid.layout.persons.get('d')!;
 		const [word] = withClass(card(root, 'd'), 'dynasty-card-relation');
 		const t = cardText(geo, 1, false, { title: false, dates: false });
@@ -439,7 +438,7 @@ describe('the sideways text card (B.3.10)', () => {
 		const laid = lay(TEXT, { youTab: 'c' });
 		const { root } = scene(laid, { relations: RELATIONS, me: 'c' });
 		const box = laid.layout.persons.get('c')!;
-		expect(withClass(root, 'dynasty-r1-plate')).toHaveLength(0);
+		expect(withClass(root, 'dynasty-card-foot-line')).toHaveLength(0);
 		const [tab] = withClass(card(root, 'c'), 'dynasty-r1-tab');
 		expect([num(tab, 'x'), num(tab, 'y')]).toEqual([box.x + 0.875 * 12, box.y - 0.9 * 12]);
 		const hits = withClass(root, 'dynasty-card-crown-hit');
@@ -456,7 +455,8 @@ describe('the sideways text card (B.3.10)', () => {
 		const { root } = scene(laid, {});
 		const box = laid.layout.persons.get('a')!;
 		const [name] = withClass(card(root, 'a'), 'dynasty-card-compact');
-		expect(num(name, 'x')).toBe(box.x + 0.5 * 12 + 0.5 * 12);
+		// 0.2.8: 0.6 em after the ribbon.
+		expect(num(name, 'x')).toBe(box.x + ribbonWidth(laid.layout.geometry) + 0.6 * 12);
 		expect(num(name, 'y')).toBeCloseTo(box.y + box.h / 2 + 0.35 * COMPACT_NAME_EM * 12, 9);
 	});
 

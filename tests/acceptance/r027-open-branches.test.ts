@@ -523,9 +523,11 @@ describe('open branches: more of the conditions of M.1', () => {
 			'{id: k3, name: K3, sex: m, born: 1152, parents: [r]}',
 		];
 		const holders = ['{person: c, from: 1120, to: 1150}', '{person: r, from: 1150}'];
-		// R reigns from 1150: K2 and K3 are born in the reign and come first, in the written order (K2, then K3); K1 follows.
+		// R reigns from 1150: K2 and K3 are born in the reign and come first; K1 follows.
+		// D193: inside that group the year decides: K3 1152 before K2 1155 (written K2, K3). The walk is K3, K2, K1.
+		// K2 is dead, so he is a row, not a heir; the heirs shown before him are K3 alone, so his row is at place 1.
 		const res = lineOf(people, holders, { rule: 'born-in-reign' }, 20);
 		expect(res.heirs).toEqual(['k3', 'k1']);
-		expect(rowsOf(res)).toEqual(['k2@0']);
+		expect(rowsOf(res)).toEqual(['k2@1']);
 	});
 });

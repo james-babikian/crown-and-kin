@@ -21,6 +21,7 @@
  *   cannot reach (layout, relations, fold planning) throws there.
  */
 
+import { deepFreeze } from './deep-freeze';
 import { parseDynasty } from './parse';
 import type { ParseResult } from './types';
 
@@ -39,14 +40,6 @@ export interface ParseCache {
 
 /** Makes a cache. `parse` is `parseDynasty` in the plugin; `freeze` freezes the returned `Tree`, not its `Source` (unit tests and a harness build). */
 type CreateParseCache = (options?: { parse?: (text: string) => ParseResult; limit?: number; freeze?: boolean }) => ParseCache;
-
-/** Freezes a plain data value at every depth; a shared object is visited once. */
-function deepFreeze(value: unknown, seen = new WeakSet<object>()): void {
-	if (typeof value !== 'object' || value === null || seen.has(value)) return;
-	seen.add(value);
-	Object.freeze(value);
-	for (const key of Object.keys(value)) deepFreeze((value as Record<string, unknown>)[key], seen);
-}
 
 /** Makes a cache that keeps the `limit` (default 4) most recently used parse results, errors included. */
 export const createParseCache: CreateParseCache = (options = {}) => {

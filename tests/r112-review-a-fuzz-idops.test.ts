@@ -2,8 +2,9 @@ import { describe, it } from 'vitest';
 import { parse as parseYaml, stringify } from 'yaml';
 import type { Op } from '../src/core/edit';
 import { parseDynasty } from '../src/core/parse';
-import { applyOp, newPersonId } from '../src/core/yaml-edit';
+import { applyOp } from '../src/core/yaml-edit';
 import { allFixtures } from './acceptance/load';
+import { nextIdFor } from './helpers';
 
 /*
  * Spec §8: nothing may throw. Every sample tree is mutated a few hundred times (the structure and
@@ -711,7 +712,7 @@ function runNewId(text: string) {
 		if (typeof v === 'string') named.add(v);
 	}
 	for (const ti of t.titles ?? []) for (const h of ti.holders) if (h.person) named.add(h.person);
-	const id = newPersonId(text, 'X');
+	const id = nextIdFor(text);
 	if (!/^p\d+$/.test(id)) fail(`id ${id} is not numbered`);
 	if (named.has(id)) fail(`new id ${id} is already named in the tree`);
 	let max = 0;

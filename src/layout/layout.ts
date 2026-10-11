@@ -5,8 +5,10 @@
  * and size the gaps between rows. `index.ts` is the only caller in `src/`; `edges.ts` routes the
  * lines afterwards from the same finished layout.
  */
-import { partnerOf, placedChildren, type FamilyGraph, type FamilyUnion } from '../core/derive';
+import { partnerOf, type FamilyGraph, type FamilyUnion } from '../core/derive';
+import { armsCardIds } from '../core/arms-rule';
 import type { ModelOrder } from '../core/order';
+import { consistentRows } from './row-blocks';
 import type { FarCoupleRule, FarTag, Geometry, LayoutSettings, PersonBox, PlacedFoldControl, Rect, TreeLayout, UnionPoint } from './model';
 import { MIN_HIT, barClear, childAttach, tagHit, gapHeight, lineMetrics, relationExtra, sideTagDepth, sidewaysGeometry, sidewaysPartnerGap, tagTop, tallExtra, turnedGeometry, withRelationLine } from './geometry';
 import { foldExtent, foldSpots, turnSpots, type FoldInput } from './fold-spots';
@@ -14,6 +16,8 @@ import { addTo, planLines, tabbedCards, type LinePlan } from './lines';
 import { placeInOrder } from './pava';
 import { soloFamiliesOutside } from './solo-side';
 import { turnBox, turnUnion } from './turn';
+
+export { consistentRows };
 
 /** Counts the work of the union dots (the speed proof of 0.2.4 reads it): calls and unions placed. */
 export const unionWork = { calls: 0, placed: 0 };
@@ -27,15 +31,17 @@ export const NEVER_FAR_RULE: FarCoupleRule = { maxCardWidths: Infinity, maxGener
 
 /**
  * M9 (spec §13.6, §13.7): the picture sets that every caller puts into `LayoutSettings` (the tree
- * view, the saved picture, the spike and the tests). `arms`: the houses whose `arms` is written;
- * `portraits`: the people whose `portrait` is written, or none with "Show portraits on cards" off.
+ * view, the saved picture, the spike and the tests). `arms`: the houses whose `arms` is written; `personalArms` (0.2.8):
+ * the people whose own `arms` is written; `portraits`: the people whose `portrait` is written, or none with "Show portraits on cards" off.
  * Both sorted. "Written" is enough: a missing or failing picture still keeps its room, so loading
  * never changes a layout.
  */
-export function pictureSets(g: FamilyGraph, showPortraits: boolean): { arms: string[]; portraits: string[] } {
+export function pictureSets(g: FamilyGraph, showPortraits: boolean): { arms: string[]; portraits: string[]; personalArms?: string[] } {
 	const arms = [...g.houses.values()].filter((h) => !!h.arms).map((h) => h.id);
 	const portraits = showPortraits ? g.people.filter((p) => !!p.portrait).map((p) => p.id) : [];
-	return { arms: [...new Set(arms)].sort(), portraits: [...new Set(portraits)].sort() };
+	// 0.2.8: the key is there only when a person has personal arms, so a tree without them gives the 0.2.7 shape.
+	const personal = [...new Set(g.people.filter((p) => !!p.arms).map((p) => p.id))].sort();
+	return { arms: [...new Set(arms)].sort(), portraits: [...new Set(portraits)].sort(), ...(personal.length ? { personalArms: personal } : {}) };
 }
 
 /** M9 (spec §13.6): the people whose card shows arms: their house is a house of `g` and in `arms`. */
@@ -44,6 +50,29 @@ export function armsCards(g: FamilyGraph, arms: readonly string[] | undefined): 
 	if (!arms?.length) return out;
 	const wanted = new Set(arms.filter((id) => g.houses.has(id)));
 	for (const p of g.people) if (p.house !== undefined && wanted.has(p.house)) out.add(p.id);
+	return out;
+}
+
+/** 0.2.8: `armsCards` plus the people with personal arms (their own arms show whatever the setting says). */
+function withPersonal(set: Set<string>, personal: readonly string[] | undefined): Set<string> {
+	for (const id of personal ?? []) set.add(id);
+	return set;
+}
+
+/**
+ * 0.2.8 (D206): the cards that show arms by the rule of `armsCardIds`, kept to the people who have arms to show: a house in `settings.arms` or their own
+ * arms in `settings.personalArms`. With folds the rule reads the whole graph, so folding a family never gives arms to a person whose parent is hidden.
+ */
+function armsByRule(g: FamilyGraph, settings: LayoutSettings, fold?: FoldInput): Set<string> {
+	const wanted = new Set((settings.arms ?? []).filter((id) => g.houses.has(id)));
+	const personal = new Set(settings.personalArms ?? []);
+	const whole = fold?.full ?? g;
+	const named = armsCardIds(whole, settings.armsOnCards!);
+	const out = new Set<string>();
+	for (const id of named) {
+		const p = g.byId.get(id);
+		if (p && (personal.has(id) || (p.house !== undefined && wanted.has(p.house)))) out.add(id);
+	}
 	return out;
 }
 
@@ -160,7 +189,6 @@ export function layoutFamilies(
 	// M9: which cards show arms or a portrait. Flags only: the pictures never change a box.
 	// 0.2.5: the text card shows no picture, so the setting never changes (or flags) a sideways layout.
 	const noPictures = given.form === 'text';
-	const withArms = noPictures ? new Set<string>() : armsCards(g, settings.arms);
 	const withPortrait = noPictures ? new Set<string>() : new Set(settings.portraits ?? []);
 	// Set only when true, so boxes of a tree with no tall cards and no pictures stay as they were.
 	const flags = (id: string) => ({
@@ -171,6 +199,7 @@ export function layoutFamilies(
 		...(withPortrait.has(id) ? { portrait: true as const } : {}),
 	});
 	const { gen, blocks } = consistentRows(g, coreGen, soloFamiliesOutside(g, order));
+	const withArms = noPictures ? new Set<string>() : settings.armsOnCards === undefined ? withPersonal(armsCards(g, settings.arms), settings.personalArms) : armsByRule(g, settings, fold);
 	// M10 (F3): a shown person with a hidden partner has a tag like one with a far partner.
 	const hiddenTagged = fold?.partners ?? new Map<string, string[]>();
 	const blockOf = new Map<string, number>();
@@ -280,7 +309,7 @@ export function layoutFamilies(
 	});
 
 	const centreX = (id: string) => persons.get(id)!.x + cw(id) / 2;
-	// 0.2.5 (B.3.5): a sibling group is centred by its children's axes (the Roundel's line lands 0.25 em right of the middle), so an only child drops straight.
+	// 0.2.5 (B.3.5): a sibling group is centred by its children's axes (since the axis moved to the card's middle in 0.2.8 this is 0 for every form), so an only child drops straight.
 	const attach = childAttach(geo);
 	const span = (ids: string[]) => {
 		const xs = ids.map((id) => centreX(id) + attach);
@@ -406,7 +435,7 @@ export function layoutFamilies(
  */
 function withFolds(layout: TreeLayout, spots: PlacedFoldControl[]): TreeLayout {
 	const em = layout.geometry.fontPx;
-	const boxes = spots.map((c) => foldExtent(c, c.spot, em));
+	const boxes = spots.map((c) => foldExtent(c, c.spot, em, layout.orientation === 'sideways'));
 	const dx = Math.max(0, ...boxes.map((b) => -b.x));
 	const dy = Math.max(0, ...boxes.map((b) => -b.y));
 	let folds = spots;
@@ -429,69 +458,6 @@ function withFolds(layout: TreeLayout, spots: PlacedFoldControl[]): TreeLayout {
 	const right = Math.max(layout.width + dx, ...boxes.map((b) => b.x + dx + b.w));
 	const bottom = Math.max(layout.height + dy, ...boxes.map((b) => b.y + dy + b.h));
 	return { ...layout, rowGaps, farTags, width: right, height: bottom, folds };
-}
-
-/**
- * Rows the lines can rely on: each block sits exactly one row below the lower placement parent
- * of its member with parents, and no row is empty. Generations from `core/generations` already
- * satisfy this, except when its iteration stops without settling (for example a founder who
- * marries his own granddaughter); then a trunk would cross rows or point upwards. A married-in
- * member who cannot share the row of their block (they are its ancestor) leaves the block.
- */
-export function consistentRows(g: FamilyGraph, coreGen: Map<string, number>, modelBlocks: string[][]): { gen: Map<string, number>; blocks: string[][] } {
-	// M10 (F2): `coreGen` can hold people that folds hide; they must not keep a row empty. The generations of the shown people stay.
-	if (coreGen.size !== g.people.length) coreGen = new Map([...coreGen].filter(([id]) => g.byId.has(id)));
-	const hasParents = (p: string) => g.placementParents.get(p)!.length > 0;
-	const isAncestor = (a: string, of: string) => {
-		const seen = new Set<string>();
-		const stack = [a];
-		while (stack.length) {
-			for (const c of placedChildren(g, stack.pop()!)) {
-				if (c === of) return true;
-				if (!seen.has(c)) {
-					seen.add(c);
-					stack.push(c);
-				}
-			}
-		}
-		return false;
-	};
-	const split = (keep: (block: string[], p: string) => boolean) =>
-		modelBlocks.flatMap((b) => {
-			const stay = b.filter((p) => keep(b, p));
-			return [...(stay.length ? [stay] : []), ...b.filter((p) => !keep(b, p)).map((p) => [p])];
-		});
-	const settle = (blocks: string[][]) => {
-		const gen = new Map(coreGen);
-		for (let pass = 0; pass <= blocks.length; pass++) {
-			let changed = false;
-			for (const block of blocks) {
-				const blood = block.find(hasParents);
-				const want = blood === undefined ? gen.get(block[0])! : Math.max(...g.placementParents.get(blood)!.map((p) => gen.get(p)!)) + 1;
-				for (const p of block) {
-					if (gen.get(p) !== want) {
-						gen.set(p, want);
-						changed = true;
-					}
-				}
-			}
-			if (!changed) return gen;
-		}
-		return undefined;
-	};
-	let blocks = split((b, p) => {
-		const blood = b.find(hasParents);
-		return blood === undefined || p === blood || !isAncestor(p, blood);
-	});
-	let gen = settle(blocks);
-	if (!gen) {
-		// Rare loops through two marriages: every married-in member stands alone.
-		blocks = split((b, p) => hasParents(p) || b.length === 1);
-		gen = settle(blocks)!;
-	}
-	const dense = new Map([...new Set(gen.values())].sort((a, b) => a - b).map((v, i) => [v, i]));
-	for (const [id, v] of gen) gen.set(id, dense.get(v)!);
-	return { gen, blocks };
 }
 
 /**

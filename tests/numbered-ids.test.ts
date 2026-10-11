@@ -4,8 +4,9 @@ import type { EditResult, Op } from '../src/core/edit';
 import { nextPersonId } from '../src/core/id-gen';
 import { issueText } from '../src/core/messages';
 import { parseDynasty, parseBody, referencedIds } from '../src/core/parse';
-import { applyOp, newPersonId } from '../src/core/yaml-edit';
+import { applyOp } from '../src/core/yaml-edit';
 import { randomTree } from './random-trees';
+import { nextIdFor } from './helpers';
 
 // Version 0.2.2, D104 and D105 (spec §13.17 rules 1 and 2): numbered ids for new people, the
 // example in the "has no id" warning, and the name in the duplicate id warning.
@@ -15,7 +16,7 @@ const ok = (r: EditResult): EditResult & { ok: true } => {
 	return r;
 };
 const add = (body: string, name: string): { body: string; id: string } => {
-	const id = newPersonId(body, name);
+	const id = nextIdFor(body);
 	return { id, body: ok(applyOp(body, { kind: 'add-person', id, fields: { name } })).body };
 };
 const tree = (src: string) => {
@@ -28,7 +29,7 @@ const texts = (src: string, code: string) =>
 		.issues.filter((i) => i.code === code)
 		.map(issueText);
 
-describe('newPersonId and add-person (D104)', () => {
+describe('the next person id and add-person (D104)', () => {
 	const BODY = 'people:\n  - {id: aldric, name: Aldric}\n';
 
 	it('the first new person is p1, then p2: the name never influences the id', () => {
@@ -37,40 +38,38 @@ describe('newPersonId and add-person (D104)', () => {
 		const second = add(first.body, 'Aldric');
 		expect(second.id).toBe('p2');
 		expect(tree(second.body).people.map((p) => p.id)).toEqual(['aldric', 'p1', 'p2']);
-		expect(newPersonId(BODY, 'Zed')).toBe(newPersonId(BODY, 'Aldric'));
-		expect(newPersonId(BODY, '')).toBe(newPersonId(BODY, '李'));
-		expect(newPersonId(BODY, undefined as unknown as string)).toBe('p1');
+		expect(nextIdFor(BODY)).toBe('p1');
 	});
 
 	it('goes on after the highest number, also when the people are not in order', () => {
 		const body = 'people:\n  - {id: p7, name: A}\n  - {id: p3, name: B}\n  - {id: p-5, name: C}\n  - {id: p3-p7, name: D}\n  - {id: P9, name: E}\n';
-		expect(newPersonId(body, 'X')).toBe('p8');
+		expect(nextIdFor(body)).toBe('p8');
 	});
 
 	it('a leading zero counts', () => {
-		expect(newPersonId('people:\n  - {id: p007, name: A}\n', 'X')).toBe('p8');
+		expect(nextIdFor('people:\n  - {id: p007, name: A}\n')).toBe('p8');
 	});
 
 	it('a numeric id of the YAML is text: 7 is not p7', () => {
-		expect(newPersonId('people:\n  - {id: 7, name: A}\n', 'X')).toBe('p1');
+		expect(nextIdFor('people:\n  - {id: 7, name: A}\n')).toBe('p1');
 	});
 
 	it('a dangling reference counts as taken, in every place that names a person', () => {
 		const people = '  - {id: p2, name: A}\n';
-		expect(newPersonId(`options: {start: p9}\npeople:\n${people}`, 'X')).toBe('p10');
-		expect(newPersonId(`options: {focus: p9}\npeople:\n${people}`, 'X')).toBe('p10');
-		expect(newPersonId(`options: {me: p9}\npeople:\n${people}`, 'X')).toBe('p10');
-		expect(newPersonId(`people:\n  - {id: p2, name: A, parents: [p9]}\n`, 'X')).toBe('p10');
-		expect(newPersonId(`people:\n  - {id: p2, name: A, parents: [{id: p9, type: ward}]}\n`, 'X')).toBe('p10');
-		expect(newPersonId(`unions:\n  - {partners: [p2, p9]}\npeople:\n${people}`, 'X')).toBe('p10');
-		expect(newPersonId(`titles:\n  - {id: t, name: T, holders: [{person: p9}]}\npeople:\n${people}`, 'X')).toBe('p10');
-		expect(newPersonId(`titles:\n  - {id: t, name: T, holders: [p9]}\npeople:\n${people}`, 'X')).toBe('p10');
+		expect(nextIdFor(`options: {start: p9}\npeople:\n${people}`)).toBe('p10');
+		expect(nextIdFor(`options: {focus: p9}\npeople:\n${people}`)).toBe('p10');
+		expect(nextIdFor(`options: {me: p9}\npeople:\n${people}`)).toBe('p10');
+		expect(nextIdFor(`people:\n  - {id: p2, name: A, parents: [p9]}\n`)).toBe('p10');
+		expect(nextIdFor(`people:\n  - {id: p2, name: A, parents: [{id: p9, type: ward}]}\n`)).toBe('p10');
+		expect(nextIdFor(`unions:\n  - {partners: [p2, p9]}\npeople:\n${people}`)).toBe('p10');
+		expect(nextIdFor(`titles:\n  - {id: t, name: T, holders: [{person: p9}]}\npeople:\n${people}`)).toBe('p10');
+		expect(nextIdFor(`titles:\n  - {id: t, name: T, holders: [p9]}\npeople:\n${people}`)).toBe('p10');
 	});
 
 	it('the number of a deleted last person can be used again if no reference names it', () => {
 		const body = 'people:\n  - {id: p1, name: A}\n  - {id: p2, name: B, parents: [p1]}\n  - {id: p3, name: C, parents: [p2]}\n';
 		const after = ok(applyOp(body, { kind: 'delete-person', id: 'p3' })).body;
-		expect(newPersonId(after, 'X')).toBe('p3');
+		expect(nextIdFor(after)).toBe('p3');
 		// Deleting a person removes the references to them, so a dangling one cannot come from the delete.
 		expect(after).not.toContain('p3');
 	});
@@ -105,11 +104,11 @@ describe('newPersonId and add-person (D104)', () => {
 		for (let seed = 1; seed <= 40; seed++) {
 			const body = randomTree(seed);
 			const t = tree(body);
-			const id = newPersonId(body, 'Someone');
+			const id = nextIdFor(body);
 			expect(id, `seed ${seed}`).toBe(`p${t.people.length}`);
 			const out = ok(applyOp(body, { kind: 'add-person', id, fields: { name: 'Someone' } }));
 			expect(tree(out.body).people.map((p) => p.id), `seed ${seed}`).toEqual([...t.people.map((p) => p.id), id]);
-			expect(newPersonId(out.body, 'Someone')).toBe(`p${t.people.length + 1}`);
+			expect(nextIdFor(out.body)).toBe(`p${t.people.length + 1}`);
 		}
 	});
 });

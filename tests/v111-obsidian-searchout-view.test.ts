@@ -106,10 +106,11 @@ describe('D102: the structure', () => {
 		expect(body.contains(m.contentEl.querySelector('.dynasty-picture-list'))).toBe(true);
 	});
 
-	it('the content is the header, then the search bar, then the scroller, in this order', () => {
+	it('the content is the top (the heading, the hint and the search bar), then the scroller, then the footer, in this order', () => {
 		const m = pick();
-		const kids = m.contentEl.children.map((c) => [...c.classes].find((n) => /^dynasty-(sheet-header|picture-searchbar|sheet-body)$/.test(n)));
-		expect(kids).toEqual(['dynasty-sheet-header', 'dynasty-picture-searchbar', 'dynasty-sheet-body']);
+		const kids = m.contentEl.children.map((c) => [...c.classes].find((n) => /^dynasty-(picture-top|foot|sheet-body)$/.test(n))).filter(Boolean);
+		expect(kids).toEqual(['dynasty-picture-top', 'dynasty-sheet-body', 'dynasty-foot']);
+		expect(search(m).parentElement?.parentElement?.hasClass('dynasty-picture-top')).toBe(true);
 		expect(search(m).parentElement?.hasClass('dynasty-picture-searchbar')).toBe(true);
 	});
 
@@ -168,7 +169,7 @@ describe('D102: the scroller does not move when the field gets the focus', () =>
 		const m = pick();
 		scroller(m).scrollTop = 500;
 		expect(scroller(m).contains(search(m))).toBe(false);
-		expect(search(m).parentElement?.parentElement).toBe(m.contentEl);
+		expect(search(m).parentElement?.parentElement?.parentElement).toBe(m.contentEl);
 	});
 
 	it('the first visualViewport resize still puts the scroller to the top', () => {

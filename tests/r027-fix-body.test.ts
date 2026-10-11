@@ -81,7 +81,8 @@ const cases: Case[] = [
 	{ id: 'L06b', src: cadet(AD, AH), spec: { adopted: true }, off: ids('as, c1, c2, e1'), on: ids('as, c1, c2') },
 	{ id: 'L07', src: cadet(CKIDS, CH), spec: { heirs: ['e1'] }, off: ids('e1, k1, c2, c3'), on: ids('e1, k1, c2, c3') },
 	{ id: 'L08', src: cadet(HH, CH), spec: { inherit: 'men-first-in-house' }, off: ids('ks, c2, e1, kd, cs'), on: ids('ks, c2, kd, cs') },
-	{ id: 'L09', src: cadet(HH, CH), spec: { illegitimate: 'after' }, off: ids('kd, ks, c2, cs, e1, cb'), on: ids('kd, ks, c2, cs, cb') },
+	// 0.2.8 D193: the children of y rank by birth year: c1 1155, cs 1157, c2 1158 (written c1, c2, cs).
+	{ id: 'L09', src: cadet(HH, CH), spec: { illegitimate: 'after' }, off: ids('kd, ks, cs, c2, e1, cb'), on: ids('kd, ks, cs, c2, cb') },
 	{ id: 'L10', src: cadet(CKIDS, ['{name: Legend, from: 1100}', ...CH]), spec: {}, off: ids('k1, c2, c3, e1'), on: ids('k1, c2, c3') },
 	{
 		id: 'L11',

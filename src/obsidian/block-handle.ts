@@ -9,11 +9,14 @@ import { Transaction } from '@codemirror/state';
 import type { EditorView } from '@codemirror/view';
 import type { WritePlan } from '../core/block-write';
 import { findBlocks, ordinalForSection, type LocatedBlock } from '../core/block-locate';
-import { relocate, relocateAll, sameBody, smallestChange, undoBlock } from '../core/block-match';
+import { relocate, relocateAll, sameBody as sameBodyAfterTidy, smallestChange, undoBlock } from '../core/block-match';
 import { createUndoStack, planWrite } from '../core/block-write';
 import type { EditResult, Op } from '../core/edit';
 import { applyOp } from '../core/yaml-edit';
 import { newBlockState, type BlockState } from './block-state';
+
+/** The same text is the usual answer, and it needs no copy of the whole body (`sameBody` tidies both texts first). */
+const sameBody = (a: string, b: string): boolean => a === b || sameBodyAfterTidy(a, b);
 
 /**
  * One change as an editor transaction, so Ctrl/Cmd+Z undoes it (spec §6.1). Obsidian's
@@ -33,6 +36,9 @@ function applyToEditor(view: MarkdownView, c: { from: number; to: number; text: 
 
 const keyString = (path: string, ordinal: number) => `${path}\u0000#${ordinal}`;
 const pause = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+
+/** F-VIEW-04: the longest `forBlock` waits for a write of the note to end (a slow disk or a sync lock), in ms. */
+export const FOR_BLOCK_WAIT_MS = 10_000;
 
 /** Most maintenance steps a handle remembers for `followed` (the delete Notice's Undo, spec §6.1). */
 const MAINTAINED_MAX = 20;
@@ -673,22 +679,28 @@ export class HandleRegistry {
 	 * For the link update after a rename (spec §6.9): the handle of block `ordinal` of a Markdown note, also of a
 	 * block no view has drawn or of a closed note. The note is read as `sync` reads it (never a read that
 	 * overlapped a write), every handle of the note finds its block again, and an existing handle of the
-	 * block is shared. Null if the note or the block is gone.
+	 * block is shared. Null if the note or the block is gone. F-VIEW-04: writes of the note can keep the reads from being
+	 * fresh for `FOR_BLOCK_WAIT_MS`; the block is not gone then, so `onBusy` runs (the caller tells the user) and the result is null.
 	 */
-	async forBlock(path: string, ordinal: number): Promise<Handle | null> {
+	async forBlock(path: string, ordinal: number, onBusy?: () => void): Promise<Handle | null> {
 		if (!this.file(path) || !Number.isInteger(ordinal) || ordinal < 0) return null;
-		for (let i = 0; i < 20; i++) {
+		const until = Date.now() + FOR_BLOCK_WAIT_MS;
+		while (Date.now() < until) {
 			if ((this.writing.get(path) ?? 0) > 0) {
 				await pause(25);
 				continue;
 			}
 			const read = await this.readOnce(path);
 			if (!read) return null;
-			if (!this.stillFresh(path, read)) continue;
+			if (!this.stillFresh(path, read)) {
+				await pause(25);
+				continue;
+			}
 			this.applyText(path, read.text);
 			const blocks = findBlocks(read.text);
 			return blocks[ordinal] ? this.obtain(path, ordinal, blocks) : null;
 		}
+		onBusy?.();
 		return null;
 	}
 

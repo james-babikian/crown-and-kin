@@ -1,9 +1,9 @@
 /*
  * The parts of the ID change that both the Houses window and the Titles window draw (spec §13.17
- * rule 5, D109, D110, D113): the small button "Change ID" and the note "New ID: …" with its button
- * "Keep old ID" on a row of the list, and the ID field (a labelled text field, the button "Make ID
- * from the name" and the line that says why the draft ID is refused) inside the small ID window
- * (`id-window.ts`). The draft logic is in `id-draft.ts`.
+ * rule 5, D109, D110, D113): the note "New ID: …" with its button "Keep old ID" on a row of the
+ * list, and the ID field (a labelled text field, the button "Make ID from the name" and the line
+ * that says why the draft ID is refused) inside the small ID window (`id-window.ts`). The button
+ * "Change ID" is part of the window page (`list-window.ts`). The draft logic is in `id-draft.ts`.
  */
 
 import { ID_UI } from '../render/ui-text';
@@ -80,20 +80,6 @@ export function idField(parent: HTMLElement, o: IdFieldOptions): IdFieldView {
 export interface IdRowView {
 	setItem: (item: string) => void;
 	setProblem: (text: string) => void;
-}
-
-/** The small button "Change ID" of a saved row: it opens the small ID window. At least 44 px high (CSS). */
-export function idOpenButton(parent: HTMLElement, o: { key: string; item: string; onOpen: () => void }): IdRowView {
-	const b = parent.createEl('button', {
-		cls: ['dynasty-sheet-action', 'dynasty-id-open'],
-		text: ID_UI.open,
-		attr: { type: 'button', 'aria-label': ID_UI.openAria(o.item), 'data-focus': `id-open:${o.key}` },
-	});
-	b.addEventListener('click', () => o.onOpen());
-	return {
-		setItem: (item) => b.setAttribute('aria-label', ID_UI.openAria(item)),
-		setProblem: () => undefined,
-	};
 }
 
 /**

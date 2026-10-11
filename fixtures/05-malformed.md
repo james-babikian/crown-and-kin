@@ -7,7 +7,7 @@ House Ashford's records were copied by a careless scribe. The tree must still re
 - Arn, Bram and Col Marsh are each other's ancestors (a cycle through birth and adoptive links).
 - Joss has three birth parents. One union has three partners, and one lists Tilda twice.
 - Piers is placed under ward parents he does not have.
-- Unknown values: a union type, a placement and a parent type.
+- Unknown values: a placement and a parent type. A partnership word that the plugin does not know (`handfasting`) gives no warning; it is drawn as a marriage (D188 item 12).
 - House Brennock's colour is not quoted, so YAML reads it as a comment.
 
 ```dynasty
@@ -119,5 +119,5 @@ unions:
   - partners: [tilda, tilda]                  # the same person twice
   - partners: [piers, nobody]                 # missing partner
   - partners: [ranulf, sela]
-    type: handfasting                         # unknown union type
+    type: handfasting                         # unknown word: drawn as a marriage, no warning
 ```

@@ -25,7 +25,7 @@ function lay(src: string, settings: LayoutSettings, geo = GEO) {
 }
 
 describe('C1: a listed union with an unknown type is drawn like a marriage (spec §5.3)', () => {
-	// `type: implicit` is not a union type (validation warns `unknown-union-type`). Its dot is the
+	// `type: implicit` is not a union type (0.2.8 I13: no warning, as it is no near-typo of a known type). Its dot is the
 	// marriage dot, but edges.ts `coupleKind` gives its line the thin "no recorded partnership" style.
 	const src = `people:
   - {id: a, name: A, sex: m}
@@ -40,7 +40,7 @@ unions:
 	] as const) {
 		it(label, () => {
 			const { g, edges } = lay(src, settings);
-			expect(g.issues.map((i) => i.code)).toContain('unknown-union-type');
+			expect(g.issues.map((i) => i.code)).not.toContain('unknown-union-type');
 			const couple = edges.paths.filter((p) => p.people.length === 2 && p.people.includes('a') && p.people.includes('b'));
 			expect(couple.length).toBeGreaterThan(0);
 			expect(couple.map((p) => p.kind)).toEqual(couple.map(() => 'marriage'));

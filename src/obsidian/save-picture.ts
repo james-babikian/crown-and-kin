@@ -12,6 +12,7 @@
 import { Modal, Notice, type App, type TFile } from 'obsidian';
 import type { FamilyGraph } from '../core/derive';
 import type { FoldKey } from '../core/folds';
+import { folderOf, numberedFreePath } from '../core/link-text';
 import { portraitCropOf, type CropFraction } from '../core/portrait-crop';
 import type { CardLabel } from '../core/titles';
 import { PICTURE_EM, isRoundel, pictureSize, roundelPics } from '../layout/geometry';
@@ -21,6 +22,7 @@ import type { BreakList } from '../render/break-words';
 import { measureText } from '../render/dom/measure';
 import type { SceneFonts } from '../render/dom/scene';
 import type { LineMarks } from '../render/line-highlight';
+import type { ArmsOutline } from '../layout/arms-outline';
 import { savedExtent, savedFileName, savedFrame, savedLegend, savedScale, type PictureMap } from '../render/saved-picture';
 import { DEFAULT_LIGHT } from '../render/styles';
 import { renderSvg } from '../render/svg-string';
@@ -30,6 +32,7 @@ import { ignoreGhostClick, phoneLayout } from './modal-layout';
 import type { PictureStore } from './picture-store';
 import { trackModal } from './plugin-modals';
 import { nameDialog } from './sheet-parts';
+import { buildShell, type Shell } from './window-shell';
 
 /** What the tree view gives the save (P1): the drawn graph and the view's settings. */
 export interface SaveSource {
@@ -51,6 +54,8 @@ export interface SaveSource {
 	fonts: SceneFonts;
 	showDates: boolean;
 	showPortraits: boolean;
+	/** "Arms on cards" (0.2.8, D206): the saved picture follows the cards (supervisor default, open to veto). */
+	armsOnCards?: 'few' | 'all';
 	/** The user's break places for names (D118). */
 	breaks?: BreakList;
 	sourcePath: string;
@@ -79,6 +84,7 @@ const LOAD_LIMIT_MS = 60_000;
 export class SaveWindow extends Modal {
 	private kind: SaveKind = 'png';
 	private readonly cleanup: (() => void)[] = [];
+	private shell: Shell | null = null;
 
 	constructor(
 		app: App,
@@ -92,16 +98,23 @@ export class SaveWindow extends Modal {
 		m.addClass('dynasty-sheet');
 		m.addClass('dynasty-save-window');
 		this.cleanup.push(phoneLayout(this), ignoreGhostClick(this), trackModal(this, () => this.close()));
-		const el = this.contentEl;
-		el.addClass('dynasty-sheet-content');
-		const header = el.createDiv({ cls: 'dynasty-sheet-header' });
-		nameDialog(this.modalEl, header.createDiv({ cls: 'dynasty-sheet-title', text: SAVE_UI.title }));
-		const actions = header.createDiv({ cls: 'dynasty-sheet-actions' });
-		const cancel = actions.createEl('button', { cls: 'dynasty-sheet-cancel', text: SAVE_UI.cancel, attr: { type: 'button' } });
-		cancel.addEventListener('click', () => this.close());
-		const save = actions.createEl('button', { cls: ['mod-cta', 'dynasty-sheet-save', 'dynasty-save-button'], text: SAVE_UI.save, attr: { type: 'button' } });
-		save.addEventListener('click', () => this.chosen());
-		const body = el.createDiv({ cls: 'dynasty-sheet-body' });
+		// The window family (contract C): the frame comes from the shell, as for the other small windows.
+		const shell = buildShell({
+			modalEl: this.modalEl,
+			contentEl: this.contentEl,
+			title: SAVE_UI.title,
+			titled: true,
+			cancelLabel: SAVE_UI.cancel,
+			saveLabel: SAVE_UI.save,
+			onCancel: () => this.close(),
+			onSave: () => this.chosen(),
+			buttons: { save: { cls: ['dynasty-save-button'] } },
+		});
+		this.shell = shell;
+		nameDialog(this.modalEl, shell.titleEl);
+		const cancel = shell.cancel;
+		const save = shell.save;
+		const body = shell.body;
 		const group = body.createDiv({ cls: ['dynasty-choice-options', 'dynasty-save-kinds'], attr: { role: 'radiogroup', 'aria-label': SAVE_UI.kindLabel } });
 		const options: [SaveKind, string, string][] = [
 			['png', SAVE_UI.png, SAVE_UI.pngDetail],
@@ -138,7 +151,7 @@ export class SaveWindow extends Modal {
 			e.preventDefault();
 			this.chosen();
 		});
-		save.focus();
+		save?.focus();
 	}
 
 	private chosen(): void {
@@ -149,6 +162,8 @@ export class SaveWindow extends Modal {
 
 	override onClose(): void {
 		for (const c of this.cleanup.splice(0)) c();
+		this.shell?.dispose();
+		this.shell = null;
 		this.contentEl.empty();
 		try {
 			this.o.onClosed?.();
@@ -227,6 +242,7 @@ export async function makePicture(store: PictureStore | undefined, src: SaveSour
 		labels: src.labels,
 		showDates: src.showDates,
 		showPortraits: src.showPortraits,
+		...(src.armsOnCards !== undefined ? { armsOnCards: src.armsOnCards } : {}),
 		...(folds?.hidden.length ? { foldHidden: new Set(folds.hidden) } : {}),
 		...(src.breaks ? { breaks: src.breaks } : {}),
 		...(src.me !== undefined ? { marked: src.me } : {}),
@@ -236,7 +252,7 @@ export async function makePicture(store: PictureStore | undefined, src: SaveSour
 	const heading = src.note;
 	const extent = savedExtent(laid, legend, heading, fontPx, measure, src.fonts, src.succession?.sentence);
 	const sc = savedScale(extent, fontPx, kind);
-	const pictures = await picturesFor(store, src, laid, sc.pictureScale, savedFrame(laid.layout, legend, heading, fontPx, measure, src.fonts).legend?.arms);
+	const { pictures, outlines } = await picturesFor(store, src, laid, sc.pictureScale, savedFrame(laid.layout, legend, heading, fontPx, measure, src.fonts).legend?.arms);
 	const svg = renderSvg(g, laid.layout, laid.edges, {
 		palette: DEFAULT_LIGHT,
 		dark: false,
@@ -250,6 +266,7 @@ export async function makePicture(store: PictureStore | undefined, src: SaveSour
 		showDates: src.showDates,
 		measure,
 		fonts: src.fonts,
+		outlines,
 		saved: { heading, legend, pictures, scale: sc.scale, ...(folds ? { folds: new Set(folds.folded) } : {}) },
 	});
 	const name = savedFileName(src.note, kind, src.focusName);
@@ -268,9 +285,11 @@ export async function makePicture(store: PictureStore | undefined, src: SaveSour
  * frame), null for another problem. The arms are made once per house at the larger of the card's box
  * and the legend's box.
  */
-async function picturesFor(store: PictureStore | undefined, src: SaveSource, laid: LaidOut, scale: number, legendArms: { w: number; h: number } | undefined): Promise<PictureMap> {
+async function picturesFor(store: PictureStore | undefined, src: SaveSource, laid: LaidOut, scale: number, legendArms: { w: number; h: number } | undefined): Promise<{ pictures: PictureMap; outlines: ReadonlyMap<string, ArmsOutline> }> {
 	const out = new Map<string, string | 'missing' | null>();
-	if (!store) return out;
+	// D219: the outline of each arms picture, read while its copy was made; the picture draws the gap round the arms from it.
+	const outlines = new Map<string, ArmsOutline>();
+	if (!store) return { pictures: out, outlines };
 	const { g } = src;
 	const geo = laid.layout.geometry;
 	// The Roundel's medallion is 2 em across and its arms alone 2 em high (B.3.3): so the copies are made at that size.
@@ -284,7 +303,10 @@ async function picturesFor(store: PictureStore | undefined, src: SaveSource, lai
 		const p = g.byId.get(box.id);
 		if (!p) continue;
 		const house = p.house !== undefined ? g.houses.get(p.house) : undefined;
-		if (box.arms && house?.arms && !houses.has(house.id)) {
+		// 0.2.8 (I05): the personal arms of a person, else the arms of the house; one copy per person and one per house.
+		if (box.arms && p.arms) {
+			wanted.push({ key: `person-arms:${p.id}`, link: p.arms, w: armsW, h: armsH, fit: 'meet' });
+		} else if (box.arms && house?.arms && !houses.has(house.id)) {
 			houses.add(house.id);
 			wanted.push({ key: `arms:${house.id}`, link: house.arms, w: armsW, h: armsH, fit: 'meet' });
 		}
@@ -301,8 +323,10 @@ async function picturesFor(store: PictureStore | undefined, src: SaveSource, lai
 		}
 		const uri = await store.exportCopy(r.file, { w: Math.max(1, Math.ceil(x.w * scale)), h: Math.max(1, Math.ceil(x.h * scale)), fit: x.fit, crop: x.crop });
 		out.set(x.key, typeof uri === 'string' ? uri : null);
+		const outline = x.fit === 'meet' && typeof uri === 'string' ? (store.outlineOf?.(r.file) ?? null) : null;
+		if (outline) outlines.set(x.key, outline);
 	}
-	return out;
+	return { pictures: out, outlines };
 }
 
 /**
@@ -347,20 +371,11 @@ function loadImage(url: string): Promise<HTMLImageElement> {
 	});
 }
 
-const folderOf = (path: string) => path.split('/').slice(0, -1).join('/');
-
 /** D70: a free path in Obsidian's attachment folder of the note; before Obsidian 1.5.7, the note's folder with " 1", " 2", …. */
 async function freePath(app: App, name: string, sourcePath: string): Promise<string> {
 	const fm = app.fileManager as { getAvailablePathForAttachment?: (n: string, s?: string) => Promise<string> };
 	if (typeof fm.getAvailablePathForAttachment === 'function') return fm.getAvailablePathForAttachment(name, sourcePath);
-	const folder = folderOf(sourcePath);
-	const dot = name.lastIndexOf('.');
-	const stem = dot > 0 ? name.slice(0, dot) : name;
-	const ext = dot > 0 ? name.slice(dot) : '';
-	const at = (n: string) => (folder ? `${folder}/${n}` : n);
-	let path = at(name);
-	for (let i = 1; app.vault.getAbstractFileByPath(path); i++) path = at(`${stem} ${i}${ext}`);
-	return path;
+	return numberedFreePath(folderOf(sourcePath), name, (p) => !!app.vault.getAbstractFileByPath(p));
 }
 
 /** The result Notice (spec §13.8): the file and its folder, the small-names texts, and Share where the device can share the file. It stays until the owner closes it. */

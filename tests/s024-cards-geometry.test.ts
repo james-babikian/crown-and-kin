@@ -12,6 +12,9 @@ const LINES: readonly NameLineCount[] = [1, 2, 3];
 const wholeGeo = (f: number) => geometryFor(f);
 const relationGeo = (f: number) => withRelationLine(geometryFor(f), { relationLine: true } as never);
 
+// 0.2.8 (I01): the badge centre lies on the middle of the arc of the card corner (radius 8 px, the default theme's --radius-m): this far in from the corner on each side.
+const CORNER_C = 8 - 8 / Math.SQRT2;
+
 describe('4.1 the card size and the one text size (D117, D126)', () => {
 	it('the card height is 3.8 em, rounded to whole px', () => {
 		expect(geometryFor(16).cardH).toBe(61);
@@ -73,16 +76,16 @@ describe('4.1 the card size and the one text size (D117, D126)', () => {
 
 // E3 (contract 4.2): the end of the D14 sign against the disc of the badge on the top right corner. The sign does not move.
 describe('E3: the sign end and the badge disc (Full and Compact)', () => {
-	it('the centre line of the sign ends at least r - width/2 from the badge centre, on every kind, font and name-line count; Compact too', () => {
+	it('the badge covers the end of the sign by at most 0.3 em, on every kind, font and name-line count; Compact too (0.2.8: the disc is 0.55 em and its centre lies on the corner arc; 0.2.7 kept the end clear of the disc)', () => {
 		const bad: string[] = [];
 		for (const f of FONTS) {
 			for (const geo of [wholeGeo(f), relationGeo(f)]) {
 				for (const lines of LINES) {
 					const t = cardText(geo, lines);
 					const need = BADGE_RADIUS_EM * f - t.sign.width / 2;
-					const end = Math.hypot(geo.cardW - t.sign.x1, t.sign.y1);
+					const end = Math.hypot(geo.cardW - CORNER_C - t.sign.x1, t.sign.y1 - CORNER_C);
 					// The plate form (relation line) centres its text by 0.25 em differently from the old card, so a shortfall under 0.05 px is allowed (a check, D126 2).
-					if (end < need - 0.05) bad.push(`Full f${f} ${lines}L: ${end.toFixed(2)} < ${need.toFixed(2)}`);
+					if (end < need - 0.3 * f) bad.push(`Full f${f} ${lines}L: ${end.toFixed(2)} < ${need.toFixed(2)} - 0.3 em`);
 				}
 			}
 			// Compact: the sign is drawn through `signAt` (the Compact name is 1.5 em of the note font).
@@ -91,19 +94,21 @@ describe('E3: the sign end and the badge disc (Full and Compact)', () => {
 			const compactBaseline = geo.cardH / 2 + 0.35 * 1.5 * f;
 			const s = signAt(t, 1.5, compactBaseline, t.sign.x1);
 			const need = BADGE_RADIUS_EM * f - s.width / 2;
-			const end = Math.hypot(geo.cardW - s.x1, s.y1);
-			if (end < need - 1e-9) bad.push(`Compact f${f}: ${end.toFixed(2)} < ${need.toFixed(2)}`);
+			const end = Math.hypot(geo.cardW - CORNER_C - s.x1, s.y1 - CORNER_C);
+			if (end < need - 0.3 * f) bad.push(`Compact f${f}: ${end.toFixed(2)} < ${need.toFixed(2)} - 0.3 em`);
 		}
 		// E3 is a check, not a failure (D126 2). The only reports of 0.2.4 were on the Compact size (3.35 em cards at 8 and 9 px), which is gone (D179).
 		expect(bad, bad.join('; ')).toEqual([]);
 	});
 
-	it('numbers at 16 px: the upper end of the sign is 9.5 px from the badge centre (the disc is 9.6 px): the disc covers its end by 0.07 px plus the stroke, and the sign does not move (D126 2)', () => {
+	it('numbers at 16 px: the upper end of the sign is 9.5 px from the corner and 6.4 px from the badge centre, which lies on the corner arc (the disc is 8.8 px): the disc covers 2 px of its end, and the sign does not move (D126 2; 0.2.8, I01)', () => {
 		const t = cardText(wholeGeo(16));
-		const end = Math.hypot(wholeGeo(16).cardW - t.sign.x1, t.sign.y1);
-		expect(end).toBeGreaterThan(9.4);
-		expect(end).toBeLessThan(9.7);
-		expect(BADGE_RADIUS_EM * 16).toBeCloseTo(9.6, 9);
+		expect(Math.hypot(wholeGeo(16).cardW - t.sign.x1, t.sign.y1)).toBeGreaterThan(9.4);
+		expect(Math.hypot(wholeGeo(16).cardW - t.sign.x1, t.sign.y1)).toBeLessThan(9.7);
+		const end = Math.hypot(wholeGeo(16).cardW - CORNER_C - t.sign.x1, t.sign.y1 - CORNER_C);
+		expect(end).toBeGreaterThan(6.3);
+		expect(end).toBeLessThan(6.5);
+		expect(BADGE_RADIUS_EM * 16).toBeCloseTo(8.8, 9);
 	});
 
 	it('the sideways geometry keeps the card size, so the sign keeps its place', () => {

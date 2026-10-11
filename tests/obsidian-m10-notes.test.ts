@@ -5,16 +5,13 @@ vi.mock('@codemirror/language', () => ({ forceParsing: () => false, syntaxTree: 
 vi.mock('@codemirror/view', () => ({ ViewPlugin: { fromClass: () => ({}) } }));
 
 import { TFile as VaultFile } from 'obsidian';
-import { deriveFamilies } from '../src/core/derive';
 import type { Op } from '../src/core/edit';
-import { parseDynasty } from '../src/core/parse';
 import { applyOp } from '../src/core/yaml-edit';
 import { EditSheet } from '../src/obsidian/edit-sheet';
-import { openHousePage } from '../src/obsidian/house-page-window';
 import { HousesWindow } from '../src/obsidian/houses-window';
 import { makePersonNote } from '../src/obsidian/make-note';
 import { buildLegend } from '../src/render/dom/scene';
-import { HOUSE_PAGE_UI, NOTE_UI, REMOVE, WRITE_TEXT } from '../src/render/ui-text';
+import { HOUSE_PAGE_UI, NOTE_UI, REMOVE, WINDOW_UI, WRITE_TEXT } from '../src/render/ui-text';
 import { FEl, device, dispatch, fakeWin, installDom, resetDom } from './acceptance/fake-dom';
 import { noticeList, notices, openModals, resetObsidian } from './acceptance/fake-obsidian';
 import { fakeHandle, type FakeHandle } from './acceptance/tree-view-fakes';
@@ -494,113 +491,6 @@ describe('makePersonNote: checks before vault.create', () => {
 	});
 });
 
-// ---------- the house page (H2–H4) ----------
-
-const graph = () => {
-	const parsed = parseDynasty(BODY);
-	if (!parsed.ok) throw new Error('bad body');
-	return deriveFamilies(parsed.tree);
-};
-
-function openPage(houseId: string, options: Options = {}) {
-	const v = fakeVault(options);
-	const shown: string[] = [];
-	const notes: (() => Promise<void>)[] = [];
-	let closed = 0;
-	const win = openHousePage(v.app as never, {
-		app: v.app as never,
-		houseId,
-		whole: graph(),
-		sourcePath: 'Trees/Tree.md',
-		show: (id) => shown.push(id),
-		openNote: (open) => notes.push(open),
-		onClosed: () => closed++,
-	})!;
-	const content = (win as unknown as { contentEl: FEl }).contentEl;
-	return { ...v, win, content, shown, notes, closed: () => closed, rows: () => content.querySelectorAll('.dynasty-hp-row') };
-}
-
-describe('H2: the house page window', () => {
-	it('shows the name, the number of people and one 44 px button for each person, in the order of the page', () => {
-		device.width = 1280;
-		const p = openPage('valmont');
-		expect(p.content.querySelector('.dynasty-sheet-title')!.getText()).toBe('House Valmont');
-		expect(p.content.querySelector('.dynasty-hp-count')!.getText()).toBe('4 people');
-		expect(p.rows().map((r) => r.getAttribute('data-person'))).toEqual(['aldric', 'bran', 'cara', 'dora']);
-		// RB2: the name of the row comes from its text (WCAG 2.5.3); the title only adds the action.
-		expect(p.rows()[0].getAttribute('aria-label')).toBeNull();
-		expect(p.rows()[0].getAttribute('title')).toBe(HOUSE_PAGE_UI.rowHint);
-		expect(p.content.querySelector('.dynasty-hp-head')!.children.map((c) => c.getText())).toEqual(['Generation', 'Name', 'Title', 'Born', 'Died']);
-		// The value is the plain number; the lead word shows only in the two-line layout (CSS).
-		expect(p.rows()[0].querySelector('.dynasty-hp-gen .dynasty-hp-value')!.getText()).toBe('1');
-		expect(p.rows()[0].querySelector('.dynasty-hp-gen .dynasty-hp-lead')!.getText()).toBe('Generation ');
-	});
-
-	it('"1 person" for one person', () => {
-		const p = openPage('orsini');
-		expect(p.content.querySelector('.dynasty-hp-count')!.getText()).toBe('1 person');
-	});
-
-	it('a house with no person: the text, no count, no table, no note button', () => {
-		const p = openPage('empty');
-		expect(p.content.querySelector('.dynasty-hp-none')!.getText()).toBe('No person in the tree has this house.');
-		expect(p.content.querySelector('.dynasty-hp-count')).toBeNull();
-		expect(p.content.querySelector('.dynasty-hp-table')).toBeNull();
-		expect(p.content.querySelector('.dynasty-hp-make-note')).toBeNull();
-	});
-
-	it('a house that is not in the tree gives a Notice and no window', () => {
-		const v = fakeVault();
-		const win = openHousePage(v.app as never, { app: v.app as never, houseId: 'nobody', whole: graph(), sourcePath: 'x.md', show: () => {}, openNote: () => {} });
-		expect(win).toBeNull();
-		expect(openModals).toEqual([]);
-		expect(lastNotice()).toBe(HOUSE_PAGE_UI.none);
-	});
-
-	it('below 600 px the window has the phone class; the text of a row is the same (the layout is CSS)', () => {
-		device.width = 390;
-		device.height = 844;
-		const p = openPage('valmont');
-		expect((p.win as unknown as { modalEl: FEl }).modalEl.hasClass('is-phone')).toBe(true);
-		expect(p.rows()[0].querySelector('.dynasty-hp-gen')!.getText()).toBe('Generation 1');
-	});
-
-	it('H3: a tap on a row closes the window, then shows the card', () => {
-		const p = openPage('valmont');
-		dispatch(p.rows()[1], 'click');
-		expect(openModals).toEqual([]);
-		expect(p.shown).toEqual(['bran']);
-		expect(p.closed()).toBe(1);
-	});
-
-	it('H4: Make a note with this table makes the note in the D60 folder, tells, closes and hands the opener over', async () => {
-		const p = openPage('valmont', { parent: 'Notes', files: ['Notes/House Valmont, people.md'] });
-		const b = p.content.querySelector('.dynasty-hp-make-note')!;
-		expect(b.getText()).toBe('Make a note with this table');
-		expect(b.getAttribute('aria-label')).toBe(HOUSE_PAGE_UI.makeNoteLabel('House Valmont'));
-		dispatch(b, 'click');
-		await settle();
-		expect(p.created).toHaveLength(1);
-		expect(p.created[0].path).toBe('Notes/House Valmont, people 1.md');
-		expect(p.created[0].data.startsWith('| Generation | Name | Title | Born | Died |\n| --- | --- | --- | --- | --- |\n| 1 | Aldric Valmont |')).toBe(true);
-		expect(p.created[0].data).not.toContain('#');
-		expect(lastNotice()).toBe(HOUSE_PAGE_UI.noteMade('House Valmont, people 1'));
-		expect(openModals).toEqual([]);
-		expect(p.notes).toHaveLength(1);
-		await p.notes[0]();
-		expect(p.leaves[0].opened[0].path).toBe('Notes/House Valmont, people 1.md');
-	});
-
-	it('H4: a failed vault write gives the Notice and the window stays', async () => {
-		vi.spyOn(console, 'error').mockImplementation(() => {});
-		const p = openPage('valmont', { failCreate: true });
-		dispatch(p.content.querySelector('.dynasty-hp-make-note')!, 'click');
-		await settle();
-		expect(lastNotice()).toBe(HOUSE_PAGE_UI.noteFailed('House Valmont, people'));
-		expect(openModals).toHaveLength(1);
-	});
-});
-
 // ---------- the People button (H1) ----------
 
 describe('H1: People in the Houses window', () => {
@@ -620,29 +510,47 @@ describe('H1: People in the Houses window', () => {
 		return openListPage(c, id);
 	};
 
-	it('each saved house has People with its label on its page; a house new in the draft has none', () => {
+	it('each saved house has a People section with its rows and a button for the note; a house new in the draft has none (D202)', () => {
 		const h = openHouses();
-		const b = rowOf(h.content, 'valmont').querySelector('.dynasty-house-people')!;
-		expect(b.getText()).toBe('People');
-		expect(b.getAttribute('aria-label')).toBe('People: show the people of House Valmont');
+		const page = rowOf(h.content, 'valmont');
+		const section = page.querySelector('[data-section="people"]')!;
+		expect(section.querySelector('.dynasty-sheet-section-title, .dynasty-section-title')?.getText() ?? section.getText()).toContain(WINDOW_UI.sectionPeople);
+		const b = section.querySelector('.dynasty-house-people')!;
+		expect(b.getText()).toBe(HOUSE_PAGE_UI.makeNote);
+		expect(b.getAttribute('aria-label')).toBe(HOUSE_PAGE_UI.makeNoteLabel('House Valmont'));
 		backToList(h.content);
 		dispatch(h.content.querySelector('.dynasty-house-add')!, 'click');
-		expect(h.content.querySelector('.dynasty-lw-page')!.querySelector('.dynasty-house-people')).toBeNull();
+		expect(h.content.querySelector('.dynasty-lw-page')!.querySelector('[data-section="people"]')).toBeNull();
 	});
 
-	it('without the option there is no People button', () => {
+	it('without the option there is no button for the note, and the rows stay', () => {
 		const v = fakeVault();
 		const win = HousesWindow.create(v.app as never, { handle: writingHandle(BODY) as never })!;
 		win.open();
-		expect((win as unknown as { contentEl: FEl }).contentEl.querySelector('.dynasty-house-people')).toBeNull();
+		const content = (win as unknown as { contentEl: FEl }).contentEl;
+		const page = openListPage(content, 'valmont');
+		expect(page.querySelector('.dynasty-house-people')).toBeNull();
+		expect(page.querySelectorAll('.dynasty-hp-row').length).toBe(4);
 	});
 
-	it('a tap on a name closes the page and this window, then shows the card', () => {
+	it('the rows show the name, the title, and a second text line with the generation and the years', () => {
 		const h = openHouses();
-		dispatch(rowOf(h.content, 'valmont').querySelector('.dynasty-house-people')!, 'click');
-		expect(openModals).toHaveLength(2);
-		const page = openModals[1] as unknown as { contentEl: FEl };
-		dispatch(page.contentEl.querySelectorAll('.dynasty-hp-row')[2], 'click');
+		const rows = rowOf(h.content, 'valmont').querySelectorAll('.dynasty-hp-row');
+		expect(rows.map((r) => r.querySelector('.dynasty-hp-name')!.getText())).toEqual(['Aldric Valmont', 'Bran Valmont', 'Cara Valmont', 'Dora Valmont']);
+		expect(rows[0]!.querySelector('.dynasty-row-sub')!.getText()).toBe(WINDOW_UI.personRowSub(1, '1200', ''));
+	});
+
+	it('without a way to show the card, the rows are plain text', () => {
+		const v = fakeVault();
+		const win = HousesWindow.create(v.app as never, { handle: writingHandle(BODY) as never })!;
+		win.open();
+		const rows = openListPage((win as unknown as { contentEl: FEl }).contentEl, 'valmont').querySelectorAll('.dynasty-hp-row');
+		expect(rows.every((r) => r.tag !== 'button')).toBe(true);
+	});
+
+	it('a tap on a name closes the window, then shows the card', () => {
+		const h = openHouses();
+		dispatch(rowOf(h.content, 'valmont').querySelectorAll('.dynasty-hp-row')[2], 'click');
 		expect(openModals).toEqual([]);
 		expect(h.shown).toEqual(['cara']);
 	});
@@ -652,45 +560,47 @@ describe('H1: People in the Houses window', () => {
 		const name = rowOf(h.content, 'orsini').querySelector('textarea')!;
 		(name as unknown as { value: string }).value = 'House Orsini II';
 		dispatch(name, 'input');
-		dispatch(rowOf(h.content, 'valmont').querySelector('.dynasty-house-people')!, 'click');
-		const page = openModals[1] as unknown as { contentEl: FEl };
-		dispatch(page.contentEl.querySelectorAll('.dynasty-hp-row')[0], 'click');
+		dispatch(rowOf(h.content, 'valmont').querySelectorAll('.dynasty-hp-row')[0], 'click');
 		expect(openModals).toHaveLength(1);
 		expect(h.shown).toEqual([]);
-		dispatch(h.content.closest?.('.modal') ? h.content : h.content, 'click');
 		const modalEl = (h.win as unknown as { modalEl: FEl }).modalEl;
 		dispatch(modalEl.querySelector('.dynasty-sheet-keep')!, 'click');
 		expect(h.shown).toEqual([]);
 		// Again, and discard.
-		dispatch(rowOf(h.content, 'valmont').querySelector('.dynasty-house-people')!, 'click');
-		const page2 = openModals[1] as unknown as { contentEl: FEl };
-		dispatch(page2.contentEl.querySelectorAll('.dynasty-hp-row')[0], 'click');
+		dispatch(rowOf(h.content, 'valmont').querySelectorAll('.dynasty-hp-row')[0], 'click');
 		dispatch(modalEl.querySelector('.dynasty-sheet-discard')!, 'click');
 		expect(openModals).toEqual([]);
 		expect(h.shown).toEqual(['aldric']);
 	});
+
+	it('the button for the note asks first, too, when the window has unsaved changes', async () => {
+		const h = openHouses();
+		const name = rowOf(h.content, 'orsini').querySelector('textarea')!;
+		(name as unknown as { value: string }).value = 'House Orsini II';
+		dispatch(name, 'input');
+		dispatch(rowOf(h.content, 'valmont').querySelector('.dynasty-house-people')!, 'click');
+		await settle();
+		const modalEl = (h.win as unknown as { modalEl: FEl }).modalEl;
+		expect(modalEl.querySelector('.dynasty-sheet-keep')).not.toBeNull();
+		dispatch(modalEl.querySelector('.dynasty-sheet-keep')!, 'click');
+		expect(openModals).toHaveLength(1);
+	});
 });
 
-describe('H1: the house rows of the legend', () => {
+// 0.2.8 (D196 item 3): the live legend has no house rows; the call of 0.2.7 with houses and a callback still works and draws none.
+describe('H1: the house rows of the legend (gone in 0.2.8)', () => {
 	const houses = [
 		{ id: 'valmont', name: 'House Valmont', color: '#8b1a1a' },
 		{ id: 'orsini', name: 'House Orsini' },
 	];
 
-	it('with a callback the rows are buttons with a tooltip; a tap gives the house id', () => {
+	it('with a callback no row is drawn, and no button', () => {
 		const list = new FEl('div') as unknown as HTMLElement;
 		const seen: string[] = [];
 		buildLegend(list, houses as never, (id) => seen.push(id));
-		const rows = (list as unknown as FEl).querySelectorAll('.dynasty-legend-house');
-		expect(rows.map((r) => r.hasClass('is-button'))).toEqual([true, true]);
-		expect(rows[0].getAttribute('aria-label')).toBe('People: show the people of House Valmont');
-		dispatch(rows[1], 'click');
-		expect(seen).toEqual(['orsini']);
-	});
-
-	it('without a callback the rows stay plain (the static phone preview)', () => {
-		const list = new FEl('div') as unknown as HTMLElement;
-		buildLegend(list, houses as never);
+		expect((list as unknown as FEl).querySelectorAll('.dynasty-legend-house')).toEqual([]);
 		expect((list as unknown as FEl).querySelectorAll('button')).toEqual([]);
+		expect(seen).toEqual([]);
 	});
 });
+

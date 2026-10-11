@@ -13,10 +13,11 @@ const rule = (selector: string): string => {
 };
 
 describe('phone list rows (D173)', () => {
-	it('the name button keeps a gap of 0.5 em after the pictures, before the divider of the pencil button', () => {
-		expect(rule('.dynasty-list button.dynasty-list-go')).toMatch(/padding-right:\s*0\.5em/);
-		// The divider is the left border of the pencil button, so the gap belongs to the name button.
-		expect(rule('.dynasty-list button.dynasty-list-edit:not(.dynasty-list-whole)')).toMatch(/border-left:/);
+	it('0.2.8 (C03): no divider before the pencil; the pencil is a 44 px square at the right edge', () => {
+		const pencil = rule('.dynasty-list button.dynasty-list-edit:not(.dynasty-list-whole)');
+		expect(pencil).not.toMatch(/border-left:/);
+		expect(pencil).toMatch(/width:\s*44px/);
+		expect(pencil).toMatch(/height:\s*44px/);
 	});
 
 	it('the sobriquet is one inline box that is never wider than the row', () => {

@@ -53,9 +53,9 @@ const TREE = [
 	'',
 ].join('\n');
 
-const branchRows = (p: FEl) => p.querySelectorAll('.dynasty-succ-branch-row').map((r) => r.getText());
+const branchRows = (p: FEl) => p.querySelectorAll('.dynasty-succ-branch').map((r) => r.getText());
 /** Every row of the list in order: heirs ("1st…") and grey rows ("?…"). */
-const order = (p: FEl) => p.querySelectorAll('.dynasty-succ-list [role="listitem"]').map((i) => i.querySelector('.dynasty-succ-ord')!.getText());
+const order = (p: FEl) => p.querySelectorAll('.dynasty-succ-list [role="listitem"]').map((i) => i.querySelector('.dynasty-ord')!.getText());
 
 describe('the grey rows of the open branches', () => {
 	it('stand at their place between the heirs, with the text of the note', () => {
@@ -113,7 +113,7 @@ describe('the grey rows of the open branches', () => {
 	it('a tap on a grey row shows the card, like a name', () => {
 		const o = openWin(TREE, { succession: { limit: () => 5, oldAge: () => 110, youngDeathAge: () => 0 } });
 		const p = page(o, 'crown');
-		const b = p.querySelectorAll('.dynasty-succ-branch button')[0];
+		const b = p.querySelectorAll('.dynasty-succ-branch')[0];
 		dispatch(b, 'click');
 		expect(o.shown).toEqual(['early']);
 		expect(b.getAttribute('aria-label')).toBe(T.branchRowLabel(T.branchRow('Early Ardent', 'c. 1141')));

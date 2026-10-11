@@ -83,18 +83,18 @@ import { DEFAULT_FAR_RULE, NEVER_FAR_RULE } from '../layout/index';
 import type { Geometry, LaidOut, LayoutSettings, Orientation, PersonBox, Rect } from '../layout/model';
 import { fontsChanged, parsePx, usesFamily, type FontState } from '../render/fonts';
 import { clearMeasureCache, measureText, usableFamily } from '../render/dom/measure';
-import { calloutBackdrop, plusChoice } from '../render/dom/theme-read';
+import { calloutBackdrop } from '../render/dom/theme-read';
 import { wireCardTips, type CardTips } from '../render/dom/card-tip';
 import { PanZoom, visibleRect } from '../render/dom/pan-zoom';
-import { setLegendArms, type PictureSlot } from '../render/dom/pictures';
-import { FILL_ALL_EVENT, buildLegend, buildScene, discPath, lodClass, parsePxRadius, type CardLink, type Scene, type SceneOptions } from '../render/dom/scene';
+import type { PictureSlot } from '../render/dom/pictures';
+import { FILL_ALL_EVENT, buildLegend, buildScene, discPath, lodClass, type CardLink, type Scene, type SceneOptions } from '../render/dom/scene';
 import { sameTall } from '../render/dom/tall-cards';
 import { parseBreakList } from '../render/break-words';
-import { buildPhoneList, setListEditable, showListPicture, type ListPictureSlots } from '../render/dom/phone-list-dom';
-import { buildCallout, Popover } from '../render/dom/widgets';
-import { legendHouses } from '../render/legend';
+import { buildPhoneList, failListPicture, restoreListPictures, setListEditable, showListPicture, type ListPictureSlots } from '../render/dom/phone-list-dom';
+import { buildCallout, fitLegend, Popover, type PopoverOptions } from '../render/dom/widgets';
 import { SIGN_CARD_LABEL, cardLabel, familyOf, finderSentence, linkTarget, startPerson, stepSentences, type RenderTiming } from '../render/tree-info';
-import { ADD_UI, BLOCK_UI, FINDER_UI, FOCUS_UI, FOLD_UI, FULL_UI, HINT_UI, HOUSES, PHONE_LIST_UI, PROBLEMS_HINT, SAVE_UI, SUCCESSION_UI, TITLES_UI, UI, WRITE_TEXT, problemsLabel, problemsTitle } from '../render/ui-text';
+import { ADD_UI, BLOCK_UI, FINDER_UI, FOCUS_UI, FOLD_UI, FULL_UI, HINT_UI, PHONE_LIST_UI, PROBLEMS_HINT, SAVE_UI, SHEET, SUCCESSION_UI, TITLES_UI, UI, WRITE_TEXT, problemsLabel, problemsTitle } from '../render/ui-text';
+import { TOOLBAR_UI } from '../render/view-text';
 import {
 	centreOn,
 	isPan,
@@ -114,20 +114,20 @@ import {
 	type Size,
 	type View,
 } from '../render/view-math';
-import { sameBody } from '../core/block-match';
+import { sameBody as sameBodyAfterTidy } from '../core/block-match';
 import type { Handle, HandleRegistry } from './block-handle';
+import { lastHeight, rememberHeight } from './block-height';
 import { carryState, focusKey, newBlockState, type BlockState, type FinderState } from './block-state';
 import { EditSheet, type SheetFolds } from './edit-sheet';
-import { PHONE_FOCUS_MIN_PEOPLE, badgeTap, chooseFocus, clearToolbar, finderFirstView, finderOrientation, focusView, isPhoneWindow, orientationFor, outsideBox, sidewaysView, tagHitBelow } from './focus-mode';
+import { PHONE_FOCUS_MIN_PEOPLE, badgeTap, chooseFocus, clearToolbar, finderFirstView, finderOrientation, focusView, isPhoneWindow, keepTopCardWhole, orientationFor, outsideBox, parentsAbove, sidewaysView, tagHitBelow } from './focus-mode';
 import { cutBack, planFolds, withFolds, type FoldPlan } from './fold-view';
 import type { FoldRef } from '../render/dom/folds';
 import { FullScreenModal } from './full-screen';
-import { openHousePage } from './house-page-window';
 import { HousesWindow } from './houses-window';
 import { createLivePictures, zoomStep, type LivePictures } from './live-pictures';
 import { measuredLayout, type MeasuredResult } from './measured-layout';
-import { listData, listStart, listWord, popTrail, pushTrail } from './phone-list';
-import { pickPerson } from './person-picker';
+import { linkWord, listData, listStart, listWord, popTrail, pushTrail } from './phone-list';
+import { pickPerson, type PickerContext } from './person-picker';
 import type { CopyBox, PictureCopy, PictureStore, ResolvedPicture } from './picture-store';
 import { pluginModalOpen } from './plugin-modals';
 import { relationsFor, validMe } from './relation-cache';
@@ -138,14 +138,21 @@ import { TitlesWindow } from './titles-window';
 
 /** D144: after a move the keyboard focus (and so a screen reader) goes to the heading of the centre section of the list. */
 const LIST_FOCUS = '.dynasty-list-section[data-section="person"] .dynasty-list-head';
-/** D144: the small picture copies of a list row, in CSS px (twice the 28 x 34 and 40 x 40 boxes of the CSS, for a sharp copy). */
-const LIST_ARMS_BOX: CopyBox = { w: 56, h: 68, fit: 'meet' };
+/**
+ * D144, D209: the small picture copies of a list row, in CSS px (about twice the size on the screen, for a sharp copy): the arms of the large row are
+ * 35 px high under a portrait and 56 px high alone; the portrait is 36 px in a row and 56 px in the large row.
+ */
+const LIST_ARMS_BOX: CopyBox = { w: 96, h: 120, fit: 'meet' };
 const LIST_PORTRAIT_BOX: CopyBox = { w: 96, h: 96, fit: 'portrait' };
+const HERO_PORTRAIT_BOX: CopyBox = { w: 128, h: 128, fit: 'portrait' };
 
 /** The most cards attached in one idle chunk. */
 const IDLE_CARDS_PER_CHUNK = 25;
 /** An idle chunk stops when the idle callback has less than this many ms left. */
 const IDLE_STOP_MS = 4;
+
+/** The same text is the usual answer, and it needs no copy of the whole body (`sameBody` tidies both texts first). */
+const sameBody = (a: string, b: string): boolean => a === b || sameBodyAfterTidy(a, b);
 
 /** What a tree view needs from the plugin. */
 export interface TreeHost {
@@ -162,7 +169,32 @@ export interface TreeHost {
 	readonly pictures?: PictureStore;
 	/** M11: the parse that the read paths share; a host without one (a unit fake) parses each time. */
 	readonly parseCache?: ParseCache;
+	/**
+	 * 0.2.8 contract B.5 (D183): set only by the plugin. On a cold start a tree draws a box of its last known height until `ready(el)` (the
+	 * plugin styles and the stored settings are in) and until the place of its block is known, for at most `START_LIMIT_MS`. `cache()` is false until the
+	 * metadata cache has finished once (or the limit has passed), so no warning about a missing picture counts before it is true.
+	 * Absent in a host that has no cold start (the unit fakes): the tree draws at once.
+	 */
+	readonly startedUp?: { ready(el: HTMLElement): boolean; cache(): boolean };
 }
+
+/** D183: the longest a tree waits for the styles, the settings and its block place on a cold start, in ms. */
+export const START_LIMIT_MS = 2000;
+/**
+ * The hard cap of the wait for the plugin styles, in ms. Obsidian reads styles.css after `onload`, and on a cold iPhone that can take longer than
+ * `START_LIMIT_MS`; a tree drawn before the styles has no layout at all. The settings and the block place keep the shorter limit.
+ */
+export const STYLES_LIMIT_MS = 8000;
+/** A block whose section Obsidian does not tell yet is asked again for this long (ms) before it is called read only. */
+const SECTION_LIMIT_MS = 5000;
+/** The wait between two asks for the section of a block, in ms. */
+const SECTION_STEP_MS = 250;
+/** The wait between two looks at the start conditions, in ms. */
+const START_STEP_MS = 50;
+/** The least time between two asks for the section during the start wait. */
+const ASK_GAP_MS = 100;
+/** The height of the box that stands in for a tree on a phone, when no height of the block is known, in px. */
+const PHONE_PLACEHOLDER_PX = 260;
 
 /** What a full-screen view takes over from the embedded view that opened it (spec §7.1). */
 export interface FullSource {
@@ -238,9 +270,6 @@ interface PictureInfo {
 /** Numbers the result bars, for their `aria-labelledby`. */
 let resultIds = 0;
 
-/** O3: the legend's arms box, in CSS px (styles.css `.dynasty-legend-arms`). */
-const LEGEND_ARMS_BOX: CopyBox = { w: 20, h: 24, fit: 'meet' };
-
 /** Runs `fn` in the next idle time (a timer where the browser has no idle callback, as Safari); the fold and card chains share it. */
 function later(fn: (idle: { timeRemaining(): number }) => void): void {
 	const ric = (globalThis as unknown as { requestIdleCallback?: (f: typeof fn, o: { timeout: number }) => number }).requestIdleCallback;
@@ -253,8 +282,6 @@ export const HOVER_SOURCE = 'dynasty-tree';
 const HIGHLIGHT_MS = 2000;
 /** The person a save just changed in a phone list and the time the row flash ends; kept per block, so a second build keeps the flash. */
 const savedFlashes = new WeakMap<BlockState, { id: string; until: number }>();
-/** Height of the D28 hint label in px (styles.css), to put it level with the toolbar. */
-const HINT_HEIGHT = 28;
 /** After css-change, the theme colours are read once more this much later (a theme's sheet can still load). */
 export const THEME_RECHECK_MS = 400;
 const RESOLVE_RETRIES_MS = [250, 1000];
@@ -312,6 +339,13 @@ interface RedrawOptions {
 	keepOwn?: boolean;
 }
 
+/** The order of the parts of each toolbar, by class (0.2.8, G.13); `orderBar` sorts the bar by it. */
+const BAR_ORDER = {
+	desktop: ['dynasty-read-only-label', 'dynasty-open-source', 'dynasty-add-person', 'dynasty-find', 'dynasty-focus', 'dynasty-fit', 'dynasty-sep-a', 'dynasty-houses-button', 'dynasty-titles-button', 'dynasty-sep-b', 'dynasty-more', 'dynasty-grow', 'dynasty-warning-badge', 'dynasty-expand', 'dynasty-close'],
+	phone: ['dynasty-read-only-label', 'dynasty-open-source', 'dynasty-add-person', 'dynasty-houses-button', 'dynasty-focus', 'dynasty-find', 'dynasty-more', 'dynasty-warning-badge', 'dynasty-close'],
+	list: ['dynasty-read-only-label', 'dynasty-open-source', 'dynasty-add-person', 'dynasty-show-text', 'dynasty-grow', 'dynasty-list-find', 'dynasty-list-back', 'dynasty-warning-badge', 'dynasty-expand'],
+} as const;
+
 /** The least size of the text of an Overview fold sign on the screen, in px, and the most it grows. */
 const MIN_SIGN_TEXT_PX = 11;
 const MAX_SIGN_BOOST = 8;
@@ -331,6 +365,8 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 	private carry: Anchor | null = null;
 	/** Height of the toolbar band at the top of the viewport, kept free in plugin-chosen views. */
 	private insetTop = 0;
+	/** The last value of `--dynasty-bars` set on the box, so that an unchanged height sets nothing. */
+	private barsPx = '';
 	/** The same at the bottom: the full-screen toolbar on a phone (spec §7.5). */
 	private insetBottom = 0;
 	/** Set for the full-screen view (spec §7.1); null for an embed. */
@@ -367,6 +403,8 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 	private focusStale = false;
 	/** The block's folds changed while this view had no size (the other mode of the note): it draws again when it shows (M10 F10). */
 	private foldsStale = false;
+	/** The last press on a fold control came from the keyboard (I37): the redraw puts the keyboard focus back on the new control only then. */
+	private foldByKey = false;
 	private laid: LaidOut | null = null;
 	/** M10 (F1): the folds this draw applied, so the settle, the sheet and the saved picture use the same people. */
 	private foldPlan: FoldPlan | null = null;
@@ -386,6 +424,9 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 	private tips: CardTips | null = null;
 	private popover: Popover | null = null;
 	private observer: ResizeObserver | null = null;
+	/** D183: watches the root of the block, so its height is read after the browser has laid the page out (`keepHeight`). */
+	private heightWatch: ResizeObserver | null = null;
+	private heightRoot: HTMLElement | null = null;
 	/** The viewport whose theme colours were read or are due (a new render draws a new one). */
 	private themeRead: HTMLElement | null = null;
 	/** `--dynasty-callout-bg` as last read: the toolbar and the D28 hints take it. */
@@ -403,9 +444,21 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 	private optionsHeight: number | undefined;
 	private blocked = false;
 	private readonly timers = new Set<number>();
-	private readonly info: MarkdownSectionInformation | null;
+	/** The section of the block; null until Obsidian tells it (on a cold start it can answer null first and a section later). */
+	private info: MarkdownSectionInformation | null;
 	/** What Obsidian reported for this block, on the root as `data-dynasty-section` for the test harness. */
-	private readonly sectionNote: string;
+	private sectionNote: string;
+	/** The render context, kept to ask for the section again; null in the full-screen view. */
+	private readonly ctx: MarkdownPostProcessorContext | null;
+	/**
+	 * The place of the block is not known YET (D183): a retry or a new ask for the section is still to come. The "Read only" label and the "Open note" chip
+	 * wait for it to end, so they never flash on a block that is only late.
+	 */
+	private placePending = false;
+	private sectionTimer = 0;
+	/** `onload` has run: a section found later starts its own look for the handle. */
+	private started = false;
+	private lastAskAt = -Infinity;
 	/** The block's handle once known; null while it resolves, and for a read-only view. */
 	private handle: Handle | null = null;
 	/** The handle this view lost (detached): its session state moves to the next handle of the block (D6). */
@@ -447,6 +500,11 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 	private finderAlt: (MeasuredResult & { geo: Geometry }) | null = null;
 	private retries = 0;
 	private retryTimer = 0;
+	/** D183: when this view started (ms of `performance.now`), and the timer of the cold-start wait. */
+	private startAt = 0;
+	private startTimer = 0;
+	/** The box of the last known height is on the page (the tree draws once the start conditions hold). */
+	private waiting = false;
 	/** The problems of the whole tree's text (spec §8); the picture warnings come on top (`allIssues`). */
 	private textIssues: CodedIssue[] = [];
 	/** M9: the pictures of the whole tree, resolved at render (O1, O2); null with no picture store. */
@@ -457,10 +515,6 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 	private picturesOn = false;
 	/** Raised by every render: a background check or a start of the pictures from before it does nothing. */
 	private pictureToken = 0;
-	/** The legend's arms copies, held while the legend shows them. */
-	private legendCopies: PictureCopy[] = [];
-	/** Stops the legend's arms requests that still wait (the legend closed). */
-	private legendAbort: AbortController | null = null;
 	private unsubPictures: (() => void) | null = null;
 	/** D144: this view drew the phone list. A turn of the phone and the card settings do not touch a list; it has no scene, no layout and no view. */
 	private listMode = false;
@@ -468,6 +522,8 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 	private listEl: HTMLElement | null = null;
 	/** The small picture copies of the rows, held until the list is drawn again or goes away. */
 	private listCopies: PictureCopy[] = [];
+	/** The person of the large row, the only row with arms (D209 rule A: the personal arms, else the arms of the house). */
+	private listCentre: string | null = null;
 	/** Stops the picture requests of the rows that still wait. */
 	private listAbort: AbortController | null = null;
 
@@ -485,6 +541,7 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 			this.full = place.host;
 			this.sourcePath = f.sourcePath;
 			this.info = null;
+			this.ctx = null;
 			this.readOnly = f.readOnly || !f.handle;
 			this.sectionNote = 'full';
 			this.peeked = f.handle ?? f.peeked;
@@ -494,15 +551,20 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 			return;
 		}
 		const ctx = place.ctx;
+		this.ctx = ctx;
 		this.full = null;
 		this.sourcePath = ctx.sourcePath;
 		const info = ctx.getSectionInfo(containerEl);
 		this.info = info;
 		this.readOnly = info === null;
+		this.placePending = info === null;
 		this.sectionNote = info ? `${info.lineStart}-${info.lineEnd}` : 'none';
 		const ordinal = info ? host.handles.quickOrdinal(info, source) : null;
 		// Only for the view state until `resolve` has checked the block: never written through.
-		this.peeked = ordinal === null ? null : host.handles.peek(ctx.sourcePath, ordinal);
+		// F-VIEW-03: a handle whose body is not this block's text belongs to another block (the registry has not read a change of the note yet),
+		// so the view starts with a state of its own and takes the right handle's state in `attach`.
+		const peek = ordinal === null ? null : host.handles.peek(ctx.sourcePath, ordinal);
+		this.peeked = peek && sameBody(peek.body, source) ? peek : null;
 		this.key = `${ctx.sourcePath}\u0000${ordinal !== null ? `#${ordinal}` : `text ${shortHash(source)}`}`;
 		this.ready = info ? host.handles.resolve(ctx.sourcePath, info, source).catch(() => null) : Promise.resolve(null);
 	}
@@ -527,9 +589,23 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 		return this.host.settings ?? DEFAULT_SETTINGS;
 	}
 
+	/** G.1, G.3: what the person picker needs for portraits and relation words (Find, Focus, the finder). */
+	private pickerContext(): PickerContext {
+		return { sourcePath: this.sourcePath, me: this.meId, relationOptions: this.relationOptions, ...(this.host.pictures ? { pictures: this.host.pictures } : {}) };
+	}
+
 	/** D174: the options of every relation call of this view (cards, finder, sheet, saved picture), from the settings. */
 	private get relationOptions(): RelationOptions {
 		return { oneParentUnknown: this.settings.oneParentUnknown };
+	}
+
+	/**
+	 * True when the tree is not on screen: its box is in the page with no layout parent (a closed fold), or it is not in the page at all (the reading view
+	 * of another tab is taken out of the page). Its redraw can wait for the open trees.
+	 */
+	get offScreen(): boolean {
+		const el = this.containerEl;
+		return !el.isConnected || el.offsetParent === null;
 	}
 
 	/**
@@ -555,7 +631,10 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 			// a new direction or break list changes nothing in it.
 			if (this.listMode) {
 				const kinWords = prev.oneParentUnknown !== now.oneParentUnknown && this.meId !== null;
-				if (prev.showDates !== now.showDates || prev.showRelations !== now.showRelations || prev.showPortraits !== now.showPortraits || kinWords) this.render(this.fonts);
+				// 0.2.8: the list does not follow "Arms on cards" (D209 item 6: only the top row shows arms), so a change of it draws the list again
+				// without need; the badge counts by "Warn about more than 2 parents of a type".
+				const arms = prev.armsOnCards !== now.armsOnCards;
+				if (prev.showDates !== now.showDates || prev.showRelations !== now.showRelations || prev.showPortraits !== now.showPortraits || kinWords || arms || prev.warnManyParents !== now.warnManyParents) this.render(this.fonts);
 				return;
 			}
 			const root = this.viewport?.parentElement ?? null;
@@ -572,7 +651,10 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 			// so the view draws again; the new layout measures the new texts. A view with no mark and no finder shows none.
 			const kin = prev.oneParentUnknown !== now.oneParentUnknown && (this.finderDrawn !== null || this.meId !== null);
 			// D126 (1): "Reduce movement" is read when a movement starts, so a change needs no redraw.
-			if (!reigns && !portraits && !breaks && !plate && !kin && (prev.focusGenerations === now.focusGenerations || this.focusId === null)) {
+			// 0.2.8 (D206): "Arms on cards" gives or takes the arms room of a card, so the tree is laid out again; "Warn about more than 2 parents" changes the badge.
+			const armsRoom = prev.armsOnCards !== now.armsOnCards && hasArms(this.g);
+			const warns = prev.warnManyParents !== now.warnManyParents;
+			if (!reigns && !portraits && !breaks && !plate && !kin && !armsRoom && !warns && (prev.focusGenerations === now.focusGenerations || this.focusId === null)) {
 				root?.toggleClass('dynasty-no-dates', !now.showDates);
 				this.updateHeight();
 				return;
@@ -584,6 +666,7 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 
 	/** Obsidian calls this once the block's container is in the DOM: wires listeners and renders it. */
 	override onload(): void {
+		this.startAt = performance.now();
 		this.host.views.add(this);
 		for (const type of STOPPED_EVENTS) {
 			this.registerDomEvent(this.containerEl, type as keyof HTMLElementEventMap, (e) => e.stopPropagation(), { passive: true });
@@ -637,16 +720,20 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 		const mc = this.host.app?.metadataCache;
 		if (store && mc && typeof mc.on === 'function') this.registerEvent(mc.on('resolved', () => this.guard(() => this.linksResolved())));
 		// D7: a view that gave up finding its block tries again when the note changes (the pasted copy is deleted).
-		if (this.info && !this.full) this.unwatch = this.host.handles.watchNote?.((path) => this.guard(() => this.noteModified(path))) ?? null;
-		this.guard(() => this.render(null));
+		if (this.info && !this.full) this.unwatch ??= this.host.handles.watchNote?.((path) => this.guard(() => this.noteModified(path))) ?? null;
+		this.guard(() => this.begin());
 		if (this.info || this.full) {
 			void this.ready.then((h) => this.guard(() => this.attach(h)));
 		}
+		this.started = true;
+		if (!this.info && this.ctx) this.watchSection();
 	}
 
 	/** Obsidian calls this when the block leaves the note: stops timers and tears the scene down. */
 	override onunload(): void {
 		this.unloaded = true;
+		if (this.startTimer) this.containerEl.win.clearTimeout(this.startTimer);
+		if (this.sectionTimer) this.containerEl.win.clearTimeout(this.sectionTimer);
 		if (this.retryTimer) this.containerEl.win.clearTimeout(this.retryTimer);
 		if (this.turnTimer) this.containerEl.win.clearTimeout(this.turnTimer);
 		this.host.views.delete(this);
@@ -667,6 +754,7 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 	retire(): void {
 		if (this.unloaded) return;
 		this.readOnly = true;
+		this.placePending = false;
 		this.guard(() => this.updateEditUi());
 		this.unload();
 	}
@@ -696,14 +784,22 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 		if (this.unloaded) return;
 		if (!h) {
 			this.handle = null;
-			if (!this.readOnly) {
+			// A retry is still to come: the block may only be late (D183), so it is not read only yet and nothing says so.
+			if (this.info && this.retries < RESOLVE_RETRIES_MS.length) {
+				this.placePending = true;
+				this.retryResolve();
+				return;
+			}
+			if (!this.readOnly || this.placePending) {
 				this.readOnly = true;
+				this.placePending = false;
 				this.updateEditUi();
 			}
 			this.retryResolve();
 			return;
 		}
 		this.readOnly = false;
+		this.placePending = false;
 		if (this.handle !== h) {
 			// A new handle of the same block (the old one was detached): the session state follows the block.
 			if (this.lost) carryState(this.lost.state, h.state);
@@ -732,13 +828,83 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 	 * note's own editor (not an embed) and its body matches exactly one block of the note, it is
 	 * that block, and the view can edit it. Synchronous, so the block's view state applies at once.
 	 */
-	private lateResolve(): void {
+	private lateResolve(ask = true): void {
+		if (ask) this.askSection();
 		if (this.info || this.full || this.lateTried || this.handle) return;
+		// I07: a call before the block is in the page, or before it is in the note's editor, says nothing yet; only a sure answer ends the tries.
+		if (!this.containerEl.isConnected) return;
+		// A side view of another plugin is no editor and no reading view: nothing will ever make this block known, so there is no wait.
+		if (this.inForeignView() || !this.inNoteView()) {
+			this.lateTried = true;
+			this.endPlacePending();
+			return;
+		}
+		if (!this.host.handles.inEditorOf(this.containerEl, this.sourcePath)) return;
 		this.lateTried = true;
-		if (this.inForeignView() || !this.host.handles.inEditorOf(this.containerEl, this.sourcePath)) return;
 		const h = this.host.handles.resolveByBody(this.sourcePath, this.source);
 		this.ready = Promise.resolve(h);
 		if (h) this.attach(h);
+	}
+
+	/**
+	 * Asks Obsidian for the section of the block once more (D183). In a Reading view on a cold start the first answer can be null and a later one a section;
+	 * `lateResolve` cannot help there. When a section comes, the view takes the place of a block it can edit and looks for its handle.
+	 */
+	private askSection(minGap = 0): void {
+		const ctx = this.ctx;
+		if (!ctx || this.info || this.full || this.unloaded) return;
+		// The start tick and the section timer both ask: within one gap, one ask is enough (a note with many trees makes many asks).
+		const now = performance.now();
+		if (now - this.lastAskAt < minGap) return;
+		this.lastAskAt = now;
+		let info: MarkdownSectionInformation | null = null;
+		try {
+			info = ctx.getSectionInfo(this.containerEl);
+		} catch {
+			// Obsidian cannot tell yet: the next look asks again.
+		}
+		if (!info) return;
+		this.info = info;
+		this.sectionNote = `${info.lineStart}-${info.lineEnd}`;
+		const ordinal = this.host.handles.quickOrdinal(info, this.source);
+		const peek = ordinal === null ? null : this.host.handles.peek(this.sourcePath, ordinal);
+		this.peeked = peek && sameBody(peek.body, this.source) ? peek : null;
+		const oldKey = this.key;
+		this.key = `${this.sourcePath}\u0000${ordinal !== null ? `#${ordinal}` : `text ${shortHash(this.source)}`}`;
+		// The view state that the session kept under the text key follows the block to its place key.
+		const loose = this.host.looseStates.get(oldKey);
+		if (loose && oldKey !== this.key && !this.host.looseStates.has(this.key)) {
+			this.host.looseStates.set(this.key, loose);
+			this.host.looseStates.delete(oldKey);
+		}
+		this.readOnly = false;
+		this.placePending = false;
+		this.ready = this.host.handles.resolve(this.sourcePath, info, this.source).catch(() => null);
+		// D7: also for a section that comes before `onload` ends, so a view that loses its block tries again when the note changes.
+		this.unwatch ??= this.host.handles.watchNote?.((path) => this.guard(() => this.noteModified(path))) ?? null;
+		if (!this.started) return;
+		void this.ready.then((h) => this.guard(() => this.attach(h)));
+	}
+
+	/** The look for the section goes on every `SECTION_STEP_MS` until `SECTION_LIMIT_MS` has passed since the start; then the block is read only for good. */
+	private watchSection(): void {
+		if (this.sectionTimer || this.unloaded || this.info) return;
+		this.sectionTimer = this.containerEl.win.setTimeout(() => {
+			this.sectionTimer = 0;
+			this.guard(() => {
+				this.askSection(ASK_GAP_MS);
+				if (this.info || this.unloaded) return;
+				if (performance.now() - this.startAt >= SECTION_LIMIT_MS) this.endPlacePending();
+				else this.watchSection();
+			});
+		}, SECTION_STEP_MS);
+	}
+
+	/** No more asks are to come: a block with no place is read only, and now the label and the chip say so. */
+	private endPlacePending(): void {
+		if (!this.placePending) return;
+		this.placePending = false;
+		this.updateEditUi();
 	}
 
 	/** Finds this view's block again, from Obsidian's section and the rendered body (spec §6.1). */
@@ -871,6 +1037,11 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 		return !!this.containerEl.closest('.markdown-embed, .internal-embed, .canvas-node, .hover-popover, .popover');
 	}
 
+	/** Is this block inside a note's own editor or reading view? Not so in the side view of another plugin. */
+	private inNoteView(): boolean {
+		return !!this.containerEl.closest('.markdown-source-view, .markdown-reading-view, .markdown-preview-view, .cm-editor');
+	}
+
 	/** Called by the plugin on `css-change`: re-measure and re-layout only if a font changed (§5.8). */
 	onCssChange(): void {
 		this.guard(() => {
@@ -888,25 +1059,17 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 		});
 	}
 
-	/** The theme corner radius (px, `--radius-s`), read from the connected view; 4 when unknown. Only a tree with a marked card needs it. */
-	private themeRadius(): number {
-		const el = this.viewport ?? this.containerEl;
-		return el.isConnected ? parsePxRadius(getComputedStyle(el).getPropertyValue('--radius-s'), 4) : 4;
-	}
-
-	/** The view is in the document only after the scene is built, so the radius is read at the first fill that finds it connected (the marked bar needs it). */
+	/**
+	 * The scene is in the document only after it is built, so the card corner radius is read at the first fill that finds it connected (every ribbon and badge needs it).
+	 * The scene reads the card's own computed `rx` (the theme sets it from --radius-m); reading a theme variable here gave 4 px in themes with an 8 px card corner.
+	 */
 	private learnRadius(): void {
-		const o = this.lastLayout?.opts;
-		if (o && o.cornerRadius === undefined && this.meId !== null && this.viewport?.isConnected) this.scene?.setCornerRadius(this.themeRadius());
+		if (this.viewport?.isConnected) this.scene?.syncCornerRadius();
 	}
 
-	/** A theme change can change the corner radius; the marked bar (at most one) is then drawn again. */
+	/** A theme change can change the card corner radius; the ribbons and badges are then drawn again. */
 	private recheckRadius(): void {
-		const last = this.lastLayout;
-		if (this.meId === null || !last || !this.g || !this.laid) return;
-		const r = this.themeRadius();
-		if (r === (last.opts.cornerRadius ?? 4)) return;
-		this.scene?.setCornerRadius(r);
+		if (this.viewport?.isConnected) this.scene?.syncCornerRadius(true);
 	}
 
 	/** Called by the plugin `THEME_RECHECK_MS` after `css-change`: a theme can change its colours a frame later (its style sheet still loads). */
@@ -925,17 +1088,14 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 
 	/**
 	 * What one CSS rule cannot follow in every theme. The toolbar in a callout shows the
-	 * callout's own background as the theme paints it (spec §10); the `+` badge takes the text colour
-	 * where the theme's text-on-accent is too weak on its accent.
+	 * callout's own background as the theme paints it (spec §10).
 	 */
 	private readTheme(): boolean {
 		const vp = this.viewport;
-		const root = vp?.parentElement;
-		if (!vp || !root || !vp.isConnected) return false;
+		if (!vp?.parentElement || !vp.isConnected) return false;
 		// Outside a callout there is nothing to read (no computed style, spec §7.7).
 		this.calloutBg = vp.closest('.callout') ? calloutBackdrop<HTMLElement>(vp, (e) => getComputedStyle(e).backgroundColor) : null;
 		this.paintCalloutBg();
-		root.toggleClass('dynasty-plus-text', plusChoice(root));
 		return true;
 	}
 
@@ -1013,7 +1173,7 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 		}
 		if (!best) return null;
 		const f = laid.layout.geometry.fontPx;
-		const bandClear = !this.panZoom || bandShift(v, this.panZoom.size, this.insetTop, laid.layout.persons.values()) === 0;
+		const bandClear = !this.panZoom || this.topClear(v, this.panZoom.size, [...laid.layout.persons.values()]);
 		return { person: best.id, dx: (v.cx - best.cx) / f, dy: (v.cy - best.cy) / f, scale: v.scale, byUser: !!this.peekState()?.view, bandClear };
 	}
 
@@ -1057,7 +1217,6 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 		this.picturesOn = false;
 		this.live?.destroy();
 		this.live = null;
-		this.releaseLegend();
 		this.releaseList();
 		this.tips?.destroy();
 		this.tips = null;
@@ -1067,12 +1226,129 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 		this.popover = null;
 		this.observer?.disconnect();
 		this.observer = null;
+		this.heightWatch?.disconnect();
+		this.heightWatch = null;
+		this.heightRoot = null;
 		for (const t of this.timers) this.containerEl.win.clearTimeout(t);
 		this.timers.clear();
 		this.hoverPopover = null;
 	}
 
+	/**
+	 * D183: the first draw. On a cold start the page can show the block before the plugin styles are applied and before Obsidian says where the block is,
+	 * so the tree would show without style, read only, with a count of warnings that are not true yet. Until the styles and the settings are in and the
+	 * block place is known (or known to be out of reach: an embed, a Canvas card, a page preview), the view shows an empty box of the last known height. A timer
+	 * looks again every `START_STEP_MS`, not only the resize observer, and after `START_LIMIT_MS` the tree draws as it is.
+	 */
+	private begin(): void {
+		if (!this.waitingToStart()) {
+			this.render(null);
+			return;
+		}
+		this.showPlaceholder();
+		this.startTick();
+	}
+
+	/** True while the start conditions do not hold yet. A host with no `startedUp` and a full-screen view never wait. */
+	private waitingToStart(): boolean {
+		const su = this.host.startedUp;
+		if (!su || this.full || this.unloaded) return false;
+		this.askSection(ASK_GAP_MS);
+		const age = performance.now() - this.startAt;
+		// Only the cap of the styles ends the wait for them; the shorter limit holds for the settings and the block place (see `STYLES_LIMIT_MS`).
+		if (age >= STYLES_LIMIT_MS) return false;
+		if (!su.ready(this.containerEl)) return true;
+		if (age >= START_LIMIT_MS) return false;
+		if (this.info || this.handle) return false;
+		this.lateResolve(false);
+		return !(this.handle || this.lateTried);
+	}
+
+	/**
+	 * The box that stands in for the tree. An svg of the height, because the plugin styles may not be there yet and a style attribute is not allowed.
+	 * The `display` attribute makes it a block with no style sheet: an inline svg sits on a text baseline and the root grows by the gap under it.
+	 */
+	private showPlaceholder(): void {
+		const el = this.containerEl;
+		el.empty();
+		this.waiting = true;
+		const phone = this.coarse && this.isPhone();
+		const px = lastHeight(this.host.app, this.key) ?? (phone ? PHONE_PLACEHOLDER_PX : this.settings.embedHeightDesktop);
+		const box = el.createDiv({ cls: ['dynasty-root', 'dynasty-placeholder'], attr: { 'aria-busy': 'true', 'data-dynasty-placeholder': '' } });
+		box.createSvg('svg', { cls: 'dynasty-placeholder-box', attr: { width: '100%', height: String(Math.round(px)), display: 'block', 'aria-hidden': 'true' } });
+	}
+
+	private startTick(): void {
+		if (this.startTimer || this.unloaded) return;
+		const win = this.containerEl.win;
+		this.startTimer = win.setTimeout(() => {
+			this.startTimer = 0;
+			this.guard(() => this.startLook());
+		}, START_STEP_MS);
+	}
+
+	/** One look at the start conditions: the tree draws when they hold, else the timer looks again. */
+	private startLook(): void {
+		if (!this.waiting || this.unloaded) return;
+		if (this.waitingToStart()) {
+			this.startTick();
+			return;
+		}
+		this.waiting = false;
+		this.render(null);
+	}
+
+	/** The plugin tells that a start condition came (the styles, the stored settings, the metadata cache): look at once, and count the pictures again. */
+	startUpDone(): void {
+		this.guard(() => {
+			if (this.unloaded) return;
+			if (this.waiting) {
+				this.startLook();
+				return;
+			}
+			// A tree that drew before the metadata cache was ready had no count of missing pictures: look again.
+			this.picturesLookAgain();
+		});
+	}
+
+	/** The pictures are resolved again (the metadata cache learned a file): the badge, the cards and the list rows follow. */
+	private picturesLookAgain(): void {
+		const whole = this.whole;
+		if (!whole || !this.pictureInfo) return;
+		this.resolvePictures(whole);
+		this.updateBadge();
+		this.live?.refresh([]);
+		this.refillList();
+		if (this.picturesOn) this.checkPictures();
+	}
+
+	/**
+	 * The height of this block's root is kept for the next cold start (D183). A read of `offsetHeight` in the middle of the first draw lays the whole page out
+	 * early (46 ms at 4x CPU on sample tree 07b) and again when the draw goes on. So a resize observer reads it, once the page is laid out, and again when the
+	 * root changes (the resize handle comes later than the first draw).
+	 */
+	private keepHeight(): void {
+		// The full-screen view is as high as the window; its height must not stand in for the note block (D183).
+		if (this.full) return;
+		const root = this.viewport?.parentElement ?? this.listEl?.parentElement?.parentElement ?? null;
+		if (!root?.isConnected) return;
+		if (typeof ResizeObserver !== 'function') {
+			this.readHeight(root);
+			return;
+		}
+		if (this.heightRoot === root) return;
+		this.heightWatch?.disconnect();
+		this.heightRoot = root;
+		this.heightWatch = new ResizeObserver(() => this.guard(() => this.readHeight(root)));
+		this.heightWatch.observe(root);
+	}
+
+	private readHeight(root: HTMLElement): void {
+		if (root.isConnected && root.offsetHeight > 0) rememberHeight(this.host.app, this.key, root.offsetHeight);
+	}
+
 	private render(fontsOverride: FontState | null): void {
+		this.waiting = false;
 		this.foldsStale = false;
 		this.teardown();
 		this.listMode = false;
@@ -1105,7 +1381,8 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 			box.content.createDiv({ cls: 'dynasty-error-detail', text: hardErrorText(parsed.error) });
 			return;
 		}
-		const whole = deriveFamilies(parsed.tree);
+		// A.5: "Warn about more than 2 parents of a type". The derive is not cached (`parse-cache.ts`), so the setting needs no cache key; `onSettingsChange` draws again.
+		const whole = deriveFamilies(parsed.tree, { warnManyParents: this.settings.warnManyParents });
 		const t1 = performance.now();
 		if (!whole.people.length && !whole.issues.some((i) => i.level === 'blocking')) {
 			this.renderEmpty(el, whole);
@@ -1193,12 +1470,12 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 		const laidBase: LayoutSettings = withFolds(shaped(small ? { ...base, far: NEVER_FAR_RULE } : base), plan, canFold);
 		// Spec §13.3, §13.5: the card labels of the drawn graph. A tree with no titles draws as in M7 (no labels).
 		const labels = needsLabels(g) ? cardLabels(g) : undefined;
-		const { laid, settings } = this.layOut(g, geo, laidBase, fonts, sub?.hidden, labels, plan.hidden);
+		const { laid, settings } = this.layOut(g, geo, laidBase, fonts, labels, plan.hidden);
 		// D51: on an upright phone the small tree is also laid out top to bottom. The first view, which
 		// knows the free area between the result bar and the toolbar, draws the direction with larger names.
 		// The other direction has its own card form (the Roundel), so it gets its own geometry; `geo` has the text card.
 		const altGeo = cardForm(geometryFor(fonts.px), 'down');
-		this.finderAlt = small && orientation === 'sideways' ? { ...this.layOut(g, altGeo, withFolds(shaped({ sweeps: 4, far: NEVER_FAR_RULE }), plan, canFold), fonts, undefined, labels, plan.hidden), geo: altGeo } : null;
+		this.finderAlt = small && orientation === 'sideways' ? { ...this.layOut(g, altGeo, withFolds(shaped({ sweeps: 4, far: NEVER_FAR_RULE }), plan, canFold), fonts, labels, plan.hidden), geo: altGeo } : null;
 		const t2 = performance.now();
 		// The finder's tree has its own key: its views never replace the saved view of the family.
 		const finderKey = succession ? `succession:${succession.titleId}|` : finder?.line ? `finder:${finder.state.first}>${finder.state.second}:${finder.state.index}:${finder.state.whole ? 'whole' : 'line'}|` : '';
@@ -1233,8 +1510,11 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 		this.blocked = blocking.length > 0;
 		this.buildBanner(root, blocking);
 
-		const viewport = root.createDiv({ cls: 'dynasty-viewport' });
+		// D212 (bars-in-flow): in a note the toolbar and the banner stand above the tree, in the flow of the box; the drawing area is what is left below them.
+		// The full-screen view keeps them over the tree (its toolbar is at the foot on a phone).
+		const viewport = root.createDiv({ cls: ['dynasty-viewport', ...(this.full ? [] : ['is-flow'])] });
 		this.viewport = viewport;
+		this.barsPx = '';
 		this.updateHeight();
 		// The HTML wrapper takes the CSS transform during a pinch (see PanZoom).
 		const canvas = viewport.createDiv({ cls: 'dynasty-canvas' });
@@ -1307,6 +1587,7 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 			viewport,
 			scene: sceneEl,
 			wrapper: canvas,
+			frameTop: () => this.frameTop(),
 			bounds: this.bounds,
 			fontPx: geo.fontPx,
 			// A touch embed is a static preview (D1); the full-screen view always pans and zooms (spec §7.2).
@@ -1331,6 +1612,8 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 		if (orientation === 'sideways') for (const dir of ['up', 'down']) viewport.createDiv({ cls: 'dynasty-hint-slot', attr: { 'data-dir': dir } });
 		this.observer = new ResizeObserver(() => this.guard(() => this.resized()));
 		this.observer.observe(viewport);
+		// A banner that grows (the steps open, a long sentence wraps) takes room from the drawing area below it without a change of the box.
+		if (viewport.hasClass('is-flow')) for (const bar of Array.from(viewport.querySelectorAll<HTMLElement>(':scope > .dynasty-toolbar, :scope > .dynasty-result'))) this.observer.observe(bar);
 		const t3 = performance.now();
 		const timing: RenderTiming = {
 			path: this.sourcePath,
@@ -1398,6 +1681,7 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 		this.buildBanner(root, blocking);
 		const viewport = root.createDiv({ cls: ['dynasty-viewport', 'dynasty-list-viewport'] });
 		this.viewport = viewport;
+		this.barsPx = '';
 		// The warning badge opens its problem list in this popover.
 		this.popover = new Popover(viewport);
 		this.buildListBar(viewport, st);
@@ -1412,13 +1696,17 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 		const ctl = new AbortController();
 		this.listAbort = ctl;
 		const token = this.pictureToken;
+		this.listCentre = centre;
+		const data = listData(whole, centre);
 		const result = buildPhoneList(viewport, {
 			g: whole,
-			data: listData(whole, centre),
+			data,
 			me,
 			showDates: this.settings.showDates,
+			showPortraits: this.settings.showPortraits,
 			editable: !this.readOnly && !this.blocked && !this.inForeignView(),
 			word: (id) => words?.get(id) ?? listWord(id, { me, showRelations: this.settings.showRelations, cards: rel?.cards }),
+			link: (row) => linkWord(whole, data, row),
 			...(succession ? { bar: { sentence: succession.sentence, closeLabel: SUCCESSION_UI.barCloseLabel, onClose: () => this.guard(() => this.closeSuccession()) } } : {}),
 			...(labels ? { labels } : {}),
 			pictures: (slots, id) => this.listPictures(whole, slots, id, ctl.signal, token),
@@ -1443,6 +1731,7 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 				this.lateResolve();
 				this.updateEditUi();
 				this.readThemeSoon(viewport);
+				this.keepHeight();
 			}),
 		);
 		this.observer.observe(viewport);
@@ -1456,11 +1745,14 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 		this.timing = { t0, t: timing };
 		this.host.recordTiming(timing);
 		this.markInteractive();
+		this.keepHeight();
+		// F-VIEW-01: the list checks its picture files too, so a file that is too large or not a picture shows on the badge.
+		this.startPictures();
 	}
 
-	/** The bar above the list (D144): Add person (made by `updateEditUi`), Find, Back after a move, the problem badge, Expand. */
+	/** The bar above the list (D144, 0.2.8 G.13): the same flat row as the computer's toolbar: Add person and the tree text (made by `updateEditUi`) at the left, then Find, Back after a move, the problem badge and Expand. */
 	private buildListBar(viewport: HTMLElement, st: BlockState): void {
-		const bar = viewport.createDiv({ cls: 'dynasty-toolbar' });
+		const bar = viewport.createDiv({ cls: 'dynasty-toolbar', attr: { role: 'toolbar', 'aria-label': TOOLBAR_UI.region } });
 		// First in the viewport, so Tab reaches the bar before the list.
 		viewport.prepend(bar);
 		// D182: the phone bar shows icons only; the full text is in the aria-label.
@@ -1469,6 +1761,7 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 			setIcon(b.createSpan({ cls: 'dynasty-tool-icon' }), icon);
 			return b;
 		};
+		bar.createSpan({ cls: 'dynasty-grow', attr: { 'aria-hidden': 'true' } });
 		button('search', PHONE_LIST_UI.findLabel, 'dynasty-list-find').addEventListener('click', () => this.guard(() => void this.listFind()));
 		const back = st.listBack?.length ? popTrail(st.listBack, (id) => !!this.whole?.byId.has(id)) : null;
 		if (back) {
@@ -1477,6 +1770,7 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 		}
 		this.updateBadge(bar);
 		button('maximize', PHONE_LIST_UI.expandLabel, 'dynasty-expand').addEventListener('click', () => this.guard(() => void this.openFull(null)));
+		this.orderBar(bar);
 	}
 
 	/** A tap on a name of the list: the list moves to that person and the old person goes on the Back trail. */
@@ -1499,7 +1793,7 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 	private async listFind(): Promise<void> {
 		const g = this.whole;
 		if (!g || this.unloaded) return;
-		const picked = await pickPerson(this.host.app, g, new Set(), FULL_UI.findPlaceholder, FULL_UI.findTitle, false);
+		const picked = await pickPerson(this.host.app, g, new Set(), FULL_UI.findPlaceholder, FULL_UI.findTitle, false, null, null, this.pickerContext());
 		if (this.unloaded) return;
 		if (picked?.kind !== 'person') {
 			this.guard(() => this.refocusTool('.dynasty-list-find'));
@@ -1538,35 +1832,58 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 		this.timers.add(t);
 	}
 
-	/** The small picture copies of one row: the arms of the house, and the portrait when "Show portraits on cards" is on. */
+	/**
+	 * The small picture copies of one row (0.2.8): the portrait when "Show portraits on cards" is on, and for the large row the arms (D209 rule A: the personal
+	 * arms first, else the arms of the house; the list does not follow "Arms on cards"). The row made a place for each picture it has. The portrait of the large row is 56 px, the others 36 px.
+	 */
 	private listPictures(whole: FamilyGraph, slots: ListPictureSlots, id: string, signal: AbortSignal, token: number): void {
 		const store = this.host.pictures;
 		const info = this.pictureInfo;
 		const p = whole.byId.get(id);
-		if (!store || !info || !p) return;
-		const fileOf = (link: string | undefined): TFile | null => {
+		if (!p) return;
+		if (!store || !info) {
+			// No store: nothing will ever fill the places.
+			for (const slot of [slots.arms, slots.portrait]) failListPicture(slot);
+			return;
+		}
+		const su = this.host.startedUp;
+		// D213: a file that the metadata cache may not know yet keeps its place; any other file that cannot show leaves no empty place.
+		const fileOf = (link: string | undefined): TFile | null | 'wait' => {
 			const r = link !== undefined ? info.resolved.get(link) : undefined;
-			return r?.ok ? r.file : null;
+			if (r?.ok) return r.file;
+			return r && r.code === 'missing-picture' && su && !su.cache() ? 'wait' : null;
 		};
-		const load = (file: TFile | null, box: CopyBox, slot: HTMLElement) => {
-			if (!file) return;
+		const load = (file: TFile | null | 'wait', box: CopyBox, slot: HTMLElement) => {
+			if (file === 'wait') return;
+			if (!file) {
+				failListPicture(slot);
+				return;
+			}
+			const live = () => !signal.aborted && token === this.pictureToken && !this.unloaded && slot.isConnected;
 			void store.acquire(file, box, signal).then(
 				(c) => {
-					if (!c || !('url' in c)) return;
-					if (signal.aborted || token !== this.pictureToken || this.unloaded || !slot.isConnected) {
+					if (!c || !('url' in c)) {
+						if (live()) this.guard(() => failListPicture(slot));
+						return;
+					}
+					if (!live()) {
 						c.release();
 						return;
 					}
 					this.listCopies.push(c);
 					this.guard(() => showListPicture(slot, c.url));
 				},
-				(e: unknown) => console.error('Dynasty Tree: cannot show a picture in the list', e),
+				(e: unknown) => {
+					console.error('Dynasty Tree: cannot show a picture in the list', e);
+					if (live()) this.guard(() => failListPicture(slot));
+				},
 			);
 		};
-		load(fileOf(p.house !== undefined ? whole.houses.get(p.house)?.arms : undefined), LIST_ARMS_BOX, slots.arms);
-		if (this.settings.showPortraits) {
+		const hero = this.listCentre === id;
+		if (hero && slots.arms) load(fileOf(p.arms ?? (p.house !== undefined ? whole.houses.get(p.house)?.arms : undefined)), LIST_ARMS_BOX, slots.arms);
+		if (this.settings.showPortraits && slots.portrait) {
 			const crop = portraitCropOf(p);
-			load(fileOf(p.portrait), { ...LIST_PORTRAIT_BOX, ...(crop ? { crop } : {}) }, slots.portrait);
+			load(fileOf(p.portrait), { ...(hero ? HERO_PORTRAIT_BOX : LIST_PORTRAIT_BOX), ...(crop ? { crop } : {}) }, slots.portrait);
 		}
 	}
 
@@ -1606,7 +1923,11 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 		const add = box.createEl('button', { cls: ['mod-cta', 'dynasty-add-first'], text: ADD_UI.addFirst, attr: { type: 'button' } });
 		add.addEventListener('click', () => this.guard(() => void this.openNewPerson()));
 		// On a phone, Close is the only way out of the full-screen view, also after the last person is deleted.
-		if (this.full) this.closeButton(root.createDiv({ cls: 'dynasty-toolbar' }));
+		if (this.full) {
+			const bar = root.createDiv({ cls: 'dynasty-toolbar', attr: { role: 'toolbar', 'aria-label': TOOLBAR_UI.region } });
+			bar.createSpan({ cls: 'dynasty-grow', attr: { 'aria-hidden': 'true' } });
+			this.closeButton(bar);
+		}
 		this.updateEditUi();
 		// A block in a callout in Live Preview has no section: it is found once it is in the note (see lateResolve).
 		this.observer = new ResizeObserver(() =>
@@ -1654,7 +1975,7 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 			auto: st.autoFocus,
 			has: (id) => whole.byId.has(id),
 			large: () => whole.people.length > PHONE_FOCUS_MIN_PEOPLE,
-			// Spec §5.5: the person last edited, `options.start`, the first root.
+			// Spec §5.5: the person last edited, `options.start`, the first root. The marked person does not count here (D144: the family of a large tree's full-screen view); it only decides the first view (`startId`).
 			start: () => startPerson(whole, [st.lastEdited, tree.options.start].find((id) => id != null && whole.byId.has(id)) ?? undefined),
 		});
 		if (choice.dropSession) st.focus = null;
@@ -1748,6 +2069,12 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 		const desktop = `${this.settings.embedHeightDesktop}px`;
 		const h = this.dragHeight !== null ? `${this.dragHeight}px` : embedHeight(this.optionsHeight, false, { desktop, phone: desktop });
 		this.viewport?.style.setProperty('--dynasty-height', h);
+		// The bars stand above the drawing area, so a short box (`height: 100`) with a banner would leave it no room. The style sheet keeps a minimum for the area.
+		const bars = `${Math.round(this.frameTop())}px`;
+		if (bars !== this.barsPx) {
+			this.barsPx = bars;
+			this.viewport?.style.setProperty('--dynasty-bars', bars);
+		}
 	}
 
 	/**
@@ -1761,7 +2088,6 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 		geo: Geometry,
 		base: LayoutSettings,
 		fonts: SceneOptions['fonts'],
-		hidden?: ReadonlyMap<string, number>,
 		labels?: ReadonlyMap<string, CardLabel>,
 		foldHidden?: ReadonlySet<string>,
 	): MeasuredResult {
@@ -1769,10 +2095,10 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 		return measuredLayout(g, geo, base, {
 			fonts,
 			measure: measureText,
-			hidden,
 			labels,
 			showDates: this.settings.showDates,
 			showPortraits: this.settings.showPortraits,
+			armsOnCards: this.settings.armsOnCards,
 			...(foldHidden?.size ? { foldHidden } : {}),
 			...(breaks.size ? { breaks } : {}),
 			...(this.meId !== null ? { marked: this.meId } : {}),
@@ -1822,7 +2148,7 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 		if (!last || !g || !this.panZoom) return false;
 		// css-change: the widths cached for the same font text can belong to the face that was in use before.
 		if (fresh) clearMeasureCache();
-		const next = this.layOut(g, last.geo, last.settings, last.opts.fonts, last.opts.badges?.hidden, last.opts.labels);
+		const next = this.layOut(g, last.geo, last.settings, last.opts.fonts, last.opts.labels);
 		const sameCards = sameTall(next.settings.tallCards, last.settings.tallCards) && sameTall(next.settings.tallTitles, last.settings.tallTitles) && sameTall(next.settings.longNames, last.settings.longNames);
 		if (sameCards) {
 			if (fresh) this.scene?.refit();
@@ -1902,7 +2228,7 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 		this.updateEditUi();
 		// The first resize comes once the block is in the note, inside its callout if it has one.
 		this.readThemeSoon(vp);
-		const size = { w: vp.clientWidth, h: vp.clientHeight };
+		const size = { w: vp.clientWidth, h: vp.clientHeight - this.frameTop(vp) };
 		// A box with a width but no height yet: `firstDue` stays, so the next sized resize shows the first view.
 		if (size.w <= 0 || size.h <= 0) return;
 		const first = pz.view === null || this.firstDue;
@@ -1937,7 +2263,7 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 		const carriedByUser = this.carry?.byUser ?? false;
 		// Larger cards around the same centre can reach up under the toolbar; if none was there
 		// before, move the view down just enough.
-		if (carried && this.carry?.bandClear) carried = clearBand(carried, size, this.insetTop, [...this.laid.layout.persons.values()]);
+		if (carried && this.carry?.bandClear) carried = this.clearTop(carried, size, [...this.laid.layout.persons.values()]);
 		this.carry = null;
 		const st = this.ensureState();
 		const targets = this.full?.target ? [this.full.target] : (this.pendingTarget ?? []);
@@ -1963,16 +2289,37 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 			}
 		}
 		this.markInteractive();
+		this.keepHeight();
 		this.startPictures();
 		this.showEdited(st);
 		this.takeFocus();
 	}
 
 	/**
+	 * D212 (bars-in-flow): the screen px from the top of the tree box to the top of the drawing area. In a note the toolbar and the banner stand above the
+	 * tree, so this is the foot of the last of them; in the full-screen view they lie over the tree and it is 0. The pan and zoom code works in the drawing area.
+	 */
+	private frameTop(vp: HTMLElement | null = this.viewport): number {
+		if (!vp?.hasClass('is-flow')) return 0;
+		let bottom = 0;
+		for (const bar of Array.from(vp.querySelectorAll<HTMLElement>(':scope > .dynasty-toolbar, :scope > .dynasty-result'))) {
+			const end = bar.offsetTop + bar.offsetHeight;
+			if (Number.isFinite(end)) bottom = Math.max(bottom, end);
+		}
+		return bottom;
+	}
+
+	/**
 	 * The toolbar bands that views chosen by the plugin keep free: at the top, or at the bottom for
-	 * the full-screen toolbar on a phone (spec §7.5).
+	 * the full-screen toolbar on a phone (spec §7.5). In a note the bars are above the drawing area (`frameTop`), so nothing is kept free.
 	 */
 	private measureInsets(vp: HTMLElement): void {
+		if (vp.hasClass('is-flow')) {
+			this.insetTop = 0;
+			this.insetBottom = 0;
+			this.barBox = null;
+			return;
+		}
 		const bar = vp.querySelector<HTMLElement>('.dynasty-toolbar');
 		const atBottom = !!bar && bar.offsetTop > vp.clientHeight / 2;
 		// With the toolbar at the bottom, the top band is the phone's status bar or notch (safe area).
@@ -1985,8 +2332,8 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 	}
 
 	/**
-	 * D51: the first view of the finder's small tree on an upright phone draws the direction in which the
-	 * fitted line shows the larger names, in the free area below the result bar and above the toolbar.
+	 * D51, D203 item 2: the first view of the finder's small tree on an upright phone draws it top to bottom, in the free area below the
+	 * result bar and above the toolbar (before 0.2.8 the direction with the larger names won).
 	 * The other layout replaces the drawn one in place; the window's orientation stays the view's own,
 	 * so the D24 turn logic sees no turn.
 	 */
@@ -2000,7 +2347,8 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 		const top = Math.max(0, Math.min(this.insetTop, size.h - 1));
 		const area = { w: size.w, h: Math.max(1, size.h - top - Math.max(0, this.insetBottom)) };
 		const facts = (l: LaidOut) => ({ bounds: treeBounds(l.layout.width, l.layout.height), fontPx: l.layout.geometry.fontPx });
-		if (finderOrientation(area, facts(now), facts(alt.laid)) !== alt.laid.layout.orientation) return;
+		// 0.2.8 (D203 item 2): on a phone the line of the finder is always drawn top to bottom (the whole tree stays sideways); elsewhere the larger names decide.
+		if (!this.isPhone() && finderOrientation(area, facts(now), facts(alt.laid)) !== alt.laid.layout.orientation) return;
 		last.settings = alt.settings;
 		// The geometry follows the direction too: a later layout of this tree (a font change) must not mix the text card with a top-to-bottom tree.
 		last.geo = alt.geo;
@@ -2060,15 +2408,18 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 		const v = this.aboveBottomBar(size, (area) => focusView(this.bounds, area, laid.layout.geometry.fontPx, me, this.insetTop, children, atTop, parents));
 		// Not clearBand (which clears the whole width): only the cards and badges under the toolbar
 		// itself move the view down, and never so far that the focus card leaves the free area.
-		if (!this.barBox) return v;
+		// With no toolbar over the tree (a note, D212) the top card is whole when nothing is cut by the top of the drawing area.
+		if (!this.barBox) return this.keepTopWhole(v, size, laid, me ? [me] : []);
 		const boxes = [...persons.values(), ...(this.scene?.badges ?? []).map((b) => b.mark)];
 		return clearToolbar(v, size, this.barBox, boxes, me, size.h - this.insetBottom);
 	}
 
-	/** Start person (spec §5.5): the person last edited in this block, else options.start, else the first root. */
+	/** Start person (spec §5.5, G.4): the person last edited in this block, else options.start, else the marked person ("You"), else the first root. */
 	private startId(): string | null {
+		const g = this.g;
+		if (!g) return null;
 		const edited = this.peekState()?.lastEdited ?? null;
-		return this.g ? startPerson(this.g, edited !== null && this.g.byId.has(edited) ? edited : this.optionsStart) : null;
+		return startPerson(g, [edited, this.optionsStart, this.meId].find((id) => id != null && g.byId.has(id)) ?? undefined);
 	}
 
 	/**
@@ -2106,7 +2457,7 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 		).view;
 		// The group starts below the toolbar box, but a card above it in the children's column (or above a
 		// tall group's person) can reach under the note's toolbar: move down, as D18 does.
-		if (!this.barBox) return view;
+		if (!this.barBox) return this.keepTopWhole(view, size, laid, me ? [me] : []);
 		return clearToolbar(view, size, this.barBox, [...persons.values(), ...(this.scene?.badges ?? []).map((b) => b.mark)], me, bottom);
 	}
 
@@ -2116,11 +2467,27 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 		const startBox = start ? (persons.get(start) ?? null) : null;
 		const fam = start && this.g ? familyOf(this.g, start) : null;
 		const family = fam ? { partners: boxesOf(persons, fam.partners), children: boxesOf(persons, fam.children) } : null;
+		// 0.2.8 (G.4): the readable view of a note shows the row of the parents above the start person.
+		const parents = start && this.g ? boxesOf(persons, this.g.placementParents.get(start) ?? []) : [];
 		return this.aboveBottomBar(size, (area) => {
-			const v = defaultView(this.bounds, area, laid.layout.geometry.fontPx, startBox, this.insetTop, family);
+			const v0 = defaultView(this.bounds, area, laid.layout.geometry.fontPx, startBox, this.insetTop, family);
+			const v = startBox ? parentsAbove(v0, area, this.insetTop, startBox, parents) : v0;
 			// A toolbar taller than the gap between rows could still reach the row above the start person.
-			return clearBand(v, area, this.insetTop, [...persons.values()]);
+			return this.clearTop(v, area, [...persons.values()], startBox ? [startBox] : []);
 		});
+	}
+
+	/**
+	 * Moves a view down just enough that no card is under the bars over the tree (the full-screen view), or cut by the top of the drawing area when the bars stand
+	 * above it (a note, D212 `bars-in-flow`).
+	 */
+	private clearTop(v: View, size: Size, boxes: Rect[], keys: readonly Rect[] = []): View {
+		return this.insetTop > 0 ? clearBand(v, size, this.insetTop, boxes) : keepTopCardWhole(v, size, 0, size.h, boxes, keys);
+	}
+
+	/** True when `clearTop` would not move the view. */
+	private topClear(v: View, size: Size, boxes: Rect[]): boolean {
+		return this.insetTop > 0 ? bandShift(v, size, this.insetTop, boxes) === 0 : keepTopCardWhole(v, size, 0, size.h, boxes, []) === v;
 	}
 
 	/** Sets the level of detail class for `view`; true when the level changed. */
@@ -2144,6 +2511,8 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 		return (e: Event) => {
 			e.preventDefault();
 			e.stopPropagation();
+			// I37: only a key press gets its fold control back with the keyboard focus after the redraw; a tap or a click leaves no focus ring on it.
+			this.foldByKey = e.type === 'keydown' || (e as MouseEvent).detail === 0;
 			this.guard(() => this.toggleFold(f.control));
 		};
 	}
@@ -2167,8 +2536,9 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 		const scene = this.scene;
 		const vp = this.viewport;
 		if (!scene || !vp || view.scale <= 0) return;
-		const w = vp.clientWidth / view.scale;
-		const h = vp.clientHeight / view.scale;
+		const area = this.panZoom?.size ?? { w: vp.clientWidth, h: vp.clientHeight };
+		const w = area.w / view.scale;
+		const h = area.h / view.scale;
 		let filled = false;
 		for (const f of scene.folds) {
 			if (f.filled) continue;
@@ -2315,7 +2685,7 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 				f.el.setAttribute('transform', `translate(${sx} ${sy}) scale(${boost}) translate(${-sx} ${-sy})`);
 				visible = { x: sx + (visible.x - sx) * boost, y: sy + (visible.y - sy) * boost, w: visible.w * boost, h: visible.h * boost };
 			} else f.el.removeAttribute('transform');
-			const r = cutBack(foldHit(visible, view.scale), visible, this.tapAreas);
+			const r = cutBack(foldHit(visible, view.scale, fontPx), visible, this.tapAreas);
 			f.hit.setAttribute('x', String(r.x));
 			f.hit.setAttribute('y', String(r.y));
 			f.hit.setAttribute('width', String(r.w));
@@ -2384,8 +2754,8 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 		let counts = { up: 0, down: 0 };
 		if (this.hintOn && pz && this.laid?.layout.orientation === 'sideways') {
 			const size = pz.size;
-			// In the note the toolbar is a box at the top right, not a band: the box starts at the top edge.
-			const top = this.barBox ? 0 : Math.max(0, this.insetTop);
+			// 0.2.8: the toolbar is a band over the full width, so the free area starts below it.
+			const top = Math.max(0, this.insetTop);
 			counts = outsideBox(view, size, this.hintKids, top, size.h - this.insetBottom);
 		}
 		for (const dir of ['up', 'down'] as const) {
@@ -2412,14 +2782,8 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 		const up = vp?.querySelector<HTMLElement>(':scope > .dynasty-hint-up') ?? null;
 		const down = vp?.querySelector<HTMLElement>(':scope > .dynasty-hint-down') ?? null;
 		if (!vp || (!up && !down)) return;
-		const bar = vp.querySelector<HTMLElement>(':scope > .dynasty-toolbar');
-		const atTop = !!bar && bar.offsetWidth > 0 && bar.offsetTop <= vp.clientHeight / 2;
-		if (up) {
-			// Level with the note's toolbar and left of it; in full screen below the top safe area.
-			up.style.setProperty('--dynasty-hint-top', `${atTop ? bar!.offsetTop + Math.max(0, (bar!.offsetHeight - HINT_HEIGHT) / 2) : Math.max(0, this.insetTop) + 4}px`);
-			if (atTop) up.style.setProperty('--dynasty-hint-right', `${Math.max(0, vp.clientWidth - bar!.offsetLeft) + 4}px`);
-			else up.style.removeProperty('--dynasty-hint-right');
-		}
+		// 0.2.8: the toolbar is a band over the full width, so the hint at the top stands below the bands that the view keeps free.
+		up?.style.setProperty('--dynasty-hint-top', `${this.frameTop(vp) + Math.max(0, this.insetTop) + 4}px`);
 		down?.style.setProperty('--dynasty-hint-bottom', `${this.insetBottom + 4}px`);
 	}
 
@@ -2620,6 +2984,8 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 	}
 
 	private async openSheet(id: string, fromTap: boolean): Promise<void> {
+		// A read-only embed never opens the edit sheet, also when a window calls this directly (G.7).
+		if (this.inForeignView()) return;
 		const h = await this.validHandle();
 		if (!h || this.readOnly) return;
 		const sheet = EditSheet.create(this.host.app, {
@@ -2683,13 +3049,19 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 		const st = h.state;
 		const full = !!this.full;
 		const host = this.host;
+		const fromButton = !!this.viewport?.querySelector('.dynasty-titles-button');
 		const win = TitlesWindow.create(this.host.app, {
 			handle: h,
 			sourcePath: this.sourcePath,
-			beforeWrite: () => this.keepView(),
-			onClosed: () => TreeView.refocusButton(host, st, full, '.dynasty-more'),
-			show: (id) => TreeView.showFound(host, st, full, id),
 			reduced: () => this.reduced(),
+			beforeWrite: () => this.keepView(),
+			// The computer has a Titles button of its own; on the phone the window comes from More.
+			onClosed: () => TreeView.refocusButton(host, st, full, fromButton ? '.dynasty-titles-button' : '.dynasty-more'),
+			show: (id) => TreeView.showFound(host, st, full, id),
+			openPerson: (id) => TreeView.openPersonOf(host, st, full, id, this.unloaded ? null : this),
+			pictures: host.pictures,
+			me: () => this.meId,
+			relationOptions: () => this.relationOptions,
 			// Contract 0.2.7 E.4, K.10, M.7: Show opens the view of the line; the settings come from the host, because this view can be drawn again after a Save.
 			showLine: (title) => TreeView.showSuccession(host, st, title, this.unloaded ? null : this),
 			succession: {
@@ -2715,6 +3087,13 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 		const same = [...host.views].filter((x) => !x.unloaded && !!x.full === full && x.peekState() === st);
 		const v = same.find((x) => !!x.panZoom?.view) ?? same[0];
 		v?.guard(() => v.showFound(id));
+	}
+
+	/** G.7: a row of the line of succession opens that person's window; the view that opened the Titles window may be drawn again by now. */
+	private static openPersonOf(host: TreeHost, st: BlockState, full: boolean, id: string, own: TreeView | null): void {
+		const same = [...host.views].filter((x) => !x.unloaded && !x.inForeignView() && !!x.full === full && x.peekState() === st);
+		const v = own ?? same.find((x) => !!x.panZoom?.view) ?? same[0];
+		v?.guard(() => void v.openSheet(id, false));
 	}
 
 	/** Find's result (spec §6.10): a drawn person is centred and highlighted; else the view shows all people with them. */
@@ -2792,18 +3171,24 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 	private updateEditUi(): void {
 		const empty = this.emptyEl;
 		if (empty) {
-			const ro = this.readOnly || (empty.isConnected && this.inForeignView());
+			const foreign = empty.isConnected && this.inForeignView();
+			const ro = this.readOnly || foreign;
 			empty.parentElement?.toggleClass('dynasty-read-only', ro);
 			empty.querySelector<HTMLButtonElement>('.dynasty-add-first')?.toggle(!ro);
+			// A block whose place is only not known YET says nothing (D183).
+			const say = ro && (foreign || !this.placePending);
 			let label = empty.querySelector<HTMLElement>('.dynasty-read-only-label');
-			if (ro && !label) label = empty.createDiv({ cls: 'dynasty-read-only-label', text: BLOCK_UI.readOnly });
-			else if (!ro && label) label.remove();
+			if (say && !label) label = empty.createDiv({ cls: 'dynasty-read-only-label', text: BLOCK_UI.readOnly });
+			else if (!say && label) label.remove();
 			return;
 		}
 		const vp = this.viewport;
 		const root = vp?.parentElement;
 		if (!vp || !root) return;
-		const readOnly = this.readOnly || (vp.isConnected && this.inForeignView());
+		const foreign = vp.isConnected && this.inForeignView();
+		const readOnly = this.readOnly || foreign;
+		// A block whose place is only not known YET shows no label and no chip (D183); the edit tools stay away.
+		const say = readOnly && (foreign || !this.placePending);
 		root.toggleClass('dynasty-read-only', readOnly);
 		let bar = vp.querySelector<HTMLElement>('.dynasty-toolbar');
 		if (!bar) {
@@ -2812,12 +3197,12 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 			vp.prepend(bar);
 		}
 		let open = bar.querySelector<HTMLElement>('.dynasty-open-source');
-		if (readOnly && !open) {
+		if (say && !open) {
 			open = bar.createEl('button', { cls: ['dynasty-tool', 'dynasty-open-source'], attr: { type: 'button', 'aria-label': BLOCK_UI.openSourceLabel } });
 			setIcon(open.createSpan({ cls: 'dynasty-tool-icon' }), 'file-symlink');
 			open.createSpan({ cls: 'dynasty-tool-text', text: BLOCK_UI.openSource });
 			open.addEventListener('click', (e) => this.guard(() => this.openSource(e)));
-		} else if (!readOnly && open) {
+		} else if (!say && open) {
 			open.remove();
 			open = null;
 		}
@@ -2825,18 +3210,24 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 		const noEdits = readOnly || this.blocked;
 		if (this.listEl) setListEditable(this.listEl, !noEdits);
 		let label = bar.querySelector<HTMLElement>('.dynasty-read-only-label');
-		if (noEdits && !label) {
+		const showLabel = say || this.blocked;
+		if (showLabel && !label) {
 			label = bar.createSpan({ cls: 'dynasty-read-only-label', text: BLOCK_UI.readOnly });
-		} else if (!noEdits && label) {
+		} else if (!showLabel && label) {
 			label.remove();
 			label = null;
 		}
-		// Spec §6.10: "Add person" on embedded desktop and embedded touch views that can be edited.
+		// Spec §6.10: "Add person" on embedded desktop and embedded touch views that can be edited. The computer row shows its word (0.2.8, G.13); the phone bars show the icon.
 		const canAdd = !noEdits && !!this.handle;
+		const kind = this.barKind();
 		let add = bar.querySelector<HTMLElement>('.dynasty-add-person');
 		if (canAdd && !add) {
 			add = bar.createEl('button', { cls: ['clickable-icon', 'dynasty-tool', 'dynasty-add-person'], attr: { 'aria-label': this.listMode ? PHONE_LIST_UI.addPersonLabel : ADD_UI.addPerson, type: 'button' } });
 			setIcon(add.createSpan({ cls: 'dynasty-tool-icon' }), 'user-plus');
+			if (kind === 'desktop') {
+				add.addClass('dynasty-tool-main');
+				add.createSpan({ cls: 'dynasty-tool-text', text: PHONE_LIST_UI.addPerson });
+			}
 			add.addEventListener('click', () => this.guard(() => void this.openNewPerson()));
 		} else if (!canAdd && add) {
 			add.remove();
@@ -2857,21 +3248,40 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 		const canHouses = canAdd && (!!this.full || !this.coarse);
 		let houses = bar.querySelector<HTMLElement>('.dynasty-houses-button');
 		if (canHouses && !houses) {
-			houses = bar.createEl('button', { cls: ['clickable-icon', 'dynasty-tool', 'dynasty-houses-button'], attr: { 'aria-label': HOUSES.button, type: 'button' } });
+			houses = bar.createEl('button', { cls: ['clickable-icon', 'dynasty-tool', 'dynasty-houses-button'], attr: { 'aria-label': TOOLBAR_UI.housesLabel, type: 'button' } });
 			setIcon(houses.createSpan({ cls: 'dynasty-tool-icon' }), 'castle');
 			houses.addEventListener('click', () => this.guard(() => void this.openHouses()));
 		} else if (!canHouses && houses) {
 			houses.remove();
 			houses = null;
 		}
-		orderFirst(bar, [label, open, add, text, houses]);
+		// Titles leave the More list on the computer (0.2.8, G.13): a button of their own next to Houses. On a phone they stay in More.
+		const canTitles = kind === 'desktop' && this.canEditWindows();
+		let titles = bar.querySelector<HTMLElement>('.dynasty-titles-button');
+		if (canTitles && !titles) {
+			titles = bar.createEl('button', { cls: ['clickable-icon', 'dynasty-tool', 'dynasty-titles-button'], attr: { 'aria-label': TITLES_UI.moreLabel, type: 'button' } });
+			setIcon(titles.createSpan({ cls: 'dynasty-tool-icon' }), 'crown');
+			titles.addEventListener('click', () => this.guard(() => void this.openTitles()));
+		} else if (!canTitles && titles) {
+			titles.remove();
+			titles = null;
+		}
+		bar.querySelector<HTMLElement>('.dynasty-sep-a')?.toggle(!!houses || !!titles);
+		this.orderBar(bar);
 		if (!bar.childElementCount) bar.remove();
 		// The toolbar can be wider now (Add person): the D28 hint stays left of it.
 		this.placeHints();
 		const resizable = !this.full && !readOnly && !this.coarse && !this.blocked && !!this.handle && !this.isPhone();
 		let grip = root.querySelector<HTMLElement>(':scope > .dynasty-resize');
-		if (resizable && !grip) grip = this.buildResizeHandle(root, vp);
-		else if (!resizable && grip) grip.remove();
+		// The handle stands below the box, inside the root: the root changes height and the box does not, so the resize observer
+		// of the box says nothing. The kept height of the next cold start is the height of the root (D183).
+		if (resizable && !grip) {
+			grip = this.buildResizeHandle(root, vp);
+			this.keepHeight();
+		} else if (!resizable && grip) {
+			grip.remove();
+			this.keepHeight();
+		}
 	}
 
 	/** The block can be edited here (the same test as for "Add person" in the bar): the item "Show the tree text" needs it. */
@@ -3034,7 +3444,7 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 		const g = this.whole;
 		// A retired view is only a picture: its toolbar opens nothing.
 		if (!g || this.unloaded) return;
-		const picked = await pickPerson(this.host.app, g, new Set(), FULL_UI.findPlaceholder, FULL_UI.findTitle, false);
+		const picked = await pickPerson(this.host.app, g, new Set(), FULL_UI.findPlaceholder, FULL_UI.findTitle, false, null, null, this.pickerContext());
 		if (picked?.kind !== 'person' || this.unloaded) return;
 		// Find never enters focus mode (spec §6.10); a person outside the focus family is shown in the whole tree.
 		this.guard(() => this.showPeople([picked.id]));
@@ -3045,7 +3455,7 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 		const g = this.whole;
 		// A retired view is only a picture: its toolbar opens nothing.
 		if (!g || this.unloaded) return;
-		const picked = await pickPerson(this.host.app, g, new Set(), FOCUS_UI.pickerPlaceholder, FOCUS_UI.pickerTitle, false);
+		const picked = await pickPerson(this.host.app, g, new Set(), FOCUS_UI.pickerPlaceholder, FOCUS_UI.pickerTitle, false, null, null, this.pickerContext());
 		if (picked?.kind !== 'person' || this.unloaded) {
 			// No choice: the keyboard focus goes back to the Focus button (spec §5.2), as for the finder's pickers.
 			this.guard(() => this.refocusTool('.dynasty-focus'));
@@ -3055,8 +3465,28 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 	}
 
 	/**
-	 * The Focus list (D132), only while a focus shows: Choose a person opens the picker, Clear focus
-	 * shows all people. Clear focus is `focusOn(null)`, so it writes nothing: a pin stays in the note.
+	 * How the toolbar menus open (0.2.8, G.13): a sheet from the bottom of the phone's full-screen view, else a menu under the button that opened it.
+	 */
+	private menuPlace(opener: HTMLElement): { anchor?: DOMRect; opts: PopoverOptions } {
+		return this.barKind() === 'phone' ? { opts: { sheet: true, reduced: () => this.reduced() } } : { anchor: opener.getBoundingClientRect(), opts: { align: 'start' } };
+	}
+
+	/** One row of a toolbar menu: its icon, its text and the accessible name; a key press gives the focus back to the opener, a picker or a new menu takes it itself. */
+	private menuItem(pop: Popover, el: HTMLElement, icon: string, text: string, cls: string, run: (keyboard: boolean) => void, label?: string): HTMLElement {
+		const b = el.createEl('button', { cls: ['dynasty-popover-item', 'dynasty-more-item', cls], attr: { type: 'button', role: 'menuitem' } });
+		if (label) b.setAttribute('aria-label', label);
+		setIcon(b.createSpan({ cls: 'dynasty-tool-icon' }), icon);
+		b.createSpan({ cls: 'dynasty-more-text', text });
+		b.addEventListener('click', (e) => {
+			pop.close(!e.detail);
+			this.guard(() => run(!e.detail));
+		});
+		return b;
+	}
+
+	/**
+	 * The Focus menu of the toolbar (D132, 0.2.8 G.13): Choose a person opens the picker, Focus on you (only with a marked person) shows the
+	 * family of that person, Clear focus (only while a focus shows) shows all people. Clear focus is `focusOn(null)`, so it writes nothing: a pin stays in the note.
 	 */
 	private toggleFocusList(opener: HTMLElement, keyboard: boolean): void {
 		const pop = this.popover;
@@ -3065,30 +3495,27 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 			pop.close();
 			return;
 		}
+		const where = this.menuPlace(opener);
 		pop.open(
 			'focus',
 			(el) => {
-				const item = (icon: string, text: string, label: string, run: (keyboard: boolean) => void) => {
-					const b = el.createEl('button', { cls: ['dynasty-popover-item', 'dynasty-more-item'], attr: { type: 'button', 'aria-label': label } });
-					setIcon(b.createSpan({ cls: 'dynasty-tool-icon' }), icon);
-					b.createSpan({ cls: 'dynasty-more-text', text });
-					b.addEventListener('click', (e) => {
-						// A key press on the item gives the focus back to Focus; a picker takes it itself.
-						pop.close(!e.detail);
-						this.guard(() => run(!e.detail));
-					});
-					return b;
-				};
-				const first = item('crosshair', FOCUS_UI.choose, FOCUS_UI.chooseLabel, () => void this.pickFocusPerson());
-				item('users', FOCUS_UI.clear, FOCUS_UI.clearLabel, (key) => {
-					// The redraw builds the Focus button again; a key press has the keyboard focus on the new button.
-					if (key) this.focusDue = '.dynasty-focus';
-					this.focusOn(null);
-				});
+				const first = this.menuItem(pop, el, 'user', FOCUS_UI.choose, 'dynasty-focus-choose', () => void this.pickFocusPerson(), FOCUS_UI.chooseLabel);
+				const me = this.meId;
+				if (me !== null) this.menuItem(pop, el, 'user-check', TOOLBAR_UI.focusOnYou, 'dynasty-focus-me', () => this.focusOn(me));
+				if (this.focusId !== null) {
+					el.createDiv({ cls: 'dynasty-menu-sep', attr: { role: 'separator' } });
+					this.menuItem(pop, el, 'x', FOCUS_UI.clear, 'dynasty-focus-clear', (key) => {
+						// The redraw builds the Focus button again; a key press has the keyboard focus on the new button.
+						if (key) this.focusDue = '.dynasty-focus';
+						this.focusOn(null);
+					}, FOCUS_UI.clearLabel);
+				}
 				// Enter or Space on Focus moves the focus into the list (spec §5.2).
 				if (keyboard) first.focus();
 			},
 			opener,
+			where.anchor,
+			where.opts,
 		);
 		opener.setAttribute('aria-expanded', 'true');
 		pop.whenClosed(() => opener.setAttribute('aria-expanded', 'false'));
@@ -3178,8 +3605,32 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 		}
 	}
 
+	/** Which toolbar this view has (0.2.8, G.13): the row of the computer, the bar at the bottom of the phone's full-screen view, or the bar of the phone list. */
+	private barKind(): 'desktop' | 'phone' | 'list' {
+		if (this.listMode) return 'list';
+		return this.full && this.isPhone() ? 'phone' : 'desktop';
+	}
+
+	/**
+	 * The order of the toolbar (0.2.8, G.13), by class: the computer row is Add person, Find, Focus, Fit | Houses, Titles | More … Expand (or Close); the phone's
+	 * bottom bar is Add person, Houses, Focus, Find, More, Close; the list's bar is Add person, the tree text … Find, Back, Expand. The problem badge is
+	 * always next to the last button. A part that the view does not make is simply not in the bar. Only what is out of place moves: a move takes the keyboard focus from a button.
+	 */
+	private orderBar(bar: HTMLElement): void {
+		const order = BAR_ORDER[this.barKind()];
+		const rank = (el: Element) => {
+			const i = order.findIndex((c) => (el as HTMLElement).hasClass(c));
+			return i < 0 ? order.length : i;
+		};
+		const want = Array.from(bar.children).sort((a, b) => rank(a) - rank(b));
+		want.forEach((e, i) => {
+			const at = bar.children[i] ?? null;
+			if (at !== e) bar.insertBefore(e, at);
+		});
+	}
+
 	private buildToolbar(viewport: HTMLElement): void {
-		const bar = viewport.createDiv({ cls: 'dynasty-toolbar' });
+		const bar = viewport.createDiv({ cls: 'dynasty-toolbar', attr: { role: 'toolbar', 'aria-label': TOOLBAR_UI.region } });
 		// First in the viewport, so Tab reaches every toolbar button before the cards, badges and tags (spec §5.2).
 		viewport.prepend(bar);
 		const button = (icon: string, label: string, cls: string) => {
@@ -3187,50 +3638,41 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 			setIcon(b.createSpan({ cls: 'dynasty-tool-icon' }), icon);
 			return b;
 		};
-		// §6.10: Add person and Houses are added first by updateEditUi. A static touch embed
-		// has no Focus button (D1): it shows what the block and the session choose.
+		const kind = this.barKind();
+		// §6.10: Add person, Houses and Titles are added by updateEditUi once the block's handle is known. A static touch embed
+		// has no Find, Focus or More (D1): it shows what the block and the session choose.
 		if (this.full || !this.coarse) {
+			const find = button('search', FULL_UI.find, 'dynasty-find');
+			find.addEventListener('click', () => this.guard(() => void this.find()));
 			const on = this.focusId !== null;
 			const focus = button('crosshair', on ? FOCUS_UI.focusOn : FOCUS_UI.focus, 'dynasty-focus');
 			focus.toggleClass('is-active', on);
 			focus.setAttribute('aria-pressed', String(on));
-			// D132: with a focus on, a press opens a small list (Choose a person, Clear focus); with none, it opens the picker, so a screen reader must not announce a menu.
-			if (on) {
-				focus.setAttribute('aria-haspopup', 'true');
-				focus.setAttribute('aria-expanded', 'false');
-			}
-			focus.addEventListener('click', (e) =>
-				this.guard(() => {
-					if (this.focusId === null) void this.pickFocusPerson();
-					else this.toggleFocusList(focus, !e.detail);
-				}),
-			);
-		}
-		if (this.full) {
-			const find = button('search', FULL_UI.find, 'dynasty-find');
-			find.addEventListener('click', () => this.guard(() => void this.find()));
-		}
-		if (this.full || !this.coarse) {
-			// D52: on a phone, Fit and Legend are items of the More list, so the toolbar keeps one row and Close shows.
-			if (!this.isPhone()) {
-				// Arrows inward, "the whole tree in view": a magnifier next to Find looked the same (phone bar).
-				const fit = button('shrink', UI.fit, 'dynasty-fit');
+			// The Focus menu (Choose a person, Focus on you, Clear focus) always opens; a screen reader hears a menu.
+			focus.setAttribute('aria-haspopup', 'true');
+			focus.setAttribute('aria-expanded', 'false');
+			focus.addEventListener('click', (e) => this.guard(() => this.toggleFocusList(focus, !e.detail)));
+			if (kind === 'desktop') {
+				const fit = button('minimize', UI.fit, 'dynasty-fit');
 				fit.addEventListener('click', () => this.guard(() => this.fit()));
-				const legend = button('info', UI.legend, 'dynasty-legend-button');
-				legend.addEventListener('click', () => this.guard(() => this.toggleLegend(legend)));
+				// The two bars between the groups: the first goes while the block cannot be edited (no Houses, no Titles).
+				bar.createSpan({ cls: ['dynasty-sep', 'dynasty-sep-a'], attr: { 'aria-hidden': 'true' } });
+				bar.createSpan({ cls: ['dynasty-sep', 'dynasty-sep-b'], attr: { 'aria-hidden': 'true' } });
 			}
 			// D49: new actions go into one More list; the static touch preview has none (D1, like D36).
 			const more = button('more-horizontal', FINDER_UI.more, 'dynasty-more');
 			more.setAttribute('aria-haspopup', 'true');
 			more.addEventListener('click', (e) => this.guard(() => this.toggleMore(more, !e.detail)));
 		}
+		if (kind !== 'phone') bar.createSpan({ cls: 'dynasty-grow', attr: { 'aria-hidden': 'true' } });
 		this.updateBadge(bar);
 		if (this.full) this.closeButton(bar);
 		else {
-			// Corner brackets read as "full screen"; Fit uses shrink.
+			// Corner brackets read as "full screen"; Fit uses the brackets turned inward.
 			const expand = button('maximize', FULL_UI.expand, 'dynasty-expand');
 			expand.addEventListener('click', () => this.guard(() => void this.openFull(null)));
 		}
+		this.orderBar(bar);
 	}
 
 	private closeButton(bar: HTMLElement): void {
@@ -3268,59 +3710,32 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 		return true;
 	}
 
+	/** The line styles (D25, D196 item 3): a menu under the More button on the computer; on a phone a sheet with Close, and a tap outside closes it. */
 	private toggleLegend(opener: HTMLElement): void {
 		const pop = this.popover;
 		if (!pop) return;
-		this.releaseLegend();
 		if (pop.kind === 'legend') {
 			pop.close();
 			return;
 		}
+		const where = this.menuPlace(opener);
 		pop.open(
 			'legend',
 			(el) => {
-				el.createDiv({ cls: 'dynasty-popover-title', text: UI.legendTitle });
-				// Spec §13.6 "Legend": the houses of the whole tree, with their arms.
-				// M10 (H1): the house rows open the house page, which is read-only and so also works in a read-only tree.
-				const { arms } = buildLegend(el.createDiv({ cls: 'dynasty-legend' }), this.whole ? legendHouses(this.whole) : undefined, this.canOpenHousePage() ? (id) => this.guard(() => this.openHousePage(id)) : undefined);
-				this.fillLegendArms(arms);
+				if (where.opts.sheet) {
+					const head = el.createDiv({ cls: 'dynasty-sheet-head' });
+					head.createSpan({ cls: 'dynasty-popover-title', text: UI.legendTitle });
+					const close = head.createEl('button', { cls: ['dynasty-link', 'dynasty-sheet-close'], text: SHEET.close, attr: { type: 'button' } });
+					close.addEventListener('click', () => pop.close(true));
+				} else el.createDiv({ cls: 'dynasty-popover-title', text: UI.legendTitle });
+				buildLegend(el.createDiv({ cls: 'dynasty-legend' }));
+				// A sheet has its own height rules (rows of 40 px, scrolls); only the menu of a computer is made compact to fit a short box.
+				if (!where.opts.sheet) fitLegend(el);
 			},
 			opener,
+			where.anchor,
+			where.opts,
 		);
-		// However the legend closes, its arms copies go back to the store at once.
-		pop.whenClosed(() => this.releaseLegend());
-	}
-
-	/** The house page opens on the computer and in the full-screen view, never in the static phone preview or a foreign view (D36). */
-	private canOpenHousePage(): boolean {
-		return !!this.whole && !this.inForeignView() && (!!this.full || !this.coarse);
-	}
-
-	/** A tap on a house row of the legend (spec §13.12): the legend closes, the page opens on the saved tree. */
-	private openHousePage(houseId: string): void {
-		const whole = this.whole;
-		if (!whole || this.unloaded) return;
-		this.popover?.close();
-		const st = this.peekState();
-		const full = !!this.full;
-		const host = this.host;
-		openHousePage(this.host.app, {
-			app: this.host.app,
-			showGeneration: () => this.settings.showHouseGeneration,
-			houseId,
-			whole,
-			sourcePath: this.sourcePath,
-			pictures: this.host.pictures,
-			// This view, if it is still there (a page opened from the legend has no write that can replace it).
-			show: (id) => {
-				if (!this.unloaded) this.guard(() => this.showFound(id));
-				else if (st) TreeView.showFound(host, st, full, id);
-			},
-			openNote: (open) => this.openNote(open),
-			onClosed: () => {
-				if (st) TreeView.refocusButton(host, st, full, '.dynasty-legend-button');
-			},
-		});
 	}
 
 	private toggleProblems(opener: HTMLElement, issues: CodedIssue[], keyboard: boolean): void {
@@ -3420,10 +3835,11 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 		const near = anchor?.kind === 'person' ? this.anchorOn(anchor.id) : control ? this.anchorOn(control.parents[0]) : null;
 		const fallback = near ?? this.keptAnchor();
 		const active = this.containerEl.doc?.activeElement as Element | null | undefined;
-		const focused = active?.closest?.('.dynasty-fold')?.getAttribute('data-fold') ?? null;
+		const focused = this.foldByKey ? (active?.closest?.('.dynasty-fold')?.getAttribute('data-fold') ?? null) : null;
+		this.foldByKey = false;
 		const plan = planFolds(g, whole, this.ensureState().folds, true, this.linePeopleNow());
 		this.foldPlan = plan;
-		const next = this.layOut(g, last.geo, withFolds(last.settings, plan, true), last.opts.fonts, last.opts.badges?.hidden, last.opts.labels, plan.hidden);
+		const next = this.layOut(g, last.geo, withFolds(last.settings, plan, true), last.opts.fonts, last.opts.labels, plan.hidden);
 		last.settings = next.settings;
 		this.redraw(g, next.laid);
 		// `redraw` asks for a first view; a fold keeps the view.
@@ -3554,11 +3970,14 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 	private allIssues(): CodedIssue[] {
 		const info = this.pictureInfo;
 		if (!info) return this.textIssues;
+		const su = this.host.startedUp;
 		const pics: CodedIssue[] = [];
 		info.uses.forEach((u, i) => {
 			const r = info.resolved.get(u.link);
-			if (r && !r.ok) pics.push(pictureIssue(u.owner, r));
-			else {
+			// D183: until the metadata cache has finished, a picture that it does not know yet is no warning.
+			if (r && !r.ok) {
+				if (r.code !== 'missing-picture' || !su || su.cache()) pics.push(pictureIssue(u.owner, r));
+			} else {
 				const found = info.found.get(i);
 				if (found) pics.push(found);
 			}
@@ -3585,8 +4004,7 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 			// A click that a key makes has no press count (detail 0); a mouse or touch press has 1 or more.
 			b.addEventListener('click', (e) => this.guard(() => this.toggleProblems(b, this.allIssues(), !e.detail)));
 			// Before Close or Expand, as when the toolbar is built.
-			const after = bar.querySelector<HTMLElement>(':scope > .dynasty-close, :scope > .dynasty-expand');
-			if (after) bar.insertBefore(b, after);
+			this.orderBar(bar);
 			badge = b;
 		}
 		const label = problemsLabel(issues.length);
@@ -3607,7 +4025,11 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 		}
 		const uses: PictureUse[] = [];
 		for (const h of whole.houses.values()) if (h.arms) uses.push({ owner: { kind: 'arms', house: { id: h.id, name: h.name } }, link: h.arms });
-		for (const p of whole.people) if (p.portrait) uses.push({ owner: { kind: 'portrait', person: { id: p.id, name: p.name } }, link: p.portrait });
+		for (const p of whole.people) {
+			if (p.portrait) uses.push({ owner: { kind: 'portrait', person: { id: p.id, name: p.name } }, link: p.portrait });
+			// 0.2.8 (I05, contract A.1): the personal arms of a person have the same warnings as the arms of a house.
+			if (p.arms) uses.push({ owner: { kind: 'portrait', person: { id: p.id, name: p.name }, arms: true }, link: p.arms });
+		}
 		const resolved = new Map<string, ResolvedPicture>();
 		for (const u of uses) if (!resolved.has(u.link)) resolved.set(u.link, store.resolve(u.link, this.sourcePath));
 		const old = this.pictureInfo;
@@ -3626,7 +4048,8 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 	/** The file of a picture slot, or the problem of its link (O1). */
 	private pictureFile(slot: PictureSlot): TFile | PictureProblem {
 		const info = this.pictureInfo;
-		const link = slot.kind === 'arms' ? (slot.house !== undefined ? this.whole?.houses.get(slot.house)?.arms : undefined) : this.whole?.byId.get(slot.person)?.portrait;
+		const personal = slot.owner && 'person' in slot.owner ? this.whole?.byId.get(slot.owner.person)?.arms : undefined;
+		const link = slot.kind === 'arms' ? (personal ?? (slot.house !== undefined ? this.whole?.houses.get(slot.house)?.arms : undefined)) : this.whole?.byId.get(slot.person)?.portrait;
 		const r = link !== undefined ? info?.resolved.get(link) : undefined;
 		if (!r) return { ok: false, code: 'picture-not-image', file: link ?? '' };
 		return r.ok ? r.file : r;
@@ -3735,10 +4158,11 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 			const r = info.resolved.get(u.link);
 			if (!r?.ok || r.file.path !== file.path) return;
 			info.found.set(i, pictureIssue(u.owner, p));
-			if (u.owner.kind === 'portrait') this.live?.problem(u.owner.person.id, 'portrait');
+			if (u.owner.kind === 'portrait') this.live?.problem(u.owner.person.id, u.owner.arms ? 'arms' : 'portrait');
 			else if (drawn) {
 				const house = u.owner.house.id;
-				for (const person of drawn.people) if (person.house === house) this.live?.problem(person.id, 'arms');
+				// A person with personal arms shows those, so a problem of the house arms is not theirs.
+				for (const person of drawn.people) if (person.house === house && !person.arms) this.live?.problem(person.id, 'arms');
 			}
 		});
 		this.updateBadge();
@@ -3768,14 +4192,14 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 	}
 
 	/**
-	 * The metadata cache finished indexing. Only a list that has a link to a missing picture looks again, and
-	 * only the links that were missing are asked: nothing else costs time when every picture is found.
+	 * The metadata cache finished indexing (I06: the tree on a computer looks too, not only the phone list). Only a view that has a link to a
+	 * missing picture looks again, and only the links that were missing are asked: nothing else costs time when every picture is found.
 	 */
 	private linksResolved(): void {
 		const info = this.pictureInfo;
 		const whole = this.whole;
 		const store = this.host.pictures;
-		if (!info || !whole || !store || this.unloaded || !this.listEl) return;
+		if (!info || !whole || !store || this.unloaded || !this.viewport) return;
 		let late = false;
 		for (const [link, r] of info.resolved) {
 			if (!r.ok && r.code === 'missing-picture' && store.resolve(link, this.sourcePath).ok) {
@@ -3784,10 +4208,7 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 			}
 		}
 		if (!late) return;
-		this.resolvePictures(whole);
-		this.updateBadge();
-		this.refillList();
-		if (this.picturesOn) this.checkPictures();
+		this.picturesLookAgain();
 	}
 
 	/**
@@ -3804,51 +4225,17 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 		this.listAbort = ctl;
 		const token = this.pictureToken;
 		for (const row of Array.from(list.querySelectorAll<HTMLElement>('.dynasty-list-row[data-person]'))) {
-			const arms = row.querySelector<HTMLElement>('.dynasty-list-arms');
-			const portrait = row.querySelector<HTMLElement>('.dynasty-list-portrait');
-			if (!arms || !portrait) continue;
+			restoreListPictures(row);
+			const arms = row.querySelector<HTMLElement>('.dynasty-hero-arms') ?? undefined;
+			const portrait = row.querySelector<HTMLElement>('.dynasty-list-portrait, .dynasty-hero-portrait') ?? undefined;
+			if (!arms && !portrait) continue;
 			for (const slot of [arms, portrait]) {
+				if (!slot) continue;
 				slot.removeClass('has-picture');
 				for (const img of Array.from(slot.querySelectorAll('img'))) img.remove();
 			}
-			this.listPictures(whole, { arms, portrait }, row.getAttribute('data-person') ?? '', ctl.signal, token);
+			this.listPictures(whole, { ...(arms ? { arms } : {}), ...(portrait ? { portrait } : {}) }, row.getAttribute('data-person') ?? '', ctl.signal, token);
 		}
-	}
-
-	/** S4, O3: the legend's arms, from small copies held while the legend may show them. */
-	private fillLegendArms(arms: Map<string, HTMLElement>): void {
-		this.releaseLegend();
-		const store = this.host.pictures;
-		const whole = this.whole;
-		const info = this.pictureInfo;
-		if (!store || !whole || !info) return;
-		const token = this.pictureToken;
-		const ctl = new AbortController();
-		this.legendAbort = ctl;
-		for (const [house, el] of arms) {
-			const link = whole.houses.get(house)?.arms;
-			const r = link !== undefined ? info.resolved.get(link) : undefined;
-			if (!r?.ok) continue;
-			void store.acquire(r.file, LEGEND_ARMS_BOX, ctl.signal).then(
-				(c) => {
-					if (!c || !('url' in c)) return;
-					if (ctl.signal.aborted || token !== this.pictureToken || this.unloaded || !el.isConnected) {
-						c.release();
-						return;
-					}
-					this.legendCopies.push(c);
-					this.guard(() => setLegendArms(el, c.url));
-				},
-				(e: unknown) => console.error('Dynasty Tree: cannot show the arms in the legend', e),
-			);
-		}
-	}
-
-	/** The legend's arms copies go back to the store (the legend closes, or a new scene). */
-	private releaseLegend(): void {
-		this.legendAbort?.abort();
-		this.legendAbort = null;
-		for (const c of this.legendCopies.splice(0)) c.release();
 	}
 
 	/** True for a note's tree while a full-screen view of the same block covers it. */
@@ -3922,6 +4309,7 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 			fonts: opts.fonts,
 			showDates: this.settings.showDates,
 			showPortraits: this.settings.showPortraits,
+			armsOnCards: this.settings.armsOnCards,
 			sourcePath: this.sourcePath,
 			note: name.replace(/\.md$/i, ''),
 			...(focus !== undefined ? { focusName: focus } : {}),
@@ -3955,16 +4343,16 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 	}
 
 	/**
-	 * The finder's result bar at the top of the view (spec §13.2, D48): the sentence, then Show the
-	 * steps, Other relation, Show in the whole tree (or back to the line only) and Close. Every button
-	 * is at least 44 px high (styles.css).
+	 * The banner of the relation finder's result (spec §13.2, D48; 0.2.8 G.13): one row under the toolbar with the sentence, then the links
+	 * Show the steps, Other relation, Show in the whole tree (or back to the line only) and Close. On a phone Close is an X with a 44 px
+	 * tap area. The links wrap under the sentence when the row is narrow; the steps open as a list under them.
 	 */
 	private buildResultBar(viewport: HTMLElement, before: HTMLElement, d: FinderDrawn, whole: FamilyGraph): void {
 		const { state: f, result } = d;
 		const name = (id: string) => whole.byId.get(id)?.name || id;
 		// Named by its sentence, not aria-label: Obsidian shows an aria-label as a tooltip on every free point of the bar.
 		const id = `dynasty-result-${++resultIds}`;
-		const bar = viewport.createDiv({ cls: 'dynasty-result', attr: { role: 'group', 'aria-labelledby': id } });
+		const bar = viewport.createDiv({ cls: ['dynasty-result', ...(this.barKind() === 'phone' ? ['dynasty-result-phone'] : [])], attr: { role: 'group', 'aria-labelledby': id } });
 		// After the toolbar and before the cards in the Tab order (spec §5.2).
 		viewport.insertBefore(bar, before);
 		bar.createDiv({ cls: 'dynasty-result-text', text: finderSentence(whole, result, f.index), attr: { id, role: 'status', tabindex: -1 } });
@@ -3975,28 +4363,84 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 		if (sentences.more) list.createEl('li', { cls: 'dynasty-result-more-steps', text: FINDER_UI.moreSteps(sentences.more) });
 		list.toggle(f.steps);
 		const row = bar.createDiv({ cls: 'dynasty-result-buttons' });
-		const button = (text: string, cls: string, run: () => void, label?: string) => {
-			const b = row.createEl('button', { cls: ['dynasty-result-button', cls], text, attr: { type: 'button' } });
-			if (label) b.setAttribute('aria-label', label);
-			b.addEventListener('click', () => this.guard(run));
-			return b;
+		const others = result.kind === 'named' && result.relations.length > 1 ? result.relations.length : 0;
+		// Only the bar changes: the tree is not drawn again.
+		const toggleSteps = (after: (shown: boolean) => void) => {
+			f.steps = !f.steps;
+			list.toggle(f.steps);
+			after(f.steps);
 		};
-		if (steps.length) {
-			// Only the bar changes: the tree is not drawn again.
-			const toggle = button(f.steps ? FINDER_UI.hideSteps : FINDER_UI.showSteps, 'dynasty-result-steps-button', () => {
-				f.steps = !f.steps;
-				list.toggle(f.steps);
-				toggle.setText(f.steps ? FINDER_UI.hideSteps : FINDER_UI.showSteps);
+		if (this.barKind() === 'phone') {
+			// D212 (phone-banner-row): one row, the sentence, the link "Options" and the X. The link opens the actions in a sheet.
+			const options = row.createEl('button', { cls: ['dynasty-result-button', 'dynasty-link', 'dynasty-result-options'], attr: { type: 'button', 'aria-label': FINDER_UI.optionsLabel, 'aria-haspopup': 'true', 'aria-expanded': 'false' } });
+			options.createSpan({ text: FINDER_UI.options });
+			setIcon(options.createSpan({ cls: 'dynasty-tool-icon', attr: { 'aria-hidden': 'true' } }), 'chevron-down');
+			options.addEventListener('click', () => this.guard(() => this.toggleBannerOptions(options, { steps: steps.length > 0, others, line: !!d.line }, d, toggleSteps)));
+		} else {
+			const button = (text: string, cls: string, run: () => void, label?: string) => {
+				const b = row.createEl('button', { cls: ['dynasty-result-button', 'dynasty-link', cls], text, attr: { type: 'button' } });
+				if (label) b.setAttribute('aria-label', label);
+				b.addEventListener('click', () => this.guard(run));
+				return b;
+			};
+			if (steps.length) {
+				const toggle = button(f.steps ? FINDER_UI.hideSteps : FINDER_UI.showSteps, 'dynasty-result-steps-button', () =>
+					toggleSteps((shown) => {
+						toggle.setText(shown ? FINDER_UI.hideSteps : FINDER_UI.showSteps);
+						toggle.setAttribute('aria-expanded', String(shown));
+					}),
+				);
 				toggle.setAttribute('aria-expanded', String(f.steps));
-			});
-			toggle.setAttribute('aria-expanded', String(f.steps));
+			}
+			if (others) button(FINDER_UI.other, 'dynasty-result-other', () => this.finderChange({ index: (f.index + 1) % others }, '.dynasty-result-other'), FINDER_UI.otherLabel(name(f.second), name(f.first)));
+			if (d.line) button(f.whole ? FINDER_UI.lineOnly : FINDER_UI.whole, 'dynasty-result-whole', () => this.finderChange({ whole: !f.whole }, '.dynasty-result-whole'));
 		}
-		if (result.kind === 'named' && result.relations.length > 1) {
-			const n = result.relations.length;
-			button(FINDER_UI.other, 'dynasty-result-other', () => this.finderChange({ index: (f.index + 1) % n }, '.dynasty-result-other'), FINDER_UI.otherLabel(name(f.second), name(f.first)));
+		this.closeLink(row, 'dynasty-result-close', FINDER_UI.close, FINDER_UI.closeLabel, () => this.closeFinder());
+	}
+
+	/**
+	 * The menu of the link "Options" in the phone banner (D212): Show the steps (or Hide), Other relation and Show in the whole tree (or Show only
+	 * the line), as a sheet from the bottom like the other menus of the phone. Each row does what the link of the computer's banner does.
+	 */
+	private toggleBannerOptions(opener: HTMLElement, has: { steps: boolean; others: number; line: boolean }, d: FinderDrawn, toggleSteps: (after: (shown: boolean) => void) => void): void {
+		const pop = this.popover;
+		if (!pop) return;
+		if (pop.kind === 'options') {
+			pop.close();
+			return;
 		}
-		if (d.line) button(f.whole ? FINDER_UI.lineOnly : FINDER_UI.whole, 'dynasty-result-whole', () => this.finderChange({ whole: !f.whole }, '.dynasty-result-whole'));
-		button(FINDER_UI.close, 'dynasty-result-close', () => this.closeFinder(), FINDER_UI.closeLabel);
+		const { state: f } = d;
+		const name = (id: string) => this.whole?.byId.get(id)?.name || id;
+		const where = this.menuPlace(opener);
+		pop.open(
+			'options',
+			(el) => {
+				if (has.steps) {
+					this.menuItem(pop, el, 'list', f.steps ? FINDER_UI.hideSteps : FINDER_UI.showSteps, 'dynasty-result-steps-button', () => toggleSteps(() => undefined));
+				}
+				if (has.others) {
+					this.menuItem(pop, el, 'repeat', FINDER_UI.other, 'dynasty-result-other', () => this.finderChange({ index: (f.index + 1) % has.others }, '.dynasty-result-options'), FINDER_UI.otherLabel(name(f.second), name(f.first)));
+				}
+				if (has.line) {
+					this.menuItem(pop, el, f.whole ? 'minimize-2' : 'maximize-2', f.whole ? FINDER_UI.lineOnly : FINDER_UI.whole, 'dynasty-result-whole', () => this.finderChange({ whole: !f.whole }, '.dynasty-result-options'));
+				}
+			},
+			opener,
+			where.anchor,
+			where.opts,
+		);
+		opener.setAttribute('aria-expanded', 'true');
+		pop.whenClosed(() => opener.setAttribute('aria-expanded', 'false'));
+	}
+
+	/** The Close of a banner: the word as a link on the computer, an X with a 44 px tap area on a phone (0.2.8 G.13, I37). */
+	private closeLink(row: HTMLElement, cls: string, text: string, label: string, run: () => void): HTMLElement {
+		const icon = this.barKind() === 'phone';
+		const b = row.createEl('button', { cls: ['dynasty-result-button', cls, ...(icon ? ['clickable-icon', 'dynasty-bar-x'] : ['dynasty-link'])], attr: { type: 'button', 'aria-label': label } });
+		if (icon) setIcon(b.createSpan({ cls: 'dynasty-tool-icon', attr: { 'aria-hidden': 'true' } }), 'x');
+		else b.setText(text);
+		b.addEventListener('click', () => this.guard(run));
+		return b;
 	}
 
 	/** Other relation, Show in the whole tree: the block's result changes, and its views draw it; the focus stays on the pressed button. */
@@ -4042,16 +4486,15 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 		return this.finderDrawn?.line?.people ?? null;
 	}
 
-	/** The bar above the tree (F.3): the sentence and Close. It reuses the look and the place of the finder's result bar. */
+	/** The banner of the Show view (F.3, 0.2.8 G.13): the sentence and Close in one row, with the look and the place of the finder's banner. */
 	private buildSuccessionBar(viewport: HTMLElement, before: HTMLElement, d: SuccessionDrawn): void {
 		const id = `dynasty-result-${++resultIds}`;
-		const bar = viewport.createDiv({ cls: ['dynasty-result', 'dynasty-succession-bar'], attr: { role: 'group', 'aria-labelledby': id } });
+		const bar = viewport.createDiv({ cls: ['dynasty-result', 'dynasty-succession-bar', ...(this.barKind() === 'phone' ? ['dynasty-result-phone'] : [])], attr: { role: 'group', 'aria-labelledby': id } });
 		// After the toolbar and before the cards in the Tab order, like the finder's bar.
 		viewport.insertBefore(bar, before);
 		bar.createDiv({ cls: ['dynasty-result-text', 'dynasty-succession-text'], text: d.sentence, attr: { id, role: 'status', tabindex: -1 } });
 		const row = bar.createDiv({ cls: 'dynasty-result-buttons' });
-		const close = row.createEl('button', { cls: ['dynasty-result-button', 'dynasty-succession-close'], text: SUCCESSION_UI.barClose, attr: { type: 'button', 'aria-label': SUCCESSION_UI.barCloseLabel } });
-		close.addEventListener('click', () => this.guard(() => this.closeSuccession()));
+		this.closeLink(row, 'dynasty-succession-close', SUCCESSION_UI.barClose, SUCCESSION_UI.barCloseLabel, () => this.closeSuccession());
 	}
 
 	/** The cards of heirs and branches say their place in the screen-reader label (F.4). The scene's own text has none: it does not know the line. */
@@ -4131,7 +4574,13 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 		const heirs = boxesOf(persons, d.heirs);
 		if (!ruler) return this.defaultViewFor(laid, size);
 		const bounds = around([ruler, ...heirs]);
-		return this.aboveBottomBar(size, (area) => successionFirstView(bounds, area, laid.layout.geometry.fontPx, this.insetTop, ruler, heirs, laid.layout.orientation, this.isPhone() ? PHONE_MIN_SCALE : 0));
+		const v = this.aboveBottomBar(size, (area) => successionFirstView(bounds, area, laid.layout.geometry.fontPx, this.insetTop, ruler, heirs, laid.layout.orientation, this.isPhone() ? PHONE_MIN_SCALE : 0));
+		return this.keepTopWhole(v, size, laid, [ruler, ...heirs]);
+	}
+
+	/** D212 (bars-in-flow): a first view that the plugin chooses never leaves a card cut in two by the toolbar and the banner at the top (`keepTopCardWhole`). */
+	private keepTopWhole(v: View, size: Size, laid: LaidOut, keys: readonly Rect[]): View {
+		return keepTopCardWhole(v, size, this.insetTop, size.h - Math.max(0, this.insetBottom), laid.layout.persons.values(), keys);
 	}
 
 	/**
@@ -4159,12 +4608,13 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 		const edge = (b: Rect) => (sideways ? b.x : b.y);
 		const least = Math.min(...boxes.map(edge));
 		const oldest = boxes.filter((b) => edge(b) <= least + 1);
-		return this.aboveBottomBar(size, (area) => finderFirstView(bounds, area, laid.layout.geometry.fontPx, this.insetTop, oldest, laid.layout.orientation));
+		const v = this.aboveBottomBar(size, (area) => finderFirstView(bounds, area, laid.layout.geometry.fontPx, this.insetTop, oldest, laid.layout.orientation));
+		return this.keepTopWhole(v, size, laid, boxes);
 	}
 
 	/**
-	 * The More button (D49): the list of the new actions (Relation; Titles where the block can be
-	 * edited, spec §13.4); on a phone also Fit and the legend (D52), which the phone's toolbar does not have.
+	 * The More button (D49, 0.2.8 G.13): the menu of the toolbar. On a phone Fit and Titles come first (the phone's bar has neither button); then the line
+	 * styles (the legend), Relation (spec §13.2), Save as picture (spec §13.8) and, where the block can be edited, Show the tree text. Titles of the computer have a button of their own.
 	 */
 	private toggleMore(opener: HTMLElement, keyboard: boolean): void {
 		const pop = this.popover;
@@ -4173,36 +4623,29 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 			pop.close();
 			return;
 		}
+		const where = this.menuPlace(opener);
 		pop.open(
 			'more',
 			(el) => {
-				const item = (icon: string, text: string, cls: string, run: () => void, label?: string) => {
-					const b = el.createEl('button', { cls: ['dynasty-popover-item', 'dynasty-more-item', cls], attr: { type: 'button' } });
-					if (label) b.setAttribute('aria-label', label);
-					setIcon(b.createSpan({ cls: 'dynasty-tool-icon' }), icon);
-					b.createSpan({ cls: 'dynasty-more-text', text });
-					b.addEventListener('click', (e) => {
-						// A key press on the item gives the focus back to More; a new popover or a picker takes it itself.
-						pop.close(!e.detail);
-						this.guard(run);
-					});
-					return b;
-				};
-				const first = item('route', FINDER_UI.relation, 'dynasty-more-relation', () => void this.startFinder(), FINDER_UI.relationLabel);
-				// Spec §13.4, D49: the Titles window, where the block can be edited.
-				if (this.canEditWindows()) item('crown', TITLES_UI.more, 'dynasty-more-titles', () => void this.openTitles(), TITLES_UI.moreLabel);
-				// Spec §13.8, O11: wherever the More list is, read-only views included.
-				if (this.laid) item('image-down', SAVE_UI.more, 'dynasty-more-save', () => this.openSave(), SAVE_UI.moreLabel);
-				if (this.isPhone()) {
-					item('shrink', UI.fit, 'dynasty-more-fit', () => this.fit());
-					item('info', UI.legend, 'dynasty-more-legend', () => this.toggleLegend(opener));
+				const item = (icon: string, text: string, cls: string, run: () => void, label?: string) => this.menuItem(pop, el, icon, text, cls, run, label);
+				const rows: HTMLElement[] = [];
+				if (this.barKind() === 'phone') {
+					rows.push(item('minimize', UI.fit, 'dynasty-more-fit', () => this.fit()));
+					// Spec §13.4, D49: the Titles window, where the block can be edited.
+					if (this.canEditWindows()) rows.push(item('crown', TITLES_UI.more, 'dynasty-more-titles', () => void this.openTitles(), TITLES_UI.moreLabel));
 				}
+				rows.push(item('book-open', UI.legend, 'dynasty-more-legend', () => this.toggleLegend(opener)));
+				rows.push(item('route', FINDER_UI.relation, 'dynasty-more-relation', () => void this.startFinder(), FINDER_UI.relationLabel));
+				// Spec §13.8, O11: wherever the More list is, read-only views included.
+				if (this.laid) rows.push(item('image-down', SAVE_UI.more, 'dynasty-more-save', () => this.openSave(), SAVE_UI.moreLabel));
 				// D176 (2): the last item, where the block can be edited.
-				if (this.canShowText()) item('code', BLOCK_UI.showText, 'dynasty-more-text-source', () => void this.showText(), BLOCK_UI.showTextLabel);
+				if (this.canShowText()) rows.push(item('code', BLOCK_UI.showText, 'dynasty-more-text-source', () => void this.showText(), BLOCK_UI.showTextLabel));
 				// Enter or Space on More moves the focus into the list (spec §5.2).
-				if (keyboard) first.focus();
+				if (keyboard) rows[0].focus();
 			},
 			opener,
+			where.anchor,
+			where.opts,
 		);
 	}
 
@@ -4212,12 +4655,12 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 		if (!g || this.unloaded) return;
 		const st = this.ensureState();
 		const me = this.meId;
-		const a = await pickPerson(this.host.app, g, new Set(), FINDER_UI.placeholder, FINDER_UI.firstTitle, false, me);
+		const a = await pickPerson(this.host.app, g, new Set(), FINDER_UI.placeholder, FINDER_UI.firstTitle, false, me, null, this.pickerContext());
 		if (a?.kind !== 'person') {
 			this.guard(() => this.refocusTool('.dynasty-more'));
 			return;
 		}
-		const b = await pickPerson(this.host.app, g, new Set([a.id]), FINDER_UI.placeholder, FINDER_UI.secondTitle, false, me !== a.id ? me : null);
+		const b = await pickPerson(this.host.app, g, new Set([a.id]), FINDER_UI.placeholder, FINDER_UI.secondTitle, false, me !== a.id ? me : null, null, this.pickerContext());
 		if (b?.kind !== 'person') {
 			this.guard(() => this.refocusTool('.dynasty-more'));
 			return;
@@ -4304,9 +4747,14 @@ function hasPortraits(g: FamilyGraph | null): boolean {
 	return !!g?.people.some((p) => !!p.portrait);
 }
 
+/** The drawn graph has arms that a card could show (a house with arms, or a person with personal arms): only then does "Arms on cards" change its layout. */
+function hasArms(g: FamilyGraph | null): boolean {
+	return !!g?.people.some((p) => !!p.arms || (p.house !== undefined && !!g.houses.get(p.house)?.arms));
+}
+
 /** Tells two picture owners apart (a house and a person can share an id). */
 function ownerKey(o: PictureOwner): string {
-	return o.kind === 'arms' ? `arms:${o.house.id}` : `portrait:${o.person.id}`;
+	return o.kind === 'arms' ? `arms:${o.house.id}` : `${o.arms ? 'person-arms' : 'portrait'}:${o.person.id}`;
 }
 
 /** Some card shows a reign (spec §13.3): "Show dates on cards" then changes the title text lines. */
@@ -4337,16 +4785,4 @@ function around(boxes: readonly Rect[], margin = FIT_MARGIN): Rect {
 /** The drawn cards of `ids`, in the same order; people with no card are left out. */
 function boxesOf(persons: ReadonlyMap<string, PersonBox>, ids: Iterable<string>): PersonBox[] {
 	return [...ids].map((id) => persons.get(id)).filter((b): b is PersonBox => !!b);
-}
-
-/**
- * Puts the given elements first in `bar`, in this order, moving only what is out of place: a move
- * takes the keyboard focus from a button.
- */
-function orderFirst(bar: HTMLElement, els: (HTMLElement | null)[]): void {
-	const want = els.filter((e): e is HTMLElement => !!e);
-	want.forEach((e, i) => {
-		const at = bar.children[i] ?? null;
-		if (at !== e) bar.insertBefore(e, at);
-	});
 }

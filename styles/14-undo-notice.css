@@ -1,0 +1,14 @@
+/* ---------- Notice with Undo (spec §6.1, §6.7) ---------- */
+
+.dynasty-undo-notice {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: var(--size-4-2);
+}
+
+.dynasty-undo-button {
+	min-height: 44px;
+	min-width: 64px;
+}
+

@@ -10,6 +10,7 @@ import { FullScreenModal } from '../../src/obsidian/full-screen';
 import { HousesWindow, firstFreeColour, houseOps, loadHouses, rowsOf } from '../../src/obsidian/houses-window';
 import { HOUSE_PALETTE } from '../../src/render/styles';
 import { HOUSES, HOUSE_COLOUR_NAMES, REMOVE, SHEET, WRITE_TEXT } from '../../src/render/ui-text';
+import { TOOLBAR_UI } from '../../src/render/view-text';
 import { FEl, clock, dispatch, fakeDoc, fakeWin, installDom, resetDom, runTimers, settle } from './fake-dom';
 import { noticeList, notices, openModals, resetObsidian } from './fake-obsidian';
 import { embed, fakeHandle, openFullScreen, phone, type FakeHandle } from './tree-view-fakes';
@@ -100,7 +101,8 @@ function writingHandle(body = SOURCE): FakeHandle & { ops: Op[] } {
 const toolbar = (root: FEl) =>
 	Array.from(root.querySelector('.dynasty-toolbar')?.children ?? [])
 		.map((b) => [...b.classes].find((c) => c.startsWith('dynasty-') && c !== 'dynasty-tool') ?? '')
-		.filter(Boolean);
+		// The bars between the groups and the free room are no buttons.
+		.filter((c) => c && c !== 'dynasty-sep' && c !== 'dynasty-grow');
 
 const housesWindows = () => openModals.filter((m) => (m as unknown) instanceof HousesWindow) as unknown as HousesWindow[];
 
@@ -141,20 +143,21 @@ function type(input: FEl, text: string): void {
 describe('the Houses button (D36, spec §6.10)', () => {
 	it('sits after Add person in the desktop embed', async () => {
 		const { el } = await embed(SOURCE, { handle: writingHandle() });
-		// M7 (D49): More after the legend.
-		expect(toolbar(el)).toEqual(['dynasty-add-person', 'dynasty-houses-button', 'dynasty-focus', 'dynasty-fit', 'dynasty-legend-button', 'dynasty-more', 'dynasty-expand']);
+		// 0.2.8 (G.13): Add person, Find, Focus, Fit | Houses, Titles | More … Expand.
+		expect(toolbar(el)).toEqual(['dynasty-add-person', 'dynasty-find', 'dynasty-focus', 'dynasty-fit', 'dynasty-houses-button', 'dynasty-titles-button', 'dynasty-more', 'dynasty-expand']);
 		const b = el.querySelector('.dynasty-houses-button')!;
 		expect(b.tag).toBe('button');
-		expect(b.getAttribute('aria-label')).toBe(HOUSES.button);
+		expect(b.getAttribute('aria-label')).toBe(TOOLBAR_UI.housesLabel);
 	});
 
 	it('is in the full-screen view, on the computer and on a phone', async () => {
 		const desk = await openFullScreen(SOURCE);
-		expect(toolbar(desk.root)).toEqual(['dynasty-add-person', 'dynasty-houses-button', 'dynasty-focus', 'dynasty-find', 'dynasty-fit', 'dynasty-legend-button', 'dynasty-more', 'dynasty-close']);
+		expect(toolbar(desk.root)).toEqual(['dynasty-add-person', 'dynasty-find', 'dynasty-focus', 'dynasty-fit', 'dynasty-houses-button', 'dynasty-titles-button', 'dynasty-more', 'dynasty-close']);
 		desk.modal.close();
 		phone();
 		const ph = await openFullScreen(SOURCE);
-		expect(toolbar(ph.root).slice(0, 2)).toEqual(['dynasty-add-person', 'dynasty-houses-button']);
+		// The phone's bottom bar (G.13): Add person, Houses, Focus, Find, More, Close; Fit and Titles are in More.
+		expect(toolbar(ph.root)).toEqual(['dynasty-add-person', 'dynasty-houses-button', 'dynasty-focus', 'dynasty-find', 'dynasty-more', 'dynasty-close']);
 	});
 
 	it('is not in the static phone preview (D1), a read-only tree or a tree with editing off', async () => {
@@ -178,11 +181,12 @@ describe('the Houses button (D36, spec §6.10)', () => {
 		expect(rows(content).map((r) => r.getAttribute('data-house'))).toEqual(['valmont', 'orsini', 'thorne']);
 		expect(rows(content).map((r) => r.querySelector('.dynasty-lw-row-name')!.getText())).toEqual(['House Valmont', 'House Orsini', 'House Thorne']);
 		expect(rows(content).map((r) => r.querySelector('.dynasty-lw-row-sum')!.getText())).toEqual(['1 person', '2 people', 'No people']);
-		const swatch = (id: string) => row(content, id).querySelector('.dynasty-lw-swatch')!;
+		// 0.2.8 (D213, D214): the house colour is a small dot before the count; a house with no arms (and this window has no pictures) has no lead at all.
+		const dot = (id: string) => row(content, id).querySelector('.dynasty-lw-dot');
 		// Only the custom property carries the colour (spec §5.8).
-		expect(swatch('valmont').styleProps.get('--dynasty-house-color')).toBe(P[0]);
-		expect(swatch('thorne').hasClass('is-none')).toBe(true);
-		expect(swatch('thorne').styleProps.size).toBe(0);
+		expect(dot('valmont')!.styleProps.get('--dynasty-house-color')).toBe(P[0]);
+		expect(dot('thorne')).toBeNull();
+		expect(row(content, 'valmont').querySelector('.dynasty-row-lead')).toBeNull();
 	});
 });
 
@@ -198,7 +202,7 @@ describe('draft and Save (spec §6.10, D32)', () => {
 		expect(colours.filter((c) => c.getAttribute('aria-pressed') === 'true').map((c) => c.getAttribute('data-colour'))).toEqual([P[0]]);
 		const other = content.querySelector('.dynasty-house-other input')!;
 		expect(other.getAttribute('type')).toBe('color');
-		expect(content.querySelector('.dynasty-house-other label')!.getText()).toBe(HOUSES.otherColour);
+		expect(content.querySelector('.dynasty-house-other .dynasty-swatch')!.getAttribute('aria-label')).toBe(HOUSES.otherColour);
 		// The page opens with the focus on Back, so no keyboard opens on a phone.
 		expect(fakeDoc.activeElement).toBe(backButton(content));
 	});
@@ -243,7 +247,7 @@ describe('draft and Save (spec §6.10, D32)', () => {
 		other.value = '#A0B1C2';
 		dispatch(other, 'change');
 		backToList(content);
-		expect(row(content, 'thorne').querySelector('.dynasty-lw-swatch')!.styleProps.get('--dynasty-house-color')).toBe('#a0b1c2');
+		expect(row(content, 'thorne').querySelector('.dynasty-lw-dot')!.styleProps.get('--dynasty-house-color')).toBe('#a0b1c2');
 		save(content);
 		await settle();
 		expect(handle.ops[0]).toEqual({ kind: 'batch', ops: [{ kind: 'edit-house', id: 'thorne', color: '#a0b1c2' }] });
@@ -371,7 +375,9 @@ describe('delete a house (D32, spec §6.1 Notice with Undo)', () => {
 		type(fresh.querySelector('textarea')!, 'House Gone');
 		dispatch(fresh.querySelector('.dynasty-house-delete')!, 'click');
 		expect(rows(content)).toHaveLength(3);
-		save(content);
+		// Nothing is left to save, so the list has Close only.
+		expect(content.querySelector('button[data-focus="save"]')).toBeNull();
+		dispatch(content.querySelector('button[data-focus="cancel"]')!, 'click');
 		await settle();
 		expect(handle.write).not.toHaveBeenCalled();
 	});
@@ -425,23 +431,24 @@ describe('closing and questions (spec §6.3 commit model, §5.2 keyboard)', () =
 	it('every control is a button or a field with a name, so the window works by keyboard alone', async () => {
 		const { content, modal } = await openWindow();
 		const named = (c: FEl) => !!c.getAttribute('aria-label') || c.getText() !== '' || (c.getAttribute('id') && modal.querySelector(`label[for="${c.getAttribute('id')}"]`));
-		const controlsOf = () => modal.all().filter((e) => ['button', 'input', 'select', 'textarea'].includes(e.tag));
-		// The list: Cancel, Save, the search box and Add, then the rows.
+		// The colour field behind the "Other colour" swatch is hidden from the keyboard on purpose: the swatch is the control.
+		const controlsOf = () => modal.all().filter((e) => ['button', 'input', 'select', 'textarea'].includes(e.tag) && e.getAttribute('aria-hidden') !== 'true');
+		// The list: the search box and Add, the rows, then Close in the footer (the list has nothing to save).
 		for (const c of controlsOf()) {
 			expect(c.getAttribute('tabindex')).not.toBe('-1');
 			expect(named(c), `${c.tag}.${[...c.classes].join('.')}`).toBeTruthy();
 		}
-		expect(controlsOf().map((c) => [...c.classes][0] ?? c.tag).slice(0, 2)).toEqual(['dynasty-sheet-cancel', 'mod-cta']);
+		expect(controlsOf().map((c) => [...c.classes][0] ?? c.tag).slice(-1)).toEqual(['dynasty-sheet-cancel']);
 		pageFor(content, 'valmont');
 		const controls = controlsOf();
 		for (const c of controls) {
 			expect(c.getAttribute('tabindex')).not.toBe('-1');
 			expect(named(c), `${c.tag}.${[...c.classes].join('.')}`).toBeTruthy();
 		}
-		// Header first: Cancel, Save; then Back and the page; Delete (in Other actions) last.
+		// Back and the page first; Delete (in Other actions) last of the page; then Cancel and Save in the footer.
 		const order = controls.map((c) => [...c.classes][0] ?? c.tag);
-		expect(order.slice(0, 2)).toEqual(['dynasty-sheet-cancel', 'mod-cta']);
-		expect(last(controls)!.hasClass('dynasty-house-delete')).toBe(true);
+		expect(order.slice(-2)).toEqual(['dynasty-sheet-cancel', 'mod-cta']);
+		expect(controls[controls.length - 3]!.hasClass('dynasty-house-delete')).toBe(true);
 	});
 });
 

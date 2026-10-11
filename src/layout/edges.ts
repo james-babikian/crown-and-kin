@@ -218,15 +218,15 @@ function route(g: FamilyGraph, layout: TreeLayout, anchors: Map<string, string>,
 		firstSeg.push(count);
 		count += s.length;
 	}
-	const dots = markers.map((mk) => ({ x: mk.x, y: mk.y }));
-	const cards = [...layout.persons.values()];
+	// B.3: the search looks only near the curve, so the lines, the dots and the cards are kept in grids; the indexes are the ones of `all`, `dots` and `cards`.
+	const index = new RumourIndex(all, markers.map((mk) => ({ x: mk.x, y: mk.y })), [...layout.persons.values()]);
 	// The plugin draws the "?" circle 0.5 em wide in radius, the headless pictures 8 px; 2 px more keeps it off the card's edge.
 	const cardRoom = Math.max(8, 0.5 * geo.fontPx) + 2;
 	const range = (i: number): [number, number] => [firstSeg[i], firstSeg[i] + segs[i].length];
 	for (const { path, curve, from, alt, trunk } of rumours) {
-		const near = { cards, room: cardRoom, alt: alt && trunk !== undefined ? { segs: alt, own: [range(trunk), range(path)] } : undefined };
-		const spot = rumourSpot(curve, all, [firstSeg[from ?? path], firstSeg[path] + segs[path].length], dots, !!side, near);
-		dots.push(spot);
+		const near = { room: cardRoom, alt: alt && trunk !== undefined ? { segs: alt, own: [range(trunk), range(path)] } : undefined };
+		const spot = rumourSpot(curve, index, [firstSeg[from ?? path], firstSeg[path] + segs[path].length], !!side, near);
+		index.addDot(spot);
 		markers.push({ ...spot, kind: 'rumour' });
 	}
 
@@ -289,9 +289,74 @@ type Spot = { x: number; y: number };
 /** How far `p` is from the box `b` (0 inside it). */
 const boxGap = (p: Spot, b: Rect) => Math.hypot(Math.max(b.x - p.x, 0, p.x - b.x - b.w), Math.max(b.y - p.y, 0, p.y - b.y - b.h));
 
+/**
+ * A grid of cells over boxes: `add` puts an index in every cell its box touches; `near` gives the indexes whose boxes touch a query box, once each, in
+ * ascending order, so a search that walks them takes its choices in the same order as one that walks the whole list.
+ */
+class BoxGrid {
+	private cells = new Map<number, number[]>();
+	constructor(private size: number) {}
+	private key(cx: number, cy: number): number {
+		return (cx + 1e6) * 2000003 + (cy + 1e6);
+	}
+	add(i: number, x0: number, y0: number, x1: number, y1: number): void {
+		const c = this.size;
+		for (let cx = Math.floor(x0 / c); cx <= Math.floor(x1 / c); cx++) {
+			for (let cy = Math.floor(y0 / c); cy <= Math.floor(y1 / c); cy++) {
+				const k = this.key(cx, cy);
+				const list = this.cells.get(k);
+				if (list) list.push(i);
+				else this.cells.set(k, [i]);
+			}
+		}
+	}
+	near(x0: number, y0: number, x1: number, y1: number): number[] {
+		const c = this.size;
+		const seen = new Set<number>();
+		for (let cx = Math.floor(x0 / c); cx <= Math.floor(x1 / c); cx++) {
+			for (let cy = Math.floor(y0 / c); cy <= Math.floor(y1 / c); cy++) for (const i of this.cells.get(this.key(cx, cy)) ?? []) seen.add(i);
+		}
+		return [...seen].sort((a, b) => a - b);
+	}
+}
+
+/**
+ * The lines, the dots and the cards of one drawing, each in a grid, for the search of the "?" spots (B.3: it used to scan every one of them for each
+ * rumoured line, so a tree of rumoured parents grew with the square of its people). The answers keep the original indexes; a dot added later gets the next one.
+ */
+class RumourIndex {
+	private segGrid = new BoxGrid(64);
+	private dotGrid = new BoxGrid(64);
+	private cardGrid = new BoxGrid(64);
+	constructor(
+		readonly all: Seg[],
+		readonly dots: Spot[],
+		readonly cards: Rect[],
+	) {
+		all.forEach(([x1, y1, x2, y2], i) => this.segGrid.add(i, Math.min(x1, x2), Math.min(y1, y2), Math.max(x1, x2), Math.max(y1, y2)));
+		dots.forEach((d, i) => this.dotGrid.add(i, d.x, d.y, d.x, d.y));
+		cards.forEach((b, i) => this.cardGrid.add(i, b.x, b.y, b.x + b.w, b.y + b.h));
+	}
+	addDot(d: Spot): void {
+		this.dotGrid.add(this.dots.push(d) - 1, d.x, d.y, d.x, d.y);
+	}
+	/** The lines whose box meets the box. The caller tests the exact distance. */
+	segsIn(x0: number, y0: number, x1: number, y1: number): number[] {
+		return this.segGrid.near(x0, y0, x1, y1).filter((i) => {
+			const [ax, ay, bx, by] = this.all[i];
+			return Math.max(ax, bx) >= x0 && Math.min(ax, bx) <= x1 && Math.max(ay, by) >= y0 && Math.min(ay, by) <= y1;
+		});
+	}
+	dotsIn(x0: number, y0: number, x1: number, y1: number): number[] {
+		return this.dotGrid.near(x0, y0, x1, y1).filter((i) => this.dots[i].x >= x0 && this.dots[i].x <= x1 && this.dots[i].y >= y0 && this.dots[i].y <= y1);
+	}
+	cardsIn(x0: number, y0: number, x1: number, y1: number): number[] {
+		return this.cardGrid.near(x0, y0, x1, y1);
+	}
+}
+
 /** What the "?" must keep clear of besides lines and dots: every card by `room`, and where else it may sit. */
 interface RumourRoom {
-	cards: Rect[];
 	room: number;
 	/** Straight pieces of the rumoured line's trunk the "?" may sit on when the line itself has no room; `own`: the segment ranges (trunk, line) it may touch. */
 	alt?: { segs: Seg[]; own: [number, number][] };
@@ -305,20 +370,17 @@ interface RumourRoom {
  * any point it may take is clear of the cards.
  * `all` holds the segments of every line; `own` is the range of the curve's own segments in it.
  */
-function rumourSpot(curve: Curve, all: Seg[], own: [number, number], dots: Spot[], clearest: boolean, near: RumourRoom): Spot {
+function rumourSpot(curve: Curve, ix: RumourIndex, own: [number, number], clearest: boolean, near: RumourRoom): Spot {
+	const { all, dots, cards } = ix;
 	const other = (i: number) => i < own[0] || i >= own[1];
-	// Only what lies near the curve is looked at: it lies inside the box of its ends, and nothing farther than 40 px
-	// (46 for a dot, which counts 6 px less) can change which point is clear or which is the clearest.
-	const [sx, sy, , tx, ty] = curve;
-	const box = { x0: Math.min(sx, tx) - 40, x1: Math.max(sx, tx) + 40, y0: Math.min(sy, ty) - 40, y1: Math.max(sy, ty) + 40 };
-	const lines = all.filter(([x1, y1, x2, y2], i) => other(i) && Math.max(x1, x2) >= box.x0 && Math.min(x1, x2) <= box.x1 && Math.max(y1, y2) >= box.y0 && Math.min(y1, y2) <= box.y1);
-	const nearDots = dots.filter((d) => d.x >= box.x0 - 6 && d.x <= box.x1 + 6 && d.y >= box.y0 - 6 && d.y <= box.y1 + 6);
-	const nearCards = near.cards.filter((b) => b.x < box.x1 && b.x + b.w > box.x0 && b.y < box.y1 && b.y + b.h > box.y0);
-	const offCards = (p: Spot) => near.cards.every((b) => boxGap(p, b) >= near.room);
-	// For a point of the curve itself: a card that is 40 px from the curve's box is farther than `room` from the point.
-	const offCurveCards = (p: Spot) => nearCards.every((b) => boxGap(p, b) >= near.room);
-	const clearOf = (p: Spot, ok: (i: number) => boolean, segs: Seg[], ds: Spot[], offC: (q: Spot) => boolean) => segs.every((s, i) => ok(i) || beyond(p, s, 10) || distance(p, s) > 10) && ds.every((d) => Math.hypot(p.x - d.x, p.y - d.y) > 16) && offC(p);
-	const clear = (p: Spot) => clearOf(p, () => false, lines, nearDots, offCurveCards);
+	// Only what lies near a point is looked at: nothing farther than 10 px (16 for a dot) from a point changes whether it is clear, and nothing
+	// farther than 40 px (46 for a dot, which counts 6 px less) changes which point is the clearest. The grids give those by the point, not by the box of
+	// the curve's ends, which for a long link would hold half the drawing.
+	const offCards = (p: Spot) => ix.cardsIn(p.x - near.room, p.y - near.room, p.x + near.room, p.y + near.room).every((i) => boxGap(p, cards[i]) >= near.room);
+	const dotsClear = (p: Spot) => ix.dotsIn(p.x - 16, p.y - 16, p.x + 16, p.y + 16).every((i) => Math.hypot(p.x - dots[i].x, p.y - dots[i].y) > 16);
+	const clear = (p: Spot) => ix.segsIn(p.x - 10, p.y - 10, p.x + 10, p.y + 10).every((i) => !other(i) || beyond(p, all[i], 10) || distance(p, all[i]) > 10) && dotsClear(p) && offCards(p);
+	// A place on the trunk's alternative: clear of every line but the curve's own pieces (`ok`), of every dot and of every card.
+	const clearAll = (p: Spot, ok: (i: number) => boolean) => ix.segsIn(p.x - 10, p.y - 10, p.x + 10, p.y + 10).every((i) => ok(i) || beyond(p, all[i], 10) || distance(p, all[i]) > 10) && dotsClear(p) && offCards(p);
 	const along = (at: (t: number) => Spot, steps: number): Spot[] => {
 		const out: Spot[] = [];
 		for (let i = 0; i <= steps; i++) out.push(at(0.5 + (i % 2 ? 1 : -1) * Math.ceil(i / 2) * (0.5 / Math.ceil(steps / 2))));
@@ -333,31 +395,34 @@ function rumourSpot(curve: Curve, all: Seg[], own: [number, number], dots: Spot[
 	if (near.alt) {
 		const mine = near.alt.own;
 		const ok = (i: number) => mine.some(([a, b]) => i >= a && i < b);
-		const spot = altSpots.find((p) => clearOf(p, ok, all, dots, offCards));
+		const spot = altSpots.find((p) => clearAll(p, ok));
 		if (spot) return spot;
 	}
 	const mid = bezier(curve, 0.5);
 	if (!clearest) {
-		if (offCurveCards(mid)) return mid;
+		if (offCards(mid)) return mid;
 	} else {
 		let best = mid;
 		let room = -1;
 		for (let i = 2; i <= 38; i++) {
 			const p = bezier(curve, i / 40);
-			if (!offCurveCards(p)) continue;
-			const d = Math.min(40, ...lines.map((s) => (beyond(p, s, 40) ? 40 : distance(p, s))), ...nearDots.map((q) => Math.hypot(p.x - q.x, p.y - q.y) - 6));
+			if (!offCards(p)) continue;
+			// A loop, not a spread: a crowded drawing can have more lines here than an argument list takes.
+			let d = 40;
+			for (const i of ix.segsIn(p.x - 40, p.y - 40, p.x + 40, p.y + 40)) if (other(i) && !beyond(p, all[i], 40)) d = Math.min(d, distance(p, all[i]));
+			for (const i of ix.dotsIn(p.x - 46, p.y - 46, p.x + 46, p.y + 46)) d = Math.min(d, Math.hypot(p.x - dots[i].x, p.y - dots[i].y) - 6);
 			if (d > room) {
 				room = d;
 				best = p;
 			}
 		}
-		if (offCurveCards(best)) return best;
+		if (offCards(best)) return best;
 	}
 	// No place clear of the cards is also clear of the lines: the cards come first. A link between two
 	// cards of one row crosses only the gap between them, so there it takes the gap's middle.
 	const places = [...along((t) => bezier(curve, t), 200), ...altSpots];
 	const free = places.find(offCards);
 	if (free) return free;
-	const gap = (p: Spot) => Math.min(...near.cards.map((b) => boxGap(p, b)));
+	const gap = (p: Spot) => cards.reduce((m, b) => Math.min(m, boxGap(p, b)), Infinity);
 	return places.reduce((a, b) => (gap(b) > gap(a) ? b : a));
 }

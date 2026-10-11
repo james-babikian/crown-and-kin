@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { deriveFamilies } from '../../src/core/derive';
-import type { ApplyOp, EditRefusal, EditResult, NewPersonId, Op, ParentKind, UnionRef } from '../../src/core/edit';
+import type { ApplyOp, EditRefusal, EditResult, Op, ParentKind, UnionRef } from '../../src/core/edit';
 import { parseDynasty } from '../../src/core/parse';
 import * as edit from '../../src/core/yaml-edit';
 import { golden, replaceOnce } from './golden';
+import { nextIdFor } from '../helpers';
 import { fixtureNote, fixtureSource, topLevelBlocks } from './load';
 
 // Spec §4.2 (parent-entry write form), §4.3 (primary union, sibling groups), §5.9 (Add first
@@ -27,7 +28,6 @@ import { fixtureNote, fixtureSource, topLevelBlocks } from './load';
 //   removed key in M2 (the decision notes), so no user comment is lost.
 
 const applyOp: ApplyOp = edit.applyOp;
-const newPersonId: NewPersonId = edit.newPersonId;
 
 const NOTE9 = fixtureNote('09');
 /** Fixture 9, the main tree. Bodies have no final newline, like `LocatedBlock.body`. */
@@ -76,15 +76,15 @@ const U0: UnionRef = { index: 0, partners: ['aldous', '0017'] };
 /** Written as [edric, joan]; a ref may name the partners in either order (contract). */
 const U1: UnionRef = { index: 1, partners: ['joan', 'edric'] };
 
-describe('newPersonId (§6.8, D104)', () => {
-	it('a number after the highest p<number>, whatever the name', () => {
-		// MAIN has no numbered id, so the first one is p1 for every name.
-		for (const name of ['Ivo Harrow', 'Edric', 'Joan', 'Mäud Quill', '', '???', '0017']) expect(newPersonId(MAIN, name)).toBe('p1');
-		expect(newPersonId('', 'Aldric Valmont')).toBe('p1');
+describe('the next person id (§6.8, D104)', () => {
+	it('a number after the highest p<number>', () => {
+		// MAIN has no numbered id, so the first one is p1.
+		expect(nextIdFor(MAIN)).toBe('p1');
+		expect(nextIdFor('')).toBe('p1');
 	});
 
 	it('goes on after the highest number and counts a reference', () => {
-		expect(newPersonId('people:\n  - {id: p3, name: A}\n  - {id: p7, name: B}\n  - {id: edric, name: C, parents: [p9]}\n', 'Ivo')).toBe('p10');
+		expect(nextIdFor('people:\n  - {id: p3, name: A}\n  - {id: p7, name: B}\n  - {id: edric, name: C, parents: [p9]}\n')).toBe('p10');
 	});
 });
 

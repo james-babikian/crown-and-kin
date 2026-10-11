@@ -10,13 +10,23 @@
 import { foldForMatch } from './fold';
 import { str, type Raw, type RawMap } from './tolerate';
 
-/** Turns a display name into a slug: "Aldric Valmont" → "aldric-valmont", "Þórr" → "thorr". */
+/** Characters an id may hold besides hyphens: lower-case or uncased letters, digits and marks of any writing system (I16). */
+const ID_REST = /[^\p{Ll}\p{Lm}\p{Lo}\p{N}\p{M}]+/gu;
+const ID_VALID = /^[\p{Ll}\p{Lm}\p{Lo}\p{N}\p{M}-]+$/u;
+const HAS_LETTER = /[\p{L}\p{N}]/u;
+
+/** Turns a display name into a slug: "Aldric Valmont" → "aldric-valmont", "Þórr" → "thorr", "Иван" → "иван". */
 export function slugify(name: string): string {
 	// The search fold lower-cases before the letter map and repeats until stable, so a capital ẞ or a letter such as Ǣ gives the same text as in search.
+	// Letters, digits and marks of other writing systems stay (I16). The fold has already taken the Latin accents off.
 	const slug = foldForMatch(name)
-		.replace(/[^a-z0-9]+/g, '-')
-		.replace(/^-+|-+$/g, '');
-	if (slug === '') return 'person';
+		.replace(ID_REST, '-')
+		// A mark with no letter before it (after a hyphen or at the start) has nothing to sit on.
+		.replace(/(^|-)\p{M}+/gu, '$1')
+		.replace(/-+/g, '-')
+		.replace(/^-+|-+$/g, '')
+		.normalize('NFC');
+	if (!HAS_LETTER.test(slug)) return 'person';
 	return /^\d+$/.test(slug) ? `p-${slug}` : slug;
 }
 
@@ -97,7 +107,7 @@ export function makeIdFromName(kind: 'house' | 'title', name: string, taken: Rea
  */
 export function checkNewId(id: string, taken: ReadonlySet<string>): null | 'empty' | 'characters' | 'taken' {
 	if (typeof id !== 'string' || id.trim() === '') return 'empty';
-	if (!/^[a-z0-9-]+$/.test(id) || !/[a-z0-9]/.test(id)) return 'characters';
+	if (!ID_VALID.test(id) || !HAS_LETTER.test(id)) return 'characters';
 	return taken.has(id) ? 'taken' : null;
 }
 

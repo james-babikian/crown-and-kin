@@ -1,21 +1,21 @@
 /*
  * The pure part of the title editing (spec §13.4, §13.5): what a holder's text lines say, how the
- * holder form turns its fields into holder values (`as` only when the ruler name changed), and the
- * Titles window's draft: its rows (with the "Name of the list", D64, the "Name for a man", D66, and the "Name for a woman", D65), whether it changed, the one `batch` that Save writes
+ * holder form turns its fields into holder values (`as` only when the ruler name changed, and the tick box "Holds the title through
+ * the spouse", D195), and the Titles window's draft: its rows (with the "Name for a man", D66, and the "Name for a woman", D65; the
+ * window no longer shows the "Name of the list" and never writes it, so a written `plural` stays, D201), whether it changed, the one `batch` that Save writes
  * (with ids for holder people who have none), the Id field of each title (§13.17 rule 5, D109), and how the draft follows a tree that changed under the window. No `obsidian` import, so vitest runs it;
  * `titles-window.ts`, `holder-form.ts` and `sheet-titles.ts` use it.
  */
 
 import type { FamilyGraph } from '../core/derive';
 import type { EditTitle, HolderFields, HolderRef, Op } from '../core/edit';
-import { nextPersonId } from '../core/id-gen';
-import { referencedIds } from '../core/parse';
 import type { SuccessionSpec } from '../core/succession';
 import { readInherit, readRule, type InheritIllegitimate, type InheritRule, type InheritThrough, type SuccessionRule } from '../core/succession-keys';
+import { sameList } from '../core/same-list';
 import { entryReign, rulerName } from '../core/titles';
-import { isMap, str, type Raw } from '../core/tolerate';
 import type { Holder, Title } from '../core/types';
 import { draftId, idChanged, idOps, isIdOp, type IdRow } from './id-draft';
+import { idsForPeople } from './person-ids';
 
 /** The written values of one holder entry (spec §13.4); absent = no key. */
 export interface HolderValues {
@@ -25,17 +25,25 @@ export interface HolderValues {
 	number?: string;
 	from?: string;
 	to?: string;
+	/** D195, contract A.2: the key `through-spouse`. `'true'` from the tick box, or the id of the partner as written by hand. Absent: off. */
+	throughSpouse?: string;
 }
 
 /** The keys a draft can change on an existing holder; `person` never changes. */
-const EDIT_KEYS = ['name', 'as', 'number', 'from', 'to'] as const;
-/** §13.0 item 1: the key order of a new holder. */
-const ADD_KEYS = ['person', 'name', 'as', 'number', 'from', 'to'] as const;
+const EDIT_KEYS = ['name', 'as', 'number', 'from', 'to', 'throughSpouse'] as const;
+/** §13.0 item 1: the key order of a new holder (`through-spouse` comes after `to`, contract A.2). */
+const ADD_KEYS = ['person', 'name', 'as', 'number', 'from', 'to', 'throughSpouse'] as const;
+/** The key that a draft value is written under. */
+const WRITE_KEY: Record<(typeof ADD_KEYS)[number], keyof HolderFields> = { person: 'person', name: 'name', as: 'as', number: 'number', from: 'from', to: 'to', throughSpouse: 'through-spouse' };
 
 /** The values of a holder as read. */
 export function valuesOf(h: Holder): HolderValues {
 	const out: HolderValues = {};
-	for (const k of ADD_KEYS) if (h[k] !== undefined) out[k] = h[k];
+	for (const k of ADD_KEYS) {
+		if (k === 'throughSpouse') {
+			if (h.throughSpouse !== undefined) out.throughSpouse = h.throughSpouse === true ? 'true' : h.throughSpouse;
+		} else if (h[k] !== undefined) out[k] = h[k];
+	}
 	return out;
 }
 
@@ -91,14 +99,16 @@ export interface HolderFormFields {
 	from: string;
 	to: string;
 	name?: string;
+	/** The tick box "Holds the title through the spouse" (D195). */
+	throughSpouse?: boolean;
 }
 
 /**
  * What the form shows first: the values, and the written ruler name (§13.5, D131). The field is empty
  * when the entry has no `as`, so typed text can be told from the default, which `rulerHint` gives.
  */
-export function formStart(v: HolderValues, personName: string | undefined, askName: boolean): HolderFormFields {
-	return { number: v.number ?? '', ruler: v.as ?? '', from: v.from ?? '', to: v.to ?? '', ...(askName ? { name: v.name ?? '' } : {}) };
+export function formStart(v: HolderValues, askName: boolean): HolderFormFields {
+	return { number: v.number ?? '', ruler: v.as ?? '', from: v.from ?? '', to: v.to ?? '', throughSpouse: v.throughSpouse !== undefined, ...(askName ? { name: v.name ?? '' } : {}) };
 }
 
 /** The default ruler name that the empty form field shows as a hint: the first word of the person's name, or the typed name of a holder who is not in the tree. */
@@ -129,8 +139,11 @@ export function formResult(before: HolderValues, personName: string | undefined,
 	set('from', clean(f.from));
 	set('to', clean(f.to));
 	if (f.name !== undefined) set('name', clean(f.name));
+	// The box on: a hand-written id stays (the box showed it ticked); off: the key goes (D195).
+	if (!f.throughSpouse) delete out.throughSpouse;
+	else if (out.throughSpouse === undefined) out.throughSpouse = 'true';
 	const ruler = f.ruler.trim();
-	const atStart = formStart(before, personName, false).ruler.trim();
+	const atStart = formStart(before, false).ruler.trim();
 	const plain = rulerOf({ ...out, as: undefined }, personName);
 	if (ruler === atStart) set('as', before.as);
 	else if (ruler === '' || (out.number !== undefined && ruler === plain)) set('as', undefined);
@@ -157,14 +170,14 @@ export function previewParts(personName: string | undefined, f: HolderFormFields
 /** The fields an edit writes: only the changed ones, `null` for a removed key. */
 export function changedFields(base: HolderValues, now: HolderValues): HolderFields {
 	const out: HolderFields = {};
-	for (const k of EDIT_KEYS) if (base[k] !== now[k]) out[k] = now[k] ?? null;
+	for (const k of EDIT_KEYS) if (base[k] !== now[k]) out[WRITE_KEY[k]] = now[k] ?? null;
 	return out;
 }
 
 /** The fields of a new holder, in the §13.0 key order. */
 export function addFields(v: HolderValues): HolderFields {
 	const out: HolderFields = {};
-	for (const k of ADD_KEYS) if (v[k] !== undefined) out[k] = v[k];
+	for (const k of ADD_KEYS) if (v[k] !== undefined) out[WRITE_KEY[k]] = v[k];
 	return out;
 }
 
@@ -205,9 +218,6 @@ export const SUCCESSION_FIELDS = ['rule', 'inherit', 'through', 'illegitimate', 
 /** One field name of `SuccessionDraft`. */
 export type SuccessionField = (typeof SUCCESSION_FIELDS)[number];
 
-/** The draft of a title with no succession key written. */
-export const emptySuccession = (): SuccessionDraft => ({ rule: '', inherit: '', through: '', illegitimate: 'no', adopted: false, body: false, year: '', heirs: [], exclude: [] });
-
 /** The succession keys of a title as read. */
 export function successionOf(t: Title): SuccessionDraft {
 	const bad = t.badKeys ?? {};
@@ -236,14 +246,7 @@ export interface TitleRow {
 	name: string;
 	/** The name as read; null for a new title. */
 	baseName: string | null;
-	/**
-	 * The "Name of the list" field as typed (D64): the heading of the holder list and the table note
-	 * name. Empty when the title has no plural of its own (none is written, or it is the name).
-	 */
-	plural: string;
-	/** The field as read; null for a new title. */
-	basePlural: string | null;
-	/** The "Name for a man" field as typed (D66, `male-name`); empty when none is written. */
+/** The "Name for a man" field as typed (D66, `male-name`); empty when none is written. */
 	maleName: string;
 	/** The field as read; null for a new title. */
 	baseMaleName: string | null;
@@ -268,9 +271,7 @@ export function titleRows(g: FamilyGraph, key: () => string): TitleRow[] {
 
 function rowOf(t: Title, key: () => string): TitleRow {
 	const holders = t.holders.map((h): HolderRow => ({ key: key(), ref: refOf(t.id, h), base: valuesOf(h), values: valuesOf(h) }));
-	// The parser gives the name as the plural when none is written: the field then starts empty.
-	const plural = t.plural.trim() === t.name.trim() ? '' : t.plural;
-	const maleName = t.maleName ?? '';
+const maleName = t.maleName ?? '';
 	const femaleName = t.femaleName ?? '';
 	const succ = successionOf(t);
 	return {
@@ -279,9 +280,7 @@ function rowOf(t: Title, key: () => string): TitleRow {
 		idDraft: t.id,
 		name: t.name,
 		baseName: t.name,
-		plural,
-		basePlural: plural,
-		maleName,
+maleName,
 		baseMaleName: maleName,
 		femaleName,
 		baseFemaleName: femaleName,
@@ -296,12 +295,6 @@ function rowOf(t: Title, key: () => string): TitleRow {
 /** The row as the Id logic sees it. */
 export const titleIdRow = (t: TitleRow): IdRow => ({ key: t.key, id: t.id, idDraft: t.idDraft, name: t.name, deleted: t.deleted });
 
-/** The plural that Save writes for the draft (D64): null for an empty field or the title name. */
-export function pluralOf(t: TitleRow): string | null {
-	const p = t.plural.trim();
-	return p === '' || p === t.name.trim() ? null : p;
-}
-
 /** The `male-name` that Save writes for the draft (D66): null for an empty field. */
 export function maleNameOf(t: TitleRow): string | null {
 	const m = t.maleName.trim();
@@ -314,14 +307,9 @@ export function femaleNameOf(t: TitleRow): string | null {
 	return f === '' ? null : f;
 }
 
-/** The heading of the title's holder list now: the draft plural, else the draft name ('' when both are empty). */
-export function listName(t: TitleRow): string {
-	return pluralOf(t) ?? t.name.trim();
-}
-
-/** The name of the saved list: the table note is made from the saved tree, not from the draft. */
+/** The name of the saved title: the table note is made from the saved tree, not from the draft (D201: it uses the name of the title). */
 export function savedListName(t: TitleRow): string {
-	return t.basePlural?.trim() || t.baseName || t.name.trim();
+	return t.baseName || t.name.trim();
 }
 
 const sameValues = (a: HolderValues | null, b: HolderValues) => !!a && Object.keys(changedFields(a, b)).length === 0;
@@ -333,10 +321,6 @@ export function holdersChanged(t: TitleRow): boolean {
 }
 
 const nameChanged = (t: TitleRow) => t.baseName !== null && t.name.trim() !== t.baseName;
-/** The owner typed in the "Name of the list" field (a stale Save keeps the text). */
-const pluralEdited = (t: TitleRow) => t.basePlural !== null && t.plural.trim() !== t.basePlural.trim();
-/** The plural to write differs from the one read; a value equal to the name counts as none. */
-const pluralChanged = (t: TitleRow) => t.basePlural !== null && pluralOf(t) !== (t.basePlural.trim() || null);
 /** The owner typed in the "Name for a man" field (D66); a stale Save keeps the text. */
 const maleEdited = (t: TitleRow) => t.baseMaleName !== null && t.maleName.trim() !== t.baseMaleName.trim();
 const maleChanged = (t: TitleRow) => t.baseMaleName !== null && maleNameOf(t) !== (t.baseMaleName.trim() || null);
@@ -344,7 +328,6 @@ const maleChanged = (t: TitleRow) => t.baseMaleName !== null && maleNameOf(t) !=
 const femaleEdited = (t: TitleRow) => t.baseFemaleName !== null && t.femaleName.trim() !== t.baseFemaleName.trim();
 const femaleChanged = (t: TitleRow) => t.baseFemaleName !== null && femaleNameOf(t) !== (t.baseFemaleName.trim() || null);
 
-const sameList = (a: readonly string[], b: readonly string[]) => a.length === b.length && a.every((x, i) => x === b[i]);
 
 /**
  * True when one succession field differs from the field as read. "Not written" and "No preference" for `inherit` are the
@@ -426,7 +409,7 @@ export function draftTitle(g: FamilyGraph, t: TitleRow): Title | null {
 /** True when Save has something to write. */
 export function draftChanged(rows: readonly TitleRow[]): boolean {
 	return rows.some((t) =>
-		t.id === null ? !t.deleted : t.deleted || idChanged(titleIdRow(t)) || nameChanged(t) || maleChanged(t) || femaleChanged(t) || pluralChanged(t) || holdersChanged(t) || successionChanges(t).length > 0,
+		t.id === null ? !t.deleted : t.deleted || idChanged(titleIdRow(t)) || nameChanged(t) || maleChanged(t) || femaleChanged(t) || holdersChanged(t) || successionChanges(t).length > 0,
 	);
 }
 
@@ -454,8 +437,7 @@ export function windowOps(rows: readonly TitleRow[], newId: (name: string, taken
 			taken.add(id);
 			const maleName = maleNameOf(t);
 			const femaleName = femaleNameOf(t);
-			const plural = pluralOf(t);
-			adds.push({ kind: 'add-title', id, name, ...(maleName !== null ? { maleName } : {}), ...(femaleName !== null ? { femaleName } : {}), ...(plural !== null ? { plural } : {}) });
+adds.push({ kind: 'add-title', id, name, ...(maleName !== null ? { maleName } : {}), ...(femaleName !== null ? { femaleName } : {}) });
 			// A new title gets its `holders` key only with its first holder.
 			if (t.holders.length) addLists.push({ kind: 'set-holders', title: id, items: t.holders.map((h) => ({ add: addFields(h.values) })) });
 			continue;
@@ -467,8 +449,8 @@ export function windowOps(rows: readonly TitleRow[], newId: (name: string, taken
 		// After its id op the title has its new id.
 		const id = idChanged(titleIdRow(t)) ? draftId(titleIdRow(t)) : t.id;
 		const succession = successionEdit(t);
-		if (nameChanged(t) || maleChanged(t) || femaleChanged(t) || pluralChanged(t) || Object.keys(succession).length) {
-			// `null` removes the key: an empty field writes no male-name or female-name (D65, D66); an empty field or the title name writes no plural (D64).
+		if (nameChanged(t) || maleChanged(t) || femaleChanged(t) || Object.keys(succession).length) {
+			// `null` removes the key: an empty field writes no male-name or female-name (D65, D66). The window never writes `plural` (D201): a written one stays.
 			// The succession keys are only the ones the owner changed, so an unrelated Save never touches a hand-written key (A.3).
 			edits.push({
 				kind: 'edit-title',
@@ -476,8 +458,7 @@ export function windowOps(rows: readonly TitleRow[], newId: (name: string, taken
 				...(nameChanged(t) ? { name: t.name.trim() } : {}),
 				...(maleChanged(t) ? { maleName: maleNameOf(t) } : {}),
 				...(femaleChanged(t) ? { femaleName: femaleNameOf(t) } : {}),
-				...(pluralChanged(t) ? { plural: pluralOf(t) } : {}),
-				...succession,
+...succession,
 			});
 		}
 		if (!holdersChanged(t)) continue;
@@ -517,12 +498,11 @@ export function rebase(rows: readonly TitleRow[], fresh: readonly TitleRow[]): T
 		const name = nameChanged(was) ? was.name : f.name;
 		// An id the user typed stays; else the row shows the new saved id.
 		const idDraft = (was.idDraft ?? was.id!).trim() !== was.id ? was.idDraft : f.id!;
-		const plural = pluralEdited(was) ? was.plural : f.plural;
-		const maleName = maleEdited(was) ? was.maleName : f.maleName;
+const maleName = maleEdited(was) ? was.maleName : f.maleName;
 		const femaleName = femaleEdited(was) ? was.femaleName : f.femaleName;
 		const succ = rebaseSuccession(was, f);
 		if (!holdersChanged(was)) {
-			out.push({ ...f, key: was.key, idDraft, name, plural, maleName, femaleName, deleted: was.deleted, ...(succ ? { succ } : {}) });
+			out.push({ ...f, key: was.key, idDraft, name, maleName, femaleName, deleted: was.deleted, ...(succ ? { succ } : {}) });
 			continue;
 		}
 		// Every holder as read is found again first, also those the draft removed: they stay removed.
@@ -560,7 +540,7 @@ export function rebase(rows: readonly TitleRow[], fresh: readonly TitleRow[]): T
 		holders.push(...pool);
 		const keyOf = (fh: HolderRow) => [...hits].find(([, v]) => v === fh)?.[0] ?? fh.key;
 		const baseRows = f.holders.map((fh) => ({ ...fh, key: keyOf(fh), values: { ...fh.values } }));
-		out.push({ ...f, key: was.key, idDraft, name, plural, maleName, femaleName, deleted: was.deleted, holders, baseRows, ...(succ ? { succ } : {}) });
+		out.push({ ...f, key: was.key, idDraft, name, maleName, femaleName, deleted: was.deleted, holders, baseRows, ...(succ ? { succ } : {}) });
 	}
 	out.push(...rows.filter((t) => t.id === null));
 	return out;
@@ -601,38 +581,25 @@ function matchHolder(pool: readonly HolderRow[], b: HolderRow, bySameText: boole
  * it. `data` is the body as plain data (`parseBody`).
  */
 export function withHolderIds(ops: readonly Op[], g: FamilyGraph, data: unknown): Op[] {
-	const people = isMap(data) && Array.isArray(data.people) ? (data.people as Raw[]) : [];
-	const unwritten = (id: string) => {
-		const p = g.byId.get(id);
-		if (!p) return false;
-		const raw = people[p.index];
-		return str(isMap(raw) ? raw.id : undefined) !== id;
-	};
-	const used = new Set<string>(isMap(data) ? referencedIds(data) : []);
-	const ids = new Map<string, string>();
-	const see = (person: string | null | undefined) => {
-		if (typeof person !== 'string' || ids.has(person) || !unwritten(person)) return;
-		const next = nextPersonId(used);
-		used.add(next);
-		ids.set(person, next);
-	};
+	const named: (string | null | undefined)[] = [];
 	for (const op of ops) {
-		if (op.kind === 'set-holders') for (const item of op.items) see('add' in item ? item.add.person : item.fields?.person);
+		if (op.kind === 'set-holders') for (const item of op.items) named.push('add' in item ? item.add.person : item.fields?.person);
 		// A named heir and an excluded person are written by id too (K.3): a person with no written id gets one first.
-		else if (op.kind === 'edit-title') for (const id of [...(op.heirs ?? []), ...(op.exclude ?? [])]) see(id);
+		else if (op.kind === 'edit-title') named.push(...(op.heirs ?? []), ...(op.exclude ?? []));
 	}
+	const ids = idsForPeople(g, data, named);
 	if (!ids.size) return [...ops];
 	const mapIds = (list: string[] | null | undefined) => (list ? list.map((id) => ids.get(id) ?? id) : list);
 	const map = (fields: HolderFields): HolderFields => (typeof fields.person === 'string' && ids.has(fields.person) ? { ...fields, person: ids.get(fields.person)! } : fields);
 	const give = [...ids].map(([id, next]): Op => ({ kind: 'set-person-fields', id, fields: { id: next } }));
 	// The id changes of titles stay first (§13.17 rule 5); they name no holder person.
 	const lead = ops.filter(isIdOp);
-	const named = ops
+	const renamed = ops
 		.filter((op) => !isIdOp(op))
 		.map((op): Op => {
 			if (op.kind === 'set-holders') return { ...op, items: op.items.map((item) => ('add' in item ? { add: map(item.add) } : item.fields ? { ...item, fields: map(item.fields) } : item)) };
 			if (op.kind === 'edit-title' && (op.heirs || op.exclude)) return { ...op, ...(op.heirs ? { heirs: mapIds(op.heirs) } : {}), ...(op.exclude ? { exclude: mapIds(op.exclude) } : {}) };
 			return op;
 		});
-	return [...lead, ...give, ...named];
+	return [...lead, ...give, ...renamed];
 }

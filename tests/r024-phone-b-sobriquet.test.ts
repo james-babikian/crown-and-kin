@@ -27,7 +27,7 @@ import { holderText } from '../src/obsidian/titles-draft';
 import { TitlesWindow } from '../src/obsidian/titles-window';
 import { FullScreenModal } from '../src/obsidian/full-screen';
 import { MAYBE_TEXT } from '../src/render/tree-info';
-import { SHEET } from '../src/render/ui-text';
+import { SHEET, WINDOW_UI } from '../src/render/ui-text';
 import { build } from './helpers';
 import { FEl, clock, device, fakeWin, installDom, resetDom } from './acceptance/fake-dom';
 import { openModals, resetObsidian } from './acceptance/fake-obsidian';
@@ -168,14 +168,13 @@ describe('D122: the holder lists', () => {
 	it('the Titles window shows the sobriquet after the ruler text, on the same line, in its own span', async () => {
 		const handle = writingHandle(TITLED);
 		const { el } = await embed(TITLED, { handle, host: fakeHost() as Host });
-		await click(el.querySelector('.dynasty-more'));
-		await click(el.querySelector('.dynasty-more-titles'));
+		await click(el.querySelector('.dynasty-titles-button'));
 		const win = openModals.find((m) => (m as unknown) instanceof TitlesWindow) as unknown as { contentEl: FEl };
 		expect(win).toBeDefined();
 		// The holders show on the edit page of the title (D134).
 		const page = openPage(win.contentEl, 'duke');
 		const names = page.querySelectorAll('.dynasty-holder-name').map((n) => n.getText());
-		expect(names).toEqual(['Aldric II “the Wise”', 'Bran I', 'Orso the Old I', 'Aldric “the Wise”']);
+		expect(names).toEqual(['Aldric II “the Wise”', 'Bran I', 'Orso the Old I', 'Aldric Valmont “the Wise”']);
 		const sob = page.querySelector('.dynasty-holder-name .dynasty-picker-sob')!;
 		expect(sob.getText()).toBe(' “the Wise”');
 		// D130 item 8: the label span holds the ruler text and the sobriquet, so the space before the sobriquet is kept.
@@ -220,7 +219,8 @@ describe('D122: the sobriquet field of the edit sheet', () => {
 		const input = row.querySelector('input')!;
 		expect(row.querySelector('.dynasty-sheet-hint')!.getAttribute('id')).toBe(`${input.getAttribute('id')}-hint`);
 		expect(input.getAttribute('aria-describedby')).toBe(`${input.getAttribute('id')}-hint`);
-		expect(input.getAttribute('autocapitalize')).toBe('none');
+		// D196 item 1: no automatic capital, no correction.
+		expect(input.getAttribute('autocapitalize')).toBe('off');
 		expect(input.value).toBe('');
 	});
 
@@ -289,17 +289,20 @@ const REL = (extra: string[]) =>
 		'',
 	].join('\n');
 
-// D146, D147: on a computer the box is in the portrait row; on a phone the strip is closed and holds the open part in the page.
-const relationBox = (modal: FEl) => modal.querySelector('.dynasty-relinfo')!;
+// 0.2.8: the relation is one text line in the text column of the header, with the sentence of the "maybe" under it.
+const relationBox = (modal: FEl) => modal.querySelector('.dynasty-head-text')!;
 const widths = [
 	['computer', 1280],
 	['phone', 390],
 ] as const;
 
 describe.each(widths)('D123: the edit sheet shows what a rumoured link could change (%s)', (_name, width) => {
-	const phone = width < 600;
-	/** The text of the relation: the whole sentence in the strip, the value in the box. */
-	const relationText = (box: FEl) => box.querySelector(phone ? '.dynasty-relinfo-text' : '.dynasty-relinfo-value')!.getText();
+	/** The text of the relation: "Your half-brother, maybe full" (the first item of the joined text line), or the sentence of the marked person. */
+	const relationText = (box: FEl) => {
+		const line = box.querySelector('.dynasty-head-rel')!;
+		return line.hasClass('is-me') ? line.getText() : line.querySelector('.dynasty-jitem')!.getText();
+	};
+	const your = (word: string) => WINDOW_UI.relationYour(word);
 
 	beforeEach(() => {
 		device.width = width;
@@ -308,29 +311,29 @@ describe.each(widths)('D123: the edit sheet shows what a rumoured link could cha
 	it('half-brother who would be a full brother: the paragraph follows the relation to you', () => {
 		const { modal } = open(REL(['  - {id: gareth, name: Gareth, sex: m, parents: [roland, mara]}']), 'gareth');
 		const box = relationBox(modal);
-		expect(relationText(box)).toBe(phone ? 'Relation to you: Half-brother.' : 'Half-brother');
-		if (!phone) expect(box.querySelector('.dynasty-relinfo-title')!.getText()).toBe('Relation to you');
-		expect(box.querySelector('.dynasty-relinfo-maybe')!.getText()).toBe(MAYBE_TEXT.sheet('brother'));
+		expect(relationText(box)).toBe(your('half-brother, maybe full'));
+		expect(box.querySelector('.dynasty-relation-maybe')!.getText()).toBe(MAYBE_TEXT.sheet('brother'));
 		// Under the relation.
-		const order = box.all().map((c) => [...c.classes].join(' '));
+		const order = box.children.map((c) => [...c.classes].join(' '));
 		const at = (cls: string) => order.findIndex((k) => k.includes(cls));
-		expect(at('dynasty-relinfo-maybe')).toBeGreaterThan(at(phone ? 'dynasty-relinfo-text' : 'dynasty-relinfo-value'));
+		expect(at('dynasty-relation-maybe')).toBeGreaterThan(at('dynasty-head-rel'));
 	});
 
+	// 0.2.8 F-KIN-08: the text line of the window carries the card text, so a relation with a maybe reads "Half-sister, maybe full".
 	// D174 rule 3: Edda and Sibyl each list one birth parent and a rumoured parent, so both are incomplete: half-sisters, and two
 	// different rumoured fathers change nothing (before D174: "Sister" with a "maybe half" paragraph).
 	it('two different rumoured fathers (D174 rule 3): Half-sister and no paragraph', () => {
 		const { modal } = open(REL(['  - {id: sibyl, name: Sibyl, sex: f, parents: [mara, {id: quinn, type: rumoured}]}']), 'sibyl');
 		const box = relationBox(modal);
-		expect(relationText(box)).toBe(phone ? 'Relation to you: Half-sister.' : 'Half-sister');
-		expect(box.querySelector('.dynasty-relinfo-maybe')).toBeNull();
+		expect(relationText(box)).toBe(your('half-sister'));
+		expect(box.querySelector('.dynasty-relation-maybe')).toBeNull();
 	});
 
 	it('a sister who would be a half-sister (one rumoured third parent, D174 rule 4): the same paragraph, the other word', () => {
 		const body = ['options:', '  me: fenna', 'people:', '  - {id: mara, name: Mara, sex: f}', '  - {id: dov, name: Dov, sex: m}', '  - {id: yann, name: Yann, sex: m}', '  - {id: fenna, name: Fenna, sex: f, parents: [dov, mara]}', '  - {id: elin, name: Elin, sex: f, parents: [dov, mara, {id: yann, type: rumoured}]}', ''].join('\n');
 		const box = relationBox(open(body, 'elin').modal);
-		expect(relationText(box)).toBe(phone ? 'Relation to you: Sister.' : 'Sister');
-		expect(box.querySelector('.dynasty-relinfo-maybe')!.getText()).toBe(MAYBE_TEXT.sheet('half-sister'));
+		expect(relationText(box)).toBe(your('sister, maybe half'));
+		expect(box.querySelector('.dynasty-relation-maybe')!.getText()).toBe(MAYBE_TEXT.sheet('half-sister'));
 	});
 
 	// D174: Alis lists only Mara; Edda lists Mara and a rumoured Roland. Setting on: half, and "maybe full" with the cause 'unlisted' (the
@@ -338,33 +341,33 @@ describe.each(widths)('D123: the edit sheet shows what a rumoured link could cha
 	it('one listed parent against a rumoured parent: on, the paragraph for a parent who is not listed; off, Half-sister and no paragraph', () => {
 		const body = REL(['  - {id: alis, name: Alis, sex: f, parents: [mara]}']);
 		const on = relationBox(open(body, 'alis').modal);
-		expect(relationText(on)).toBe(phone ? 'Relation to you: Half-sister.' : 'Half-sister');
-		expect(on.querySelector('.dynasty-relinfo-maybe')!.getText()).toBe(MAYBE_TEXT.sheetUnlisted('sister'));
+		expect(relationText(on)).toBe(your('half-sister, maybe full'));
+		expect(on.querySelector('.dynasty-relation-maybe')!.getText()).toBe(MAYBE_TEXT.sheetUnlistedOther('sister'));
 		closePluginModals();
 		const off = relationBox(open(body, 'alis', { oneParentUnknown: false }).modal);
-		expect(relationText(off)).toBe(phone ? 'Relation to you: Half-sister.' : 'Half-sister');
-		expect(off.querySelector('.dynasty-relinfo-maybe')).toBeNull();
+		expect(relationText(off)).toBe(your('half-sister'));
+		expect(off.querySelector('.dynasty-relation-maybe')).toBeNull();
 	});
 
 	it('D174: two people who list only Mara: on, the paragraph for a parent who is not listed; off, Sister and no paragraph', () => {
 		const body = ['options:', '  me: hild', 'people:', '  - {id: mara, name: Mara, sex: f}', '  - {id: hild, name: Hild, sex: f, parents: [mara]}', '  - {id: ines, name: Ines, sex: f, parents: [mara]}', ''].join('\n');
 		const on = relationBox(open(body, 'ines').modal);
-		expect(relationText(on)).toBe(phone ? 'Relation to you: Half-sister.' : 'Half-sister');
-		expect(on.querySelector('.dynasty-relinfo-maybe')!.getText()).toBe(MAYBE_TEXT.sheetUnlisted('sister'));
+		expect(relationText(on)).toBe(your('half-sister, maybe full'));
+		expect(on.querySelector('.dynasty-relation-maybe')!.getText()).toBe(MAYBE_TEXT.sheetUnlistedSame('sister'));
 		closePluginModals();
 		const off = relationBox(open(body, 'ines', { oneParentUnknown: false }).modal);
-		expect(relationText(off)).toBe(phone ? 'Relation to you: Sister.' : 'Sister');
-		expect(off.querySelector('.dynasty-relinfo-maybe')).toBeNull();
+		expect(relationText(off)).toBe(your('sister'));
+		expect(off.querySelector('.dynasty-relation-maybe')).toBeNull();
 	});
 
 	it('no rumour and both parents listed: no paragraph', () => {
 		const { modal } = open(REL(['  - {id: ari, name: Ari, sex: f}', '  - {id: bea, name: Bea, sex: f, parents: [mara, ari]}', '  - {id: cil, name: Cil, sex: f, parents: [mara, ari]}']), 'cil');
-		expect(relationBox(modal).querySelector('.dynasty-relinfo-maybe')).toBeNull();
+		expect(relationBox(modal).querySelector('.dynasty-relation-maybe')).toBeNull();
 	});
 
 	it('the marked person has no paragraph', () => {
 		const { modal } = open(REL([]), 'edda');
-		expect(relationBox(modal).querySelector('.dynasty-relinfo-maybe')).toBeNull();
-		expect(relationBox(modal).querySelector('.dynasty-relinfo-value, .dynasty-relinfo-text')!.getText()).toBe('This is you.');
+		expect(relationBox(modal).querySelector('.dynasty-relation-maybe')).toBeNull();
+		expect(relationText(relationBox(modal))).toBe('This is you.');
 	});
 });

@@ -1,0 +1,105 @@
+/* ---------- You and your family (M7: spec §13.1, §13.2) ---------- */
+
+/* D40: the relation to the marked person, one small text line after the card's other text lines: italic and muted. */
+.dynasty-card-relation {
+	font-size: calc(var(--dynasty-font-size) * 0.85);
+	font-style: italic;
+	fill: var(--dynasty-muted, var(--text-muted));
+}
+
+/* D41, D117: "You" on the marked card is bold and italic, in the text colour. */
+.dynasty-card-me .dynasty-card-relation {
+	font-style: italic;
+	font-weight: var(--bold-weight, 600);
+	fill: var(--text-normal);
+}
+
+/* D41, D153: the marked card has one thicker border in the text colour. It uses no accent colour: the accent of a theme can clash with
+   the ribbon and the house colours, and the text colour shows also where there is no colour. The width repeats ME_LOOK.border (2 px since D212, you-border). */
+.dynasty-card-me .dynasty-card-bg {
+	stroke: var(--text-normal);
+	stroke-width: 2;
+}
+
+.dynasty-card-me:focus-visible .dynasty-card-bg {
+	stroke-width: 2;
+}
+
+/* D47: the relation finder's line: its lines are thicker and in the accent colour, with their normal
+   pattern; its union signs and far-couple tags take the accent. Cards keep their border (D41). */
+.dynasty-line.dynasty-on-line {
+	stroke: var(--interactive-accent);
+	stroke-opacity: 1;
+}
+
+.dynasty-line-marriage.dynasty-on-line {
+	stroke-width: 4;
+}
+
+.dynasty-line-betrothal.dynasty-on-line {
+	stroke-width: 4;
+}
+
+.dynasty-line-concubinage.dynasty-on-line {
+	stroke-width: 3.5;
+}
+
+.dynasty-line-affair.dynasty-on-line {
+	stroke-width: 3.5;
+}
+
+.dynasty-line-implicit.dynasty-on-line {
+	stroke-width: 2.75;
+}
+
+.dynasty-line-descent.dynasty-on-line {
+	stroke-width: 3;
+}
+
+.dynasty-line-illegitimate.dynasty-on-line {
+	stroke-width: 3;
+}
+
+.dynasty-line-birth-link.dynasty-on-line {
+	stroke-width: 3;
+}
+
+.dynasty-line-adoptive.dynasty-on-line {
+	stroke-width: 4.5;
+}
+
+.dynasty-line-ward.dynasty-on-line {
+	stroke-width: 4.5;
+}
+
+.dynasty-line-rumoured.dynasty-on-line {
+	stroke-width: 3;
+}
+
+.dynasty-union-dot.dynasty-on-line {
+	fill: var(--interactive-accent);
+}
+
+.dynasty-union-ring.dynasty-on-line,
+.dynasty-union-open-triangle.dynasty-on-line {
+	fill: var(--background-primary);
+	stroke: var(--interactive-accent);
+}
+
+.dynasty-tag.dynasty-on-line .dynasty-tag-pill {
+	stroke: var(--interactive-accent);
+	stroke-width: 2;
+}
+
+/* D47 "Show in the whole tree": every card, line, sign and tag beside the line is faded. */
+.dynasty-faded {
+	opacity: 0.25;
+}
+
+
+/* 0.2.8 (I19): the sample of the dead signs in the legend: the date text with the sign, in the note font. */
+.dynasty-legend-dagger {
+	font-family: var(--font-text);
+	font-size: 12px;
+	fill: var(--dynasty-muted, var(--text-muted));
+}

@@ -14,8 +14,9 @@ import { deriveFamilies } from '../src/core/derive';
 import type { Op } from '../src/core/edit';
 import { describeHouseIdChange } from '../src/core/house-ops';
 import { nextPersonId } from '../src/core/id-gen';
+import { REFUSAL_TEXT } from '../src/core/refusal-text';
 import { parseBody, parseDynasty, readTree } from '../src/core/parse';
-import { applyOp, newPersonId } from '../src/core/yaml-edit';
+import { applyOp } from '../src/core/yaml-edit';
 import { EditSheet } from '../src/obsidian/edit-sheet';
 import { FullScreenModal } from '../src/obsidian/full-screen';
 import { HousesWindow, houseOps, loadHouses, rowsOf } from '../src/obsidian/houses-window';
@@ -25,9 +26,10 @@ import { draftChanged, rebase, titleIdRow, titleRows, windowOps, withHolderIds }
 import { TitlesWindow } from '../src/obsidian/titles-window';
 import { HOUSES, ID_UI, REMOVE, SHEET, TITLES_UI, WRITE_TEXT } from '../src/render/ui-text';
 import { FEl, clock, dispatch, fakeDoc, fakeWin, installDom, resetDom, settle } from './acceptance/fake-dom';
-import { noticeList, notices, openModals, resetObsidian } from './acceptance/fake-obsidian';
+import { lastMenu, noticeList, notices, openModals, resetObsidian } from './acceptance/fake-obsidian';
 import { embed, fakeHandle, fakeHost, type FakeHandle, type Host } from './acceptance/tree-view-fakes';
 import { backToList, backButton, openPage, pageOf } from './lw-support';
+import { nextIdFor } from './helpers';
 
 /*
  * Version 0.2.2, WP3 (spec §13.17): the numbered person id at the four places that make one, the Id
@@ -103,7 +105,7 @@ describe('a new person id is the same at the four places (§13.17 rule 1, D104)'
 	const EXPECTED = 'p10';
 
 	it('newPersonId, withHolderIds, idsFor (the sheet) and the new-person write all give p10 for the same text', async () => {
-		expect(newPersonId(TREE, 'Anybody')).toBe(EXPECTED);
+		expect(nextIdFor(TREE)).toBe(EXPECTED);
 
 		const parsed = parseBody(TREE);
 		if (!parsed.ok) throw new Error('parse');
@@ -153,8 +155,8 @@ describe('a new person id is the same at the four places (§13.17 rule 1, D104)'
 
 	it('nextPersonId from core is what every place uses (the name is not an input)', () => {
 		expect(nextPersonId(new Set(['p4', 'aldric']))).toBe('p5');
-		expect(newPersonId('people:\n  - id: p4\n    name: X\n', 'Zed')).toBe('p5');
-		expect(newPersonId('people:\n  - id: p4\n    name: X\n', 'Aldric')).toBe('p5');
+		expect(nextIdFor('people:\n  - id: p4\n    name: X\n')).toBe('p5');
+		expect(nextIdFor('people:\n  - id: p4\n    name: X\n')).toBe('p5');
 	});
 });
 
@@ -177,14 +179,15 @@ describe('the Id line of the edit sheet (§13.17 rule 3, D106)', () => {
 		expect(line).not.toBeNull();
 		expect(line!.getText()).toBe(SHEET.idLine('p12'));
 		expect(SHEET.idLine('p12')).toBe('ID: p12');
-		const last = body.children[body.children.length - 1];
-		expect(last).toBe(line);
-		const del = body.querySelector('.dynasty-delete')!;
-		expect(Array.from(body.children).indexOf(line!)).toBeGreaterThan(Array.from(body.children).indexOf(del));
+		// 0.2.8: the line is the last element of the section Actions, after the row Delete person.
+		const actions = body.querySelector('[data-section="actions"]')!;
+		const items = actions.querySelectorAll('.dynasty-sheet-id, .dynasty-delete');
+		expect(items[items.length - 1]).toBe(line);
+		expect(items.indexOf(line!)).toBeGreaterThan(items.indexOf(actions.querySelector('.dynasty-delete')!));
 		// Plain text: not a field, not a button, and not in the Save and Cancel bar.
 		expect(line!.tag).toBe('div');
 		expect(line!.querySelector('input')).toBeNull();
-		expect(modal.querySelector('.dynasty-sheet-header')!.querySelector('.dynasty-sheet-id')).toBeNull();
+		expect(modal.querySelector('.dynasty-foot')!.querySelector('.dynasty-sheet-id')).toBeNull();
 	});
 
 	it('is not shown for a person with no written id', () => {
@@ -217,7 +220,7 @@ describe('the Id line of the edit sheet (§13.17 rule 3, D106)', () => {
 		const css = readFileSync('styles.css', 'utf8');
 		const rule = /\.dynasty-sheet-id \{([^}]*)\}/.exec(css);
 		expect(rule).not.toBeNull();
-		expect(rule![1]).toContain('color: var(--text-muted)');
+		expect(rule![1]).toContain('color: var(--dynasty-muted)');
 		expect(rule![1]).toContain('user-select: text');
 		// No colour value is written into the rules of the Id field.
 		expect(/#[0-9a-f]{3,8}\b|rgb\(/i.test(rule![1])).toBe(false);
@@ -309,7 +312,7 @@ describe('the Id draft check (§13.17 rule 5)', () => {
 	it('refusal texts: id-taken and bad-value of an id op are never the stale text', () => {
 		expect(idRefusalText('id-taken', undefined)).toBe(ID_UI.inUse);
 		expect(idRefusalText('bad-value', 'A value of this id is a YAML anchor or alias. Edit the note text.')).toBe(ID_UI.anchor);
-		expect(idRefusalText('bad-value', 'An id has the letters a to z, digits and hyphens only.')).toBe(ID_UI.notAllowed);
+		expect(idRefusalText('bad-value', REFUSAL_TEXT.idCharacters)).toBe(ID_UI.notAllowed);
 		expect(idRefusalText('unknown-house', undefined)).toBeNull();
 		for (const text of [ID_UI.inUse, ID_UI.notAllowed, ID_UI.anchor]) {
 			expect(text).not.toBe(HOUSES.stale);
@@ -407,7 +410,7 @@ describe('Houses window: the Id change (§13.17 rule 5, D109, D110)', () => {
 		for (const [id, name] of [['valmont', 'House Valmont'], ['orsini', 'House Orsini'], ['thorne', 'House Thorne']]) {
 			const page = gotoPage(content, id);
 			const button = page.querySelector('.dynasty-id-open')!;
-			expect(button.getText()).toBe('Change ID');
+			expect(button.querySelector('.dynasty-row-title')!.getText()).toBe('Change ID');
 			expect(button.getAttribute('aria-label')).toBe(`Change ID of ${name}`);
 			expect(button.tag).toBe('button');
 			// The button comes before Delete, in the section "Other actions".
@@ -422,7 +425,8 @@ describe('Houses window: the Id change (§13.17 rule 5, D109, D110)', () => {
 		expect(/\.dynasty-sheet button\.dynasty-id-open \{[^}]*min-height: 44px/.test(css)).toBe(true);
 		expect(/\.dynasty-sheet button\.dynasty-id-old \{[^}]*min-height: 44px/.test(css)).toBe(true);
 		expect(/\.dynasty-sheet \.dynasty-id-field \.dynasty-sheet-input \{[^}]*min-height: 44px/.test(css)).toBe(true);
-		expect(/\.modal\.dynasty-sheet\.dynasty-houses:not\(\.is-phone\) \{[^}]*width: min\(720px/.test(css)).toBe(true);
+		// 0.2.8: every window of the family is 620 px wide on a computer.
+		expect(/\.modal\.dynasty-sheet \{[^}]*width: min\(620px/.test(css)).toBe(true);
 	});
 
 	it('the accessible name of the button follows the name in the field', async () => {
@@ -441,7 +445,7 @@ describe('Houses window: the Id change (§13.17 rule 5, D109, D110)', () => {
 		expect(fieldOf(w).value).toBe('thorne');
 		expect(fieldOf(w).getAttribute('aria-label')).toBe('ID of House Thorne');
 		expect(w.querySelector('.dynasty-id-make')!.getText()).toBe('Make ID from the name');
-		expect(w.querySelectorAll('.dynasty-id-actions button').map((b) => b.getText())).toEqual(['Cancel', 'Use this ID']);
+		expect([w.querySelector('.dynasty-sheet-cancel')!, useOf(w)].map((b) => b.getText())).toEqual(['Cancel', 'Use this ID']);
 		expect(problemOf(w)).toBe('');
 		expect(fakeDoc.activeElement).toBe(fieldOf(w));
 		// The small window is a modal over the Houses window, which does not change.
@@ -480,7 +484,7 @@ describe('Houses window: the Id change (§13.17 rule 5, D109, D110)', () => {
 		const w = await openIdOf(pageOf(content));
 		expect(fieldOf(w).value).toBe('crown');
 		type(fieldOf(w), 'something-else');
-		await click(w.querySelector('.dynasty-id-actions .dynasty-sheet-cancel'));
+		await click(w.querySelector('.dynasty-sheet-cancel'));
 		expect(openModals).toHaveLength(1);
 		expect(noteOf(content)!.querySelector('.dynasty-id-new-text')!.getText()).toBe('New ID: crown');
 		// Esc (close of the top modal) is Cancel too.
@@ -533,7 +537,7 @@ describe('Houses window: the Id change (§13.17 rule 5, D109, D110)', () => {
 		// A swap cannot be made: the saved id of the other row is taken.
 		type(fieldOf(w), 'valmont');
 		expect(problemOf(w)).toBe(ID_UI.taken);
-		await click(w.querySelector('.dynasty-id-actions .dynasty-sheet-cancel'));
+		await click(w.querySelector('.dynasty-sheet-cancel'));
 		const t = await openIdOf(gotoPage(content, 'House_Thorne'));
 		expect(fieldOf(t).value).toBe('House_Thorne');
 		expect(problemOf(t)).toBe('');
@@ -697,7 +701,7 @@ describe('Houses window: the Id change (§13.17 rule 5, D109, D110)', () => {
 		for (const [refusal, text] of [
 			[{ ok: false, code: 'id-taken' }, ID_UI.inUse],
 			[{ ok: false, code: 'bad-value', detail: 'A value of this id is a YAML anchor or alias. Edit the note text.' }, ID_UI.anchor],
-			[{ ok: false, code: 'bad-value', detail: 'An id has the letters a to z, digits and hyphens only.' }, ID_UI.notAllowed],
+			[{ ok: false, code: 'bad-value', detail: REFUSAL_TEXT.idCharacters }, ID_UI.notAllowed],
 		] as const) {
 			resetDom();
 			resetObsidian();
@@ -797,8 +801,7 @@ const titlesWindows = () => openModals.filter((m) => (m as unknown) instanceof T
 async function openTitles(body = TITLES_BODY, handle: Writing = writingHandle(body)) {
 	const host = fakeHost() as Host;
 	const { el } = await embed(handle.body, { handle, host });
-	await click(el.querySelector('.dynasty-more'));
-	await click(el.querySelector('.dynasty-more-titles'));
+	await click(el.querySelector('.dynasty-titles-button'));
 	const win = titlesWindows()[0];
 	expect(win).toBeDefined();
 	const content = (win as unknown as { contentEl: FEl }).contentEl;
@@ -812,7 +815,7 @@ describe('Titles window: the Id change (§13.17 rule 5, D109, D110)', () => {
 		for (const q of ['.dynasty-id-row', '.dynasty-id-input', '.dynasty-id-make', '.dynasty-id-open']) expect(content.querySelectorAll(q)).toHaveLength(0);
 		const page = gotoPage(content, 'duke');
 		const button = page.querySelector('.dynasty-id-open')!;
-		expect(button.getText()).toBe('Change ID');
+		expect(button.querySelector('.dynasty-row-title')!.getText()).toBe('Change ID');
 		expect(button.getAttribute('aria-label')).toBe('Change ID of Duke');
 		// The button comes before Delete, in the section "Other actions".
 		const row = button.parentElement!;
@@ -829,7 +832,7 @@ describe('Titles window: the Id change (§13.17 rule 5, D109, D110)', () => {
 		expect(w.querySelector('.dynasty-sheet-hint')!.getText()).toBe('The ID is a short name. The plugin uses it to find this title. Most users never change it.');
 		expect(fieldOf(w).value).toBe('duke');
 		expect(fieldOf(w).getAttribute('aria-label')).toBe('ID of Duke');
-		expect(w.querySelectorAll('.dynasty-id-actions button').map((b) => b.getText())).toEqual(['Cancel', 'Use this ID']);
+		expect([w.querySelector('.dynasty-sheet-cancel')!, useOf(w)].map((b) => b.getText())).toEqual(['Cancel', 'Use this ID']);
 		expect(fakeDoc.activeElement).toBe(fieldOf(w));
 		type(fieldOf(w), 'king');
 		await click(useOf(w));
@@ -841,7 +844,7 @@ describe('Titles window: the Id change (§13.17 rule 5, D109, D110)', () => {
 		// Open again: the draft id.
 		const again = await openIdOf(pageOf(content));
 		expect(fieldOf(again).value).toBe('king');
-		await click(again.querySelector('.dynasty-id-actions .dynasty-sheet-cancel'));
+		await click(again.querySelector('.dynasty-sheet-cancel'));
 		await click(noteOf(content)!.querySelector('button'));
 		expect(noteOf(content)).toBeNull();
 		expect(win.isDirty()).toBe(false);
@@ -852,7 +855,8 @@ describe('Titles window: the Id change (§13.17 rule 5, D109, D110)', () => {
 		await setId(content, 'duke', 'duke-of-valmont');
 		type(nameField(content, 'dynasty-title-name'), 'Duke of Valmont');
 		// Move the first holder later: a set-holders op with refs. The holders are always on the page.
-		await click(pageOf(content).querySelector('.dynasty-holder-later'));
+		await click(pageOf(content).querySelector('.dynasty-holder-more'));
+		lastMenu()!.item(TITLES_UI.moveLater)!.click();
 		await click(saveOf(content));
 		expect(handle.ops).toHaveLength(0);
 		expect(confirmLines(modal)).toEqual([ID_UI.confirmLine('Duke of Valmont', 'duke', 'duke-of-valmont', ID_UI.places(2)), REMOVE.canUndo]);
@@ -976,8 +980,8 @@ describe('Titles window: the Id change (§13.17 rule 5, D109, D110)', () => {
 		const baron = rows.find((t) => t.id === 'baron')!;
 		baron.deleted = true;
 		baron.idDraft = 'ignored';
-		rows.push({ key: 'new', id: null, name: 'King', baseName: null, plural: '', basePlural: null, maleName: '', baseMaleName: null, femaleName: '', baseFemaleName: null, deleted: false, holders: [], baseRows: [] });
-		const ops = windowOps(rows, (name, taken) => (taken.has('king') ? 'king-2' : 'king'));
+		rows.push({ key: 'new', id: null, name: 'King', baseName: null, maleName: '', baseMaleName: null, femaleName: '', baseFemaleName: null, deleted: false, holders: [], baseRows: [] });
+		const ops = windowOps(rows, (_name, taken) => (taken.has('king') ? 'king-2' : 'king'));
 		expect(ops.map((o) => o.kind)).toEqual(['set-title-id', 'edit-title', 'set-holders', 'delete-title', 'add-title']);
 		expect(ops[0]).toEqual({ kind: 'set-title-id', id: 'duke', newId: 'king' });
 		const lists = ops[2] as Extract<Op, { kind: 'set-holders' }>;

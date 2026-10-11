@@ -15,7 +15,7 @@ import { REFUSAL_TEXT } from './refusal-text';
 import { normaliseSobriquet } from './sobriquet';
 
 /** §4.1 and §13.0 field order; a new key goes after the nearest earlier key that is present. */
-export const PERSON_ORDER = ['id', 'name', 'sobriquet', 'title', 'card-title', 'house', 'sex', 'born', 'died', 'parents', 'placement', 'illegitimate', 'childless', 'union', 'link', 'portrait', 'portrait-crop', 'notes'];
+export const PERSON_ORDER = ['id', 'name', 'sobriquet', 'title', 'card-title', 'house', 'sex', 'born', 'died', 'parents', 'placement', 'illegitimate', 'childless', 'union', 'link', 'portrait', 'portrait-crop', 'arms', 'notes'];
 /** §4.1 and §13.0 order of the `options` keys. */
 export const OPTION_ORDER = ['start', 'focus', 'me', 'generations', 'height'];
 /** §4.1 and §13.0 order of the top-level sections. */
@@ -31,7 +31,7 @@ export const isBooleanField = (field: string): boolean => field === 'illegitimat
 export const TEXT_FIELDS = new Set(['id', 'house', 'card-title', 'born', 'died', 'union', 'start', 'focus', 'me', 'end']);
 
 /** The person fields `personValue` and `sameValue` handle. */
-export const PERSON_FIELDS: readonly PersonField[] = ['name', 'sobriquet', 'title', 'card-title', 'house', 'sex', 'born', 'died', 'illegitimate', 'childless', 'link', 'portrait', 'portrait-crop', 'notes', 'placement'];
+export const PERSON_FIELDS: readonly PersonField[] = ['name', 'sobriquet', 'title', 'card-title', 'house', 'sex', 'born', 'died', 'illegitimate', 'childless', 'link', 'portrait', 'portrait-crop', 'arms', 'notes', 'placement'];
 
 /**
  * Picture keys (spec §13.0 item 3): always written in double quotes, whatever the text is, so a
@@ -442,7 +442,16 @@ export function addPair(src: Source, map: YAMLMap, key: string, value: NewValue,
 		const at = src.withCommentsAbove(src.lineStart(keyStart), floor);
 		return insertAt(at, ' '.repeat(keyCol) + line + '\n' + (isTop ? '\n' : ''));
 	}
-	return insertAt(src.pairLineEnd(last), (isTop ? '\n' : '') + '\n' + ' '.repeat(keyCol) + line);
+	let at = src.pairLineEnd(last);
+	// Whole-line comments right below the last pair that sit deeper than its key belong to it, so the new key goes after them.
+	for (let nl = src.text.indexOf('\n', at); nl !== -1; nl = src.text.indexOf('\n', at)) {
+		const ls = nl + 1;
+		const le = src.lineEnd(ls);
+		const raw = src.text.slice(ls, le);
+		if (!raw.trimStart().startsWith('#') || raw.length - raw.trimStart().length <= keyCol) break;
+		at = le;
+	}
+	return insertAt(at, (isTop ? '\n' : '') + '\n' + ' '.repeat(keyCol) + line);
 }
 
 /** Removes a pair and only its own lines. */
@@ -543,7 +552,7 @@ export function appendItem(src: Source, seq: YAMLSeq, block: string[], flow: str
 	const items = seq.items as Node[];
 	if (seq.flow) {
 		const last = items[items.length - 1];
-		if (last?.range) return insertAt(src.nodeEnd(last), `, ${flow}`);
+		if (last?.range) return flowInsertAfter(src, seq, items.length - 1, [flow]);
 		return insertAt(src.text.indexOf('[', seq.range![0]) + 1, flow);
 	}
 	const last = items[items.length - 1];
@@ -559,6 +568,24 @@ export function appendItem(src: Source, seq: YAMLSeq, block: string[], flow: str
 
 /** A patch that inserts `text` at `at` without removing anything. */
 export const insertAt = (at: number, text: string): Patch => ({ start: at, end: at, text });
+
+/**
+ * Adds flow entries after item `k` of a flow list. If the item has an end-of-line comment, the
+ * entries go on their own line after it, so the comment stays with the item it follows.
+ */
+export function flowInsertAfter(src: Source, seq: YAMLSeq, k: number, entries: string[]): Patch {
+	const item = seq.items[k] as Node;
+	const e = src.nodeEnd(item);
+	const m = /^[ \t]*(,?)[ \t]*#/.exec(src.text.slice(e, src.lineEnd(e)));
+	if (!m) return insertAt(e, entries.map((x) => `, ${x}`).join(''));
+	const end = src.lineEnd(e);
+	const ls = src.lineStart(item.range![0]);
+	const lead = /^[ \t]*/.exec(src.text.slice(ls))![0];
+	// An item that does not start its line sits after `[`: the new line goes two columns deeper than that line.
+	const indent = src.text.slice(ls, item.range![0]).trim() === '' ? lead : lead + '  ';
+	const more = k < seq.items.length - 1 ? ',' : '';
+	return { start: e, end, text: (m[1] ? '' : ',') + src.text.slice(e, end) + '\n' + indent + entries.join(', ') + more };
+}
 
 // ---------------------------------------------------------------------------------------------
 // Checks
@@ -776,7 +803,7 @@ export function sameValue(field: PersonField, raw: Raw, write: string | null, wr
 	if (field === 'portrait-crop') return sameCropText(cropValue(raw), write === null ? undefined : write);
 	// The model unwraps a pair of marks around a sobriquet, so the old and the new text are compared the way the model reads them.
 	if (field === 'sobriquet') return normaliseSobriquet(str(raw)) === normaliseSobriquet(write === null ? undefined : str(write));
-	const read = field === 'link' || field === 'portrait' ? linkValue(raw, written) : str(raw);
+	const read = field === 'link' || field === 'portrait' || field === 'arms' ? linkValue(raw, written) : str(raw);
 	return read === (write === null ? undefined : str(write));
 }
 

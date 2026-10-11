@@ -120,7 +120,7 @@ describe('"Name for a man" in the Titles window draft (D66)', () => {
 
 	it('a new title: add-title with both names; an empty field writes none', () => {
 		const rows = rowsOf();
-		const blank = { baseName: null, plural: '', basePlural: null, baseMaleName: null, baseFemaleName: null, deleted: false, holders: [], baseRows: [] };
+		const blank = { baseName: null, baseMaleName: null, baseFemaleName: null, deleted: false, holders: [], baseRows: [] };
 		rows.push({ ...blank, key: 'a', id: null, name: 'Queen of the Isles', maleName: ' King of the Isles ', femaleName: ' Queen of the Isles ' });
 		rows.push({ ...blank, key: 'b', id: null, name: 'Reeve', maleName: ' ', femaleName: '' });
 		const o = ops(rows);
@@ -193,8 +193,7 @@ const cardText = (root: FEl, id: string, cls: string) =>
 async function openTitles(handle = writingHandle()) {
 	const host = fakeHost() as Host & { app: Record<string, unknown> };
 	const { el } = await embed(handle.body, { handle, host });
-	await click(el.querySelector('.dynasty-more'));
-	await click(el.querySelector('.dynasty-more-titles'));
+	await click(el.querySelector('.dynasty-titles-button'));
 	const win = openModals.find((m) => (m as unknown) instanceof TitlesWindow) as unknown as { contentEl: FEl } | undefined;
 	expect(win).toBeDefined();
 	return { handle, content: win!.contentEl };
@@ -219,7 +218,7 @@ describe('"Name for a man" in the Titles window on the fakes (D66)', () => {
 		expect(input.getAttribute('aria-label')).toBe(TITLES_UI.maleAria('Duke of Valmont'));
 		expect(input.getAttribute('aria-label')!.startsWith(TITLES_UI.maleLabel)).toBe(true);
 		const page = pageFor(content, 'duke-of-valmont');
-		expect(page.children.filter((c) => c.tag === 'label' && c.hasClass('dynasty-sheet-field')).map((c) => c.getAttribute('data-field'))).toEqual([null, 'male-name', 'female-name', 'plural']);
+		expect(page.querySelector('[data-section="names"] .dynasty-grid')!.children.filter((c) => c.tag === 'label' && c.hasClass('dynasty-sheet-field')).map((c) => c.getAttribute('data-field'))).toEqual([null, 'male-name', 'female-name']);
 		expect(pageFor(content, 'count-of-orsini').querySelector('.dynasty-title-male textarea')!.value).toBe('');
 	});
 
@@ -252,7 +251,7 @@ describe('the edit sheet shows the form of the title that the card uses (D66)', 
 		const sheet = await openSheetOn(el, id, 'mouse');
 		return { el, handle, content: (sheet as unknown as { contentEl: FEl }).contentEl };
 	}
-	const holdingName = (content: FEl) => content.querySelector('.dynasty-titles-section .dynasty-title-holding[data-title="duke-of-valmont"] .dynasty-title-holding-name')!.getText();
+	const holdingName = (content: FEl) => content.querySelector('[data-section="titles"] .dynasty-title-holding[data-title="duke-of-valmont"] .dynasty-title-holding-name')!.getText();
 
 	it('a holder with sex: m sees the male form, like his card', async () => {
 		const { el, content } = await sheetOf('roderick', BODY_MF);

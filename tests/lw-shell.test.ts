@@ -3,9 +3,10 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vite
 
 vi.mock('obsidian', () => import('./acceptance/fake-obsidian'));
 
-import { ListEditWindow, type ListKind, type ListRowView } from '../src/obsidian/list-window';
+import { ListEditWindow, type ListKind, type ListRowView, type PageHead } from '../src/obsidian/list-window';
 import { matchesAll } from '../src/obsidian/list-search';
-import { HOUSES, ID_UI, SHEET, TITLES_UI, WIN_LIST_UI } from '../src/render/ui-text';
+import type { Op } from '../src/core/edit';
+import { HOUSES, ID_UI, REMOVE, SHEET, TITLES_UI, WIN_LIST_UI, WINDOW_UI, WRITE_TEXT } from '../src/render/ui-text';
 import { FEl, dispatch, dispatchWindow, fakeDoc, fakeWin, installDom, resetDom, runTimers } from './acceptance/fake-dom';
 import { notices, openModals, resetObsidian } from './acceptance/fake-obsidian';
 import { backButton, backToList, listRows, openPage, pageOf, press, rowNames, rowOf, rowTexts, searchBox, searchFor } from './lw-support';
@@ -81,23 +82,35 @@ class TestWindow extends ListEditWindow {
 	protected isSaved(key: string): boolean {
 		return this.item(key).id !== null;
 	}
+	protected pageHead(key: string): PageHead {
+		return { lead: () => undefined, name: this.labelOf(key), meta: '' };
+	}
 	protected renderPage(page: HTMLElement, key: string): void {
 		if (this.failPage) throw new Error('page failed');
 		const it = this.item(key);
-		this.textField(page, {
-			cls: 'dynasty-title-name',
-			label: TITLES_UI.nameLabel,
-			value: it.name,
-			aria: TITLES_UI.nameLabel,
-			focus: `name:${key}`,
-			onInput: (v) => {
-				it.name = v;
-				this.dirty = true;
-				this.typed.push(v);
-				this.updateBackName(key);
+		this.drawSections(page, 'test', [
+			{
+				key: 'details',
+				title: 'Details',
+				summary: '',
+				open: true,
+				build: (body) =>
+					this.textField(body, {
+						cls: 'dynasty-title-name',
+						label: TITLES_UI.nameLabel,
+						value: it.name,
+						aria: TITLES_UI.nameLabel,
+						focus: `name:${key}`,
+						onInput: (v) => {
+							it.name = v;
+							this.dirty = true;
+							this.typed.push(v);
+							this.updateBackName(key);
+						},
+					}),
 			},
-		});
-		this.otherActions(page, key, 'dynasty-title-delete', (n) => TITLES_UI.deleteLabel(n));
+			this.otherActionsSection(key, 'dynasty-title-delete', (n) => TITLES_UI.deleteLabel(n)),
+		]);
 	}
 	protected addItem(): string {
 		const key = `t${this.next++}`;
@@ -219,13 +232,27 @@ describe('open: header, bar, list (D.3.1, D.3.2)', () => {
 		expect(fakeDoc.activeElement).toBe(w.modal);
 	});
 
-	it('has the header with the title, Cancel and Save, and names the dialog', () => {
+	it('has the header with the title and one button, Close, when the draft has no change, and names the dialog (list-footer-close)', () => {
 		const w = open();
 		expect(w.content.querySelector('.dynasty-sheet-title')!.getText()).toBe(TITLES_UI.title);
-		expect(w.content.querySelector('button[data-focus="cancel"]')!.getText()).toBe(SHEET.cancel);
-		expect(w.content.querySelector('button[data-focus="save"]')!.getText()).toBe(SHEET.save);
+		expect(w.content.querySelector('button[data-focus="cancel"]')!.getText()).toBe(SHEET.close);
+		expect(w.content.querySelector('button[data-focus="save"]')).toBeNull();
 		expect(w.modal.getAttribute('role')).toBe('dialog');
 		expect(w.modal.getAttribute('aria-modal')).toBe('true');
+	});
+
+	it('keeps Cancel and Save on the list when the draft has a change, and on every page', () => {
+		const w = new TestWindow();
+		w.dirty = true;
+		open(w);
+		expect(w.content.querySelector('button[data-focus="cancel"]')!.getText()).toBe(SHEET.cancel);
+		expect(w.content.querySelector('button[data-focus="save"]')!.getText()).toBe(SHEET.save);
+		const v = open(new TestWindow());
+		openPage(v.content, 't0');
+		expect(v.content.querySelector('button[data-focus="save"]')!.getText()).toBe(SHEET.save);
+		// Back to a list with no change: Close only again.
+		backToList(v.content);
+		expect(v.content.querySelector('button[data-focus="save"]')).toBeNull();
 	});
 
 	it('shows the Houses title and classes for the houses kind', () => {
@@ -246,6 +273,11 @@ describe('open: header, bar, list (D.3.1, D.3.2)', () => {
 		expect(kids[1]!.tag).toBe('button');
 		expect(kids[1]!.hasClass('dynasty-lw-add')).toBe(true);
 		expect(w.content.querySelector('.dynasty-sheet-body')!.contains(bar)).toBe(false);
+		// The header of the list (an icon, the name, the number of items) stands above the bar, also outside the body.
+		const top = w.content.querySelector('.dynasty-lw-top')!;
+		expect(top.contains(bar)).toBe(true);
+		expect(top.querySelector('.dynasty-head-name')!.getText()).toBe(TITLES_UI.title);
+		expect(top.querySelector('.dynasty-lw-meta-count')!.getText()).toBe(WINDOW_UI.listMetaTitles(3));
 	});
 
 	it('gives the search box its type, name and keyboard settings', () => {
@@ -264,10 +296,10 @@ describe('open: header, bar, list (D.3.1, D.3.2)', () => {
 	it('gives the Add button its classes, focus name, text and a hidden icon', () => {
 		const w = open();
 		const add = w.content.querySelector('button.dynasty-lw-add')!;
-		for (const c of ['dynasty-sheet-action', 'dynasty-title-add']) expect(add.hasClass(c)).toBe(true);
+		for (const c of ['dynasty-btn', 'dynasty-title-add']) expect(add.hasClass(c)).toBe(true);
 		expect(add.getAttribute('data-focus')).toBe('add');
 		expect(add.getText()).toBe(TITLES_UI.add);
-		expect(add.querySelector('.dynasty-lw-add-icon')!.getAttribute('aria-hidden')).toBe('true');
+		expect(add.querySelector('.dynasty-btn-icon')!.getAttribute('aria-hidden')).toBe('true');
 	});
 
 	it('draws a list of items, each with one row button, in tree order', () => {
@@ -310,7 +342,7 @@ describe('open: header, bar, list (D.3.1, D.3.2)', () => {
 		expect(tag.hasClass('is-check-id')).toBe(true);
 	});
 
-	it('draws a colour square through the house colour property only, and an arms box that the window fills', () => {
+	it('draws the house colour as a dot in the second text line through the house colour property only, and an arms box only for a row with arms (D213, D214)', () => {
 		class Houses extends TestWindow {
 			protected override rowViews(): ListRowView[] {
 				return [
@@ -327,18 +359,26 @@ describe('open: header, bar, list (D.3.1, D.3.2)', () => {
 		}
 		const w = open(new Houses([{ key: 'a', id: 'a', name: 'A', holders: [] }, { key: 'b', id: 'b', name: 'B', holders: [] }], 'houses'));
 		const [a, b] = listRows(w.content);
-		const swatchA = a!.querySelector('.dynasty-lw-swatch')!;
-		expect(swatchA.style.getPropertyValue('--dynasty-house-color')).toBe('#aa0000');
-		expect(swatchA.attrs.get('style')).toBeUndefined();
-		expect(b!.querySelector('.dynasty-lw-swatch')!.hasClass('is-none')).toBe(true);
-		expect(a!.querySelector('.dynasty-lw-armsbox')!.getAttribute('data-arms')).toBe('x.png');
-		expect(b!.querySelector('.dynasty-lw-armsbox')!.getAttribute('data-arms')).toBe('none');
+		// The row with arms has the arms box as its lead, and the box has no colour. The colour is the dot before the count; a row with no arms has no lead at all.
+		const boxA = a!.querySelector('.dynasty-lw-armsbox')!;
+		expect(boxA.getAttribute('data-arms')).toBe('x.png');
+		expect(boxA.style.getPropertyValue('--dynasty-house-color')).toBe('');
+		const dotA = a!.querySelector('.dynasty-lw-dot')!;
+		expect(dotA.style.getPropertyValue('--dynasty-house-color')).toBe('#aa0000');
+		expect(dotA.attrs.get('style')).toBeUndefined();
+		expect(dotA.getAttribute('aria-hidden')).toBe('true');
+		expect(a!.querySelector('.dynasty-lw-row-sum')!.getText()).toBe('1 person');
+		expect(a!.querySelector('.dynasty-lw-swatch')).toBeNull();
+		expect(b!.querySelector('.dynasty-lw-armsbox')).toBeNull();
+		expect(b!.querySelector('.dynasty-lw-dot')).toBeNull();
+		expect(b!.querySelector('.dynasty-row-lead')).toBeNull();
 	});
 
-	it('shows no swatch and no arms box for titles', () => {
+	it('shows no lead at all for a row with no arms: no crown, no swatch, no arms box (D213)', () => {
 		const w = open();
 		expect(w.content.querySelector('.dynasty-lw-swatch')).toBeNull();
 		expect(w.content.querySelector('.dynasty-lw-armsbox')).toBeNull();
+		expect(listRows(w.content)[0]!.querySelector('.dynasty-row-lead')).toBeNull();
 	});
 
 	it('has the error line (alert, hidden), the count line (status, polite) and the list in the body', () => {
@@ -477,7 +517,7 @@ describe('search (D.3.3)', () => {
 	it('does not build the window again: no extra header or bar after typing', () => {
 		const w = open();
 		searchFor(w.content, 'a');
-		expect(w.content.querySelectorAll('.dynasty-sheet-header')).toHaveLength(1);
+		expect(w.content.querySelectorAll('.dynasty-sheet-title')).toHaveLength(1);
 		expect(w.content.querySelectorAll('.dynasty-lw-bar')).toHaveLength(1);
 	});
 
@@ -598,8 +638,10 @@ describe('open a page and go back (D.3.4)', () => {
 		openPage(w.content, 'duke-of-valmont');
 		expect(w.pageKey).toBe('t0');
 		expect(w.content.querySelector('.dynasty-lw-bar')).toBeNull();
+		expect(w.content.querySelector('.dynasty-lw-top')).toBeNull();
 		expect(w.content.querySelector('ul.dynasty-lw-list')).toBeNull();
-		expect(w.content.querySelector('.dynasty-lw-backbar')).not.toBeNull();
+		// The way back is a link above the header of the page (G.7).
+		expect(w.content.querySelector('.dynasty-sheet-body .dynasty-back')).not.toBeNull();
 		expect(active()).toBe('back');
 		expect(fakeDoc.activeElement).toBe(backButton(w.content));
 	});
@@ -614,11 +656,11 @@ describe('open a page and go back (D.3.4)', () => {
 		const w = open();
 		openPage(w.content, 't0');
 		const back = backButton(w.content)!;
-		expect(back.hasClass('dynasty-lw-back')).toBe(true);
-		expect(back.hasClass('dynasty-sheet-action')).toBe(true);
+		expect(back.hasClass('dynasty-back')).toBe(true);
 		expect(back.getAttribute('aria-label')).toBe(WIN_LIST_UI.backTitles);
-		expect(back.getText()).toBe(WIN_LIST_UI.back);
-		expect(back.querySelector('.dynasty-lw-back-icon')!.getAttribute('aria-hidden')).toBe('true');
+		// The link shows the name of the list that the user came from (G.7): "‹ Titles".
+		expect(back.getText()).toBe(TITLES_UI.title);
+		expect(back.querySelector('.dynasty-back-chevron')!.getAttribute('aria-hidden')).toBe('true');
 	});
 
 	it('uses the houses Back name for the houses kind', () => {
@@ -627,14 +669,15 @@ describe('open a page and go back (D.3.4)', () => {
 		expect(backButton(w.content)!.getAttribute('aria-label')).toBe(WIN_LIST_UI.backHouses);
 	});
 
-	it('shows the item name as a level 2 heading in the Back bar, outside the scrolling body', () => {
+	it('shows the item name as a level 2 heading in the header of the page', () => {
 		const w = open();
 		openPage(w.content, 't1');
-		const name = w.content.querySelector('.dynasty-lw-backbar .dynasty-lw-back-name')!;
+		const name = w.content.querySelector('.dynasty-lw-pagehead .dynasty-lw-back-name')!;
 		expect(name.getAttribute('role')).toBe('heading');
 		expect(name.getAttribute('aria-level')).toBe('2');
 		expect(name.getText()).toBe('Count of d’España');
-		expect(w.content.querySelector('.dynasty-sheet-body')!.contains(w.content.querySelector('.dynasty-lw-backbar'))).toBe(false);
+		// The header of the page scrolls with the page (the bar of a phone shows the title when it has scrolled away).
+		expect(w.content.querySelector('.dynasty-sheet-body')!.contains(name)).toBe(true);
 	});
 
 	it('draws the page as a labelled region with the id or the key as data', () => {
@@ -939,11 +982,12 @@ describe('Other actions (D.3.7)', () => {
 	it('is the last section of the page, with its label, Change ID before Delete', () => {
 		const w = open();
 		const page = openPage(w.content, 't0');
-		const last = page.children[page.children.length - 1]!;
-		expect(last.hasClass('dynasty-lw-actions')).toBe(true);
-		expect(last.querySelector('.dynasty-sheet-label')!.getText()).toBe(WIN_LIST_UI.otherActions);
-		const buttons = last.querySelectorAll('button');
-		expect(buttons.map((b) => b.getText())).toEqual([ID_UI.open, TITLES_UI.delete]);
+		const last = page.querySelectorAll('section.dynasty-section')[page.querySelectorAll('section.dynasty-section').length - 1]!;
+		expect(last.getAttribute('data-section')).toBe('more');
+		expect(last.querySelector('.dynasty-section-title')!.getText()).toBe(WINDOW_UI.sectionOther);
+		const buttons = last.querySelectorAll('.dynasty-row-text').map((t) => t.parentElement!);
+		expect(buttons.map((b) => b.querySelector('.dynasty-row-title')!.getText())).toEqual([ID_UI.open, TITLES_UI.delete]);
+		expect(buttons[0]!.querySelector('.dynasty-row-sub')!.getText()).toBe(ID_UI.hint('title'));
 		expect(buttons[0]!.hasClass('dynasty-id-open')).toBe(true);
 		expect(buttons[0]!.getAttribute('data-focus')).toBe('id-open:t0');
 		expect(buttons[1]!.hasClass('mod-warning')).toBe(true);
@@ -956,13 +1000,13 @@ describe('Other actions (D.3.7)', () => {
 		const w = open(new TestWindow([{ key: 'n', id: null, name: 'Baron', holders: [] }]));
 		const page = openPage(w.content, 'n');
 		expect(page.querySelector('button.dynasty-id-open')).toBeNull();
-		expect(page.querySelectorAll('.dynasty-lw-actions button')).toHaveLength(1);
+		expect(page.querySelectorAll('.dynasty-lw-actions-row button')).toHaveLength(1);
 	});
 
 	it('uses the old houses class and text for the houses kind', () => {
 		class Houses extends TestWindow {
 			protected override renderPage(page: HTMLElement, key: string): void {
-				this.otherActions(page, key, 'dynasty-house-delete', 'Delete this house');
+				this.drawSections(page, 'test', [this.otherActionsSection(key, 'dynasty-house-delete', 'Delete this house')]);
 			}
 		}
 		const w = open(new Houses(items(), 'houses'));
@@ -1103,8 +1147,10 @@ describe('close rules (D.3.8)', () => {
 		expect(w.log).not.toContain('save');
 	});
 
-	it('runs Save from the list and from a page', () => {
-		const w = open();
+	it('runs Save from the list (when it has changes) and from a page', () => {
+		const w = new TestWindow();
+		w.dirty = true;
+		open(w);
 		dispatch(w.content.querySelector('button[data-focus="save"]')!, 'click');
 		expect(w.log).toEqual(['save', 'released']);
 		const v = open(new TestWindow());
@@ -1143,7 +1189,9 @@ describe('close rules (D.3.8)', () => {
 
 describe('questions, errors and notices', () => {
 	it('draws the question over the window with a name, the text and the buttons; the first button has the focus', () => {
-		const w = open();
+		const w = new TestWindow();
+		w.dirty = true;
+		open(w);
 		w.doConfirm('save');
 		const layer = w.confirm!;
 		expect(layer.getAttribute('role')).toBe('alertdialog');
@@ -1169,7 +1217,9 @@ describe('questions, errors and notices', () => {
 	});
 
 	it('returns the focus to the active control, else Save, when no control is named', () => {
-		const w = open();
+		const w = new TestWindow();
+		w.dirty = true;
+		open(w);
 		listRows(w.content)[1]!.focus();
 		w.doConfirm();
 		dispatch(w.confirm!.querySelector('.dynasty-sheet-keep')!, 'click');
@@ -1316,10 +1366,12 @@ describe('the style block (D.2, D.3.9)', () => {
 		expect(block).not.toContain('dynasty-holder-label');
 	});
 
-	it('gives the window one fixed height on the computer', () => {
+	it('makes the window as tall as its list on the computer, up to the maximum of the sheet, anchored at the top (list-window-height)', () => {
 		const rule = rules.find((r) => r.media === null && r.selectors.includes('.modal.dynasty-sheet.dynasty-lw:not(.is-phone)'));
 		expect(rule).toBeDefined();
-		expect(rule!.body).toContain('height: min(88vh, 900px)');
+		expect(rule!.body).toContain('height: auto');
+		expect(rule!.body).toContain('min-height: 320px');
+		expect(rule!.body).not.toContain('900px');
 	});
 
 	it('has an own rule for a short window (a phone on its side)', () => {
@@ -1328,19 +1380,21 @@ describe('the style block (D.2, D.3.9)', () => {
 		expect(win).toBeDefined();
 		expect(win!.body).toContain('height: calc(100vh - 2 * var(--size-4-2))');
 		expect(win!.body).toContain('max-height: calc(100vh - 2 * var(--size-4-2))');
-		const bars = short.find((r) => r.selectors.some((x) => x.endsWith('.dynasty-lw-bar')) && r.selectors.some((x) => x.endsWith('.dynasty-lw-backbar')));
-		expect(bars).toBeDefined();
-		expect(bars!.body).toContain('padding: var(--size-4-1) var(--size-4-2)');
+		const top = short.find((r) => r.selectors.some((x) => x.endsWith('.dynasty-lw-top')));
+		expect(top).toBeDefined();
+		expect(top!.body).toContain('padding-top: var(--size-4-2)');
 	});
 
 	it('makes the name fields grow and shrink: a height from the property, 44 px minimum, no resize, no scroll', () => {
 		const rule = rules.find((r) => r.media === null && r.selectors.some((x) => x.includes('textarea.dynasty-lw-field')));
 		expect(rule).toBeDefined();
-		for (const d of ['height: var(--dynasty-lw-field-height, auto)', 'min-height: 44px', 'resize: none', 'overflow: hidden', 'overflow-wrap: anywhere', 'box-sizing: border-box']) expect(rule!.body, d).toContain(d);
+		for (const d of ['height: var(--dynasty-lw-field-height, auto)', 'min-height: var(--input-height)', 'resize: none', 'overflow: hidden', 'overflow-wrap: anywhere', 'box-sizing: border-box']) expect(rule!.body, d).toContain(d);
 	});
 
 	it('gives every tappable part a hit area of at least 44 px', () => {
-		for (const cls of ['dynasty-lw-add', 'dynasty-lw-back']) expect(declarations(cls), cls).toMatch(/min-height:\s*44px/);
+		// The Add button and the way back are buttons of the window family: 44 px on a phone and on every touch screen (10-edit-sheet.css).
+		expect(css).toMatch(/\.dynasty-sheet\.is-phone \.dynasty-btn \{[^}]*min-height: 44px/);
+		expect(css).toMatch(/@media \(pointer: coarse\) \{[^@]*\.dynasty-btn,[^}]*min-height: 44px/);
 		const clear = declarations('dynasty-lw-clear');
 		expect(clear).toMatch(/width:\s*44px/);
 		expect(clear).toMatch(/height:\s*44px/);
@@ -1349,7 +1403,8 @@ describe('the style block (D.2, D.3.9)', () => {
 
 	it('hides the native cancel button of the search box and draws the chevron with CSS', () => {
 		expect(block).toContain('::-webkit-search-cancel-button');
-		expect(rules.some((r) => r.selectors.some((x) => x.endsWith('.dynasty-lw-row::after')))).toBe(true);
+		// The chevron of a row is the icon of the row anatomy (`dynasty-row-chev`).
+		expect(css).toContain('.dynasty-row-chev');
 	});
 
 	it('keeps the focus ring on a row', () => {
@@ -1365,15 +1420,14 @@ describe('the style block (D.2, D.3.9)', () => {
 	});
 
 	it('puts the two buttons of Other actions in one row on the computer, each full width on a phone', () => {
-		expect(declarations('dynasty-lw-actions-row')).toContain('display: flex');
-		const phone = rules.find((r) => r.selectors.some((x) => x.includes('.is-phone') && x.includes('.dynasty-lw-actions')));
-		expect(phone).toBeDefined();
-		expect(phone!.body).toMatch(/flex:\s*1 1 100%/);
+		// 0.2.8: the section "Other actions" holds two rows, one under the other, on every device.
+		expect(declarations('dynasty-lw-actions-row')).toContain('display: grid');
 	});
 
 	it('keeps the two width rules of the old windows', () => {
-		expect(css).toContain('.modal.dynasty-sheet.dynasty-titles:not(.is-phone)');
-		expect(css).toContain('.modal.dynasty-sheet.dynasty-houses:not(.is-phone)');
+		// 0.2.8: every window of the family is 620 px wide on a computer and top-anchored (10-edit-sheet.css); the old wide rules are gone.
+		expect(css).toContain('width: min(620px, calc(100vw - 2 * var(--size-4-4)))');
+		expect(css).not.toContain('.modal.dynasty-sheet.dynasty-titles:not(.is-phone)');
 	});
 });
 
@@ -1395,7 +1449,7 @@ describe('the texts (WIN_LIST_UI)', () => {
 	const texts = Object.values(WIN_LIST_UI).flatMap(sample);
 
 	it('has every entry', () => {
-		expect(Object.keys(WIN_LIST_UI).length).toBeGreaterThanOrEqual(18);
+		expect(Object.keys(WIN_LIST_UI).length).toBeGreaterThanOrEqual(15);
 		expect(texts.length).toBeGreaterThan(20);
 	});
 
@@ -1414,5 +1468,97 @@ describe('the texts (WIN_LIST_UI)', () => {
 
 	it('keeps a sentence short', () => {
 		for (const t of texts) expect(t.split(/\s+/).length, t).toBeLessThanOrEqual(20);
+	});
+});
+
+// P8-24: the save pipeline that the Houses window and the Titles window share (keys, one batch write, the Undo notice, a failed write).
+describe('the shared save pipeline', () => {
+	class Piped extends TestWindow {
+		keyOf = () => this.nextKey();
+		write = (handle: never, ops: Op[], before: (() => void) | undefined) => this.writeBatch(handle, ops, before, 'test write');
+		undo = (handle: never, ops: Op[], deleted: string[]) => this.undoAfterWrite(handle, { body: 'x' }, ops, deleted, (n) => `Gone: ${n.join(', ')}`);
+		fail = (out: never, handle: never, onStale: (b: string) => void, onRefusal: (code: string, idText: string | null) => void) => this.failedWrite(out, handle, onStale, onRefusal as never);
+		plain = (code: string) => this.refusedPlainly(code as never);
+		sent = () => this.sentIds;
+		isSaving = () => this.saving;
+	}
+	const idOp = { kind: 'set-title-id', id: 'a', to: 'b' } as unknown as Op;
+	const textOp = { kind: 'set-title-fields', id: 'a', fields: {} } as unknown as Op;
+	const handleOf = (write: () => Promise<unknown>) => ({ body: 'now', write }) as never;
+
+	it('numbers the row keys h0, h1, … for houses and t0, t1, … for titles', () => {
+		const h = new Piped([], 'houses');
+		expect([h.keyOf(), h.keyOf()]).toEqual(['h0', 'h1']);
+		const t = new Piped([], 'titles');
+		expect([t.keyOf(), t.keyOf()]).toEqual(['t0', 't1']);
+	});
+
+	it('writes the ops as one batch; the window shows that it saves and tells the id ops', async () => {
+		const w = new Piped();
+		const order: string[] = [];
+		const handle = handleOf(async () => {
+			order.push(`write saving=${w.isSaving()}`);
+			return { ok: true, body: 'next' };
+		});
+		const out = await w.write(handle, [idOp, textOp], () => order.push('before'));
+		expect(out).toEqual({ ok: true, body: 'next' });
+		expect(order).toEqual(['before', 'write saving=true']);
+		expect(w.sent()).toBe(true);
+		expect(w.isSaving()).toBe(false);
+		expect(w.modal.hasClass('is-saving')).toBe(false);
+		await w.write(handleOf(async () => ({ ok: true, body: 'n' })), [textOp], undefined);
+		expect(w.sent()).toBe(false);
+	});
+
+	it('a write that throws gives null, the failed text, and the window can save again', async () => {
+		const w = new Piped();
+		vi.spyOn(console, 'error').mockImplementation(() => {});
+		const out = await w.write(handleOf(async () => Promise.reject(new Error('disk'))), [textOp], undefined);
+		expect(out).toBeNull();
+		expect(notices).toContain(HOUSES.failed);
+		expect(w.isSaving()).toBe(false);
+	});
+
+	it('the Undo notice names a delete, adds the "also" text when more was written, and else counts the id changes', () => {
+		const w = new Piped();
+		const handle = handleOf(async () => ({ ok: true, body: '' }));
+		w.undo(handle, [textOp], ['Duke']);
+		w.undo(handle, [textOp, textOp], ['Duke']);
+		w.undo(handle, [idOp], []);
+		w.undo(handle, [textOp], []);
+		expect(notices).toHaveLength(3);
+		expect(notices[0]).toBe('Gone: Duke');
+		expect(notices[1]).toContain('Gone: Duke');
+		expect(notices[1]).toContain(REMOVE.undoAlso);
+		expect(notices[2]).toBe(ID_UI.changed(1));
+	});
+
+	it('a failed write: stale reloads, missing says so, a refusal gets its code and the id text only after an id op', async () => {
+		const w = new Piped();
+		const handle = handleOf(async () => ({ ok: true, body: '' }));
+		const stale: string[] = [];
+		const refusals: [string, string | null][] = [];
+		const onRefusal = (code: string, idText: string | null) => refusals.push([code, idText]);
+		w.fail({ ok: false, code: 'stale' } as never, handle, (b) => stale.push(b), onRefusal);
+		expect(stale).toEqual(['now']);
+		w.fail({ ok: false, code: 'missing' } as never, handle, (b) => stale.push(b), onRefusal);
+		expect(notices).toContain(HOUSES.missing);
+		const taken = { ok: false, code: 'refused', refusal: { code: 'id-taken' } } as never;
+		await w.write(handleOf(async () => ({ ok: true, body: '' })), [textOp], undefined);
+		w.fail(taken, handle, () => {}, onRefusal);
+		await w.write(handleOf(async () => ({ ok: true, body: '' })), [idOp], undefined);
+		w.fail(taken, handle, () => {}, onRefusal);
+		expect(refusals).toEqual([
+			['id-taken', null],
+			['id-taken', ID_UI.inUse],
+		]);
+	});
+
+	it('a refusal with no case of its own: blocked, invalid YAML, or the general text', () => {
+		const w = new Piped();
+		w.plain('blocked');
+		w.plain('invalid-yaml');
+		w.plain('unknown-title');
+		expect(notices).toEqual([WRITE_TEXT.blocked, HOUSES.invalid, HOUSES.refused]);
 	});
 });

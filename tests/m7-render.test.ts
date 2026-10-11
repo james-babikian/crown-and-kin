@@ -396,8 +396,8 @@ describe('styles.css: the M7 looks use theme variables and match styles.ts', () 
 		expect(rule('.dynasty-union-dot.dynasty-on-line')).toEqual({ fill: 'var(--interactive-accent)' });
 		expect(rule('.dynasty-tag.dynasty-on-line .dynasty-tag-pill')!.stroke).toBe('var(--interactive-accent)');
 		expect(Number(rule('.dynasty-faded')!.opacity)).toBe(FADED_OPACITY);
-		expect(rule('.dynasty-card-relation')).toEqual({ 'font-size': 'calc(var(--dynasty-font-size) * 0.85)', 'font-style': 'italic', fill: 'var(--text-normal)' });
-		expect(rule('.dynasty-card-me .dynasty-card-relation')).toEqual({ 'font-style': 'italic', 'font-weight': 'var(--bold-weight, 600)' });
+		expect(rule('.dynasty-card-relation')).toEqual({ 'font-size': 'calc(var(--dynasty-font-size) * 0.85)', 'font-style': 'italic', fill: 'var(--dynasty-muted, var(--text-muted))' });
+		expect(rule('.dynasty-card-me .dynasty-card-relation')).toEqual({ 'font-style': 'italic', 'font-weight': 'var(--bold-weight, 600)', fill: 'var(--text-normal)' });
 		expect(rule('.dynasty-no-relations .dynasty-card-relation')).toBeNull();
 		expect(rule('.dynasty-card-me .dynasty-card-bg')).toEqual({ stroke: 'var(--text-normal)', 'stroke-width': String(ME_LOOK.border) });
 		expect(rule('.dynasty-card-me-ring')).toBeNull();

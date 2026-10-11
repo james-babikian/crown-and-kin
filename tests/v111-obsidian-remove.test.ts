@@ -14,7 +14,7 @@ import { createPictureStore, type PictureCopy, type PictureIO, type PictureStore
 import { PICTURES_UI } from '../src/render/ui-text';
 import { FEl, device, dispatch, fakeDoc, fakeWin, installDom, resetDom, runTimers, settle } from './acceptance/fake-dom';
 import { openPage } from './lw-support';
-import { openModals, resetObsidian } from './acceptance/fake-obsidian';
+import { lastMenu, openModals, resetObsidian } from './acceptance/fake-obsidian';
 import { fakeHandle, type FakeHandle } from './acceptance/tree-view-fakes';
 
 /*
@@ -256,6 +256,12 @@ function windowStore() {
 	return { a, store };
 }
 
+/** 0.2.8: the arms button and the portrait button open a short menu; this taps one item of it. */
+function menuItem(button: FEl | null, title: string): void {
+	dispatch(button!, 'click');
+	lastMenu()!.item(title)!.click();
+}
+
 describe('D97: the Houses window uses the Remove row', () => {
 	function open() {
 		const { a, store } = windowStore();
@@ -271,13 +277,15 @@ describe('D97: the Houses window uses the Remove row', () => {
 	it('the arms box of a house with arms opens a list with "Remove arms" first; a tap clears the arms in the window; Save writes it', async () => {
 		const { content, row, handle } = open();
 		await settle();
-		dispatch(row('valmont').querySelector('.dynasty-house-arms')!, 'click');
+		menuItem(row('valmont').querySelector('.dynasty-house-arms'), PICTURES_UI.selectArms);
 		const picker = openPicker();
 		expect(rowLabel(rowEls(picker)[0])).toBe('Remove arms');
 		dispatch(removeRow(picker)!, 'click');
 		await settle();
 		expect(openModals.length).toBe(1);
-		expect(content.querySelector('.dynasty-lw-page button.dynasty-house-arms')!.hasClass('is-empty')).toBe(true);
+		// With the arms gone the "Open all" row has the text link "Add arms" (D213, D216 item 1), not an empty ring.
+		expect(content.querySelector('.dynasty-lw-page button.dynasty-house-arms')!.hasClass('is-add')).toBe(true);
+		expect(content.querySelector('.dynasty-lw-page .dynasty-openall .dynasty-add-arms')).not.toBeNull();
 		// Nothing is written until Save.
 		expect(handle.write).not.toHaveBeenCalled();
 		dispatch(content.querySelector('.dynasty-sheet-save')!, 'click');
@@ -289,16 +297,19 @@ describe('D97: the Houses window uses the Remove row', () => {
 	it('a house with no arms opens a list with no Remove row', async () => {
 		const { row } = open();
 		await settle();
-		dispatch(row('thorne').querySelector('.dynasty-house-arms')!, 'click');
+		const arms = row('thorne').querySelector('.dynasty-openall .dynasty-add-arms')!;
+		// A house with no arms has the text link "Add arms" in the "Open all" row: a tap opens the picker at once, and there is no menu with a Remove arms item.
+		dispatch(arms, 'click');
 		expect(removeRow(openPicker())).toBeNull();
 	});
 
-	it('Cancel in the list changes nothing; the Remove arms button stays', async () => {
+	it('Cancel in the list changes nothing; the Remove arms item stays in the menu', async () => {
 		const { content, row } = open();
 		await settle();
 		row('valmont');
-		expect(content.querySelector('.dynasty-house-remove-arms')!.getText()).toBe(PICTURES_UI.removeArms);
 		dispatch(content.querySelector('.dynasty-lw-page button.dynasty-house-arms')!, 'click');
+		expect(lastMenu()!.item(PICTURES_UI.removeArms)).toBeDefined();
+		lastMenu()!.item(PICTURES_UI.selectArms)!.click();
 		dispatch(openPicker().contentEl.querySelector('.dynasty-sheet-cancel')!, 'click');
 		await settle();
 		expect(content.querySelector('.dynasty-lw-page button.dynasty-house-arms')!.hasClass('is-empty')).toBe(false);
@@ -318,12 +329,13 @@ describe('D97: the edit sheet uses the Remove row', () => {
 	it('a person with a portrait: "Remove portrait" is the first row; a tap clears the portrait in the sheet; Save writes it', async () => {
 		const { content, handle } = open('aldric');
 		await settle();
-		dispatch(content.querySelector('.dynasty-select-portrait')!, 'click');
+		menuItem(content.querySelector('.dynasty-pic'), PICTURES_UI.selectPortrait);
 		const picker = openPicker();
 		expect(rowLabel(rowEls(picker)[0])).toBe('Remove portrait');
 		dispatch(removeRow(picker)!, 'click');
 		await settle();
-		expect(content.querySelector('.dynasty-remove-portrait')).toBeNull();
+		dispatch(content.querySelector('.dynasty-pic')!, 'click');
+		expect(lastMenu()!.item(PICTURES_UI.removePortrait)).toBeUndefined();
 		expect(handle.write).not.toHaveBeenCalled();
 		dispatch(content.querySelector('.dynasty-sheet-save')!, 'click');
 		await settle();
@@ -334,14 +346,16 @@ describe('D97: the edit sheet uses the Remove row', () => {
 	it('a person with no portrait: the list has no Remove row', async () => {
 		const { content } = open('wren');
 		await settle();
-		dispatch(content.querySelector('.dynasty-select-portrait')!, 'click');
+		dispatch(content.querySelector('.dynasty-pic')!, 'click');
+		expect(lastMenu()!.item(PICTURES_UI.removePortrait)).toBeUndefined();
+		lastMenu()!.item(PICTURES_UI.selectPortrait)!.click();
 		expect(removeRow(openPicker())).toBeNull();
 	});
 
-	it('the Remove portrait button stays and works', async () => {
+	it('the Remove portrait item of the menu works', async () => {
 		const { content, handle } = open('aldric');
 		await settle();
-		dispatch(content.querySelector('.dynasty-remove-portrait')!, 'click');
+		menuItem(content.querySelector('.dynasty-pic'), PICTURES_UI.removePortrait);
 		dispatch(content.querySelector('.dynasty-sheet-save')!, 'click');
 		await settle();
 		expect(handle.ops).toEqual([{ kind: 'set-person-fields', id: 'aldric', fields: { portrait: null } }]);

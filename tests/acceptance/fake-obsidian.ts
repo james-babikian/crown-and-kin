@@ -18,6 +18,7 @@ export function resetObsidian(): void {
 	openModals.length = 0;
 	notices.length = 0;
 	noticeList.length = 0;
+	menus.length = 0;
 	settingRows.length = 0;
 	settingGroups.length = 0;
 	iconCalls.length = 0;
@@ -402,3 +403,75 @@ export class PluginSettingTab {
 	display(): void {}
 	hide(): void {}
 }
+
+// ---------- Menu (the short menu of a window: the picture menu, the holder menu) ----------
+
+/** One item of a fake menu. A test finds it by its title and calls `click()`. */
+export class MenuItem {
+	title = '';
+	icon = '';
+	warning = false;
+	disabled = false;
+	private action: (() => void) | null = null;
+	setTitle(t: string): this {
+		this.title = t;
+		return this;
+	}
+	setIcon(i: string): this {
+		this.icon = i;
+		return this;
+	}
+	setWarning(w: boolean): this {
+		this.warning = w;
+		return this;
+	}
+	setDisabled(d: boolean): this {
+		this.disabled = d;
+		return this;
+	}
+	onClick(fn: () => void): this {
+		this.action = fn;
+		return this;
+	}
+	/** As a tap on the item: a disabled item does nothing. */
+	click(): void {
+		if (!this.disabled) this.action?.();
+	}
+}
+
+/** Every menu that a window showed, the newest last. */
+export const menus: Menu[] = [];
+
+export class Menu {
+	items: (MenuItem | 'sep')[] = [];
+	shown = false;
+	addItem(cb: (i: MenuItem) => void): this {
+		const i = new MenuItem();
+		cb(i);
+		this.items.push(i);
+		return this;
+	}
+	addSeparator(): this {
+		this.items.push('sep');
+		return this;
+	}
+	showAtPosition(): this {
+		this.shown = true;
+		menus.push(this);
+		return this;
+	}
+	showAtMouseEvent(): this {
+		return this.showAtPosition();
+	}
+	hide(): this {
+		this.shown = false;
+		return this;
+	}
+	/** The item with this title (test helper). */
+	item(title: string): MenuItem | undefined {
+		return this.items.find((x): x is MenuItem => x !== 'sep' && x.title === title);
+	}
+}
+
+/** The newest menu (test helper). */
+export const lastMenu = (): Menu | undefined => menus[menus.length - 1];

@@ -437,12 +437,11 @@ describe('the style block', () => {
 		expect(rule).toContain('pointer-events: none');
 		expect(rule).toContain('var(--text-normal)');
 		expect(rule).toContain('var(--background-primary)');
-		expect(rule).toContain('var(--font-ui-small)');
+		expect(rule).toContain('var(--dynasty-type-text)');
 		expect(rule).not.toMatch(/#[0-9a-f]{3,8}\b|rgb|hsl/i);
 	});
 
-	it('keeps the focus-list rule of WP-C3 and puts nothing of the tip outside the marked block', () => {
-		expect(rules).toContain('.dynasty-popover-focus');
+	it('puts nothing of the tip outside the marked block (0.2.8: the Focus menu has its rule with the More menu in the toolbar chunk)', () => {
 		const before = css.slice(0, css.indexOf('/* C: focus list and tooltip */'));
 		expect(before).not.toMatch(/dynasty-tip/);
 	});

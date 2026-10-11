@@ -516,7 +516,8 @@ export function wheel(deltaX: number, deltaY: number, clientX = 400, clientY = 3
 	return { deltaX, deltaY, deltaZ: 0, deltaMode: 0, ctrlKey: false, metaKey: false, shiftKey: false, altKey: false, clientX, clientY };
 }
 
-const COMPUTED = { fontSize: '16px', fontFamily: 'sans-serif', paddingTop: '0px', getPropertyValue: () => '' };
+// The plugin style sheet counts as applied (D183): main.ts waits for `--dynasty-css-ready` on a cold start.
+const COMPUTED = { fontSize: '16px', fontFamily: 'sans-serif', paddingTop: '0px', getPropertyValue: (name: string) => (name === '--dynasty-css-ready' ? '1' : '') };
 
 /** Puts the fake globals in place (Obsidian's createEl and friends, ResizeObserver, getComputedStyle). */
 export function installDom(): void {

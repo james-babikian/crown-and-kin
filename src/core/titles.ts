@@ -21,7 +21,6 @@
  */
 
 import type { FamilyGraph } from './derive';
-import type { SetPersonFields } from './edit';
 import type { Holder, Person, Title } from './types';
 
 /** One title that a person holds: the title and this person's entries of it, in list order. */
@@ -178,22 +177,6 @@ export function pickerSuffix(label: CardLabel, personName: string): string | und
 	return text === undefined ? undefined : `(${text})`;
 }
 
-/** The `set-person-fields` op that "Show on the card" writes. */
-export type CardTitleOpResult = SetPersonFields & { fields: { 'card-title': string | null } };
-
-/**
- * "Show on the card" (D62, §13.3): the op for selecting `titleId` for `personId`. It removes
- * `card-title` when `titleId` is the first holding and the person has no written `title`;
- * else it writes `card-title: titleId`.
- */
-export function cardTitleOp(g: FamilyGraph, personId: string, titleId: string): CardTitleOpResult {
-	const person = g?.byId.get(personId);
-	const first = cardLabels(g).get(personId)?.holdings[0];
-	// The first title shows by default only when no written `title` takes its place (D56, D63).
-	const remove = !!person && person.title === undefined && first?.title.id === titleId;
-	return { kind: 'set-person-fields', id: personId, fields: { 'card-title': remove ? null : titleId } };
-}
-
 /**
  * The Delete title confirmation (§13.4): `holders` = the written holder items of the first title
  * with the id; `cards` = the people whose shown title is this title (their card then shows a
@@ -250,29 +233,6 @@ export function holderTable(g: FamilyGraph, title: Title): string {
 	}
 	return rows.join('\n') + '\n';
 }
-
-// The helper signatures, for callers that load this module by path (the acceptance and fuzz tests).
-
-/** The signature of `cardLabels`. */
-export type CardLabels = typeof cardLabels;
-/** The signature of `entryReign`. */
-export type EntryReign = typeof entryReign;
-/** The signature of `reignText`. */
-export type ReignText = typeof reignText;
-/** The signature of `rulerName`. */
-export type RulerName = typeof rulerName;
-/** The signature of `searchNames`. */
-export type SearchNames = typeof searchNames;
-/** The signature of `pickerSuffix`. */
-export type PickerSuffix = typeof pickerSuffix;
-/** The signature of `cardTitleOp`. */
-export type CardTitleOp = typeof cardTitleOp;
-/** The signature of `describeDeleteTitle`. */
-export type DescribeDeleteTitle = typeof describeDeleteTitle;
-/** The signature of `noteName`. */
-export type NoteName = typeof noteName;
-/** The signature of `holderTable`. */
-export type HolderTable = typeof holderTable;
 
 /**
  * True when the drawn graph needs card labels: it has titles (spec §13.4) or a person has a sobriquet (D122).

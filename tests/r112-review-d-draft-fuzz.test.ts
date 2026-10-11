@@ -92,7 +92,7 @@ describe('review D: a draft that the Houses window accepts is never refused by t
 				if (r() < 0.3) row.name = NAMES[Math.floor(r() * NAMES.length)];
 				if (r() < 0.2) row.deleted = true;
 			}
-			for (let i = Math.floor(r() * 3); i > 0; i--) rows.push({ key: `n${key++}`, id: null, name: NAMES[Math.floor(r() * NAMES.length)], baseName: null, plural: '', basePlural: null, maleName: '', baseMaleName: null, femaleName: '', baseFemaleName: null, deleted: false, holders: [], baseRows: [] });
+			for (let i = Math.floor(r() * 3); i > 0; i--) rows.push({ key: `n${key++}`, id: null, name: NAMES[Math.floor(r() * NAMES.length)], baseName: null, maleName: '', baseMaleName: null, femaleName: '', baseFemaleName: null, deleted: false, holders: [], baseRows: [] });
 			if (rows.some((x) => !x.deleted && x.name.trim() === '')) continue;
 			const raw = parsed.data as { people?: { 'card-title'?: string }[] };
 			const have = new Set(rows.filter((x) => x.id !== null).map((x) => x.id));

@@ -313,10 +313,12 @@ describe('born during the reign with no birth years (contract J.9, K.8)', () => 
 		expect(result.noBirthYear).toBe(0);
 	});
 
-	it('a parent who never held the title gives no precedence: the written order stands', () => {
+	it('a parent who never held the title gives no precedence: the birth years (D193) decide, not the reign', () => {
 		const more = [...people.slice(0, 3), '{id: k1, name: K1, sex: m, born: 1180, parents: [c1]}', '{id: k2, name: K2, sex: m, born: 1176, parents: [c1]}'];
 		const { result } = lineOfTitle(blockOf(more, REIGNS, ['succession: born-in-reign']));
-		expect(result.heirs).toEqual(['c1', 'k1', 'k2']);
+		// D193: C1 never held the title, so there is no reign precedence among his sons. K1 1180 and K2 1176 are both dated:
+		// K2 1176 before K1 1180 (written K1, K2).
+		expect(result.heirs).toEqual(['c1', 'k2', 'k1']);
 	});
 });
 

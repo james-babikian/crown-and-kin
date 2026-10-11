@@ -10,28 +10,32 @@
  * the holder form in `holder-form.ts`, and "Make a note with this table" in `table-note.ts`.
  */
 
-import { Notice, setIcon, type App } from 'obsidian';
+import { Notice, type App } from 'obsidian';
+import { nb } from '../render/text-join';
 import { deriveFamilies, type FamilyGraph } from '../core/derive';
 import type { Op } from '../core/edit';
+import type { RelationOptions } from '../core/relations';
 import { normBody } from '../core/block-match';
 import { parseBody, readTree } from '../core/parse';
 import { quotedSobriquet } from '../core/sobriquet';
 import { newTitleId } from '../core/title-ops';
 import { describeDeleteTitle, describeTitleIdChange } from '../core/titles';
-import { HOUSES, ID_UI, REMOVE, SUCCESSION_UI, TITLES_UI, WIN_LIST_UI, WRITE_TEXT } from '../render/ui-text';
+import { HOUSES, ID_UI, REMOVE, SUCCESSION_UI, TITLES_UI, WIN_LIST_UI, WINDOW_UI, WRITE_TEXT } from '../render/ui-text';
 import type { Handle, HandleWriteOutcome } from './block-handle';
 import { holderForm } from './holder-form';
-import { danglingIds, draftId, idChanged, idFromName, idProblemFor, idProblems, idRefusalText, isIdOp, reasonText } from './id-draft';
+import { danglingIds, draftId, idChanged, idFromName, idProblemFor, idProblems, reasonText } from './id-draft';
 import { idNewNameNote, idNote, type IdRowView } from './id-field';
 import { openIdWindow } from './id-window';
-import { ListEditWindow, type ListRowView } from './list-window';
+import { ListEditWindow, findableArms, type ListRowView, type PageHead } from './list-window';
 import { matchesAll } from './list-search';
-import { pickPerson } from './person-picker';
-import { freshOrStale, onWriteFailed } from './sheet-parts';
+import { pickPerson, type PickerContext } from './person-picker';
+import { freshOrStale } from './sheet-parts';
 import { successionSection, type SuccessionView } from './succession-section';
+import type { PictureStore } from './picture-store';
+import { RowPictures, buildRow, iconButton, personLead, showMenu, textButton } from './window-parts';
+import type { SectionSpec } from './window-sections';
 import { makeTableNote } from './table-note';
-import { draftChanged, emptyNames, holderText, listName, personNameOf, rebase, savedListName, titleIdRow, titleRows, windowOps, withHolderIds, type HolderRow, type HolderValues, type TitleRow } from './titles-draft';
-import { undoNotice } from './undo-notice';
+import { draftChanged, emptyNames, holderText, personNameOf, rebase, savedListName, titleIdRow, titleRows, windowOps, withHolderIds, type HolderRow, type HolderValues, type TitleRow } from './titles-draft';
 
 /** The tree that the window edits, loaded from one block body. */
 export interface LoadedTitles {
@@ -67,6 +71,14 @@ export interface TitlesOptions {
 	reduced?: () => boolean;
 	/** Contract 0.2.7 E.4: shows the line of succession of a title in the tree; the window has closed. */
 	showLine?: (titleId: string) => void;
+	/** G.7: opens the edit window of a person (a tap on a row of the line of succession); absent: the card shows in the tree. */
+	openPerson?: (id: string) => void;
+	/** The plugin's picture store: portraits and arms in the rows and in the person picker; absent: initials and a crown. */
+	pictures?: PictureStore;
+	/** The marked person, for the relation word in the person picker's rows (G.3); absent: no word. */
+	me?: () => string | null;
+	/** The relation settings for those words; absent: the defaults. */
+	relationOptions?: () => RelationOptions;
 	/** Contract 0.2.7 K.10, M.7: the length of the line, the age of the warning and the age for open branches (the settings). Defaults: 5, 110 and 0. */
 	succession?: { limit: () => number; oldAge: () => number; youngDeathAge?: () => number };
 }
@@ -79,13 +91,12 @@ const DEFAULT_OLD_AGE = 110;
 export class TitlesWindow extends ListEditWindow {
 	private data: LoadedTitles;
 	private rows: TitleRow[];
-	private keys = 0;
-	/** The batch that is being written had id ops: a refusal of `id-taken` or `bad-value` is about an id. */
-	private sentIds = false;
 	/** The ID notes of the page on screen now. */
 	private pageViews: IdRowView[] = [];
 	/** The Succession section of the page on screen now (a saved title only). */
 	private section: SuccessionView | null = null;
+	/** The pictures of the rows of the window now on screen. */
+	private pictures: RowPictures | null = null;
 
 	/** Null, with a Notice, if the block cannot be edited now. */
 	static create(app: App, o: TitlesOptions): TitlesWindow | null {
@@ -105,10 +116,6 @@ export class TitlesWindow extends ListEditWindow {
 		this.rows = titleRows(data.g, () => this.nextKey());
 	}
 
-	private nextKey(): string {
-		return `t${this.keys++}`;
-	}
-
 	/** True if the draft has an unsaved change. */
 	isDirty(): boolean {
 		return draftChanged(this.rows);
@@ -122,17 +129,21 @@ export class TitlesWindow extends ListEditWindow {
 		return this.o.reduced?.() ?? false;
 	}
 
-	protected override opened(): void {
-		// A turn of the phone or a resize can change the layout; the section then draws its choices as buttons or as dropdowns.
-		const win = this.modalEl.win ?? window;
-		const relayout = () => this.guard(() => this.section?.relayout());
-		win.addEventListener('resize', relayout);
-		this.cleanup.push(() => win.removeEventListener('resize', relayout));
+	protected override beforeBuild(): void {
+		// A new draw makes new rows: the copies of the old ones go back to the store.
+		this.pictures?.release();
+		this.pictures = new RowPictures(this.o.pictures, this.o.sourcePath);
+	}
+
+	protected override rowsGone(list: HTMLElement): void {
+		this.pictures?.forget(list);
 	}
 
 	protected released(): void {
 		this.section?.dispose();
 		this.section = null;
+		this.pictures?.release();
+		this.pictures = null;
 		try {
 			this.o.onClosed?.();
 		} catch (e) {
@@ -150,11 +161,7 @@ export class TitlesWindow extends ListEditWindow {
 		return t.name.trim() || TITLES_UI.newTitle;
 	}
 
-	private listLabel(t: TitleRow): string {
-		return listName(t) || TITLES_UI.newTitle;
-	}
-
-	protected labelOf(key: string): string {
+protected labelOf(key: string): string {
 		const t = this.byKey(key);
 		return t ? this.label(t) : TITLES_UI.newTitle;
 	}
@@ -173,15 +180,26 @@ export class TitlesWindow extends ListEditWindow {
 				name: this.label(t),
 				summary: this.summary(t),
 				state: problems.has(t.key) ? 'check-id' : t.id === null ? 'new' : draftChanged([t]) ? 'changed' : '',
+				arms: this.armsOfRow(t),
 			}));
 	}
 
-	/** "3 holders · Newest holder: Aldric II": the newest holder is the last one of the draft, named as the holder row names it. */
+	/** "3 holders · newest: Aldric Valmont": the newest holder is the last one of the draft (the page of the Titles window, D197). */
 	private summary(t: TitleRow): string {
-		const count = TITLES_UI.count(t.holders.length);
+		return this.holdersSummary(t);
+	}
+
+	/** The arms link of the house of the newest holder, when the picture store can find its file; null when the house has no arms (D213: the row then has no lead, no crown). */
+	private armsOfRow(t: TitleRow): string | null {
 		const last = t.holders[t.holders.length - 1];
-		const ruler = last ? holderText(this.data.g, last.values).ruler : '';
-		return ruler ? `${count} · ${WIN_LIST_UI.newest(ruler)}` : count;
+		const house = last?.values.person !== undefined ? this.data.g.byId.get(last.values.person)?.house : undefined;
+		return findableArms(this.o.pictures, house ? this.data.g.houses?.get(house)?.arms : undefined, this.o.sourcePath);
+	}
+
+	/** The lead of a list row: the arms of the newest holder's house, at the right of the row. */
+	protected override rowArms(box: HTMLElement, view: ListRowView): void {
+		box.empty();
+		if (view.arms) this.pictures?.show(box, view.arms, { px: 40, fit: 'meet' });
 	}
 
 	/** The texts of a holder that the search looks at (the draft values): ruler text, full name, typed name, sobriquet. */
@@ -193,7 +211,7 @@ export class TitlesWindow extends ListEditWindow {
 	protected matchReason(key: string, words: readonly string[]): string | null {
 		const t = this.byKey(key);
 		if (!t) return null;
-		const own = [t.name, t.plural, t.maleName, t.femaleName];
+		const own = [t.name, t.maleName, t.femaleName];
 		const holders = t.holders.map((h) => this.holderTexts(h));
 		const id = t.id ?? '';
 		if (!matchesAll(words, [...own, id, ...holders.flatMap((h) => h.texts)])) return null;
@@ -207,11 +225,50 @@ export class TitlesWindow extends ListEditWindow {
 
 	protected addItem(): string {
 		const key = this.nextKey();
-		this.rows.push({ key, id: null, name: '', baseName: null, plural: '', basePlural: null, maleName: '', baseMaleName: null, femaleName: '', baseFemaleName: null, deleted: false, holders: [], baseRows: [] });
+		this.rows.push({ key, id: null, name: '', baseName: null, maleName: '', baseMaleName: null, femaleName: '', baseFemaleName: null, deleted: false, holders: [], baseRows: [] });
 		return key;
 	}
 
 	// ---------- the edit page ----------
+
+	/** The header of a title page: the name and the holders text line, and at the right the arms of the house of the newest holder. A house with no arms gives no picture at all (D213). */
+	protected pageHead(key: string): PageHead {
+		const t = this.byKey(key)!;
+		const arms = this.armsOfRow(t);
+		return {
+			...(arms
+				? {
+						lead: (parent: HTMLElement) => {
+							const lead = parent.createSpan({ cls: ['dynasty-row-lead', 'is-arms', 'is-head-arms'], attr: { 'aria-hidden': 'true' } });
+							this.pictures?.show(lead, arms, { px: 56, fit: 'meet' });
+						},
+					}
+				: {}),
+			name: this.label(t),
+			meta: this.holdersMeta(t),
+		};
+	}
+
+	/** "7 holders · newest: Percival Valmont (r. 1160–1207)": the line under the name of a title page. */
+	private holdersMeta(t: TitleRow): string {
+		const last = t.holders[t.holders.length - 1];
+		const x = last ? holderText(this.data.g, last.values) : undefined;
+		const newest = x ? nb(`${x.full ?? x.ruler}${x.reign ? ` ${TITLES_UI.reign(x.reign)}` : ''}`) : '';
+		return WINDOW_UI.sumHolders(t.holders.length, newest);
+	}
+
+	/** The line under the title of the closed section "Holders": the count and the newest holder (no reign). */
+	private holdersSummary(t: TitleRow): string {
+		const last = t.holders[t.holders.length - 1];
+		const x = last ? holderText(this.data.g, last.values) : undefined;
+		return WINDOW_UI.sumHolders(t.holders.length, x ? (x.full ?? x.ruler) : '');
+	}
+
+	/** The line under the title of the closed section "Names": the name and the number of other names (only the names for a man and a woman, D201). */
+	private namesSummary(t: TitleRow): string {
+		const n = [t.maleName, t.femaleName].filter((x) => x.trim() !== '').length;
+		return WINDOW_UI.sumNames(this.label(t), n);
+	}
 
 	protected renderPage(page: HTMLElement, key: string): void {
 		const t = this.byKey(key);
@@ -220,70 +277,17 @@ export class TitlesWindow extends ListEditWindow {
 		this.section?.dispose();
 		this.section = null;
 		const problem = idProblems('title', this.rows.map(titleIdRow), this.data.dangling).get(t.key);
-		let heading: HTMLElement | null = null;
-		// The heading of the holder list and the accessible names show the draft's names at once.
+		// The accessible names and the summaries show the draft's names at once.
 		const follow = () => {
-			heading?.setText(this.listLabel(t));
-			plural.setAttribute('aria-label', TITLES_UI.pluralAria(this.label(t)));
 			male.setAttribute('aria-label', TITLES_UI.maleAria(this.label(t)));
 			female.setAttribute('aria-label', TITLES_UI.femaleAria(this.label(t)));
 			this.updateBackName(t.key);
+			this.sections?.setSummary('names', this.namesSummary(t));
 			for (const v of this.pageViews) v.setItem(this.label(t));
 			// A new title's name can change the id that it would get.
 			this.refreshIdProblems();
 		};
-		this.textField(page, {
-			cls: 'dynasty-title-name',
-			label: TITLES_UI.nameLabel,
-			value: t.name,
-			aria: TITLES_UI.nameLabel,
-			focus: `name:${t.key}`,
-			onInput: (v) => {
-				t.name = v;
-				follow();
-			},
-		});
-		// D66: the male form, before the female form (as in the text of the note).
-		const male = this.textField(page, {
-			cls: 'dynasty-title-male',
-			label: TITLES_UI.maleLabel,
-			value: t.maleName,
-			placeholder: TITLES_UI.malePlaceholder,
-			aria: TITLES_UI.maleAria(this.label(t)),
-			focus: `male-name:${t.key}`,
-			onInput: (v) => {
-				t.maleName = v;
-			},
-		});
-		male.parentElement?.setAttribute('data-field', 'male-name');
-		// D65: the female form.
-		const female = this.textField(page, {
-			cls: 'dynasty-title-female',
-			label: TITLES_UI.femaleLabel,
-			value: t.femaleName,
-			placeholder: TITLES_UI.femalePlaceholder,
-			aria: TITLES_UI.femaleAria(this.label(t)),
-			focus: `female-name:${t.key}`,
-			onInput: (v) => {
-				t.femaleName = v;
-			},
-		});
-		female.parentElement?.setAttribute('data-field', 'female-name');
-		// D64: the plural.
-		const plural = this.textField(page, {
-			cls: 'dynasty-title-plural',
-			label: TITLES_UI.pluralLabel,
-			value: t.plural,
-			placeholder: TITLES_UI.pluralPlaceholder,
-			aria: TITLES_UI.pluralAria(this.label(t)),
-			focus: `plural:${t.key}`,
-			onInput: (v) => {
-				t.plural = v;
-				follow();
-			},
-		});
-		plural.parentElement?.setAttribute('data-field', 'plural');
-		// The note of a new id sits under the fields (D110). The red edge goes on the page.
+		// The note of a new id sits under the header (D110). The red edge goes on the page.
 		if (t.id !== null && idChanged(titleIdRow(t))) {
 			this.pageViews.push(
 				idNote(page, {
@@ -302,38 +306,100 @@ export class TitlesWindow extends ListEditWindow {
 		}
 		// A new title is marked when its name gives the ID that a changed title has taken (owner decision "3-both").
 		if (t.id === null) this.pageViews.push(idNewNameNote(page, { key: t.key, problem: problem ? reasonText(problem) : '' }));
-		const panel = page.createDiv({ cls: 'dynasty-holder-panel' });
-		heading = panel.createDiv({ cls: 'dynasty-sheet-section-title dynasty-holder-heading', text: this.listLabel(t) });
-		panel.createDiv({ cls: 'dynasty-sheet-hint', text: TITLES_UI.intro });
-		panel.createDiv({ cls: 'dynasty-sheet-hint dynasty-holder-count', text: TITLES_UI.count(t.holders.length) });
-		const holders = panel.createDiv({ cls: 'dynasty-holder-list' });
-		if (!t.holders.length) holders.createDiv({ cls: 'dynasty-holder-none', text: TITLES_UI.noHolders });
-		t.holders.forEach((h, i) => this.holderRow(holders, t, h, i));
-		const buttons = panel.createDiv({ cls: 'dynasty-holder-panel-buttons' });
-		const addHolder = buttons.createEl('button', { cls: ['dynasty-sheet-action', 'dynasty-holder-add'], text: TITLES_UI.addHolder, attr: { type: 'button', 'aria-label': TITLES_UI.addHolderLabel(this.label(t)), 'data-focus': `add-holder:${t.key}` } });
-		addHolder.addEventListener('click', () => this.guard(() => void this.addHolder(t)));
-		// The saved list only: a title that is not saved yet has none (spec §13.4).
-		if (t.id !== null) {
-			const id = t.id;
-			const note = buttons.createEl('button', { cls: ['dynasty-sheet-action', 'dynasty-title-note'], text: TITLES_UI.makeNote, attr: { type: 'button', 'aria-label': TITLES_UI.makeNoteLabel(savedListName(t)), 'data-focus': `note:${t.key}` } });
-			note.addEventListener('click', () => this.guard(() => this.askNote(id, `note:${t.key}`)));
+
+		// The fields are made first, so `follow` can name them; the section draws them when it is built.
+		let male!: HTMLTextAreaElement;
+		let female!: HTMLTextAreaElement;
+		const names: SectionSpec = {
+			key: 'names',
+			title: WINDOW_UI.sectionNames,
+			summary: this.namesSummary(t),
+			open: t.id === null,
+			build: (body) => {
+				const grid = body.createDiv({ cls: ['dynasty-grid', 'is-stack'] });
+				const nameField = this.textField(grid, {
+					cls: 'dynasty-title-name',
+					label: TITLES_UI.nameLabel,
+					value: t.name,
+					placeholder: TITLES_UI.namePlaceholder,
+					aria: TITLES_UI.nameLabel,
+					focus: `name:${t.key}`,
+					onInput: (v) => {
+						t.name = v;
+						follow();
+					},
+				});
+				nameField.parentElement?.addClass('is-wide');
+				// D66: the male form, before the female form (as in the text of the note).
+				male = this.textField(grid, {
+					cls: 'dynasty-title-male',
+					label: TITLES_UI.maleLabel,
+					value: t.maleName,
+					placeholder: TITLES_UI.malePlaceholder,
+					aria: TITLES_UI.maleAria(this.label(t)),
+					focus: `male-name:${t.key}`,
+					onInput: (v) => {
+						t.maleName = v;
+						follow();
+					},
+				});
+				male.parentElement?.setAttribute('data-field', 'male-name');
+				// D65: the female form.
+				female = this.textField(grid, {
+					cls: 'dynasty-title-female',
+					label: TITLES_UI.femaleLabel,
+					value: t.femaleName,
+					placeholder: TITLES_UI.femalePlaceholder,
+					aria: TITLES_UI.femaleAria(this.label(t)),
+					focus: `female-name:${t.key}`,
+					onInput: (v) => {
+						t.femaleName = v;
+						follow();
+					},
+				});
+				female.parentElement?.setAttribute('data-field', 'female-name');
+			},
+		};
+		const holders: SectionSpec = {
+			key: 'holders',
+			title: WINDOW_UI.sectionHolders,
+			summary: this.holdersSummary(t),
+			open: true,
+			build: (body) => {
+				body.createDiv({ cls: ['dynasty-sheet-hint'], text: TITLES_UI.intro });
+				const list = body.createDiv({ cls: ['dynasty-rows', 'dynasty-holder-list'] });
+				if (!t.holders.length) list.createDiv({ cls: ['dynasty-holder-none', 'dynasty-sheet-none'], text: TITLES_UI.noHolders });
+				t.holders.forEach((h, i) => this.holderRow(list, t, h, i));
+				const buttons = body.createDiv({ cls: ['dynasty-actions', 'dynasty-holder-panel-buttons'] });
+				textButton(buttons, ['dynasty-btn', 'dynasty-holder-add'], TITLES_UI.addHolder, () => this.guard(() => void this.addHolder(t)), { icon: 'plus', label: TITLES_UI.addHolderLabel(this.label(t)), focus: `add-holder:${t.key}` });
+				// The saved list only: a title that is not saved yet has none (spec §13.4).
+				if (t.id !== null) {
+					const id = t.id;
+					textButton(buttons, ['dynasty-btn', 'dynasty-title-note'], TITLES_UI.makeNote, () => this.guard(() => this.askNote(id, `note:${t.key}`)), { label: TITLES_UI.makeNoteLabel(savedListName(t)), focus: `note:${t.key}` });
+				}
+			},
+		};
+		const specs: SectionSpec[] = [names, holders];
+		// A title that is not saved yet shows only the "new title" text in place of the succession sections.
+		if (t.id !== null && t.succ) {
+			const view = this.successionView(t);
+			this.section = view;
+			specs.push(
+				{ key: 'line', title: WINDOW_UI.sectionLine, summary: view.lineSummary(), open: false, build: (body) => view.renderLine(body) },
+				{ key: 'rules', title: WINDOW_UI.sectionRules, summary: view.rulesSummary(), open: false, build: (body) => view.renderRules(body) },
+			);
 		}
-		this.successionPart(page, t);
-		this.otherActions(page, t.key, 'dynasty-title-delete', (name) => TITLES_UI.deleteLabel(name));
+		specs.push(this.otherActionsSection(t.key, 'dynasty-title-delete', (name) => TITLES_UI.deleteLabel(name)));
+		this.drawSections(page, 'title', specs, t.id === null);
+		if (t.id === null || !t.succ) page.createDiv({ cls: ['dynasty-sheet-hint'], text: SUCCESSION_UI.newTitle, attr: { 'data-hint': 'new-title' } });
 	}
 
-	// ---------- the Succession section (contract 0.2.7 E) ----------
+	// ---------- the succession sections (contract 0.2.7 E; 0.2.8 C) ----------
 
-	/** The section after the holder list and before Other actions. A title that is not saved yet shows only the "new title" text. */
-	private successionPart(page: HTMLElement, t: TitleRow): void {
-		if (t.id === null || !t.succ) {
-			const box = page.createDiv({ cls: 'dynasty-succ', attr: { role: 'group', 'aria-label': SUCCESSION_UI.heading, 'data-section': 'succession' } });
-			box.createDiv({ cls: 'dynasty-sheet-section-title', text: SUCCESSION_UI.heading });
-			box.createDiv({ cls: 'dynasty-sheet-hint', text: SUCCESSION_UI.newTitle, attr: { 'data-hint': 'new-title' } });
-			return;
-		}
+	/** The view of the line and the rules for the draft of a saved title. */
+	private successionView(t: TitleRow): SuccessionView {
 		const settings = this.o.succession;
-		this.section = successionSection(page, {
+		return successionSection({
 			g: () => this.data.g,
 			row: t,
 			limit: () => settings?.limit() ?? DEFAULT_LIMIT,
@@ -344,8 +410,14 @@ export class TitlesWindow extends ListEditWindow {
 			edited: () => this.clearError(),
 			guard: (fn) => this.guard(fn),
 			showCard: (id) => this.showCard(id),
+			...(this.o.openPerson ? { openPerson: (id: string) => this.openPerson(id) } : {}),
 			show: () => this.showLine(t),
 			pick: (kind, skip) => this.pickForSection(kind, skip),
+			summaries: (s) => {
+				this.sections?.setSummary('line', s.line);
+				this.sections?.setSummary('rules', s.rules);
+			},
+			...(this.o.pictures ? { pictures: this.o.pictures, sourcePath: this.o.sourcePath } : {}),
 		});
 	}
 
@@ -354,11 +426,22 @@ export class TitlesWindow extends ListEditWindow {
 		if (this.busy) return null;
 		this.busy = true;
 		try {
-			const picked = await pickPerson(this.app, this.data.g, new Set(skip), SUCCESSION_UI.pickerPlaceholder, kind === 'heir' ? SUCCESSION_UI.heirPickerTitle : SUCCESSION_UI.excludePickerTitle, false);
+			const picked = await pickPerson(this.app, this.data.g, new Set(skip), SUCCESSION_UI.pickerPlaceholder, kind === 'heir' ? SUCCESSION_UI.heirPickerTitle : SUCCESSION_UI.excludePickerTitle, false, null, null, this.pickerPictures());
 			return picked?.kind === 'person' && !this.closing ? picked.id : null;
 		} finally {
 			this.busy = false;
 		}
+	}
+
+	/** What the person picker needs for its rows (G.3): portraits, the marked person and the relation settings. */
+	private pickerPictures(): PickerContext {
+		const me = this.o.me?.();
+		return {
+			...(this.o.pictures ? { pictures: this.o.pictures } : {}),
+			sourcePath: this.o.sourcePath,
+			...(me ? { me } : {}),
+			...(this.o.relationOptions ? { relationOptions: this.o.relationOptions() } : {}),
+		};
 	}
 
 	/** Show (E.4): with no changes the window closes and the tree shows the line; with changes it asks first. */
@@ -382,54 +465,75 @@ export class TitlesWindow extends ListEditWindow {
 		]);
 	}
 
+	/**
+	 * One row of the Holders section (page): the full name, or the ruler text when the entry has a number or a written ruler name (a button
+	 * that shows the card) with the sobriquet, a second text line (the full name after a ruler text, the reign, "Not in the tree"), the
+	 * portrait at the right when the person has one, and the menu "more" with Edit, Move earlier, Move later and Remove.
+	 */
 	private holderRow(list: HTMLElement, t: TitleRow, h: HolderRow, i: number): void {
 		const text = holderText(this.data.g, h.values);
-		const row = list.createDiv({ cls: text.inTree ? 'dynasty-holder-row' : ['dynasty-holder-row', 'is-not-in-tree'], attr: { 'data-holder': h.key } });
-		if (h.values.person !== undefined) row.setAttribute('data-person', h.values.person);
-		const words = row.createDiv({ cls: 'dynasty-holder-text' });
+		// Only a holder with a number or a written ruler name keeps that name in bold; the full name leads every other row (holder-rows).
+		const keepsRuler = h.values.number !== undefined || (h.values.as ?? '').trim() !== '';
+		const lead = !keepsRuler && text.full ? text.full : text.ruler;
+		const rowAttr: Record<string, string> = { 'data-holder': h.key };
+		if (h.values.person !== undefined) rowAttr['data-person'] = h.values.person;
+		const r = buildRow(list, {
+			cls: text.inTree ? 'dynasty-holder-row' : ['dynasty-holder-row', 'is-not-in-tree'],
+			attr: rowAttr,
+			// A holder who is not in the tree has no lead: no "?" disc (D213). The text line says so.
+			...(text.inTree
+				? {
+						lead: (row: HTMLElement) => {
+							const p = this.data.g.byId.get(h.values.person!);
+							personLead(row, { name: p?.name ?? text.ruler, ...(p?.portrait ? { portrait: p.portrait } : {}), ...(p?.portraitCrop ? { portraitCrop: p.portraitCrop } : {}) }, this.pictures ?? undefined);
+						},
+					}
+				: {}),
+		});
 		if (text.inTree) {
 			const person = h.values.person!;
-			const name = words.createEl('button', { cls: 'dynasty-holder-name', attr: { type: 'button', 'aria-label': TITLES_UI.showCardLabel(text.ruler), 'data-focus': `name:${h.key}` } });
+			const name = r.title.createEl('button', { cls: 'dynasty-holder-name', attr: { type: 'button', 'aria-label': TITLES_UI.showCardLabel(lead), 'data-focus': `name:${h.key}` } });
 			// A button is a flex box in Obsidian, and a flex box drops the space that starts a text item. One inline label around
-			// the ruler text and the sobriquet is the only item, so the space before the sobriquet stays (D130 item 8).
-			const label = name.createSpan({ cls: 'dynasty-holder-label', text: text.ruler });
-			// D122: the sobriquet follows the ruler text on the same text line, in regular weight (the button is semibold).
+			// the name and the sobriquet is the only item, so the space before the sobriquet stays (D130 item 8).
+			const label = name.createSpan({ cls: 'dynasty-holder-label', text: lead });
+			// D122: the sobriquet follows the name on the same text line, in regular weight (the button is semibold).
 			if (text.sobriquet !== undefined) label.createSpan({ cls: 'dynasty-picker-sob', text: ` ${quotedSobriquet(text.sobriquet)}` });
 			name.addEventListener('click', () => this.guard(() => this.showCard(person)));
-		} else words.createDiv({ cls: 'dynasty-holder-name', text: text.ruler });
-		if (text.full) words.createDiv({ cls: 'dynasty-holder-full', text: text.full });
-		if (text.reign) words.createDiv({ cls: 'dynasty-holder-reign', text: text.reign });
-		if (!text.inTree) words.createDiv({ cls: 'dynasty-holder-note', text: TITLES_UI.notInTree });
-		const buttons = row.createDiv({ cls: 'dynasty-holder-buttons' });
-		const move = (dir: -1 | 1, cls: string, icon: string, label: string, aria: string) => {
-			const b = buttons.createEl('button', { cls: ['dynasty-sheet-action', 'dynasty-holder-move', cls], attr: { type: 'button', 'aria-label': aria, 'data-focus': `${cls}:${h.key}` } });
-			setIcon(b.createSpan({ cls: 'dynasty-holder-move-icon' }), icon);
-			b.createSpan({ cls: 'dynasty-holder-move-text', text: label });
+		} else r.title.createSpan({ cls: 'dynasty-holder-name', text: lead });
+		const sub = [keepsRuler ? text.full : undefined, text.reign, text.inTree ? undefined : TITLES_UI.notInTree].filter((x): x is string => !!x);
+		r.sub.setText(sub.join(' · '));
+		if (keepsRuler && text.full) r.sub.addClass('dynasty-holder-full');
+		const move = (dir: -1 | 1) => {
 			const to = i + dir;
-			b.disabled = to < 0 || to >= t.holders.length;
-			b.addEventListener('click', () =>
-				this.guard(() => {
-					if (to < 0 || to >= t.holders.length) return;
-					[t.holders[i], t.holders[to]] = [t.holders[to], t.holders[i]];
-					// The focus stays on the pressed button of the moved holder, or on its other arrow at an end.
-					const end = to === 0 || to === t.holders.length - 1;
-					this.build(end ? `${dir < 0 ? 'dynasty-holder-later' : 'dynasty-holder-earlier'}:${h.key}` : `${cls}:${h.key}`);
-				}),
-			);
+			if (to < 0 || to >= t.holders.length) return;
+			[t.holders[i], t.holders[to]] = [t.holders[to], t.holders[i]];
+			this.build(`more:${h.key}`);
 		};
-		move(-1, 'dynasty-holder-earlier', 'arrow-up', TITLES_UI.moveEarlier, TITLES_UI.moveEarlierLabel(text.ruler));
-		move(1, 'dynasty-holder-later', 'arrow-down', TITLES_UI.moveLater, TITLES_UI.moveLaterLabel(text.ruler));
-		const edit = buttons.createEl('button', { cls: ['dynasty-sheet-action', 'dynasty-holder-edit'], text: TITLES_UI.edit, attr: { type: 'button', 'aria-label': TITLES_UI.editLabel(text.ruler), 'data-focus': `edit:${h.key}` } });
-		edit.addEventListener('click', () => this.guard(() => this.editHolder(t, h)));
-		const remove = buttons.createEl('button', { cls: ['dynasty-sheet-action', 'dynasty-holder-remove'], text: TITLES_UI.remove, attr: { type: 'button', 'aria-label': TITLES_UI.removeLabel(text.ruler), 'data-focus': `remove:${h.key}` } });
-		remove.addEventListener('click', () =>
-			this.guard(() => {
-				const at = t.holders.indexOf(h);
-				if (at < 0) return;
-				t.holders.splice(at, 1);
-				const next = t.holders[at] ?? t.holders[at - 1];
-				this.build(next ? `remove:${next.key}` : `add-holder:${t.key}`);
-			}),
+		const more = iconButton(
+			r.actions(),
+			'more-vertical',
+			TITLES_UI.editLabel(lead),
+			() =>
+				showMenu(more, [
+					{ icon: 'edit-3', label: TITLES_UI.edit, run: () => this.guard(() => this.editHolder(t, h)) },
+					{ icon: 'arrow-up', label: TITLES_UI.moveEarlier, disabled: i === 0, run: () => this.guard(() => move(-1)) },
+					{ icon: 'arrow-down', label: TITLES_UI.moveLater, disabled: i === t.holders.length - 1, run: () => this.guard(() => move(1)) },
+					'sep',
+					{
+						icon: 'trash-2',
+						label: TITLES_UI.remove,
+						warning: true,
+						run: () =>
+							this.guard(() => {
+								const at = t.holders.indexOf(h);
+								if (at < 0) return;
+								t.holders.splice(at, 1);
+								const next = t.holders[at] ?? t.holders[at - 1];
+								this.build(next ? `more:${next.key}` : `add-holder:${t.key}`);
+							}),
+					},
+				]),
+			{ cls: 'dynasty-holder-more', focus: `more:${h.key}` },
 		);
 	}
 
@@ -510,7 +614,7 @@ export class TitlesWindow extends ListEditWindow {
 					h.values = v;
 					return null;
 				},
-				closed: () => done(`edit:${h.key}`),
+				closed: () => done(`more:${h.key}`),
 			}),
 		);
 	}
@@ -521,7 +625,7 @@ export class TitlesWindow extends ListEditWindow {
 		this.busy = true;
 		let picked: Awaited<ReturnType<typeof pickPerson>> = null;
 		try {
-			picked = await pickPerson(this.app, this.data.g, new Set(), TITLES_UI.pickerPlaceholder, TITLES_UI.pickerTitle, true, null, () => TITLES_UI.notInTreeRow);
+			picked = await pickPerson(this.app, this.data.g, new Set(), TITLES_UI.pickerPlaceholder, TITLES_UI.pickerTitle, true, null, () => TITLES_UI.notInTreeRow, this.pickerPictures());
 		} finally {
 			this.busy = false;
 		}
@@ -568,6 +672,16 @@ export class TitlesWindow extends ListEditWindow {
 		const go = () => {
 			this.finish();
 			this.o.show?.(id);
+		};
+		if (this.isDirty()) this.askDiscard(go);
+		else go();
+	}
+
+	/** A tap on an heir (G.7): the window closes and the person opens; with changes it asks first, as for a holder name. */
+	private openPerson(id: string): void {
+		const go = () => {
+			this.finish();
+			this.o.openPerson?.(id);
 		};
 		if (this.isDirty()) this.askDiscard(go);
 		else go();
@@ -650,17 +764,7 @@ export class TitlesWindow extends ListEditWindow {
 	/** The one question before Save changes an id: what changes, and how many people. Closing it is Cancel. */
 	private askIds(changed: TitleRow[], go: () => void): void {
 		const lines = changed.map((t) => ID_UI.confirmLine(this.label(t), t.id!, draftId(titleIdRow(t)), ID_UI.places(describeTitleIdChange(this.data.g, t.id!).people)));
-		this.showConfirm(ID_UI.confirmTitle(changed.length), [...lines, REMOVE.canUndo], 'save', [
-			{ label: ID_UI.keep, cls: 'dynasty-sheet-keep dynasty-id-keep', run: () => this.hideConfirm() },
-			{
-				label: ID_UI.change(changed.length),
-				cls: 'mod-cta dynasty-id-change',
-				run: () => {
-					this.hideConfirm();
-					go();
-				},
-			},
-		]);
+		this.askIdChange(changed.length, lines, go);
 	}
 
 	/** Writes the ops of the draft as one batch (one Undo step) and closes the window when it works. */
@@ -670,24 +774,9 @@ export class TitlesWindow extends ListEditWindow {
 		const showRow = show !== null ? this.byKey(show) : undefined;
 		const showId = showRow && showRow.id !== null ? (idChanged(titleIdRow(showRow)) ? draftId(titleIdRow(showRow)) : showRow.id) : null;
 		const deleted = this.rows.filter((t) => t.id !== null && t.deleted).map((t) => t.baseName || t.id!);
-		const idCount = ops.filter(isIdOp).length;
 		const h = this.o.handle;
-		this.sentIds = idCount > 0;
-		this.saving = true;
-		this.modalEl.addClass('is-saving');
-		let out: HandleWriteOutcome;
-		try {
-			this.o.beforeWrite?.();
-			// One write, so one Undo reverts every change of the window (spec §6.1, D8, §13.0 item 6).
-			out = await h.write({ kind: 'batch', ops });
-		} catch (e) {
-			console.error('Dynasty Tree: cannot save the titles', e);
-			this.refused(HOUSES.failed);
-			return;
-		} finally {
-			this.saving = false;
-			this.modalEl.removeClass('is-saving');
-		}
+		const out = await this.writeBatch(h, ops, this.o.beforeWrite, 'Dynasty Tree: cannot save the titles');
+		if (!out) return;
 		if (!out.ok) {
 			this.failed(out);
 			return;
@@ -700,36 +789,22 @@ export class TitlesWindow extends ListEditWindow {
 				console.error('Dynasty Tree: cannot show the line of succession', e);
 			}
 		}
-		if (deleted.length) {
-			const others = ops.length > deleted.length;
-			undoNotice(others ? `${TITLES_UI.deleted(deleted)} ${REMOVE.undoAlso}` : TITLES_UI.deleted(deleted), h, out.body);
-		} else if (idCount) {
-			undoNotice(ops.length > idCount ? `${ID_UI.changed(idCount)} ${REMOVE.undoAlso}` : ID_UI.changed(idCount), h, out.body);
-		}
+		this.undoAfterWrite(h, out, ops, deleted, TITLES_UI.deleted);
 	}
 
 	private failed(out: Exclude<HandleWriteOutcome, { ok: true }>): void {
 		const h = this.o.handle;
-		const detail = out.code === 'refused' ? out.refusal.detail : undefined;
-		onWriteFailed(out, {
-			stale: () => this.stale(h.body),
-			missing: () => this.refused(HOUSES.missing),
-			refused: (code) => {
-				// §13.17 rule 5: `id-taken` and `bad-value` of an id op are about the id, never "changed under the window".
-				const idText = this.sentIds ? idRefusalText(code, detail) : null;
-				if (idText) {
-					this.refused(idText);
-					return;
-				}
-				const gone = code === 'unknown-title' || code === 'unknown-holder' || code === 'unknown-person' || code === 'id-taken';
-				// A title, holder or person that is not in the tree now: the tree changed under the window.
-				// With the same body a reload changes nothing, so the stale message would come back at each Save.
-				if (gone && normBody(h.body) !== normBody(this.data.body)) this.stale(h.body);
-				else if (code === 'unknown-person') this.refused(TITLES_UI.personGone);
-				else if (code === 'blocked') this.refused(WRITE_TEXT.blocked);
-				else if (code === 'invalid-yaml') this.refused(HOUSES.invalid);
-				else this.refused(HOUSES.refused);
-			},
+		this.failedWrite(out, h, (body) => this.stale(body), (code, idText) => {
+			if (idText) {
+				this.refused(idText);
+				return;
+			}
+			const gone = code === 'unknown-title' || code === 'unknown-holder' || code === 'unknown-person' || code === 'id-taken';
+			// A title, holder or person that is not in the tree now: the tree changed under the window.
+			// With the same body a reload changes nothing, so the stale message would come back at each Save.
+			if (gone && normBody(h.body) !== normBody(this.data.body)) this.stale(h.body);
+			else if (code === 'unknown-person') this.refused(TITLES_UI.personGone);
+			else this.refusedPlainly(code);
 		});
 	}
 

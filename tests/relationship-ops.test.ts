@@ -3,7 +3,8 @@ import { deriveFamilies } from '../src/core/derive';
 import type { EditResult, Op } from '../src/core/edit';
 import { parseDynasty, textWithoutComments } from '../src/core/parse';
 import { familyOf } from '../src/core/family-query';
-import { applyOp, newPersonId } from '../src/core/yaml-edit';
+import { applyOp } from '../src/core/yaml-edit';
+import { nextIdFor } from './helpers';
 
 // Unit tests for the relationship ops (spec §6.2–§6.8) on YAML the golden files do not cover:
 // flow-map people, flow lists, comments between items, CRLF, aliases, single-string parents.
@@ -91,17 +92,14 @@ describe('add-person', () => {
 	});
 });
 
-describe('newPersonId (§6.8, D104)', () => {
+describe('the next person id (§6.8, D104)', () => {
 	it('is above every person id and every reference, and is a string', () => {
 		const src = 'options:\n  start: p12\npeople:\n  - id: ada\n    name: Ada\n  - id: p2\n    name: B\n    parents: [p5]\n';
-		expect(newPersonId(src, 'Ada')).toBe('p13');
-		expect(newPersonId(src, '1234')).toBe('p13');
-		expect(newPersonId(src, '')).toBe('p13');
+		expect(nextIdFor(src)).toBe('p13');
 	});
 
-	it('never throws on bad input', () => {
-		expect(newPersonId('a: [', 'Ada')).toBe('p1');
-		expect(newPersonId(undefined as unknown as string, undefined as unknown as string)).toBe('p1');
+	it('gives p1 for text that is not a block', () => {
+		expect(nextIdFor('a: [')).toBe('p1');
 	});
 });
 

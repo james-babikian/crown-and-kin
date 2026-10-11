@@ -57,7 +57,7 @@ async function drain(): Promise<void> {
 describe('review M9 obsidian: the sheet portrait', () => {
 	const BODY = ['people:', '  - id: aldric', '    name: Aldric Valmont', '    portrait: "[[aldric.jpg]]"', ''].join('\n');
 
-	it('the Select portrait button that has the keyboard focus stays in the sheet (and keeps the focus) when the portrait copy arrives', async () => {
+	it('the portrait button that has the keyboard focus stays in the sheet (and keeps the focus) when the portrait copy arrives', async () => {
 		const files = [file('Pictures/aldric.jpg')];
 		const app = {
 			metadataCache: { getFirstLinkpathDest: (p: string) => files.find((f) => f.path.endsWith(p)) ?? null },
@@ -77,13 +77,13 @@ describe('review M9 obsidian: the sheet portrait', () => {
 		const sheet = EditSheet.create(app as never, { handle: h as never, personId: 'aldric', sourcePath: 'Tree.md', pictures: store })!;
 		sheet.open();
 		const content = (sheet as unknown as { contentEl: FEl }).contentEl;
-		const select = content.querySelector('.dynasty-select-portrait')!;
+		const select = content.querySelector('.dynasty-pic')!;
 		select.focus();
 		expect(fakeDoc.activeElement).toBe(select);
 		// The copy arrives while the user is on the button (a keyboard user, or a press under way).
 		arrive({ url: 'blob:aldric', w: 96, h: 96, release() {} });
 		await settle();
-		expect(content.querySelector('.dynasty-sheet-portrait-img')?.getAttribute('src')).toBe('blob:aldric');
+		expect(content.querySelector('.dynasty-pic-img')?.getAttribute('src')).toBe('blob:aldric');
 		// The button the user is on must be the same element, still in the sheet, with the focus.
 		expect(content.contains(select)).toBe(true);
 		expect(content.contains(fakeDoc.activeElement)).toBe(true);

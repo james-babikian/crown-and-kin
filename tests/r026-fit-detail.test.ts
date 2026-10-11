@@ -59,7 +59,7 @@ describe('R026 fit: the body group of a card', () => {
 			expect(bodies).toHaveLength(1);
 			expect(c.children[c.children.length - 1]).toBe(bodies[0]);
 			const names = bodies[0].children.map((e) => [...e.classes][0]);
-			expect(names.slice(0, 3)).toEqual(['dynasty-card-strip', 'dynasty-card-full', 'dynasty-card-compact']);
+			expect(names.slice(0, 3)).toEqual(['dynasty-card-ribbon', 'dynasty-card-full', 'dynasty-card-compact']);
 			// The bg rect stays outside: the Overview level draws it, in the house colour.
 			expect(c.children.some((e) => e.hasClass('dynasty-card-bg'))).toBe(true);
 		}
@@ -173,6 +173,7 @@ describe('R026 fit: styles.css names few elements at a level change', () => {
 				'.dynasty-fold-pill',
 				'.dynasty-fold-pill-big',
 				'.dynasty-fold-text',
+				'.dynasty-fold-text.is-sideways',
 				'.dynasty-fold.is-open',
 				'.dynasty-tag-compact',
 				'.dynasty-tag-full',
@@ -182,7 +183,7 @@ describe('R026 fit: styles.css names few elements at a level change', () => {
 	});
 
 	it('no rule of the Overview level names a part inside the body group (they would restyle every card again)', () => {
-		const inside = ['.dynasty-card-full', '.dynasty-card-compact', '.dynasty-card-strip', '.dynasty-card-compact-sign', '.dynasty-card-compact-arms'];
+		const inside = ['.dynasty-card-full', '.dynasty-card-compact', '.dynasty-card-ribbon', '.dynasty-card-compact-sign', '.dynasty-card-compact-arms'];
 		for (const s of subjects('overview')) expect(inside, s).not.toContain(s);
 	});
 

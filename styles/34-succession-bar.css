@@ -1,0 +1,52 @@
+/*
+ * The bar of the Show view on the tree is the banner of the finder (`.dynasty-result` in 18-more-list-finder-bar.css; 0.2.8 G.13, I37 B: one row, with an X of 44 px
+ * on a phone). This chunk has the same bar at the top of the phone list (F.6, D182): the sentence, and an icon-only Close with a 44 × 44 px target.
+ * `dynasty-list-showbar`: a row of 48 px with the secondary background and a hairline below. In the flow of the list, not on a tree.
+ */
+.dynasty-list-succession {
+	/* Its own layer above Obsidian's block buttons (pencil, more), which appear over the right end of the bar after a tap (D212, list-showbar-layer). */
+	position: relative;
+	z-index: 1;
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	box-sizing: border-box;
+	min-height: 48px;
+	/* The bar reaches 8 px beyond the rows on both sides, and its text starts where the text of the rows starts. */
+	margin: 0 -8px;
+	padding: 0 0 0 16px;
+	background: var(--background-secondary);
+	border-bottom: 1px solid var(--background-modifier-border);
+	font-family: var(--font-interface);
+	font-size: var(--dynasty-type-text);
+	color: var(--text-normal);
+}
+
+.dynasty-list-succession .dynasty-succession-text {
+	flex: 1 1 auto;
+	min-width: 0;
+	padding: 6px 0;
+	line-height: 1.35;
+}
+
+.dynasty-list-succession .dynasty-succession-close {
+	flex: none;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 44px;
+	height: 44px;
+	min-width: 44px;
+	min-height: 44px;
+	padding: 0;
+	background: transparent;
+	box-shadow: none;
+	color: var(--text-normal);
+}
+
+/* Opaque in every theme (as the sheets, D212): Cupertino makes the secondary background 75 % see-through, and the rows would show through the text. */
+@supports (color: rgb( from red r g b)) {
+	.dynasty-list-succession {
+		background: rgb(from var(--background-secondary) r g b);
+	}
+}

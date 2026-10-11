@@ -22,17 +22,17 @@ import { tallCardsFor, tallTitlesFor, titleMeasure } from '../render/dom/tall-ca
 export interface MeasuredOptions {
 	fonts: SceneFonts;
 	measure: Measure;
-	/** Focus mode: people with relatives who are not shown. Not read since 0.2.4 (the `+` badge sits on the corner and no longer narrows a name); kept so callers compile. */
-	hidden?: ReadonlyMap<string, number>;
 	/** M8: the card labels of the drawn graph. */
 	labels?: ReadonlyMap<string, CardLabel>;
 	/** "Show dates on cards": off leaves the reign out of the title text line (D61). */
 	showDates: boolean;
 	/** "Show portraits on cards" (O10). */
 	showPortraits: boolean;
+	/** "Arms on cards" (0.2.8, D206): which cards show arms. Absent: the 0.2.7 rule (every card of a house with arms). */
+	armsOnCards?: 'few' | 'all';
 	/**
 	 * M10 (F1): the people that folds hide. They are left out of the tall-card and tall-title answers, so hidden people never change
-	 * the settings or the cache key. Not the same as `hidden` (the focus badge counts). Absent = the `foldHidden` of `base`.
+	 * the settings or the cache key. Absent = the `foldHidden` of `base`.
 	 */
 	foldHidden?: ReadonlySet<string>;
 	/** The user's break places for names (D118). */
@@ -63,6 +63,8 @@ export function measuredLayout(g: FamilyGraph, geo: Geometry, base: LayoutSettin
 	delete plain.tallTitles;
 	delete plain.arms;
 	delete plain.portraits;
+	delete plain.personalArms;
+	delete plain.armsOnCards;
 	delete plain.foldHidden;
 	delete plain.foldedFamilies;
 	delete plain.foldControls;
@@ -75,6 +77,9 @@ export function measuredLayout(g: FamilyGraph, geo: Geometry, base: LayoutSettin
 	// L1: empty lists stay out, so a tree with no pictures has the M8 cache key.
 	if (sets.arms.length) plain.arms = sets.arms;
 	if (sets.portraits.length) plain.portraits = sets.portraits;
+	// 0.2.8: the people with personal arms always show them; the setting decides the house arms (D206).
+	if (sets.personalArms?.length) plain.personalArms = sets.personalArms;
+	if (o.armsOnCards !== undefined) plain.armsOnCards = o.armsOnCards;
 	const drawn = drawnGeometry(geo, plain);
 	const titles = o.labels ? tallTitlesFor(g, o.labels, drawn, o.showDates, titleMeasure(drawn, o.fonts, o.measure)).filter((id) => !skip.has(id)) : [];
 	const titled: LayoutSettings = titles.length ? { ...plain, tallTitles: titles } : plain;

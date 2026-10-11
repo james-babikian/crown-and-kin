@@ -52,7 +52,7 @@ describe('F.4: the tab text and width', () => {
 });
 
 describe('F.4: the Roundel right edge', () => {
-	it('portrait: axis - 1.6 em; arms only: axis - 1.45 em; no picture: axis - 0.4 em (a portrait with arms is a portrait)', () => {
+	it('portrait: axis - 1.9 em; arms only: axis - 1.75 em; no picture: axis - 0.4 em (a portrait with arms is a portrait); 0.2.8 (G.5): 0.3 em further out', () => {
 		for (const f of SIZES) {
 			const g = geo(f, 'roundel');
 			const axis = roundelAxis(g);
@@ -61,9 +61,9 @@ describe('F.4: the Roundel right edge', () => {
 				return axis - (r.x + r.w);
 			};
 			for (const n of [3, 4]) {
-				expect(right(true, false, n), `f${f}`).toBeCloseTo(1.6 * f, 9);
-				expect(right(true, true, n), `f${f}`).toBeCloseTo(1.6 * f, 9);
-				expect(right(false, true, n), `f${f}`).toBeCloseTo(1.45 * f, 9);
+				expect(right(true, false, n), `f${f}`).toBeCloseTo(1.9 * f, 9);
+				expect(right(true, true, n), `f${f}`).toBeCloseTo(1.9 * f, 9);
+				expect(right(false, true, n), `f${f}`).toBeCloseTo(1.75 * f, 9);
 				expect(right(false, false, n), `f${f}`).toBeCloseTo(0.4 * f, 9);
 			}
 		}
@@ -126,10 +126,10 @@ describe('F.4: the clear spaces, on both forms, for every picture kind and text'
 
 describe('F.4: the numbers at 16 px', () => {
 	const g = geo(16, 'roundel');
-	it('"20th" with a portrait has 56 px of room and needs 43', () => {
+	it('"20th" with a portrait has 48 px of room and needs 43', () => {
 		const axis = roundelAxis(g);
-		const room = axis - 1.6 * 16 - (0.5 + 0.25) * 16;
-		expect(Math.round(room)).toBe(56);
+		const room = axis - 1.9 * 16 - (0.5 + 0.25) * 16;
+		expect(Math.round(room)).toBe(48);
 		const r = ordinalTabRect(g, true, false, 4);
 		expect(r.w).toBeCloseTo(43.2, 9);
 		expect(r.w).toBeLessThanOrEqual(room);
@@ -140,18 +140,18 @@ describe('F.4: the numbers at 16 px', () => {
 			const r = ordinalTabRect(g, p, a, n);
 			return [r.x, r.y, r.w, r.h].map((v) => Math.round(v * 100) / 100);
 		};
-		expect(at(true, false, 3)).toEqual([31.6, -8.8, 36.8, 18.4]);
-		expect(at(true, false, 4)).toEqual([25.2, -8.8, 43.2, 18.4]);
-		expect(at(false, true, 3)).toEqual([34, -8.8, 36.8, 18.4]);
-		expect(at(false, false, 3)).toEqual([50.8, -8.8, 36.8, 18.4]);
-		expect(at(false, false, 4)).toEqual([44.4, -8.8, 43.2, 18.4]);
+		expect(at(true, false, 3)).toEqual([22.8, -8.8, 36.8, 18.4]);
+		expect(at(true, false, 4)).toEqual([16.4, -8.8, 43.2, 18.4]);
+		expect(at(false, true, 3)).toEqual([25.2, -8.8, 36.8, 18.4]);
+		expect(at(false, false, 3)).toEqual([46.8, -8.8, 36.8, 18.4]);
+		expect(at(false, false, 4)).toEqual([40.4, -8.8, 43.2, 18.4]);
 	});
 
 	it('the constants are the contract numbers', () => {
 		expect(ORDINAL_EM.width3).toBe(2.3);
 		expect(ORDINAL_EM.width4).toBe(2.7);
 		expect(ORDINAL_EM.corner).toBe(0.2);
-		expect(ORDINAL_EM.text).toBe(0.85);
+		expect(ORDINAL_EM.text).toBe(0.8);
 		expect(ROUNDEL_EM.tabH).toBe(1.15);
 	});
 });

@@ -7,7 +7,7 @@ import type { IssueCode } from '../src/core/messages';
 import { parseDynasty } from '../src/core/parse';
 import { normaliseSobriquet } from '../src/core/sobriquet';
 import { computeRelations, findRelation, lineSubgraph, relationsKey } from '../src/core/relations';
-import type { CardLabels, CardTitleOp, DescribeDeleteTitle, HolderTable, PickerSuffix, ReignText, SearchNames } from '../src/core/titles';
+import type * as TitlesModule from '../src/core/titles';
 import type { Title } from '../src/core/types';
 import { applyOp } from '../src/core/yaml-edit';
 import { geometryFor } from '../src/layout/geometry';
@@ -856,13 +856,12 @@ describe('fuzz: relation names and the finder never throw (spec §13.1, §13.2, 
 // --- Titles (M8) ---------------------------------------------------------
 
 interface TitlesHelpers {
-	cardLabels: CardLabels;
-	reignText: ReignText;
-	searchNames: SearchNames;
-	pickerSuffix: PickerSuffix;
-	cardTitleOp: CardTitleOp;
-	describeDeleteTitle: DescribeDeleteTitle;
-	holderTable: HolderTable;
+	cardLabels: typeof TitlesModule.cardLabels;
+	reignText: typeof TitlesModule.reignText;
+	searchNames: typeof TitlesModule.searchNames;
+	pickerSuffix: typeof TitlesModule.pickerSuffix;
+	describeDeleteTitle: typeof TitlesModule.describeDeleteTitle;
+	holderTable: typeof TitlesModule.holderTable;
 }
 
 // Variable paths keep the module types loose in this file; the modules exist and a missing one fails the file.
@@ -923,7 +922,6 @@ function runTitles(text: string, rng: Rng, m: TitlesHelpers) {
 		for (const x of m.searchNames(l, p.name)) if (typeof x !== 'string') fail('a search name is not text');
 		m.pickerSuffix(l, p.name);
 		for (const h of l.holdings) m.reignText(h.entries);
-		if (l.holdings.length) m.cardTitleOp(g, p.id, rng.pick(l.holdings).title.id);
 	}
 	for (const t of list) {
 		const d = m.describeDeleteTitle(g, t.id);

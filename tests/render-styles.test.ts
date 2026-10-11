@@ -3,7 +3,8 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { cardText, geometryFor } from '../src/layout/geometry';
 import { COMPACT_NAME_EM, RUMOUR_FONT_EM, TAG_COMPACT_FONT_EM, TAG_FONT_EM } from '../src/render/dom/scene';
-import { DEAD_STRIP_OPACITY, HOUSE_DARK_LIFT, STROKES, UNION_MARKS, roleCss } from '../src/render/styles';
+import { DEAD_STRIP_OPACITY, HOUSE_DARK_LIFT, STROKES, UNION_MARKS } from '../src/render/styles';
+import { roleCss } from './role-css';
 
 // styles.css draws the lines in Obsidian; STROKES draws them in the headless pictures and the
 // legend. The two must not drift apart.
@@ -48,6 +49,8 @@ describe('styles.css matches STROKES', () => {
 		for (const list of blocks) {
 			list.forEach(([k, v], i) => {
 				if (!v.includes('color-mix(')) return;
+				// A custom property takes any text, so a second declaration is no fallback: the next test checks the tokens.
+				if (k.startsWith('--')) return;
 				mixes++;
 				const first = /color-mix\(in srgb, (var\([^)]*\)*\))/.exec(v)?.[1];
 				expect(first, v).toBeDefined();
@@ -60,6 +63,28 @@ describe('styles.css matches STROKES', () => {
 		expect(mixes).toBeGreaterThanOrEqual(6);
 	});
 
+	it('a token (custom property) with color-mix() has a plain value first and is set again only inside @supports', () => {
+		const head = '@supports (color: color-mix(';
+		const start = css.indexOf(head);
+		expect(start).toBeGreaterThan(-1);
+		let depth = 0;
+		let end = -1;
+		for (let i = css.indexOf('{', start); i < css.length; i++) {
+			if (css[i] === '{') depth++;
+			else if (css[i] === '}' && --depth === 0) {
+				end = i;
+				break;
+			}
+		}
+		const inside = css.slice(css.indexOf('{', start) + 1, end);
+		const outside = css.slice(0, start) + css.slice(end + 1);
+		const mixed = [...inside.matchAll(/(--dynasty-[\w-]+):\s*color-mix\(/g)].map((m) => m[1]);
+		expect(mixed.length).toBeGreaterThan(0);
+		for (const name of mixed) expect(outside, name).toMatch(new RegExp(`${name}:\\s*var\\(`));
+		// Outside the @supports block no token holds a color-mix().
+		expect(outside).not.toMatch(/--dynasty-[\w-]+:\s*color-mix\(/);
+	});
+
 	it('has no colour literals', () => {
 		// rgba(var(--callout-color), …) is Obsidian's own callout colour, so it is allowed.
 		expect(css).not.toMatch(/#[0-9a-f]{3,8}\b|rgba?\(\s*[\d.]|hsla?\(/i);
@@ -67,17 +92,18 @@ describe('styles.css matches STROKES', () => {
 });
 
 describe('styles.css cards and union signs (D26, D27)', () => {
-	it('dates use the dates role', () => {
-		expect(values('.dynasty-card-dates', 'fill')).toEqual(roleCss('dates'));
+	it('dates use the plugin grey, with the dates role (the theme grey) as the fallback (D212, contrast-tokens)', () => {
+		expect(roleCss('dates')).toEqual(['var(--text-muted)']);
+		expect(values('.dynasty-card-dates', 'fill')).toEqual(['var(--dynasty-muted, var(--text-muted))']);
+		expect(values('.dynasty-card-title', 'fill')).toEqual(['var(--dynasty-muted, var(--text-muted))']);
 	});
 
-	it('house strips: 0.5 em wide, lifted in the dark theme, less faded when dead', () => {
-		expect(cardText(geometryFor(16)).stripW).toBe(8);
-		expect(values('.theme-dark .dynasty-has-house .dynasty-card-strip', 'fill')).toEqual([
+	it('house ribbons: lifted in the dark theme, less faded when dead', () => {
+		expect(values('.theme-dark .dynasty-has-house .dynasty-card-ribbon', 'fill')).toEqual([
 			'var(--dynasty-house-color)',
-			`color-mix(in srgb, var(--dynasty-house-color) ${Math.round((1 - HOUSE_DARK_LIFT) * 100)}%, var(--text-normal))`,
+			`color-mix(in srgb, var(--dynasty-house-color) ${Math.round((1 - HOUSE_DARK_LIFT) * 100)}%, var(--text-normal))`, // 60 % since 0.2.8
 		]);
-		expect(Number(rule('.dynasty-deceased .dynasty-card-strip')?.opacity)).toBe(DEAD_STRIP_OPACITY);
+		expect(Number(rule('.dynasty-deceased .dynasty-card-ribbon')?.opacity)).toBe(DEAD_STRIP_OPACITY);
 	});
 
 	it('union signs have the outline widths the headless renderer draws', () => {
@@ -105,11 +131,14 @@ describe('styles.css text sizes match what the renderer measures', () => {
 		['.dynasty-card-name', t.nameSize / 16],
 		['.dynasty-card-title', t.smallSize / 16],
 		['.dynasty-card-dates', t.smallSize / 16],
-		['.dynasty-card-compact', COMPACT_NAME_EM],
 		['.dynasty-rumour-marker text', RUMOUR_FONT_EM],
 		['.dynasty-tag-full .dynasty-tag-text', TAG_FONT_EM],
 	])('%s', (selector, k) => {
 		expect(rule(selector)?.['font-size']).toBe(times(k));
+	});
+
+	it('.dynasty-card-compact: the Compact size of the note font, or the shrunk size the scene sets for a long name (D203)', () => {
+		expect(rule('.dynasty-card-compact')?.['font-size']).toBe(`calc(var(--dynasty-font-size) * var(--dynasty-compact-em, ${COMPACT_NAME_EM}))`);
 	});
 
 	it('Compact and Overview tags', () => {

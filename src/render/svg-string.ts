@@ -19,21 +19,24 @@
 import type { FamilyGraph } from '../core/derive';
 import { isDead } from '../core/succession-keys';
 import type { CardLabel } from '../core/titles';
-import { ORDINAL_EM, ROUNDEL_EM, centredWithoutWord, cardText, isRoundel, nameCountOf, nameRoom, ordinalTabRect, relationY, roundelPics, signBelowRing, tagTop, youTabRect, type CardText, type ShownLines } from '../layout/geometry';
+import { ORDINAL_EM, ROUNDEL_EM, centredWithoutWord, cardText, footSpan, isRoundel, nameCountOf, nameRoom, ordinalTabRect, relationY, ribbonWidth, roundelPics, signBelowRing, tagTop, youTabRect, type CardText, type ShownLines } from '../layout/geometry';
+import { armsGap, type ArmsOutline } from '../layout/arms-outline';
 import { farTagSigns } from '../layout/far-tag-sign';
 import { illegitimateSigns } from '../layout/illegitimate-sign';
 import { FOLD_EM } from '../layout/fold-spots';
 import type { EdgeDrawing, NameLineCount, StrokeKind, TreeLayout } from '../layout/model';
-import { signText } from './dom/folds';
-import { ME_WORD, TAB_TEXT_EM, type Measure, type SceneFonts } from './dom/scene';
+import { FOLD_CHIP_EM, signText } from './dom/folds';
+import { FRAME_STROKE_PX, RUMOUR_FONT_EM, TAB_TEXT_BASE_EM, TAB_TEXT_EM, type Measure, type SceneFonts } from './dom/scene';
 import { legendRows, type LegendHouse, type LegendPart } from './legend';
 import { lineLook, type LineMarks, type LineState } from './line-highlight';
 import type { BreakList } from './break-words';
 import { cardNameLines, titleLines, type NameMeasure, type NameRun } from './name-lines';
 import { fixedColour, fontOf, savedFrame, xmlText, type PictureMap, type SavedFrame, type SavedParts } from './saved-picture';
-import { DEAD_STRIP_OPACITY, DEFAULT_DARK, DEFAULT_LIGHT, FADED_OPACITY, HEIR_LOOK, ME_LOOK, ME_RING_INNER, ON_LINE_EXTRA, ROUNDEL_LOOK, STROKES, TAG_MARK, UNION_MARKS, stripColour, tagMarkSlot, unionMark, unionShape, type Palette, type UnionShape } from './styles';
-import { LEGEND_LABELS, SIGN_LEGEND_LABEL, dateLine, farTagName, splitMaybe } from './tree-info';
-import { markedBarPath, truncate, truncateWithMaybe } from './view-math';
+import { DEAD_STRIP_OPACITY, DEFAULT_DARK, DEFAULT_LIGHT, FADED_OPACITY, HEIR_LOOK, ME_LOOK, ME_RING_INNER, ON_LINE_EXTRA, SAVED_CARD_RADIUS, STROKES, TAG_MARK, UNION_MARKS, stripColour, tagMarkSlot, unionMark, unionShape, type Palette, type UnionShape } from './styles';
+import { LEGEND_DEAD_DOUBT_LABEL, LEGEND_DEAD_LABEL, LEGEND_LABELS, SIGN_LEGEND_LABEL } from './legend-text';
+import { dateLine, farTagName, splitMaybe } from './tree-info';
+import { ribbonPath, truncate, truncateWithMaybe } from './view-math';
+import { ME_WORD } from './view-text';
 
 /** The fade of a part beside the finder's line, as an SVG attribute (D47). */
 const fadeAttr = (s: LineState) => (s === 'faded' ? ` opacity="${FADED_OPACITY}"` : '');
@@ -103,6 +106,8 @@ export interface SvgOptions {
 	measure?: Measure;
 	/** P2: the font families and bold weight the text is measured and written in. */
 	fonts?: SceneFonts;
+	/** D219: the outlines of the arms pictures, by the keys of `pictures` (`arms:<house>`, `person-arms:<person>`); an arms picture without one is drawn without a gap, as on screen while its shape is not known. */
+	outlines?: ReadonlyMap<string, ArmsOutline>;
 	/** B9: arms and portraits to embed (data URIs), without the saved picture's heading and legend (the spike). */
 	pictures?: PictureMap;
 	/** P3: draw a saved picture: white ground, heading, tree and legend, colours from `palette`, and parity ids. */
@@ -220,12 +225,12 @@ export function renderSvg(g: FamilyGraph, layout: TreeLayout, edges: EdgeDrawing
 		const isMe = opts.me !== undefined && p.id === opts.me;
 		// D96: on the marked card the sign keeps clear of the mark's inner ring.
 		const ring = isMe ? ME_RING_INNER : undefined;
-		const hasArms = !!(box.arms && house);
+		const hasArms = !!(box.arms && (p.arms || house));
 		// The Roundel's pictures stand on its top edge (`rp`); the text card has none.
 		const rp = roundel ? roundelPics(geo, { arms: hasArms, portrait: !!box.portrait }) : undefined;
 		// F.4: the ordinal tab replaces the "You" tab of the same card.
 		const ordinal = ordinalIds.has(p.id) ? opts.ordinals?.get(p.id) : undefined;
-		const tab = layout.youTab === p.id && !ordinal ? youTabRect(geo, !!(rp?.portrait || rp?.arms)) : undefined;
+		const tab = layout.youTab === p.id && !ordinal ? youTabRect(geo, !!rp?.portrait, !!rp?.arms) : undefined;
 		const ordTab = ordinal ? ordinalTabRect(geo, !!rp?.portrait, !!rp?.arms, [...ordinal].length) : undefined;
 		const nameFont = fontOf(fonts.bold, t.nameSize, fonts.text);
 		const sobFont = fontOf('400', t.nameSize, fonts.text);
@@ -235,28 +240,23 @@ export function renderSvg(g: FamilyGraph, layout: TreeLayout, edges: EdgeDrawing
 		const nameMeasure: NameMeasure = measured ? (s, sob) => measured(s, sob ? sobFont : nameFont) : (s, sob) => textWidth(s, t.nameSize, !sob);
 		const names = cardNameLines(shownName, cl?.sobriquet ?? p.sobriquet, nameRoom(geo, t, signed.has(p.id), ring), nameMeasure, count, opts.breaks);
 		out.push(`<g${di(`card:${p.id}`)}${fadeAttr(look.card(p.id))}>`);
-		// F.2, F.5: the heir's still outline, as the highlight of the screen at rest: a wide ring in the text colour under the card, and an accent border. The marked heir keeps its border in the text colour (D153), so its ring takes the accent.
+		// F.2, F.5 (0.2.8, I35 as changed by D212): the heir's outline is one accent border, 2 px wide; no second ring. The marked heir keeps the marked card's border
+		// in the text colour (D153), and its ordinal tab shows that it is an heir.
 		const heir = heirIds.has(p.id);
-		if (heir) out.push(`<rect x="${box.x}" y="${box.y}" width="${box.w}" height="${box.h}" rx="6" fill="none" stroke="${isMe ? c.accent : c.text}" stroke-width="${HEIR_LOOK.ring}"${di(`heir:${p.id}`)}/>`);
 		// D41, D153: the marked card has one thicker border in the text colour; no theme accent colour is used.
 		const border = isMe ? `stroke="${c.text}" stroke-width="${ME_LOOK.border}"` : heir ? `stroke="${c.accent}" stroke-width="${HEIR_LOOK.border}"` : `stroke="${c.cardBorder}"`;
-		out.push(`<rect x="${box.x}" y="${box.y}" width="${box.w}" height="${box.h}" rx="6" fill="${c.cardFill}" ${border}/>`);
+		// The heir's outline is the card's own border now, so its parity id sits on the card rect.
+		out.push(`<rect x="${box.x}" y="${box.y}" width="${box.w}" height="${box.h}" rx="${SAVED_CARD_RADIUS}" fill="${c.cardFill}" ${border}${heir ? di(`heir:${p.id}`) : ''}/>`);
 		const barFill = `fill="${esc(accent)}"${dead ? ` fill-opacity="${DEAD_STRIP_OPACITY}"` : ''}`;
-		// D176 (1): on the marked card the bar lies inside the thick border (it starts at the inner edge and follows the inner corners); other cards keep the bar at the card edge.
-		if (isMe) out.push(`<path d="${markedBarPath(box.x, box.y, box.h, t.stripW, ME_LOOK.border, 6)}" ${barFill}/>`);
-		else out.push(`<rect x="${box.x}" y="${box.y}" width="${t.stripW}" height="${box.h}" rx="3" ${barFill}/>`);
+		// 0.2.8 (C, G.15): the house ribbon along the top edge (the left edge of a sideways card), with the card's own corners at a fixed radius; on the marked card it lies inside the thick border.
+		const rib = ribbonWidth(geo);
+		const inset = isMe ? ME_RING_INNER : 0;
+		out.push(`<path d="${ribbonPath(box.x + inset, box.y + inset, roundel ? box.w - 2 * inset : rib, roundel ? rib : box.h - 2 * inset, rib, Math.max(0, SAVED_CARD_RADIUS - inset), roundel ? 'top' : 'left')}" ${barFill}/>`);
 		if (t.r1?.plate && opts.relations?.get(p.id)?.text) {
-			// The footer plate of the relation word, made first so the word lies over it (as in the scene): the house colour, also on the marked card (D153).
-			// A person with no relation word has no plate.
-			const ins = isMe ? ME_RING_INNER : 1;
-			const x0 = box.x + t.stripW;
-			const x1 = box.x + box.w - ins;
-			const y0 = box.y + t.r1.plate.y;
-			const y1 = box.y + box.h - ins;
-			const rr = ROUNDEL_LOOK.corner;
-			const opacity = dark ? ROUNDEL_LOOK.plate.dark : ROUNDEL_LOOK.plate.light;
-			out.push(`<path d="M${x0} ${y0}H${x1}V${y1 - rr}Q${x1} ${y1} ${x1 - rr} ${y1}H${x0}Z" fill="${esc(accent)}" fill-opacity="${opacity}"${di(`plate:${p.id}`)}/>`);
-			out.push(`<line x1="${x0}" y1="${y0}" x2="${x1}" y2="${y0}" stroke="${esc(accent)}" stroke-opacity="${ROUNDEL_LOOK.hairline.opacity}" stroke-width="${ROUNDEL_LOOK.hairline.width}"/>`);
+			// The foot hairline over the relation word (there is no footer plate). A person with no relation word has none.
+			const span = footSpan(geo, box.w, isMe ? ME_RING_INNER : 1);
+			const y0 = box.y + t.r1.plate.y + 0.5;
+			out.push(`<line x1="${box.x + span.x0}" y1="${y0}" x2="${box.x + span.x1}" y2="${y0}" stroke="${c.cardBorder}" stroke-width="1"${di(`foot:${p.id}`)}/>`);
 		}
 		names.forEach((runs: NameRun[], i) => {
 			const y = box.y + [t.nameBaseline, t.name2Baseline!, t.name3Baseline!][i];
@@ -286,23 +286,30 @@ export function renderSvg(g: FamilyGraph, layout: TreeLayout, edges: EdgeDrawing
 		const relY = relationY(t);
 		if (relation && relY !== undefined) {
 			const style = isMe ? `font-style="italic" font-weight="${esc(nameWeight)}"` : 'font-style="italic"';
-			// The word may use the plate's width; every other line keeps its column.
+			// The word may use the width that the card gives it; every other line keeps its column. 0.2.8: the word is muted; "You" is in the text colour.
 			const relW = t.relationW ?? t.textW;
 			const { word, suffix } = splitMaybe(relation);
 			const relFont = relationFontOf(t.smallSize, fonts.text, isMe, fonts.bold);
 			const relText = suffix
 				? truncateWithMaybe(word, suffix, relW, (s) => (measured ? measured(s, relFont) : textWidth(s, t.smallSize, isMe)))
 				: measured ? cutWith(relation, relW, relFont) : fit(relation, relW, t.smallSize, isMe);
-			out.push(`<text x="${tx}" y="${box.y + relY}"${anchor} font-size="${t.smallSize}" ${style} fill="${c.text}"${di(`relation:${p.id}`)}>${esc(relText)}</text>`);
+			out.push(`<text x="${tx}" y="${box.y + relY}"${anchor} font-size="${t.smallSize}" ${style} fill="${isMe ? c.text : c.textMuted}"${di(`relation:${p.id}`)}>${esc(relText)}</text>`);
 		}
 		// M9: the pictures. Arms with a problem show nothing; a portrait always has its frame (B1, B9).
 		const muted = dead ? ` opacity="${DEAD_PICTURE_OPACITY}"` : '';
 		if (rp) {
 			// B.3.3: the arms and the medallion on the top edge, in the scene's order. The saved picture draws the Full level only, so each picture is made once.
-			const ringW = ROUNDEL_EM.ring * geo.fontPx;
 			if (rp.arms) {
-				const uri = pics?.get(`arms:${house!.id}`);
+				// The personal arms of the person, else the arms of the house. The caller (`save-picture.ts`) names the personal ones `person-arms:<id>`.
+				const uri = p.arms ? pics?.get(`person-arms:${p.id}`) : pics?.get(`arms:${house!.id}`);
 				const r = rp.arms;
+				// D219: the gap in the colour of the page follows the outline of the picture; the picture comes over it. Without an outline there is no gap.
+				// No `opacity` on the gap (a dead person's arms are faded, the gap behind them is not): resvg 2.6 panics on a layer outside a cropped view, as it does on an image.
+				const outline = isUri(uri) ? opts.outlines?.get(p.arms ? `person-arms:${p.id}` : `arms:${house!.id}`) : undefined;
+				if (outline) {
+					const gap = armsGap(outline, { x: box.x + r.x, y: box.y + r.y, w: r.w, h: r.h }, ROUNDEL_EM.halo * geo.fontPx);
+					out.push(`<path d="${gap.d}" fill="${ground}" stroke="${ground}" stroke-width="${gap.strokeWidth}" stroke-linejoin="round" fill-rule="evenodd"/>`);
+				}
 				if (isUri(uri)) out.push(`<image href="${esc(uri)}" x="${box.x + r.x}" y="${box.y + r.y}" width="${r.w}" height="${r.h}" preserveAspectRatio="xMidYMid meet"${muted}${di(`arms:${p.id}`)}/>`);
 			}
 			if (rp.portrait) {
@@ -310,34 +317,36 @@ export function renderSvg(g: FamilyGraph, layout: TreeLayout, edges: EdgeDrawing
 				const uri = pics?.get(`portrait:${p.id}`);
 				const cx = box.x + rp.cx;
 				const cy = box.y + rp.cy;
-				// A card-colour halo under the medallion keeps the line and the card edge off the ring.
-				out.push(`<circle cx="${cx}" cy="${cy}" r="${rp.haloR}" fill="${c.cardFill}"/>`);
+				// A gap in the page colour round the picture keeps the line and the card edge off it.
+				out.push(`<circle cx="${cx}" cy="${cy}" r="${rp.haloR}" fill="${ground}"/>`);
+				const absent = uri === 'missing';
 				if (isUri(uri)) {
 					const id = `dynasty-portrait-clip-${clips++}`;
 					out.push(`<clipPath id="${id}"><circle cx="${cx}" cy="${cy}" r="${r.w / 2}"/></clipPath>`);
 					out.push(`<image href="${esc(uri)}" x="${box.x + r.x}" y="${box.y + r.y}" width="${r.w}" height="${r.h}" preserveAspectRatio="xMidYMin slice" clip-path="url(#${id})"${muted}${di(`portrait:${p.id}`)}/>`);
+				} else {
+					// D219: no ring round a picture that shows. A portrait that is missing or cannot be read keeps a thin frame on the picture's edge; a file that is not
+					// in the vault gives the dashed frame with a grey inside, as on screen.
+					const paint = absent ? `fill="${c.cardBorder}" stroke="${c.textMuted}" stroke-dasharray="3 2"` : `fill="none" stroke="${c.textMuted}"`;
+					out.push(`<circle cx="${cx}" cy="${cy}" r="${rp.ringR - FRAME_STROKE_PX / 2}" ${paint} stroke-width="${FRAME_STROKE_PX}"${di(`frame:${p.id}`)}/>`);
 				}
-				// The ring is drawn on its middle line, in the house colour; only a file that is not in the vault gives the dashed ring with a grey inside.
-				const paint = uri === 'missing' ? `fill="${c.cardBorder}" stroke="${esc(accent)}" stroke-dasharray="3 2"` : `fill="none" stroke="${esc(accent)}"`;
-				out.push(`<circle cx="${cx}" cy="${cy}" r="${rp.ringR - ringW / 2}" ${paint} stroke-width="${ringW}"${di(`frame:${p.id}`)}/>`);
 			}
 		}
 		if (tab) {
 			// D148: the small "You" tab on the top edge of the person that `TreeLayout.youTab` names; the Full level only, so no other level hides it.
-			// D153: the tab is a small plate in the house colour. It lies on the border and the line above the card, so a card-colour base under it keeps them from showing through the tint.
+			// 0.2.8: one look for both tabs: the card colour inside a 1 px border in the text colour, on a card-colour base with a wide edge, so the border
+			// and the line above the card do not show through.
 			const spot = `x="${box.x + tab.x}" y="${box.y + tab.y}" width="${tab.w}" height="${tab.h}" rx="${tab.h / 2}"`;
-			const tabOpacity = dark ? ROUNDEL_LOOK.plate.dark : ROUNDEL_LOOK.plate.light;
-			out.push(`<rect ${spot} fill="${c.cardFill}" stroke="${c.cardFill}" stroke-width="${ROUNDEL_LOOK.tabStroke}"/>`);
-			out.push(`<rect ${spot} fill="${esc(accent)}" fill-opacity="${tabOpacity}" stroke="${esc(accent)}" stroke-opacity="${ROUNDEL_LOOK.hairline.opacity}" stroke-width="${ROUNDEL_LOOK.hairline.width}"${di(`tab:${p.id}`)}/>`);
-			out.push(`<text x="${box.x + tab.x + tab.w / 2}" y="${box.y + tab.y + tab.h / 2 + 0.35 * TAB_TEXT_EM * geo.fontPx}" font-size="${TAB_TEXT_EM * geo.fontPx}" font-style="italic" font-weight="${esc(nameWeight)}" text-anchor="middle" fill="${c.text}">${ME_WORD}</text>`);
+			out.push(`<rect ${spot} fill="${c.cardFill}" stroke="${c.cardFill}" stroke-width="${HEIR_LOOK.tabBase}"/>`);
+			out.push(`<rect ${spot} fill="${c.cardFill}" stroke="${c.text}" stroke-width="${HEIR_LOOK.tabBorder}"${di(`tab:${p.id}`)}/>`);
+			out.push(`<text x="${box.x + tab.x + tab.w / 2}" y="${box.y + tab.y + tab.h / 2 + TAB_TEXT_BASE_EM * geo.fontPx}" font-size="${TAB_TEXT_EM * geo.fontPx}" font-weight="${esc(nameWeight)}" text-anchor="middle" fill="${c.text}">${ME_WORD}</text>`);
 		}
 		if (ordTab) {
-			// F.4: the ordinal tab, in the fixed colours: a card-colour base, the house tint of the plate, a 1 px border and the text in the text colour, bold, not italic.
+			// F.4: the ordinal tab, in the fixed colours and with the same look as the "You" tab; the text is bold, not italic.
 			const spot = `x="${box.x + ordTab.x}" y="${box.y + ordTab.y}" width="${ordTab.w}" height="${ordTab.h}" rx="${ORDINAL_EM.corner * geo.fontPx}"`;
-			const tabOpacity = dark ? ROUNDEL_LOOK.plate.dark : ROUNDEL_LOOK.plate.light;
-			out.push(`<rect ${spot} fill="${c.cardFill}"/>`);
-			out.push(`<rect ${spot} fill="${esc(accent)}" fill-opacity="${tabOpacity}" stroke="${c.text}" stroke-width="${HEIR_LOOK.tabBorder}"${di(`ordinal:${p.id}`)}/>`);
-			out.push(`<text x="${box.x + ordTab.x + ordTab.w / 2}" y="${box.y + ordTab.y + ordTab.h / 2 + 0.35 * ORDINAL_EM.text * geo.fontPx}" font-size="${ORDINAL_EM.text * geo.fontPx}" font-weight="${esc(nameWeight)}" text-anchor="middle" fill="${c.text}">${esc(ordinal!)}</text>`);
+			out.push(`<rect ${spot} fill="${c.cardFill}" stroke="${c.cardFill}" stroke-width="${HEIR_LOOK.tabBase}"/>`);
+			out.push(`<rect ${spot} fill="${c.cardFill}" stroke="${c.text}" stroke-width="${HEIR_LOOK.tabBorder}"${di(`ordinal:${p.id}`)}/>`);
+			out.push(`<text x="${box.x + ordTab.x + ordTab.w / 2}" y="${box.y + ordTab.y + ordTab.h / 2 + TAB_TEXT_BASE_EM * geo.fontPx}" font-size="${ORDINAL_EM.text * geo.fontPx}" font-weight="${esc(nameWeight)}" text-anchor="middle" fill="${c.text}">${esc(ordinal!)}</text>`);
 		}
 		out.push(`</g>`);
 	}
@@ -357,8 +366,11 @@ export function renderSvg(g: FamilyGraph, layout: TreeLayout, edges: EdgeDrawing
 			out.push(`<${m.tag} ${at} ${paint}${fadeAttr(state)}${di(`union:${shape}`)}/>`);
 		} else {
 			if (saved) out.push(`<g${di('rumour')}>`);
-			out.push(`<circle cx="${mk.x}" cy="${mk.y}" r="8" fill="${ground}" stroke="${c.rumoured}"${fadeAttr(state)}/>`);
-			out.push(`<text x="${mk.x}" y="${mk.y + 4}" font-size="11" font-weight="700" text-anchor="middle" fill="${c.rumoured}"${fadeAttr(state)}>?</text>`);
+			// F-LAYOUT-02: the size of the live marker, 0.5 em and 0.7 em of the note font (`scene.ts`), not a fixed 8 px and 11 px.
+			const em = layout.geometry.fontPx;
+			const size = RUMOUR_FONT_EM * em;
+			out.push(`<circle cx="${mk.x}" cy="${mk.y}" r="${0.5 * em}" fill="${ground}" stroke="${c.rumoured}"${fadeAttr(state)}/>`);
+			out.push(`<text x="${mk.x}" y="${mk.y + 0.35 * size}" font-size="${size}" font-weight="700" text-anchor="middle" fill="${c.rumoured}"${fadeAttr(state)}>?</text>`);
 			if (saved) out.push('</g>');
 		}
 	});
@@ -373,20 +385,24 @@ export function renderSvg(g: FamilyGraph, layout: TreeLayout, edges: EdgeDrawing
 			const { spot } = control;
 			if (!control.folded) {
 				if (!foldMode.buttons) continue;
-				const r = (FOLD_EM.button / 2) * em;
-				const arm = FOLD_EM.minusHalf * r;
-				out.push(`<circle cx="${spot.x}" cy="${spot.y}" r="${r}" fill="${c.cardFill}" stroke="${c.line}" stroke-width="1"/>`);
-				out.push(`<path d="M${spot.x - arm} ${spot.y}H${spot.x + arm}" fill="none" stroke="${c.text}" stroke-width="${FOLD_EM.minusStroke * r}"/>`);
+				// 0.2.8 (C01): a small square chip with rounded corners and a round-capped minus.
+				const side = FOLD_CHIP_EM * em;
+				const arm = 0.28 * em;
+				out.push(`<rect x="${spot.x - side / 2}" y="${spot.y - side / 2}" width="${side}" height="${side}" rx="${0.15 * em}" fill="${ground}" stroke="${c.textMuted}" stroke-width="1"/>`);
+				out.push(`<path d="M${spot.x - arm} ${spot.y}H${spot.x + arm}" fill="none" stroke="${c.text}" stroke-width="${0.11 * em}" stroke-linecap="round"/>`);
 				continue;
 			}
 			const text = signText(control.count);
 			const textW = measured ? measured(text, signFont) : textWidth(text, sized, true);
 			const h = FOLD_EM.signHeight * em;
-			const left = spot.x - h / 2;
+			// D206: the sign is centred on the line; D207: in a sideways layout the line runs along it, so it starts where the open chip starts.
+			const width = textW + FOLD_EM.signPad * em;
+			const anchored = layout.orientation === 'sideways';
+			const left = anchored ? spot.x - (FOLD_CHIP_EM / 2) * em : spot.x - width / 2;
 			const group = saved ? `<g${di(`fold:${control.key}`)}>` : '';
 			if (group) out.push(group);
-			out.push(`<rect x="${left}" y="${spot.y - h / 2}" width="${textW + FOLD_EM.signPad * em}" height="${h}" rx="${h / 2}" fill="${c.cardFill}" stroke="${c.line}" stroke-width="1"/>`);
-			out.push(`<text x="${left + 0.45 * em}" y="${spot.y + 0.35 * sized}" font-size="${sized}" font-weight="600"${saved ? ` font-family="${esc(fonts.ui)}"` : ''} fill="${c.text}">${esc(text)}</text>`);
+			out.push(`<rect x="${left}" y="${spot.y - h / 2}" width="${width}" height="${h}" rx="${0.25 * em}" fill="${ground}" stroke="${c.textMuted}" stroke-width="1"/>`);
+			out.push(`<text x="${anchored ? left + 0.45 * em : spot.x}" y="${spot.y + 0.35 * sized}" font-size="${sized}" font-weight="600"${anchored ? '' : ' text-anchor="middle"'}${saved ? ` font-family="${esc(fonts.ui)}"` : ''} fill="${c.text}">${esc(text)}</text>`);
 			if (group) out.push('</g>');
 		}
 	}
@@ -416,6 +432,7 @@ export function renderSvg(g: FamilyGraph, layout: TreeLayout, edges: EdgeDrawing
 		const state = look.tag(tag);
 		const group = saved || state === 'faded';
 		if (group) out.push(`<g${di(`tag:${tag.person}`)}${fadeAttr(state)}>`);
+		// 0.2.8 (I36 C, then D212 tag-edge): the pill is a chip with the line colour as its edge, so it still reads as a tag without colour (3:1 on the page).
 		const edge = state === 'on' ? `stroke="${c.accent}" stroke-width="2"` : `stroke="${c.line}" stroke-width="1"`;
 		out.push(`<rect x="${left}" y="${top}" width="${w}" height="${tagH}" rx="${tagH / 2}" fill="${c.cardFill}" ${edge}/>`);
 		out.push(`<text x="${left + pad}" y="${base}" font-size="${1.25 * tagFont}" font-family="Segoe UI Symbol, DejaVu Sans, sans-serif" fill="${c.textMuted}">⚭</text>`);
@@ -450,10 +467,10 @@ function legendSvg(frame: SavedFrame, saved: SavedParts, c: Palette, fonts: Scen
 		for (const cell of L.lines.rows) {
 			const row = rows.get(cell.item);
 			if (!row) continue;
-			const item = cell.item === 'sign' ? 'legend-sign' : `legend-line:${cell.item}`;
+			const item = cell.item === 'sign' ? 'legend-sign' : cell.item === 'dead' || cell.item === 'dead-doubt' ? `legend-${cell.item}` : `legend-line:${cell.item}`;
 			out.push(`<g transform="translate(${cell.x} ${cell.y})" data-item="${item}">`);
 			out.push(`<g transform="translate(0 ${(L.rowH - L.sample.h) / 2}) scale(${L.sample.scale})">${row.parts.map((part) => partSvg(part, c, '#ffffff')).join('')}</g>`);
-			out.push(label(L.labelX, cell.item === 'sign' ? SIGN_LEGEND_LABEL : LEGEND_LABELS[cell.item as StrokeKind]));
+			out.push(label(L.labelX, cell.item === 'sign' ? SIGN_LEGEND_LABEL : cell.item === 'dead' ? LEGEND_DEAD_LABEL : cell.item === 'dead-doubt' ? LEGEND_DEAD_DOUBT_LABEL : LEGEND_LABELS[cell.item as StrokeKind]));
 			out.push('</g>');
 		}
 	}
@@ -490,7 +507,8 @@ function partSvg(part: LegendPart, c: Palette, ground: string, inRumour = false)
 		const shape = (cls.find((x) => x.startsWith('dynasty-union-') && x !== 'dynasty-union-dot')?.slice('dynasty-union-'.length) ?? 'dot') as UnionShape;
 		const spec = UNION_MARKS[shape] ?? UNION_MARKS.dot;
 		attrs.push(spec.stroke ? `fill="${ground}" stroke="${c.line}" stroke-width="${spec.stroke}" stroke-linejoin="round"` : `fill="${c.line}"`);
-	} else if (cls.includes('dynasty-legend-card')) attrs.push(`fill="${c.cardFill}" stroke="${c.cardBorder}"`);
+	} else if (cls.includes('dynasty-legend-dagger')) attrs.push(`font-size="12" fill="${c.textMuted}"`);
+	else if (cls.includes('dynasty-legend-card')) attrs.push(`fill="${c.cardFill}" stroke="${c.cardBorder}"`);
 	else if (cls.includes('dynasty-sign')) attrs.push(`stroke="${c.line}"`);
 	else if (inRumour && part.tag === 'circle') attrs.push(`fill="${ground}" stroke="${c.rumoured}"`);
 	else if (inRumour && part.tag === 'text') attrs.push(`font-size="9" font-weight="700" fill="${c.rumoured}"`);

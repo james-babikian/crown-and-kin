@@ -16,7 +16,7 @@ import { HEIR_LOOK } from '../src/render/styles';
 import { SETTINGS_UI, SHEET, SUCCESSION_UI as T } from '../src/render/ui-text';
 import { FEl, clock, device, fakeWin, installDom, resetDom } from './acceptance/fake-dom';
 import { openModals, resetObsidian } from './acceptance/fake-obsidian';
-import { choose, ctl, openWin, page, tapChoice } from './r027-window-support';
+import { choose, ctl, openWin, page } from './r027-window-support';
 import { click, type } from './s113-c-support';
 
 /*
@@ -111,16 +111,17 @@ describe('A: a value that the plugin cannot read', () => {
 		expect(T.unknownValue('salic')).toBe('Unknown value (salic)');
 	});
 
-	it('phone: no choice is chosen for each bad value, and a tap on any choice calls pick', async () => {
+	it('phone: each bad value shows first in its own list, and a choice in the list calls pick (phone-rules-native)', async () => {
 		device.width = 390;
 		device.coarse = true;
 		const o = openWin(mini('succession: eldest-child\ninherit: foo\ninherit-through: bar\ninherit-illegitimate: baz'));
 		const p = page(o, 'crown');
-		for (const key of ['inherit', 'through', 'illegitimate']) {
-			const chosen = ctl(p, key)!.querySelectorAll('button').filter((b) => b.getAttribute('aria-checked') === 'true');
-			expect(chosen, key).toHaveLength(0);
+		for (const [key, text] of [['inherit', 'foo'], ['through', 'bar'], ['illegitimate', 'baz']] as const) {
+			const select = ctl(p, key)!.querySelector('select')!;
+			expect(select.value, key).toBe('?');
+			expect(optionTexts(select)[0], key).toBe(`Unknown value (${text})`);
 		}
-		await tapChoice(p, 'illegitimate', 'no');
+		choose(p, 'illegitimate', 'no');
 		expect(o.win.isDirty()).toBe(true);
 		await click(saveButton(o));
 		expect(o.handle.body).not.toContain('baz');
@@ -244,13 +245,12 @@ describe('F: carryState keeps one temporary view', () => {
 });
 
 describe('G: the saved picture has the look of the screen', () => {
-	it('HEIR_LOOK is ring 6, border 3, and styles.css has the same numbers', () => {
-		expect(HEIR_LOOK.ring).toBe(6);
-		expect(HEIR_LOOK.border).toBe(3);
+	it('HEIR_LOOK is one border of 2 px and no ring (0.2.8, I35 as changed by D212), and styles.css has the same number', () => {
+		expect(HEIR_LOOK.border).toBe(2);
+		expect('ring' in HEIR_LOOK).toBe(false);
 		const css = readFileSync('styles.css', 'utf8');
-		const block = (selector: string) => css.slice(css.indexOf(`${selector} {`)).split('}')[0];
-		expect(block('.dynasty-card.dynasty-heir .dynasty-card-ring')).toContain(`stroke-width: ${HEIR_LOOK.ring};`);
-		expect(block('.dynasty-card.dynasty-heir .dynasty-card-bg')).toContain(`stroke-width: ${HEIR_LOOK.border};`);
+		expect(css).not.toContain('dynasty-heir-ring');
+		expect(css.slice(css.indexOf('.dynasty-card.dynasty-heir .dynasty-card-bg {\n\tstroke: var(--interactive-accent)')).split('}')[0]).toContain(`stroke-width: ${HEIR_LOOK.border};`);
 	});
 });
 
@@ -278,10 +278,10 @@ describe('H, I: the texts', () => {
 	});
 
 	it('I: the other texts', () => {
-		expect(T.branchNote).toBe('A grey row shows a person who died and has no children in the tree. The person may have children that are not in the tree yet. If the person had no children, tick “No children” in the edit sheet.');
+		expect(T.branchNote).toBe('A grey row shows a person who died and has no children in the tree. The person may have children that are not in the tree yet. If the person had no children, tick “No children” in the person window.');
 		expect(T.moreBranches).toBe('and more open branches');
 		expect(SHEET.childlessHint).toBe('If the person had no children, tick this box. The line of succession then shows no open branch for the person.');
-		expect(SETTINGS_UI.youngDeathAgeDesc).toBe('For a person who died younger than this age, the line of succession shows no open branch. The birth year and the death year must be known. Use 0 to show every open branch.');
+		expect(SETTINGS_UI.youngDeathAgeDesc).toBe('For a person who died younger than this age, the line of succession shows no open branch. The note must give the birth year and the death year. Use a number from 0 to 1000. Use 0 to show every open branch.');
 	});
 });
 

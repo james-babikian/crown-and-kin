@@ -6,7 +6,7 @@
 
 import { partnerOf, type FamilyGraph } from './derive';
 import type { ParentKind, UnionKind, UnionRef } from './edit';
-import { PARENT_TYPES, PLACEMENT_TYPES } from './types';
+import { PARENT_LIMIT, PARENT_TYPES, PLACEMENT_TYPES } from './types';
 import { cleanParents, push } from './validate';
 
 /** One parent entry, as `familyOf` reports it for a person. */
@@ -44,7 +44,7 @@ export interface FamilyView {
 	siblings: SiblingPosition | null;
 	/** Placement-eligible parent types the person has (for "Shown under", §6.3). */
 	placementTypes: ParentKind[];
-	/** Parent types already at the limit of 2 (disabled in Add parent, §6.4). */
+	/** Parent types already at their limit, `PARENT_LIMIT`: 2 birth, adoptive or ward parents, 8 rumoured ones (disabled in Add parent, §6.4; contract B.3). */
 	fullTypes: ParentKind[];
 	/** Choices for "other parent" in Add child: partners in union order, then implicit co-parents (§6.4). "No other parent" is added by the UI. */
 	otherParentChoices: string[];
@@ -166,7 +166,7 @@ export const familyOf: FamilyOf = (g, id) => {
 		partners,
 		siblings,
 		placementTypes: PLACEMENT_TYPES.filter((t) => count(t) > 0),
-		fullTypes: PARENT_TYPES.filter((t) => count(t) >= 2),
+		fullTypes: PARENT_TYPES.filter((t) => count(t) >= PARENT_LIMIT[t]),
 		otherParentChoices: choices,
 	};
 };

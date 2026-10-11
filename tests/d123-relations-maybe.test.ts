@@ -59,7 +59,7 @@ describe('D123: cards and sheet words (contract 2.2 and 2.4)', () => {
 	});
 	it('case b (no father listed for S; D174, setting on): Half-sister, maybe full with cause unlisted, no extra name', () => {
 		expect(names(b, 'S')).toEqual(['Half-sister']);
-		expect(rels(b, 'S')[0].maybe).toEqual({ effect: 'full', text: 'Sister', lower: 'sister', cause: 'unlisted' });
+		expect(rels(b, 'S')[0].maybe).toEqual({ effect: 'full', text: 'Sister', lower: 'sister', cause: 'unlisted', unlistedForm: 'other-parent' });
 	});
 	it('case c: Half-sister, maybe full', () => {
 		const s = rels(c, 'S');
@@ -83,7 +83,8 @@ describe('D123: cards and sheet words (contract 2.2 and 2.4)', () => {
 	it('the sheet: the maybe paragraph comes from the first relation only; the Also list prints r.lower', () => {
 		const g = rels(a, 'G');
 		expect(relationSummary(g, false)).toEqual({
-			main: 'Relation to you: Half-brother.',
+			// 0.2.8 F-KIN-08: the first text line is the card text, with the maybe.
+			main: 'Relation to you: Half-brother, maybe full.',
 			also: 'Also: rumoured brother.',
 			maybe: 'If every rumoured link is true, this person is your brother.',
 		});
@@ -310,11 +311,14 @@ describe('D123 and D174: random trees against an independent brute force (spec Â
 			}
 			return out;
 		};
+		// 0.2.8 R4: a child with two birth parents and a rumoured parent may also have just the two birth parents. This outcome
+		// counts for the maybe of a half pair, by rumour and (fix round, D205 item 2) by an unlisted parent; not for the second test (D174 item 4).
+		const outcomes = (k: Kid): string[][] => (S(k).length === 2 && R(k).length > 0 ? [...choices(k), S(k)] : choices(k));
 		// Second test: two equal choices, neither of fewer than two people where the setting is on.
 		const secondFull = choices(me).some((t1) => choices(p).some((t2) => key(t1) === key(t2) && !(on && t1.length < 2)));
-		// A maybe of a half pair by rumour: two equal choices of any size; by unlisted parent: two choices of at most two people together.
-		const equalChoice = choices(me).some((t1) => choices(p).some((t2) => key(t1) === key(t2)));
-		const fewTogether = choices(me).some((t1) => choices(p).some((t2) => key([...t1, ...t2]).split(',').length <= 2));
+		// A maybe of a half pair by rumour: two equal outcomes of any size; by unlisted parent: two outcomes of at most two people together.
+		const equalChoice = outcomes(me).some((t1) => outcomes(p).some((t2) => key(t1) === key(t2)));
+		const fewTogether = outcomes(me).some((t1) => outcomes(p).some((t2) => key([...t1, ...t2]).split(',').length <= 2));
 		const sureHalf = key(S(me)) !== key(S(p)) || incomplete(me) || incomplete(p);
 		const sameA = key(A(me)) === key(A(p));
 		const secondHalf = !secondFull;
@@ -340,6 +344,8 @@ describe('D123 and D174: random trees against an independent brute force (spec Â
 				add(`rumoured ${sib(p.sex, secondHalf)}`, undefined);
 			}
 		}
+		// Fix round, D205 item 2: a sure name with "maybe full" by rumour has made the extra name "rumoured brother" already, so a rumoured half line adds none.
+		if ([...out.values()].some((m) => m?.effect === 'full' && m.cause === 'rumoured')) out.delete(`rumoured ${sib(p.sex, true)}`);
 		return out;
 	}
 	for (const [label, on] of [

@@ -60,14 +60,16 @@ describe('D174: the card text, the screen-reader words and the sheet paragraph',
 
 	it('the screen-reader words follow the cause', () => {
 		expect(spokenRelation(fullRumoured)).toBe('half-sister, or sister if the rumoured links are true');
-		expect(spokenRelation(fullUnlisted)).toBe('half-sister, or sister if both people have the same parent who is not listed');
+		expect(spokenRelation(fullUnlisted)).toBe('half-sister, or sister if the parent that the note does not name is the same person for both');
+		expect(spokenRelation(rel('Half-sister', { effect: 'full', lower: 'sister', cause: 'unlisted', unlistedForm: 'other-parent' }))).toBe('half-sister, or sister if this person’s other parent is also your parent');
 		expect(spokenRelation(halfRumoured)).toBe('sister, or half-sister if the rumoured links are true');
 		expect(spokenRelation(plain)).toBe('half-sister');
 	});
 
 	it('the sheet paragraph follows the cause of the first relation', () => {
 		expect(relationSummary([fullRumoured], false).maybe).toBe('If every rumoured link is true, this person is your sister.');
-		expect(relationSummary([fullUnlisted], false).maybe).toBe('If both people have the same parent who is not listed, this person is your sister.');
+		expect(relationSummary([fullUnlisted], false).maybe).toBe('If the parent that the note does not name is the same person for both, this person is your sister.');
+		expect(relationSummary([rel('Half-sister', { effect: 'full', lower: 'sister', cause: 'unlisted', unlistedForm: 'other-parent' })], false).maybe).toBe('If this person’s other parent is also your parent, this person is your sister.');
 		expect(relationSummary([halfRumoured], false).maybe).toBe('If every rumoured link is true, this person is your half-sister.');
 		expect(relationSummary([plain], false).maybe).toBeUndefined();
 		expect(relationSummary([plain, fullUnlisted], false).maybe).toBeUndefined();

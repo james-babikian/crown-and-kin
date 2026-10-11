@@ -5,11 +5,10 @@ vi.mock('@codemirror/language', () => ({ forceParsing: () => false, syntaxTree: 
 vi.mock('@codemirror/view', () => ({ ViewPlugin: { fromClass: () => ({}) } }));
 
 import { planInsert } from '../src/obsidian/insert-tree';
-import { matchPictures } from '../src/obsidian/picture-picker';
 import { INSERT_UI } from '../src/render/ui-text';
 
 // Adopted from scratch/r111-review-a 153116b (N1 and F4b). Rulings A3 and A4 of the 0.2.1 review wave.
-describe('review A: text that the plugin writes into a note, and a query that folds to nothing', () => {
+describe('review A: text that the plugin writes into a note', () => {
 	it('N1: the block that "Insert family tree" writes is plain ASCII (the note gets no curly marks)', () => {
 		const plan = planInsert('', '');
 		expect(plan.text).toMatch(/^[\x00-\x7f]*$/);
@@ -25,12 +24,5 @@ describe('review A: text that the plugin writes into a note, and a query that fo
 	it('the display hint keeps the curly marks, the note hint has straight marks', () => {
 		expect(INSERT_UI.hint).toContain('“Add first person”');
 		expect(INSERT_UI.noteHint).toContain('"Add first person"');
-	});
-
-	it('F4b: matchPictures with a query of one combining mark finds no picture; a query of spaces lists all', () => {
-		const files = [{ path: 'Art/lion.png' }, { path: 'Art/rose.png' }] as never[];
-		expect(matchPictures(files, '́')).toHaveLength(0);
-		expect(matchPictures(files, '  ')).toHaveLength(2);
-		expect(matchPictures(files, '')).toHaveLength(2);
 	});
 });

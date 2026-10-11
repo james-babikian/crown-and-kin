@@ -14,9 +14,9 @@ import type { TFile } from 'obsidian';
 import type { PictureProblem } from '../core/pictures';
 import { formatPortraitCrop, type CropFraction } from '../core/portrait-crop';
 import type { Rect } from '../layout/model';
-import { setPicture, setSlotProblem, type PictureSlot, type SlotProblem } from '../render/dom/pictures';
+import { setArmsGap, setPicture, setSlotProblem, type PictureSlot, type SlotProblem } from '../render/dom/pictures';
 import { MAX_LIVE_PICTURES, livePictureSlots, type Lod } from '../render/view-math';
-import type { CopyBox, PictureCopy, PictureStore } from './picture-store';
+import { isProblem, type CopyBox, type PictureCopy, type PictureStore } from './picture-store';
 
 /** The live pictures of one scene (O5, B15). */
 export interface LivePictures {
@@ -76,7 +76,6 @@ export function zoomStep(scale: number): number {
 	return scale <= 2 ? 2 : 4;
 }
 
-const isProblem = (x: unknown): x is PictureProblem => !!x && typeof x === 'object' && (x as { ok?: unknown }).ok === false;
 const slotProblemOf = (p: PictureProblem): SlotProblem => (p.code === 'missing-picture' ? 'missing' : 'other');
 
 /**
@@ -134,6 +133,12 @@ export function createLivePictures(
 		else if (st.url === null) shown++;
 		st.url = url;
 		setPicture(slots[i], url);
+	};
+
+	/** D219: shows the copy and, for arms, the gap that follows the outline that the store read from the picture (no gap while it is not known). */
+	const showCopy = (i: number, url: string, file: TFile) => {
+		show(i, url);
+		if (slots[i].kind === 'arms') setArmsGap(slots[i], store.outlineOf?.(file) ?? null);
 	};
 
 	const stopRequest = (st: SlotState) => {
@@ -226,7 +231,7 @@ export function createLivePictures(
 				const old = st.held;
 				st.held = r;
 				st.key = key;
-				show(i, r.url);
+				showCopy(i, r.url, file);
 				old?.release();
 			},
 			(e: unknown) => {
@@ -253,7 +258,7 @@ export function createLivePictures(
 				const hit = store.peek(file, box);
 				if (hit) {
 					states[i].key = keyOf(file, box);
-					show(i, hit.url);
+					showCopy(i, hit.url, file);
 				}
 				continue;
 			}

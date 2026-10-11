@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { deriveFamilies, type FamilyGraph } from '../src/core/derive';
 import type { EditResult, Op } from '../src/core/edit';
 import { parseDynasty } from '../src/core/parse';
-import { cardLabels, cardTitleOp, describeDeleteTitle, holderTable, pickerSuffix, searchNames, titleNameFor } from '../src/core/titles';
+import { cardLabels, describeDeleteTitle, holderTable, pickerSuffix, searchNames, titleNameFor } from '../src/core/titles';
 import type { Title, Tree } from '../src/core/types';
 import { applyOp } from '../src/core/yaml-edit';
 import { fixture } from './helpers';
@@ -146,7 +146,6 @@ describe('card labels with female-name (D65)', () => {
 		const maud = cardLabels(g).get('maud')!;
 		expect(searchNames(maud, 'Maud Valmont')).toEqual([]);
 		expect(pickerSuffix(maud, 'Maud Valmont')).toBeUndefined();
-		expect(cardTitleOp(g, 'maud', 'duke').fields['card-title']).toBeNull();
 	});
 
 	it('a tree without female-name has the same labels as the D56/D63 rule on the name', () => {

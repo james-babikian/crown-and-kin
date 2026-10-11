@@ -6,7 +6,8 @@ import type { EditRefusal, Op, ParentKind, UnionKind } from '../src/core/edit';
 import { familyOf, pickerExclusions } from '../src/core/family-query';
 import { parseDynasty } from '../src/core/parse';
 import { commentsOf } from '../src/core/yaml-patch';
-import { applyOp, newPersonId } from '../src/core/yaml-edit';
+import { applyOp } from '../src/core/yaml-edit';
+import { nextIdFor } from './helpers';
 
 // Property (spec §6.2–§6.7, §8): random sequences of relationship ops on every sample tree never
 // throw, never create a cycle, never lose a comment unless the op removes something, and always
@@ -61,7 +62,7 @@ function randomOp(body: string, g: FamilyGraph, random: () => number): { op: Op;
 			const at = pick([undefined, 'siblings', 'before', 'after'] as const);
 			const op: Op = {
 				kind: 'add-person',
-				id: newPersonId(body, name),
+				id: nextIdFor(body),
 				fields: { name, sex: pick(['m', 'f', null]), born: pick(['1102', '0042', null]) },
 				parents: parents.map((id) => ({ id, type: 'birth' as const })),
 				at: at === undefined ? undefined : at === 'siblings' ? (parents.length ? { kind: 'after-siblings', parents } : undefined) : { kind: at, id: pick(written).id },

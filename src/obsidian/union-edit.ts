@@ -5,12 +5,12 @@
  * other way to close with changes asks "Discard changes?".
  */
 
-import { Modal, type App } from 'obsidian';
+import { setIcon, type App } from 'obsidian';
 import { UNION_TYPES } from '../core/types';
 import { SHEET, UNION_EDIT, UNION_TYPE_TEXT } from '../render/ui-text';
-import { ignoreGhostClick, phoneLayout } from './modal-layout';
-import { trackModal } from './plugin-modals';
-import { nameDialog, revealFocused, sheetField } from './sheet-parts';
+import { buildShell } from './window-shell';
+import { nameDialog, sheetField } from './sheet-parts';
+import { SmallFormModal } from './small-form';
 
 /** The editable fields of one partnership. */
 export interface UnionValues {
@@ -24,12 +24,7 @@ export type UnionSave = (v: UnionValues) => Promise<string | null>;
 
 const same = (a: UnionValues, b: UnionValues) => a.type === b.type && a.start.trim() === b.start.trim() && a.end.trim() === b.end.trim();
 
-class UnionEditModal extends Modal {
-	private closing = false;
-	private saving = false;
-	private confirmEl: HTMLElement | null = null;
-	private errorEl: HTMLElement | null = null;
-	private readonly cleanup: (() => void)[] = [];
+class UnionEditModal extends SmallFormModal {
 	private readonly values: UnionValues;
 
 	constructor(
@@ -43,28 +38,20 @@ class UnionEditModal extends Modal {
 	}
 
 	override onOpen(): void {
-		this.modalEl.addClass('dynasty-sheet');
-		this.modalEl.addClass('dynasty-union-edit');
-		this.cleanup.push(phoneLayout(this, () => revealFocused(this.modalEl, this.contentEl)), ignoreGhostClick(this), trackModal(this, () => this.finish()));
-		// The keyboard can cover a field in the scrolling body: bring it into view when it gets the focus (C1).
-		const reveal = () => revealFocused(this.modalEl, this.contentEl, 300);
-		this.contentEl.addEventListener('focusin', reveal);
-		this.cleanup.push(() => this.contentEl.removeEventListener('focusin', reveal));
+		this.openFrame('dynasty-union-edit');
 		const el = this.contentEl;
-		el.addClass('dynasty-sheet-content');
-		const header = el.createDiv({ cls: 'dynasty-sheet-header' });
-		nameDialog(this.modalEl, header.createDiv({ cls: 'dynasty-sheet-title', text: UNION_EDIT.title }));
-		const actions = header.createDiv({ cls: 'dynasty-sheet-actions' });
-		actions.createEl('button', { cls: 'dynasty-sheet-cancel', text: SHEET.cancel, attr: { type: 'button' } }).addEventListener('click', () => this.finish());
-		const save = actions.createEl('button', { cls: ['mod-cta', 'dynasty-sheet-save'], text: SHEET.save, attr: { type: 'button' } });
-		save.addEventListener('click', () => void this.write());
-		const body = el.createDiv({ cls: 'dynasty-sheet-body' });
+		const shell = buildShell({ modalEl: this.modalEl, contentEl: el, title: UNION_EDIT.title, titled: true, onCancel: () => this.finish(), onSave: () => void this.write() });
+		this.shell = shell;
+		nameDialog(this.modalEl, shell.titleEl);
+		const body = shell.body;
 		body.createDiv({ cls: 'dynasty-choice-text', text: this.pair });
 		this.errorEl = body.createDiv({ cls: 'dynasty-sheet-error', attr: { role: 'alert' } });
 		this.errorEl.hide();
 		const field = (label: string, name: string) => sheetField(body, label, name, 'dynasty-union');
 		const t = field(UNION_EDIT.type, 'union-type');
-		const sel = t.row.createEl('select', { cls: ['dropdown', 'dynasty-sheet-input'], attr: { id: t.id } });
+		const wrap = t.row.createDiv({ cls: 'dynasty-select' });
+		const sel = wrap.createEl('select', { cls: ['dropdown', 'dynasty-sheet-input', 'dynasty-input'], attr: { id: t.id } });
+		setIcon(wrap.createSpan({ cls: 'dynasty-select-chevron', attr: { 'aria-hidden': 'true' } }), 'chevron-down');
 		const types: string[] = [...UNION_TYPES];
 		// An unknown type stays selectable, so Save never changes it by itself.
 		if (!types.includes(this.values.type)) types.push(this.values.type);
@@ -74,7 +61,7 @@ class UnionEditModal extends Modal {
 		for (const key of ['start', 'end'] as const) {
 			const f = field(UNION_EDIT[key], `union-${key}`);
 			// Free text (fictional calendars): never a numeric keyboard (spec §7.4).
-			const input = f.row.createEl('input', { cls: 'dynasty-sheet-input', attr: { id: f.id, type: 'text', autocomplete: 'off', spellcheck: 'false' } });
+			const input = f.row.createEl('input', { cls: ['dynasty-sheet-input', 'dynasty-input'], attr: { id: f.id, type: 'text', autocomplete: 'off', autocorrect: 'off', autocapitalize: 'off', spellcheck: 'false' } });
 			input.value = this.values[key];
 			input.addEventListener('input', () => {
 				this.values[key] = input.value;
@@ -108,42 +95,14 @@ class UnionEditModal extends Modal {
 		}
 	}
 
-	private finish(): void {
-		this.closing = true;
-		this.close();
+	protected dirty(): boolean {
+		return !same(this.values, this.initial);
 	}
 
-	/** Esc, the X button and a press outside: with changes, ask first (spec §6.3). */
-	override close(): void {
-		if (this.closing || same(this.values, this.initial)) {
-			super.close();
-			return;
-		}
-		if (this.confirmEl) {
-			this.confirmEl.remove();
-			this.confirmEl = null;
-			return;
-		}
-		const layer = this.modalEl.createDiv({ cls: 'dynasty-sheet-confirm', attr: { role: 'alertdialog', 'aria-modal': 'true' } });
-		this.confirmEl = layer;
-		const box = layer.createDiv({ cls: 'dynasty-sheet-confirm-box' });
-		box.createDiv({ cls: 'dynasty-sheet-confirm-title', text: SHEET.discardTitle });
-		box.createDiv({ cls: 'dynasty-sheet-confirm-text', text: UNION_EDIT.discardText });
-		const row = box.createDiv({ cls: 'dynasty-sheet-confirm-actions' });
-		const keep = row.createEl('button', { cls: 'dynasty-sheet-keep', text: SHEET.keepEditing, attr: { type: 'button' } });
-		const discard = row.createEl('button', { cls: ['mod-warning', 'dynasty-sheet-discard'], text: SHEET.discard, attr: { type: 'button' } });
-		keep.addEventListener('click', () => {
-			layer.remove();
-			this.confirmEl = null;
-		});
-		discard.addEventListener('click', () => this.finish());
-		keep.focus();
+	protected discardText(): string {
+		return UNION_EDIT.discardText;
 	}
 
-	override onClose(): void {
-		for (const c of this.cleanup.splice(0)) c();
-		this.contentEl.empty();
-	}
 }
 
 /** Opens the editor; it calls `save` on Save and stays open until a save succeeds or the user cancels. */

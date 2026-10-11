@@ -51,12 +51,13 @@ describe('phone list: pictures whose files arrive after the first draw', () => {
 		const { el } = await embed(PICS, { host, handle: fakeHandle('n.md', PICS) });
 		await settle();
 		const row = () => el.querySelector('.dynasty-list-row[data-person="ann"]')!;
-		expect(row().querySelector('.dynasty-list-arms.has-picture')).toBeNull();
+		expect(row().querySelector('.dynasty-hero-arms.has-picture')).toBeNull();
 		known = true;
 		hear!(['va-arms.png', 'ann.png']);
 		await settle();
-		expect(row().querySelector('.dynasty-list-arms.has-picture img')).not.toBeNull();
-		expect(row().querySelector('.dynasty-list-portrait.has-picture img')).not.toBeNull();
+		expect(row().querySelector('.dynasty-hero-arms.has-picture img')).not.toBeNull();
+		// Ann is the person in the centre: her portrait and arms stand in the column of the large row.
+		expect(row().querySelector('.dynasty-hero-portrait.has-picture img')).not.toBeNull();
 	});
 
 	it('the file is on disk but the cache does not know it at first: the metadata cache event fills the list', async () => {
@@ -83,15 +84,16 @@ describe('phone list: pictures whose files arrive after the first draw', () => {
 		const { el } = await embed(PICS, { host, handle: fakeHandle('n.md', PICS) });
 		await settle();
 		const row = () => el.querySelector('.dynasty-list-row[data-person="ann"]')!;
-		expect(row().querySelector('.dynasty-list-arms.has-picture')).toBeNull();
+		expect(row().querySelector('.dynasty-hero-arms.has-picture')).toBeNull();
 		resolved!();
 		await settle();
-		expect(row().querySelector('.dynasty-list-arms.has-picture')).toBeNull();
+		expect(row().querySelector('.dynasty-hero-arms.has-picture')).toBeNull();
 		known = true;
 		resolved!();
 		await settle();
-		expect(row().querySelector('.dynasty-list-arms.has-picture img')).not.toBeNull();
-		expect(row().querySelector('.dynasty-list-portrait.has-picture img')).not.toBeNull();
+		expect(row().querySelector('.dynasty-hero-arms.has-picture img')).not.toBeNull();
+		// Ann is the person in the centre: her portrait and arms stand in the column of the large row.
+		expect(row().querySelector('.dynasty-hero-portrait.has-picture img')).not.toBeNull();
 		// Every picture is found now: a later event asks the store nothing.
 		const before = resolves;
 		const copies = acquires;

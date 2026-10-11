@@ -1,0 +1,109 @@
+/* The window "Save as a picture" (spec §13.8). The legend rows are in 08-toolbar.css; the live legend has no house rows (0.2.8 D196 item 3). */
+
+/* Spec §13.8, D72: the window "Save as a picture", with PNG and SVG as a pair of choices. */
+.modal.dynasty-save-window {
+	width: min(480px, calc(100vw - 2 * var(--size-4-4)));
+}
+
+.modal.dynasty-save-window.is-phone {
+	width: 100vw;
+}
+
+.dynasty-sheet .dynasty-save-kind {
+	position: relative;
+	padding-left: calc(var(--size-4-3) + 26px);
+}
+
+/* A round mark shows the selected kind also without colour. */
+.dynasty-sheet .dynasty-save-kind::before {
+	content: '';
+	position: absolute;
+	left: var(--size-4-3);
+	top: 50%;
+	box-sizing: border-box;
+	width: 16px;
+	height: 16px;
+	margin-top: -8px;
+	border: 2px solid var(--text-muted);
+	border-radius: 50%;
+}
+
+.dynasty-sheet .dynasty-save-kind.is-selected {
+	box-shadow: 0 0 0 2px var(--interactive-accent);
+}
+
+.dynasty-sheet .dynasty-save-kind.is-selected::before {
+	border-color: var(--interactive-accent);
+	background: var(--interactive-accent);
+	box-shadow: inset 0 0 0 3px var(--background-primary);
+}
+
+/* The result Notice (spec §13.8): Share has a 44 × 44 px hit area (B8). */
+.dynasty-save-small {
+	margin-top: var(--size-4-1);
+}
+
+.notice button.dynasty-save-share {
+	display: block;
+	min-width: 88px;
+	min-height: 44px;
+	margin-top: var(--size-4-2);
+}
+
+
+/*
+ * The legend lines reach 3:1 on the window colour in every theme (G3: Cupertino light had ward 2.34, rumoured 2.35, its "?" 2.7 and the phone birth link 2.48).
+ * The grey lines take the run-time line token (`--dynasty-edge`, see `paintContrast` in main.ts). The ward and the rumoured line keep a part of their hue, in a mix
+ * that leans on the token. The mix sits in `@supports`, because var() hides `color-mix()` from the parser and an engine without it would draw no line.
+ */
+.dynasty-legend-sample .dynasty-line-marriage,
+.dynasty-legend-sample .dynasty-line-betrothal,
+.dynasty-legend-sample .dynasty-line-concubinage,
+.dynasty-legend-sample .dynasty-line-affair,
+.dynasty-legend-sample .dynasty-line-implicit,
+.dynasty-legend-sample .dynasty-line-descent,
+.dynasty-legend-sample .dynasty-line-illegitimate,
+.dynasty-legend-sample .dynasty-line-birth-link,
+.dynasty-legend-sample .dynasty-line-ward,
+.dynasty-legend-sample .dynasty-line-rumoured {
+	stroke: var(--dynasty-edge);
+}
+
+.dynasty-legend-sample .dynasty-line-rumoured {
+	stroke-opacity: 1;
+}
+
+.dynasty-legend-sample .dynasty-union-dot {
+	fill: var(--dynasty-edge);
+}
+
+.dynasty-legend-sample .dynasty-union-ring,
+.dynasty-legend-sample .dynasty-union-open-triangle {
+	stroke: var(--dynasty-edge);
+}
+
+.dynasty-legend-sample .dynasty-rumour-marker circle {
+	stroke: var(--dynasty-edge);
+}
+
+.dynasty-legend-sample .dynasty-rumour-marker text {
+	fill: var(--dynasty-edge);
+}
+
+@supports (color: color-mix(in srgb, red 50%, blue)) {
+	.dynasty-legend-sample .dynasty-line-ward {
+		stroke: var(--dynasty-edge);
+		stroke: color-mix(in srgb, var(--dynasty-edge) 75%, var(--color-blue));
+	}
+
+	.dynasty-legend-sample .dynasty-line-rumoured,
+	.dynasty-legend-sample .dynasty-rumour-marker circle {
+		stroke: var(--dynasty-edge);
+		stroke: color-mix(in srgb, var(--dynasty-edge) 75%, var(--color-red));
+	}
+
+	.dynasty-legend-sample .dynasty-rumour-marker text {
+		fill: var(--dynasty-edge);
+		fill: color-mix(in srgb, var(--dynasty-edge) 75%, var(--color-red));
+	}
+}

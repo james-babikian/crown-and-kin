@@ -1,16 +1,16 @@
 // 0.2.5 WP-B4 (CONTRACT B.3.11, B.5 test 6): the saved picture follows the card form. `renderSvg` draws what the live scene draws for the
-// Roundel, the sideways text card and the "You" tab: the same elements, the same text places, the plate with the numbers of
-// `ROUNDEL_LOOK`, the tab in the house colour (D153), no picture in a sideways tree, and the Full level only.
+// Roundel, the sideways text card and the "You" tab: the same elements, the same text places, the foot hairline (0.2.8; the plate before),
+// the tab, no picture in a sideways tree, and the Full level only.
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { beforeAll, describe, expect, it } from 'vitest';
 import type { FamilyGraph } from '../src/core/derive';
 import { cardLabels } from '../src/core/titles';
-import { ROUNDEL_EM, cardForm, cardText, centredWithoutWord, geometryFor, roundelAxis, roundelPics, youTabRect } from '../src/layout/geometry';
+import { ROUNDEL_EM, cardForm, cardText, centredWithoutWord, footSpan, geometryFor, roundelAxis, roundelPics, youTabRect } from '../src/layout/geometry';
 import { DEFAULT_LAYOUT_SETTINGS, clearLayoutCache, layoutTree, pictureSets } from '../src/layout/index';
 import type { Geometry, LaidOut, LayoutSettings } from '../src/layout/model';
-import { TAB_TEXT_EM, buildScene, type Scene } from '../src/render/dom/scene';
-import { DEFAULT_DARK, DEFAULT_LIGHT, ME_RING_INNER, ROUNDEL_LOOK, mixHex } from '../src/render/styles';
+import { FRAME_STROKE_PX, TAB_TEXT_BASE_EM, TAB_TEXT_EM, buildScene, type Scene } from '../src/render/dom/scene';
+import { DEFAULT_DARK, DEFAULT_LIGHT, HEIR_LOOK, ME_RING_INNER, mixHex } from '../src/render/styles';
 import { renderSvg } from '../src/render/svg-string';
 import { FEl, installDom } from './acceptance/fake-dom';
 import { build } from './helpers';
@@ -131,18 +131,19 @@ describe('B.3.11: the saved picture has the elements of the live scene, for each
 				if (!e.hasClass('dynasty-card')) continue;
 				const id = e.getAttribute('data-person')!;
 				want.push(`card:${id}`);
-				if (all(e).some((x) => x.hasClass('dynasty-r1-plate'))) want.push(`plate:${id}`);
+				if (all(e).some((x) => x.hasClass('dynasty-card-foot-line'))) want.push(`foot:${id}`);
 				if (all(e).some((x) => x.hasClass('dynasty-r1-tab-group'))) want.push(`tab:${id}`);
 				if (all(e).some((x) => x.hasClass('dynasty-card-relation'))) want.push(`relation:${id}`);
 			}
 			for (const s of scene.pictures.filter((x) => x.lod === 'full')) {
 				if (s.kind === 'arms' && PICTURES.get(`arms:${s.house}`)?.startsWith('data:')) want.push(`arms:${s.person}`);
 				if (s.kind === 'portrait') {
-					want.push(`frame:${s.person}`);
+					// D219: a portrait that shows has no frame; an empty one keeps its thin frame.
 					if (PICTURES.get(`portrait:${s.person}`)?.startsWith('data:')) want.push(`portrait:${s.person}`);
+					else want.push(`frame:${s.person}`);
 				}
 			}
-			const got = nodes(parseSvg(svg)).flatMap((n) => (n.attrs['data-item'] && /^(card|plate|tab|relation|arms|frame|portrait):/.test(n.attrs['data-item']) ? [n.attrs['data-item']] : []));
+			const got = nodes(parseSvg(svg)).flatMap((n) => (n.attrs['data-item'] && /^(card|foot|tab|relation|arms|frame|portrait):/.test(n.attrs["data-item"]) ? [n.attrs['data-item']] : []));
 			expect(got.sort()).toEqual(want.sort());
 		});
 
@@ -197,8 +198,8 @@ describe('B.3.11: the saved picture has the elements of the live scene, for each
 	});
 });
 
-describe('B.3.4: the plate and the "You" tab in the saved picture', () => {
-	it('the plate is the scene\'s path and hairline, in the house colour, with the light opacity of ROUNDEL_LOOK', () => {
+describe('B.3.4: the foot hairline and the "You" tab in the saved picture', () => {
+	it('the foot hairline is the scene\'s line, in the card\'s own edge colour', () => {
 		const laid = lay(ROUNDEL, { relationLine: true });
 		const { root } = sceneOf(laid);
 		const svg = svgOf(laid);
@@ -206,53 +207,42 @@ describe('B.3.4: the plate and the "You" tab in the saved picture', () => {
 		const t = cardText(geo, 1);
 		for (const id of ['b', 'd']) {
 			const sceneCard = all(root).find((e) => e.hasClass('dynasty-card') && e.getAttribute('data-person') === id)!;
-			const plate = item(cardNode(svg, id), `plate:${id}`)!;
-			expect(plate.tag).toBe('path');
-			expect(plate.attrs.d).toBe(all(sceneCard).find((e) => e.hasClass('dynasty-r1-plate'))!.getAttribute('d'));
-			const house = g.byId.get(id)!.house;
-			const colour = house ? g.houses.get(house)!.color! : DEFAULT_LIGHT.noHouse;
-			expect(plate.attrs.fill.toLowerCase()).toBe(colour.toLowerCase());
-			expect(Number(plate.attrs['fill-opacity'])).toBe(ROUNDEL_LOOK.plate.light);
+			const line = item(cardNode(svg, id), `foot:${id}`)!;
+			expect(line.tag).toBe('line');
+			const live = all(sceneCard).find((e) => e.hasClass('dynasty-card-foot-line'))!;
+			for (const k of ['x1', 'y1', 'x2', 'y2']) expect(Number(line.attrs[k]), `${id} ${k}`).toBeCloseTo(Number(live.getAttribute(k)), 9);
 			const box = laid.layout.persons.get(id)!;
-			const line = cardNode(svg, id).children.find((n) => n.tag === 'line' && n.attrs['stroke-opacity'] === String(ROUNDEL_LOOK.hairline.opacity))!;
-			expect([Number(line.attrs.x1), Number(line.attrs.y1), Number(line.attrs.x2), Number(line.attrs.y2)]).toEqual([box.x + t.stripW, box.y + box.h - t.r1!.plate!.h, box.x + box.w - 1, box.y + box.h - t.r1!.plate!.h]);
-			expect(line.attrs['stroke-width']).toBe(String(ROUNDEL_LOOK.hairline.width));
-			expect(line.attrs.stroke.toLowerCase()).toBe(colour.toLowerCase());
+			const span = footSpan(geo, box.w, 1);
+			expect([Number(line.attrs.x1), Number(line.attrs.y1), Number(line.attrs.x2)]).toEqual([box.x + span.x0, box.y + box.h - t.r1!.plate!.h + 0.5, box.x + span.x1]);
+			expect(line.attrs.stroke).toBe(DEFAULT_LIGHT.cardBorder);
+			expect(line.attrs['stroke-width']).toBe('1');
 		}
 	});
 
-	it('the plate of the marked card is the house colour at the light opacity, like every plate (D153), inside the border', () => {
+	it('the hairline of the marked card stays inside the border (D153)', () => {
 		const laid = lay(ROUNDEL, { relationLine: true });
-		const { root } = sceneOf(laid);
 		const svg = svgOf(laid);
-		const plate = item(cardNode(svg, 'c'), 'plate:c')!;
-		expect(plate.attrs.fill.toLowerCase()).toBe('#1e5a8b');
-		expect(Number(plate.attrs['fill-opacity'])).toBe(ROUNDEL_LOOK.plate.light);
-		const sceneCard = all(root).find((e) => e.hasClass('dynasty-card') && e.getAttribute('data-person') === 'c')!;
-		expect(plate.attrs.d).toBe(all(sceneCard).find((e) => e.hasClass('dynasty-r1-plate'))!.getAttribute('d'));
 		const box = laid.layout.persons.get('c')!;
-		expect(plate.attrs.d).toContain(`H${box.x + box.w - ME_RING_INNER}`);
+		const line = item(cardNode(svg, 'c'), 'foot:c')!;
+		expect([Number(line.attrs.x1), Number(line.attrs.x2)]).toEqual([box.x + ME_RING_INNER, box.x + box.w - ME_RING_INNER]);
 	});
 
-	it('dark palette: the plate opacity is the dark one and the house colour is lifted as the strip is', () => {
+	it('dark palette: the ribbon colour is lifted by 40 % toward the text colour, as on the screen', () => {
 		const laid = lay(ROUNDEL, { relationLine: true });
 		const svg = svgOf(laid, { dark: true });
-		const plate = item(cardNode(svg, 'b'), 'plate:b')!;
-		expect(Number(plate.attrs['fill-opacity'])).toBe(ROUNDEL_LOOK.plate.dark);
-		expect(plate.attrs.fill.toLowerCase()).toBe(mixHex('#8b1e3f', 0.7, DEFAULT_DARK.text));
-		expect(Number(item(cardNode(svg, 'c'), 'plate:c')!.attrs['fill-opacity'])).toBe(ROUNDEL_LOOK.plate.dark);
+		expect(svg).toContain(`Z" fill="${mixHex('#8b1e3f', 0.6, DEFAULT_DARK.text)}"`);
 	});
 
-	it('plate off: no plate, no relation word, even when the caller still gives relations; the card is shorter', () => {
+	it('plate off: no foot hairline, no relation word, even when the caller still gives relations; the card is shorter', () => {
 		const on = lay(ROUNDEL, { relationLine: true });
 		const off = lay(ROUNDEL, { youTab: 'c' });
 		const svg = svgOf(off, { relations: true });
-		expect(nodes(parseSvg(svg)).some((n) => /^(plate|relation):/.test(n.attrs['data-item'] ?? ''))).toBe(false);
+		expect(nodes(parseSvg(svg)).some((n) => /^(foot|relation):/.test(n.attrs['data-item'] ?? ''))).toBe(false);
 		expect(textsOf(cardNode(svg, 'd')).map(textIn)).toEqual(['Dora']);
 		expect(off.layout.persons.get('d')!.h).toBeLessThan(on.layout.persons.get('d')!.h);
 	});
 
-	it('the tab: the scene\'s rectangle in the house colour (D153) over a card-colour base, the text-colour bold italic "You"; and only on the card of `youTab`', () => {
+	it('the tab: the scene\'s rectangle in the card colour inside a text-colour border (0.2.8), over a wide card-colour base, the text-colour bold "You"; and only on the card of `youTab`', () => {
 		const laid = lay(ROUNDEL, { youTab: 'c' });
 		const svg = svgOf(laid);
 		const geo = laid.layout.geometry;
@@ -262,19 +252,18 @@ describe('B.3.4: the plate and the "You" tab in the saved picture', () => {
 		const r = youTabRect(geo, true);
 		expect([Number(rect.attrs.x), Number(rect.attrs.y), Number(rect.attrs.width), Number(rect.attrs.height)]).toEqual([box.x + r.x, box.y + r.y, r.w, r.h]);
 		expect(Number(rect.attrs.rx)).toBe(r.h / 2);
-		expect(rect.attrs.fill.toLowerCase()).toBe('#1e5a8b');
-		expect(Number(rect.attrs['fill-opacity'])).toBe(ROUNDEL_LOOK.plate.light);
-		expect(rect.attrs.stroke.toLowerCase()).toBe('#1e5a8b');
-		expect(Number(rect.attrs['stroke-opacity'])).toBe(ROUNDEL_LOOK.hairline.opacity);
-		expect(Number(rect.attrs['stroke-width'])).toBe(ROUNDEL_LOOK.hairline.width);
+		expect(rect.attrs.fill).toBe(DEFAULT_LIGHT.cardFill);
+		expect(rect.attrs.stroke).toBe(DEFAULT_LIGHT.text);
+		expect(Number(rect.attrs['stroke-width'])).toBe(HEIR_LOOK.tabBorder);
 		const base = card.children[card.children.indexOf(rect) - 1];
 		expect([base.tag, base.attrs.x, base.attrs.y, base.attrs.width, base.attrs.height, base.attrs.fill, base.attrs.stroke]).toEqual(['rect', rect.attrs.x, rect.attrs.y, rect.attrs.width, rect.attrs.height, DEFAULT_LIGHT.cardFill, DEFAULT_LIGHT.cardFill]);
-		expect(Number(base.attrs['stroke-width'])).toBe(ROUNDEL_LOOK.tabStroke);
+		expect(Number(base.attrs['stroke-width'])).toBe(HEIR_LOOK.tabBase);
 		const word = textsOf(cardNode(svg, 'c')).find((n) => textIn(n) === 'You')!;
 		expect(word.attrs.fill).toBe(DEFAULT_LIGHT.text);
-		expect(word.attrs['font-style']).toBe('italic');
+		expect(word.attrs['font-style']).toBeUndefined();
 		expect(word.attrs['font-weight']).toBe(FONTS.bold);
 		expect(Number(word.attrs['font-size'])).toBeCloseTo(TAB_TEXT_EM * 12, 9);
+		expect(Number(word.attrs.y)).toBeCloseTo(box.y + r.y + r.h / 2 + TAB_TEXT_BASE_EM * 12, 9);
 		expect(nodes(parseSvg(svg)).filter((n) => /^tab:/.test(n.attrs['data-item'] ?? ''))).toHaveLength(1);
 	});
 
@@ -298,7 +287,7 @@ describe('B.3.4: the plate and the "You" tab in the saved picture', () => {
 });
 
 describe('B.3.3, B.3.10: pictures in the saved picture', () => {
-	it('the Roundel: the arms and the medallion are the places of roundelPics, with a card-colour halo and a house-colour ring', () => {
+	it('the Roundel: the arms and the medallion are the places of roundelPics, with a gap in the page colour and no ring (D219)', () => {
 		const laid = lay(ROUNDEL, { relationLine: true });
 		const geo = laid.layout.geometry;
 		const svg = svgOf(laid);
@@ -309,26 +298,27 @@ describe('B.3.3, B.3.10: pictures in the saved picture', () => {
 		expect([Number(arms.attrs.x), Number(arms.attrs.y), Number(arms.attrs.width), Number(arms.attrs.height)]).toEqual([box.x + rp.arms!.x, box.y + rp.arms!.y, rp.arms!.w, rp.arms!.h]);
 		const portrait = item(node, 'portrait:a')!;
 		expect([Number(portrait.attrs.x), Number(portrait.attrs.y), Number(portrait.attrs.width), Number(portrait.attrs.height)]).toEqual([box.x + rp.portrait!.x, box.y + rp.portrait!.y, rp.portrait!.w, rp.portrait!.h]);
-		const frame = item(node, 'frame:a')!;
-		expect(Number(frame.attrs.cx)).toBeCloseTo(box.x + roundelAxis(geo), 9);
-		expect(Number(frame.attrs.cy)).toBeCloseTo(box.y + rp.cy, 9);
-		expect(Number(frame.attrs.r)).toBeCloseTo(rp.ringR - ROUNDEL_EM.ring * 12 / 2, 9);
-		expect(Number(frame.attrs['stroke-width'])).toBeCloseTo(ROUNDEL_EM.ring * 12, 9);
-		expect(frame.attrs.stroke.toLowerCase()).toBe('#8b1e3f');
-		const halo = node.children.find((n) => n.tag === 'circle' && n.attrs.fill === DEFAULT_LIGHT.cardFill && Number(n.attrs.r) === rp.haloR)!;
-		expect(Number(halo.attrs.cx)).toBeCloseTo(Number(frame.attrs.cx), 9);
-		// The halo is under the picture and the ring.
+		// D219: a portrait that shows has no frame and no ring.
+		expect(item(node, 'frame:a')).toBeUndefined();
+		const halo = node.children.find((n) => n.tag === 'circle' && n.attrs.fill === DEFAULT_LIGHT.background && Number(n.attrs.r) === rp.haloR)!;
+		expect(Number(halo.attrs.cx)).toBeCloseTo(box.x + roundelAxis(geo), 9);
+		expect(Number(halo.attrs.cy)).toBeCloseTo(box.y + rp.cy, 9);
+		// The gap is under the picture, and the picture reaches the outer radius of the old ring.
 		expect(node.children.indexOf(halo)).toBeLessThan(node.children.indexOf(portrait));
-		expect(node.children.indexOf(portrait)).toBeLessThan(node.children.indexOf(frame));
+		expect(Number(portrait.attrs.width) / 2).toBeCloseTo(rp.ringR, 9);
+		expect(rp.haloR - rp.ringR).toBeCloseTo(ROUNDEL_EM.halo * 12, 9);
 	});
 
-	it('the Full level only: one frame circle and one picture for each portrait (no second group for the Compact level)', () => {
+	it('the Full level only: one picture for each portrait that shows and a frame only for one that does not (no second group for the Compact level)', () => {
 		const svg = svgOf(lay(ROUNDEL, { relationLine: true }));
 		const items = nodes(parseSvg(svg)).flatMap((n) => (n.attrs['data-item'] ? [n.attrs['data-item']] : []));
-		expect(items.filter((x) => x === 'frame:a')).toHaveLength(1);
+		expect(items.filter((x) => x === 'frame:a')).toHaveLength(0);
 		expect(nodes(parseSvg(svg)).filter((n) => n.tag === 'image')).toHaveLength(items.filter((x) => /^(arms|portrait):/.test(x)).length);
-		// A missing file: the dashed ring with a grey inside, as the scene's frame.
+		// A missing file: the dashed frame on the picture's edge with a grey inside, as the scene's frame.
 		const missing = item(cardNode(svg, 'c'), 'frame:c')!;
+		expect(Number(missing.attrs.r)).toBeCloseTo(roundelPics(lay(ROUNDEL, { relationLine: true }).layout.geometry, { arms: false, portrait: true }).ringR - 0.5, 9);
+		expect(missing.attrs['stroke-width']).toBe('1');
+		expect(missing.attrs.stroke).toBe(DEFAULT_LIGHT.textMuted);
 		expect(missing.attrs['stroke-dasharray']).toBe('3 2');
 		expect(missing.attrs.fill).toBe(DEFAULT_LIGHT.cardBorder);
 	});
@@ -353,7 +343,7 @@ describe('B.3.3, B.3.10: pictures in the saved picture', () => {
 		}
 	});
 
-	it('the text card keeps its text left, the plate word at the text\'s left edge', () => {
+	it('the text card keeps its text left, the relation word at the text\'s left edge', () => {
 		const laid = lay(TEXT, { relationLine: true });
 		const svg = svgOf(laid);
 		const box = laid.layout.persons.get('d')!;
@@ -365,7 +355,7 @@ describe('B.3.3, B.3.10: pictures in the saved picture', () => {
 	});
 });
 
-describe('ROUNDEL_LOOK equals the numbers in styles.css (the block under /* roundel: card */)', () => {
+describe('the saved look equals the numbers in styles.css (the block under /* roundel: card */)', () => {
 	const raw = readFileSync(join(__dirname, '..', 'styles.css'), 'utf8');
 	const block = raw.slice(raw.indexOf('/* roundel: card */'), raw.indexOf('/* C: phone list */')).replace(/\/\*[\s\S]*?\*\//g, '');
 	const rule = (selector: string): Record<string, string> => {
@@ -380,23 +370,20 @@ describe('ROUNDEL_LOOK equals the numbers in styles.css (the block under /* roun
 		);
 	};
 
-	it('the plate opacities: light, dark (the marked card has none of its own, D153)', () => {
-		expect(Number(rule('.dynasty-r1-plate')['fill-opacity'])).toBe(ROUNDEL_LOOK.plate.light);
-		expect(Number(rule('.theme-dark .dynasty-r1-plate')['fill-opacity'])).toBe(ROUNDEL_LOOK.plate.dark);
+	it('the foot hairline and the tabs', () => {
+		expect(Number(rule('.dynasty-card-foot-line')['stroke-width'])).toBe(1);
+		expect(rule('.dynasty-card-foot-line').stroke).toBe('var(--background-modifier-border)');
+		expect(Number(rule('.dynasty-r1-tab-base,\n.dynasty-ordinal-tab-base')['stroke-width'])).toBe(HEIR_LOOK.tabBase);
+		expect(Number(rule('.dynasty-r1-tab,\n.dynasty-ordinal-tab')['stroke-width'])).toBe(HEIR_LOOK.tabBorder);
+		expect(rule('.dynasty-r1-tab-text,\n.dynasty-ordinal-tab-text')['font-size']).toBe(`calc(var(--dynasty-font-size) * ${TAB_TEXT_EM})`);
+		expect(rule('.dynasty-r1-tab-text,\n.dynasty-ordinal-tab-text').fill).toBe('var(--text-normal)');
 	});
 
-	it('the hairline and the tab', () => {
-		expect(Number(rule('.dynasty-r1-plate-line')['stroke-opacity'])).toBe(ROUNDEL_LOOK.hairline.opacity);
-		expect(Number(rule('.dynasty-r1-plate-line')['stroke-width'])).toBe(ROUNDEL_LOOK.hairline.width);
-		expect(Number(rule('.dynasty-r1-tab-base')['stroke-width'])).toBe(ROUNDEL_LOOK.tabStroke);
-		expect(Number(rule('.dynasty-r1-tab')['stroke-width'])).toBe(ROUNDEL_LOOK.hairline.width);
-		expect(Number(rule('.dynasty-r1-tab')['stroke-opacity'])).toBe(ROUNDEL_LOOK.hairline.opacity);
-		expect(Number(rule('.dynasty-r1-tab')['fill-opacity'])).toBe(ROUNDEL_LOOK.plate.light);
-		expect(rule('.dynasty-r1-tab-text')['font-size']).toBe(`calc(var(--dynasty-font-size) * ${TAB_TEXT_EM})`);
-		expect(rule('.dynasty-r1-tab-text').fill).toBe('var(--text-normal)');
-	});
-
-	it('the ring of the medallion is as wide as the saved picture draws it', () => {
-		expect(rule('.dynasty-card-r1 .dynasty-portrait-frame,\n.dynasty-card-r1 .dynasty-portrait.has-picture .dynasty-portrait-frame')['stroke-width']).toBe('calc(var(--dynasty-font-size) * 0.15)');
+	it('D219: the style has no house-colour ring; the frame of an empty portrait is as wide as the saved picture draws it, and a portrait that shows has no frame', () => {
+		expect(block).not.toContain('dynasty-portrait-frame');
+		const plain = raw.replace(/\/\*[\s\S]*?\*\//g, '');
+		expect(/\.dynasty-portrait-frame \{[^}]*stroke-width: 1;/.test(plain)).toBe(true);
+		expect(FRAME_STROKE_PX).toBe(1);
+		expect(/\.dynasty-portrait\.has-picture \.dynasty-portrait-frame \{[^}]*stroke: none;/.test(plain)).toBe(true);
 	});
 });

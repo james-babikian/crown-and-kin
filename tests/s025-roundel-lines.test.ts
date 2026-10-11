@@ -248,7 +248,7 @@ function check(L: Layouts): Result {
 			if (s.tab && rectsMeet(s.tab, box)) res.problems.push(`${s.b.id}: far-couple tag of ${t.person} overlaps the tab`);
 		}
 		for (const c of lay.folds ?? []) {
-			const m = foldMark(c, c.spot, f, false);
+			const m = foldMark(c, c.spot, f, false, lay.orientation === 'sideways');
 			const near2 = (cx: number, cy: number, r: number) => toSegment(cx, cy, m.x1, m.y1, m.x2, m.y2) < r + m.r;
 			if (s.disc && near2(s.disc.x, s.disc.y, s.disc.r)) res.problems.push(`${s.b.id}: fold control ${c.key} overlaps the medallion`);
 			if (shapeRects.some((q) => distToRect(m.x1, m.y1, q) < m.r || distToRect(m.x2, m.y2, q) < m.r)) res.problems.push(`${s.b.id}: fold control ${c.key} overlaps the shield`);

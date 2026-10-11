@@ -6,7 +6,7 @@ import { PICTURE_EM, cardForm, geometryFor, pictureSize } from '../src/layout/ge
 import { DEFAULT_LAYOUT_SETTINGS, armsCards, clearLayoutCache, layoutTree, pictureSets } from '../src/layout/index';
 import type { LaidOut, LayoutSettings } from '../src/layout/model';
 import { buildScene, type Scene } from '../src/render/dom/scene';
-import { setLegendArms, setPicture, setSlotProblem } from '../src/render/dom/pictures';
+import { setPicture, setSlotProblem } from '../src/render/dom/pictures';
 import { legendHouses } from '../src/render/legend';
 import { savedExtent, savedFrame, savedLegend, savedScale } from '../src/render/saved-picture';
 import { DEFAULT_LIGHT } from '../src/render/styles';
@@ -113,15 +113,6 @@ describe('slots and the legend (S1, S2, S4)', () => {
 		setSlotProblem(slot, 'other');
 		expect(el.all().some((e) => e.tag === 'image')).toBe(false);
 		expect(el.hasClass('has-picture')).toBe(false);
-	});
-
-	it('setLegendArms shows one picture or none', () => {
-		const el = new FEl('span');
-		setLegendArms(el as unknown as HTMLElement, 'blob:a');
-		setLegendArms(el as unknown as HTMLElement, 'blob:b');
-		expect(el.children.map((c) => c.getAttribute('src'))).toEqual(['blob:b']);
-		setLegendArms(el as unknown as HTMLElement, null);
-		expect(el.children).toEqual([]);
 	});
 
 	it('legendHouses: every house in list order, or only the houses of the given people', () => {

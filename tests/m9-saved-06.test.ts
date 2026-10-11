@@ -98,8 +98,8 @@ function sceneItems(root: FEl, saved: SavedParts): string[] {
 			out.push(`card:${id}`);
 			if (e.hasClass('dynasty-signed')) out.push(`sign:${id}`);
 			if (all(e).some((x) => x.hasClass('dynasty-card-relation'))) out.push(`relation:${id}`);
-			// 0.2.5 (B.3.11): the Roundel's plate and "You" tab are items too.
-			if (all(e).some((x) => x.hasClass('dynasty-r1-plate'))) out.push(`plate:${id}`);
+			// 0.2.5 (B.3.11): the Roundel's foot hairline (0.2.8; the plate before) and "You" tab are items too.
+			if (all(e).some((x) => x.hasClass('dynasty-card-foot-line'))) out.push(`foot:${id}`);
 			if (all(e).some((x) => x.hasClass('dynasty-r1-tab'))) out.push(`tab:${id}`);
 		}
 		if (e.hasClass('dynasty-line') && e.parentElement?.hasClass('dynasty-lines')) out.push(`line:${[...e.classes].find((c) => c.startsWith('dynasty-line-'))!.slice('dynasty-line-'.length)}`);

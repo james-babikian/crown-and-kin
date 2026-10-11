@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { NameRoom } from '../src/layout/model';
 import { parseBreakList } from '../src/render/break-words';
-import { breakPlaces, breakWord, cardNameLines, fitRuns, nameLines, runsText, syllableBreaks, type NameMeasure } from '../src/render/name-lines';
+import { breakPlaces, cardNameLines, fitRuns, nameLines, runsText, syllableBreaks, type NameMeasure } from '../src/render/name-lines';
 
 // 0.2.4 (D117, D118, D122, D125, D127; contract 4.3 and 5): the card name with a sobriquet. The measure is a plain
 // number per character, a little narrower for the regular sobriquet, so every width in these tests is plain arithmetic.
@@ -151,11 +151,6 @@ describe('hyphens (D117): own hyphen, syllable rule, the owner list (D118)', () 
 		// "sh" is a digraph: no break between s and h.
 		expect(syllableBreaks('Ashira')).toEqual([4]);
 		expect(syllableBreaks('Ab')).toEqual([]);
-	});
-
-	it('breakWord gives the pieces without added hyphens', () => {
-		expect(breakWord('Longnamunda')).toEqual(['Longna', 'mun', 'da']);
-		expect(breakWord('Anne-Marie')).toEqual(['An', 'ne-', 'Ma', 'rie']);
 	});
 
 	it('a word that does not fit breaks with a hyphen at the end of the text line', () => {

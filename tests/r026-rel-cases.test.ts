@@ -103,11 +103,11 @@ describe('D176 item 4: sets of rumoured parents (rows 1 to 8, 16)', () => {
 	});
 	it('row 8: Kay (Pa, ~Qu, ~Ro) and Lou (Qu, Pa, ~Ro): half-sisters, maybe full (the whole set of three alone would match, so it stays a choice)', () => {
 		const h = tree(['pa m', 'qu m', 'ro m', 'kay f pa qu:rumoured ro:rumoured', 'lou f qu pa ro:rumoured']);
-		// Only the whole set matches (Lou keeps one set), so every rumoured link must be true: no "some". The rule text of D176
-		// lists row 8 among the rows with the flag; the flag rule ("the matching set leaves out a rumoured parent") says otherwise, and the sentence "If every rumoured link is true" is right here.
-		const every = { ...halfFull, maybe: 'full/rumoured' };
-		expect(facts(h, 'kay', 'lou')).toEqual(every);
-		expect(facts(h, 'lou', 'kay')).toEqual(every);
+		// 0.2.8 R4: Lou has two birth parents and a rumoured third, so Lou may also have just Qu and Pa. That set equals Kay's choice
+		// (Pa, Qu), which leaves out Ro: the rumour of Ro need not be true, so the flag "some" is set (before R4: every rumoured link, no flag).
+		const some = { ...halfFull, maybe: 'full/rumoured/some' };
+		expect(facts(h, 'kay', 'lou')).toEqual(some);
+		expect(facts(h, 'lou', 'kay')).toEqual(some);
 	});
 	it('a pair whose rumoured sets are equal as a whole has no "some": every rumoured link must be true', () => {
 		const h = tree([...M, 'a f m x:rumoured', 'b f m x:rumoured']);

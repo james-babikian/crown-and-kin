@@ -12,9 +12,9 @@ import { CROP_COPY_PX, dragCrop, openCropTool, sideOf, sliderOf, toolSizes, whee
 import { EditSheet } from '../src/obsidian/edit-sheet';
 import type { CropResult } from '../src/obsidian/crop-tool';
 import { createPictureStore, type CopyBox, type PictureCopy, type PictureIO, type PictureStore } from '../src/obsidian/picture-store';
-import { CROP_UI } from '../src/render/ui-text';
+import { CROP_UI, PICTURES_UI, WINDOW_UI } from '../src/render/ui-text';
 import { FEl, device, dispatch, fakeWin, installDom, pointer, resetDom, wheel } from './acceptance/fake-dom';
-import { openModals, resetObsidian } from './acceptance/fake-obsidian';
+import { lastMenu, notices, openModals, resetObsidian } from './acceptance/fake-obsidian';
 import { pngHead } from './acceptance/m9-support';
 import { pickerRowFor } from './acceptance/m11-support';
 import { fakeHandle, type FakeHandle } from './acceptance/tree-view-fakes';
@@ -33,6 +33,9 @@ beforeAll(() => {
 beforeEach(() => {
 	resetDom();
 	resetObsidian();
+	// D212 crop-tool: a 1024 × 768 window gives the frame of 280 px that the numbers below use: (768 - 96 - 280) / 1.4 = 280, the area 392 px.
+	device.width = 1024;
+	device.height = 768;
 });
 
 afterEach(() => vi.restoreAllMocks());
@@ -208,11 +211,15 @@ describe('C4: the tool\'s steps', () => {
 		const phone = toolSizes(true, 390, 844);
 		expect(phone.frame).toBeGreaterThanOrEqual(140);
 		expect(phone.area).toBeGreaterThan(phone.frame);
-		expect(phone.area).toBeLessThanOrEqual(390 - 24);
+		// D212 crop-tool: the area takes the full width of a phone.
+		expect(phone.area).toBeLessThanOrEqual(390);
+		expect(phone.area).toBeGreaterThanOrEqual(390 - 2);
 		const short = toolSizes(true, 390, 400);
 		expect(short.frame).toBe(140);
 		const desk = toolSizes(false, 1280, 800);
-		expect(desk.frame).toBe(280);
+		// D212 crop-tool: a large window, 48 px from the edges: (800 - 96 - 280) / 1.4 px.
+		expect(desk.frame).toBe(302);
+		expect(toolSizes(false, 1280, 2000).frame).toBe(480);
 		expect(toolSizes(true, Number.NaN, Number.NaN).frame).toBeGreaterThan(0);
 	});
 });
@@ -560,7 +567,7 @@ function sheetStore(files: VaultFile[]) {
 	return { app, store, boxes };
 }
 
-describe('C7, D91: the edit sheet and the part of the portrait', () => {
+describe('C7, D91: the person window and the part of the portrait', () => {
 	const files = [file('Pictures/roderick.jpg'), file('Pictures/new.png')];
 
 	function open(id: string, pictures = true) {
@@ -585,51 +592,56 @@ describe('C7, D91: the edit sheet and the part of the portrait', () => {
 		await settle();
 	}
 
-	const partButton = (content: FEl) => content.querySelector('.dynasty-select-part');
+	// 0.2.8 (Q6H A): the portrait in the header is one button that opens a short menu.
+	const menuOf = (content: FEl) => {
+		dispatch(content.querySelector('.dynasty-pic')!, 'click');
+		return lastMenu()!;
+	};
+	const partItem = (content: FEl) => menuOf(content).item(WINDOW_UI.selectPart);
+	const choose = (content: FEl, title: string) => menuOf(content).item(title)!.click();
+	const topTool = () => openModals[openModals.length - 1] as unknown as { contentEl: FEl };
 
-	it('Select the part shows under the portrait when the portrait can show, with its label and text', async () => {
+	it('the menu offers Select the part when the portrait can show, after Select portrait and before Remove portrait', async () => {
 		const { content } = open('roderick');
 		await settle();
-		const b = partButton(content)!;
-		expect(b.hidden).toBe(false);
-		expect(b.getText()).toBe('Select the part');
-		expect(b.getAttribute('aria-label')).toBe('Select the part of the portrait that the card shows');
-		const buttons = content.querySelector('.dynasty-sheet-portrait-buttons')!.children.map((c) => c.getText());
-		expect(buttons).toEqual(['Select portrait', 'Remove portrait', 'Select the part']);
+		const m = menuOf(content);
+		const titles = m.items.filter((i) => i !== 'sep').map((i) => (i as { title: string }).title);
+		expect(titles).toEqual([PICTURES_UI.selectPortrait, WINDOW_UI.selectPart, PICTURES_UI.removePortrait, WINDOW_UI.selectPersonalArms]);
+		expect(WINDOW_UI.selectPart).toBe('Select the part of the portrait');
 	});
 
 	it('it does not show with no portrait, nor when the file is missing', async () => {
 		const none = open('wren');
 		await settle();
-		expect(partButton(none.content)).toBeNull();
+		expect(partItem(none.content)).toBeUndefined();
+		expect(menuOf(none.content).item(PICTURES_UI.removePortrait)).toBeUndefined();
 		resetObsidian();
 		const { app, store } = sheetStore([]);
 		const handle = writingHandle(BODY);
 		const sheet = EditSheet.create(app as never, { handle: handle as never, personId: 'roderick', sourcePath: 'Tree.md', pictures: store })!;
 		sheet.open();
 		const content = (sheet as unknown as { contentEl: FEl }).contentEl;
-		expect(partButton(content)!.hidden).toBe(true);
+		expect(partItem(content)).toBeUndefined();
 	});
 
-	it('it shows in the sheet of a new person after a portrait is selected', async () => {
+	it('a new person has no portrait menu: a tap on the picture says "save first"', async () => {
 		const { app, store } = sheetStore(files);
 		const handle = writingHandle(BODY);
 		const sheet = EditSheet.createNew(app as never, { handle: handle as never, sourcePath: 'Tree.md', pictures: store, newPerson: { kind: 'person' } } as never)!;
 		sheet.open();
 		const content = (sheet as unknown as { contentEl: FEl }).contentEl;
-		expect(partButton(content)).toBeNull();
-		dispatch(content.querySelector('.dynasty-select-portrait')!, 'click');
-		await pickInPicker('Pictures/new.png');
-		expect(partButton(content)!.hidden).toBe(false);
+		dispatch(content.querySelector('.dynasty-pic')!, 'click');
+		expect(notices).toContain(WINDOW_UI.saveFirst);
+		expect(openModals.filter((m) => (m as unknown as { contentEl: FEl }).contentEl.querySelector('.dynasty-picker-list'))).toHaveLength(0);
 	});
 
 	it('the round portrait shows the draft part, and a new part makes a new copy', async () => {
 		const { content, boxes } = open('roderick');
 		await settle();
 		expect(boxes.filter((b) => b.fit === 'portrait')[0].crop).toEqual({ left: 0.1, top: 0.4, side: 0.5 });
-		dispatch(partButton(content)!, 'click');
+		choose(content, WINDOW_UI.selectPart);
 		await settle();
-		const tool = openModals[openModals.length - 1] as unknown as { contentEl: FEl };
+		const tool = topTool();
 		dispatch(tool.contentEl.querySelector('.dynasty-crop-reset')!, 'click');
 		dispatch(tool.contentEl.querySelector('.dynasty-crop-save')!, 'click');
 		await settle();
@@ -641,9 +653,9 @@ describe('C7, D91: the edit sheet and the part of the portrait', () => {
 	it('the tool opens on the draft part, its Save is a draft edit, and the sheet Save writes only portrait-crop', async () => {
 		const { content, handle } = open('roderick');
 		await settle();
-		dispatch(partButton(content)!, 'click');
+		choose(content, WINDOW_UI.selectPart);
 		await settle();
-		const tool = openModals[openModals.length - 1] as unknown as { contentEl: FEl };
+		const tool = topTool();
 		const area = tool.contentEl.querySelector('.dynasty-crop-area')!;
 		expect(prop(area, '--dynasty-crop-scale')).toBeCloseTo(1.4, 5);
 		dispatch(tool.contentEl.querySelector('.dynasty-crop-button')!, 'click');
@@ -663,10 +675,9 @@ describe('C7, D91: the edit sheet and the part of the portrait', () => {
 	it('Cancel in the tool changes nothing: the sheet is not dirty', async () => {
 		const { content, handle } = open('roderick');
 		await settle();
-		dispatch(partButton(content)!, 'click');
+		choose(content, WINDOW_UI.selectPart);
 		await settle();
-		const tool = openModals[openModals.length - 1] as unknown as { contentEl: FEl };
-		dispatch(tool.contentEl.querySelector('.dynasty-crop-cancel')!, 'click');
+		dispatch(topTool().contentEl.querySelector('.dynasty-crop-cancel')!, 'click');
 		await settle();
 		await saveSheet(content);
 		expect(handle.ops).toEqual([]);
@@ -675,9 +686,9 @@ describe('C7, D91: the edit sheet and the part of the portrait', () => {
 	it('Reset and Save in the tool for a person with a part removes it from the note', async () => {
 		const { content, handle } = open('roderick');
 		await settle();
-		dispatch(partButton(content)!, 'click');
+		choose(content, WINDOW_UI.selectPart);
 		await settle();
-		const tool = openModals[openModals.length - 1] as unknown as { contentEl: FEl };
+		const tool = topTool();
 		dispatch(tool.contentEl.querySelector('.dynasty-crop-reset')!, 'click');
 		dispatch(tool.contentEl.querySelector('.dynasty-crop-save')!, 'click');
 		await settle();
@@ -686,11 +697,15 @@ describe('C7, D91: the edit sheet and the part of the portrait', () => {
 		expect(handle.body).toBe(BODY.replace('    portrait-crop: "0.1 0.4 0.5"\n', ''));
 	});
 
-	it('D91: selecting another picture clears the draft part; the same save writes portrait-crop null with the new portrait', async () => {
+	it('D196 item 4: a picked portrait opens the crop tool at once; Cancel there keeps the new portrait with the automatic part (D91)', async () => {
 		const { content, handle } = open('roderick');
 		await settle();
-		dispatch(content.querySelector('.dynasty-select-portrait')!, 'click');
+		choose(content, PICTURES_UI.selectPortrait);
 		await pickInPicker('Pictures/new.png');
+		const tool = topTool();
+		expect(tool.contentEl.querySelector('.dynasty-crop-area')).not.toBeNull();
+		dispatch(tool.contentEl.querySelector('.dynasty-crop-cancel')!, 'click');
+		await settle();
 		await saveSheet(content);
 		expect(handle.ops).toEqual([{ kind: 'set-person-fields', id: 'roderick', fields: { portrait: '[[new.png]]', 'portrait-crop': null } }]);
 		expect(handle.body).toBe(BODY.replace('    portrait: "[[roderick.jpg]]"\n    portrait-crop: "0.1 0.4 0.5"\n', '    portrait: "[[new.png]]"\n'));
@@ -699,8 +714,8 @@ describe('C7, D91: the edit sheet and the part of the portrait', () => {
 	it('D91: Remove portrait clears the draft part; the save removes both keys', async () => {
 		const { content, handle } = open('roderick');
 		await settle();
-		dispatch(content.querySelector('.dynasty-remove-portrait')!, 'click');
-		expect(partButton(content)).toBeNull();
+		choose(content, PICTURES_UI.removePortrait);
+		expect(partItem(content)).toBeUndefined();
 		await saveSheet(content);
 		expect(handle.ops).toEqual([{ kind: 'set-person-fields', id: 'roderick', fields: { portrait: null, 'portrait-crop': null } }]);
 		expect(handle.body).toBe(BODY.replace('    portrait: "[[roderick.jpg]]"\n    portrait-crop: "0.1 0.4 0.5"\n', ''));
@@ -709,9 +724,11 @@ describe('C7, D91: the edit sheet and the part of the portrait', () => {
 	it('D91: a new link text for the same file keeps the part, and the write says so with portrait-crop', async () => {
 		const { content, handle } = open('gwen');
 		await settle();
-		dispatch(content.querySelector('.dynasty-select-portrait')!, 'click');
+		choose(content, PICTURES_UI.selectPortrait);
 		// The picker writes "[[roderick.jpg]]"; the note has "![[Pictures/roderick.jpg]]": another text, the same file.
 		await pickInPicker('Pictures/roderick.jpg');
+		dispatch(topTool().contentEl.querySelector('.dynasty-crop-cancel')!, 'click');
+		await settle();
 		await saveSheet(content);
 		expect(handle.ops).toEqual([{ kind: 'set-person-fields', id: 'gwen', fields: { portrait: '[[roderick.jpg]]', 'portrait-crop': '0.2 0.2 0.4' } }]);
 		expect(handle.body).toBe(BODY.replace('portrait: "![[Pictures/roderick.jpg]]"', 'portrait: "[[roderick.jpg]]"'));
@@ -720,8 +737,10 @@ describe('C7, D91: the edit sheet and the part of the portrait', () => {
 	it('D91: a person with no part who selects a new picture writes only the portrait', async () => {
 		const { content, handle } = open('odette');
 		await settle();
-		dispatch(content.querySelector('.dynasty-select-portrait')!, 'click');
+		choose(content, PICTURES_UI.selectPortrait);
 		await pickInPicker('Pictures/new.png');
+		dispatch(topTool().contentEl.querySelector('.dynasty-crop-cancel')!, 'click');
+		await settle();
 		await saveSheet(content);
 		expect(handle.ops).toEqual([{ kind: 'set-person-fields', id: 'odette', fields: { portrait: '[[new.png]]' } }]);
 	});
@@ -729,11 +748,9 @@ describe('C7, D91: the edit sheet and the part of the portrait', () => {
 	it('a part chosen for a new picture in the same sheet is written with it (one write)', async () => {
 		const { content, handle } = open('roderick');
 		await settle();
-		dispatch(content.querySelector('.dynasty-select-portrait')!, 'click');
+		choose(content, PICTURES_UI.selectPortrait);
 		await pickInPicker('Pictures/new.png');
-		dispatch(partButton(content)!, 'click');
-		await settle();
-		const tool = openModals[openModals.length - 1] as unknown as { contentEl: FEl };
+		const tool = topTool();
 		expect(prop(tool.contentEl.querySelector('.dynasty-crop-area')!, '--dynasty-crop-scale')).toBeCloseTo(280 / 400, 5);
 		dispatch(tool.contentEl.querySelectorAll('.dynasty-crop-zoom .dynasty-crop-button')[1], 'click');
 		dispatch(tool.contentEl.querySelector('.dynasty-crop-save')!, 'click');
@@ -746,9 +763,9 @@ describe('C7, D91: the edit sheet and the part of the portrait', () => {
 		expect(fields['portrait-crop']).toBe('0.1 0.0667 0.8');
 	});
 
-	it('the tool works with no store in the sheet only as far as the button: no store, no button', async () => {
+	it('with no store the picture is not an option for a part: the menu has no Select the part', async () => {
 		const { content } = open('roderick', false);
 		await settle();
-		expect(partButton(content)!.hidden).toBe(true);
+		expect(partItem(content)).toBeUndefined();
 	});
 });

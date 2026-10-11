@@ -1,0 +1,56 @@
+/* ---------- Far-couple tags (D10) ---------- */
+
+.dynasty-tag {
+	cursor: pointer;
+	outline: none;
+	font-family: var(--font-interface);
+}
+
+/* The hit area is invisible but takes presses. It lies below the cards, so a card wins where they overlap. */
+.dynasty-tag-hit {
+	cursor: pointer;
+	fill: none;
+	stroke: none;
+	pointer-events: all;
+}
+
+/* 0.2.8 (I36 C, D212 tag-edge): the pill is a chip: the secondary background and the line colour as its edge (3:1), so it reads as a tag also without colour. */
+.dynasty-tag-pill {
+	fill: var(--background-secondary);
+	stroke: var(--dynasty-edge, var(--text-muted));
+	stroke-width: 1;
+}
+
+.dynasty-tag-text {
+	fill: var(--dynasty-muted, var(--text-muted));
+}
+
+.dynasty-tag-full .dynasty-tag-text {
+	font-size: calc(var(--dynasty-font-size) * 0.75);
+}
+
+.dynasty-tag-compact .dynasty-tag-text,
+.dynasty-tag-sign .dynasty-tag-text {
+	font-size: calc(var(--dynasty-font-size) * 1.5);
+}
+
+.dynasty-tag:hover .dynasty-tag-pill,
+.dynasty-tag.is-hover .dynasty-tag-pill,
+.dynasty-tag:focus-visible .dynasty-tag-pill {
+	stroke: var(--interactive-accent);
+	stroke-width: 2;
+}
+
+/* Keyboard focus: a 2 px ring in the text colour outside the accent, as on the cards (WP6.5). */
+.dynasty-tag-ring {
+	display: none;
+	fill: none;
+	stroke: var(--text-normal);
+	pointer-events: none;
+}
+
+.dynasty-tag:focus-visible .dynasty-tag-ring {
+	display: inline;
+	stroke-width: 6;
+}
+

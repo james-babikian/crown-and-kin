@@ -37,7 +37,7 @@ describe('fold controls keep clear of tags and of each other (fixture 15)', () =
 			it(`${view}, folds ${label}`, () => {
 				const { layout, edges } = lay(settings, parents);
 				const folds = layout.folds ?? [];
-				const boxes = folds.map((c) => foldExtent(c, c.spot, 16));
+				const boxes = folds.map((c) => foldExtent(c, c.spot, 16, layout.orientation === 'sideways'));
 				const hits: string[] = [];
 				for (const [i, c] of folds.entries()) {
 					for (const t of layout.farTags.values()) if (meet(boxes[i], t.hit)) hits.push(`${c.key} on the tag of ${t.person}`);
@@ -46,7 +46,7 @@ describe('fold controls keep clear of tags and of each other (fixture 15)', () =
 				expect(hits).toEqual([]);
 				// The stem of a folded family ends at its spot, and the room follows: the drawing holds every hit area.
 				for (const c of folds) {
-					const box = foldExtent(c, c.spot, 16);
+					const box = foldExtent(c, c.spot, 16, layout.orientation === 'sideways');
 					expect(box.x).toBeGreaterThanOrEqual(-1e-6);
 					expect(box.y).toBeGreaterThanOrEqual(-1e-6);
 					expect(box.x + box.w).toBeLessThanOrEqual(layout.width + 1e-6);

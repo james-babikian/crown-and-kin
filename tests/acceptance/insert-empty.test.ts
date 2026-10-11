@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import type { PlanWrite } from '../../src/core/block-write';
-import type { LocateBlock } from '../../src/core/block-locate';
 import * as locate from '../../src/core/block-locate';
 import * as write from '../../src/core/block-write';
 import type { ApplyOp, EditResult, Op } from '../../src/core/edit';
@@ -16,7 +15,8 @@ import { replaceOnce } from './golden';
 // comment ("a comment-only body keeps the comment above"), `people` goes directly below it.
 
 const applyOp: ApplyOp = edit.applyOp;
-const locateBlock: LocateBlock = locate.locateBlock;
+/** The block with this ordinal, or null. */
+const locateBlock = (text: string, ordinal: number) => locate.findBlocks(text)[ordinal] ?? null;
 const planWrite: PlanWrite = write.planWrite;
 
 const HELP = [

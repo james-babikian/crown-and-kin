@@ -4,10 +4,14 @@
  * the tree) that stand between the heirs. It reads the family graph of the whole tree and
  * changes nothing. The Titles window and the Show view call `successionLine`; `specOf` turns the keys of a title into
  * the shape the engine reads, and the window passes its draft in the same shape.
+ *
+ * 0.2.8 adds: the birth-year order of brothers and sisters (D193, slot-fill), a holder entry that holds the title through the
+ * spouse (D195, spec §13.21 rule 13a), co-rulers that are never in the line (S2), the climb in the order of the note
+ * (F-KIN-11), and `SuccessionResult.notes` for the quiet notes of the window.
  */
 
-import { drawnParentMap, type DrawnParent, type FamilyGraph } from './derive';
-import { isDead, readInherit, readRule, yearOf, type InheritRule, type InheritThrough, type SuccessionRule } from './succession-keys';
+import { drawnParentMap, partnerOf, type DrawnParent, type FamilyGraph } from './derive';
+import { isDead, readInherit, readRule, resolveSpouse, yearOf, type InheritRule, type InheritThrough, type SpouseWorld, type SuccessionRule } from './succession-keys';
 import type { Holder, Person, Title } from './types';
 
 /** The succession keys of one title as the engine reads them; the Titles window passes its draft in the same shape. */
@@ -48,6 +52,22 @@ export function specOf(title: Title): SuccessionSpec {
 	return spec;
 }
 
+/**
+ * A quiet note under or above the line (0.2.8 contract B.2, an internal note §2.1). The window turns `kind` and `params` into a text of
+ * `SUCCESSION_UI`. Params hold person ids, except `entry` of `body-skipped`, which is the name written in the holder entry.
+ * - `order-from-note` {a, b}: two neighbouring children of one parent, in line order, ordered only by the order in the note;
+ *   {a, b, reason: 'same-year'} when both have the same birth year (without `reason`, a birth year is missing).
+ * - `order-contradiction` {people}: birth years and the order in the note do not agree for these children, in written order.
+ * - `co-rulers-not-in-line` {}: the other holders (`coRulers`) are not in the line.
+ * - `born-in-reign-no-from` {parent}: the parent holds this title, but no entry has a readable start year, so the children keep their rank.
+ * - `through-spouse` {holder, spouse}: the holder holds the title through the spouse; the line is for the spouse.
+ * - `body-skipped` {first, entry}: with `heirs-of-body`, the first holder is `first` because the first entry `entry` is not a person in the tree.
+ */
+export interface SuccessionNote {
+	kind: 'order-from-note' | 'order-contradiction' | 'co-rulers-not-in-line' | 'born-in-reign-no-from' | 'through-spouse' | 'body-skipped';
+	params: Record<string, string | string[]>;
+}
+
 /** What the line is: a list of heirs, or the reason there is none. */
 export type SuccessionKind = 'line' | 'no-rule' | 'no-ruler' | 'ruler-not-in-tree' | 'bad-rule';
 
@@ -84,6 +104,8 @@ export interface SuccessionResult {
 	openBranches: { id: string; before: number }[];
 	/** M.4: more open branches than the cap (`limit`) in the shown line. */
 	moreBranches: boolean;
+	/** 0.2.8: quiet notes for the window (see `SuccessionNote`); empty when there is nothing to say. */
+	notes: SuccessionNote[];
 }
 
 /** M.2: a line entry inside the engine, an heir or an open branch. */
@@ -101,6 +123,7 @@ function mergeItems(a: Item[], b: Item[]): Item[] {
 const OPEN_END: readonly string[] = ['present', 'now', 'current', 'ongoing', 'living', 'alive', 'reigning'];
 const NONE: Person[] = [];
 const NONE_DRAWN: DrawnParent[] = [];
+const NO_IDS: string[] = [];
 
 const empty = (kind: SuccessionKind, year: number | null, yearFrom: SuccessionResult['yearFrom']): SuccessionResult => ({
 	kind,
@@ -117,6 +140,7 @@ const empty = (kind: SuccessionKind, year: number | null, yearFrom: SuccessionRe
 	outsideBody: false,
 	openBranches: [],
 	moreBranches: false,
+	notes: [],
 });
 
 /** The list `a`, then the items of `b` that `a` does not have, in the order of `b`. */
@@ -190,7 +214,25 @@ export function successionLine(g: FamilyGraph, title: Title, spec: SuccessionSpe
 	if (rIdx < 0) return { ...empty('no-ruler', Y, yearFrom), noYear };
 	const ruler = entries[rIdx].person !== undefined && g.byId.has(entries[rIdx].person!) ? entries[rIdx].person! : undefined;
 	if (ruler === undefined) return { ...empty('ruler-not-in-tree', Y, yearFrom), noYear };
-	const R: string = ruler;
+	const X: string = ruler;
+
+	// D195, rule 13a: a holder entry with `through-spouse` (up to R's entry) is read as its spouse S. The key is ignored when
+	// no spouse can be found (`validate.ts` warns). Without a rule there is no line and the key changes nothing.
+	const spouseAt = new Map<number, string>();
+	if (spec.rule) {
+		let world: SpouseWorld | undefined;
+		let holderIds: string[] | undefined;
+		for (let i = 0; i <= rIdx; i++) {
+			const e = entries[i];
+			if (e.throughSpouse === undefined || e.person === undefined || !g.byId.has(e.person)) continue;
+			world ??= spouseWorldOf(g);
+			holderIds ??= entries.flatMap((h) => (h.person !== undefined && g.byId.has(h.person) ? [h.person] : []));
+			const s = resolveSpouse(world, e.person, e.throughSpouse, holderIds);
+			if (s.ok) spouseAt.set(i, s.id);
+		}
+	}
+	// R is the person the line is computed after: the spouse of a keyed ruler entry. `X` stays the holder (the result's `ruler`).
+	const R: string = spouseAt.get(rIdx) ?? X;
 
 	const P = (id: string): Person => g.byId.get(id)!;
 	const excluded = new Set(spec.exclude ?? []);
@@ -199,11 +241,19 @@ export function successionLine(g: FamilyGraph, title: Title, spec: SuccessionSpe
 	let size = 0;
 	for (const p of g.people) if (p.index >= size) size = p.index + 1;
 	const aliveMemo = new Int8Array(size);
-	const bornMemo = new Map<string, number | undefined>();
-	const bornYear = (id: string) => {
-		if (!bornMemo.has(id)) bornMemo.set(id, yearOf(P(id).born));
-		return bornMemo.get(id);
+	// The birth year of a person, read once (NaN for no year).
+	const yearKnown = new Uint8Array(size);
+	const yearValue = new Float64Array(size);
+	const bornOf = (p: Person): number | undefined => {
+		if (!yearKnown[p.index]) {
+			const y = yearOf(p.born);
+			yearValue[p.index] = y === undefined ? NaN : y;
+			yearKnown[p.index] = 1;
+		}
+		const v = yearValue[p.index];
+		return Number.isNaN(v) ? undefined : v;
 	};
+	const bornYear = (id: string) => bornOf(P(id));
 	const aliveOf = (p: Person): boolean => {
 		let a = aliveMemo[p.index];
 		if (a === 0) {
@@ -226,13 +276,16 @@ export function successionLine(g: FamilyGraph, title: Title, spec: SuccessionSpe
 	const aliveAt = (id: string) => aliveOf(P(id));
 
 	// K.6: the holders who rule at the same time as R.
-	const coRulers = findCoRulers(g, entries, R, Y, startedFor(entries, Y));
+	const coRulers = findCoRulers(g, entries, X, Y, startedFor(entries, Y));
 
 	// The rule line.
 	const rule = spec.rule;
-	// L.2: the first holder is the first entry, in list order, whose person is in the tree.
-	const firstEntry = spec.body ? entries.find((e) => e.person !== undefined && g.byId.has(e.person)) : undefined;
-	const engine = rule ? makeEngine(g, entries, spec, rule, R, Y, rIdx, aliveOf, bornYear, excluded, firstEntry?.person, youngDeathAge) : undefined;
+	// L.2: the first holder is the first entry, in list order, whose person is in the tree; D195: its spouse if the entry has the key.
+	const firstIdx = spec.body ? entries.findIndex((e) => e.person !== undefined && g.byId.has(e.person)) : -1;
+	const firstHolder = firstIdx >= 0 ? spouseAt.get(firstIdx) ?? entries[firstIdx].person : undefined;
+	// Who held the title (an open branch needs none of them), who the climb follows, and who is never in the line (S2, D195).
+	const hold = holdersOf(g, entries, rIdx, R, X, spouseAt, coRulers);
+	const engine = rule ? makeEngine(g, entries, spec, rule, R, Y, aliveOf, bornYear, bornOf, excluded, firstHolder, youngDeathAge, hold, spouseAt) : undefined;
 	const items = engine ? engine.line() : [];
 	const ruleLine = items.filter((i) => !i.branch).map((i) => i.id);
 
@@ -245,7 +298,8 @@ export function successionLine(g: FamilyGraph, title: Title, spec: SuccessionSpe
 		named.add(id);
 		let state: NamedHeirState;
 		if (!g.byId.has(id)) state = 'not-in-tree';
-		else if (id === R) state = 'is-ruler';
+		// R, and the holder of a keyed entry (D195: the holder and the spouse both are "the ruler"). A co-ruler is left to the ruler's choice.
+		else if (id === R || id === X) state = 'is-ruler';
 		else if (excluded.has(id)) state = 'excluded';
 		else if (!aliveAt(id)) state = Y !== null && (bornYear(id) ?? -Infinity) > Y ? 'not-born' : 'not-alive';
 		else {
@@ -289,11 +343,21 @@ export function successionLine(g: FamilyGraph, title: Title, spec: SuccessionSpe
 	};
 	const old = oldAge > 0 ? heirs.filter((id) => isOld(P(id), reference, oldAge)) : [];
 
+	// 0.2.8: the notes. The order of the groups is the order the window shows them in.
+	const notes: SuccessionNote[] = [];
+	if (spouseAt.has(rIdx)) notes.push({ kind: 'through-spouse', params: { holder: X, spouse: R } });
+	if (coRulers.length) notes.push({ kind: 'co-rulers-not-in-line', params: {} });
+	if (engine && firstHolder !== undefined && firstIdx > 0) {
+		const skipped = entries[0];
+		notes.push({ kind: 'body-skipped', params: { first: firstHolder, entry: skipped.name ?? skipped.person ?? '' } });
+	}
+	if (engine) notes.push(...engine.notes(new Set(heirs)));
+
 	return {
 		kind: 'line',
 		year: Y,
 		yearFrom,
-		ruler: R,
+		ruler: X,
 		heirs,
 		more: all.length > max,
 		namedHeirs,
@@ -305,8 +369,53 @@ export function successionLine(g: FamilyGraph, title: Title, spec: SuccessionSpe
 		outsideBody: engine ? engine.outsideBody() : false,
 		openBranches: rows,
 		moreBranches,
-		...(engine && firstEntry ? { firstHolder: firstEntry.person } : {}),
+		notes,
+		...(engine && firstHolder !== undefined ? { firstHolder } : {}),
 	};
+}
+
+/** The partners and the birth and adoptive parents of the family graph, in the form the partner choice reads (spec §13.21 rule 13a). */
+function spouseWorldOf(g: FamilyGraph): SpouseWorld {
+	const drawn = drawnParentMap(g);
+	return {
+		partners: (id) =>
+			(g.unionsOf.get(id) ?? []).map((key) => {
+				const fu = g.unionByKey.get(key)!;
+				return { id: partnerOf(fu, id), type: fu.type };
+			}),
+		claimParents: (id) => [...new Set((drawn.get(id) ?? []).filter((d) => d.type === 'birth' || d.type === 'adoptive').map((d) => d.id))],
+		exists: (id) => g.byId.has(id),
+	};
+}
+
+/** Who held the title, who the climb follows as an earlier holder, and who is never in the line. */
+interface Holders {
+	/** The persons of the entries before R's entry, a keyed entry by its spouse; the climb follows them (rule 13). */
+	earlier: Set<string>;
+	/** Everyone who held the title as far as an open branch is concerned: the persons as written, the spouses, R, the holder and the co-rulers (rule 23). */
+	held: Set<string>;
+	/** Never in the line, but they still pass a claim: the co-rulers (S2) and the holder of a keyed ruler entry (D195). */
+	blocked: Set<string>;
+}
+
+function holdersOf(g: FamilyGraph, entries: readonly Holder[], rIdx: number, R: string, X: string, spouseAt: ReadonlyMap<number, string>, coRulers: readonly string[]): Holders {
+	const earlier = new Set<string>();
+	const held = new Set<string>([R, X, ...coRulers]);
+	for (let i = 0; i < rIdx; i++) {
+		const id = entries[i].person;
+		if (id === undefined || !g.byId.has(id)) continue;
+		held.add(id);
+		const s = spouseAt.get(i);
+		if (s === undefined) earlier.add(id);
+		else {
+			// The spouse takes the place of the holder; a spouse who is R is not added.
+			held.add(s);
+			if (s !== R) earlier.add(s);
+		}
+	}
+	const blocked = new Set<string>(coRulers);
+	if (spouseAt.has(rIdx)) blocked.add(X);
+	return { earlier, held, blocked };
 }
 
 /** True when the entry at index `i` has started at `Y`, for every entry in the list (the B.3 test without the stop). */
@@ -388,6 +497,8 @@ interface Engine {
 	line(): Item[];
 	leftOutNoSex(inLine: ReadonlySet<string>): number;
 	outsideBody(): boolean;
+	/** The notes of the walks (0.2.8): D202 order notes, S3; only for people in the shown line (`shown`). */
+	notes(shown: ReadonlySet<string>): SuccessionNote[];
 }
 
 /**
@@ -401,12 +512,14 @@ function makeEngine(
 	rule: SuccessionRule,
 	R: string,
 	Y: number | null,
-	rIdx: number,
 	alive: (p: Person) => boolean,
 	bornYear: (id: string) => number | undefined,
+	yearAt: (p: Person) => number | undefined,
 	excluded: ReadonlySet<string>,
 	body: string | undefined,
 	youngDeath: number,
+	hold: Holders,
+	spouseAt: ReadonlyMap<number, string>,
 ): Engine {
 	const P = (id: string): Person => g.byId.get(id)!;
 	const drawn = drawnParentMap(g);
@@ -441,41 +554,65 @@ function makeEngine(
 		return kids;
 	};
 
-	// The earlier holders: the persons of the entries before R's entry (C.6).
-	const earlier = new Set<string>();
-	for (let i = 0; i < rIdx; i++) {
-		const id = entries[i].person;
-		if (id !== undefined && g.byId.has(id)) earlier.add(id);
-	}
+	// The earlier holders: the persons of the entries before R's entry (C.6), a keyed entry by its spouse (D195).
+	const earlier = hold.earlier;
 
 	// Born during a reign of the parent (key 2 of C.4): the reigns with a start year, by person.
 	const reigns = new Map<string, { from: number; to?: number }[]>();
 	if (rule === 'born-in-reign') {
-		for (const h of entries) {
+		entries.forEach((h, i) => {
 			const from = yearOf(h.from);
-			if (h.person === undefined || from === undefined) continue;
+			if (h.person === undefined || from === undefined) return;
 			const to = yearOf(h.to);
-			const list = reigns.get(h.person) ?? [];
-			list.push(to === undefined ? { from } : { from, to });
-			reigns.set(h.person, list);
-		}
+			// D195: the years of a keyed entry are also reigns of the spouse.
+			for (const id of [h.person, spouseAt.get(i)]) {
+				if (id === undefined) continue;
+				const list = reigns.get(id) ?? [];
+				list.push(to === undefined ? { from } : { from, to });
+				reigns.set(id, list);
+			}
+		});
 	}
 
 	const through = spec.inheritThrough;
 
+	// What the walks note for the window (0.2.8): D202 pairs and breaks of the order, S3 parents. Filled by `rank` in every pass.
+	const pairs = new Map<string, [string, string, boolean]>();
+	const loops = new Map<string, string[]>();
+	const noFrom = new Map<string, string[]>();
+	// S3: the people who hold the title in an entry with no readable start year (a keyed entry holds for its spouse too).
+	const unstarted = new Set<string>();
+	if (rule === 'born-in-reign') {
+		entries.forEach((h, i) => {
+			if (h.person === undefined || yearOf(h.from) !== undefined) return;
+			unstarted.add(h.person);
+			const spouse = spouseAt.get(i);
+			if (spouse !== undefined) unstarted.add(spouse);
+		});
+	}
+	// The primary parents are the ones the edit sheet orders brothers and sisters by (it moves a person among the same parents).
+	// A placement list holds at most two ids, so the test is a few comparisons.
+	const sameParents = (a: string, b: string): boolean => {
+		const x = g.placementParents.get(a) ?? NO_IDS;
+		const y = g.placementParents.get(b) ?? NO_IDS;
+		if (x.length !== y.length) return false;
+		if (x.length < 2) return x.length === 0 || x[0] === y[0];
+		return (x[0] === y[0] && x[1] === y[1]) || (x[0] === y[1] && x[1] === y[0]);
+	};
 	// M.1: a person who has a child in the tree by a birth, adoptive or rumoured link has a drawn family; a ward link does not count (D191). Made on first need.
 	let parentOf: Set<string> | undefined;
 	const hasChild = (id: string): boolean => {
 		if (!parentOf) {
 			parentOf = new Set();
-			for (const q of g.people) for (const r of q.parents) if (r.type !== 'ward' && g.byId.has(r.id)) parentOf.add(r.id);
+			// I42: a person who lists the same person as a parent (a self-listing) is no child; a cycle link still is.
+			for (const q of g.people) for (const r of q.parents) if (r.type !== 'ward' && r.id !== q.id && g.byId.has(r.id)) parentOf.add(r.id);
 		}
 		return parentOf.has(id);
 	};
 	// M.1: dead at Y (not alive and not just unborn), not R, not closed, no child, not too young at death.
 	const openBranch = (x: Person): boolean => {
 		// M.1: R, and a person who held the title before R (the title passed on, so the line of the holder is closed).
-		if (x.id === R || earlier.has(x.id) || alive(x)) return false;
+		if (x.id === R || hold.held.has(x.id) || alive(x)) return false;
 		if (Y !== null && (bornYear(x.id) ?? -Infinity) > Y) return false;
 		if (x.childless === true || hasChild(x.id)) return false;
 		if (youngDeath > 0) {
@@ -562,7 +699,20 @@ function makeEngine(
 		};
 
 		// K.2: the parents followed from x. L.4: with the switch on, only parents in the body, over claim links.
-		const order = (ids: string[]) => (parentPref === undefined || ids.length < 2 ? ids : [...ids.filter((p) => P(p).sex === parentPref), ...ids.filter((p) => P(p).sex !== parentPref)]);
+		// The preferred sex first, then the order of `parents` in the note (F-KIN-11); the drawn order only lists the parents.
+		const noteOrder = (x: string, ids: string[]): string[] => {
+			if (ids.length < 2) return ids;
+			const written = P(x).parents;
+			const at = (id: string) => {
+				const i = written.findIndex((r) => r.id === id);
+				return i < 0 ? Infinity : i;
+			};
+			return ids.slice().sort((a, b) => at(a) - at(b));
+		};
+		const order = (x: string, ids: string[]) => {
+			const inNote = noteOrder(x, ids);
+			return parentPref === undefined || inNote.length < 2 ? inNote : [...inNote.filter((p) => P(p).sex === parentPref), ...inNote.filter((p) => P(p).sex !== parentPref)];
+		};
 		const nextParents = (x: string): string[] => {
 			const holders: string[] = [];
 			for (const d of drawn.get(x) ?? []) {
@@ -570,10 +720,10 @@ function makeEngine(
 				if (body !== undefined && !(carries(d, P(x), illOn) && inBody(d.id))) continue;
 				if (through === undefined || passes(d.id)) holders.push(d.id);
 			}
-			if (holders.length) return order(holders);
+			if (holders.length) return order(x, holders);
 			const followed = claimParents(x).filter(passes).filter((q) => body === undefined || inBody(q));
 			const near = followed.length < 2 ? followed : followed.filter((p) => earlier.has(p) || descendsFrom(p));
-			return order(near.length ? near : followed);
+			return order(x, near.length ? near : followed);
 		};
 
 		// `up`: R and the ancestors that carry the claim, breadth first, with their distance from R.
@@ -611,18 +761,120 @@ function makeEngine(
 			const by = bornYear(child.id);
 			return by !== undefined && (reigns.get(parent) ?? []).some((r) => by >= r.from && (r.to === undefined || by <= r.to));
 		};
+		// D193 key 3 (slot-fill): the children with a birth year are put in year order, the earlier first, and fill the places
+		// that the dated children hold in the written order; a child with no year keeps its place and equal years keep the written order.
+		const slotFill = (group: Person[]): Person[] => {
+			let last = -Infinity;
+			let sorted = true;
+			let dated = 0;
+			for (let i = 0; i < group.length; i++) {
+				const y = yearAt(group[i]);
+				if (y === undefined) continue;
+				dated++;
+				if (y < last) sorted = false;
+				last = y;
+			}
+			if (dated < 2 || sorted) return group;
+			const slots: number[] = [];
+			const people: { x: Person; y: number; i: number }[] = [];
+			group.forEach((x, i) => {
+				const y = yearAt(x);
+				if (y === undefined) return;
+				slots.push(i);
+				people.push({ x, y, i });
+			});
+			people.sort((a, b) => a.y - b.y || a.i - b.i);
+			const out = group.slice();
+			slots.forEach((slot, k) => {
+				out[slot] = people[k].x;
+			});
+			return out;
+		};
+		// One group in rank order: slot-fill, the notes, and the reversal of `youngest-child`.
+		// Only the children who pass the sex test of the pass take part: under "women-only" a brother with a year must not move his
+		// sisters. A child left out keeps his place in the written order.
+		// With `after` the illegitimate children are a group of their own (the pass that reads the flag): a legitimate child with
+		// a year never moves them, and the notes name only the people of one tier.
+		const tiered = illOn && spec.illegitimate === 'after';
+		const tierFill = (eligible: Person[]): Person[] => {
+			const legit = eligible.filter((x) => !x.illegitimate);
+			if (!tiered || legit.length === 0 || legit.length === eligible.length) {
+				const sorted = slotFill(eligible);
+				noteGroup(eligible, sorted);
+				return sorted;
+			}
+			const tiers = [legit, eligible.filter((x) => x.illegitimate)];
+			const out = eligible.slice();
+			let changed = false;
+			for (const tier of tiers) {
+				const sorted = slotFill(tier);
+				noteGroup(tier, sorted);
+				if (sorted === tier) continue;
+				changed = true;
+				const inTier = new Set(tier);
+				let next = 0;
+				eligible.forEach((x, i) => {
+					if (inTier.has(x)) out[i] = sorted[next++];
+				});
+			}
+			return changed ? out : eligible;
+		};
+		const rankGroup = (group: Person[]): Person[] => {
+			const eligible = only === undefined ? group : group.filter(sexOk);
+			const sorted = tierFill(eligible);
+			let final = group;
+			if (sorted !== eligible) {
+				let next = 0;
+				final = eligible === group ? sorted : group.map((x) => (sexOk(x) ? sorted[next++] : x));
+			}
+			return reverse ? final.slice().reverse() : final;
+		};
+		const grouped = stepPref !== undefined || reigning;
 		const rank = (parent: string): Person[] => {
 			const kids = claimKids(parent);
 			if (kids.length < 2) return kids;
-			const ordered = reverse ? kids.slice().reverse() : kids;
-			if (stepPref === undefined && !reigning) return ordered;
-			// Stable by the gender step, then the reign step; the written order decides the rest. Most families need no change.
+			// S3: with this rule a holder with no start year gives the children no precedence. A parent who never held the title is not a holder.
+			if (reigning && unstarted.has(parent) && !reigns.has(parent) && !noFrom.has(parent)) noFrom.set(parent, kids.map((k) => k.id));
+			if (!grouped) return rankGroup(kids);
+			// The gender step, then the reign step make the groups; the written order and the birth years decide inside a group.
 			const code = (x: Person) => step(x) * 2 + (reigning && !reignOk(parent, x) ? 1 : 0);
-			const first = code(ordered[0]);
-			if (ordered.every((x) => code(x) === first)) return ordered;
+			const first = code(kids[0]);
+			if (kids.every((x) => code(x) === first)) return rankGroup(kids);
 			const buckets: Person[][] = [[], [], [], []];
-			for (const x of ordered) buckets[code(x)].push(x);
-			return buckets[0].concat(buckets[1], buckets[2], buckets[3]);
+			for (const x of kids) buckets[code(x)].push(x);
+			return ([] as Person[]).concat(...buckets.filter((b) => b.length).map(rankGroup));
+		};
+		// D202: the notes of one group. `final` is the group in rank order (before `youngest-child` reverses it).
+		const noteGroup = (group: Person[], final: Person[]) => {
+			for (let k = 0; k + 1 < final.length; k++) {
+				const a = final[k];
+				const b = final[k + 1];
+				const ya = yearAt(a);
+				const yb = yearAt(b);
+				// Two years that differ put the pair in order; every other pair stands in the order of the note.
+				if (ya !== undefined && yb !== undefined && ya !== yb) continue;
+				// Brothers and sisters of the same parents can move in the edit sheet; the note is for the other case.
+				if (sameParents(a.id, b.id)) continue;
+				const [first, second] = reverse ? [b.id, a.id] : [a.id, b.id];
+				pairs.set(`${first}\0${second}`, [first, second, ya !== undefined && ya === yb]);
+			}
+			if (final === group) return;
+			// A dated child that crossed a child with no year breaks the order of the note: the data does not agree with itself.
+			const place = new Map(final.map((x, i) => [x.id, i]));
+			const involved = new Set<string>();
+			group.forEach((u, i) => {
+				if (yearAt(u) !== undefined) return;
+				group.forEach((w, j) => {
+					// w stood on one side of u in the note; it is a break when w stands on the other side now.
+					const wasBefore = j < i;
+					const isBefore = place.get(w.id)! < i;
+					if (yearAt(w) !== undefined && wasBefore !== isBefore) {
+						involved.add(u.id);
+						involved.add(w.id);
+					}
+				});
+			});
+			if (involved.size) loops.set([...involved].sort().join('\0'), group.filter((x) => involved.has(x.id)).map((x) => x.id));
 		};
 
 		// C.5: the walk with representation, from each person of `up`. Iterative: a house can be hundreds of generations deep.
@@ -634,6 +886,11 @@ function makeEngine(
 		for (const id of up) flags[P(id).index] |= BLOCKED;
 		for (const id of ancestors) flags[P(id).index] |= BLOCKED;
 		for (const id of excluded) {
+			const x = g.byId.get(id);
+			if (x) flags[x.index] |= BLOCKED;
+		}
+		// S2, D195: the co-rulers and the holder of a keyed entry are never in the line, but they still pass a claim.
+		for (const id of hold.blocked) {
 			const x = g.byId.get(id);
 			if (x) flags[x.index] |= BLOCKED;
 		}
@@ -747,6 +1004,24 @@ function makeEngine(
 			let n = 0;
 			for (const id of noSex) if (!inLine.has(id)) n++;
 			return n;
+		},
+		notes: (shown) => {
+			const out: SuccessionNote[] = [];
+			// S3: a parent with no start year, when some of the children are in the shown line.
+			for (const [parent, kids] of noFrom) {
+				if (kids.some((id) => shown.has(id))) out.push({ kind: 'born-in-reign-no-from', params: { parent } });
+			}
+			// D202: a break shows for the people it names; a pair inside a break is part of that note.
+			const inLoop = new Set<string>();
+			for (const people of loops.values()) {
+				if (people.filter((id) => shown.has(id)).length < 2) continue;
+				out.push({ kind: 'order-contradiction', params: { people } });
+				for (const id of people) inLoop.add(id);
+			}
+			for (const [a, b, same] of pairs.values()) {
+				if (shown.has(a) && shown.has(b) && !(inLoop.has(a) && inLoop.has(b))) out.push({ kind: 'order-from-note', params: same ? { a, b, reason: 'same-year' } : { a, b } });
+			}
+			return out;
 		},
 	};
 }

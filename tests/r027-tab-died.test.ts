@@ -34,7 +34,8 @@ describe('dateLine and the alive words (K.7)', () => {
 	it('another text is still a death date; a normal date line is unchanged', () => {
 		expect(dateLine(person({ born: '1100', died: '1160' }))).toBe('1100–1160');
 		expect(dateLine(person({ died: '1160' }))).toBe('d. 1160');
-		expect(dateLine(person({ died: 'unknown' }))).toBe('d. unknown');
+		// 0.2.8 I19: a death text with no year shows the sign ("unknown" is a doubt).
+		expect(dateLine(person({ died: 'unknown' }))).toBe('†?');
 		expect(dateLine(person({ born: '1100' }))).toBe('b. 1100');
 		expect(dateLine(person({}))).toBeUndefined();
 	});

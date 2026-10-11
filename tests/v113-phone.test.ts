@@ -7,16 +7,13 @@ vi.mock('@codemirror/view', () => ({ ViewPlugin: { fromClass: () => ({}) } }));
 
 import { deriveFamilies } from '../src/core/derive';
 import { parseDynasty } from '../src/core/parse';
-import { SETTINGS_UI, FLOW, HOUSE_PAGE_UI } from '../src/render/ui-text';
-import { choose } from '../src/obsidian/choice-modal';
+import { SETTINGS_UI, FLOW } from '../src/render/ui-text';
 import { EditSheet } from '../src/obsidian/edit-sheet';
 import { HousesWindow } from '../src/obsidian/houses-window';
-import { openHousePage } from '../src/obsidian/house-page-window';
-import { openIdWindow } from '../src/obsidian/id-window';
 import { pickPerson } from '../src/obsidian/person-picker';
 import { closePluginModals } from '../src/obsidian/plugin-modals';
 import { TitlesWindow } from '../src/obsidian/titles-window';
-import { FEl, clock, device, dispatch, fakeDoc, fakeWin, installDom, resetDom, runTimers } from './acceptance/fake-dom';
+import { FEl, clock, dispatch, fakeDoc, fakeWin, installDom, resetDom, runTimers } from './acceptance/fake-dom';
 import { openModals, resetObsidian } from './acceptance/fake-obsidian';
 import { fakeApp } from './acceptance/tree-view-fakes';
 import { openPage } from './lw-support';
@@ -47,7 +44,6 @@ afterEach(() => {
 	vi.restoreAllMocks();
 });
 
-const css = readFileSync(new URL('../styles.css', import.meta.url), 'utf8');
 
 const BODY = [
 	'houses:',
@@ -92,17 +88,6 @@ describe('P5: every window of the plugin is a dialog with a name', () => {
 		const titles = TitlesWindow.create(fakeApp() as never, { handle: writingHandle(BODY) as never, sourcePath: 'n.md' })!;
 		titles.open();
 		expectDialog((titles as unknown as { modalEl: FEl }).modalEl, 'Titles');
-	});
-
-	it('the house page, a choice step and the small ID window', () => {
-		const win = openHousePage(fakeApp() as never, { app: fakeApp() as never, houseId: 'valmont', whole: graph(), sourcePath: 'n.md', show: () => {}, openNote: () => {} })!;
-		expectDialog((win as unknown as { modalEl: FEl }).modalEl, 'House Valmont');
-		void choose(fakeApp() as never, { title: 'Add a parent', name: 'parent-type', choices: [{ value: 1, label: 'Birth parent' }] });
-		const choice = openModals[openModals.length - 1] as unknown as { modalEl: FEl };
-		expectDialog(choice.modalEl, 'Add a parent');
-		openIdWindow(fakeApp() as never, { kind: 'house', item: 'House Thorne', key: 'k', value: 'thorne', check: () => null, make: () => null, use: () => {}, closed: () => {} });
-		const idWin = openModals[openModals.length - 1] as unknown as { modalEl: FEl };
-		expectDialog(idWin.modalEl, 'ID of House Thorne');
 	});
 
 	it('two windows get two different title ids', () => {
@@ -182,76 +167,6 @@ describe('C1: a field in the scrolling body is brought into view when it gets th
 		sheet.open();
 		const modal = (sheet as unknown as { modalEl: FEl }).modalEl;
 		expect(modal.querySelector('[data-field="new-house-name"] input')!.getAttribute('spellcheck')).toBe('false');
-	});
-});
-
-describe('D113 item 4: the house page in design 4B', () => {
-	const open = (showGeneration?: () => boolean) => {
-		const win = openHousePage(fakeApp() as never, { app: fakeApp() as never, houseId: 'valmont', whole: graph(), sourcePath: 'n.md', show: () => {}, openNote: () => {}, showGeneration })!;
-		return (win as unknown as { contentEl: FEl }).contentEl;
-	};
-	const cells = (row: FEl) => row.querySelectorAll('.dynasty-hp-cell').map((c) => [...c.classes].find((k) => k !== 'dynasty-hp-cell')!);
-
-	it('every row has five cells in one order, a chevron that a screen reader does not read, and the lead words', () => {
-		const content = open();
-		const row = content.querySelectorAll('.dynasty-hp-row')[0];
-		expect(cells(row)).toEqual(['dynasty-hp-gen', 'dynasty-hp-name', 'dynasty-hp-title', 'dynasty-hp-born', 'dynasty-hp-died']);
-		expect(row.querySelector('.dynasty-hp-chevron')!.getAttribute('aria-hidden')).toBe('true');
-		expect(row.querySelector('.dynasty-hp-born .dynasty-hp-lead')!.getText()).toBe('b. ');
-		expect(row.querySelector('.dynasty-hp-died .dynasty-hp-lead')!.getText()).toBe('d. ');
-		expect(row.querySelector('.dynasty-hp-died .dynasty-hp-value')!.getText()).toBe('1160');
-	});
-
-	it('an empty value gives an empty cell with no lead (the two-line layout hides it)', () => {
-		const content = open();
-		const bran = content.querySelectorAll('.dynasty-hp-row')[1];
-		expect(bran.querySelector('.dynasty-hp-title')!.children).toHaveLength(0);
-		expect(bran.querySelector('.dynasty-hp-died')!.children).toHaveLength(0);
-	});
-
-	it('with the setting off there is no Generation column and no generation cell, and the dates stay', () => {
-		const content = open(() => false);
-		expect(content.querySelector('.dynasty-hp-table')!.hasClass('has-no-generation')).toBe(true);
-		expect(content.querySelector('.dynasty-hp-head')!.children.map((c) => c.getText())).toEqual(['Name', 'Title', 'Born', 'Died']);
-		const row = content.querySelectorAll('.dynasty-hp-row')[0];
-		expect(cells(row)).toEqual(['dynasty-hp-name', 'dynasty-hp-title', 'dynasty-hp-born', 'dynasty-hp-died']);
-		expect(row.getText()).not.toContain(HOUSE_PAGE_UI.lead.generation.trim());
-		expect(row.getText()).toContain('1102');
-	});
-
-	it('with no answer from the caller the page shows the generation; the plugin list of Obsidian is not read (review 0.2.3)', () => {
-		const app = fakeApp() as unknown as { plugins?: unknown };
-		app.plugins = { plugins: { 'dynasty-tree': { settings: { showHouseGeneration: false } } } };
-		const page = (openHousePage(app as never, { app: app as never, houseId: 'valmont', whole: graph(), sourcePath: 'n.md', show: () => {}, openNote: () => {} }) as unknown as { contentEl: FEl }).contentEl;
-		expect(page.querySelectorAll('.dynasty-hp-gen').length).toBeGreaterThan(0);
-	});
-
-	it('a house page does not draw again when the width changes: the text is the same at every width', () => {
-		device.width = 1280;
-		const content = open();
-		const before = content.getText();
-		device.width = 390;
-		dispatch(fakeWin as never, 'resize');
-		expect(content.getText()).toBe(before);
-	});
-
-	it('the CSS: the table is a size container; the two-line layout starts at 34 text widths (em); the row wraps its text; dates break at the space', () => {
-		expect(css).toMatch(/\.dynasty-hp-table\s*\{[^}]*container-type:\s*inline-size/);
-		expect(css).toMatch(/@container \(max-width:\s*34em\)/);
-		const row = /\.dynasty-sheet button\.dynasty-hp-row\s*\{([^}]*)\}/.exec(css)![1];
-		expect(row).toMatch(/white-space:\s*normal/);
-		expect(/\.dynasty-hp-cell\s*\{([^}]*)\}/.exec(css)![1]).toMatch(/overflow-wrap:\s*break-word/);
-		expect(css).not.toMatch(/\.dynasty-house-page\.is-phone \.dynasty-hp-/);
-		expect(css).toMatch(/\.dynasty-hp-chevron\s*\{[^}]*display:\s*block/);
-	});
-
-	it('the CSS: the buttons of the plugin windows wrap their label (P2, P3) and the settings fields are 16 px on a touch screen (P7)', () => {
-		const wrap = /\.dynasty-sheet-action,\s*\.dynasty-sheet-actions button,\s*\.dynasty-sheet-confirm-actions button\s*\{([^}]*)\}/.exec(css)![1];
-		expect(wrap).toMatch(/white-space:\s*normal/);
-		expect(wrap).toMatch(/height:\s*auto/);
-		const media = /@media \(pointer: coarse\), \(max-width: 599px\)\s*\{\s*\.dynasty-settings input,\s*\.dynasty-settings select\s*\{([^}]*)\}/.exec(css);
-		expect(media).not.toBeNull();
-		expect(media![1]).toMatch(/font-size:\s*max\(16px/);
 	});
 });
 

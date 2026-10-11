@@ -5,7 +5,7 @@
 
 import { Notice, PluginSettingTab, Setting, SettingGroup, debounce, type App, type Plugin } from 'obsidian';
 import { SETTINGS_UI } from '../render/ui-text';
-import { GENERATIONS, OLD_AGE, PHONE_DIRECTIONS, REDUCE_MOTIONS, SUCCESSION_LENGTH, YOUNG_DEATH_AGE, parseDesktopHeight, parseWhole, type DynastySettings, type PhoneDirection, type ReduceMotion } from './settings';
+import { ARMS_ON_CARDS, GENERATIONS, OLD_AGE, PHONE_DIRECTIONS, REDUCE_MOTIONS, SUCCESSION_LENGTH, YOUNG_DEATH_AGE, parseDesktopHeight, parseWhole, type ArmsOnCards, type DynastySettings, type PhoneDirection, type ReduceMotion } from './settings';
 
 /** What the tab needs from the plugin. */
 export interface SettingsHost extends Plugin {
@@ -28,6 +28,8 @@ const HEIGHT_TYPING_MS = 400;
 
 /** The text of each choice of "Tree direction on a phone held upright" (D150). */
 const DIRECTION_LABEL: Record<PhoneDirection, string> = { sideways: SETTINGS_UI.directionSideways, down: SETTINGS_UI.directionDown };
+/** The text of each choice of "Arms on cards" (D204). */
+const ARMS_LABEL: Record<ArmsOnCards, string> = { few: SETTINGS_UI.armsFew, all: SETTINGS_UI.armsAll };
 /** The text of each choice of "Reduce movement" (D126). */
 const REDUCE_LABEL: Record<ReduceMotion, string> = { system: SETTINGS_UI.reduceFollow, on: SETTINGS_UI.reduceOn, off: SETTINGS_UI.reduceOff };
 
@@ -94,6 +96,16 @@ export class DynastySettingTab extends PluginSettingTab {
 					d.onChange((v) => void this.host.changeSettings({ phoneDirection: PHONE_DIRECTIONS.find((x) => x === v) ?? 'sideways' }));
 				});
 			});
+			// 0.2.8 contract A.4, D204: which cards show the arms of a house.
+			add((row) => {
+				row.setName(t.armsOnCards).setDesc(t.armsOnCardsDesc);
+				row.addDropdown((d) => {
+					name(d.selectEl, t.armsOnCards);
+					for (const v of ARMS_ON_CARDS) d.addOption(v, ARMS_LABEL[v]);
+					d.setValue(s.armsOnCards);
+					d.onChange((v) => void this.host.changeSettings({ armsOnCards: ARMS_ON_CARDS.find((x) => x === v) ?? 'few' }));
+				});
+			});
 			add((row) => {
 				row.setName(t.breakWords).setDesc(t.breakWordsDesc);
 				row.addTextArea((area) => {
@@ -157,6 +169,16 @@ export class DynastySettingTab extends PluginSettingTab {
 					name(tg.toggleEl.querySelector('input'), t.portraits);
 					tg.setValue(s.showPortraits);
 					tg.onChange((v) => void this.host.changeSettings({ showPortraits: v }));
+				});
+			});
+			// 0.2.8 contract A.5, D188 item 10: the warning about more than 2 parents of a type.
+			add((row) => {
+				row.setName(t.manyParents).setDesc(t.manyParentsDesc);
+				row.addToggle((tg) => {
+					name(tg.toggleEl, t.manyParents);
+					name(tg.toggleEl.querySelector('input'), t.manyParents);
+					tg.setValue(s.warnManyParents);
+					tg.onChange((v) => void this.host.changeSettings({ warnManyParents: v }));
 				});
 			});
 			add((row) => {

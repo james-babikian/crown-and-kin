@@ -12,7 +12,7 @@ import { specOf, successionLine } from '../src/core/succession';
 import { closePluginModals } from '../src/obsidian/plugin-modals';
 import { clock, device, fakeWin, installDom, resetDom } from './acceptance/fake-dom';
 import { openModals, resetObsidian } from './acceptance/fake-obsidian';
-import { ctl, lineTexts, openWin, page, tapChoice } from './r027-window-support';
+import { choose, ctl, lineTexts, openWin, page } from './r027-window-support';
 
 beforeAll(() => {
 	installDom();
@@ -50,24 +50,23 @@ function mini(extra: string): string {
 }
 
 describe('finding 1: a value the plugin cannot read cannot be cleared by choosing the value that the list already shows', () => {
-	it('phone: "None" shows as chosen for `succession: salic`, and tapping it changes nothing', async () => {
+	it('phone: the bad rule `succession: salic` shows first in the list, and choosing "None" removes it', () => {
 		device.width = 390;
 		device.coarse = true;
 		const o = openWin(mini('succession: salic'));
 		const p = page(o, 'crown');
-		const chosen = ctl(p, 'rule')!.querySelectorAll('button').filter((b) => b.getAttribute('aria-checked') === 'true').map((b) => b.getAttribute('data-value'));
-		expect(chosen).toEqual([]); // ruling A: the note has a bad rule, so no choice shows as chosen
-		await tapChoice(p, 'rule', '');
+		expect(ctl(p, 'rule')!.querySelector('select')!.value).toBe('?'); // ruling A: the note has a bad rule, so the unknown value is chosen
+		choose(p, 'rule', '');
 		// The draft (`titles-draft` test "None removes it") means to remove the key; the window can never send that choice.
 		expect(o.win.isDirty(), 'tapping None on a bad rule must remove the key').toBe(true);
 	});
 
-	it('phone: "No preference" shows as chosen for `inherit: foo`, and tapping it changes nothing', async () => {
+	it('phone: the bad `inherit: foo` shows first in the list, and choosing "No preference" replaces it', () => {
 		device.width = 390;
 		device.coarse = true;
 		const o = openWin(mini('succession: eldest-child\ninherit: foo'));
 		const p = page(o, 'crown');
-		await tapChoice(p, 'inherit', 'no-preference');
+		choose(p, 'inherit', 'no-preference');
 		expect(o.win.isDirty(), 'tapping No preference on a bad "inherit" must replace the bad text').toBe(true);
 	});
 });
@@ -81,6 +80,6 @@ describe('finding 2: the window computes the line with a year that the tree read
 		const g = deriveFamilies(r.tree);
 		const saved = successionLine(g, g.titles[0], specOf(g.titles[0]), 5, 110);
 		expect(saved.year).toBeNull();
-		expect(lineTexts(p)[0], 'the window must show the line that Show will draw').toBe('Line of succession after Rex now');
+		expect(lineTexts(p)[0], 'the window must show the line that Show will draw').toBe('After Rex now');
 	});
 });

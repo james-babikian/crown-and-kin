@@ -40,12 +40,17 @@ afterEach(() => {
 	vi.restoreAllMocks();
 });
 
+/** The text that a person sees and a speech program reads: text in an element with aria-hidden="true" (initials, icons) is decoration. */
+const readable = (el: FEl): string => (el.getAttribute('aria-hidden') === 'true' ? '' : el.text + el.children.map(readable).join(''));
+
 const norm = (s: string) => s.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
 
 function mismatches(root: FEl): string[] {
 	const out: string[] = [];
 	for (const b of root.querySelectorAll('button')) {
-		const visible = b.getText().trim();
+		// 0.2.8: a row has a title (its label) and a second text line (a description); the label is the title, and the initials circle is decoration.
+		const title = b.querySelector('.dynasty-row-title');
+		const visible = readable(title ?? b).trim();
 		const label = b.getAttribute('aria-label');
 		if (!visible || !label) continue;
 		if (!` ${norm(label)} `.includes(` ${norm(visible)} `)) out.push(`"${visible}" is not in "${label}"`);
@@ -92,7 +97,7 @@ describe('label in name', () => {
 			const s = EditSheet.create(fakeApp() as never, { handle: h as never, personId: id, sourcePath: 'n.md' });
 			if (!s) continue;
 			s.open();
-			for (const m of mismatches((s as unknown as { modalEl: FEl }).modalEl)) all.add(m.replace(/ in ".*"/, '').replace(/"/g, '') + ' ...');
+			for (const m of mismatches((s as unknown as { modalEl: FEl }).modalEl)) all.add(m.replace(/"/g, ''));
 			closePluginModals();
 		}
 		expect([...all].sort()).toEqual([]);

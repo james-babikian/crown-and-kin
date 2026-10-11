@@ -201,7 +201,11 @@ describe('Full-screen view: the TreeView in the modal', () => {
 		// Spec §7.2: in full screen a wheel pans the tree; the popover is an HTML control on top of it.
 		desktop();
 		const { root } = await openFullScreen(source);
-		dispatch(root.querySelector(button)!, 'click');
+		// 0.2.8 (G.13): the line styles are an item of More; the problem list has its own button.
+		if (button === '.dynasty-legend-button') {
+			dispatch(root.querySelector('.dynasty-more')!, 'click');
+			dispatch(root.querySelector('.dynasty-more-legend')!, 'click');
+		} else dispatch(root.querySelector(button)!, 'click');
 		const target = root.querySelector(`.dynasty-popover ${row}`);
 		expect(target).not.toBeNull();
 		const start = shown(root);

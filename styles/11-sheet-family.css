@@ -1,0 +1,56 @@
+/* ---------- Family and actions in the person window (spec §6.3, §7.4, §7.5; 0.2.8 contract C) ---------- */
+
+/* The three groups of the Family section stand under a small heading; each group is a list of rows. */
+.dynasty-family-group {
+	display: grid;
+	/* The width of the controls at the end of a person row (a parent: the type chip and a cross; a partner: Edit and a cross; a child: an arrow). */
+	--dynasty-family-end: 120px;
+}
+
+.dynasty-sheet.is-phone .dynasty-family-group {
+	--dynasty-family-end: 152px;
+}
+
+.dynasty-family-empty {
+	padding: 4px 0;
+}
+
+.dynasty-family-controls {
+	display: flex;
+	align-items: center;
+	gap: 2px;
+}
+
+/* One width for the end controls of every person row, so the portraits of the rows stand on one vertical line (D214). */
+.dynasty-family-row[data-child] > .dynasty-row-chev {
+	flex: 0 0 var(--dynasty-family-end);
+	width: var(--dynasty-family-end);
+	justify-content: flex-end;
+}
+
+/*
+ * F3 item 7: the end controls keep the width of the group but may grow with the type chip (a long type word on a phone). A fixed width let
+ * the chip run over the text line. The text line has a gap and wraps before the chip.
+ */
+.dynasty-family-row:is([data-parent], [data-partner]) > .dynasty-family-controls {
+	flex: 0 0 auto;
+	min-width: var(--dynasty-family-end);
+	justify-content: flex-end;
+}
+
+.dynasty-family-row > .dynasty-row-text {
+	padding-right: var(--size-4-2);
+}
+
+/* The Actions section: a row with an icon lead; Delete stands last, in the error colour. The slot of "Make a note" holds one row of its own. */
+.dynasty-actions-list {
+	display: grid;
+}
+
+.dynasty-note-slot {
+	display: contents;
+}
+
+.dynasty-sheet-confirm-text + .dynasty-sheet-confirm-text {
+	margin-top: var(--size-4-2);
+}

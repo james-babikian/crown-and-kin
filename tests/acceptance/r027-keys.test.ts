@@ -450,7 +450,7 @@ describe('the warnings of the new keys (contract A.5, K.4)', () => {
 			'unknown-succession':
 				'The title Duke has “succession: primogenitor”. The plugin does not know this rule, so it shows no line of succession. Use one of these rules: eldest-child, youngest-child, siblings-first, nearest-relative, born-in-reign.',
 			'year-unreadable':
-				'The title Duke has “year: the old days”. The plugin cannot find a year in it, so the line of succession uses the end of the last reign. Write the year as a number, for example “year: 1210”.',
+				'The title Duke has “year: the old days”. The plugin cannot find a year in it. The line of succession uses the end of the last reign. If the last reign has no end, the line is for now. Write the year as a number, for example “year: 1210”.',
 			'missing-heir': 'The title Duke has “heir: ghost”, but no person has this ID. Correct the ID, or remove it.',
 		});
 	});

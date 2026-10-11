@@ -39,7 +39,7 @@ describe('cardForm', () => {
 
 describe('Roundel constants', () => {
 	it('hold the numbers of contract B.2', () => {
-		expect(ROUNDEL_EM).toEqual({ crown: 0.75, reach: 1.6, medal: 1, ring: 0.15, halo: 0.2, above: 0.25, column: 10, plateMore: 0.25, armsGap: 0.25, tabW: 2.3, tabH: 1.15, tabAbove: 0.55, tabAboveText: 0.9, wordRaise: 0.15 });
+		expect(ROUNDEL_EM).toEqual({ crown: 0.75, reach: 1.6, medal: 1, ring: 0.15, halo: 0.2, above: 0.25, column: 10, plateMore: 0.25, armsGap: 0.55, tabW: 2.3, tabH: 1.15, tabAbove: 0.55, tabAboveText: 0.9, wordRaise: 0.15 });
 		expect(TAB_REACH_PAD_PX).toBe(1);
 		expect(SIGN_LINE_CLEAR_PX).toBe(5);
 	});

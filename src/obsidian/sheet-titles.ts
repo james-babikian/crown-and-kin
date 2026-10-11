@@ -1,6 +1,6 @@
 /*
- * The Titles section of the edit sheet (spec §13.4, §13.3, §13.5; D54, D62, D63), between the fields
- * and Family: the person's titles, each with its holder entries (number and reign), Edit and Remove;
+ * The Titles section of the edit sheet (spec §13.4, §13.3, §13.5; D54, D62, D63), after Family:
+ * the person's titles, one row for each holder entry (number and reign) with Edit and Remove;
  * "Show on the card" or "On the card" when the card could show another title; Add title (the titles
  * of the tree, then "New title…"), then the holder form. Each title shows by the name that the card
  * uses for this person (D65: the female form for `sex: f`). Like the relationship actions, each action
@@ -13,12 +13,13 @@ import type { FamilyGraph } from '../core/derive';
 import type { Op } from '../core/edit';
 import { newTitleId } from '../core/title-ops';
 import { quotedSobriquet } from '../core/sobriquet';
-import { cardLabels, entryReign, rulerName, titleNameFor, type Holding } from '../core/titles';
+import { cardLabels, entryReign, reignText, rulerName, titleNameFor, type Holding } from '../core/titles';
 import type { Holder, Person } from '../core/types';
-import { TITLES_UI, WRITE_TEXT } from '../render/ui-text';
+import { TITLES_UI, WINDOW_UI, WRITE_TEXT } from '../render/ui-text';
 import { choose } from './choice-modal';
 import { holderForm } from './holder-form';
 import { addFields, changedFields, refOf, valuesOf } from './titles-draft';
+import { buildRow, textButton } from './window-parts';
 
 /** What the Titles section needs from the edit sheet. */
 export interface TitlesHost {
@@ -37,7 +38,7 @@ export interface TitlesHost {
 	/** The message of the last failed write, for the holder form. */
 	lastError(): string;
 	/** A sheet button (44 px, spec §7.5) that runs `run` unless the sheet is saving. */
-	button(parent: HTMLElement, text: string, cls: string, run: () => void, label?: string): HTMLButtonElement;
+	button(parent: HTMLElement, text: string, cls: string, run: () => void, label?: string, icon?: string): HTMLButtonElement;
 }
 
 const NEW_TITLE = '\u0000new-title';
@@ -65,44 +66,60 @@ export function titleOnCard(g: FamilyGraph, person: Person): string | undefined 
 	return person.title === undefined ? label.shown.title.id : undefined;
 }
 
-/** Builds the Titles section into `parent`. */
-export function titlesSection(parent: HTMLElement, host: TitlesHost): void {
+/** The line under the title of the closed Titles section: the first title with its reign, and how many more (contract C). */
+export function titlesSummary(host: TitlesHost): string {
 	const { g, person } = host.data();
-	const sec = parent.createDiv({ cls: 'dynasty-sheet-section dynasty-titles-section' });
-	sec.createDiv({ cls: 'dynasty-sheet-section-title', text: TITLES_UI.heading });
 	const holdings = cardLabels(g).get(person.id)?.holdings ?? [];
-	if (!holdings.length) sec.createDiv({ cls: 'dynasty-family-empty', text: TITLES_UI.noneHeld });
+	const first = holdings[0];
+	if (!first) return WINDOW_UI.noTitles;
+	const reign = reignText(first.entries)?.replace(/^\(|\)$/g, '');
+	const parts = [titleNameFor(first.title, person), reign, holdings.length > 1 ? WINDOW_UI.andMore(holdings.length - 1) : undefined];
+	return parts.filter((x): x is string => !!x).join(' · ');
+}
+
+/** Builds the body of the Titles section into `parent`: one row for each holder entry, then Add title. */
+export function titlesBody(parent: HTMLElement, host: TitlesHost): void {
+	const { g, person } = host.data();
+	const holdings = cardLabels(g).get(person.id)?.holdings ?? [];
+	const rows = parent.createDiv({ cls: 'dynasty-rows' });
+	if (!holdings.length) rows.createDiv({ cls: ['dynasty-sheet-none', 'dynasty-family-empty'], text: TITLES_UI.noneHeld });
 	// §13.4: only when the card could show another title than the one it shows.
 	const choice = holdings.length >= 2 || (person.title !== undefined && holdings.length >= 1);
 	const onCard = titleOnCard(g, person);
-	for (const h of holdings) holdingGroup(sec, host, h, choice, onCard);
+	for (const h of holdings) holdingRows(rows, host, h, choice, onCard);
 	if (host.readOnly) return;
-	const row = sec.createDiv({ cls: 'dynasty-family-buttons' });
-	host.button(row, TITLES_UI.addTitle, 'dynasty-add-title', () => void addTitle(host));
+	const row = parent.createDiv({ cls: 'dynasty-actions' });
+	host.button(row, TITLES_UI.addTitle, 'dynasty-add-title', () => void addTitle(host), undefined, 'plus');
 }
 
-function holdingGroup(sec: HTMLElement, host: TitlesHost, h: Holding, choice: boolean, onCard: string | undefined): void {
+function holdingRows(list: HTMLElement, host: TitlesHost, h: Holding, choice: boolean, onCard: string | undefined): void {
 	const { person } = host.data();
 	const title = h.title;
 	// D65: the form that the card uses, so the sheet and the card say the same.
 	const shownName = titleNameFor(title, person);
-	const group = sec.createDiv({ cls: 'dynasty-family-group dynasty-title-holding', attr: { 'data-title': title.id } });
-	const head = group.createDiv({ cls: 'dynasty-family-row dynasty-title-holding-head' });
-	head.createDiv({ cls: 'dynasty-family-name dynasty-title-holding-name', text: shownName });
-	if (choice) {
-		const controls = head.createDiv({ cls: 'dynasty-family-controls' });
-		if (onCard === title.id) controls.createDiv({ cls: 'dynasty-title-on-card', text: TITLES_UI.onCard });
-		else if (!host.readOnly) host.button(controls, TITLES_UI.showOnCard, 'dynasty-show-on-card', () => void showOnCard(host, title.id), TITLES_UI.showOnCardLabel(shownName));
-	}
-	for (const entry of h.entries) {
+	const group = list.createDiv({ cls: ['dynasty-rows', 'dynasty-family-group', 'dynasty-title-holding'], attr: { 'data-title': title.id } });
+	h.entries.forEach((entry, i) => {
 		const text = entryText(entry, person.name, person.sobriquet);
-		const row = group.createDiv({ cls: 'dynasty-family-row dynasty-title-entry', attr: { 'data-index': String(entry.index) } });
-		row.createDiv({ cls: 'dynasty-family-name dynasty-family-detail', text });
-		if (host.readOnly) continue;
-		const controls = row.createDiv({ cls: 'dynasty-family-controls' });
-		host.button(controls, TITLES_UI.edit, 'dynasty-edit-holder', () => editEntry(host, title.id, shownName, entry), TITLES_UI.entryEditLabel(shownName, text));
-		host.button(controls, TITLES_UI.remove, 'dynasty-remove-holder', () => void removeEntry(host, title.id, shownName, entry), TITLES_UI.entryRemoveLabel(shownName, text));
-	}
+		const r = buildRow(group, {
+			cls: ['dynasty-family-row', 'dynasty-title-entry', ...(i === 0 ? ['dynasty-title-holding-head'] : [])],
+			attr: { 'data-index': String(entry.index) },
+		});
+		// The name of a title of the world: the name look of the Family rows (D218 rules 1 to 3).
+		r.title.addClass('dynasty-family-name');
+		r.title.createSpan({ cls: 'dynasty-title-holding-name', text: shownName });
+		// The tag belongs to the title, so the first row of it carries it.
+		if (choice && i === 0 && onCard === title.id) r.title.createSpan({ cls: ['dynasty-tag', 'dynasty-title-on-card'], text: TITLES_UI.onCard });
+		r.sub.addClass('dynasty-family-detail');
+		const ruler = entry.number !== undefined ? `${rulerName(entry, person.name)} ${entry.number}` : undefined;
+		const sub = [ruler, entryReign(entry)].filter((x): x is string => !!x).join(' · ');
+		r.sub.setText(sub || TITLES_UI.entryNone);
+		if (host.readOnly) return;
+		const controls = r.actions();
+		controls.addClass('dynasty-family-controls');
+		if (choice && i === 0 && onCard !== title.id) textButton(controls, ['dynasty-link', 'dynasty-show-on-card'], TITLES_UI.showOnCard, () => void showOnCard(host, title.id), { label: TITLES_UI.showOnCardLabel(shownName), focus: 'dynasty-show-on-card' });
+		textButton(controls, ['dynasty-link', 'dynasty-edit-holder'], TITLES_UI.edit, () => editEntry(host, title.id, shownName, entry), { label: TITLES_UI.entryEditLabel(shownName, text), focus: 'dynasty-edit-holder' });
+		textButton(controls, ['dynasty-link', 'dynasty-remove-holder'], TITLES_UI.remove, () => void removeEntry(host, title.id, shownName, entry), { label: TITLES_UI.entryRemoveLabel(shownName, text), focus: 'dynasty-remove-holder' });
+	});
 }
 
 /**

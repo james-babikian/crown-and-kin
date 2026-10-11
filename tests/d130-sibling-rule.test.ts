@@ -89,9 +89,9 @@ function rels(g: FamilyGraph, me: string, other: string, options?: RelationOptio
 
 const texts = (list: readonly Relation[]) => list.map((r) => r.text);
 
-/** A `RelationMaybe` with `lower` made from `text`. */
-function maybe(effect: 'full' | 'half', text: string, cause: 'rumoured' | 'unlisted'): RelationMaybe {
-	return { effect, text, lower: text.toLowerCase(), cause };
+/** A `RelationMaybe` with `lower` made from `text`. 0.2.8 (F-KIN-08): an 'unlisted' cause names its sentence form. */
+function maybe(effect: 'full' | 'half', text: string, cause: 'rumoured' | 'unlisted', unlistedForm?: 'same-person' | 'other-parent'): RelationMaybe {
+	return { effect, text, lower: text.toLowerCase(), cause, ...(unlistedForm ? { unlistedForm } : {}) };
 }
 
 const named = (r: FinderResult) => {
@@ -175,13 +175,13 @@ const ROWS: Row[] = [
 			['Gracie', 'Helen'],
 			['Fiona', 'Ingrid'],
 		],
-		on: { names: ['Half-sister'], maybe: maybe('full', 'Sister', 'unlisted') },
+		on: { names: ['Half-sister'], maybe: maybe('full', 'Sister', 'unlisted', 'other-parent') },
 		off: { names: ['Half-sister'] },
 	},
 	{
 		title: 'Helen and Ingrid: on: Half-sister, maybe full (unlisted); off: Sister',
 		pairs: [['Helen', 'Ingrid']],
-		on: { names: ['Half-sister'], maybe: maybe('full', 'Sister', 'unlisted') },
+		on: { names: ['Half-sister'], maybe: maybe('full', 'Sister', 'unlisted', 'same-person') },
 		off: { names: ['Sister'] },
 	},
 	{
@@ -194,14 +194,15 @@ const ROWS: Row[] = [
 			['Helen', 'Clara'],
 			['Ingrid', 'Alice'],
 		],
-		on: { names: ['Half-sister'], maybe: maybe('full', 'Sister', 'unlisted') },
+		on: { names: ['Half-sister'], maybe: maybe('full', 'Sister', 'unlisted', 'other-parent') },
 		off: { names: ['Half-sister'] },
 	},
 	{
-		// {David, Mary, Yannick} and {Mary}: three people.
-		title: 'Eleanor and Helen: Half-sister',
+		// {David, Mary, Yannick} and {Mary}: three people. Since the 0.2.8 fix round (D205 item 2) the sure parents {David, Mary} count as an outcome
+		// too, so an unlisted parent of Helen could make them full: the same shape as Sue (Carl, Anna, rumoured Dirk) and Tom (Anna).
+		title: 'Eleanor and Helen: on: Half-sister, maybe full (unlisted); off: Half-sister',
 		pairs: [['Eleanor', 'Helen']],
-		on: { names: ['Half-sister'] },
+		on: { names: ['Half-sister'], maybe: maybe('full', 'Sister', 'unlisted', 'other-parent') },
 		off: { names: ['Half-sister'] },
 	},
 	{
@@ -329,12 +330,12 @@ describe('D174 beside the direct line: half-uncle, half-niece, cousins', () => {
 	};
 
 	it('half-uncle: Nina (Helen\'s daughter) → Ivan (lists only Mary)', () => {
-		one('Nina', 'Ivan', ON, { names: ['Half-uncle'], maybe: maybe('full', 'Uncle', 'unlisted') });
+		one('Nina', 'Ivan', ON, { names: ['Half-uncle'], maybe: maybe('full', 'Uncle', 'unlisted', 'same-person') });
 		one('Nina', 'Ivan', OFF, { names: ['Uncle'] });
 	});
 
 	it('half-niece: Ingrid → Nina', () => {
-		one('Ingrid', 'Nina', ON, { names: ['Half-niece'], maybe: maybe('full', 'Niece', 'unlisted') });
+		one('Ingrid', 'Nina', ON, { names: ['Half-niece'], maybe: maybe('full', 'Niece', 'unlisted', 'same-person') });
 		one('Ingrid', 'Nina', OFF, { names: ['Niece'] });
 	});
 
@@ -343,7 +344,7 @@ describe('D174 beside the direct line: half-uncle, half-niece, cousins', () => {
 			['Nina', 'Olive'],
 			['Olive', 'Nina'],
 		]) {
-			one(me, other, ON, { names: ['Half first cousin'], maybe: maybe('full', 'First cousin', 'unlisted') });
+			one(me, other, ON, { names: ['Half first cousin'], maybe: maybe('full', 'First cousin', 'unlisted', 'same-person') });
 			one(me, other, OFF, { names: ['First cousin'] });
 		}
 	});
@@ -412,7 +413,7 @@ describe('D174 invariant 1: no rumoured link, setting off = the rule of 0.2.4', 
 		expect(computeRelations(g, 'alys', OFF).get('blanche')!.map((r) => r.lower)).toEqual(['sister']);
 		const on = computeRelations(g, 'alys', ON).get('blanche')!;
 		expect(on.map((r) => r.lower)).toEqual(['half-sister']);
-		expect(on[0].maybe).toEqual(maybe('full', 'Sister', 'unlisted'));
+		expect(on[0].maybe).toEqual(maybe('full', 'Sister', 'unlisted', 'same-person'));
 	});
 });
 
@@ -453,7 +454,7 @@ describe('D174 invariant 2: adoptive and ward links never make a child incomplet
 		// d lists x (birth) and y (ward); e lists only x.
 		const on = computeRelations(h, 'd', ON).get('e')!;
 		expect(texts(on)).toEqual(['Half-brother']);
-		expect(on[0].maybe).toEqual(maybe('full', 'Brother', 'unlisted'));
+		expect(on[0].maybe).toEqual(maybe('full', 'Brother', 'unlisted', 'same-person'));
 		expect(texts(computeRelations(h, 'd', OFF).get('e')!)).toEqual(['Brother']);
 	});
 });
@@ -464,14 +465,14 @@ describe('D174 invariant 3: cousins through two brothers who list only their fat
 	it('setting on: the brothers are Half-brother, maybe full; their children Half first cousin, maybe full (cause unlisted)', () => {
 		const brothers = computeRelations(h, 'b1', ON).get('b2')!;
 		expect(texts(brothers)).toEqual(['Half-brother']);
-		expect(brothers[0].maybe).toEqual(maybe('full', 'Brother', 'unlisted'));
+		expect(brothers[0].maybe).toEqual(maybe('full', 'Brother', 'unlisted', 'same-person'));
 		for (const [me, other] of [
 			['k1', 'k2'],
 			['k2', 'k1'],
 		]) {
 			const list = computeRelations(h, me, ON).get(other)!;
 			expect(texts(list)).toEqual(['Half first cousin']);
-			expect(list[0].maybe).toEqual(maybe('full', 'First cousin', 'unlisted'));
+			expect(list[0].maybe).toEqual(maybe('full', 'First cousin', 'unlisted', 'same-person'));
 		}
 		expect(texts(computeRelations(h, 'k1', ON).get('b2')!)).toEqual(['Half-uncle']);
 		expect(texts(computeRelations(h, 'b1', ON).get('k2')!)).toEqual(['Half-niece']);
@@ -552,7 +553,7 @@ describe('D174 other shapes: three parents, an unknown parent type, a rumoured p
 
 	it('an unknown parent type counts as birth (spec §8)', () => {
 		for (const [, options] of SETTINGS) checkPair(g, 'Uma', 'Fiona', options, { names: ['Sister'] });
-		checkPair(g, 'Vic', 'Helen', ON, { names: ['Half-sister'], maybe: maybe('full', 'Sister', 'unlisted') });
+		checkPair(g, 'Vic', 'Helen', ON, { names: ['Half-sister'], maybe: maybe('full', 'Sister', 'unlisted', 'same-person') });
 		checkPair(g, 'Vic', 'Helen', OFF, { names: ['Sister'] });
 	});
 
@@ -752,9 +753,9 @@ describe('card text (depends on the render change)', () => {
 	it('Helen → Ingrid, setting on: "Half-sister, maybe full"; the texts for a parent who is not listed', () => {
 		const list = rels(g, 'Helen', 'Ingrid', ON);
 		expect(cardRelationText(list[0])).toBe('Half-sister, maybe full');
-		expect(spokenRelation(list[0])).toBe('half-sister, or sister if both people have the same parent who is not listed');
+		expect(spokenRelation(list[0])).toBe('half-sister, or sister if the parent that the note does not name is the same person for both');
 		const summary = relationSummary(list, false);
-		expect(summary.maybe).toBe('If both people have the same parent who is not listed, this person is your sister.');
+		expect(summary.maybe).toBe('If the parent that the note does not name is the same person for both, this person is your sister.');
 		expect(summary.also).toBeUndefined();
 	});
 

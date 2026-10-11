@@ -36,8 +36,13 @@ import { clampPan, doubleTapView, isDoubleTap, isPan, panFrom, pinchView, scaleL
 export interface PanZoomOptions {
 	viewport: HTMLElement;
 	scene: SVGGElement;
-	/** The HTML element around the <svg> that takes the CSS transform during a pinch; it fills the viewport from its top left corner. */
+	/** The HTML element around the <svg> that takes the CSS transform during a pinch; it fills the drawing area from its top left corner. */
 	wrapper?: HTMLElement;
+	/**
+	 * D212 (bars in flow): the screen px between the top of `viewport` and the top of the drawing area, where the toolbar and the banner stand above the tree in a
+	 * note. The size that `resize` gets is the size of the drawing area. Default: 0 (the whole viewport, the full-screen view).
+	 */
+	frameTop?: () => number;
 	bounds: Rect;
 	fontPx: number;
 	/** False on a touch-first device: the embedded tree is a static preview (D1). */
@@ -381,8 +386,15 @@ export class PanZoom {
 		}
 	}
 
-	private local(e: PointerEvent | WheelEvent): Point {
+	/** The screen top of the drawing area: the viewport's top plus the bands above the tree. */
+	private areaTop(): { left: number; top: number } {
 		const r = this.o.viewport.getBoundingClientRect();
+		const band = this.o.frameTop?.() ?? 0;
+		return { left: r.left, top: r.top + (Number.isFinite(band) ? band : 0) };
+	}
+
+	private local(e: PointerEvent | WheelEvent): Point {
+		const r = this.areaTop();
 		return { x: e.clientX - r.left, y: e.clientY - r.top };
 	}
 
@@ -463,7 +475,7 @@ export class PanZoom {
 			// The finger that stays down goes on panning from here.
 			const [restId, rest] = [...this.pointers][0] ?? [];
 			if (restId !== undefined && rest && this.view) {
-				const r = this.o.viewport.getBoundingClientRect();
+				const r = this.areaTop();
 				this.drag = { id: restId, x: rest.x + r.left, y: rest.y + r.top, start: this.view, panning: true, type: 'touch', onBackground: false };
 				return;
 			}

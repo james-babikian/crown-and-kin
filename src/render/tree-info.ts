@@ -6,11 +6,13 @@
 import type { FamilyGraph } from '../core/derive';
 import { linkText } from '../core/link-text';
 import { CURLY_APOSTROPHE } from '../core/quote';
-import { isDead } from '../core/succession-keys';
+import { DOUBTFUL_DIED, isDead, yearOf } from '../core/succession-keys';
 import type { FinderResult, Relation, RelationStep } from '../core/relations';
 import type { CardLabel } from '../core/titles';
 import type { Person } from '../core/types';
-import type { StrokeKind } from '../layout/model';
+
+// The legend texts live in legend-text.ts (one home each); these names stay importable from here.
+export { LEGEND_HOUSES_LABEL, LEGEND_LABELS, LEGEND_LINES_LABEL, LEGEND_ORDER, SIGN_LEGEND_LABEL } from './legend-text';
 
 /** The relation text builders below (spec §13.1, §13.2). Names come from `g.byId`; an empty name uses the id; the possessive is always "’s" (D99). */
 export interface RelationTexts {
@@ -37,14 +39,20 @@ export const MAYBE_TEXT = {
 	cardHalf: ', maybe half',
 	/** The sheet paragraph when a rumoured link is part of the doubt. */
 	sheet: (lower: string) => `If every rumoured link is true, this person is your ${lower}.`,
-	/** The sheet paragraph when only a parent who is not listed is the doubt (D174). */
-	sheetUnlisted: (lower: string) => `If both people have the same parent who is not listed, this person is your ${lower}.`,
+	/** The sheet paragraph when only a parent who is not listed is the doubt (D174), form 'same-person': both people list the same one parent (F-KIN-08). */
+	sheetUnlistedSame: (lower: string) => `If the parent that the note does not name is the same person for both, this person is your ${lower}.`,
+	/** The same, form 'other-parent': one person lists both parents and the other lists one of them (F-KIN-08). */
+	sheetUnlistedOther: (lower: string) => `If this person${CURLY_APOSTROPHE}s other parent is also your parent, this person is your ${lower}.`,
 	/** D176 (4): the sheet paragraph when only some of the rumoured links can be true together (`maybe.some`). */
 	sheetSome: (lower: string) => `If some of the rumoured links are true, this person is your ${lower}.`,
 	spoken: (lower: string) => `or ${lower} if the rumoured links are true`,
-	spokenUnlisted: (lower: string) => `or ${lower} if both people have the same parent who is not listed`,
+	spokenUnlistedSame: (lower: string) => `or ${lower} if the parent that the note does not name is the same person for both`,
+	spokenUnlistedOther: (lower: string) => `or ${lower} if this person${CURLY_APOSTROPHE}s other parent is also your parent`,
 	spokenSome: (lower: string) => `or ${lower} if some rumoured links are true`,
 } as const;
+
+/** The sheet paragraph for an 'unlisted' cause; the form says which of the two sentences is true (F-KIN-08). */
+const sheetUnlisted = (m: { lower: string; unlistedForm?: 'same-person' | 'other-parent' }) => (m.unlistedForm === 'other-parent' ? MAYBE_TEXT.sheetUnlistedOther(m.lower) : MAYBE_TEXT.sheetUnlistedSame(m.lower));
 
 /** The relation text of a card: "Half-brother, maybe full" or "Sister, maybe half" when the relation has a maybe; else `rel.text`. */
 export function cardRelationText(rel: Relation): string {
@@ -62,7 +70,7 @@ export function splitMaybe(text: string): { word: string; suffix: string } {
 export function spokenRelation(rel: Relation): string {
 	if (!rel.maybe) return rel.lower;
 	const m = rel.maybe;
-	const tail = m.cause === 'unlisted' ? MAYBE_TEXT.spokenUnlisted(m.lower) : m.some ? MAYBE_TEXT.spokenSome(m.lower) : MAYBE_TEXT.spoken(m.lower);
+	const tail = m.cause === 'unlisted' ? (m.unlistedForm === 'other-parent' ? MAYBE_TEXT.spokenUnlistedOther(m.lower) : MAYBE_TEXT.spokenUnlistedSame(m.lower)) : m.some ? MAYBE_TEXT.spokenSome(m.lower) : MAYBE_TEXT.spoken(m.lower);
 	return `${rel.lower}, ${tail}`;
 }
 
@@ -96,13 +104,38 @@ export function familyOf(g: FamilyGraph, id: string): { partners: string[]; chil
 	return { partners: [...partners], children: [...children] };
 }
 
-/** The dates text line of a card: "born–died", "b. born" or "d. died"; none without dates. A `died` that means alive (K.7: "no", "false") counts as no death date. */
+/** I19: the sign of a dead person whose `died` holds no year ("yes", "true", a doubt such as "?"); '†?' for a doubt, '†' for any other text without a year. */
+export const DEAD_SIGN = '†';
+export const DEAD_SIGN_DOUBT = '†?';
+
+/** Screen-reader words for the two signs (the character itself is not read). */
+export const CARD_SPOKEN_DEAD = 'dead';
+export const CARD_SPOKEN_DEAD_DOUBT = 'dead, but the death text is not clear';
+
+/**
+ * The two parts of a card's dates (I19): the text with the years, and the sign of a dead person with no death year.
+ * A `died` that means alive (K.7: "no", "false") gives neither a death year nor the sign.
+ */
+function dateParts(p: Person): { text?: string; sign?: string } {
+	const dead = isDead(p);
+	const died = dead ? p.died : undefined;
+	const hasYear = died !== undefined && yearOf(died) !== undefined;
+	const sign = dead && !hasYear ? (DOUBTFUL_DIED.includes(p.died!.trim().toLowerCase()) ? DEAD_SIGN_DOUBT : DEAD_SIGN) : undefined;
+	let text: string | undefined;
+	if (p.born && hasYear) text = `${p.born}–${died}`;
+	else if (p.born) text = `b. ${p.born}`;
+	else if (hasYear) text = `d. ${died}`;
+	return { ...(text !== undefined ? { text } : {}), ...(sign !== undefined ? { sign } : {}) };
+}
+
+/**
+ * The dates text line of a card: "born–died", "b. born" or "d. died"; none without dates. A dead person with no death year
+ * (I19) gets a sign after the birth text: "b. 1131 †", or "†" alone; "†?" if the `died` text is a doubt.
+ */
 export function dateLine(p: Person): string | undefined {
-	const died = isDead(p) ? p.died : undefined;
-	if (p.born && died) return `${p.born}–${died}`;
-	if (p.born) return `b. ${p.born}`;
-	if (died) return `d. ${died}`;
-	return undefined;
+	const { text, sign } = dateParts(p);
+	if (text !== undefined && sign !== undefined) return `${text} ${sign}`;
+	return text ?? sign;
 }
 
 /**
@@ -115,7 +148,10 @@ export function dateLine(p: Person): string | undefined {
 export function cardLabel(p: Person, relation?: string, label?: CardLabel, inLine?: string): string {
 	const name = label ? label.name : p.name;
 	const title = label ? [label.title, label.reign].filter((x) => x !== undefined && x !== '').join(' ') : p.title;
-	return [name, title, dateLine(p), relation, inLine].filter((x) => x !== undefined && x !== '').join(', ');
+	// The sign is a character, so the label says it with words (ruling 14).
+	const { text, sign } = dateParts(p);
+	const dead = sign === undefined ? undefined : sign === DEAD_SIGN_DOUBT ? CARD_SPOKEN_DEAD_DOUBT : CARD_SPOKEN_DEAD;
+	return [name, title, text, dead, relation, inLine].filter((x) => x !== undefined && x !== '').join(', ');
 }
 
 /**
@@ -128,47 +164,8 @@ export function linkTarget(link: string | undefined): string | null {
 	return s === '' || s === '#' ? null : s;
 }
 
-/** Legend labels for each line style; `STROKES[kind].label` in styles.ts reads them from here. */
-export const LEGEND_LABELS: Record<StrokeKind, string> = {
-	marriage: 'Marriage',
-	betrothal: 'Betrothal',
-	concubinage: 'Concubinage',
-	affair: 'Affair',
-	implicit: 'Parents with no recorded partnership',
-	descent: 'Child',
-	illegitimate: 'Illegitimate child',
-	'birth-link': 'Birth parent of a child shown under other parents',
-	adoptive: 'Adoptive parent',
-	ward: 'Guardian of a ward',
-	rumoured: 'Rumoured parent',
-};
-
-/** Legend label for the card sign (spec D14): illegitimacy that no dashed line shows. */
-export const SIGN_LEGEND_LABEL = 'Illegitimate child (no dashed line)';
-
-/** M9 (spec §13.6 "Legend", §13.8): the heading of the legend's houses part, on screen and in a saved picture. */
-export const LEGEND_HOUSES_LABEL = 'Houses';
-
-/** M9 (spec §13.8, D74): the heading of the line styles part of a saved picture's legend. */
-export const LEGEND_LINES_LABEL = 'Line styles';
-
 /** Screen-reader text added to a card with the sign. */
 export const SIGN_CARD_LABEL = 'illegitimate';
-
-/** Legend order: partnerships, then children, then other parents. */
-export const LEGEND_ORDER: StrokeKind[] = [
-	'marriage',
-	'betrothal',
-	'concubinage',
-	'affair',
-	'implicit',
-	'descent',
-	'illegitimate',
-	'adoptive',
-	'ward',
-	'rumoured',
-	'birth-link',
-];
 
 /** How long the last render took, for the "Show render timing" command (spec §7.7). */
 export interface RenderTiming {
@@ -265,7 +262,7 @@ export interface RelationInfo {
 	kind: 'relation' | 'me' | 'none';
 	/** 'Relation to you' for kind 'relation'; '' for 'me' and 'none'. */
 	title: string;
-	/** 'Second cousin' (no full stop) for 'relation'; 'This is you.' for 'me'; 'No relation to you in this tree.' for 'none'. */
+	/** 'Second cousin' (no full stop) for 'relation'; with a maybe it is the card text ('Half-sister, maybe full', F-KIN-08); 'This is you.' for 'me'; 'No relation to you in this tree.' for 'none'. */
 	value: string;
 	/** The whole first text line: 'Relation to you: Second cousin.' (= `relationSummary().main`). */
 	sentence: string;
@@ -281,7 +278,7 @@ export function relationInfo(rels: readonly Relation[] | undefined, isMe: boolea
 	const sum = relationSummary(rels, isMe);
 	if (isMe) return { kind: 'me', title: '', value: sum.main, sentence: sum.main, others: 0 };
 	if (!rels?.length) return { kind: 'none', title: '', value: sum.main, sentence: sum.main, others: 0 };
-	const info: RelationInfo = { kind: 'relation', title: RELINFO.title, value: rels[0].text, sentence: sum.main, others: rels.length - 1 };
+	const info: RelationInfo = { kind: 'relation', title: RELINFO.title, value: cardRelationText(rels[0]), sentence: sum.main, others: rels.length - 1 };
 	if (sum.also !== undefined) info.also = sum.also;
 	if (sum.maybe !== undefined) info.maybe = sum.maybe;
 	return info;
@@ -294,16 +291,14 @@ const ALSO_SHOWN = 3;
 export const relationSummary: RelationTexts['relationSummary'] = (rels: readonly Relation[] | undefined, isMe) => {
 	if (isMe) return { main: 'This is you.' };
 	if (!rels?.length) return { main: 'No relation to you in this tree.' };
-	const main = `${RELINFO.title}: ${rels[0].text}.`;
+	// One source for the card, the header line of the window and the phone list (F-KIN-08).
+	const main = `${RELINFO.title}: ${cardRelationText(rels[0])}.`;
 	// The card shows the first relation only, so the sheet explains the maybe of that one only.
 	const m = rels[0].maybe;
-	const maybe = m ? { maybe: m.cause === 'unlisted' ? MAYBE_TEXT.sheetUnlisted(m.lower) : m.some ? MAYBE_TEXT.sheetSome(m.lower) : MAYBE_TEXT.sheet(m.lower) } : {};
+	const maybe = m ? { maybe: m.cause === 'unlisted' ? sheetUnlisted(m) : m.some ? MAYBE_TEXT.sheetSome(m.lower) : MAYBE_TEXT.sheet(m.lower) } : {};
 	const others = rels.slice(1);
 	if (!others.length) return { main, ...maybe };
 	const names = others.slice(0, ALSO_SHOWN).map((r) => r.lower);
 	const more = others.length - names.length;
 	return { main, also: `Also: ${names.join(', ')}${more > 0 ? `, and ${more} more` : ''}.`, ...maybe };
 };
-
-/** The three builders as one `RelationTexts`, so the compiler keeps them in step with it. */
-export const RELATION_TEXTS: RelationTexts = { finderSentence, stepSentences, relationSummary };

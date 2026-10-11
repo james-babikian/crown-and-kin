@@ -129,7 +129,8 @@ const isDynasty = (info: string) => info.split(/[ \t]/, 1)[0] === 'dynasty';
 
 /** The line after YAML front matter, or 0. Fences inside front matter are not Markdown. */
 function afterFrontMatter(lines: Line[]): number {
-	if (lines.length === 0 || lines[0].text.trimEnd() !== '---') return 0;
+	// A byte order mark before the first `---` does not stop front matter (T-X4-01).
+	if (lines.length === 0 || lines[0].text.replace(/^﻿/, '').trimEnd() !== '---') return 0;
 	for (let i = 1; i < lines.length; i++) {
 		const t = lines[i].text.trimEnd();
 		if (t === '---' || t === '...') return i + 1;
@@ -259,12 +260,6 @@ export const findBlocks: FindBlocks = (text) => {
 	}
 	return blocks;
 };
-
-/** The block with this ordinal, or null. */
-export type LocateBlock = (text: string, ordinal: number) => LocatedBlock | null;
-
-/** Implements `LocateBlock`. */
-export const locateBlock: LocateBlock = (text, ordinal) => findBlocks(text)[ordinal] ?? null;
 
 const normalise = (s: string) => s.replace(/\r\n?/g, '\n').replace(/\n$/, '');
 

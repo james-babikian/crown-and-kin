@@ -93,46 +93,41 @@ const personBlock = (body: string, id: string) => {
 	return body.slice(i, j < 0 ? undefined : j);
 };
 
-describe('G5 M8 item 1: the holder buttons have a visible shape on a phone', () => {
-	it('every button of the holder panel but the name has a border', () => {
-		expect(rule('.dynasty-sheet .dynasty-holder-panel button:not(.dynasty-holder-name)')).toMatch(/border: 1px solid var\(--background-modifier-border\)/);
+describe('G5 M8 item 1: the buttons of a holder row have a visible shape and a 44 px hit area on a phone', () => {
+	it('the buttons of the window (Cancel, Save, Add) have an edge that reaches 3:1 (I39)', () => {
+		expect(rule('.dynasty-sheet-actions button', '.dynasty-sheet-confirm-actions button', '.dynasty-btn', '.dynasty-sheet button.dynasty-sheet-save-another')).toMatch(/border: 1px solid var\(--dynasty-btn-edge\)/);
 	});
 
-	it('on a phone the panel has the fill of the window, not --background-secondary (the fill Obsidian gives a phone button), and a border', () => {
-		const phone = rule('.dynasty-sheet.is-phone .dynasty-holder-panel');
-		expect(phone).toMatch(/background: var\(--modal-background, var\(--background-primary\)\)/);
-		expect(phone).not.toMatch(/--background-secondary/);
-		expect(phone).toMatch(/border: 1px solid var\(--background-modifier-border\)/);
+	it('the icon button (the menu "more" of a holder row) is 44 px on a phone', () => {
+		const r = rule('.dynasty-sheet.is-phone .dynasty-icon-btn');
+		expect(r).toMatch(/width: 44px/);
+		expect(r).toMatch(/min-height: 44px/);
 	});
 
-	it('the buttons keep a 44 px hit area (spec §7.5)', () => {
-		expect(rule('.dynasty-sheet-actions button', '.dynasty-sheet-action', '.dynasty-sheet-confirm-actions button')).toMatch(/min-height: 44px;[\s\S]*min-width: 44px/);
-		expect(rule('.dynasty-sheet.is-phone .dynasty-holder-buttons > .dynasty-holder-move')).toMatch(/width: 44px/);
+	it('the row keeps a hit area of at least 44 px (spec §7.5); every row has one height, 48 px (D213)', () => {
+		expect(rule('.dynasty-row')).toMatch(/min-height: 48px/);
 	});
 });
 
-describe('G5 M8 item 2: a holder who is not in the tree has the same name size and weight', () => {
-	it('one rule sets the font size and weight of the name button and the name text', () => {
-		const r = rule('.dynasty-sheet button.dynasty-holder-name', '.dynasty-sheet div.dynasty-holder-name');
-		expect(r).toMatch(/font-size: var\(--font-ui-small\)/);
-		expect(r).toMatch(/font-weight: var\(--font-semibold\)/);
-		// No other rule gives the name text its own size or weight.
-		for (const m of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
-			const sels = m[1].split(',').map((x) => x.trim());
-			if (sels.some((x) => /div\.dynasty-holder-name$/.test(x)) && sels.length === 1) expect(m[2]).not.toMatch(/font-(size|weight)/);
-		}
+describe('G5 M8 item 2: a holder who is not in the tree has the same name size as the name buttons', () => {
+	it('the name button and the name text have the Name role: Heading size, semibold, text font (D218 items 1 to 3)', () => {
+		expect(rule('.dynasty-sheet button.dynasty-holder-name')).toMatch(/font-size: var\(--dynasty-type-heading\)/);
+		const text = rule('.dynasty-sheet div.dynasty-holder-name', '.dynasty-sheet span.dynasty-holder-name');
+		expect(text).toMatch(/font-size: var\(--dynasty-type-heading\)/);
+		expect(text).toMatch(/font-weight: var\(--font-semibold\)/);
+		expect(text).toMatch(/font-family: var\(--font-text\)/);
+		expect(rule('.dynasty-sheet button.dynasty-holder-name')).toMatch(/font-weight: var\(--font-semibold\)/);
 	});
 
 	it('the Titles window gives the name text of a holder who is not in the tree the same class as the name buttons', async () => {
 		const body = ['titles:', '  - id: duke', '    name: Duke', '    holders:', '      - {name: Orso the Old, number: I}', '      - {person: a, number: II}', 'people:', '  - id: a', '    name: Aldric Valmont', ''].join('\n');
 		const handle = writingHandle(body);
 		const { el } = await embed(body, { handle, host: fakeHost() as Host });
-		await click(el.querySelector('.dynasty-more'));
-		await click(el.querySelector('.dynasty-more-titles'));
+		await click(el.querySelector('.dynasty-titles-button'));
 		const win = openModals.find((m) => (m as unknown) instanceof TitlesWindow) as unknown as { contentEl: FEl };
 		expect(win).toBeDefined();
 		const names = openPage(win.contentEl, 'duke').querySelectorAll('.dynasty-holder-name');
-		expect(names.map((n) => n.tag.toLowerCase())).toEqual(['div', 'button']);
+		expect(names.map((n) => n.tag.toLowerCase())).toEqual(['span', 'button']);
 		expect(names[0].getAttribute('class')).toBe(names[1].getAttribute('class'));
 	});
 });

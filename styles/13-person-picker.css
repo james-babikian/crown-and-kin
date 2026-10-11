@@ -1,0 +1,391 @@
+/* ---------- Person picker (spec §6.6) ---------- */
+
+.dynasty-picker .dynasty-picker-row {
+	/* The row holds a text for a screen reader (position: absolute). Without a positioned row that text takes the prompt as its box and grows its scroll area. */
+	position: relative;
+	display: flex;
+	align-items: center;
+	gap: var(--size-4-3);
+	min-height: 44px;
+}
+
+/*
+ * Find (D212 find-rows, D213): about 560 px wide on a computer, not Obsidian's 700 px, so a portrait at the right of a row is not far from its name.
+ * A phone has the whole width.
+ */
+.prompt.dynasty-picker:not(.is-phone) {
+	--prompt-width: 560px;
+	width: min(560px, calc(100vw - 2 * var(--size-4-4)));
+}
+
+/* G.1, G.3: a row is the text, then the round portrait at the right when the person has one. No initials, no house ring, no empty circle (D213). */
+.dynasty-picker .dynasty-picker-row > .dynasty-picker-text {
+	flex: 1 1 auto;
+}
+
+.dynasty-picker-swatch {
+	flex: none;
+	width: 28px;
+	height: 28px;
+	border-radius: 50%;
+}
+
+.dynasty-picker-swatch.has-picture {
+	box-shadow: 0 0 0 1px var(--background-modifier-border);
+}
+
+.dynasty-picker-swatch.is-failed {
+	display: none;
+}
+
+.dynasty-picker-swatch.is-new {
+	width: 32px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	background: transparent;
+	color: var(--interactive-accent);
+	font-weight: var(--font-semibold);
+	font-size: var(--dynasty-type-title);
+	border-radius: 0;
+}
+
+.dynasty-picker.is-phone .dynasty-picker-swatch {
+	width: 36px;
+	height: 36px;
+}
+
+.dynasty-picker-text {
+	min-width: 0;
+}
+
+/* D218 rules 1 to 3: the name of a person is the Heading role in the text font, semibold; the text line under it is the Text role in the text font, muted. */
+.dynasty-picker-name {
+	font-family: var(--font-text);
+	font-size: var(--dynasty-type-heading);
+	font-weight: var(--font-semibold);
+	line-height: 1.25;
+	overflow-wrap: anywhere;
+}
+
+.dynasty-picker .dynasty-picker-sob,
+.dynasty-picker .dynasty-picker-suffix {
+	font-weight: var(--font-normal);
+}
+
+/* The first row, "Create a new person", is the plugin speaking, not a name: the interface font, the Control role. */
+.dynasty-picker-new .dynasty-picker-name {
+	color: var(--interactive-accent);
+	font-family: var(--font-interface);
+	font-size: var(--dynasty-type-control);
+}
+
+.dynasty-picker-sub {
+	color: var(--dynasty-muted);
+	font-family: var(--font-text);
+	font-size: var(--dynasty-type-text);
+	line-height: 1.35;
+}
+
+/* D218 rule 4: the relation word of a row is italic, as on the cards and in the Family rows. */
+.dynasty-picker-sub i {
+	font-style: italic;
+}
+
+/* F3 item 3: the selection fill is darker than the window, so the grey line is 4.27 to 4.41 on it in three light themes. In the selected row it moves toward the text colour. */
+.dynasty-picker .suggestion-item.is-selected .dynasty-picker-sub {
+	color: var(--text-normal);
+	color: color-mix(in srgb, var(--text-normal) 55%, var(--dynasty-muted));
+}
+
+.dynasty-picker-head {
+	flex: none;
+	display: flex;
+	align-items: center;
+	gap: var(--size-4-2);
+	padding: var(--size-4-3) var(--size-4-4) var(--size-4-1);
+}
+
+/* The title of the prompt: the Heading role, semibold. */
+.dynasty-picker .dynasty-sheet-title {
+	font-size: var(--dynasty-type-heading);
+	font-weight: var(--font-semibold);
+}
+
+/* Cancel stands in the row of the field (person-picker.ts); only a phone shows it. */
+.dynasty-picker-cancel {
+	display: none;
+}
+
+/* D212 sheet-opaque, F3 item 5: the plain page background on a phone and on a computer, in every theme (see 10-edit-sheet.css). */
+.modal-container .prompt.dynasty-picker.dynasty-picker {
+	background: var(--background-primary) !important;
+	backdrop-filter: none;
+	-webkit-backdrop-filter: none;
+}
+
+/* The probe is split over lines on purpose: the proof test reads every "rgb(from" as a use. */
+@supports (color: rgb(
+	from red r g b
+)) {
+	.modal-container .prompt.dynasty-picker.dynasty-picker {
+		background: rgb(from var(--background-primary) r g b) !important;
+	}
+}
+
+.prompt.dynasty-picker.is-phone {
+	width: 100vw;
+	max-width: 100vw;
+	height: var(--dynasty-sheet-height, 100%);
+	max-height: var(--dynasty-sheet-height, 100%);
+	align-self: flex-start;
+	margin-top: var(--dynasty-sheet-top, 0);
+	top: 0;
+	border-radius: 0;
+	border: none;
+	display: flex;
+	flex-direction: column;
+	/*
+	 * D125 (3): Obsidian's `.is-phone .prompt` keeps the safe area at the bottom (the home bar). The keyboard covers that
+	 * bar and the plugin already ends the prompt at the keyboard (`--dynasty-sheet-height`), so while a keyboard is up the
+	 * space is blank. It goes by the keyboard height itself: no number is compared, and no keyboard gives the old space.
+	 */
+	padding-bottom: max(0px, calc(var(--safe-area-inset-bottom, 0px) - var(--keyboard-height, 0px)));
+	/*
+	 * The status bar space belongs to the prompt, not to the field container: Obsidian 1.13+ draws that container as the grey pill, so padding
+	 * inside it made the pill 105 px high and left the clear button above the field.
+	 */
+	padding-top: env(safe-area-inset-top);
+}
+
+/* The title is for a screen reader only: the field and Cancel share the top row, so the first result sits higher (D212 find-rows). */
+.dynasty-picker.is-phone .dynasty-picker-head {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	margin: -1px;
+	padding: 0;
+	overflow: hidden;
+	clip-path: inset(50%);
+	white-space: nowrap;
+}
+
+.dynasty-picker.is-phone .prompt-input-container {
+	order: -1;
+	flex: none;
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	/* D125 (3): a low top row gives the list more rows above the keyboard. The container is the field row only; the top inset is on the prompt. */
+	padding: 0 max(var(--size-4-3), env(safe-area-inset-right)) 0 max(var(--size-4-3), env(safe-area-inset-left));
+	border-bottom: 1px solid var(--background-modifier-border);
+}
+
+/*
+ * The grey pill is the container, so the field inside it draws nothing of its own. Obsidian's `.is-phone .prompt-input[type=text]` gives the field a
+ * rounded border, which looked like an oval inside the oval. The long selector also beats Obsidian's hover, focus and "has text" rules (padding 96 px).
+ */
+.dynasty-picker.is-phone .prompt-input-container input.prompt-input {
+	flex: 1 1 auto;
+	min-width: 0;
+	min-height: 44px;
+	padding: 0 4px 0 8px;
+	border: 0;
+	border-radius: 0;
+	background: transparent;
+	box-shadow: none;
+	outline: none;
+	font-size: max(16px, var(--dynasty-type-control));
+}
+
+/* A touch screen shows the caret, so only a keyboard or a mouse gets a focus ring, and it goes round the pill. */
+@media (pointer: fine) {
+	.dynasty-picker.is-phone .prompt-input-container:has(> input.prompt-input:focus-visible) {
+		outline: 2px solid var(--background-modifier-border-focus);
+		outline-offset: -2px;
+	}
+}
+
+/*
+ * Obsidian floats the clear button over the field at the right edge, where Cancel stands. Here it is an item of the row between the field and Cancel:
+ * typed text ends at the button, and its 12 px margin plus the 6 px row gap keep a wrong tap away from Cancel. The hit area is 44 x 44 px.
+ */
+.dynasty-picker.is-phone .prompt-input-container .search-input-clear-button {
+	position: static;
+	flex: none;
+	width: 44px;
+	height: 44px;
+}
+
+/* The margin has its own, stronger rule: the Cupertino theme resets it to 0 with a longer selector, and its row gap alone is 8 px. */
+.prompt.dynasty-picker.is-phone.is-phone .prompt-input-container .search-input-clear-button {
+	margin: 0 12px 0 0;
+}
+
+.dynasty-picker.is-phone .prompt-input-container button.dynasty-picker-cancel {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	flex: none;
+	min-height: 44px;
+	min-width: 44px;
+	padding: 0 8px;
+	border: 0;
+	background: none;
+	box-shadow: none;
+	color: var(--dynasty-link);
+	font-size: var(--dynasty-type-control);
+	font-weight: var(--font-normal);
+}
+
+.dynasty-picker.is-phone .prompt-results {
+	order: 0;
+	flex: 1 1 auto;
+	max-height: none;
+	overflow-y: auto;
+	/* D125 (3): the first row starts 4 px under the field (Obsidian's own padding is 12 px). */
+	padding-top: var(--size-4-1);
+}
+
+/*
+ * The picture picker (D212 picker-grid): pictures stand in a grid of 72 px thumbnails with the file name under each, so a face or a shield is
+ * chosen by sight. A folder is a quiet heading over its pictures; "Add a picture from this device" and "Remove" stay full-width rows. The
+ * base rules of the rows are in 21-houses-pictures.css; these are more specific and take their place in the picker.
+ */
+.modal.dynasty-picture-picker .dynasty-picture-list {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
+	gap: 6px 8px;
+}
+
+.modal.dynasty-picture-picker.is-phone .dynasty-picture-list {
+	grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+}
+
+.modal.dynasty-picture-picker .dynasty-picture-row {
+	flex-direction: column;
+	align-items: center;
+	justify-content: flex-start;
+	min-height: 0;
+	gap: 6px;
+	padding: 10px 4px 8px;
+	text-align: center;
+	contain-intrinsic-size: auto 120px;
+}
+
+.modal.dynasty-picture-picker .dynasty-picture-row.dynasty-picture-folder-row,
+.modal.dynasty-picture-picker .dynasty-picture-row.dynasty-picture-device,
+.modal.dynasty-picture-picker .dynasty-picture-row.dynasty-picture-remove,
+.modal.dynasty-picture-picker .dynasty-picture-none {
+	grid-column: 1 / -1;
+	flex-direction: row;
+	justify-content: flex-start;
+	min-height: 44px;
+	padding-top: 6px;
+	padding-bottom: 6px;
+	text-align: left;
+	contain-intrinsic-size: auto 44px;
+}
+
+.modal.dynasty-picture-picker .dynasty-picture-row.dynasty-picture-folder-row {
+	margin-top: 10px;
+	border-bottom: 1px solid var(--background-modifier-border);
+	border-radius: 0;
+	color: var(--dynasty-muted);
+	font-size: var(--dynasty-type-small);
+	font-weight: var(--font-semibold);
+}
+
+.modal.dynasty-picture-picker .dynasty-picture-row.dynasty-picture-folder-row:hover {
+	background: none;
+}
+
+.modal.dynasty-picture-picker .dynasty-picture-folder-icon,
+.modal.dynasty-picture-picker .dynasty-picture-spacer,
+.modal.dynasty-picture-picker .dynasty-picture-row:not(.dynasty-picture-folder-row) .dynasty-picture-chevron {
+	display: none;
+}
+
+.modal.dynasty-picture-picker .dynasty-picture-count {
+	margin-left: 6px;
+	color: var(--dynasty-muted);
+	font-size: var(--dynasty-type-small);
+	font-weight: var(--font-normal);
+}
+
+/* F3 item 2: the base rules use the accent and the raw muted role, which are 2.13 to 3.49 in light themes. The run-time tokens reach 4.5:1. */
+.modal.dynasty-picture-picker .dynasty-picture-device .dynasty-picture-name,
+.modal.dynasty-picture-picker .dynasty-picture-device .dynasty-picture-plus {
+	color: var(--dynasty-link);
+}
+
+.modal.dynasty-picture-picker .dynasty-picture-remove .dynasty-picture-plus,
+.modal.dynasty-picture-picker .dynasty-picture-chevron,
+.modal.dynasty-picture-picker .dynasty-picture-folder,
+.modal.dynasty-picture-picker .dynasty-picture-none {
+	color: var(--dynasty-muted);
+}
+
+.modal.dynasty-picture-picker .dynasty-picture-thumb {
+	width: 72px;
+	height: 72px;
+	border-radius: var(--radius-m);
+}
+
+/* On the highlighted row (keyboard cursor or pointer) the quiet texts take the text colour: the muted grey on the hover fill was 4.27–4.41:1 in Minimal and AnuPpuccin light (G3). */
+.modal.dynasty-picture-picker .dynasty-picture-row.is-cursor :is(.dynasty-picture-folder, .dynasty-picture-folder-name, .dynasty-picture-count, .dynasty-picture-chevron, .dynasty-picture-none, .dynasty-picture-name, .dynasty-picture-plus, .dynasty-picture-hint),
+.modal.dynasty-picture-picker .dynasty-picture-row:hover :is(.dynasty-picture-folder, .dynasty-picture-folder-name, .dynasty-picture-count, .dynasty-picture-chevron, .dynasty-picture-none, .dynasty-picture-name, .dynasty-picture-plus, .dynasty-picture-hint) {
+	color: var(--text-normal);
+}
+
+/* The chosen picture: a frame in the text colour, not colour alone, so a weak theme accent cannot hide it. */
+.modal.dynasty-picture-picker .dynasty-picture-row.is-selected {
+	box-shadow: inset 0 0 0 2px var(--text-normal);
+}
+
+/* D218 rules 2 and 3: the file name under a thumbnail is Small and regular. The base rules of the picker, in 21-houses-pictures.css, set a heading of 650, a bold row and the raw role sizes; these are more specific. */
+.modal.dynasty-picture-picker .dynasty-picture-heading {
+	font-size: var(--dynasty-type-heading);
+	font-weight: var(--font-semibold);
+}
+
+.modal.dynasty-picture-picker .dynasty-picture-hint {
+	font-size: var(--dynasty-type-small);
+}
+
+.modal.dynasty-picture-picker .dynasty-picture-plus {
+	font-size: var(--dynasty-type-title);
+}
+
+.modal.dynasty-picture-picker .dynasty-picture-folder,
+.modal.dynasty-picture-picker .dynasty-picture-none {
+	font-size: var(--dynasty-type-small);
+}
+
+.modal.dynasty-picture-picker .dynasty-picture-name {
+	font-size: var(--dynasty-type-small);
+	font-weight: var(--font-normal);
+	line-height: 1.25;
+}
+
+.modal.dynasty-picture-picker .dynasty-picture-text {
+	max-width: 100%;
+}
+
+.modal.dynasty-picture-picker .dynasty-picture-inuse {
+	margin-left: 0;
+	padding-left: 0;
+	font-size: var(--dynasty-type-small);
+}
+
+.modal.dynasty-picture-picker .dynasty-picture-inuse .svg-icon {
+	width: 13px;
+	height: 13px;
+}
+
+/* The two action rows ("Add a picture from this device", "Remove") are Control rows, regular. */
+.modal.dynasty-picture-picker .dynasty-picture-device .dynasty-picture-name,
+.modal.dynasty-picture-picker .dynasty-picture-remove .dynasty-picture-name {
+	font-size: var(--dynasty-type-control);
+	font-weight: var(--font-normal);
+}

@@ -5,12 +5,10 @@ vi.mock('obsidian', () => import('./acceptance/fake-obsidian'));
 vi.mock('@codemirror/language', () => ({ forceParsing: () => false, syntaxTree: () => ({ length: 0 }) }));
 vi.mock('@codemirror/view', () => ({ ViewPlugin: { fromClass: () => ({}) } }));
 
-import { deriveFamilies } from '../src/core/derive';
 import { parseDynasty } from '../src/core/parse';
 import * as UI from '../src/render/ui-text';
 import { EditSheet } from '../src/obsidian/edit-sheet';
 import { HousesWindow } from '../src/obsidian/houses-window';
-import { openHousePage } from '../src/obsidian/house-page-window';
 import { closePluginModals } from '../src/obsidian/plugin-modals';
 import { TitlesWindow } from '../src/obsidian/titles-window';
 import { FEl, clock, fakeDoc, fakeWin, installDom, resetDom, settle } from './acceptance/fake-dom';
@@ -139,7 +137,7 @@ describe('D113 item 2: the note after "Use this ID"', () => {
 	it('has the normal text colour and size; "Keep old ID" is a normal small button of at least 44 px', () => {
 		const note = rule('.dynasty-id-new');
 		expect(note).toMatch(/color:\s*var\(--text-normal\)/);
-		expect(note).toMatch(/font-size:\s*var\(--font-ui-medium\)/);
+		expect(note).toContain('font-size: var(--dynasty-type-text)');
 		const button = rule('.dynasty-sheet button.dynasty-id-old');
 		expect(button).toMatch(/min-height:\s*44px/);
 		expect(button).toMatch(/background:\s*var\(--interactive-normal\)/);
@@ -333,7 +331,7 @@ describe('D113 item 3: a refused Save shows its message once, on the edit page',
 
 	it('the CSS: a red edge of 3 px in the error colour', () => {
 		const edge = rule('.dynasty-lw .dynasty-lw-page.has-id-problem');
-		expect(edge).toMatch(/border-left:\s*3px solid var\(--text-error\)/);
+		expect(edge).toMatch(/border-left:\s*3px solid var\(--dynasty-error\)/);
 	});
 });
 
@@ -448,27 +446,6 @@ describe('C5: "Remove partnership?" keeps the text that the owner wrote', () => 
 	it('a type with capitals keeps them, and only the first letter of a known type is small', () => {
 		expect(UI.REMOVE.partnershipText(UI.unionTypeText('Handfasting'), 'A', 'B')).toContain('the other (Handfasting) of A and B');
 		expect(UI.REMOVE.partnershipText(UI.unionTypeText('affair'), 'A', 'B')).toContain('removes the affair of A and B');
-	});
-});
-
-describe('C7: the arms box of the house page', () => {
-	const page = (arms: boolean) => {
-		const parsed = parseDynasty(`houses:\n  - {id: v, name: House Valmont${arms ? ', arms: "[[arms.png]]"' : ''}}\npeople:\n  - {id: a, name: Aldric, house: v}\n`);
-		if (!parsed.ok) throw new Error('bad body');
-		const win = openHousePage({} as never, { app: {} as never, houseId: 'v', whole: deriveFamilies(parsed.tree), sourcePath: 'Tree.md', show: () => {}, openNote: () => {} })!;
-		return (win as unknown as { contentEl: FEl }).contentEl.querySelector('.dynasty-hp-arms')!;
-	};
-
-	it('has a role and a real name when the house has arms', () => {
-		const arms = page(true);
-		expect(arms.getAttribute('role')).toBe('img');
-		expect(arms.getAttribute('aria-label')).toBe('Arms of House Valmont');
-	});
-
-	it('an empty box has neither', () => {
-		const arms = page(false);
-		expect(arms.getAttribute('role')).toBeNull();
-		expect(arms.getAttribute('aria-label')).toBeNull();
 	});
 });
 

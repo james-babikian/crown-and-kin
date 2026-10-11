@@ -194,13 +194,6 @@ export function comments15(): { folds: Map<string, FoldFact>; sets: Map<string, 
 	return { folds, sets, names, people };
 }
 
-/** The set of folds of a label such as "A+B" as fold keys (the comments name the folds; `keyOf` maps a name to its key). */
-export function keysOf(folds: ReadonlyMap<string, FoldFact>, names: readonly string[]): Set<string> {
-	return new Set(names.map((n) => folds.get(n)!.key));
-}
-
 /** Sorted copy, for comparing lists as sets. */
 export const sorted = <T>(items: Iterable<T>): T[] => [...items].sort();
 
-/** The document position of each person of a tree (`Person.index` of the parser). */
-export const indexOf = (tree: Tree, id: string): number => tree.people.findIndex((p) => p.id === id);

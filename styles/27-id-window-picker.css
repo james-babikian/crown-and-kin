@@ -1,0 +1,140 @@
+/* D106: "ID: p12", the last line of the edit sheet of a person whose ID is written. Muted text, never below 4.5:1; the text can be selected and copied. A theme can set --font-ui-smaller to 9.6 px on a phone; the line is never smaller than 12 px (review 0.2.3). */
+.dynasty-sheet-id {
+	margin-top: 0;
+	color: var(--dynasty-muted);
+	font-size: var(--dynasty-type-small);
+	-webkit-user-select: text;
+	user-select: text;
+	/* An id with no hyphen has no place to break; without this the sheet scrolls sideways. */
+	overflow-wrap: anywhere;
+}
+
+/* The small button "Change id" of a saved house or title (spec §13.17 rule 5, D110): at least 44 px high (spec §7.5). */
+.dynasty-sheet button.dynasty-id-open {
+	min-height: 44px;
+	min-width: 44px;
+}
+
+/* The note of a new ID: a text line under the name in the normal text colour and size (D113 item 2), with the button "Keep old ID". */
+.dynasty-id-new {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0 var(--size-4-2);
+	min-width: 0;
+	color: var(--text-normal);
+	font-size: var(--dynasty-type-text);
+}
+
+.dynasty-id-new-text {
+	min-width: 0;
+	overflow-wrap: anywhere;
+}
+
+/* Phone: the text takes the room that the button leaves and wraps in it, so the button stays on the line of the text and the row does not get taller (D113 item 2). */
+.dynasty-sheet.is-phone .dynasty-id-new-text {
+	flex: 1 1 8em;
+}
+
+.dynasty-id-new-problem {
+	flex: 1 1 100%;
+	color: var(--dynasty-error);
+}
+
+/* "Keep old ID" is a normal small button (D113 item 2, not a link) with a 44 px hit area. */
+.dynasty-sheet button.dynasty-id-old {
+	width: auto;
+	min-width: 44px;
+	min-height: 44px;
+	padding: 0 var(--size-4-3);
+	background: var(--interactive-normal);
+	/* I39: the edge of a button reaches 3:1 on the window. */
+	border: 1px solid var(--dynasty-btn-edge);
+	box-shadow: none;
+	color: var(--text-normal);
+	font-size: var(--dynasty-type-control);
+}
+
+.dynasty-sheet button.dynasty-id-old:hover {
+	background: var(--interactive-hover);
+}
+
+/* The small Id window (D110): the field, "Make id from the name", the reason, and two buttons. */
+.modal.dynasty-sheet.dynasty-id-window:not(.is-phone) {
+	width: min(420px, calc(100vw - 2 * var(--size-4-4)));
+}
+
+.dynasty-id-window .dynasty-sheet-body {
+	overflow-y: auto;
+}
+
+.dynasty-id-row {
+	display: flex;
+	flex-direction: column;
+	align-items: stretch;
+	gap: var(--size-4-1);
+}
+
+.dynasty-id-field {
+	display: flex;
+	align-items: center;
+	gap: var(--size-4-3);
+	min-height: 44px;
+}
+
+.dynasty-sheet .dynasty-id-field .dynasty-sheet-input {
+	flex: 1 1 auto;
+	width: auto;
+	min-width: 6em;
+	min-height: 44px;
+}
+
+.dynasty-sheet .dynasty-id-row .dynasty-id-make {
+	width: 100%;
+	min-height: 44px;
+	border: 1px solid var(--dynasty-btn-edge);
+	box-shadow: none;
+}
+
+.dynasty-id-problem {
+	color: var(--dynasty-error);
+	font-size: var(--dynasty-type-text);
+}
+
+.dynasty-sheet .dynasty-id-input[aria-invalid='true'] {
+	border-color: var(--dynasty-error);
+}
+
+.dynasty-id-window .dynasty-id-use:disabled {
+	opacity: 0.5;
+	cursor: default;
+}
+
+/*
+ * Phone: a small sheet at the top of the screen, as high as its content and never higher than the
+ * visible area, so the keyboard cannot cover the field or the buttons (D110). The body scrolls if the
+ * visible area is too low for all of it.
+ */
+.modal.dynasty-sheet.dynasty-id-window.is-phone {
+	height: auto;
+	max-height: var(--dynasty-sheet-height, 100%);
+	border-radius: 0 0 var(--radius-l) var(--radius-l);
+	border-bottom: 1px solid var(--background-modifier-border);
+	box-shadow: var(--shadow-l);
+	/* Obsidian slides a phone modal by its own height (a bottom sheet) with an inline transform and
+	   transition. This is a top sheet, so the slide shows as a jump. An inline style loses only to !important. */
+	transform: none !important;
+	transition: none !important;
+}
+
+.dynasty-id-window.is-phone .dynasty-sheet-body {
+	padding-bottom: var(--size-4-3);
+}
+
+/* phone-B: picker */
+/* Wave 2 only: new rules for `.dynasty-picker*` (person list height, `.dynasty-picker-sob`) go below this line. */
+/* D122: the sobriquet after a name in a person list and in a holder list: regular weight (the name is semibold). */
+.dynasty-picker-sob {
+	font-weight: var(--font-normal);
+}
+

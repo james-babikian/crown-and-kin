@@ -10,16 +10,18 @@
 import { Notice, TFile, type App, type CachedMetadata, type EventRef, type TAbstractFile } from 'obsidian';
 import { findBlocks } from '../core/block-locate';
 import { encode, linkTargets, normaliseTarget } from '../core/link-rewrite';
+import { folderOf } from '../core/link-text';
 import { pictureFormat } from '../core/pictures';
 import { applyOp } from '../core/yaml-edit';
 import { RENAME_UI, renamedKind, renamedText, type LinkReportText } from '../render/ui-text';
+import { VIEW_NOTICE } from '../render/view-text';
 import type { Handle } from './block-handle';
 import type { PendingRename } from './settings';
 
 /** What the updater needs from the handle registry (`HandleRegistry.forBlock`). */
 export interface BlockSource {
 	/** The handle of block `ordinal` of the note at `path`, or null if the note or the block is gone. */
-	forBlock(path: string, ordinal: number): Promise<Pick<Handle, 'body' | 'write'> | null>;
+	forBlock(path: string, ordinal: number, onBusy?: () => void): Promise<Pick<Handle, 'body' | 'write'> | null>;
 	/** Every handle: their undo entries follow the rename too. */
 	all(): Iterable<Pick<Handle, 'key' | 'mapUndo'>>;
 }
@@ -71,14 +73,16 @@ interface Kept {
 	other: string;
 }
 
-/** One tree after its update: links changed and kept, a failure, no more trees in the note (`gone`), or no link to a renamed note (null). */
-type TreeResult = { changed: number; kept: Kept[] } | { failed: Failure } | 'gone' | null;
+/** One tree after its update: links changed and kept, a failure, no more trees in the note (`gone`), a note that stayed busy (`busy`, F-VIEW-04), or no link to a renamed note (null). */
+type TreeResult = { changed: number; kept: Kept[] } | { failed: Failure } | 'gone' | 'busy' | null;
 
 /** What the scan of the notes found, for the Notices at the end. */
 interface ScanResult {
 	/** Trees with a changed link. */
 	trees: number;
 	failures: Failure[];
+	/** F-VIEW-04: the notes that stayed busy until the update gave up (a slow write or a sync lock); each one once. */
+	gaveUp: Failure[];
 	/** The first kept link of each tree that has kept links and no changed link. */
 	kept: (Kept & { path: string })[];
 }
@@ -191,7 +195,6 @@ export function nameForms(name: string): string[] {
 const isRelative = (target: string) => /^\.\.?\//.test(target);
 
 /** The folder of a vault path ('' at the top). */
-const folderOf = (path: string) => path.split('/').slice(0, -1).join('/');
 
 /** A `./` or `../` target from the folder `from`, as a vault path (null if it leaves the vault). */
 function resolveRelative(target: string, from: string): string | null {
@@ -544,6 +547,7 @@ export class LinkUpdater {
 		report.notes = files.length;
 		let trees = 0;
 		const failures: Failure[] = [];
+		const gaveUp: Failure[] = [];
 		const kept: (Kept & { path: string })[] = [];
 		let slice = Date.now();
 		for (const file of this.candidates(files)) {
@@ -571,6 +575,13 @@ export class LinkUpdater {
 				const path = file.path;
 				const r = await this.tree(path, ordinal, batch);
 				if (r === 'gone') break;
+				if (r === 'busy') {
+					// The note is not gone: the rest of its trees would wait just as long, so the update leaves the note and tells the user once.
+					const first = batch[0];
+					gaveUp.push({ path, old: shownPath(plainName(first.oldPath)), next: shownPath(plainName(first.file.path)) });
+					report.failed.push(shownPath(path));
+					break;
+				}
 				if (r === null) continue;
 				report.trees++;
 				if ('failed' in r) {
@@ -587,18 +598,20 @@ export class LinkUpdater {
 			// One note at a time, so a vault with many trees never holds up the interface (spec §6.9).
 			await pause(0);
 		}
-		return { trees, failures, kept };
+		return { trees, failures, gaveUp, kept };
 	}
 
 	/** The Notices at the end of an update. */
-	private showResult(report: LinkReportText, st: Progress, { trees, failures, kept }: ScanResult): void {
+	private showResult(report: LinkReportText, st: Progress, { trees, failures, gaveUp, kept }: ScanResult): void {
 		// D35: the numbers only.
 		if (report.links > 0) new Notice(RENAME_UI.updated(report.links, trees));
-		else if (st.shown && !kept.length && !failures.length) new Notice(RENAME_UI.noLinksFor(renamedKind(report.renames)));
+		else if (st.shown && !kept.length && !failures.length && !gaveUp.length) new Notice(RENAME_UI.noLinksFor(renamedKind(report.renames)));
 		for (const k of kept.slice(0, MAX_FAILURE_NOTICES)) new Notice(RENAME_UI.kept(k.link, shownPath(k.path), shownPath(k.other)), KEPT_NOTICE_MS);
 		if (kept.length > MAX_FAILURE_NOTICES) new Notice(RENAME_UI.moreKept(kept.length - MAX_FAILURE_NOTICES), KEPT_NOTICE_MS);
 		for (const f of failures.slice(0, MAX_FAILURE_NOTICES)) new Notice(RENAME_UI.failed(shownPath(f.path), f.old, f.next), 0);
 		if (failures.length > MAX_FAILURE_NOTICES) new Notice(RENAME_UI.moreFailed(failures.length - MAX_FAILURE_NOTICES), 0);
+		for (const g of gaveUp.slice(0, MAX_FAILURE_NOTICES)) new Notice(VIEW_NOTICE.renameGaveUp(shownPath(g.path), g.old, g.next), 0);
+		if (gaveUp.length > MAX_FAILURE_NOTICES) new Notice(RENAME_UI.moreFailed(gaveUp.length - MAX_FAILURE_NOTICES), 0);
 	}
 
 	/**
@@ -611,7 +624,9 @@ export class LinkUpdater {
 		for (let attempt = 0; attempt < 2; attempt++) {
 			// The plugin or the setting was turned off: no further write, also not a retry.
 			if (this.halted()) return null;
-			const h = await this.blocks.forBlock(path, ordinal);
+			let busy = false;
+			const h = await this.blocks.forBlock(path, ordinal, () => (busy = true));
+			if (!h && busy && !this.halted()) return 'busy';
 			if (!h || this.halted()) return h ? null : 'gone';
 			const found = this.linksFor(h.body, path, batch);
 			map = found.map;

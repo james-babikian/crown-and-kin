@@ -2,21 +2,16 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 /*
- * Review D: the Houses window is meant to be 720 px wide on the computer (D110), so the name field keeps
- * its room beside four buttons. Obsidian's `.modal` has `max-width: var(--dialog-max-width)`, and on the
- * computer `--dialog-max-width` is `80vw` (app.css). The rule below sets `width` only, so the window is
- * 80vw wide in a window narrower than 900 px. Measured once in Chrome with Obsidian's app.css and the
- * real DOM (a manual probe, not kept), name field width of the first row:
- *   window 600 px: modal 480 px, name 18 px (0.2.1: 87 px)     window 640 px: modal 512, name 18 (0.2.1: 119)
- *   window 700 px: modal 560 px, name 64 px (0.2.1: 167 px)    window 760 px: modal 608, name 112 (0.2.1: 167)
- *   window 900 px: modal 720 px, name 224 px
+ * Review D, changed in 0.2.8: every window of the family is 620 px wide on the computer, so the name field keeps
+ * its room. Obsidian's `.modal` has `max-width: var(--dialog-max-width)`, and on the computer `--dialog-max-width` is `80vw` (app.css),
+ * so the rule must lift that cap, or the window is narrower than 620 px in an app window narrower than 775 px.
  */
-describe('review D: the Houses window width', () => {
-	it('the 720 px rule also lifts the 80vw cap of Obsidian (max-width), or the name field is squeezed in a window of 600 to 900 px', () => {
+describe('review D: the width of the windows', () => {
+	it('the 620 px rule also lifts the 80vw cap of Obsidian (max-width)', () => {
 		const css = readFileSync('styles.css', 'utf8');
-		const rule = /\.modal\.dynasty-sheet\.dynasty-houses:not\(\.is-phone\)\s*\{([^}]*)\}/.exec(css);
+		const rule = /\.modal\.dynasty-sheet\s*\{([^}]*)\}/.exec(css);
 		expect(rule).not.toBeNull();
-		expect(rule![1]).toMatch(/width:\s*min\(720px/);
-		expect(rule![1]).toMatch(/max-width\s*:/);
+		expect(rule![1]).toMatch(/width:\s*min\(620px/);
+		expect(rule![1]).toMatch(/max-width\s*:\s*none/);
 	});
 });

@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { badgeHit, badgeTap, badgeTapWins } from '../src/obsidian/focus-mode';
+import { badgeTap } from '../src/obsidian/focus-mode';
+import { badgeSquare } from './badge-square';
+import type { Rect } from '../src/layout/model';
 import { discPath, BADGE_RADIUS_EM } from '../src/render/dom/scene';
 
 // Contract 4.2: which element wins a tap in the overlap of the badge's tap square and its own card (the rule of spec §13.10, 6 screen px).
@@ -12,6 +14,17 @@ const CY = CARD.y;
 const MARK = { x: CX - R, y: CY - R, w: 2 * R, h: 2 * R };
 const SCALE = 14 / F;
 const CAP = CARD.h / 2;
+/**
+ * The rule of contract 4.2 as a model for these tests (the view gets the same result from the stacking of the badge square and the card):
+ * the part of the square outside its own card is the badge; over its own card the card wins, except inside the disc round the badge centre.
+ */
+function badgeTapWins(mark: Rect, point: { x: number; y: number }, scale: number, fontPx: number, capPx: number, avoid: readonly Rect[]): boolean {
+	const { square, disc } = badgeTap(mark, scale, fontPx, capPx, avoid);
+	const inSquare = point.x >= square.x && point.x <= square.x + square.w && point.y >= square.y && point.y <= square.y + square.h;
+	const overOwnCard = point.x <= disc.cx && point.y >= disc.cy;
+	if (inSquare && !overOwnCard) return true;
+	return point.y >= disc.top && Math.hypot(point.x - disc.cx, point.y - disc.cy) <= disc.r;
+}
 const wins = (x: number, y: number, avoid: { x: number; y: number; w: number; h: number }[] = [], scale = SCALE) => badgeTapWins(MARK, { x, y }, scale, F, CAP, avoid);
 
 describe('badgeTapWins (contract 4.2)', () => {
@@ -55,7 +68,7 @@ describe('badgeTapWins (contract 4.2)', () => {
 
 	it('a tag tap area that touches the card top leaves no strip above it', () => {
 		const tag = { x: CX - 60, y: CY - 30, w: 100, h: 30 };
-		const sq = badgeHit(MARK, SCALE, F, CAP, [tag]);
+		const sq = badgeSquare(MARK, SCALE, F, CAP, [tag]);
 		expect(sq.y).toBeCloseTo(CY, 9);
 		expect(wins(CX, CY - 1, [tag])).toBe(false);
 		// The own card's corner under the disc is still the badge.
@@ -65,7 +78,7 @@ describe('badgeTapWins (contract 4.2)', () => {
 	it('a tag tap area that does not meet the square or lies beside the card changes nothing', () => {
 		const far = { x: CX + 200, y: CY - 30, w: 100, h: 30 };
 		const below = { x: CX - 60, y: CY + 70, w: 100, h: 30 };
-		expect(badgeHit(MARK, SCALE, F, CAP, [far, below])).toEqual(badgeHit(MARK, SCALE, F, CAP, []));
+		expect(badgeSquare(MARK, SCALE, F, CAP, [far, below])).toEqual(badgeSquare(MARK, SCALE, F, CAP, []));
 	});
 
 	it('at a low zoom (names under 11 px) the badge is its circle only, with no 6 px margin', () => {

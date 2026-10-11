@@ -1,0 +1,309 @@
+/* ---------- Titles and holders (spec §13.3–§13.5; D54–D63; 0.2.8 contract C, G.6, G.7, D195, D201) ---------- */
+
+/*
+ * Obsidian shows an aria-label as a floating label when the pointer rests on the element (the CSS switch `--no-tooltip` turns it off, and it
+ * inherits). In these windows only a button with no text keeps one: the page, the rows, the sections and the tick boxes show none.
+ */
+.dynasty-lw {
+	--no-tooltip: true;
+}
+
+.dynasty-lw .dynasty-icon-btn,
+.dynasty-lw .dynasty-lw-clear,
+.dynasty-sheet.dynasty-lw button.dynasty-house-arms:not(.is-add) {
+	--no-tooltip: false;
+}
+
+/* Spec §13.5: the ruler name of the shown title after the full name in a picker row. */
+.dynasty-picker-suffix {
+	color: var(--dynasty-muted);
+	font-weight: var(--font-normal);
+}
+
+.dynasty-holder-none {
+	padding: 4px 0;
+}
+
+/* The holder rows of a title page: the lead, the ruler text, a second text line, the menu "more". */
+.dynasty-holder-list {
+	display: grid;
+}
+
+/*
+ * A holder in the tree: a tap shows the card (spec §13.4). It looks like the name in a row, not like a link (D218 item 5): the Name role
+ * (Heading size, semibold, text font; D218 items 1 to 3). The hit area is at least 44 px high (§13.0 item 8).
+ */
+.dynasty-sheet button.dynasty-holder-name {
+	display: inline;
+	height: auto;
+	min-height: 30px;
+	padding: 0;
+	border: 0;
+	background: transparent;
+	box-shadow: none;
+	color: var(--text-normal);
+	font-family: var(--font-text);
+	font-size: var(--dynasty-type-heading);
+	font-weight: var(--font-semibold);
+	line-height: 1.25;
+	text-align: left;
+	white-space: normal;
+	cursor: pointer;
+}
+
+.dynasty-sheet button.dynasty-holder-name:hover {
+	background: transparent;
+}
+
+/* The thin underline shows under a pointer that can hover; a finger leaves no hover behind (D218 item 5). */
+@media (hover: hover) {
+	.dynasty-sheet button.dynasty-holder-name:hover {
+		text-decoration: underline solid;
+		text-decoration-thickness: 1px;
+		text-underline-offset: 3px;
+	}
+}
+
+/* On a phone the tap area of the name grows to 44 px by an invisible extension, with no change of the look (F4). A row is at least 52 px high, so the extension stays inside its own row. */
+.dynasty-sheet.is-phone button.dynasty-holder-name {
+	position: relative;
+}
+
+.dynasty-sheet.is-phone button.dynasty-holder-name::after {
+	content: '';
+	position: absolute;
+	left: -8px;
+	right: -8px;
+	top: 50%;
+	height: 44px;
+	margin-top: -22px;
+}
+
+.dynasty-sheet div.dynasty-holder-name,
+.dynasty-sheet span.dynasty-holder-name {
+	font-family: var(--font-text);
+	font-size: var(--dynasty-type-heading);
+	font-weight: var(--font-semibold);
+	line-height: 1.25;
+}
+
+/*
+ * The ruler text and the sobriquet are one inline item of the button. A button is a flex box, so loose text and a span would be two items and the space between them would go (D130 item 8). Never make this a flex or grid box.
+ * It is also the name of a person in a holder row, a row of the line and a named heir: the Name role. The sobriquet in it is regular (27-id-window-picker.css).
+ */
+.dynasty-sheet .dynasty-holder-label {
+	min-width: 0;
+	overflow-wrap: anywhere;
+	font-family: var(--font-text);
+	font-size: var(--dynasty-type-heading);
+	font-weight: var(--font-semibold);
+	line-height: 1.25;
+}
+
+/* The text line under a name (the full name after a ruler text, the reign, the dates) is in the text font at the Text size. */
+.dynasty-sheet .dynasty-holder-row .dynasty-row-sub,
+.dynasty-sheet .dynasty-succ-item .dynasty-row-sub {
+	font-family: var(--font-text);
+	font-size: var(--dynasty-type-text);
+	line-height: 1.35;
+}
+
+/* A holder who is not in the tree shows in muted text, and says so in words (not colour alone). */
+.dynasty-holder-row.is-not-in-tree .dynasty-row-title {
+	color: var(--dynasty-muted);
+}
+
+/* D218 item 4: a note is quiet grey roman text at the Small size, in the interface font. Italic stays for relation words. This comes after the text line rule above, so a note in a row keeps its own look. */
+.dynasty-sheet .dynasty-holder-note,
+.dynasty-sheet .dynasty-holder-row .dynasty-row-sub.dynasty-holder-note {
+	color: var(--dynasty-muted);
+	font-family: var(--font-interface);
+	font-size: var(--dynasty-type-small);
+	font-style: normal;
+	font-weight: var(--font-normal);
+}
+
+.dynasty-holder-buttons {
+	flex: none;
+	display: flex;
+	align-items: center;
+	gap: 2px;
+}
+
+.dynasty-holder-panel {
+	display: grid;
+	gap: var(--size-4-2);
+}
+
+.dynasty-holder-panel > .dynasty-sub {
+	margin-bottom: -4px;
+}
+
+.dynasty-sheet.is-phone .dynasty-sheet-body .dynasty-holder-move:disabled {
+	opacity: 0.35;
+}
+
+/* The tick box of the holder form (D195): its hint stands under it at all times. */
+.modal.dynasty-holder-form .dynasty-holder-tick {
+	gap: 9px;
+}
+
+/* The holder form: Number beside Ruler name, From beside Until; the live preview below them (spec §13.5). */
+.dynasty-holder-form-row {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: var(--size-4-3);
+}
+
+/* The head of the form is in the Title role of the other windows, in the text font (it names a title and a holder); the preview is a quiet text line (holder-form). */
+.modal.dynasty-holder-form .dynasty-holder-context {
+	color: var(--text-normal);
+	font-family: var(--font-text);
+	font-size: var(--dynasty-type-title);
+	font-weight: var(--font-semibold);
+	line-height: 1.2;
+	letter-spacing: 0;
+}
+
+.modal.dynasty-holder-form .dynasty-holder-preview {
+	padding: 0;
+	border-radius: 0;
+	background: none;
+	color: var(--dynasty-muted);
+	font-family: var(--font-text);
+	font-size: var(--dynasty-type-text);
+	font-weight: var(--font-normal);
+	overflow-wrap: anywhere;
+}
+
+.dynasty-sheet.is-phone .dynasty-holder-form-row {
+	grid-template-columns: 1fr;
+}
+
+/*
+ * The succession sections of a title page (contract 0.2.7 E; 0.2.8 C, G.6). The choices are dropdowns on every device; on a phone each one
+ * opens the phone's own list (D208 item 3).
+ */
+.dynasty-succ-pair {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+}
+
+/* A switch is a row with the label at the left and the switch at the right (`dynasty-rule`). */
+.dynasty-rule {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) auto;
+	align-items: center;
+	gap: 4px 16px;
+	min-height: 44px;
+	cursor: pointer;
+}
+
+.dynasty-rule-text {
+	display: flex;
+	flex-direction: column;
+}
+
+.dynasty-succ-switch-text {
+	color: var(--text-normal);
+	font-size: var(--dynasty-type-control);
+	font-weight: var(--font-normal);
+}
+
+.dynasty-succ-switch .checkbox-container {
+	flex: none;
+}
+
+/* The summary sentence is for a screen reader; it takes no room. */
+.dynasty-succ-live {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	margin: -1px;
+	padding: 0;
+	overflow: hidden;
+	clip-path: inset(50%);
+	white-space: nowrap;
+}
+
+/* The line: the sub-heading and Show above the rows. */
+.dynasty-line-box {
+	display: grid;
+	gap: 2px;
+}
+
+.dynasty-line-head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+	margin-bottom: 4px;
+}
+
+/* A sub-heading: the Small role, semibold, quiet grey (D218 items 2 and 3). */
+.dynasty-sheet .dynasty-line-head b,
+.dynasty-sheet .dynasty-succ-heading {
+	color: var(--dynasty-muted);
+	font-size: var(--dynasty-type-small);
+	font-weight: var(--font-semibold);
+}
+
+.dynasty-succ-list {
+	display: grid;
+}
+
+.dynasty-succ-msg {
+	font-size: var(--dynasty-type-text);
+	font-weight: var(--font-normal);
+}
+
+.dynasty-succ-more {
+	margin-top: 2px;
+}
+
+/* G.6, quiet-warnings; D218 item 4: a note of the line is a quiet grey roman text line at the Small size, with no sign; a warning is in the text colour. */
+.dynasty-succ-note,
+.dynasty-succ-subnote {
+	display: block;
+	margin: 2px 0;
+	color: var(--dynasty-muted);
+	font-size: var(--dynasty-type-small);
+	font-style: normal;
+	line-height: 1.4;
+}
+
+/* D218 item 4: the open-branch row of the line (a person with no children in the tree) is quiet grey roman text, not a name. It is more specific than the name rules above. */
+.dynasty-sheet .dynasty-row.is-open-branch .dynasty-row-title,
+.dynasty-sheet .dynasty-row.is-open-branch .dynasty-holder-label {
+	color: var(--dynasty-muted);
+	font-family: var(--font-interface);
+	font-size: var(--dynasty-type-text);
+	font-style: normal;
+	font-weight: var(--font-normal);
+}
+
+.dynasty-succ-note.is-warning,
+.dynasty-succ-subnote.is-warning {
+	color: var(--text-normal);
+}
+
+.dynasty-succ-subnote {
+	margin-left: 42px;
+}
+
+.dynasty-succ-branch-note {
+	margin-top: var(--size-4-1);
+}
+
+.dynasty-succ-people .dynasty-actions {
+	margin-top: 4px;
+}
+
+/* The Titles section of the person window (spec §13.4): the name of a title is a name in a row. */
+.dynasty-title-holding-name {
+	font-family: var(--font-text);
+	font-size: var(--dynasty-type-heading);
+	font-weight: var(--font-semibold);
+	line-height: 1.25;
+}

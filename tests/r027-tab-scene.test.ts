@@ -6,7 +6,7 @@ import type { FamilyGraph } from '../src/core/derive';
 import { ORDINAL_EM, cardForm, geometryFor, ordinalTabRect } from '../src/layout/geometry';
 import { DEFAULT_LAYOUT_SETTINGS, clearLayoutCache, layoutTree, pictureSets } from '../src/layout/index';
 import type { Geometry, LaidOut, LayoutSettings } from '../src/layout/model';
-import { buildScene, type SceneOptions } from '../src/render/dom/scene';
+import { TAB_TEXT_BASE_EM, buildScene, type SceneOptions } from '../src/render/dom/scene';
 import { FEl, installDom } from './acceptance/fake-dom';
 import { serial } from './acceptance/m11-support';
 import { build } from './helpers';
@@ -127,7 +127,7 @@ describe('F.4: the ordinal tab', () => {
 				const word = withClass(group, 'dynasty-ordinal-tab-text')[0];
 				expect(word.getText()).toBe(text);
 				expect(num(word, 'x')).toBeCloseTo(box.x + r.x + r.w / 2, 9);
-				expect(num(word, 'y')).toBeCloseTo(box.y + r.y + r.h / 2 + 0.35 * ORDINAL_EM.text * 12, 9);
+				expect(num(word, 'y')).toBeCloseTo(box.y + r.y + r.h / 2 + TAB_TEXT_BASE_EM * 12, 9);
 			}
 		});
 	}

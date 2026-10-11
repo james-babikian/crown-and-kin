@@ -71,7 +71,7 @@ describe('the plate and the "You" tab follow the setting (D145, D148)', () => {
 		const { el, peek } = await drawn(MARKED);
 		expect([cardH(el, 'ann'), cardH(el, 'bo'), cardH(el, 'cy')]).toEqual([77, 77, 77]);
 		expect(count(el, '.dynasty-card-r1')).toBe(3);
-		expect(count(el, '.dynasty-r1-plate')).toBe(3);
+		expect(count(el, '.dynasty-card-foot-line')).toBe(3); // 0.2.8: the foot hairline replaces the plate
 		expect(tabs(el)).toBe(0);
 		expect(peek.lastLayout.geo.form).toBe('roundel');
 		expect(peek.lastLayout.settings.relationLine).toBe(true);
@@ -82,7 +82,7 @@ describe('the plate and the "You" tab follow the setting (D145, D148)', () => {
 	it('with a mark and the setting off: shorter cards, no plate, no word, the tab on the marked card, the label keeps the relation', async () => {
 		const { el, peek } = await drawn(MARKED, { ...DEFAULT_SETTINGS, showRelations: false });
 		expect([cardH(el, 'ann'), cardH(el, 'bo'), cardH(el, 'cy')]).toEqual([61, 61, 61]);
-		expect(count(el, '.dynasty-r1-plate')).toBe(0);
+		expect(count(el, '.dynasty-card-foot-line')).toBe(0);
 		expect(count(el, '.dynasty-card-relation')).toBe(0);
 		expect(tabs(el)).toBe(1);
 		expect(el.querySelector('.dynasty-card[data-person="bo"] .dynasty-r1-tab-group')).not.toBeNull();
@@ -98,7 +98,7 @@ describe('the plate and the "You" tab follow the setting (D145, D148)', () => {
 	it('with no mark: no plate and no tab, whatever the setting says', async () => {
 		const { el } = await drawn(PEOPLE);
 		expect([cardH(el, 'ann'), cardH(el, 'bo')]).toEqual([61, 61]);
-		expect(count(el, '.dynasty-r1-plate')).toBe(0);
+		expect(count(el, '.dynasty-card-foot-line')).toBe(0);
 		expect(tabs(el)).toBe(0);
 	});
 
@@ -175,7 +175,7 @@ describe('the card form follows the direction (D150)', () => {
 		phone();
 		const { root } = await full(MARKED, { ...DEFAULT_SETTINGS, showRelations: false });
 		expect(tabs(root)).toBe(1);
-		expect(count(root, '.dynasty-r1-plate')).toBe(0);
+		expect(count(root, '.dynasty-card-foot-line')).toBe(0);
 	});
 });
 
@@ -232,7 +232,7 @@ describe('the small tree of the relation finder (D47, D51)', () => {
 		expect(peek.lastLayout.settings.relationLine).toBeUndefined();
 		expect(peek.lastLayout.settings.youTab).toBe('bo');
 		expect(tabs(el)).toBe(1);
-		expect(count(el, '.dynasty-r1-plate')).toBe(0);
+		expect(count(el, '.dynasty-card-foot-line')).toBe(0);
 		expect(cardH(el, 'ann')).toBe(61);
 	});
 
@@ -267,7 +267,7 @@ describe('the small tree of the relation finder (D47, D51)', () => {
 		expect(peek.lastLayout.settings.youTab).toBe('bo');
 		expect(count(r.root, '.dynasty-card-r1')).toBe(3);
 		expect(tabs(r.root)).toBe(1);
-		expect(count(r.root, '.dynasty-r1-plate')).toBe(0);
+		expect(count(r.root, '.dynasty-card-foot-line')).toBe(0);
 	});
 });
 

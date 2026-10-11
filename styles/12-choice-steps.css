@@ -1,0 +1,62 @@
+/* ---------- Choice steps of the add flows (spec §6.4) ---------- */
+
+.modal.dynasty-choice {
+	width: min(480px, calc(100vw - 2 * var(--size-4-4)));
+}
+
+.modal.dynasty-choice.is-phone {
+	width: 100vw;
+}
+
+.dynasty-choice-text {
+	color: var(--text-normal);
+}
+
+.dynasty-choice-list {
+	margin: 0;
+	padding-left: var(--size-4-6);
+}
+
+.dynasty-choice-options {
+	display: flex;
+	flex-direction: column;
+	gap: var(--size-4-2);
+}
+
+.dynasty-sheet .dynasty-choice-option {
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+	justify-content: center;
+	gap: 2px;
+	width: 100%;
+	min-height: 52px;
+	height: auto;
+	padding: var(--size-4-2) var(--size-4-3);
+	text-align: left;
+	font-size: var(--dynasty-type-control);
+	white-space: normal;
+	/* I39: the edge of a button reaches 3:1 on the window. */
+	border: 1px solid var(--dynasty-btn-edge);
+	box-shadow: none;
+}
+
+.dynasty-choice-label {
+	font-weight: var(--font-semibold);
+}
+
+.dynasty-choice-detail {
+	font-size: var(--dynasty-type-small);
+	opacity: 0.85;
+}
+
+.dynasty-sheet .dynasty-choice-option.mod-cta {
+	border-color: transparent;
+	color: var(--dynasty-on-accent);
+}
+
+.dynasty-sheet .dynasty-choice-option:disabled {
+	opacity: 0.5;
+	cursor: not-allowed;
+}
+

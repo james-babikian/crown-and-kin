@@ -12,7 +12,7 @@ import { createParseCache } from '../core/parse-cache';
 import { INSERT_UI, RENAME_UI, TIMING_UI, UI, WRITE_TEXT } from '../render/ui-text';
 import { clearLayoutCache } from '../layout/index';
 import { clearMeasureCache } from '../render/dom/measure';
-import { themeChanged } from '../render/dom/theme-read';
+import { contrastChoices, onAccentChoice } from '../render/dom/theme-read';
 import { buildCallout } from '../render/dom/widgets';
 import { timingText, type RenderTiming } from '../render/tree-info';
 import { HandleRegistry } from './block-handle';
@@ -26,7 +26,8 @@ import { createPictureStore, isPictureExtension } from './picture-store';
 import { LinkUpdater, RENAME_TIMING, extensionOf } from './rename-links';
 import { DEFAULT_SETTINGS, PENDING_KEY, normaliseSettings, readPending, settingsChanges, type DynastySettings } from './settings';
 import { DynastySettingTab, type SettingsHost } from './settings-tab';
-import { HOVER_SOURCE, THEME_RECHECK_MS, TreeView, type TreeHost } from './tree-view';
+import { renameHeights } from './block-height';
+import { HOVER_SOURCE, START_LIMIT_MS, STYLES_LIMIT_MS, THEME_RECHECK_MS, TreeView, type TreeHost } from './tree-view';
 
 /** B16: vault events for picture files are grouped for this long, in ms, before the views refresh. */
 export const PICTURE_EVENT_MS = 250;
@@ -59,6 +60,22 @@ export default class DynastyTreePlugin extends Plugin implements TreeHost, Setti
 	 * reader which changes one (layout, relations, fold planning) throws in the harness and not in a note.
 	 */
 	readonly parseCache = createParseCache({ freeze: typeof __DYNASTY_HARNESS__ !== 'undefined' && __DYNASTY_HARNESS__ === true });
+	/**
+	 * 0.2.8 contract B.5 (D183): the cold start. A tree draws a box of its last known height until the plugin styles (a probe element with the
+	 * variable `--dynasty-css-ready` of the style sheet), the stored settings and its block place are in, and it counts no missing picture until the
+	 * metadata cache has finished once. The settings and the cache end at the latest `START_LIMIT_MS` after the plugin starts, the styles at `STYLES_LIMIT_MS`.
+	 */
+	readonly startedUp = {
+		ready: (el: HTMLElement) => this.startReady(el),
+		cache: () => this.cacheSeen || performance.now() - this.startedAt >= START_LIMIT_MS,
+	};
+	private readonly startedAt = performance.now();
+	private settingsIn = false;
+	private cacheSeen = false;
+	private cssSeen = false;
+	private cssProbe: HTMLElement | null = null;
+	/** The waiting redraws of trees that are off screen; they stop when the plugin unloads. */
+	private readonly redrawTimers = new Set<ReturnType<typeof setTimeout>>();
 	/** O9, B16: picture files that changed, told to the store's listeners together after a short wait. */
 	private changedPictures = new Set<string>();
 	private readonly tellPictures = debounce(
@@ -88,10 +105,30 @@ export default class DynastyTreePlugin extends Plugin implements TreeHost, Setti
 			}
 		});
 		this.registerEditorExtension(tallBlockParser);
+		// D183: the metadata cache has finished once: a picture that it did not know is looked for again.
+		const mc = this.app.metadataCache;
+		if (typeof mc?.on === 'function') {
+			this.registerEvent(
+				mc.on('resolved', () => {
+					if (this.cacheSeen) return;
+					this.cacheSeen = true;
+					this.startUpDone();
+				}),
+			);
+		}
+		// The limit passes: every tree that still waits draws as it is, and the pictures are counted.
+		const limit = setTimeout(() => this.startUpDone(), START_LIMIT_MS + 50);
+		this.register(() => clearTimeout(limit));
+		this.register(() => this.cssProbe?.remove());
+		// The text colour set on the page body must not outlive the plugin (G.12).
+		this.register(() => document.body?.style.removeProperty('--dynasty-on-accent'));
+		// The same for the run-time grey, link, edge and error colours (D212, contrast-tokens).
+		this.register(() => this.clearContrast());
 		// One later check for all trees: a theme can change its colours a frame later (its style sheet still loads).
 		const recheck = debounce(
 			() => {
-				themeChanged();
+				this.paintOnAccent();
+				this.paintContrast();
 				for (const v of this.views) v.recheckTheme();
 			},
 			THEME_RECHECK_MS,
@@ -99,7 +136,8 @@ export default class DynastyTreePlugin extends Plugin implements TreeHost, Setti
 		);
 		this.registerEvent(
 			this.app.workspace.on('css-change', () => {
-				themeChanged();
+				this.paintOnAccent();
+				this.paintContrast();
 				for (const v of this.views) v.onCssChange();
 				recheck();
 			}),
@@ -159,6 +197,8 @@ export default class DynastyTreePlugin extends Plugin implements TreeHost, Setti
 		this.addSettingTab(new DynastySettingTab(this.app, this));
 		// The trees above are drawn with the defaults if they render first; they draw again if the stored settings differ.
 		const stored = await this.loadSettings();
+		this.settingsIn = true;
+		this.startUpDone();
 		// Spec §6.9: a link update that an earlier session did not complete (a phone closed the app) continues.
 		this.links.restore(readPending(stored));
 		// Only now: before, a rename would use the default "Update tree links" and store the default settings.
@@ -166,6 +206,8 @@ export default class DynastyTreePlugin extends Plugin implements TreeHost, Setti
 		this.registerEvent(this.app.vault.on('rename', (file, oldPath) => this.links.renamed(file, oldPath)));
 		try {
 			this.app.workspace.onLayoutReady(() => {
+				this.paintOnAccent();
+				this.paintContrast();
 				this.links.resume();
 				// Obsidian sends `create` for every file while the vault loads: only later ones count.
 				this.registerEvent(this.app.vault.on('create', (file) => this.pictureChanged(file)));
@@ -173,6 +215,85 @@ export default class DynastyTreePlugin extends Plugin implements TreeHost, Setti
 		} catch (e) {
 			console.error('Dynasty Tree: cannot continue the link update of an earlier rename', e);
 		}
+	}
+
+	/**
+	 * I40 (0.2.8, contract G.12): the text on the accent (`--dynasty-on-accent`, on the page body, so the windows have it too) is black or white by
+	 * measured contrast where the theme's own pair is under 4.5:1; else the base token of the style sheet (the theme's pair) stays.
+	 */
+	private paintOnAccent(): void {
+		try {
+			const body = document.body;
+			if (!body?.isConnected) return;
+			const pick = onAccentChoice(body);
+			if (pick) body.style.setProperty('--dynasty-on-accent', pick);
+			else body.style.removeProperty('--dynasty-on-accent');
+		} catch (e) {
+			console.error('Dynasty Tree: cannot read the colour of the text on the accent', e);
+		}
+	}
+
+	/** Takes the run-time contrast tokens off the page body, so the static values of the style sheet show (also when the plugin unloads). */
+	private clearContrast(): void {
+		document.body?.style.removeProperty('--dynasty-muted');
+		document.body?.style.removeProperty('--dynasty-link');
+		document.body?.style.removeProperty('--dynasty-edge');
+		document.body?.style.removeProperty('--dynasty-error');
+	}
+
+	/**
+	 * D212 (contrast-tokens): the grey of the second text lines, the link colour, the colour of lines and controls and the error colour (`--dynasty-muted`,
+	 * `--dynasty-link`, `--dynasty-edge`, `--dynasty-error`, on the page body, so the windows have them too) are pulled toward the text colour of the theme until text
+	 * reaches 4.5:1 and a line 3:1 on the page, card and window colours. A token that is strong enough already keeps the static value of the style sheet.
+	 */
+	private paintContrast(): void {
+		try {
+			const body = document.body;
+			if (!body?.isConnected) return;
+			// The static value is the start, so the overrides must be off while it is read.
+			this.clearContrast();
+			const cs = getComputedStyle(body);
+			const picks = contrastChoices((name) => cs.getPropertyValue(name));
+			// One call for each property with its name written out: the lint rule on custom properties reads the name.
+			const muted = picks['--dynasty-muted'];
+			const link = picks['--dynasty-link'];
+			const edge = picks['--dynasty-edge'];
+			const error = picks['--dynasty-error'];
+			if (muted) body.style.setProperty('--dynasty-muted', muted);
+			if (link) body.style.setProperty('--dynasty-link', link);
+			if (edge) body.style.setProperty('--dynasty-edge', edge);
+			if (error) body.style.setProperty('--dynasty-error', error);
+		} catch (e) {
+			console.error('Dynasty Tree: cannot read the colours of the theme for the grey text', e);
+		}
+	}
+
+	/**
+	 * D183: the styles and the stored settings are in. The settings give up waiting after `START_LIMIT_MS`; the styles only after `STYLES_LIMIT_MS`,
+	 * because Obsidian reads styles.css after `onload` and a tree drawn before it has no style at all.
+	 */
+	private startReady(el: HTMLElement): boolean {
+		const age = performance.now() - this.startedAt;
+		// Ask the probe on every call: it is the one signal that the styles are applied.
+		const styles = this.stylesIn(el) || age >= STYLES_LIMIT_MS;
+		return styles && (this.settingsIn || age >= START_LIMIT_MS);
+	}
+
+	/** The style sheet of the plugin is applied when a probe element in the page has its custom property. Once seen, always true. */
+	private stylesIn(el: HTMLElement): boolean {
+		if (this.cssSeen) return true;
+		try {
+			this.cssProbe ??= (el.doc ?? document).body.createDiv({ cls: 'dynasty-css-probe', attr: { 'aria-hidden': 'true' } });
+			if (getComputedStyle(this.cssProbe).getPropertyValue('--dynasty-css-ready').trim() === '1') this.cssSeen = true;
+		} catch {
+			// A page that cannot tell: the limit decides.
+		}
+		return this.cssSeen;
+	}
+
+	/** Tells every tree that a start condition came. */
+	private startUpDone(): void {
+		for (const v of [...this.views]) v.startUpDone();
 	}
 
 	/** Reads `data.json` and applies its settings; returns the stored data. */
@@ -185,7 +306,7 @@ export default class DynastyTreePlugin extends Plugin implements TreeHost, Setti
 		}
 		const prev = this.settings;
 		this.settings = normaliseSettings(stored);
-		if (settingsChanges(prev, this.settings).length) for (const v of this.views) v.onSettingsChange(prev);
+		if (settingsChanges(prev, this.settings).length) this.redrawViews(prev);
 		return stored;
 	}
 
@@ -208,13 +329,29 @@ export default class DynastyTreePlugin extends Plugin implements TreeHost, Setti
 		await this.loadSettings();
 	}
 
+	/**
+	 * A setting changed: every tree draws again (spec §9). Each draw is a whole layout, so trees that nobody sees (another tab,
+	 * a closed fold) wait one timer turn each, behind the trees on screen (G3 wave 2: the open tree took 3 s with many trees open).
+	 */
+	private redrawViews(prev: DynastySettings): void {
+		const hidden = [...this.views].filter((v) => v.offScreen);
+		for (const v of [...this.views]) if (!hidden.includes(v)) v.onSettingsChange(prev);
+		hidden.forEach((v, i) => {
+			const t = setTimeout(() => {
+				this.redrawTimers.delete(t);
+				v.onSettingsChange(prev);
+			}, i);
+			this.redrawTimers.add(t);
+		});
+	}
+
 	/** Stores a change of the settings tab and draws every open tree again (spec §9). */
 	async changeSettings(change: Partial<DynastySettings>): Promise<void> {
 		const prev = this.settings;
 		const next = normaliseSettings({ ...prev, ...change });
 		if (!settingsChanges(prev, next).length) return;
 		this.settings = next;
-		for (const v of [...this.views]) v.onSettingsChange(prev);
+		this.redrawViews(prev);
 		try {
 			await this.store();
 		} catch (e) {
@@ -224,6 +361,8 @@ export default class DynastyTreePlugin extends Plugin implements TreeHost, Setti
 
 	override onunload(): void {
 		this.links.stop();
+		for (const t of this.redrawTimers) clearTimeout(t);
+		this.redrawTimers.clear();
 		// Every blob URL of the pictures goes; the queue stops.
 		this.pictures.clear();
 		this.parseCache.clear();
@@ -300,6 +439,7 @@ export default class DynastyTreePlugin extends Plugin implements TreeHost, Setti
 	private renamed(oldPath: string, newPath: string): void {
 		try {
 			this.handles.renamed(oldPath, newPath);
+			renameHeights(oldPath, newPath);
 			for (const v of this.views) v.renamed(oldPath, newPath);
 			const prefix = `${oldPath}\u0000`;
 			for (const [k, st] of [...this.looseStates]) {

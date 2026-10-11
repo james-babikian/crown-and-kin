@@ -1,8 +1,10 @@
 /*
- * The Houses window (spec §6.10, §13.16 rule 5, D32, D36, D134, D138; arms §13.6, D67–D69): the houses of one
- * tree as a searchable list with an edit page. The list shows the colour square, the arms, the name and the
- * number of people of each house. A tap on a house opens its page in the same window: the name, People, the
- * arms, the colours and, at the end, Change ID and Delete under "Other actions". The window shell
+ * The Houses window (spec §6.10, §13.16 rule 5, D32, D36, D134, D138; arms §13.6, D67–D69; 0.2.8 contract C, D202): the houses of one
+ * tree as a searchable list with an edit page. The list shows the arms or a colour dot, the name and the
+ * number of people of each house. A tap on a house opens its page in the same window: the header with the arms (a tap opens the
+ * menu Select arms and Remove arms), the section Details (the name and the colour), the section People (the first eight people of
+ * the saved house, "and N more", and the button "Make a note with this table"; the old table window is gone) and, at the end, Change ID and
+ * Delete under "Other actions". The window shell
  * (`list-window.ts`) draws the list, the search, the Back bar and the close rules; this file gives the houses,
  * the page and the save. Like the edit sheet the window is a draft: Save writes every change in one write
  * (one undo step), Cancel writes nothing, and any other way to close asks first. A colour comes from the colours
@@ -14,27 +16,33 @@
  * has it, after one question, in the same write.
  */
 
-import { Notice, setIcon, type App } from 'obsidian';
+import { Notice, type App } from 'obsidian';
 import { armsColours } from '../core/arms-colours';
+import { houseNoteName, housePage, houseTableNote, type HousePage } from '../core/house-page';
+import { nb } from '../render/text-join';
 import { deriveFamilies, type FamilyGraph } from '../core/derive';
 import type { Op } from '../core/edit';
 import { describeHouseIdChange } from '../core/house-ops';
 import { parseBody, parseDynasty } from '../core/parse';
 import { HOUSE_PALETTE } from '../render/styles';
-import { HOUSES, HOUSE_COLOUR_NAMES, HOUSE_PAGE_UI, ID_UI, PICTURES_UI, REMOVE, WIN_LIST_UI, WRITE_TEXT } from '../render/ui-text';
+import { HOUSES, HOUSE_COLOUR_NAMES, HOUSE_PAGE_UI, ID_UI, PICTURES_UI, WIN_LIST_UI, WINDOW_UI, WRITE_TEXT } from '../render/ui-text';
 import type { Handle, HandleWriteOutcome } from './block-handle';
-import { openHousePage } from './house-page-window';
-import { danglingIds, draftId, idChanged, idFromName, idOps, idProblemFor, idProblems, idRefusalText, isIdOp, reasonText, type IdRow } from './id-draft';
+import { danglingIds, draftId, idChanged, idFromName, idOps, idProblemFor, idProblems, reasonText, type IdRow } from './id-draft';
 import { idNewNameNote, idNote, type IdRowView } from './id-field';
 import { openIdWindow } from './id-window';
-import { ListEditWindow, type ListRowView } from './list-window';
+import { ListEditWindow, findableArms, type ListRowView, type PageHead } from './list-window';
+import { openMadeNote } from './make-note';
+import { makeNote } from './table-note';
+import type { SectionSpec } from './window-sections';
+import { buildRow, showMenu, textButton, type MenuEntry } from './window-parts';
 import { matchesAll } from './list-search';
 import { currentPictureOf, pickPicture } from './picture-picker';
 import { ARMS_PIXELS, type PictureCopy, type PictureStore } from './picture-store';
-import { freshOrStale, onWriteFailed } from './sheet-parts';
-import { undoNotice } from './undo-notice';
+import { freshOrStale } from './sheet-parts';
 
 const HEX = /^#[0-9a-f]{6}$/i;
+/** D202 (2), G.10: the People section shows this many people, then "and N more". */
+const PEOPLE_ROWS = 8;
 
 /** One house as the Houses window shows it: its id, name, colour and the people who have it. */
 export interface LoadedHouse {
@@ -167,8 +175,8 @@ export interface HousesOptions {
 	/** The plugin's picture store (M9 contract O3); without it the window shows no arms pictures. */
 	pictures?: PictureStore;
 	/**
-	 * Spec §13.12 (H1, H3): what the People button needs from the tree view. Without it the rows have no
-	 * People button. `show` runs after this window has closed; `openNote` opens the note of the house page.
+	 * Spec §13.12 (H1, H3): what the People section needs from the tree view. Without it a row does not open the card and
+	 * the section has no button for the note. `show` runs after this window has closed; `openNote` opens the note of the house page.
 	 */
 	people?: {
 		show: (personId: string) => void;
@@ -185,9 +193,6 @@ export const ARMS_BOX_PX = 40;
 export class HousesWindow extends ListEditWindow {
 	private data: LoadedHouses;
 	private rows: HouseRow[];
-	private keys = 0;
-	/** The batch that is being written had id ops: a refusal of `id-taken` or `bad-value` is about an id. */
-	private sentIds = false;
 	/** Spec §13.6: the arms pictures of the window by link (a copy, a problem, or still loading). */
 	private readonly copies = new Map<string, PictureCopy | 'problem' | 'loading'>();
 	/**
@@ -199,6 +204,8 @@ export class HousesWindow extends ListEditWindow {
 	private listBoxes = new Map<string, HTMLElement>();
 	/** The arms box button of the open page. */
 	private pageBox: HTMLElement | null = null;
+	/** The link "Add arms" in the "Open all" row of the open page (D216 item 1); it shows only while the house has no arms to show. */
+	private addArmsEl: HTMLElement | null = null;
 	/** D68: the colours of each arms link, null when the plugin cannot read them. */
 	private readonly colours = new Map<string, string[] | null | 'loading'>();
 	/** The "Colours from the arms" group of the open page. */
@@ -206,7 +213,9 @@ export class HousesWindow extends ListEditWindow {
 	/** The ID note of the open page (it follows the name and the id problems without a new draw). */
 	private noteViews: IdRowView[] = [];
 	private shown = false;
-	/** What runs when the window has really closed (the People button: show a card); dropped if the user keeps editing. */
+	/** "Make a note with this table" runs once at a time. */
+	private tableBusy = false;
+/** What runs when the window has really closed (the People button: show a card); dropped if the user keeps editing. */
 	private afterClose: (() => void) | null = null;
 
 	/** Null, with a Notice, if the block cannot be edited now. */
@@ -253,6 +262,7 @@ export class HousesWindow extends ListEditWindow {
 		this.asks.clear();
 		this.listBoxes.clear();
 		this.pageBox = null;
+		this.addArmsEl = null;
 		this.armsGroup = null;
 		try {
 			this.o.onClosed?.();
@@ -266,10 +276,6 @@ export class HousesWindow extends ListEditWindow {
 		} catch (e) {
 			console.error('Dynasty Tree: cannot show the person', e);
 		}
-	}
-
-	private nextKey(): string {
-		return `h${this.keys++}`;
 	}
 
 	/** True if the draft has an unsaved change (an edit, a delete or a new house). */
@@ -316,7 +322,8 @@ export class HousesWindow extends ListEditWindow {
 				// A refused ID comes before "New": the owner must fix it before Save.
 				state: problems.has(r.key) ? 'check-id' : r.id === null ? 'new' : houseOps([r]).length > 0 ? 'changed' : '',
 				colour: r.colour,
-				arms: armsOf(r.arms),
+				// Only arms that the plugin can find give the row a lead (D213); a house with no arms has none.
+				arms: findableArms(this.o.pictures, armsOf(r.arms), this.o.sourcePath ?? ''),
 			}));
 	}
 
@@ -340,12 +347,13 @@ export class HousesWindow extends ListEditWindow {
 	protected override build(focus: string | null = null): void {
 		this.listBoxes = new Map();
 		this.pageBox = null;
+		this.addArmsEl = null;
 		this.armsGroup = null;
 		this.noteViews = [];
 		super.build(focus);
 	}
 
-	/** The arms box of a row is the picture of the house, or an empty dashed box (spec §13.6). */
+	/** The arms box of a row is the picture of the house, at the right of the row; a picture that cannot show takes the box away (spec §13.6, D213). */
 	protected override rowArms(box: HTMLElement, view: ListRowView): void {
 		this.listBoxes.set(view.key, box);
 		this.showArms(box, view.arms ?? null);
@@ -353,38 +361,24 @@ export class HousesWindow extends ListEditWindow {
 
 	// ---------- the edit page (spec §6.10, D.3.6) ----------
 
+	protected pageHead(key: string): PageHead {
+		const r = this.rowByKey(key)!;
+		return {
+			// The arms button at the right of the header: a tap opens the short menu (Select arms, Remove arms). A house with no arms has no button there; its link "Add arms" stands in the "Open all" row.
+			lead: (parent) => this.armsBox(parent, r),
+			name: this.label(r),
+			// D216 item 2: the count of the people is the summary of the closed People section, not a line of the header. Only a new house has a line.
+			...(r.id === null ? { meta: HOUSES.newHouse } : {}),
+		};
+	}
+
 	protected renderPage(page: HTMLElement, key: string): void {
 		const r = this.rowByKey(key);
 		if (!r) return;
-		this.textField(page, {
-			cls: 'dynasty-house-name',
-			label: HOUSES.nameLabel,
-			value: r.name,
-			aria: HOUSES.nameLabel,
-			focus: `name:${r.key}`,
-			onInput: (value) => {
-				r.name = value;
-				for (const v of this.noteViews) v.setItem(this.label(r));
-				this.updateBackName(key);
-				// A new house's name can change the id that it would get.
-				this.refreshIdProblems();
-			},
-		});
-		const meta = page.createDiv({ cls: 'dynasty-lw-meta' });
-		meta.createDiv({ cls: 'dynasty-house-count', text: HOUSES.count(this.peopleOf(r).length) });
-		// H1: only a saved house has a page; a house that is new in the draft has none.
-		if (this.o.people && r.id !== null) {
-			const people = meta.createEl('button', {
-				cls: ['dynasty-sheet-action', 'dynasty-house-people'],
-				text: HOUSE_PAGE_UI.people,
-				attr: { type: 'button', 'aria-label': HOUSE_PAGE_UI.peopleLabel(this.savedName(r.id) ?? this.label(r)), 'data-focus': `people:${r.key}` },
-			});
-			const id = r.id;
-			people.addEventListener('click', () => this.guard(() => this.openPeople(id, `people:${r.key}`)));
-		}
 		const problems = idProblems('house', this.rows.map(idRow), this.data.dangling);
 		const problem = problems.get(r.key);
 		this.noteViews = [];
+		// The note of a new id sits under the header (D110).
 		if (r.id !== null && idChanged(idRow(r))) {
 			this.noteViews.push(
 				idNote(page, {
@@ -403,9 +397,120 @@ export class HousesWindow extends ListEditWindow {
 		}
 		// A new house is marked when its name gives the ID that a changed house has taken (owner decision "3-both").
 		if (r.id === null) this.noteViews.push(idNewNameNote(page, { key: r.key, problem: problem ? reasonText(problem) : '' }));
-		page.createDiv({ cls: 'dynasty-sheet-hint', text: HOUSES.intro });
-		this.palette(page, r);
-		this.otherActions(page, key, 'dynasty-house-delete', (name) => HOUSES.deleteLabel(name));
+		const hp = r.id !== null ? housePage(this.data.g, r.id) : null;
+		const specs: SectionSpec[] = [
+			{
+				key: 'details',
+				title: WINDOW_UI.sectionDetails,
+				summary: this.label(r),
+				open: true,
+				build: (body) => {
+					const field = this.textField(body, {
+						cls: 'dynasty-house-name',
+						label: HOUSES.nameLabel,
+						value: r.name,
+						aria: HOUSES.nameLabel,
+						focus: `name:${r.key}`,
+						onInput: (value) => {
+							r.name = value;
+							for (const v of this.noteViews) v.setItem(this.label(r));
+							this.updateBackName(key);
+							this.sections?.setSummary('details', this.label(r));
+							// A new house's name can change the id that it would get.
+							this.refreshIdProblems();
+						},
+					});
+					void field;
+					this.palette(body, r);
+				},
+			},
+		];
+		// H1: only a saved house has people; a house that is new in the draft has none.
+		if (r.id !== null) {
+			// D216 item 2: "N people in M generations".
+			const gens = hp ? new Set(hp.rows.map((x) => x.generation)).size : 0;
+			specs.push({
+				key: 'people',
+				title: WINDOW_UI.sectionPeople,
+				summary: WINDOW_UI.sumPeopleHeader(hp?.count ?? 0, gens),
+				open: false,
+				build: (body) => this.peopleBody(body, r, hp),
+			});
+		}
+		specs.push(this.otherActionsSection(key, 'dynasty-house-delete', (name) => HOUSES.deleteLabel(name)));
+		const view = this.drawSections(page, 'house', specs, r.id === null);
+		this.addArmsLink(view.openAllRow, r);
+	}
+
+	/** The People section (D202 (2), G.10): the first eight people of the saved house, "and N more", and the button that makes a note with the table. */
+	private peopleBody(body: HTMLElement, r: HouseRow, hp: HousePage | null): void {
+		const rows = body.createDiv({ cls: ['dynasty-rows', 'dynasty-hp-rows'] });
+		const all = hp?.rows ?? [];
+		if (!all.length) rows.createDiv({ cls: ['dynasty-sheet-none', 'dynasty-hp-none'], text: HOUSE_PAGE_UI.none });
+		const generation = this.showGeneration();
+		for (const p of all.slice(0, PEOPLE_ROWS)) {
+			// The page shows plain rows; the tap that shows the card (spec §13.12 H1) stays where the tree view gives a way to do it.
+			const show = this.o.people?.show;
+			// A plain full-width row: no chevron, no hairline (people-rows). The tap stays (spec §13.12), as a soft tint under the pointer.
+			const row = buildRow(rows, { cls: 'dynasty-hp-row', attr: { 'data-person': p.id }, ...(show ? { tap: () => this.guard(() => this.leaveThen(() => show(p.id))), chevron: false } : {}) });
+			// The name in bold, then the title with its reign; the reign never breaks (G.2, G.10).
+			row.title.createEl('b', { cls: 'dynasty-hp-name', text: p.name });
+			if (p.title) row.title.createSpan({ cls: 'dynasty-sob', text: ` · ${nb(p.title)}` });
+			const years = WINDOW_UI.personRowYears(p.born, p.died);
+			row.sub.setText(generation ? WINDOW_UI.personRowSub(p.generation, p.born, p.died) : years);
+		}
+		if (all.length > PEOPLE_ROWS) body.createDiv({ cls: ['dynasty-sheet-none', 'dynasty-hp-more'], text: WINDOW_UI.andMore(all.length - PEOPLE_ROWS) });
+		if (!all.length || !this.o.people || !hp) return;
+		const id = r.id!;
+		const name = this.savedName(id) ?? this.label(r);
+		textButton(body.createDiv({ cls: 'dynasty-actions' }), ['dynasty-btn', 'dynasty-hp-make-note', 'dynasty-house-people'], HOUSE_PAGE_UI.makeNote, () => this.guard(() => void this.makeTable(hp)), {
+			label: HOUSE_PAGE_UI.makeNoteLabel(name),
+			focus: `people:${r.key}`,
+		});
+	}
+
+	/** The setting "Show generation on the house page", read when the page draws; on when the caller gives none. */
+	private showGeneration(): boolean {
+		try {
+			return this.o.showGeneration ? this.o.showGeneration() : true;
+		} catch {
+			return true;
+		}
+	}
+
+	/** H4: a note with the table of the people of the saved house; the tree does not change and nothing is asked. */
+	private async makeTable(hp: HousePage): Promise<void> {
+		if (this.tableBusy) return;
+		this.tableBusy = true;
+		const name = houseNoteName(hp.house);
+		try {
+			const made = await makeNote(this.app, this.o.sourcePath ?? '', name, houseTableNote(hp));
+			if (!made.ok) {
+				new Notice(HOUSE_PAGE_UI.noteFailed(name));
+				return;
+			}
+			new Notice(HOUSE_PAGE_UI.noteMade(made.name));
+			const file = made.file;
+			const open = this.o.people?.openNote;
+			// The note opens after this window has closed (through its normal close, with its question about unsaved changes).
+			this.leaveThen(() => open?.(() => openMadeNote(this.app, file)));
+		} catch (e) {
+			console.error('Dynasty Tree: cannot make the house note', e);
+			new Notice(HOUSE_PAGE_UI.noteFailed(name));
+		} finally {
+			this.tableBusy = false;
+		}
+	}
+
+	/** Closes the window through its normal close, then runs `run`; with a question about unsaved changes the action waits, and "Keep editing" drops it. */
+	private leaveThen(run: () => void): void {
+		// An open edit page would take the first close and drop the action. `goBack` draws the list again too: after
+		// "Keep editing" the window must show the list, or Esc would go back one more step and not ask.
+		if (this.page !== null) this.goBack();
+		this.afterClose = run;
+		this.close();
+		// Only a question about unsaved changes keeps the window open with the action waiting.
+		if (!this.closing && !this.confirmEl) this.afterClose = null;
 	}
 
 	/** The name of a saved house, as the page shows it (the name, else the id). */
@@ -454,60 +559,82 @@ export class HousesWindow extends ListEditWindow {
 		});
 	}
 
-	// ---------- the house page (spec §13.12) ----------
-
-	/**
-	 * People: the page of the saved house. The page reads the saved tree, never the draft. A tap on a
-	 * name closes the page, then this window through its normal close (with its question about unsaved
-	 * changes), then the view shows the card.
-	 */
-	private openPeople(id: string, focus: string): void {
-		const people = this.o.people;
-		const parsed = parseDynasty(this.data.body);
-		if (!people || !parsed.ok) return;
-		const leaveThen = (run: () => void) => {
-			// An open edit page would take the first close and drop the action. `goBack` draws the list again too: after
-			// "Keep editing" the window must show the list, or Esc would go back one more step and not ask.
-			if (this.page !== null) this.goBack();
-			this.afterClose = run;
-			this.close();
-			// Only a question about unsaved changes keeps the window open with the action waiting.
-			if (!this.closing && !this.confirmEl) this.afterClose = null;
-		};
-		openHousePage(this.app, {
-			app: this.app,
-			showGeneration: this.o.showGeneration,
-			houseId: id,
-			whole: deriveFamilies(parsed.tree),
-			sourcePath: this.o.sourcePath ?? '',
-			pictures: this.o.pictures,
-			show: (personId) => leaveThen(() => people.show(personId)),
-			openNote: (open) => leaveThen(() => people.openNote(open)),
-			onClosed: () => {
-				// Back to the People button, unless this window is closing too.
-				if (this.shown && !this.closing) this.modalEl.querySelector<HTMLElement>(`[data-focus="${focus}"]`)?.focus();
-			},
-		});
-	}
-
 	// ---------- arms (spec §13.6) ----------
 
 	/**
-	 * The arms box of the page (about 40 px high): the arms picture, or an empty dashed box for a house
-	 * with no arms or arms that cannot show. A tap opens the picture picker; the box is at least 44 × 44 px
-	 * (spec §7.5, B8).
+	 * The arms of the house at the right of the header of the page (about 56 px high). A tap opens the short menu (Select arms, Remove
+	 * arms); the box is at least 44 × 44 px (spec §7.5, B8). A house with no arms, or arms that cannot show, has no picture and no
+	 * initials: the button is then hidden (`is-add`), and the link "Add arms" in the "Open all" row takes its place (D213, D216 item 1).
 	 */
 	private armsBox(parent: HTMLElement, r: HouseRow): void {
-		const b = parent.createEl('button', {
-			cls: 'dynasty-house-arms',
-			attr: { type: 'button', 'aria-label': PICTURES_UI.armsLabel(this.label(r)), 'data-focus': `arms:${r.key}` },
-		});
-		b.addEventListener('click', () => this.guard(() => void this.selectArms(r, `arms:${r.key}`)));
+		const b = parent.createEl('button', { cls: ['dynasty-house-arms', 'dynasty-arms-mark', 'is-house-head'], attr: { type: 'button', 'data-focus': `arms:${r.key}` } });
+		// Hidden with no arms, but a tap that still reaches it (a picture that failed while the button had the focus) opens the picker, as the link does.
+		b.addEventListener('click', () => this.guard(() => (b.hasClass('is-add') ? void this.selectArms(r) : this.armsMenu(b, r))));
 		this.pageBox = b;
-		this.showArms(b, armsOf(r.arms));
+		this.showHeadArms(b, r);
 	}
 
-	/** Fills an arms box for `link`: its picture when the copy is ready, else the loading or empty state. */
+	/**
+	 * D216 item 1: "Add arms" stands where "Add portrait" stands in the person window, at the left in the "Open all" row. It shares the look of
+	 * that link and opens the picture picker at once (there is no menu to show). The sections are drawn after the header, so the row exists
+	 * only now; the state of the header button decides if the link shows.
+	 */
+	private addArmsLink(row: HTMLElement | null, r: HouseRow): void {
+		this.addArmsEl = null;
+		if (!row) return;
+		const link = row.createEl('button', { cls: ['dynasty-link', 'dynasty-add-portrait', 'dynasty-add-arms'], text: WINDOW_UI.addArms, attr: { type: 'button', 'data-focus': `add-arms:${r.key}` } });
+		link.addEventListener('click', () => this.guard(() => void this.selectArms(r)));
+		row.prepend(link);
+		this.addArmsEl = link;
+		link.toggle(this.pageBox?.hasClass('is-add') === true);
+	}
+
+	/** Fills the header button for the draft of `r`: the arms picture, the loading state, or nothing (then the link "Add arms" shows). */
+	private showHeadArms(b: HTMLElement, r: HouseRow): void {
+		const link = armsOf(r.arms);
+		const state = link ? this.copyFor(link) : 'problem';
+		const none = state === 'problem';
+		const held = b === b.doc.activeElement;
+		b.toggleClass('is-add', none);
+		// The button keeps its name while it is hidden, so a control in the tree never has none.
+		b.setAttribute('aria-label', PICTURES_UI.armsButtonLabel(this.label(r)));
+		if (none) b.removeAttribute('aria-haspopup');
+		else b.setAttribute('aria-haspopup', 'menu');
+		this.showArms(b, none ? null : link);
+		const add = this.addArmsEl;
+		if (!add) return;
+		add.toggle(none);
+		// A hidden button cannot keep the focus: it would drop to the page, outside the window. The link takes its place.
+		if (held && none) add.focus({ preventScroll: true });
+	}
+
+	/** The focus name of the arms control that is on screen for the draft of `r`: the arms button, or the link "Add arms" when there is no picture. */
+	private armsFocus(r: HouseRow): string {
+		const link = armsOf(r.arms);
+		return (link ? this.copyFor(link) : 'problem') === 'problem' ? `add-arms:${r.key}` : `arms:${r.key}`;
+	}
+
+	/** The menu of the arms: Select arms, and Remove arms when the draft has arms (D97). */
+	private armsMenu(anchor: HTMLElement, r: HouseRow): void {
+		const items: (MenuEntry | 'sep')[] = [{ icon: 'image', label: PICTURES_UI.selectArms, run: () => void this.selectArms(r) }];
+		if (armsOf(r.arms)) {
+			items.push({
+				icon: 'trash-2',
+				label: PICTURES_UI.removeArms,
+				warning: true,
+				run: () => {
+					r.arms = null;
+					this.build(this.armsFocus(r));
+				},
+			});
+		}
+		showMenu(anchor, items);
+	}
+
+	/**
+	 * Fills an arms box for `link`: its picture when the copy is ready, else the loading state. With no picture the box is empty and a row
+	 * box goes away (`is-empty`).
+	 */
 	private showArms(b: HTMLElement, link: string | null): void {
 		b.empty();
 		b.removeClass('is-empty');
@@ -557,7 +684,7 @@ export class HousesWindow extends ListEditWindow {
 			if (armsOf(row.arms) !== link) continue;
 			const box = this.listBoxes.get(row.key);
 			if (box) this.showArms(box, link);
-			if (this.page === row.key && this.pageBox) this.showArms(this.pageBox, link);
+			if (this.page === row.key && this.pageBox) this.showHeadArms(this.pageBox, row);
 		}
 	}
 
@@ -592,13 +719,13 @@ export class HousesWindow extends ListEditWindow {
 	}
 
 	/** Select arms (spec §13.6): the picture picker; the chosen link goes into the draft. */
-	private async selectArms(r: HouseRow, focus: string): Promise<void> {
+	private async selectArms(r: HouseRow): Promise<void> {
 		const sourcePath = this.o.sourcePath ?? '';
 		// V1: the window's draft value (not the saved one) is the current picture.
 		const current = currentPictureOf(this.o.pictures, armsOf(r.arms), sourcePath);
 		// D97: the list has a Remove row only when the draft has arms.
 		const remove = armsOf(r.arms) ? PICTURES_UI.removeArms : undefined;
-		const picked = await pickPicture(this.app, { sourcePath, store: this.o.pictures, title: PICTURES_UI.armsLabel(this.label(r)), current, remove });
+		const picked = await pickPicture(this.app, { sourcePath, store: this.o.pictures, title: PICTURES_UI.armsLabel(this.label(r)), barTitle: PICTURES_UI.pickerBarArms, current, remove });
 		if (!this.shown) return;
 		if (picked.kind === 'choose') {
 			r.arms = picked.link;
@@ -607,7 +734,8 @@ export class HousesWindow extends ListEditWindow {
 			// The same as the Remove arms button: the draft changes; Save writes it.
 			r.arms = null;
 		}
-		this.build(focus);
+		// The control that has the focus depends on the new draft: the arms button, or the link when there are no arms.
+		this.build(this.armsFocus(r));
 	}
 
 	/** D68: the colours of the arms, from the store's 64 × 64 pixels; the group fills in when they are ready. */
@@ -639,24 +767,22 @@ export class HousesWindow extends ListEditWindow {
 		return 'loading';
 	}
 
-	/** The "Colours from the arms" buttons (D68: the exact colours), or the text that says the colours are unknown. */
+	/**
+	 * The colours read from the arms (D68: the exact colours), as round swatches with a small dot. The group stays empty, and so hidden,
+	 * while the picture is read and when the plugin cannot read it: no empty box and no text ever shows (arms-colours).
+	 */
 	private fillArmsColours(group: HTMLElement, r: HouseRow, link: string): void {
 		group.empty();
 		const list = this.armsColoursFor(link);
 		group.toggleClass('is-loading', list === 'loading');
-		if (list === 'loading') return;
-		if (list === null) {
-			group.createDiv({ cls: ['dynasty-sheet-hint', 'dynasty-house-arms-none'], text: PICTURES_UI.noArmsColours });
-			return;
-		}
+		if (list === 'loading' || list === null) return;
 		list.forEach((hex, i) => {
 			const chosen = lower(r.colour) === hex;
 			const b = group.createEl('button', {
-				cls: chosen ? ['dynasty-house-arms-colour', 'is-selected'] : 'dynasty-house-arms-colour',
+				cls: chosen ? ['dynasty-swatch', 'dynasty-house-arms-colour', 'is-selected'] : ['dynasty-swatch', 'dynasty-house-arms-colour'],
 				attr: { type: 'button', 'aria-label': PICTURES_UI.armsColourLabel(i + 1), 'aria-pressed': String(chosen), 'data-colour': hex, 'data-focus': `arms-colour:${r.key}:${hex}` },
 			});
 			b.style.setProperty('--dynasty-house-color', hex);
-			if (chosen) setIcon(b, 'check');
 			b.addEventListener('click', () =>
 				this.guard(() => {
 					r.colour = hex;
@@ -667,47 +793,25 @@ export class HousesWindow extends ListEditWindow {
 	}
 
 	/**
-	 * D32: the arms box, Select arms and Remove arms, then the 12 house colours and "Other colour" (the system
-	 * colour window). Spec §13.6: with arms, the colours of the arms come before the label "House colours". The
-	 * palette is always on the page; it has no toggle.
+	 * D32: the colour of the house under one label, "Colour": a row of round swatches, the 12 house colours and then the swatch "Other
+	 * colour" (the system colour window). The row is a radio group; the current colour has a ring in the text colour inside the swatch,
+	 * not colour alone. With arms, a thin divider and the colours of the arms (D68, spec §13.6, D208 item 2) follow, each with a small dot;
+	 * they show only after the picture is read. The palette is always on the page; it has no toggle.
 	 */
-	private palette(page: HTMLElement, r: HouseRow): void {
-		const box = page.createDiv({ cls: 'dynasty-house-palette', attr: { 'data-house': r.id ?? r.key } });
-		const arms = armsOf(r.arms);
-		const armsPart = box.createDiv({ cls: 'dynasty-house-arms-part' });
-		armsPart.createDiv({ cls: 'dynasty-sheet-label', text: PICTURES_UI.armsHeading });
-		const armsButtons = armsPart.createDiv({ cls: 'dynasty-house-arms-buttons' });
-		this.armsBox(armsButtons, r);
-		const select = armsButtons.createEl('button', { cls: ['dynasty-sheet-action', 'dynasty-house-select-arms'], text: PICTURES_UI.selectArms, attr: { type: 'button', 'data-focus': `select-arms:${r.key}` } });
-		select.addEventListener('click', () => this.guard(() => void this.selectArms(r, `select-arms:${r.key}`)));
-		if (arms) {
-			const remove = armsButtons.createEl('button', { cls: ['dynasty-sheet-action', 'dynasty-house-remove-arms'], text: PICTURES_UI.removeArms, attr: { type: 'button', 'data-focus': `remove-arms:${r.key}` } });
-			remove.addEventListener('click', () =>
-				this.guard(() => {
-					r.arms = null;
-					this.build(`select-arms:${r.key}`);
-				}),
-			);
-		}
-		const title = box.createDiv({ cls: 'dynasty-sheet-label', text: HOUSES.paletteTitle(this.label(r)) });
+	private palette(body: HTMLElement, r: HouseRow): void {
+		const box = body.createDiv({ cls: ['dynasty-house-palette', 'dynasty-sheet-field'], attr: { 'data-house': r.id ?? r.key } });
 		const titleId = `dynasty-house-palette-${r.key}-${this.keys}`;
-		title.setAttribute('id', titleId);
-		if (arms) {
-			box.createDiv({ cls: ['dynasty-sheet-label', 'dynasty-house-arms-title'], text: PICTURES_UI.coloursFromArms });
-			const group = box.createDiv({ cls: ['dynasty-house-colours', 'dynasty-house-arms-colours'], attr: { role: 'group', 'aria-label': PICTURES_UI.coloursFromArms } });
-			this.armsGroup = { key: r.key, el: group };
-			this.fillArmsColours(group, r, arms);
-			box.createDiv({ cls: ['dynasty-sheet-label', 'dynasty-house-palette-title'], text: PICTURES_UI.houseColours });
-		}
-		const grid = box.createDiv({ cls: 'dynasty-house-colours', attr: { role: 'group', 'aria-labelledby': titleId } });
+		box.createDiv({ cls: 'dynasty-sheet-label', text: WINDOW_UI.colour, attr: { id: titleId } });
+		const grid = box.createDiv({ cls: ['dynasty-swatches', 'dynasty-house-colours'], attr: { role: 'radiogroup', 'aria-label': HOUSES.paletteTitle(this.label(r)), 'aria-labelledby': titleId } });
+		let inPalette = false;
 		HOUSE_PALETTE.forEach((hex, i) => {
 			const chosen = lower(r.colour) === hex;
+			if (chosen) inPalette = true;
 			const b = grid.createEl('button', {
-				cls: chosen ? ['dynasty-house-colour', 'is-selected'] : 'dynasty-house-colour',
-				attr: { type: 'button', 'aria-label': HOUSE_COLOUR_NAMES[i], 'aria-pressed': String(chosen), 'data-colour': hex, 'data-focus': `colour:${r.key}:${hex}` },
+				cls: chosen ? ['dynasty-swatch', 'dynasty-house-colour', 'is-selected'] : ['dynasty-swatch', 'dynasty-house-colour'],
+				attr: { type: 'button', role: 'radio', 'aria-label': HOUSE_COLOUR_NAMES[i], 'aria-pressed': String(chosen), 'aria-checked': String(chosen), 'data-colour': hex, 'data-focus': `colour:${r.key}:${hex}` },
 			});
 			b.style.setProperty('--dynasty-house-color', hex);
-			if (chosen) setIcon(b, 'check');
 			b.addEventListener('click', () =>
 				this.guard(() => {
 					r.colour = hex;
@@ -715,18 +819,31 @@ export class HousesWindow extends ListEditWindow {
 				}),
 			);
 		});
-		const other = box.createDiv({ cls: 'dynasty-house-other' });
+		// "Other colour": the last swatch. A colour that is not in the palette shows in this swatch, which then has a ring.
+		const custom = !!r.colour && HEX.test(r.colour) && !inPalette;
+		const other = grid.createDiv({ cls: 'dynasty-house-other' });
 		const id = `${titleId}-other`;
-		const input = other.createEl('input', { cls: 'dynasty-sheet-colour', attr: { type: 'color', id, 'data-focus': `other:${r.key}` } });
+		const swatch = other.createEl('button', {
+			cls: custom ? ['dynasty-swatch', 'is-other', 'is-custom', 'is-selected'] : ['dynasty-swatch', 'is-other'],
+			attr: { type: 'button', role: 'radio', 'aria-label': HOUSES.otherColour, 'aria-checked': String(custom), 'aria-pressed': String(custom), 'data-focus': `other-swatch:${r.key}` },
+		});
+		if (custom) swatch.style.setProperty('--dynasty-house-color', r.colour!.toLowerCase());
+		const input = other.createEl('input', { cls: ['dynasty-sheet-colour', 'dynasty-house-other-input'], attr: { type: 'color', id, tabindex: '-1', 'aria-hidden': 'true', 'data-focus': `other:${r.key}` } });
 		input.value = r.colour && HEX.test(r.colour) ? r.colour.toLowerCase() : '#888888';
-		other.createEl('label', { cls: 'dynasty-house-other-label', text: HOUSES.otherColour, attr: { for: id } });
+		swatch.addEventListener('click', () => this.guard(() => (input.showPicker ? input.showPicker() : input.click())));
 		input.addEventListener('change', () =>
 			this.guard(() => {
 				if (!HEX.test(input.value)) return;
 				r.colour = input.value.toLowerCase();
-				this.build(`other:${r.key}`);
+				this.build(`other-swatch:${r.key}`);
 			}),
 		);
+		const arms = armsOf(r.arms);
+		if (arms) {
+			const group = box.createDiv({ cls: ['dynasty-swatches', 'dynasty-house-colours', 'dynasty-house-arms-colours'], attr: { role: 'group', 'aria-label': PICTURES_UI.coloursFromArms } });
+			this.armsGroup = { key: r.key, el: group };
+			this.fillArmsColours(group, r, arms);
+		}
 	}
 
 	// ---------- add and delete ----------
@@ -852,70 +969,30 @@ export class HousesWindow extends ListEditWindow {
 	/** The one question before Save changes an id: what changes, and how many people. Closing it is Cancel. */
 	private askIds(changed: HouseRow[], go: () => void): void {
 		const lines = changed.map((r) => ID_UI.confirmLine(this.label(r), r.id!, draftId(idRow(r)), ID_UI.places(describeHouseIdChange(this.data.g, r.id!).people)));
-		this.showConfirm(ID_UI.confirmTitle(changed.length), [...lines, REMOVE.canUndo], 'save', [
-			{ label: ID_UI.keep, cls: 'dynasty-sheet-keep dynasty-id-keep', run: () => this.hideConfirm() },
-			{
-				label: ID_UI.change(changed.length),
-				cls: 'mod-cta dynasty-id-change',
-				run: () => {
-					this.hideConfirm();
-					go();
-				},
-			},
-		]);
+		this.askIdChange(changed.length, lines, go);
 	}
 
 	/** Writes the ops of the draft as one batch (one Undo step) and closes the window when it works. */
 	private async commit(ops: Op[]): Promise<void> {
 		if (this.saving) return;
 		const deleted = this.rows.filter((r) => r.id !== null && r.deleted).map((r) => r.base?.name || r.id!);
-		const idCount = ops.filter(isIdOp).length;
 		const h = this.o.handle;
-		this.sentIds = idCount > 0;
-		this.saving = true;
-		this.modalEl.addClass('is-saving');
-		let out: HandleWriteOutcome;
-		try {
-			this.o.beforeWrite?.();
-			// One write, so one Undo reverts every change of the window (spec §6.1, D8).
-			out = await h.write({ kind: 'batch', ops });
-		} catch (e) {
-			console.error('Dynasty Tree: cannot save the houses', e);
-			this.refused(HOUSES.failed);
-			return;
-		} finally {
-			this.saving = false;
-			this.modalEl.removeClass('is-saving');
-		}
+		const out = await this.writeBatch(h, ops, this.o.beforeWrite, 'Dynasty Tree: cannot save the houses');
+		if (!out) return;
 		if (!out.ok) {
 			this.failed(out);
 			return;
 		}
 		this.finish();
-		if (deleted.length) {
-			const others = ops.length > deleted.length;
-			undoNotice(others ? `${HOUSES.deleted(deleted)} ${REMOVE.undoAlso}` : HOUSES.deleted(deleted), h, out.body);
-		} else if (idCount) {
-			undoNotice(ops.length > idCount ? `${ID_UI.changed(idCount)} ${REMOVE.undoAlso}` : ID_UI.changed(idCount), h, out.body);
-		}
+		this.undoAfterWrite(h, out, ops, deleted, HOUSES.deleted);
 	}
 
 	private failed(out: Exclude<HandleWriteOutcome, { ok: true }>): void {
-		const h = this.o.handle;
-		const detail = out.code === 'refused' ? out.refusal.detail : undefined;
-		onWriteFailed(out, {
-			stale: () => this.stale(h.body),
-			missing: () => this.refused(HOUSES.missing),
-			refused: (code) => {
-				// §13.17 rule 5: `id-taken` and `bad-value` of an id op are about the id, never "changed under the window".
-				const idText = this.sentIds ? idRefusalText(code, detail) : null;
-				// A house that is not in the tree now: the tree changed under the window.
-				if (code === 'unknown-house') this.stale(h.body);
-				else if (idText) this.refused(idText);
-				else if (code === 'blocked') this.refused(WRITE_TEXT.blocked);
-				else if (code === 'invalid-yaml') this.refused(HOUSES.invalid);
-				else this.refused(HOUSES.refused);
-			},
+		this.failedWrite(out, this.o.handle, (body) => this.stale(body), (code, idText) => {
+			// A house that is not in the tree now: the tree changed under the window.
+			if (code === 'unknown-house') this.stale(this.o.handle.body);
+			else if (idText) this.refused(idText);
+			else this.refusedPlainly(code);
 		});
 	}
 

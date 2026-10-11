@@ -106,8 +106,7 @@ describe('Titles window: a refusal for a person who is not in the tree', () => {
 		handle.write.mockImplementation((async () => ({ ok: false, code: 'refused', refusal: { ok: false, code: 'unknown-person' } })) as never);
 		const host = fakeHost() as Host;
 		const { el } = await embed(BODY, { handle, host });
-		await click(el.querySelector('.dynasty-more'));
-		await click(el.querySelector('.dynasty-more-titles'));
+		await click(el.querySelector('.dynasty-titles-button'));
 		const win = openModals.find((m) => (m as unknown) instanceof TitlesWindow) as unknown as { contentEl: FEl };
 		const content = win.contentEl;
 		const name = openPage(content, 'duke').querySelector('.dynasty-title-name textarea')!;

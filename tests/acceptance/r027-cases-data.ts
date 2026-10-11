@@ -94,7 +94,7 @@ export const TREES: Record<string, CaseTree> = {
 		holders: ['{person: a1, from: 1150, to: 1180}', '{person: r, from: 1180}'],
 	},
 	'S04': {
-		what: 'Written order, not birth years, ranks siblings (D2); twins in written order; youngest child first reverses the written order',
+		what: 'Birth year first (D193): the dated children sort by year; twins (equal years) keep the written order; youngest child first reverses the whole result',
 		people: [
 			'{id: a1, name: A1, sex: m, born: 1125, died: 1180}',
 			'{id: r, name: R, sex: m, born: 1150, parents: [a1]}',
@@ -798,8 +798,10 @@ export const RUNS: CaseRun[] = [
 	{ id: 'S03b', tree: 'S03', keys: { succession: 'eldest-child', inherit: 'no-preference' }, want: { heirs: ['g1', 'g2', 'd1', 's2'] } },
 	{ id: 'S03c', tree: 'S03', keys: { succession: 'nearest-relative', inherit: 'no-preference' }, want: { heirs: ['d1', 's2', 'g1', 'g2'] } },
 	{ id: 'S03d', tree: 'S03', keys: { succession: 'eldest-child', inherit: 'men-only' }, want: { heirs: ['g2', 's2'] } },
-	{ id: 'S04a', tree: 'S04', keys: { succession: 'eldest-child', inherit: 'no-preference' }, want: { heirs: ['t1', 't2', 'y'] } },
-	{ id: 'S04b', tree: 'S04', keys: { succession: 'youngest-child', inherit: 'no-preference' }, want: { heirs: ['y', 't2', 't1'] } },
+	// D193: written T1 1180, T2 1180, Y 1170; all dated, so year order Y 1170, T1 1180, T2 1180 (equal years keep the written order T1, T2).
+	{ id: 'S04a', tree: 'S04', keys: { succession: 'eldest-child', inherit: 'no-preference' }, want: { heirs: ['y', 't1', 't2'] } },
+	// D193: youngest-child reverses the result of S04a: T2, T1, Y.
+	{ id: 'S04b', tree: 'S04', keys: { succession: 'youngest-child', inherit: 'no-preference' }, want: { heirs: ['t2', 't1', 'y'] } },
 	{ id: 'S05a', tree: 'S05', keys: { succession: 'eldest-child', inherit: 'men-only' }, want: { heirs: ['s', 'b'] } },
 	{ id: 'S06a', tree: 'S06', keys: { succession: 'youngest-child', inherit: 'no-preference' }, want: { heirs: ['c3', 'c2', 'c2s', 'c1', 'yb', 'ob'] } },
 	{ id: 'S06b', tree: 'S06', keys: { succession: 'eldest-child', inherit: 'no-preference' }, want: { heirs: ['c1', 'c2', 'c2s', 'c3', 'ob', 'yb'] } },
@@ -936,7 +938,9 @@ export const RUNS: CaseRun[] = [
 	{ id: 'S50f', tree: 'S50', keys: { succession: 'nearest-relative', inherit: 'men-only', through: 'anyone' }, want: { heirs: ['ed3', 'ph6'] } },
 	{ id: 'S50g', tree: 'S50', keys: { succession: 'eldest-child', inherit: 'men-first-in-house', through: 'anyone' }, want: { heirs: ['ed3', 'ph6', 'ph5d', 'isa'] } },
 	{ id: 'S50h', tree: 'S50', keys: { succession: 'eldest-child', inherit: 'men-first-in-house' }, want: { heirs: ['ph6', 'ph5d', 'isa', 'ed3'] } },
-	{ id: 'S51a', tree: 'S51', keys: { succession: 'eldest-child', inherit: 'men-only', through: 'women' }, want: { heirs: ['rsn', 'msn'] } },
+	// D193: the climb is R, M (F does not pass a claim; M does). M's claim children are written R 1150, Rsis 1152, Msn 1130; year order Msn 1130, R, Rsis 1152.
+	// So Msn comes first, then Rsis passes the claim to her son Rsn.
+	{ id: 'S51a', tree: 'S51', keys: { succession: 'eldest-child', inherit: 'men-only', through: 'women' }, want: { heirs: ['msn', 'rsn'] } },
 	{ id: 'S52a', tree: 'S52', keys: { succession: 'eldest-child', inherit: 'no-preference' }, want: { heirs: ['s1', 'hp', 'hpd', 'hm', 'hmd'] } },
 	{ id: 'S52b', tree: 'S52', keys: { succession: 'eldest-child', inherit: 'men-first' }, want: { heirs: ['s1', 'hp', 'hpd', 'hm', 'hmd'] } },
 	{ id: 'S52c', tree: 'S52', keys: { succession: 'eldest-child', inherit: 'women-first' }, want: { heirs: ['s1', 'hmd', 'hm', 'hpd', 'hp'] } },

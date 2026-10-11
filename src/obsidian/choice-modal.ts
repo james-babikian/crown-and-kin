@@ -5,6 +5,7 @@
 
 import { Modal, type App } from 'obsidian';
 import { FLOW } from '../render/ui-text';
+import { buildShell, type Shell } from './window-shell';
 import { ignoreGhostClick, phoneLayout } from './modal-layout';
 import { trackModal } from './plugin-modals';
 import { nameDialog } from './sheet-parts';
@@ -35,6 +36,7 @@ export interface ChoiceSpec<T> {
 class ChoiceModal<T> extends Modal {
 	private chosen = false;
 	private readonly cleanup: (() => void)[] = [];
+	private shell: Shell | null = null;
 
 	constructor(
 		app: App,
@@ -51,12 +53,11 @@ class ChoiceModal<T> extends Modal {
 		m.setAttribute('data-choice', this.spec.name);
 		this.cleanup.push(phoneLayout(this), ignoreGhostClick(this), trackModal(this, () => this.close()));
 		const el = this.contentEl;
-		el.addClass('dynasty-sheet-content');
-		const header = el.createDiv({ cls: 'dynasty-sheet-header' });
-		nameDialog(this.modalEl, header.createDiv({ cls: 'dynasty-sheet-title', text: this.spec.title }));
-		const cancel = header.createDiv({ cls: 'dynasty-sheet-actions' }).createEl('button', { cls: 'dynasty-sheet-cancel', text: FLOW.cancel, attr: { type: 'button' } });
-		cancel.addEventListener('click', () => this.close());
-		const body = el.createDiv({ cls: 'dynasty-sheet-body' });
+		// The window family (contract C): Cancel is the only button of the frame; the choices are the buttons of the body.
+		const shell = buildShell({ modalEl: this.modalEl, contentEl: el, title: this.spec.title, titled: true, cancelLabel: FLOW.cancel, saveLabel: null, onCancel: () => this.close() });
+		this.shell = shell;
+		nameDialog(this.modalEl, shell.titleEl);
+		const body = shell.body;
 		for (const t of this.spec.text ?? []) body.createDiv({ cls: 'dynasty-choice-text', text: t });
 		if (this.spec.list?.length) {
 			const ul = body.createEl('ul', { cls: 'dynasty-choice-list' });
@@ -86,6 +87,8 @@ class ChoiceModal<T> extends Modal {
 
 	override onClose(): void {
 		for (const c of this.cleanup.splice(0)) c();
+		this.shell?.dispose();
+		this.shell = null;
 		this.contentEl.empty();
 		if (!this.chosen) this.done(null);
 	}

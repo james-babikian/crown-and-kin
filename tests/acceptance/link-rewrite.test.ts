@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import type { PlanWrite } from '../../src/core/block-write';
-import type { LocateBlock } from '../../src/core/block-locate';
 import * as locate from '../../src/core/block-locate';
 import * as write from '../../src/core/block-write';
 import type { ApplyOp, EditRefusal, EditResult } from '../../src/core/edit';
@@ -30,7 +29,8 @@ import { allFixtures, fixtureSource } from './load';
 const linkTargets: LinkTargets = impl.linkTargets;
 const normaliseTarget: NormaliseTarget = impl.normaliseTarget;
 const applyOp: ApplyOp = edit.applyOp;
-const locateBlock: LocateBlock = locate.locateBlock;
+/** The block with this ordinal, or null. */
+const locateBlock = (text: string, ordinal: number) => locate.findBlocks(text)[ordinal] ?? null;
 const planWrite: PlanWrite = write.planWrite;
 
 const rewrite = (body: string, map: Record<string, string>) => applyOp(body, { kind: 'rewrite-links', map });
@@ -513,7 +513,8 @@ describe('fuzz: linkTargets, normaliseTarget and rewrite-links never throw (§8)
 	const JUNK = ['[[', ']]', '|', '#', '"', "'", ':', ': ', '\n', '  ', '- ', '{', '}', '[', ']', ',', '\\', '\t', '&a', '*a', '!!str ', '%', '@', '`', 'link: ', '[[Old Hall]]', 'Old Hall', '\u0000', '\ud800', 'é', '.md'];
 	const TARGETS = ['old hall', 'Old Hall', '', ' ', 'houses/old hall', 'wren of the marches', 'a|b', 'a#b', ']]', '[[', '"', "'", '\n', 'x'.repeat(300), '.md', '$&', '\\', '__proto__', 'constructor'];
 
-	it('3000 mutated bodies and odd maps', { timeout: 60_000 }, () => {
+	// Alone it takes 43 s and 52 s in a loaded suite (F-HARN-05); the limit leaves room for a slower machine. The 3000 cases stay.
+	it('3000 mutated bodies and odd maps', { timeout: 240_000 }, () => {
 		const rng = new Rng(0x0dd5eed5);
 		for (let k = 0; k < 3000; k++) {
 			let b = rng.pick(SEEDS);

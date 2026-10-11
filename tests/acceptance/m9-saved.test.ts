@@ -127,7 +127,7 @@ function sceneItems(d: Drawn, saved: SavedParts): string[] {
 			if (e.hasClass('dynasty-signed')) out.push(`sign:${id}`);
 			if (all(e).some((x) => x.hasClass('dynasty-card-relation'))) out.push(`relation:${id}`);
 			// 0.2.5 (B.3.11): the Roundel's plate and "You" tab are items too.
-			if (all(e).some((x) => x.hasClass('dynasty-r1-plate'))) out.push(`plate:${id}`);
+			if (all(e).some((x) => x.hasClass('dynasty-card-foot-line'))) out.push(`foot:${id}`);
 			if (all(e).some((x) => x.hasClass('dynasty-r1-tab'))) out.push(`tab:${id}`);
 		}
 		if (e.hasClass('dynasty-line') && e.parentElement?.hasClass('dynasty-lines')) out.push(`line:${[...e.classes].find((c) => c.startsWith('dynasty-line-'))!.slice('dynasty-line-'.length)}`);
@@ -138,8 +138,9 @@ function sceneItems(d: Drawn, saved: SavedParts): string[] {
 	for (const s of d.scene.pictures.filter((x) => x.lod === 'full')) {
 		if (s.kind === 'arms' && isUri(saved.pictures.get(`arms:${s.house}`))) out.push(`arms:${s.person}`);
 		if (s.kind === 'portrait') {
-			out.push(`frame:${s.person}`);
+			// D219: a portrait that shows has no frame; one that is missing or cannot be read keeps its thin frame.
 			if (isUri(saved.pictures.get(`portrait:${s.person}`))) out.push(`portrait:${s.person}`);
+			else out.push(`frame:${s.person}`);
 		}
 	}
 	out.push('heading');
@@ -176,7 +177,9 @@ describe('P4, B3: the saved SVG has the elements of the drawn scene (spec §13.8
 		const d = await drawn14();
 		const svg = savedSvg(d, saveOf(d));
 		expect(isDashed(byItem(svg, 'frame:oswin')!)).toBe(true);
-		for (const id of ['darian', 'hugo', 'aldric']) expect(isDashed(byItem(svg, `frame:${id}`)!), id).toBe(false);
+		for (const id of ['darian', 'hugo']) expect(isDashed(byItem(svg, `frame:${id}`)!), id).toBe(false);
+		// D219: a portrait that shows has no frame.
+		expect(byItem(svg, 'frame:aldric')).toBeUndefined();
 		for (const x of ['portrait:oswin', 'portrait:darian', 'portrait:hugo', 'arms:giselle', 'arms:darian']) expect(byItem(svg, x), x).toBeUndefined();
 	});
 
@@ -351,25 +354,27 @@ describe('P4: without `saved` (and without `pictures`), renderSvg draws exactly 
 		// 0.2.4: all 16 were recorded again for the card geometry (card 61 px high, name text 0.85 em, boxes at the lower right).
 		// 0.2.5 (D140, WP-A1): 04 (a rumoured father is seated beside his child's parent) and 12 (partners on one row) were recorded again.
 		// 0.2.6 (D179): all 16 were recorded again, because the picture is drawn with the Roundel (the classic card is gone). The same hashes come from the code of 0.2.5 with `cardForm(geometryFor(16, 'normal'), 'down')`.
+		// 0.2.8 G5b (P7): all 17 were recorded again (the card content is centred on the middle of the card, not 0.25 em right of it).
+		// 0.2.8 look round (D212–D214): all 17 were recorded again (thin arms rim, You tab, 2 px You border, one heir outline, centred text).
 	const M8_SVG: Record<string, string> = {
-		'01': '75582d61e6438f28',
-		'02': 'ad2b0b4a9061ab79',
-		'03': '4fa78b6958a6d140',
-		'04': '10810bb976a08dab',
-		'05': 'f190fe145ad363f3',
-		'06': '87d7a4f1cb97ba4b',
-		'07': '2b6ecbbb0091d6eb',
-		'07b': '415e860d115f0669',
-		'08': 'b37a80331e4579fb',
-		'09': '318b2e5e35be818f',
-		'10': 'f98cb38e609e5d55',
-		'11': 'df929a1903c8998b',
-		'12': 'ef3438a883cb56b2',
-		'13': '5b84823e6f9c2fad',
-		'14': '27aef842d4b5e0d0',
-		'15': '269044aebd6a206b',
+		'01': 'dedcfcbf12666e4e',
+		'02': 'c4549da0f00c0735',
+		'03': '6718dbc7ea29196d',
+		'04': '6529721205f3e303',
+		'05': 'e88c3d30965c8004',
+		'06': '62abb3284fe34a56',
+		'07': '1952fb2f475caa33',
+		'07b': '2731452e4cfe11f3',
+		'08': '6b4b7dbe99d66352',
+		'09': '42ec1ed2b1426b47',
+		'10': '66f1441c31cdc85a',
+		'11': '9fe758e236c283b5',
+		'12': '0adbdd430939b8c4',
+		'13': 'd6b0f69edee9a325',
+		'14': '5cfdc875670755d5',
+		'15': 'd7840700a0bf93c2',
 		// Sample tree 16 (0.2.7): recorded from the 0.2.6 build.
-		'16': 'ac75971a60fa2260',
+		'16': 'e21f140364e486f0',
 	};
 	for (const f of allFixtures()) {
 		it(`sample tree ${f.id}`, () => {

@@ -19,9 +19,9 @@ import type { InheritIllegitimate, InheritRule, InheritThrough, SuccessionRule }
 
 /**
  * Person fields the edit sheet can set (§6.3 "Fields"); `card-title` is written by "Show on the
- * card" (§13.3, D62), `portrait` by Select portrait and Remove portrait (§13.7).
+ * card" (§13.3, D62), `portrait` by Select portrait and Remove portrait (§13.7), `arms` by Select arms and Remove arms (D181, §13.6).
  */
-export type PersonField = 'name' | 'sobriquet' | 'title' | 'card-title' | 'house' | 'sex' | 'born' | 'died' | 'illegitimate' | 'childless' | 'link' | 'portrait' | 'portrait-crop' | 'notes' | 'placement';
+export type PersonField = 'name' | 'sobriquet' | 'title' | 'card-title' | 'house' | 'sex' | 'born' | 'died' | 'illegitimate' | 'childless' | 'link' | 'portrait' | 'portrait-crop' | 'arms' | 'notes' | 'placement';
 
 /** A value an edit can write for a person field: text, a boolean (`illegitimate` and `childless` only), or `null` to remove the key. */
 export type FieldValue = string | boolean | null;
@@ -98,7 +98,7 @@ export type Placement =
 
 /**
  * A new person as one block map with keys in §4.1 order (§6.2). The id is chosen by the caller
- * with `newPersonId`, so a batch can refer to it; `applyOp` refuses `id-taken` if it exists.
+ * with `nextPersonId` (`id-gen.ts`), so a batch can refer to it; `applyOp` refuses `id-taken` if it exists.
  * `parents` is written as a flow sequence: birth parents as plain ids, other types as flow maps (§4.2).
  */
 export interface AddPerson {
@@ -109,7 +109,7 @@ export interface AddPerson {
 	at?: Placement;
 }
 
-/** Add one parent entry to an existing person. Refused with `limit` if the person already has 2 of that type, `cycle` if the parent is the child or a descendant (through any type). */
+/** Add one parent entry to an existing person. Refused with `limit` if the person already has the most of that type (2; 8 for rumoured parents, `PARENT_LIMIT`), `cycle` if the parent is the child or a descendant (through any type). */
 export interface AddParent {
 	kind: 'add-parent';
 	child: string;
@@ -234,8 +234,11 @@ export interface SetHouseId {
 
 // ---- Titles (spec §13.3–§13.5) ----
 
-/** The fields of a holder that ops can write. `null` (or empty text) removes the key. */
-export type HolderFields = Partial<Record<'person' | 'name' | 'as' | 'number' | 'from' | 'to', string | null>>;
+/**
+ * The fields of a holder that ops can write. `null` (or empty text) removes the key. `through-spouse`
+ * is the tick box (D195): `'true'` ticks it, `null` unticks it; an id written by hand stays when the box is ticked.
+ */
+export type HolderFields = Partial<Record<'person' | 'name' | 'as' | 'number' | 'from' | 'to' | 'through-spouse', string | null>>;
 
 /**
  * A written holder item: its title, its index in the written `holders` list, who it names and
@@ -382,9 +385,6 @@ export type Op =
 	| SetHouseId
 	| TitleOp
 	| RewriteLinksOp;
-
-/** Picks an unused numbered person id (§6.8, §13.17 rule 1); `yaml-edit.ts` exports it. The name is unused. */
-export type NewPersonId = (body: string, name: string) => string;
 
 /** Why `applyOp` refused an edit, instead of throwing (spec §8). */
 export type EditRefusal =

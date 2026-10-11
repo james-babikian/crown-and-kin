@@ -18,7 +18,7 @@
  *   relationship-action write, Save, reload after a write), and the confirm/error messages.
  */
 
-import { Modal, Notice, type App, type TFile } from 'obsidian';
+import { Modal, Notice, setIcon, type App, type TFile } from 'obsidian';
 import { deriveFamilies, type FamilyGraph } from '../core/derive';
 import type { FieldValue, Op, ParentKind, PersonField, UnionKind, UnionRef } from '../core/edit';
 import type { PersonFolds } from '../core/folds';
@@ -28,13 +28,16 @@ import { formatPortraitCrop, sameCropText } from '../core/portrait-crop';
 import { nextPersonId } from '../core/id-gen';
 import { newHouseId } from '../core/yaml-edit';
 import { parseBody, readTree, referencedIds } from '../core/parse';
-import { isMap, str, type Raw } from '../core/tolerate';
-import { PARENT_TYPES, PLACEMENT_TYPES, UNION_TYPES, type Person, type Tree } from '../core/types';
-import { linkTarget, relationInfo } from '../render/tree-info';
-import { CROP_UI, FAMILY, FINDER_UI, FOCUS_UI, FOLD_UI, ME_UI, NEW_SHEET, NOTE_UI, PICTURES_UI, REMOVE, SHEET, UI, UNION_EDIT, UNION_TYPE_TEXT, WRITE_TEXT, deleteText, parentTypeText, partnerDetail, unionTypeText } from '../render/ui-text';
+import { isMap, type Raw } from '../core/tolerate';
+import { PARENT_LIMIT, PARENT_TYPES, PLACEMENT_TYPES, UNION_TYPES, type Person, type Tree } from '../core/types';
+import { dateLine, linkTarget, relationInfo } from '../render/tree-info';
+import { quotedSobriquet } from '../core/sobriquet';
+import { joined, nb } from '../render/text-join';
+import { FAMILY, FINDER_UI, FOCUS_UI, FOLD_UI, ME_UI, NEW_SHEET, NOTE_UI, PICTURES_UI, REMOVE, SHEET, UI, UNION_EDIT, UNION_TYPE_TEXT, WINDOW_UI, WRITE_TEXT, deleteText, parentTypeText, partnerDetail, unionTypeText } from '../render/ui-text';
 import { linkedNotePath, personNoteName } from '../core/note-make';
 import { makePersonNote, openMadeNote, type MakeNoteMode, type MakePersonNoteOutcome, type SameNameAnswer } from './make-note';
 import { normBody } from '../core/block-match';
+import { cardLabels, needsLabels } from '../core/titles';
 import type { Handle, HandleWriteOutcome, Written } from './block-handle';
 import type { ViewKind } from './block-state';
 import { describeDelete, familyOf, type FamilyView, type ParentLink, type PartnerLink } from '../core/family-query';
@@ -42,21 +45,25 @@ import type { RelationOptions } from '../core/relations';
 import { openCropTool, startCropOf } from './crop-tool';
 import { addChild, addParent, addPartner, autoUnionNotice, unionOp, type FlowHost, type NewRelation } from './family-flows';
 import { ignoreGhostClick, phoneLayout } from './modal-layout';
-import { pickPerson } from './person-picker';
+import { hasNoWrittenId, idsForPeople } from './person-ids';
+import { pickPerson, type PickerContext } from './person-picker';
 import { currentPictureOf, pickPicture } from './picture-picker';
 import type { PictureCopy, PictureStore } from './picture-store';
 import { relationsFor, validMe } from './relation-cache';
-import { freshOrStale, nameDialog, onWriteFailed, sheetField, showErrorLine } from './sheet-parts';
-import { renderRelationBox, renderRelationStrip, type RelationView } from './sheet-relation';
-import { titlesSection, type TitlesHost } from './sheet-titles';
+import { drawableColour, freshOrStale, nameDialog, onWriteFailed, sheetField, showErrorLine } from './sheet-parts';
+import { renderRelationLine, type RelationView } from './sheet-relation';
+import { titlesBody, titlesSummary, type TitlesHost } from './sheet-titles';
+import { buildShell, type Shell } from './window-shell';
+import { renderSections, type SectionsView, type SectionSpec } from './window-sections';
+import { RowPictures, buildRow, iconButton, iconLead, personLead, showMenu, textButton, type MenuEntry } from './window-parts';
 import { undoNotice } from './undo-notice';
 import { editUnion } from './union-edit';
 import { trackModal } from './plugin-modals';
 
 const TEXT_FIELDS = ['name', 'sobriquet', 'title', 'born', 'died', 'link', 'notes'] as const;
 const NEW_HOUSE = '\u0000new';
-/** Spec §13.7: the sheet's portrait is about 96 px across. */
-export const SHEET_PORTRAIT_PX = 96;
+/** Contract C (Q6H A): the round portrait of the header is 64 px across. */
+export const SHEET_PORTRAIT_PX = 64;
 
 interface Draft {
 	name: string;
@@ -75,6 +82,8 @@ interface Draft {
 	portrait: string;
 	/** Spec §13.13: the selected part of the portrait as written text; '' = none (the automatic part). */
 	portraitCrop: string;
+	/** 0.2.8 contract A.1: the personal arms link; '' = none. */
+	arms: string;
 	notes: string;
 	placement: string;
 }
@@ -129,6 +138,7 @@ function draftOf(l: Loaded): Draft {
 		link: p.link ?? '',
 		portrait: p.portrait ?? '',
 		portraitCrop: p.portraitCrop ?? '',
+		arms: p.arms ?? '',
 		notes: p.notes ?? '',
 		placement: p.placement ?? (p.id ? l.g.placementType.get(p.id) : undefined) ?? '',
 	};
@@ -182,11 +192,7 @@ function namesIn(ops: Op[]): string[] {
 
 /** True for a person with no written id (spec §8 warning): the tree names them `~N`, after their place in the list. */
 function unwritten(l: Loaded, id: string): boolean {
-	const p = l.g.byId.get(id);
-	const data = l.data as Raw;
-	if (!p || !isMap(data) || !Array.isArray(data.people)) return false;
-	const raw = data.people[p.index] as Raw;
-	return str(isMap(raw) ? raw.id : undefined) !== id;
+	return hasNoWrittenId(l.g, l.data, id);
 }
 
 /**
@@ -233,15 +239,7 @@ function takenIds(l: Loaded, more: Iterable<string> = []): Set<string> {
  * as a reference names nobody.
  */
 function idsFor(l: Loaded, names: Iterable<string>): Map<string, string> {
-	const ids = new Map<string, string>();
-	const used = takenIds(l);
-	for (const id of names) {
-		if (ids.has(id) || !unwritten(l, id)) continue;
-		const next = nextPersonId(used);
-		used.add(next);
-		ids.set(id, next);
-	}
-	return ids;
+	return idsForPeople(l.g, l.data, names);
 }
 
 type IdFields = Extract<Op, { kind: 'set-person-fields' }>['fields'] & { id?: string };
@@ -365,6 +363,11 @@ export class EditSheet extends Modal {
 	private errorEl: HTMLElement | null = null;
 	private statusEl: HTMLElement | null = null;
 	private bodyEl: HTMLElement | null = null;
+	/** The text line under the header for a problem with the portrait, and what the round portrait showed last (so a repaint that changes nothing leaves it alone). */
+	private problemEl: HTMLElement | null = null;
+	private portraitKey = '';
+	/** The parent type of the last relationship write, for the text of a `limit` refusal. */
+	private limitType: string | undefined;
 	private status = '';
 	/** The last message a failed write showed; the partnership editor shows it too. */
 	private lastError = '';
@@ -385,15 +388,25 @@ export class EditSheet extends Modal {
 	 */
 	private portrait: { link: string; crop: string; path: string | null; copy: PictureCopy | null; problem: string | null; missing: boolean; loading: boolean; waiting: boolean } | null = null;
 	private portraitAbort: AbortController | null = null;
-	private portraitEl: HTMLElement | null = null;
-	/** The round frame and the problem text of the portrait: a copy that arrives changes only these. */
+	/** The round portrait button of the header: a copy that arrives changes only this. */
 	private portraitFrame: HTMLElement | null = null;
-	private portraitHint: HTMLElement | null = null;
-	/** Spec §13.13: the Select the part button; it shows when the portrait can show. */
-	private partButton: HTMLButtonElement | null = null;
-	/** D146, D147: what the relation infobox shows for this build (null: nothing), and whether that build drew the phone strip. */
+	/** D209 item 5: the text link "Add portrait" in the row of "Open all"; shown while the header has no picture. */
+	private addPortraitEl: HTMLElement | null = null;
+	/** Gives the hidden names of the parent type chips their ids. */
+	private static chipCounter = 0;
+	/** The frame of the window (Cancel, Save, the scrolling body) and its sections, drawn again with the form. */
+	private shell: Shell | null = null;
+	private sections: SectionsView | null = null;
+	/** The pictures of the rows and of the small arms marks of the header; released when the form is drawn again and when the window closes. */
+	private rowPictures: RowPictures | null = null;
+	/** Contract C: the header draws the name, the detail line and the personal arms; these follow the draft. */
+	private head: { paint(): void; arms(): void } | null = null;
+	/** What the form showed last: a window that crosses 600 px (a turn, a resize) draws again, because the frame differs. */
+	private builtPhone = false;
+	/** G.7: the people the user came from by a child row, the nearest last. */
+	private readonly trail: string[] = [];
+	/** What the relation line shows for this build (null: nothing). */
 	private relView: RelationView | null = null;
-	private relPhone = false;
 	/** Spec §13.11: the slot in the Actions list for Make a note, what it shows now, and the busy flag of the flow (N2). */
 	private noteSlot: HTMLElement | null = null;
 	private noteKey = '';
@@ -456,8 +469,17 @@ export class EditSheet extends Modal {
 		if (store) this.cleanup.push(store.onChange((paths) => this.portraitFilesChanged(paths)));
 		this.shown = true;
 		this.build();
-		if (this.isNew) this.focusName();
-		else if (!this.modalEl.contains(this.modalEl.doc?.activeElement ?? null)) {
+		if (this.isNew) {
+			this.focusName();
+			// Why: after `onOpen` returns, Obsidian moves the focus to the first control of the window when the device has a
+			// physical keyboard (a computer). That control is "Open all". A phone has no such step, so only a computer needs this.
+			void Promise.resolve().then(() => {
+				if (!this.shown || this.closing) return;
+				const active = this.modalEl.doc?.activeElement as HTMLElement | null | undefined;
+				const typing = !!active && this.contentEl.contains(active) && active.matches('input, textarea, select');
+				if (!typing) this.focusName();
+			});
+		} else if (!this.modalEl.contains(this.modalEl.doc?.activeElement ?? null)) {
 			// On a phone the sheet can open with the focus left on the page, so a Tab key would reach the tree below it.
 			this.modalEl.setAttribute('tabindex', '-1');
 			this.modalEl.focus({ preventScroll: true });
@@ -472,10 +494,14 @@ export class EditSheet extends Modal {
 		for (const c of this.cleanup.splice(0)) c();
 		// O7: the sheet's portrait copy is released when the sheet closes.
 		this.dropPortrait();
-		this.portraitEl = null;
 		this.portraitFrame = null;
-		this.portraitHint = null;
-		this.partButton = null;
+		this.addPortraitEl = null;
+		this.shell?.dispose();
+		this.shell = null;
+		this.sections = null;
+		this.rowPictures?.release();
+		this.rowPictures = null;
+		this.head = null;
 		this.contentEl.empty();
 	}
 
@@ -530,6 +556,9 @@ export class EditSheet extends Modal {
 		if (portrait !== this.base.portrait.trim()) out.portrait = portrait === '' ? null : portrait;
 		// Spec §13.13, D91: the part follows the picture. A changed part is written (or removed); a part that is kept while
 		// the link text changes to the same file is written again, so the core rule that a new picture drops its part keeps it.
+		// 0.2.8 contract A.1: Select personal arms and Remove personal arms are draft edits too.
+		const arms = this.draft.arms.trim();
+		if (arms !== this.base.arms.trim()) out.arms = arms === '' ? null : arms;
 		const crop = this.draft.portraitCrop.trim();
 		if (!sameCropText(crop, this.base.portraitCrop.trim())) out['portrait-crop'] = crop === '' ? null : crop;
 		else if (out.portrait !== undefined && out.portrait !== null && crop !== '') out['portrait-crop'] = crop;
@@ -542,37 +571,41 @@ export class EditSheet extends Modal {
 		if (this.closed) return;
 		const el = this.contentEl;
 		const kept = this.focusMark();
+		this.shell?.dispose();
+		this.rowPictures?.release();
+		this.rowPictures = new RowPictures(this.o.pictures, this.o.sourcePath);
 		el.empty();
 		this.confirmEl = null;
 		this.settleQuestion();
 		this.noteSlot = null;
 		this.noteKey = '';
-		el.addClass('dynasty-sheet-content');
+		this.addPortraitEl = null;
 		const ro = this.readOnly;
 		this.modalEl.toggleClass('is-read-only', ro);
 		this.relView = this.makeRelationView();
-		this.relPhone = this.modalEl.hasClass('is-phone');
+		this.builtPhone = this.modalEl.hasClass('is-phone');
 
-		const header = el.createDiv({ cls: 'dynasty-sheet-header' });
-		nameDialog(this.modalEl, header.createDiv({ cls: 'dynasty-sheet-title', text: this.title() }));
-		const actions = header.createDiv({ cls: 'dynasty-sheet-actions' });
-		const cancel = actions.createEl('button', { cls: 'dynasty-sheet-cancel', text: ro ? SHEET.close : SHEET.cancel, attr: { type: 'button', 'data-focus': 'cancel' } });
-		cancel.addEventListener('click', () => this.finish());
-		if (!ro) {
-			const save = actions.createEl('button', { cls: ['mod-cta', 'dynasty-sheet-save'], text: SHEET.save, attr: { type: 'button', 'data-focus': 'save' } });
-			save.addEventListener('click', () => void this.save());
-			if (this.rel?.kind === 'child') {
-				// Spec §6.3: quick entry of several children; in the header, so it stays reachable (spec §7.4).
-				const more = header.createEl('button', { cls: 'dynasty-sheet-save-another', text: NEW_SHEET.saveAnother, attr: { type: 'button', 'data-focus': 'save-another' } });
-				more.addEventListener('click', () => void this.save(true));
-			}
-		}
-
-		const body = el.createDiv({ cls: 'dynasty-sheet-body' });
+		const shell = buildShell({
+			modalEl: this.modalEl,
+			contentEl: el,
+			title: this.title(),
+			// A new person has no header with a name yet, so the bar shows the title.
+			titled: this.isNew,
+			cancelLabel: ro ? SHEET.close : SHEET.cancel,
+			saveLabel: ro ? null : SHEET.save,
+			onCancel: () => this.finish(),
+			onSave: () => void this.save(),
+			// Spec §6.3: quick entry of several children; in the footer (a phone: under the bar), so it stays reachable (spec §7.4).
+			...(!ro && this.rel?.kind === 'child' ? { extra: { text: NEW_SHEET.saveAnother, focus: 'save-another', run: () => void this.save(true) } } : {}),
+		});
+		this.shell = shell;
+		nameDialog(this.modalEl, shell.titleEl);
+		const body = shell.body;
 		this.bodyEl = body;
 		body.addEventListener('focusin', () => this.revealFocused(300));
-		// D147: the strip is the first child, so it is right under the header and before the portrait in the reading order.
-		if (this.relView && this.relPhone) renderRelationStrip(body, this.relView);
+		// G.7: a child row opened this person; the way back names the person before.
+		const before = this.trail[this.trail.length - 1];
+		if (before !== undefined) shell.setBack(this.name(before), WINDOW_UI.backToLabel(this.name(before)), () => this.goBackTo());
 		if (ro) {
 			const banner = body.createDiv({ cls: ['callout', 'dynasty-sheet-banner'], attr: { 'data-callout': 'warning' } });
 			banner.createDiv({ cls: 'callout-title' }).createDiv({ cls: 'callout-title-inner', text: UI.bannerTitle });
@@ -591,42 +624,221 @@ export class EditSheet extends Modal {
 		this.errorEl.hide();
 		if (this.isNew) this.relationBox(body);
 
-		this.portraitField(body);
-		// A read-only sheet with no portrait has no portrait row; the box then stands alone where the row would be.
-		if (this.relView && !this.relPhone && !this.portraitEl) renderRelationBox(body, this.relView);
-		this.textField(body, 'name', SHEET.name, { autocapitalize: 'words' });
-		// D122: the card adds the quote marks, so the hint says so; a sobriquet usually starts with a small letter.
-		const sobInput = this.textField(body, 'sobriquet', SHEET.sobriquet, { autocapitalize: 'none' });
-		const sobId = sobInput.getAttribute('id') ?? '';
-		sobInput.parentElement?.createDiv({ cls: 'dynasty-sheet-hint', text: SHEET.sobriquetHint, attr: { id: `${sobId}-hint` } });
-		sobInput.setAttribute('aria-describedby', `${sobId}-hint`);
-		const titleInput = this.textField(body, 'title', SHEET.title);
-		// D98: the hint points to the Titles section, which the sheet of a new person does not have.
-		if (!this.isNew) {
-			const titleId = titleInput.getAttribute('id') ?? '';
-			titleInput.parentElement?.createDiv({ cls: 'dynasty-sheet-hint', text: SHEET.titleHint, attr: { id: `${titleId}-hint` } });
-			titleInput.setAttribute('aria-describedby', `${titleId}-hint`);
-		}
-		this.houseField(body);
-		this.sexField(body);
-		this.textField(body, 'born', SHEET.born);
-		this.textField(body, 'died', SHEET.died);
-		this.checkField(body, 'illegitimate', SHEET.illegitimate);
-		this.checkField(body, 'childless', SHEET.childless, SHEET.childlessHint);
-		this.textField(body, 'link', SHEET.link, { placeholder: SHEET.linkPlaceholder });
-		this.textField(body, 'notes', SHEET.notes, {}, true);
-		this.placementField(body);
-
-		if (!this.isNew) {
-			// Spec §13.4: between the fields and Family.
-			titlesSection(body, this.titlesHost());
-			const me = this.me();
-			this.familySection(body);
-			this.actionsSection(body, me);
-			if (!ro) this.deleteSection(body);
-			this.idLine(body);
-		}
+		this.personHeader(body);
+		this.sections = renderSections(body, 'person', this.sectionSpecs(), () => shell.checkOverflow(), this.isNew ? this : undefined);
+		this.openNoteLink(this.sections.openAllRow);
+		this.addPortraitLink(this.sections.openAllRow);
 		this.restoreFocus(kept);
+	}
+
+	/** The sections of the window: all five for a person in the tree, Details and Notes for a new person. */
+	private sectionSpecs(): SectionSpec[] {
+		const fam = this.data.fam;
+		const specs: SectionSpec[] = [{ key: 'details', title: WINDOW_UI.sectionDetails, summary: this.detailsSummary(), open: true, build: (b) => this.detailsBody(b) }];
+		if (!this.isNew && fam) specs.push({ key: 'family', title: WINDOW_UI.sectionFamily, summary: this.familySummary(), open: false, build: (b) => this.familyBody(b) });
+		if (!this.isNew) specs.push({ key: 'titles', title: WINDOW_UI.sectionTitles, summary: titlesSummary(this.titlesHost()), open: false, build: (b) => titlesBody(b, this.titlesHost()) });
+		specs.push({ key: 'notes', title: WINDOW_UI.sectionNotes, summary: this.notesSummary(), open: false, build: (b) => this.notesBody(b) });
+		if (!this.isNew) specs.push({ key: 'actions', title: WINDOW_UI.sectionActions, summary: '', open: false, build: (b) => this.actionsBody(b, this.me()) });
+		return specs;
+	}
+
+	/** Joins the parts of a summary with " · "; parts that are empty are left out. */
+	private sum(parts: (string | undefined)[]): string {
+		return parts.filter((x): x is string => !!x).join(' · ');
+	}
+
+	private detailsSummary(): string {
+		const d = this.draft;
+		const house = d.house === NEW_HOUSE ? this.newHouse.name.trim() : (this.data.g.houses?.get(d.house)?.name ?? '');
+		const sex = d.sex === 'm' ? SHEET.sexMale : d.sex === 'f' ? SHEET.sexFemale : '';
+		return this.sum([house || SHEET.noHouse, sex, dateLine({ ...this.data.person, born: d.born.trim() || undefined, died: d.died.trim() || undefined })]);
+	}
+
+	private familySummary(): string {
+		const fam = this.data.fam;
+		if (!fam) return '';
+		return WINDOW_UI.sumFamilyParts(fam.parents.length, fam.partners.length, this.childrenOf().length).join(' · ');
+	}
+
+	private notesSummary(): string {
+		const link = this.draft.link.trim();
+		if (link) return WINDOW_UI.sumNotesLinked(link.replace(/^\[\[|\]\]$/g, ''));
+		const first = this.draft.notes.split('\n').find((t) => t.trim() !== '');
+		return first?.trim() ?? WINDOW_UI.sumNotesNone;
+	}
+
+	/** The closed sections show a summary of the draft: it follows the fields while the user types (it does not show the saved values). */
+	private updateSummaries(): void {
+		this.sections?.setSummary('details', this.detailsSummary());
+		this.sections?.setSummary('notes', this.notesSummary());
+	}
+
+	/** People who list this person as a parent, in tree order. */
+	private childrenOf(): Person[] {
+		const id = this.data.person.id;
+		return id === '' ? [] : this.data.g.people.filter((q) => q.parents.some((l) => l.id === id));
+	}
+
+	// ---------- the header (contract C, Q6H A) ----------
+
+	/** The house of the draft: the written house, or the new house that the form asks for. */
+	private draftHouse(): { name: string; colour: string | null; arms: string | null } | null {
+		const d = this.draft.house;
+		if (d === '') return null;
+		if (d === NEW_HOUSE) return this.newHouse.name.trim() ? { name: this.newHouse.name.trim(), colour: this.newHouse.color, arms: null } : null;
+		const h = this.data.g.houses?.get(d);
+		return h ? { name: h.name || h.id, colour: h.color ?? null, arms: h.arms?.trim() || null } : { name: SHEET.unknownHouse(d), colour: null, arms: null };
+	}
+
+	/** The name that the header, the labels and the bar show now. */
+	private shownName(): string {
+		return this.draft.name.trim() || this.data.person.name || '';
+	}
+
+	/**
+	 * The header: the name with the small personal arms after it, one detail text line (house, title, dates), then the relation text
+	 * line, and the round portrait at the right (D209: 64 px, a faint outline, no house ring; no circle when there is no portrait). A tap
+	 * on the portrait or on the arms opens the picture menu. The header follows the draft (`head.paint`).
+	 */
+	private personHeader(parent: HTMLElement): void {
+		const head = parent.createDiv({ cls: ['dynasty-head', 'dynasty-person-head', 'dynasty-q6h-A'] });
+		const text = head.createDiv({ cls: 'dynasty-head-text' });
+		const nameLine = text.createDiv({ cls: 'dynasty-head-name' });
+		const nameText = nameLine.createSpan();
+		let armsMark: HTMLElement | null = null;
+		const metaHost = text.createDiv({ cls: 'dynasty-head-metahost' });
+		if (this.relView) renderRelationLine(text, this.relView);
+		// D209 item 4: the portrait stands at the right of the name.
+		const pic = head.createEl('button', { cls: 'dynasty-pic', attr: { type: 'button', 'aria-haspopup': 'menu', 'data-focus': 'portrait' } });
+		this.portraitFrame = pic;
+		pic.addEventListener('click', () => this.pictureMenu(pic));
+		const problem = parent.createDiv({ cls: 'dynasty-head-problem' });
+		problem.hide();
+
+		const paintName = () => {
+			nameText.empty();
+			const name = this.draft.name.trim();
+			if (name) {
+				nameText.appendText(name);
+				const sob = this.draft.sobriquet.trim();
+				if (sob) nameText.createSpan({ cls: 'dynasty-sob', text: ` ${quotedSobriquet(sob)}` });
+			} else nameText.createSpan({ cls: 'is-empty', text: this.isNew ? WINDOW_UI.enterName : SHEET.unnamed });
+			this.shell?.setTitle(this.isNew ? this.title() : name || SHEET.unnamed, this.isNew);
+		};
+		const paintMeta = () => {
+			metaHost.empty();
+			const parts: (HTMLElement | string)[] = [];
+			const house = this.draftHouse();
+			if (house) {
+				const hs = createSpan({ cls: 'dynasty-house' });
+				if (house.arms) {
+					const slot = hs.createSpan({ cls: 'dynasty-house-armsmark' });
+					this.rowPictures?.show(slot, house.arms, { px: 30, fit: 'meet' });
+				} else hs.createSpan({ cls: 'dynasty-house-dot' });
+				hs.appendText(house.name);
+				parts.push(hs);
+			}
+			const label = this.cardLabel();
+			const titleText = label?.title ?? this.draft.title.trim();
+			if (titleText) parts.push(nb(label?.title && label.reign ? `${titleText} ${label.reign}` : titleText));
+			const dates = dateLine({ ...this.data.person, born: this.draft.born.trim() || undefined, died: this.draft.died.trim() || undefined });
+			if (dates) parts.push(dates);
+			if (this.isNew && this.rel) parts.push(this.newDetail());
+			if (parts.length) joined(metaHost, 'dynasty-head-meta', parts);
+			const colour = house?.colour;
+			if (drawableColour(colour)) head.style.setProperty('--dynasty-house-color', colour);
+			else head.style.removeProperty('--dynasty-house-color');
+			head.toggleClass('has-house', !!house);
+		};
+		const paintArms = () => {
+			armsMark?.remove();
+			armsMark = null;
+			// "Add portrait or arms" becomes "Add portrait" when the person has arms.
+			this.paintAddPortrait();
+			const link = this.draft.arms.trim();
+			if (!link) return;
+			const name = this.shownName() || WINDOW_UI.thisPersonInSentence;
+			armsMark = nameLine.createEl('button', { cls: 'dynasty-arms-mark', attr: { type: 'button', 'aria-label': WINDOW_UI.armsOfPerson(name), 'aria-haspopup': 'menu', 'data-focus': 'personal-arms' } });
+			armsMark.addEventListener('click', () => this.pictureMenu(armsMark!));
+			this.rowPictures?.show(armsMark, link, { px: 44, fit: 'meet' });
+		};
+		this.head = {
+			paint: () => {
+				paintName();
+				paintMeta();
+				this.paintPortrait();
+			},
+			arms: paintArms,
+		};
+		paintName();
+		paintMeta();
+		paintArms();
+		this.problemEl = problem;
+		this.paintPortrait();
+	}
+
+	/** The card label of the person (title text and reign as the card shows them), or undefined when the tree has no titles. */
+	private cardLabel() {
+		const id = this.data.person.id;
+		if (this.isNew || id === '' || !needsLabels(this.data.g)) return undefined;
+		return cardLabels(this.data.g).get(id);
+	}
+
+	/** The detail text of a new person: "Child of A and B", "Partner of A", "Birth parent of A". */
+	private newDetail(): string {
+		const rel = this.rel;
+		if (!rel) return '';
+		const kind = rel.kind === 'parent' ? NEW_SHEET.titleParent : rel.kind === 'child' ? NEW_SHEET.titleChild : rel.kind === 'partner' ? NEW_SHEET.titlePartner : NEW_SHEET.titlePerson;
+		const detail =
+			rel.kind === 'parent'
+				? NEW_SHEET.parentOf(rel.type, this.name(rel.child))
+				: rel.kind === 'child'
+					? NEW_SHEET.childOf(this.name(rel.parent), rel.other === null ? null : this.name(rel.other))
+					: rel.kind === 'partner'
+						? NEW_SHEET.partnerOf(this.name(rel.partner))
+						: '';
+		return this.sum([kind, detail]);
+	}
+
+	/** The short menu of the portrait and the personal arms (D198 Q6H A). A new person has no portrait yet. */
+	private pictureMenu(anchor: HTMLElement): void {
+		if (this.readOnly) return;
+		if (this.isNew) {
+			new Notice(WINDOW_UI.saveFirst);
+			return;
+		}
+		const link = this.draft.portrait.trim();
+		const p = link ? this.portraitFor(link) : null;
+		const items: (MenuEntry | 'sep')[] = [{ icon: 'image', label: PICTURES_UI.selectPortrait, run: () => void this.selectPortrait() }];
+		if (link) {
+			// Shown once the portrait can show; a picture with a problem has no part to select.
+			if (p && p.path !== null && p.problem === null) items.push({ icon: 'crop', label: WINDOW_UI.selectPart, run: () => void this.selectPart() });
+			items.push({
+				icon: 'trash-2',
+				label: PICTURES_UI.removePortrait,
+				warning: true,
+				run: () => {
+					this.portraitLinkChanged('');
+					this.draft.portrait = '';
+					this.clearError();
+					this.head?.paint();
+				},
+			});
+		}
+		items.push('sep', { icon: 'shield', label: WINDOW_UI.selectPersonalArms, run: () => void this.selectArms() });
+		if (this.draft.arms.trim()) {
+			items.push({
+				icon: 'trash-2',
+				label: WINDOW_UI.removePersonalArms,
+				warning: true,
+				run: () => {
+					this.draft.arms = '';
+					this.clearError();
+					this.head?.arms();
+				},
+			});
+		}
+		showMenu(anchor, items);
 	}
 
 	/**
@@ -669,7 +881,7 @@ export class EditSheet extends Modal {
 		return rel.kind === 'parent' ? NEW_SHEET.titleParent : rel.kind === 'child' ? NEW_SHEET.titleChild : rel.kind === 'partner' ? NEW_SHEET.titlePartner : NEW_SHEET.titlePerson;
 	}
 
-	/** What the new person will be, and for a new partner the type of the partnership. */
+	/** The choices of a new person: the partnership of the parents of a child, the type of a new partnership, and the notes about them. */
 	private relationBox(parent: HTMLElement): void {
 		const rel = this.rel;
 		if (!rel || (rel.kind === 'person' && !this.relNote)) return;
@@ -687,20 +899,16 @@ export class EditSheet extends Modal {
 			});
 			return;
 		}
-		const text =
-			rel.kind === 'parent'
-				? NEW_SHEET.parentOf(rel.type, this.name(rel.child))
-				: rel.kind === 'child'
-					? NEW_SHEET.childOf(this.name(rel.parent), rel.other === null ? null : this.name(rel.other))
-					: NEW_SHEET.partnerOf(this.name(rel.partner));
-		box.createDiv({ cls: 'dynasty-sheet-relation-text', text });
+		// The text "Child of A and B" stands in the detail line of the header; the box keeps the choices and the notes.
 		if (rel.kind === 'child') this.partnershipField(box, rel);
-		if (rel.kind !== 'partner') return;
-		const { row, id } = sheetField(box, NEW_SHEET.unionType, 'union-type');
-		const sel = row.createEl('select', { cls: ['dropdown', 'dynasty-sheet-input'], attr: { id } });
-		for (const t of UNION_TYPES) sel.createEl('option', { text: UNION_TYPE_TEXT[t], attr: { value: t } });
-		sel.value = this.unionType;
-		sel.addEventListener('change', () => (this.unionType = sel.value));
+		if (rel.kind === 'partner') {
+			const { row, id } = sheetField(box, NEW_SHEET.unionType, 'union-type');
+			const sel = row.createEl('select', { cls: ['dropdown', 'dynasty-sheet-input'], attr: { id } });
+			for (const t of UNION_TYPES) sel.createEl('option', { text: UNION_TYPE_TEXT[t], attr: { value: t } });
+			sel.value = this.unionType;
+			sel.addEventListener('change', () => (this.unionType = sel.value));
+		}
+		if (!box.childElementCount) box.remove();
 	}
 
 	/**
@@ -788,80 +996,109 @@ export class EditSheet extends Modal {
 
 	// ---------- the portrait (spec §13.7) ----------
 
-	/** The portrait at the top of the sheet: the round picture (about 96 px), Select portrait and Remove portrait. */
-	private portraitField(parent: HTMLElement): void {
-		if (this.readOnly && !this.draft.portrait.trim()) {
-			this.portraitEl = null;
-			return;
-		}
-		this.portraitEl = parent.createDiv({ cls: ['dynasty-sheet-field', 'dynasty-sheet-portrait'], attr: { 'data-field': 'portrait' } });
-		this.drawPortrait();
-	}
-
-	/** Draws the portrait part again from the draft (after Select or Remove). */
-	private drawPortrait(focus?: 'select' | 'remove' | 'part'): void {
-		const sec = this.portraitEl;
-		if (!sec) return;
-		sec.empty();
-		sec.createDiv({ cls: 'dynasty-sheet-label', text: PICTURES_UI.portraitHeading });
-		const row = sec.createDiv({ cls: 'dynasty-sheet-portrait-row' });
-		this.portraitFrame = row.createDiv({ cls: 'dynasty-sheet-portrait-frame' });
-		this.portraitHint = null;
-		this.partButton = null;
+	/**
+	 * Shows the portrait state in the round button of the header and the problem text under it. A copy that arrives comes here
+	 * only, so the rest of the header keeps its elements and the focus (O2).
+	 */
+	private paintPortrait(): void {
+		const frame = this.portraitFrame;
+		if (!frame || !this.bodyEl?.contains(frame)) return;
 		const link = this.draft.portrait.trim();
-		if (!this.readOnly) {
-			const buttons = row.createDiv({ cls: 'dynasty-sheet-portrait-buttons' });
-			const select = this.button(buttons, PICTURES_UI.selectPortrait, 'dynasty-select-portrait', () => void this.selectPortrait());
-			if (focus === 'select') select.focus();
-			if (link) {
-				const remove = this.button(buttons, PICTURES_UI.removePortrait, 'dynasty-remove-portrait', () => {
-					this.portraitLinkChanged('');
-					this.draft.portrait = '';
-					this.clearError();
-					this.drawPortrait('select');
-				});
-				if (focus === 'remove') remove.focus();
-				// Shown once the portrait can show (paintPortrait); a picture with a problem has no part to select.
-				const part = this.button(buttons, CROP_UI.select, 'dynasty-select-part', () => void this.selectPart(), CROP_UI.selectLabel);
-				part.toggle(false);
-				this.partButton = part;
-				if (focus === 'part') part.focus();
-			}
+		const p = link ? this.portraitFor(link) : null;
+		const name = this.shownName();
+		const key = [p?.copy?.url ?? '', p?.loading ? 'l' : '', p?.missing ? 'm' : '', name, p?.problem ?? ''].join('|');
+		const host = this.problemEl;
+		if (key === this.portraitKey && frame.hasClass('is-painted')) return;
+		this.portraitKey = key;
+		frame.addClass('is-painted');
+		frame.empty();
+		frame.removeClass('is-none', 'is-loading', 'has-picture');
+		if (p?.copy) {
+			frame.addClass('has-picture');
+			frame.createEl('img', { cls: 'dynasty-pic-img', attr: { src: p.copy.url, alt: '' } });
+		} else if (p?.loading) {
+			// The copy is on its way: the 64 px slot keeps its place and draws nothing, so the header does not jump when the picture comes.
+			frame.addClass('is-loading');
+		} else {
+			// D213: no picture, no circle. The text link "Add portrait" (saved person) is the way to add one; a problem shows in the text under the header.
+			frame.addClass('is-none');
 		}
-		// Last in the row: the box stands right of the frame and the buttons (D146). This part builds the row again, so it builds the box again.
-		if (this.relView && !this.relPhone) {
-			row.addClass('has-relinfo');
-			renderRelationBox(row, this.relView);
+		frame.setAttribute('aria-label', WINDOW_UI.portraitOf(name || WINDOW_UI.thisPersonInSentence));
+		this.paintAddPortrait();
+		const text = p?.problem ?? null;
+		if (!host) return;
+		if (text === null) {
+			host.hide();
+			host.setText('');
+		} else {
+			host.setText(text);
+			host.show();
 		}
-		this.paintPortrait();
 	}
 
 	/**
-	 * Shows the portrait state in the frame and the problem text. A copy that arrives comes here only,
-	 * so the buttons stay the same elements and keep the focus and a press under way (O2).
+	 * D209 item 5, D218 item 8: "Add portrait or arms", a small text link at the left of the row of "Open all". Only a saved person that can
+	 * change has it, and only while the person has no portrait. Its tap opens the picture menu (Select portrait, Select personal arms), so the
+	 * arms stay reachable for a person with no portrait. A person with personal arms already sees "Add portrait".
 	 */
-	private paintPortrait(): void {
-		const sec = this.portraitEl;
+	private addPortraitLink(row: HTMLElement | null): void {
+		this.addPortraitEl = null;
+		if (!row || this.isNew || this.readOnly) return;
+		const link = row.createEl('button', { cls: ['dynasty-link', 'dynasty-add-portrait'], attr: { type: 'button', 'data-focus': 'add-portrait' } });
+		link.addEventListener('click', () => this.pictureMenu(link));
+		row.prepend(link);
+		this.addPortraitEl = link;
+		this.paintAddPortrait();
+	}
+
+	/**
+	 * D218 item 9 (N23): "Open linked note", a text link left of "Open all", for a saved person that has a link. It stands in the row
+	 * under the header, not in the closed Actions section, so a fresh window shows it. It closes the window and then opens the note.
+	 */
+	private openNoteLink(row: HTMLElement | null): void {
+		if (!row || this.isNew) return;
+		const linktext = linkTarget(this.data.person.link);
+		if (!linktext) return;
+		const link = row.createEl('button', { cls: ['dynasty-link', 'dynasty-open-note', 'dynasty-sheet-open-link'], text: SHEET.openLink, attr: { type: 'button', 'data-focus': 'dynasty-sheet-open-link' } });
+		link.addEventListener('click', () => {
+			if (this.saving) return;
+			try {
+				this.leaveFor(() => {
+					const open = () => this.app.workspace.openLinkText(linktext, this.o.sourcePath, false);
+					if (this.o.openNote) this.o.openNote(open);
+					else void open().catch((e) => console.error('Dynasty Tree: cannot open link', e));
+				});
+			} catch (e) {
+				console.error('Dynasty Tree: the sheet action failed', e);
+			}
+		});
+		// Left of "Open all", which stands last in the row.
+		const all = row.querySelector('.dynasty-openall-button');
+		if (all) row.insertBefore(link, all);
+		else row.appendChild(link);
+	}
+
+	private paintAddPortrait(): void {
+		const link = this.addPortraitEl;
+		if (!link) return;
+		link.setText(this.draft.arms.trim() ? WINDOW_UI.addPortraitHasArms : WINDOW_UI.addPortrait);
+		const hold = link === link.doc.activeElement;
+		const show = this.portraitFrame?.hasClass('is-none') === true;
+		link.toggle(show);
+		// A hidden control cannot keep the focus: it would drop to the page, outside the window. The portrait takes its place.
+		if (hold && !show) this.portraitFrame?.focus({ preventScroll: true });
+	}
+
+	/**
+	 * When the picture picker closes, the focus is on the page or on the hidden "Add portrait" link: the link hides itself when a portrait
+	 * is chosen. This moves the focus to the portrait (`data-focus="portrait"`) unless it is already inside the window.
+	 */
+	private focusPortraitIfLost(): void {
 		const frame = this.portraitFrame;
-		if (!sec || !frame || !sec.contains(frame)) return;
-		const link = this.draft.portrait.trim();
-		const p = link ? this.portraitFor(link) : null;
-		// The file resolves and its copy has no problem (a copy still loading counts, so the focus can stay on the button).
-		this.partButton?.toggle(!!p && p.path !== null && p.problem === null);
-		frame.empty();
-		frame.removeClass('is-none', 'is-loading', 'is-missing');
-		if (!p) frame.addClass('is-none');
-		else if (p.copy) frame.createEl('img', { cls: 'dynasty-sheet-portrait-img', attr: { src: p.copy.url, alt: '' } });
-		else if (p.loading) frame.addClass('is-loading');
-		// B1: only a missing file gives the dashed frame; the other problems a solid empty one.
-		else frame.addClass(p.missing ? 'is-missing' : 'is-none');
-		const text = p?.problem ?? null;
-		if (text === null) {
-			this.portraitHint?.remove();
-			this.portraitHint = null;
-		} else if (this.portraitHint && sec.contains(this.portraitHint)) {
-			if (this.portraitHint.getText() !== text) this.portraitHint.setText(text);
-		} else this.portraitHint = sec.createDiv({ cls: ['dynasty-sheet-hint', 'dynasty-sheet-portrait-problem'], text });
+		if (!frame || !this.shown || frame.hasClass('is-none')) return;
+		const active = frame.doc.activeElement;
+		const lost = !active || active === frame.doc.body || !this.modalEl.contains(active) || active === this.addPortraitEl;
+		if (lost) frame.focus({ preventScroll: true });
 	}
 
 	/**
@@ -939,19 +1176,38 @@ export class EditSheet extends Modal {
 		const current = currentPictureOf(this.o.pictures, this.draft.portrait?.trim(), this.o.sourcePath);
 		// D97: the list has a Remove row only when the draft has a portrait.
 		const remove = this.draft.portrait.trim() ? PICTURES_UI.removePortrait : undefined;
-		const picked = await pickPicture(this.app, { sourcePath: this.o.sourcePath, store: this.o.pictures, title: PICTURES_UI.pickerPortraitTitle(name), current, remove });
+		const picked = await pickPicture(this.app, { sourcePath: this.o.sourcePath, store: this.o.pictures, title: PICTURES_UI.pickerPortraitTitle(name), barTitle: PICTURES_UI.pickerBarPortrait, current, remove, hint: WINDOW_UI.pickPortraitHint });
 		if (!this.shown) return;
 		if (picked.kind === 'choose') {
 			this.portraitLinkChanged(picked.link);
 			this.draft.portrait = picked.link;
 			this.clearError();
-		} else if (picked.kind === 'remove') {
-			// The same as the Remove portrait button: the draft changes; Save writes it.
+			this.head?.paint();
+			this.focusPortraitIfLost();
+			// D196 item 4: the crop tool opens at once. If the user closes it, the part that the plugin chose by itself stays.
+			await this.selectPart();
+			return;
+		}
+		if (picked.kind === 'remove') {
+			// The same as the Remove portrait item: the draft changes; Save writes it.
 			this.portraitLinkChanged('');
 			this.draft.portrait = '';
 			this.clearError();
 		}
-		this.drawPortrait('select');
+		this.head?.paint();
+	}
+
+	/** Select personal arms (contract A.1, D198): the picture picker; the chosen link goes into the draft. */
+	private async selectArms(): Promise<void> {
+		const name = this.shownName() || WINDOW_UI.thisPersonInSentence;
+		const current = currentPictureOf(this.o.pictures, this.draft.arms.trim(), this.o.sourcePath);
+		const remove = this.draft.arms.trim() ? WINDOW_UI.removePersonalArms : undefined;
+		const picked = await pickPicture(this.app, { sourcePath: this.o.sourcePath, store: this.o.pictures, title: WINDOW_UI.pickArms(name), barTitle: PICTURES_UI.pickerBarArms, current, remove, hint: WINDOW_UI.pickArmsHint });
+		if (!this.shown) return;
+		if (picked.kind === 'choose') this.draft.arms = picked.link;
+		else if (picked.kind === 'remove') this.draft.arms = '';
+		this.clearError();
+		this.head?.arms();
 	}
 
 	/**
@@ -990,35 +1246,62 @@ export class EditSheet extends Modal {
 			this.draft.portraitCrop = r.crop ? formatPortraitCrop(r.crop) : '';
 			this.clearError();
 		}
-		this.drawPortrait('part');
+		this.head?.paint();
 	}
 
-	private textField(parent: HTMLElement, key: (typeof TEXT_FIELDS)[number], label: string, o: { autocapitalize?: string; placeholder?: string } = {}, area = false): HTMLInputElement | HTMLTextAreaElement {
+	/** Called after a field of the draft changed: the header and the summaries of the closed sections follow it. */
+	private fieldChanged(key: string): void {
+		if (key === 'name' || key === 'sobriquet' || key === 'title' || key === 'born' || key === 'died' || key === 'house' || key === 'sex' || key === 'link' || key === 'notes') {
+			this.head?.paint();
+			this.updateSummaries();
+		}
+	}
+
+	private textField(
+		parent: HTMLElement,
+		key: (typeof TEXT_FIELDS)[number],
+		label: string,
+		o: { autocapitalize?: string; placeholder?: string; wide?: boolean; hint?: string } = {},
+		area = false,
+	): HTMLInputElement | HTMLTextAreaElement {
 		const { row, id } = sheetField(parent, label, key);
+		if (o.wide) row.addClass('is-wide');
 		// Plain attribute names (no spread), so the colour rule of eslint.config.mjs can check them; null writes no attribute.
 		const extra = { autocapitalize: o.autocapitalize ?? null, placeholder: o.placeholder ?? null };
+		// D196 item 1: a name is not a sentence, so the keyboard adds no capital and no correction. A note is text, so it keeps the spell check.
 		// born and died are free text (fictional calendars): never a numeric keyboard (spec §7.4).
 		const input = area
-			? row.createEl('textarea', { cls: 'dynasty-sheet-input', attr: { id, rows: 4, autocapitalize: extra.autocapitalize, placeholder: extra.placeholder, 'data-focus': `field:${key}` } })
-			: row.createEl('input', { cls: 'dynasty-sheet-input', attr: { id, type: 'text', autocomplete: 'off', spellcheck: key === 'notes' ? 'true' : 'false', autocapitalize: extra.autocapitalize, placeholder: extra.placeholder, 'data-focus': `field:${key}` } });
+			? row.createEl('textarea', { cls: ['dynasty-sheet-input', 'dynasty-input'], attr: { id, rows: 4, autocapitalize: extra.autocapitalize, placeholder: extra.placeholder, 'data-focus': `field:${key}` } })
+			: row.createEl('input', {
+					cls: ['dynasty-sheet-input', 'dynasty-input'],
+					attr: { id, type: 'text', autocomplete: 'off', autocorrect: 'off', spellcheck: 'false', autocapitalize: extra.autocapitalize, placeholder: extra.placeholder, 'data-focus': `field:${key}` },
+				});
 		input.value = this.draft[key];
 		// Read-only, not disabled: the user can still select and copy the text.
 		input.readOnly = this.readOnly;
+		if (o.hint) {
+			const hintId = `${id}-hint`;
+			row.createDiv({ cls: ['dynasty-sheet-hint', 'is-on-focus'], text: o.hint, attr: { id: hintId } });
+			input.setAttribute('aria-describedby', hintId);
+		}
 		input.addEventListener('input', () => {
 			this.draft[key] = input.value;
 			this.clearError();
 			// The button and its label follow the draft name and link (N1).
 			if (key === 'link' || key === 'name') this.updateNoteButton();
+			this.fieldChanged(key);
 		});
 		return input;
 	}
 
 	private select(parent: HTMLElement, key: 'house' | 'sex' | 'placement', label: string, options: [string, string][]): HTMLSelectElement {
 		const { row, id } = sheetField(parent, label, key);
-		const sel = row.createEl('select', { cls: ['dropdown', 'dynasty-sheet-input'], attr: { id, 'data-focus': `field:${key}` } });
+		const wrap = row.createDiv({ cls: 'dynasty-select' });
+		const sel = wrap.createEl('select', { cls: ['dropdown', 'dynasty-sheet-input', 'dynasty-input'], attr: { id, 'data-focus': `field:${key}` } });
 		for (const [value, text] of options) sel.createEl('option', { text, attr: { value } });
 		sel.value = this.draft[key];
 		sel.disabled = this.readOnly;
+		setIcon(wrap.createSpan({ cls: 'dynasty-select-chevron', attr: { 'aria-hidden': 'true' } }), 'chevron-down');
 		return sel;
 	}
 
@@ -1029,20 +1312,30 @@ export class EditSheet extends Modal {
 		if (current && !houses.some((h) => h.id === current)) opts.push([current, SHEET.unknownHouse(current)]);
 		if (!this.readOnly) opts.push([NEW_HOUSE, SHEET.newHouse]);
 		const sel = this.select(parent, 'house', SHEET.house, opts);
-		sel.addEventListener('change', () => (this.draft.house = sel.value));
+		sel.addEventListener('change', () => {
+			this.draft.house = sel.value;
+			this.fieldChanged('house');
+		});
 		if (this.readOnly) return;
-		const form = parent.createDiv({ cls: 'dynasty-sheet-subform' });
+		const form = parent.createDiv({ cls: ['dynasty-sheet-subform', 'is-wide'] });
 		const name = sheetField(form, SHEET.newHouseName, 'new-house-name');
-		const nameInput = name.row.createEl('input', { cls: 'dynasty-sheet-input', attr: { id: name.id, type: 'text', autocomplete: 'off', spellcheck: 'false', autocapitalize: 'words' } });
+		const nameInput = name.row.createEl('input', {
+			cls: ['dynasty-sheet-input', 'dynasty-input'],
+			attr: { id: name.id, type: 'text', autocomplete: 'off', autocorrect: 'off', spellcheck: 'false', autocapitalize: 'off' },
+		});
 		nameInput.value = this.newHouse.name;
 		nameInput.addEventListener('input', () => {
 			this.newHouse.name = nameInput.value;
 			this.clearError();
+			this.fieldChanged('house');
 		});
 		const colour = sheetField(form, SHEET.newHouseColour, 'new-house-color');
 		const colourInput = colour.row.createEl('input', { cls: 'dynasty-sheet-colour', attr: { id: colour.id, type: 'color' } });
 		colourInput.value = this.newHouse.color;
-		colourInput.addEventListener('input', () => (this.newHouse.color = colourInput.value));
+		colourInput.addEventListener('input', () => {
+			this.newHouse.color = colourInput.value;
+			this.fieldChanged('house');
+		});
 		const show = () => form.toggle(sel.value === NEW_HOUSE);
 		show();
 		sel.addEventListener('change', () => {
@@ -1061,23 +1354,20 @@ export class EditSheet extends Modal {
 		// D12: any value is valid; an unusual one stays selectable so the sheet never changes it by itself.
 		if (this.base.sex && this.base.sex !== 'm' && this.base.sex !== 'f') opts.push([this.base.sex, SHEET.sexOther(this.base.sex)]);
 		const sel = this.select(parent, 'sex', SHEET.sex, opts);
-		sel.addEventListener('change', () => (this.draft.sex = sel.value));
+		sel.addEventListener('change', () => {
+			this.draft.sex = sel.value;
+			this.fieldChanged('sex');
+		});
 	}
 
-	private checkField(parent: HTMLElement, field: 'illegitimate' | 'childless', text: string, hint?: string): void {
-		// With a hint, the label and the hint stand in one box, so the hint stays under its box.
-		const host = hint ? parent.createDiv({ cls: 'dynasty-sheet-check-pair' }) : parent;
-		// The whole row is the label, so the hit area is the full row (spec §7.5).
-		const row = host.createEl('label', { cls: 'dynasty-sheet-field dynasty-sheet-check', attr: { 'data-field': field } });
+	/** One tick box: the whole row is the label, so the hit area is the full row (spec §7.5). */
+	private checkField(parent: HTMLElement, field: 'illegitimate' | 'childless', text: string, hintId?: string): void {
+		const row = parent.createEl('label', { cls: 'dynasty-sheet-field dynasty-sheet-check dynasty-check', attr: { 'data-field': field } });
 		const box = row.createEl('input', { attr: { type: 'checkbox', 'data-focus': `field:${field}` } });
 		box.checked = this.draft[field];
 		box.disabled = this.readOnly;
 		row.createSpan({ cls: 'dynasty-sheet-label', text });
-		if (hint) {
-			const id = `dynasty-sheet-${field}-hint`;
-			host.createDiv({ cls: 'dynasty-sheet-hint', text: hint, attr: { id } });
-			box.setAttribute('aria-describedby', id);
-		}
+		if (hintId) box.setAttribute('aria-describedby', hintId);
 		box.addEventListener('change', () => (this.draft[field] = box.checked));
 	}
 
@@ -1088,14 +1378,47 @@ export class EditSheet extends Modal {
 		const opts: [string, string][] = choices.map((t) => [t, SHEET.placement[t] ?? t]);
 		if (this.base.placement && !choices.includes(this.base.placement)) opts.push([this.base.placement, SHEET.placementOther(this.base.placement)]);
 		const sel = this.select(parent, 'placement', SHEET.shownUnder, opts);
-		sel.parentElement?.createDiv({ cls: 'dynasty-sheet-hint', text: SHEET.shownUnderHint });
+		sel.parentElement?.parentElement?.createDiv({ cls: ['dynasty-sheet-hint', 'is-on-focus'], text: SHEET.shownUnderHint });
 		sel.addEventListener('change', () => (this.draft.placement = sel.value));
+	}
+
+	// ---------- the sections (contract C) ----------
+
+	/** Details: name, sobriquet, title text, house, sex, born, died, and the two tick boxes. */
+	private detailsBody(body: HTMLElement): void {
+		const grid = body.createDiv({ cls: 'dynasty-grid' });
+		this.textField(grid, 'name', SHEET.name, { autocapitalize: 'off' });
+		// D122: the card adds the quote marks, so the hint says so; a sobriquet usually starts with a small letter.
+		this.textField(grid, 'sobriquet', SHEET.sobriquet, { autocapitalize: 'off', hint: SHEET.sobriquetHint });
+		// D98: the hint points to the Titles section, which the window of a new person does not have.
+		this.textField(grid, 'title', SHEET.title, { autocapitalize: 'off', wide: true, ...(this.isNew ? {} : { hint: SHEET.titleHint }) });
+		this.houseField(grid);
+		this.sexField(grid);
+		this.textField(grid, 'born', SHEET.born);
+		this.textField(grid, 'died', SHEET.died);
+		const checks = grid.createDiv({ cls: ['dynasty-sheet-field', 'is-wide', 'dynasty-checks-field'] });
+		const row = checks.createDiv({ cls: 'dynasty-checks' });
+		const hintId = 'dynasty-sheet-childless-hint';
+		this.checkField(row, 'illegitimate', SHEET.illegitimate);
+		this.checkField(row, 'childless', SHEET.childless, hintId);
+		checks.createDiv({ cls: ['dynasty-sheet-hint', 'is-on-focus'], text: SHEET.childlessHint, attr: { id: hintId } });
+		this.placementField(grid);
+	}
+
+	/** Notes: the linked note and the notes. */
+	private notesBody(body: HTMLElement): void {
+		const stack = body.createDiv({ cls: 'dynasty-stack' });
+		this.textField(stack, 'link', SHEET.link, { placeholder: SHEET.linkPlaceholder, autocapitalize: 'off' });
+		this.textField(stack, 'notes', SHEET.notes, {}, true);
 	}
 
 	// ---------- Family, Actions, Delete (spec §6.3) ----------
 
-	private button(parent: HTMLElement, text: string, cls: string, run: () => void, label?: string): HTMLButtonElement {
-		const b = parent.createEl('button', { cls: ['dynasty-sheet-action', cls], text, attr: { type: 'button', 'data-focus': cls } });
+	/** A button of the window (a `dynasty-btn`): it does nothing while a write runs, and a failing action never leaves an exception (spec §8). */
+	private button(parent: HTMLElement, text: string, cls: string, run: () => void, label?: string, icon?: string): HTMLButtonElement {
+		const b = parent.createEl('button', { cls: ['dynasty-btn', cls], attr: { type: 'button', 'data-focus': cls } });
+		if (icon) setIcon(b.createSpan({ cls: 'dynasty-btn-icon', attr: { 'aria-hidden': 'true' } }), icon);
+		b.createSpan({ text });
 		if (label) b.setAttribute('aria-label', label);
 		b.addEventListener('click', () => {
 			if (this.saving) return;
@@ -1108,35 +1431,170 @@ export class EditSheet extends Modal {
 		return b;
 	}
 
-	/** The Family section (spec §6.3). */
-	private familySection(parent: HTMLElement): void {
+	/** One action of the Actions section: a row with an icon, tapped as a whole. `danger` shows it in the error colour (Delete). */
+	private actionRow(parent: HTMLElement, icon: string, text: string, cls: string, run: () => void, label?: string, danger = false): HTMLElement {
+		const r = buildRow(parent, {
+			tap: () => {
+				if (this.saving) return;
+				try {
+					run();
+				} catch (e) {
+					console.error('Dynasty Tree: the sheet action failed', e);
+				}
+			},
+			cls: ['dynasty-action-row', cls, ...(danger ? ['is-danger', 'mod-warning'] : [])],
+			attr: { 'data-focus': cls },
+			...(label ? { label } : {}),
+			chevron: false,
+			lead: (row) => iconLead(row, icon),
+		});
+		r.title.setText(text);
+		return r.row;
+	}
+
+	/**
+	 * An "Add" link at a group heading of the Family section. It shows a plus mark and "Add"; a screen reader and voice control get the full
+	 * name ("Add parent") from a hidden text, not from an aria-label, which Obsidian would show as a tooltip.
+	 */
+	private addLink(parent: HTMLElement, text: string, cls: string, run: () => void): HTMLButtonElement {
+		const b = parent.createEl('button', { cls: ['dynasty-link', 'dynasty-add-link', cls], attr: { type: 'button', 'data-focus': cls } });
+		setIcon(b.createSpan({ cls: 'dynasty-btn-icon', attr: { 'aria-hidden': 'true' } }), 'plus');
+		b.createSpan({ text: FAMILY.addLink, attr: { 'aria-hidden': 'true' } });
+		b.createSpan({ cls: 'dynasty-sr-only', text });
+		b.addEventListener('click', () => {
+			if (this.saving) return;
+			try {
+				run();
+			} catch (e) {
+				console.error('Dynasty Tree: the sheet action failed', e);
+			}
+		});
+		return b;
+	}
+
+	/** The name of a person in a row: the name, then the sobriquet in curly marks. */
+	private rowName(title: HTMLElement, id: string): void {
+		const p = this.data.g.byId.get(id);
+		title.appendText(p?.name || id);
+		if (p?.sobriquet) title.createSpan({ cls: 'dynasty-sob', text: ` ${quotedSobriquet(p.sobriquet)}` });
+	}
+
+	/** The relation word that a person row shows (D215), or undefined; the row's screen-reader name holds the same word. */
+	private relationWord(id: string): { text: string } | undefined {
+		const me = this.me();
+		return me && (id === me || this.data.person.id === me) ? relationsFor(this.data.g, me, this.o.relationOptions).cards.get(id) : undefined;
+	}
+
+	/**
+	 * The second text line of a person row: the years, with the relation word to the marked person before them (the marked person in bold).
+	 * D215: the word shows only in the window of the marked person. In another window it would read as a relation to that window's person
+	 * ("Grandfather" for a father). "You" is a name, not a relation word, so it stays.
+	 */
+	private rowSub(sub: HTMLElement, id: string): void {
+		const me = this.me();
+		const word = this.relationWord(id);
+		if (me && word) sub.createEl(id === me ? 'b' : 'i', { text: word.text });
+		const p = this.data.g.byId.get(id);
+		const dates = p ? dateLine(p) : '';
+		if (dates) sub.appendText(`${word ? ' · ' : ''}${dates}`);
+	}
+
+	private personRowLead(row: HTMLElement, id: string): void {
+		const p = this.data.g.byId.get(id);
+		personLead(row, { name: p?.name || id, ...(p?.portrait ? { portrait: p.portrait } : {}), ...(p?.portraitCrop ? { portraitCrop: p.portraitCrop } : {}) }, this.rowPictures ?? undefined);
+	}
+
+	/** The Family section: the three Add buttons, then Parents, Partners, Children and the place among the siblings (spec §6.3, G.7). */
+	private familyBody(body: HTMLElement): void {
 		const fam = this.data.fam;
 		if (!fam) return;
 		const ro = this.readOnly;
-		const sec = parent.createDiv({ cls: 'dynasty-sheet-section dynasty-family' });
-		sec.createDiv({ cls: 'dynasty-sheet-section-title', text: FAMILY.heading });
 
-		const parents = sec.createDiv({ cls: 'dynasty-family-group', attr: { 'data-family': 'parents' } });
-		parents.createDiv({ cls: 'dynasty-sheet-label', text: FAMILY.parents });
-		if (!fam.parents.length) parents.createDiv({ cls: 'dynasty-family-empty', text: FAMILY.noParents });
+		// D212: a quiet "+ Add" link at the right of each group heading, in place of the row of three buttons.
+		const group = (key: string, heading: string, add?: { text: string; cls: string; run: () => void }) => {
+			const head = body.createDiv({ cls: 'dynasty-sub-row' });
+			head.createDiv({ cls: 'dynasty-sub', text: heading });
+			if (add && !ro) this.addLink(head, add.text, add.cls, add.run);
+			return body.createDiv({ cls: ['dynasty-rows', 'dynasty-family-group'], attr: { 'data-family': key } });
+		};
+		const parents = group('parents', FAMILY.parents, { text: FAMILY.addParent, cls: 'dynasty-add-parent', run: () => void addParent(this.flowHost()) });
+		if (!fam.parents.length) parents.createDiv({ cls: ['dynasty-sheet-none', 'dynasty-family-empty'], text: FAMILY.noParents });
 		for (const link of fam.parents) this.parentRow(parents, fam, link);
 
-		const partners = sec.createDiv({ cls: 'dynasty-family-group', attr: { 'data-family': 'partners' } });
-		partners.createDiv({ cls: 'dynasty-sheet-label', text: FAMILY.partners });
-		if (!fam.partners.length) partners.createDiv({ cls: 'dynasty-family-empty', text: FAMILY.noPartners });
+		const partners = group('partners', FAMILY.partners, { text: FAMILY.addPartner, cls: 'dynasty-add-partner', run: () => void addPartner(this.flowHost()) });
+		if (!fam.partners.length) partners.createDiv({ cls: ['dynasty-sheet-none', 'dynasty-family-empty'], text: FAMILY.noPartners });
 		for (const link of fam.partners) this.partnerRow(partners, link);
+
+		// G.7: a child row opens that person in this window, with a way back.
+		const children = group('children', WINDOW_UI.children, { text: FAMILY.addChild, cls: 'dynasty-add-child', run: () => void addChild(this.flowHost()) });
+		const kids = this.childrenOf();
+		if (!kids.length) children.createDiv({ cls: ['dynasty-sheet-none', 'dynasty-family-empty'], text: WINDOW_UI.noChildren });
+		for (const kid of kids) {
+			const name = kid.name || kid.id;
+			const r = buildRow(children, {
+				tap: () => this.openPerson(kid.id),
+				label: WINDOW_UI.openPersonLabel(name, this.relationWord(kid.id)?.text),
+				cls: 'dynasty-family-row',
+				attr: { 'data-child': kid.id },
+				lead: (row) => this.personRowLead(row, kid.id),
+			});
+			r.title.addClass('dynasty-family-name');
+			this.rowName(r.title, kid.id);
+			this.rowSub(r.sub, kid.id);
+		}
 
 		const sib = fam.siblings;
 		if (sib) {
-			const group = sec.createDiv({ cls: 'dynasty-family-group', attr: { 'data-family': 'siblings' } });
-			group.createDiv({ cls: 'dynasty-sheet-label', text: FAMILY.siblings });
-			group.createDiv({ cls: 'dynasty-family-position', text: FAMILY.position(sib.index + 1, sib.group.length) });
+			const place = group('siblings', FAMILY.siblings);
+			const r = buildRow(place, { cls: 'dynasty-family-row' });
+			r.title.addClass('dynasty-family-position');
+			r.title.setText(FAMILY.position(sib.index + 1, sib.group.length));
 			if (!ro) {
-				const row = group.createDiv({ cls: 'dynasty-family-buttons' });
-				this.button(row, FAMILY.moveEarlier, 'dynasty-move-earlier', () => void this.moveSibling('earlier')).disabled = !sib.canMoveEarlier;
-				this.button(row, FAMILY.moveLater, 'dynasty-move-later', () => void this.moveSibling('later')).disabled = !sib.canMoveLater;
+				const actions = r.actions();
+				this.button(actions, FAMILY.moveEarlier, 'dynasty-move-earlier', () => void this.moveSibling('earlier')).disabled = !sib.canMoveEarlier;
+				this.button(actions, FAMILY.moveLater, 'dynasty-move-later', () => void this.moveSibling('later')).disabled = !sib.canMoveLater;
 			}
 		}
+	}
+
+	/**
+	 * G.7: a child row opens that person in this window. With unsaved changes the window first asks "Discard changes?", because the
+	 * draft belongs to the person on screen. The way back names the person that the user came from.
+	 */
+	private openPerson(id: string): void {
+		if (this.isNew || this.gone || !this.data.g.byId.has(id)) return;
+		const go = () => this.moveTo(id, true);
+		if (this.isDirty()) this.showConfirm({ title: SHEET.discardTitle, text: [SHEET.discardText], confirm: SHEET.discard, confirmCls: 'dynasty-sheet-discard', keep: SHEET.keepEditing, onConfirm: go });
+		else go();
+	}
+
+	/** The back link: the person before, with the same question when the draft has changes. */
+	private goBackTo(): void {
+		const to = this.trail[this.trail.length - 1];
+		if (to === undefined) return;
+		const go = () => this.moveTo(to, false);
+		if (this.isDirty()) this.showConfirm({ title: SHEET.discardTitle, text: [SHEET.discardText], confirm: SHEET.discard, confirmCls: 'dynasty-sheet-discard', keep: SHEET.keepEditing, onConfirm: go });
+		else go();
+	}
+
+	/** Shows another person of the same tree in this window, from the body that the window holds now. */
+	private moveTo(id: string, forward: boolean): void {
+		const was = this.data.person.id;
+		const fresh = this.fresh();
+		if (!fresh) return;
+		const r = loadSheet(this.o.handle.body, id);
+		if (r.kind !== 'ok') return;
+		if (forward) this.trail.push(was);
+		else this.trail.pop();
+		this.dropPortrait();
+		this.data = r.data;
+		this.base = this.baseOf(r.data);
+		this.draft = { ...this.base };
+		this.newHouse = blankHouse();
+		this.gone = false;
+		this.status = '';
+		this.build();
+		if (this.bodyEl) this.bodyEl.scrollTop = 0;
 	}
 
 	/** The marked person, if the tree has a mark that names a person (spec §13.1). */
@@ -1145,7 +1603,7 @@ export class EditSheet extends Modal {
 	}
 
 	/**
-	 * Spec §13.1, D146: what the infobox shows for this person, or null when nothing shows (a new person, a tree with no mark).
+	 * Spec §13.1, D146: what the relation text line shows for this person, or null when nothing shows (a new person, a tree with no mark).
 	 * The names come from the whole tree, as on the cards. Show the line is not on the marked person's own sheet.
 	 */
 	private makeRelationView(): RelationView | null {
@@ -1155,33 +1613,39 @@ export class EditSheet extends Modal {
 		const p = this.data.person;
 		const v: RelationView = relationInfo(relationsFor(this.data.g, me, this.o.relationOptions).all.get(p.id), p.id === me);
 		const finder = this.o.finder;
-		if (v.kind !== 'me' && finder && !this.gone) {
-			v.addLineButton = (parent) => void this.button(parent, ME_UI.showLine, 'dynasty-show-line', () => this.leaveFor(() => finder.show(me, p.id)), ME_UI.showLineLabel(p.name || p.id));
-		}
+		if (v.kind !== 'me' && finder && !this.gone) v.showLine = { label: ME_UI.showLine, aria: ME_UI.showLineLabel(p.name || p.id), run: () => this.leaveFor(() => finder.show(me, p.id)) };
 		return v;
 	}
 
-	/** D147: a window that crosses 600 px (a turn, a resize) swaps the box and the strip. The build keeps the draft and the focus. */
+	/** D147: a window that crosses 600 px (a turn, a resize) draws again, because a phone has a bar and a computer has a footer. The build keeps the draft and the focus. */
 	private relLayout(): void {
 		// The first layout runs inside `phoneLayout`, before the first build.
-		if (this.bodyEl === null || this.closed || this.relView === null) return;
-		if (this.modalEl.hasClass('is-phone') !== this.relPhone) this.build();
+		if (this.bodyEl === null || this.closed) return;
+		if (this.modalEl.hasClass('is-phone') !== this.builtPhone) this.build();
 	}
 
 	private parentRow(parent: HTMLElement, fam: FamilyView, link: ParentLink): void {
 		const name = this.name(link.id);
-		const row = parent.createDiv({ cls: 'dynasty-family-row', attr: { 'data-parent': link.id, 'data-type': link.type } });
-		row.createDiv({ cls: 'dynasty-family-name', text: name });
-		const controls = row.createDiv({ cls: 'dynasty-family-controls' });
-		const sel = controls.createEl('select', { cls: ['dropdown', 'dynasty-family-select'], attr: { 'aria-label': FAMILY.parentTypeLabel(name), 'data-focus': 'parent-type' } });
+		const r = buildRow(parent, { cls: 'dynasty-family-row', attr: { 'data-parent': link.id, 'data-type': link.type }, lead: (row) => this.personRowLead(row, link.id) });
+		r.title.addClass('dynasty-family-name');
+		this.rowName(r.title, link.id);
+		this.rowSub(r.sub, link.id);
+		const controls = r.actions();
+		controls.addClass('dynasty-family-controls');
+		const chip = controls.createSpan({ cls: 'dynasty-chip-select' });
+		// The name comes from a hidden text, not from an aria-label: Obsidian shows an aria-label as a tooltip over the chip.
+		const chipId = `dynasty-chip-${++EditSheet.chipCounter}`;
+		chip.createSpan({ cls: 'dynasty-sr-only', text: FAMILY.parentTypeLabel(name), attr: { id: chipId } });
+		const sel = chip.createEl('select', { cls: ['dropdown', 'dynasty-family-select'], attr: { 'aria-labelledby': chipId, 'data-focus': 'parent-type' } });
 		const count = (t: string) => fam.parents.filter((l) => l.type === t).length;
 		for (const t of PARENT_TYPES) {
 			const opt = sel.createEl('option', { text: parentTypeText(t), attr: { value: t } });
-			// A type that has 2 parents already is full (spec §4.2).
-			opt.disabled = t !== link.type && count(t) >= 2;
+			// A type that has its most parents already is full (spec §4.2, `PARENT_LIMIT`).
+			opt.disabled = t !== link.type && count(t) >= PARENT_LIMIT[t];
 		}
 		sel.value = link.type;
 		sel.disabled = this.readOnly;
+		setIcon(chip.createSpan({ cls: 'dynasty-chip-chevron', attr: { 'aria-hidden': 'true' } }), 'chevron-down');
 		sel.addEventListener('change', () => {
 			const to = sel.value as ParentKind;
 			if (to === link.type) return;
@@ -1190,67 +1654,59 @@ export class EditSheet extends Modal {
 			});
 		});
 		if (this.readOnly) return;
-		this.button(controls, FAMILY.remove, 'dynasty-remove-parent', () => void this.removeParent(link), FAMILY.removeParentLabel(name));
+		iconButton(controls, 'x', FAMILY.removeParentLabel(name), () => void this.removeParent(link), { cls: 'dynasty-remove-parent', focus: 'dynasty-remove-parent' });
 	}
 
 	private partnerRow(parent: HTMLElement, link: PartnerLink): void {
 		const name = this.name(link.partner);
-		const row = parent.createDiv({ cls: 'dynasty-family-row', attr: { 'data-partner': link.partner, 'data-union': link.union ? String(link.union.index) : 'none' } });
-		const text = row.createDiv({ cls: 'dynasty-family-name' });
-		text.createDiv({ text: name });
-		text.createDiv({ cls: 'dynasty-family-detail', text: partnerDetail(link.type, link.start, link.end) });
+		const r = buildRow(parent, {
+			cls: 'dynasty-family-row',
+			attr: { 'data-partner': link.partner, 'data-union': link.union ? String(link.union.index) : 'none' },
+			lead: (row) => this.personRowLead(row, link.partner),
+		});
+		r.title.addClass('dynasty-family-name');
+		this.rowName(r.title, link.partner);
+		r.sub.addClass('dynasty-family-detail');
+		r.sub.setText(`⚭ ${partnerDetail(link.type, link.start, link.end)}`);
+		// The box of the end controls stands also when it is empty, so the pictures of the rows keep one vertical line.
+		const controls = r.actions();
+		controls.addClass('dynasty-family-controls');
 		if (this.readOnly || !link.union) return;
-		const controls = row.createDiv({ cls: 'dynasty-family-controls' });
-		this.button(controls, FAMILY.edit, 'dynasty-edit-union', () => void this.editPartnership(link), FAMILY.editLabel(name));
-		this.button(controls, FAMILY.removePartnership, 'dynasty-remove-union', () => this.confirmRemovePartnership(link), FAMILY.removePartnershipLabel(name));
+		textButton(controls, ['dynasty-link', 'dynasty-edit-union'], FAMILY.edit, () => void this.editPartnership(link), { label: FAMILY.editLabel(name), focus: 'dynasty-edit-union' });
+		iconButton(controls, 'x', FAMILY.removePartnershipLabel(name), () => this.confirmRemovePartnership(link), { cls: 'dynasty-remove-union', focus: 'dynasty-remove-union' });
 	}
 
-	/** The Actions section (spec §6.3); `me` is the marked person (spec §13.1), or null. */
-	private actionsSection(parent: HTMLElement, me: string | null): void {
-		const sec = parent.createDiv({ cls: 'dynasty-sheet-section dynasty-actions' });
-		sec.createDiv({ cls: 'dynasty-sheet-section-title', text: FAMILY.actions });
-		const list = sec.createDiv({ cls: 'dynasty-actions-list' });
-		if (!this.readOnly) {
-			this.button(list, FAMILY.addParent, 'dynasty-add-parent', () => void addParent(this.flowHost()));
-			this.button(list, FAMILY.addChild, 'dynasty-add-child', () => void addChild(this.flowHost()));
-			this.button(list, FAMILY.addPartner, 'dynasty-add-partner', () => void addPartner(this.flowHost()));
-		}
+	/** The Actions section (spec §6.3); `me` is the marked person (spec §13.1), or null. Delete and the ID line stand last. */
+	private actionsBody(body: HTMLElement, me: string | null): void {
+		const list = body.createDiv({ cls: ['dynasty-rows', 'dynasty-actions-list'] });
 		const p = this.data.person;
 		const focus = this.o.focus;
-		if (focus && !this.gone) this.button(list, FOCUS_UI.focusHere, 'dynasty-focus-here', () => this.leaveFor(() => focus.here(p.id)), FOCUS_UI.focusHereLabel(p.name));
+		if (focus && !this.gone) this.actionRow(list, 'crosshair', FOCUS_UI.focusHere, 'dynasty-focus-here', () => this.leaveFor(() => focus.here(p.id)), FOCUS_UI.focusHereLabel(p.name));
 		if (!this.readOnly) {
 			// D18: one pin per tree; the pinned person's sheet offers to remove it.
-			if (this.data.tree.options.focus === p.id) this.button(list, FOCUS_UI.unpin, 'dynasty-unpin', () => void this.pin(false), FOCUS_UI.unpinLabel(p.name));
-			else this.button(list, FOCUS_UI.pin, 'dynasty-pin', () => void this.pin(true), FOCUS_UI.pinLabel(p.name));
+			if (this.data.tree.options.focus === p.id) this.actionRow(list, 'pin', FOCUS_UI.unpin, 'dynasty-unpin', () => void this.pin(false), FOCUS_UI.unpinLabel(p.name));
+			else this.actionRow(list, 'pin', FOCUS_UI.pin, 'dynasty-pin', () => void this.pin(true), FOCUS_UI.pinLabel(p.name));
 			// Spec §13.1: one mark per tree; the marked person's sheet offers to remove it.
-			if (me === p.id) this.button(list, ME_UI.unmark, 'dynasty-unmark-me', () => void this.markMe(false), ME_UI.unmarkLabel(p.name));
-			else this.button(list, ME_UI.mark, 'dynasty-mark-me', () => void this.markMe(true), ME_UI.markLabel(p.name));
+			if (me === p.id) this.actionRow(list, 'user-check', ME_UI.unmark, 'dynasty-unmark-me', () => void this.markMe(false), ME_UI.unmarkLabel(p.name));
+			else this.actionRow(list, 'user-check', ME_UI.mark, 'dynasty-mark-me', () => void this.markMe(true), ME_UI.markLabel(p.name));
 		}
 		// Spec §13.10: Hide descendants and Show descendants write nothing, so they are in a read-only tree too; not for a new person.
 		const folds = this.o.folds;
 		if (folds && !this.isNew && !this.gone) {
 			const state = folds.state(p.id);
-			if (state.open.length) this.button(list, FOLD_UI.hideDescendants, 'dynasty-hide-descendants', () => this.leaveFor(() => folds.hide(p.id)), FOLD_UI.hideDescendantsLabel(p.name));
-			if (state.folded.length) this.button(list, FOLD_UI.showDescendants, 'dynasty-show-descendants', () => this.leaveFor(() => folds.show(p.id)), FOLD_UI.showDescendantsLabel(p.name));
+			if (state.open.length) this.actionRow(list, 'fold-vertical', FOLD_UI.hideDescendants, 'dynasty-hide-descendants', () => this.leaveFor(() => folds.hide(p.id)), FOLD_UI.hideDescendantsLabel(p.name));
+			if (state.folded.length) this.actionRow(list, 'fold-vertical', FOLD_UI.showDescendants, 'dynasty-show-descendants', () => this.leaveFor(() => folds.show(p.id)), FOLD_UI.showDescendantsLabel(p.name));
 		}
 		const finder = this.o.finder;
-		if (finder && !this.gone) this.button(list, ME_UI.showRelationTo, 'dynasty-relation-to', () => void this.relationTo(finder), ME_UI.showRelationToLabel(p.name));
+		if (finder && !this.gone) this.actionRow(list, 'git-branch', ME_UI.showRelationTo, 'dynasty-relation-to', () => void this.relationTo(finder), ME_UI.showRelationToLabel(p.name));
 		// Spec §13.11: Make a note / Make the linked note, before Open link.
 		if (!this.readOnly) {
 			this.noteSlot = list.createDiv({ cls: 'dynasty-note-slot' });
 			this.updateNoteButton();
 		}
-		const linktext = linkTarget(this.data.person.link);
-		if (linktext) {
-			this.button(list, SHEET.openLink, 'dynasty-sheet-open-link', () =>
-				this.leaveFor(() => {
-					const open = () => this.app.workspace.openLinkText(linktext, this.o.sourcePath, false);
-					if (this.o.openNote) this.o.openNote(open);
-					else void open().catch((e) => console.error('Dynasty Tree: cannot open link', e));
-				}),
-			);
-		}
-		if (!list.childElementCount) sec.remove();
+		// D218 item 9: "Open linked note" stands in the row under the header (`openNoteLink`), not here.
+		if (!this.readOnly) this.actionRow(list, 'trash-2', FAMILY.deletePerson, 'dynasty-delete-person', () => this.confirmDelete(), undefined, true);
+		this.idLine(body);
 	}
 
 	// ---------- Make a note (spec §13.11) ----------
@@ -1283,7 +1739,7 @@ export class EditSheet extends Modal {
 		if (!mode) return;
 		const text = mode === 'new' ? NOTE_UI.make : NOTE_UI.makeLinked;
 		const label = mode === 'new' ? NOTE_UI.makeLabel(name) : NOTE_UI.makeLinkedLabel(name);
-		this.button(slot, text, 'dynasty-make-note', () => void this.makeNoteFlow(mode), label);
+		this.actionRow(slot, 'file-text', text, 'dynasty-make-note', () => void this.makeNoteFlow(mode), label);
 	}
 
 	/** N2, N3: the flow, then what the sheet shows for its result. A busy flag covers the whole flow. */
@@ -1455,7 +1911,7 @@ export class EditSheet extends Modal {
 	private async relationTo(finder: NonNullable<SheetBase['finder']>): Promise<void> {
 		const p = this.data.person;
 		const me = this.me();
-		const picked = await pickPerson(this.app, this.data.g, new Set([p.id]), FINDER_UI.placeholder, FINDER_UI.otherTitle, false, me !== p.id ? me : null);
+		const picked = await pickPerson(this.app, this.data.g, new Set([p.id]), FINDER_UI.placeholder, FINDER_UI.otherTitle, false, me !== p.id ? me : null, null, this.pickerContext());
 		if (picked?.kind !== 'person' || !this.shown) return;
 		this.leaveFor(() => finder.show(picked.id, p.id));
 	}
@@ -1467,13 +1923,7 @@ export class EditSheet extends Modal {
 	private idLine(parent: HTMLElement): void {
 		const id = this.data.person.id;
 		if (this.gone || !this.data.g.byId.has(id) || unwritten(this.data, id)) return;
-		parent.createDiv({ cls: 'dynasty-sheet-id', text: SHEET.idLine(id) });
-	}
-
-	private deleteSection(parent: HTMLElement): void {
-		const sec = parent.createDiv({ cls: 'dynasty-sheet-section dynasty-delete' });
-		const b = this.button(sec, FAMILY.deletePerson, 'dynasty-delete-person', () => this.confirmDelete());
-		b.addClass('mod-warning');
+		parent.createDiv({ cls: ['dynasty-sheet-id', 'dynasty-id'], text: SHEET.idLine(id) });
 	}
 
 	/** What the Titles section (spec §13.4) uses of the sheet: its data, its draft and its writes. */
@@ -1492,7 +1942,7 @@ export class EditSheet extends Modal {
 				return !!out;
 			},
 			lastError: () => this.lastError,
-			button: (parent, text, cls, run, label) => this.button(parent, text, cls, run, label),
+			button: (parent, text, cls, run, label, icon) => this.button(parent, text, cls, run, label, icon),
 		};
 	}
 
@@ -1507,7 +1957,23 @@ export class EditSheet extends Modal {
 			ready: () => this.pendingOps() !== null && this.fresh(),
 			commit: (ops, highlight) => this.writeWithDraft(ops, highlight),
 			openNew: (rel, name) => this.openNew(rel, name),
+			picker: () => this.flowPickerContext(),
 		};
+	}
+
+	/**
+	 * D211: the lists of Add parent, Add child and Add partner name no relation, unless this window is about the marked person: the words
+	 * say "to You", and in the window of another person they would be read as relations to that person.
+	 */
+	private flowPickerContext(): PickerContext {
+		const ctx = this.pickerContext();
+		return this.me() === this.data.person.id ? ctx : { ...ctx, me: null };
+	}
+
+	/** The rows of the person picker: portraits, the marked person for the relation word, and the relation settings (G.3). */
+	private pickerContext(): PickerContext {
+		const me = this.me();
+		return { ...(this.o.pictures ? { pictures: this.o.pictures } : {}), sourcePath: this.o.sourcePath, me, ...(this.o.relationOptions ? { relationOptions: this.o.relationOptions } : {}) };
 	}
 
 	private openNew(rel: NewRelation, name?: string): void {
@@ -1672,7 +2138,7 @@ export class EditSheet extends Modal {
 				// A partnership, title or holder that the sheet showed is not in the tree now: the tree changed.
 				else if (code === 'unknown-union' || code === 'unknown-person' || code === 'unknown-title' || code === 'unknown-holder' || code === 'id-taken') this.stale(h.body);
 				else if (code === 'cycle') this.refused(WRITE_TEXT.cycle);
-				else if (code === 'limit') this.refused(WRITE_TEXT.limit);
+				else if (code === 'limit') this.refused(WRITE_TEXT.limit(this.limitType));
 				else if (code === 'no-sibling') this.refused(WRITE_TEXT.noSibling);
 				else this.refused(WRITE_TEXT.refused);
 			},
@@ -1689,6 +2155,8 @@ export class EditSheet extends Modal {
 		const pending = this.pendingOps();
 		if (pending === null) return null;
 		const all = [...pending, ...ops];
+		// The refusal `limit` says which type is full: the text differs for a rumoured parent (contract B.3).
+		this.limitType = ops.map((op) => (op.kind === 'add-parent' ? op.type : op.kind === 'set-parent-type' ? op.to : undefined)).find((t) => t !== undefined);
 		const ids = idsFor(this.data, [this.data.person.id, ...namesIn(all), ...holderNames(all)]);
 		const out = await this.write(withIds(all, ids), highlight === null ? null : (ids.get(highlight) ?? highlight));
 		if (!out) return null;
@@ -1736,7 +2204,7 @@ export class EditSheet extends Modal {
 		const name = this.draft.name.trim();
 		// The related people and the parent sheet's person get an id if they have none (see `idsFor`).
 		const ids = idsFor(this.data, [...(parent ? [parent.data.person.id] : []), ...this.relIds(), ...namesIn(pending)]);
-		// The id newPersonId gives (D104), also unused by the ids above.
+		// The next free person id (D104), also unused by the ids above.
 		const id = nextPersonId(takenIds(this.data, ids.values()));
 		const taken = pending.flatMap((op) => (op.kind === 'batch' ? op.ops : [op])).filter((op) => op.kind === 'add-house').map((op) => (op.kind === 'add-house' && parent ? newHouseId(parent.data.data, op.name) : ''));
 		const out = await this.write(withIds([...pending, ...this.newPersonOps(id, taken)], ids), id);

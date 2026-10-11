@@ -85,17 +85,18 @@ describe('F6, F7, F16: the controls in the scene', () => {
 		}
 	});
 
-	it('the open button is a circle 1.2 em across on the spot; the sign is a pill 1.25 em high that starts half its height left of the spot (it grows to the right)', () => {
+	it('the open button is a circle 1.2 em across on the spot; the sign is a pill 1.25 em high that is centred on the spot (D206)', () => {
 		const d = draw('A', FOLDS);
 		const button = (d.scene.folds).find((r) => !r.control.folded)!;
-		expect(button.mark.w).toBeCloseTo(1.2 * EM, 6);
-		expect(button.mark.h).toBeCloseTo(1.2 * EM, 6);
+		// 0.2.8 (C01): the open button is a small square chip, 0.95 em across, centred on the spot; the layout still reserves the 1.2 em circle.
+		expect(button.mark.w).toBeCloseTo(0.95 * EM, 6);
+		expect(button.mark.h).toBeCloseTo(0.95 * EM, 6);
 		expect(button.mark.x + button.mark.w / 2).toBeCloseTo(button.control.spot.x, 6);
 		expect(button.mark.y + button.mark.h / 2).toBeCloseTo(button.control.spot.y, 6);
 		const sign = (d.scene.folds).find((r) => r.control.folded)!;
 		expect(sign.control.count).toBe(75);
 		expect(sign.mark.h).toBeCloseTo(1.25 * EM, 6);
-		expect(sign.mark.x).toBeCloseTo(sign.control.spot.x - (1.25 * EM) / 2, 6);
+		expect(sign.mark.x + sign.mark.w / 2).toBeCloseTo(sign.control.spot.x, 6);
 		expect(sign.mark.y + sign.mark.h / 2).toBeCloseTo(sign.control.spot.y, 6);
 		// "+ 75" is 4 characters of 10 px; the pill is the text plus 0.9 em wide.
 		expect(sign.mark.w).toBeCloseTo(40 + 0.9 * EM, 6);
@@ -116,7 +117,7 @@ describe('F6, F7, F16: the controls in the scene', () => {
 			}
 			expect(ref.markOverview).toBeDefined();
 			expect(ref.markOverview!.h).toBeCloseTo(2 * EM, 6);
-			expect(ref.markOverview!.x).toBeCloseTo(ref.control.spot.x - EM, 6);
+			expect(ref.markOverview!.x + ref.markOverview!.w / 2).toBeCloseTo(ref.control.spot.x, 6);
 			expect(ref.markOverview!.y + ref.markOverview!.h / 2).toBeCloseTo(ref.control.spot.y, 6);
 			expect(ref.markOverview!.w).toBeGreaterThan(ref.mark.w);
 		}

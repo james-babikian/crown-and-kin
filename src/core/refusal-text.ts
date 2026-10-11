@@ -14,6 +14,9 @@ export const REFUSAL_TEXT = {
 	pluralText: 'The plural must be text.',
 	holderNeeds: 'A holder needs a person or a name.',
 	newIdText: 'The new id must be text without spaces at the ends.',
+	// The ID window compares a refusal with these two exactly (`idRefusalText`), so they are constants, not literals.
+	idCharacters: 'An ID has only letters, digits and hyphens.',
+	idNotText: 'The new ID must be a word or a number.',
 	unknownParentType: 'Unknown parent type.',
 	unknownUnionType: 'Unknown partnership type.',
 	alreadyParent: 'This person is already a parent of that type.',

@@ -98,7 +98,7 @@ describe('the settings tab (spec §9, D33)', () => {
 		expect(names(0)).toEqual([SETTINGS_UI.heightDesktop]);
 		// M7 (spec §13.1): the relation names are in the Cards group. 0.2.7 (E.6, J.8): the settings of the line of succession come last.
 		// 0.2.4 (D118, D126): 0.2.5 (D150): the direction row comes first, then the break list and "Reduce movement"; the card style of the phone preview is gone (D144), and 0.2.6 (D179) removes "Card size".
-		expect(names(1)).toEqual([SETTINGS_UI.phoneDirection, SETTINGS_UI.breakWords, SETTINGS_UI.reduceMotion, SETTINGS_UI.dates, SETTINGS_UI.relations, SETTINGS_UI.oneParentUnknown, SETTINGS_UI.portraits, SETTINGS_UI.successionLength, SETTINGS_UI.oldAge, SETTINGS_UI.youngDeathAge]);
+		expect(names(1)).toEqual([SETTINGS_UI.phoneDirection, SETTINGS_UI.armsOnCards, SETTINGS_UI.breakWords, SETTINGS_UI.reduceMotion, SETTINGS_UI.dates, SETTINGS_UI.relations, SETTINGS_UI.oneParentUnknown, SETTINGS_UI.portraits, SETTINGS_UI.manyParents, SETTINGS_UI.successionLength, SETTINGS_UI.oldAge, SETTINGS_UI.youngDeathAge]);
 		// D113 item 4: the house page has its own group.
 		expect(names(2)).toEqual([SETTINGS_UI.houseGeneration]);
 		expect(names(3)).toEqual([SETTINGS_UI.generations]);
@@ -111,7 +111,7 @@ describe('the settings tab (spec §9, D33)', () => {
 	it('shows the stored values; a bad stored value shows its default', async () => {
 		// The stored data of 0.2.4 still has the phone height and the card style: both are dropped (D144).
 		const { fake, plugin } = await loadPlugin({ embedHeightDesktop: 640, embedHeightPhone: 70, phoneCardStyle: 'whole', cardSize: 'compact', showDates: false, focusGenerations: 99, updateLinks: false });
-		expect(plugin.settings).toEqual({ embedHeightDesktop: 640, showDates: false, showRelations: true, oneParentUnknown: true, showPortraits: true, showHouseGeneration: true, focusGenerations: 3, updateLinks: false, breakWords: '', reduceMotion: 'system', phoneDirection: 'sideways', successionLength: 5, oldAge: 110, youngDeathAge: 0 });
+		expect(plugin.settings).toEqual({ embedHeightDesktop: 640, showDates: false, showRelations: true, oneParentUnknown: true, showPortraits: true, showHouseGeneration: true, focusGenerations: 3, updateLinks: false, breakWords: '', reduceMotion: 'system', phoneDirection: 'sideways', successionLength: 5, oldAge: 110, youngDeathAge: 0, armsOnCards: 'few', warnManyParents: true });
 		openTab(fake);
 		expect(control<TextComponent>(SETTINGS_UI.heightDesktop).getValue()).toBe('640');
 		expect(control<ToggleComponent>(SETTINGS_UI.dates).getValue()).toBe(false);
@@ -136,6 +136,27 @@ describe('the settings tab (spec §9, D33)', () => {
 		control<ToggleComponent>(SETTINGS_UI.houseGeneration).fire(false);
 		await settle();
 		expect(plugin.settings.showHouseGeneration).toBe(false);
+		expect(last(fake.saved)).toEqual(plugin.settings);
+	});
+
+	it('0.2.8 (A.4, A.5): "Arms on cards" offers the two values and stores a change; "Warn about more than 2 parents of a type" is on by default and stores a change', async () => {
+		const { fake, plugin } = await loadPlugin();
+		openTab(fake);
+		const arms = control<DropdownComponent>(SETTINGS_UI.armsOnCards);
+		expect(arms.getValue()).toBe('few');
+		expect(arms.options).toEqual([
+			['few', SETTINGS_UI.armsFew],
+			['all', SETTINGS_UI.armsAll],
+		]);
+		expect(arms.selectEl.getAttribute('aria-label')).toBe(SETTINGS_UI.armsOnCards);
+		arms.fire('all');
+		const warn = control<ToggleComponent>(SETTINGS_UI.manyParents);
+		expect(warn.getValue()).toBe(true);
+		expect(warn.toggleEl.getAttribute('aria-label')).toBe(SETTINGS_UI.manyParents);
+		warn.fire(false);
+		await settle();
+		expect(plugin.settings.armsOnCards).toBe('all');
+		expect(plugin.settings.warnManyParents).toBe(false);
 		expect(last(fake.saved)).toEqual(plugin.settings);
 	});
 
@@ -486,32 +507,36 @@ describe('keyboard (spec §5.2)', () => {
 	it('Esc closes the legend and gives the focus back to the Legend button', async () => {
 		desktop();
 		const { el } = await embed(TREE, { handle: fakeHandle('n.md', TREE) });
-		const legend = el.querySelector('.dynasty-legend-button')!;
-		legend.focus();
-		dispatch(legend, 'click');
+		// 0.2.8 (G.13): the line styles are an item of More, and Esc gives the focus back to the button that opened the menu (More).
+		const more = el.querySelector('.dynasty-more')!;
+		more.focus();
+		dispatch(more, 'click');
+		dispatch(el.querySelector('.dynasty-more-legend')!, 'click');
 		expect(el.querySelector('.dynasty-popover-legend')).not.toBeNull();
-		const e = dispatch(legend, 'keydown', { key: 'Escape' });
+		const e = dispatch(more, 'keydown', { key: 'Escape' });
 		expect(el.querySelector('.dynasty-popover-legend')).toBeNull();
-		expect(fakeDoc.activeElement).toBe(legend);
+		expect(fakeDoc.activeElement).toBe(more);
 		// Obsidian does not see the Esc: a full-screen view around the tree stays open.
 		expect(e.defaultPrevented).toBe(true);
 	});
 
 	it('full-screen view: Esc (Obsidian closes with no text) closes an open legend first, then the view', async () => {
 		const { root, modal } = await openFullScreen(TREE);
-		const legend = root.querySelector('.dynasty-legend-button')!;
-		legend.focus();
-		dispatch(legend, 'click');
+		const more = root.querySelector('.dynasty-more')!;
+		more.focus();
+		dispatch(more, 'click');
+		dispatch(root.querySelector('.dynasty-more-legend')!, 'click');
 		expect(root.querySelector('.dynasty-popover-legend')).not.toBeNull();
 		modal.close();
 		expect(root.querySelector('.dynasty-popover-legend')).toBeNull();
 		expect(fullViews()).toContain(modal);
-		expect(fakeDoc.activeElement).toBe(legend);
+		expect(fakeDoc.activeElement).toBe(more);
 		modal.close();
 		expect(fullViews()).not.toContain(modal);
 		// The toolbar Close (an explicit close) never stops at a popover.
 		const again = await openFullScreen(TREE);
-		dispatch(again.root.querySelector('.dynasty-legend-button')!, 'click');
+		dispatch(again.root.querySelector('.dynasty-more')!, 'click');
+		dispatch(again.root.querySelector('.dynasty-more-legend')!, 'click');
 		dispatch(again.root.querySelector('.dynasty-close')!, 'click');
 		expect(fullViews()).not.toContain(again.modal);
 	});
@@ -520,7 +545,8 @@ describe('keyboard (spec §5.2)', () => {
 		// M6 iPhone test: a phone showed the Notice "[object PointerEvent]" (the decision notes "M6 iPhone test").
 		const evt = { type: 'pointerup', pointerType: 'touch', toString: () => '[object PointerEvent]' };
 		const { root, modal } = await openFullScreen(TREE);
-		dispatch(root.querySelector('.dynasty-legend-button')!, 'click');
+		dispatch(root.querySelector('.dynasty-more')!, 'click');
+		dispatch(root.querySelector('.dynasty-more-legend')!, 'click');
 		expect(root.querySelector('.dynasty-popover-legend')).not.toBeNull();
 		modal.close(evt);
 		expect(root.querySelector('.dynasty-popover-legend')).toBeNull();

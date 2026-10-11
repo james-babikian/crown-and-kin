@@ -1,0 +1,491 @@
+/* ---------- Toolbar and menus (0.2.8, contract C and G.13) ---------- */
+
+/*
+ * One flat row at the top of the tree (D197 Q3 B): on a computer Add person with its word, Find, Focus, Fit | Houses, Titles | More … Expand;
+ * the phone's full-screen bar at the bottom and the bar of the phone list use the same class. It lies over the top of the tree box, and the first
+ * views keep clear of it (`measureInsets`). Every button has a hit area of 44 × 44 px (spec §7.5); the hover chip is 30 px.
+ */
+.dynasty-toolbar {
+	position: absolute;
+	top: 0;
+	left: 0;
+	right: 0;
+	display: flex;
+	align-items: center;
+	gap: 0;
+	box-sizing: border-box;
+	height: 44px;
+	padding: 0 2px;
+	background: var(--background-primary);
+	border-bottom: 1px solid var(--background-modifier-border);
+	font-family: var(--font-interface);
+	font-size: var(--dynasty-type-control);
+	cursor: default;
+	z-index: 2;
+}
+
+/*
+ * Inside a callout, the toolbar shows the callout's own background over the note background. The
+ * tree view reads the backgrounds between the tree and the callout, as the theme paints them, into
+ * --dynasty-callout-bg (Obsidian 1.13 mixes the tint with color-mix(), Minimal's outlined callouts
+ * have none, other themes paint their own). Until then, or if that fails, the tint as Obsidian before
+ * 1.13 painted it, where --callout-color is "r, g, b".
+ */
+.callout .dynasty-toolbar,
+.callout .dynasty-hint,
+.callout .dynasty-result {
+	background-image: var(--dynasty-callout-bg, linear-gradient(rgba(var(--callout-color), 0.1), rgba(var(--callout-color), 0.1)));
+}
+
+.dynasty-toolbar .dynasty-tool {
+	position: relative;
+	/* Hit targets of at least 44 × 44 px (spec §7.5); the chip that shows hover and the pressed state is 30 px. */
+	flex: none;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: 6px;
+	box-sizing: border-box;
+	min-width: 44px;
+	width: 44px;
+	min-height: 44px;
+	height: 44px;
+	margin: 0;
+	padding: 0;
+	background: transparent;
+	box-shadow: none;
+	border: none;
+	border-radius: 0;
+	color: var(--icon-color, var(--text-muted));
+	font-family: var(--font-interface);
+	cursor: pointer;
+}
+
+.dynasty-toolbar .dynasty-tool::before {
+	content: '';
+	position: absolute;
+	inset: 7px;
+	border-radius: var(--radius-s);
+	background: transparent;
+}
+
+.dynasty-toolbar .dynasty-tool > * {
+	position: relative;
+}
+
+.dynasty-toolbar .dynasty-tool:hover {
+	color: var(--text-normal);
+	background: transparent;
+	box-shadow: none;
+}
+
+.dynasty-toolbar .dynasty-tool:hover::before {
+	background: var(--background-modifier-hover);
+}
+
+.dynasty-toolbar .dynasty-tool[aria-pressed='true']::before {
+	background: var(--background-modifier-active-hover);
+}
+
+.dynasty-toolbar .dynasty-tool[aria-pressed='true'] {
+	color: var(--text-accent);
+}
+
+.dynasty-toolbar .dynasty-tool .svg-icon {
+	width: 17px;
+	height: 17px;
+}
+
+/* Add person has its word on the computer. */
+.dynasty-toolbar .dynasty-tool.dynasty-tool-main {
+	width: auto;
+	padding: 0 10px 0 6px;
+	color: var(--text-normal);
+	font-weight: var(--font-semibold);
+}
+
+.dynasty-toolbar .dynasty-tool.dynasty-tool-main::before {
+	inset: 7px 0;
+}
+
+.dynasty-tool-icon {
+	display: flex;
+}
+
+.dynasty-toolbar .dynasty-sep {
+	flex: none;
+	width: 1px;
+	height: 18px;
+	margin: 0 6px;
+	background: var(--background-modifier-border);
+}
+
+.dynasty-toolbar .dynasty-grow {
+	flex: 1 1 auto;
+	min-width: 0;
+}
+
+.dynasty-warning-badge,
+.dynasty-warning-badge .dynasty-tool-icon {
+	color: var(--text-warning);
+}
+
+.dynasty-toolbar .dynasty-tool.dynasty-warning-badge {
+	width: auto;
+	padding: 0 8px;
+}
+
+.dynasty-toolbar .dynasty-tool.dynasty-warning-badge::before {
+	inset: 7px 0;
+}
+
+.dynasty-warning-count {
+	font-weight: var(--font-semibold);
+}
+
+/* ---------- Menus: a menu under the button on a computer, a sheet from the bottom on a phone ---------- */
+
+.dynasty-popover {
+	position: absolute;
+	top: calc(44px + 4px);
+	right: var(--size-4-1);
+	width: max-content;
+	max-width: min(440px, calc(100% - 2 * var(--size-4-1)));
+	max-height: calc(100% - 44px - 4 * var(--size-4-1));
+	overflow: auto;
+	z-index: 4;
+	padding: var(--size-4-2) var(--size-4-3);
+	background: var(--background-primary);
+	border: 1px solid var(--background-modifier-border);
+	border-radius: var(--radius-m);
+	box-shadow: var(--shadow-s);
+	font-family: var(--font-interface);
+	font-size: var(--dynasty-type-control);
+	cursor: default;
+	user-select: text;
+	-webkit-user-select: text;
+}
+
+/* The menus of the toolbar (More, Focus): `ob-menu`. */
+.dynasty-popover-more,
+.dynasty-popover-focus {
+	min-width: 200px;
+	padding: 6px;
+	background: var(--background-secondary);
+}
+
+.dynasty-popover-legend {
+	width: 300px;
+	padding: 10px 14px;
+	box-shadow: var(--shadow-l);
+}
+
+/* D212 (legend-width): 320 px wide and as tall as its rows, up to the height of the tree, so no label wraps and no scrollbar shows. */
+.dynasty-popover.dynasty-popover-legend:not(.is-sheet) {
+	box-sizing: border-box;
+	width: 320px;
+	max-height: calc(100% - 52px);
+}
+
+/*
+ * 0.2.8 (G5b): in a short tree box (a note embed of 500 px) the 15 rows are taller than the box, and the end of the list was cut with no sign. `fitLegend` adds
+ * `is-tight` when the rows do not fit: the rows are as high as their sample (22 px, plus 2 px) and the gaps and the padding are smaller, so the whole list shows.
+ * A box that is still too short for that scrolls inside.
+ */
+.dynasty-popover-legend.is-tight {
+	padding-top: 8px;
+	padding-bottom: 8px;
+}
+
+.dynasty-popover-legend.is-tight .dynasty-popover-title {
+	margin-bottom: 4px;
+}
+
+.dynasty-popover-legend.is-tight .dynasty-legend {
+	gap: 0;
+}
+
+.dynasty-popover-legend.is-tight .dynasty-legend-row {
+	min-height: 24px;
+}
+
+.dynasty-popover-problems {
+	/*
+	 * Left, right and bottom stay flush so the callout's own border sits at the popover's edge.
+	 * The top keeps clearance: Minimal's outlined callouts (owner's theme) draw the title row on
+	 * and above the callout's top border (a −24px offset in Minimal's theme.css); without room
+	 * above the callout, the popover's `overflow: auto` cuts the title off (0.1.1 iPhone test).
+	 */
+	padding: var(--size-4-6) 0 0 0;
+}
+
+/* A popover that belongs to an element in the tree opens next to it. */
+.dynasty-popover.is-anchored {
+	top: var(--dynasty-pop-y);
+	left: var(--dynasty-pop-x);
+	right: auto;
+}
+
+.dynasty-popover-problems .callout {
+	margin: 0;
+}
+
+/* D218 (rules 2 and 3): the title of a popover or a bar is a Heading, semibold. */
+.dynasty-popover-title {
+	font-size: var(--dynasty-type-heading);
+	font-weight: var(--font-semibold);
+	margin-bottom: var(--size-4-2);
+}
+
+.dynasty-popover .dynasty-popover-item,
+.dynasty-popover .dynasty-problem-button {
+	display: block;
+	width: 100%;
+	min-height: 44px;
+	height: auto;
+	padding: var(--size-4-1) var(--size-4-2);
+	text-align: left;
+	white-space: normal;
+	font-family: var(--font-interface);
+	font-size: var(--dynasty-type-control);
+	font-weight: inherit;
+	color: var(--text-normal);
+	background: transparent;
+	border: none;
+	border-radius: var(--radius-s);
+	box-shadow: none;
+	cursor: pointer;
+}
+
+/* A row of the problems list is a row, not a link (D218 item 5): no underline. */
+.dynasty-popover .dynasty-problem-button {
+	margin-left: calc(-1 * var(--size-4-2));
+	text-decoration: none;
+}
+
+.dynasty-popover .dynasty-popover-item:hover,
+.dynasty-popover .dynasty-problem-button:hover {
+	background: var(--background-modifier-hover);
+}
+
+/* A row of a menu: its icon in a column of its own, then its text, every row from the same left edge (D212, more-menu-align; a theme centres the text of a button). */
+.dynasty-popover .dynasty-popover-item.dynasty-more-item {
+	display: flex;
+	align-items: center;
+	justify-content: flex-start;
+	gap: 10px;
+	font-size: inherit;
+	text-align: left;
+}
+
+.dynasty-more-item .dynasty-tool-icon {
+	flex: none;
+	width: 20px;
+	justify-content: center;
+	color: var(--icon-color, var(--text-muted));
+}
+
+.dynasty-more-item .svg-icon {
+	width: 16px;
+	height: 16px;
+}
+
+.dynasty-menu-sep {
+	height: 1px;
+	margin: 4px -6px;
+	background: var(--background-modifier-border);
+}
+
+.dynasty-problems-list {
+	margin: var(--size-4-2) 0 0 0;
+	padding-left: var(--size-4-4);
+}
+
+.dynasty-problem {
+	margin: 0 0 var(--size-4-1) 0;
+}
+
+.dynasty-problem.is-blocking {
+	font-weight: var(--font-semibold);
+}
+
+/* The dimmed cover under a sheet: a tap on it closes the sheet. */
+.dynasty-cover {
+	position: absolute;
+	inset: 0;
+	z-index: 3;
+	background: var(--background-modifier-cover);
+}
+
+/* A sheet from the bottom (the phone's menus and legend): `ob-sheet`. */
+.dynasty-popover.is-sheet {
+	top: auto;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	width: auto;
+	max-width: none;
+	max-height: calc(100% - 60px);
+	box-sizing: border-box;
+	padding: 6px 12px calc(env(safe-area-inset-bottom, 0px) + 10px);
+	/* Opaque in every theme (D212, sheet-opaque): Cupertino makes its window background translucent and blurs only its own windows, so the tree would show through the text. The @supports rule below drops the alpha of a theme colour where the browser can (var() hides a relative colour from the parser, so it cannot sit here as a second line). */
+	background: var(--background-primary);
+	backdrop-filter: none;
+	-webkit-backdrop-filter: none;
+	border: none;
+	border-radius: 14px 14px 0 0;
+	box-shadow: var(--shadow-l);
+	font-size: var(--dynasty-type-control);
+}
+
+@supports (color: rgb( from red r g b)) {
+	.dynasty-popover.is-sheet {
+		background: rgb(from var(--background-primary) r g b);
+	}
+}
+
+.dynasty-popover.is-sheet .dynasty-popover-item.dynasty-more-item {
+	min-height: 48px;
+	padding: 0 10px;
+	gap: 14px;
+	font-size: var(--dynasty-type-control);
+	border-radius: 10px;
+}
+
+.dynasty-popover.is-sheet .dynasty-more-item .svg-icon {
+	width: 20px;
+	height: 20px;
+}
+
+.dynasty-popover.is-sheet .dynasty-menu-sep {
+	margin: 4px 0;
+}
+
+.dynasty-sheet-grip {
+	width: 36px;
+	height: 5px;
+	margin: 2px auto 8px;
+	border-radius: 3px;
+	background: var(--background-modifier-border-hover);
+}
+
+/*
+ * D220: a swipe down closes a phone sheet (`src/render/dom/sheet-swipe.ts`). The grip and the title row start the swipe at any scroll position, so the browser must not
+ * scroll from them (`touch-action: none`); the grip's touch area is larger than its 5 px bar (up and to the sides, not down, where the first row starts).
+ * The list keeps its vertical scroll, and the bounce at its top stays inside the sheet. While a finger pulls, the sheet follows through `--dynasty-sheet-pull`;
+ * the move costs no layout. At rest the sheet has no transform.
+ */
+.dynasty-popover.is-sheet {
+	touch-action: pan-y;
+	overscroll-behavior: contain;
+}
+
+.dynasty-popover.is-sheet.is-pulled {
+	transform: translateY(var(--dynasty-sheet-pull, 0px));
+	will-change: transform;
+}
+
+.dynasty-popover.is-sheet.is-settling {
+	transition: transform 200ms ease-out;
+}
+
+.dynasty-sheet-grip {
+	position: relative;
+	touch-action: none;
+}
+
+.dynasty-sheet-grip::before {
+	content: '';
+	position: absolute;
+	top: -8px;
+	right: -60px;
+	bottom: -6px;
+	left: -60px;
+}
+
+.dynasty-sheet-head {
+	touch-action: none;
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	min-height: 44px;
+	padding: 0 0 4px 4px;
+}
+
+.dynasty-sheet-head .dynasty-popover-title {
+	margin: 0;
+}
+
+/* "Close" is a link, so regular at the Control size (D218 items 3 and 5). */
+.dynasty-sheet-head .dynasty-sheet-close {
+	min-height: 44px;
+	padding: 0 8px;
+	font-size: var(--dynasty-type-control);
+	font-weight: var(--font-normal);
+}
+
+/* A link in a banner or a sheet: the link token, no box (`dynasty-link`; the windows have their own rule in their chunks). */
+.dynasty-result .dynasty-link,
+.dynasty-popover .dynasty-link {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	padding: 0;
+	border: 0;
+	background: none;
+	box-shadow: none;
+	color: var(--dynasty-link, var(--text-accent));
+	font-family: var(--font-interface);
+	font-size: inherit;
+	font-weight: var(--font-normal);
+	cursor: pointer;
+	text-decoration: none;
+}
+
+/* The same thin underline on hover as every link (D218 item 5); a touch screen has no hover. */
+@media (hover: hover) {
+	.dynasty-result .dynasty-link:hover,
+	.dynasty-popover .dynasty-link:hover {
+		background: none;
+		text-decoration: underline solid;
+		text-decoration-thickness: 1px;
+		text-underline-offset: 3px;
+	}
+}
+
+/* ---------- The legend (D25, D196 item 3: the line styles only) ---------- */
+
+.dynasty-legend {
+	display: grid;
+	gap: 2px;
+}
+
+.dynasty-legend-row {
+	display: grid;
+	grid-template-columns: 72px 1fr;
+	align-items: center;
+	gap: 12px;
+	min-height: 28px;
+	font-size: var(--dynasty-type-text);
+}
+
+.dynasty-popover.is-sheet .dynasty-legend-row {
+	min-height: 40px;
+}
+
+.dynasty-legend-sample {
+	flex: none;
+	justify-self: start;
+	--dynasty-font-size: 13px;
+}
+
+.dynasty-legend-label {
+	color: var(--text-normal);
+}
+
+/* The card ends a legend sample draws between (D25: samples look like the tree). */
+.dynasty-legend-card {
+	fill: var(--background-primary-alt);
+	stroke: var(--background-modifier-border-hover);
+	stroke-width: 1;
+}

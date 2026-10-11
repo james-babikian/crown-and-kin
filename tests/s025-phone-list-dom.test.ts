@@ -2,12 +2,13 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vites
 
 vi.mock('obsidian', () => import('./acceptance/fake-obsidian'));
 
-import { listData, listWord } from '../src/obsidian/phone-list';
+import { linkWord, listData, listWord } from '../src/obsidian/phone-list';
 import { buildPhoneList, setListEditable, showListPicture, type PhoneListSpec } from '../src/render/dom/phone-list-dom';
 import { PHONE_LIST_UI } from '../src/render/ui-text';
 import { FEl, dispatch, installDom, resetDom } from './acceptance/fake-dom';
 import { iconCalls, resetObsidian } from './acceptance/fake-obsidian';
 import { build } from './helpers';
+import { accName } from './acceptance/accessible-name';
 
 /*
  * 0.2.5, WP-C2a (D144; contract C.3.1): the DOM of the phone list, on the fake DOM. Roles and names, the sections and
@@ -76,6 +77,9 @@ beforeEach(() => {
 	resetObsidian();
 });
 
+/** The text line of a row without the spaces round the marks "·" (the marks are elements of their own). */
+const metaText = (r: FEl) => (r.querySelector('.dynasty-list-meta')?.getText() ?? '').replace(/\s*·\s*/g, ' · ').trim();
+
 describe('the list element and its roles', () => {
 	it('is a region named for the person in the middle', () => {
 		const { list } = make();
@@ -108,41 +112,53 @@ describe('the list element and its roles', () => {
 		expect(buttons.length).toBeGreaterThan(0);
 		for (const b of buttons) {
 			expect(b.getAttribute('type')).toBe('button');
-			expect(b.getAttribute('aria-label')).toBeTruthy();
+			expect(accName(b)).toBeTruthy();
+			expect(b.getAttribute('aria-label')).toBeNull();
 		}
 	});
 });
 
 describe('sections, headings and rows', () => {
-	it('has the sections parents, person and children in this order', () => {
+	it('has the sections person, parents, partners and children in this order (D209)', () => {
 		const { list } = make();
-		expect(list.querySelectorAll('.dynasty-list-section').map((s) => s.getAttribute('data-section'))).toEqual(['parents', 'person', 'children']);
-		expect(list.querySelectorAll('.dynasty-list-head').map((h) => h.getText())).toEqual([PHONE_LIST_UI.headParents, PHONE_LIST_UI.headYou, PHONE_LIST_UI.headChildren]);
+		expect(list.querySelectorAll('.dynasty-list-section').map((s) => s.getAttribute('data-section'))).toEqual(['person', 'parents', 'partners', 'children']);
+		expect(list.querySelectorAll('.dynasty-list-head').map((h) => h.getText())).toEqual([PHONE_LIST_UI.headYou, PHONE_LIST_UI.headParents, PHONE_LIST_UI.headPartner, PHONE_LIST_UI.headChildren]);
 	});
 
 	it('says "This person" when the centre is not the marked person, and leaves out empty sections', () => {
 		const { list } = make({ centre: 'lena' });
-		expect(list.querySelectorAll('.dynasty-list-head').map((h) => h.getText())).toEqual([PHONE_LIST_UI.headParents, PHONE_LIST_UI.headPerson]);
+		expect(list.querySelectorAll('.dynasty-list-head').map((h) => h.getText())).toEqual([PHONE_LIST_UI.headPerson, PHONE_LIST_UI.headParents]);
 		expect(list.querySelector('[data-section="children"]')).toBeNull();
+		expect(list.querySelector('[data-section="partners"]')).toBeNull();
 		const top = make({ centre: 'aldric' });
 		expect(top.list.querySelector('[data-section="parents"]')).toBeNull();
+	});
+
+	it('writes each heading in the singular for one row and the plural for more (D209 item 7)', () => {
+		const heads = (centre: string) => make({ centre }).list.querySelectorAll('.dynasty-list-head').map((h) => h.getText());
+		// Lena has two parents; Marta has one child (Lena) and one partner; Aldric has three children and one partner.
+		expect(heads('lena')).toEqual([PHONE_LIST_UI.headPerson, PHONE_LIST_UI.headParents]);
+		expect(heads('marta')).toEqual([PHONE_LIST_UI.headPerson, PHONE_LIST_UI.headPartner, PHONE_LIST_UI.headChild]);
+		expect(heads('aldric')).toEqual([PHONE_LIST_UI.headPerson, PHONE_LIST_UI.headPartner, PHONE_LIST_UI.headChildren]);
 	});
 
 	it('lists the rows in order and counts them', () => {
 		const { list, res } = make();
 		const ids = list.querySelectorAll('.dynasty-list-row').map((r) => r.getAttribute('data-person'));
-		expect(ids).toEqual(['aldric', 'isolde', 'gareth', 'roderick', 'marta', 'lena', 'kit', 'pia']);
+		expect(ids).toEqual(['roderick', 'aldric', 'isolde', 'gareth', 'marta', 'lena', 'kit', 'pia']);
 		expect(res.rows).toBe(ids.length);
 	});
 
-	it('writes the sub-headings of the children, with the years of the partner', () => {
+	it('writes the sub-headings of the children with the name of the partner only, and only when there is more than one group (D209 item 7)', () => {
 		const { list } = make();
-		expect(list.querySelectorAll('.dynasty-list-sub').map((h) => h.getText())).toEqual([PHONE_LIST_UI.withPartner('Marta', '1133–1170'), PHONE_LIST_UI.noPartner, PHONE_LIST_UI.otherChildren]);
+		expect(list.querySelectorAll('.dynasty-list-sub').map((h) => h.getText())).toEqual([PHONE_LIST_UI.withPartner('Marta'), PHONE_LIST_UI.noPartner, PHONE_LIST_UI.otherChildren]);
+		// Marta's one group: no sub-heading. Aldric's one group: none either.
+		expect(make({ centre: 'marta' }).list.querySelectorAll('.dynasty-list-sub')).toHaveLength(0);
+		expect(make({ centre: 'aldric' }).list.querySelectorAll('.dynasty-list-sub')).toHaveLength(0);
 	});
 
-	it('leaves the years out of rows and sub-headings when dates are off', () => {
+	it('leaves the years out of rows when dates are off', () => {
 		const { list } = make({ showDates: false });
-		expect(list.querySelector('.dynasty-list-sub')!.getText()).toBe(PHONE_LIST_UI.withPartner('Marta'));
 		expect(row(list, 'marta').querySelector('.dynasty-list-meta')).toBeNull();
 	});
 
@@ -151,6 +167,9 @@ describe('sections, headings and rows', () => {
 		expect(row(list, 'roderick').classes.has('dynasty-list-me')).toBe(true);
 		expect(row(list, 'aldric').classes.has('dynasty-list-me')).toBe(false);
 		expect(row(list, 'roderick').querySelector('.dynasty-list-word')!.getText()).toBe('You');
+		// D209 item 1: "You" is the strong word; a relation word is not.
+		expect(row(list, 'roderick').querySelector('.dynasty-list-word')!.classes.has('is-strong')).toBe(true);
+		expect(row(list, 'aldric').querySelector('.dynasty-list-word')!.classes.has('is-strong')).toBe(false);
 	});
 
 	it('shows the name, the sobriquet in curly marks, the word, the years and the title', () => {
@@ -158,9 +177,10 @@ describe('sections, headings and rows', () => {
 		const r = row(list, 'roderick');
 		expect(r.querySelector('.dynasty-list-name')!.getText()).toBe(`Roderick ${'“'}the Bold${'”'}`);
 		expect(r.querySelector('.dynasty-list-sob')!.getText()).toBe('“the Bold”');
-		expect(r.querySelector('.dynasty-list-meta')!.getText()).toBe('You · 1131–1190');
+		// 0.2.8 (G.2): the items are one joined text line; the "·" between them is a mark of its own, so the text is read without the spaces round it.
+		expect(metaText(r)).toBe('You · 1131–1190');
 		const a = row(list, 'aldric');
-		expect(a.querySelector('.dynasty-list-meta')!.getText()).toBe('Father · b. 1102');
+		expect(metaText(a)).toBe('Father · b. 1102 · Duke of Valmont');
 		expect(a.querySelector('.dynasty-list-title')!.getText()).toBe('Duke of Valmont');
 	});
 
@@ -168,7 +188,7 @@ describe('sections, headings and rows', () => {
 		const { list } = make();
 		const m = row(list, 'marta');
 		expect(m.querySelector('.dynasty-list-word')).toBeNull();
-		expect(m.querySelector('.dynasty-list-meta')!.getText()).toBe('1133–1170');
+		expect(metaText(m)).toBe('1133–1170');
 		expect(row(list, 'kit').querySelector('.dynasty-list-meta')).toBeNull();
 	});
 
@@ -181,8 +201,8 @@ describe('sections, headings and rows', () => {
 
 	it('speaks the relation in the accessible name of the name button', () => {
 		const { list } = make();
-		expect(row(list, 'aldric').querySelector('.dynasty-list-go')!.getAttribute('aria-label')).toBe(PHONE_LIST_UI.goLabel('Aldric', 'father'));
-		expect(row(list, 'marta').querySelector('.dynasty-list-go')!.getAttribute('aria-label')).toBe(PHONE_LIST_UI.goLabel('Marta'));
+		expect(accName(row(list, 'aldric').querySelector('.dynasty-list-go')!)).toBe(PHONE_LIST_UI.goLabel('Aldric', 'father'));
+		expect(accName(row(list, 'marta').querySelector('.dynasty-list-go')!)).toBe(PHONE_LIST_UI.goLabel('Marta'));
 	});
 });
 
@@ -230,7 +250,7 @@ describe('the two kinds of tap', () => {
 			['marta', true],
 		]);
 		expect(spy.go).toEqual([]);
-		expect(pencil.getAttribute('aria-label')).toBe(PHONE_LIST_UI.editLabel('Marta'));
+		expect(accName(pencil)).toBe(PHONE_LIST_UI.editLabel('Marta'));
 		expect(iconCalls).toContain('pencil');
 	});
 
@@ -242,7 +262,7 @@ describe('the two kinds of tap', () => {
 		expect(buttons[0].classes.has('dynasty-list-edit')).toBe(true);
 		expect(buttons[0].classes.has('dynasty-list-whole')).toBe(true);
 		expect(buttons[0].classes.has('dynasty-list-go')).toBe(false);
-		expect(buttons[0].getAttribute('aria-label')).toBe(PHONE_LIST_UI.editLabel('Roderick'));
+		expect(accName(buttons[0])).toBe(PHONE_LIST_UI.editLabel('Roderick'));
 		dispatch(buttons[0], 'click', { pointerType: 'touch' });
 		expect(spy.edit).toEqual([['roderick', true]]);
 		expect(spy.go).toEqual([]);
@@ -286,25 +306,66 @@ describe('a read-only tree', () => {
 });
 
 describe('pictures and focus', () => {
-	it('asks for the two picture places of every row, empty at first', () => {
-		const { list, spy } = make();
+	// Roderick (the centre, with a portrait and the arms of his house), Aldric (a portrait) and Marta (none).
+	const has = (id: string) => ({ portrait: id === 'roderick' || id === 'aldric', arms: id === 'roderick' });
+
+	it('makes a picture place only for a picture that the person has (D213)', () => {
+		const { list, spy } = make({ has });
 		expect(spy.slots).toEqual(list.querySelectorAll('.dynasty-list-row').map((r) => r.getAttribute('data-person')));
-		expect(list.querySelectorAll('.dynasty-list-arms')).toHaveLength(spy.slots.length);
-		expect(list.querySelectorAll('.dynasty-list-portrait')).toHaveLength(spy.slots.length);
+		// The large row: a column with the portrait and the arms. Aldric: a small portrait. No other row has a place, and none has an initials disc.
+		expect(list.querySelectorAll('.dynasty-hero-col')).toHaveLength(1);
+		expect(list.querySelectorAll('.dynasty-hero-portrait')).toHaveLength(1);
+		expect(list.querySelectorAll('.dynasty-hero-arms')).toHaveLength(1);
+		expect(list.querySelectorAll('.dynasty-list-portrait')).toHaveLength(1);
+		expect(row(list, 'aldric').querySelector('.dynasty-list-portrait')).not.toBeNull();
+		expect(row(list, 'marta').querySelector('.dynasty-list-pics')).toBeNull();
+		expect(list.querySelectorAll('.dynasty-hero-pic')).toHaveLength(0);
+		expect(list.querySelectorAll('.dynasty-mono')).toHaveLength(0);
 		expect(list.querySelectorAll('.has-picture')).toHaveLength(0);
 	});
 
-	it('puts a picture into a slot with an empty alt text', () => {
-		let slot: HTMLElement | null = null;
-		make({ pictures: (s, id) => void (id === 'aldric' && (slot = s.arms)) });
-		expect(slot).not.toBeNull();
-		showListPicture(slot!, 'blob:copy');
+	it('makes no column for the large row of a person with no picture, and the arms alone get a column with no portrait', () => {
+		const none = make({ has: () => ({ portrait: false, arms: false }) });
+		expect(none.list.querySelectorAll('.dynasty-hero-col')).toHaveLength(0);
+		expect(row(none.list, 'roderick').querySelector('.dynasty-list-whole')!.classes.has('has-column')).toBe(false);
+		const arms = make({ has: (id) => ({ portrait: false, arms: id === 'roderick' }) });
+		expect(arms.list.querySelector('.dynasty-hero-col')!.classes.has('no-portrait')).toBe(true);
+		expect(arms.list.querySelectorAll('.dynasty-hero-portrait')).toHaveLength(0);
+		expect(row(arms.list, 'roderick').querySelector('.dynasty-list-whole')!.classes.has('has-column')).toBe(true);
+	});
+
+	it('without has, decides from the data: a portrait link, and for the centre the arms of the person or the house; arms in no other row (D209 rule A)', () => {
+		const withPics = build(`
+houses:
+  - {id: h, name: House H, arms: "[[h.png]]"}
+people:
+  - {id: a, name: A, house: h, portrait: "[[a.png]]"}
+  - {id: b, name: B, house: h, portrait: "[[b.png]]", parents: [a]}
+  - {id: c, name: C, parents: [a]}
+`).g;
+		const base = { g: withPics, data: listData(withPics, 'a'), me: null, showDates: false, editable: true, word: () => null, onGo: () => undefined, onEdit: () => undefined };
+		const list = buildPhoneList(new FEl('div', { cls: 'dynasty-viewport' }) as unknown as HTMLElement, base).list as unknown as FEl;
+		expect(list.querySelectorAll('.dynasty-hero-arms')).toHaveLength(1);
+		expect(list.querySelectorAll('.dynasty-hero-portrait')).toHaveLength(1);
+		expect(row(list, 'b').querySelectorAll('.dynasty-list-portrait')).toHaveLength(1);
+		expect(row(list, 'b').querySelector('.dynasty-hero-arms')).toBeNull();
+		expect(row(list, 'c').querySelector('.dynasty-list-portrait')).toBeNull();
+		const off = buildPhoneList(new FEl('div', { cls: 'dynasty-viewport' }) as unknown as HTMLElement, { ...base, showPortraits: false }).list as unknown as FEl;
+		expect(off.querySelectorAll('.dynasty-list-portrait, .dynasty-hero-portrait')).toHaveLength(0);
+	});
+
+	it('puts a picture into a slot with an empty alt text, and does nothing for a place that was not made', () => {
+		let slot: HTMLElement | undefined;
+		make({ has, pictures: (s, id) => void (id === 'aldric' && (slot = s.portrait)) });
+		expect(slot).toBeDefined();
+		showListPicture(slot, 'blob:copy');
 		const el = slot as unknown as FEl;
 		expect(el.classes.has('has-picture')).toBe(true);
 		const img = el.querySelector('img')!;
 		expect(img.getAttribute('src')).toBe('blob:copy');
 		expect(img.getAttribute('alt')).toBe('');
 		expect(img.classes.has('dynasty-picture')).toBe(true);
+		expect(() => showListPicture(undefined, 'blob:copy')).not.toThrow();
 	});
 
 	it('returns the heading of the centre section for the focus', () => {
@@ -320,5 +381,47 @@ describe('pictures and focus', () => {
 		expect(row(list, 'gareth').getAttribute('data-link')).toBe('rumoured');
 		expect(row(list, 'pia').getAttribute('data-link')).toBe('adoptive');
 		expect(row(list, 'aldric').getAttribute('data-link')).toBeNull();
+	});
+});
+
+describe('the kind of link as the first item of the text line (D210)', () => {
+	const spec = (centre: string, me: string | null, showRelations = true): Partial<PhoneListSpec> & { centre: string } => {
+		const data = listData(g, centre);
+		const cards = new Map([['aldric', { text: 'Father', lower: 'father' }]]);
+		return { centre, data, me, link: (r) => linkWord(g, data, r), word: (id) => listWord(id, { me, showRelations, cards }) };
+	};
+
+	it('puts the link word first in plain italic, and the label names the link', () => {
+		const { list } = make(spec('roderick', 'roderick'));
+		const pia = row(list, 'pia');
+		expect(metaText(pia)).toBe('Adopted daughter · b. 1135');
+		expect(pia.querySelector('.dynasty-list-link')!.classes.has('dynasty-list-word')).toBe(false);
+		expect(accName(pia.querySelector('.dynasty-list-go')!)).toBe(PHONE_LIST_UI.goLabel('Pia', undefined, { lower: 'adopted daughter', of: 'Roderick' }));
+		expect(accName(pia.querySelector('.dynasty-list-go')!)).toContain('Pia, adopted daughter of Roderick');
+		expect(metaText(row(list, 'gareth'))).toBe('Rumoured father · b. 1104');
+		expect(accName(row(list, 'gareth').querySelector('.dynasty-list-go')!)).toContain('Gareth, rumoured father of Roderick');
+	});
+
+	it('keeps the relation word after the link word when the list is about someone else, also with relation names off', () => {
+		// Pia is marked; the list is about Roderick. Pia is his adopted daughter, and "You" stays bold after the link word.
+		const on = make(spec('roderick', 'pia')).list;
+		expect(metaText(row(on, 'pia'))).toBe('Adopted daughter · You · b. 1135');
+		expect(row(on, 'pia').querySelector('.dynasty-list-word')!.classes.has('is-strong')).toBe(true);
+		expect(row(on, 'pia').querySelector('.dynasty-list-link')!.classes.has('is-strong')).toBe(false);
+		const off = make(spec('roderick', 'aldric', false)).list;
+		expect(metaText(row(off, 'pia'))).toBe('Adopted daughter · b. 1135');
+		expect(metaText(row(on, 'aldric'))).toBe('Father · b. 1102 · Duke of Valmont');
+	});
+
+	it('replaces the relation word when the list is about You', () => {
+		// The relation cache of the list names Pia "Sister"; the link word takes its place.
+		const data = listData(g, 'roderick');
+		const cards = new Map([['pia', { text: 'Daughter', lower: 'daughter' }], ['aldric', { text: 'Father', lower: 'father' }]]);
+		const { list } = make({ data, me: 'roderick', link: (r) => linkWord(g, data, r), word: (id) => listWord(id, { me: 'roderick', showRelations: true, cards }) });
+		expect(metaText(row(list, 'pia'))).toBe('Adopted daughter · b. 1135');
+		expect(row(list, 'pia').querySelector('.dynasty-list-word')).toBeNull();
+		// A birth parent has no link word, so the relation word stays.
+		expect(metaText(row(list, 'aldric'))).toBe('Father · b. 1102 · Duke of Valmont');
+		expect(row(list, 'aldric').querySelector('.dynasty-list-link')).toBeNull();
 	});
 });

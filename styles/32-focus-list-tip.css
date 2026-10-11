@@ -1,0 +1,46 @@
+/* C: focus list and tooltip */
+
+/* D145: the tip of a card, with "Show relation names on cards" off. Obsidian's own tooltip does not work on SVG, so this is an HTML element in the viewport.
+   The code sets only the three custom properties (card centre, card edge, arrow shift). It shows the relation text, in the colours of the theme. */
+.dynasty-tip {
+	position: absolute;
+	left: var(--dynasty-tip-x, 0px);
+	top: var(--dynasty-tip-y, 0px);
+	z-index: 30;
+	pointer-events: none;
+	padding: 4px 10px;
+	border-radius: var(--radius-s);
+	background: var(--text-normal);
+	color: var(--background-primary);
+	font-size: var(--dynasty-type-text);
+	line-height: 1.3;
+	text-align: center;
+	white-space: nowrap;
+	box-shadow: var(--shadow-s);
+	transform: translateX(-50%);
+}
+
+/* Over the card, when the space under it is too small. */
+.dynasty-tip.dynasty-tip-above {
+	transform: translate(-50%, -100%);
+}
+
+/* The arrow points at the card, also when the tip had to move to stay inside the viewport. */
+.dynasty-tip::before {
+	content: '';
+	position: absolute;
+	left: calc(50% + var(--dynasty-tip-arrow, 0px));
+	top: -4px;
+	width: 8px;
+	height: 8px;
+	background: inherit;
+	transform: translateX(-50%) rotate(45deg);
+}
+
+.dynasty-tip.dynasty-tip-above::before {
+	top: auto;
+	bottom: -4px;
+}
+
+
+

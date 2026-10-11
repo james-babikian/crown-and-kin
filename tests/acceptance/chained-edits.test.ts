@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import type { ApplyOp, EditResult, NewPersonId, Op, UnionRef } from '../../src/core/edit';
+import type { ApplyOp, EditResult, Op, UnionRef } from '../../src/core/edit';
 import { parseDynasty } from '../../src/core/parse';
 import { deriveFamilies } from '../../src/core/derive';
 import * as edit from '../../src/core/yaml-edit';
 import { golden } from './golden';
+import { nextIdFor } from '../helpers';
 import { fixtureSource } from './load';
 import { layOut } from './pipeline';
 
@@ -14,7 +15,6 @@ import { layOut } from './pipeline';
 // in the layout follows the document).
 
 const applyOp: ApplyOp = edit.applyOp;
-const newPersonId: NewPersonId = edit.newPersonId;
 
 function ok(r: EditResult): Extract<EditResult, { ok: true }> {
 	if (!r.ok) throw new Error(`edit refused: ${r.code} ${r.detail ?? ''}`);
@@ -33,7 +33,7 @@ describe('chained edits on fixture 1 (§10)', () => {
 		const bodies: string[] = [];
 
 		// 1. Open Edric, change his title in the draft, then Add spouse → New: one write (§6.3).
-		const spouse = newPersonId(body, 'Beatrice Lorne');
+		const spouse = nextIdFor(body);
 		expect(spouse).toBe('p1');
 		let r = applyOp(body, {
 			kind: 'batch',
@@ -60,7 +60,7 @@ describe('chained edits on fixture 1 (§10)', () => {
 		const ids: string[] = [];
 		for (const [name, sex, born] of children) {
 			// Each new person gets the next number, whatever the name (D104).
-			const id = newPersonId(body, name);
+			const id = nextIdFor(body);
 			expect(id).toBe(`p${ids.length + 2}`);
 			const op: Op = {
 				kind: 'batch',

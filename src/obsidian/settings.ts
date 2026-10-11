@@ -11,6 +11,10 @@ export const PHONE_DIRECTIONS: readonly PhoneDirection[] = ['sideways', 'down'];
 export type ReduceMotion = 'system' | 'on' | 'off';
 export const REDUCE_MOTIONS: readonly ReduceMotion[] = ['system', 'on', 'off'];
 
+/** 0.2.8 contract A.4 (D204): which cards show the arms of their house. */
+export type ArmsOnCards = 'few' | 'all';
+export const ARMS_ON_CARDS: readonly ArmsOnCards[] = ['few', 'all'];
+
 /** The characters of `breakWords` that `normaliseSettings` keeps. */
 export const BREAK_WORDS_MAX = 20000;
 
@@ -44,6 +48,10 @@ export interface DynastySettings {
 	oldAge: number;
 	/** Contract 0.2.7 M.7: a person who died younger than this age opens no branch in the line, 0–1000; 0 shows every open branch. Default 0. */
 	youngDeathAge: number;
+	/** 0.2.8 contract A.4 (D204): `'few'` shows house arms on the first person of a house, a married-in spouse of another house and a holder; `'all'` shows them on every card. Default 'few'. */
+	armsOnCards: ArmsOnCards;
+	/** 0.2.8 contract A.5 (D188 item 10): warn about more than 2 birth, adoptive or ward parents. Off stops the warning `too-many-parents` for those types. Default on. */
+	warnManyParents: boolean;
 }
 
 /** The settings a fresh install starts with. */
@@ -62,6 +70,8 @@ export const DEFAULT_SETTINGS: DynastySettings = {
 	successionLength: 5,
 	oldAge: 110,
 	youngDeathAge: 0,
+	armsOnCards: 'few',
+	warnManyParents: true,
 };
 
 /*
@@ -105,6 +115,8 @@ export const normaliseSettings = (raw: unknown): DynastySettings => {
 		successionLength: wholeIn(s.successionLength, SUCCESSION_LENGTH) ? s.successionLength : d.successionLength,
 		oldAge: wholeIn(s.oldAge, OLD_AGE) ? s.oldAge : d.oldAge,
 		youngDeathAge: wholeIn(s.youngDeathAge, YOUNG_DEATH_AGE) ? s.youngDeathAge : d.youngDeathAge,
+		armsOnCards: ARMS_ON_CARDS.find((v) => v === s.armsOnCards) ?? d.armsOnCards,
+		warnManyParents: typeof s.warnManyParents === 'boolean' ? s.warnManyParents : d.warnManyParents,
 	};
 };
 

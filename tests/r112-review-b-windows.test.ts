@@ -12,9 +12,9 @@ import { FullScreenModal } from '../src/obsidian/full-screen';
 import { HousesWindow } from '../src/obsidian/houses-window';
 import { closePluginModals } from '../src/obsidian/plugin-modals';
 import { TitlesWindow } from '../src/obsidian/titles-window';
-import { ID_UI, WRITE_TEXT } from '../src/render/ui-text';
+import { ID_UI, TITLES_UI, WRITE_TEXT } from '../src/render/ui-text';
 import { FEl, clock, dispatch, installDom, resetDom, settle, fakeWin } from './acceptance/fake-dom';
-import { notices, openModals, resetObsidian } from './acceptance/fake-obsidian';
+import { lastMenu, notices, openModals, resetObsidian } from './acceptance/fake-obsidian';
 import { embed, fakeHandle, fakeHost, type FakeHandle, type Host } from './acceptance/tree-view-fakes';
 import { backToList, openPage } from './lw-support';
 
@@ -131,8 +131,7 @@ people:
 async function openTitles(handle: Writing) {
 	const host = fakeHost() as Host;
 	const { el } = await embed(handle.body, { handle, host });
-	await click(el.querySelector('.dynasty-more'));
-	await click(el.querySelector('.dynasty-more-titles'));
+	await click(el.querySelector('.dynasty-titles-button'));
 	const win = openModals.find((m) => (m as unknown) instanceof TitlesWindow) as unknown as TitlesWindow;
 	expect(win).toBeDefined();
 	return { handle, win, content: (win as unknown as { contentEl: FEl }).contentEl, modal: (win as unknown as { modalEl: FEl }).modalEl };
@@ -184,7 +183,8 @@ people:
 		const { content, modal } = await openTitles(handle);
 		// Remove the second holder of Duke (a holder list written as an alias cannot be edited) and also change the id of Baron.
 		const duke = openPage(content, 'duke');
-		await click(duke.querySelectorAll('.dynasty-holder-remove')[1]);
+		await click(duke.querySelectorAll('.dynasty-holder-more')[1]);
+		lastMenu()!.item(TITLES_UI.remove)!.click();
 		backToList(content);
 		await setId(openPage(content, 'baron'), 'count');
 		await click(content.querySelector('.dynasty-sheet-save'));

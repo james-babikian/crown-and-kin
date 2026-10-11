@@ -93,6 +93,8 @@ describe('review A: slugify is the same as in 0.2.0', () => {
 			const n = 1 + (next() % 12);
 			for (let k = 0; k < n; k++) text += next() % 10 === 0 ? String.fromCharCode(next() % 0x2fff) : pool[next() % pool.length];
 			if (CHANGED_IN_024.test(text)) continue;
+			// 0.2.8 (I16): a letter, digit or mark beyond ASCII now stays in an id.
+			if (/[\p{L}\p{N}\p{M}]/u.test(foldForMatch(text).replace(/[\x00-\x7f]/g, ''))) continue;
 			expect(slugify(text), JSON.stringify(text)).toBe(slugifyOld(text));
 		}
 	});

@@ -11,10 +11,3 @@ describe('M11 fix: picker preview frame', () => {
 		expect(rule('.dynasty-picture-thumb.is-missing')).toMatch(/border-style:\s*dashed/);
 	});
 });
-
-describe('M11 fix: house page header', () => {
-	it('the Close button sits at the right edge (no room kept for the hidden X)', () => {
-		expect(rule('.dynasty-house-page .dynasty-sheet-header')).toMatch(/padding-right:\s*var\(--size-4-4\)/);
-		expect(rule('.dynasty-house-page .dynasty-sheet-actions')).toMatch(/margin-left:\s*auto/);
-	});
-});

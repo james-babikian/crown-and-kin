@@ -17,7 +17,7 @@ describe('the open sign inside a far-couple tag (live tree)', () => {
 	it('the hole of a ring has the fill of the tag pill, not the page fill', () => {
 		const pill = fillOf('.dynasty-tag-pill');
 		const ring = fillOf('.dynasty-tag-mark.dynasty-union-ring') ?? fillOf('.dynasty-union-ring');
-		expect(pill).toBe('var(--background-primary-alt)');
+		expect(pill).toBe('var(--background-secondary)'); // 0.2.8 (I36 C): the pill is the secondary background
 		expect(ring).toBe(pill);
 	});
 });

@@ -1,0 +1,360 @@
+/* ---------- Arms and the colour of a house, the pictures of the windows (spec §13.6, §13.7; D67–D69, D75; 0.2.8 contract C) ---------- */
+
+/* The arms of a house in the header of its page, at the right: the picture as it is (D75: no frame, edge or background). A tap opens the menu. The button has no box of its own (quiet-controls). */
+.dynasty-sheet button.dynasty-house-arms {
+	min-width: 44px;
+	min-height: 44px;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	padding: 0;
+	border: 0;
+	background: none;
+	box-shadow: none;
+}
+
+.dynasty-sheet button.dynasty-house-arms:hover {
+	background: var(--background-modifier-hover);
+}
+
+/*
+ * A house with no arms has no picture, no initials and no empty ring (D213): the button of the header has nothing to show, and the text link
+ * "Add arms" stands in the "Open all" row instead, where "Add portrait" stands in the person window (D216 item 1). The link takes its look
+ * from the "Add portrait" rules (10-edit-sheet.css); this class only names it.
+ */
+.dynasty-sheet button.dynasty-house-arms.is-add {
+	display: none;
+}
+
+.dynasty-house-arms .dynasty-house-arms-img {
+	display: block;
+	width: auto;
+	height: auto;
+	max-width: 52px;
+	max-height: 56px;
+}
+
+.dynasty-sheet button.dynasty-house-arms.is-house-head::after {
+	display: none;
+}
+
+.dynasty-house-arms.is-loading {
+	opacity: 0.5;
+}
+
+/* The row of the list: the arms at the right. A house with no arms has no box; its colour is the dot in the second text line (35-list-windows.css). */
+.dynasty-lw-armsbox .dynasty-house-arms-img {
+	max-width: 28px;
+	max-height: 32px;
+}
+
+/* The colour of the house: round swatches; the current one has a ring inside it in the text colour, so it does not rely on colour alone. */
+.dynasty-swatches {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+}
+
+.dynasty-sheet .dynasty-swatch {
+	position: relative;
+	width: 28px;
+	height: 28px;
+	min-width: 28px;
+	min-height: 28px;
+	padding: 0;
+	border: 0;
+	border-radius: 50%;
+	background: var(--dynasty-house-color);
+	box-shadow: inset 0 0 0 1px var(--background-modifier-border);
+	color: var(--text-on-accent);
+	cursor: pointer;
+}
+
+.dynasty-sheet .dynasty-swatch.is-selected {
+	box-shadow: inset 0 0 0 2px var(--modal-background, var(--background-primary)), inset 0 0 0 4px var(--text-normal);
+}
+
+.dynasty-sheet .dynasty-swatch.is-other {
+	background: conic-gradient(red, gold, green, dodgerblue, purple, red);
+}
+
+/* A colour of the tree that is not in the set shows in the last swatch, in a smaller disc. */
+.dynasty-sheet .dynasty-swatch.is-other.is-custom::before {
+	content: '';
+	position: absolute;
+	inset: 5px;
+	border-radius: 50%;
+	background: var(--dynasty-house-color);
+	box-shadow: 0 0 0 1px var(--modal-background, var(--background-primary));
+}
+
+.dynasty-swatch .svg-icon {
+	width: 14px;
+	height: 14px;
+	filter: drop-shadow(0 0 1px var(--background-modifier-cover));
+}
+
+/* The system colour window is opened by the last swatch; its input stays in the page but takes no room. */
+.dynasty-house-other {
+	position: relative;
+	display: inline-flex;
+}
+
+.dynasty-sheet .dynasty-house-other-input {
+	position: absolute;
+	left: 0;
+	top: 0;
+	width: 28px;
+	height: 28px;
+	min-height: 0;
+	opacity: 0;
+	pointer-events: none;
+}
+
+.dynasty-sheet.is-phone .dynasty-swatch,
+.dynasty-sheet.is-phone .dynasty-house-other-input {
+	width: 44px;
+	height: 44px;
+	min-width: 44px;
+	min-height: 44px;
+}
+
+/*
+ * One label "Colour", then one row of round colours, then the colours read from the arms (D68, D208 item 2, arms-colours). A thin divider
+ * stands over them, and each carries a small dot as its mark. The group has no content while the picture is read, or when the plugin cannot
+ * read it, and then it is not shown at all: no empty box.
+ */
+.dynasty-house-palette {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+}
+
+.dynasty-house-arms-colours {
+	margin-top: 4px;
+	padding-top: 12px;
+	border-top: 1px solid var(--background-modifier-border);
+}
+
+.dynasty-house-arms-colours:empty,
+.dynasty-house-arms-colours.is-loading {
+	display: none;
+}
+
+.dynasty-sheet button.dynasty-house-arms-colour::after {
+	content: '';
+	position: absolute;
+	right: -2px;
+	bottom: -2px;
+	width: 10px;
+	height: 10px;
+	border-radius: 50%;
+	background: var(--text-normal);
+	box-shadow: 0 0 0 2px var(--modal-background, var(--background-primary));
+}
+
+/*
+ * The People section of a house (D202, G.10; people-rows): plain full-width rows, the name in bold, the title after it, then the generation and the
+ * years. No hairline and no chevron. The title stays on the name line (D218 item 11, answer B). The name is the Name role and the line under it the
+ * Text role, both in the text font (D218 items 1 to 3). The selectors are long enough to win over the general row rules on a phone.
+ */
+.dynasty-hp-rows {
+	display: grid;
+}
+
+.dynasty-sheet .dynasty-hp-rows .dynasty-hp-row .dynasty-row-title,
+.dynasty-sheet .dynasty-hp-rows .dynasty-hp-row .dynasty-row-title b.dynasty-hp-name {
+	font-family: var(--font-text);
+	font-size: var(--dynasty-type-heading);
+	font-weight: var(--font-semibold);
+	line-height: 1.25;
+}
+
+.dynasty-sheet .dynasty-hp-rows .dynasty-hp-row .dynasty-row-title .dynasty-sob {
+	font-weight: var(--font-normal);
+}
+
+.dynasty-sheet .dynasty-hp-rows .dynasty-hp-row .dynasty-row-sub {
+	font-family: var(--font-text);
+	font-size: var(--dynasty-type-text);
+	line-height: 1.35;
+}
+
+.dynasty-lw .dynasty-hp-more {
+	padding: 2px 0 6px;
+	font-size: var(--dynasty-type-text);
+}
+
+/* The portrait of the person window: the problem text under the header is in 10-edit-sheet.css. */
+
+/* The picture picker (spec §13.14, D92 to D95, D102): a search bar and the folder list. The bar never scrolls; the sheet body below it is the scroller, on the computer and on the phone. */
+.dynasty-picture-top {
+	flex: none;
+	background: var(--modal-background, var(--background-primary));
+}
+
+.dynasty-picture-intro {
+	padding: 22px 24px 4px;
+}
+
+.dynasty-picture-hint {
+	margin-top: 3px;
+	color: var(--dynasty-muted);
+}
+
+.dynasty-sheet.is-phone .dynasty-picture-intro {
+	padding: 8px max(16px, env(safe-area-inset-left)) 4px;
+}
+
+.dynasty-picture-searchbar {
+	flex: none;
+	padding: var(--size-4-2) 24px;
+	border-bottom: 1px solid var(--background-modifier-border);
+	background: var(--modal-background, var(--background-primary));
+}
+
+.dynasty-sheet.is-phone .dynasty-picture-searchbar {
+	padding-left: max(var(--size-4-3), env(safe-area-inset-left));
+	padding-right: max(var(--size-4-3), env(safe-area-inset-right));
+}
+
+.dynasty-picture-picker .dynasty-sheet-body {
+	padding-top: var(--size-4-2);
+}
+
+.dynasty-sheet.is-saving .dynasty-picture-searchbar {
+	opacity: 0.6;
+	pointer-events: none;
+}
+
+.dynasty-picture-list {
+	flex: none;
+	min-width: 0;
+}
+
+/* A row is at least 44 px high (§7.5). content-visibility keeps a list of 2 000 rows cheap to lay out and to scroll; 44 px is its guess for a row that is not drawn. The indent is 16 px for each depth. */
+.dynasty-picture-row {
+	box-sizing: border-box;
+	display: flex;
+	padding-left: calc(var(--size-4-2) + var(--dynasty-picker-depth, 0) * 16px);
+	border-radius: var(--radius-s);
+	cursor: pointer;
+	content-visibility: auto;
+}
+
+.dynasty-picture-row:hover,
+.dynasty-picture-row.is-cursor {
+	background: var(--background-modifier-hover);
+}
+
+/* The selected picture: a bar in the text colour, not colour alone, so a weak theme accent cannot hide it. */
+.dynasty-picture-row.is-selected {
+	background: var(--background-modifier-hover);
+}
+
+.dynasty-picture-plus {
+	flex: none;
+	width: 32px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	color: var(--interactive-accent);
+	font-weight: var(--font-semibold);
+}
+
+.dynasty-picture-text {
+	min-width: 0;
+}
+
+/* A file name is the Small role; the action rows below it are controls (D218 item 2). */
+.dynasty-picture-name {
+	overflow-wrap: anywhere;
+}
+
+.dynasty-picture-folder,
+.dynasty-picture-none {
+	overflow-wrap: anywhere;
+}
+
+.dynasty-picture-none {
+	padding: var(--size-4-2);
+}
+
+/* A folder row is a sub-heading: Small, semibold. The arrow turns down when the folder is open. */
+.dynasty-picture-folder-row {
+	font-size: var(--dynasty-type-small);
+	font-weight: var(--font-semibold);
+}
+
+.dynasty-picture-chevron,
+.dynasty-picture-spacer {
+	flex: none;
+	width: 20px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+
+.dynasty-picture-chevron .svg-icon,
+.dynasty-picture-folder-icon .svg-icon {
+	width: 18px;
+	height: 18px;
+}
+
+.dynasty-picture-chevron .svg-icon {
+	transition: transform 80ms ease-out;
+}
+
+.dynasty-picture-folder-row.is-open .dynasty-picture-chevron .svg-icon {
+	transform: rotate(90deg);
+}
+
+.dynasty-picture-folder-icon {
+	flex: none;
+	color: var(--text-muted);
+}
+
+.dynasty-picture-folder-name {
+	min-width: 0;
+	overflow-wrap: anywhere;
+}
+
+.dynasty-picture-count {
+	flex: none;
+	padding-left: var(--size-4-2);
+	font-variant-numeric: tabular-nums;
+}
+
+/* The row preview: a box that keeps the picture's own proportions. It is empty while the picture loads. A picture that cannot show has a solid frame; a file that is not in the vault has a dashed frame. */
+.dynasty-picture-thumb {
+	flex: none;
+	box-sizing: border-box;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	overflow: hidden;
+	border: 1px solid var(--background-modifier-border);
+	background: var(--background-primary);
+}
+
+.dynasty-picture-thumb.is-missing {
+	border-style: dashed;
+}
+
+.dynasty-picture-thumb-img {
+	display: block;
+	max-width: 100%;
+	max-height: 100%;
+	object-fit: contain;
+	pointer-events: none;
+}
+
+/* The mark on the current picture: a check and the text, in both lists. */
+.dynasty-picture-inuse {
+	flex: none;
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	color: var(--text-muted);
+}
+

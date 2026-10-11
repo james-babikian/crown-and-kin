@@ -12,14 +12,17 @@ import { noteName } from '../core/titles';
 import { illegitimateSigns } from '../layout/illegitimate-sign';
 import type { LaidOut, StrokeKind } from '../layout/model';
 import type { Measure, SceneFonts } from './dom/scene';
-import { LEGEND_SAMPLE_H, LEGEND_SAMPLE_W, legendHouses, type LegendHouse } from './legend';
-import { LEGEND_HOUSES_LABEL, LEGEND_LABELS, LEGEND_LINES_LABEL, LEGEND_ORDER, SIGN_LEGEND_LABEL } from './tree-info';
+import { LEGEND_DEAD_SAMPLE_W, LEGEND_SAMPLE_H, LEGEND_SAMPLE_W, legendHouses, type LegendExtraKind, type LegendHouse } from './legend';
+import { LEGEND_DEAD_DOUBT_LABEL, LEGEND_DEAD_LABEL, LEGEND_HOUSES_LABEL, LEGEND_LABELS, LEGEND_LINES_LABEL, LEGEND_ORDER, SIGN_LEGEND_LABEL } from './legend-text';
+import { dateLine } from './tree-info';
 
 /** What a saved picture's legend shows (P3): the line kinds drawn, the D14 sign when used, the houses of the drawn people. */
 export interface SavedLegendContent {
 	kinds: readonly StrokeKind[];
 	sign: boolean;
 	houses: readonly LegendHouse[];
+	/** 0.2.8 (I19): the dead signs that a drawn date text carries ("†", "†?"), in legend order; absent when none is drawn. */
+	dead?: readonly ('dead' | 'dead-doubt')[];
 }
 
 /** B9, B1: a picture map: `arms:<houseId>` / `portrait:<personId>` → a data URI, 'missing' (dashed frame) or null (another problem). */
@@ -44,10 +47,22 @@ export interface SavedParts {
 /** The legend content of a saved picture (P3): the kinds of `laid`'s lines in legend order, the D14 sign, the houses of the drawn people in list order. */
 export function savedLegend(g: FamilyGraph, laid: LaidOut): SavedLegendContent {
 	const used = new Set(laid.edges.paths.map((p) => p.kind));
+	// I19: the legend explains a dead sign only when a drawn card has one; "†?" is a text with a question mark after the sign.
+	let dead = false;
+	let doubt = false;
+	for (const id of laid.layout.persons.keys()) {
+		const p = g.byId.get(id);
+		const text = p ? dateLine(p) : undefined;
+		if (!text?.includes('†')) continue;
+		if (text.includes('†?')) doubt = true;
+		else dead = true;
+	}
+	const marks: ('dead' | 'dead-doubt')[] = [...(dead ? (['dead'] as const) : []), ...(doubt ? (['dead-doubt'] as const) : [])];
 	return {
 		kinds: LEGEND_ORDER.filter((k) => used.has(k)),
 		sign: illegitimateSigns(g, laid.edges).size > 0,
 		houses: legendHouses(g, laid.layout.persons.keys()),
+		...(marks.length ? { dead: marks } : {}),
 	};
 }
 
@@ -175,7 +190,7 @@ export interface SavedFrame {
 		strip: { x: number; w: number; h: number };
 		arms: { x: number; w: number; h: number };
 		houseLabelX: number;
-		lines?: { title: SavedText; rows: SavedCell<StrokeKind | 'sign'>[] };
+		lines?: { title: SavedText; rows: SavedCell<StrokeKind | LegendExtraKind>[] };
 		houses?: { title: SavedText; rows: SavedCell<LegendHouse>[] };
 	};
 }
@@ -251,7 +266,8 @@ export function savedFrame(tree: { width: number; height: number }, legend: Save
 	const titleSize = TITLE_EM * f;
 	const titleFont = fontOf(fonts.bold, titleSize, fonts.ui);
 	const titleH = 1.5 * titleSize;
-	const sample = { w: LEGEND_SAMPLE_W * k, h: LEGEND_SAMPLE_H * k, scale: k };
+	// The labels stand in one column, so a picture with a dead sign gives every sample the wider slot.
+	const sample = { w: (legend.dead?.length ? LEGEND_DEAD_SAMPLE_W : LEGEND_SAMPLE_W) * k, h: LEGEND_SAMPLE_H * k, scale: k };
 	const labelX = sample.w + 0.5 * f;
 	const strip = { x: 0, w: 0.4375 * f, h: 1.625 * f };
 	const arms = { x: strip.w + 0.375 * f, w: 1.375 * f, h: 1.625 * f };
@@ -264,8 +280,8 @@ export function savedFrame(tree: { width: number; height: number }, legend: Save
 		const rows = items.map((item, i) => ({ item, x: (i % cols) * (cellW + colGap), y: titleH + Math.floor(i / cols) * rowH }));
 		return { rows, w: cols * cellW + (cols - 1) * colGap, h: titleH + Math.ceil(items.length / cols) * rowH };
 	};
-	const lineItems: (StrokeKind | 'sign')[] = [...legend.kinds, ...(legend.sign ? (['sign'] as const) : [])];
-	const labelOf = (kind: StrokeKind | 'sign') => (kind === 'sign' ? SIGN_LEGEND_LABEL : LEGEND_LABELS[kind]);
+	const lineItems: (StrokeKind | LegendExtraKind)[] = [...legend.kinds, ...(legend.sign ? (['sign'] as const) : []), ...(legend.dead ?? [])];
+	const labelOf = (kind: StrokeKind | LegendExtraKind) => (kind === 'sign' ? SIGN_LEGEND_LABEL : kind === 'dead' ? LEGEND_DEAD_LABEL : kind === 'dead-doubt' ? LEGEND_DEAD_DOUBT_LABEL : LEGEND_LABELS[kind]);
 	const lineCell = Math.max(0, ...lineItems.map((kind) => labelX + measure(labelOf(kind), labelFont)));
 	const houseCell = Math.max(0, ...legend.houses.map((h) => houseLabelX + measure(h.name, labelFont)));
 	const titleText = (text: string, x: number, y: number): SavedText => ({ text, x, y: y + titleSize, size: titleSize, weight: fonts.bold, font: titleFont });

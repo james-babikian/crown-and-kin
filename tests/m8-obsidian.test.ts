@@ -17,18 +17,19 @@ import { DEFAULT_SETTINGS } from '../src/obsidian/settings';
 import { entryText, titleOnCard } from '../src/obsidian/sheet-titles';
 import { freeName } from '../src/obsidian/table-note';
 import {
+	addFields,
 	changedFields,
 	draftChanged,
 	emptyNames,
 	formResult,
 	formStart,
 	holderText,
-	listName,
-	previewParts,
+previewParts,
 	rebase,
 	rulerHint,
 	savedListName,
 	titleRows,
+	valuesOf,
 	windowOps,
 	type HolderRow,
 	type HolderValues,
@@ -37,7 +38,7 @@ import {
 import { TitlesWindow } from '../src/obsidian/titles-window';
 import { TITLES_UI, deleteText } from '../src/render/ui-text';
 import { FEl, clock, dispatch, fakeWin, installDom, resetDom, settle } from './acceptance/fake-dom';
-import { notices, openModals, resetObsidian } from './acceptance/fake-obsidian';
+import { lastMenu, notices, openModals, resetObsidian } from './acceptance/fake-obsidian';
 import { golden, replaceOnce } from './acceptance/golden';
 import { BODY_13 } from './acceptance/titles-support';
 import { embed, fakeHandle, fakeHost, fillAllCards, openSheetOn, type FakeHandle, type Host } from './acceptance/tree-view-fakes';
@@ -114,9 +115,9 @@ describe('holder rows of the Titles window (spec §13.4)', () => {
 
 describe('the holder form (spec §13.5): the ruler name and the preview', () => {
 	it('starts with the written ruler name; the field is empty when the entry has no `as` (D131)', () => {
-		expect(formStart({ person: 'roderick', from: '1150' }, 'Roderick Valmont', false)).toEqual({ number: '', ruler: '', from: '1150', to: '' });
-		expect(formStart({ person: 'gareth', as: 'Gareth', number: 'I' }, 'Ser Gareth Orsini', false).ruler).toBe('Gareth');
-		expect(formStart({ name: 'Aldric', number: 'I' }, undefined, true)).toEqual({ number: 'I', ruler: '', from: '', to: '', name: 'Aldric' });
+		expect(formStart({ person: 'roderick', from: '1150' }, false)).toEqual({ number: '', ruler: '', from: '1150', to: '', throughSpouse: false });
+		expect(formStart({ person: 'gareth', as: 'Gareth', number: 'I' }, false).ruler).toBe('Gareth');
+		expect(formStart({ name: 'Aldric', number: 'I' }, true)).toEqual({ number: 'I', ruler: '', from: '', to: '', throughSpouse: false, name: 'Aldric' });
 	});
 
 	it('the hint of the ruler field is the first word of the name, or the typed name of a holder who is not in the tree', () => {
@@ -194,13 +195,13 @@ describe('the Titles window draft: Save is one batch (spec §13.4, §13.0 item 6
 		duke.holders = [h0, h1, h2, h3, h5, h4, { key: 'new', ref: null, base: null, values: { person: 'king-roderick', from: '1228' } }];
 		titleOf(rows, 'king-of-the-vale').name = 'High King of the Vale';
 		titleOf(rows, 'warden-of-the-marches').deleted = true;
-		rows.push({ key: 'nt', id: null, name: 'Lord of Harrowmere', baseName: null, plural: 'Lords of Harrowmere', basePlural: null, maleName: '', baseMaleName: null, femaleName: '', baseFemaleName: null, deleted: false, holders: [], baseRows: [] });
+		rows.push({ key: 'nt', id: null, name: 'Lord of Harrowmere', baseName: null, maleName: '', baseMaleName: null, femaleName: '', baseFemaleName: null, deleted: false, holders: [], baseRows: [] });
 		expect(draftChanged(rows)).toBe(true);
 		const ops = windowOps(rows, newId(BODY_13));
 		expect(ops.map((o) => o.kind)).toEqual(['edit-title', 'set-holders', 'delete-title', 'add-title']);
-		// The same text as the WP 8.0 golden Save, with the plural of the new title (D64).
+		// The same text as the WP 8.0 golden Save, except for the plural of the new title: the window no longer writes the list name (D201).
 		const out = bodyOf(applyOp(BODY_13, { kind: 'batch', ops }));
-		expect(out + '\n').toBe(golden('13-window-save.yaml'));
+		expect(out + '\n').toBe(replaceOnce(golden('13-window-save.yaml'), '    plural: Lords of Harrowmere\n', ''));
 	});
 
 	it('a new title with holders: add-title with a fresh id, then one set-holders with the new holders', () => {
@@ -209,8 +210,8 @@ describe('the Titles window draft: Save is one batch (spec §13.4, §13.0 item 6
 			{ key: 'a', ref: null, base: null, values: { person: 'elinor', number: 'I', from: '1180' } },
 			{ key: 'b', ref: null, base: null, values: { name: 'Orso' } },
 		];
-		rows.push({ key: 'n1', id: null, name: 'Duke of Valmont', baseName: null, plural: '', basePlural: null, maleName: '', baseMaleName: null, femaleName: '', baseFemaleName: null, deleted: false, holders, baseRows: [] });
-		rows.push({ key: 'n2', id: null, name: 'Duke of Valmont', baseName: null, plural: '', basePlural: null, maleName: '', baseMaleName: null, femaleName: '', baseFemaleName: null, deleted: false, holders: [], baseRows: [] });
+		rows.push({ key: 'n1', id: null, name: 'Duke of Valmont', baseName: null, maleName: '', baseMaleName: null, femaleName: '', baseFemaleName: null, deleted: false, holders, baseRows: [] });
+		rows.push({ key: 'n2', id: null, name: 'Duke of Valmont', baseName: null, maleName: '', baseMaleName: null, femaleName: '', baseFemaleName: null, deleted: false, holders: [], baseRows: [] });
 		const ops = windowOps(rows, newId(BODY_13));
 		// Both ids unused in the body and by each other (§6.8).
 		expect(ops).toEqual([
@@ -236,7 +237,7 @@ describe('the Titles window draft: Save is one batch (spec §13.4, §13.0 item 6
 
 	it('a deleted new title writes nothing; an empty name must be entered first', () => {
 		const rows = rowsOf();
-		rows.push({ key: 'n', id: null, name: '  ', baseName: null, plural: '', basePlural: null, maleName: '', baseMaleName: null, femaleName: '', baseFemaleName: null, deleted: false, holders: [], baseRows: [] });
+		rows.push({ key: 'n', id: null, name: '  ', baseName: null, maleName: '', baseMaleName: null, femaleName: '', baseFemaleName: null, deleted: false, holders: [], baseRows: [] });
 		expect(emptyNames(rows).map((t) => t.key)).toEqual(['n']);
 		rows[rows.length - 1].deleted = true;
 		expect(draftChanged(rows)).toBe(false);
@@ -265,105 +266,109 @@ describe('the draft follows a tree that changed under the window (stale Save, sp
 
 	it('a title deleted elsewhere leaves the draft; a new title stays', () => {
 		const rows = rowsOf();
-		rows.push({ key: 'n', id: null, name: 'Baron', baseName: null, plural: '', basePlural: null, maleName: '', baseMaleName: null, femaleName: '', baseFemaleName: null, deleted: false, holders: [], baseRows: [] });
+		rows.push({ key: 'n', id: null, name: 'Baron', baseName: null, maleName: '', baseMaleName: null, femaleName: '', baseFemaleName: null, deleted: false, holders: [], baseRows: [] });
 		const other = bodyOf(applyOp(BODY_13, { kind: 'delete-title', id: 'warden-of-the-marches' }));
 		const next = rebase(rows, rowsOf(graph(other)));
 		expect(next.map((t) => t.id)).toEqual(['duke-of-valmont', 'count-of-orsini', 'king-of-the-vale', null]);
 	});
 });
 
-describe('"Name of the list" in the Titles window (D64)', () => {
+describe('the list name in the Titles window (D201: no field, the window never writes it)', () => {
 	const DUKE_PLURAL = '    plural: Dukes of Valmont\n';
-	const WARDEN = '    name: Warden of the Marches\n';
 	const only = (rows: TitleRow[]) => {
 		const ops = windowOps(rows, newId(BODY_13));
 		return { ops, body: ops.length ? bodyOf(applyOp(BODY_13, { kind: 'batch', ops })) : BODY_13 };
 	};
 
-	it('starts with the written plural; empty when no plural is written', () => {
+	it('a row has no plural: the window neither shows nor keeps the list name', () => {
 		const rows = rowsOf();
-		expect(titleOf(rows, 'duke-of-valmont').plural).toBe('Dukes of Valmont');
-		expect(titleOf(rows, 'warden-of-the-marches').plural).toBe('');
-		expect(listName(titleOf(rows, 'warden-of-the-marches'))).toBe('Warden of the Marches');
+		expect('plural' in titleOf(rows, 'duke-of-valmont')).toBe(false);
+		expect('basePlural' in titleOf(rows, 'duke-of-valmont')).toBe(false);
 	});
 
-	it('a plural typed for a title without one: edit-title writes it after the name', () => {
-		const rows = rowsOf();
-		titleOf(rows, 'warden-of-the-marches').plural = ' Wardens of the Marches ';
-		expect(draftChanged(rows)).toBe(true);
-		const { ops, body } = only(rows);
-		expect(ops).toEqual([{ kind: 'edit-title', id: 'warden-of-the-marches', plural: 'Wardens of the Marches' }]);
-		expect(body).toBe(replaceOnce(BODY_13, WARDEN, `${WARDEN}    plural: Wardens of the Marches\n`));
-	});
-
-	it('a changed plural changes only its text line', () => {
-		const rows = rowsOf();
-		titleOf(rows, 'duke-of-valmont').plural = 'Grand Dukes of Valmont';
-		const { ops, body } = only(rows);
-		expect(ops).toEqual([{ kind: 'edit-title', id: 'duke-of-valmont', plural: 'Grand Dukes of Valmont' }]);
-		expect(body).toBe(replaceOnce(BODY_13, DUKE_PLURAL, '    plural: Grand Dukes of Valmont\n'));
-	});
-
-	it('an empty field removes the plural', () => {
-		const rows = rowsOf();
-		titleOf(rows, 'duke-of-valmont').plural = '  ';
-		const { ops, body } = only(rows);
-		expect(ops).toEqual([{ kind: 'edit-title', id: 'duke-of-valmont', plural: null }]);
-		expect(body).toBe(replaceOnce(BODY_13, DUKE_PLURAL, ''));
-	});
-
-	it('the title name (after trim) removes the plural; on a title without one it changes nothing', () => {
-		const rows = rowsOf();
-		titleOf(rows, 'duke-of-valmont').plural = ' Duke of Valmont ';
-		expect(only(rows).ops).toEqual([{ kind: 'edit-title', id: 'duke-of-valmont', plural: null }]);
-		const again = rowsOf();
-		titleOf(again, 'warden-of-the-marches').plural = 'Warden of the Marches';
-		expect(draftChanged(again)).toBe(false);
-		expect(windowOps(again, newId(BODY_13))).toEqual([]);
-	});
-
-	it('a rename and a plural make one edit-title', () => {
+	it('a rename makes one edit-title with the name only; a written plural stays in the note (A.3)', () => {
 		const rows = rowsOf();
 		const king = titleOf(rows, 'king-of-the-vale');
 		king.name = 'High King of the Vale';
-		king.plural = 'High Kings of the Vale';
+		const duke = titleOf(rows, 'duke-of-valmont');
+		duke.name = 'Grand Duke of Valmont';
 		const { ops, body } = only(rows);
-		expect(ops).toEqual([{ kind: 'edit-title', id: 'king-of-the-vale', name: 'High King of the Vale', plural: 'High Kings of the Vale' }]);
-		expect(body + '\n').toBe(golden('13-edit-title.yaml'));
+		expect(ops).toEqual([
+			{ kind: 'edit-title', id: 'duke-of-valmont', name: 'Grand Duke of Valmont' },
+			{ kind: 'edit-title', id: 'king-of-the-vale', name: 'High King of the Vale' },
+		]);
+		expect(ops.every((o) => !('plural' in o))).toBe(true);
+		expect(body).toContain(DUKE_PLURAL.trimEnd());
+		expect(body).toContain('name: High King of the Vale');
 	});
 
-	it('a new title: add-title with the plural; an empty field or the name writes none', () => {
+	it('a new title: add-title with the name and the other forms of the name, never a plural', () => {
 		const rows = rowsOf();
-		rows.push({ key: 'a', id: null, name: 'Baron of Greyfen', baseName: null, plural: 'Barons of Greyfen', basePlural: null, maleName: '', baseMaleName: null, femaleName: '', baseFemaleName: null, deleted: false, holders: [], baseRows: [] });
-		rows.push({ key: 'b', id: null, name: 'Lord', baseName: null, plural: ' Lord ', basePlural: null, maleName: '', baseMaleName: null, femaleName: '', baseFemaleName: null, deleted: false, holders: [], baseRows: [] });
-		rows.push({ key: 'c', id: null, name: 'Reeve', baseName: null, plural: '', basePlural: null, maleName: '', baseMaleName: null, femaleName: '', baseFemaleName: null, deleted: false, holders: [], baseRows: [] });
+		rows.push({ key: 'a', id: null, name: 'Baron of Greyfen', baseName: null, maleName: 'Baron', baseMaleName: null, femaleName: '', baseFemaleName: null, deleted: false, holders: [], baseRows: [] });
+		rows.push({ key: 'c', id: null, name: 'Reeve', baseName: null, maleName: '', baseMaleName: null, femaleName: '', baseFemaleName: null, deleted: false, holders: [], baseRows: [] });
 		expect(windowOps(rows, newId(BODY_13))).toEqual([
-			{ kind: 'add-title', id: 'baron-of-greyfen', name: 'Baron of Greyfen', plural: 'Barons of Greyfen' },
-			{ kind: 'add-title', id: 'lord', name: 'Lord' },
+			{ kind: 'add-title', id: 'baron-of-greyfen', name: 'Baron of Greyfen', maleName: 'Baron' },
 			{ kind: 'add-title', id: 'reeve', name: 'Reeve' },
 		]);
 	});
 
-	it('the list name follows the draft; the saved list name does not', () => {
+	it('the saved list name is the name of the saved title, for the label of the table note', () => {
 		const rows = rowsOf();
 		const duke = titleOf(rows, 'duke-of-valmont');
-		duke.plural = 'Grand Dukes';
-		expect(listName(duke)).toBe('Grand Dukes');
-		expect(savedListName(duke)).toBe('Dukes of Valmont');
-		duke.plural = '';
 		duke.name = 'Grand Duke';
-		expect(listName(duke)).toBe('Grand Duke');
+		expect(savedListName(duke)).toBe('Duke of Valmont');
 		expect(savedListName(titleOf(rows, 'warden-of-the-marches'))).toBe('Warden of the Marches');
 	});
 
-	it('a stale Save keeps an edited plural; a plural changed elsewhere comes through on an untouched title', () => {
+	it('a stale Save keeps an edited name; a name changed elsewhere comes through on an untouched title', () => {
 		const rows = rowsOf();
-		titleOf(rows, 'duke-of-valmont').plural = 'Grand Dukes';
-		const other = replaceOnce(BODY_13, '    plural: Counts of Orsini\n', '    plural: Counts\n');
+		titleOf(rows, 'duke-of-valmont').name = 'Grand Duke';
+		const other = replaceOnce(BODY_13, '    name: Count of Orsini\n', '    name: Count\n');
 		const next = rebase(rows, rowsOf(graph(other)));
-		expect(titleOf(next, 'duke-of-valmont').plural).toBe('Grand Dukes');
-		expect(titleOf(next, 'count-of-orsini').plural).toBe('Counts');
-		expect(windowOps(next, newId(other))).toEqual([{ kind: 'edit-title', id: 'duke-of-valmont', plural: 'Grand Dukes' }]);
+		expect(titleOf(next, 'duke-of-valmont').name).toBe('Grand Duke');
+		expect(titleOf(next, 'count-of-orsini').name).toBe('Count');
+		expect(windowOps(next, newId(other))).toEqual([{ kind: 'edit-title', id: 'duke-of-valmont', name: 'Grand Duke' }]);
+	});
+});
+
+describe('the tick box "Holds the title through the spouse" in the holder draft (D195, contract A.2)', () => {
+	it('a written key reads as ticked: true for the box, the id for a hand-written id', () => {
+		expect(valuesOf({ person: 'a', index: 0, throughSpouse: true })).toEqual({ person: 'a', throughSpouse: 'true' });
+		expect(valuesOf({ person: 'a', index: 0, throughSpouse: 'anna' })).toEqual({ person: 'a', throughSpouse: 'anna' });
+		expect(valuesOf({ person: 'a', index: 0 })).toEqual({ person: 'a' });
+		expect(formStart({ person: 'a', throughSpouse: 'anna' }, false).throughSpouse).toBe(true);
+		expect(formStart({ person: 'a' }, false).throughSpouse).toBe(false);
+	});
+
+	it('ticking writes true, unticking removes the key, and a hand-written id stays while the box stays ticked', () => {
+		const none = { number: '', ruler: '', from: '', to: '' };
+		expect(formResult({ person: 'a' }, 'A', { ...none, throughSpouse: true }).throughSpouse).toBe('true');
+		expect(formResult({ person: 'a', throughSpouse: 'true' }, 'A', { ...none, throughSpouse: false }).throughSpouse).toBeUndefined();
+		expect(formResult({ person: 'a', throughSpouse: 'anna' }, 'A', { ...none, throughSpouse: true }).throughSpouse).toBe('anna');
+		expect(formResult({ person: 'a', throughSpouse: 'anna' }, 'A', { ...none, throughSpouse: false }).throughSpouse).toBeUndefined();
+	});
+
+	it('the fields of an edit and of a new holder: the key is "through-spouse", after "to", null removes it', () => {
+		expect(changedFields({ person: 'a' }, { person: 'a', throughSpouse: 'true' })).toEqual({ 'through-spouse': 'true' });
+		expect(changedFields({ person: 'a', throughSpouse: 'true' }, { person: 'a' })).toEqual({ 'through-spouse': null });
+		expect(changedFields({ person: 'a', throughSpouse: 'true' }, { person: 'a', throughSpouse: 'true' })).toEqual({});
+		expect(Object.keys(addFields({ person: 'a', throughSpouse: 'true', to: '1100', from: '1090' }))).toEqual(['person', 'from', 'to', 'through-spouse']);
+	});
+
+	it('a tick writes the key into the note as a map entry, and an unticked box removes it again', () => {
+		const rows = rowsOf();
+		const king = titleOf(rows, 'king-of-the-vale');
+		king.holders[1]!.values = { ...king.holders[1]!.values, throughSpouse: 'true' };
+		const { ops, body } = (() => {
+			const o = windowOps(rows, newId(BODY_13));
+			return { ops: o, body: bodyOf(applyOp(BODY_13, { kind: 'batch', ops: o })) };
+		})();
+		expect(ops).toHaveLength(1);
+		expect(body).toContain('through-spouse: true');
+		const back = rowsOf(graph(body));
+		titleOf(back, 'king-of-the-vale').holders[1]!.values = { ...titleOf(back, 'king-of-the-vale').holders[1]!.values };
+		delete titleOf(back, 'king-of-the-vale').holders[1]!.values.throughSpouse;
+		expect(bodyOf(applyOp(body, { kind: 'batch', ops: windowOps(back, newId(body)) }))).not.toContain('through-spouse');
 	});
 });
 
@@ -471,8 +476,8 @@ describe('card labels in the tree view (spec §13.3, §13.5)', () => {
 async function openTitles(handle = writingHandle()) {
 	const host = fakeHost() as Host & { app: Record<string, unknown> };
 	const { el } = await embed(handle.body, { handle, host });
-	await click(el.querySelector('.dynasty-more'));
-	const item = el.querySelector('.dynasty-more-titles');
+	// 0.2.8 (G.13): Titles have a button of their own on the computer; they are no item of More there.
+	const item = el.querySelector('.dynasty-titles-button');
 	expect(item?.getAttribute('aria-label')).toBe(TITLES_UI.moreLabel);
 	await click(item);
 	const win = openModals.find((m) => (m as unknown) instanceof TitlesWindow) as unknown as { contentEl: FEl; modalEl: FEl } | undefined;
@@ -490,20 +495,23 @@ describe('the Titles window on the fakes (spec §13.4)', () => {
 	it('opens from More → Titles; lists the titles of the tree with their holder counts', async () => {
 		const { content } = await openTitles();
 		expect(rowNames(content)).toEqual(G13.titles.map((t) => t.name));
-		expect(rowTexts(content).find((t) => t.startsWith('Duke of Valmont'))).toContain(TITLES_UI.count(7));
+		expect(rowTexts(content).find((t) => t.startsWith('Duke of Valmont'))).toContain('7 holders');
 	});
 
 	it('Show holders lists the holders in order; a move and Save make one write, which one undo restores', async () => {
 		const { content, handle } = await openTitles();
 		const rows = titleBox(content, 'king-of-the-vale').querySelectorAll('.dynasty-holder-row');
-		expect(rows.map((r) => r.querySelector('.dynasty-holder-name')!.getText())).toEqual(['Aldric III', 'Edmund I', 'Roderick']);
-		expect(titleBox(content, 'king-of-the-vale').querySelector('.dynasty-holder-heading')!.getText()).toBe('Kings of the Vale');
-		// Move earlier is off on the first holder, Move later on the last.
-		expect(rows[0].querySelector('.dynasty-holder-earlier')!.disabled).toBe(true);
-		expect(rows[2].querySelector('.dynasty-holder-later')!.disabled).toBe(true);
-		await click(rows[0].querySelector('.dynasty-holder-later'));
+		expect(rows.map((r) => r.querySelector('.dynasty-holder-name')!.getText())).toEqual(['Aldric III', 'Edmund I', 'Roderick Valmont']);
+		expect(titleBox(content, 'king-of-the-vale').querySelector('.dynasty-lw-pagehead .dynasty-head-name')!.getText()).toBe('King of the Vale');
+		// Move earlier is off on the first holder, Move later on the last (the menu "more" of each row).
+		await click(rows[0].querySelector('.dynasty-holder-more'));
+		expect(lastMenu()!.item(TITLES_UI.moveEarlier)!.disabled).toBe(true);
+		await click(rows[2].querySelector('.dynasty-holder-more'));
+		expect(lastMenu()!.item(TITLES_UI.moveLater)!.disabled).toBe(true);
+		await click(rows[0].querySelector('.dynasty-holder-more'));
+		lastMenu()!.item(TITLES_UI.moveLater)!.click();
 		const after = content.querySelectorAll('.dynasty-lw-page .dynasty-holder-name').map((n) => n.getText());
-		expect(after).toEqual(['Edmund I', 'Aldric III', 'Roderick']);
+		expect(after).toEqual(['Edmund I', 'Aldric III', 'Roderick Valmont']);
 		expect(handle.ops).toHaveLength(0);
 		await click(content.querySelector('.dynasty-sheet-save'));
 		expect(handle.ops).toHaveLength(1);
@@ -514,29 +522,20 @@ describe('the Titles window on the fakes (spec §13.4)', () => {
 		expect(handle.body).toBe(BODY_13);
 	});
 
-	it('"Name of the list" (D64): the heading follows the field at once; Save writes the plural in one write, which one undo restores', async () => {
+	it('the Names section has the name, the name for a man and the name for a woman, and no list name (D201); a rename is one write that one undo restores', async () => {
 		const { content, handle } = await openTitles();
 		const box = titleBox(content, 'duke-of-valmont');
-		const field = box.querySelector('.dynasty-title-plural')!;
-		expect(field.tag).toBe('label');
-		expect(field.querySelector('.dynasty-sheet-label')!.getText()).toBe(TITLES_UI.pluralLabel);
-		const input = field.querySelector('textarea')!;
-		expect(input.value).toBe('Dukes of Valmont');
-		expect(input.getAttribute('placeholder')).toBe(TITLES_UI.pluralPlaceholder);
-		expect(input.getAttribute('aria-label')!.startsWith(TITLES_UI.pluralLabel)).toBe(true);
-		expect(titleBox(content, 'warden-of-the-marches').querySelector('.dynasty-title-plural textarea')!.value).toBe('');
-		const plural = titleBox(content, 'duke-of-valmont').querySelector('.dynasty-title-plural textarea')!;
-		plural.value = 'Grand Dukes of Valmont';
-		dispatch(plural, 'input');
-		expect(content.querySelector('.dynasty-holder-heading')!.getText()).toBe('Grand Dukes of Valmont');
-		plural.value = '';
-		dispatch(plural, 'input');
-		expect(content.querySelector('.dynasty-holder-heading')!.getText()).toBe('Duke of Valmont');
-		plural.value = 'Grand Dukes of Valmont';
-		dispatch(plural, 'input');
+		expect(box.querySelector('.dynasty-title-plural')).toBeNull();
+		const name = box.querySelector('.dynasty-title-name textarea')!;
+		expect(name.value).toBe('Duke of Valmont');
+		expect(name.getAttribute('placeholder')).toBe(TITLES_UI.namePlaceholder);
+		name.value = 'Grand Duke of Valmont';
+		dispatch(name, 'input');
+		expect(content.querySelector('.dynasty-lw-pagehead .dynasty-head-name')!.getText()).toBe('Grand Duke of Valmont');
 		await click(content.querySelector('.dynasty-sheet-save'));
 		expect(handle.ops).toHaveLength(1);
-		expect(handle.body).toBe(replaceOnce(BODY_13, '    plural: Dukes of Valmont\n', '    plural: Grand Dukes of Valmont\n'));
+		// The written plural stays (A.3).
+		expect(handle.body).toBe(replaceOnce(BODY_13, '    name: Duke of Valmont\n', '    name: Grand Duke of Valmont\n'));
 		await handle.undo();
 		expect(handle.body).toBe(BODY_13);
 	});
@@ -590,7 +589,8 @@ describe('the Titles window on the fakes (spec §13.4)', () => {
 		const create = vi.fn(async () => ({}));
 		(host.app.vault as unknown as Record<string, unknown>).create = create;
 		host.app.fileManager = { getNewFileParent: () => ({ isRoot: () => true, path: '/', children: [] }) };
-		await click(titleBox(content, 'duke-of-valmont').querySelector('.dynasty-holder-remove'));
+		await click(titleBox(content, 'duke-of-valmont').querySelector('.dynasty-holder-more'));
+		lastMenu()!.item(TITLES_UI.remove)!.click();
 		await click(content.querySelector('.dynasty-lw-page .dynasty-title-note'));
 		expect(create).not.toHaveBeenCalled();
 		expect(win.modalEl.querySelector('.dynasty-sheet-confirm')!.getText()).toContain(TITLES_UI.noteText);
@@ -601,7 +601,8 @@ describe('the Titles window on the fakes (spec §13.4)', () => {
 
 	it('Edit opens the holder form; its Save changes the draft only', async () => {
 		const { content, handle } = await openTitles();
-		await click(titleBox(content, 'duke-of-valmont').querySelectorAll('.dynasty-holder-edit')[2]);
+		await click(titleBox(content, 'duke-of-valmont').querySelectorAll('.dynasty-holder-more')[2]);
+		lastMenu()!.item(TITLES_UI.edit)!.click();
 		const form = top();
 		expect(form.modalEl.hasClass('dynasty-holder-form')).toBe(true);
 		const number = form.contentEl.querySelector('[data-field="number"] input')!;
@@ -622,7 +623,8 @@ describe('the Titles window on the fakes (spec §13.4)', () => {
 
 	it('D131: a holder who is not in the tree: the ruler field stays empty and its hint follows the name field; a typed ruler name is kept', async () => {
 		const { content } = await openTitles();
-		await click(titleBox(content, 'count-of-orsini').querySelectorAll('.dynasty-holder-edit')[0]);
+		await click(titleBox(content, 'count-of-orsini').querySelectorAll('.dynasty-holder-more')[0]);
+		lastMenu()!.item(TITLES_UI.edit)!.click();
 		const form = top();
 		const ruler = form.contentEl.querySelector('[data-field="ruler"] input')!;
 		const name = form.contentEl.querySelector('[data-field="holder-name"] input')!;
@@ -641,6 +643,61 @@ describe('the Titles window on the fakes (spec §13.4)', () => {
 	});
 });
 
+describe('the holder form: the tick box and the text fields (D195, D196 item 1, contract A.2)', () => {
+	async function formOf(titleId: string, index: number) {
+		const { content, handle } = await openTitles();
+		await click(titleBox(content, titleId).querySelectorAll('.dynasty-holder-more')[index]);
+		lastMenu()!.item(TITLES_UI.edit)!.click();
+		return { content, handle, form: top() };
+	}
+
+	it('a person in the tree has the tick box with its hint; ticking writes through-spouse: true in one write, and one undo restores the note', async () => {
+		const { content, handle, form } = await formOf('duke-of-valmont', 2);
+		const box = form.contentEl.querySelector('[data-field="through-spouse"] input')!;
+		expect(box.getAttribute('type')).toBe('checkbox');
+		expect(box.disabled).toBe(false);
+		expect(box.checked).toBe(false);
+		expect(form.contentEl.querySelector('[data-field="through-spouse"] label')!.getText()).toBe(TITLES_UI.holderTickLabel);
+		expect(form.contentEl.querySelector('[data-field="through-spouse"] .dynasty-sheet-hint')!.getText()).toBe(TITLES_UI.holderTickHint);
+		box.checked = true;
+		dispatch(box, 'change');
+		await click(form.contentEl.querySelector('.dynasty-sheet-save'));
+		expect(handle.ops).toHaveLength(0);
+		await click(content.querySelector('.dynasty-sheet-save'));
+		expect(handle.ops).toHaveLength(1);
+		expect(handle.body).toContain('through-spouse: true');
+		await handle.undo();
+		expect(handle.body).toBe(BODY_13);
+	});
+
+	it('a holder who is not in the tree has the box off, with the reason under it', async () => {
+		const { form } = await formOf('count-of-orsini', 0);
+		const box = form.contentEl.querySelector('[data-field="through-spouse"] input')!;
+		expect(box.disabled).toBe(true);
+		expect(box.checked).toBe(false);
+		expect(form.contentEl.querySelector('[data-field="through-spouse"] .dynasty-sheet-hint')!.getText()).toBe(TITLES_UI.holderTickDisabled);
+	});
+
+	it('the name fields of the form do not start with a capital and do not correct the text (D196 item 1)', async () => {
+		const { form } = await formOf('count-of-orsini', 0);
+		for (const name of ['holder-name', 'ruler', 'number']) {
+			const input = form.contentEl.querySelector(`[data-field="${name}"] input`)!;
+			expect(input.getAttribute('autocapitalize'), name).toBe('off');
+			expect(input.getAttribute('autocorrect'), name).toBe('off');
+		}
+	});
+
+	it('the Titles page has no field for the list name (D201) and its name fields do not start with a capital', async () => {
+		const { content } = await openTitles();
+		const page = titleBox(content, 'duke-of-valmont');
+		expect(page.querySelector('.dynasty-title-plural')).toBeNull();
+		expect(page.querySelector('[data-field="plural"]')).toBeNull();
+		for (const cls of ['dynasty-title-name', 'dynasty-title-male', 'dynasty-title-female']) {
+			expect(page.querySelector(`.${cls} textarea`)!.getAttribute('autocapitalize'), cls).toBe('off');
+		}
+	});
+});
+
 describe('the Titles section of the edit sheet (spec §13.4)', () => {
 	async function sheetOf(id: string, handle = writingHandle()) {
 		const { el } = await embed(handle.body, { handle });
@@ -651,19 +708,18 @@ describe('the Titles section of the edit sheet (spec §13.4)', () => {
 
 	it('sits between the fields and Family; lists each title with its entries', async () => {
 		const { content } = await sheetOf('roderick');
+		// 0.2.8: Details, Family, Titles, Notes, Actions (the sections of the person window).
 		const body = content.querySelector('.dynasty-sheet-body')!;
-		const order = body.children.map((c) => (c.hasClass('dynasty-titles-section') ? 'titles' : c.hasClass('dynasty-family') ? 'family' : c.getAttribute('data-field') ?? ''));
-		expect(order.indexOf('titles')).toBeGreaterThan(order.indexOf('notes'));
-		expect(order.indexOf('titles')).toBe(order.indexOf('family') - 1);
-		const sec = content.querySelector('.dynasty-titles-section')!;
-		expect(sec.querySelectorAll('.dynasty-title-entry').map((e) => e.querySelector('.dynasty-family-detail')!.getText())).toEqual(['1150–1158', 'Roderick I, from 1163']);
+		expect(body.querySelectorAll('section.dynasty-section').map((c) => c.getAttribute('data-section'))).toEqual(['details', 'family', 'titles', 'notes', 'actions']);
+		const sec = content.querySelector('[data-section="titles"]')!;
+		expect(sec.querySelectorAll('.dynasty-title-entry').map((e) => e.querySelector('.dynasty-family-detail')!.getText())).toEqual(['1150–1158', 'Roderick I · from 1163']);
 		// One title and no written title: no "Show on the card" (§13.4).
 		expect(sec.querySelector('.dynasty-show-on-card')).toBeNull();
 	});
 
 	it('"Show on the card" on the first title removes the card-title line (one write)', async () => {
 		const { content, handle } = await sheetOf('young-aldric');
-		const sec = content.querySelector('.dynasty-titles-section')!;
+		const sec = content.querySelector('[data-section="titles"]')!;
 		expect(sec.querySelector('.dynasty-title-holding[data-title="king-of-the-vale"] .dynasty-title-on-card')!.getText()).toBe(TITLES_UI.onCard);
 		await click(sec.querySelector('.dynasty-title-holding[data-title="duke-of-valmont"] .dynasty-show-on-card'));
 		expect(handle.ops).toHaveLength(1);
@@ -672,7 +728,7 @@ describe('the Titles section of the edit sheet (spec §13.4)', () => {
 
 	it('Remove writes at once, with a Notice with Undo', async () => {
 		const { content, handle } = await sheetOf('gareth');
-		await click(content.querySelector('.dynasty-titles-section .dynasty-remove-holder'));
+		await click(content.querySelector('[data-section="titles"] .dynasty-remove-holder'));
 		expect(handle.ops).toHaveLength(1);
 		expect(graph(handle.body).titles[0].holders.map((h) => h.person ?? h.name)).not.toContain('gareth');
 		expect(notices.some((n) => n.startsWith(TITLES_UI.removed('Ser Gareth Orsini', 'Duke of Valmont')))).toBe(true);
@@ -680,7 +736,7 @@ describe('the Titles section of the edit sheet (spec §13.4)', () => {
 
 	it('Edit writes only the changed value of that entry; a block-map holder stays a block map', async () => {
 		const { content, handle } = await sheetOf('gareth');
-		await click(content.querySelector('.dynasty-titles-section .dynasty-edit-holder'));
+		await click(content.querySelector('[data-section="titles"] .dynasty-edit-holder'));
 		const form = top();
 		const to = form.contentEl.querySelector('[data-field="to"] input')!;
 		to.value = '1164';

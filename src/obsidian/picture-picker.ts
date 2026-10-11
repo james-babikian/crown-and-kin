@@ -30,7 +30,7 @@
  * - Keyboard focus (D95). On a touch-first device (`isTouchFirst`: `(pointer: coarse)` in the picker's own
  *   window) the search field gets no focus at open and no timer focuses it later. Elsewhere the field gets
  *   the focus at open and refocus timers run until the owner presses a key or a pointer.
- * - Rows. Each row is at least `PICKER_ROW_PX` high, with `content-visibility: auto`, so a list of 2 000
+ * - Rows. Each row is at least 44 px high, with `content-visibility: auto`, so a list of 2 000
  *   rows is cheap. Order: the device row, folders, then the root's pictures. A folder row has a chevron,
  *   the folder icon, the name and the count, indented for each depth by the CSS. `role="tree"` in
  *   the folder view; in the search the list is a `listbox` of `option`s. A folder row's label is
@@ -74,18 +74,16 @@ import {
 	type PictureFileLike,
 	type PictureTree,
 } from '../core/picture-list';
-import { foldForMatch } from '../core/fold';
+import { folderOf, numberedFreePath } from '../core/link-text';
 import { judgeHeader, readPictureHeader, type PictureProblem, type SupportedFormat } from '../core/pictures';
 import { PICKER_UI, PICTURES_UI, deviceNotice } from '../render/ui-text';
 import { NO_READ_BYTES, NO_READ_BYTES_COARSE, isShownPictureExtension, type CopyBox, type PictureCopy, type PictureStore } from './picture-store';
 import { phoneLayout } from './modal-layout';
 import { trackModal } from './plugin-modals';
 import { nameDialog } from './sheet-parts';
-
-/** The row height, in CSS px (spec §7.5); the CSS sets the same minimum. */
-export const PICKER_ROW_PX = 44;
-/** The row preview box, in CSS px (D93). */
-export const PREVIEW_BOX_PX = 32;
+import { buildShell, type Shell } from './window-shell';
+/** The preview box of a picture, in CSS px: a thumbnail in a grid of pictures (D212 picker-grid; D93 had a 32 px box in a row). */
+export const PREVIEW_BOX_PX = 72;
 /** The copy box of a row preview: the picture's own proportions, never cut. */
 export const PREVIEW_BOX: CopyBox = { w: PREVIEW_BOX_PX, h: PREVIEW_BOX_PX, fit: 'meet' };
 /** The most row previews that load at one time. */
@@ -104,7 +102,7 @@ export interface PreviewRowRef {
 	key: string;
 	/** The picture to load. */
 	file: TFile;
-	/** The 32 px box in the row: the loader puts the `<img>` here and takes it away. */
+	/** The thumbnail box: the loader puts the `<img>` here and takes it away. */
 	box: HTMLElement;
 }
 
@@ -139,6 +137,10 @@ export interface PickPictureOptions {
 	store?: PictureStore;
 	/** The window title, for example "Select the arms of House Valmont". */
 	title: string;
+	/** The short title of the bar of a phone window ("Portrait", "Arms"), so the long heading does not stand twice. Absent: `title`. */
+	barTitle?: string;
+	/** A quiet text line under the title (one for a portrait and one for personal arms). */
+	hint?: string;
 	/** The current picture as a resolved file (`currentPictureOf`), or null or absent for none. The picker only shows it. */
 	current?: CurrentFileLike | null;
 	/**
@@ -165,30 +167,6 @@ export function pictureLink(app: App, file: TFile, sourcePath: string): string {
 	return app.fileManager.generateMarkdownLink(file, sourcePath).replace(/^!/, '');
 }
 
-/** The vault's pictures that the plugin can show, by name, then folder. */
-export function vaultPictures(app: App): TFile[] {
-	let files: TFile[] = [];
-	try {
-		files = app.vault.getFiles().filter((f) => isShownPictureExtension(f.extension));
-	} catch {
-		return [];
-	}
-	return files.sort((a, b) => a.name.localeCompare(b.name) || a.path.localeCompare(b.path));
-}
-
-/** The pictures whose path has every word of `query`; case, accents and quote look-alikes are ignored on both sides (D100). */
-export function matchPictures(files: readonly TFile[], query: string): TFile[] {
-	const words = foldForMatch(query).split(/\s+/).filter(Boolean);
-	if (!words.length) {
-		// A query with only spaces is no search; a query that folds to nothing (a lone accent) finds nothing, as in 0.2.0 (the picker's "searching" test reads the raw query too).
-		return query.split(/\s+/).some(Boolean) ? [] : [...files];
-	}
-	return files.filter((f) => {
-		const p = foldForMatch(f.path);
-		return words.every((w) => p.includes(w));
-	});
-}
-
 /** A file name Obsidian accepts: characters that links or file systems cannot hold become "-". */
 export function safePictureName(name: string, format: SupportedFormat): string {
 	const ext = format === 'jpeg' ? 'jpg' : format;
@@ -201,7 +179,6 @@ export function safePictureName(name: string, format: SupportedFormat): string {
 }
 
 /** The folder of a vault path, '' at the top. */
-const folderOf = (path: string) => path.split('/').slice(0, -1).join('/');
 
 /** The resolved file of a link from the caller's draft, or null; the same `store.resolve` as the cards. Never throws. */
 export function currentPictureOf(store: PictureStore | undefined, link: string | null | undefined, sourcePath: string): TFile | null {
@@ -447,6 +424,7 @@ class PicturePicker extends Modal {
 	private fileInput: HTMLInputElement | null = null;
 	private scroller: HTMLElement | null = null;
 	private previews: RowPreviews | null = null;
+	private shell: Shell | null = null;
 	/** The owner has scrolled, pressed a key, typed or touched: the plugin leaves the scroll alone. */
 	private acted = false;
 	/** A key or a pointer: the search field is not given the focus back. */
@@ -484,25 +462,38 @@ class PicturePicker extends Modal {
 		this.cleanup.push(phoneLayout(this), trackModal(this, () => this.close()));
 		const el = this.contentEl;
 		el.empty();
-		el.addClass('dynasty-sheet-content');
-		const header = el.createDiv({ cls: 'dynasty-sheet-header' });
-		nameDialog(this.modalEl, header.createDiv({ cls: 'dynasty-sheet-title', text: this.o.title }));
-		const actions = header.createDiv({ cls: 'dynasty-sheet-actions' });
-		const cancel = actions.createEl('button', { cls: 'dynasty-sheet-cancel', text: PICTURES_UI.cancel, attr: { type: 'button' } });
-		cancel.addEventListener('click', () => this.close());
-		this.selectEl = actions.createEl('button', { cls: ['mod-cta', 'dynasty-picture-select'], text: PICTURES_UI.select, attr: { type: 'button' } });
-		this.selectEl.addEventListener('click', () => this.guard(() => this.chooseSelected()));
+		// The window family (contract C): a bar on a phone, a footer on a computer; Select is the main button.
+		const shell = buildShell({
+			modalEl: this.modalEl,
+			contentEl: el,
+			// A phone shows the long heading in the page under the bar; its bar then says only what is picked.
+			title: this.modalEl.hasClass('is-phone') && this.o.barTitle ? this.o.barTitle : this.o.title,
+			titled: true,
+			cancelLabel: PICTURES_UI.cancel,
+			saveLabel: PICTURES_UI.select,
+			onCancel: () => this.close(),
+			onSave: () => this.guard(() => this.chooseSelected()),
+			buttons: { save: { cls: ['dynasty-picture-select'] } },
+		});
+		this.shell = shell;
+		nameDialog(this.modalEl, shell.titleEl);
+		this.selectEl = shell.save;
+		const body = shell.body;
 
 		// The bar is a sibling of the scroller, not a child: iOS scrolls the scroller that holds the focused field.
-		const bar = el.createDiv({ cls: 'dynasty-picture-searchbar' });
+		const top = createDiv({ cls: 'dynasty-picture-top' });
+		el.insertBefore(top, body);
+		const intro = top.createDiv({ cls: 'dynasty-picture-intro' });
+		const heading = intro.createDiv({ cls: 'dynasty-picture-heading', text: this.o.title, attr: { id: 'dynasty-picture-heading' } });
+		if (this.o.hint) intro.createDiv({ cls: 'dynasty-picture-hint', text: this.o.hint });
+		const bar = top.createDiv({ cls: 'dynasty-picture-searchbar' });
 		const search = bar.createEl('input', {
-			cls: ['dynasty-sheet-input', 'dynasty-picture-search'],
-			attr: { type: 'search', autocomplete: 'off', spellcheck: 'false', placeholder: PICTURES_UI.search, 'aria-label': PICTURES_UI.searchLabel, 'aria-controls': 'dynasty-picture-list' },
+			cls: ['dynasty-sheet-input', 'dynasty-input', 'dynasty-picture-search'],
+			attr: { type: 'search', autocomplete: 'off', autocorrect: 'off', autocapitalize: 'off', spellcheck: 'false', placeholder: PICTURES_UI.search, 'aria-label': PICTURES_UI.searchLabel, 'aria-controls': 'dynasty-picture-list' },
 		});
 		this.searchEl = search;
 		search.addEventListener('input', () => this.guard(() => this.onSearch()));
-		const body = el.createDiv({ cls: 'dynasty-sheet-body' });
-		this.listEl = body.createDiv({ cls: 'dynasty-picture-list', attr: { id: 'dynasty-picture-list', 'aria-label': this.o.title } });
+		this.listEl = body.createDiv({ cls: 'dynasty-picture-list', attr: { id: 'dynasty-picture-list', 'aria-labelledby': heading.id } });
 		// The device's file choice (Photos or Files on an iPhone, D69); hidden, opened by the first row.
 		const input = body.createEl('input', { cls: 'dynasty-picture-file', attr: { type: 'file', accept: 'image/*', tabindex: '-1', 'aria-hidden': 'true' } });
 		// Hidden as in the M9 iPhone check, where a click from a button opened Photos and Files.
@@ -538,6 +529,8 @@ class PicturePicker extends Modal {
 		this.frame = 0;
 		this.previews?.dispose();
 		this.previews = null;
+		this.shell?.dispose();
+		this.shell = null;
 		this.contentEl.empty();
 		// A promise settles once: a choice already resolved it.
 		if (!this.chosen) this.done({ kind: 'cancel' });
@@ -899,14 +892,7 @@ class PicturePicker extends Modal {
 
 	/** Before Obsidian 1.5.7: the note's folder, with " 1", " 2", … when the name is taken. */
 	private freePath(name: string): string {
-		const folder = folderOf(this.o.sourcePath);
-		const dot = name.lastIndexOf('.');
-		const base = dot > 0 ? name.slice(0, dot) : name;
-		const ext = dot > 0 ? name.slice(dot) : '';
-		const at = (n: string) => (folder ? `${folder}/${n}` : n);
-		let path = at(name);
-		for (let i = 1; this.app.vault.getAbstractFileByPath(path); i++) path = at(`${base} ${i}${ext}`);
-		return path;
+		return numberedFreePath(folderOf(this.o.sourcePath), name, (p) => !!this.app.vault.getAbstractFileByPath(p));
 	}
 }
 

@@ -9,7 +9,7 @@ import { computeModelOrder } from '../../src/core/order';
 import { fixtureSource } from './load';
 import { HousesWindow } from '../../src/obsidian/houses-window';
 import { FEl, dispatch, fakeWin, installDom, resetDom } from './fake-dom';
-import { openModals, resetObsidian } from './fake-obsidian';
+import { resetObsidian } from './fake-obsidian';
 import { graphOf, housePageModule, tableCellOf } from './m10-support';
 import { fakeHandle } from './tree-view-fakes';
 
@@ -320,9 +320,8 @@ people:
 		const content = (win as unknown as { contentEl: FEl }).contentEl;
 		// 0.2.5 (D134): People is on the edit page of the house.
 		dispatch(content.querySelectorAll('button.dynasty-lw-row')[0], 'click');
-		dispatch(content.querySelector('.dynasty-lw-page .dynasty-house-people')!, 'click');
-		const page = openModals[1] as unknown as { contentEl: FEl };
-		dispatch(page.contentEl.querySelectorAll('.dynasty-hp-row')[0], 'click');
+		// 0.2.8 (D202): the people are a section of the page; a tap on a name closes the window and shows the card.
+		dispatch(content.querySelectorAll('.dynasty-lw-page .dynasty-hp-row')[0], 'click');
 		expect(shown).toEqual(['aldric']);
 	});
 });

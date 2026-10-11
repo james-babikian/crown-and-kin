@@ -4,6 +4,7 @@
  * move a card or change a line (spec §5.1 step 6, D9). Renderers call `layoutTree`; they read the
  * shared shapes and helpers of `model.ts` and `geometry.ts` directly.
  */
+import { deepFreeze } from '../core/deep-freeze';
 import type { FamilyGraph } from '../core/derive';
 import { computeGenerations } from '../core/generations';
 import { foldControls, foldFamilies, hiddenPartners, pruneGraph, type FoldControl } from '../core/folds';
@@ -45,12 +46,16 @@ export function layoutKey(g: FamilyGraph, geo: Geometry, settings: LayoutSetting
 	const rel = { ...(settings.relationLine ? { relationLine: true } : {}), ...(youTab !== undefined ? { youTab } : {}), ...(ordinals.length ? { ordinalCards: ordinals } : {}) };
 	// The crown and the reach come from the picture lists as given (`drawnGeometry` has no graph), so a list of ids that are not in this graph still moves the layout.
 	const drawn = withRelationLine(geo, { ...settings, youTab, ordinalCards: ordinals });
-	const heights = { ...(drawn.crown ? { crown: drawn.crown } : {}), ...(drawn.reach ? { reach: drawn.reach } : {}) };
+	const heights = { ...(drawn.crown ? { crown: drawn.crown } : {}), ...(drawn.textTop ? { textTop: drawn.textTop } : {}), ...(drawn.reach ? { reach: drawn.reach } : {}) };
 	// 0.2.5: the text card shows no picture, so the picture lists never change a sideways text layout.
 	const textCard = geo.form === 'text';
 	// M9 (L3): the picture sets, filtered, once each and sorted; none leaves the key as in M8.
 	const arms = textCard ? [] : [...new Set(settings.arms ?? [])].filter((id) => g.houses.has(id)).sort();
+	// 0.2.8: the people with personal arms and the setting; absent leaves the key as before.
+	const personalArms = textCard ? [] : [...new Set(settings.personalArms ?? [])].filter((id) => g.byId.has(id)).sort();
 	const portraits = textCard ? [] : [...new Set(settings.portraits ?? [])].filter((id) => g.byId.has(id)).sort();
+	// D206: a holder shows the arms of the house; the titles are not part of the people list below, so the holders go in with the setting.
+	const holders = settings.armsOnCards === undefined ? [] : [...new Set(g.titles.flatMap((x) => x.holders.map((h) => h.person ?? '')))].filter(Boolean).sort();
 	// M10 (L3, F1): the people that folds hide, the folded families and the controls; empty or absent leaves the key as before.
 	const hidden = [...new Set(settings.foldHidden ?? [])].filter((id) => g.byId.has(id)).sort();
 	const folded = [...new Set(settings.foldedFamilies ?? [])].sort();
@@ -62,6 +67,8 @@ export function layoutKey(g: FamilyGraph, geo: Geometry, settings: LayoutSetting
 		...(folded.length ? { foldedFamilies: folded } : {}),
 		...(settings.foldControls ? { foldControls: true } : {}),
 		...(arms.length ? { arms } : {}),
+		...(personalArms.length ? { personalArms } : {}),
+		...(!textCard && settings.armsOnCards !== undefined ? { armsOnCards: settings.armsOnCards, armsHolders: holders } : {}),
 		...(portraits.length ? { portraits } : {}),
 	};
 	const parts: unknown[] = [
@@ -134,24 +141,6 @@ export const layoutTree: LayoutTree = (g, geo, settings, fontFamily) => {
 	while (cache.size > LAYOUT_CACHE_SIZE) cache.delete(cache.keys().next().value!);
 	return out;
 };
-
-const readOnly = () => {
-	throw new TypeError('Layout results are read-only');
-};
-
-function deepFreeze<T>(value: T): T {
-	if (value === null || typeof value !== 'object' || Object.isFrozen(value)) return value;
-	if (value instanceof Map) {
-		for (const [k, v] of value) {
-			deepFreeze(k);
-			deepFreeze(v);
-		}
-		for (const method of ['set', 'delete', 'clear']) Object.defineProperty(value, method, { value: readOnly });
-	} else {
-		for (const v of Object.values(value)) deepFreeze(v);
-	}
-	return Object.freeze(value);
-}
 
 /** Settings button "Clear layout cache" (spec §9). */
 export function clearLayoutCache(): void {

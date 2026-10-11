@@ -15,10 +15,10 @@ import { newIdIn } from './id-gen';
 import { parseBody, readTree, textWithoutComments } from './parse';
 import { dropHolderPatches, dropHolders, dropIdPatches, dropIds } from './title-ops';
 import { isEmpty, isMap as isRawMap, list, str, unwrapCurly, type Raw, type RawMap } from './tolerate';
-import { isParentType, isPlacementType, isUnionType, parentKind, PLACEMENT_TYPES, type Tree } from './types';
+import { isParentType, isPlacementType, isUnionType, PARENT_LIMIT, parentKind, PLACEMENT_TYPES, type Tree } from './types';
 import { dashOf, flowComment, insertItem, itemEnd, itemStart, removeFromSection, removeItems, section, type Where } from './yaml-list';
 import {
-	addPair, clone, commentsOf, doubleQuoted, findPair, finish, finishTogether, insertAt, isBooleanField, isRefusal, layoutOf, PERSON_FIELDS, PERSON_ORDER, personNode, personValue,
+	addPair, clone, commentsOf, doubleQuoted, findPair, finish, finishTogether, flowInsertAfter, insertAt, isBooleanField, isRefusal, layoutOf, PERSON_FIELDS, PERSON_ORDER, personNode, personValue,
 	QUOTED_FIELDS, refuse, removePair, renderScalar, setPairValue, TEXT_FIELDS, topMap, type Parsed, type Patch, type Refusal, Source, type Step,
 } from './yaml-patch';
 import { REFUSAL_TEXT } from './refusal-text';
@@ -158,7 +158,7 @@ function addPerson(ctx: OpContext, op: AddPerson): EditResult {
 		if (!isParentType(r.type)) return refuse('bad-value', REFUSAL_TEXT.unknownParentType);
 		if (seen.has(`${r.id}\0${r.type}`)) return refuse('bad-value', 'The same parent is given twice.');
 		seen.add(`${r.id}\0${r.type}`);
-		if (parents.filter((x) => x.type === r.type).length > 2) return refuse('limit');
+		if (parents.filter((x) => x.type === r.type).length > PARENT_LIMIT[r.type]) return refuse('limit');
 	}
 
 	const where = placement(ctx, op.at);
@@ -249,7 +249,7 @@ function addParent(ctx: OpContext, op: AddParent): EditResult {
 	const current = writtenParents(g, op.child);
 	const same = current.filter((r) => r.type === op.type);
 	if (same.some((r) => r.id === op.parent)) return refuse('bad-value', REFUSAL_TEXT.alreadyParent);
-	if (same.length >= 2) return refuse('limit');
+	if (same.length >= PARENT_LIMIT[op.type]) return refuse('limit');
 	const chosen = op.union === undefined ? undefined : resolveUnion(ctx, op.union);
 	if (isRefusal(chosen)) return chosen;
 
@@ -317,7 +317,7 @@ function appendParent(p: Parsed, item: YAMLMap, id: string, type: ParentKind): P
 	if (seq) {
 		if (seq.flow) {
 			if (!seq.items.length) return insertAt(src.text.indexOf('[', seq.range![0]) + 1, entry);
-			return insertAt(src.nodeEnd(seq.items[seq.items.length - 1] as Node), `, ${entry}`);
+			return flowInsertAfter(src, seq, seq.items.length - 1, [entry]);
 		}
 		const dashCol = src.column(dashOf(src, seq.items[0] as Node));
 		return insertAt(itemEnd(src, seq, seq.items.length - 1), '\n' + ' '.repeat(dashCol) + '- ' + entry);
@@ -650,7 +650,7 @@ function setParentType(ctx: OpContext, op: SetParentType): EditResult {
 	if (op.from === op.to) return { ok: true, body: ctx.first.src.text, created: [] };
 	const current = writtenParents(ctx.g, op.child).filter((r) => r.type === op.to);
 	if (current.some((r) => r.id === op.parent)) return refuse('bad-value', REFUSAL_TEXT.alreadyParent);
-	if (current.length >= 2) return refuse('limit');
+	if (current.length >= PARENT_LIMIT[op.to]) return refuse('limit');
 
 	const src = ctx.first.src;
 	const expected = clone(ctx.data) as RawMap;

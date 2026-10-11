@@ -16,8 +16,8 @@ import { openModals, resetObsidian } from './acceptance/fake-obsidian';
 import { desktop, embed, fakeHandle, fullViews, openFullScreen, phone, tabletDevice, type FakeHandle } from './acceptance/tree-view-fakes';
 
 /*
- * WP-C3 of 0.2.5 (D132, the 0.2.5 contract C.3.3): the Focus button. With no focus a press opens the
- * picker. While a focus shows, a press opens a small list: Choose a person, Clear focus. Clear
+ * WP-C3 of 0.2.5 (D132, the 0.2.5 contract C.3.3): the Focus button. 0.2.8 (G.13): a press always opens the Focus menu:
+ * Choose a person, Focus on you (only with a marked person), and (only while a focus shows) Clear focus. Clear
  * focus writes nothing; the Show all people button is gone.
  */
 
@@ -115,16 +115,19 @@ async function choose(id: string): Promise<void> {
 }
 
 describe('the Focus button with no focus on', () => {
-	it('goes straight to the picker and has no menu attributes', async () => {
+	it('opens the menu with one item, Choose a person; the choice draws the family', async () => {
 		const { root } = await desk(LINE);
 		const b = focusButton(root);
-		expect(b.getAttribute('aria-haspopup')).toBeNull();
-		expect(b.getAttribute('aria-expanded')).toBeNull();
+		expect(b.getAttribute('aria-haspopup')).toBe('true');
+		expect(b.getAttribute('aria-expanded')).toBe('false');
 		expect(b.getAttribute('aria-label')).toBe(FOCUS_UI.focus);
 		expect(b.getAttribute('aria-pressed')).toBe('false');
 		await press(root, '.dynasty-focus');
+		expect(pickerOpen()).toBe(false);
+		expect(list(root)).not.toBeNull();
+		expect(items(root).map((i) => i.querySelector('.dynasty-more-text')!.getText())).toEqual([FOCUS_UI.choose]);
+		await press(root, '.dynasty-popover-focus .dynasty-popover-item');
 		expect(pickerOpen()).toBe(true);
-		expect(list(root)).toBeNull();
 		await choose('p4');
 		expect(drawn(root)).toEqual(['p1', 'p2', 'p3', 'p4', 'p5', 'p6', 'p7']);
 	});
@@ -140,6 +143,8 @@ describe('the Focus button with no focus on', () => {
 	it('a picker closed with no choice gives the keyboard focus back to the Focus button', async () => {
 		const { root } = await desk(LINE);
 		await press(root, '.dynasty-focus', 0);
+		click(items(root)[0], 0);
+		await settle();
 		new FEl('div').focus();
 		picker().close();
 		runTimers(0);
@@ -223,7 +228,7 @@ describe('the Focus button while a focus shows', () => {
 		expect(drawn(root)).toEqual(FAMILY);
 	});
 
-	it('Clear focus shows all people, builds the button again with no menu attributes, and writes nothing', async () => {
+	it('Clear focus shows all people, builds the button again with its menu attributes and writes nothing', async () => {
 		const { root, handle } = await desk(PINNED);
 		expect(drawn(root)).toEqual(FAMILY);
 		await press(root, '.dynasty-focus');
@@ -234,8 +239,8 @@ describe('the Focus button while a focus shows', () => {
 		expect(list(root)).toBeNull();
 		expect(drawn(root)).toEqual(ALL);
 		const b = focusButton(root);
-		expect(b.getAttribute('aria-haspopup')).toBeNull();
-		expect(b.getAttribute('aria-expanded')).toBeNull();
+		expect(b.getAttribute('aria-haspopup')).toBe('true');
+		expect(b.getAttribute('aria-expanded')).toBe('false');
 		expect(b.getAttribute('aria-label')).toBe(FOCUS_UI.focus);
 		expect(b.hasClass('is-active')).toBe(false);
 		expect(handle.write).not.toHaveBeenCalled();
@@ -253,7 +258,7 @@ describe('the Focus button while a focus shows', () => {
 		expect(fakeDoc.activeElement).toBe(focusButton(root));
 	});
 
-	it('after Clear focus a press goes to the picker again, and a choice shows that family; the pin stays in the note', async () => {
+	it('after Clear focus the menu has one item again, and a choice shows that family; the pin stays in the note', async () => {
 		const { root, handle } = await desk(PINNED);
 		await press(root, '.dynasty-focus');
 		click(items(root)[1]);
@@ -261,6 +266,8 @@ describe('the Focus button while a focus shows', () => {
 		resizeAll();
 		flushFrames();
 		await press(root, '.dynasty-focus');
+		expect(items(root)).toHaveLength(1);
+		await press(root, '.dynasty-popover-focus .dynasty-popover-item');
 		expect(pickerOpen()).toBe(true);
 		await choose('p7');
 		expect(drawn(root)).toEqual(['p4', 'p5', 'p6', 'p7', 'p8']);
@@ -271,6 +278,7 @@ describe('the Focus button while a focus shows', () => {
 	it('a focus that the session chose also opens the list, and Clear focus shows all people', async () => {
 		const { root, handle } = await desk(LINE);
 		await press(root, '.dynasty-focus');
+		await press(root, '.dynasty-popover-focus .dynasty-popover-item');
 		await choose('p4');
 		expect(drawn(root)).toEqual(FAMILY);
 		await press(root, '.dynasty-focus');
@@ -353,11 +361,9 @@ describe('what Clear focus resets', () => {
 });
 
 describe('styles.css and the texts', () => {
-	it('the Focus list rule is in the block "C: focus list and tooltip"', () => {
+	it('the Focus menu has the rule of the toolbar menus (0.2.8: one rule for More and Focus)', () => {
 		const css = readFileSync(fileURLToPath(new URL('../styles.css', import.meta.url)), 'utf8');
-		const at = css.indexOf('/* C: focus list and tooltip */');
-		expect(at).toBeGreaterThanOrEqual(0);
-		expect(css.indexOf('.dynasty-popover-focus {')).toBeGreaterThan(at);
+		expect(css).toMatch(/\.dynasty-popover-more,\s*\.dynasty-popover-focus \{/);
 	});
 
 	it('FOCUS_UI has no Show all people text now', () => {

@@ -10,7 +10,7 @@
  */
 import type { NameLineCount, NameRoom } from '../layout/model';
 import { listKey, type BreakList } from './break-words';
-import { truncate } from './view-math';
+import { graphemes, truncate } from './view-math';
 
 /**
  * The largest `k` in `[0, n)` for which `fits(k)` is true, when `fits` is true up to some `k` and false after it (-1 when
@@ -56,7 +56,7 @@ export const nameLines: NameLines = (name, width, measure, maxLines = 3) => {
 	for (;;) {
 		if (measure(rest) <= width) return [...out, rest];
 		if (out.length >= maxLines - 1) return [...out, truncate(rest, width, measure)];
-		const chars = Array.from(rest);
+		const chars = graphemes(rest);
 		const spaces: number[] = [];
 		for (let i = 1; i < chars.length; i++) if (chars[i] === ' ') spaces.push(i);
 		// Last space first: the longest text line that fits (found from the short end, so a long name is not measured at every space).
@@ -167,19 +167,6 @@ function candidatesOf(cps: readonly string[], user?: BreakList): Cand[] {
 	return out;
 }
 
-/** The pieces of a word, split at every place and own hyphen, without added hyphens: `breakWord('Longnamunda')` is `['Longna', 'mun', 'da']`. */
-export function breakWord(word: string, user?: BreakList): string[] {
-	const cps = Array.from(word.normalize('NFC'));
-	const out: string[] = [];
-	let from = 0;
-	for (const c of candidatesOf(cps, user)) {
-		out.push(cps.slice(from, c.at).join(''));
-		from = c.at;
-	}
-	out.push(cps.slice(from).join(''));
-	return out;
-}
-
 interface Tok {
 	text: string;
 	sob: boolean;
@@ -191,7 +178,7 @@ interface Tok {
 export function fitRuns(runs: readonly NameRun[], width: number, measure: NameMeasure): NameRun[] {
 	const widthOf = (rs: readonly NameRun[]) => rs.reduce((a, r) => a + measure(r.text, r.sob), 0);
 	if (widthOf(runs) <= width) return runs.map((r) => ({ ...r }));
-	const chars = runs.flatMap((r) => Array.from(r.text).map((ch) => ({ ch, sob: r.sob })));
+	const chars = runs.flatMap((r) => graphemes(r.text).map((ch) => ({ ch, sob: r.sob })));
 	const build = (n: number): NameRun[] => {
 		const out: NameRun[] = [];
 		const body = chars.slice(0, n);
@@ -282,41 +269,39 @@ export function cardNameLines(name: string, sobriquet: string | undefined, room:
 	};
 
 	/** The names of the final text line, cut with "…": the longest run of whole tokens that fits with the "…", else a cut inside the first. */
-	const cutNames = (names: readonly Tok[]): NameRun[] => {
+	const cutNames = (names: readonly Tok[], lastW: number): NameRun[] => {
 		let best = 0;
-		while (best < names.length && widthOf(dotted(names.slice(0, best + 1))) <= r.last) best++;
+		while (best < names.length && widthOf(dotted(names.slice(0, best + 1))) <= lastW) best++;
 		if (best) return dotted(names.slice(0, best));
 		// The first word fits only without the "…": when more words follow, shorten it so that the "…" shows what is missing.
 		const first = runsOf(names.slice(0, 1));
-		if (names.length === 1) return fitRuns(first, r.last, measure);
-		return fitRuns([{ text: `${runsText(first)}…`, sob: false }], r.last, measure);
+		if (names.length === 1) return fitRuns(first, lastW, measure);
+		return fitRuns([{ text: `${runsText(first)}…`, sob: false }], lastW, measure);
 	};
 
 	/** The final text line from the rest that did not fit the room `last` (rules C and D). */
-	const finalLine = (rest: readonly Tok[]): NameRun[] => {
+	const finalLine = (rest: readonly Tok[], lastW: number): NameRun[] => {
 		const names = rest.filter((t) => !t.sob);
-		if (names.length === rest.length) return cutNames(rest);
+		if (names.length === rest.length) return cutNames(rest, lastW);
 		// The sobriquet is the last token. Alone on its text line it is cut with "…" (rule C).
-		if (!names.length) return fitRuns(runsOf(rest), r.last, measure);
+		if (!names.length) return fitRuns(runsOf(rest), lastW, measure);
 		// Else it goes completely (D127): a "…" follows the last whole name word if it fits there, else nothing.
-		if (grow(names, r.last) === names.length) return widthOf(dotted(names)) <= r.last ? dotted(names) : runsOf(names);
-		return cutNames(names);
+		if (grow(names, lastW) === names.length) return widthOf(dotted(names)) <= lastW ? dotted(names) : runsOf(names);
+		return cutNames(names, lastW);
 	};
 
 	const lines: NameRun[][] = [];
 	let rest: Tok[] = toks;
 	for (;;) {
 		const slot = lines.length + 1;
-		if (slot === 1 && grow(rest, r.only) === rest.length) {
-			lines.push(runsOf(rest));
-			break;
-		}
-		if (grow(rest, r.last) === rest.length) {
+		// F-LAYOUT-01: a name that stays on the first text line has the room `only`; the room `last` is for a final text line after the first.
+		const lastW = slot === 1 ? r.only : r.last;
+		if (grow(rest, lastW) === rest.length) {
 			lines.push(runsOf(rest));
 			break;
 		}
 		if (slot >= maxLines) {
-			lines.push(finalLine(rest));
+			lines.push(finalLine(rest, lastW));
 			break;
 		}
 		let j = grow(rest, r.full);
@@ -326,7 +311,7 @@ export function cardNameLines(name: string, sobriquet: string | undefined, room:
 			else {
 				const broken = breakToken(rest[0], r.full);
 				if (!broken) {
-					lines.push(finalLine(rest));
+					lines.push(finalLine(rest, lastW));
 					break;
 				}
 				lines.push([{ text: broken.head.text, sob: false }]);
@@ -339,7 +324,7 @@ export function cardNameLines(name: string, sobriquet: string | undefined, room:
 			const broken = breakToken(rest[0], r.full);
 			if (!broken) {
 				if (rest[0].sob) {
-					lines.push(finalLine(rest));
+					lines.push(finalLine(rest, lastW));
 					break;
 				}
 				// A word that ends the name is the final text line, so it meets the room `last` (or `only`): arms box, portrait.

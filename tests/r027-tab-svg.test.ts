@@ -7,7 +7,7 @@ import { DEFAULT_LAYOUT_SETTINGS, clearLayoutCache, layoutTree, pictureSets } fr
 import type { Geometry, LaidOut, LayoutSettings } from '../src/layout/model';
 import { buildScene } from '../src/render/dom/scene';
 import { SAVED_PNG_MAX_SIDE, savedExtent, savedFrame } from '../src/render/saved-picture';
-import { DEFAULT_DARK, DEFAULT_LIGHT, HEIR_LOOK, ME_LOOK, ROUNDEL_LOOK } from '../src/render/styles';
+import { DEFAULT_DARK, DEFAULT_LIGHT, HEIR_LOOK, ME_LOOK } from '../src/render/styles';
 import { approxMeasure, renderSvg } from '../src/render/svg-string';
 import { FEl, installDom } from './acceptance/fake-dom';
 import { build } from './helpers';
@@ -106,7 +106,7 @@ const items = (svg: string, prefix: string) => nodes(parseSvg(svg)).filter((n) =
 
 describe('F.4, F.5: the ordinal tab in the saved picture', () => {
 	for (const [name, geo] of [['Roundel', ROUNDEL], ['text card', TEXT]] as const) {
-		it(`${name}: the rectangle of the live scene, a card-colour base, the house tint, a 1 px text-colour border, 0.2 em corners`, () => {
+		it(`${name}: the rectangle of the live scene, a card-colour base, the card colour inside a 1 px text-colour border, 0.2 em corners (0.2.8: no house tint)`, () => {
 			const laid = lay(geo, { ordinalCards: ['b', 'c', 'd'] });
 			const svg = svgOf(laid, { ordinals: ORD });
 			const L = laid.layout;
@@ -121,7 +121,8 @@ describe('F.4, F.5: the ordinal tab in the saved picture', () => {
 				expect(Number(rect.attrs.rx)).toBeCloseTo(ORDINAL_EM.corner * 12, 9);
 				expect(rect.attrs.stroke).toBe(DEFAULT_LIGHT.text);
 				expect(Number(rect.attrs['stroke-width'])).toBe(1);
-				expect(Number(rect.attrs['fill-opacity'])).toBe(ROUNDEL_LOOK.plate.light);
+				expect(rect.attrs.fill).toBe(DEFAULT_LIGHT.cardFill);
+				expect(rect.attrs['fill-opacity']).toBeUndefined();
 				const base = card.children[card.children.indexOf(rect) - 1];
 				expect([base.tag, base.attrs.x, base.attrs.width, base.attrs.fill]).toEqual(['rect', rect.attrs.x, rect.attrs.width, DEFAULT_LIGHT.cardFill]);
 				const word = card.children[card.children.indexOf(rect) + 1];
@@ -136,11 +137,11 @@ describe('F.4, F.5: the ordinal tab in the saved picture', () => {
 		});
 	}
 
-	it('uses the dark palette and the dark plate opacity in a dark picture', () => {
+	it('uses the dark palette in a dark picture', () => {
 		const svg = svgOf(lay(ROUNDEL, { ordinalCards: ['b'] }), { ordinals: ORD, dark: true });
 		const rect = item(cardNode(svg, 'b'), 'ordinal:b')!;
 		expect(rect.attrs.stroke).toBe(DEFAULT_DARK.text);
-		expect(Number(rect.attrs['fill-opacity'])).toBe(ROUNDEL_LOOK.plate.dark);
+		expect(rect.attrs.fill).toBe(DEFAULT_DARK.cardFill);
 	});
 
 	it('has only fixed colours: no var() and no named theme word in any paint attribute', () => {
@@ -188,20 +189,20 @@ describe('F.4, F.5: the ordinal tab in the saved picture', () => {
 });
 
 describe('F.2, F.5: the heirs\' still outline in the saved picture', () => {
-	it('a ring in the text colour under the card, and an accent border (the highlight at rest)', () => {
+	it('one accent border 2 px wide on the card itself and no second ring (0.2.8, D212 heir-outline)', () => {
 		const laid = lay(ROUNDEL);
 		const svg = svgOf(laid, { heirs: ['b'] });
 		const card = cardNode(svg, 'b');
-		const ring = item(card, 'heir:b')!;
+		const bg = item(card, 'heir:b')!;
 		const box = laid.layout.persons.get('b')!;
-		expect([Number(ring.attrs.x), Number(ring.attrs.y), Number(ring.attrs.width), Number(ring.attrs.height)]).toEqual([box.x, box.y, box.w, box.h]);
-		expect(ring.attrs.stroke).toBe(DEFAULT_LIGHT.text);
-		expect(Number(ring.attrs['stroke-width'])).toBe(HEIR_LOOK.ring);
-		expect(ring.attrs.fill).toBe('none');
-		const bg = card.children[card.children.indexOf(ring) + 1];
+		expect([Number(bg.attrs.x), Number(bg.attrs.y), Number(bg.attrs.width), Number(bg.attrs.height)]).toEqual([box.x, box.y, box.w, box.h]);
 		expect(bg.attrs.fill).toBe(DEFAULT_LIGHT.cardFill);
 		expect(bg.attrs.stroke).toBe(DEFAULT_LIGHT.accent);
 		expect(Number(bg.attrs['stroke-width'])).toBe(HEIR_LOOK.border);
+		expect(HEIR_LOOK.border).toBe(2);
+		// The card's first shape is its own rect: nothing is drawn before it (0.2.7 had a ring there).
+		expect(card.children.find((n) => n.tag === 'rect')).toBe(bg);
+		expect(card.children.filter((n) => n.tag === 'rect' && n.attrs.fill === 'none')).toHaveLength(0);
 	});
 
 	it('only the given heirs get it; the card of a person who is not an heir keeps its border', () => {
@@ -211,19 +212,16 @@ describe('F.2, F.5: the heirs\' still outline in the saved picture', () => {
 		expect(d.children.find((n) => n.tag === 'rect')!.attrs.stroke).toBe(DEFAULT_LIGHT.cardBorder);
 	});
 
-	it('the marked heir keeps its border in the text colour (D153); its ring takes the accent', () => {
+	it('the marked heir keeps the border of the marked card in the text colour (D153), 2 px', () => {
 		const svg = svgOf(lay(ROUNDEL), { heirs: ['c'] });
-		const card = cardNode(svg, 'c');
-		const ring = item(card, 'heir:c')!;
-		expect(ring.attrs.stroke).toBe(DEFAULT_LIGHT.accent);
-		const bg = card.children[card.children.indexOf(ring) + 1];
+		const bg = item(cardNode(svg, 'c'), 'heir:c')!;
 		expect(bg.attrs.stroke).toBe(DEFAULT_LIGHT.text);
 		expect(Number(bg.attrs['stroke-width'])).toBe(ME_LOOK.border);
 	});
 
 	it('shows in the dark palette too', () => {
-		const ring = item(cardNode(svgOf(lay(ROUNDEL), { heirs: ['b'], dark: true }), 'b'), 'heir:b')!;
-		expect(ring.attrs.stroke).toBe(DEFAULT_DARK.text);
+		const bg = item(cardNode(svgOf(lay(ROUNDEL), { heirs: ['b'], dark: true }), 'b'), 'heir:b')!;
+		expect(bg.attrs.stroke).toBe(DEFAULT_DARK.accent);
 	});
 });
 

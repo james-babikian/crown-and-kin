@@ -100,10 +100,10 @@ describe('validateTree: union field on a person', () => {
 describe('validateTree: values', () => {
 	it('unknown placement, parent type and union type; any sex value is valid (D12)', () => {
 		const src = `people:\n${p('a')}${p('b', '    sex: x\n    placement: rumoured\n    parents: [{id: a, type: godparent}]\n')}unions:\n  - {partners: [a, b], type: handfasting}\n`;
+		// 0.2.8 I13: "handfasting" is no near-typo of a known type, so it is drawn as a marriage with no warning.
 		expect(all(src).map((i) => [i.code, i.params.value])).toEqual([
 			['unknown-parent-type', 'godparent'],
 			['unknown-placement', 'rumoured'],
-			['unknown-union-type', 'handfasting'],
 		]);
 	});
 

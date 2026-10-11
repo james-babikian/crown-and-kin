@@ -418,7 +418,8 @@ export function planLines({ g, persons, rows, unions, anchors, geo, side, extras
 				// first, then one right of the arms; if all are taken the line stays on the axis. A card with a tab (the marked card's "You", an ordinal) has it left of the axis.
 				const axis = b.x + roundelAxis(geo);
 				const em = geo.fontPx;
-				const places = tabbed?.has(k) || k === youTab ? [0, 3 * em] : [0, -1.75 * em, -2.5 * em, 3 * em];
+				// 0.2.8: the arms stand 0.3 em further out (G.5), so the place right of them is 3.4 em from the axis.
+				const places = tabbed?.has(k) || k === youTab ? [0, 3.4 * em] : [0, -1.75 * em, -2.5 * em, 3.4 * em];
 				for (const off of places) {
 					const x = axis + off;
 					if (!others.some((t) => Math.abs(t - x) < near)) return x;

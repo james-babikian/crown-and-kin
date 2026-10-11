@@ -1,4 +1,4 @@
-// 0.2.5 WP-B1 (CONTRACT B.3.5, B.5 test 9): the placement attaches a child by its AXIS (0.25 em right of the card middle in the Roundel),
+// 0.2.5 WP-B1 (CONTRACT B.3.5, B.5 test 9): the placement attaches a child by its AXIS (0.2.8: the card middle in every form; until 0.2.7 the Roundel's axis was 0.25 em right of it),
 // so a single child still hangs straight under its parents. The test compares two layouts of one tree under the same row code (it hard-codes no count).
 import { describe, expect, it } from 'vitest';
 import { deriveFamilies } from '../src/core/derive';
@@ -8,10 +8,10 @@ import { DEFAULT_LAYOUT_SETTINGS, clearLayoutCache, layoutTree } from '../src/la
 import { sampleSources } from './acceptance/m11-support';
 
 describe('childAttach', () => {
-	it('is 0.25 em for the Roundel and 0 for every other form', () => {
+	it('is 0 for every form (0.2.8: the Roundel axis is the card middle; it was 0.25 em right of it)', () => {
 		for (const f of [12, 16]) {
 			const normal = geometryFor(f);
-			expect(childAttach(cardForm(normal, 'down'))).toBeCloseTo(0.25 * f, 9);
+			expect(childAttach(cardForm(normal, 'down'))).toBe(0);
 			expect(childAttach(cardForm(normal, 'down'))).toBeCloseTo(roundelAxis(normal) - normal.cardW / 2, 9);
 			expect(childAttach(normal)).toBe(0);
 			expect(childAttach(cardForm(normal, 'sideways'))).toBe(0);
@@ -31,7 +31,7 @@ function straightDrops(f: number, roundel: boolean) {
 		const geo = roundel ? cardForm(geometryFor(f), 'down') : geometryFor(f);
 		const L = layoutTree(g, geo, { ...DEFAULT_LAYOUT_SETTINGS }, 'font').layout;
 		width += L.width;
-		const attach = roundel ? 0.25 * f : 0;
+		const attach = childAttach(geo);
 		for (const fu of g.unions) {
 			if (fu.children.length !== 1) continue;
 			const c = L.persons.get(fu.children[0])!;

@@ -1,0 +1,350 @@
+/* ===== list windows (0.2.5, D134) ===== */
+
+/* The window is as tall as its content, up to the screen (the base rule has the maximum), and anchored at the top: a short list is a small window, and a page that opens does not move the top edge (list-window-height). */
+.modal.dynasty-sheet.dynasty-lw:not(.is-phone) {
+	height: auto;
+	min-height: 320px;
+}
+
+/* The header of the list and the search bar sit above the part that scrolls. */
+.dynasty-lw .dynasty-lw-top {
+	flex: none;
+	padding: 22px 24px 0;
+	background: var(--modal-background, var(--background-primary));
+}
+
+/* On a phone the bar says the name of the list, so the list starts with the search box (lw-phone-header). */
+.dynasty-lw.is-phone .dynasty-lw-top {
+	padding: 4px max(16px, env(safe-area-inset-right)) 0 max(16px, env(safe-area-inset-left));
+}
+
+.dynasty-lw .dynasty-lw-head {
+	grid-template-columns: auto minmax(0, 1fr);
+	align-items: center;
+	padding-bottom: 12px;
+}
+
+.dynasty-lw .dynasty-row-lead.is-list-icon {
+	width: 44px;
+	height: 44px;
+	background: var(--background-secondary);
+	color: var(--icon-color);
+}
+
+.dynasty-lw .dynasty-row-lead.is-list-icon .svg-icon {
+	width: 20px;
+	height: 20px;
+}
+
+/* ---------- the search box, with the Add button beside it ---------- */
+
+.dynasty-lw .dynasty-lw-bar {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding-bottom: 12px;
+	border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.dynasty-lw .dynasty-lw-searchwrap {
+	position: relative;
+	flex: 1 1 auto;
+	min-width: 0;
+}
+
+.dynasty-lw .dynasty-search-icon {
+	position: absolute;
+	left: 10px;
+	top: 50%;
+	display: inline-flex;
+	margin-top: -7.5px;
+	color: var(--text-faint);
+	pointer-events: none;
+}
+
+.dynasty-lw .dynasty-search-icon .svg-icon {
+	width: 15px;
+	height: 15px;
+}
+
+.dynasty-lw input.dynasty-lw-search {
+	width: 100%;
+	min-height: var(--input-height);
+	padding-left: 32px;
+	padding-right: 44px;
+}
+
+.dynasty-lw.is-phone input.dynasty-lw-search {
+	padding-left: 36px;
+}
+
+/* The clear button is ours (44 px); the native one of the search box would be too small to tap. */
+.dynasty-lw input.dynasty-lw-search::-webkit-search-cancel-button,
+.dynasty-lw input.dynasty-lw-search::-webkit-search-decoration {
+	-webkit-appearance: none;
+	appearance: none;
+	display: none;
+}
+
+.dynasty-sheet.dynasty-lw button.dynasty-lw-clear {
+	position: absolute;
+	top: 50%;
+	right: 0;
+	width: 44px;
+	min-width: 44px;
+	height: 44px;
+	min-height: 44px;
+	margin-top: -22px;
+	padding: 0;
+	justify-content: center;
+	border: none;
+	background: transparent;
+	box-shadow: none;
+	color: var(--dynasty-muted);
+}
+
+.dynasty-sheet.dynasty-lw button.dynasty-lw-add {
+	flex: none;
+	width: auto;
+}
+
+.dynasty-lw .dynasty-lw-clear-icon {
+	display: inline-flex;
+	align-items: center;
+}
+
+/* ---------- the list ---------- */
+
+.dynasty-lw .dynasty-lw-count {
+	flex: none;
+	color: var(--dynasty-muted);
+	font-size: var(--dynasty-type-small);
+}
+
+.dynasty-lw ul.dynasty-lw-list {
+	flex: none;
+	display: flex;
+	flex-direction: column;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+.dynasty-lw li.dynasty-lw-item {
+	margin: 0;
+	padding: 0;
+}
+
+.dynasty-lw li.dynasty-lw-none {
+	padding: var(--size-4-4) var(--size-4-1);
+	list-style: none;
+}
+
+/* A row is one button: the name and the second text line, the arms when there are any, and a chevron at the right. It has no box of its own (quiet-controls). */
+.dynasty-sheet.dynasty-lw button.dynasty-lw-row {
+	min-height: 56px;
+	border: 0;
+	border-radius: var(--radius-m);
+	background: none;
+	box-shadow: none;
+}
+
+.dynasty-sheet.dynasty-lw button.dynasty-lw-row:hover {
+	background: var(--background-modifier-hover);
+}
+
+/* The text first, then the picture, then the controls: the names line up with or without a picture (D213). An icon lead of an action row stays at the left. */
+.dynasty-lw .dynasty-row > .dynasty-row-text {
+	order: 1;
+}
+
+.dynasty-lw .dynasty-row > .dynasty-row-lead {
+	order: 2;
+}
+
+.dynasty-lw .dynasty-row > .dynasty-row-lead.is-icon {
+	order: 0;
+}
+
+.dynasty-lw .dynasty-row > :not(.dynasty-ord):not(.dynasty-row-text):not(.dynasty-row-lead) {
+	order: 3;
+}
+
+.dynasty-sheet.dynasty-lw button.dynasty-lw-row:focus-visible {
+	outline: 2px solid var(--text-normal);
+	outline-offset: -2px;
+}
+
+/* D218: the name of a title or a house is the Name role (Heading size, semibold, text font); the second text line is the Text role in the text font. */
+.dynasty-lw .dynasty-lw-row-name {
+	font-family: var(--font-text);
+	font-size: var(--dynasty-type-heading);
+	font-weight: var(--font-semibold);
+	line-height: 1.25;
+	overflow-wrap: anywhere;
+}
+
+/* The selector is long enough to win over the general text line rule of a phone window. */
+.dynasty-sheet.dynasty-lw .dynasty-row .dynasty-lw-row-sum {
+	font-family: var(--font-text);
+	font-size: var(--dynasty-type-text);
+	line-height: 1.35;
+}
+
+/* D218 item 4: the reason a search found the row ("Holder: ...", "ID: ...") is the plugin speaking: quiet grey roman text at the Small size, in the interface font. */
+.dynasty-sheet.dynasty-lw .dynasty-row .dynasty-lw-row-found {
+	color: var(--dynasty-muted);
+	font-family: var(--font-interface);
+	font-size: var(--dynasty-type-small);
+	font-style: normal;
+}
+
+/* The hint of an action row ("Change ID") is not a person, house or title: it keeps the interface font. */
+.dynasty-sheet.dynasty-lw .dynasty-action-row .dynasty-row-sub {
+	font-family: var(--font-interface);
+}
+
+/* D218 item 6: a closed section with nothing to preview shows no summary line (the section "Other actions"). */
+.dynasty-lw .dynasty-section-sum:empty {
+	display: none;
+}
+
+/* A state is a word with a border, not a colour alone. */
+.dynasty-lw .dynasty-lw-state {
+	display: inline-block;
+	margin-left: var(--size-4-2);
+	padding: 0 var(--size-4-2);
+	border: 1px solid var(--dynasty-muted);
+	border-radius: var(--radius-s);
+	color: var(--dynasty-muted);
+	font-family: var(--font-interface);
+	font-size: var(--dynasty-type-small);
+	font-weight: var(--font-normal);
+	vertical-align: 1px;
+}
+
+.dynasty-lw .dynasty-lw-state.is-check-id {
+	border-color: var(--dynasty-error);
+	color: var(--dynasty-error);
+}
+
+/* The house colour: a small dot before the count in the second text line (D214). The colour reaches it only through the custom property (spec §5.8). */
+.dynasty-lw .dynasty-lw-dot {
+	display: inline-block;
+	width: 8px;
+	height: 8px;
+	margin-right: 6px;
+	border-radius: 50%;
+	background: var(--dynasty-house-color);
+	box-shadow: inset 0 0 0 1px var(--background-modifier-border);
+	vertical-align: 0.02em;
+}
+
+body.theme-dark .dynasty-lw .dynasty-lw-dot {
+	background: var(--dynasty-house-color);
+}
+
+@supports (color: color-mix(in srgb, red, blue)) {
+	body.theme-dark .dynasty-lw .dynasty-lw-dot {
+		background: var(--dynasty-house-color);
+		background: color-mix(in srgb, var(--dynasty-house-color) 60%, var(--text-normal));
+	}
+}
+
+/* The arms at the right of a row: a shield is taller than wide. A row with no arms has no box at all (D213). */
+.dynasty-lw .dynasty-row-lead.dynasty-lw-armsbox {
+	width: 30px;
+	height: 34px;
+}
+
+.dynasty-lw .dynasty-row-lead.dynasty-lw-armsbox.is-empty {
+	display: none;
+}
+
+/* ---------- the edit page ---------- */
+
+.dynasty-lw .dynasty-lw-page {
+	flex: none;
+	display: flex;
+	flex-direction: column;
+	gap: var(--size-4-3);
+}
+
+/* The header of a page: the name at the left and the arms at the right, as in the person window (D209 item 4, D213). With no arms there is only the name (and, on a house page, the link "Add arms"). */
+.dynasty-lw .dynasty-lw-pagehead {
+	grid-template-columns: minmax(0, 1fr) auto;
+	padding-bottom: 8px;
+}
+
+.dynasty-lw .dynasty-lw-pagehead > .dynasty-head-text {
+	grid-column: 1;
+	grid-row: 1;
+}
+
+.dynasty-lw .dynasty-lw-pagehead > .dynasty-row-lead,
+.dynasty-lw .dynasty-lw-pagehead > .dynasty-house-arms {
+	grid-column: 2;
+	grid-row: 1;
+}
+
+.dynasty-lw .dynasty-lw-pagehead .dynasty-row-lead.is-head-arms {
+	width: 44px;
+	height: 52px;
+}
+
+.dynasty-lw .dynasty-lw-pagehead .dynasty-house-arms {
+	min-width: 48px;
+}
+
+/* A long name wraps to two text lines and then ends with three dots. */
+.dynasty-lw .dynasty-lw-back-name {
+	display: -webkit-box;
+	-webkit-box-orient: vertical;
+	-webkit-line-clamp: 2;
+	overflow: hidden;
+	overflow-wrap: anywhere;
+}
+
+/* A name that waits for its ID, or a new name whose ID is taken: a red edge at the left of the page, in the padding of the body, so nothing moves (D113 item 3). */
+.dynasty-lw .dynasty-lw-page.has-id-problem {
+	margin-left: calc(-1 * (3px + var(--size-4-2)));
+	padding-left: var(--size-4-2);
+	border-left: 3px solid var(--dynasty-error);
+}
+
+/* A name field grows and shrinks with its text (growField in list-window.ts writes the height). */
+.dynasty-lw textarea.dynasty-lw-field {
+	box-sizing: border-box;
+	width: 100%;
+	height: var(--dynasty-lw-field-height, auto);
+	min-height: var(--input-height);
+	padding-top: 5px;
+	padding-bottom: 5px;
+	resize: none;
+	overflow: hidden;
+	overflow-wrap: anywhere;
+}
+
+.dynasty-lw.is-phone textarea.dynasty-lw-field {
+	min-height: 44px;
+}
+
+/* The section "Other actions": Change ID and Delete are rows; Delete has the error colour. */
+.dynasty-lw .dynasty-lw-actions-row {
+	display: grid;
+}
+
+/* A window of 520 px height or less (a phone held on its side) is not a phone window: it keeps the computer box. It has one fixed height, as high as the screen allows, and a smaller top, so the list keeps room. */
+@media (max-height: 520px) {
+	.modal.dynasty-sheet.dynasty-lw:not(.is-phone) {
+		height: calc(100vh - 2 * var(--size-4-2));
+		max-height: calc(100vh - 2 * var(--size-4-2));
+		margin-top: var(--size-4-2);
+	}
+
+	.dynasty-lw .dynasty-lw-top {
+		padding-top: var(--size-4-2);
+	}
+}
+
+/* ===== end list windows ===== */

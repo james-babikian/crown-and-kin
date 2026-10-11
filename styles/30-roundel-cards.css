@@ -1,0 +1,98 @@
+/* roundel: card */
+
+/* The Roundel card (top-to-bottom, Normal size) and the text card (sideways): the 0.2.5 contract section B. The numbers of the plate repeat ROUNDEL_LOOK in render/styles.ts. */
+
+/*
+ * The medallion and the arms of the Compact level are the ones of the Full group (one set of elements, WP-B8): at that level the Full group of a
+ * Roundel card shows, and each of its other children hides. A new kind of child in the Full group needs a line in the list below (a test checks it).
+ */
+.dynasty-lod-compact .dynasty-card-r1 .dynasty-card-full {
+	display: inline;
+}
+
+.dynasty-lod-compact .dynasty-card-r1 .dynasty-card-full > .dynasty-card-name,
+.dynasty-lod-compact .dynasty-card-r1 .dynasty-card-full > .dynasty-card-title,
+.dynasty-lod-compact .dynasty-card-r1 .dynasty-card-full > .dynasty-card-dates,
+.dynasty-lod-compact .dynasty-card-r1 .dynasty-card-full > .dynasty-card-relation,
+.dynasty-lod-compact .dynasty-card-r1 .dynasty-card-full > .dynasty-card-foot-line,
+.dynasty-lod-compact .dynasty-card-r1 .dynasty-card-full > .dynasty-sign,
+.dynasty-lod-compact .dynasty-card-r1 .dynasty-card-full > .dynasty-r1-tab-group,
+.dynasty-lod-compact .dynasty-card-r1 .dynasty-card-full > .dynasty-ordinal-tab-group {
+	display: none;
+}
+
+/* D219: the gap round the portrait, in the colour of the page, so the line and the card edge stop short of the picture. It is 0.2 em wide (ROUNDEL_EM.halo). */
+.dynasty-r1-halo {
+	fill: var(--background-primary);
+	stroke: none;
+	pointer-events: none;
+}
+
+/* D219: the gap round the arms follows the outline of the picture itself (src/layout/arms-outline.ts): one path, filled and stroked in the colour of the page. The stroke is twice the gap wide. */
+.dynasty-arms-gap {
+	fill: var(--background-primary);
+	fill-rule: evenodd;
+	stroke: var(--background-primary);
+	stroke-linejoin: round;
+	pointer-events: none;
+}
+
+/* The text lines of the Roundel are centred on the card axis; the text card keeps them at the left. */
+.dynasty-card-r1 .dynasty-card-name,
+.dynasty-card-r1 .dynasty-card-title,
+.dynasty-card-r1 .dynasty-card-dates,
+.dynasty-card-r1 .dynasty-card-relation,
+.dynasty-card-r1 .dynasty-card-compact {
+	text-anchor: middle;
+}
+
+/* The foot: a hairline over the relation word. It has no band behind it (there is no footer plate). It takes no press. */
+.dynasty-card-foot-line {
+	stroke: var(--background-modifier-border);
+	stroke-width: 1;
+	pointer-events: none;
+}
+
+/*
+ * The small "You" tab on the top edge of the marked card, when the tree has no relation line (D153), and the ordinal tab of an heir (F.4). One look:
+ * the card colour inside a 1 px border in the text colour, 0.2 em corners (the rx attribute), the word 0.8 em semibold in the interface font. The base
+ * under it is a card-colour pill with a wide edge, so the border and the line above the card do not show through. They take no press; the crown area holds them.
+ */
+.dynasty-r1-tab-base,
+.dynasty-ordinal-tab-base {
+	fill: var(--background-primary-alt);
+	stroke: var(--background-primary-alt);
+	stroke-width: 3;
+	pointer-events: none;
+}
+
+.dynasty-r1-tab,
+.dynasty-ordinal-tab {
+	fill: var(--background-primary-alt);
+	stroke: var(--text-normal);
+	stroke-width: 1;
+	pointer-events: none;
+}
+
+.dynasty-r1-tab-text,
+.dynasty-ordinal-tab-text {
+	font-family: var(--font-interface);
+	font-size: calc(var(--dynasty-font-size) * 0.8);
+	font-style: normal;
+	font-weight: var(--font-semibold);
+	fill: var(--text-normal);
+	text-anchor: middle;
+	pointer-events: none;
+}
+
+/* The tap area over what sticks out above the card (medallion, arms, tab): a press there opens the sheet and never pans. Nothing is drawn at the Overview level. */
+.dynasty-card-crown-hit {
+	fill: transparent;
+	stroke: none;
+}
+
+.dynasty-lod-overview .dynasty-card-crown-hit {
+	display: none;
+}
+
+

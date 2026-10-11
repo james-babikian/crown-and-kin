@@ -7,7 +7,9 @@ describe('ids', () => {
 	it('slugifies names', () => {
 		expect(slugify('Aldric Valmont')).toBe('aldric-valmont');
 		expect(slugify('Þórr Ísólfsson')).toBe('thorr-isolfsson');
-		expect(slugify('李')).toBe('person');
+		// 0.2.8 (I16): the letters of other writing systems stay in an id.
+		expect(slugify('李')).toBe('李');
+		expect(slugify('???')).toBe('person');
 		expect(slugify('1102')).toBe('p-1102');
 	});
 	it('maps Latin letters that NFKD does not split', () => {
@@ -163,7 +165,7 @@ describe('checkNewId (spec §13.17 rule 5)', () => {
 	const none = new Set<string>();
 
 	it('an id that is fine', () => {
-		for (const ok of ['crown', 'valmont-2', 'a', '7', 'house-7', '-a-', 'a--b']) expect(checkNewId(ok, none), ok).toBeNull();
+		for (const ok of ['crown', 'valmont-2', 'a', '7', 'house-7', '-a-', 'a--b', 'á', '李', 'иван']) expect(checkNewId(ok, none), ok).toBeNull();
 	});
 
 	it('empty', () => {
@@ -172,7 +174,7 @@ describe('checkNewId (spec §13.17 rule 5)', () => {
 	});
 
 	it('a character other than a-z, 0-9 and hyphen, and an id with no letter and no digit', () => {
-		for (const bad of ['Valmont', 'VALMONT', 'a b', ' a', 'a ', 'á', 'a_b', 'a.b', 'a/b', '-', '--', '---']) expect(checkNewId(bad, none), bad).toBe('characters');
+		for (const bad of ['Valmont', 'VALMONT', 'a b', ' a', 'a ', 'a_b', 'a.b', 'a/b', '-', '--', '---']) expect(checkNewId(bad, none), bad).toBe('characters');
 	});
 
 	it('an id that is taken', () => {
@@ -203,8 +205,9 @@ describe('makeIdFromName (spec §13.17 rule 5)', () => {
 
 	it('a title: the same, and `title` when the name has no usable letter', () => {
 		expect(makeIdFromName('title', 'Duke of Valmont', none)).toBe('duke-of-valmont');
-		expect(makeIdFromName('title', '李', none)).toBe('title');
-		expect(makeIdFromName('title', '李', new Set(['title']))).toBe('title-2');
+		expect(makeIdFromName('title', '???', none)).toBe('title');
+		expect(makeIdFromName('title', '???', new Set(['title']))).toBe('title-2');
+		expect(makeIdFromName('title', '李', none)).toBe('李');
 		expect(makeIdFromName('title', '', none)).toBe('title');
 		expect(makeIdFromName('title', 'Person of note', none)).toBe('person-of-note');
 	});

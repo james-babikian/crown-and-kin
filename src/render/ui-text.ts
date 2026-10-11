@@ -1,58 +1,21 @@
 /*
- * Fixed text that the tree view and the edit sheet show: toolbar labels, the banner, the lists,
- * the sheet and the Notices. Simplified Technical English (ASD-STE100) and the project word list apply. Problem sentences
- * themselves come from `src/core/messages.ts`.
+ * Fixed text of the windows, the edit sheet, the settings and the Notices. Simplified Technical English (ASD-STE100) and the project word list
+ * apply. Problem sentences themselves come from `src/core/messages.ts`. The texts of the tree
+ * view are in `view-text.ts` and the texts of the line of succession in `succession-text.ts`;
+ * this file re-exports their names, so old imports keep working.
  */
 
 import type { PictureProblem } from '../core/pictures';
 import { quote } from '../core/quote';
-import { DOUBTFUL_DIED, type InheritIllegitimate, type InheritRule, type InheritThrough, type SuccessionRule } from '../core/succession-keys';
+import { SUCCESSION_UI } from './succession-text';
+
+// Moved to their own files (one home each). These names stay importable from here.
+export { ADD_UI, BLOCK_UI, FINDER_UI, FOCUS_UI, FULL_UI, HINT_UI, PHONE_LIST_UI, PROBLEMS_HINT, UI, problemsLabel, problemsTitle } from './view-text';
+export { SUCCESSION_UI };
 
 /** Texts that two or more windows show in the same words (D112 X10): one constant each. */
 const STALE_TEXT = 'The tree changed after you opened this window. The plugin did not save. Your changes are still in the window. Select Save again to save them.';
 const MAKE_NOTE_TEXT = 'Make a note with this table';
-const PERSON_PLACEHOLDER = 'Type the name of the person';
-
-/** A `died` text that only says "yes": the row of an open branch then gives no date. */
-const BARE_DEATH_WORDS: readonly string[] = ['yes', 'true', 'dead', 'died', 'deceased'];
-
-/** The error view, the banner for blocking problems (spec §8), the Fit and legend buttons, and the partner list title. */
-export const UI = {
-	errorTitle: 'The plugin cannot show this tree',
-	internalError: 'The plugin cannot show this tree because of an error in the plugin. Close the note. Open it again.',
-	bannerTitle: 'Editing is off',
-	bannerLead: 'Correct these problems. Then you can edit this tree:',
-	fit: 'Fit the tree in the view',
-	legend: 'Show the line styles',
-	legendTitle: 'Line styles',
-	spouseListTitle: 'Partners',
-} as const;
-
-/** Toolbar badge label for `count` problems. */
-export function problemsLabel(count: number): string {
-	return count === 1 ? 'This tree has 1 problem. Show the problem.' : `This tree has ${count} problems. Show the problems.`;
-}
-
-/** Title of the problem list for `count` problems. */
-export function problemsTitle(count: number): string {
-	return count === 1 ? '1 problem in this tree' : `${count} problems in this tree`;
-}
-
-/** Hint text shown above the problem list. */
-export const PROBLEMS_HINT = 'Select a problem to show the people it is about.';
-
-/** Read-only trees (spec §6.1) and the resize handle (spec §7.5). */
-export const BLOCK_UI = {
-	openSource: 'Open note',
-	openSourceLabel: 'Open the note that contains this tree.',
-	// D176 (2): the same result as the hidden "Edit this block" button of Obsidian.
-	showText: 'Show the tree text',
-	/** D180: the shorter text of the button in the phone list bar, so the bar fits in one row. */
-	showTextShort: 'Tree text',
-	showTextLabel: 'Show the tree text: open the note for edits and show the text of this tree.',
-	readOnly: 'Read only',
-	resizeLabel: 'Drag to change the height of the tree.',
-} as const;
 
 /** The edit sheet (spec §6.3, §7.4). */
 export const SHEET = {
@@ -131,7 +94,6 @@ export function partnerDetail(type: string | null, start?: string, end?: string)
 
 /** The Family and Actions sections of the sheet (spec §6.3). */
 export const FAMILY = {
-	heading: 'Family',
 	parents: 'Parents',
 	noParents: 'This person has no recorded parents.',
 	parentTypeLabel: (name: string) => `Type of parent: ${name}`,
@@ -149,7 +111,8 @@ export const FAMILY = {
 	position: (i: number, n: number) => `Position ${i} of ${n}`,
 	moveEarlier: 'Move earlier',
 	moveLater: 'Move later',
-	actions: 'Actions',
+	/** The visible text of the "+ Add" link at each group heading (D212); the full name of each link is "Add parent", "Add child" or "Add partner". */
+	addLink: 'Add',
 	addParent: 'Add parent',
 	addChild: 'Add child',
 	addPartner: 'Add partner',
@@ -161,7 +124,7 @@ export const FLOW = {
 	cancel: 'Cancel',
 	addParentTitle: 'Add a parent',
 	parentTypeText: (name: string) => `Select the type of parent for ${name}.`,
-	typeFull: 'This person has 2 parents of this type.',
+	typeFull: (limit: number) => `This person has ${limit} parents of this type.`,
 	newOrExisting: (name: string, what: string) => `Add a ${what} to ${name}. Select a new person or a person who is in the tree.`,
 	newPerson: 'New person',
 	newPersonDetail: 'Enter a person who is not in the tree.',
@@ -191,7 +154,7 @@ export const FLOW = {
 	/** The accessible name of the search field of every person list (the placeholder is not a name). */
 	pickerSearchLabel: 'Find a person',
 	createNew: (text: string) => (text.trim() ? `Create a new person ${quote(text.trim())}` : 'Create a new person'),
-	autoUnion: (a: string, b: string) => `The plugin also added a marriage of ${a} and ${b}. To change its type, open the sheet of ${a}. Then select Edit under Partners.`,
+	autoUnion: (a: string, b: string) => `The plugin also added a marriage of ${a} and ${b}. To change its type, open the person window of ${a}. Open Family. Then select Edit under Partners.`,
 } as const;
 
 /** The sheet for a new person (spec §6.3 "New people are drafts"). */
@@ -268,49 +231,6 @@ export function deleteText(
 	return out;
 }
 
-/** The empty block (spec §5.9) and the toolbar button (spec §6.10). */
-export const ADD_UI = {
-	addFirst: 'Add first person',
-	empty: 'This tree has no people.',
-	addPerson: 'Add a person to the tree',
-} as const;
-
-/** The full-screen view (spec §7.1), its toolbar buttons (spec §6.10) and Find. */
-export const FULL_UI = {
-	expand: 'Show the tree in a full-screen view',
-	close: 'Close the full-screen view',
-	dialog: 'Tree in a full-screen view',
-	find: 'Find a person in the tree',
-	findTitle: 'Find a person',
-	findPlaceholder: PERSON_PLACEHOLDER,
-	gone: 'The plugin cannot find this tree in the note now. It closed the full-screen view.',
-	invalid: 'The tree text has an error now. The plugin closed the full-screen view.',
-	failed: 'The plugin closed the full-screen view because of an error in the plugin.',
-} as const;
-
-/** Focus mode and the pin (spec §5.6, §6.3, §6.10, D18). */
-export const FOCUS_UI = {
-	focus: 'Focus on a person in the tree',
-	pickerTitle: 'Focus on a person',
-	pickerPlaceholder: PERSON_PLACEHOLDER,
-	/** D132: the Focus button of the toolbar chooses a person, and clears the focus while one shows. */
-	choose: 'Choose a person',
-	chooseLabel: 'Choose a person: show only the family of the person that you choose',
-	clear: 'Clear focus',
-	clearLabel: 'Clear focus: show all people again',
-	/** The accessible name of the Focus button while a focus shows. */
-	focusOn: 'Focus is on. Choose a person to change it. Clear the focus to show all people.',
-	focusHere: 'Focus here',
-	focusHereLabel: (name: string) => `Focus here: show only the family of ${name}`,
-	pin: 'Pin focus here',
-	pinLabel: (name: string) => `Pin focus here: always open this tree on the family of ${name}`,
-	unpin: 'Remove pin',
-	unpinLabel: (name: string) => `Remove pin: do not open this tree on the family of ${name} each time`,
-	/** The `+` badge on a card with relatives who are not shown. */
-	badgeLabel: (name: string, hidden: number) =>
-		hidden === 1 ? `Show the family of ${name}. The tree does not show 1 relative.` : `Show the family of ${name}. The tree does not show ${hidden} relatives.`,
-} as const;
-
 /** The mark "This is me" and the relation text of the edit sheet (spec §13.1, D40–D46). */
 export const ME_UI = {
 	mark: 'This is me',
@@ -326,35 +246,11 @@ export const ME_UI = {
 	deleteClears: `This person has the mark ${quote('This is me')}. If you delete this person, no person in the tree will have the mark.`,
 } as const;
 
-/** The toolbar's More button (D49) and the relation finder (spec §13.2, D47, D48). */
-export const FINDER_UI = {
-	more: 'Show more actions',
-	relation: 'Relation',
-	relationLabel: 'Relation: find the relation between two people',
-	firstTitle: 'Select the first person',
-	secondTitle: 'Select the second person',
-	/** The picker of "Show the relation to…" in the edit sheet. */
-	otherTitle: 'Select the other person',
-	placeholder: PERSON_PLACEHOLDER,
-	/** The first row of a picker when the tree has a mark: the marked person. */
-	you: (name: string) => `You: ${name}`,
-	showSteps: 'Show the steps',
-	hideSteps: 'Hide the steps',
-	moreSteps: (n: number) => (n === 1 ? 'and 1 more step' : `and ${n} more steps`),
-	other: 'Other relation',
-	otherLabel: (second: string, first: string) => `Other relation: show the next relation of ${second} and ${first}`,
-	whole: 'Show in the whole tree',
-	lineOnly: 'Show only the line',
-	close: 'Close',
-	closeLabel: 'Close: show the tree as it was before.',
-} as const;
-
 /** D32: names of the house colours of `HOUSE_PALETTE`, in the same order. */
 export const HOUSE_COLOUR_NAMES = ['Dark red', 'Red', 'Orange', 'Gold', 'Olive', 'Green', 'Blue green', 'Light blue', 'Dark blue', 'Purple', 'Brown', 'Grey'] as const;
 
 /** The Houses window and its toolbar button (spec §6.10, D32, D36). */
 export const HOUSES = {
-	button: 'Edit the houses of the tree',
 	title: 'Houses',
 	intro: 'The colour of a house shows on the cards of the people of that house.',
 	none: 'This tree has no houses.',
@@ -412,7 +308,7 @@ export const ID_UI = {
 	make: 'Make ID from the name',
 	makeAria: (item: string) => `Make ID from the name for ${item}`,
 	empty: 'Enter an ID.',
-	characters: 'Use only small letters a to z, digits and hyphens (-).',
+	characters: 'Use only letters, digits and hyphens (-).',
 	taken: 'This ID is in use. Enter a different ID.',
 	/** The note of a new row whose name gives an ID that a changed row has taken. */
 	newName: 'This name gives an ID that is in use. Enter a different name.',
@@ -447,31 +343,27 @@ export const TITLES_UI = {
 	nameLabel: 'Name of the title',
 	// D66: the male form of the title, which the card of a man holder shows.
 	maleLabel: 'Name for a man',
-	malePlaceholder: 'For example: King of the Isles',
+	// D201: the three examples show how the title is written with a jurisdiction name.
+	namePlaceholder: 'For example: Duchy of Normandy',
+	malePlaceholder: 'For example: Duke of Normandy',
 	maleAria: (title: string) => `Name for a man: the name of ${title} for a man holder`,
 	// D65: the female form of the title, which the card of a woman holder shows.
 	femaleLabel: 'Name for a woman',
-	femalePlaceholder: 'For example: Duchess of Valmont',
+	femalePlaceholder: 'For example: Duchess of Normandy',
 	femaleAria: (title: string) => `Name for a woman: the name of ${title} for a woman holder`,
-	// D64: the plural, which names the holder list and the table note.
-	pluralLabel: 'Name of the list',
-	pluralPlaceholder: 'For example: Dukes of Valmont',
-	pluralAria: (title: string) => `Name of the list: the holders of ${title}`,
-	count: (n: number) => (n === 0 ? 'No holders' : n === 1 ? '1 holder' : `${n} holders`),
 	delete: 'Delete',
 	deleteLabel: (title: string) => `Delete ${title}`,
 	add: 'Add title',
 	noHolders: 'This title has no holders.',
 	notInTree: 'Not in the tree',
 	showCardLabel: (holder: string) => `${holder}: show the card in the tree`,
+	/** A reign after a name: "(r. 1160–1207)". */
+	reign: (years: string) => `(r. ${years})`,
 	edit: 'Edit',
 	editLabel: (holder: string) => `Edit ${holder}`,
 	moveEarlier: 'Move earlier',
 	moveLater: 'Move later',
-	moveEarlierLabel: (holder: string) => `Move earlier: ${holder}`,
-	moveLaterLabel: (holder: string) => `Move later: ${holder}`,
 	remove: 'Remove',
-	removeLabel: (holder: string) => `Remove ${holder}`,
 	addHolder: 'Add holder',
 	addHolderLabel: (title: string) => `Add holder: add a holder to ${title}`,
 	pickerTitle: 'Select the holder',
@@ -490,7 +382,7 @@ export const TITLES_UI = {
 	deleted: (titles: string[]) => (titles.length === 1 ? `The plugin deleted ${titles[0]}. You can undo this.` : `The plugin deleted ${titles.length} titles. You can undo this.`),
 	// The table note (D55, D60).
 	makeNote: MAKE_NOTE_TEXT,
-	makeNoteLabel: (plural: string) => `Make a note with this table: a note with the list of ${plural}`,
+	makeNoteLabel: (title: string) => `Make a note with this table: a note with the list of holders of ${title}`,
 	noteTitle: 'Make a note with the saved list?',
 	noteText: 'You did not save the changes in this window. The note will have the list of holders that the tree has now.',
 	noteConfirm: 'Make the note',
@@ -508,11 +400,15 @@ export const TITLES_UI = {
 	from: 'From',
 	until: 'Until',
 	preview: (full: string, shown: string) => `${full} shows as: ${shown}`,
+	// D195: the tick box of a holder, and its hints.
+	holderTickLabel: 'Holds the title through the spouse',
+	holderTickHint: 'If you tick this box, the line of succession follows the relatives of the spouse, as if the spouse held the title.',
+	holderTickDisabled: 'This holder is not a person in the tree. To use this tick box, select a person in the tree as the holder.',
+	// I15, D188 item 23.
+	rulerHint: 'If you leave this field empty, the ruler name is the first word of the name of the holder. If the name starts with a word such as “Ser”, write the ruler name here.',
 	needTitleName: 'Enter a name for the title.',
 	needHolderName: 'Enter the name of the holder.',
 	formDiscardText: 'You did not save the changes to this holder.',
-	// The Titles section of the edit sheet (spec §13.4).
-	heading: 'Titles',
 	noneHeld: 'This person holds no title.',
 	onCard: 'On the card',
 	showOnCard: 'Show on the card',
@@ -530,141 +426,84 @@ export const TITLES_UI = {
 		titles === 1 ? `The plugin also removes ${name} from the holders of 1 title.` : `The plugin also removes ${name} from the holders of ${titles} titles.`,
 } as const;
 
+function personRowYears(born: string, died: string): string {
+	return born && died ? `${born}–${died}` : born ? `b. ${born}` : died ? `d. ${died}` : '';
+}
+
 /**
- * The Succession section of the Titles window (contract 0.2.7 D.3, J, K, L), the line of succession, and the texts of the
- * Show button and its question. A text with a year has two forms: `year` is the number, or null for "now".
+ * The window family of 0.2.8 (contract C, G.7, G.10; an internal study §5): the sections of the person window, the
+ * title page and the house page, their summaries, the header of the person window, and the new texts of the People section.
+ * A section title that exists in another table (`FAMILY.heading`, `TITLES_UI.heading`, …) has the same words here.
  */
-export const SUCCESSION_UI = {
-	heading: 'Succession',
-	ruleLabel: 'Rule',
-	ruleNone: 'None',
-	// D187: the technical term in brackets.
-	rules: {
-		'eldest-child': 'Eldest child first (primogeniture)',
-		'youngest-child': 'Youngest child first (ultimogeniture)',
-		'siblings-first': 'Siblings before children (seniority)',
-		'nearest-relative': 'Nearest relative first (proximity of blood)',
-		'born-in-reign': 'Born during the reign first (porphyrogeniture)',
-	} satisfies Record<SuccessionRule, string>,
-	inheritLabel: 'Who can inherit',
-	inherits: {
-		'men-only': 'Men only (agnatic)',
-		'men-first-in-house': 'Men first in the whole house (semi-Salic)',
-		'men-first': 'Men first (male preference)',
-		'no-preference': 'No preference (equal)',
-		'women-first': 'Women first (female preference)',
-		'women-first-in-house': 'Women first in the whole house (reverse semi-Salic)',
-		'women-only': 'Women only (enatic)',
-	} satisfies Record<InheritRule, string>,
-	throughLabel: 'The right to inherit comes from',
-	// The first choice writes no key: the test of "Who can inherit" decides who passes a claim on (K.1).
-	throughSame: 'The same as Who can inherit',
-	throughs: {
-		men: 'Men (patrilineal)',
-		women: 'Women (matrilineal)',
-		anyone: 'Anyone (cognatic)',
-	} satisfies Record<InheritThrough, string>,
-	salic: 'This is the Salic law.',
-	salicReverse: 'This is the reverse of the Salic law.',
-	houseMen: 'All men of the house come before all women, whatever the generation or degree.',
-	houseWomen: 'All women of the house come before all men, whatever the generation or degree.',
-	siblingsHint: 'The oldest generation of the house comes first: aunts and uncles, then brothers, sisters and cousins, then children.',
-	nearestHint: 'Nearness is the number of steps through the family. A child is 1, a brother or sister is 2, an aunt, uncle, niece or nephew is 3, a cousin is 4.',
-	matrilinealHint: 'With “Women (matrilineal)” and “Eldest child first”, the son of an elder sister comes before a brother of the ruler. If you want brothers first, choose “Siblings before children” or “Nearest relative first”.',
-	rulerNoSex: (ruler: string) => `${ruler} has no sex value, so no claim passes through ${ruler}.`,
-	yearLabel: 'Year',
-	yearHint: 'If you leave this empty, the line is for the end of the last reign. If the last reign has no end, the line is for now. A child born after this year is not in the line.',
-	illLabel: 'Children marked as illegitimate',
-	ills: {
-		no: 'They cannot inherit',
-		after: 'They inherit after all people who are not marked',
-		equal: 'They have the same right to inherit as the other children',
-	} satisfies Record<InheritIllegitimate, string>,
-	illHint: 'If you choose “Women only”, “Women first” or “Women first in the whole house”, only the mother’s side counts. If the mark does not matter, choose the last option.',
-	adopted: 'Adopted children can inherit',
-	adoptedHint: 'Wards and rumoured children never inherit.',
-	body: 'Only descendants of the first holder can inherit',
-	bodyHint: (first: string) => `The first holder is ${first}. Only the descendants of ${first} are in the line. If the title goes to a new house, make a new title.`,
-	outsideBody: (ruler: string, first: string) =>
-		`${ruler} is not a descendant of ${first}, so nobody can inherit this title. Check the switches for adopted children and for children marked as illegitimate.`,
-	// Named heirs and excluded people (K.3).
-	heirsLabel: 'Named heirs',
-	heirsHint: 'The named heirs come first, in the order of this list. The rule gives the order of the other people.',
-	heirsNone: 'This title has no named heir.',
-	addHeir: 'Add named heir',
-	addHeirLabel: (title: string) => `Add named heir: add a named heir to ${title}`,
-	heirPickerTitle: 'Select a named heir',
-	excludeLabel: 'Excluded people',
-	excludeHint: 'An excluded person is never in the line. The children of an excluded person stay in the line.',
-	excludeNone: 'This title has no excluded person.',
-	addExclude: 'Add excluded person',
-	addExcludeLabel: (title: string) => `Add excluded person: add an excluded person to ${title}`,
-	excludePickerTitle: 'Select an excluded person',
-	pickerPlaceholder: PERSON_PLACEHOLDER,
-	remove: 'Remove',
-	moveEarlier: 'Move earlier',
-	moveLater: 'Move later',
-	removeLabel: (who: string) => `Remove ${who}`,
-	moveEarlierLabel: (who: string) => `Move earlier: ${who}`,
-	moveLaterLabel: (who: string) => `Move later: ${who}`,
-	// The state of a named heir (K.3, L.9): `year` is a number, or null for "now".
-	heirNotAlive: (name: string, year: number | null) => (year === null ? `${name} is dead, so the plugin does not use ${name} as a named heir.` : `${name} is not alive in ${year}, so the plugin does not use ${name} as a named heir.`),
-	heirNotBorn: (name: string, year: number | null) => (year === null ? `${name} is not born yet, so the plugin does not use ${name} as a named heir.` : `${name} is not born yet in ${year}, so the plugin does not use ${name} as a named heir.`),
-	heirIsRuler: (name: string) => `${name} is the ruler of this line, so the plugin does not use ${name} as a named heir.`,
-	heirExcluded: (name: string) => `${name} is in the list of excluded people, so ${name} is not in the line.`,
-	heirNotInTree: 'No person in the tree has this ID.',
-	// The line.
-	lineHeading: (ruler: string, year: number | null) => (year === null ? `Line of succession after ${ruler} now` : `Line of succession after ${ruler} in ${year}`),
-	lineRowLabel: (name: string, ordinal: string) => `${ordinal} ${name}: show the card in the tree`,
-	more: 'and more people',
-	// Open branches (M.8): a person who died and has no children in the tree. DIED is the text of the note.
-	branchMark: '?',
-	branchRow: (name: string, died: string) => {
-		const text = died.trim();
-		const word = text.toLowerCase();
-		if (text === '' || BARE_DEATH_WORDS.includes(word)) return `Open branch of ${name}: no children in the tree`;
-		if (DOUBTFUL_DIED.includes(word)) return `Open branch of ${name} (death not confirmed): no children in the tree`;
-		return `Open branch of ${name} (died ${text}): no children in the tree`;
-	},
-	branchRowLabel: (row: string) => `${row}: show the card in the tree`,
-	branchNote: 'A grey row shows a person who died and has no children in the tree. The person may have children that are not in the tree yet. If the person had no children, tick “No children” in the edit sheet.',
-	moreBranches: 'and more open branches',
-	noHeir: 'No heir in the tree',
-	heirCount: (n: number) => (n === 1 ? '1 heir' : `${n} heirs`),
-	// A written value that the plugin cannot read (the first option of a dropdown): VALUE is the text of the note, if the window can show it.
-	unknownValue: (value: string | null) => (value === null ? 'Unknown value' : `Unknown value (${value})`),
-	yearBad: (text: string) => `The plugin cannot read the year in the note: ${text}. If you type a year here, the plugin replaces it.`,
-	old: (name: string, age: number, year: number | null) => {
-		const years = age === 1 ? '1 year' : `${age} years`;
-		return year === null ? `${name} is older than ${years}. If ${name} is dead, add a death date.` : `${name} is older than ${years} in ${year}. If ${name} is dead, add a death date.`;
-	},
-	noRuler: (year: number | null) => (year === null ? 'The title has no holder now, so there is no line of succession.' : `The title has no holder in ${year}, so there is no line of succession.`),
-	rulerNotInTree: (year: number | null) =>
-		year === null ? 'The holder of the title is not in the tree now. The plugin cannot show the line of succession.' : `The holder of the title in ${year} is not in the tree. The plugin cannot show the line of succession.`,
-	badRule: 'The succession rule in the tree text has an error. Open the list of warnings.',
-	newTitle: 'Save the title first. Then you can set a succession rule.',
-	coRulers: (n: number, ruler: string, year: number | null) => (year === null ? `${n} holders rule now. The line is after ${ruler}.` : `${n} holders rule in ${year}. The line is after ${ruler}.`),
-	noYearDate: (name: string) => `The plugin cannot read a year in the date of ${name}.`,
-	noYearReign: (name: string) => `The plugin cannot read a year in the reign of ${name}.`,
-	leftOutNoSex: (n: number) => (n === 1 ? '1 person has no “sex: m” or “sex: f”, so this rule does not include this person.' : `${n} people have no “sex: m” or “sex: f”, so this rule does not include them.`),
-	noBirthYear: (n: number) => (n === 1 ? '1 heir has no birth year, so this rule cannot put this heir in order.' : `${n} heirs have no birth year, so this rule cannot put them in order.`),
-	show: 'Show',
-	showLabel: 'Show the line of succession on the tree',
-	// The Show view (F.3, F.6): the bar above the tree, the card label and the row of the phone list.
-	bar: (title: string, year: number | null) => (year === null ? `Line of succession: ${title}, now` : `Line of succession: ${title}, ${year}`),
-	barNoHeir: (title: string, year: number | null) => `${year === null ? `Line of succession: ${title}, now` : `Line of succession: ${title}, ${year}`}. No heir in the tree.`,
-	barClose: 'Close',
-	barCloseLabel: 'Close the line of succession',
-	inLine: (ordinal: string) => `${ordinal} in line`,
-	openBranchWord: 'Open branch',
-	openBranchCard: 'open branch',
-	unsavedTitle: 'Save your changes?',
-	unsaved: 'You did not save your changes. The plugin shows the line only after you save them. Save them now?',
-	saveAndShow: 'Save and show',
-	// The setting texts are in SETTINGS_UI. The delete texts (K.3, A.6):
-	deleteHeir: (name: string, titles: number) => (titles === 1 ? `The plugin also removes ${name} as the named heir of 1 title.` : `The plugin also removes ${name} as the named heir of ${titles} titles.`),
-	deleteExcluded: (name: string, titles: number) =>
-		titles === 1 ? `The plugin also removes ${name} from the excluded people of 1 title.` : `The plugin also removes ${name} from the excluded people of ${titles} titles.`,
+export const WINDOW_UI = {
+	openAll: 'Open all',
+	openAllLabel: 'Open all sections',
+	closeAll: 'Close all',
+	closeAllLabel: 'Close all sections',
+	sectionDetails: 'Details',
+	sectionFamily: 'Family',
+	sectionTitles: 'Titles',
+	sectionNotes: 'Notes',
+	sectionActions: 'Actions',
+	sectionNames: 'Names',
+	sectionHolders: 'Holders',
+	sectionLine: 'Line of succession',
+	sectionRules: 'Rules of succession',
+	sectionPeople: 'People',
+	sectionOther: 'Other actions',
+	colour: 'Colour',
+	children: 'Children',
+	noChildren: 'This person has no children in the tree.',
+	// Section summaries (a closed section shows one text line; parts are joined with " · ").
+	noTitles: 'No titles',
+	sumNotesNone: 'No notes',
+	sumNotesLinked: (name: string) => `Linked note: ${name}`,
+	andMore: (n: number) => `and ${n} more`,
+	/** "2 parents", "1 parent" or "No parents"; "1 partner" or "no partner"; "1 child" or "no children". */
+	sumFamilyParts: (parents: number, partners: number, children: number): string[] => [
+		parents === 0 ? 'No parents' : parents === 1 ? '1 parent' : `${parents} parents`,
+		partners === 0 ? 'no partner' : partners === 1 ? '1 partner' : `${partners} partners`,
+		children === 0 ? 'no children' : children === 1 ? '1 child' : `${children} children`,
+	],
+	/** D201: only the names for a man and a woman count. */
+	sumNames: (title: string, n: number) => `${title} · ${n === 0 ? 'no other names' : n === 1 ? '1 other name' : `${n} other names`}`,
+	sumHolders: (count: number, newest: string) => `${count === 0 ? 'No holders' : count === 1 ? '1 holder' : `${count} holders`}${newest ? ` · newest: ${newest}` : ''}`,
+	sumPeopleHeader: (n: number, gens: number) => (n === 0 ? 'No people' : `${n === 1 ? '1 person' : `${n} people`} in ${gens === 1 ? '1 generation' : `${gens} generations`}`),
+	// The header of the person window.
+	relationYour: (lower: string) => `Your ${lower}`,
+	moreLabel: (n: number) => `${n} more: show the other relations`,
+	enterName: 'Enter a name below',
+	portraitOf: (name: string) => `Portrait of ${name}`,
+	/** The text link at the left of "Open all" for a person with no portrait (D209 item 5, D218 item 8). */
+	addPortrait: 'Add portrait or arms',
+	/** The same link for a person that has personal arms already: only the portrait is missing. */
+	addPortraitHasArms: 'Add portrait',
+	/** D213: the text link in the header of a house page that has no arms. */
+	addArms: 'Add arms',
+	/** The placeholder of the search box of a list window on a phone, which has no heading: "Search 4 titles". */
+	searchWithCount: (count: string) => `Search ${count}`,
+	/** The same words inside a sentence ("Portrait of this person"). */
+	thisPersonInSentence: 'this person',
+	armsOfPerson: (name: string) => `Personal arms of ${name}`,
+	saveFirst: 'Save the person first. Then you can select a portrait.',
+	selectPart: 'Select the part of the portrait',
+	selectPersonalArms: 'Select personal arms',
+	removePersonalArms: 'Remove personal arms',
+	pickArms: (name: string) => `Select personal arms for ${name}`,
+	pickPortraitHint: 'After you select a picture, select the part of it to show.',
+	pickArmsHint: 'The card shows the personal arms in the same place as the house arms.',
+	// Navigation inside a window (G.7).
+	/** The name of a person row. `word`: the relation word that the row shows under the name; the name holds the visible text in the same order (WCAG 2.5.3). */
+	openPersonLabel: (name: string, word?: string) => `${word ? `${name}, ${word}` : name}. Open this person.`,
+	backToLabel: (name: string) => `Back to ${name}`,
+	listMetaTitles: (n: number) => (n === 1 ? '1 title' : `${n} titles`),
+	listMetaHouses: (n: number) => (n === 1 ? '1 house' : `${n} houses`),
+	// The People section of the house page (D202 (2), G.10).
+	/** The years of a person row: "1131–1161", "b. 1131" for a birth year alone, "d. 1161" for a death year alone. */
+	personRowYears,
+	personRowSub: (generation: number, born: string, died: string) => [`Generation ${generation}`, personRowYears(born, died)].filter(Boolean).join(' · '),
+	// The Find window (G.3).
+	findRowSub: (relation: string, years: string, title: string) => [relation, years, title].filter(Boolean).join(' · '),
 } as const;
 
 /** The settings tab (spec §9, D33). */
@@ -690,9 +529,17 @@ export const SETTINGS_UI = {
 	successionLength: 'Length of the line of succession',
 	successionLengthDesc: 'This is the number of people that the line of succession shows. Use a number from 1 to 20.',
 	oldAge: 'Warn about people older than',
-	oldAgeDesc: 'The line of succession warns about a person in the line who is older than this number of years and has no death date. Use 0 to stop the warning.',
+	oldAgeDesc: 'The plugin warns about a person in the line of succession who is older than this number of years and has no death year. Use a number from 0 to 1000. Use 0 to stop the warning.',
 	youngDeathAge: 'Age for open branches',
-	youngDeathAgeDesc: 'For a person who died younger than this age, the line of succession shows no open branch. The birth year and the death year must be known. Use 0 to show every open branch.',
+	youngDeathAgeDesc: 'For a person who died younger than this age, the line of succession shows no open branch. The note must give the birth year and the death year. Use a number from 0 to 1000. Use 0 to show every open branch.',
+	/** 0.2.8 contract A.4, D204: which cards show the arms of a house. */
+	armsOnCards: 'Arms on cards',
+	armsFew: 'Founders, married-in people and holders',
+	armsAll: 'Every card',
+	armsOnCardsDesc: `${quote('Founders, married-in people and holders')} shows the arms of a house on two kinds of card. The first kind is a person with no parent in the same house, for example a founder or a person who married into the tree. The second kind is a person who is a holder of a title in the Titles window. ${quote('Every card')} shows the arms on each person with a house. A card always shows personal arms. The list in a note on a phone does not follow this setting. In that list, only the person at the top shows arms. Those arms are the personal arms of the person, or else the arms of the house.`,
+	/** 0.2.8 contract A.5, D188 item 10. */
+	manyParents: 'Warn about more than 2 parents of a type',
+	manyParentsDesc: 'If this is on, the plugin warns when a person has more than 2 parents of one type. The types are birth, adoptive and ward. If this is off, the plugin gives no warning for these types. A person can have up to 8 rumoured parents. The plugin always warns about more than 8 rumoured parents.',
 	phoneDirection: 'Tree direction on a phone held upright',
 	directionSideways: 'Sideways',
 	directionDown: 'Like the computer',
@@ -821,23 +668,17 @@ function linkReportText(r: LinkReportText | null, enabled: boolean): string {
 	return groups.map((g) => g.join(' ')).join('\n\n') + off;
 }
 
-/** D28: the first view on an upright phone leaves children of the person outside the box. */
-export const HINT_UI = {
-	up: (n: number) => (n === 1 ? '↑ 1 more child' : `↑ ${n} more children`),
-	down: (n: number) => (n === 1 ? '↓ 1 more child' : `↓ ${n} more children`),
-} as const;
-
 /** Notices about writes (spec §6.1). */
 export const WRITE_TEXT = {
 	stale: 'The tree changed after you opened it. The plugin did not save your changes. It loaded the tree again.',
-	staleInSheet: 'The tree changed after you opened this sheet. The plugin did not save. Your changes are still in the sheet. Select Save again to save them.',
-	missing: 'The plugin cannot find this tree in the note. It did not save your changes. Your changes are still in the sheet.',
-	personGone: 'This person is not in the tree now. The plugin cannot save your changes. You can copy your text from the sheet.',
+	staleInSheet: STALE_TEXT,
+	missing: 'The plugin cannot find this tree in the note. It did not save your changes. Your changes are still in the window.',
+	personGone: 'This person is not in the tree now. The plugin cannot save your changes. You can copy your text from the window.',
 	personNotFound: 'This person is not in the tree now.',
 	blocked: 'The plugin cannot save. Editing is off for this tree.',
-	invalid: 'The plugin cannot save. The tree text has an error. Your changes are still in the sheet.',
-	refused: 'The plugin cannot save this change safely. The note did not change. Your changes are still in the sheet.',
-	failed: 'The plugin cannot save your changes because of an error in the plugin. Your changes are still in the sheet.',
+	invalid: 'The plugin cannot save. The tree text has an error. Your changes are still in the window.',
+	refused: 'The plugin cannot save this change safely. The note did not change. Your changes are still in the window.',
+	failed: 'The plugin cannot save your changes because of an error in the plugin. Your changes are still in the window.',
 	heightFailed: 'The plugin cannot save the new height of the tree.',
 	undoCommand: 'Undo last tree edit',
 	undoDone: 'The plugin undid the last tree edit.',
@@ -845,7 +686,7 @@ export const WRITE_TEXT = {
 	undoChanged: 'The plugin cannot undo the last tree edit. The tree changed after the edit.',
 	undoMissing: 'The plugin cannot find the tree of the last edit.',
 	cycle: 'The plugin cannot make this change. A person cannot be their own ancestor.',
-	limit: 'The plugin cannot make this change. A person can have only 2 parents of each type.',
+	limit: (type?: string) => (type === 'rumoured' ? 'The plugin cannot make this change. A person can have only 8 rumoured parents.' : 'The plugin cannot make this change. A person can have only 2 parents of each type.'),
 	noSibling: 'There is no sibling in that direction.',
 	needNameFirst: 'First, enter a name for this person.',
 } as const;
@@ -858,19 +699,20 @@ export const PICTURES_UI = {
 	// The Houses window (spec §13.6).
 	/** The accessible name of the arms box of a house; a tap on it opens the picker. */
 	armsLabel: (house: string) => `Select the arms of ${house}`,
-	armsHeading: 'Arms',
+	/** The spoken name of the arms button of a house in the Houses window (it opens a menu). */
+	armsButtonLabel: (house: string) => `Arms of ${house}`,
 	selectArms: 'Select arms',
 	removeArms: 'Remove arms',
 	coloursFromArms: 'Colours from the arms',
-	houseColours: 'House colours',
 	armsColourLabel: (n: number) => `Colour ${n} from the arms`,
-	noArmsColours: 'The plugin cannot read the colours of this picture.',
 	// The edit sheet (spec §13.7).
-	portraitHeading: 'Portrait',
 	selectPortrait: 'Select portrait',
 	removePortrait: 'Remove portrait',
 	// The picture picker (spec §13.6 "Picture picker", D69).
 	pickerPortraitTitle: (name: string) => `Select a portrait for ${name}`,
+	/** The short title in the bar of the picture picker on a phone (D212 picker-grid). */
+	pickerBarPortrait: 'Portrait',
+	pickerBarArms: 'Arms',
 	search: 'Type the name of a picture',
 	searchLabel: 'Find a picture in the vault',
 	fromDevice: 'Add a picture from this device',
@@ -939,8 +781,6 @@ export const SAVE_UI = {
  * its hints. The buttons also show their label as a tooltip.
  */
 export const CROP_UI = {
-	/** The button under the portrait in the edit sheet. */
-	select: 'Select the part',
 	selectLabel: 'Select the part of the portrait that the card shows',
 	title: (name: string) => `Select the part of the portrait of ${name}`,
 	hintTouch: 'Move the picture with one finger. Zoom with two fingers.',
@@ -984,25 +824,11 @@ export const NOTE_UI = {
  * with its table, and the note made from the table.
  */
 export const HOUSE_PAGE_UI = {
-	people: 'People',
-	peopleLabel: (house: string) => `People: show the people of ${house}`,
-	count: (n: number) => (n === 1 ? '1 person' : `${n} people`),
 	none: 'No person in the tree has this house.',
-	generation: 'Generation',
-	name: 'Name',
-	title: 'Title',
-	born: 'Born',
-	died: 'Died',
-	/** In the two-line layout the second text line of a row starts with these. */
-	lead: { generation: 'Generation ', born: 'b. ', died: 'd. ' },
-	/** The tooltip and description of a row; the name of the row comes from its visible text. */
-	rowHint: 'Show in the tree',
-	close: 'Close',
 	makeNote: MAKE_NOTE_TEXT,
 	makeNoteLabel: (house: string) => `Make a note with this table: the plugin makes a note with the people of ${house}`,
 	noteMade: (name: string) => `The plugin made the note ${quote(name)}.`,
 	noteFailed: (name: string) => `The plugin cannot make the note ${quote(name)}.`,
-	armsLabel: (house: string) => `Arms of ${house}`,
 } as const;
 
 /**
@@ -1021,31 +847,6 @@ export const FOLD_UI = {
 		count === 1 ? `Show the hidden person below ${names.join(' and ')}` : `Show the ${count} hidden people below ${names.join(' and ')}`,
 } as const;
 
-/** D144: the list that replaces the tree in a note on a phone (spec §5.5). */
-export const PHONE_LIST_UI = {
-	addPerson: 'Add person',
-	addPersonLabel: 'Add person: add a person to the tree',
-	find: 'Find',
-	findLabel: 'Find: find a person in the tree to show the family of that person',
-	back: 'Back',
-	backLabel: (name: string) => `Back: show the family of ${name} again`,
-	expand: 'Expand',
-	expandLabel: 'Expand: show the tree in a full-screen view',
-	headParents: 'Parents',
-	headYou: 'You',
-	headPerson: 'This person',
-	headChildren: 'Children',
-	withPartner: (name: string, years?: string) => (years ? `With ${name} (${years})` : `With ${name}`),
-	noPartner: 'No partner listed',
-	otherChildren: 'Other children',
-	/** The accessible name of the list. */
-	region: (name: string) => `Family of ${name}`,
-	goLabel: (name: string, word?: string) => `${name}${word ? `, ${word}` : ''}. Show the family of this person.`,
-	editLabel: (name: string) => `Edit ${name}`,
-	you: 'You',
-	savedElsewhere: 'The plugin saved the person. Tap Find to see this person.',
-} as const;
-
 /** D134, D138: the searchable lists of the Titles window and the Houses window. */
 export const WIN_LIST_UI = {
 	searchTitles: 'Search titles',
@@ -1058,13 +859,10 @@ export const WIN_LIST_UI = {
 	holder: (name: string) => `Holder: ${name}`,
 	person: (name: string) => `Person: ${name}`,
 	id: (id: string) => `ID: ${id}`,
-	newest: (ruler: string) => `Newest holder: ${ruler}`,
 	stateNew: 'New',
 	stateChanged: 'Changed',
 	stateCheckId: 'Check the ID',
-	back: 'Back',
 	backTitles: 'Back to the list of titles',
 	backHouses: 'Back to the list of houses',
 	editPage: (name: string) => `Page to edit ${name}`,
-	otherActions: 'Other actions',
 } as const;

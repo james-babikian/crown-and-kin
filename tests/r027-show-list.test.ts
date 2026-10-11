@@ -14,6 +14,7 @@ import { FEl, clock, dispatch, fakeWin, flushFrames, installDom, resetDom, resiz
 import { resetObsidian } from './acceptance/fake-obsidian';
 import { embed, fakeHandle, fakeHost, fullViews, phone } from './acceptance/tree-view-fakes';
 import { BODY_16 } from './r027-window-support';
+import { accName } from './acceptance/accessible-name';
 
 /*
  * Version 0.2.7, WP4 view (contract F.1, F.6, D185 item 5): the phone list while the Show view is open, and the block state. The list shows the
@@ -81,7 +82,7 @@ describe('F.6: the phone list while the view is open', () => {
 		expect(close.querySelector('.dynasty-tool-icon')).not.toBeNull();
 		expect(o.root.querySelector('.dynasty-root')!.getAttribute('data-dynasty-succession')).toBe(DUKE);
 		expect(word(o.root, 'jasper-carrow')).toBe('2nd in line');
-		expect(row(o.root, 'jasper-carrow')!.querySelector('.dynasty-list-go')!.getAttribute('aria-label')).toContain('2nd in line');
+		expect(accName(row(o.root, 'jasper-carrow')!.querySelector('.dynasty-list-go')!)).toContain('2nd in line');
 		// A person who is not in the line keeps the relation word (Edwin died; his son is the 1st in line); the marked person is not in the line.
 		expect(word(o.root, 'edwin-carrow')).toBe('Son');
 		expect(word(o.root, 'harriet-carrow')).toBe('Daughter');

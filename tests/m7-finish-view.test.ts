@@ -308,23 +308,22 @@ describe('the result bar on the computer is as wide as the tree (owner, 2026-09-
 	};
 
 	it('styles.css: the bar spans the tree between the side margins; its buttons wrap only when they do not fit', () => {
+		// 0.2.8 (G.13): the banner is a flat row over the full width of the tree, under the toolbar.
 		const bar = rule('.dynasty-result');
-		expect(bar).toContain('left: var(--size-4-1);');
-		expect(bar).toContain('right: var(--size-4-1);');
+		expect(bar).toContain('left: 0;');
+		expect(bar).toContain('right: 0;');
 		expect(bar).toContain('width: auto;');
 		expect(bar).not.toMatch(/460px/);
 		const full = rule('.dynasty-full .dynasty-result');
-		expect(full).toContain('left: max(var(--size-4-1), env(safe-area-inset-left));');
-		expect(full).toContain('right: max(var(--size-4-1), env(safe-area-inset-right));');
+		expect(full).toContain('padding-left: max(14px, env(safe-area-inset-left));');
+		expect(full).toContain('padding-right: max(4px, env(safe-area-inset-right));');
 		expect(rule('.dynasty-result-buttons')).toContain('flex-wrap: wrap;');
 	});
 
-	it('styles.css: the phone bar does not change (one row of buttons inside the safe area)', () => {
+	it('styles.css: the phone banner is one row at the top inside the safe area', () => {
 		const phoneBar = rule('.modal.dynasty-fullscreen.is-phone .dynasty-full .dynasty-result');
-		expect(phoneBar).toContain('left: max(var(--size-4-2), env(safe-area-inset-left));');
-		expect(phoneBar).toContain('right: max(var(--size-4-2), env(safe-area-inset-right));');
-		expect(phoneBar).toContain('width: auto;');
-		expect(rule('.modal.dynasty-fullscreen.is-phone .dynasty-full .dynasty-result-buttons')).toContain('flex-wrap: nowrap;');
+		expect(phoneBar).toContain('top: max(0px, env(safe-area-inset-top));');
+		expect(phoneBar).toContain('min-height: 52px;');
 	});
 
 	// The bar as Obsidian 1.13 draws it in a tree of 700 × 500 in a note at 16 px text (harness

@@ -219,12 +219,12 @@ describe('a comment on a curly-quoted list item stays when the list is changed (
 });
 
 describe('the refusal text for the illegitimate value (J.10, L.9)', () => {
-	it('says "marked as illegitimate"', () => {
+	it('names the box “Illegitimate”', () => {
 		const t = ['titles:', '  - id: duke', '    name: Duke', '    holders: []', ''].join('\n');
 		const r = applyOp(t, { kind: 'edit-title', id: 'duke', inheritIllegitimate: 'maybe' as never });
 		expect(r.ok).toBe(false);
 		if (!r.ok) {
-			expect(r.detail).toMatch(/marked as illegitimate/);
+			expect(r.detail).toContain('with the box “Illegitimate” ticked');
 			expect(r.detail).not.toMatch(/outside a marriage/);
 		}
 	});

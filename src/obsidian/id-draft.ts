@@ -8,6 +8,7 @@
 
 import type { Op } from '../core/edit';
 import { checkNewId, makeIdFromName } from '../core/id-gen';
+import { REFUSAL_TEXT } from '../core/refusal-text';
 import { isMap, str, type Raw } from '../core/tolerate';
 import { ID_UI } from '../render/ui-text';
 
@@ -154,6 +155,6 @@ export function idRefusalText(code: string, detail: string | undefined): string 
 	if (code !== 'bad-value') return null;
 	const d = detail ?? '';
 	if (/^A value of this id is a YAML anchor or alias\./.test(d)) return ID_UI.anchor;
-	if (/^An id has the letters a to z, digits|^The new id must be text\.$/.test(d)) return ID_UI.notAllowed;
+	if (d === REFUSAL_TEXT.idCharacters || d === REFUSAL_TEXT.idNotText) return ID_UI.notAllowed;
 	return null;
 }

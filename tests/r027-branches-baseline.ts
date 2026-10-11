@@ -2,10 +2,14 @@
  * A frozen copy of the succession engine before the open branches (contract 0.2.7 section M; the file `src/core/succession.ts`
  * at commit 7e703d1). The tests of M.2 ("rows never change heirs, more, old, noYear, noBirthYear") compare the new engine with it.
  * Do not change this file; it is the reference.
+ *
+ * 0.2.8 exception: the three rule changes that alter the heirs themselves are copied in, so that the property keeps its meaning
+ * (the rows change nothing else): the birth-year order inside a group (D193, `slotFill`), the climb in the order of the note
+ * (F-KIN-11, `noteOrder`) and the co-rulers that are never in the line (S2, `coRulers` blocked).
  */
 
 import { drawnParentMap, type DrawnParent, type FamilyGraph } from '../src/core/derive';
-import { isDead, readInherit, readRule, yearOf, type InheritRule, type InheritThrough, type SuccessionRule } from '../src/core/succession-keys';
+import { isDead, yearOf, type InheritRule, type InheritThrough, type SuccessionRule } from '../src/core/succession-keys';
 import type { Holder, Person, Title } from '../src/core/types';
 
 /** The succession keys of one title as the engine reads them; the Titles window passes its draft in the same shape. */
@@ -25,25 +29,6 @@ export interface SuccessionSpec {
 	exclude?: string[];
 	/** Set by `specOf` when a written value cannot be used (A.5): the line is 'bad-rule'. */
 	bad?: 'succession' | 'inherit' | 'inherit-through' | 'inherit-illegitimate';
-}
-
-/** The keys of a title as the engine reads them (A.1). */
-export function specOf(title: Title): SuccessionSpec {
-	const bad = title.badKeys ?? {};
-	const rule = readRule(title.succession);
-	const inherit = readInherit(title.inherit);
-	const spec: SuccessionSpec = { inherit: inherit ?? 'no-preference', illegitimate: title.inheritIllegitimate ?? 'no', adopted: title.inheritAdopted === true };
-	if (title.heirsOfBody) spec.body = true;
-	if (rule) spec.rule = rule;
-	if (title.inheritThrough) spec.inheritThrough = title.inheritThrough;
-	if (title.year !== undefined) spec.year = title.year;
-	if (title.heirs?.length) spec.heirs = [...title.heirs];
-	if (title.exclude?.length) spec.exclude = [...title.exclude];
-	if (bad.succession !== undefined || (title.succession !== undefined && !rule)) spec.bad = 'succession';
-	else if (bad.inherit !== undefined || (title.inherit !== undefined && !inherit)) spec.bad = 'inherit';
-	else if (bad['inherit-through'] !== undefined) spec.bad = 'inherit-through';
-	else if (bad['inherit-illegitimate'] !== undefined) spec.bad = 'inherit-illegitimate';
-	return spec;
 }
 
 /** What the line is: a list of heirs, or the reason there is none. */
@@ -213,7 +198,7 @@ export function successionLine(g: FamilyGraph, title: Title, spec: SuccessionSpe
 	const rule = spec.rule;
 	// L.2: the first holder is the first entry, in list order, whose person is in the tree.
 	const firstEntry = spec.body ? entries.find((e) => e.person !== undefined && g.byId.has(e.person)) : undefined;
-	const engine = rule ? makeEngine(g, entries, spec, rule, R, Y, rIdx, aliveOf, bornYear, excluded, firstEntry?.person) : undefined;
+	const engine = rule ? makeEngine(g, entries, spec, rule, R, rIdx, aliveOf, bornYear, excluded, firstEntry?.person, coRulers) : undefined;
 	const ruleLine = engine ? engine.line() : [];
 
 	// K.3: the named heirs come first.
@@ -367,12 +352,12 @@ function makeEngine(
 	spec: SuccessionSpec,
 	rule: SuccessionRule,
 	R: string,
-	Y: number | null,
 	rIdx: number,
 	alive: (p: Person) => boolean,
 	bornYear: (id: string) => number | undefined,
 	excluded: ReadonlySet<string>,
 	body: string | undefined,
+	coRulers: readonly string[],
 ): Engine {
 	const P = (id: string): Person => g.byId.get(id)!;
 	const drawn = drawnParentMap(g);
@@ -505,7 +490,19 @@ function makeEngine(
 		};
 
 		// K.2: the parents followed from x. L.4: with the switch on, only parents in the body, over claim links.
-		const order = (ids: string[]) => (parentPref === undefined || ids.length < 2 ? ids : [...ids.filter((p) => P(p).sex === parentPref), ...ids.filter((p) => P(p).sex !== parentPref)]);
+		const noteOrder = (x: string, ids: string[]): string[] => {
+			if (ids.length < 2) return ids;
+			const written = P(x).parents;
+			const at = (id: string) => {
+				const i = written.findIndex((r) => r.id === id);
+				return i < 0 ? Infinity : i;
+			};
+			return ids.slice().sort((a, b) => at(a) - at(b));
+		};
+		const order = (x: string, ids: string[]) => {
+			const inNote = noteOrder(x, ids);
+			return parentPref === undefined || inNote.length < 2 ? inNote : [...inNote.filter((p) => P(p).sex === parentPref), ...inNote.filter((p) => P(p).sex !== parentPref)];
+		};
 		const nextParents = (x: string): string[] => {
 			const holders: string[] = [];
 			for (const d of drawn.get(x) ?? []) {
@@ -513,10 +510,10 @@ function makeEngine(
 				if (body !== undefined && !(carries(d, P(x), illOn) && inBody(d.id))) continue;
 				if (through === undefined || passes(d.id)) holders.push(d.id);
 			}
-			if (holders.length) return order(holders);
+			if (holders.length) return order(x, holders);
 			const followed = claimParents(x).filter(passes).filter((q) => body === undefined || inBody(q));
 			const near = followed.length < 2 ? followed : followed.filter((p) => earlier.has(p) || descendsFrom(p));
-			return order(near.length ? near : followed);
+			return order(x, near.length ? near : followed);
 		};
 
 		// `up`: R and the ancestors that carry the claim, breadth first, with their distance from R.
@@ -554,18 +551,29 @@ function makeEngine(
 			const by = bornYear(child.id);
 			return by !== undefined && (reigns.get(parent) ?? []).some((r) => by >= r.from && (r.to === undefined || by <= r.to));
 		};
+		// 0.2.8 D193 key 3: slot-fill by birth year inside a group (see the header).
+		const slotFill = (group: Person[]): Person[] => {
+			const dated = group.map((x, i) => ({ x, i, y: bornYear(x.id) })).filter((d) => d.y !== undefined);
+			if (dated.length < 2) return group;
+			const sorted = dated.slice().sort((a, b) => a.y! - b.y! || a.i - b.i);
+			const out = group.slice();
+			dated.forEach((d, k) => {
+				out[d.i] = sorted[k].x;
+			});
+			return out;
+		};
 		const rank = (parent: string): Person[] => {
 			const kids = claimKids(parent);
 			if (kids.length < 2) return kids;
-			const ordered = reverse ? kids.slice().reverse() : kids;
-			if (stepPref === undefined && !reigning) return ordered;
-			// Stable by the gender step, then the reign step; the written order decides the rest. Most families need no change.
 			const code = (x: Person) => step(x) * 2 + (reigning && !reignOk(parent, x) ? 1 : 0);
-			const first = code(ordered[0]);
-			if (ordered.every((x) => code(x) === first)) return ordered;
 			const buckets: Person[][] = [[], [], [], []];
-			for (const x of ordered) buckets[code(x)].push(x);
-			return buckets[0].concat(buckets[1], buckets[2], buckets[3]);
+			for (const x of kids) buckets[code(x)].push(x);
+			const out: Person[] = [];
+			for (const b of buckets) {
+				const filled = slotFill(b);
+				out.push(...(reverse ? filled.slice().reverse() : filled));
+			}
+			return out;
 		};
 
 		// C.5: the walk with representation, from each person of `up`. Iterative: a house can be hundreds of generations deep.
@@ -577,6 +585,10 @@ function makeEngine(
 		for (const id of up) flags[P(id).index] |= BLOCKED;
 		for (const id of ancestors) flags[P(id).index] |= BLOCKED;
 		for (const id of excluded) {
+			const x = g.byId.get(id);
+			if (x) flags[x.index] |= BLOCKED;
+		}
+		for (const id of coRulers) {
 			const x = g.byId.get(id);
 			if (x) flags[x.index] |= BLOCKED;
 		}

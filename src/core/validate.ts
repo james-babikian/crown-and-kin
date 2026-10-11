@@ -2,13 +2,21 @@
  * Checks the references and values of a parsed `Tree` and returns only the parts that are safe to
  * draw, together with every problem found (spec §8, §4.1). `derive.ts` calls `validateTree` before
  * building the family graph; anything that needs the derived families (for example a `union` that
- * does not name a union of the person's own parents) is checked there instead.
+ * does not name a union of the person's own parents) is checked there instead. From 0.2.8 it also checks the parent limits
+ * (`PARENT_LIMIT`, with the setting that stops the warning for 2 parents of a type), the near-typos of type words, and the
+ * `through-spouse` key of a holder.
  */
 
 import { codedIssue, type CodedIssue, type IssueCode, type IssueParams } from './messages';
 import { readPortraitCrop } from './portrait-crop';
-import { DOUBTFUL_DIED, isDead, readInherit, readRule, yearOf } from './succession-keys';
-import { isParentType, isPlacementType, isUnionType, parentKind, type Holder, type House, type ParentRef, type ParentType, type Person, type Title, type Tree, type Union } from './types';
+import { DOUBTFUL_DIED, isDead, readInherit, readRule, resolveSpouse, yearOf, type SpouseWorld } from './succession-keys';
+import { isParentType, isPlacementType, isUnionType, PARENT_LIMIT, parentKind, PARENT_TYPES, PLACEMENT_TYPES, UNION_TYPES, type Holder, type House, type ParentRef, type ParentType, type Person, type Title, type Tree, type Union } from './types';
+
+/** What the caller can switch in validation. Absent fields mean the default. */
+export interface ValidateOptions {
+	/** The setting "Warn about more than 2 parents of a type" (0.2.8 A.5). Off stops `too-many-parents` for birth, adoptive and ward parents; the limit for rumoured parents stays. Default: on. */
+	warnManyParents?: boolean;
+}
 
 /** The parts of a tree that are safe to draw, and every problem found on the way (spec §8, §4.1). */
 export interface Validated {
@@ -75,6 +83,42 @@ export function cleanParents(
 /** J.4: the lower case texts of `sex` that mean a man or a woman but are not `m` or `f` (`M` and `F` are caught as not equal to `m` and `f`). */
 const SEX_SPELLINGS: ReadonlySet<string> = new Set(['m', 'f', 'male', 'man', 'female', 'woman', 'm.', 'f.']);
 
+/** The Levenshtein distance of two short words. */
+function editDistance(a: string, b: string): number {
+	let prev = Array.from({ length: b.length + 1 }, (_, j) => j);
+	for (let i = 1; i <= a.length; i++) {
+		const row = [i];
+		for (let j = 1; j <= b.length; j++) row.push(Math.min(prev[j] + 1, row[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)));
+		prev = row;
+	}
+	return prev[b.length];
+}
+
+/** I13: the known word within edit distance 2 of `value` (case ignored, the nearest first), or undefined. */
+function nearWord(value: string, words: readonly string[]): string | undefined {
+	const v = value.trim().toLowerCase();
+	// A long text is a sentence, not a typo; the length test also keeps the cost small.
+	if (v === '' || v.length > 40) return undefined;
+	let best: string | undefined;
+	let bestDistance = 3;
+	for (const w of words) {
+		const d = editDistance(v, w);
+		if (d < bestDistance) [best, bestDistance] = [w, d];
+	}
+	return best;
+}
+
+/** D205: common words for a parent type. They are no type (the link is read as birth and the warning shows), but the warning suggests the type. */
+const PARENT_TYPE_WORDS: Readonly<Record<string, ParentType>> = Object.assign(Object.create(null) as Record<string, ParentType>, {
+	adopted: 'adoptive',
+	foster: 'ward',
+	guardian: 'ward',
+	natural: 'birth',
+	biological: 'birth',
+	alleged: 'rumoured',
+	putative: 'rumoured',
+});
+
 class Collector {
 	readonly issues: CodedIssue[] = [];
 
@@ -139,7 +183,7 @@ function breakCycles(people: Person[], refs: Map<string, ParentRef[]>, byId: Map
  * Checks references and values, and returns only what is safe to draw. Everything that needs
  * the derived families (primary unions) is checked in `derive.ts`.
  */
-export function validateTree(tree: Tree): Validated {
+export function validateTree(tree: Tree, options: ValidateOptions = {}): Validated {
 	const out = new Collector();
 
 	// Duplicate ids. People and houses: the first wins. Unions: both are drawn; only editing is unsafe.
@@ -202,14 +246,19 @@ export function validateTree(tree: Tree): Validated {
 			} else if (why === 'missing') {
 				if (!missing.has(r.id)) out.warn('missing-parent', { ...who, ref: r.id }, [p.id]);
 				missing.add(r.id);
-			} else out.warn('unknown-parent-type', { ...who, value: r.type, parent: name(r.id) }, [p.id, r.id]);
+			} else {
+				const suggestion = PARENT_TYPE_WORDS[r.type.trim().toLowerCase()] ?? nearWord(r.type, PARENT_TYPES);
+				out.warn('unknown-parent-type', { ...who, value: r.type, parent: name(r.id), ...(suggestion ? { suggestion } : {}) }, [p.id, r.id]);
+			}
 		});
 		refs.set(p.id, valid);
 
 		const byType = new Map<string, number>();
 		for (const r of valid) byType.set(r.type, (byType.get(r.type) ?? 0) + 1);
+		// B.3, A.5: the limit of each type; the setting stops the warning for birth, adoptive and ward parents only.
 		for (const [type, count] of byType) {
-			if (count > 2) out.warn('too-many-parents', { ...who, type, count }, [p.id]);
+			const limit = PARENT_LIMIT[type as ParentType];
+			if (count > limit && (type === 'rumoured' || options.warnManyParents !== false)) out.warn('too-many-parents', { ...who, type, count, limit }, [p.id]);
 		}
 		if (p.placement !== undefined) {
 			if (!isPlacementType(p.placement)) out.warn('unknown-placement', { ...who, value: p.placement }, [p.id]);
@@ -249,18 +298,23 @@ export function validateTree(tree: Tree): Validated {
 		const absent = u.partners.filter((x) => !byId.has(x));
 		for (const ref of absent) out.warn('missing-partner', { ...label, ref, absent }, known);
 		if (absent.length) continue;
-		if (!isUnionType(u.type)) out.warn('unknown-union-type', { ...label, value: u.type }, known);
+		// I13: any word is a partnership type and is drawn as a marriage; only a near-typo of a known type warns.
+		if (!isUnionType(u.type)) {
+			const suggestion = nearWord(u.type, UNION_TYPES);
+			if (suggestion) out.warn('unknown-union-type', { ...label, value: u.type, suggestion }, known);
+		}
 		unions.push(u);
 	}
 
 	breakCycles(people, refs, byId, out);
-	const titles = validateTitles(tree.titles ?? [], people, byId, out);
+	const titles = validateTitles(tree.titles ?? [], people, byId, refs, unions, out);
 
 	return { people, byId, houses, unions, refs, unionIds, titles, issues: out.issues };
 }
 
 /** Spec §13.3, §13.4 rules for titles, holders and `card-title` (the first title with an id wins). */
-function validateTitles(written: readonly Title[], people: Person[], byId: Map<string, Person>, out: Collector): Title[] {
+function validateTitles(written: readonly Title[], people: Person[], byId: Map<string, Person>, refs: Map<string, ParentRef[]>, unions: readonly Union[], out: Collector): Title[] {
+	let world: SpouseWorld | undefined;
 	const titles: Title[] = [];
 	const byTitleId = new Map<string, Title>();
 	const dup = new Set<string>();
@@ -283,6 +337,9 @@ function validateTitles(written: readonly Title[], people: Person[], byId: Map<s
 			holders.push(h);
 		}
 		successionWarnings(t, byId, out);
+		if ((t.succession !== undefined || t.heirs !== undefined) && holders.some((h) => h.throughSpouse !== undefined && h.person !== undefined && byId.has(h.person))) {
+			throughSpouseWarnings(t, holders, byId, (world ??= spouseWorld(people, byId, refs, unions)), out);
+		}
 		const title = { ...t, holders };
 		byTitleId.set(t.id, title);
 		titles.push(title);
@@ -312,4 +369,76 @@ function successionWarnings(t: Title, byId: Map<string, Person>, out: Collector)
 	};
 	missing(t.heirs, bad.heir, 'missing-heir');
 	missing(t.exclude, bad.exclude, 'missing-excluded');
+}
+
+/**
+ * The partners and claim parents of the tree as `derive.ts` makes them: a listed union is a partnership of its type, and two
+ * placement parents of one child (the first two of the placement type) are partners in an implicit union. The same facts
+ * reach `succession.ts` through the family graph, so the warning and the line agree.
+ */
+function spouseWorld(people: Person[], byId: Map<string, Person>, refs: Map<string, ParentRef[]>, unions: readonly Union[]): SpouseWorld {
+	const partners = new Map<string, { id: string; type: string }[]>();
+	const add = (a: string, b: string, type: string) => {
+		push(partners, a, { id: b, type });
+		push(partners, b, { id: a, type });
+	};
+	const pair = (a: string, b: string) => JSON.stringify(a < b ? [a, b] : [b, a]);
+	const listed = new Set<string>();
+	for (const u of unions) {
+		add(u.partners[0], u.partners[1], u.type);
+		listed.add(pair(u.partners[0], u.partners[1]));
+	}
+	const implicit = new Set<string>();
+	const claimParents = new Map<string, string[]>();
+	for (const p of people) {
+		const byType = new Map<string, string[]>();
+		for (const r of refs.get(p.id)!) push(byType, r.type, r.id);
+		let type: string | undefined = PLACEMENT_TYPES.find((t) => byType.has(t));
+		if (p.placement !== undefined && isPlacementType(p.placement) && byType.has(p.placement)) type = p.placement;
+		const placed = type ? byType.get(type)!.slice(0, 2) : [];
+		if (placed.length === 2) {
+			const key = pair(placed[0], placed[1]);
+			if (!listed.has(key) && !implicit.has(key)) {
+				implicit.add(key);
+				add(placed[0], placed[1], 'implicit');
+			}
+		}
+		const up = [...new Set([...(byType.get('birth') ?? []), ...(byType.get('adoptive') ?? [])])];
+		if (up.length) claimParents.set(p.id, up);
+	}
+	return { partners: (id) => partners.get(id) ?? [], claimParents: (id) => claimParents.get(id) ?? [], exists: (id) => byId.has(id) };
+}
+
+/** 0.2.8 contract A.2, D195: the warnings about the `through-spouse` keys of one title. Each warns once for a person and a value; the key is then ignored. */
+function throughSpouseWarnings(t: Title, holders: readonly Holder[], byId: Map<string, Person>, world: SpouseWorld, out: Collector) {
+	const inTree = holders.flatMap((h) => (h.person !== undefined && byId.has(h.person) ? [h.person] : []));
+	const seen = new Set<string>();
+	for (const h of holders) {
+		if (h.throughSpouse === undefined || h.person === undefined || !byId.has(h.person)) continue;
+		const id = h.person;
+		const key = `${id}\0${h.throughSpouse === true ? '' : h.throughSpouse}`;
+		if (seen.has(key)) continue;
+		seen.add(key);
+		const result = resolveSpouse(world, id, h.throughSpouse, inTree);
+		if (result.ok) continue;
+		const base = { person: byId.get(id)!.name, title: t.name };
+		const names = (ids: readonly string[]) => ids.map((x) => byId.get(x)!.name);
+		switch (result.why) {
+			case 'no-partner':
+			case 'no-marriage':
+			case 'self':
+				out.warn(`through-spouse-${result.why}`, base, [id]);
+				break;
+			case 'no-claim':
+			case 'several-claims':
+				out.warn(`through-spouse-${result.why}`, { ...base, count: result.candidates.length, partners: names(result.candidates), example: result.candidates[0] }, [id, ...result.candidates]);
+				break;
+			case 'not-partner':
+				out.warn('through-spouse-not-partner', { ...base, ref: result.ref, other: byId.get(result.ref)!.name }, [id, result.ref]);
+				break;
+			case 'unknown-person':
+				out.warn('through-spouse-unknown-person', { ...base, ref: result.ref }, [id]);
+				break;
+		}
+	}
 }

@@ -149,8 +149,10 @@ const CASES: LCase[] = [
 		people: [...king(), ...HOUSE, CB],
 		holders: CH,
 		keys: [...BASE_KEYS, 'inherit-illegitimate: after'],
-		off: ['kd', 'ks', 'c2', 'cs', 'e1', 'cb'],
-		on: ['kd', 'ks', 'c2', 'cs', 'cb'],
+		// D193 (0.2.8), slot-fill: the claim children of Y in the written order are c1 (the holder, out), c2 1158, cs 1157. Both are dated, so they
+		// are put in year order: Cs 1157 before C2 1158. C1's children Kd 1184, Ks 1186 stay in year order. Cb (illegitimate, 'after') stays last.
+		off: ['kd', 'ks', 'cs', 'c2', 'e1', 'cb'],
+		on: ['kd', 'ks', 'cs', 'c2', 'cb'],
 		first: 'y',
 	},
 	{ id: 'L10', what: 'the first entry has a name and no person in the tree: H is Y', people: [...king(), ...CKIDS], holders: ['{name: Legend, from: 1100}', ...CH], keys: BASE_KEYS, off: ['k1', 'c2', 'c3', 'e1'], on: ['k1', 'c2', 'c3'], first: 'y' },

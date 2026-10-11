@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { FindBlocks, LocateBlock, LocatedBlock, OrdinalForSection, ReplaceBody } from '../../src/core/block-locate';
+import type { FindBlocks, LocatedBlock, OrdinalForSection, ReplaceBody } from '../../src/core/block-locate';
 import * as impl from '../../src/core/block-locate';
 import { replaceOnce } from './golden';
 import { fixtureNote, topLevelBlocks } from './load';
@@ -8,7 +8,6 @@ import { fixtureNote, topLevelBlocks } from './load';
 // The expected values are written from the spec and CommonMark fence rules, not from the code.
 
 const findBlocks: FindBlocks = impl.findBlocks;
-const locateBlock: LocateBlock = impl.locateBlock;
 const ordinalForSection: OrdinalForSection = impl.ordinalForSection;
 const replaceBody: ReplaceBody = impl.replaceBody;
 
@@ -107,12 +106,6 @@ describe('fixture 9: every block, in text order (§6.1, §10 item 9)', () => {
 		expect(ordinalForSection(NOTE, 93, 99, 'people:\n  - id: example\n    name: Example Person\n')).toBeNull();
 	});
 
-	it('locateBlock returns the block with that ordinal, or null', () => {
-		for (const e of FIXTURE_9) expect(shape(locateBlock(NOTE, e.ordinal)!)).toEqual(e);
-		expect(locateBlock(NOTE, 6)).toBeNull();
-		expect(locateBlock(NOTE, -1)).toBeNull();
-	});
-
 	it('replaceBody with the same body returns the identical text, for every block', () => {
 		for (const b of findBlocks(NOTE)) expect(replaceBody(NOTE, b, b.body)).toBe(NOTE);
 	});
@@ -120,21 +113,21 @@ describe('fixture 9: every block, in text order (§6.1, §10 item 9)', () => {
 
 describe('replaceBody puts the prefix back (§6.1)', () => {
 	it('in a callout: only body lines change, and every new line gets "> "', () => {
-		const b = locateBlock(NOTE, 1)!;
+		const b = findBlocks(NOTE)[1]!;
 		const newBody = replaceOnce(b.body, '    name: Hugh Quill', '    name: Hugh of Greyfen\n    born: 1150\n    sex: m');
 		const expected = replaceOnce(NOTE, '>     name: Hugh Quill\n', '>     name: Hugh of Greyfen\n>     born: 1150\n>     sex: m\n');
 		expect(replaceBody(NOTE, b, newBody)).toBe(expected);
 	});
 
 	it('in a callout inside a callout: every body line gets "> > "', () => {
-		const b = locateBlock(NOTE, 2)!;
+		const b = findBlocks(NOTE)[2]!;
 		const newBody = b.body + '\n  - id: ada\n    name: Ada';
 		const expected = replaceOnce(NOTE, '> >     born: 1120   # the year he took service\n', '> >     born: 1120   # the year he took service\n> >   - id: ada\n> >     name: Ada\n');
 		expect(replaceBody(NOTE, b, newBody)).toBe(expected);
 	});
 
 	it('in a list item: every body line gets the indentation', () => {
-		const b = locateBlock(NOTE, 3)!;
+		const b = findBlocks(NOTE)[3]!;
 		const newBody = replaceOnce(b.body, 'height: 400', 'height: 450');
 		expect(replaceBody(NOTE, b, newBody)).toBe(replaceOnce(NOTE, '    height: 400\n', '    height: 450\n'));
 	});
@@ -142,7 +135,7 @@ describe('replaceBody puts the prefix back (§6.1)', () => {
 	it('an unchanged blank line keeps its exact text; the rest of the note stays byte for byte', () => {
 		// The blank body line in the callout is written ">" in the note; the list item's is empty.
 		for (const ordinal of [1, 3]) {
-			const b = locateBlock(NOTE, ordinal)!;
+			const b = findBlocks(NOTE)[ordinal]!;
 			const newBody = b.body.replace('people:', 'people: # edited');
 			const out = replaceBody(NOTE, b, newBody);
 			const oldLines = NOTE.split('\n');
@@ -197,7 +190,7 @@ describe('line endings (§6.1: a write keeps the note line ending)', () => {
 
 	it('replaceBody keeps CRLF on every line, including new ones', () => {
 		for (const b of findBlocks(CRLF)) expect(replaceBody(CRLF, b, b.body)).toBe(CRLF);
-		const b = locateBlock(CRLF, 1)!;
+		const b = findBlocks(CRLF)[1]!;
 		const newBody = replaceOnce(b.body, '    name: Hugh Quill', '    name: Hugh of Greyfen\n    born: 1150');
 		const expected = replaceOnce(NOTE, '>     name: Hugh Quill\n', '>     name: Hugh of Greyfen\n>     born: 1150\n').replace(/\n/g, '\r\n');
 		expect(replaceBody(CRLF, b, newBody)).toBe(expected);

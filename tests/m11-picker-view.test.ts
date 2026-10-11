@@ -6,7 +6,7 @@ vi.mock('@codemirror/language', () => ({ forceParsing: () => false, syntaxTree: 
 vi.mock('@codemirror/view', () => ({ ViewPlugin: { fromClass: () => ({}) } }));
 
 import { TFile as VaultFile } from 'obsidian';
-import { PICKER_ROW_PX, PREVIEW_BOX, PREVIEW_BOX_PX, PREVIEW_LOADS } from '../src/obsidian/picture-picker';
+import { PREVIEW_BOX, PREVIEW_BOX_PX, PREVIEW_LOADS } from '../src/obsidian/picture-picker';
 import type { PictureCopy } from '../src/obsidian/picture-store';
 import { PICTURES_UI } from '../src/render/ui-text';
 import { FEl, device, dispatch, fakeDoc, fakeWin, installDom, resetDom, runFrame, runTimers, settle } from './acceptance/fake-dom';
@@ -618,7 +618,7 @@ describe('V8: the texts', () => {
 
 // ---------- row previews (V6) ----------
 
-const COPY_BOX = { w: 32, h: 32, fit: 'meet' };
+const COPY_BOX = { w: 72, h: 72, fit: 'meet' };
 
 interface LoaderKit {
 	rp: { update(): void; rowsChanged(): void; dispose(): void; readonly loading: number; readonly held: number };
@@ -666,14 +666,13 @@ async function loader(n: number): Promise<LoaderKit> {
 const imgOf = (box: FEl) => box.querySelector('img');
 
 describe('V6: the row previews (createRowPreviews)', () => {
-	it('the constants: a 32 px box, 44 px rows, 4 loads at once', () => {
-		expect(PREVIEW_BOX_PX).toBe(32);
+	it('the constants: a 72 px thumbnail box (D212), 4 loads at once', () => {
+		expect(PREVIEW_BOX_PX).toBe(72);
 		expect(PREVIEW_BOX).toEqual(COPY_BOX);
-		expect(PICKER_ROW_PX).toBe(44);
 		expect(PREVIEW_LOADS).toBe(4);
 	});
 
-	it('an update loads the rows in view first, at most 4 at once, with the 32 px box that keeps the proportions', async () => {
+	it('an update loads the rows in view first, at most 4 at once, with the 72 px box that keeps the proportions', async () => {
 		const k = await loader(30);
 		k.rp.update();
 		expect(k.asked.map((a) => a.file.name)).toEqual(['p0.png', 'p1.png', 'p2.png', 'p3.png']);
@@ -920,14 +919,18 @@ const RULES = cssRules(readFileSync('styles.css', 'utf8'));
 const pickerRules = RULES.filter((r) => r.selectors.some((s) => s.includes('dynasty-picture')));
 
 describe('V2, V5: the style sheet of the picker', () => {
-	it('a rule for the picker rows has content-visibility: auto and contain-intrinsic-size: auto 44px', () => {
+	const pickerRule = (end: string) => pickerRules.find((r) => r.selectors.some((s) => s.startsWith('.modal.dynasty-picture-picker ') && s.endsWith(end)));
+
+	it('a rule for the picker rows has content-visibility: auto, and the picker gives a row its guessed height (a thumbnail row 120 px, a full-width row 44 px)', () => {
 		const rule = pickerRules.find((r) => /content-visibility\s*:\s*auto/.test(r.body));
 		expect(rule, 'a picker rule with content-visibility').toBeDefined();
-		expect(rule!.body).toMatch(/contain-intrinsic-size\s*:\s*auto 44px/);
+		expect(pickerRule(' .dynasty-picture-row')!.body).toMatch(/contain-intrinsic-size\s*:\s*auto 120px/);
+		expect(pickerRule('.dynasty-picture-row.dynasty-picture-remove')!.body).toMatch(/contain-intrinsic-size\s*:\s*auto 44px/);
 	});
 
-	it('a picker row is at least 44 px high (spec §7.5)', () => {
-		expect(pickerRules.some((r) => /min-height\s*:\s*44px/.test(r.body))).toBe(true);
+	it('a picker row is at least 44 px high (spec §7.5): a full-width row says so, and the preview box of a thumbnail row is 72 px', () => {
+		expect(pickerRule('.dynasty-picture-row.dynasty-picture-remove')!.body).toMatch(/min-height\s*:\s*44px/);
+		expect(pickerRule(' .dynasty-picture-thumb')!.body).toMatch(/width\s*:\s*72px[^}]*height\s*:\s*72px/);
 	});
 
 	it('the large preview and its phone rules are gone: no rule for the preview box, image, name or text, and no column-reverse', () => {

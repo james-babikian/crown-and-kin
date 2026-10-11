@@ -7,12 +7,13 @@
  */
 
 import { Modal, type App } from 'obsidian';
-import { ID_UI, SHEET } from '../render/ui-text';
+import { ID_UI } from '../render/ui-text';
 import { reasonText, type IdKind, type IdReason } from './id-draft';
 import { idField } from './id-field';
 import { ignoreGhostClick, phoneLayout } from './modal-layout';
 import { trackModal } from './plugin-modals';
 import { nameDialog } from './sheet-parts';
+import { buildShell, type Shell } from './window-shell';
 
 /** What the Houses window or the Titles window gives the small window. */
 export interface IdWindowSpec {
@@ -35,6 +36,7 @@ export interface IdWindowSpec {
 
 class IdWindow extends Modal {
 	private used = false;
+	private shell: Shell | null = null;
 	private readonly cleanup: (() => void)[] = [];
 
 	constructor(
@@ -50,12 +52,23 @@ class IdWindow extends Modal {
 		this.modalEl.addClass('dynasty-id-window');
 		this.cleanup.push(phoneLayout(this, undefined, false), ignoreGhostClick(this), trackModal(this, () => this.close()));
 		const el = this.contentEl;
-		el.addClass('dynasty-sheet-content');
-		const header = el.createDiv({ cls: 'dynasty-sheet-header' });
-		nameDialog(this.modalEl, header.createDiv({ cls: 'dynasty-sheet-title', text: ID_UI.windowTitle(s.item) }));
-		const body = el.createDiv({ cls: 'dynasty-sheet-body' });
-		body.createDiv({ cls: 'dynasty-sheet-hint', text: ID_UI.hint(s.kind) });
-		let use: HTMLButtonElement | null = null;
+		// The window family (contract C): a bar on a phone, a footer on a computer; "Use this ID" is the main button.
+		let doUse: () => void = () => undefined; // eslint-disable-line prefer-const -- set after the shell exists
+		const shell = buildShell({
+			modalEl: this.modalEl,
+			contentEl: el,
+			title: ID_UI.windowTitle(s.item),
+			titled: true,
+			saveLabel: ID_UI.use,
+			onCancel: () => this.close(),
+			onSave: () => doUse(),
+			buttons: { cancel: { cls: ['dynasty-id-cancel'], focus: 'id-cancel' }, save: { cls: ['dynasty-id-use'], focus: 'id-use' } },
+		});
+		this.shell = shell;
+		nameDialog(this.modalEl, shell.titleEl);
+		const body = shell.body;
+		body.createDiv({ cls: ['dynasty-sheet-hint'], text: ID_UI.hint(s.kind) });
+		let use: HTMLButtonElement | null = shell.save;
 		const refresh = (value: string) => {
 			const why = s.check(value);
 			view.setProblem(why ? reasonText(why) : '');
@@ -75,11 +88,11 @@ class IdWindow extends Modal {
 			},
 			onEnter: () => use?.click(),
 		});
-		const actions = body.createDiv({ cls: ['dynasty-sheet-confirm-actions', 'dynasty-id-actions'] });
-		actions.createEl('button', { cls: ['dynasty-sheet-cancel', 'dynasty-id-cancel'], text: SHEET.cancel, attr: { type: 'button', 'data-focus': 'id-cancel' } }).addEventListener('click', () => this.close());
-		use = actions.createEl('button', { cls: ['mod-cta', 'dynasty-id-use'], text: ID_UI.use, attr: { type: 'button', 'data-focus': 'id-use' } });
-		use.addEventListener('click', () => {
-			if (use?.disabled) return;
+		// The shell's Save button runs `onSave`, which clicks the button below it: the click handler stands on the button itself.
+		const useButton = shell.save!;
+		use = useButton;
+		useButton.addEventListener('click', () => {
+			if (useButton.disabled) return;
 			this.used = true;
 			s.use(view.input.value.trim());
 			this.close();
@@ -91,6 +104,8 @@ class IdWindow extends Modal {
 
 	override onClose(): void {
 		for (const c of this.cleanup.splice(0)) c();
+		this.shell?.dispose();
+		this.shell = null;
 		this.contentEl.empty();
 		this.spec.closed(this.used);
 	}

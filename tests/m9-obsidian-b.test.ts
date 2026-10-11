@@ -330,9 +330,9 @@ describe('Save as picture (O11, P1–P6)', () => {
 		expect(svg).not.toContain('blob:');
 		expect(svg.match(/data-item="arms:/g)).toHaveLength(12);
 		expect(/<circle[^>]*stroke-dasharray[^>]*data-item="frame:oswin"/.test(svg)).toBe(true);
-		// P5: pictures at 4 × their CSS size in an SVG (the Roundel's medallion is 2 em = 32 px) (14 px names at 16 px text: scale 0.875).
+		// P5: pictures at 4 × their CSS size in an SVG (the Roundel's medallion is 2.3 em = 36.8 px since D219) (14 px names at 16 px text: scale 0.875).
 		const portrait = log.exports.find((x) => x.startsWith('aldric.jpg'))!;
-		expect(portrait).toBe(`aldric.jpg@${Math.ceil(32 * 4 * 0.875)}x${Math.ceil(32 * 4 * 0.875)}:portrait`);
+		expect(portrait).toBe(`aldric.jpg@${Math.ceil(36.8 * 4 * 0.875)}x${Math.ceil(36.8 * 4 * 0.875)}:portrait`);
 	});
 
 	it('focus mode names the family in the file name (P6)', async () => {

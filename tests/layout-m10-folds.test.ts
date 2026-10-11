@@ -22,7 +22,7 @@ describe('folds in the layout (WP 10.2b)', () => {
 	it('sideways, the sign of a folded family ends before the next column', () => {
 		const { layout } = lay('sideways', [A]);
 		const sign = layout.folds!.find((c) => c.key === A)!;
-		const ext = foldExtent(sign, sign.spot, 16);
+		const ext = foldExtent(sign, sign.spot, 16, true);
 		const gap = layout.rowGaps[layout.persons.get('osric')!.gen];
 		// The real pill: "+ 75" is about 3.3 em wide at most.
 		expect(sign.spot.x - 10 + 3.3 * 16).toBeLessThanOrEqual(gap.bottom);

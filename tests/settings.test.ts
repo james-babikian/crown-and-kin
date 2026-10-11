@@ -9,7 +9,7 @@ describe('normaliseSettings', () => {
 	});
 
 	it('keeps valid values', () => {
-		const s = { embedHeightDesktop: 800, showDates: false, showRelations: false, oneParentUnknown: false, showPortraits: false, showHouseGeneration: false, focusGenerations: 0, updateLinks: false, breakWords: 'Long-na-munda', reduceMotion: 'on', phoneDirection: 'down', successionLength: 12, oldAge: 90, youngDeathAge: 30 };
+		const s = { embedHeightDesktop: 800, showDates: false, showRelations: false, oneParentUnknown: false, showPortraits: false, showHouseGeneration: false, focusGenerations: 0, updateLinks: false, breakWords: 'Long-na-munda', reduceMotion: 'on', phoneDirection: 'down', successionLength: 12, oldAge: 90, youngDeathAge: 30, armsOnCards: 'all', warnManyParents: false };
 		expect(normaliseSettings(s)).toEqual(s);
 		expect(normaliseSettings({ embedHeightDesktop: 100, focusGenerations: 10 })).toMatchObject({ embedHeightDesktop: 100, focusGenerations: 10 });
 		expect(normaliseSettings({ embedHeightDesktop: 5000 })).toMatchObject({ embedHeightDesktop: 5000 });
@@ -82,7 +82,7 @@ describe('pending renames in data.json', () => {
 	const entry = { oldPath: 'A/Old.md', newPath: 'A/New.md', others: ['B/Old.md'] };
 
 	it('normaliseSettings ignores them: the settings are the same with or without the key', () => {
-		const s = { embedHeightDesktop: 800, showDates: false, showRelations: false, oneParentUnknown: false, showPortraits: false, showHouseGeneration: false, focusGenerations: 0, updateLinks: false, breakWords: 'Long-na-munda', reduceMotion: 'on', phoneDirection: 'down', successionLength: 12, oldAge: 90, youngDeathAge: 30 };
+		const s = { embedHeightDesktop: 800, showDates: false, showRelations: false, oneParentUnknown: false, showPortraits: false, showHouseGeneration: false, focusGenerations: 0, updateLinks: false, breakWords: 'Long-na-munda', reduceMotion: 'on', phoneDirection: 'down', successionLength: 12, oldAge: 90, youngDeathAge: 30, armsOnCards: 'all', warnManyParents: false };
 		expect(PENDING_KEY).toBe('pendingRenames');
 		expect(normaliseSettings({ ...s, [PENDING_KEY]: [entry] })).toEqual(s);
 		expect(normaliseSettings({ [PENDING_KEY]: [entry] })).toEqual(DEFAULT_SETTINGS);

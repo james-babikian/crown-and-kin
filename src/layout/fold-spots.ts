@@ -31,6 +31,7 @@ import type { FoldSpot, PersonBox, PlacedFoldControl, Rect, UnionPoint } from '.
  */
 export const FOLD_EM = {
 	button: 1.2,
+	chip: 0.95,
 	minusHalf: 0.45,
 	minusStroke: 0.2,
 	signHeight: 1.25,
@@ -48,7 +49,7 @@ export const FOLD_EM = {
 export const FOLD_HIT_PX = 44;
 
 /** Radius of the "+" badge in em: the same number as `BADGE_RADIUS_EM` in `render/dom/scene.ts` (a test pins that they agree). */
-export const FOLD_BADGE_EM = 0.6;
+export const FOLD_BADGE_EM = 0.55;
 
 /** The clear gap in em that a visible fold mark keeps from the badge circle of every card (D137 item 1, spec §13.10). */
 export const FOLD_BADGE_GAP_EM = 0.25;
@@ -63,16 +64,21 @@ export interface FoldMark {
 }
 
 /**
- * The visible Full-level mark of `control` at `spot`: an open button is a circle (a capsule of length 0), a folded sign a pill that
- * grows from the spot along x, or along y in the turned frame of a sideways layout. The text width is not known here, so the sign
+ * The visible Full-level mark of `control` at `spot`: an open button is a circle (a capsule of length 0), a folded sign a pill. In a
+ * `down` layout the pill is centred on the spot, on the line (0.2.8, D206). In a sideways layout the line runs along the sign and meets the middle of its near
+ * end, so the pill starts where the open chip starts (`FOLD_EM.chip` / 2 before the spot, D207) and grows to the right: along x in the real frame (`anchored`), along y in the turned frame (`turned`). The text width is not known here, so the sign
  * is as long as the layout reserves for it (0.6 em for each of its characters), the same bound `planLines` uses for its reach.
  */
-export function foldMark(control: FoldControl, spot: FoldSpot, em: number, turned: boolean): FoldMark {
+export function foldMark(control: FoldControl, spot: FoldSpot, em: number, turned: boolean, anchored = false): FoldMark {
 	if (!control.folded) return { x1: spot.x, y1: spot.y, x2: spot.x, y2: spot.y, r: (FOLD_EM.button / 2) * em };
 	const r = (FOLD_EM.signHeight / 2) * em;
 	const digits = String(Math.max(0, Math.trunc(control.count))).length;
 	const long = (FOLD_EM.signPad + (2 + digits) * 0.6) * em - 2 * r;
-	return { x1: spot.x, y1: spot.y, x2: turned ? spot.x : spot.x + long, y2: turned ? spot.y + long : spot.y, r };
+	// The first cap centre lies one radius inside the pill's left edge.
+	const start = r - (FOLD_EM.chip / 2) * em;
+	if (turned) return { x1: spot.x, y1: spot.y + start, x2: spot.x, y2: spot.y + start + long, r };
+	if (anchored) return { x1: spot.x + start, y1: spot.y, x2: spot.x + start + long, y2: spot.y, r };
+	return { x1: spot.x - long / 2, y1: spot.y, x2: spot.x + long / 2, y2: spot.y, r };
 }
 
 /** What the line planner needs to know about folds (F3, F4). */
@@ -147,7 +153,7 @@ export function placeFoldSpots(
 	// The tap area as the caller's frame sees it: the sideways sign is long along the layout's x, which is y here.
 	const areaOf = (c: FoldControl, spot: FoldSpot): Rect => {
 		if (!hints.turned) return foldExtent(c, spot, em);
-		const r = foldExtent(c, { x: spot.y, y: spot.x }, em);
+		const r = foldExtent(c, { x: spot.y, y: spot.x }, em, true);
 		return { x: r.y, y: r.x, w: r.h, h: r.w };
 	};
 	const tags = [...(hints.tags?.values() ?? [])];
@@ -178,9 +184,11 @@ export function placeFoldSpots(
 		const next = rowGaps[gen]?.bottom;
 		if (next !== undefined && next - from < FOLD_EM.shortStem * em) y = from + (next - from) / 2;
 		const first = y;
-		// The shape of the mark does not change while the control moves along its stem.
+		// The shape of the mark does not change while the control moves along its stem. In the turned frame the clearance measures the sign from the spot, as it did
+		// before D207 moved the drawn sign 0.15 em to the right (still 0.25 em clear of every badge, tests/s025-fold-badge.test.ts): so no spot, and no room the planner reserves, changes.
 		const shape = foldMark(c, { x: 0, y: 0 }, em, !!hints.turned);
-		const along = hints.turned ? shape.y2 : shape.x2;
+		const along = hints.turned ? shape.y2 - shape.y1 : shape.x2;
+		const before = hints.turned ? 0 : shape.x1;
 		// Each move clears one obstacle for good, so the loop ends.
 		for (let again = true; again; ) {
 			again = false;
@@ -195,7 +203,7 @@ export function placeFoldSpots(
 			}
 			if (again) continue;
 			for (const p of badges) {
-				const down = clearOfBadge(x, y, along, p, shape.r + badgeNeed, !!hints.turned);
+				const down = clearOfBadge(x, y, before, along, p, shape.r + badgeNeed, !!hints.turned);
 				if (down !== undefined) {
 					y += down;
 					again = true;
@@ -220,13 +228,13 @@ export function placeFoldSpots(
 const SLACK = 1e-9;
 
 /**
- * D137 item 1: how far down (y grows) a mark that starts at (x, y) and whose axis is `along` long (along x, or along y when `turned`)
- * must move to keep `need` from the badge centre `p`; undefined when it is clear already. The mark's own stem is the only way it may
- * move, so x never changes. A mark that is wholly above the circle is clear too.
+ * D137 item 1: how far down (y grows) a mark at (x, y) must move to keep `need` from the badge centre `p`; undefined when it is clear already.
+ * Its axis spans `before` to `along` from the spot, along x (`down`), or from the spot to `along` along y when `turned`. The mark's own stem is the only
+ * way it may move, so x never changes. A mark that is wholly above the circle is clear too.
  */
-function clearOfBadge(x: number, y: number, along: number, p: { x: number; y: number }, need: number, turned: boolean): number | undefined {
+function clearOfBadge(x: number, y: number, before: number, along: number, p: { x: number; y: number }, need: number, turned: boolean): number | undefined {
 	// The distance across the stem: from the badge centre to the mark's axis (turned) or to the span of its axis (down).
-	const across = turned ? Math.abs(p.x - x) : Math.max(x - p.x, 0, p.x - x - along);
+	const across = turned ? Math.abs(p.x - x) : Math.max(x + before - p.x, 0, p.x - x - along);
 	if (across >= need) return undefined;
 	const reach = Math.sqrt(need * need - across * across);
 	const end = turned ? y + along : y;
@@ -239,10 +247,10 @@ function clearOfBadge(x: number, y: number, along: number, p: { x: number; y: nu
 export const turnSpots = (spots: readonly PlacedFoldControl[]): PlacedFoldControl[] => spots.map((c) => ({ ...c, spot: { x: c.spot.y, y: c.spot.x } }));
 
 /**
- * F5b: the rectangle a control needs, in layout px: its largest mark (the Overview sign, anchored on the left and as
- * wide as the longest "+ N" text can be, or the open button) and its hit area at scale 1.
+ * F5b: the rectangle a control needs, in layout px: its largest mark (the Overview sign, as wide as the longest "+ N" text can be, or the
+ * open button) and its hit area at scale 1. The sign is centred on the spot (D206); `anchored` (the sign of a sideways layout) has its larger Overview pill start 0.625 em before the spot (D207).
  */
-export function foldExtent(control: FoldControl, spot: FoldSpot, em: number): Rect {
+export function foldExtent(control: FoldControl, spot: FoldSpot, em: number, anchored = false): Rect {
 	const half = FOLD_HIT_PX / 2;
 	let x0 = spot.x - half;
 	let x1 = spot.x + half;
@@ -252,7 +260,7 @@ export function foldExtent(control: FoldControl, spot: FoldSpot, em: number): Re
 		const h = FOLD_EM.signHeightOverview * em;
 		const digits = String(Math.max(0, Math.trunc(control.count))).length;
 		const w = (FOLD_EM.signPad + (2 + digits) * FOLD_EM.signTextOverview) * em;
-		const left = spot.x - h / 2;
+		const left = anchored ? spot.x - (FOLD_EM.signHeight / 2) * em : spot.x - w / 2;
 		// The hit area of the Full sign is centred on that pill and the Overview one on the larger pill.
 		const centre = left + w / 2;
 		x0 = Math.min(x0, left);

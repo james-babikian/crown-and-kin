@@ -8,6 +8,8 @@
  * own first row, "A holder who is not in the tree". The typed text and the text of each person are
  * folded with `foldForMatch` before they are compared (D100): case, accents and quote look-alikes do not matter.
  * D122: the sobriquet shows after the name in curly marks, and the search matches its text.
+ * 0.2.8 contract G.3, G.1: a row is the name, a second text line "relation · years · title", and at the right the round portrait when the person
+ * has one (D213: no initials, no house ring, no empty circle). On a phone the picker is a full-screen sheet; the field and Cancel share the top row (D212).
  */
 
 import { SuggestModal, prepareFuzzySearch, type App } from 'obsidian';
@@ -16,11 +18,25 @@ import { foldForMatch } from '../core/fold';
 import { quotedSobriquet } from '../core/sobriquet';
 import { cardLabels, needsLabels, pickerSuffix, searchNames, type CardLabel } from '../core/titles';
 import type { Person } from '../core/types';
-import { dateLine } from '../render/tree-info';
+import { cardLabel, dateLine } from '../render/tree-info';
+import { WINDOW_UI } from '../render/ui-text';
+import type { RelationOptions } from '../core/relations';
+import type { PictureStore } from './picture-store';
+import { relationsFor, validMe, type CardRelation } from './relation-cache';
+import { RowPictures, personLead } from './window-parts';
 import { FINDER_UI, FLOW } from '../render/ui-text';
 import { ignoreGhostClick, phoneLayout } from './modal-layout';
 import { trackModal } from './plugin-modals';
-import { drawableColour, nameDialog } from './sheet-parts';
+import { nameDialog } from './sheet-parts';
+
+/** What the picker may use for its rows: the picture store (portraits), the tree's note, the marked person and the relation options (the second text line). */
+export interface PickerContext {
+	pictures?: PictureStore;
+	sourcePath?: string;
+	/** The marked person: the second text line then starts with the relation word. Absent: the `you` of the picker, else no word. */
+	me?: string | null;
+	relationOptions?: RelationOptions;
+}
 
 /** What the picker resolved to: a person already in the tree, or a new one by the typed name. */
 export type Picked = { kind: 'person'; id: string } | { kind: 'new'; name: string };
@@ -35,6 +51,10 @@ function definePicker() {
 		private readonly people: Person[];
 		/** Spec §13.5: the card labels, for the ruler names; empty for a tree with no titles. */
 		private readonly labels: ReadonlyMap<string, CardLabel>;
+		/** G.1: the portraits of the rows; released when the picker closes. */
+		private readonly rowPictures: RowPictures;
+		/** The relation words to the marked person, or null for no word. */
+		private words: ReadonlyMap<string, CardRelation> | null | undefined;
 
 		constructor(
 			app: App,
@@ -48,8 +68,10 @@ function definePicker() {
 			private readonly you: string | null = null,
 			/** The text of the first row, when it is not "Create a new person" (the Titles window). */
 			private readonly newRow: ((typed: string) => string) | null = null,
+			private readonly ctx: PickerContext = {},
 		) {
 			super(app);
+			this.rowPictures = new RowPictures(ctx.pictures, ctx.sourcePath ?? '');
 			this.labels = needsLabels(g) ? cardLabels(g) : new Map();
 			const people = g.people.filter((p) => !exclude.has(p.id));
 			const me = you !== null ? people.find((p) => p.id === you) : undefined;
@@ -72,17 +94,24 @@ function definePicker() {
 			this.inputEl.setAttribute('aria-label', FLOW.pickerSearchLabel);
 			// D101: no curly marks and no corrections in a name that the owner types.
 			this.inputEl.setAttribute('spellcheck', 'false');
+			this.inputEl.setAttribute('autocapitalize', 'off');
+			this.inputEl.setAttribute('autocorrect', 'off');
 			this.cleanup.push(phoneLayout(this), ignoreGhostClick(this), trackModal(this, () => this.close()));
-			// A heading with the title, as on the sheets; a phone has no Esc key, so there it also has Cancel.
+			// A heading with the title, as on the sheets (a phone keeps it for a screen reader only). A phone has no Esc key, so there Cancel
+			// stands in the row of the field; a computer hides it.
 			const head = createDiv({ cls: 'dynasty-picker-head' });
 			nameDialog(this.modalEl, head.createDiv({ cls: 'dynasty-sheet-title', text: this.title }));
-			const cancel = head.createEl('button', { cls: 'dynasty-picker-cancel', text: FLOW.cancel, attr: { type: 'button' } });
+			const cancel = createEl('button', { cls: 'dynasty-picker-cancel', text: FLOW.cancel, attr: { type: 'button' } });
 			cancel.addEventListener('click', () => this.close());
+			const field = this.inputEl.parentElement;
+			if (field) field.appendChild(cancel);
+			else head.appendChild(cancel);
 			this.modalEl.prepend(head);
 		}
 
 		override onClose(): void {
 			super.onClose();
+			this.rowPictures.release();
 			for (const c of this.cleanup.splice(0)) c();
 			// SuggestModal closes before it calls onChooseSuggestion: wait one turn to tell a choice from a cancel.
 			window.setTimeout(() => {
@@ -124,10 +153,6 @@ function definePicker() {
 			}
 			const p = item.person;
 			el.setAttribute('data-person', p.id);
-			const swatch = el.createSpan({ cls: 'dynasty-picker-swatch' });
-			const colour = p.house ? this.g.houses.get(p.house)?.color : undefined;
-			if (drawableColour(colour)) swatch.style.setProperty('--dynasty-house-color', colour);
-			else swatch.addClass('is-none');
 			const text = el.createDiv({ cls: 'dynasty-picker-text' });
 			const you = this.isYou(p);
 			if (you) el.addClass('dynasty-picker-you');
@@ -137,8 +162,34 @@ function definePicker() {
 			if (suffix) name.createSpan({ cls: 'dynasty-picker-suffix', text: ` ${suffix}` });
 			// D122: the sobriquet in curly marks, in regular weight, after the name and the ruler name.
 			if (p.sobriquet !== undefined) name.createSpan({ cls: 'dynasty-picker-sob', text: ` ${quotedSobriquet(p.sobriquet)}` });
-			const sub = [p.title, dateLine(p)].filter(Boolean).join(' · ');
-			if (sub) text.createDiv({ cls: 'dynasty-picker-sub', text: sub });
+			// "You: Ann" already says who is marked, so the second text line does not repeat "You".
+			const relation = this.relationOf(p.id);
+			// D218 rule 4: the relation word is italic, as on the cards and in the window rows; the rest of the text line is plain.
+			const word = you ? '' : (relation?.text ?? '');
+			const rest = WINDOW_UI.findRowSub('', dateLine(p) ?? '', label?.title ?? p.title ?? '');
+			if (word || rest) {
+				const sub = text.createDiv({ cls: 'dynasty-picker-sub', ...(word ? {} : { text: rest }) });
+				if (word) sub.createEl('i', { text: word });
+				// A span, not loose text: the order of the nodes stays the same for a reader that walks the children.
+				if (word && rest) sub.createSpan({ text: ` · ${rest}` });
+			}
+			// The portrait stands after the text, at the right, so the names line up with or without one (D213).
+			const lead = personLead(el, { name: p.name, ...(p.portrait ? { portrait: p.portrait } : {}), ...(p.portraitCrop ? { portraitCrop: p.portraitCrop } : {}) }, this.rowPictures, 36);
+			lead?.addClass('dynasty-picker-swatch');
+			// The visible lines hold "maybe full" and "·"; a screen reader gets the sentence the cards use. A hidden
+			// text, not aria-label: Obsidian shows an aria-label as a tooltip over the row.
+			text.setAttribute('aria-hidden', 'true');
+			el.createSpan({ cls: 'dynasty-sr-only', text: cardLabel(p, you ? 'you' : relation?.lower, label) });
+		}
+
+		/** The relation of a person to the marked person (the card texts), or undefined. Worked out once, from the whole tree. */
+		private relationOf(id: string): CardRelation | undefined {
+			if (this.words === undefined) {
+				const me = this.ctx.me !== undefined ? this.ctx.me : this.you;
+				const valid = me ? validMe(this.g, me) : null;
+				this.words = valid ? relationsFor(this.g, valid, this.ctx.relationOptions).cards : null;
+			}
+			return this.words?.get(id);
 		}
 
 		onChooseSuggestion(item: Item): void {
@@ -164,10 +215,11 @@ export function pickPerson(
 	allowNew = true,
 	you: string | null = null,
 	newRow: ((typed: string) => string) | null = null,
+	ctx: PickerContext = {},
 ): Promise<Picked | null> {
 	// A promise settles once: the close after a choice cannot turn the choice into null.
 	return new Promise((resolve) => {
 		Picker ??= definePicker();
-		new Picker(app, g, exclude, placeholder, title, allowNew, resolve, you, newRow).open();
+		new Picker(app, g, exclude, placeholder, title, allowNew, resolve, you, newRow, ctx).open();
 	});
 }

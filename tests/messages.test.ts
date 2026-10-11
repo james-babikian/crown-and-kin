@@ -16,7 +16,7 @@ const SAMPLES: Record<IssueCode, IssueParams> = {
 	'missing-focus': { ref: 'lost-heir' },
 	'missing-me': { ref: 'roderik' },
 	'me-not-id': {},
-	'too-many-parents': { person: 'Joss Ashford', type: 'birth', count: 3 },
+	'too-many-parents': { person: 'Joss Ashford', type: 'birth', count: 3, limit: 2 },
 	'union-partner-count': { union: '#3', partners: ['Joss Ashford', 'Maren Holt', 'Piers Ashford'], count: 3 },
 	'union-same-partner': { union: '#4', partners: ['Tilda Ashford', 'Tilda Ashford'], person: 'Tilda Ashford' },
 	cycle: { people: ['Arn Marsh', 'Bram Marsh', 'Col Marsh'], dropped: 'Arn Marsh', parent: 'Col Marsh' },
@@ -24,9 +24,17 @@ const SAMPLES: Record<IssueCode, IssueParams> = {
 	'placement-without-parents': { person: 'Piers Ashford', placement: 'ward' },
 	'house-color-null': { house: 'House Brennock', id: 'brennock', value: '#2e7d4f' },
 	'duplicate-house-id': { id: 'valmont', house: 'House Valmont' },
-	'unknown-union-type': { union: '#6', partners: ['Ranulf Brennock', 'Sela Brennock'], value: 'handfasting' },
+	'unknown-union-type': { union: '#6', partners: ['Ranulf Brennock', 'Sela Brennock'], value: 'marriege', suggestion: 'marriage' },
 	'unknown-placement': { person: 'Tilda Ashford', value: 'fostered' },
 	'unknown-parent-type': { person: 'Edda Brennock', value: 'godfather', parent: 'Ranulf Brennock' },
+	// 0.2.8 contract A.2 (D195): holding a title through the spouse.
+	'through-spouse-no-partner': { person: 'Hugo', title: 'Duke of Valmont' },
+	'through-spouse-no-marriage': { person: 'Hugo', title: 'Duke of Valmont' },
+	'through-spouse-self': { person: 'Hugo', title: 'Duke of Valmont' },
+	'through-spouse-no-claim': { person: 'Hugo', title: 'Duke of Valmont', count: 2, partners: ['Anna', 'Berta'], example: 'anna' },
+	'through-spouse-several-claims': { person: 'Hugo', title: 'Duke of Valmont', count: 2, partners: ['Anna', 'Berta'], example: 'anna' },
+	'through-spouse-not-partner': { person: 'Hugo', title: 'Duke of Valmont', ref: 'carl', other: 'Carl' },
+	'through-spouse-unknown-person': { person: 'Hugo', title: 'Duke of Valmont', ref: 'carl' },
 	'entry-not-map': { section: 'people', index: 3 },
 	'missing-id': { section: 'people', index: 2, name: 'Aldric Valmont' },
 	'section-wrong-shape': { section: 'unions' },
@@ -62,10 +70,27 @@ const MOST_SENTENCES: Partial<Record<IssueCode, number>> = {
 	'unknown-inherit': 3,
 	'unknown-inherit-through': 3,
 	'unknown-inherit-illegitimate': 3,
-	'year-unreadable': 3,
+	'year-unreadable': 5,
+	'unknown-union-type': 3,
+	'cycle': 3,
+	'self-parent': 2,
+	'unknown-parent-type': 3,
+	'union-partner-count': 3,
+	'too-many-parents': 3,
+	'through-spouse-no-partner': 3,
+	'through-spouse-no-marriage': 3,
+	'through-spouse-no-claim': 4,
+	'through-spouse-self': 3,
+	'picture-web': 4,
+	'through-spouse-several-claims': 3,
+	'through-spouse-not-partner': 3,
+	'through-spouse-unknown-person': 3,
 	'sex-spelling': 3,
 	'died-doubtful': 3,
 };
+
+/** Texts whose first sentence is a description of 21 to 25 words (STE allows 25 for a description; D205 words). */
+const LONG_SENTENCE: IssueCode[] = ['through-spouse-no-claim', 'through-spouse-several-claims'];
 
 /** Picture warnings name a picture file, which is not a note, so the word list allows "file" there (spec §13.6). */
 const FILE_WORD: IssueCode[] = ['missing-picture', 'picture-not-image'];
@@ -86,12 +111,12 @@ const unquoted = (text: string) => text.replace(/“[^”]*”/g, '“”').repl
 const FORBIDDEN = /\b(union|unions|node|nodes|edge|edges|graph|diagram|chart|layer|rank|fixture|file|document)\b/i;
 const UNFILLED = /undefined|null|NaN|\[object|\$\{|\{\{|\?\?/;
 
-function checkText(text: string, most = 2, file = false) {
+function checkText(text: string, most = 2, file = false, words = 20) {
 	expect(text.trim()).not.toBe('');
 	expect(text).not.toMatch(UNFILLED);
 	const parts = sentences(text);
 	expect(parts.length).toBeLessThanOrEqual(most);
-	for (const sentence of parts) expect(sentence.split(/\s+/).length, sentence).toBeLessThanOrEqual(20);
+	for (const sentence of parts) expect(sentence.split(/\s+/).length, sentence).toBeLessThanOrEqual(words);
 	expect(file ? unquoted(text).replace(/\bfile\b/g, '') : unquoted(text)).not.toMatch(FORBIDDEN);
 	expect(text).not.toMatch(/\b(don't|can't|isn't|doesn't|won't)\b/i);
 	// Spec D113: the word ID is in capital letters; only the key "id:" in an example (and quoted text) is lower case.
@@ -101,7 +126,7 @@ function checkText(text: string, most = 2, file = false) {
 describe('issueText: one STE entry per code', () => {
 	for (const [code, params] of Object.entries(SAMPLES) as [IssueCode, IssueParams][]) {
 		it(`${code}: filled, at most 2 sentences of at most 20 words, word list obeyed`, () => {
-			checkText(issueText(issue(code, params)), MOST_SENTENCES[code] ?? 2, FILE_WORD.includes(code));
+			checkText(issueText(issue(code, params)), MOST_SENTENCES[code] ?? 2, FILE_WORD.includes(code), LONG_SENTENCE.includes(code) ? 25 : 20);
 		});
 		it(`${code}: still readable when the params are missing`, () => {
 			const text = issueText(issue(code, {}));
@@ -249,7 +274,7 @@ describe('issueText: succession warnings (contract 0.2.7 A.5, J.4, J.7, K.4)', (
 
 	it('year-unreadable says that the end of the last reign is used', () => {
 		expect(text('year-unreadable', { title: 'Duke of Valmont', value: 'the old days' })).toBe(
-			'The title Duke of Valmont has “year: the old days”. The plugin cannot find a year in it, so the line of succession uses the end of the last reign. Write the year as a number, for example “year: 1210”.',
+			'The title Duke of Valmont has “year: the old days”. The plugin cannot find a year in it. The line of succession uses the end of the last reign. If the last reign has no end, the line is for now. Write the year as a number, for example “year: 1210”.',
 		);
 	});
 
@@ -289,8 +314,8 @@ describe('issueText: picture warnings (spec §13.6, §13.7)', () => {
 		expect(text('missing-picture', { ...portrait, file: 'x.png' })).toBe(
 			'The portrait of Aldric Valmont uses the picture “x.png”, but the vault has no file with this name. Correct the link, or select another portrait.',
 		);
-		expect(text('picture-web', arms)).toBe('The arms of House Valmont are a web address. The plugin shows only pictures from the vault.');
-		expect(text('picture-web', portrait)).toBe('The portrait of Aldric Valmont is a web address. The plugin shows only pictures from the vault.');
+		expect(text('picture-web', arms)).toBe('The arms of House Valmont are a web address. The plugin shows only pictures from the vault. Save the picture in the vault. Then select it again.');
+		expect(text('picture-web', portrait)).toBe('The portrait of Aldric Valmont is a web address. The plugin shows only pictures from the vault. Save the picture in the vault. Then select it again.');
 	});
 
 	it('picture-not-image names a known format, else says the file is not a picture', () => {
@@ -314,8 +339,8 @@ describe('issueText: picture warnings (spec §13.6, §13.7)', () => {
 	});
 
 	it('with no owner, a person name makes it a portrait; with no names, the text still reads', () => {
-		expect(text('picture-web', { person: 'Wren' })).toBe('The portrait of Wren is a web address. The plugin shows only pictures from the vault.');
-		expect(text('picture-web', {})).toBe('The arms of a house are a web address. The plugin shows only pictures from the vault.');
+		expect(text('picture-web', { person: 'Wren' })).toBe('The portrait of Wren is a web address. The plugin shows only pictures from the vault. Save the picture in the vault. Then select it again.');
+		expect(text('picture-web', {})).toBe('The arms of a house are a web address. The plugin shows only pictures from the vault. Save the picture in the vault. Then select it again.');
 		expect(text('missing-picture', { owner: 'portrait' })).toBe(
 			'The portrait of a person uses the picture “?”, but the vault has no file with this name. Correct the link, or select another portrait.',
 		);
@@ -325,7 +350,7 @@ describe('issueText: picture warnings (spec §13.6, §13.7)', () => {
 		checkText(text('missing-picture', { ...portrait, file: 'aldric.jpg' }), 2, true);
 		checkText(text('picture-not-image', { ...arms, file: 'x.pdf' }), 2, true);
 		checkText(text('picture-too-large', { ...portrait, file: 'x.png' }));
-		checkText(text('picture-web', arms));
+		checkText(text('picture-web', arms), 4);
 	});
 });
 

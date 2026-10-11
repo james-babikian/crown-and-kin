@@ -89,12 +89,11 @@ const WORD_TEXT = /<text [^>]*font-style="italic"[^>]*>([^<]*)<\/text>/;
 
 describe('fault 1: a card with no relation word draws no plate', () => {
 	for (const [name, geo] of [['Roundel', ROUNDEL], ['text card', TEXT]] as const) {
-		it(`${name}: the scene draws a plate on the cards with a word and the marked card, none on the others`, () => {
+		it(`${name}: the scene draws a foot hairline on the cards with a word and the marked card, none on the others (0.2.8: the hairline replaces the plate)`, () => {
 			const laid = lay(geo, { relationLine: true });
 			const root = sceneRoot(laid);
-			for (const id of ['b', 'c', 'd', 'e']) expect(withClass(cardEl(root, id), 'dynasty-r1-plate'), id).toHaveLength(1);
-			expect(withClass(cardEl(root, 'a'), 'dynasty-r1-plate')).toHaveLength(0);
-			expect(withClass(cardEl(root, 'a'), 'dynasty-r1-plate-line')).toHaveLength(0);
+			for (const id of ['b', 'c', 'd', 'e']) expect(withClass(cardEl(root, id), 'dynasty-card-foot-line'), id).toHaveLength(1);
+			expect(withClass(cardEl(root, 'a'), 'dynasty-card-foot-line')).toHaveLength(0);
 		});
 
 		it(`${name}: the card of a person with no word keeps the height of the others in its row`, () => {
@@ -104,26 +103,24 @@ describe('fault 1: a card with no relation word draws no plate', () => {
 			expect(laid.layout.geometry.cardH).toBe(geo.form === 'roundel' ? 46 + 12 : 58);
 		});
 
-		it(`${name}: the saved picture has a plate and a hairline exactly where the scene has a plate`, () => {
+		it(`${name}: the saved picture has a foot hairline exactly where the scene has one`, () => {
 			const laid = lay(geo, { relationLine: true });
 			const root = sceneRoot(laid);
 			const svg = svgOf(laid);
 			for (const id of ['a', 'b', 'c', 'd', 'e']) {
-				const scene = withClass(cardEl(root, id), 'dynasty-r1-plate').length;
-				const saved = (cardSvg(svg, id).match(/data-item="plate:/g) ?? []).length;
+				const scene = withClass(cardEl(root, id), 'dynasty-card-foot-line').length;
+				const saved = (cardSvg(svg, id).match(/data-item="foot:/g) ?? []).length;
 				expect(saved, id).toBe(scene);
-				// The hairline is a `line` with the hairline opacity: one for each plate, none for a card with no plate.
-				expect((cardSvg(svg, id).match(/<line [^>]*stroke-opacity="0\.55"/g) ?? []).length, `${id} hairline`).toBe(scene);
 			}
 		});
 
-		it(`${name}: a lazy card agrees with an eager one (the plate follows the word at the fill)`, () => {
+		it(`${name}: a lazy card agrees with an eager one (the foot hairline follows the word at the fill)`, () => {
 			const laid = lay(geo, { relationLine: true });
 			const root = new FEl('g');
 			const s = buildScene(root as unknown as SVGGElement, g, laid, { fonts: FONTS, measure, link: () => null, labels, me: 'c', relations: RELATIONS, lazyCards: true });
 			s.fill.fillAll();
-			expect(withClass(cardEl(root, 'a'), 'dynasty-r1-plate')).toHaveLength(0);
-			expect(withClass(cardEl(root, 'b'), 'dynasty-r1-plate')).toHaveLength(1);
+			expect(withClass(cardEl(root, 'a'), 'dynasty-card-foot-line')).toHaveLength(0);
+			expect(withClass(cardEl(root, 'b'), 'dynasty-card-foot-line')).toHaveLength(1);
 		});
 	}
 });
@@ -134,12 +131,12 @@ describe('fault 2: the relation word may use the plate\'s inner width', () => {
 			const geo = cardForm({ ...geometryFor(f), relationLine: true }, 'down');
 			const t = cardText(geo, 1);
 			const clear = WORD_CLEAR_EM * f;
-			expect(t.relationW, `f${f}`).toBeCloseTo(2 * (geo.cardW - PLATE_INSET_PX - roundelAxis(geo) - clear), 9);
+			expect(t.relationW, `f${f}`).toBeCloseTo(2 * (geo.cardW - PLATE_INSET_PX - roundelAxis(geo) - clear) - 0.5 * f, 9); // 0.2.8: the axis moved 0.25 em to the middle; the width stayed
 			expect(t.relationW!, `f${f}`).toBeGreaterThan(t.textW);
 			// The word, centred on the axis, stays clear of the colour bar and of the card edge (the plate ends 1 px inside the edge).
 			const left = roundelAxis(geo) - t.relationW! / 2;
 			const right = roundelAxis(geo) + t.relationW! / 2;
-			expect(left - t.stripW, `f${f} bar`).toBeGreaterThanOrEqual(clear - 1e-9);
+			expect(left, `f${f} edge left`).toBeGreaterThanOrEqual(PLATE_INSET_PX + clear - 1e-9);
 			expect(geo.cardW - right, `f${f} edge`).toBeGreaterThanOrEqual(PLATE_INSET_PX + clear - 1e-9);
 		}
 	});

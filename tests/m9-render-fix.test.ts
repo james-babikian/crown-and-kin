@@ -46,7 +46,8 @@ people:
 
 /** The fill of the card strip (the second rect of the card group) and of the legend strip. */
 function strips(svg: string): { card?: string; legend?: string } {
-	const card = /<g [^>]*data-item="card:a"[^>]*>\s*<rect [^>]*\/>\s*<rect [^>]*fill="([^"]*)"/.exec(svg)?.[1];
+	// 0.2.8: the card's house colour is the fill of its ribbon, the path after the two rects (or after the one rect of a card with no heir ring).
+	const card = /<g [^>]*data-item="card:a"[^>]*>\s*<rect [^>]*\/>\s*<path [^>]*fill="([^"]*)"/.exec(svg)?.[1];
 	const legend = /<g [^>]*data-item="legend-house:v">\s*<rect [^>]*fill="([^"]*)"/.exec(svg)?.[1];
 	return { card, legend };
 }

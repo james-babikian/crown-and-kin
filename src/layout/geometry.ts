@@ -176,12 +176,9 @@ export const relationExtra = (geo: Geometry) => Math.round(LINE_HEIGHT * 0.85 * 
 /** 0.2.5 (B.2): true for the Roundel, the top-to-bottom card with a medallion on its top edge (`cardForm`). */
 export const isRoundel = (geo: Geometry): boolean => geo.form === 'roundel';
 
-/** 0.2.5 (B.2): true for the text card, the sideways card with no pictures (`cardForm`). */
-export const isTextCard = (geo: Geometry): boolean => geo.form === 'text';
-
 /**
  * D40, 0.2.5: `geo` with everything that depends on the tree and the settings, in ONE place: the plate or relation text line
- * (`LayoutSettings.relationLine`, one small text line taller), the Roundel's crown when the tree has a picture (`settings.arms` or
+ * (`LayoutSettings.relationLine`, one small text line taller), the Roundel's crown when the tree has a picture (`settings.arms`, `settings.personalArms` or
  * `settings.portraits` not empty; the text card has none) and `reach`, the space the first row keeps for what sticks out above
  * a card (B.3.4: the medallion's halo, or the "You" tab of `settings.youTab`, or the ordinal tab of `settings.ordinalCards`: both stand at the same height). A geometry that already has `relationLine`, `crown`
  * or `reach` is returned as it is, so a drawn geometry passed back in does not grow a second time; a value that is 0 is never stored.
@@ -190,12 +187,14 @@ export function withRelationLine(geo: Geometry, settings: LayoutSettings): Geome
 	if (geo.relationLine || geo.crown !== undefined || geo.reach !== undefined) return geo;
 	const f = geo.fontPx;
 	const roundel = isRoundel(geo);
-	const crown = roundel && (settings.arms?.length || settings.portraits?.length) ? Math.round(ROUNDEL_EM.crown * f) : 0;
+	const crown = roundel && (settings.arms?.length || settings.personalArms?.length || settings.portraits?.length) ? Math.round(ROUNDEL_EM.crown * f) : 0;
 	const plate = settings.relationLine === true;
 	// The tab's top with its stroke must lie inside the reach, so the first row never starts above the drawing's edge.
+	// The halo of a portrait ends below the crown: the text is centred under it, so a card with a portrait does not look top-heavy. Tree-wide, so the names of a row stay level.
+	const textTop = crown && settings.portraits?.length ? Math.round((ROUNDEL_EM.medal + ROUNDEL_EM.ring + ROUNDEL_EM.halo - ROUNDEL_EM.above) * f) : 0;
 	const reach = crown ? Math.ceil(ROUNDEL_EM.reach * f) : settings.youTab !== undefined || settings.ordinalCards?.length ? Math.ceil((roundel ? ROUNDEL_EM.tabAbove : ROUNDEL_EM.tabAboveText) * f + TAB_REACH_PAD_PX) : 0;
 	if (!crown && !reach && !plate) return geo;
-	return { ...geo, cardH: geo.cardH + crown + (plate ? relationExtra(geo) : 0), ...(crown ? { crown } : {}), ...(reach ? { reach } : {}), ...(plate ? { relationLine: true as const } : {}) };
+	return { ...geo, cardH: geo.cardH + crown + (plate ? relationExtra(geo) : 0), ...(crown ? { crown } : {}), ...(textTop > crown ? { textTop } : {}), ...(reach ? { reach } : {}), ...(plate ? { relationLine: true as const } : {}) };
 }
 
 /** `TreeLayout.geometry` of a layout with `settings`, known before the layout runs (renderers measure names with it). */
@@ -216,18 +215,39 @@ export function cardForm(geo: Geometry, orientation: Orientation): Geometry {
 /** px: how far the plate's right end and bottom lie inside the card edge (an unmarked card; the marked card's word is "You" and is short). */
 export const PLATE_INSET_PX = 1;
 
+/**
+ * 0.2.8 (contract C, G.15): the house ribbon and the foot hairline of a card. The ribbon is `em` of the note font thick (at least `minPx`) along the
+ * top edge of a top-to-bottom card and the left edge of a sideways one. The sideways hairline starts `footGapEm` after the ribbon and ends the same distance before the right edge,
+ * so it never touches the ribbon; the top-to-bottom hairline runs from edge to edge, 1 px (or the border of the marked card) in.
+ */
+export const RIBBON = { em: 0.3, minPx: 3, footGapEm: 0.35 } as const;
+
+/** The thickness of the house ribbon in px: 0.3 em, never under 3 px. */
+export const ribbonWidth = (geo: Geometry): number => Math.max(RIBBON.minPx, Math.round(RIBBON.em * geo.fontPx));
+
+/** The ends of the foot hairline across a card of width `w`, card-relative; `inset` is how far a top-to-bottom hairline stays inside the edge (the marked card's border). */
+export function footSpan(geo: Geometry, w: number, inset = 1): { x0: number; x1: number } {
+	if (isRoundel(geo)) return { x0: inset, x1: w - inset };
+	const gap = Math.round(RIBBON.footGapEm * geo.fontPx);
+	return { x0: ribbonWidth(geo) + gap, x1: w - gap };
+}
+
 /** em: the room that a relation word keeps from the colour bar and from the plate's right end, so a cut word never touches them. */
 export const WORD_CLEAR_EM = 0.125;
 
-/** 0.2.5 (B.2): the sizes of the Roundel card, in em of the note font; the layout, the scene and the saved picture read these and no other number. */
-export const ROUNDEL_EM = { crown: 0.75, reach: 1.6, medal: 1, ring: 0.15, halo: 0.2, above: 0.25, column: 10, plateMore: 0.25, armsGap: 0.25, tabW: 2.3, tabH: 1.15, tabAbove: 0.55, tabAboveText: 0.9, wordRaise: 0.15 } as const;
+/**
+ * 0.2.5 (B.2): the sizes of the Roundel card, in em of the note font; the layout, the scene and the saved picture read these and no other number.
+ * D219: `ring` is no longer a drawn ring: it is the width that the portrait picture takes beyond `medal`. `halo` is the width of the gap in the colour of the page
+ * round the portrait and round the arms (the gap of the arms follows the outline of the picture, `arms-outline.ts`).
+ */
+export const ROUNDEL_EM = { crown: 0.75, reach: 1.6, medal: 1, ring: 0.15, halo: 0.2, above: 0.25, column: 10, plateMore: 0.25, armsGap: 0.55, tabW: 2.3, tabH: 1.15, tabAbove: 0.55, tabAboveText: 0.9, wordRaise: 0.15 } as const;
 
 /**
  * 0.2.7 (F.4): the sizes of the ordinal tab, in em of the note font. Its width is fixed by the number of characters, so the live scene and the
  * saved picture agree with no measure function; it is wider than the "You" tab because its text is 0.85 em and bold. The `right...` numbers are how far
  * the tab's right edge lies left of the card axis (Roundel): 1.6 em keeps 0.25 em from the portrait's halo (1.35 em). `textCardLeft` is its left edge in a text card.
  */
-export const ORDINAL_EM = { width3: 2.3, width4: 2.7, widthMore: 0.4, text: 0.85, corner: 0.2, rightPortrait: 1.6, rightArms: 1.45, rightNone: 0.4, textCardLeft: 0.875 } as const;
+export const ORDINAL_EM = { width3: 2.3, width4: 2.7, widthMore: 0.4, text: 0.8, corner: 0.2, rightPortrait: 1.9, rightArms: 1.75, rightNone: 0.4, textCardLeft: 0.875 } as const;
 
 /** px: the margin a "You" tab adds to its height above the card top when `reach` is computed (half of its 1.5 px stroke, rounded up). */
 export const TAB_REACH_PAD_PX = 1;
@@ -268,15 +288,13 @@ export function turnedGeometry(side: Geometry): Geometry {
  * three-line name twice this (`PersonBox.h`, `PersonBox.tallName`, `PersonBox.longName`);
  * `cardText(geo, 2)` and `cardText(geo, 3)` place its text. A card with a two-line title text line (D61) is `relationExtra` taller.
  */
-export const tallExtra = (geo: Geometry) => Math.round(LINE_HEIGHT * 0.85 * geo.fontPx);
+export const tallExtra = relationExtra;
 
 /** The name text size in em of the note font (D117: one size for all card text). */
 const NAME_EM = 0.85;
 
 /** Where card text goes, so every renderer lays out the Full level of detail the same way. */
 export interface CardText {
-	/** Width of the house colour strip on the left edge (D27: 0.5 em). */
-	stripW: number;
 	/** Left edge of the text, from the card's left edge. */
 	padX: number;
 	/** Text width available before truncation. */
@@ -442,8 +460,17 @@ export const nameCountOf = (box: { tallName?: true; longName?: true }): NameLine
 
 // ---------- 0.2.5: the Roundel (top-to-bottom) and the text card (sideways), the 0.2.5 contract section B ----------
 
-/** 0.2.5: the card axis of the Roundel, card-relative: the middle of the area right of the colour strip (0.25 em right of the card's middle). */
-export const roundelAxis = (geo: Geometry): number => 0.5 * geo.fontPx + (geo.cardW - 0.5 * geo.fontPx) / 2;
+/**
+ * The card axis of the Roundel, card-relative: the middle of the card. Until 0.2.7 it was 0.25 em right of the middle, to centre the content
+ * in the area right of the house strip. 0.2.8 (D197) replaced the strip by the top ribbon, so the content is centred on the whole card.
+ */
+export const roundelAxis = (geo: Geometry): number => geo.cardW / 2;
+
+/**
+ * The old axis offset, 0.25 em. Only the widths that depend on the axis keep it (`formText`), so that no name or relation word fits
+ * differently than before the axis moved to the middle.
+ */
+const OLD_AXIS_SHIFT_EM = 0.25;
 
 /**
  * 0.2.5 (B.3.5): how far right of its card's middle a line from the parents lands. The Roundel takes its line on the axis; every other
@@ -464,14 +491,15 @@ function formText(geo: Geometry, names: NameLineCount, tall: boolean, shown?: Sh
 	const nameLine = lh * nameSize;
 	const smallLine = lh * smallSize;
 	const crown = geo.crown ?? 0;
+	// 0.2.8 (D212): the room for the text starts under the ribbon, or under the portrait's halo, not at the card's edge: the text block is centred in what is left.
+	const lead = roundel ? Math.max(ribbonWidth(geo), geo.textTop ?? crown) : crown;
 	const cardH = geo.cardH + (names - 1) * tallExtra(geo) + (tall ? relationExtra(geo) : 0);
 	const plateH = geo.relationLine === true ? relationExtra(geo) + ROUNDEL_EM.plateMore * f : 0;
 	const titles = shown ? (shown.title ? (tall ? 2 : 1) : 0) : tall ? 2 : 1;
 	const smalls = titles + (shown ? (shown.dates ? 1 : 0) : 1);
-	const top = crown + (cardH - plateH - crown - names * nameLine - smalls * smallLine) / 2;
+	const top = lead + (cardH - plateH - lead - names * nameLine - smalls * smallLine) / 2;
 	// Baseline of a line box: its middle plus about a third of the font size (Latin cap height is about 0.7 em).
 	const baseline = (lineTop: number, line: number, size: number) => lineTop + line / 2 + 0.35 * size;
-	const stripW = 0.5 * f;
 	const axis = roundelAxis(geo);
 	const padX = roundel ? axis - (ROUNDEL_EM.column * f) / 2 : 0.875 * f;
 	const textW = roundel ? ROUNDEL_EM.column * f : geo.cardW - padX - 0.5 * f;
@@ -486,9 +514,8 @@ function formText(geo: Geometry, names: NameLineCount, tall: boolean, shown?: Sh
 	const small = top + names * nameLine;
 	// The word may use the plate: the Roundel centres it on the axis, so the nearer plate end (the right one) sets the width on both sides.
 	const wordClear = WORD_CLEAR_EM * f;
-	const relationW = roundel ? 2 * (geo.cardW - PLATE_INSET_PX - axis - wordClear) : geo.cardW - PLATE_INSET_PX - wordClear - padX;
+	const relationW = roundel ? 2 * (geo.cardW - PLATE_INSET_PX - axis - wordClear) - 2 * OLD_AXIS_SHIFT_EM * f : geo.cardW - PLATE_INSET_PX - wordClear - padX;
 	return {
-		stripW,
 		padX,
 		textW,
 		nameSize,
@@ -502,7 +529,7 @@ function formText(geo: Geometry, names: NameLineCount, tall: boolean, shown?: Sh
 		// Raised, so a descender of the word stays above the pill of a far-couple tag that hangs into the plate (B.3.2).
 		...(plateH > 0 ? { relationBaseline: cardH - plateH / 2 + 0.35 * smallSize + 0.5 - ROUNDEL_EM.wordRaise * f, relationW } : {}),
 		sign: { x1: signRight, y1: signTop, x2: signRight - signSize, y2: signTop + signSize, width: 0.15625 * f, dash: [signDash, signGap] },
-		nameWithSignW: roundel ? 2 * (signRight - signSize - 0.25 * f - axis) : textW - signSize - 0.5 * f,
+		nameWithSignW: roundel ? 2 * (signRight - signSize - 0.25 * f - axis) - 2 * OLD_AXIS_SHIFT_EM * f : textW - signSize - 0.5 * f,
 		textBottom: small + smalls * smallLine,
 		anchorX: roundel ? axis : padX,
 		...(roundel ? { middle: true as const } : {}),
@@ -512,11 +539,11 @@ function formText(geo: Geometry, names: NameLineCount, tall: boolean, shown?: Sh
 
 /** Where the medallion and the arms of a Roundel card go, card-relative layout px. */
 export interface RoundelPics {
-	/** The portrait's picture square (2 em across). */
+	/** The portrait's picture square: 2 em plus the ring's width on each side (D219: the picture takes the space that the house ring had). */
 	portrait?: Rect;
 	/** The arms box: 1.25 x 1.5 em beside the medallion, or 1.67 x 2 em in the medallion's place. */
 	arms?: Rect;
-	/** The ring's outer radius, the halo's radius and the medallion's centre. */
+	/** The portrait's outer radius (the edge of the picture; the name dates from the house ring), the halo's radius and the medallion's centre. */
 	ringR: number;
 	haloR: number;
 	cx: number;
@@ -532,7 +559,8 @@ export function roundelPics(geo: Geometry, o: { arms: boolean; portrait: boolean
 	const r = E.medal * f;
 	const ringR = r + E.ring * f;
 	const haloR = ringR + E.halo * f;
-	const portrait = o.portrait ? { x: cx - r, y: cy - r, w: 2 * r, h: 2 * r } : undefined;
+	// D219: no house ring any more. The picture fills the ring's space, so the outer diameter, the halo and the layout stay where they were.
+	const portrait = o.portrait ? { x: cx - ringR, y: cy - ringR, w: 2 * ringR, h: 2 * ringR } : undefined;
 	let arms: Rect | undefined;
 	if (o.arms) {
 		if (o.portrait) {
@@ -559,13 +587,17 @@ export function roundelLineEnd(geo: Geometry, o: { arms?: boolean; portrait?: bo
 
 /**
  * 0.2.5 (B.3.4): the small "You" tab of the marked person, card-relative. The Roundel puts it on the top edge left of the medallion
- * (`hasPictures`) or of the axis; the text card puts it above the text's left edge.
+ * or of the arms or of the axis; the text card puts it above the text's left edge. 0.2.8 (D213): it keeps the ordinal tab's distance from the
+ * picture (`ORDINAL_EM.right...`), so "You" and "1st" stand alike; its width (2.3 em) is the ordinal's for 3 characters, so the two tabs are the same shape.
  */
-export function youTabRect(geo: Geometry, hasPictures: boolean): Rect {
+export function youTabRect(geo: Geometry, hasPortrait: boolean, hasArms = false): Rect {
 	const f = geo.fontPx;
 	const w = ROUNDEL_EM.tabW * f;
 	const h = ROUNDEL_EM.tabH * f;
-	if (isRoundel(geo)) return { x: roundelAxis(geo) - (hasPictures ? 1.45 : 0.4) * f - w, y: -ROUNDEL_EM.tabAbove * f, w, h };
+	if (isRoundel(geo)) {
+		const E = ORDINAL_EM;
+		return { x: roundelAxis(geo) - (hasPortrait ? E.rightPortrait : hasArms ? E.rightArms : E.rightNone) * f - w, y: -ROUNDEL_EM.tabAbove * f, w, h };
+	}
 	return { x: 0.875 * f, y: -ROUNDEL_EM.tabAboveText * f, w, h };
 }
 
@@ -573,7 +605,7 @@ export function youTabRect(geo: Geometry, hasPictures: boolean): Rect {
  * 0.2.7 (F.4): the ordinal tab ("2nd") of a card in the Show view, card-relative, on the top edge at the height of the "You" tab. The width follows
  * `chars`, the length of the text (2.3 em for 3 characters, 2.7 em for 4, 0.4 em more for each further character, at most 6 are counted). The Roundel
  * puts the right edge 1.6 em left of the axis when the card has a portrait (halo 1.35 em + 0.25 em), 1.45 em with arms alone, 0.4 em with no picture;
- * the text card starts it at 0.875 em. The "You" tab keeps only 0.1 em from the halo, so it cannot give these numbers.
+ * the text card starts it at 0.875 em. The "You" tab uses the same right edges (`youTabRect`).
  */
 export function ordinalTabRect(geo: Geometry, hasPortrait: boolean, hasArms: boolean, chars: number): Rect {
 	const f = geo.fontPx;

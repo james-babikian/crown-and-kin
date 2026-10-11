@@ -10,14 +10,14 @@
 
 import { isMap, isSeq, type Node } from 'yaml';
 import { deriveFamilies, type FamilyGraph } from './derive';
-import type { AddHouse, ApplyOp, Batch, EditResult, FieldValue, NewPersonId, Op, PersonField, RewriteLinksOp, SetOption, SetPersonFields } from './edit';
+import type { AddHouse, ApplyOp, Batch, EditResult, FieldValue, Op, PersonField, RewriteLinksOp, SetOption, SetPersonFields } from './edit';
 import { deleteHouse, editHouse, setHouseId } from './house-ops';
-import { newIdIn, nextPersonId } from './id-gen';
+import { newIdIn } from './id-gen';
 import { rewriteLinks } from './link-rewrite';
 import { parseBody, readTree, referencedIds } from './parse';
 import { relationshipOp, removeStaleKeys } from './relationship-ops';
 import { cleanCardTitles, titleOp } from './title-ops';
-import { isEmpty, isMap as isRawMap, str, type Raw, type RawMap } from './tolerate';
+import { isEmpty, str, type Raw, type RawMap } from './tolerate';
 import type { Tree } from './types';
 import { itemEnd } from './yaml-list';
 import {
@@ -174,21 +174,6 @@ function addHouse(first: Parsed, op: AddHouse, data: RawMap): EditResult {
 	};
 	return finish(first, [step], expected, [id]);
 }
-
-/**
- * The id a new person gets (D104, §13.17 rule 1): `nextPersonId` over every person id and every
- * reference to a person, so a dangling reference is never filled by accident. The name argument of
- * `NewPersonId` stays for the callers; it is not used, so this function does not list it.
- */
-export const newPersonId: NewPersonId = (body) => {
-	try {
-		const parsed = typeof body === 'string' ? parseBody(body) : null;
-		const taken = parsed?.ok && isRawMap(parsed.data) ? referencedIds(parsed.data) : new Set<string>();
-		return nextPersonId(taken);
-	} catch {
-		return nextPersonId(new Set());
-	}
-};
 
 /**
  * `keepStale`: inside a batch, keys left stale are judged once, on the batch's final data.

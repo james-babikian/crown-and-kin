@@ -17,7 +17,7 @@ vi.mock('@codemirror/view', () => ({ ViewPlugin: { fromClass: () => ({}) } }));
 
 import { TFile as VaultFile } from 'obsidian';
 import { build } from './helpers';
-import { matchPictures, pickPicture } from '../src/obsidian/picture-picker';
+import { pickPicture } from '../src/obsidian/picture-picker';
 import { pickPerson } from '../src/obsidian/person-picker';
 import { FEl, device, dispatch, fakeWin, installDom, resetDom } from './acceptance/fake-dom';
 import { openModals, resetObsidian } from './acceptance/fake-obsidian';
@@ -131,17 +131,6 @@ function file(path: string): VaultFile {
 const PICTURES = ['Arms/d’España.png', "Arms/d'Aragon.png", 'Arms/España.png', 'Arms/Æthelred.svg', 'Portraits/Ørsted.jpg', 'Portraits/plain.jpg'].map(file);
 
 describe('D100: the picture search folds both sides', () => {
-	it('matchPictures: "d\'España" finds "d’España" and the reverse', () => {
-		expect(matchPictures(PICTURES, "d'España").map((f) => f.path)).toEqual(['Arms/d’España.png']);
-		expect(matchPictures(PICTURES, 'd’Aragon').map((f) => f.path)).toEqual(["Arms/d'Aragon.png"]);
-	});
-
-	it('matchPictures: "espana" finds "España"; "aethelred" finds "Æthelred"; "orsted" finds "Ørsted"; a path word works', () => {
-		expect(matchPictures(PICTURES, 'espana').map((f) => f.path)).toEqual(['Arms/d’España.png', 'Arms/España.png']);
-		expect(matchPictures(PICTURES, 'aethelred').map((f) => f.path)).toEqual(['Arms/Æthelred.svg']);
-		expect(matchPictures(PICTURES, 'orsted portraits').map((f) => f.path)).toEqual(['Portraits/Ørsted.jpg']);
-		expect(matchPictures(PICTURES, '  ').length).toBe(PICTURES.length);
-	});
 
 	it('the picture list: the same words find the same pictures, and the rows show the stored names', () => {
 		const app = {

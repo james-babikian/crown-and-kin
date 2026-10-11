@@ -229,7 +229,7 @@ describe('the succession warnings (A.5, K.4)', () => {
 	it('warn about an unreadable year only when the title has a rule or a named heir', () => {
 		expect(only('    year: Easter\n', 'year-unreadable')).toEqual([]);
 		expect(issueText(only('    year: Easter\n    succession: eldest-child\n', 'year-unreadable')[0])).toBe(
-			'The title Duke has “year: Easter”. The plugin cannot find a year in it, so the line of succession uses the end of the last reign. Write the year as a number, for example “year: 1210”.',
+			'The title Duke has “year: Easter”. The plugin cannot find a year in it. The line of succession uses the end of the last reign. If the last reign has no end, the line is for now. Write the year as a number, for example “year: 1210”.',
 		);
 		expect(only('    year: Easter\n    heir: a\n', 'year-unreadable')).toHaveLength(1);
 		expect(only('    year: -200\n    heir: a\n', 'year-unreadable')).toEqual([]);

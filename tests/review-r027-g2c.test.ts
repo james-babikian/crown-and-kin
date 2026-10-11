@@ -72,13 +72,13 @@ async function show(e: { host: Host; st: ReturnType<typeof noteHandle>['state'];
 const card = (root: FEl, id: string) => root.querySelector(`.dynasty-card[data-person="${id}"]`)!;
 
 describe('F.2: the outline of an heir', () => {
-	it('every heir card that the view has filled has the ring rect (the lazy fill makes it only for focus and highlight)', async () => {
+	it('every heir card that the view has filled has the heir class and no second ring (0.2.8, D212: the outline is the border of the card)', async () => {
 		const e = await desk();
 		await show(e);
 		const filled = LINE.filter((id) => card(e.root, id).querySelector('.dynasty-card-full'));
 		expect(filled.length, 'the first view fills the heir cards').toBe(LINE.length);
-		const withRing = filled.filter((id) => card(e.root, id).querySelector('.dynasty-card-ring'));
-		expect(withRing).toEqual(filled);
+		expect(filled.filter((id) => card(e.root, id).hasClass('dynasty-heir'))).toEqual(filled);
+		expect(filled.filter((id) => card(e.root, id).querySelector('.dynasty-heir-ring'))).toEqual([]);
 	});
 });
 

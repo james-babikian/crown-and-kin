@@ -71,7 +71,7 @@ function genTree(seed: number) {
 	return { n, parents, rand };
 }
 
-function yamlOf(n: number, parents: string[][], order: number[], shuffleParents?: () => number) {
+function yamlOf(parents: string[][], order: number[], shuffleParents?: () => number) {
 	const lineOf = (i: number) => {
 		let ps = parents[i];
 		if (shuffleParents) {
@@ -159,8 +159,8 @@ function mismatches(seed: number, on: boolean): string[] {
 		const j = Math.floor(rand() * (i + 1));
 		[perm[i], perm[j]] = [perm[j], perm[i]];
 	}
-	const g1 = graph(yamlOf(n, parents, idx));
-	const g2 = graph(yamlOf(n, parents, perm));
+	const g1 = graph(yamlOf(parents, idx));
+	const g2 = graph(yamlOf(parents, perm));
 	const out: string[] = [];
 	for (let m = 0; m < n; m++) {
 		const r1 = computeRelations(g1, `p${m}`, { oneParentUnknown: on });

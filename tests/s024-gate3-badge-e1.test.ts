@@ -4,10 +4,10 @@ import { parseDynasty } from '../src/core/parse';
 import { geometryFor } from '../src/layout/geometry';
 import { DEFAULT_LAYOUT_SETTINGS, clearLayoutCache, layoutTree } from '../src/layout/index';
 import type { LayoutSettings, Rect } from '../src/layout/model';
-import { badgeHit } from '../src/obsidian/focus-mode';
+import { badgeSquare } from './badge-square';
 import { sampleSources } from './acceptance/m11-support';
 
-// Contract 4.2, check E1 and the clip of `badgeHit(mark, scale, fontPx, capPx, avoid)`: the part of the tap square outside its own card (after
+// Contract 4.2, check E1 and the clip of `badgeSquare(mark, scale, fontPx, capPx, avoid)`: the part of the tap square outside its own card (after
 // the cap and the clip) holds no other card and no tag tap area of another person, on every card of every sample tree, down and sideways.
 // The tap area in the clipped strip belongs to the tag (spec §7.5). 52 tag overlaps in 389 cards of trees 07 and 07b came from the first draft.
 const ov = (a: Rect, b: Rect) => Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x) > 0.01 && Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y) > 0.01;
@@ -15,7 +15,7 @@ const ov = (a: Rect, b: Rect) => Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, 
 const SAMPLES = sampleSources();
 const scalesFor = (f: number) => [11 / f, 12 / f, 14 / f, 1, 1.25];
 
-describe('badgeHit against cards and tag tap areas on real layouts (E1)', () => {
+describe('badgeSquare against cards and tag tap areas on real layouts (E1)', () => {
 	for (const font of [8, 11, 12, 16, 20, 24, 32, 48]) {
 		for (const orientation of ['down', 'sideways'] as const) {
 			it(`font ${font} ${orientation}: every sample tree`, () => {
@@ -36,7 +36,7 @@ describe('badgeHit against cards and tag tap areas on real layouts (E1)', () => 
 						for (const p of persons) {
 							const cap = orientation === 'sideways' ? L.geometry.nodeGap : p.h / 2;
 							const mark = { x: p.x + p.w - R, y: p.y - R, w: 2 * R, h: 2 * R };
-							const sq = badgeHit(mark, scale, font, cap, tags.filter((t) => t.person !== p.id).map((t) => t.hit));
+							const sq = badgeSquare(mark, scale, font, cap, tags.filter((t) => t.person !== p.id).map((t) => t.hit));
 							squares++;
 							for (const o of persons) if (o.id !== p.id && ov(sq, o)) report.push(`${s.id} ${orientation} scale ${scale.toFixed(2)}: ${p.id} square meets card ${o.id}`);
 							for (const t of tags) if (t.person !== p.id && ov(sq, t.hit)) report.push(`${s.id} ${orientation} scale ${scale.toFixed(2)}: ${p.id} square meets the tag area of ${t.person}`);

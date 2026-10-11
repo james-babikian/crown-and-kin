@@ -124,19 +124,22 @@ describe('sample tree 16: one key changed at a time (lines worked out by hand)',
 	});
 
 	// Margrave: the limit 20 shows the whole line; without the switch Hale has no claim.
+	// D193: Bram's children are written Finn 1215, Greta 1217, Hale 1214. Siblings-first levels: Dorian -1, Leif 0, Finn/Hale +1 (Elowen -1, Isolde 0, Greta +1
+	// in the second pass). Inside level +1 the walk place decides, and Hale 1214 comes before Finn 1215. So: Dorian, Leif, Hale, Finn, then the women Elowen, Isolde, Greta.
 	it('Margrave of the Salt Coast: the whole line, and the line without the adopted son', () => {
 		const whole = lineOf('margrave-of-the-salt-coast', {}, 20);
-		expect(whole.heirs).toEqual(['dorian-saltmarsh', 'leif-saltmarsh', 'finn-saltmarsh', 'hale-saltmarsh', 'elowen-saltmarsh', 'isolde-saltmarsh', 'greta-saltmarsh']);
+		expect(whole.heirs).toEqual(['dorian-saltmarsh', 'leif-saltmarsh', 'hale-saltmarsh', 'finn-saltmarsh', 'elowen-saltmarsh', 'isolde-saltmarsh', 'greta-saltmarsh']);
 		expect(whole.more).toBe(false);
 		expect(lineOf('margrave-of-the-salt-coast', { adopted: false }, 20).heirs).toEqual(['dorian-saltmarsh', 'leif-saltmarsh', 'finn-saltmarsh', 'elowen-saltmarsh', 'isolde-saltmarsh', 'greta-saltmarsh']);
 	});
 
-	// Margrave with the rule "Eldest child first" instead. Pass 1 (men only): the walk from Bram gives Finn and Hale (Greta is a woman),
-	// the walk from Corvin gives Dorian and his son Leif. Pass 2 (men first): Finn, Hale, Greta, then Isolde, then Dorian, Leif, Elowen.
+	// Margrave with the rule "Eldest child first" instead. D193: Bram's children go by birth year, Hale 1214 before Finn 1215.
+	// Pass 1 (men only): the walk from Bram gives Hale and Finn (Greta is a woman),
+	// the walk from Corvin gives Dorian and his son Leif. Pass 2 (men first): Hale, Finn, Greta, then Isolde, then Dorian, Leif, Elowen.
 	// The line is pass 1, then the people that only pass 2 has, in its order: Greta, Isolde, Elowen.
 	it('Margrave of the Salt Coast with the rule "Eldest child first": all men first, then the women', () => {
 		const r = lineOf('margrave-of-the-salt-coast', { rule: 'eldest-child' }, 20);
-		expect(r.heirs).toEqual(['finn-saltmarsh', 'hale-saltmarsh', 'dorian-saltmarsh', 'leif-saltmarsh', 'greta-saltmarsh', 'isolde-saltmarsh', 'elowen-saltmarsh']);
+		expect(r.heirs).toEqual(['hale-saltmarsh', 'finn-saltmarsh', 'dorian-saltmarsh', 'leif-saltmarsh', 'greta-saltmarsh', 'isolde-saltmarsh', 'elowen-saltmarsh']);
 	});
 
 	// Lord: without the exclusion Osric is in the line, before Quill (nearest first: 3 steps each, written order).

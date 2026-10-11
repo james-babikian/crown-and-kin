@@ -17,12 +17,12 @@ vi.mock('../src/obsidian/person-picker', () => ({
 
 import { closePluginModals } from '../src/obsidian/plugin-modals';
 import { successionHints } from '../src/obsidian/succession-section';
-import { emptySuccession } from '../src/obsidian/titles-draft';
-import { SUCCESSION_UI as T } from '../src/render/ui-text';
+import type { SuccessionDraft } from '../src/obsidian/titles-draft';
+import { SUCCESSION_UI as T, WINDOW_UI } from '../src/render/ui-text';
 import { FEl, clock, device, dispatch, dispatchWindow, fakeWin, installDom, resetDom, runTimers, settle } from './acceptance/fake-dom';
 import { openModals, resetObsidian } from './acceptance/fake-obsidian';
-import { BODY_16, choose, ctl, lineRows, notes, openWin, page, section, tapChoice, type Opened } from './r027-window-support';
-import { backToList } from './lw-support';
+import { BODY_16, choose, ctl, lineRows, notes, openWin, page, section, type Opened } from './r027-window-support';
+import { backToList, pageOf } from './lw-support';
 import { click, type } from './s113-c-support';
 
 /*
@@ -82,32 +82,30 @@ describe('placement', () => {
 	it('stands after the holder list and before Other actions, in a saved title', () => {
 		const o = openWin();
 		const p = page(o, 'duke-of-carrowmere');
-		const order = p.children.map((c) => c.getAttribute('data-section') ?? c.classes.values().next().value);
-		const holderAt = order.indexOf('dynasty-holder-panel');
-		const successionAt = order.indexOf('succession');
-		const actionsAt = order.indexOf('dynasty-lw-actions');
-		expect(holderAt).toBeGreaterThan(-1);
-		expect(successionAt).toBeGreaterThan(holderAt);
-		expect(actionsAt).toBeGreaterThan(successionAt);
-		expect(section(p).querySelector('.dynasty-sheet-section-title')!.getText()).toBe(T.heading);
+		// 0.2.8 (Q4 A): Names, Holders, Line of succession, Rules of succession, Other actions.
+		const order = p.querySelectorAll('section.dynasty-section').map((c) => c.getAttribute('data-section'));
+		expect(order).toEqual(['names', 'holders', 'line', 'rules', 'more']);
+		expect(p.querySelector('[data-section="line"] .dynasty-section-title')!.getText()).toBe(WINDOW_UI.sectionLine);
+		expect(p.querySelector('[data-section="rules"] .dynasty-section-title')!.getText()).toBe(WINDOW_UI.sectionRules);
 	});
 
 	it('shows only the "new title" text for a title that is not saved yet', () => {
 		const o = openWin();
 		tap(o.content.querySelector('button.dynasty-lw-add'));
 		const p = o.content.querySelector('.dynasty-lw-page')!;
-		const s = section(p);
-		expect(s.querySelector('[data-hint="new-title"]')!.getText()).toBe(T.newTitle);
-		expect(s.querySelectorAll('select, input, button')).toHaveLength(0);
+		expect(() => section(p)).toThrow('no Succession section');
+		expect(p.querySelector('[data-hint="new-title"]')!.getText()).toBe(T.newTitle);
+		expect(p.querySelector('[data-section="line"]')).toBeNull();
+		expect(p.querySelector('[data-section="rules"]')).toBeNull();
 	});
 });
 
 describe('the line of sample tree 16 (the expected lines are in the comments of the fixture)', () => {
 	const cases: [string, string, string[], boolean][] = [
-		['duke-of-carrowmere', 'Line of succession after Bertram now', ['Fenwick Carrow', 'Jasper Carrow', 'Cedric Carrow', 'Dunstan Carrow'], false],
-		['countess-of-harrowfen', 'Line of succession after Matilda in 1215', ['Clara Harrow', 'Agnes Harrow', 'Dagmar Harrow', 'Sunniva Harrow', 'Tilde Harrow'], true],
-		['margrave-of-the-salt-coast', 'Line of succession after Bram now', ['Dorian Saltmarsh', 'Leif Saltmarsh', 'Finn Saltmarsh', 'Hale Saltmarsh', 'Elowen Saltmarsh'], true],
-		['lord-of-wetherby', 'Line of succession after Wystan now', ['Sam Wether', 'Cass Wether', 'Bertie Wether', 'Quill Penn', 'Ronan Penn'], false],
+		['duke-of-carrowmere', 'After Bertram now', ['Fenwick Carrow', 'Jasper Carrow', 'Cedric Carrow', 'Dunstan Carrow'], false],
+		['countess-of-harrowfen', 'After Matilda in 1215', ['Clara Harrow', 'Agnes Harrow', 'Dagmar Harrow', 'Sunniva Harrow', 'Tilde Harrow'], true],
+		['margrave-of-the-salt-coast', 'After Bram now', ['Dorian Saltmarsh', 'Leif Saltmarsh', 'Hale Saltmarsh', 'Finn Saltmarsh', 'Elowen Saltmarsh'], true],
+		['lord-of-wetherby', 'After Wystan now', ['Sam Wether', 'Cass Wether', 'Bertie Wether', 'Quill Penn', 'Ronan Penn'], false],
 	];
 	for (const [id, heading, names, more] of cases) {
 		it(`${id}: the heading, ${names.length} rows${more ? ', "and more people"' : ''} and Show`, () => {
@@ -126,7 +124,8 @@ describe('the line of sample tree 16 (the expected lines are in the comments of 
 	it('a tap on a name shows the card like a holder name, and asks first when the draft has changes', () => {
 		const o = openWin();
 		const p = page(o, 'duke-of-carrowmere');
-		dispatch(p.querySelectorAll('.dynasty-succ-row button.dynasty-holder-name')[1], 'click');
+		// G.7: the whole row is the button; without the option "openPerson" the card shows in the tree.
+		dispatch(p.querySelectorAll('.dynasty-succ-item')[1], 'click');
 		expect(o.shown).toEqual(['jasper-carrow']);
 		expect(o.closed.n).toBe(1);
 	});
@@ -134,7 +133,7 @@ describe('the line of sample tree 16 (the expected lines are in the comments of 
 	it('a row has a name for a screen reader that tells the place and the action', () => {
 		const o = openWin();
 		const p = page(o, 'duke-of-carrowmere');
-		expect(p.querySelector('.dynasty-succ-row button')!.getAttribute('aria-label')).toBe(T.lineRowLabel('Fenwick Carrow', '1st'));
+		expect(p.querySelector('.dynasty-succ-item')!.getAttribute('aria-label')).toBe(T.lineRowLabel('Fenwick Carrow', '1st'));
 	});
 
 	it('warns under the row of an old heir, with the number of the setting', () => {
@@ -149,6 +148,18 @@ describe('the line of sample tree 16 (the expected lines are in the comments of 
 		expect(notes(page(none, 'duke-of-carrowmere'), 'old')).toEqual([]);
 	});
 
+	it('draws the notes and the warnings of the line as quiet text lines with no sign (quiet-warnings)', () => {
+		const o = openWin();
+		const p = page(o, 'duke-of-carrowmere');
+		const warning = p.querySelector('.dynasty-succ-subnote.is-warning')!;
+		expect(warning.getAttribute('data-note')).toBe('old');
+		// The words carry the warning: the line is a plain block of text, with no icon and no inner element.
+		expect(warning.children).toHaveLength(0);
+		expect(warning.getText()).toBe(T.old('Cedric Carrow', 110, null));
+		expect(p.querySelector('.dynasty-succ-note-icon')).toBeNull();
+		expect(p.querySelector('.dynasty-succ-line .svg-icon')).toBeNull();
+	});
+
 	it('the length of the line follows the setting', () => {
 		const o = openWin(BODY_16, { succession: { limit: () => 2, oldAge: () => 110 } });
 		const p = page(o, 'duke-of-carrowmere');
@@ -161,7 +172,8 @@ describe('the messages', () => {
 	it('shows no line for a title with no rule and no named heir, and hides the block', () => {
 		const o = openWin(mini());
 		const p = page(o, 'crown');
-		expect((p.querySelector('.dynasty-succ-line') as FEl).hidden).toBe(true);
+		// 0.2.8: the section stays; its body says that there is no heir (the same text as in the plain window).
+		expect(p.querySelector('.dynasty-succ-line [data-msg="no-rule"]')!.getText()).toBe(T.noHeir);
 		expect(p.querySelector('button.dynasty-succ-show')).toBeNull();
 	});
 
@@ -240,7 +252,8 @@ describe('the messages', () => {
 });
 
 describe('the hints', () => {
-	const d = (o: Partial<ReturnType<typeof emptySuccession>>) => ({ ...emptySuccession(), ...o });
+	const empty: SuccessionDraft = { rule: '', inherit: '', through: '', illegitimate: 'no', adopted: false, body: false, year: '', heirs: [], exclude: [] };
+	const d = (o: Partial<SuccessionDraft>) => ({ ...empty, ...o });
 
 	it('the Salic hint shows only for eldest child, men only and "Men" as the line', () => {
 		expect(successionHints(d({ rule: 'eldest-child', inherit: 'men-only', through: 'men' })).inherit).toEqual([T.salic]);
@@ -343,7 +356,8 @@ describe('the fields', () => {
 		choose(p, 'rule', '');
 		expect(ctl(p, 'inherit')).toBeNull();
 		expect(ctl(p, 'through')).toBeNull();
-		expect((p.querySelector('.dynasty-succ-line') as FEl).hidden).toBe(true);
+		expect(p.querySelector('.dynasty-succ-line [data-msg="no-rule"]')!.getText()).toBe(T.noHeir);
+		expect(p.querySelector('button.dynasty-succ-show')).toBeNull();
 		choose(p, 'rule', 'eldest-child');
 		expect(ctl(p, 'inherit')!.querySelector('select')!.value).toBe('no-preference');
 	});
@@ -355,14 +369,14 @@ describe('the fields', () => {
 		expect(lineRows(p)).toHaveLength(3);
 		type(year, '1101');
 		// The draft has the text at once; the line waits.
-		expect(p.querySelector('.dynasty-succ-heading')!.getText()).toBe(T.lineHeading('Rex', null));
+		expect(p.querySelector('.dynasty-succ-heading')!.getText()).toBe(T.lineAfter('Rex', null));
 		runTimers(299);
-		expect(p.querySelector('.dynasty-succ-heading')!.getText()).toBe(T.lineHeading('Rex', null));
+		expect(p.querySelector('.dynasty-succ-heading')!.getText()).toBe(T.lineAfter('Rex', null));
 		runTimers(2);
-		expect(p.querySelector('.dynasty-succ-heading')!.getText()).toBe(T.lineHeading('Rex', 1101));
+		expect(p.querySelector('.dynasty-succ-heading')!.getText()).toBe(T.lineAfter('Rex', 1101));
 		type(year, '1103');
 		dispatch(year, 'blur');
-		expect(p.querySelector('.dynasty-succ-heading')!.getText()).toBe(T.lineHeading('Rex', 1103));
+		expect(p.querySelector('.dynasty-succ-heading')!.getText()).toBe(T.lineAfter('Rex', 1103));
 		expect(o.win.isDirty()).toBe(true);
 	});
 
@@ -439,7 +453,7 @@ describe('named heirs and excluded people', () => {
 		for (const row of rowsOf(p, 'exclude')) tap(row.querySelector('button.dynasty-holder-remove'));
 		for (const kind of ['heirs', 'exclude']) {
 			const none = ctl(p, kind)!.querySelector('.dynasty-holder-none')!;
-			expect(none.hasClass('dynasty-sheet-hint')).toBe(true);
+			expect(none.hasClass('dynasty-sheet-none')).toBe(true);
 		}
 	});
 
@@ -491,7 +505,7 @@ describe('named heirs and excluded people', () => {
 		const p = page(o, 'crown');
 		const row = rowsOf(p, 'heirs')[0];
 		expect(row.getAttribute('data-person')).toBe('ghost');
-		expect(row.querySelector('div.dynasty-holder-name')!.getText()).toBe('ghost');
+		expect(row.querySelector('span.dynasty-holder-name')!.getText()).toBe('ghost');
 		expect(row.getText()).toContain(T.heirNotInTree);
 		expect(row.querySelector('button.dynasty-holder-name')).toBeNull();
 		tap(row.querySelector('button.dynasty-holder-remove'));
@@ -586,45 +600,48 @@ describe('the phone layout', () => {
 		return openWin(body);
 	};
 
-	it('shows Rule, Who can inherit, The right to inherit comes from and the illegitimate choice as lists of buttons', async () => {
+	it('shows Rule, Who can inherit, The right to inherit comes from and the illegitimate choice as one list each, the phone\'s own (phone-rules-native)', async () => {
 		const o = phone();
 		const p = page(o, 'countess-of-harrowfen');
 		expect(o.modal.hasClass('is-phone')).toBe(true);
 		for (const key of ['rule', 'inherit', 'through', 'illegitimate']) {
 			const group = ctl(p, key)!;
-			expect(group.getAttribute('role')).toBe('radiogroup');
-			expect(group.querySelector('select')).toBeNull();
-			expect(group.querySelectorAll('button').length).toBeGreaterThan(2);
+			expect(group.querySelector('select'), key).not.toBeNull();
+			// No column of buttons and no group of radio buttons any more.
+			expect(group.querySelectorAll('button'), key).toHaveLength(0);
+			expect(p.querySelector('[role="radiogroup"]')).toBeNull();
 		}
-		const picked = (key: string) => ctl(p, key)!.querySelectorAll('button').filter((b) => b.getAttribute('aria-checked') === 'true').map((b) => b.getText());
-		expect(picked('rule')).toEqual([T.rules['youngest-child']]);
-		expect(picked('inherit')).toEqual([T.inherits['women-first']]);
-		expect(picked('through')).toEqual([T.throughSame]);
-		expect(picked('illegitimate')).toEqual([T.ills.after]);
+		const picked = (key: string) => ctl(p, key)!.querySelector('select')!.value;
+		expect(picked('rule')).toBe('youngest-child');
+		expect(picked('inherit')).toBe('women-first');
+		expect(picked('through')).toBe('');
+		expect(picked('illegitimate')).toBe('after');
+		const texts = (key: string) => ctl(p, key)!.querySelector('select')!.querySelectorAll('option').map((x) => x.getText());
+		expect(texts('rule')[1]).toBe(T.rules['eldest-child']);
+		expect(texts('through')[0]).toBe(T.throughSame);
 		// The year stays a text field.
 		expect(ctl(p, 'year')!.querySelector('input')).not.toBeNull();
 	});
 
-	it('a tap on a button changes the draft and the line', async () => {
+	it('a choice in a list changes the draft and the line', () => {
 		const o = phone(mini('succession: eldest-child'));
 		const p = page(o, 'crown');
-		await tapChoice(p, 'rule', 'youngest-child');
+		choose(p, 'rule', 'youngest-child');
 		expect(lineRows(p)[0]).toBe('1stLate Ardent');
-		await tapChoice(p, 'inherit', 'women-only');
+		choose(p, 'inherit', 'women-only');
 		expect(lineRows(p)).toEqual(['1stMiss Ardent']);
-		expect(ctl(p, 'inherit')!.querySelectorAll('button').filter((b) => b.getAttribute('aria-checked') === 'true').map((b) => b.getAttribute('data-value'))).toEqual(['women-only']);
-		await tapChoice(p, 'illegitimate', 'equal');
+		expect(ctl(p, 'inherit')!.querySelector('select')!.value).toBe('women-only');
+		choose(p, 'illegitimate', 'equal');
 		expect(o.win.isDirty()).toBe(true);
 	});
 
-	it('a button of a list has a place of 44 px or more in the style sheet', () => {
+	it('a list has a place of 44 px or more on a phone in the style sheet, and the columns of buttons are gone', () => {
 		const css = readFileSync(new URL('../styles.css', import.meta.url), 'utf8');
-		const rule = /\.dynasty-sheet button\.dynasty-succ-choice \{[^}]*\}/.exec(css)![0];
-		expect(rule).toContain('min-height: 44px');
-		expect(css).toMatch(/\.dynasty-succ-body select\.dynasty-sheet-input,\s*\.dynasty-succ-body input\.dynasty-succ-year \{\s*min-height: 44px;/);
+		expect(css).toMatch(/\.dynasty-sheet\.is-phone input,\s*\.dynasty-sheet\.is-phone select,\s*\.dynasty-sheet\.is-phone textarea \{[^}]*min-height: 44px/);
+		expect(css).not.toContain('dynasty-succ-choice');
 	});
 
-	it('changes from dropdowns to buttons when the window gets narrow', async () => {
+	it('keeps the lists when the window gets narrow', async () => {
 		const o = openWin();
 		const p = page(o, 'duke-of-carrowmere');
 		expect(ctl(p, 'rule')!.querySelector('select')).not.toBeNull();
@@ -632,8 +649,10 @@ describe('the phone layout', () => {
 		dispatchWindow('resize');
 		await settle();
 		expect(o.modal.hasClass('is-phone')).toBe(true);
-		expect(ctl(p, 'rule')!.querySelector('select')).toBeNull();
-		expect(ctl(p, 'rule')!.querySelectorAll('button').length).toBe(6);
+		// The whole window is drawn again (a phone has a bar, a computer a footer), so the page is a new element.
+		const again = pageOf(o.content);
+		expect(ctl(again, 'rule')!.querySelector('select')).not.toBeNull();
+		expect(ctl(again, 'rule')!.querySelectorAll('button')).toHaveLength(0);
 	});
 });
 
