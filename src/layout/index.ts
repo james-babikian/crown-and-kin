@@ -24,6 +24,14 @@ export const LAYOUT_CACHE_SIZE = 16;
 
 const cache = new Map<string, LaidOut>();
 
+/** Thrown by `layoutTree` when its `shouldStop` check answers true between two phases (spec §7.7, time budget). The caller shows the bar for a tree that took too long. */
+export class LayoutStopped extends Error {
+	constructor() {
+		super('The layout stopped: it passed its time budget.');
+		this.name = 'LayoutStopped';
+	}
+}
+
 /**
  * Everything that can move a card or change a line, in a stable text form. Names, titles,
  * dates, links and notes are left out: they change what a card says, not where it sits.
@@ -121,7 +129,7 @@ function foldPlan(g: FamilyGraph, settings: LayoutSettings): { pruned: FamilyGra
  * frozen, and the maps throw on `set`, `delete` and `clear`. The layout keeps its own copy of
  * `geo`.
  */
-export const layoutTree: LayoutTree = (g, geo, settings, fontFamily) => {
+export const layoutTree: LayoutTree = (g, geo, settings, fontFamily, shouldStop) => {
 	const key = layoutKey(g, geo, settings, fontFamily);
 	const hit = cache.get(key);
 	if (hit) {
@@ -130,12 +138,20 @@ export const layoutTree: LayoutTree = (g, geo, settings, fontFamily) => {
 		cache.set(key, hit);
 		return hit;
 	}
+	// Only between the phases, never inside one: a stopped layout leaves no partial result, and nothing of it is cached.
+	const check = () => {
+		if (shouldStop?.()) throw new LayoutStopped();
+	};
+	check();
 	const gen = computeGenerations(g);
+	check();
 	const fold = foldPlan(g, settings);
 	// F2: the generations come from the whole graph; the arranger and the router get the graph without the hidden people.
 	const shown = fold ? fold.pruned : g;
 	const order = computeModelOrder(shown, gen);
+	check();
 	const layout = layoutFamilies(shown, gen, order, { ...geo }, settings, undefined, fold?.input);
+	check();
 	const out: LaidOut = deepFreeze({ layout, edges: routeEdges(shown, layout, order.anchors, fold?.input.lines) });
 	cache.set(key, out);
 	while (cache.size > LAYOUT_CACHE_SIZE) cache.delete(cache.keys().next().value!);

@@ -9,9 +9,9 @@ import { treeBounds, type View } from '../../src/render/view-math';
 import { FEl, clock, dispatch, fakeWin, flushFrames, installDom, pointer, resetDom, runFrame, runTimers } from './fake-dom';
 
 /*
- * 0.2.4, phone animation (D124 items 2 to 4, contract 7): the proofs of M5 (Fit and the other animations change the scale of the scene at each
- * frame, so the browser shapes all SVG text again at each frame), M11 (the work at the end of a pan runs inside the pointer-up handler) and
- * the reduced movement of `PanZoom` (D126 1). The real PanZoom runs on the fake DOM.
+ * 0.2.4, phone animation (D124 items 2 to 4, contract 7): the proofs of M5 (a change of the scale of the scene at each frame makes the browser shape
+ * all SVG text again; since D235 no view change runs over frames) and M11 (the work at the end of a pan runs inside the pointer-up handler). The real
+ * PanZoom runs on the fake DOM.
  */
 
 beforeAll(() => installDom());
@@ -36,7 +36,7 @@ interface Rig {
 	fills: View[];
 }
 
-function make(o: { mode?: 'full' | 'embed'; reduced?: () => boolean; start?: View } = {}): Rig {
+function make(o: { mode?: 'full' | 'embed'; start?: View } = {}): Rig {
 	const vp = new FEl('div', { cls: 'dynasty-viewport' });
 	const canvas = vp.createDiv({ cls: 'dynasty-canvas' });
 	const scene = canvas.createSvg('svg', { cls: 'dynasty-svg' }).createSvg('g', { cls: 'dynasty-scene' });
@@ -59,7 +59,6 @@ function make(o: { mode?: 'full' | 'embed'; reduced?: () => boolean; start?: Vie
 		onSettle: (view, byUser) => settled.push({ view, byUser }),
 		onFill: (v) => fills.push(v),
 		guard: (fn) => fn(),
-		...(o.reduced ? { reduced: o.reduced } : {}),
 	});
 	pz.resize(SIZE);
 	pz.setView(o.start ?? { scale: 1, cx: 2000, cy: 1000 });
@@ -86,97 +85,47 @@ function onScreen(r: Rig): View {
 	return { scale: s, cx: (SIZE.w / 2 - tx) / s, cy: (SIZE.h / 2 - ty) / s };
 }
 
-const scaleOf = (t: string) => Number(/scale\(([-\d.e]+)\)/.exec(t)![1]);
-
-describe('M5: an animation does not change the scale of the scene at each frame', () => {
-	it('a zoom out (Fit): the scene is written once, and the screen shows the current view at every frame', () => {
-		const r = make({ start: { scale: 1, cx: 1500, cy: 900 } });
-		const to: View = { scale: 0.25, cx: 2000, cy: 1000 };
-		r.pz.setView(to, { animate: true, byUser: true });
-		const seen: View[] = [];
-		for (let i = 0; i < 30; i++) {
-			runFrame();
-			seen.push(onScreen(r));
-		}
-		expect(r.writes.length, r.writes.join('\n')).toBeLessThanOrEqual(1);
-		// The screen follows the animation: the scale falls from 1 to 0.25 and ends there.
-		expect(seen[0].scale).toBeGreaterThan(0.5);
-		expect(seen[seen.length - 1].scale).toBeCloseTo(0.25, 2);
-		expect(seen[seen.length - 1].cx).toBeCloseTo(2000, 0);
-		for (let i = 1; i < seen.length; i++) expect(seen[i].scale).toBeLessThanOrEqual(seen[i - 1].scale + 1e-9);
-		expect(r.canvas.hasClass(GESTURE_CLASS)).toBe(false);
-		expect(r.pz.view).toEqual(to);
-		expect(r.settled).toEqual([{ view: to, byUser: true }]);
-	});
-
-	it('a zoom out fills the end view once, at the start, and no frame fills again (a fill at each frame lays the text out again)', () => {
-		const r = make({ start: { scale: 1, cx: 1500, cy: 900 } });
-		const to: View = { scale: 0.25, cx: 2000, cy: 1000 };
-		r.pz.setView(to, { animate: true });
-		runFrame();
-		expect(r.fills).toEqual([to]);
-		flushFrames();
-		expect(r.fills).toEqual([to]);
-	});
-
-	it('a zoom in: the picture that is drawn covers it, so the scene is written once, at the end', () => {
-		const r = make({ start: { scale: 0.25, cx: 2000, cy: 1000 } });
-		r.pz.setView({ scale: 1, cx: 1500, cy: 900 }, { animate: true, byUser: true });
-		flushFrames();
-		expect(r.writes.length).toBeLessThanOrEqual(1);
-		expect(onScreen(r).scale).toBeCloseTo(1, 2);
-	});
-
-	it('a move at the same scale (Find) writes only moves: no write changes the scale', () => {
-		const r = make({ start: { scale: 1, cx: 600, cy: 900 } });
-		r.pz.setView({ scale: 1, cx: 3400, cy: 900 }, { animate: true, byUser: true });
-		flushFrames();
-		expect(r.writes.length).toBeGreaterThan(0);
-		for (const w of r.writes) expect(scaleOf(w)).toBe(1);
-		expect(onScreen(r).cx).toBeCloseTo(3400, 0);
-	});
-
-	it('a zoom out to a view that does not hold the start view still ends on the target, and writes with the scale of its frame', () => {
-		const r = make({ start: { scale: 1, cx: 600, cy: 500 } });
-		r.pz.setView({ scale: 0.5, cx: 3400, cy: 1500 }, { animate: true });
-		flushFrames();
-		expect(onScreen(r).scale).toBeCloseTo(0.5, 2);
-		expect(onScreen(r).cx).toBeCloseTo(3400, 0);
-		expect(r.canvas.hasClass(GESTURE_CLASS)).toBe(false);
-	});
-
-	it('fuzz: at every frame of a random animation the screen shows the view of that frame, and at the end the target', () => {
-		let a = 7;
-		const next = () => ((a = (a * 1103515245 + 12345) % 2147483648) / 2147483648);
-		for (let seed = 0; seed < 120; seed++) {
+describe('D235: a view change does not slide, so the scene is written once and the text is not shaped again', () => {
+	it('a zoom out (Fit), a zoom in and a move (Find): one write in the next frame, at the target, with no wrapper transform', () => {
+		for (const [start, to] of [
+			[{ scale: 1, cx: 1500, cy: 900 }, { scale: 0.25, cx: 2000, cy: 1000 }],
+			[{ scale: 0.25, cx: 2000, cy: 1000 }, { scale: 1, cx: 1500, cy: 900 }],
+			[{ scale: 1, cx: 600, cy: 900 }, { scale: 1, cx: 3400, cy: 900 }],
+			[{ scale: 1, cx: 600, cy: 500 }, { scale: 0.5, cx: 3400, cy: 1500 }],
+		] as [View, View][]) {
 			resetDom();
-			const r = make({ start: { scale: 0.2 + next() * 1.5, cx: next() * 4000, cy: next() * 2000 } });
-			const to: View = { scale: 0.2 + next() * 1.5, cx: next() * 4000, cy: next() * 2000 };
-			r.pz.setView(to, { animate: true });
-			for (let f = 0; f < 40; f++) {
-				runFrame();
-				const v = r.pz.view!;
-				const s = onScreen(r);
-				const ctx = `seed ${seed} frame ${f}`;
-				expect(Math.abs(s.scale / v.scale - 1), ctx).toBeLessThan(0.01);
-				expect(Math.abs(s.cx - v.cx) * v.scale, ctx).toBeLessThan(1.5);
-				expect(Math.abs(s.cy - v.cy) * v.scale, ctx).toBeLessThan(1.5);
-			}
-			expect(r.pz.view!.scale, `seed ${seed}`).toBeCloseTo(to.scale, 6);
-			expect(r.canvas.hasClass(GESTURE_CLASS), `seed ${seed}`).toBe(false);
+			const r = make({ start });
+			r.pz.setView(to, { byUser: true });
+			expect(r.pz.view).toEqual(to);
+			expect(r.settled).toEqual([{ view: to, byUser: true }]);
+			expect(r.pz.busy).toBe(false);
+			runFrame();
+			expect(r.writes).toHaveLength(1);
+			expect(r.canvas.hasClass(GESTURE_CLASS)).toBe(false);
+			const s = onScreen(r);
+			expect(s.scale).toBeCloseTo(to.scale, 3);
+			expect(s.cx).toBeCloseTo(to.cx, 1);
+			expect(s.cy).toBeCloseTo(to.cy, 1);
+			flushFrames();
+			expect(r.writes).toHaveLength(1);
 		}
 	});
 
-	it('a press in the middle of an animation stops it and shows that view', () => {
-		const r = make({ mode: 'full', start: { scale: 1, cx: 1500, cy: 900 } });
-		r.pz.setView({ scale: 0.25, cx: 2000, cy: 1000 }, { animate: true, byUser: true });
-		for (let i = 0; i < 5; i++) runFrame();
-		const mid = r.pz.view!;
-		dispatch(r.vp, 'pointerdown', pointer('touch', 1, 400, 300));
+	it('the frame count of a view change is one, also when the call is made twice before the frame', () => {
+		const frames: number[] = [];
+		const real = fakeWin.requestAnimationFrame;
+		vi.spyOn(fakeWin, 'requestAnimationFrame').mockImplementation((cb: () => void) => {
+			frames.push(1);
+			return real.call(fakeWin, cb);
+		});
+		const r = make({ start: { scale: 1, cx: 1500, cy: 900 } });
+		frames.length = 0;
+		r.pz.setView({ scale: 0.5, cx: 2000, cy: 1000 }, { byUser: true });
+		r.pz.setView({ scale: 0.25, cx: 2200, cy: 1000 }, { byUser: true });
+		expect(frames).toHaveLength(1);
 		flushFrames();
-		expect(r.pz.view).toEqual(mid);
-		expect(r.canvas.hasClass(GESTURE_CLASS)).toBe(false);
-		expect(onScreen(r).scale).toBeCloseTo(mid.scale, 2);
+		expect(r.writes).toHaveLength(1);
+		expect(onScreen(r).scale).toBeCloseTo(0.25, 3);
 	});
 });
 
@@ -252,59 +201,6 @@ describe('M11: the work at the end of a pan runs in the next frame', () => {
 		}
 		expect(r.settled).toHaveLength(2);
 		expect(r.settled[1].view).toEqual(r.pz.view);
-	});
-});
-
-describe('D126 (1): PanZoom with reduced movement', () => {
-	let frames = 0;
-	beforeEach(() => {
-		frames = 0;
-		const real = fakeWin.requestAnimationFrame;
-		vi.spyOn(fakeWin, 'requestAnimationFrame').mockImplementation((cb: () => void) => {
-			frames++;
-			return real.call(fakeWin, cb);
-		});
-	});
-
-	it('setView with animate sets the view at once, settles once and asks for one frame only', () => {
-		const r = make({ reduced: () => true, start: { scale: 1, cx: 1500, cy: 900 } });
-		frames = 0;
-		const to: View = { scale: 0.25, cx: 2000, cy: 1000 };
-		r.pz.setView(to, { animate: true, byUser: true });
-		expect(r.pz.view).toEqual(to);
-		expect(r.settled).toEqual([{ view: to, byUser: true }]);
-		expect(r.pz.busy).toBe(false);
-		runFrame();
-		expect(frames).toBe(1);
-		expect(r.writes).toHaveLength(1);
-		expect(onScreen(r).scale).toBeCloseTo(0.25, 3);
-	});
-
-	it('with reduced movement off the same call animates over several frames', () => {
-		const r = make({ reduced: () => false, start: { scale: 1, cx: 1500, cy: 900 } });
-		frames = 0;
-		r.pz.setView({ scale: 0.25, cx: 2000, cy: 1000 }, { animate: true });
-		expect(r.pz.busy).toBe(true);
-		flushFrames();
-		expect(frames).toBeGreaterThan(5);
-	});
-
-	it('the function is read when an animation starts', () => {
-		let reduced = false;
-		const r = make({ reduced: () => reduced, start: { scale: 1, cx: 1500, cy: 900 } });
-		r.pz.setView({ scale: 0.5, cx: 1500, cy: 900 }, { animate: true });
-		expect(r.pz.busy).toBe(true);
-		flushFrames();
-		reduced = true;
-		r.pz.setView({ scale: 1, cx: 1500, cy: 900 }, { animate: true });
-		expect(r.pz.busy).toBe(false);
-		expect(r.pz.view!.scale).toBe(1);
-	});
-
-	it('without the option nothing changes: the animation runs', () => {
-		const r = make({ start: { scale: 1, cx: 1500, cy: 900 } });
-		r.pz.setView({ scale: 0.5, cx: 1500, cy: 900 }, { animate: true });
-		expect(r.pz.busy).toBe(true);
 	});
 });
 

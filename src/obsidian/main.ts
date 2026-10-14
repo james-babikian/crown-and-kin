@@ -24,10 +24,10 @@ import { tallBlockParser } from './live-preview';
 import { clearRelationCache } from './relation-cache';
 import { createPictureStore, isPictureExtension } from './picture-store';
 import { LinkUpdater, RENAME_TIMING, extensionOf } from './rename-links';
-import { DEFAULT_SETTINGS, PENDING_KEY, normaliseSettings, readPending, settingsChanges, type DynastySettings } from './settings';
+import { DEFAULT_SETTINGS, NO_EXTRAS, buildStoredData, clearInvalid, normaliseSettings, readPending, readStoredSettings, settingsChanges, type DynastySettings, type StoredExtras } from './settings';
 import { DynastySettingTab, type SettingsHost } from './settings-tab';
 import { renameHeights } from './block-height';
-import { HOVER_SOURCE, START_LIMIT_MS, STYLES_LIMIT_MS, THEME_RECHECK_MS, TreeView, type TreeHost } from './tree-view';
+import { HOVER_SOURCE, START_LIMIT_MS, STYLES_LIMIT_MS, THEME_RECHECK_MS, TreeView, type OpenTime, type TreeHost } from './tree-view';
 
 /** B16: vault events for picture files are grouped for this long, in ms, before the views refresh. */
 export const PICTURE_EVENT_MS = 250;
@@ -44,6 +44,11 @@ export default class DynastyTreePlugin extends Plugin implements TreeHost, Setti
 	});
 	/** One `saveData` at a time: the settings and the pending renames share `data.json`. */
 	private saving: Promise<void> = Promise.resolve();
+	/** W7: what the last load kept of `data.json` (version, unknown keys, invalid values); a save writes it back. */
+	private extras: StoredExtras = NO_EXTRAS;
+	/** The read at start failed: the settings in memory are defaults until the first save reads again. */
+	private startupReadFailed = false;
+	private recovery: Promise<void> | null = null;
 	readonly looseStates = new Map<string, BlockState>();
 	readonly views = new Set<TreeView>();
 	/** Most recent render first; read by the timing command and the test harness. */
@@ -51,6 +56,8 @@ export default class DynastyTreePlugin extends Plugin implements TreeHost, Setti
 	readonly timings = new Map<string, RenderTiming>();
 	/** First render of each note in this session, before any cache is warm. */
 	readonly firstTimings = new Map<string, RenderTiming>();
+	/** Spec §7.7 (render timing): the opens of blocks that have shown no tree yet; the views of one block add their renders to one open. */
+	readonly opens = new Map<string, OpenTime>();
 	/** Number of tree renders in this session; the harness checks that a tree settles. */
 	renderCount = 0;
 	/** M9 contract O3: one picture store for all trees (`TreeHost.pictures`). */
@@ -296,37 +303,79 @@ export default class DynastyTreePlugin extends Plugin implements TreeHost, Setti
 		for (const v of [...this.views]) v.startUpDone();
 	}
 
-	/** Reads `data.json` and applies its settings; returns the stored data. */
-	private async loadSettings(): Promise<unknown> {
-		let stored: unknown = null;
+	/** Reads `data.json`. `ok` is false when the file cannot be read (a sync tool may be half way through a write): the caller decides what that means. */
+	private async readData(): Promise<{ ok: true; data: unknown } | { ok: false }> {
 		try {
-			stored = await this.loadData();
+			return { ok: true, data: await this.loadData() };
 		} catch (e) {
-			console.error('Dynasty Tree: cannot read the settings; the plugin uses the defaults', e);
+			console.error('Dynasty Tree: cannot read the settings', e);
+			return { ok: false };
 		}
+	}
+
+	/** Applies stored data: the settings, and the extras that a save writes back (W7). */
+	private applyStored(stored: unknown): void {
 		const prev = this.settings;
-		this.settings = normaliseSettings(stored);
+		const { settings, extras } = readStoredSettings(stored);
+		this.settings = settings;
+		this.extras = extras;
 		if (settingsChanges(prev, this.settings).length) this.redrawViews(prev);
+	}
+
+	/** Reads `data.json` and applies its settings; returns the stored data. A file that cannot be read counts as empty, and the first save reads it once more. */
+	private async loadSettings(): Promise<unknown> {
+		const r = await this.readData();
+		this.startupReadFailed = !r.ok;
+		const stored = r.ok ? r.data : null;
+		this.applyStored(stored);
 		return stored;
 	}
 
 	/**
-	 * Writes `data.json`: the settings, and the renames that wait for a link update under their own key
-	 * (only while there are some, so the file keeps the shape of earlier versions).
+	 * After a failed read at start, the settings in memory are defaults, and a save would wipe the unknown keys, the raw
+	 * values and the version of the file. So the first save reads the file once more. If that read fails too, the save goes on as before.
+	 */
+	private recoverStartupRead(): Promise<void> {
+		if (!this.startupReadFailed) return Promise.resolve();
+		this.recovery ??= (async () => {
+			const r = await this.readData();
+			this.startupReadFailed = false;
+			if (r.ok) this.applyStored(r.data);
+		})();
+		return this.recovery;
+	}
+
+	/**
+	 * Writes `data.json`: the settings, the version, the keys that this version does not know, and the renames
+	 * that wait for a link update (see `buildStoredData`).
 	 */
 	private store(): Promise<void> {
 		const write = async () => {
-			const pending = this.links.pendingList();
-			await this.saveData(pending.length ? { ...this.settings, [PENDING_KEY]: pending } : { ...this.settings });
+			await this.recoverStartupRead();
+			await this.saveData(buildStoredData(this.settings, this.extras, this.links.pendingList()));
 		};
 		const next = this.saving.then(write, write);
 		this.saving = next.catch(() => undefined);
 		return next;
 	}
 
-	/** Sync or another program changed the stored settings (Obsidian 1.5.7 and later). */
+	/**
+	 * Sync or another program changed the stored settings (Obsidian 1.5.7 and later). A running save finishes first: the
+	 * read cannot then overwrite a change of the user. A save that starts during the read makes that read old, so it is read again.
+	 */
 	override async onExternalSettingsChange(): Promise<void> {
-		await this.loadSettings();
+		for (;;) {
+			let running: Promise<void>;
+			do {
+				running = this.saving;
+				await running;
+			} while (running !== this.saving);
+			const r = await this.readData();
+			if (running !== this.saving) continue;
+			// A file that cannot be read is not an empty file: the settings and the extras stay as they are.
+			if (r.ok) this.applyStored(r.data);
+			return;
+		}
 	}
 
 	/**
@@ -347,10 +396,16 @@ export default class DynastyTreePlugin extends Plugin implements TreeHost, Setti
 
 	/** Stores a change of the settings tab and draws every open tree again (spec §9). */
 	async changeSettings(change: Partial<DynastySettings>): Promise<void> {
+		// Only when needed: an await here would delay the change by one turn.
+		if (this.startupReadFailed) await this.recoverStartupRead();
 		const prev = this.settings;
 		const next = normaliseSettings({ ...prev, ...change });
-		if (!settingsChanges(prev, next).length) return;
+		// A kept raw value (spec §9, the settings file) goes only when its setting really changes: a blur on a field with the same value keeps it.
+		const changed = settingsChanges(prev, next);
+		if (!changed.length) return;
+		const extras = clearInvalid(this.extras, changed);
 		this.settings = next;
+		this.extras = extras;
 		this.redrawViews(prev);
 		try {
 			await this.store();

@@ -186,9 +186,10 @@ describe('the list of a phone note stands on the marked person when nothing befo
 		expect(drawn(full)).toEqual(everybody(src));
 	});
 
-	it('a tree with more than 100 people opens the full-screen view on the start person\'s family (D20), whatever the list stands on', async () => {
+	// D234: this test pinned the first root; the marked person now comes before it.
+	it('a tree with more than 100 people opens the full-screen view on the family of the marked person when nobody was edited and options.start is not set (D20, D234)', async () => {
 		phone();
 		const src = line(101, 'me: p50');
-		expect(drawn((await openFullScreen(src)).root)).toEqual(family(src, 'p0'));
+		expect(drawn((await openFullScreen(src)).root)).toEqual(family(src, 'p50'));
 	});
 });

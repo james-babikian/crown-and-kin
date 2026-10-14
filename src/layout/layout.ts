@@ -11,8 +11,9 @@ import type { ModelOrder } from '../core/order';
 import { consistentRows } from './row-blocks';
 import type { FarCoupleRule, FarTag, Geometry, LayoutSettings, PersonBox, PlacedFoldControl, Rect, TreeLayout, UnionPoint } from './model';
 import { MIN_HIT, barClear, childAttach, tagHit, gapHeight, lineMetrics, relationExtra, sideTagDepth, sidewaysGeometry, sidewaysPartnerGap, tagTop, tallExtra, turnedGeometry, withRelationLine } from './geometry';
+import { compactor, type CompactStep } from './compact';
 import { foldExtent, foldSpots, turnSpots, type FoldInput } from './fold-spots';
-import { addTo, planLines, tabbedCards, type LinePlan } from './lines';
+import { addTo, dotSide, planLines, tabbedCards, type LinePlan } from './lines';
 import { placeInOrder } from './pava';
 import { soloFamiliesOutside } from './solo-side';
 import { turnBox, turnUnion } from './turn';
@@ -24,7 +25,7 @@ export const unionWork = { calls: 0, placed: 0 };
 
 /** Spec D11 defaults: far when more than 3 card widths apart, or more than one generation. */
 export const DEFAULT_FAR_RULE: FarCoupleRule = { maxCardWidths: 3, maxGenerations: 1 };
-/** Default layout settings: `down` orientation, 4 sweeps, the D11 far-couple rule. */
+/** Default layout settings: `down` orientation, 4 sweeps (then the compaction step of `compact.ts`), the D11 far-couple rule. */
 export const DEFAULT_LAYOUT_SETTINGS: LayoutSettings = { sweeps: 4, far: DEFAULT_FAR_RULE };
 /** M7: never far, so a couple is never split (the relation finder's small tree, D47). */
 export const NEVER_FAR_RULE: FarCoupleRule = { maxCardWidths: Infinity, maxGenerations: Infinity };
@@ -121,8 +122,7 @@ function unionPlacer(g: FamilyGraph, persons: Map<string, PersonBox>, rowIndex: 
 			} else {
 				const anchor = persons.get(order.anchors.get(fu.key)!)!;
 				const other = anchor === a ? b : a;
-				const dir = other.x >= anchor.x ? 1 : -1;
-				unions.set(fu.key, { key: fu.key, x: anchor.x + anchor.w / 2 + (dir * anchor.w) / 4, y, bar: false, far: false });
+				unions.set(fu.key, { key: fu.key, x: anchor.x + anchor.w / 2 + (dotSide(other.x, anchor.x) * anchor.w) / 4, y, bar: false, far: false });
 			}
 		}
 		return unions;
@@ -239,6 +239,8 @@ export function layoutFamilies(
 	const persons = new Map<string, PersonBox>();
 	const rows: string[][] = [];
 	const rowIndex = new Map<string, number>();
+	// The smallest centre distances `placeRow` used in each row, for the added step.
+	const rowMinGaps: number[][] = [];
 	// Sideways: cards with a far tag, and the gap after them that holds the tag's whole hit area
 	// (`sideTagDepth`) and room for one routed leg below it.
 	const spaced = new Set<string>(side ? hiddenTagged.keys() : []);
@@ -278,9 +280,13 @@ export function layoutFamilies(
 		}
 		const centres = placeInOrder(targets, gaps);
 		rows[r] = ids;
+		rowMinGaps[r] = gaps;
 		ids.forEach((id, i) => {
 			rowIndex.set(id, i);
-			persons.set(id, { id, x: centres[i] - cw(id) / 2, y: r * (geo.cardH + geo.rowGap), w: cw(id), h: ch(id), gen: r, ...flags(id) });
+			// A later round moves the same boxes, so the added step can keep them.
+			const box = persons.get(id);
+			if (box) box.x = centres[i] - cw(id) / 2;
+			else persons.set(id, { id, x: centres[i] - cw(id) / 2, y: r * (geo.cardH + geo.rowGap), w: cw(id), h: ch(id), gen: r, ...flags(id) });
 		});
 	};
 	const blockCentre = (bi: number) => {
@@ -364,6 +370,9 @@ export function layoutFamilies(
 	};
 
 	let unions: Map<string, UnionPoint>;
+	// The added step reads the structure of the placed rows once, in the first round, and runs again in each round.
+	let compact: CompactStep | undefined;
+	const childUnions = new Set(downNeed.flatMap((keys) => [...keys]));
 	if (side) {
 		// Couples far by generations alone are known before placement: most tags, found in one round.
 		for (const fu of g.unions) {
@@ -378,6 +387,8 @@ export function layoutFamilies(
 			upSweep();
 			downSweep();
 		}
+		// 0.3 (D231): one added step closes the empty space the sweeps leave between sibling groups; sweeps 0 keeps the packed rows.
+		if (settings.sweeps >= 1) (compact ??= compactor(g, order.anchors, persons, blocks, rowBlocks, families, attach))(rowMinGaps, placeUnions(childUnions));
 		// Normalise x to start at 0. Sideways, x is the stack axis (real y): the first card of a stack starts `reach` in, for a "You" tab above it.
 		const minX = Math.min(...[...persons.values()].map((p) => p.x)) - (side ? (geo.reach ?? 0) : 0);
 		for (const p of persons.values()) p.x -= minX;

@@ -75,23 +75,6 @@ function pinchPastLimit(bg: FEl, pz: PanZoom): View {
 }
 
 describe('Full-screen gestures in PanZoom (spec §7.2, §7.6)', () => {
-	it('a tap that stops an animation (Fit, Find, double-tap) still ends with a settled view', () => {
-		const vp = new FEl('div', { cls: 'dynasty-viewport' });
-		const bg = vp.createSvg('svg', { cls: 'dynasty-svg' });
-		const settled: { view: View; byUser: boolean }[] = [];
-		const pz = fullPanZoom(vp, settled);
-		settled.length = 0;
-		pz.setView({ scale: 0.3, cx: 1000, cy: 500 }, { animate: true, byUser: true });
-		runFrame(); // one frame of the animation
-		dispatch(bg, 'pointerdown', pointer('touch', 3, 400, 300));
-		dispatch(bg, 'pointerup', pointer('touch', 3, 400, 300));
-		flushFrames();
-		runTimers();
-		// The view stops where the tap caught it (or ends the animation); the level of detail and
-		// the shared view must follow the view on screen.
-		expect(settled[settled.length - 1]).toEqual({ view: pz.view, byUser: true });
-	});
-
 	it('after a two-finger drag past the pan limit, lifting one finger does not make the view jump on the next 1 px move', () => {
 		const vp = new FEl('div', { cls: 'dynasty-viewport' });
 		const bg = vp.createSvg('svg', { cls: 'dynasty-svg' });

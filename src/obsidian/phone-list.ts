@@ -177,13 +177,20 @@ export function linkWord(g: FamilyGraph, data: ListData, row: ListRow): ListWord
 	return { text, lower: text.toLowerCase() };
 }
 
+/** The people the list shows, each once: the rows that carry a relation word are these (WP-K asks for their names in one request). */
+export function listIds(data: ListData): string[] {
+	const ids = new Set<string>();
+	for (const r of [...data.parents, ...data.person, ...data.groups.flatMap((gr) => gr.rows)]) ids.add(r.id);
+	return [...ids];
+}
+
 /** What `listWord` reads. */
 export interface ListWordFacts {
 	me: string | null;
 	/** The setting "Show relation names on cards". */
 	showRelations: boolean;
 	/** `relationsFor(whole, me).cards`; undefined when there is no mark. */
-	cards: ReadonlyMap<string, CardRelation> | undefined;
+	cards: { get(id: string): CardRelation | undefined } | undefined;
 }
 
 /**

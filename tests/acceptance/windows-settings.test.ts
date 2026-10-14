@@ -136,7 +136,7 @@ describe('the settings tab (spec §9, D33)', () => {
 		control<ToggleComponent>(SETTINGS_UI.houseGeneration).fire(false);
 		await settle();
 		expect(plugin.settings.showHouseGeneration).toBe(false);
-		expect(last(fake.saved)).toEqual(plugin.settings);
+		expect(last(fake.saved)).toEqual({ ...plugin.settings, settingsVersion: 1 });
 	});
 
 	it('0.2.8 (A.4, A.5): "Arms on cards" offers the two values and stores a change; "Warn about more than 2 parents of a type" is on by default and stores a change', async () => {
@@ -157,7 +157,7 @@ describe('the settings tab (spec §9, D33)', () => {
 		await settle();
 		expect(plugin.settings.armsOnCards).toBe('all');
 		expect(plugin.settings.warnManyParents).toBe(false);
-		expect(last(fake.saved)).toEqual(plugin.settings);
+		expect(last(fake.saved)).toEqual({ ...plugin.settings, settingsVersion: 1 });
 	});
 
 	it('stores each change', async () => {
@@ -167,7 +167,7 @@ describe('the settings tab (spec §9, D33)', () => {
 		control<DropdownComponent>(SETTINGS_UI.generations).fire('5');
 		await settle();
 		expect(plugin.settings).toEqual({ ...DEFAULT_SETTINGS, updateLinks: false, focusGenerations: 5 });
-		expect(last(fake.saved)).toEqual(plugin.settings);
+		expect(last(fake.saved)).toEqual({ ...plugin.settings, settingsVersion: 1 });
 	});
 
 	it('0.2.4: the break list and "Reduce movement" show their stored values, with the choices in the plugin words and an accessible name', async () => {
@@ -201,7 +201,7 @@ describe('the settings tab (spec §9, D33)', () => {
 		control<TextAreaComponent>(SETTINGS_UI.breakWords).fire('Long-na-munda\nVal-mont ');
 		await settle();
 		expect(plugin.settings).toEqual({ ...DEFAULT_SETTINGS, reduceMotion: 'off', breakWords: 'Long-na-munda\nVal-mont ' });
-		expect(last(fake.saved)).toEqual(plugin.settings);
+		expect(last(fake.saved)).toEqual({ ...plugin.settings, settingsVersion: 1 });
 	});
 
 	it('0.2.4: the break list is stored when the field loses the focus, and when the tab closes with the typing not yet stored', async () => {
@@ -388,7 +388,7 @@ describe('link updates in data.json and the command "Show the last link update" 
 		const { fake, plugin } = await loadPlugin({ ...DEFAULT_SETTINGS, updateLinks: false, pendingRenames: [entry] });
 		expect(plugin.settings).toEqual({ ...DEFAULT_SETTINGS, updateLinks: false });
 		await settle();
-		expect(last(fake.saved)).toEqual(plugin.settings);
+		expect(last(fake.saved)).toEqual({ ...plugin.settings, settingsVersion: 1 });
 		expect(plugin.links.pendingList()).toEqual([]);
 	});
 
@@ -398,7 +398,7 @@ describe('link updates in data.json and the command "Show the last link update" 
 		openTab(fake);
 		control<ToggleComponent>(SETTINGS_UI.dates).fire(false);
 		await settle();
-		expect(last(fake.saved)).toEqual({ ...plugin.settings, pendingRenames: [entry] });
+		expect(last(fake.saved)).toEqual({ ...plugin.settings, settingsVersion: 1, pendingRenames: [entry] });
 	});
 
 	it('the command shows what the last link update did', async () => {

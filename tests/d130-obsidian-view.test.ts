@@ -3,15 +3,15 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vite
 vi.mock('obsidian', () => import('./acceptance/fake-obsidian'));
 vi.mock('@codemirror/language', () => ({ forceParsing: () => false, syntaxTree: () => ({ length: 0 }) }));
 vi.mock('@codemirror/view', () => ({ ViewPlugin: { fromClass: () => ({}) } }));
-// The two relation functions are wrapped, so the tests can read the options that each call got.
+// The two relation functions are wrapped (the names of the cards come from the lookup, WP-K), so the tests can read the options that each call got.
 vi.mock('../src/core/relations', async (importOriginal) => {
 	const m = await importOriginal<typeof import('../src/core/relations')>();
-	return { ...m, computeRelations: vi.fn(m.computeRelations), findRelation: vi.fn(m.findRelation) };
+	return { ...m, relationLookup: vi.fn(m.relationLookup), findRelation: vi.fn(m.findRelation) };
 });
 
 import { deriveFamilies, type FamilyGraph } from '../src/core/derive';
 import { parseDynasty } from '../src/core/parse';
-import { computeRelations, findRelation, type RelationOptions } from '../src/core/relations';
+import { relationLookup, findRelation, type RelationOptions } from '../src/core/relations';
 import { FullScreenModal } from '../src/obsidian/full-screen';
 import { closePluginModals } from '../src/obsidian/plugin-modals';
 import { clearRelationCache, relationsFor, type CardRelation } from '../src/obsidian/relation-cache';
@@ -36,7 +36,7 @@ beforeEach(() => {
 	FullScreenModal.openViews.clear();
 	closePluginModals();
 	clearRelationCache();
-	vi.mocked(computeRelations).mockClear();
+	vi.mocked(relationLookup).mockClear();
 	vi.mocked(findRelation).mockClear();
 	vi.spyOn(performance, 'now').mockImplementation(() => clock.now);
 });
@@ -108,22 +108,22 @@ function expectCard(el: FEl, peek: Peek, id: string, text: string): void {
 describe('D174: the options reach every relation call of the view', () => {
 	it('the cards and the saved picture use the setting of the host', async () => {
 		const { peek } = await open(SAMPLE('p12'), { ...DEFAULT_SETTINGS, oneParentUnknown: false });
-		expect(optionsOf(computeRelations, 2)).toEqual([OFF]);
+		expect(optionsOf(relationLookup, 2)).toEqual([OFF]);
 		const g = graph(SAMPLE('p12'));
 		const off = relationsFor(g, 'p12', OFF);
 		// The same object: the view took the names of this setting from the cache, not those of the other setting.
 		expect(peek.lastLayout!.opts.relations).toBe(off.cards);
 		expect(peek.saveSource()!.relations).toBe(off.cards);
-		expect(optionsOf(computeRelations, 2)).toEqual([OFF]);
+		expect(optionsOf(relationLookup, 2)).toEqual([OFF]);
 	});
 
 	it('the edit sheet uses the setting of the host', async () => {
 		const { el } = await open(SAMPLE('p12'), { ...DEFAULT_SETTINGS, oneParentUnknown: false });
-		const before = vi.mocked(computeRelations).mock.calls.length;
+		const before = vi.mocked(relationLookup).mock.calls.length;
 		await openSheetOn(el, 'p13', 'mouse');
 		// The sheet asks the cache with the same options as the cards: no new computation, and no call with other options.
-		expect(vi.mocked(computeRelations).mock.calls.length).toBe(before);
-		expect(optionsOf(computeRelations, 2).every((o) => o?.oneParentUnknown === false)).toBe(true);
+		expect(vi.mocked(relationLookup).mock.calls.length).toBe(before);
+		expect(optionsOf(relationLookup, 2).every((o) => o?.oneParentUnknown === false)).toBe(true);
 	});
 
 	it('the finder uses the setting of the host, also after a change of the setting', async () => {
@@ -163,7 +163,7 @@ describe('D174: a change of the setting draws the cards again', () => {
 		const renders = host.renders!;
 		change(host, peek, { oneParentUnknown: false });
 		expect(host.renders).toBe(renders);
-		expect(computeRelations).not.toHaveBeenCalled();
+		expect(relationLookup).not.toHaveBeenCalled();
 	});
 
 	it('with "Show relation names on cards" off the view still draws again, so the names are right when the words show again', async () => {

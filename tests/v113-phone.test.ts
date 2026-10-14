@@ -112,7 +112,7 @@ describe('P5: every window of the plugin is a dialog with a name', () => {
 
 describe('P4: the search field of a person list has a name', () => {
 	it('aria-label "Find a person", and no spell check (D101)', () => {
-		void pickPerson(fakeApp() as never, graph(), new Set(), 'Type the name of the parent', 'Add parent');
+		void pickPerson(fakeApp() as never, graph(), new Set(), 'Type a name', 'Add parent');
 		const picker = openModals[openModals.length - 1] as unknown as { inputEl: FEl };
 		expect(picker.inputEl.getAttribute('aria-label')).toBe(FLOW.pickerSearchLabel);
 		expect(FLOW.pickerSearchLabel).toBe('Find a person');

@@ -1,11 +1,23 @@
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 import { foldHidden, foldKey } from '../src/core/folds';
 import { foldExtent } from '../src/layout/fold-spots';
 import { DEFAULT_LAYOUT_SETTINGS, clearLayoutCache, geometryFor, layoutTree } from '../src/layout/index';
 import type { LayoutSettings, Rect } from '../src/layout/model';
+import { drawFold } from '../src/render/dom/folds';
+import { approxMeasure } from '../src/render/svg-string';
+import { FEl, installDom } from './acceptance/fake-dom';
 import { block15, graphOf } from './acceptance/m10-support';
 
-/* M10 fix round (V2, V4): no fold control's hit area lies on a far-couple tag or on the hit area of another control. */
+/*
+ * M10 fix round (V2, V4): no fold control's hit area lies on another control's, and no visible "+ N" sign (Full and
+ * Overview) lies on a far-couple tag's hit area. WP-Q (0.3): the tag check compares the drawn sign marks, not
+ * `foldExtent`, which is a worst-case bound (1.5 em per character plus the 44 px squares); at run time the tag wins
+ * and the fold's tap area is cut back (`cutBack`). The bound met Wanda's tag in "sideways, folds A" after the WP-Q
+ * placement step although the drawn signs keep clear (G2 of WP-Q).
+ */
+
+beforeAll(() => installDom());
+const FONTS = { text: 'serif', ui: 'sans', bold: '700' };
 
 const g = graphOf(block15(0));
 const VIEWS: [string, LayoutSettings][] = [
@@ -40,7 +52,15 @@ describe('fold controls keep clear of tags and of each other (fixture 15)', () =
 				const boxes = folds.map((c) => foldExtent(c, c.spot, 16, layout.orientation === 'sideways'));
 				const hits: string[] = [];
 				for (const [i, c] of folds.entries()) {
-					for (const t of layout.farTags.values()) if (meet(boxes[i], t.hit)) hits.push(`${c.key} on the tag of ${t.person}`);
+					if (c.folded) {
+						const ref = drawFold({ controls: new FEl('g') as never, hits: new FEl('g') as never, fonts: FONTS, measure: approxMeasure, em: 16, label: 'x', fitters: [], ...(layout.orientation === 'sideways' ? { anchored: true } : {}) }, c);
+						for (const t of layout.farTags.values()) {
+							if (meet(ref.mark, t.hit)) hits.push(`${c.key} sign on the tag of ${t.person}`);
+							if (ref.markOverview && meet(ref.markOverview, t.hit)) hits.push(`${c.key} overview sign on the tag of ${t.person}`);
+						}
+					} else {
+						for (const t of layout.farTags.values()) if (meet(boxes[i], t.hit)) hits.push(`${c.key} on the tag of ${t.person}`);
+					}
 					for (let j = i + 1; j < folds.length; j++) if (meet(boxes[i], boxes[j])) hits.push(`${c.key} on ${folds[j].key}`);
 				}
 				expect(hits).toEqual([]);

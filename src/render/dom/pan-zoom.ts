@@ -11,9 +11,7 @@
  * transform on an HTML parent does not reach the SVG text layout. When the pinch ends, the <g>
  * takes the real view and the wrapper transform goes, in the same frame. While a pinch leaves empty
  * space around the wrapped picture, the real view is drawn about every 250 ms during the pinch, and
- * the wrapper goes on from that picture (owner decision D19). An animation (double-tap)
- * uses the wrapper too, but only while it shows a part of the picture already drawn: a zoom out or
- * a move to another part would show empty space.
+ * the wrapper goes on from that picture (owner decision D19).
  *
  * Embedded ('embed'): only a mouse pans. A finger or a pen never pans an embedded tree, also on a
  * laptop with a touchscreen: the drag scrolls the note (CSS touch-action: pan-y). A plain wheel is
@@ -23,14 +21,18 @@
  *
  * M11 (spec §13.15): the tree view attaches card content that is near the view. `onFirstDraw` runs once,
  * right after the first write of the scene transform, in the same task (`onSettle` cannot do this: it runs
- * before that write). `onFill` also runs during a wheel or trackpad zoom and an animation, but only when
+ * before that write). `onFill` also runs during a wheel or trackpad zoom, but only when
  * the visible rectangle leaves the last filled one and at most once for each frame. A drag pan never
  * fills; it ends at its settle. `visibleRect` is the one owner of the conversion from a `View` and the
  * viewport size to a layout `Rect`.
+ *
+ * 0.3 (D235): no view change slides. `setView` shows the new view in the next frame, whatever the caller: Fit, Find, the reveal after an
+ * edit and the double tap. In the full-screen view a drag or wheel pan of a tree that is smaller than the free area (`freeArea`: the space
+ * between the bars) keeps the whole tree inside that area (D222, `panLimits`).
  */
 
 import type { Rect } from '../../layout/model';
-import { clampPan, doubleTapView, isDoubleTap, isPan, panFrom, pinchView, scaleLimits, transformFor, wheelFactor, zoomAt, type Point, type Size, type View } from '../view-math';
+import { clampTo, doubleTapView, isDoubleTap, isPan, panFrom, panLimits, pinchView, scaleLimits, transformFor, wheelFactor, zoomAt, type FreeArea, type Point, type Size, type View } from '../view-math';
 
 /** Everything `PanZoom` needs from the tree view to run gestures on one drawn tree. */
 export interface PanZoomOptions {
@@ -48,21 +50,25 @@ export interface PanZoomOptions {
 	/** False on a touch-first device: the embedded tree is a static preview (D1). */
 	interactive: boolean;
 	mode: 'embed' | 'full';
-	/** After a gesture or an animation ends. `byUser` is false for views the plugin chose. */
+	/** After a gesture ends or a view is set. `byUser` is false for views the plugin chose. */
 	onSettle: (view: View, byUser: boolean) => void;
 	/** A pinch drew the real view to fill empty space (D19); the pinch goes on. */
 	onFill?: (view: View) => void;
-	/** Once, right after the first write of the scene transform, in the same task. No pan, pinch, animation frame or later `setView` calls it. */
+	/** Once, right after the first write of the scene transform, in the same task. No pan, pinch, wheel zoom or later `setView` calls it. */
 	onFirstDraw?: (view: View) => void;
 	/** Runs an entry point (event, frame, timer) so that an error cannot escape into Obsidian (spec §8). */
 	guard: (fn: () => void) => void;
-	/** D126: true when movement is reduced. `setView` with `animate` then sets the view at once. Read when an animation starts. Default: never. */
-	reduced?: () => boolean;
+	/**
+	 * D222: the bars of the full-screen view, in screen px (cached values, never a read of the page on a pointer move). A drag or wheel pan of a tree that is smaller
+	 * than the free area between them keeps the whole tree inside that area. Absent: the 0.2.8 limits.
+	 */
+	freeArea?: () => FreeArea;
+	/** Once at the start of each drag (a press that can begin a pan), never on a move: the caller refreshes the cached `freeArea` here. */
+	onDragStart?: () => void;
 }
 
 /** Wheel zoom counts as settled after this long without another wheel event. */
 const WHEEL_SETTLE_MS = 180;
-const ANIMATE_MS = 280;
 /** Presses here are not gestures: HTML controls on top of the tree handle their own. */
 const CONTROLS = '.dynasty-toolbar, .dynasty-popover, .dynasty-result';
 /** A press on these is not on the empty background (no double-tap zoom there). */
@@ -108,11 +114,6 @@ export function covers(drawn: View, view: View, size: Size): boolean {
 	);
 }
 
-/** The view `e` (0 to 1, eased) of the way from `from` to `to`: the zoom changes geometrically, so the motion looks even. */
-export function animView(from: View, to: View, e: number): View {
-	return { scale: from.scale * Math.pow(to.scale / from.scale, e), cx: from.cx + (to.cx - from.cx) * e, cy: from.cy + (to.cy - from.cy) * e };
-}
-
 /** D19: while a pinch leaves empty space, the real view is drawn at most this often ("about 4 times per second"). */
 export const FILL_MS = 250;
 
@@ -150,12 +151,9 @@ interface Drag {
  * limits (it keeps the tree point under the fingers); a pan or wheel that follows then moves on from
  * there, never further out, and never jumps back to the limit.
  */
-function clampFrom(view: View, from: View, bounds: Rect): View {
-	const x0 = Math.min(bounds.x, from.cx);
-	const y0 = Math.min(bounds.y, from.cy);
-	const x1 = Math.max(bounds.x + bounds.w, from.cx);
-	const y1 = Math.max(bounds.y + bounds.h, from.cy);
-	return clampPan(view, { x: x0, y: y0, w: x1 - x0, h: y1 - y0 });
+function clampFrom(view: View, from: View, bounds: Rect, size: Size, free: FreeArea | undefined): View {
+	const l = panLimits(bounds, view.scale, size, free);
+	return clampTo(view, { x0: Math.min(l.x0, from.cx), x1: Math.max(l.x1, from.cx), y0: Math.min(l.y0, from.cy), y1: Math.max(l.y1, from.cy) });
 }
 
 interface Pinch {
@@ -170,8 +168,6 @@ export class PanZoom {
 	size: Size = { w: 0, h: 0 };
 	private frame = 0;
 	private settleTimer = 0;
-	private anim: { from: View; to: View; t0: number; /** The picture was drawn at `to`, so the frames only move the wrapper (see `apply`). */ baked: boolean } | null = null;
-	private animSettleUser = false;
 	private drag: Drag | null = null;
 	private pinch: Pinch | null = null;
 	/** Pointers down in the viewport (full screen), in viewport px. */
@@ -234,39 +230,22 @@ export class PanZoom {
 		return scaleLimits(this.o.bounds, this.size, this.o.fontPx);
 	}
 
-	/** True while a press may still become a pan, or a pan, pinch or animation runs. */
+	/** True while a press may still become a pan, or a pan or pinch runs. */
 	get busy(): boolean {
-		return this.drag !== null || this.pinch !== null || this.anim !== null;
+		return this.drag !== null || this.pinch !== null;
 	}
 
-	/** The viewport changed size: re-applies the current view (or animation) to the new size. */
+	/** The viewport changed size: re-applies the current view to the new size. */
 	resize(size: Size): void {
 		this.size = size;
 		this.schedule();
 	}
 
-	/** Shows `view` now, or animates to it. */
-	setView(view: View, opts: { animate?: boolean; byUser?: boolean } = {}): void {
-		// D126 (1): with reduced movement the view changes at once, as it does without `animate`.
-		if (opts.animate && this.view && this.size.w > 0 && !this.o.reduced?.()) {
-			this.anim = { from: this.view, to: view, t0: performance.now(), baked: false };
-			this.animSettleUser = opts.byUser ?? false;
-			this.schedule();
-			return;
-		}
-		this.anim = null;
+	/** Shows `view` in the next frame (never a slide, D235) and settles on it. */
+	setView(view: View, opts: { byUser?: boolean } = {}): void {
 		this.view = view;
 		this.schedule();
 		this.settled(view, opts.byUser ?? false);
-	}
-
-	/** A press or the wheel stops an animation where it is; that view is settled (LOD, shared view). */
-	private stopAnim(): void {
-		if (!this.anim) return;
-		this.anim = null;
-		// The next frame puts the view where the animation stopped on the scene (off the wrapper).
-		this.schedule();
-		if (this.view) this.settled(this.view, this.animSettleUser);
 	}
 
 	/** Calls `onSettle` and keeps the rectangle that the caller has filled for this view. */
@@ -275,9 +254,9 @@ export class PanZoom {
 		this.o.onSettle(view, byUser);
 	}
 
-	/** During a wheel zoom or an animation: fills once the view leaves the last filled rectangle. At most once per frame, as `apply` runs once per frame. */
+	/** During a wheel zoom: fills once the view leaves the last filled rectangle. At most once per frame, as `apply` runs once per frame. */
 	private fillIfLeft(): void {
-		if (!this.view || !this.o.onFill || !(this.wheelZoom || this.anim)) return;
+		if (!this.view || !this.o.onFill || !this.wheelZoom) return;
 		const r = visibleRect(this.view, this.size);
 		const f = this.filled;
 		if (!r) return;
@@ -297,20 +276,9 @@ export class PanZoom {
 	}
 
 	private apply(): void {
-		if (this.anim) {
-			const { from, to, t0 } = this.anim;
-			const k = Math.min(1, (performance.now() - t0) / ANIMATE_MS);
-			this.view = animView(from, to, 1 - Math.pow(1 - k, 3));
-			if (k < 1) this.schedule();
-			else {
-				this.anim = null;
-				this.view = to;
-				this.settled(to, this.animSettleUser);
-			}
-		}
 		if (!this.view || this.size.w <= 0 || this.size.h <= 0) return;
 		const w = this.o.wrapper;
-		let d = this.drawn;
+		const d = this.drawn;
 		const sameSize = !!d && d.size.w === this.size.w && d.size.h === this.size.h && d.view.scale > 0;
 		const win = this.o.viewport.win ?? window;
 		if (this.fillTimer) {
@@ -343,31 +311,7 @@ export class PanZoom {
 			}
 			return;
 		}
-		if (w && d && sameSize && this.anim && !this.anim.baked) {
-			// M5: a change of scale on the scene makes the browser shape every text again, so the animation moves the wrapper over one picture.
-			// A zoom out (Fit) has no picture that covers it, so the scene is drawn once at the end view and the wrapper starts from there.
-			this.anim.baked = true;
-			const a = this.anim;
-			const zooms = Math.abs(Math.log(a.to.scale / a.from.scale)) > 1e-3;
-			if (zooms && !covers(d.view, a.to, this.size) && covers(a.to, a.from, this.size)) {
-				this.o.scene.setAttribute('transform', transformFor(a.to, this.size));
-				this.drawn = d = { view: a.to, size: this.size, at: performance.now() };
-				// Everything the end view shows is filled now, once. Every frame shows a part of it (`covers` is convex), so no frame fills again:
-				// a fill at each frame attaches cards and changes the level of detail, and the browser lays the text out again each time.
-				this.filled = visibleRect(a.to, this.size);
-				this.o.onFill?.(a.to);
-			}
-		}
-		if (w && d && sameSize && this.anim && covers(d.view, this.view, this.size)) {
-			w.style.setProperty('--dynasty-gesture-transform', gestureMatrix(d.view, this.view, this.size));
-			if (!this.wrapped) {
-				w.addClass(GESTURE_CLASS);
-				this.wrapped = true;
-			}
-			this.fillIfLeft();
-			return;
-		}
-		// The picture already shows this view (an animation that ended on the view it was drawn at): no second write, so no second text layout.
+		// The picture already shows this view (a pinch or wheel zoom that ended on the view it was drawn at): no second write, so no second text layout.
 		const shown = !!d && sameSize && d.view.scale === this.view.scale && d.view.cx === this.view.cx && d.view.cy === this.view.cy;
 		if (!shown) {
 			this.o.scene.setAttribute('transform', transformFor(this.view, this.size));
@@ -411,15 +355,14 @@ export class PanZoom {
 		if (e.pointerType === 'mouse' && e.button !== 0) return;
 		if (!this.full) {
 			if (e.pointerType !== 'mouse' || !e.isPrimary) return;
-			this.stopAnim();
 			this.drag = { id: e.pointerId, x: e.clientX, y: e.clientY, start: this.view, panning: false, type: e.pointerType, onBackground: false };
 			return;
 		}
 		this.pointers.set(e.pointerId, this.local(e));
-		this.stopAnim();
 		if (this.pinch) return;
 		if (this.pointers.size === 1) {
 			const onBackground = !(e.target as Element | null)?.closest?.(TARGETS);
+			this.o.guard(() => this.o.onDragStart?.());
 			this.drag = { id: e.pointerId, x: e.clientX, y: e.clientY, start: this.view, panning: false, type: e.pointerType, onBackground };
 			return;
 		}
@@ -460,7 +403,7 @@ export class PanZoom {
 			if (e.pointerType !== 'touch') this.o.viewport.addClass('dynasty-panning');
 		}
 		e.preventDefault();
-		this.view = clampFrom(panFrom(d.start, dx, dy), d.start, this.o.bounds);
+		this.view = clampFrom(panFrom(d.start, dx, dy), d.start, this.o.bounds, this.size, this.o.freeArea?.());
 		this.schedule();
 	}
 
@@ -499,7 +442,7 @@ export class PanZoom {
 		const last = this.lastTap;
 		if (last && isDoubleTap(last.t, last.p, now, at) && this.view) {
 			this.lastTap = null;
-			this.setView(doubleTapView(this.view, at, this.size, this.limits), { animate: true, byUser: true });
+			this.setView(doubleTapView(this.view, at, this.size, this.limits), { byUser: true });
 			return;
 		}
 		this.lastTap = { t: now, p: at };
@@ -541,7 +484,6 @@ export class PanZoom {
 		if (!zoom && (e.target as Element | null)?.closest?.(CONTROLS)) return;
 		e.preventDefault();
 		e.stopPropagation();
-		this.stopAnim();
 		if (zoom) {
 			const at = this.local(e);
 			this.wheelZoom = true;
@@ -551,7 +493,7 @@ export class PanZoom {
 			// Shift+wheel on a mouse scrolls sideways; some systems send it as a vertical delta.
 			const dx = (e.shiftKey && !e.deltaX ? e.deltaY : e.deltaX) * k;
 			const dy = (e.shiftKey && !e.deltaX ? 0 : e.deltaY) * k;
-			this.view = clampFrom(panFrom(this.view, -dx, -dy), this.view, this.o.bounds);
+			this.view = clampFrom(panFrom(this.view, -dx, -dy), this.view, this.o.bounds, this.size, this.o.freeArea?.());
 		}
 		this.schedule();
 		const win = this.o.viewport.win ?? window;
@@ -575,7 +517,6 @@ export class PanZoom {
 		if (this.settleFrame) win.cancelAnimationFrame(this.settleFrame);
 		this.settleFrame = 0;
 		this.frame = 0;
-		this.anim = null;
 		this.drag = null;
 		this.pinch = null;
 		this.pointers.clear();

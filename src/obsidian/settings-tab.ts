@@ -5,7 +5,7 @@
 
 import { Notice, PluginSettingTab, Setting, SettingGroup, debounce, type App, type Plugin } from 'obsidian';
 import { SETTINGS_UI } from '../render/ui-text';
-import { ARMS_ON_CARDS, GENERATIONS, OLD_AGE, PHONE_DIRECTIONS, REDUCE_MOTIONS, SUCCESSION_LENGTH, YOUNG_DEATH_AGE, parseDesktopHeight, parseWhole, type ArmsOnCards, type DynastySettings, type PhoneDirection, type ReduceMotion } from './settings';
+import { ARMS_ON_CARDS, BREAK_WORDS_MAX, GENERATIONS, OLD_AGE, PHONE_DIRECTIONS, REDUCE_MOTIONS, SUCCESSION_LENGTH, YOUNG_DEATH_AGE, parseDesktopHeight, parseWhole, type ArmsOnCards, type DynastySettings, type PhoneDirection, type ReduceMotion } from './settings';
 
 /** What the tab needs from the plugin. */
 export interface SettingsHost extends Plugin {
@@ -115,7 +115,9 @@ export class DynastySettingTab extends PluginSettingTab {
 					area.setValue(s.breakWords);
 					// D118: the list is stored when the typing stops or the field loses the focus, not at each key press (each store lays the trees out again).
 					const store = () => {
-						if (area.getValue() !== this.host.settings.breakWords) void this.host.changeSettings({ breakWords: area.getValue() });
+						// A typed text over the limit is cut here: a stored text over the limit counts as not valid.
+						const text = area.getValue().slice(0, BREAK_WORDS_MAX);
+						if (text !== this.host.settings.breakWords) void this.host.changeSettings({ breakWords: text });
 					};
 					const later = debounce(store, HEIGHT_TYPING_MS, true);
 					this.pendingBreaks = () => {

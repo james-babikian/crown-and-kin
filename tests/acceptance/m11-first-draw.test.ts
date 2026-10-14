@@ -112,15 +112,7 @@ describe('S5a: onFirstDraw', () => {
 		flushFrames();
 		runTimers();
 		flushFrames();
-		pz.setView({ scale: 0.3, cx: 800, cy: 400 }, { animate: true, byUser: true });
-		flushFrames();
-		expect(first).toHaveLength(1);
-	});
-
-	it('an animated first view also calls it once (at the first write)', () => {
-		const { pz, first } = make();
-		pz.resize(SIZE);
-		pz.setView({ scale: 0.5, cx: 2000, cy: 1000 }, { animate: true });
+		pz.setView({ scale: 0.3, cx: 800, cy: 400 }, { byUser: true });
 		flushFrames();
 		expect(first).toHaveLength(1);
 	});

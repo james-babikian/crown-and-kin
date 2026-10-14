@@ -121,7 +121,7 @@ body {
 
 /*
  * In the full-screen view on a device with a touch screen, the wrapper keeps its layer all the
- * time: to make the layer when a pinch or a double-tap starts, and to remove it after, made the
+ * time: to make the layer when a pinch starts, and to remove it after, made the
  * browser lay out every SVG text again (a 350 ms and a 630 ms frame on a slow phone, WP5.3). A
  * mouse-only computer does not pinch, and keeps the sharper text of a page without extra layers.
  */
@@ -978,12 +978,12 @@ body.is-phone,
 
 /*
  * 0.2.8 (G5b): in a short tree box (a note embed of 500 px) the 15 rows are taller than the box, and the end of the list was cut with no sign. `fitLegend` adds
- * `is-tight` when the rows do not fit: the rows are as high as their sample (22 px, plus 2 px) and the gaps and the padding are smaller, so the whole list shows.
+ * `is-tight` when the rows do not fit: the rows are as high as their sample (22 px) and the gaps and the padding are smaller, so the whole list shows.
  * A box that is still too short for that scrolls inside.
  */
 .dynasty-popover-legend.is-tight {
-	padding-top: 8px;
-	padding-bottom: 8px;
+	padding-top: 6px;
+	padding-bottom: 6px;
 }
 
 .dynasty-popover-legend.is-tight .dynasty-popover-title {
@@ -994,8 +994,9 @@ body.is-phone,
 	gap: 0;
 }
 
+/* 0.3 (spec §13.22 rule 6, Legend): the sample is 22 px high, so a row needs no more. At 24 px the 18 rows still scrolled by 13 px in a 500 px note box. */
 .dynasty-popover-legend.is-tight .dynasty-legend-row {
-	min-height: 24px;
+	min-height: 22px;
 }
 
 .dynasty-popover-problems {
@@ -3232,7 +3233,7 @@ body.theme-dark .dynasty-house-dot {
 	font-weight: var(--font-semibold);
 }
 
-/* Cancel stands in the row of the field (person-picker.ts); only a phone shows it. */
+/* Cancel stands beside the grey pill (person-picker.ts); only a phone shows it. */
 .dynasty-picker-cancel {
 	display: none;
 }
@@ -3263,8 +3264,15 @@ body.theme-dark .dynasty-house-dot {
 	top: 0;
 	border-radius: 0;
 	border: none;
-	display: flex;
-	flex-direction: column;
+	/*
+	 * 0.3 (spec §6.6): two columns, so Cancel stands at the right of the grey pill, outside it (as in an iOS search bar). Both are children of the prompt,
+	 * where Obsidian keeps them; the list takes the second row and the whole width.
+	 */
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) auto;
+	grid-template-rows: auto minmax(0, 1fr);
+	align-content: start;
+	column-gap: var(--size-4-2);
 	/*
 	 * D125 (3): Obsidian's `.is-phone .prompt` keeps the safe area at the bottom (the home bar). The keyboard covers that
 	 * bar and the plugin already ends the prompt at the keyboard (`--dynasty-sheet-height`), so while a keyboard is up the
@@ -3290,14 +3298,46 @@ body.theme-dark .dynasty-house-dot {
 	white-space: nowrap;
 }
 
+/*
+ * Obsidian gives the pill 8 px of margin below. In a grid row that margin would put the middle of the row 4 px below the middle of the pill, and Cancel with it,
+ * so the pill has no vertical margin, with a selector that a theme cannot beat, and the list takes the 8 px as padding (below). The sides keep Obsidian's inset.
+ */
+.prompt.dynasty-picker.is-phone.is-phone .prompt-input-container {
+	margin-top: 0;
+	margin-bottom: 0;
+}
+
+/*
+ * 0.3 (spec §6.6), fix round: the pill and Cancel stand in row 1 of the prompt grid in every theme. Cupertino lifts the pill out of the flow (position absolute, at the bottom of the
+ * prompt, like an iOS 26 search bar) while Cancel stays in the top row, 400 px above it. The doubled `.is-phone` makes the selector longer than any theme rule for these
+ * two boxes; order, position, inset and alignment are set again here, so no theme can move one of them away from the other.
+ */
+.prompt.dynasty-picker.is-phone.is-phone .prompt-input-container,
+.prompt.dynasty-picker.is-phone.is-phone > button.dynasty-picker-cancel {
+	order: 0;
+	position: relative;
+	inset: auto;
+	grid-row: 1;
+	align-self: center;
+}
+
+.prompt.dynasty-picker.is-phone.is-phone .prompt-input-container {
+	grid-column: 1;
+	width: auto;
+}
+
+.prompt.dynasty-picker.is-phone.is-phone > button.dynasty-picker-cancel {
+	grid-column: 2;
+}
+
 .dynasty-picker.is-phone .prompt-input-container {
-	order: -1;
-	flex: none;
+	grid-row: 1;
+	grid-column: 1;
 	display: flex;
 	align-items: center;
 	gap: 6px;
-	/* D125 (3): a low top row gives the list more rows above the keyboard. The container is the field row only; the top inset is on the prompt. */
-	padding: 0 max(var(--size-4-3), env(safe-area-inset-right)) 0 max(var(--size-4-3), env(safe-area-inset-left));
+	/* D125 (3): a low top row gives the list more rows above the keyboard. The container is the field row only; the top inset is on the prompt. The right side is short: the X ends the pill, Cancel is outside. */
+	padding: 0 var(--size-4-2) 0 max(var(--size-4-3), env(safe-area-inset-left));
 	border-bottom: 1px solid var(--background-modifier-border);
 }
 
@@ -3327,8 +3367,9 @@ body.theme-dark .dynasty-house-dot {
 }
 
 /*
- * Obsidian floats the clear button over the field at the right edge, where Cancel stands. Here it is an item of the row between the field and Cancel:
- * typed text ends at the button, and its 12 px margin plus the 6 px row gap keep a wrong tap away from Cancel. The hit area is 44 x 44 px.
+ * Obsidian floats the clear button over the field at the right edge. Here it is the last item of the row inside the pill: typed text ends at the button.
+ * The hit area is 44 x 44 px. Between its box and the Cancel box are the 8 px padding of the pill and the 8 px column gap of the prompt: 16 px or more, so a wrong tap
+ * does not reach Cancel.
  */
 .dynasty-picker.is-phone .prompt-input-container .search-input-clear-button {
 	position: static;
@@ -3337,19 +3378,22 @@ body.theme-dark .dynasty-house-dot {
 	height: 44px;
 }
 
-/* The margin has its own, stronger rule: the Cupertino theme resets it to 0 with a longer selector, and its row gap alone is 8 px. */
+/* The margin has its own, stronger rule: a theme (Cupertino) sets it with a longer selector, and the 16 px depend on it being 0. */
 .prompt.dynasty-picker.is-phone.is-phone .prompt-input-container .search-input-clear-button {
-	margin: 0 12px 0 0;
+	margin: 0;
 }
 
-.dynasty-picker.is-phone .prompt-input-container button.dynasty-picker-cancel {
+.dynasty-picker.is-phone > button.dynasty-picker-cancel {
+	grid-row: 1;
+	grid-column: 2;
+	align-self: center;
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
-	flex: none;
 	min-height: 44px;
 	min-width: 44px;
-	padding: 0 8px;
+	/* The text keeps the distance to the screen edge that the pill had on its right side. */
+	padding: 0 max(var(--size-4-3), env(safe-area-inset-right)) 0 var(--size-4-2);
 	border: 0;
 	background: none;
 	box-shadow: none;
@@ -3359,12 +3403,18 @@ body.theme-dark .dynasty-house-dot {
 }
 
 .dynasty-picker.is-phone .prompt-results {
-	order: 0;
-	flex: 1 1 auto;
+	grid-row: 2;
+	grid-column: 1 / -1;
+	min-height: 0;
 	max-height: none;
 	overflow-y: auto;
-	/* D125 (3): the first row starts 4 px under the field (Obsidian's own padding is 12 px). */
-	padding-top: var(--size-4-1);
+	/* D125 (3): the first row starts 4 px under the field's margin (Obsidian's own padding is 12 px). The margin of 8 px is here, not on the pill. */
+	padding-top: calc(var(--size-4-1) + var(--size-4-2));
+}
+
+/* Cupertino gives the list its own padding (75 px at the top, under a top bar that is not there once the pill is pinned); the strong selector keeps the first row 12 px under the pill. */
+.prompt.dynasty-picker.is-phone.is-phone .prompt-results {
+	padding-top: calc(var(--size-4-1) + var(--size-4-2));
 }
 
 /*
@@ -4958,6 +5008,8 @@ body.dynasty-fullscreen-open .popover.hover-popover {
 	-webkit-appearance: none;
 	width: 22px;
 	height: 22px;
+	/* Obsidian lifts the knob with `top: var(--slider-thumb-y)`. Cancel it, or the margin below doubles the shift. */
+	top: 0;
 	margin-top: -9.5px;
 	border-radius: 50%;
 	background: white;
@@ -6367,3 +6419,121 @@ body.theme-dark .dynasty-lw .dynasty-lw-dot {
 }
 
 /* ===== end list windows ===== */
+/* ---------- Very large tree: the low bar (D159, D223, D226; spec §7.7) ---------- */
+
+/*
+ * One low bar across the note width in place of the tree: a small tree icon at the left, the message, the button "Draw the tree" at the right. Below
+ * 520 px of box width (a phone, a narrow pane) the button goes under the text and fills the width. The bar takes no space it does not need: the note
+ * keeps no empty box. The look is option A of the Step 0 page (D223). Colours come from the theme's variables only, so light and dark follow.
+ */
+.dynasty-large-root {
+	container-type: inline-size;
+}
+
+.dynasty-large-bar {
+	/* The hidden name of the bar is absolute; the bar is its box, so it never reaches a scroller around it (the iPhone Find fault, tests/r028-ios-find.test.ts). */
+	position: relative;
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: var(--size-4-3);
+	box-sizing: border-box;
+	padding: var(--size-4-3) var(--size-4-4);
+	border: 1px solid var(--background-modifier-border);
+	border-radius: var(--radius-m);
+	background: var(--background-primary);
+	font-family: var(--font-interface);
+	font-size: var(--dynasty-type-text);
+	color: var(--dynasty-muted, var(--text-muted));
+}
+
+/*
+ * In Live Preview Obsidian puts its own edit icon (`</>`) in the top-right corner of the block, over the bar. The bar keeps the right edge free for it,
+ * so the button never lies under the icon (found in the visual check of 2026-10-13).
+ */
+.cm-embed-block .dynasty-large-bar {
+	padding-right: calc(var(--size-4-4) + 32px);
+}
+
+.dynasty-large-icon {
+	display: inline-flex;
+	flex: none;
+	width: var(--icon-m);
+	height: var(--icon-m);
+	color: var(--dynasty-muted, var(--text-muted));
+}
+
+.dynasty-large-icon .svg-icon {
+	width: var(--icon-m);
+	height: var(--icon-m);
+}
+
+.dynasty-large-text {
+	flex: 1 1 0;
+	min-width: 0;
+	line-height: var(--line-height-normal);
+}
+
+.dynasty-large-action {
+	display: flex;
+	flex: none;
+	align-items: center;
+	gap: var(--size-4-3);
+}
+
+/* The button of the bar ("Draw the tree" or "Choose a person"), with a hit area of at least 44 px (spec §7.5). Prefixed with the bar so that the theme's own button rule does not win. */
+.dynasty-large-bar .dynasty-large-button {
+	min-height: 44px;
+	min-width: 44px;
+	padding: 0 var(--size-4-6);
+	font-size: var(--dynasty-type-control);
+	font-weight: var(--font-semibold);
+}
+
+/* The short text that takes the button's place after a tap. */
+.dynasty-large-live:empty {
+	display: none;
+}
+
+@container (max-width: 520px) {
+	.dynasty-large-text {
+		flex: 1 1 calc(100% - var(--icon-m) - var(--size-4-3));
+	}
+
+	.dynasty-large-action {
+		flex: 1 1 100%;
+		justify-content: center;
+	}
+
+	.dynasty-large-bar .dynasty-large-button {
+		flex: 1 1 100%;
+	}
+}
+
+/*
+ * The full-screen view: the bar stands in the middle of the free area. The toolbar lies over the viewport, at the top on a computer and at the bottom
+ * on a phone (the phone's bar, spec §7.5), so the bar keeps clear of it and of the notch.
+ */
+.dynasty-large-viewport {
+	display: flex;
+	flex-direction: column;
+	justify-content: center;
+	box-sizing: border-box;
+	padding: var(--size-4-4);
+	cursor: default;
+}
+
+.dynasty-large-viewport .dynasty-large-bar {
+	width: 100%;
+	max-width: 40rem;
+	margin-inline: auto;
+}
+
+.dynasty-full .dynasty-large-viewport {
+	padding-top: calc(env(safe-area-inset-top, 0px) + 44px + var(--size-4-4));
+}
+
+.modal.dynasty-fullscreen.is-phone .dynasty-full .dynasty-large-viewport {
+	padding-top: max(var(--size-4-4), env(safe-area-inset-top));
+	padding-bottom: calc(52px + env(safe-area-inset-bottom) + var(--size-4-4));
+}

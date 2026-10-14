@@ -1,3 +1,4 @@
+// 0.3 (D231, WP-Q): the "M8" hashes of the sample trees were recorded again, once, because the added step of the placement moves cards.
 import { createHash } from 'node:crypto';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { deriveFamilies, type FamilyGraph } from '../../src/core/derive';
@@ -357,24 +358,24 @@ describe('P4: without `saved` (and without `pictures`), renderSvg draws exactly 
 		// 0.2.8 G5b (P7): all 17 were recorded again (the card content is centred on the middle of the card, not 0.25 em right of it).
 		// 0.2.8 look round (D212–D214): all 17 were recorded again (thin arms rim, You tab, 2 px You border, one heir outline, centred text).
 	const M8_SVG: Record<string, string> = {
-		'01': 'dedcfcbf12666e4e',
-		'02': 'c4549da0f00c0735',
-		'03': '6718dbc7ea29196d',
+		'01': 'f13ea328e79a2b20',
+		'02': '0d0031e864263af0',
+		'03': '7b48f3df3836d59e',
 		'04': '6529721205f3e303',
-		'05': 'e88c3d30965c8004',
-		'06': '62abb3284fe34a56',
-		'07': '1952fb2f475caa33',
-		'07b': '2731452e4cfe11f3',
-		'08': '6b4b7dbe99d66352',
-		'09': '42ec1ed2b1426b47',
+		'05': '42332f9712089e46',
+		'06': '7a1e0be81a42d154',
+		'07': 'de326e1fcb3508ab',
+		'07b': 'df8683b091e3896a',
+		'08': 'e1f43a48db41cabc',
+		'09': '68c0e2e912ac4fb7',
 		'10': '66f1441c31cdc85a',
-		'11': '9fe758e236c283b5',
-		'12': '0adbdd430939b8c4',
-		'13': 'd6b0f69edee9a325',
-		'14': '5cfdc875670755d5',
-		'15': 'd7840700a0bf93c2',
+		'11': 'd3a91fb6fc4cba1e',
+		'12': 'a55491c6b3371bc9',
+		'13': 'ec9750a2f1c5eb37',
+		'14': 'dde8521427bdcc5f',
+		'15': 'f0a5cdeb06b210bc',
 		// Sample tree 16 (0.2.7): recorded from the 0.2.6 build.
-		'16': 'e21f140364e486f0',
+		'16': '99560e1945080631',
 	};
 	for (const f of allFixtures()) {
 		it(`sample tree ${f.id}`, () => {

@@ -2,6 +2,7 @@
  * Relation names (spec §13.1) and the relation finder (spec §13.2; D40–D50). `computeRelations`
  * names every person's relation to the marked person ("This is me"); `findRelation` names the
  * relation of one person to another, or finds the shortest chain of links between them;
+ * `relationLookup` gives the same names for the people a view asks for, each worked out once (WP-K);
  * `lineSubgraph` builds the small tree that shows one relation (D47); `relationsKey` is the cache
  * key of the names. The names are English kinship words (exempt from the STE word rule, §13.0
  * item 5), all in the `WORDS` table below; `src/render/tree-info.ts` builds the sentences around them.
@@ -199,6 +200,9 @@ export interface RelationMaybe {
 
 /** D123: counts the second comparison run (the one that counts a rumoured link like a birth link). A tree with no rumoured link leaves it at 0 if the setting of D174 is off or no pair is half. */
 export const relationRunStats = { second: 0 };
+
+/** How often `Kin.relationsFor` ran (one call names one person), for the tests of the lookup: a person is worked out at most once. */
+export const relationCallStats = { calls: 0 };
 
 /** One name of a person's relation to the marked person (or to the finder's first person). */
 export interface Relation {
@@ -1535,6 +1539,7 @@ class Kin {
 
 	/** Every named relation of `p` to `m` (§13.1), best first, one per name. */
 	relationsFor(m: number, p: number): Cand[] {
+		relationCallStats.calls++;
 		this.belowScratch.clear();
 		this.dagScratch.clear();
 		this.sure?.belowScratch.clear();
@@ -2097,6 +2102,90 @@ export const computeRelations: ComputeRelations = (g, me, options = DEFAULT_RELA
 	kin.release();
 	return freezeMap(out);
 };
+
+/** The relations of the people that a view asks for, one answer per person (WP-K, spec §13.1 "Performance"). */
+export interface RelationLookup {
+	/** The same value as `computeRelations(g, me, options).get(id)`: undefined for a person with no relation, for an unknown id, and for every id when `me` is not a person. */
+	get(id: string): readonly Relation[] | undefined;
+	/** `get` for each id of the list, as a map that holds only the people with a relation (like `computeRelations`). The search memos are dropped once, at the end. */
+	getMany(ids: Iterable<string>): ReadonlyMap<string, readonly Relation[]>;
+}
+
+/**
+ * A lookup that gives what `computeRelations(g, me, options)` gives, for the people asked, each worked out once on one full
+ * `Kin` (same code, same data, so same names, lines and order). It must never call `relationsFor` twice for one person: a
+ * second call reads candidates that the first one cleaned (`forget`) and loses names. So each answer is kept. The search
+ * memos are dropped after every request (`release`); the lines that are built later need only the candidates.
+ */
+export function relationLookup(g: FamilyGraph, me: string, options: RelationOptions = DEFAULT_RELATION_OPTIONS): RelationLookup {
+	let kin: Kin | undefined;
+	let mark: number | undefined;
+	let self: readonly Relation[] | undefined;
+	// By index, not by id: a tree that repeats an id (computeRelations keeps the last index that has a name) needs each index once.
+	const done = new Map<number, readonly Relation[] | null>();
+	let repeated: Map<string, number[]> | undefined;
+	let worked = false;
+
+	const open = (k: Kin): void => {
+		mark = k.idx.get(me);
+		if (k.idx.size === k.ids.length) return;
+		const by = new Map<string, number[]>();
+		k.ids.forEach((id, i) => by.set(id, [...(by.get(id) ?? []), i]));
+		repeated = by;
+	};
+
+	const named = (k: Kin, m: number, p: number): readonly Relation[] | null => {
+		const hit = done.get(p);
+		if (hit !== undefined) return hit;
+		let out: readonly Relation[] | null;
+		if (p === m) {
+			self ??= deepFreeze([{ text: capital(WORDS.you), lower: WORDS.you, kind: 'self', distance: 0, line: { people: [me], links: [], unions: [] } } satisfies Relation]);
+			out = self;
+		} else {
+			const cands = k.relationsFor(m, p);
+			out = cands.length ? Object.freeze(cands.map((c) => k.lazyRelation(c))) : null;
+		}
+		done.set(p, out);
+		worked = true;
+		return out;
+	};
+
+	const one = (id: string): readonly Relation[] | undefined => {
+		if (!kin) {
+			kin = new Kin(g, options);
+			open(kin);
+		}
+		if (mark === undefined) return undefined;
+		const at = repeated ? (repeated.get(id) ?? []) : kin.idx.has(id) ? [kin.idx.get(id)!] : [];
+		for (let i = at.length - 1; i >= 0; i--) {
+			const r = named(kin, mark, at[i]);
+			if (r) return r;
+		}
+		return undefined;
+	};
+
+	const finish = (): void => {
+		if (worked) kin?.release();
+		worked = false;
+	};
+
+	return {
+		get(id) {
+			const r = one(id);
+			finish();
+			return r;
+		},
+		getMany(ids) {
+			const out = new Map<string, readonly Relation[]>();
+			for (const id of ids) {
+				const r = one(id);
+				if (r) out.set(id, r);
+			}
+			finish();
+			return freezeMap(out);
+		},
+	};
+}
 
 /** Implements `FindRelation`: the second person as a relative of the first (§13.2). */
 export const findRelation: FindRelation = (g, first, second, options = DEFAULT_RELATION_OPTIONS) => {

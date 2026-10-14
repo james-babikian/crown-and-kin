@@ -10,6 +10,7 @@
  * D122: the sobriquet shows after the name in curly marks, and the search matches its text.
  * 0.2.8 contract G.3, G.1: a row is the name, a second text line "relation · years · title", and at the right the round portrait when the person
  * has one (D213: no initials, no house ring, no empty circle). On a phone the picker is a full-screen sheet; the field and Cancel share the top row (D212).
+ * D237: the list builds at most `PICKER_PAGE` people at once; the next page is added to the same list when the reader scrolls near its end.
  */
 
 import { SuggestModal, prepareFuzzySearch, type App } from 'obsidian';
@@ -22,7 +23,7 @@ import { cardLabel, dateLine } from '../render/tree-info';
 import { WINDOW_UI } from '../render/ui-text';
 import type { RelationOptions } from '../core/relations';
 import type { PictureStore } from './picture-store';
-import { relationsFor, validMe, type CardRelation } from './relation-cache';
+import { relationsFor, validMe, type CardLookup, type CardRelation } from './relation-cache';
 import { RowPictures, personLead } from './window-parts';
 import { FINDER_UI, FLOW } from '../render/ui-text';
 import { ignoreGhostClick, phoneLayout } from './modal-layout';
@@ -43,6 +44,43 @@ export type Picked = { kind: 'person'; id: string } | { kind: 'new'; name: strin
 
 type Item = { kind: 'new'; text: string } | { kind: 'person'; person: Person };
 
+/** D237: the people a list builds at once, and the people that each scroll to the end adds. */
+export const PICKER_PAGE = 200;
+/** The scroll position that adds the next page: this many heights of the list before its end, so the new rows exist before the reader sees them. */
+const NEAR_END = 2;
+
+/** Obsidian's row list inside `SuggestModal` (not in the public typings): the keyboard moves over `suggestions`, and `addSuggestion` adds one row at the end. */
+interface Chooser {
+	values: unknown[] | null;
+	suggestions: HTMLElement[];
+	selectedItem: number;
+	addSuggestion?(value: Item): void;
+	setSelectedItem?(index: number, evt: Event | null): void;
+}
+
+/** The people of a list of items, in order, without the marked person (the row of that person has no relation word). */
+function wordIds(items: Item[], you: string | null): string[] {
+	return items.flatMap((i) => (i.kind === 'person' && i.person.id !== you ? [i.person.id] : []));
+}
+
+/** The rows whose relation words are worked out at once, in `getSuggestions` (about a screenful, and a little more for a scroll). */
+export const FIRST_ROWS = 20;
+/** The rows whose words are worked out in one idle step after that. */
+export const IDLE_CHUNK = 50;
+/** An idle step waits at most this long when the browser stays busy; where there is no idle callback (Safari), it is the plain delay. */
+const IDLE_MS = 300;
+
+/** Runs `fn` in idle time, or after `IDLE_MS` where the browser has no idle callback; gives a function that cancels it. */
+function whenIdle(fn: () => void): () => void {
+	const g = globalThis as unknown as { requestIdleCallback?: (f: () => void, o: { timeout: number }) => number; cancelIdleCallback?: (id: number) => void };
+	if (g.requestIdleCallback && g.cancelIdleCallback) {
+		const id = g.requestIdleCallback(fn, { timeout: IDLE_MS });
+		return () => g.cancelIdleCallback!(id);
+	}
+	const id = window.setTimeout(fn, IDLE_MS);
+	return () => window.clearTimeout(id);
+}
+
 // Defined on first use: tests that mock `obsidian` without SuggestModal can still load the sheet.
 function definePicker() {
 	return class PersonPicker extends SuggestModal<Item> {
@@ -54,7 +92,22 @@ function definePicker() {
 		/** G.1: the portraits of the rows; released when the picker closes. */
 		private readonly rowPictures: RowPictures;
 		/** The relation words to the marked person, or null for no word. */
-		private words: ReadonlyMap<string, CardRelation> | null | undefined;
+		private words: CardLookup | null | undefined;
+		/** The people of the rows whose words are not yet worked out, in the order of the rows; the idle steps take them in chunks. */
+		private queue: string[] = [];
+		/** The redraw of the second text line of each shown row that had no word when it drew. */
+		private pending = new Map<string, (() => void)[]>();
+		private stopFill: (() => void) | null = null;
+		/** Set by `onClose`: a late scroll or idle step must not start work on a picker that is gone. */
+		private closed = false;
+		/** True while the fallback of `loadMore` puts the selected row back, so `onSelectedChange` does not add a page again. */
+		private restoring = false;
+		/** D237: every item of the last list (the new-person row first, then the people), of which only the first `built` have rows. */
+		private pool: Item[] = [];
+		private built = 0;
+		/** The items the next `getSuggestions` hands to Obsidian; it grows only where `addSuggestion` is missing (see `loadMore`). */
+		private window = 0;
+		private lastQuery: string | null = null;
 
 		constructor(
 			app: App,
@@ -78,8 +131,14 @@ function definePicker() {
 			this.people = me ? [me, ...people.filter((p) => p !== me)] : people;
 			this.setPlaceholder(placeholder);
 			this.emptyStateText = FLOW.pickerEmpty;
-			// Find lists every person of a large tree (spec §6.10).
-			this.limit = Math.max(200, this.people.length + 1);
+			// D237: `getSuggestions` hands over the pages, so Obsidian must not cut the list again (its default limit is 100).
+			this.limit = Number.MAX_SAFE_INTEGER;
+			this.window = this.firstWindow();
+		}
+
+		/** The items of the first list: the new-person row (when there is one) and one page of people. */
+		private firstWindow(): number {
+			return (this.allowNew ? 1 : 0) + PICKER_PAGE;
 		}
 
 		/** The marked person's row, "You: NAME" (spec §13.2). */
@@ -97,20 +156,30 @@ function definePicker() {
 			this.inputEl.setAttribute('autocapitalize', 'off');
 			this.inputEl.setAttribute('autocorrect', 'off');
 			this.cleanup.push(phoneLayout(this), ignoreGhostClick(this), trackModal(this, () => this.close()));
+			// D237: a scroll does not bubble, so the listener stands on the list itself.
+			const list = this.resultContainerEl;
+			const onScroll = () => {
+				if (list.scrollHeight - list.scrollTop - list.clientHeight < list.clientHeight * NEAR_END) this.loadMore();
+			};
+			list.addEventListener('scroll', onScroll, { passive: true });
+			this.cleanup.push(() => list.removeEventListener('scroll', onScroll));
 			// A heading with the title, as on the sheets (a phone keeps it for a screen reader only). A phone has no Esc key, so there Cancel
-			// stands in the row of the field; a computer hides it.
+			// stands at the right of the grey pill, outside it, as in an iOS search bar; a computer hides it.
 			const head = createDiv({ cls: 'dynasty-picker-head' });
 			nameDialog(this.modalEl, head.createDiv({ cls: 'dynasty-sheet-title', text: this.title }));
 			const cancel = createEl('button', { cls: 'dynasty-picker-cancel', text: FLOW.cancel, attr: { type: 'button' } });
 			cancel.addEventListener('click', () => this.close());
 			const field = this.inputEl.parentElement;
-			if (field) field.appendChild(cancel);
-			else head.appendChild(cancel);
+			// A sibling of the pill, not a child: the stylesheet puts both in one row of the prompt.
+			if (field?.parentElement === this.modalEl) this.modalEl.insertBefore(cancel, field.nextElementSibling);
+			else this.modalEl.appendChild(cancel);
 			this.modalEl.prepend(head);
 		}
 
 		override onClose(): void {
 			super.onClose();
+			this.closed = true;
+			this.stopWords();
 			this.rowPictures.release();
 			for (const c of this.cleanup.splice(0)) c();
 			// SuggestModal closes before it calls onChooseSuggestion: wait one turn to tell a choice from a cancel.
@@ -120,6 +189,109 @@ function definePicker() {
 		}
 
 		getSuggestions(query: string): Item[] {
+			// A new text starts again at the first page; the same text (the fallback of `loadMore`) keeps the pages it has.
+			if (query !== this.lastQuery) {
+				this.lastQuery = query;
+				this.window = this.firstWindow();
+			}
+			this.pool = this.suggest(query);
+			const out = this.pool.slice(0, this.window);
+			this.built = out.length;
+			this.fillWords(out);
+			return out;
+		}
+
+		/**
+		 * D237: adds the next page of the list. Each row goes to the end of Obsidian's own list, so the selected row, the keyboard and the
+		 * scroll position stay as they are. Where that list has no `addSuggestion` (an Obsidian that changed), the list is built again with
+		 * one more page and the scroll position is put back; that costs more but loses nothing. `showSelected` (a key press) also keeps the
+		 * selected row in view; a scroll keeps the reader's position.
+		 */
+		loadMore(showSelected = false): void {
+			if (this.closed || this.built >= this.pool.length) return;
+			const next = this.pool.slice(this.built, this.built + PICKER_PAGE);
+			const chooser = (this as unknown as { chooser?: Chooser }).chooser;
+			if (chooser?.addSuggestion && chooser.values) {
+				for (const item of next) chooser.addSuggestion(item);
+				this.built += next.length;
+				this.queueWords(wordIds(next, this.you));
+				return;
+			}
+			const list = this.resultContainerEl;
+			const top = list.scrollTop;
+			const selected = chooser?.selectedItem ?? 0;
+			this.window = this.built + next.length;
+			// The rebuild selects the first row; the reader's row must stay selected (and in view), as with `addSuggestion`.
+			this.restoring = true;
+			try {
+				(this as unknown as { onInput(): void }).onInput();
+				list.scrollTop = top;
+				if (chooser && chooser.suggestions.length > 0) {
+					const at = Math.min(selected, chooser.suggestions.length - 1);
+					if (chooser.setSelectedItem) chooser.setSelectedItem(at, null);
+					else chooser.selectedItem = at;
+					if (showSelected) chooser.suggestions[at]?.scrollIntoView?.({ block: 'nearest' });
+				}
+			} finally {
+				this.restoring = false;
+			}
+		}
+
+		/** Obsidian calls this when the selected row changes. Near the last row, the next page is added, so the arrow key does not wrap to the top while rows are missing. */
+		onSelectedChange(): void {
+			const chooser = (this as unknown as { chooser?: Chooser }).chooser;
+			if (!this.restoring && chooser && chooser.selectedItem >= this.built - 10) this.loadMore(true);
+		}
+
+		/**
+		 * WP-K: the words of the first rows come from one request, and the words of the later rows are worked out in idle steps, so the first
+		 * picker on a large marked tree does not wait for the whole tree. A row draws without a word until then.
+		 * D237: only the rows that exist get words; `loadMore` queues the people of each new page.
+		 */
+		private fillWords(out: Item[]): void {
+			this.stopWords();
+			const words = this.wordsOf();
+			if (!words) return;
+			const ids = wordIds(out, this.you);
+			words.getMany(ids.slice(0, FIRST_ROWS));
+			this.queueWords(ids.slice(FIRST_ROWS));
+		}
+
+		/** Puts people on the queue of the idle fill (not those with a word already) and starts the fill when it is not running. */
+		private queueWords(ids: string[]): void {
+			const words = this.wordsOf();
+			if (this.closed || !words) return;
+			this.queue.push(...ids.filter((id) => !words.known(id)));
+			if (!this.stopFill) this.schedule();
+		}
+
+		private schedule(): void {
+			if (this.queue.length) this.stopFill = whenIdle(() => this.fillStep());
+		}
+
+		private fillStep(): void {
+			this.stopFill = null;
+			if (this.closed) return;
+			const words = this.wordsOf();
+			if (!words) return;
+			const chunk = this.queue.splice(0, IDLE_CHUNK);
+			words.getMany(chunk);
+			for (const id of chunk) {
+				for (const redraw of this.pending.get(id) ?? []) redraw();
+				this.pending.delete(id);
+			}
+			this.schedule();
+		}
+
+		/** Ends the idle steps (a new list, or the picker closes). */
+		private stopWords(): void {
+			this.stopFill?.();
+			this.stopFill = null;
+			this.queue = [];
+			this.pending.clear();
+		}
+
+		private suggest(query: string): Item[] {
 			const q = query.trim();
 			const first: Item[] = this.allowNew ? [{ kind: 'new', text: query }] : [];
 			if (!q) return [...first, ...this.people.map((person): Item => ({ kind: 'person', person }))];
@@ -163,33 +335,52 @@ function definePicker() {
 			// D122: the sobriquet in curly marks, in regular weight, after the name and the ruler name.
 			if (p.sobriquet !== undefined) name.createSpan({ cls: 'dynasty-picker-sob', text: ` ${quotedSobriquet(p.sobriquet)}` });
 			// "You: Ann" already says who is marked, so the second text line does not repeat "You".
-			const relation = this.relationOf(p.id);
 			// D218 rule 4: the relation word is italic, as on the cards and in the window rows; the rest of the text line is plain.
-			const word = you ? '' : (relation?.text ?? '');
 			const rest = WINDOW_UI.findRowSub('', dateLine(p) ?? '', label?.title ?? p.title ?? '');
-			if (word || rest) {
-				const sub = text.createDiv({ cls: 'dynasty-picker-sub', ...(word ? {} : { text: rest }) });
+			let sub: HTMLElement | null = null;
+			const paintSub = () => {
+				sub?.remove();
+				sub = null;
+				const word = you ? '' : (this.relationOf(p.id)?.text ?? '');
+				if (!word && !rest) return;
+				sub = text.createDiv({ cls: 'dynasty-picker-sub', ...(word ? {} : { text: rest }) });
 				if (word) sub.createEl('i', { text: word });
 				// A span, not loose text: the order of the nodes stays the same for a reader that walks the children.
 				if (word && rest) sub.createSpan({ text: ` · ${rest}` });
-			}
+			};
+			paintSub();
 			// The portrait stands after the text, at the right, so the names line up with or without one (D213).
 			const lead = personLead(el, { name: p.name, ...(p.portrait ? { portrait: p.portrait } : {}), ...(p.portraitCrop ? { portraitCrop: p.portraitCrop } : {}) }, this.rowPictures, 36);
 			lead?.addClass('dynasty-picker-swatch');
 			// The visible lines hold "maybe full" and "·"; a screen reader gets the sentence the cards use. A hidden
 			// text, not aria-label: Obsidian shows an aria-label as a tooltip over the row.
 			text.setAttribute('aria-hidden', 'true');
-			el.createSpan({ cls: 'dynasty-sr-only', text: cardLabel(p, you ? 'you' : relation?.lower, label) });
+			const spoken = () => cardLabel(p, you ? 'you' : this.relationOf(p.id)?.lower, label);
+			const sr = el.createSpan({ cls: 'dynasty-sr-only', text: spoken() });
+			// A row of a person whose word is not worked out yet gets it in place when its idle step has run.
+			const words = this.wordsOf();
+			if (!you && words && !words.known(p.id)) {
+				const redraw = () => {
+					paintSub();
+					sr.setText(spoken());
+				};
+				this.pending.set(p.id, [...(this.pending.get(p.id) ?? []), redraw]);
+			}
 		}
 
-		/** The relation of a person to the marked person (the card texts), or undefined. Worked out once, from the whole tree. */
+		/** The relation of a person to the marked person (the card texts), or undefined. It never works one out: the render must stay cheap. */
 		private relationOf(id: string): CardRelation | undefined {
+			return this.wordsOf()?.peek(id);
+		}
+
+		/** The relation words of the whole tree to the marked person, or null with no valid mark. */
+		private wordsOf(): CardLookup | null {
 			if (this.words === undefined) {
 				const me = this.ctx.me !== undefined ? this.ctx.me : this.you;
 				const valid = me ? validMe(this.g, me) : null;
 				this.words = valid ? relationsFor(this.g, valid, this.ctx.relationOptions).cards : null;
 			}
-			return this.words?.get(id);
+			return this.words;
 		}
 
 		onChooseSuggestion(item: Item): void {

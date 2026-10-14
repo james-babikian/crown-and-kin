@@ -233,7 +233,9 @@ describe('fillNear builds the lines and signs near the view', () => {
 	it('a line that starts outside the grown view and ends inside it is built whole', () => {
 		const eager = build('07', false);
 		const lazy = build('07', true);
-		const edge = { x: 5200, y: 100, w: 20, h: 20 };
+		// A small view at the right end of the first long line, so the test does not depend on where the placement puts the cards.
+		const long = eager.laid.edges.paths.map((p) => pathBox(p.d, 4)!).find((b) => b.w > 400)!;
+		const edge = { x: long.x + long.w - 10, y: long.y + long.h / 2, w: 20, h: 20 };
 		const spanning = eager.laid.edges.paths.map((p) => p.d).filter((d) => {
 			const b = pathBox(d, 4)!;
 			return boxNearView(b, edge) && (b.x < edge.x - edge.w || b.x + b.w > edge.x + 2 * edge.w);

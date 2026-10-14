@@ -15,7 +15,7 @@ import { desktop, embed, fakeHandle, openFullScreen, phone } from './acceptance/
  * Review round 0.2.3, area C, spec §13.18 rule 5 ("Start on me"), moved to 0.2.5 (D144): every combination of device, place, pin, session focus,
  * edited person, options.start, options.me and tree size against a model written from the spec. A tree in a note on a phone is a list that
  * stands on the person of the start chain (the session choice, the pin, the marked person, the person edited last, the oldest person who has
- * children, the first root; `options.start` is not in it). The full-screen view on a phone keeps the rule of D20; the computer and the tablet
+ * children, the first root; `options.start` is not in it). The full-screen view on a phone keeps the rule of D20 and D234 (the person edited last, `options.start`, the marked person, the first root); the computer and the tablet
  * show the whole tree or the pin.
  */
 
@@ -69,7 +69,8 @@ function expected(o: Case): string | null {
 	if (has(o.pin)) return o.pin!;
 	if (o.device !== 'phone') return null;
 	if (o.size <= 100) return null;
-	return [o.edited, o.start].find(has) ?? 'p0';
+	// D234: the marked person is on the chain after `options.start`; a mark that names nobody counts as no mark.
+	return [o.edited, o.start, o.me].find(has) ?? 'p0';
 }
 
 /** D144: the person that the list of a phone note stands on, and the rung of the start chain that chose the person. */
@@ -131,6 +132,6 @@ describe('spec §13.18 rule 5: the first view against a model of the spec', () =
 		expect(bad.join('\n')).toBe('');
 	};
 	it('every combination of the note opens the person that the spec names: the list stands on the start chain, the other devices draw the whole tree or the pin', run(cases.filter((c) => c.place === 'preview')), 120000);
-	// The full-screen view on a phone does not use the marked person as its start person (D20).
-	it('the full-screen view on a phone does not use the marked person as its start person', run(cases.filter((c) => c.place === 'full')), 120000);
+	// D234: the full-screen view on a phone of a tree over 100 people starts on the marked person when nobody was edited and `options.start` is not set.
+	it('the full-screen view on a phone uses the marked person as its start person, after the person edited last and options.start (D234)', run(cases.filter((c) => c.place === 'full')), 120000);
 });

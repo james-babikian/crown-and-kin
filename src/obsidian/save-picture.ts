@@ -40,7 +40,7 @@ export interface SaveSource {
 	g: FamilyGraph;
 	labels?: ReadonlyMap<string, CardLabel>;
 	/** The relation names of the cards; absent when the view has none or "Show relation names on cards" is off. */
-	relations?: ReadonlyMap<string, { text: string; lower: string }>;
+	relations?: { get(id: string): { text: string; lower: string } | undefined };
 	me?: string;
 	/** The relation finder's line; `fade` for "Show in the whole tree". */
 	line?: LineMarks;

@@ -33,7 +33,7 @@ export interface OpContext {
 	keepStale?: boolean;
 }
 
-const UNION_ORDER = ['id', 'partners', 'type', 'start', 'end'];
+export const UNION_ORDER = ['id', 'partners', 'type', 'start', 'end'];
 const flowText = (v: string) => renderScalar(v, null, { flow: true, text: true, indent: '' });
 
 function done(r: EditResult, effects: 'auto-union'[] = []): EditResult {

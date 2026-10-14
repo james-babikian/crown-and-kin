@@ -133,18 +133,18 @@ describe('review M7: the finder\'s line has no gaps in the whole tree (D47, spec
 		expect(gaps).toEqual([]);
 	});
 
-	it('two legs from one side: P1 > P2 in random tree 2 lights the stretch from the end of P1\'s leg to the sign', () => {
-		// P0's and P1's legs reach the implicit union of P0 and P1 from the same side; P1's leg stops
-		// where it meets P0's leg (edges.ts), so the last part to the sign belongs to P0's leg.
-		const { g } = build(randomTree(2));
+	it('two legs from one side: P7 > P8 in random tree 47 lights the stretch from the end of P7\'s leg to the sign', () => {
+		// P2's and P7's legs reach the implicit union of P2 and P7 from the same side; P7's leg stops
+		// where it meets P2's leg (edges.ts), so the last part to the sign belongs to P2's leg. (N05: random tree 2 had this case until its dot moved between the legs.)
+		const { g } = build(randomTree(47));
 		const laid = lay(g, { ...DEFAULT_LAYOUT_SETTINGS, relationLine: true });
-		const key = g.primaryUnion.get('p2')!;
+		const key = g.primaryUnion.get('p8')!;
 		const dot = laid.layout.unions.get(key)!;
-		const leg = laid.edges.paths.find((p) => p.union === key && p.parents?.length === 1 && p.parents[0] === 'p1')!;
+		const leg = laid.edges.paths.find((p) => p.union === key && p.parents?.length === 1 && p.parents[0] === 'p7')!;
 		const end = Number(/H(-?[\d.]+)$/.exec(leg.d)![1]);
 		expect(Math.abs(end - dot.x)).toBeGreaterThan(20);
-		const line = lineOf(g, 'p1', 'p2');
-		expect(line.links.map((l) => `${l.parent}>${l.child}`)).toEqual(['p1>p2']);
+		const line = lineOf(g, 'p7', 'p8');
+		expect(line.links.map((l) => `${l.parent}>${l.child}`)).toEqual(['p7>p8']);
 		const { gaps, look } = lineGaps(g, laid, line, true);
 		// Every point between the leg's end and the sign lies on a piece drawn on.
 		const on = look.paths.filter((p) => p.state === 'on').flatMap((p, i) => segsOf(p.d, i));

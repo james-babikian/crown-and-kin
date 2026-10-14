@@ -1,0 +1,462 @@
+{
+	"v0.1.0/01-three-generations.md": [
+		{
+			"status": "ok",
+			"warnings": []
+		}
+	],
+	"v0.1.0/02-three-spouses.md": [
+		{
+			"status": "ok",
+			"warnings": []
+		}
+	],
+	"v0.1.0/03-cousin-marriage.md": [
+		{
+			"status": "ok",
+			"warnings": []
+		}
+	],
+	"v0.1.0/04-illegitimate-rumoured.md": [
+		{
+			"status": "ok",
+			"warnings": []
+		}
+	],
+	"v0.1.0/05-malformed.md": [
+		{
+			"status": "ok",
+			"warnings": [
+				{
+					"level": "warning",
+					"code": "house-color-null",
+					"text": "House Brennock has no colour. Put quotes around the colour: color: \"#2e7d4f\"."
+				},
+				{
+					"level": "blocking",
+					"code": "duplicate-person-id",
+					"text": "Hal Ashford (hal) has the same ID as another person. To edit the tree again, give each person a different ID."
+				},
+				{
+					"level": "blocking",
+					"code": "duplicate-union-id",
+					"text": "More than one partnership has the ID “spring-wedding”. To edit the tree again, give each partnership a different ID."
+				},
+				{
+					"level": "warning",
+					"code": "missing-start",
+					"text": "No person has the ID “aldous”, so the tree cannot start at this person. Correct the ID, or remove “start: aldous”."
+				},
+				{
+					"level": "warning",
+					"code": "missing-focus",
+					"text": "No person has the ID “lost-heir”, so the tree cannot show the family of this person. Correct the ID, or remove “focus: lost-heir”."
+				},
+				{
+					"level": "warning",
+					"code": "too-many-parents",
+					"text": "Joss Ashford has 3 birth parents, but a person can have only 2 of each type. Remove the extra parents, or change their type."
+				},
+				{
+					"level": "warning",
+					"code": "missing-house",
+					"text": "Wynn Ashford has the house “ashfurd”, but no house has this ID. Correct the ID, or add the house."
+				},
+				{
+					"level": "warning",
+					"code": "missing-parent",
+					"text": "Wynn Ashford has a parent with the ID “ghost”, but no person has this ID. Correct the ID, or add the person."
+				},
+				{
+					"level": "warning",
+					"code": "placement-without-parents",
+					"text": "Piers Ashford has “placement: ward”, but has no ward parents. Add ward parents, or remove “placement: ward”."
+				},
+				{
+					"level": "warning",
+					"code": "unknown-placement",
+					"text": "Tilda Ashford has the unknown placement “fostered”. Use birth, adoptive or ward."
+				},
+				{
+					"level": "warning",
+					"code": "missing-union",
+					"text": "Cole Ashford has “union: second-wedding”, but no partnership has this ID. Correct the ID, or remove “union: second-wedding”."
+				},
+				{
+					"level": "warning",
+					"code": "unknown-parent-type",
+					"text": "Edda Brennock has the parent Ranulf Brennock with the type “godfather”, which the plugin does not know. The plugin counts Ranulf Brennock as a birth parent of Edda Brennock. Use birth, adoptive, ward or rumoured."
+				},
+				{
+					"level": "warning",
+					"code": "union-partner-count",
+					"text": "The tree does not show a partnership with 3 people: Joss Ashford, Maren Holt and Piers Ashford. Give each partnership exactly 2 people. Write one partnership for each pair, for example “- partners: [aldric, isolde]”."
+				},
+				{
+					"level": "warning",
+					"code": "union-same-partner",
+					"text": "The tree does not show partnership 4 in the “unions” list, because it has Tilda Ashford two times. Change one partner to a different person."
+				},
+				{
+					"level": "warning",
+					"code": "missing-partner",
+					"text": "The tree does not show the partnership of Piers Ashford and “nobody”, because no person has the ID “nobody”. Correct the ID, or add the person."
+				},
+				{
+					"level": "warning",
+					"code": "cycle",
+					"text": "Arn Marsh, Bram Marsh and Col Marsh are ancestors of each other, so the tree has a time loop. The tree does not show the line from Col Marsh to Arn Marsh. If this is a mistake, correct the parents."
+				}
+			]
+		}
+	],
+	"v0.1.0/06-sixty-people.md": [
+		{
+			"status": "ok",
+			"warnings": []
+		}
+	],
+	"v0.1.0/07-four-hundred-people.md": [
+		{
+			"status": "ok",
+			"warnings": []
+		}
+	],
+	"v0.1.0/08-parent-types.md": [
+		{
+			"status": "ok",
+			"warnings": []
+		}
+	],
+	"v0.1.0/09-formatting.md": [
+		{
+			"status": "ok",
+			"warnings": []
+		},
+		{
+			"status": "ok",
+			"warnings": []
+		},
+		{
+			"status": "ok",
+			"warnings": []
+		},
+		{
+			"status": "ok",
+			"warnings": []
+		},
+		{
+			"status": "ok",
+			"warnings": []
+		},
+		{
+			"status": "ok",
+			"warnings": []
+		}
+	],
+	"v0.1.0/10-hand-typing.md": [
+		{
+			"status": "ok",
+			"warnings": [
+				{
+					"level": "warning",
+					"code": "house-color-null",
+					"text": "House Valmont has no colour. Put quotes around the colour: color: \"#8b1e3f\"."
+				}
+			]
+		}
+	],
+	"v0.1.0/11-close-kin-marriages.md": [
+		{
+			"status": "ok",
+			"warnings": []
+		}
+	],
+	"v0.2.0/01-three-generations.md": [
+		{
+			"status": "ok",
+			"warnings": []
+		}
+	],
+	"v0.2.0/02-three-spouses.md": [
+		{
+			"status": "ok",
+			"warnings": []
+		}
+	],
+	"v0.2.0/03-cousin-marriage.md": [
+		{
+			"status": "ok",
+			"warnings": []
+		}
+	],
+	"v0.2.0/04-illegitimate-rumoured.md": [
+		{
+			"status": "ok",
+			"warnings": []
+		}
+	],
+	"v0.2.0/05-malformed.md": [
+		{
+			"status": "ok",
+			"warnings": [
+				{
+					"level": "warning",
+					"code": "house-color-null",
+					"text": "House Brennock has no colour. Put quotes around the colour: color: \"#2e7d4f\"."
+				},
+				{
+					"level": "blocking",
+					"code": "duplicate-person-id",
+					"text": "Hal Ashford (hal) has the same ID as another person. To edit the tree again, give each person a different ID."
+				},
+				{
+					"level": "blocking",
+					"code": "duplicate-union-id",
+					"text": "More than one partnership has the ID “spring-wedding”. To edit the tree again, give each partnership a different ID."
+				},
+				{
+					"level": "warning",
+					"code": "missing-start",
+					"text": "No person has the ID “aldous”, so the tree cannot start at this person. Correct the ID, or remove “start: aldous”."
+				},
+				{
+					"level": "warning",
+					"code": "missing-focus",
+					"text": "No person has the ID “lost-heir”, so the tree cannot show the family of this person. Correct the ID, or remove “focus: lost-heir”."
+				},
+				{
+					"level": "warning",
+					"code": "too-many-parents",
+					"text": "Joss Ashford has 3 birth parents, but a person can have only 2 of each type. Remove the extra parents, or change their type."
+				},
+				{
+					"level": "warning",
+					"code": "missing-house",
+					"text": "Wynn Ashford has the house “ashfurd”, but no house has this ID. Correct the ID, or add the house."
+				},
+				{
+					"level": "warning",
+					"code": "missing-parent",
+					"text": "Wynn Ashford has a parent with the ID “ghost”, but no person has this ID. Correct the ID, or add the person."
+				},
+				{
+					"level": "warning",
+					"code": "placement-without-parents",
+					"text": "Piers Ashford has “placement: ward”, but has no ward parents. Add ward parents, or remove “placement: ward”."
+				},
+				{
+					"level": "warning",
+					"code": "unknown-placement",
+					"text": "Tilda Ashford has the unknown placement “fostered”. Use birth, adoptive or ward."
+				},
+				{
+					"level": "warning",
+					"code": "missing-union",
+					"text": "Cole Ashford has “union: second-wedding”, but no partnership has this ID. Correct the ID, or remove “union: second-wedding”."
+				},
+				{
+					"level": "warning",
+					"code": "unknown-parent-type",
+					"text": "Edda Brennock has the parent Ranulf Brennock with the type “godfather”, which the plugin does not know. The plugin counts Ranulf Brennock as a birth parent of Edda Brennock. Use birth, adoptive, ward or rumoured."
+				},
+				{
+					"level": "warning",
+					"code": "union-partner-count",
+					"text": "The tree does not show a partnership with 3 people: Joss Ashford, Maren Holt and Piers Ashford. Give each partnership exactly 2 people. Write one partnership for each pair, for example “- partners: [aldric, isolde]”."
+				},
+				{
+					"level": "warning",
+					"code": "union-same-partner",
+					"text": "The tree does not show partnership 4 in the “unions” list, because it has Tilda Ashford two times. Change one partner to a different person."
+				},
+				{
+					"level": "warning",
+					"code": "missing-partner",
+					"text": "The tree does not show the partnership of Piers Ashford and “nobody”, because no person has the ID “nobody”. Correct the ID, or add the person."
+				},
+				{
+					"level": "warning",
+					"code": "cycle",
+					"text": "Arn Marsh, Bram Marsh and Col Marsh are ancestors of each other, so the tree has a time loop. The tree does not show the line from Col Marsh to Arn Marsh. If this is a mistake, correct the parents."
+				}
+			]
+		}
+	],
+	"v0.2.0/06-sixty-people.md": [
+		{
+			"status": "ok",
+			"warnings": []
+		}
+	],
+	"v0.2.0/07-four-hundred-people.md": [
+		{
+			"status": "ok",
+			"warnings": []
+		}
+	],
+	"v0.2.0/07b-four-hundred-people-pictures.md": [
+		{
+			"status": "ok",
+			"warnings": []
+		}
+	],
+	"v0.2.0/08-parent-types.md": [
+		{
+			"status": "ok",
+			"warnings": []
+		}
+	],
+	"v0.2.0/09-formatting.md": [
+		{
+			"status": "ok",
+			"warnings": []
+		},
+		{
+			"status": "ok",
+			"warnings": []
+		},
+		{
+			"status": "ok",
+			"warnings": []
+		},
+		{
+			"status": "ok",
+			"warnings": []
+		},
+		{
+			"status": "ok",
+			"warnings": []
+		},
+		{
+			"status": "ok",
+			"warnings": []
+		}
+	],
+	"v0.2.0/10-hand-typing.md": [
+		{
+			"status": "ok",
+			"warnings": [
+				{
+					"level": "warning",
+					"code": "house-color-null",
+					"text": "House Valmont has no colour. Put quotes around the colour: color: \"#8b1e3f\"."
+				}
+			]
+		}
+	],
+	"v0.2.0/11-close-kin-marriages.md": [
+		{
+			"status": "ok",
+			"warnings": []
+		}
+	],
+	"v0.2.0/12-relations.md": [
+		{
+			"status": "ok",
+			"warnings": []
+		}
+	],
+	"v0.2.0/13-titles.md": [
+		{
+			"status": "ok",
+			"warnings": [
+				{
+					"level": "warning",
+					"code": "entry-not-map",
+					"text": "Entry 4 in the holders of King of the Vale is not a holder. Write each holder like this: - {person: aldric}."
+				},
+				{
+					"level": "warning",
+					"code": "section-wrong-shape",
+					"text": "The holders of the title Warden of the Marches are not a list, so the tree ignores them. Write each holder like this: - {person: aldric}."
+				},
+				{
+					"level": "warning",
+					"code": "entry-not-map",
+					"text": "Entry 5 in the “titles” list is not a title, so the tree does not show it. Start each title with “- id:”."
+				},
+				{
+					"level": "warning",
+					"code": "missing-id",
+					"text": "Margrave of the Salt Coast has no ID, so the tree does not use this title. Add an ID, for example: id: margrave-of-the-salt-coast."
+				},
+				{
+					"level": "warning",
+					"code": "missing-holder",
+					"text": "The title Count of Orsini has a holder with the ID “cosimo”, but no person has this ID. Correct the ID, or write the name of the holder."
+				},
+				{
+					"level": "warning",
+					"code": "missing-holder",
+					"text": "The title Count of Orsini has a holder with the ID “beatrice”, but no person has this ID. Correct the ID, or write the name of the holder."
+				},
+				{
+					"level": "warning",
+					"code": "holder-empty",
+					"text": "Entry 9 in the holders of Count of Orsini has no person and no name. Add “person:” or “name:”."
+				},
+				{
+					"level": "warning",
+					"code": "duplicate-title-id",
+					"text": "More than one title has the ID “count-of-orsini”, and the tree uses only the first. Give each title a different ID."
+				},
+				{
+					"level": "warning",
+					"code": "card-title-not-held",
+					"text": "Isolde Orsini has “card-title: duke-of-valmont”, but Isolde Orsini does not hold a title with this ID. The card shows the first title instead. Correct the ID, or remove it."
+				}
+			]
+		},
+		{
+			"status": "ok",
+			"warnings": [
+				{
+					"level": "warning",
+					"code": "section-wrong-shape",
+					"text": "The “titles” section is not a list, so the tree ignores it. Start each title with “- id:”."
+				},
+				{
+					"level": "warning",
+					"code": "card-title-not-held",
+					"text": "Aldric Valmont has “card-title: duke-of-valmont”, but Aldric Valmont does not hold a title with this ID. The card shows the first title instead. Correct the ID, or remove it."
+				}
+			]
+		}
+	],
+	"v0.2.0/14-pictures.md": [
+		{
+			"status": "ok",
+			"warnings": []
+		},
+		{
+			"status": "ok",
+			"warnings": []
+		},
+		{
+			"status": "ok",
+			"warnings": [
+				{
+					"level": "warning",
+					"code": "bad-portrait-crop",
+					"text": "The plugin cannot read the selected part of the portrait of Bertrand Valmont, so the card shows the automatic part. Select the part again, or remove “portrait-crop”."
+				},
+				{
+					"level": "warning",
+					"code": "bad-portrait-crop",
+					"text": "The plugin cannot read the selected part of the portrait of Hilda Valmont, so the card shows the automatic part. Select the part again, or remove “portrait-crop”."
+				}
+			]
+		}
+	],
+	"v0.2.0/15-long-names-and-branches.md": [
+		{
+			"status": "ok",
+			"warnings": []
+		},
+		{
+			"status": "ok",
+			"warnings": []
+		}
+	]
+}

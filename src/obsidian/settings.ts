@@ -15,7 +15,7 @@ export const REDUCE_MOTIONS: readonly ReduceMotion[] = ['system', 'on', 'off'];
 export type ArmsOnCards = 'few' | 'all';
 export const ARMS_ON_CARDS: readonly ArmsOnCards[] = ['few', 'all'];
 
-/** The characters of `breakWords` that `normaliseSettings` keeps. */
+/** The most characters of `breakWords` that this version accepts. A longer stored text is invalid. */
 export const BREAK_WORDS_MAX = 20000;
 
 /** The plugin settings (spec §9, D33), stored with `Plugin.saveData`. The settings tab and every reader use this shape. */
@@ -94,31 +94,107 @@ export const YOUNG_DEATH_AGE = { min: 0, max: 1000 } as const;
 
 const wholeIn = (v: unknown, r: { min: number; max: number }): v is number => typeof v === 'number' && Number.isInteger(v) && v >= r.min && v <= r.max;
 
+/*
+ * One reader for each setting. It returns the value, or `undefined` when the stored value is not valid for
+ * this version. Both `normaliseSettings` (invalid becomes the default) and `readStoredSettings` (invalid is
+ * also kept as stored, spec §9) use it, so the two can never disagree on what is valid.
+ */
+const bool = (v: unknown): boolean | undefined => (typeof v === 'boolean' ? v : undefined);
+const choice = <T extends string>(list: readonly T[], v: unknown): T | undefined => list.find((x) => x === v);
+const whole =
+	(r: { min: number; max: number }) =>
+	(v: unknown): number | undefined =>
+		wholeIn(v, r) ? v : undefined;
+// A height typed as 480.5 is still a height: round it, then check the range.
+const height = (v: unknown): number | undefined => {
+	const n = typeof v === 'number' && Number.isFinite(v) ? Math.round(v) : NaN;
+	return wholeIn(n, DESKTOP_HEIGHT) ? n : undefined;
+};
+
+const READERS: { [K in keyof DynastySettings]: (v: unknown) => DynastySettings[K] | undefined } = {
+	embedHeightDesktop: height,
+	showDates: bool,
+	showRelations: bool,
+	oneParentUnknown: bool,
+	showPortraits: bool,
+	showHouseGeneration: bool,
+	focusGenerations: whole(GENERATIONS),
+	updateLinks: bool,
+	// Too long is invalid, not cut: a newer version may allow more, and the raw text is then kept and written back unchanged.
+	breakWords: (v) => (typeof v === 'string' && v.length <= BREAK_WORDS_MAX ? v : undefined),
+	reduceMotion: (v) => choice(REDUCE_MOTIONS, v),
+	phoneDirection: (v) => choice(PHONE_DIRECTIONS, v),
+	successionLength: whole(SUCCESSION_LENGTH),
+	oldAge: whole(OLD_AGE),
+	youngDeathAge: whole(YOUNG_DEATH_AGE),
+	armsOnCards: (v) => choice(ARMS_ON_CARDS, v),
+	warnManyParents: bool,
+};
+
+const KNOWN_KEYS = Object.keys(DEFAULT_SETTINGS) as (keyof DynastySettings)[];
+
+const asRecord = (raw: unknown): Record<string, unknown> => (raw !== null && typeof raw === 'object' && !Array.isArray(raw) ? (raw as Record<string, unknown>) : {});
+
 /** Reads stored data: every missing, wrong-type or out-of-range value becomes its default. Pure. */
 export const normaliseSettings = (raw: unknown): DynastySettings => {
-	const s = raw !== null && typeof raw === 'object' && !Array.isArray(raw) ? (raw as Record<string, unknown>) : {};
-	const d = DEFAULT_SETTINGS;
-	// A height typed as 480.5 is still a height: round it, then check the range.
-	const desktop = typeof s.embedHeightDesktop === 'number' && Number.isFinite(s.embedHeightDesktop) ? Math.round(s.embedHeightDesktop) : NaN;
-	return {
-		embedHeightDesktop: wholeIn(desktop, DESKTOP_HEIGHT) ? desktop : d.embedHeightDesktop,
-		showDates: typeof s.showDates === 'boolean' ? s.showDates : d.showDates,
-		showRelations: typeof s.showRelations === 'boolean' ? s.showRelations : d.showRelations,
-		oneParentUnknown: typeof s.oneParentUnknown === 'boolean' ? s.oneParentUnknown : d.oneParentUnknown,
-		showPortraits: typeof s.showPortraits === 'boolean' ? s.showPortraits : d.showPortraits,
-		showHouseGeneration: typeof s.showHouseGeneration === 'boolean' ? s.showHouseGeneration : d.showHouseGeneration,
-		focusGenerations: wholeIn(s.focusGenerations, GENERATIONS) ? s.focusGenerations : d.focusGenerations,
-		updateLinks: typeof s.updateLinks === 'boolean' ? s.updateLinks : d.updateLinks,
-		breakWords: typeof s.breakWords === 'string' ? s.breakWords.slice(0, BREAK_WORDS_MAX) : d.breakWords,
-		reduceMotion: REDUCE_MOTIONS.find((v) => v === s.reduceMotion) ?? d.reduceMotion,
-		phoneDirection: PHONE_DIRECTIONS.find((v) => v === s.phoneDirection) ?? d.phoneDirection,
-		successionLength: wholeIn(s.successionLength, SUCCESSION_LENGTH) ? s.successionLength : d.successionLength,
-		oldAge: wholeIn(s.oldAge, OLD_AGE) ? s.oldAge : d.oldAge,
-		youngDeathAge: wholeIn(s.youngDeathAge, YOUNG_DEATH_AGE) ? s.youngDeathAge : d.youngDeathAge,
-		armsOnCards: ARMS_ON_CARDS.find((v) => v === s.armsOnCards) ?? d.armsOnCards,
-		warnManyParents: typeof s.warnManyParents === 'boolean' ? s.warnManyParents : d.warnManyParents,
-	};
+	const s = asRecord(raw);
+	const out: Record<string, unknown> = { ...DEFAULT_SETTINGS };
+	for (const k of KNOWN_KEYS) out[k] = READERS[k](s[k]) ?? DEFAULT_SETTINGS[k];
+	return out as unknown as DynastySettings;
 };
+
+/** The key of the settings version in `data.json`. It is not a setting: it is not in `DynastySettings`, and `settingsChanges` never reports it. */
+export const VERSION_KEY = 'settingsVersion';
+/** The settings version that this release writes (W7). A higher stored version is kept as stored. */
+export const SETTINGS_VERSION = 1;
+
+/**
+ * Every key that an earlier release stored as a setting and this release does not (from the git history of
+ * this file, 0.1.0 to 0.2.8). A load drops them and a save does not write them again (spec §9, D144, D179).
+ */
+export const REMOVED_KEYS: readonly string[] = ['cardSize', 'embedHeightPhone', 'phoneCardStyle'];
+
+/**
+ * What a load keeps of `data.json` besides the settings, so that a save does not lose it (W7): the version,
+ * the keys that no release knows, and the raw value of a known key that is not valid here (for example a
+ * choice that a newer version added). The settings in memory hold the default for such a key.
+ */
+export interface StoredExtras {
+	version: number;
+	unknown: Readonly<Record<string, unknown>>;
+	invalid: Readonly<Record<string, unknown>>;
+}
+
+/** No extras: a fresh install, and the state before the first load. */
+export const NO_EXTRAS: StoredExtras = { version: SETTINGS_VERSION, unknown: {}, invalid: {} };
+
+/** A stored version that is not a positive whole number counts as absent. */
+const readVersion = (v: unknown): number => (typeof v === 'number' && Number.isInteger(v) && v >= 1 ? v : SETTINGS_VERSION);
+
+/** Reads `data.json`: the settings, and what a save must write back unchanged. Pure. */
+export function readStoredSettings(raw: unknown): { settings: DynastySettings; extras: StoredExtras } {
+	const s = asRecord(raw);
+	const known = new Set<string>(KNOWN_KEYS);
+	const skip = new Set<string>([VERSION_KEY, PENDING_KEY, ...REMOVED_KEYS]);
+	// `Object.fromEntries` makes own properties, so a stored key named `__proto__` stays plain data.
+	const unknown = Object.fromEntries(Object.entries(s).filter(([k]) => !known.has(k) && !skip.has(k)));
+	const invalid = Object.fromEntries(KNOWN_KEYS.filter((k) => k in s && READERS[k](s[k]) === undefined).map((k) => [k, s[k]]));
+	return { settings: normaliseSettings(raw), extras: { version: readVersion(s[VERSION_KEY]), unknown, invalid } };
+}
+
+/** The extras after the user changed these settings: the kept raw value of a changed setting goes (spec §9). */
+export function clearInvalid(extras: StoredExtras, changed: readonly string[]): StoredExtras {
+	if (!changed.some((k) => k in extras.invalid)) return extras;
+	return { ...extras, invalid: Object.fromEntries(Object.entries(extras.invalid).filter(([k]) => !changed.includes(k))) };
+}
+
+/**
+ * The object for `Plugin.saveData`: the kept keys, the settings, the kept raw values, the version, and the
+ * renames that wait (only while there are some, so the file keeps the shape of earlier versions). Pure.
+ */
+export function buildStoredData(settings: DynastySettings, extras: StoredExtras, pending: readonly PendingRename[]): Record<string, unknown> {
+	return { ...extras.unknown, ...settings, ...extras.invalid, [VERSION_KEY]: extras.version, ...(pending.length ? { [PENDING_KEY]: pending } : {}) };
+}
 
 /** True when movement is reduced (D126). `prefers` is `matchMedia('(prefers-reduced-motion: reduce)').matches` on the view's own window. */
 export const reducedMotion = (setting: ReduceMotion, prefers: boolean): boolean => (setting === 'on' ? true : setting === 'off' ? false : prefers);

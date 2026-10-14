@@ -4,22 +4,22 @@ geometry font 16 normal card 180x61 union 10 couple 36 node 20 row 100 tag 18
 row 0: aldous 0017
 row 1: piers tamsin edric joan rosamund
 gap 0: 61 161
-person 0017 gen 0 at 556 0 size 180 61
-person aldous gen 0 at 340 0 size 180 61
+person 0017 gen 0 at 516 0 size 180 61
+person aldous gen 0 at 300 0 size 180 61
 person edric gen 1 at 400 161 size 180 61
 person joan gen 1 at 616 161 size 180 61
 person piers gen 1 at 0 161 size 180 61
 person rosamund gen 1 at 816 161 size 180 61
 person tamsin gen 1 at 200 161 size 180 61
-union u0 at 538 30.5 bar
+union u0 at 498 30.5 bar
 union u1 at 598 191.5 bar
-path marriage [aldous 0017] M520 30.5H556
+path marriage [aldous 0017] M480 30.5H516
 path betrothal [edric joan] M580 191.5H616
-path descent [aldous 0017 edric rosamund] M538 30.5V131M490 131H906
+path descent [aldous 0017 edric rosamund] M498 30.5V131M490 131H906
 path descent [edric aldous 0017] M490 131V161
 path descent [rosamund aldous 0017] M906 131V161
-path descent [aldous piers tamsin] M430 61V131M90 131H430
+path descent [aldous piers tamsin] M390 61V131M90 131H390
 path descent [piers aldous] M90 131V161
 path ward [tamsin aldous] M290 131V161
-marker union at 538 30.5
+marker union at 498 30.5
 marker union at 598 191.5

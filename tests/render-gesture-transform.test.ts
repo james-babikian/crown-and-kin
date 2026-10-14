@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { FILL_MS, animView, covers, fillDue, gestureMatrix, gestureTransform } from '../src/render/dom/pan-zoom';
-import { doubleTapView, pinchView, type Size, type View } from '../src/render/view-math';
+import { FILL_MS, covers, fillDue, gestureMatrix, gestureTransform } from '../src/render/dom/pan-zoom';
+import { pinchView, type Size, type View } from '../src/render/view-math';
 
 /** Screen point of tree point `p` in `v` (the scene transform of `transformFor`). */
 const screen = (v: View, p: { x: number; y: number }, s: Size) => ({ x: (p.x - v.cx) * v.scale + s.w / 2, y: (p.y - v.cy) * v.scale + s.h / 2 });
@@ -60,7 +60,7 @@ describe('gestureTransform (WP5.3, spec §7.6: a CSS transform on a wrapper duri
 	});
 });
 
-describe('covers and animView (WP5.3: the wrapper for an animation only while it shows the drawn picture)', () => {
+describe('covers (the wrapper of a pinch only while it shows the drawn picture)', () => {
 	const size: Size = { w: 390, h: 844 };
 	const drawn: View = { scale: 0.25, cx: 1200, cy: 800 };
 
@@ -71,26 +71,6 @@ describe('covers and animView (WP5.3: the wrapper for an animation only while it
 		expect(covers(drawn, { scale: 0.25, cx: 1210, cy: 800 }, size)).toBe(false);
 		// Half a screen px of drift is allowed (rounding).
 		expect(covers(drawn, { scale: 0.25, cx: 1200 + 0.4 / 0.25, cy: 800 }, size)).toBe(true);
-	});
-
-	it('every frame of a double-tap zoom shows a part of the picture drawn before it', () => {
-		const limits = { min: 0.05, max: 4 };
-		for (const at of [{ x: 20, y: 30 }, { x: 195, y: 422 }, { x: 370, y: 820 }, { x: 0, y: 844 }]) {
-			const to = doubleTapView(drawn, at, size, limits);
-			for (let i = 0; i <= 20; i++) {
-				const k = i / 20;
-				expect(covers(drawn, animView(drawn, to, 1 - Math.pow(1 - k, 3)), size)).toBe(true);
-			}
-		}
-	});
-
-	it('animView starts at from, ends at to, and changes the zoom geometrically', () => {
-		const to: View = { scale: 1, cx: 1000, cy: 600 };
-		expect(animView(drawn, to, 0)).toEqual(drawn);
-		const end = animView(drawn, to, 1);
-		expect(end.scale).toBeCloseTo(1);
-		expect(end.cx).toBeCloseTo(1000);
-		expect(animView(drawn, to, 0.5).scale).toBeCloseTo(0.5);
 	});
 });
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { CodedIssue, HardError, HardErrorCode, IssueCode, IssueParams } from '../src/core/messages';
-import { codedIssue, hardErrorText, ISSUE_CODES, issueText } from '../src/core/messages';
+import { codedIssue, hardErrorText, ISSUE_CODES, issueText, LIMIT_DETAIL } from '../src/core/messages';
 import { CURLY_APOSTROPHE, quote } from '../src/core/quote';
 
 // Typed as a full record, so a new code in messages.ts fails the typecheck until it gets a sample here.
@@ -367,9 +367,48 @@ describe('hardErrorText', () => {
 
 	it('yaml-invalid shows the line and the parser message', () => {
 		expect(hardErrorText(HARD['yaml-invalid'])).toBe(
-			'The block has an error on text line 3. Correct this text line to show the tree. Details: Nested mappings are not allowed',
+			'Text line 3 of the tree text has an error. Correct this text line to show the tree. Details: Nested mappings are not allowed',
 		);
-		expect(hardErrorText({ code: 'yaml-invalid' })).toBe('The block has an error. Correct the text to show the tree.');
+		expect(hardErrorText({ code: 'yaml-invalid' })).toBe('The tree text has an error. Correct the text to show the tree.');
+	});
+
+	// WP-H2: the details that the plugin writes itself are plain words, in STE. Each has three short sentences (owner-approved words).
+	for (const [key, detail] of [
+		['tooLarge', LIMIT_DETAIL.tooLarge],
+		['tooDeep', LIMIT_DETAIL.tooDeep],
+		['duplicateKey', LIMIT_DETAIL.duplicateKey('born')],
+	] as const) {
+		it(`the limit detail ${key} is in STE`, () => {
+			checkText(detail, 3);
+			expect(detail).not.toMatch(/stack|exceeded|recursion|alias count|block|map/i);
+			expect(hardErrorText({ code: 'yaml-invalid', detail })).toContain(detail);
+		});
+	}
+
+	it('the limit details are the words that the owner approved', () => {
+		expect(LIMIT_DETAIL.tooLarge).toBe(
+			'The mark “*” repeats text that you named with the mark “&”. The tree text uses these marks so often that the plugin cannot read it. Replace some of the marks “*” with the text that they repeat.',
+		);
+		expect(LIMIT_DETAIL.tooDeep).toBe(
+			'The tree text goes too many levels deep. A level is a list or a section inside another list or section. Remove the extra levels.',
+		);
+	});
+
+	it('the repeated-key detail names the real key, and falls back to name for an odd key', () => {
+		expect(LIMIT_DETAIL.duplicateKey('born')).toBe(
+			'One person or section has the field “born:” two times. Delete one of the text lines, or change the name of the field.',
+		);
+		const fallback = 'One person or section has the same field two times, for example two “name:” text lines. Delete one of the text lines, or change the name of the field.';
+		expect(LIMIT_DETAIL.duplicateKey()).toBe(fallback);
+		expect(LIMIT_DETAIL.duplicateKey('a key with spaces and a very long name that fills the line')).toBe(fallback);
+		expect(LIMIT_DETAIL.duplicateKey('x\ny')).toBe(fallback);
+	});
+
+	it('a hard error says "tree text", not "block"', () => {
+		expect(hardErrorText({ code: 'not-a-map' })).toBe(
+			'The tree text does not have sections such as “people:”. To show the tree, put each person in a list below “people:”.',
+		);
+		for (const e of [HARD['yaml-invalid'], { code: 'yaml-invalid' as const }, HARD['not-a-map']]) expect(hardErrorText(e)).not.toMatch(/block/i);
 	});
 });
 

@@ -4,7 +4,7 @@ vi.mock('obsidian', () => import('./acceptance/fake-obsidian'));
 
 import { PanZoom } from '../src/render/dom/pan-zoom';
 import { treeBounds, type View } from '../src/render/view-math';
-import { FEl, clock, dispatch, flushFrames, installDom, pointer, resetDom, runFrame, runTimers, wheel } from './acceptance/fake-dom';
+import { FEl, clock, dispatch, flushFrames, installDom, pointer, resetDom, runTimers, wheel } from './acceptance/fake-dom';
 
 /* M11 fix round (B1): `onFill` runs during a wheel zoom and an animation when the view leaves the last filled rectangle; never on a plain pan. */
 
@@ -51,17 +51,6 @@ describe('B1: onFill outside a pinch', () => {
 		dispatch(vp, 'wheel', { ...wheel(0, -250), ctrlKey: true });
 		flushFrames();
 		expect(fills).toHaveLength(1);
-	});
-
-	it('an animation to a wider view calls it', () => {
-		const { pz, fills } = make();
-		fills.length = 0;
-		pz.setView({ scale: 0.25, cx: 2000, cy: 1000 }, { animate: true });
-		for (let i = 0; i < 30; i++) {
-			clock.now += 16;
-			runFrame();
-		}
-		expect(fills.length).toBeGreaterThan(0);
 	});
 
 	it('a plain drag pan never calls it', () => {

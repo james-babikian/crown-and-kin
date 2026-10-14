@@ -12,7 +12,7 @@
 import type { FamilyGraph } from '../core/derive';
 import type { CardLabel } from '../core/titles';
 import { drawnGeometry } from '../layout/geometry';
-import { illegitimateSigns, layoutTree, pictureSets } from '../layout/index';
+import { LayoutStopped, illegitimateSigns, layoutTree, pictureSets } from '../layout/index';
 import type { Geometry, LaidOut, LayoutSettings } from '../layout/model';
 import type { Measure, SceneFonts } from '../render/dom/scene';
 import type { BreakList } from '../render/break-words';
@@ -54,8 +54,12 @@ export interface MeasuredResult {
  * loading never feed back into these steps. M10 (F1): the fold settings of `base` (`foldHidden`, `foldedFamilies`,
  * `foldControls`) go into the layout as they are (`o.foldHidden` fills `foldHidden` when `base` has none), and the
  * people that folds hide are skipped in steps 3 and 4.
+ * 0.3 (spec §7.7, time budget): `shouldStop` is checked between the steps and inside `layoutTree` between its phases; a true answer throws `LayoutStopped`.
  */
-export function measuredLayout(g: FamilyGraph, geo: Geometry, base: LayoutSettings, o: MeasuredOptions): MeasuredResult {
+export function measuredLayout(g: FamilyGraph, geo: Geometry, base: LayoutSettings, o: MeasuredOptions, shouldStop?: () => boolean): MeasuredResult {
+	const check = () => {
+		if (shouldStop?.()) throw new LayoutStopped();
+	};
 	const sets = pictureSets(g, o.showPortraits);
 	const plain: LayoutSettings = { ...base };
 	delete plain.tallCards;
@@ -88,12 +92,14 @@ export function measuredLayout(g: FamilyGraph, geo: Geometry, base: LayoutSettin
 		...(o.breaks ? { breaks: o.breaks } : {}),
 		...(o.marked !== undefined ? { marked: o.marked } : {}),
 	};
+	check();
 	let tall = tallCardsFor(g, drawn, o.fonts, o.measure, undefined, o.labels, skipping, extra);
 	if (tall === undefined) {
-		const first = layoutTree(g, geo, titled, o.fonts.text);
+		const first = layoutTree(g, geo, titled, o.fonts.text, shouldStop);
+		check();
 		tall = tallCardsFor(g, drawn, o.fonts, o.measure, illegitimateSigns(g, first.edges), o.labels, skipping, extra) ?? { tall: [], long: [] };
 		if (!tall.tall.length) return { laid: first, settings: titled };
 	}
 	const settings: LayoutSettings = tall.tall.length ? { ...titled, tallCards: tall.tall, ...(tall.long.length ? { longNames: tall.long } : {}) } : titled;
-	return { laid: layoutTree(g, geo, settings, o.fonts.text), settings };
+	return { laid: layoutTree(g, geo, settings, o.fonts.text, shouldStop), settings };
 }

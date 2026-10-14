@@ -359,6 +359,24 @@ describe('Rename, fix round after the M6 iPhone test (the decision notes "M6 iPh
 			expect(notices[0]).toBe('The plugin did not change the link “Old” in a tree in the note “A”. The link now opens a different note with the same name: “y/Old”.');
 			expect(RENAME_UI.moreKept(2)).toBe('The plugin also did not change the links in 2 other trees for the same reason.');
 		});
+
+		it('a kept link is also named when other links of the same tree changed (owner, 2026-10-13)', async () => {
+			const s = setup({ 'T.md': tree(person('a', '"[[x/Old]]"'), person('b', '"[[Old]]"')), 'x/Old.md': '', 'y/Old.md': '' });
+			await s.rename(['x/Old.md', 'x/New.md']);
+			// "[[x/Old]]" changes; "[[Old]]" now opens y/Old.md and stays.
+			expect(bodyOf(s, 'T.md')).toContain('"[[New]]"');
+			expect(bodyOf(s, 'T.md')).toContain('"[[Old]]"');
+			expect(s.updater.last?.skipped).toHaveLength(1);
+			expect(notices).toEqual([RENAME_UI.updated(1, 1), RENAME_UI.kept('Old', 'T', 'y/Old')]);
+		});
+
+		it('trees that changed and kept links count with the trees that only kept: three Notices, then one for the rest', async () => {
+			const files: Record<string, string> = { 'x/Old.md': '', 'y/Old.md': '' };
+			for (const n of ['A', 'B', 'C', 'D']) files[`${n}.md`] = tree(person('a', '"[[x/Old]]"'), person('b', '"[[Old]]"'));
+			const s = setup(files);
+			await s.rename(['x/Old.md', 'x/New.md']);
+			expect(notices).toEqual([RENAME_UI.updated(4, 4), RENAME_UI.kept('Old', 'A', 'y/Old'), RENAME_UI.kept('Old', 'B', 'y/Old'), RENAME_UI.kept('Old', 'C', 'y/Old'), RENAME_UI.moreKept(1)]);
+		});
 	});
 
 	describe('only notes that can hold a tree are read', () => {

@@ -90,7 +90,7 @@ export interface SvgOptions {
 	dark?: boolean;
 	fontFamily?: string;
 	/** D40: the relation text of each card, as `SceneOptions.relations`. */
-	relations?: ReadonlyMap<string, { text: string; lower: string }>;
+	relations?: { get(id: string): { text: string; lower: string } | undefined };
 	/** D41: the marked person, as `SceneOptions.me`. */
 	me?: string;
 	/** D47: the relation finder's line, as `SceneOptions.line`. */

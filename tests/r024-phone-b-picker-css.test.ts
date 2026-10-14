@@ -80,9 +80,12 @@ describe('D125 (3): no bottom space under the list while the keyboard is up', ()
 });
 
 describe('D125 (3): a lower head and a first row close to the field', () => {
-	it('the top row (the field and Cancel, D212) has no space above or under it; the gap to the list is the list padding below', () => {
+	it('the top row (the pill and Cancel, D212) has no space above or under it; the gap to the list is the list padding below', () => {
+		// 0.3 B.3: Cancel is outside the pill, so the pill keeps its safe area on the left only; its right side holds the X.
 		const pad = decl('.dynasty-picker.is-phone .prompt-input-container', 'padding');
-		expect(pad).toMatch(/^0 max\(var\(--size-4-3\), env\(safe-area-inset-right\)\) 0 max\(var\(--size-4-3\), env\(safe-area-inset-left\)\)$/);
+		expect(pad).toMatch(/^0 var\(--size-4-2\) 0 max\(var\(--size-4-3\), env\(safe-area-inset-left\)\)$/);
+		// Cancel has the safe area on its right.
+		expect(decl('.dynasty-picker.is-phone > button.dynasty-picker-cancel', 'padding')).toMatch(/env\(safe-area-inset-right\)\) 0 var\(--size-4-2\)$/);
 	});
 
 	it('the top still clears the notch: the prompt, not the grey pill, keeps the top safe area (0.2.8 iPhone finding)', () => {
@@ -90,14 +93,14 @@ describe('D125 (3): a lower head and a first row close to the field', () => {
 	});
 
 	it('the Cancel button keeps a 44 px hit area', () => {
-		const r = rule('.dynasty-picker.is-phone .prompt-input-container button.dynasty-picker-cancel');
+		const r = rule('.dynasty-picker.is-phone > button.dynasty-picker-cancel');
 		expect(r).toMatch(/min-height:\s*44px/);
 		expect(r).toMatch(/min-width:\s*44px/);
 	});
 
-	it('the list starts 4 px under the field; its bottom padding is left alone', () => {
+	it('the list starts 12 px under the pill (4 px of padding and the 8 px that were the margin of the pill); its bottom padding is left alone', () => {
 		const r = rule('.dynasty-picker.is-phone .prompt-results');
-		expect(r).toMatch(/padding-top:\s*var\(--size-4-1\)/);
+		expect(r).toMatch(/padding-top:\s*calc\(var\(--size-4-1\) \+ var\(--size-4-2\)\)/);
 		expect(r).not.toMatch(/padding-bottom/);
 	});
 

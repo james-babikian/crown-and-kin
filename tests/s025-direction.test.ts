@@ -252,7 +252,7 @@ describe('the settings row (spec §9)', () => {
 		control().fire('down');
 		await settle();
 		expect(plugin.settings.phoneDirection).toBe('down');
-		expect(fake.saved[fake.saved.length - 1]).toEqual(plugin.settings);
+		expect(fake.saved[fake.saved.length - 1]).toEqual({ ...plugin.settings, settingsVersion: 1 });
 	});
 
 	it('a wrong choice is stored as Sideways', async () => {

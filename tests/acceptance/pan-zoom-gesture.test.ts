@@ -106,7 +106,7 @@ describe('Gesture wrapper state (§7.2, §7.6, D19)', () => {
 					dispatch(kind < 0.6 ? bg : vp, kind < 0.6 ? 'pointerup' : kind < 0.8 ? 'pointercancel' : 'lostpointercapture', pointer('touch', pid, x, y));
 				} else if (r < 0.85) runFrame();
 				else if (r < 0.9) runTimers(100 + next() * 300);
-				else if (r < 0.93) pz.setView({ scale: 0.2 + next(), cx: next() * 4000, cy: next() * 2000 }, { animate: true, byUser: true });
+				else if (r < 0.93) pz.setView({ scale: 0.2 + next(), cx: next() * 4000, cy: next() * 2000 }, { byUser: true });
 				else if (r < 0.95) dispatch(bg, 'wheel', wheel(next() * 50 - 25, next() * 50 - 25));
 				else runFrame();
 			}

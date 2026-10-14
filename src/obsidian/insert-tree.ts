@@ -128,7 +128,8 @@ export function planInsert(head: string, tail: string): InsertPlan {
  * Runs the command in an editor: one change, so one Ctrl/Cmd+Z undoes it. A selection is replaced.
  * With the cursor in a fenced block (a tree, a code block), the new tree goes after that block, in
  * the same container, and the block does not change; a block that never closes gets the tree above
- * it. With the cursor in the note properties, the tree goes after them.
+ * it. With the cursor in the note properties, the tree goes after them. The opening fence never sits on line 0 (D224): Live Preview
+ * opens a note with the cursor on its first line and shows the source of a tree while the cursor is in it, so a blank line goes first.
  */
 export function insertTree(editor: Editor): void {
 	const from = editor.getCursor('from');
@@ -148,9 +149,11 @@ export function insertTree(editor: Editor): void {
 			// After the block, the tree would be code of that block and its closing fence would close it.
 			const rest = markerAsSpaces(around.openPrefix);
 			const blank = rest.trimEnd();
-			const text = [`${around.openPrefix}\`\`\`dynasty`, `${rest}# ${INSERT_UI.noteHint}`, `${rest}\`\`\``, blank, ''].join('\n');
+			// D224: a block that opens on line 0 would put the new fence on line 0 too.
+			const lead = around.open === 0 ? [blank] : [];
+			const text = [...lead, `${around.openPrefix}\`\`\`dynasty`, `${rest}# ${INSERT_UI.noteHint}`, `${rest}\`\`\``, blank, ''].join('\n');
 			const start = { line: around.open, ch: 0 };
-			editor.transaction({ changes: [{ from: start, to: start, text }], selection: { from: { line: around.open + 3, ch: blank.length } } });
+			editor.transaction({ changes: [{ from: start, to: start, text }], selection: { from: { line: around.open + lead.length + 3, ch: blank.length } } });
 			return;
 		}
 		const at = around.close;
@@ -164,9 +167,14 @@ export function insertTree(editor: Editor): void {
 	}
 	const first = editor.getLine(from.line);
 	const last = editor.getLine(to.line);
-	const plan = planInsert(first.slice(0, from.ch), last.slice(to.ch));
+	const head = first.slice(0, from.ch);
+	const plan = planInsert(head, last.slice(to.ch));
+	// D224: Live Preview opens a note with the cursor on line 0 and shows the source of a tree there. Only the
+	// marker-only branch of the plan puts the fence on its first line. Add the same blank line the plan writes.
+	const p = containerPrefix(head);
+	const lead = from.line === 0 && head.trimEnd() === p.first.trimEnd() ? p.rest.trimEnd() : null;
 	const start = { line: from.line, ch: 0 };
 	const end = { line: to.line, ch: last.length };
-	const cursor = { line: from.line + plan.cursor.line, ch: plan.cursor.ch };
-	editor.transaction({ changes: [{ from: start, to: end, text: plan.text }], selection: { from: cursor } });
+	const cursor = { line: from.line + plan.cursor.line + (lead === null ? 0 : 1), ch: plan.cursor.ch };
+	editor.transaction({ changes: [{ from: start, to: end, text: lead === null ? plan.text : `${lead}\n${plan.text}` }], selection: { from: cursor } });
 }

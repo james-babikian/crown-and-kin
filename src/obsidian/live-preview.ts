@@ -3,7 +3,8 @@
  * closing fence, and the parser stops a little below the visible part of the note. A tall tree
  * (sample trees 6 and 7) therefore stayed as source text until the user scrolled to its end
  * (the decision notes). When a dynasty block is visible but not yet parsed to its end, this asks the
- * parser to read to the end of the block, and the block is drawn at once.
+ * parser to read to the end of the block, and the block is drawn at once. The scan of the note for blocks waits
+ * until the user stops typing (WP-H2, P3), because it costs a few ms for each key press in a note of 1 MB.
  */
 
 import { forceParsing, syntaxTree } from '@codemirror/language';
@@ -12,23 +13,41 @@ import { findBlocks } from '../core/block-locate';
 
 const PARSE_BUDGET_MS = 150;
 const MAX_TRIES = 40;
+/** The quiet time after the last text change before the note is scanned for blocks. */
+export const TYPING_WAIT_MS = 200;
+/** The user event of the plugin's own writes (`block-handle.ts` `applyToEditor`). */
+const PLUGIN_EVENT = 'input.dynasty-tree';
 
-class TallBlockParser {
+/**
+ * The update holds a keyboard change by the user: text typed, pasted or dropped ("input" and its kinds, such as "input.type"
+ * and "input.paste") or deleted ("delete" and its kinds). Undo and redo are single steps, so they scan at once. The plugin's
+ * own writes carry "input.dynasty-tree" (`block-handle.ts`); they are not typing, so they scan at once too.
+ */
+function isTyping(u: ViewUpdate): boolean {
+	return u.transactions.some((tr) => (tr.isUserEvent('input') && !tr.isUserEvent(PLUGIN_EVENT)) || tr.isUserEvent('delete'));
+}
+
+/** The view plugin class; exported for the test. */
+export class TallBlockParser {
 	private ranges: { from: number; to: number }[] | null = null;
 	private timer = 0;
 	private tries = 0;
 
 	constructor(private readonly view: EditorView) {
-		this.schedule();
+		this.schedule(0);
 	}
 
 	update(u: ViewUpdate): void {
-		if (u.docChanged) this.ranges = null;
-		if (u.docChanged || u.viewportChanged) this.schedule();
+		if (u.docChanged) {
+			this.ranges = null;
+			// Only the user's typing waits: each key press restarts the wait, so typing never scans. A change that the plugin or
+			// Obsidian makes (a write to the note, a note switch) happens once, so it scans at once.
+			this.schedule(isTyping(u) ? TYPING_WAIT_MS : 0);
+		} else if (u.viewportChanged) this.schedule(0);
 	}
 
-	private schedule(): void {
-		if (this.timer) return;
+	private schedule(delay: number): void {
+		if (this.timer) window.clearTimeout(this.timer);
 		// Dispatching from inside an update is not allowed; wait for the next task.
 		this.timer = window.setTimeout(() => {
 			this.timer = 0;
@@ -37,7 +56,7 @@ class TallBlockParser {
 			} catch (e) {
 				console.error('Dynasty Tree: cannot prepare the tree in Live Preview', e);
 			}
-		}, 0);
+		}, delay);
 	}
 
 	private blockRanges(): { from: number; to: number }[] {
@@ -70,7 +89,7 @@ class TallBlockParser {
 			return;
 		}
 		// Very long notes can need more than one budget; continue in later tasks.
-		if (++this.tries < MAX_TRIES) this.schedule();
+		if (++this.tries < MAX_TRIES) this.schedule(0);
 	}
 
 	destroy(): void {

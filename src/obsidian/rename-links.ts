@@ -189,6 +189,8 @@ export function nameForms(name: string): string[] {
 			// A bad escape: the name has no decoded form.
 		}
 	}
+	// In single-quoted YAML an apostrophe is written twice, so the note text has "o''neil" for "o'neil".
+	for (const f of [...forms]) if (f.includes("'")) forms.push(f.replace(/'/g, "''"));
 	return [...new Set(forms)];
 }
 
@@ -593,7 +595,9 @@ export class LinkUpdater {
 				if (r.changed > 0) {
 					report.links += r.changed;
 					trees++;
-				} else if (r.kept.length) kept.push({ ...r.kept[0], path });
+				}
+				// Also when other links of the same tree changed (owner, 2026-10-13): a kept link is never silent.
+				if (r.kept.length) kept.push({ ...r.kept[0], path });
 			}
 			// One note at a time, so a vault with many trees never holds up the interface (spec §6.9).
 			await pause(0);

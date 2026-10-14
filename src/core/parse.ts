@@ -7,9 +7,9 @@
  * reads the person key `arms` and the holder key `through-spouse`.
  */
 
-import { isScalar, Lexer, parseDocument, type Document } from 'yaml';
+import { isAlias, isMap as isYamlMap, isNode, isPair, isScalar, isSeq, Lexer, parseDocument, type Document } from 'yaml';
 import { personIdSource } from './id-gen';
-import { codedIssue, type CodedIssue, type HardError } from './messages';
+import { codedIssue, LIMIT_DETAIL, type CodedIssue, type HardError } from './messages';
 import { cropValue } from './portrait-crop';
 import { normaliseSobriquet } from './sobriquet';
 import { readIllegitimate, readThrough } from './succession-keys';
@@ -450,11 +450,166 @@ function cleanDetail(message: string): string {
 	return message.split('\n')[0].replace(/ at line \d+, column \d+:?$/, '').trim();
 }
 
+/**
+ * The engine's "Maximum call stack size exceeded" (Firefox and Safari say "too much recursion"). The package may throw it, or
+ * catch it and report its text as a parse error. Only the message is tested: it is the same in every realm, and another
+ * `RangeError` (for example an invalid array length) is not a nesting that is too deep.
+ */
+function isStackOverflow(e: unknown): boolean {
+	const err = e as { message?: unknown } | null;
+	return typeof err?.message === 'string' && /call stack size|too much recursion/i.test(err.message);
+}
+
 function yamlError(e: unknown): HardError {
 	const err = e as { message?: unknown; linePos?: { line: number }[] };
-	const detail = typeof err?.message === 'string' ? cleanDetail(err.message) : String(e);
+	// A nesting so deep that the parser runs out of stack space (F3): say it in plain words, not in the engine's words.
+	const detail = isStackOverflow(e) ? LIMIT_DETAIL.tooDeep : typeof err?.message === 'string' ? cleanDetail(err.message) : String(e);
 	const line = err?.linePos?.[0]?.line;
 	return typeof line === 'number' ? { code: 'yaml-invalid', line, detail } : { code: 'yaml-invalid', detail };
+}
+
+/**
+ * How large the aliases of a block may make the tree, in nodes: a number for each character of the text, plus a base, and never
+ * more than a fixed ceiling. A real tree repeats a short house or a short list, which is about one node for each five
+ * characters of text; 50 for each character leaves room (one test tree shares a map of 1 000 keys, 36 for each character).
+ * The edit code copies the whole expanded data, at about 0.2 microseconds for each node, so the ceiling of 5 million nodes
+ * bounds that copy. It does not bound the whole edit: see `ALIAS_MARKS_CAP` for the other cost.
+ */
+export const ALIAS_NODES_PER_CHAR = 50;
+export const ALIAS_NODES_BASE = 10_000;
+export const ALIAS_NODES_CEILING = 5_000_000;
+/**
+ * How many alias uses (`*name`) and anchors (`&name`) together a block may hold, when it has at least one alias. The `yaml`
+ * package finds the anchor of each alias with a pass over the list of all aliases and anchors before it, which is quadratic and
+ * does not depend on the size of what the alias stands for. Measured on the development computer, a block with `house: *h` for
+ * each person (the anchor at the top) reads in 0.5 to 0.6 s for 7 000 uses and an edit takes 1.1 to 1.5 s; at 11 900 uses it
+ * reads in 1.3 to 1.6 s and an edit takes about 3.2 s; at 20 000 uses an edit takes 5 s. 50 000 uses of a short anchor read in
+ * 10 s. So an edit is never "under a second" for a tree of this kind. A tree of 10 000 people that share one house is the most
+ * that a real tree needs, so the cap is 12 000: it allows that tree and keeps the worst case near 3 s.
+ */
+export const ALIAS_MARKS_CAP = 12_000;
+/**
+ * The cap on the work of the aliases that sit inside an anchored list or map (G2b of WP-H2). When the anchored collection
+ * is used, the `yaml` package resolves each alias inside it with a visit of the whole document (`getAliasCount`, no cache),
+ * so the work is (aliases inside anchored collections) x (nodes of the document), which `ALIAS_MARKS_CAP` does not see:
+ * 800 such aliases in a note of 4 000 people read in 5 s. Measured at about 7 million steps a second on the development
+ * computer, so 10 million keeps the read near 1.5 s. A real tree has few aliases inside an anchored collection.
+ */
+export const NESTED_ALIAS_WORK_CAP = 10_000_000;
+
+/** What `scanDocument` finds in one pass over the parsed document. */
+interface DocumentScan {
+	/** The number of nodes of the document with every alias counted as the node it stands for. May be `Infinity`. */
+	expanded: number;
+	/** The text offset of the first key that repeats an earlier key of the same map, or undefined. */
+	duplicateAt: number | undefined;
+	/** The repeated key, for the message. */
+	duplicateKey: string | undefined;
+	/** The number of alias uses and of anchors in the document (`ALIAS_MARKS_CAP`). */
+	aliasUses: number;
+	anchorCount: number;
+	/** The aliases inside anchored collections, each counted once per anchored collection around it (`NESTED_ALIAS_WORK_CAP`). */
+	nestedAliases: number;
+	/** The nodes of the document as written (an alias counts as one node). */
+	written: number;
+}
+
+/**
+ * One pass over the document with no recursion (a deep tree must not overflow the stack here either). It counts the
+ * nodes as if every alias were written out, using the size counted once for the anchor (an alias is never followed),
+ * and finds the first repeated key of a map. The `yaml` package finds repeated keys itself with a scan of the earlier
+ * keys for each key, which is quadratic: 40 000 keys of one map took 5 s to read (F2). A set does it in linear time,
+ * so `parseBody` turns the package's check off and uses this one.
+ */
+function scanDocument(doc: Document): DocumentScan {
+	const anchors = new Map<string, unknown>();
+	const sizes = new Map<unknown, number>();
+	let duplicateAt: number | undefined;
+	let duplicateKey: string | undefined;
+	let aliasUses = 0;
+	let anchorCount = 0;
+	let nestedAliases = 0;
+	let written = 0;
+	// How many anchored collections hold the node being entered.
+	let anchoredDepth = 0;
+	interface Frame {
+		node: unknown;
+		kids: unknown[];
+		at: number;
+		sum: number;
+		anchored: boolean;
+	}
+	const stack: Frame[] = [];
+	let total = 1;
+	const push = (f: Frame): void => {
+		if (f.anchored) anchoredDepth++;
+		stack.push(f);
+	};
+
+	/** The size of a leaf, or undefined after a collection was pushed. */
+	const enter = (node: unknown): number | undefined => {
+		written++;
+		if (!isNode(node)) return 1;
+		// A later anchor of the same name replaces an earlier one, as in the package.
+		if (node.anchor) {
+			anchors.set(node.anchor, node);
+			anchorCount++;
+		}
+		if (isAlias(node)) {
+			aliasUses++;
+			nestedAliases += anchoredDepth;
+			return sizes.get(anchors.get(node.source)) ?? 1;
+		}
+		if (isYamlMap(node)) {
+			const kids: unknown[] = [];
+			const seen = new Set<unknown>();
+			for (const pair of node.items) {
+				const key = pair.key;
+				if (isScalar(key)) {
+					if (seen.has(key.value)) {
+						const at = key.range?.[0];
+						if (at !== undefined && (duplicateAt === undefined || at < duplicateAt)) {
+							duplicateAt = at;
+							duplicateKey = typeof key.value === 'string' ? key.value : undefined;
+						}
+					} else seen.add(key.value);
+				}
+				kids.push(key, pair.value);
+			}
+			push({ node, kids, at: 0, sum: 1, anchored: !!node.anchor });
+			return undefined;
+		}
+		if (isSeq(node)) {
+			// A flow list can hold `a: b` pairs; the pair is not a node of its own.
+			push({ node, kids: node.items.flatMap((item) => (isPair(item) ? [item.key, item.value] : [item])), at: 0, sum: 1, anchored: !!node.anchor });
+			return undefined;
+		}
+		return 1;
+	};
+
+	const first = enter(doc.contents);
+	if (first !== undefined) return { expanded: first, duplicateAt, duplicateKey, aliasUses, anchorCount, nestedAliases, written };
+	while (stack.length) {
+		const f = stack[stack.length - 1];
+		if (f.at < f.kids.length) {
+			const size = enter(f.kids[f.at++]);
+			if (size !== undefined) f.sum += size;
+		} else {
+			stack.pop();
+			if (f.anchored) anchoredDepth--;
+			sizes.set(f.node, f.sum);
+			if (stack.length) stack[stack.length - 1].sum += f.sum;
+			else total = f.sum;
+		}
+	}
+	return { expanded: total, duplicateAt, duplicateKey, aliasUses, anchorCount, nestedAliases, written };
+}
+
+/** The 1-based text line of an offset in `source`. */
+function lineOf(source: string, offset: number): number {
+	let line = 1;
+	for (let i = source.indexOf('\n'); i >= 0 && i < offset; i = source.indexOf('\n', i + 1)) line++;
+	return line;
 }
 
 /** The result of `parseBody`: the parsed document and raw data on success, or a `HardError`. */
@@ -471,9 +626,28 @@ export type ParsedBody = { ok: true; doc: Document; data: Raw } | { ok: false; e
  */
 export function parseBody(source: string): ParsedBody {
 	try {
-		const doc = parseDocument(source, { schema: 'failsafe', logLevel: 'error' });
+		// `uniqueKeys: false`: the package checks keys in quadratic time, so `scanDocument` does it (F2).
+		const doc = parseDocument(source, { schema: 'failsafe', logLevel: 'error', uniqueKeys: false });
 		tolerateEmbeds(doc, source);
-		if (doc.errors.length) return { ok: false, error: yamlError(doc.errors[0]) };
+		const scan = scanDocument(doc);
+		// The first problem in the text wins, as with the package's own list of errors.
+		const firstError = doc.errors[0];
+		if (scan.duplicateAt !== undefined && scan.duplicateAt < (firstError?.pos[0] ?? Infinity)) {
+			return { ok: false, error: { code: 'yaml-invalid', line: lineOf(source, scan.duplicateAt), detail: LIMIT_DETAIL.duplicateKey(scan.duplicateKey) } };
+		}
+		if (firstError) return { ok: false, error: yamlError(firstError) };
+		// The package resolves each alias in time that grows with the square of their number (ALIAS_MARKS_CAP).
+		if (scan.aliasUses > 0 && scan.aliasUses + scan.anchorCount > ALIAS_MARKS_CAP) {
+			return { ok: false, error: { code: 'yaml-invalid', detail: LIMIT_DETAIL.tooLarge } };
+		}
+		// Each alias inside an anchored list or map costs a visit of the whole document (NESTED_ALIAS_WORK_CAP).
+		if (scan.nestedAliases * scan.written > NESTED_ALIAS_WORK_CAP) {
+			return { ok: false, error: { code: 'yaml-invalid', detail: LIMIT_DETAIL.tooLarge } };
+		}
+		// Aliases that write out far more than the text could hold (F1). The count in `toJS` below does not see a wide bomb.
+		if (scan.expanded > Math.min(ALIAS_NODES_PER_CHAR * source.length + ALIAS_NODES_BASE, ALIAS_NODES_CEILING)) {
+			return { ok: false, error: { code: 'yaml-invalid', detail: LIMIT_DETAIL.tooLarge } };
+		}
 		blankPlainNulls(doc);
 		// The yaml package refuses more than 100 alias uses by default; a large tree can use one
 		// `house: *h` for every person. The limit still grows only with the text, so it stays safe.

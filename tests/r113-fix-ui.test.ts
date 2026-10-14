@@ -124,7 +124,7 @@ describe('X10: one constant for a text that two places show', () => {
 
 	it('the source has each of these strings one time', () => {
 		const src = ['ui-text', 'view-text', 'succession-text'].map((f) => readFileSync(new URL(`../src/render/${f}.ts`, import.meta.url), 'utf8')).join(' ');
-		for (const s of ['The tree changed after you opened this window.', "'Make a note with this table'", "'Type the name of the person'", 'The plugin updates the tree links to the renamed note.', 'The trees have no links to the renamed note.']) {
+		for (const s of ['The tree changed after you opened this window.', "'Make a note with this table'", "'Type a name'", 'The plugin updates the tree links to the renamed note.', 'The trees have no links to the renamed note.']) {
 			expect(src.split(s).length - 1, s).toBe(1);
 		}
 	});

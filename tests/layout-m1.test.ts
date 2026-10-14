@@ -179,12 +179,15 @@ describe('far couples (D10)', () => {
 		const conrad = far.layout.persons.get('conrad')!;
 		const [s] = segments(couple[0].d);
 		expect(s.y1).toBe(conrad.y + conrad.h);
-		expect(s.x1).toBe(u.x);
+		// The path text keeps one decimal.
+		expect(Math.abs(s.x1 - u.x)).toBeLessThanOrEqual(0.05 + 1e-9);
 		expect(u.x).toBeGreaterThan(conrad.x);
 		expect(u.x).toBeLessThan(conrad.x + conrad.w);
 		// Tristan still hangs from the dot.
 		const trunk = far.edges.paths.find((p) => p.kind === 'descent' && p.people.join() === 'conrad,lisette,tristan')!;
-		expect(trunk.d.startsWith(`M${u.x} ${u.y}`)).toBe(true);
+		const start = /^M([\d.]+) ([\d.]+)/.exec(trunk.d)!;
+		expect(Math.abs(Number(start[1]) - u.x)).toBeLessThanOrEqual(0.05 + 1e-9);
+		expect(Math.abs(Number(start[2]) - u.y)).toBeLessThanOrEqual(0.05 + 1e-9);
 	});
 
 	it('the far rule moves no card sideways (rows only get the height their lines need)', () => {

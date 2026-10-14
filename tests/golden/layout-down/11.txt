@@ -1,5 +1,5 @@
 orientation down
-size 814 544
+size 797.996 544
 geometry font 16 normal card 180x61 union 10 couple 36 node 20 row 100 tag 18
 row 0: aurel viviane
 row 1: varian yseult corwin maud
@@ -8,37 +8,37 @@ row 3: osric
 gap 0: 61 161
 gap 1: 222 322
 gap 2: 383 483
-person alys gen 2 at 526 322 size 180 61
-person aurel gen 0 at 110 0 size 180 61
-person corwin gen 1 at 418 161 size 180 61
-person maud gen 1 at 634 161 size 180 61
-person osric gen 3 at 481 483 size 180 61
-person sybil gen 2 at 236 322 size 180 61
+person alys gen 2 at 509.996 322 size 180 61
+person aurel gen 0 at 93.996 0 size 180 61
+person corwin gen 1 at 401.996 161 size 180 61
+person maud gen 1 at 617.996 161 size 180 61
+person osric gen 3 at 464.996 483 size 180 61
+person sybil gen 2 at 205.858 322 size 180 61
 person valen gen 2 at 0 322 size 180 61
-person varian gen 1 at 18 161 size 180 61
-person viviane gen 0 at 326 0 size 180 61
-person yseult gen 1 at 218 161 size 180 61
-union u0 at 308 30.5 bar
-union u1 at 208 191.5 bar
-union u2 at 616 191.5 bar
-union u3 at 571 405
-path marriage [aurel viviane] M290 30.5H326
-path marriage [varian yseult] M198 191.5H218
-path marriage [corwin maud] M598 191.5H634
-path marriage [corwin alys] M508 222V244H471V405H571
-path marriage [corwin alys] M616 383V405H571
-path descent [aurel viviane varian yseult corwin] M308 30.5V131M108 131H508
-path descent [varian aurel viviane] M108 131V161
-path descent [yseult aurel viviane] M308 131V161
-path descent [corwin aurel viviane] M508 131V161
-path descent [varian yseult valen sybil] M208 191.5V292M90 292H326
+person varian gen 1 at 1.98 161 size 180 61
+person viviane gen 0 at 309.996 0 size 180 61
+person yseult gen 1 at 201.996 161 size 180 61
+union u0 at 291.996 30.5 bar
+union u1 at 191.988 191.5 bar
+union u2 at 599.996 191.5 bar
+union u3 at 554.996 405
+path marriage [aurel viviane] M274 30.5H310
+path marriage [varian yseult] M182 191.5H202
+path marriage [corwin maud] M582 191.5H618
+path marriage [corwin alys] M492 222V244H447.9V405H555
+path marriage [corwin alys] M600 383V405H555
+path descent [aurel viviane varian yseult corwin] M292 30.5V131M92 131H492
+path descent [varian aurel viviane] M92 131V161
+path descent [yseult aurel viviane] M292 131V161
+path descent [corwin aurel viviane] M492 131V161
+path descent [varian yseult valen sybil] M192 191.5V292M90 292H295.9
 path descent [valen varian yseult] M90 292V322
-path descent [sybil varian yseult] M326 292V322
-path descent [corwin maud alys] M616 191.5V292
-path descent [alys corwin maud] M616 292V322
-path descent [corwin alys osric] M571 405V453
-path descent [osric corwin alys] M571 453V483
-marker union at 308 30.5
-marker union at 208 191.5
-marker union at 616 191.5
-marker union at 571 405
+path descent [sybil varian yseult] M295.9 292V322
+path descent [corwin maud alys] M600 191.5V292
+path descent [alys corwin maud] M600 292V322
+path descent [corwin alys osric] M555 405V453
+path descent [osric corwin alys] M555 453V483
+marker union at 291.996 30.5
+marker union at 191.988 191.5
+marker union at 599.996 191.5
+marker union at 554.996 405

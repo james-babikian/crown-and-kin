@@ -95,7 +95,7 @@ export interface SceneOptions {
 	/** Focus mode (spec §5.6): people with relatives who are not shown, and how many; each card gets a `+` badge. */
 	badges?: { hidden: ReadonlyMap<string, number>; label: (p: Person, hidden: number) => string };
 	/** D40 (spec §13.1): the relation text of each card ("Half-sister"; "You" for the marked person), drawn on the relation line in class `dynasty-card-relation`, and named in the card's screen-reader label. The setting "Show relation names on cards" off: pass it and set class `dynasty-no-relations` on the tree (like `dynasty-no-dates`), so the text hides but the label keeps the relation (M7 ruling). */
-	relations?: ReadonlyMap<string, { text: string; lower: string }>;
+	relations?: { get(id: string): { text: string; lower: string } | undefined };
 	/** D41: the marked person; the card gets class `dynasty-card-me` (one thicker border in the text colour, no accent, D153). */
 	me?: string;
 	/** The card corner radius (px) when the caller knows it; else the scene reads it from the card bg once it is in the document (`syncCornerRadius`). */

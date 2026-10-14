@@ -318,5 +318,7 @@ export interface LaidOut {
 /**
  * The single synchronous entry point renderers call (`src/layout/index.ts`).
  * Goes through the in-memory LRU cache (spec §5.1 step 6); `fontFamily` is part of the key (§5.8).
+ * 0.3 (spec §7.7, time budget): `shouldStop` is checked between the phases; when it answers true the layout throws `LayoutStopped` and nothing enters the cache.
+ * It is an argument of its own, never a setting, so it is not part of the cache key.
  */
-export type LayoutTree = (g: FamilyGraph, geo: Geometry, settings: LayoutSettings, fontFamily: string) => LaidOut;
+export type LayoutTree = (g: FamilyGraph, geo: Geometry, settings: LayoutSettings, fontFamily: string, shouldStop?: () => boolean) => LaidOut;

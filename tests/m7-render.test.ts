@@ -215,16 +215,17 @@ unions:
 });
 
 describe('D47: two legs from one side (M7 fix round)', () => {
-	// Random tree 2: P1's leg stops on P0's leg (edges.ts), short of the sign of their implicit union.
+	// Random tree 47: P7's leg stops on P2's leg (edges.ts), short of the sign of their implicit union. (Tree 2 had this until N05: its dot now lies
+	// between the legs. Partners in one row without a bar still meet the dot from one side.)
 	it('the nearer leg is split: its last run to the sign is on, the rest keeps its state', async () => {
 		const { randomTree } = await import('./random-trees');
-		const { g } = build(randomTree(2));
+		const { g } = build(randomTree(47));
 		const laid = lay(g);
-		const key = g.primaryUnion.get('p2')!;
+		const key = g.primaryUnion.get('p8')!;
 		const legs = laid.edges.paths.filter((p) => p.union === key && p.parents?.length === 1);
-		const far = legs.find((p) => p.parents![0] === 'p1')!;
-		const near = legs.find((p) => p.parents![0] !== 'p1')!;
-		const look = lineLook(g, laid.layout, laid.edges, { people: new Set(['p1', 'p2']), unions: new Set(), links: new Set(['p1\0p2']), fade: true });
+		const far = legs.find((p) => p.parents![0] === 'p7')!;
+		const near = legs.find((p) => p.parents![0] !== 'p7')!;
+		const look = lineLook(g, laid.layout, laid.edges, { people: new Set(['p7', 'p8']), unions: new Set(), links: new Set(['p7\0p8']), fade: true });
 		const dot = laid.edges.markers.find((m) => m.union === key)!;
 		const [, head, x] = /^(.*)H(-?[\d.]+)$/.exec(near.d)!;
 		expect(Number(x)).toBeCloseTo(dot.x, 1);
@@ -236,7 +237,7 @@ describe('D47: two legs from one side (M7 fix round)', () => {
 		expect(look.paths.some((p) => p.d === near.d)).toBe(false);
 		expect(look.markers[laid.edges.markers.indexOf(dot)]).toBe('on');
 		// With the nearer partner on the line, the leg is whole again.
-		const both = lineLook(g, laid.layout, laid.edges, { people: new Set(['p0', 'p1', 'p2']), unions: new Set([key]), links: new Set(), fade: true });
+		const both = lineLook(g, laid.layout, laid.edges, { people: new Set(['p2', 'p7', 'p8']), unions: new Set([key]), links: new Set(), fade: true });
 		expect(both.paths.find((p) => p.d === near.d)!.state).toBe('on');
 	});
 });

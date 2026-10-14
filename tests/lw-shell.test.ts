@@ -1349,7 +1349,8 @@ describe('the style block (D.2, D.3.9)', () => {
 		expect(css.indexOf(START)).toBeLessThan(css.indexOf(END));
 		expect(css.indexOf('/* roundel: card */')).toBeLessThan(css.indexOf(START));
 		expect(css.indexOf('/* C: focus list and tooltip */')).toBeLessThan(css.indexOf(START));
-		expect(css.slice(css.indexOf(END) + END.length).trim()).toBe('');
+		// Later chunks may follow (0.3 WP-G adds `36-large-tree.css`); none of them uses a list-window class.
+		expect(css.slice(css.indexOf(END) + END.length)).not.toMatch(/dynasty-lw/);
 	});
 
 	it('has rules, and every selector of the block holds a dynasty-lw class', () => {

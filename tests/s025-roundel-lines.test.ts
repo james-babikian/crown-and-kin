@@ -313,7 +313,8 @@ describe('B.3.3: dotted side links that cross a picture are counted', () => {
 	};
 
 	it('sample 07b at 12 px, with its real pictures: 3 cards (the count of the prototype)', () => {
-		expect(count('07b', 12, 'real')).toBe(3);
+		// 0.3 (D231): the added step moves cards of tree 07b, and one of the three cards no longer has a side link across its picture.
+		expect(count('07b', 12, 'real')).toBe(2);
 	});
 
 	it('the count at 16 px, and with a picture for everyone, is pinned (a change is a layout change that someone must look at)', () => {
@@ -504,7 +505,8 @@ describe('B.3.3: the plan the layout sized the gaps with is the plan the lines a
 	});
 
 	it('planLines gives the marked card no drop left of the axis, and every other card the same drop as without a mark', () => {
-		const s = ids().find((x) => x.id === '07')!;
+		// 0.3 (D231): with the added step no card of tree 07 has a drop that another trunk moves; tree 12 still has one.
+		const s = ids().find((x) => x.id === '12')!;
 		const g = parse(s.source);
 		const base = lay(g, { f: 12, orientation: 'down', pictures: 'all', plate: true });
 		const L = base.laid.layout;

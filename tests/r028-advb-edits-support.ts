@@ -344,7 +344,7 @@ function tryOp(rand: () => number, m: Model, counter: { n: number }): Gen | null
 			ref: (x) => {
 				const c = x.people.find((z) => z.id === child.id)!;
 				// The spec names both refusals and not their order: when both apply, either code is right.
-				const full = c.parents.filter((r) => r.type === type).length >= 2;
+				const full = c.parents.filter((r) => r.type === type).length >= (type === 'rumoured' ? 8 : 2);
 				const loop = descendants(x, child.id).has(parent.id);
 				if (full || loop) return { ok: false, code: full && loop ? 'limit|cycle' : full ? 'limit' : 'cycle' };
 				const y = clone(x);
@@ -386,7 +386,7 @@ function tryOp(rand: () => number, m: Model, counter: { n: number }): Gen | null
 			idempotent: false,
 			op: { kind: 'set-parent-type', child: c.id, parent: r.id, from: r.type as (typeof TYPES)[number], to },
 			ref: (x) => {
-				if (to !== r.type && x.people.find((z) => z.id === c.id)!.parents.filter((z) => z.type === to).length >= 2) return { ok: false, code: 'limit' };
+				if (to !== r.type && x.people.find((z) => z.id === c.id)!.parents.filter((z) => z.type === to).length >= (to === 'rumoured' ? 8 : 2)) return { ok: false, code: 'limit' };
 				const y = clone(x);
 				const cc = y.people.find((z) => z.id === c.id)!;
 				cc.parents.find((z) => z.id === r.id && z.type === r.type)!.type = to;

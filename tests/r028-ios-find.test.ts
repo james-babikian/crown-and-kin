@@ -157,7 +157,7 @@ const PLUGIN = CHUNKS.map(chunk).join('\n');
 const OBSIDIAN = `
 .modal { position: relative; }
 .prompt { position: absolute; overflow: hidden; }
-.prompt-input-container { padding: 12px; }
+.prompt-input-container { padding: 12px; margin-bottom: 8px; }
 .prompt-input-container .search-input-clear-button { position: absolute; right: 8px; }
 `;
 
@@ -198,6 +198,7 @@ describe('Find on an iPhone: the hidden names do not grow the scroll area of the
 		['Add link of the Family section (edit-sheet.ts addLink)', () => el('span', ['dynasty-sr-only'], el('button', ['dynasty-link', 'dynasty-add-link'], el('div', ['dynasty-sheet-body'], windowOf())))],
 		['parent-type chip (edit-sheet.ts)', () => el('span', ['dynasty-sr-only'], el('span', ['dynasty-chip-select'], el('div', ['dynasty-family-controls'], windowOf())))],
 		['title of a computer window (window-shell.ts)', () => el('div', ['dynasty-sheet-title', 'dynasty-sr-only'], el('div', ['modal-content'], windowOf())), (h) => h.parent?.parent ?? null],
+		['low bar of a very large tree (large-bar.ts)', () => el('span', ['dynasty-sr-only'], el('div', ['dynasty-large-bar'], el('div', ['dynasty-large-root'], windowOf())))],
 		['button of the phone list (phone-list-dom.ts nameBy)', () => el('span', ['dynasty-sr-only'], el('button', ['dynasty-list-go'], el('div', ['dynasty-list-row'], el('div', ['dynasty-list-root'], windowOf()))))],
 	];
 	for (const [name, make, box] of places) {
@@ -233,7 +234,7 @@ describe('Find on an iPhone: the hidden names do not grow the scroll area of the
 			}
 		};
 		walk(new URL('../src/', import.meta.url));
-		expect(found.sort()).toEqual(['edit-sheet.ts', 'person-picker.ts', 'phone-list-dom.ts', 'window-shell.ts']);
+		expect(found.sort()).toEqual(['edit-sheet.ts', 'large-bar.ts', 'person-picker.ts', 'phone-list-dom.ts', 'window-shell.ts']);
 	});
 });
 
@@ -243,7 +244,9 @@ describe('Find on an iPhone: the header', () => {
 		const prompt = phonePicker();
 		const container = el('div', ['prompt-input-container'], prompt);
 		const clear = el('div', ['search-input-clear-button'], container);
-		return { prompt, container, clear };
+		// 0.3 B.3: Cancel is a child of the prompt, beside the pill, not inside it.
+		const cancel = el('button', ['dynasty-picker-cancel'], prompt);
+		return { prompt, container, clear, cancel };
 	};
 
 	it('the status bar space is the padding of the prompt, not of the grey pill', () => {
@@ -252,19 +255,58 @@ describe('Find on an iPhone: the header', () => {
 		expect(computed(css, prompt, 'padding-top')).toBe('env(safe-area-inset-top)');
 		const padding = computed(css, container, 'padding')!;
 		expect(padding).not.toContain('safe-area-inset-top');
-		// 0 at the top and the bottom; the sides keep the safe areas.
-		expect(padding.replace(/max\(var\(--size-4-3\), env\(safe-area-inset-(left|right)\)\)/g, 'M')).toBe('0 M 0 M');
+		// 0 at the top and the bottom; the left keeps the safe area, the right is short because the X ends the pill (Cancel is outside).
+		expect(padding.replace(/max\(var\(--size-4-3\), env\(safe-area-inset-left\)\)/, 'M')).toBe('0 var(--size-4-2) 0 M');
 	});
 
-	it('the clear button is an item of the row between the field and Cancel, 44 px high, with 12 px beside Cancel (the margin beats the Cupertino theme)', () => {
-		const { clear } = parts();
+	it('the clear button is the last item of the pill, 44 px high, and 16 px or more from the Cancel box (the margin beats the Cupertino theme)', () => {
+		const { clear, container, prompt } = parts();
 		const css = sheet();
 		expect(computed(css, clear, 'position')).toBe('static');
 		expect(computed(css, clear, 'height')).toBe('44px');
 		expect(computed(css, clear, 'width')).toBe('44px');
-		expect(computed(css, clear, 'margin')).toBe('0 12px 0 0');
-		// The row gap (6 px) and this margin keep 16 px or more between the two hit areas.
-		expect(parseFloat(computed(css, parts().container, 'gap')!) + 12).toBeGreaterThanOrEqual(16);
+		expect(computed(css, clear, 'margin')).toBe('0');
+		// The right padding of the pill and the column gap of the prompt lie between the X box and the Cancel box; each is Obsidian's 8 px step.
+		expect(computed(css, container, 'padding')!.split(/\s+/)[1]).toBe('var(--size-4-2)');
+		expect(computed(css, prompt, 'column-gap')).toBe('var(--size-4-2)');
+	});
+
+	it('Cancel is outside the grey pill: the prompt is a grid, the pill is column 1 and Cancel column 2 of the same row, the list is the row below', () => {
+		const { prompt, container, cancel } = parts();
+		const results = el('div', ['prompt-results'], prompt);
+		const css = sheet();
+		expect(cancel.parent).toBe(prompt);
+		expect(computed(css, prompt, 'display')).toBe('grid');
+		expect(computed(css, prompt, 'grid-template-columns')).toBe('minmax(0, 1fr) auto');
+		expect([computed(css, container, 'grid-row'), computed(css, container, 'grid-column')]).toEqual(['1', '1']);
+		expect([computed(css, cancel, 'grid-row'), computed(css, cancel, 'grid-column')]).toEqual(['1', '2']);
+		expect([computed(css, results, 'grid-row'), computed(css, results, 'grid-column')]).toEqual(['2', '1 / -1']);
+		expect(computed(css, cancel, 'display')).toBe('inline-flex');
+		expect(computed(css, cancel, 'min-width')).toBe('44px');
+		expect(computed(css, cancel, 'min-height')).toBe('44px');
+	});
+
+	it('the pill has no margin below (Obsidian gives it 8 px), so Cancel is centred on the pill; the list has that 8 px as padding', () => {
+		const { container, prompt } = parts();
+		const results = el('div', ['prompt-results'], prompt);
+		const css = sheet();
+		expect([computed(css, container, 'margin-top'), computed(css, container, 'margin-bottom')]).toEqual(['0', '0']);
+		// The sides are not set here: the inset of Obsidian stays.
+		expect(computed(css, container, 'margin-left')).toBeUndefined();
+		expect(computed(css, results, 'padding-top')).toBe('calc(var(--size-4-1) + var(--size-4-2))');
+		// A computer picker keeps the margin of Obsidian.
+		const body = el('body', []);
+		const desk = el('div', ['prompt', 'dynasty-picker'], el('div', ['modal-container'], body));
+		expect(computed(css, el('div', ['prompt-input-container'], desk), 'margin-bottom')).toBe('8px');
+	});
+
+	it('a computer picker keeps Cancel hidden and its prompt is not a grid', () => {
+		const body = el('body', []);
+		const prompt = el('div', ['prompt', 'dynasty-picker'], el('div', ['modal-container'], body));
+		const cancel = el('button', ['dynasty-picker-cancel'], prompt);
+		const css = sheet();
+		expect(computed(css, cancel, 'display')).toBe('none');
+		expect(computed(css, prompt, 'display')).toBeUndefined();
 	});
 
 	it('the field draws nothing of its own inside the pill (no oval in the oval), at rest and in every state', () => {

@@ -22,7 +22,7 @@ export interface CardTipOptions {
 	text(id: string): string | undefined;
 	/** True while a tip may show at all (the setting is off, a mark exists, the device is not a phone). Asked at each use. */
 	enabled(): boolean;
-	/** True while the view pans, zooms or moves by an animation: the cards are not where they will rest. */
+	/** True while the view pans or zooms by a gesture: the cards are not where they will rest. */
 	busy(): boolean;
 	/** Milliseconds a mouse rests on a card before the tip shows (default 400). */
 	delayMs?: number;

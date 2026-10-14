@@ -491,14 +491,32 @@ export const issueText = (issue: CodedIssue): string => {
 	return make ? make(issue.params ?? {}) : 'The tree has a problem.';
 };
 
-const BLOCK_ERROR = 'The block has an error. Correct the text to show the tree.';
+const BLOCK_ERROR = 'The tree text has an error. Correct the text to show the tree.';
+
+/**
+ * The "Details" of a hard error that the plugin finds itself (WP-H2), in plain words. They are the `detail` of a
+ * `yaml-invalid` error, so the box shows them after "Details:".
+ */
+export const LIMIT_DETAIL = {
+	/** The aliases (`*name`) expand to far more nodes than the text could hold (F1). */
+	tooLarge: `The mark ${quote('*')} repeats text that you named with the mark ${quote('&')}. The tree text uses these marks so often that the plugin cannot read it. Replace some of the marks ${quote('*')} with the text that they repeat.`,
+	/** The text nests so deep that the parser runs out of room (F3). */
+	tooDeep: 'The tree text goes too many levels deep. A level is a list or a section inside another list or section. Remove the extra levels.',
+	/** The same key twice in one section; the plugin checks this itself (F2). */
+	duplicateKey: (key?: string): string => {
+		// The key is the user's own text; a long or odd one would not read well in a sentence.
+		const end = 'Delete one of the text lines, or change the name of the field.';
+		if (key !== undefined && /^[A-Za-z][\w-]{0,30}$/.test(key)) return `One person or section has the field ${quote(`${key}:`)} two times. ${end}`;
+		return `One person or section has the same field two times, for example two ${quote('name:')} text lines. ${end}`;
+	},
+} as const;
 
 const HARD_ERROR_TEXT: { [C in HardErrorCode]: (e: HardError) => string } = {
 	'yaml-invalid': (e) => {
-		const where = e.line !== undefined ? `The block has an error on text line ${e.line}. Correct this text line to show the tree.` : BLOCK_ERROR;
+		const where = e.line !== undefined ? `Text line ${e.line} of the tree text has an error. Correct this text line to show the tree.` : BLOCK_ERROR;
 		return e.detail ? `${where} Details: ${e.detail}` : where;
 	},
-	'not-a-map': () => 'The block does not have sections such as “people:”. To show the tree, put each person in a list below “people:”.',
+	'not-a-map': () => 'The tree text does not have sections such as “people:”. To show the tree, put each person in a list below “people:”.',
 };
 
 /** The sentence to show the user for a hard error (the tree cannot be drawn at all). */

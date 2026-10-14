@@ -22,8 +22,8 @@ describe('0.2.4 settings keys', () => {
 		expect(normaliseSettings({ reduceMotion: 3, breakWords: 7 })).toMatchObject({ reduceMotion: 'system', breakWords: '' });
 	});
 
-	it('cuts the break list at the maximum length', () => {
-		expect(normaliseSettings({ breakWords: 'a'.repeat(BREAK_WORDS_MAX + 50) }).breakWords).toHaveLength(BREAK_WORDS_MAX);
+	it('treats a break list over the maximum length as not valid (it is kept raw, F.3)', () => {
+		expect(normaliseSettings({ breakWords: 'a'.repeat(BREAK_WORDS_MAX + 50) }).breakWords).toBe('');
 	});
 
 	it('reports a changed new key', () => {

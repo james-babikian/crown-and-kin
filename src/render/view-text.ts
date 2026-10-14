@@ -9,7 +9,7 @@
 export const ME_WORD = 'You';
 
 /** The placeholder of every box that searches for a person. The windows and the line of succession use it too. */
-export const PERSON_PLACEHOLDER = 'Type the name of the person';
+export const PERSON_PLACEHOLDER = 'Type a name';
 
 /** The error view, the banner for blocking problems (spec §8), the Fit and legend buttons, and the partner list title. */
 export const UI = {

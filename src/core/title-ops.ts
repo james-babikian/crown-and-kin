@@ -42,8 +42,8 @@ import {
 import { REFUSAL_TEXT } from './refusal-text';
 
 /** §13.0 key order of a title and of a holder. */
-const TITLE_ORDER = ['id', 'name', 'male-name', 'female-name', 'plural', 'numbering', 'count-with', 'succession', 'inherit', 'inherit-through', 'inherit-illegitimate', 'inherit-adopted', 'heirs-of-body', 'year', 'heir', 'exclude', 'holders'];
-const HOLDER_ORDER = ['person', 'name', 'as', 'number', 'from', 'to', 'through-spouse'] as const;
+export const TITLE_ORDER = ['id', 'name', 'male-name', 'female-name', 'plural', 'numbering', 'count-with', 'succession', 'inherit', 'inherit-through', 'inherit-illegitimate', 'inherit-adopted', 'heirs-of-body', 'year', 'heir', 'exclude', 'holders'];
+export const HOLDER_ORDER = ['person', 'name', 'as', 'number', 'from', 'to', 'through-spouse'] as const;
 type HolderKey = (typeof HOLDER_ORDER)[number];
 type Changes = [HolderKey, string | null][];
 

@@ -259,7 +259,8 @@ describe('F.4: planLines gives a tabbed card the drop places of the "You" card',
 	});
 
 	it('`tabbed` and `youTab` are the same for a single card; the "You" card and the ordinal cards are tabbed together', () => {
-		const t = trees.find((x) => x.id === '07')!;
+		// 0.3 (D231): with the added step no card of tree 07 has a drop that another trunk moves; tree 12 still has one.
+		const t = trees.find((x) => x.id === '12')!;
 		const plainLaid = run(t.g, 12, []);
 		const L = plainLaid.layout;
 		const order = computeModelOrder(t.g, computeGenerations(t.g));

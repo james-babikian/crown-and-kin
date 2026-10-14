@@ -261,13 +261,67 @@ export function panFrom(start: View, dx: number, dy: number): View {
 	return { scale: start.scale, cx: start.cx - dx / start.scale, cy: start.cy - dy / start.scale };
 }
 
-/** Pans stop when the tree would leave the viewport entirely; the centre stays over the tree. */
-export function clampPan(view: View, bounds: Rect): View {
-	return {
-		scale: view.scale,
-		cx: Math.min(bounds.x + bounds.w, Math.max(bounds.x, view.cx)),
-		cy: Math.min(bounds.y + bounds.h, Math.max(bounds.y, view.cy)),
-	};
+/** The bars of the full-screen view (D222): screen px at the top and at the bottom of the viewport that a card may not go under. The sides have none. */
+export interface FreeArea {
+	top: number;
+	bottom: number;
+}
+
+/** The free area as far as `size` allows: both insets are kept apart by at least one px. */
+function insetsIn(free: FreeArea, size: Size): FreeArea {
+	// A NaN inset (a bar the browser cannot measure) counts as no bar; `Math.max(0, NaN)` would be NaN.
+	const t = Number.isFinite(free.top) ? free.top : 0;
+	const b = Number.isFinite(free.bottom) ? free.bottom : 0;
+	const top = Math.max(0, Math.min(t, size.h - 1));
+	return { top, bottom: Math.max(0, Math.min(b, size.h - 1 - top)) };
+}
+
+/** A hair of room, so a tree that fits exactly (the fit scale) counts as fitting. */
+const FIT_EPS = 1e-6;
+
+/**
+ * The limits for the centre of a pan, in layout px. Without `free`, and in an axis where the tree is larger than the screen, the centre stays over the
+ * bounds. With `free` (D222), in an axis where the bounds at this scale are smaller than the free area, the bounds stay wholly inside the free area:
+ * the bounds hold the 24 px margin, so a card stops that far short of the edge and never goes under a bar.
+ */
+export function panLimits(bounds: Rect, scale: number, size: Size, free?: FreeArea): { x0: number; x1: number; y0: number; y1: number } {
+	let x0 = bounds.x;
+	let x1 = bounds.x + bounds.w;
+	let y0 = bounds.y;
+	let y1 = bounds.y + bounds.h;
+	if (free && validSize(size) && scale > 0) {
+		const { top, bottom } = insetsIn(free, size);
+		if (bounds.w * scale <= size.w + FIT_EPS) {
+			x0 = bounds.x + bounds.w - size.w / 2 / scale;
+			x1 = bounds.x + size.w / 2 / scale;
+		}
+		if (bounds.h * scale <= size.h - top - bottom + FIT_EPS) {
+			y0 = bounds.y + bounds.h - (size.h / 2 - bottom) / scale;
+			y1 = bounds.y + (size.h / 2 - top) / scale;
+		}
+	}
+	return { x0, x1, y0, y1 };
+}
+
+/** `view` with its centre inside the limits. A pair that crosses (a rounding hair) gives the upper limit. */
+export function clampTo(view: View, l: { x0: number; x1: number; y0: number; y1: number }): View {
+	return { scale: view.scale, cx: Math.min(l.x1, Math.max(l.x0, view.cx)), cy: Math.min(l.y1, Math.max(l.y0, view.cy)) };
+}
+
+/** Pans stop when the tree would leave the viewport entirely; the centre stays over the tree. With `area`: see `panLimits`. */
+export function clampPan(view: View, bounds: Rect, area?: { free: FreeArea; size: Size }): View {
+	return clampTo(view, panLimits(bounds, view.scale, area?.size ?? { w: 0, h: 0 }, area?.free));
+}
+
+/**
+ * D222: the view that puts the middle of `bounds` at the middle of the free area (the viewport minus the bars), at `scale`. Null when the bounds at
+ * that scale do not fit inside the free area: the caller then keeps its own view.
+ */
+export function centredSmallTree(bounds: Rect, size: Size, scale: number, free: FreeArea): View | null {
+	if (!validSize(size) || !(scale > 0) || !(bounds.w > 0) || !(bounds.h > 0)) return null;
+	const { top, bottom } = insetsIn(free, size);
+	if (bounds.w * scale > size.w + FIT_EPS || bounds.h * scale > size.h - top - bottom + FIT_EPS) return null;
+	return { scale, cx: bounds.x + bounds.w / 2, cy: bounds.y + bounds.h / 2 + (bottom - top) / 2 / scale };
 }
 
 /** M11: true when `box` meets `view` grown by one view width left and right and one view height above and below (layout px). */

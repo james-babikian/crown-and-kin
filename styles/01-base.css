@@ -121,7 +121,7 @@ body {
 
 /*
  * In the full-screen view on a device with a touch screen, the wrapper keeps its layer all the
- * time: to make the layer when a pinch or a double-tap starts, and to remove it after, made the
+ * time: to make the layer when a pinch starts, and to remove it after, made the
  * browser lay out every SVG text again (a 350 ms and a 630 ms frame on a slow phone, WP5.3). A
  * mouse-only computer does not pinch, and keeps the sharper text of a page without extra layers.
  */

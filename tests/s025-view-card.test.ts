@@ -51,7 +51,7 @@ const MARKED = `options:\n  me: bo\n${PEOPLE}`;
 
 interface Peek {
 	saveSource(): SaveSource | null;
-	lastLayout: { geo: Geometry; settings: { relationLine?: boolean; youTab?: string; orientation?: string }; opts: { relations?: ReadonlyMap<string, unknown> } };
+	lastLayout: { geo: Geometry; settings: { relationLine?: boolean; youTab?: string; orientation?: string }; opts: { relations?: { get(id: string): unknown } } };
 }
 
 const cardH = (root: FEl, id: string) => Number(root.querySelector(`.dynasty-card[data-person="${id}"] .dynasty-card-bg`)!.getAttribute('height'));
@@ -90,7 +90,7 @@ describe('the plate and the "You" tab follow the setting (D145, D148)', () => {
 		expect(peek.lastLayout.settings.relationLine).toBeUndefined();
 		// The scene still gets the words, so the screen-reader label says how the person is related to you.
 		const cards = relationsFor(build(MARKED).g, 'bo').cards;
-		expect(peek.lastLayout.opts.relations?.size).toBe(cards.size);
+		for (const id of ['ann', 'bo', 'cy']) expect(peek.lastLayout.opts.relations?.get(id), id).toEqual(cards.get(id));
 		expect(el.querySelector('.dynasty-card[data-person="cy"]')!.getAttribute('aria-label')).toContain(cards.get('cy')!.lower);
 		expect(el.querySelector('.dynasty-root')!.hasClass('dynasty-no-relations')).toBe(false);
 	});

@@ -16,7 +16,7 @@ import {
 import { REFUSAL_TEXT } from './refusal-text';
 
 /** §4.1 and §13.0 item 1 order of a house's keys. */
-const HOUSE_ORDER = ['id', 'name', 'color', 'arms'];
+export const HOUSE_ORDER = ['id', 'name', 'color', 'arms'];
 const COLOUR = /^#[0-9a-fA-F]{6}$/;
 
 /** The index of the first house item with this id: the one the tree uses (§4.1). */

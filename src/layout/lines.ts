@@ -8,9 +8,9 @@
  * dot or a single parent, a leg, a drop to a child) has its own x, and every sideways run has its
  * own lane.
  */
-import type { FamilyGraph } from '../core/derive';
+import type { FamilyGraph, FamilyUnion } from '../core/derive';
 import { barClear, isRoundel, lineMetrics, roundelAxis, sideTagDepth, tagHit, tagTop, type LineMetrics } from './geometry';
-import { FOLD_EM, placeFoldSpots, type LineExtras } from './fold-spots';
+import { FOLD_EM, foldMark, placeFoldSpots, type LineExtras } from './fold-spots';
 import type { Geometry, PersonBox, Rect, UnionPoint } from './model';
 
 /** A sideways run inside gap `gap` (below row `gap`) at couple lane `lane`, ending at `x`. */
@@ -123,6 +123,20 @@ export function tabbedCards(youTab: string | undefined, ordinalCards: readonly s
 	return new Set([...(ordinalCards ?? []), ...(youTab !== undefined ? [youTab] : [])]);
 }
 
+/**
+ * Two distances closer than this are a tie. Plans made again on cards that moved by one amount differ in their last digits, and a tie
+ * must go the same way in both (the right side, the first candidate).
+ */
+export const TIE = 1e-6;
+
+/**
+ * Spec §5.1 step 5: the side of the dot of partners in different blocks. The other partner counts as to the right (1) when its card
+ * starts at most `TIE` left of the anchor's card, so that round-off in an exact tie never flips the dot. `layout.ts` and `planLines` both call it.
+ */
+export function dotSide(otherX: number, anchorX: number): 1 | -1 {
+	return otherX >= anchorX - TIE ? 1 : -1;
+}
+
 /** Plans every leg, sibling bar, dot position and tag zone of a tree: see the file header. */
 export function planLines({ g, persons, rows, unions, anchors, geo, side, extras, tabbed, youTab }: PlanInput): LinePlan {
 	const m = lineMetrics(geo);
@@ -156,7 +170,22 @@ export function planLines({ g, persons, rows, unions, anchors, geo, side, extras
 	// 1. Union dots. A dot between side-by-side partners stays in their gap; other dots move
 	//    outwards from their anchor, a step at a time, until no other trunk is there.
 	const dotX = new Map<string, number>();
-	const ux = (key: string) => dotX.get(key) ?? unions.get(key)!.x;
+	// N05: a dot that the move below put between its legs is on the finished layout, but the plan made again on that layout (the router
+	// does it) must start where the first plan started, or it routes the legs differently and the dot no longer fits them. For partners on
+	// different rows the first place is the one under the anchor (`unionPlacer` in layout.ts: spec §5.1 step 5), found again from the cards.
+	const home = new Map<string, number>();
+	for (const fu of g.unions) {
+		const u = unions.get(fu.key)!;
+		const [a, b] = fu.partners.map(box);
+		const anchor = anchors.get(fu.key) !== undefined ? box(anchors.get(fu.key)!) : undefined;
+		if (u.bar || u.far || a.gen === b.gen || !anchor) continue;
+		const other = anchor === a ? b : a;
+		const x = anchor.x + anchor.w / 2 + (dotSide(other.x, anchor.x) * anchor.w) / 4;
+		// A union that was not moved keeps its own x to the last digit.
+		if (Math.abs(x - u.x) > 1e-6) home.set(fu.key, x);
+	}
+	const start = (key: string) => home.get(key) ?? unions.get(key)!.x;
+	const ux = (key: string) => dotX.get(key) ?? start(key);
 	for (const fu of g.unions) {
 		const u = unions.get(fu.key)!;
 		if (u.bar) reserve(box(fu.partners[0]).gen, u.x);
@@ -167,10 +196,10 @@ export function planLines({ g, persons, rows, unions, anchors, geo, side, extras
 	for (const fu of g.unions) {
 		if (!hasDot(fu.key) || farAtCorner(fu.key)) continue;
 		const gap = dotGap(fu.key);
-		const dir = ux(fu.key) >= centre(anchorOf(fu.key)) ? 1 : -1;
-		let x = unions.get(fu.key)!.x;
+		const dir = ux(fu.key) >= centre(anchorOf(fu.key)) - TIE ? 1 : -1;
+		let x = start(fu.key);
 		while (!isFree(gap, x)) x += dir * m.legStep;
-		if (x !== unions.get(fu.key)!.x) dotX.set(fu.key, x);
+		if (x !== start(fu.key)) dotX.set(fu.key, x);
 		reserve(gap, x);
 		addTo(dotsIn, gap, x);
 	}
@@ -190,7 +219,7 @@ export function planLines({ g, persons, rows, unions, anchors, geo, side, extras
 		const legs = (g.unionsOf.get(p.id) ?? []).filter((k) => hasDot(k) && (!unions.get(k)!.far || anchorOf(k).id === p.id));
 		const sides = g.secondary.filter((s) => !s.unionKey && s.parents.includes(p.id));
 		const solo = (g.soloChildren.get(p.id) ?? []).length > 0 || foldedSolo.has(p.id);
-		const sideOf = (k: string): 'left' | 'right' => (ux(k) >= cx ? 'right' : 'left');
+		const sideOf = (k: string): 'left' | 'right' => (ux(k) >= cx - TIE ? 'right' : 'left');
 		if (side) {
 			// The side each line prefers, in the order the lines take their places: a single parent's trunk, legs, side links.
 			const prefs = [...(solo ? ['left' as const] : []), ...legs.map(sideOf), ...sides.map((s) => (centre(box(s.child)) >= cx ? ('right' as const) : ('left' as const)))];
@@ -354,7 +383,7 @@ export function planLines({ g, persons, rows, unions, anchors, geo, side, extras
 		let bestCost = Infinity;
 		for (const c of candidates) {
 			const cost = Math.abs(c.x - cur) + Math.abs(c.x - target) + c.penalty;
-			if (cost < bestCost) {
+			if (cost < bestCost - TIE) {
 				best = c;
 				bestCost = cost;
 			}
@@ -374,6 +403,58 @@ export function planLines({ g, persons, rows, unions, anchors, geo, side, extras
 	const runs: Run[] = [];
 	const legs: Leg[] = [];
 	const dots = new Map<string, { gap: number; lane: number }>();
+	// N05: the dot sits under the anchor (spec §5.1 step 5) before the legs are routed. When the anchor's leg then hops to a free column
+	// (past a card of the lower row) and reaches the dot's line on the far side of the dot, the line runs on beyond the dot and the dot is
+	// a stub at its end, not a point between the partners. Once both legs' columns are known, a dot of partners on different rows that
+	// lies outside them moves to the middle of the span, or to the nearest place in it that no other line holds; the trunk to the children
+	// starts at the moved dot (`dotX`), so the children stay where they are and no stub is left. If no place in the span is free, the dot
+	// goes onto the entry of the nearer leg, which is still on the line of both legs, when no other line holds it; else it stays.
+	const moveDotIntoLegs = (fu: FamilyUnion, mine: readonly Leg[], gap: number) => {
+		const [a, b] = fu.partners.map(box);
+		if (unions.get(fu.key)!.far || a.gen === b.gen || mine.length !== 2) return;
+		const lo = Math.min(...mine.map((l) => l.entryX));
+		const hi = Math.max(...mine.map((l) => l.entryX));
+		const at = ux(fu.key);
+		if (at >= lo - 0.5 && at <= hi + 0.5) return;
+		// Columns of other legs through the rows around the gap would cross a trunk that falls on them, as for a dot of step 1.
+		// Lines that leave the cards of this row downwards pass the dot's line too: legs (`exitsIn`) and the links of children placed elsewhere.
+		const exitHere = (x: number) => !clearOfExits(gap, x) || [...sideExits].some(([k, at]) => box(k.slice(k.lastIndexOf('|') + 1)).gen === gap && Math.abs(at - x) < near);
+		// The "+ N" sign of a folded family hangs below its dot, in a lane that is not known yet: the dot keeps clear of the sign's width in any lane,
+		// and a folded family's own sign, which moves with its dot, keeps clear of the other dots of the gap.
+		const signs = foldedList.filter((f) => f.union !== undefined && f.union !== fu.key && g.unionByKey.has(f.union) && hasDot(f.union) && dotGap(f.union) === gap);
+		const own = foldedList.find((f) => f.union === fu.key);
+		const across = (k: ReturnType<typeof foldMark>, x: number) => Math.max(Math.min(k.x1, k.x2) - x, 0, x - Math.max(k.x1, k.x2));
+		const signClear = (x: number) => {
+			if (signs.some((f) => across(foldMark(f, { x: ux(f.union!), y: 0 }, geo.fontPx, !!side), x) < foldMark(f, { x: 0, y: 0 }, geo.fontPx, !!side).r + near)) return false;
+			if (!own) return true;
+			const k = foldMark(own, { x, y: 0 }, geo.fontPx, !!side);
+			return !(dotsIn.get(gap) ?? []).some((d) => d !== at && across(k, d) < k.r + near);
+		};
+		const clear = (x: number) => isFree(gap, x) && !hit(gap, x) && !hit(gap + 1, x) && !exitHere(x) && signClear(x);
+		const mid = (lo + hi) / 2;
+		const steps = Math.floor((hi - lo) / 2 / m.legStep);
+		let place = undefined as number | undefined;
+		for (let i = 0; i <= steps && place === undefined; i++) place = [mid + i * m.legStep, mid - i * m.legStep].find((c) => c > lo && c < hi && clear(c));
+		// Nothing is free in the span (a narrow or crowded one): the nearer entry, unless a trunk, a line through the gap, an exit or a sign
+		// holds it; the other entry then. If both are held, the dot stays where it was: a stub is better than a dot on another family's line.
+		if (place === undefined) {
+			const entries = [lo, hi].sort((p, q) => Math.abs(p - at) - Math.abs(q - at));
+			// The legs of this couple leave their cards at the entries, so their own exits do not count.
+			const otherExit = (x: number) =>
+				(exitsIn.get(gap) ?? []).some((t) => Math.abs(t - x) < near && !mine.some((l) => l.startX === t)) ||
+				[...sideExits].some(([k, at]) => box(k.slice(k.lastIndexOf('|') + 1)).gen === gap && Math.abs(at - x) < near);
+			place = entries.find((x) => isFree(gap, x) && !hit(gap + 1, x) && !otherExit(x) && signClear(x));
+			if (place === undefined) return;
+		}
+		// The old place is free again for the dots that come after.
+		for (const held of [reserved.get(gap), dotsIn.get(gap)]) {
+			const i = held?.indexOf(at) ?? -1;
+			if (i >= 0) held!.splice(i, 1);
+		}
+		dotX.set(fu.key, place);
+		reserve(gap, place);
+		addTo(dotsIn, gap, place);
+	};
 	for (const fu of g.unions) {
 		if (!hasDot(fu.key)) continue;
 		const u = unions.get(fu.key)!;
@@ -395,9 +476,10 @@ export function planLines({ g, persons, rows, unions, anchors, geo, side, extras
 			mine.push(leg);
 		}
 		legs.push(...mine);
+		moveDotIntoLegs(fu, mine, gap);
 		const dot = { gap, lane: 0 };
 		dots.set(fu.key, dot);
-		const xs = [x0, ...mine.map((l) => l.entryX)];
+		const xs = [ux(fu.key), ...mine.map((l) => l.entryX)];
 		runs.push({ gap, lo: Math.min(...xs), hi: Math.max(...xs), set: (lane) => (dot.lane = lane) });
 	}
 	const coupleLanes = pack(runs, rows.length, m.laneMargin);

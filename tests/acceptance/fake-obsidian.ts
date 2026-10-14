@@ -68,8 +68,45 @@ export class SuggestModal<T> extends Modal {
 	emptyStateText = '';
 	setPlaceholder(): void {}
 	setInstructions(): void {}
-	getSuggestions(): T[] {
+	// eslint-disable-next-line @typescript-eslint/no-unused-vars
+	getSuggestions(_query: string): T[] {
 		return [];
+	}
+	// eslint-disable-next-line @typescript-eslint/no-unused-vars
+	renderSuggestion(_value: T, _el: HTMLElement): void {}
+	/** Obsidian's row list (IT in app.js): the keyboard moves over `suggestions`; `addSuggestion` adds one row at the end. A test may delete `addSuggestion`. */
+	chooser: {
+		values: T[] | null;
+		suggestions: FEl[];
+		selectedItem: number;
+		addSuggestion?: (v: T) => void;
+	} = {
+		values: [],
+		suggestions: [],
+		selectedItem: 0,
+		addSuggestion: (v: T) => {
+			const el = this.resultContainerEl.createDiv({ cls: 'suggestion-item' });
+			this.renderSuggestion(v, el as unknown as HTMLElement);
+			this.chooser.values?.push(v);
+			this.chooser.suggestions.push(el);
+		},
+	};
+	/** What Obsidian does on a typed text: the suggestions cut at `limit`, then a new row for each. A test calls it; the fake does not call it at open. */
+	updateSuggestions(): void {
+		const all = this.getSuggestions(this.inputEl.value).slice(0, this.limit);
+		this.resultContainerEl.empty();
+		this.chooser.values = [];
+		this.chooser.suggestions = [];
+		this.chooser.selectedItem = 0;
+		for (const v of all) {
+			const el = this.resultContainerEl.createDiv({ cls: 'suggestion-item' });
+			this.renderSuggestion(v, el as unknown as HTMLElement);
+			this.chooser.values.push(v);
+			this.chooser.suggestions.push(el);
+		}
+	}
+	onInput(): void {
+		this.updateSuggestions();
 	}
 }
 

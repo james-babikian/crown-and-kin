@@ -11,14 +11,14 @@ person beatrix gen 1 at 551.203 161 size 180 61
 person cecily gen 1 at 967.187 161 size 180 61
 person clarice gen 1 at 767.187 161 size 180 61
 person edmund gen 1 at 335.203 161 size 180 61
-person elinor gen 0 at 759.192 0 size 180 61
-person godric gen 0 at 543.192 0 size 180 61
+person elinor gen 0 at 759.195 0 size 180 61
+person godric gen 0 at 543.195 0 size 180 61
 person hugo gen 2 at 0 322 size 180 61
 person maud gen 2 at 200 322 size 180 61
 person osric gen 2 at 800 322 size 180 61
 person piers gen 2 at 400 322 size 180 61
 person sybil gen 2 at 600 322 size 180 61
-union u0 at 741.192 30.5 bar
+union u0 at 741.195 30.5 bar
 union u1 at 317.203 191.5 bar
 union u2 at 533.203 191.5 bar
 union u3 at 641.195 244
@@ -38,7 +38,7 @@ path descent [piers edmund beatrix] M490 292V322
 path descent [edmund clarice sybil osric] M641.2 244V292M641.2 292H890
 path descent [sybil edmund clarice] M690 292V322
 path descent [osric edmund clarice] M890 292V322
-marker union at 741.192 30.5
+marker union at 741.195 30.5
 marker union at 317.203 191.5
 marker union at 533.203 191.5
 marker union at 641.195 244

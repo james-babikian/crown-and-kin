@@ -329,6 +329,22 @@ describe('pan and zoom', () => {
 		expect(clampPan({ scale: 1, cx: -50, cy: 500 }, b)).toEqual({ scale: 1, cx: 0, cy: 100 });
 	});
 
+	it('0.3 (D222): with a free area, a tree smaller than it stays wholly inside it; a larger axis keeps the rule above', () => {
+		const b = { x: 0, y: 0, w: 100, h: 100 };
+		const area = { size: { w: 400, h: 600 }, free: { top: 50, bottom: 100 } };
+		// The centre far to the left: the bounds' lower right corner is at the free area's lower right corner (screen 400, 500).
+		const v = clampPan({ scale: 1, cx: -500, cy: -500 }, b, area);
+		expect(200 + (b.x + b.w - v.cx)).toBeCloseTo(400, 6);
+		expect(300 + (b.y + b.h - v.cy)).toBeCloseTo(500, 6);
+		// The centre far to the right: the bounds' upper left corner is at the free area's upper left corner (screen 0, 50).
+		const w = clampPan({ scale: 1, cx: 900, cy: 900 }, b, area);
+		expect(200 + (b.x - w.cx)).toBeCloseTo(0, 6);
+		expect(300 + (b.y - w.cy)).toBeCloseTo(50, 6);
+		// A tree taller than the free area (450 px) keeps the 0.2.8 limit in y, and the width still follows the free area.
+		const tall = { x: 0, y: 0, w: 100, h: 1000 };
+		expect(clampPan({ scale: 1, cx: 900, cy: 5000 }, tall, area)).toEqual({ scale: 1, cx: 50 + 150, cy: 1000 });
+	});
+
 	it('centres a tree that is smaller than the viewport', () => {
 		const b = { x: 0, y: 0, w: 100, h: 100 };
 		expect(clampCentre({ scale: 1, cx: 0, cy: 0 }, b, size)).toEqual({ scale: 1, cx: 50, cy: 50 });

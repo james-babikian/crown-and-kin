@@ -49,8 +49,12 @@ export function rememberHeight(app: App, key: string, px: number): void {
 	heights.delete(key);
 	heights.set(key, rounded);
 	while (heights.size > MAX_BLOCKS) heights.delete(heights.keys().next().value!);
+	scheduleSave(app);
+}
+
+/** One write for a burst of changes, and none while the view is still settling. */
+function scheduleSave(app: App): void {
 	if (saveTimer !== null || typeof app.saveLocalStorage !== 'function') return;
-	// One write for a burst of changes, and none while the view is still settling.
 	saveTimer = setTimeout(() => {
 		saveTimer = null;
 		try {
@@ -59,6 +63,12 @@ export function rememberHeight(app: App, key: string, px: number): void {
 			// The heights stay in memory.
 		}
 	}, 2000);
+}
+
+/** Forgets the kept height of the block `key`, in memory and in the store: the block now shows something of another height (the low bar of a large tree). */
+export function forgetHeight(app: App, key: string): void {
+	readStore(app);
+	if (heights.delete(key)) scheduleSave(app);
 }
 
 /** Moves the kept height of a renamed note's blocks to the new path (the key starts with the path and a NUL). */

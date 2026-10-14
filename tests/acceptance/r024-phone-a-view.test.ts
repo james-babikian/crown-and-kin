@@ -11,7 +11,7 @@ import { DEFAULT_SETTINGS, type DynastySettings } from '../../src/obsidian/setti
 import { clearMeasureCache } from '../../src/render/dom/measure';
 import { FEl, clock, device, flushFrames, installDom, resetDom, runFrame, runTimers, settle, dispatch } from './fake-dom';
 import { resetObsidian } from './fake-obsidian';
-import { desktop, embed, fakeHandle, fakeHost, openFullScreen, phone, shown } from './tree-view-fakes';
+import { desktop, embed, fakeHandle, fakeHost, openFullScreen, phone, shown as sceneOf } from './tree-view-fakes';
 
 /*
  * 0.2.4, the view of the phone preview (WP phone-A): "Reduce movement" (D126 1, contract 3.3) in the tree view, on the fake DOM. The pictures of
@@ -45,7 +45,12 @@ const tree = (me: boolean) =>
 		'',
 	].join('\n');
 
-describe('D126 (1): reduced movement in the tree view', () => {
+/**
+ * What the screen shows: the scene transform and the wrapper transform.
+ */
+const shown = (root: FEl) => `${sceneOf(root)}|${root.querySelector('.dynasty-canvas')?.style.getPropertyValue('--dynasty-gesture-transform') ?? ''}`;
+
+describe('D126 (1), D235: reduced movement in the tree view (the still outline of the highlight; no view change slides)', () => {
 	const settingOf = (reduceMotion: DynastySettings['reduceMotion']): DynastySettings => ({ ...DEFAULT_SETTINGS, reduceMotion });
 
 	/**
@@ -77,20 +82,16 @@ describe('D126 (1): reduced movement in the tree view', () => {
 		expect(r.end).toBe(r.oneFrame);
 	});
 
-	it('Off: Fit animates, so one frame later the scene is still near the old view and the end is another', async () => {
-		const r = await fitFrom('off');
-		expect(r.now).toEqual(r.awayView);
-		expect(r.end).not.toBe(r.oneFrame);
-	});
-
-	it('Follow the device: the phone setting decides, read each time', async () => {
-		device.reduceMotion = true;
-		const on = await fitFrom('system');
-		expect(on.end).toBe(on.oneFrame);
-		resetDom();
-		device.reduceMotion = false;
-		const off = await fitFrom('system');
-		expect(off.end).not.toBe(off.oneFrame);
+	it('Off, and Follow the device: Fit also sets its view at once (D235, no slide), whatever the setting or the device says', async () => {
+		const on = await fitFrom('on');
+		for (const [setting, prefers] of [['off', false], ['system', true], ['system', false]] as const) {
+			resetDom();
+			device.reduceMotion = prefers;
+			const r = await fitFrom(setting);
+			expect(r.now, setting).not.toEqual(r.awayView);
+			expect(r.oneFrame, setting).toBe(r.end);
+			expect(r.end, setting).toBe(on.end);
+		}
 	});
 
 	/** A highlight on the card of `ann`, from the tree view. */

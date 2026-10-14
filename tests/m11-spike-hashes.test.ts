@@ -8,6 +8,7 @@ import { sampleSources, svgHash } from './acceptance/m11-support';
  * with a sha256 recorded from the head of `milestone-11` before the build (`tests/acceptance/m11-spike-hashes.json`).
  * Unlike the other golden files this one is a recorded regression value: the speed work must not change the
  * headless drawing at all. This test passes now and must keep passing after every M11 package.
+ * 0.3 (D231, WP-Q): the hashes of 15 of the 17 trees were recorded again, once, because the added step of the placement moves cards (the trees 04 and 10 are as before).
  * Run: npx vitest run tests/m11-spike-hashes.test.ts
  */
 

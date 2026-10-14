@@ -1,3 +1,4 @@
+// 0.3 (D231, WP-Q): the hashes of this file were recorded again, once, because the added step of the placement moves cards.
 import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 import { deriveFamilies } from '../src/core/derive';
@@ -37,10 +38,10 @@ function sidewaysHash(source: string): string {
 }
 
 const RECORDED: Record<string, string> = {
-	'07': '9d570616c37278220889078ee790ef40322860a821d4a09c0e38c579f8fa2a16',
-	'07b': '9d570616c37278220889078ee790ef40322860a821d4a09c0e38c579f8fa2a16',
-	'12': 'a7821a8ddeeb9aac604f3b0a76df6d04eab1d5d3ebb2d81ed5e5a5a5c1e8ff51',
-	'15': '286f5fe7774bd077e0c99a06c9446c0e79d16494f6810ac8bff49fe19a931c19',
+	'07': 'be1e8efd407dc7d6395ee4fb808baeb34d495e6b9dd2451acbd834b616215ae2',
+	'07b': 'be1e8efd407dc7d6395ee4fb808baeb34d495e6b9dd2451acbd834b616215ae2',
+	'12': '61afce3056b2d6045d11532f263188686579add8e4a08a971b5a5d3c800b907b',
+	'15': 'cb891a39822ade5a727be399dffd4e3db55bf7cf69ad66ede792b4eecbfbd107',
 };
 
 const SAMPLES = sampleSources().filter((s) => IDS.includes(s.id));

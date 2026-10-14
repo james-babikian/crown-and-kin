@@ -1,0 +1,118 @@
+/* ---------- Very large tree: the low bar (D159, D223, D226; spec §7.7) ---------- */
+
+/*
+ * One low bar across the note width in place of the tree: a small tree icon at the left, the message, the button "Draw the tree" at the right. Below
+ * 520 px of box width (a phone, a narrow pane) the button goes under the text and fills the width. The bar takes no space it does not need: the note
+ * keeps no empty box. The look is option A of the Step 0 page (D223). Colours come from the theme's variables only, so light and dark follow.
+ */
+.dynasty-large-root {
+	container-type: inline-size;
+}
+
+.dynasty-large-bar {
+	/* The hidden name of the bar is absolute; the bar is its box, so it never reaches a scroller around it (the iPhone Find fault, tests/r028-ios-find.test.ts). */
+	position: relative;
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: var(--size-4-3);
+	box-sizing: border-box;
+	padding: var(--size-4-3) var(--size-4-4);
+	border: 1px solid var(--background-modifier-border);
+	border-radius: var(--radius-m);
+	background: var(--background-primary);
+	font-family: var(--font-interface);
+	font-size: var(--dynasty-type-text);
+	color: var(--dynasty-muted, var(--text-muted));
+}
+
+/*
+ * In Live Preview Obsidian puts its own edit icon (`</>`) in the top-right corner of the block, over the bar. The bar keeps the right edge free for it,
+ * so the button never lies under the icon (found in the visual check of 2026-10-13).
+ */
+.cm-embed-block .dynasty-large-bar {
+	padding-right: calc(var(--size-4-4) + 32px);
+}
+
+.dynasty-large-icon {
+	display: inline-flex;
+	flex: none;
+	width: var(--icon-m);
+	height: var(--icon-m);
+	color: var(--dynasty-muted, var(--text-muted));
+}
+
+.dynasty-large-icon .svg-icon {
+	width: var(--icon-m);
+	height: var(--icon-m);
+}
+
+.dynasty-large-text {
+	flex: 1 1 0;
+	min-width: 0;
+	line-height: var(--line-height-normal);
+}
+
+.dynasty-large-action {
+	display: flex;
+	flex: none;
+	align-items: center;
+	gap: var(--size-4-3);
+}
+
+/* The button of the bar ("Draw the tree" or "Choose a person"), with a hit area of at least 44 px (spec §7.5). Prefixed with the bar so that the theme's own button rule does not win. */
+.dynasty-large-bar .dynasty-large-button {
+	min-height: 44px;
+	min-width: 44px;
+	padding: 0 var(--size-4-6);
+	font-size: var(--dynasty-type-control);
+	font-weight: var(--font-semibold);
+}
+
+/* The short text that takes the button's place after a tap. */
+.dynasty-large-live:empty {
+	display: none;
+}
+
+@container (max-width: 520px) {
+	.dynasty-large-text {
+		flex: 1 1 calc(100% - var(--icon-m) - var(--size-4-3));
+	}
+
+	.dynasty-large-action {
+		flex: 1 1 100%;
+		justify-content: center;
+	}
+
+	.dynasty-large-bar .dynasty-large-button {
+		flex: 1 1 100%;
+	}
+}
+
+/*
+ * The full-screen view: the bar stands in the middle of the free area. The toolbar lies over the viewport, at the top on a computer and at the bottom
+ * on a phone (the phone's bar, spec §7.5), so the bar keeps clear of it and of the notch.
+ */
+.dynasty-large-viewport {
+	display: flex;
+	flex-direction: column;
+	justify-content: center;
+	box-sizing: border-box;
+	padding: var(--size-4-4);
+	cursor: default;
+}
+
+.dynasty-large-viewport .dynasty-large-bar {
+	width: 100%;
+	max-width: 40rem;
+	margin-inline: auto;
+}
+
+.dynasty-full .dynasty-large-viewport {
+	padding-top: calc(env(safe-area-inset-top, 0px) + 44px + var(--size-4-4));
+}
+
+.modal.dynasty-fullscreen.is-phone .dynasty-full .dynasty-large-viewport {
+	padding-top: max(var(--size-4-4), env(safe-area-inset-top));
+	padding-bottom: calc(52px + env(safe-area-inset-bottom) + var(--size-4-4));
+}

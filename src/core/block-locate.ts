@@ -108,6 +108,10 @@ function stripColumns(s: string, cols: number): { removed: string; rest: string 
 const OPEN = /^(`{3,}|~{3,})(.*)$/;
 const CLOSE = /^(`{3,}|~{3,})[ \t]*$/;
 const LIST_MARKER = /^([-+*]|\d{1,9}[.)])(?=[ \t]|$)/;
+/** Three or more of `-`, `*` or `_` (the same one), spaces between: a thematic break, which CommonMark reads before a list item. */
+const THEMATIC_BREAK = /^([-*_])(?:[ \t]*\1){2,}[ \t]*$/;
+// The deepest nesting of quote markers that one list marker line may open; deeper lines are read as plain text.
+const MAX_QUOTE_DEPTH = 64;
 
 interface Fence {
 	char: string;
@@ -147,6 +151,11 @@ interface Opening {
 	column: number;
 	/** Whitespace before the fence on its line, when no list marker precedes it. */
 	indent: string | null;
+	/**
+	 * The list items outside a quote that a marker line opened ("- > ..."): a line of the fence below must stand
+	 * at least `need` columns in, after `depth` quote markers, or the item and the fence have ended.
+	 */
+	guards: { depth: number; need: number }[];
 }
 
 /**
@@ -155,17 +164,45 @@ interface Opening {
  * indented 4 or more.
  */
 class ListStack {
-	private columns: number[] = [];
-	private depth = 0;
+	/**
+	 * One frame for each quote depth that a marker line opened ("- > x" opens depth 1 inside the list item of depth 0).
+	 * The last frame is the current one. A later line with fewer quote markers goes back to the frame of its depth, so
+	 * the list items that held the quote still hold the lines below it.
+	 */
+	private frames: { depth: number; columns: number[] }[] = [{ depth: 0, columns: [] }];
+
+	private get columns(): number[] {
+		return this.frames[this.frames.length - 1].columns;
+	}
 
 	/** Reads one line outside a fence; returns the fence it opens, if any. */
 	scan(line: string): Opening | null {
 		const q = stripQuotes(line, Infinity);
-		if (q.depth !== this.depth) {
-			this.columns = [];
-			this.depth = q.depth;
+		while (this.frames.length > 1 && this.frames[this.frames.length - 1].depth > q.depth) this.frames.pop();
+		// A line that starts a quote (or a quote of another depth) with no frame of that depth ends the list items before it.
+		if (this.frames[this.frames.length - 1].depth !== q.depth) this.frames = [{ depth: q.depth, columns: [] }];
+		else this.dropEndedItems(line, q.depth);
+		return this.scanContent(q.rest, q.depth);
+	}
+
+	/**
+	 * A line that continues a quote from a marker line must still stand inside the list item that holds the quote: its
+	 * quote marker is indented to the item's content column. If not ("- > a" then "> b"), the item has ended and the
+	 * quote is a new one; every frame goes, as if the line had started a quote.
+	 */
+	private dropEndedItems(line: string, depth: number): void {
+		for (let k = this.frames.length - 1; k >= 1; k--) {
+			const parent = this.frames[k - 1];
+			const rest = stripQuotes(line, parent.depth).rest;
+			const need = parent.columns[parent.columns.length - 1] ?? 0;
+			if (indentation(rest).cols >= need) continue;
+			this.frames = [{ depth, columns: [] }];
+			return;
 		}
-		const s = q.rest;
+	}
+
+	/** The line after its leading quote markers; `depth` is the number of quote markers in front of it. */
+	private scanContent(s: string, depth: number): Opening | null {
 		if (s.trim() === '') return null;
 		let ind = indentation(s);
 		while (this.columns.length && this.columns[this.columns.length - 1] > ind.cols) this.columns.pop();
@@ -173,7 +210,9 @@ class ListStack {
 		for (;;) {
 			const m = LIST_MARKER.exec(s.slice(ind.chars));
 			const top = this.columns[this.columns.length - 1] ?? 0;
-			if (!m || ind.cols - top > 3) break;
+			if (ind.cols - top > 3) break;
+			if (THEMATIC_BREAK.test(s.slice(ind.chars))) return null;
+			if (!m) break;
 			const afterMarker = ind.chars + m[0].length;
 			const markerEnd = ind.cols + m[0].length;
 			const gap = indentation(s, afterMarker, markerEnd);
@@ -184,11 +223,27 @@ class ListStack {
 			if (gap.chars === s.length) return null;
 			ind = gap.cols - markerEnd > 4 ? { cols: content, chars: afterMarker + 1 } : gap;
 		}
+		// A callout opened after a list marker on the same line ("- > - item"): the lines below start with the quote
+		// marker, so the list items inside it are counted from that marker. The `>` must be at most 3 columns past the
+		// item's content column; further right it is indented code (CommonMark).
+		const lead = marker ? indentation(s, ind.chars, ind.cols).cols - ind.cols : 4;
+		const inner = marker && lead <= 3 && ind.cols - (this.columns[this.columns.length - 1] ?? 0) <= 3 ? stripQuotes(s.slice(ind.chars), Infinity) : null;
+		// A line with more quote markers than any real note has is read as plain text: the scan of a hostile line stays
+		// shallow, so it can never overflow the call stack (spec §8: nothing may throw).
+		if (inner && inner.depth > 0 && depth + inner.depth > MAX_QUOTE_DEPTH) return null;
+		if (inner && inner.depth > 0) {
+			// The outer frame keeps its list columns for the lines that go back to its depth.
+			this.frames.push({ depth: depth + inner.depth, columns: [] });
+			// A fence on this same line has no prefix to copy from the lines below: it stays unread, as before.
+			this.scanContent(inner.rest, depth + inner.depth);
+			return null;
+		}
 		const container = this.columns[this.columns.length - 1] ?? 0;
 		if (ind.cols - container > 3) return null;
 		const fence = openingFence(s.slice(ind.chars));
 		if (!fence) return null;
-		return { fence, depth: q.depth, container, column: ind.cols, indent: marker ? null : s.slice(0, ind.chars) };
+		const guards = this.frames.slice(0, -1).map((f) => ({ depth: f.depth, need: f.columns[f.columns.length - 1] ?? 0 }));
+		return { fence, depth, container, column: ind.cols, indent: marker ? null : s.slice(0, ind.chars), guards };
 	}
 }
 
@@ -209,7 +264,7 @@ export const findBlocks: FindBlocks = (text) => {
 			i++;
 			continue;
 		}
-		const { fence, depth, container, column } = open;
+		const { fence, depth, container, column, guards } = open;
 		let closeLine: number | null = null;
 		let j = i + 1;
 		for (; j < lines.length; j++) {
@@ -220,6 +275,7 @@ export const findBlocks: FindBlocks = (text) => {
 			const ind = indentation(q.rest);
 			// A less indented line ends the list item, and the fence with it.
 			if (!blank && ind.cols < container) break;
+			if (!blank && guards.some((g) => indentation(stripQuotes(lines[j].text, g.depth).rest).cols < g.need)) break;
 			if (!blank && ind.cols - container <= 3) {
 				const m = CLOSE.exec(q.rest.slice(ind.chars));
 				if (m && m[1][0] === fence.char && m[1].length >= fence.length) {
@@ -329,6 +385,33 @@ export const replaceBody: ReplaceBody = (text, block, newBody) => {
 		...next.slice(head, next.length - tail).map((l) => ({ line: withPrefix(l) })),
 		...rawLines.slice(rawLines.length - tail).map((line, k) => ({ line, after: breaks[rawLines.length - tail + k] })),
 	];
-	const out = pieces.map((p, k) => (k === pieces.length - 1 ? p.line : p.line + (p.after ?? near))).join('');
-	return text.slice(0, block.bodyStart) + out + text.slice(block.bodyEnd);
+	// `swap`: one break of a kept line, taken in place of its own (see below).
+	const build = (fresh: string, swap?: { k: number; br: string }) =>
+		pieces.map((p, k) => (k === pieces.length - 1 ? p.line : p.line + (swap?.k === k ? swap.br : (p.after ?? fresh)))).join('');
+	const before = text.slice(0, block.bodyStart);
+	const after = text.slice(block.bodyEnd);
+	const countBreaks = (s: string) => s.match(/\r\n|\r|\n/g)?.length ?? 0;
+	// A new line's break that sits next to an empty line can join with it: a lone CR before an empty line that ends
+	// with LF reads as one CRLF, and a line is lost. Take another break for the new lines then (the rest keeps its bytes).
+	const wanted = countBreaks(before) + pieces.length - 1 + countBreaks(after);
+	const first = build(near);
+	const ok = (out: string) => countBreaks(before + out + after) === wanted;
+	if (ok(first)) return before + first + after;
+	const choices = [...new Set([block.eol, '\n', '\r', '\r\n'])];
+	for (const fresh of choices) {
+		const out = build(fresh);
+		if (fresh !== near && ok(out)) return before + out + after;
+	}
+	// Still a line lost: a kept line's lone CR next to an empty line, or an LF behind it. Give that one break (inside
+	// the body, so no byte outside it changes) another form; if none helps, the text stays wrong and the write is refused.
+	for (let k = 0; k < pieces.length - 1; k++) {
+		if (pieces[k].line !== '' && pieces[k + 1].line !== '') continue;
+		for (const br of choices) {
+			for (const fresh of choices) {
+				const out = build(fresh, { k, br });
+				if (ok(out)) return before + out + after;
+			}
+		}
+	}
+	return before + first + after;
 };

@@ -189,12 +189,12 @@
 
 /*
  * 0.2.8 (G5b): in a short tree box (a note embed of 500 px) the 15 rows are taller than the box, and the end of the list was cut with no sign. `fitLegend` adds
- * `is-tight` when the rows do not fit: the rows are as high as their sample (22 px, plus 2 px) and the gaps and the padding are smaller, so the whole list shows.
+ * `is-tight` when the rows do not fit: the rows are as high as their sample (22 px) and the gaps and the padding are smaller, so the whole list shows.
  * A box that is still too short for that scrolls inside.
  */
 .dynasty-popover-legend.is-tight {
-	padding-top: 8px;
-	padding-bottom: 8px;
+	padding-top: 6px;
+	padding-bottom: 6px;
 }
 
 .dynasty-popover-legend.is-tight .dynasty-popover-title {
@@ -205,8 +205,9 @@
 	gap: 0;
 }
 
+/* 0.3 (spec §13.22 rule 6, Legend): the sample is 22 px high, so a row needs no more. At 24 px the 18 rows still scrolled by 13 px in a 500 px note box. */
 .dynasty-popover-legend.is-tight .dynasty-legend-row {
-	min-height: 24px;
+	min-height: 22px;
 }
 
 .dynasty-popover-problems {

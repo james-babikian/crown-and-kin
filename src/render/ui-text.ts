@@ -8,6 +8,7 @@
 import type { PictureProblem } from '../core/pictures';
 import { quote } from '../core/quote';
 import { SUCCESSION_UI } from './succession-text';
+import { PERSON_PLACEHOLDER } from './view-text';
 
 // Moved to their own files (one home each). These names stay importable from here.
 export { ADD_UI, BLOCK_UI, FINDER_UI, FOCUS_UI, FULL_UI, HINT_UI, PHONE_LIST_UI, PROBLEMS_HINT, UI, problemsLabel, problemsTitle } from './view-text';
@@ -147,9 +148,9 @@ export const FLOW = {
 	existingText: (a: string, b: string, n: number) => (n === 1 ? `${a} and ${b} have this partnership now:` : `${a} and ${b} have these partnerships now:`),
 	existingWarn: 'If you continue, the plugin adds one more partnership. It does not change the partnerships above.',
 	addAnother: 'Add one more partnership',
-	pickerParent: 'Type the name of the parent',
-	pickerChild: 'Type the name of the child',
-	pickerPartner: 'Type the name of the partner',
+	pickerParent: PERSON_PLACEHOLDER,
+	pickerChild: PERSON_PLACEHOLDER,
+	pickerPartner: PERSON_PLACEHOLDER,
 	pickerEmpty: 'No person has this name.',
 	/** The accessible name of the search field of every person list (the placeholder is not a name). */
 	pickerSearchLabel: 'Find a person',
@@ -367,7 +368,7 @@ export const TITLES_UI = {
 	addHolder: 'Add holder',
 	addHolderLabel: (title: string) => `Add holder: add a holder to ${title}`,
 	pickerTitle: 'Select the holder',
-	pickerPlaceholder: 'Type the name of the holder',
+	pickerPlaceholder: PERSON_PLACEHOLDER,
 	/** The first row of the holder picker. */
 	notInTreeRow: 'A holder who is not in the tree',
 	needName: 'Enter a name for each title.',
@@ -865,4 +866,35 @@ export const WIN_LIST_UI = {
 	backTitles: 'Back to the list of titles',
 	backHouses: 'Back to the list of houses',
 	editPage: (name: string) => `Page to edit ${name}`,
+} as const;
+
+/** A number of people with a comma as the thousands separator ("1,600"): normal English, and a space can read as two numbers. */
+export function groupCount(n: number): string {
+	return String(Math.max(0, Math.trunc(n))).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+}
+
+/**
+ * The low bar of a very large tree (D159, D223, D226, D227; spec §7.7). The words are final (clarity-editor, 2026-10-13); all of them
+ * are here, so one edit changes every surface. `n` is the people count, `m` the limit that applies.
+ */
+export const LARGE_UI = {
+	/** The name of the bar for a screen reader (a hidden text, not an `aria-label`: Obsidian shows an `aria-label` as a tooltip). */
+	region: 'Large tree',
+	/** Above the first limit, with the button. */
+	ask: (n: number) => `This tree has ${groupCount(n)} people. The plugin can take several seconds to draw it. Obsidian does not answer in that time.`,
+	drawButton: 'Draw the tree',
+	/** The button of a bar that does not draw (D227 item 3): it opens the person picker, then the family of the chosen person shows. */
+	chooseButton: 'Choose a person',
+	/** Above the top that applies on a computer or a tablet. */
+	top: (n: number, m: number) => `This tree has ${groupCount(n)} people. The plugin does not draw a tree with more than ${groupCount(m)} people. The plugin does not change your note. Choose a person to see the family of that person.`,
+	/** Above the phone top, in the full-screen view. */
+	phoneTop: (n: number, m: number) => `This tree has ${groupCount(n)} people. On a phone, the plugin does not draw a whole tree with more than ${groupCount(m)} people. Choose a person to see the family of that person.`,
+	/** After a tap on the button: the button area shows this, and a screen reader reads it. */
+	busy: 'Wait. The plugin draws the tree.',
+	/** A draw that passed its time budget. */
+	slow: 'The plugin stopped because this tree took too long to draw. The plugin does not change your note. Choose a person to see a family. To draw the whole tree, make the tree smaller in the note.',
+	/** A focus family whose own people pass the top (a pin with very many generations, or a chosen person with a very large family). */
+	focusTop: (n: number, m: number) => `The family of this person has ${groupCount(n)} people. The plugin does not draw a family with more than ${groupCount(m)} people. The plugin does not change your note. Choose another person to see a smaller family.`,
+	/** The button of that bar. */
+	chooseOtherButton: 'Choose another person',
 } as const;

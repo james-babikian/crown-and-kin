@@ -35,7 +35,7 @@ export interface PopoverOptions {
 
 /**
  * 0.2.8 (G5b): makes the open legend as compact as it needs to be to show all its rows. A note embed is only 500 px high, and the rows alone are taller. When the
- * content is taller than the box, the class `is-tight` (rows 24 px, no gaps, less padding) is added. Returns whether it was added. A box that is still too short
+ * content is taller than the box, the class `is-tight` (rows 22 px, no gaps, less padding) is added. Returns whether it was added. A box that is still too short
  * scrolls inside, as before.
  */
 export function fitLegend(el: HTMLElement): boolean {

@@ -2,7 +2,7 @@
  * The per-block memory kept for the session (spec §5.5): the last view, the last-edited
  * person, the session focus and the "just saved" highlight. Each `Handle` owns its state
  * (`block-handle.ts`: `readonly state = newBlockState()`); `main.ts` keeps only `looseStates`, for
- * views with no handle. Only the focus and fold fields end when the note closes (`endSessionFocus`).
+ * views with no handle. Only the focus, fold and "Draw the tree" fields end when the note closes (`endSessionFocus`).
  */
 
 import type { FoldKey } from '../core/folds';
@@ -32,6 +32,8 @@ export interface BlockState {
 	focus: SessionFocus | null;
 	/** The focus the phone rule chose, kept so that an edit does not move it; until the note closes. */
 	autoFocus: string | null;
+	/** The marked person when `autoFocus` was chosen (D234): a new, changed or removed mark chooses again. */
+	autoMark?: string | null;
 	/**
 	 * A person just saved, to show once (§5.5): the first view of `place` (the kind of view whose
 	 * sheet or toolbar wrote) that renders after the write takes it, and shows all people if its
@@ -59,6 +61,11 @@ export interface BlockState {
 	 * when the note closes. Optional so that `newBlockState()` stays as it is.
 	 */
 	listBack?: string[];
+	/**
+	 * 0.3 (spec §7.7, D223): the user tapped "Draw the tree" on the low bar of this block. Every later render of the block in the session draws the tree with no
+	 * bar (an edit, a setting, a fold, Find), until the note closes. It never lifts the top (the second limit, the phone top). Optional so that `newBlockState()` stays as it is.
+	 */
+	largeTapped?: boolean;
 }
 
 /** What the relation finder shows (spec §13.2, D47, D48); it writes nothing to the note. */
@@ -95,11 +102,13 @@ export const focusKey = (id: string | null, n = 0, orientation: Orientation = 'd
 export function endSessionFocus(st: BlockState): void {
 	st.focus = null;
 	st.autoFocus = null;
+	st.autoMark = null;
 	st.shown = null;
 	st.finder = null;
 	st.succession = null;
 	st.folds.clear();
 	st.listBack = undefined;
+	st.largeTapped = undefined;
 }
 
 /**
@@ -117,7 +126,10 @@ export function carryState(from: BlockState, to: BlockState): void {
 	to.lastEdited ??= from.lastEdited;
 	to.highlight ??= from.highlight;
 	to.focus ??= from.focus;
-	to.autoFocus ??= from.autoFocus;
+	if (to.autoFocus === null && from.autoFocus !== null) {
+		to.autoFocus = from.autoFocus;
+		to.autoMark = from.autoMark;
+	}
 	to.shown ??= from.shown;
 	// One temporary view at a time (F.1): the one that `to` holds wins, and then `from` gives neither.
 	if (!to.finder && !to.succession) {
@@ -126,4 +138,5 @@ export function carryState(from: BlockState, to: BlockState): void {
 	}
 	if (!to.folds.size) to.folds = new Set(from.folds);
 	to.listBack ??= from.listBack;
+	to.largeTapped ??= from.largeTapped;
 }

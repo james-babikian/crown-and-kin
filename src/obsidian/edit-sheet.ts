@@ -1485,6 +1485,13 @@ export class EditSheet extends Modal {
 		return me && (id === me || this.data.person.id === me) ? relationsFor(this.data.g, me, this.o.relationOptions).cards.get(id) : undefined;
 	}
 
+	/** WP-K: the words of the parent rows and child rows come from one request. Only the window of the marked person shows them (D215). */
+	private warmRelationWords(fam: FamilyView): void {
+		const me = this.me();
+		if (!me || this.data.person.id !== me) return;
+		relationsFor(this.data.g, me, this.o.relationOptions).cards.getMany([...fam.parents.map((l) => l.id), ...this.childrenOf().map((k) => k.id)]);
+	}
+
 	/**
 	 * The second text line of a person row: the years, with the relation word to the marked person before them (the marked person in bold).
 	 * D215: the word shows only in the window of the marked person. In another window it would read as a relation to that window's person
@@ -1509,6 +1516,7 @@ export class EditSheet extends Modal {
 		const fam = this.data.fam;
 		if (!fam) return;
 		const ro = this.readOnly;
+		this.warmRelationWords(fam);
 
 		// D212: a quiet "+ Add" link at the right of each group heading, in place of the row of three buttons.
 		const group = (key: string, heading: string, add?: { text: string; cls: string; run: () => void }) => {

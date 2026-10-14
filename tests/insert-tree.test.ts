@@ -171,8 +171,9 @@ describe('insertTree in an editor', () => {
 
 	it('in a code block that never closes, in a callout list item: the same container', () => {
 		const s = run('> - ```js\n>   x', { line: 1, ch: 3 });
-		expect(s.text).toBe(['> - ```dynasty', `>   ${HINT}`, '>   ```', '>', '> - ```js', '>   x'].join('\n'));
-		expect(s.cursor).toEqual({ line: 3, ch: 1 });
+		// The block opens on line 0, so a blank callout line goes first (D224).
+		expect(s.text).toBe(['>', '> - ```dynasty', `>   ${HINT}`, '>   ```', '>', '> - ```js', '>   x'].join('\n'));
+		expect(s.cursor).toEqual({ line: 4, ch: 1 });
 	});
 
 	it('in the note properties: the tree goes after them, and they do not change (review 0.1.1 E)', () => {
@@ -193,5 +194,76 @@ describe('insertTree in an editor', () => {
 		const blocks = findBlocks(s.text);
 		expect(blocks).toHaveLength(2);
 		expect(blocks[1].body.trimEnd()).toBe(HINT);
+	});
+});
+
+// D224 (0.3): the opening fence never sits on line 0. Live Preview opens a note with the cursor on its
+// first line, and shows the source text of a tree while the cursor is in it.
+describe('insertTree never puts the opening fence on line 0 (D224)', () => {
+	const fenceLine = (text: string) => text.split('\n').findIndex((l) => /^[ >\t]*(?:(?:[-*+]|\d+[.)]) )?```dynasty/.test(l));
+
+	it('an empty note: one blank line, then the tree', () => {
+		const s = run('', { line: 0, ch: 0 });
+		expect(s.transactions).toBe(1);
+		expect(s.text).toBe(['', '```dynasty', HINT, '```', ''].join('\n'));
+		const b = expectOneEmptyTree(s.text);
+		expect(b.openLine).toBe(1);
+		expect(s.cursor).toEqual({ line: b.closeLine! + 1, ch: 0 });
+	});
+
+	it('a note whose first line is empty and others follow: the blank line stays, the tree is on line 1', () => {
+		const s = run('\nThe end.', { line: 0, ch: 0 });
+		expect(s.text).toBe(['', '```dynasty', HINT, '```', '', 'The end.'].join('\n'));
+		const b = expectOneEmptyTree(s.text);
+		expect(b.openLine).toBeGreaterThan(0);
+		expect(s.cursor).toEqual({ line: b.closeLine! + 1, ch: 0 });
+	});
+
+	it('text before the cursor on line 0 keeps the fence off line 0 as before', () => {
+		const s = run('House Thorne', { line: 0, ch: 12 });
+		expect(fenceLine(s.text)).toBe(2);
+	});
+
+	it('a code block that never closes and opens on line 0: the tree goes above it, below a blank line', () => {
+		const s = run('```js\nlet a = 1;', { line: 1, ch: 3 });
+		expect(s.text).toBe(['', '```dynasty', HINT, '```', '', '```js', 'let a = 1;'].join('\n'));
+		const b = expectOneEmptyTree(s.text);
+		expect(b.openLine).toBe(1);
+		expect(s.cursor).toEqual({ line: b.closeLine! + 1, ch: 0 });
+	});
+
+	it('a callout on line 0: the blank line is ">"', () => {
+		const s = run('> ', { line: 0, ch: 2 });
+		expect(s.text).toBe(['>', '> ```dynasty', `> ${HINT}`, '> ```', '>'].join('\n'));
+		const b = expectOneEmptyTree(s.text, '> ');
+		expect(b.openLine).toBe(1);
+		expect(s.cursor).toEqual({ line: b.closeLine! + 1, ch: 1 });
+	});
+
+	it('a callout code block that never closes, opening on line 0: the blank line is ">"', () => {
+		const s = run('> - ```js\n>   x', { line: 1, ch: 3 });
+		expect(s.text).toBe(['>', '> - ```dynasty', `>   ${HINT}`, '>   ```', '>', '> - ```js', '>   x'].join('\n'));
+		expect(s.cursor).toEqual({ line: 4, ch: 1 });
+	});
+
+	it('a list marker on line 0: the blank line is empty, the cursor line moves by one', () => {
+		const s = run('- ', { line: 0, ch: 2 });
+		expect(s.text).toBe(['', '- ```dynasty', `  ${HINT}`, '  ```', ''].join('\n'));
+		expect(s.cursor).toEqual({ line: 4, ch: 0 });
+		const n = run('1. ', { line: 0, ch: 3 });
+		expect(n.text.split('\n')[0]).toBe('');
+		expect(fenceLine(n.text)).toBe(1);
+	});
+
+	it('a selection that starts on line 0 at its start: the same rule', () => {
+		const s = run('remove\nkeep', { line: 0, ch: 0 }, { line: 0, ch: 6 });
+		expect(fenceLine(s.text)).toBeGreaterThan(0);
+		expect(s.text.split('\n')[0]).toBe('');
+	});
+
+	it('a tree in a note on line 0 or later never changes: a second tree goes after the first', () => {
+		const first = '```dynasty\npeople:\n  - id: a\n    name: A\n```\n';
+		const s = run(first, { line: 2, ch: 0 });
+		expect(s.text.startsWith(first)).toBe(true);
 	});
 });
