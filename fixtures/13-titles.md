@@ -16,7 +16,7 @@ The comments in the block give the expected results (read by `tests/acceptance/t
 - `# warning: <code> | <param>=<value>; …` at the top: every warning of the block, and no others. `ids=` lists the people that the warning names.
 - In each person: `# name line:` and `# title line:` (the card's text lines; `none` for no title text line), `# holds:` (the ids of the titles the person holds, in the order of the `titles` list), `# shown:` (the shown title, with `(selected)` when `card-title` selects it), `# search:` (the extra texts that the picker and Find match) and `# picker:` (the picker row suffix).
 
-```dynasty
+```kin
 # Sample tree 13: titles, holders and regnal numbers (spec §13.3–§13.5).
 #
 # warning: section-wrong-shape | section=holders; title=Warden of the Marches
@@ -296,7 +296,7 @@ unions:
 
 A second tree in the same note. Its `titles` section is a map, not a list, so the tree ignores it; the `card-title` then names no title that Aldric holds.
 
-```dynasty
+```kin
 # warning: section-wrong-shape | section=titles
 # warning: card-title-not-held | person=Aldric Valmont; ref=duke-of-valmont; ids=aldric
 titles:

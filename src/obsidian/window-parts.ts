@@ -40,7 +40,7 @@ export function showMenu(anchor: HTMLElement, items: MenuItems): Menu {
 				try {
 					it.run();
 				} catch (e) {
-					console.error('Dynasty Tree: a menu action failed', e);
+					console.error('Crown and Kin: a menu action failed', e);
 				}
 			});
 		});
@@ -141,7 +141,7 @@ export class RowPictures {
 						slot.addClass('has-picture');
 						slot.createEl('img', { attr: { src: c.url, alt: '' } });
 					})
-					.catch((e) => console.error('Dynasty Tree: cannot show a picture in a row', e));
+					.catch((e) => console.error('Crown and Kin: cannot show a picture in a row', e));
 			},
 		};
 		this.entries.add(entry);

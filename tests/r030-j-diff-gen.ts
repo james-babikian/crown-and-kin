@@ -20,7 +20,7 @@ function line(rand: () => number, shapes: Shapes): string {
 	const q = pick(rand, QUOTE);
 	const marker = pick(rand, MARKER);
 	const gap = pick(rand, GAP);
-	const fence = pick(rand, ['```dynasty', '```dynasty', '```', '~~~dynasty', '````dynasty', '```js', '~~~']);
+	const fence = pick(rand, ['```kin', '```kin', '```', '~~~kin', '````kin', '```js', '~~~']);
 	const close = pick(rand, ['```', '```', '~~~', '````', '~~~~']);
 	const r = rand();
 	if (r < 0.14) return q + lead + marker + gap + 'item';

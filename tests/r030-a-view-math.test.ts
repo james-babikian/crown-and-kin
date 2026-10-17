@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { FIT_MARGIN, centredSmallTree, clampPan, clampTo, panLimits, treeBounds, type Size, type View } from '../src/render/view-math';
+import { FIT_MARGIN, centredOpening, clampTo, panLimits, treeBounds, type FreeArea, type Size, type View } from '../src/render/view-math';
 
 /*
  * 0.3 WP-A (D222): the pure rules of the small tree in the full-screen view. A phone is 390 x 844 with 47 px of top safe area and a bottom bar of 34 px
@@ -11,6 +11,11 @@ const PHONE_FREE = { top: 47, bottom: 98 };
 const COMPUTER: Size = { w: 900, h: 700 };
 const COMPUTER_FREE = { top: 52, bottom: 0 };
 
+/** The drag clamp of the view: the centre inside `panLimits` (the pan code does `clampTo(view, panLimits(...))`). */
+function clampPan(view: View, bounds: { x: number; y: number; w: number; h: number }, area?: { free: FreeArea; size: Size }): View {
+	return clampTo(view, panLimits(bounds, view.scale, area?.size ?? { w: 0, h: 0 }, area?.free));
+}
+
 /** Where the bounds are on the screen for `view`: left, top, right, bottom in px. */
 function onScreen(view: View, size: Size, b: { x: number; y: number; w: number; h: number }) {
 	const left = size.w / 2 + (b.x - view.cx) * view.scale;
@@ -18,10 +23,10 @@ function onScreen(view: View, size: Size, b: { x: number; y: number; w: number; 
 	return { left, top, right: left + b.w * view.scale, bottom: top + b.h * view.scale };
 }
 
-describe('D222: centredSmallTree', () => {
+describe('D222: the tree that fits opens centred (centredOpening)', () => {
 	it('puts a one-person tree in the middle of the free area of a phone', () => {
 		const bounds = treeBounds(160, 64);
-		const v = centredSmallTree(bounds, PHONE, 0.875, PHONE_FREE)!;
+		const v = centredOpening(bounds, PHONE, 0.875, PHONE_FREE, 16)!;
 		expect(v).not.toBeNull();
 		const s = onScreen(v, PHONE, bounds);
 		expect((s.left + s.right) / 2).toBeCloseTo(PHONE.w / 2, 6);
@@ -31,22 +36,16 @@ describe('D222: centredSmallTree', () => {
 
 	it('does the same on a computer, where only the top bar is there', () => {
 		const bounds = treeBounds(500, 300);
-		const v = centredSmallTree(bounds, COMPUTER, 1, COMPUTER_FREE)!;
+		const v = centredOpening(bounds, COMPUTER, 1, COMPUTER_FREE, 16)!;
 		const s = onScreen(v, COMPUTER, bounds);
 		expect((s.top + s.bottom) / 2).toBeCloseTo((52 + 700) / 2, 6);
 		expect((s.left + s.right) / 2).toBeCloseTo(450, 6);
 	});
 
-	it('answers null when the tree does not fit at that scale, in width or in height', () => {
-		expect(centredSmallTree(treeBounds(400, 100), PHONE, 0.875, PHONE_FREE)).toBeNull();
-		expect(centredSmallTree(treeBounds(100, 900), PHONE, 0.875, PHONE_FREE)).toBeNull();
-		expect(centredSmallTree(treeBounds(100, 100), PHONE, 0.875, { top: 47, bottom: 800 })).toBeNull();
-	});
-
-	it('counts a tree that fits exactly (the fit scale) as fitting', () => {
+	it('counts a tree that fits exactly (the fit scale) as fitting, at the same scale', () => {
 		const bounds = treeBounds(1000, 400);
 		const scale = Math.min(PHONE.w / bounds.w, (PHONE.h - 47 - 98) / bounds.h);
-		expect(centredSmallTree(bounds, PHONE, scale, PHONE_FREE)).not.toBeNull();
+		expect(centredOpening(bounds, PHONE, scale, PHONE_FREE, 16)!.scale).toBe(scale);
 	});
 });
 

@@ -2,7 +2,7 @@
 
 Conrad and Lisette share grandparents (Aurel and Viviane). Each person must appear once.
 
-```dynasty
+```kin
 houses:
   - id: castellane
     name: House Castellane

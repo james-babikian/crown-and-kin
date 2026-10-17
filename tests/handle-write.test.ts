@@ -67,7 +67,7 @@ function fakeApp(path: string, initial: string, editor = false) {
 	return { app, calls, get: () => text, set: (t: string) => (text = t) };
 }
 
-const fence = (body: string) => ['```dynasty', body, '```'].join('\n');
+const fence = (body: string) => ['```kin', body, '```'].join('\n');
 const X = 'people:\n  - id: a\n    name: Alys';
 const Y = 'people:\n  - id: y\n    name: Yara';
 const queen = { kind: 'set-person-fields', id: 'a', fields: { title: 'Queen' } } as const;

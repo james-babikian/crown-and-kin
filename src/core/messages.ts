@@ -511,16 +511,66 @@ export const LIMIT_DETAIL = {
 	},
 } as const;
 
-const HARD_ERROR_TEXT: { [C in HardErrorCode]: (e: HardError) => string } = {
-	'yaml-invalid': (e) => {
-		const where = e.line !== undefined ? `Text line ${e.line} of the tree text has an error. Correct this text line to show the tree.` : BLOCK_ERROR;
-		return e.detail ? `${where} Details: ${e.detail}` : where;
+/**
+ * F8: the parser's own English, in plain words. Each entry tests the first sentence of the parser's message and gives the Details of the box. The
+ * parser's words (flow sequence, mapping, scalar, alias) mean nothing to the owner of a note. A message that no entry knows is not shown.
+ */
+const PLAIN_DETAIL: [RegExp, (m: RegExpMatchArray) => string][] = [
+	[/^Sequence item without - indicator/, () => `This text line does not fit the list above it. Check the spaces at the start of the text line. Each item of a list starts with ${quote('-')}.`],
+	[/^Nested mappings are not allowed/, () => `The value of a field has a colon ${quote(':')} in it. Put the value in quote marks.`],
+	[/^Flow sequence .*end with a \]/, () => `A list in square brackets is not closed, or its next text line starts too far to the left. Add the bracket ${quote(']')} at the end of the list.`],
+	[/^Flow map .*end with a \}/, () => `A section in curly brackets is not closed. Add the bracket ${quote('}')} at the end of the section.`],
+	[/^Tabs are not allowed as indentation/, () => 'This text line starts with a tab. Use spaces in place of the tab.'],
+	[/^Missing closing .?quote/, () => 'A quote mark is not closed. Add the quote mark at the end of the text.'],
+	[/^Plain value cannot start with reserved character (.+)$/, (m) => `A value starts with the character ${quote(m[1])}. This character has a special use. Put the value in quote marks.`],
+	[/^All mapping items must start at the same column/, () => 'The text lines of one person or section do not start at the same place. Use the same number of spaces at the start of each of them.'],
+	[/^All sequence items must start at the same column/, () => 'The items of one list do not start at the same place. Use the same number of spaces at the start of each of them.'],
+	[/^Source contains multiple documents/, () => `The tree text has a text line with only three dashes ${quote('---')}. Delete that text line.`],
+	[/^Unresolved alias .*: (.+)$/, (m) => `The mark ${quote(`*${m[1]}`)} repeats text. No text above it has the mark ${quote(`&${m[1]}`)}. Put ${quote(`&${m[1]}`)} at the start of the text to repeat, above ${quote(`*${m[1]}`)}. Or delete ${quote(`*${m[1]}`)}. Check that both marks have the same name.`],
+	[/^Block collections are not allowed within flow collections/, () => 'A text line that starts a list or a section stands inside brackets. Check that every bracket is closed. Write the content of the brackets on one text line, or remove the brackets.'],
+	[/^Implicit keys .*single line/, () => 'The name of a field goes over more than one text line. Write the whole name on one text line.'],
+	[/^Implicit map keys need to be followed/, () => `A text line has a name but no colon after it. Add a colon ${quote(':')} after the name.`],
+	[/^Missing , (between|or :)/, (m) => (m[1] === 'or :' ? `Two items in curly brackets have no comma or colon between them. Add a comma ${quote(',')} between two items. Or add a colon ${quote(':')} between a name and its value.` : `Two items in brackets have no comma between them. Add a comma ${quote(',')} between the items.`)],
+	[/^Invalid escape sequence/, () => `A text in double quote marks has a backslash ${quote('\\')} that the plugin cannot read. Delete the backslash, or write it two times.`],
+];
+
+/** What the box says when the parser's message has no entry above. It does not repeat the parser's words. */
+const UNKNOWN_DETAIL = 'The plugin cannot say more. Check the text lines of the tree text for a quote mark or a bracket that is not closed. Start with the text line that the box names and go up.';
+
+/** True for a detail that the plugin wrote itself in plain words (`LIMIT_DETAIL`). */
+const isPlainDetail = (detail: string): boolean => detail === LIMIT_DETAIL.tooLarge || detail === LIMIT_DETAIL.tooDeep || detail.startsWith('One person or section has the ');
+
+/** The words that follow "Details:": the plugin's own text as it is, a parser message in plain words, or the one text for a message that has no entry. */
+function plainDetail(detail: string): string {
+	if (isPlainDetail(detail)) return detail;
+	for (const [test, say] of PLAIN_DETAIL) {
+		const m = detail.match(test);
+		if (m) return say(m);
+	}
+	return UNKNOWN_DETAIL;
+}
+
+/** The number of text lines in a block body: a last text line that ends with a line break has no empty text line after it. */
+const textLines = (source: string): number => {
+	const n = source.split(/\r\n|\r|\n/).length;
+	return /[\r\n]$/.test(source) ? n - 1 : n;
+};
+
+const HARD_ERROR_TEXT: { [C in HardErrorCode]: (e: HardError, source?: string) => string } = {
+	'yaml-invalid': (e, source) => {
+		// F8: the parser can report the end of the text, one text line after the last (an open bracket or quote mark); the box names a text line that the text has.
+		const line = e.line !== undefined && source !== undefined ? Math.max(1, Math.min(e.line, textLines(source))) : e.line;
+		const where = line !== undefined ? `Text line ${line} of the tree text has an error. Correct this text line to show the tree.` : BLOCK_ERROR;
+		return e.detail ? `${where} Details: ${plainDetail(e.detail)}` : where;
 	},
 	'not-a-map': () => 'The tree text does not have sections such as “people:”. To show the tree, put each person in a list below “people:”.',
 };
 
-/** The sentence to show the user for a hard error (the tree cannot be drawn at all). */
-export const hardErrorText = (error: HardError): string => {
-	const make = HARD_ERROR_TEXT[error.code] as ((e: HardError) => string) | undefined;
-	return make ? make(error) : BLOCK_ERROR;
+/**
+ * The sentence to show the user for a hard error (the tree cannot be drawn at all). With the block body (`source`) the text line that the box names
+ * is a text line that the body has (F8).
+ */
+export const hardErrorText = (error: HardError, source?: string): string => {
+	const make = HARD_ERROR_TEXT[error.code] as ((e: HardError, source?: string) => string) | undefined;
+	return make ? make(error, source) : BLOCK_ERROR;
 };

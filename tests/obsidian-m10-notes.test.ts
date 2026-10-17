@@ -288,7 +288,7 @@ describe('N2: Make a note', () => {
 		await settle();
 		expect(s.created).toEqual([]);
 		expect(s.handle.write).not.toHaveBeenCalled();
-		expect(notices).toContain(WRITE_TEXT.stale);
+		expect(notices).toContain(WRITE_TEXT.staleWindow);
 	});
 
 	it('a failed vault write gives the Notice, changes nothing and keeps the sheet', async () => {
@@ -587,20 +587,13 @@ describe('H1: People in the Houses window', () => {
 	});
 });
 
-// 0.2.8 (D196 item 3): the live legend has no house rows; the call of 0.2.7 with houses and a callback still works and draws none.
+// 0.2.8 (D196 item 3): the live legend has no house rows.
 describe('H1: the house rows of the legend (gone in 0.2.8)', () => {
-	const houses = [
-		{ id: 'valmont', name: 'House Valmont', color: '#8b1a1a' },
-		{ id: 'orsini', name: 'House Orsini' },
-	];
-
-	it('with a callback no row is drawn, and no button', () => {
+	it('no house row is drawn, and no button', () => {
 		const list = new FEl('div') as unknown as HTMLElement;
-		const seen: string[] = [];
-		buildLegend(list, houses as never, (id) => seen.push(id));
+		buildLegend(list);
 		expect((list as unknown as FEl).querySelectorAll('.dynasty-legend-house')).toEqual([]);
 		expect((list as unknown as FEl).querySelectorAll('button')).toEqual([]);
-		expect(seen).toEqual([]);
 	});
 });
 

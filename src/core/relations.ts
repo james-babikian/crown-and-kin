@@ -261,7 +261,7 @@ export type FindRelation = (g: FamilyGraph, first: string, second: string, optio
  * It runs `deriveFamilies` on a `Tree` whose people are the line's people with `parents` = the line's
  * links among them (never the raw `person.parents`) and whose unions are the original union objects
  * of `line.unions` (same keys), then makes two patches: a child whose only line link to a parent is
- * `rumoured` gets `placementParents = [parent]` and `placementType = 'rumoured'` (`edges.ts` draws it
+ * `rumoured` gets `placementParents = [parent]` and `placementType = 'rumoured'` (`layout/draw.ts` draws it
  * with the rumoured stroke and the "?" marker); an implicit union of `line.unions` with no shared
  * child stays as an implicit `FamilyUnion` with `children: []` (a plain connector). Pure.
  */

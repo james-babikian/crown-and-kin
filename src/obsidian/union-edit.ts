@@ -88,7 +88,7 @@ class UnionEditModal extends SmallFormModal {
 			this.errorEl?.setText(message);
 			this.errorEl?.show();
 		} catch (e) {
-			console.error('Dynasty Tree: cannot save the partnership', e);
+			console.error('Crown and Kin: cannot save the partnership', e);
 		} finally {
 			this.saving = false;
 			this.modalEl.removeClass('is-saving');

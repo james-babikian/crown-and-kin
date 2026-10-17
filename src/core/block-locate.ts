@@ -1,13 +1,13 @@
 /*
- * Finds `dynasty` fenced code blocks the way CommonMark reads fences (spec §6.1), without a
+ * Finds `kin` fenced code blocks the way CommonMark reads fences (spec §6.1), without a
  * full Markdown parser. Containers are blockquotes and callouts (`>` markers) and list items
  * (tracked by their content column). Every fence, whatever its language, is tracked, so a
- * `dynasty` example inside a longer or different fence is content and not a block.
+ * `kin` example inside a longer or different fence is content and not a block.
  */
 
-/** One `dynasty` fenced code block found in a note: its position, body and container prefix. */
+/** One `kin` fenced code block found in a note: its position, body and container prefix. */
 export interface LocatedBlock {
-	/** Index of this block among the `dynasty` blocks of the note, from 0, in text order. */
+	/** Index of this block among the `kin` blocks of the note, from 0, in text order. */
 	ordinal: number;
 	/**
 	 * 0-based line numbers of the opening and closing fence lines. `closeLine` is null for a block
@@ -129,7 +129,7 @@ function openingFence(s: string): Fence | null {
 }
 
 /** Obsidian keys code-block processors by the first word of the info string, case-sensitive. */
-const isDynasty = (info: string) => info.split(/[ \t]/, 1)[0] === 'dynasty';
+const isKin = (info: string) => info.split(/[ \t]/, 1)[0] === 'kin';
 
 /** The line after YAML front matter, or 0. Fences inside front matter are not Markdown. */
 function afterFrontMatter(lines: Line[]): number {
@@ -247,7 +247,7 @@ class ListStack {
 	}
 }
 
-/** All `dynasty` blocks of a note in text order. Fences inside longer fences are skipped (§6.1). */
+/** All `kin` blocks of a note in text order. Fences inside longer fences are skipped (§6.1). */
 export type FindBlocks = (text: string) => LocatedBlock[];
 
 /** Implements `FindBlocks`. */
@@ -288,7 +288,7 @@ export const findBlocks: FindBlocks = (text) => {
 		// An unclosed block at the end of a note that ends with a line break: that break ends the
 		// last body line; it does not start an extra empty one.
 		if (closeLine === null && j === lines.length && bodyLast > i && endsWithBreak(text)) bodyLast--;
-		if (isDynasty(fence.info)) {
+		if (isKin(fence.info)) {
 			let prefix: string | null = null;
 			const body: string[] = [];
 			for (let k = i + 1; k <= bodyLast; k++) {

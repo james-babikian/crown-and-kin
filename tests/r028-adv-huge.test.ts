@@ -54,7 +54,7 @@ function pipeline(text: string): { cards: number; ms: Record<string, number>; sv
 }
 
 describe('X2 (8): a note of 1 MB around one block (spec §6.1, block-locate)', () => {
-	const block = '```dynasty\n' + BODY + '```\n';
+	const block = '```kin\n' + BODY + '```\n';
 	const prose = (lines: number) => 'Lorem ipsum dolor sit amet, consectetur adipiscing elit.\n'.repeat(lines);
 
 	it('finds the one block and its body in 1 MB of text, with LF and with CRLF', () => {
@@ -83,10 +83,10 @@ describe('X2 (8): a note of 1 MB around one block (spec §6.1, block-locate)', (
 		'10 000 fences that never close before the block (the block is then only text)': '```js\n'.repeat(10000) + block,
 		'10 000 closed fences before the block': '```js\nx\n```\n'.repeat(10000) + block,
 		'a fence line with an info text of 1 000 000 characters': '```' + 'y'.repeat(1_000_000) + '\n' + block,
-		'a body line of 1 000 000 characters': '```dynasty\n' + 'a'.repeat(1_000_000) + '\n```\n',
+		'a body line of 1 000 000 characters': '```kin\n' + 'a'.repeat(1_000_000) + '\n```\n',
 		'10 000 blocks': block.repeat(10000),
-		'a block inside 3 000 quote marks': '>'.repeat(3000) + ' ```dynasty\n' + '>'.repeat(3000) + ' people:\n' + '>'.repeat(3000) + ' ```\n',
-		'a block inside 500 nested list items': Array.from({ length: 500 }, (_, i) => ' '.repeat(i * 2) + '- item').join('\n') + '\n' + ' '.repeat(1000) + '```dynasty\n' + ' '.repeat(1000) + 'people:\n' + ' '.repeat(1000) + '```\n',
+		'a block inside 3 000 quote marks': '>'.repeat(3000) + ' ```kin\n' + '>'.repeat(3000) + ' people:\n' + '>'.repeat(3000) + ' ```\n',
+		'a block inside 500 nested list items': Array.from({ length: 500 }, (_, i) => ' '.repeat(i * 2) + '- item').join('\n') + '\n' + ' '.repeat(1000) + '```kin\n' + ' '.repeat(1000) + 'people:\n' + ' '.repeat(1000) + '```\n',
 	};
 	for (const [label, text] of Object.entries(shapes)) {
 		it(`${label}: no throw, the right number of blocks, in less than 2 s`, () => {

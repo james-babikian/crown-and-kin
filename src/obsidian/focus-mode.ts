@@ -4,10 +4,10 @@
  * Pure, so the priority rules run under vitest; the tree view supplies the facts.
  */
 
-import type { Orientation, Rect } from '../layout/model';
+import type { Orientation, Rect, TreeLayout } from '../layout/model';
 import { COMPACT_NAME_EM } from '../render/dom/scene';
 import type { PhoneDirection } from './settings';
-import { FIT_MIN_NAME_PX, HIT_EM, MIN_HIT_PX, READABLE_NAME_PX, START_TOP_GAP, chooseLod, fitScale, fitView, type Size, type View } from '../render/view-math';
+import { FIT_MIN_NAME_PX, HIT_EM, MIN_HIT_PX, READABLE_NAME_PX, START_TOP_GAP, chooseLod, enlargeHit, fitScale, fitView, type Size, type View } from '../render/view-math';
 
 /**
  * What the user chose for this block in this session (Focus, Focus here, a `+` badge, Clear focus).
@@ -26,6 +26,35 @@ export const PHONE_SHORT_SIDE = 600;
 /** A phone: a coarse pointer and a window whose shorter side is under 600 px. Tablets are not phones. */
 export function isPhoneWindow(coarse: boolean, innerWidth: number, innerHeight: number): boolean {
 	return coarse && Math.min(innerWidth, innerHeight) < PHONE_SHORT_SIDE;
+}
+
+/** The facts of a window that the phone tests read; a real `Window` fits. */
+export interface PhoneWindow {
+	innerWidth: number;
+	innerHeight: number;
+	screen?: { width: number; height: number } | null;
+}
+
+/**
+ * Is this device a phone? The screen decides, not the window: an on-screen keyboard makes a tablet's window lower than 600 px, but not its screen.
+ * The toolbar's look (`is-phone-side`) and its button set (`TreeView.barKind`) both ask this, so they cannot disagree.
+ */
+export function isPhoneDevice(coarse: boolean, win: PhoneWindow): boolean {
+	return isPhoneWindow(coarse, win.screen?.width || win.innerWidth, win.screen?.height || win.innerHeight);
+}
+
+/**
+ * D242: a phone held sideways. A phone device whose window is wider than high. A window exactly as wide as the screen's short side
+ * is a phone held upright with its keyboard open (the keyboard makes the window lower, never wider; see `orientationFor`), so it is not sideways.
+ * A window narrower than 600 px has the phone look on its own (`is-phone`), so this matters only for windows from 600 px up.
+ */
+export function isPhoneSideways(coarse: boolean, win: PhoneWindow): boolean {
+	if (!isPhoneDevice(coarse, win) || win.innerWidth <= win.innerHeight) return false;
+	const sw = win.screen?.width ?? 0;
+	const sh = win.screen?.height ?? 0;
+	if (sw <= 0 || sh <= 0) return true;
+	const short = Math.min(sw, sh);
+	return !(Math.abs(win.innerWidth - short) <= 1 && Math.max(sw, sh) > short + 1);
 }
 
 /**
@@ -61,6 +90,11 @@ export interface FocusFacts {
 	large(): boolean;
 	/** The start person of the whole tree (spec §5.5). Called only when the phone rule decides. */
 	start(): string | null;
+	/**
+	 * F5: a draw of the whole tree stopped (spec §7.7) and this view is new. Then a session choice of the whole tree (Clear focus) is not taken
+	 * over: the view opens on the family that the other rules give, and the stop bar shows again only when the user chooses Clear focus once more.
+	 */
+	stopped?: boolean;
 }
 
 /** What `chooseFocus` decided, and what the caller should remember or forget. */
@@ -83,8 +117,8 @@ export interface FocusChoice {
 export function chooseFocus(f: FocusFacts): FocusChoice {
 	let dropSession = false;
 	if (f.session) {
-		if (f.session.id === null) return { id: null, from: 'session', dropSession, auto: f.auto };
-		if (f.has(f.session.id)) return { id: f.session.id, from: 'session', dropSession, auto: f.auto };
+		if (f.session.id === null && !f.stopped) return { id: null, from: 'session', dropSession, auto: f.auto };
+		if (f.session.id !== null && f.has(f.session.id)) return { id: f.session.id, from: 'session', dropSession, auto: f.auto };
 		dropSession = true;
 	}
 	if (f.pin !== undefined && f.has(f.pin)) return { id: f.pin, from: 'pin', dropSession, auto: f.auto };
@@ -108,8 +142,10 @@ export const FOCUS_SIDE_PAD = 8;
  * parent in the drawn family, D23) the card sits near the top of the area instead, as in D13, so
  * the view is not half empty. The same happens in a low box (a phone on its side, D30) when the
  * centred view cannot show the `parents`, the focus card and a child whole (see `familyFits`).
+ * G3 F4: when no child can show whole at 14 px names, the names go smaller, not under 11 px, so that a child shows whole beside the couple (the focus card and the
+ * near `partners`), else beside the focus card (see `smallerForChild`).
  */
-export function focusView(bounds: Rect, size: Size, fontPx: number, focus: Rect | null, insetTop = 0, children: Rect[] = [], atTop = false, parents: Rect[] = []): View {
+export function focusView(bounds: Rect, size: Size, fontPx: number, focus: Rect | null, insetTop = 0, children: Rect[] = [], atTop = false, parents: Rect[] = [], partners: Rect[] = []): View {
 	const top = Math.max(0, Math.min(insetTop, size.h - 1));
 	const area = { w: size.w, h: size.h - top };
 	const fit = fitScale(bounds, area);
@@ -117,12 +153,53 @@ export function focusView(bounds: Rect, size: Size, fontPx: number, focus: Rect 
 	let v: View;
 	if (fit * f >= FIT_MIN_NAME_PX || !focus) v = { scale: fit, cx: bounds.x + bounds.w / 2, cy: bounds.y + bounds.h / 2 };
 	else {
-		const scale = READABLE_NAME_PX / f;
-		const low = atTop || !familyFits(focus, parents, children, scale, area.h);
+		const readable = READABLE_NAME_PX / f;
+		const lowAt = (k: number) => atTop || !familyFits(focus, parents, children, k, area.h);
+		// G3 F4: when no child can show whole beside the focus card at 14 px names (a low area between two bars, children far apart), the names go smaller, but not under 11 px, as far
+		// as a child needs to show whole. First with the couple (the focus person and the near partners) whole beside the child; else with the focus card only, as D18 does at 14 px.
+		// If no child shows even then, the view is as before.
+		let scale = readable;
+		let core = focus;
+		if (children.length && !childPlace(focus, children, area.w / readable, FOCUS_SIDE_PAD / readable).whole) {
+			const couple = partners.length ? around([focus, ...partners]) : null;
+			const withCouple = couple ? smallerForChild(couple, children, area, readable, FIT_MIN_NAME_PX / f, lowAt(readable)) : readable;
+			if (couple && withCouple < readable) {
+				scale = withCouple;
+				core = couple;
+			} else scale = smallerForChild(focus, children, area, readable, FIT_MIN_NAME_PX / f, lowAt(readable));
+		}
+		// The smaller scale was found for the view at 14 px (top or centred); if the view would change kind at that scale, the child it was found for may be
+		// below the area, so the view is as before.
+		if (scale < readable && lowAt(scale) !== lowAt(readable)) {
+			scale = readable;
+			core = focus;
+		}
+		const low = lowAt(scale);
 		const cy = low ? focus.y - START_TOP_GAP + area.h / 2 / scale : focus.y + focus.h / 2;
-		v = { scale, cx: focus.x + focus.w / 2 + childShift(focus, children, area.w / scale, FOCUS_SIDE_PAD / scale), cy };
+		// At the smaller names only a child that also fits the height counts, so the move never goes to one that is below the area.
+		const kids = scale < readable ? children.filter((c) => (low ? c.y + c.h - (focus.y - START_TOP_GAP) : (c.y + c.h - (focus.y + focus.h / 2)) * 2) * scale <= area.h + 1e-6) : children;
+		v = { scale, cx: core.x + core.w / 2 + childShift(core, kids, area.w / scale, FOCUS_SIDE_PAD / scale), cy };
 	}
 	return top > 0 && v.scale > 0 ? { scale: v.scale, cx: v.cx, cy: v.cy - top / 2 / v.scale } : v;
+}
+
+/**
+ * G3 F4: the scale for the focus view of a family whose children cannot show whole beside the focus card at `readable` (14 px names). The largest scale not under `floor`
+ * (11 px names) at which one child shows whole next to the whole focus card, inside the area's height (`low`: the card near the top as in D13, else centred). `readable` when a child
+ * already shows whole at that scale, or when none can at the floor either.
+ */
+function smallerForChild(focus: Rect, children: Rect[], area: Size, readable: number, floor: number, low: boolean): number {
+	if (!children.length || !(floor > 0) || !(readable > floor) || childPlace(focus, children, area.w / readable, FOCUS_SIDE_PAD / readable).whole) return readable;
+	let best = 0;
+	for (const c of children) {
+		const span = Math.max(focus.x + focus.w, c.x + c.w) - Math.min(focus.x, c.x);
+		const down = low ? c.y + c.h - (focus.y - START_TOP_GAP) : (c.y + c.h - (focus.y + focus.h / 2)) * 2;
+		if (!(span > 0) || !(down > 0)) continue;
+		best = Math.max(best, Math.min((area.w - 2 * FOCUS_SIDE_PAD) / span, area.h / down));
+	}
+	// A hair under the exact fit, so that the rounding of the sums cannot lose the child.
+	const scale = best * (1 - 1e-9);
+	return scale >= floor && scale < readable ? scale : readable;
 }
 
 /**
@@ -139,14 +216,26 @@ export function familyFits(focus: Rect, parents: readonly Rect[], children: read
 	return Math.max(up, down) * scale <= areaH / 2 + 1e-6;
 }
 
+/** The box around some cards. */
+function around(boxes: readonly Rect[]): Rect {
+	const x = Math.min(...boxes.map((b) => b.x));
+	const y = Math.min(...boxes.map((b) => b.y));
+	return { x, y, w: Math.max(...boxes.map((b) => b.x + b.w)) - x, h: Math.max(...boxes.map((b) => b.y + b.h)) - y };
+}
+
 /** The sideways move (layout px) from the focus card's centre that brings a child into sight (see focusView). */
 function childShift(focus: Rect, children: Rect[], width: number, pad: number): number {
+	return childPlace(focus, children, width, pad).shift;
+}
+
+/** `childShift` and whether a child shows whole beside the focus card at that move. */
+function childPlace(focus: Rect, children: Rect[], width: number, pad: number): { shift: number; whole: boolean } {
 	const own = focus.x + focus.w / 2;
 	const w = width - 2 * pad;
-	if (!children.length || !(w >= focus.w)) return 0;
+	if (!children.length || !(w >= focus.w)) return { shift: 0, whole: false };
 	// A child cut by no more than the side margin at the centre keeps the focus person exactly centred (D18).
 	const slack = width / 2 + pad;
-	if (children.some((c) => c.x >= own - slack - 1e-6 && c.x + c.w <= own + slack + 1e-6)) return 0;
+	if (children.some((c) => c.x >= own - slack - 1e-6 && c.x + c.w <= own + slack + 1e-6)) return { shift: 0, whole: true };
 	let best: number | null = null;
 	for (const c of children) {
 		const left = Math.min(focus.x, c.x);
@@ -156,7 +245,7 @@ function childShift(focus: Rect, children: Rect[], width: number, pad: number): 
 		const cx = Math.min(left + w / 2, Math.max(right - w / 2, own));
 		if (best === null || Math.abs(cx - own) < Math.abs(best)) best = cx - own;
 	}
-	if (best !== null) return best;
+	if (best !== null) return { shift: best, whole: true };
 	// No child fits whole beside the focus card: keep that card whole at the window's edge, towards
 	// the nearest child, if part of the child then shows. Else stay centred: a move that shows no
 	// child only takes the focus person away from the centre.
@@ -164,7 +253,7 @@ function childShift(focus: Rect, children: Rect[], width: number, pad: number): 
 	const max = (w - focus.w) / 2;
 	const right = near.x + near.w / 2 > own;
 	const seen = right ? own + max + w / 2 - near.x : near.x + near.w - (own - max - w / 2);
-	return seen > near.w / 4 ? (right ? max : -max) : 0;
+	return { shift: seen > near.w / 4 ? (right ? max : -max) : 0, whole: false };
 }
 
 /** Screen px around the badge disc in which the badge wins a tap over its own card (spec §13.10, §7.5). */
@@ -260,7 +349,7 @@ export interface SidewaysGroup {
 }
 
 /**
- * First view in `sideways` (D24): names at 14 px, never a fit. The person's column
+ * First view in `sideways` (D24): names at 14 px, never a fit; smaller, not under 11 px, only when the children's column is cut at the right edge at 14 px (V4). The person's column
  * sits at the left edge (8 screen px in) with the children's column beside it; with no children, the
  * parents' column goes at the left if the person still shows whole beside it. The group (the person,
  * partners, children and their partners; with no children, the parents) starts 24 layout px below
@@ -269,16 +358,26 @@ export interface SidewaysGroup {
  */
 export function sidewaysView(size: Size, fontPx: number, g: SidewaysGroup, top: number, bottom: number, fallback: Rect): { view: View; tall: boolean } {
 	const f = fontPx > 0 ? fontPx : 16;
-	const scale = READABLE_NAME_PX / f;
-	const pad = FOCUS_SIDE_PAD / scale;
-	const at = (left: number, freeTop: number): View => ({ scale, cx: left - pad + size.w / 2 / scale, cy: freeTop - top / scale + size.h / 2 / scale });
+	const readable = READABLE_NAME_PX / f;
+	let scale = readable;
 	const me = g.me;
-	if (!me) return { view: at(fallback.x, fallback.y - START_TOP_GAP), tall: false };
-	let left = me.x;
-	if (!g.children.length && g.parents.length) {
+	let left = me ? me.x : 0;
+	if (me && !g.children.length && g.parents.length) {
 		const px = Math.min(...g.parents.map((p) => p.x));
 		if ((me.x + me.w - px) * scale + 2 * FOCUS_SIDE_PAD <= size.w) left = px;
 	}
+	if (me && g.children.length) {
+		// V4: on a narrow phone (360 px) the children's column reaches past the right edge at 14 px names. The names go smaller, not under 11 px, so that the
+		// person's column and the nearest column of children show whole (a child a generation further right does not decide); a column that needs smaller
+		// names than that keeps 14 px, as before.
+		const near = Math.min(...g.children.map((c) => c.card.x));
+		const right = Math.max(...g.children.filter((c) => c.card.x <= near + 1).map((c) => c.card.x + c.card.w));
+		const fits = right > left ? (size.w - 2 * FOCUS_SIDE_PAD) / (right - left) : readable;
+		if (fits < readable && fits * f >= FIT_MIN_NAME_PX) scale = fits * (1 - 1e-9);
+	}
+	const pad = FOCUS_SIDE_PAD / scale;
+	const at = (x: number, freeTop: number): View => ({ scale, cx: x - pad + size.w / 2 / scale, cy: freeTop - top / scale + size.h / 2 / scale });
+	if (!me) return { view: at(fallback.x, fallback.y - START_TOP_GAP), tall: false };
 	const kids = g.children.map((c) => [c.card, ...c.partners]);
 	const group = [me, ...g.partners, ...(kids.length ? kids.flat() : g.parents)];
 	const gTop = Math.min(...group.map((b) => b.y));
@@ -330,6 +429,57 @@ export function tagHitBelow(hit: Rect, card: Rect | undefined, scale: number): R
 	}
 	const top = card.y + card.h;
 	return { x, y: top, w, h: Math.max(min, hit.y + hit.h - top) };
+}
+
+/** The press area of a sideways far-couple tag at one zoom, in layout px: the whole area, and the strip of it that wins over its own card. */
+export interface SideTagTap {
+	/** The whole press area, at least 44 screen px each way. It lies below the cards, so a card wins over it except in `over`. */
+	area: Rect;
+	/** The part of `area` over the bottom of the tag's own card, where the tag wins (it lies above the cards); null when there is none. */
+	over: Rect | null;
+}
+
+const nextTops = new WeakMap<TreeLayout, Map<string, number>>();
+
+/**
+ * 0.3.1 fix3: for each far-couple tag of a sideways `layout`, the top of the next card below its card in the same column (the next id of
+ * its row, as the layout's own tag hit area is limited); Infinity when there is none. Kept for each layout, as it does not change with zoom.
+ */
+export function tagNextTops(layout: TreeLayout): Map<string, number> {
+	let out = nextTops.get(layout);
+	if (out) return out;
+	out = new Map();
+	const at = new Map<string, number>();
+	for (const row of layout.rows) row.forEach((id, i) => at.set(id, i));
+	for (const id of layout.farTags.keys()) {
+		const box = layout.persons.get(id);
+		const row = box ? layout.rows[box.gen] : undefined;
+		const next = row && at.has(id) ? row[at.get(id)! + 1] : undefined;
+		const below = next === undefined ? undefined : layout.persons.get(next);
+		out.set(id, below ? below.y : Infinity);
+	}
+	nextTops.set(layout, out);
+	return out;
+}
+
+/**
+ * 0.3.1 fix3: a sideways far-couple tag's press area at `scale`. It hangs from its card's bottom edge as in `down` (D31) and reaches
+ * down at most to `nextTop`, the top of the next card in the column (Infinity when there is none). When that gap holds less than
+ * 44 screen px, the rest goes up over the bottom of the own card, and there the tag wins (`over`), as its pill already does where it
+ * sits on that edge. While names are under 11 px (no first view goes there), or when the rest would take more than half the own card,
+ * no strip wins: the card keeps its area, as before. `fontPx` is the layout's note font size.
+ */
+export function tagHitSide(hit: Rect, card: Rect | undefined, nextTop: number, scale: number, fontPx: number): SideTagTap {
+	if (!card || !(scale > 0)) return { area: enlargeHit(hit, scale), over: null };
+	const min = MIN_HIT_PX / scale;
+	const w = Math.max(hit.w, min);
+	const x = hit.x - (w - hit.w) / 2;
+	const bottom = card.y + card.h;
+	const h = Math.max(min, hit.y + hit.h - bottom);
+	const y = Math.min(bottom, nextTop - h);
+	const rest = bottom - y;
+	const wins = rest > 0 && scale * fontPx >= FIT_MIN_NAME_PX - 1e-9 && rest <= card.h / 2;
+	return { area: { x, y, w, h }, over: wins ? { x, y, w, h: rest } : null };
 }
 
 /**
@@ -439,11 +589,18 @@ function onScreen(view: View, size: Size, b: Rect): { left: number; right: numbe
  * zooms. A view that no move can improve stays as it is, and a result never has more cut cards than the view it was given (a move that only swaps one cut card for another is dropped).
  * After the first move down, a further move stops as soon as it would cut a card that is whole at the foot (a staircase of cut cards would push the whole tree down).
  * `bottom` is the foot of the free area (the box height, or the top of a bottom toolbar).
+ * `marks` (the `+` badges, V3) are stricter: a badge on the screen may not meet the band at all, as it would stand in the safe area or under a bar; a raise takes it above the screen.
  */
-export function keepTopCardWhole(view: View, size: Size, insetTop: number, bottom: number, boxes: Iterable<Rect>, keys: readonly Rect[]): View {
+export function keepTopCardWhole(view: View, size: Size, insetTop: number, bottom: number, boxes: Iterable<Rect>, keys: readonly Rect[], marks: Iterable<Rect> = []): View {
 	if (!(insetTop >= 0) || !(view.scale > 0) || !(size.w > 0)) return view;
-	const all = [...boxes];
-	const cut = (v: View) => all.map((b) => onScreen(v, size, b)).filter((s) => s.right > 0 && s.left < size.w && s.top < insetTop - 0.5 && s.bottom > insetTop + 0.5);
+	const cards = [...boxes];
+	const badges = [...marks];
+	const all = [...cards, ...badges];
+	// `rise` is how far a raise must move the box: a card until it is wholly under the band, a badge until it is above the screen.
+	const cut = (v: View) => [
+		...cards.map((b) => onScreen(v, size, b)).filter((s) => s.right > 0 && s.left < size.w && s.top < insetTop - 0.5 && s.bottom > insetTop + 0.5).map((s) => ({ ...s, rise: s.bottom - insetTop })),
+		...badges.map((b) => onScreen(v, size, b)).filter((s) => s.right > 0 && s.left < size.w && s.top < insetTop - 0.5 && s.bottom > 0.5).map((s) => ({ ...s, rise: s.bottom })),
+	];
 	const before = cut(view).length;
 	// A result with more cut cards than the given view is worse than no move.
 	const settle = (v: View): View => (cut(v).length > before ? view : v);
@@ -473,7 +630,7 @@ export function keepTopCardWhole(view: View, size: Size, insetTop: number, botto
 		for (let j = 0; j < 4; j++) {
 			const rc = cut(r);
 			if (!rc.length) break;
-			const up = Math.max(...rc.map((s) => s.bottom - insetTop));
+			const up = Math.max(...rc.map((s) => s.rise));
 			r = { scale: r.scale, cx: r.cx, cy: r.cy + up / r.scale };
 		}
 		// Every key card must stay whole at the top.

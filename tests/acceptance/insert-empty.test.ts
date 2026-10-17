@@ -60,13 +60,13 @@ describe('an empty tree with a help comment (§5.9, D34)', () => {
 	it('inside a callout and a list item, the comment and the new lines keep the prefix', () => {
 		const note = [
 			'> [!note] A new tree',
-			'> ```dynasty',
+			'> ```kin',
 			...HELP.split('\n').map((l) => `> ${l}`),
 			'> ```',
 			'',
 			'- Branch:',
 			'',
-			'  ```dynasty',
+			'  ```kin',
 			...HELP.split('\n').map((l) => `  ${l}`),
 			'  ```',
 			'',

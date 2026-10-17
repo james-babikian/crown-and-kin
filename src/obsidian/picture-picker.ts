@@ -74,12 +74,13 @@ import {
 	type PictureFileLike,
 	type PictureTree,
 } from '../core/picture-list';
-import { folderOf, numberedFreePath } from '../core/link-text';
+import { folderOf } from '../core/link-text';
 import { judgeHeader, readPictureHeader, type PictureProblem, type SupportedFormat } from '../core/pictures';
 import { PICKER_UI, PICTURES_UI, deviceNotice } from '../render/ui-text';
 import { NO_READ_BYTES, NO_READ_BYTES_COARSE, isShownPictureExtension, type CopyBox, type PictureCopy, type PictureStore } from './picture-store';
 import { phoneLayout } from './modal-layout';
 import { trackModal } from './plugin-modals';
+import { freePath } from './save-picture';
 import { nameDialog } from './sheet-parts';
 import { buildShell, type Shell } from './window-shell';
 /** The preview box of a picture, in CSS px: a thumbnail in a grid of pictures (D212 picker-grid; D93 had a 32 px box in a row). */
@@ -541,7 +542,7 @@ class PicturePicker extends Modal {
 		try {
 			fn();
 		} catch (e) {
-			console.error('Dynasty Tree: the picture picker failed', e);
+			console.error('Crown and Kin: the picture picker failed', e);
 		}
 	}
 
@@ -875,24 +876,18 @@ class PicturePicker extends Modal {
 				return;
 			}
 			const name = safePictureName(f.name, verdict.format);
-			const fm = this.app.fileManager as { getAvailablePathForAttachment?: (n: string, s?: string) => Promise<string> };
-			const path = typeof fm.getAvailablePathForAttachment === 'function' ? await fm.getAvailablePathForAttachment(name, this.o.sourcePath) : this.freePath(name);
+			const path = await freePath(this.app, name, this.o.sourcePath);
 			if (this.closed) return;
 			const file = await this.app.vault.createBinary(path, bytes);
 			new Notice(PICTURES_UI.added(file.name, folderOf(file.path)));
 			this.finish(pictureLink(this.app, file, this.o.sourcePath));
 		} catch (e) {
-			console.error('Dynasty Tree: cannot add the picture', e);
+			console.error('Crown and Kin: cannot add the picture', e);
 			new Notice(PICTURES_UI.addFailed);
 		} finally {
 			this.busy = false;
 			this.modalEl.removeClass('is-saving');
 		}
-	}
-
-	/** Before Obsidian 1.5.7: the note's folder, with " 1", " 2", … when the name is taken. */
-	private freePath(name: string): string {
-		return numberedFreePath(folderOf(this.o.sourcePath), name, (p) => !!this.app.vault.getAbstractFileByPath(p));
 	}
 }
 
@@ -908,7 +903,7 @@ export function pickPicture(app: App, o: PickPictureOptions): Promise<PickResult
 		try {
 			new PicturePicker(app, o, done).open();
 		} catch (e) {
-			console.error('Dynasty Tree: cannot open the picture picker', e);
+			console.error('Crown and Kin: cannot open the picture picker', e);
 			done({ kind: 'cancel' });
 		}
 	});

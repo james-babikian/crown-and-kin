@@ -147,7 +147,7 @@ interface Drag {
 }
 
 /**
- * `clampPan` with the limits widened to hold `from`. A pinch can leave the view outside the pan
+ * `clampTo` with the limits widened to hold `from`. A pinch can leave the view outside the pan
  * limits (it keeps the tree point under the fingers); a pan or wheel that follows then moves on from
  * there, never further out, and never jumps back to the limit.
  */

@@ -3,12 +3,12 @@ import { createUndoStack, planWrite, UNDO_LIMIT } from '../src/core/block-write'
 import { findBlocks } from '../src/core/block-locate';
 import { applyOp } from '../src/core/yaml-edit';
 
-const NOTE = '# N\n```dynasty\na: 1\n```\n\n> ```dynasty\n> b: 1\n> ```\n';
+const NOTE = '# N\n```kin\na: 1\n```\n\n> ```kin\n> b: 1\n> ```\n';
 
 describe('planWrite', () => {
 	it('writes the edited body into the right block', () => {
 		const r = planWrite(NOTE, 1, 'b: 1', () => ({ ok: true, body: 'b: 2\nc: 3' }));
-		expect(r).toEqual({ ok: true, newText: '# N\n```dynasty\na: 1\n```\n\n> ```dynasty\n> b: 2\n> c: 3\n> ```\n', newBody: 'b: 2\nc: 3', oldBody: 'b: 1' });
+		expect(r).toEqual({ ok: true, newText: '# N\n```kin\na: 1\n```\n\n> ```kin\n> b: 2\n> c: 3\n> ```\n', newBody: 'b: 2\nc: 3', oldBody: 'b: 1' });
 	});
 
 	it('the new body is what the next locate reads, even if the edit returned CRLF', () => {
@@ -83,7 +83,7 @@ describe('createUndoStack', () => {
 });
 
 describe('planWrite checks the written note (review F1)', () => {
-	const note = 'Intro\n\n```dynasty\npeople:\n- id: a\n  name: A\n  notes: |\n   old\n```\n\nMy prose.\n\n```dynasty\npeople:\n- id: z\n```\n';
+	const note = 'Intro\n\n```kin\npeople:\n- id: a\n  name: A\n  notes: |\n   old\n```\n\nMy prose.\n\n```kin\npeople:\n- id: z\n```\n';
 
 	it('refuses a body whose line would close the fence and spill the tree into the note', () => {
 		const r = planWrite(note, 0, findBlocks(note)[0]!.body, (b) => ({ ok: true, body: b.replace('   old', '   see:\n   ```\n   end') }));

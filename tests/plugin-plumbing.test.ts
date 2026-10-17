@@ -61,7 +61,7 @@ afterEach(() => {
 });
 
 async function loadPlugin(stored: unknown = null, app = fakeApp()) {
-	const plugin = new DynastyTreePlugin(app as never, { id: 'dynasty-tree' } as never);
+	const plugin = new DynastyTreePlugin(app as never, { id: 'crown-and-kin' } as never);
 	const fake = plugin as unknown as FakePlugin;
 	fake.stored = stored;
 	await fake.load();
@@ -166,7 +166,7 @@ describe('rename events and the plugin load (finding 7)', () => {
 	it('after the load, a rename waits for its link update with the stored setting; the handles follow a rename at any time', async () => {
 		const app = fakeApp();
 		Object.assign(app.vault, { getMarkdownFiles: () => [], getAbstractFileByPath: () => null });
-		const plugin = new DynastyTreePlugin(app as never, { id: 'dynasty-tree' } as never);
+		const plugin = new DynastyTreePlugin(app as never, { id: 'crown-and-kin' } as never);
 		const fake = plugin as unknown as FakePlugin;
 		const moved = vi.spyOn(plugin.handles, 'renamed');
 		let read!: (v: unknown) => void;

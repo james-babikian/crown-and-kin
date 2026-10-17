@@ -461,7 +461,7 @@ describe('stale writes (spec §6.1)', () => {
 		save(content);
 		await settle();
 		expect(handle.write).not.toHaveBeenCalled();
-		expect(notices).toEqual([WRITE_TEXT.stale]);
+		expect(notices).toEqual([WRITE_TEXT.staleWindow]);
 		expect(housesWindows()).toContain(win);
 		expect(content.querySelector('.dynasty-sheet-error')!.getText()).toBe(HOUSES.stale);
 		// The open page stays, with the draft.
@@ -486,7 +486,7 @@ describe('stale writes (spec §6.1)', () => {
 		}) as never);
 		save(content);
 		await settle();
-		expect(notices).toEqual([WRITE_TEXT.stale]);
+		expect(notices).toEqual([WRITE_TEXT.staleWindow]);
 		expect(housesWindows()).toContain(win);
 		expect(rows(content).map((r) => r.getAttribute('data-house'))).toEqual(['valmont', 'orsini']);
 	});

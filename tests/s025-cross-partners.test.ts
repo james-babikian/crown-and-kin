@@ -2,14 +2,15 @@
 // married-in spouse of a woman is a man with more partners, his partners stand in the order of his unions. Made-up trees only.
 import { describe, expect, it } from 'vitest';
 import { NORMAL_GEOMETRY } from '../src/layout/geometry';
-import { DEFAULT_FAR_RULE, layoutFamilies } from '../src/layout/layout';
+import { DEFAULT_FAR_RULE } from '../src/layout/layout';
+import { arrangeTree } from '../src/layout/pipeline';
 import { measureLayout } from '../scripts/metrics';
 import { build } from './helpers';
 import { CROSS_TWIN } from './s025-cross-twin';
 
 function lay(src: string) {
 	const { g, gen, order } = build(src);
-	const layout = layoutFamilies(g, gen, order, NORMAL_GEOMETRY, { sweeps: 4, far: DEFAULT_FAR_RULE });
+	const { layout } = arrangeTree(g, gen, NORMAL_GEOMETRY, { sweeps: 4, far: DEFAULT_FAR_RULE });
 	return { g, layout, order, metrics: measureLayout(g, layout) };
 }
 const mid = (l: ReturnType<typeof lay>, id: string) => l.layout.persons.get(id)!.x + l.layout.persons.get(id)!.w / 2;

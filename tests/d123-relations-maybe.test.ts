@@ -5,6 +5,7 @@ import { computeRelations, findRelation, relationRunStats, type Relation, type R
 import { cardRelationText, MAYBE_TEXT, relationSummary, spokenRelation } from '../src/render/tree-info';
 import { relationsFor, clearRelationCache } from '../src/obsidian/relation-cache';
 import { build, fixture } from './helpers';
+import { referenceMs } from './speed-ref';
 
 // D123 (spec §13.1 and §13.19 rule 6): what a rumoured parent could change in a blood relation.
 // All names in this file are made up.
@@ -424,22 +425,31 @@ describe('D123: timing with a rumoured link on every person (contract 2.3)', () 
 		computeRelations(g, me);
 		return performance.now() - t;
 	};
-	it('at most 2.2 times the birth tree, and under 300 ms', () => {
+	// The old limit was 300 ms (about 70 ms alone, 150 ms or more under a full parallel test run). The new limit is a ratio
+	// to the reference work of `speed-ref.ts`: 3.8 to 5.7 measured alone and under load (2026-10-16); 7.5 is just under
+	// 2 times the lowest, so computeRelations 2 times slower fails (checked: 9.0 to 9.8), and a busy machine does not.
+	const LIMIT = 7.5;
+	it(`at most 2.2 times the birth tree, and at most ${LIMIT} times the reference work`, () => {
 		const rumoured = dense('rumoured');
 		const birth = dense('birth');
 		expect(rumoured.people.length).toBe(400);
 		const me = 'n9x0';
 		time(rumoured, me);
 		time(birth, me);
-		// Alternate the two trees and keep the best of each, so a pause of the machine hits both.
+		// Alternate the two trees and keep the best of each, so a pause of the machine hits both. The reference work
+		// (`speed-ref.ts`) runs just before each rumoured call, so the limit is a ratio that a busy machine keeps.
 		let withRumour = Infinity;
 		let without = Infinity;
+		let perRef = Infinity;
 		for (let k = 0; k < 7; k++) {
-			withRumour = Math.min(withRumour, time(rumoured, me));
+			const ref = referenceMs(3);
+			const ms = time(rumoured, me);
+			withRumour = Math.min(withRumour, ms);
+			perRef = Math.min(perRef, ms / ref);
 			without = Math.min(without, time(birth, me));
 		}
-		console.log(`computeRelations, 400 people, rumoured on every person, last row marked: ${withRumour.toFixed(1)} ms; as birth: ${without.toFixed(1)} ms; ratio ${(withRumour / without).toFixed(2)}`);
-		expect(withRumour).toBeLessThan(300);
+		console.log(`computeRelations, 400 people, rumoured on every person, last row marked: ${withRumour.toFixed(1)} ms; as birth: ${without.toFixed(1)} ms; ratio ${(withRumour / without).toFixed(2)}; ${perRef.toFixed(2)} times the reference work`);
+		expect(perRef).toBeLessThan(LIMIT);
 		expect(withRumour).toBeLessThanOrEqual(2.2 * without);
 	}, 60_000);
 });

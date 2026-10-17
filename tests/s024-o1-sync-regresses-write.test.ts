@@ -21,7 +21,7 @@ import { HandleRegistry } from '../src/obsidian/block-handle';
  * text then replaces the handle's new body.
  */
 
-const fence = (body: string) => ['```dynasty', body, '```'].join('\n');
+const fence = (body: string) => ['```kin', body, '```'].join('\n');
 const X = 'people:\n  - id: p\n    name: Alys';
 const Y = 'people:\n  - id: q\n    name: Yara';
 

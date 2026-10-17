@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { applyOp } from '../src/core/yaml-edit';
 import { hardErrorText, LIMIT_DETAIL } from '../src/core/messages';
 import { ALIAS_MARKS_CAP, ALIAS_NODES_BASE, ALIAS_NODES_CEILING, ALIAS_NODES_PER_CHAR, parseBody, parseDynasty } from '../src/core/parse';
+import { timedRatio } from './speed-ref';
 
 /*
  * WP-H2: the limits of the read (spec §8, "nothing may throw"). F1: aliases that write out far more than the text
@@ -11,6 +12,13 @@ import { ALIAS_MARKS_CAP, ALIAS_NODES_BASE, ALIAS_NODES_CEILING, ALIAS_NODES_PER
 
 const BASE = 'people:\n  - id: aldric\n    name: Aldric\n';
 const rep = (n: number, s: string) => Array(n).fill(s).join(', ');
+// Speed limits as a ratio to the reference work of `speed-ref.ts`, measured in the same process, so a busy machine
+// does not break them. Measured on the development computer (2026-10-16), alone and under a full parallel test run:
+// 40 000 keys 55 to 81 times the reference (1.1 s alone, 2.5 s under load; the old limit was 3 000 ms), 50 000 tiny
+// alias uses 20 to 29 times (0.4 s alone, 0.8 s under load; the old limit was 1 000 ms). Each limit is at most 2 times
+// the lowest ratio measured, so the code under test 2 times slower fails (checked: 115 to 152 and 42 to 56).
+const KEYS_LIMIT = 110;
+const TINY_LIMIT = 38;
 
 describe('F1: aliases that expand far beyond the text', () => {
 	// 1 000 x 200 x 200 = 4 * 10^7 nodes from a text of about 3 KB.
@@ -90,16 +98,15 @@ describe('F1: aliases that expand far beyond the text', () => {
 });
 
 describe('F2: a map with very many keys', () => {
-	it('40 000 keys read and edit in about a second', () => {
+	it(`40 000 keys read and edit in about a second (at most ${KEYS_LIMIT} times the reference work)`, () => {
 		const keys = Array.from({ length: 40_000 }, (_, i) => `    k${i}: v${i}`).join('\n');
 		const text = `people:\n  - id: aldric\n    name: Aldric\n${keys}\n`;
-		const t0 = performance.now();
-		const r = parseDynasty(text);
-		expect(r.ok).toBe(true);
-		const edit = applyOp(text, { kind: 'set-person-fields', id: 'aldric', fields: { name: 'Edited' } });
-		expect(edit.ok).toBe(true);
-		expect(performance.now() - t0).toBeLessThan(3000);
-	});
+		const t = timedRatio(() => [parseDynasty(text), applyOp(text, { kind: 'set-person-fields', id: 'aldric', fields: { name: 'Edited' } })] as const, 3);
+		console.log(`40 000 keys: ${t.ms.toFixed(0)} ms, reference ${t.refMs.toFixed(1)} ms, ratio ${t.ratio.toFixed(1)}`);
+		expect(t.out[0].ok).toBe(true);
+		expect(t.out[1].ok).toBe(true);
+		expect(t.ratio).toBeLessThan(KEYS_LIMIT);
+	}, 120_000);
 
 	it('a repeated key of a block map is an error on the line of the second key', () => {
 		expect(parseBody('people: []\nhouses: []\npeople: []\n')).toEqual({ ok: false, error: { code: 'yaml-invalid', line: 3, detail: LIMIT_DETAIL.duplicateKey('people') } });
@@ -166,12 +173,12 @@ describe('the cap of alias uses (the package resolves aliases in quadratic time)
 		expect(parseBody(tiny(ALIAS_MARKS_CAP))).toEqual({ ok: false, error: { code: 'yaml-invalid', detail: LIMIT_DETAIL.tooLarge } });
 	}, 30_000);
 
-	it('50 000 uses of a tiny anchor are refused at once, with the plain text, and no edit runs', () => {
+	it(`50 000 uses of a tiny anchor are refused at once (at most ${TINY_LIMIT} times the reference work), with the plain text, and no edit runs`, () => {
 		const text = tiny(50_000);
-		const t0 = performance.now();
-		const r = parseDynasty(text);
-		const edit = applyOp(text, { kind: 'set-person-fields', id: 'aldric', fields: { name: 'Edited' } });
-		expect(performance.now() - t0).toBeLessThan(1000);
+		const t = timedRatio(() => [parseDynasty(text), applyOp(text, { kind: 'set-person-fields', id: 'aldric', fields: { name: 'Edited' } })] as const, 3);
+		console.log(`50 000 tiny anchor uses: ${t.ms.toFixed(0)} ms, reference ${t.refMs.toFixed(1)} ms, ratio ${t.ratio.toFixed(1)}`);
+		const [r, edit] = t.out;
+		expect(t.ratio).toBeLessThan(TINY_LIMIT);
 		expect(r).toEqual({ ok: false, error: { code: 'yaml-invalid', detail: LIMIT_DETAIL.tooLarge } });
 		expect(edit.ok).toBe(false);
 	});

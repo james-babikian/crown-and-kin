@@ -5,7 +5,6 @@ import { cardForm, geometryFor } from '../../src/layout/geometry';
 import { DEFAULT_LAYOUT_SETTINGS, clearLayoutCache, layoutKey, layoutTree } from '../../src/layout/index';
 import type { Geometry, LaidOut, LayoutSettings, Rect } from '../../src/layout/model';
 import type { PictureSlot, setPicture, setSlotProblem } from '../../src/render/dom/pictures';
-import type { LegendHouse } from '../../src/render/legend';
 import { buildLegend, buildScene, type Scene, type SceneOptions } from '../../src/render/dom/scene';
 import { FEl, installDom } from './fake-dom';
 import { allFixtures } from './load';
@@ -324,26 +323,12 @@ describe('S3: livePictureSlots, the slots to fill for a view (spec §13.0 item 3
 
 // 0.2.8 (D196 item 3, contract A.1): the live legend shows the line styles only. The houses are in the Houses window; the saved picture keeps its own house legend.
 describe('S4: the live legend has no house rows (0.2.8, D196 item 3)', () => {
-	it('a houses argument (the 0.2.7 call) adds no row, no title and no arms slot', () => {
+	it('the legend has no house row and no house title', () => {
 		const list = new FEl('div');
-		const houses: LegendHouse[] = [
-			{ id: 'valmont', name: 'House Valmont', color: '#8b1e3f', arms: true },
-			{ id: 'thorne', name: 'House Thorne', color: '#7a2e6b', arms: false },
-		];
-		const result = (buildLegend as unknown as (l: FEl, h?: readonly LegendHouse[]) => { arms: Map<string, FEl> })(list, houses);
+		buildLegend(list as unknown as HTMLElement);
 		const els = all(list);
 		expect(els.find((e) => e.hasClass('dynasty-legend-houses'))).toBeUndefined();
 		expect(els.filter((e) => e.hasClass('dynasty-legend-house'))).toHaveLength(0);
-		expect(result.arms.size).toBe(0);
-	});
-
-	it('the rows are the same with and without houses (M8)', () => {
-		const a = new FEl('div');
-		const b = new FEl('div');
-		buildLegend(a as unknown as HTMLElement);
-		(buildLegend as unknown as (l: FEl, h?: readonly LegendHouse[]) => void)(b, [{ id: 'valmont', name: 'House Valmont', color: '#8b1e3f', arms: false }]);
-		const shape = (el: FEl) => all(el).map((e) => `${e.tag}.${[...e.classes].join('.')}:${e.text}`);
-		expect(shape(b)).toEqual(shape(a));
 	});
 });
 

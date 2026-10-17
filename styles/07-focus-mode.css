@@ -40,3 +40,17 @@
 	color: var(--interactive-accent);
 }
 
+
+/*
+ * The bar of focus mode (D246, F2): "Focus on <person>" at the left and the link "Clear focus" at the right. It is the finder's bar (`.dynasty-result`, chunk 18)
+ * with its own text and one link. On a phone the row is "display: contents", so the link takes the place that the finder's Options link has; it keeps its 44 px tap area.
+ */
+.dynasty-result-phone .dynasty-result-button.dynasty-focus-bar-clear {
+	order: 2;
+	flex: none;
+	margin-right: 8px;
+}
+
+.dynasty-focus-bar-text {
+	overflow-wrap: anywhere;
+}

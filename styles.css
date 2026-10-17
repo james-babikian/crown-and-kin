@@ -1,5 +1,5 @@
 /*
- * Dynasty Tree styles.
+ * Crown and Kin styles.
  * Every class starts with `dynasty-`. Colours come only from Obsidian CSS variables (the roles in
  * THEME_VARS, src/render/styles.ts), so the tree follows the theme and light/dark mode live.
  * A house colour reaches the SVG only through the `--dynasty-house-color` custom property (spec §5.8).
@@ -141,6 +141,14 @@ body {
 
 .dynasty-error-detail {
 	white-space: pre-wrap;
+}
+
+/* The button of an error box ("Show the tree text"), with a hit area of at least 44 px (spec §7.5). */
+.dynasty-error .dynasty-error-button {
+	min-height: 44px;
+	min-width: 44px;
+	margin-top: var(--size-4-2);
+	padding: 0 var(--size-4-6);
 }
 
 
@@ -592,8 +600,10 @@ body.is-phone,
 	font-family: var(--font-interface);
 }
 
-/* The hit area is invisible but takes presses. It lies below the cards, so a card wins where they overlap. */
-.dynasty-tag-hit {
+/* The hit area is invisible but takes presses. It lies below the cards, so a card wins where they overlap,
+   except in the strip over the tag's own card (0.3.1 fix3), which is inside the tag and so above the cards. */
+.dynasty-tag-hit,
+.dynasty-tag-over {
 	cursor: pointer;
 	fill: none;
 	stroke: none;
@@ -787,6 +797,20 @@ body.is-phone,
 	color: var(--interactive-accent);
 }
 
+
+/*
+ * The bar of focus mode (D246, F2): "Focus on <person>" at the left and the link "Clear focus" at the right. It is the finder's bar (`.dynasty-result`, chunk 18)
+ * with its own text and one link. On a phone the row is "display: contents", so the link takes the place that the finder's Options link has; it keeps its 44 px tap area.
+ */
+.dynasty-result-phone .dynasty-result-button.dynasty-focus-bar-clear {
+	order: 2;
+	flex: none;
+	margin-right: 8px;
+}
+
+.dynasty-focus-bar-text {
+	overflow-wrap: anywhere;
+}
 /* ---------- Toolbar and menus (0.2.8, contract C and G.13) ---------- */
 
 /*
@@ -1117,7 +1141,8 @@ body.is-phone,
 	max-width: none;
 	max-height: calc(100% - 60px);
 	box-sizing: border-box;
-	padding: 6px 12px calc(env(safe-area-inset-bottom, 0px) + 10px);
+	/* The sides keep clear of the notch of a phone held sideways (D242); the safe area is 0 on a phone held upright. */
+	padding: 6px max(12px, env(safe-area-inset-right, 0px)) calc(env(safe-area-inset-bottom, 0px) + 10px) max(12px, env(safe-area-inset-left, 0px));
 	/* Opaque in every theme (D212, sheet-opaque): Cupertino makes its window background translucent and blurs only its own windows, so the tree would show through the text. The @supports rule below drops the alpha of a theme colour where the browser can (var() hides a relative colour from the parser, so it cannot sit here as a second line). */
 	background: var(--background-primary);
 	backdrop-filter: none;
@@ -3727,7 +3752,8 @@ body.theme-dark .dynasty-house-dot {
 
 .dynasty-full .dynasty-empty {
 	flex: 1 1 auto;
-	margin: max(var(--size-4-4), env(safe-area-inset-top)) var(--size-4-4);
+	/* The sides keep clear of the notch of a phone held sideways; the safe area is 0 elsewhere. */
+	margin: max(var(--size-4-4), env(safe-area-inset-top)) max(var(--size-4-4), env(safe-area-inset-right)) var(--size-4-4) max(var(--size-4-4), env(safe-area-inset-left));
 }
 
 /* The empty full-screen view keeps its toolbar (Close) clear of the empty box. */
@@ -3735,6 +3761,7 @@ body.theme-dark .dynasty-house-dot {
 	margin-top: calc(env(safe-area-inset-top, 0px) + 44px + var(--size-4-3));
 }
 
+.modal.dynasty-fullscreen.is-phone-side .dynasty-full.dynasty-empty-root .dynasty-empty,
 .modal.dynasty-fullscreen.is-phone .dynasty-full.dynasty-empty-root .dynasty-empty {
 	margin-top: max(var(--size-4-4), env(safe-area-inset-top));
 	margin-bottom: calc(44px + env(safe-area-inset-bottom) + var(--size-4-4));
@@ -3743,7 +3770,10 @@ body.theme-dark .dynasty-house-dot {
 /*
  * Phone layout (0.2.8, G.13): the bar sits at the bottom, flat, with a hairline above it and the safe area under it (spec §7.5): Add person, Houses,
  * Focus, Find, More, Close, spread over the width. Fit, Titles and the legend are in More.
+ * D242: a phone held sideways has the same bar. `is-phone` is a window narrower than 600 px; `is-phone-side` is a phone (by its screen) whose window is
+ * wider than high (`isPhoneSideways`). Every rule of the bar names both, so a rule cannot be added for one and forgotten for the other.
  */
+.modal.dynasty-fullscreen.is-phone-side .dynasty-full .dynasty-toolbar,
 .modal.dynasty-fullscreen.is-phone .dynasty-full .dynasty-toolbar {
 	top: auto;
 	left: 0;
@@ -3759,6 +3789,7 @@ body.theme-dark .dynasty-house-dot {
 	border-radius: 0;
 }
 
+.modal.dynasty-fullscreen.is-phone-side .dynasty-full .dynasty-toolbar .dynasty-tool,
 .modal.dynasty-fullscreen.is-phone .dynasty-full .dynasty-toolbar .dynasty-tool {
 	color: var(--text-normal);
 }
@@ -3768,6 +3799,7 @@ body.theme-dark .dynasty-house-dot {
  * text gives up its width first. If the buttons are still wider than the phone, Close stays at the
  * right edge over the others (sticky in the row, which clips instead of wrapping).
  */
+.modal.dynasty-fullscreen.is-phone-side .dynasty-full .dynasty-toolbar,
 .modal.dynasty-fullscreen.is-phone .dynasty-full .dynasty-toolbar {
 	flex-wrap: nowrap;
 	overflow-x: auto;
@@ -3775,6 +3807,7 @@ body.theme-dark .dynasty-house-dot {
 	scrollbar-width: none;
 }
 
+.modal.dynasty-fullscreen.is-phone-side .dynasty-full .dynasty-toolbar .dynasty-read-only-label,
 .modal.dynasty-fullscreen.is-phone .dynasty-full .dynasty-toolbar .dynasty-read-only-label {
 	flex: 0 1 auto;
 	min-width: 0;
@@ -3782,6 +3815,7 @@ body.theme-dark .dynasty-house-dot {
 	text-overflow: ellipsis;
 }
 
+.modal.dynasty-fullscreen.is-phone-side .dynasty-full .dynasty-toolbar .dynasty-close,
 .modal.dynasty-fullscreen.is-phone .dynasty-full .dynasty-toolbar .dynasty-close {
 	position: sticky;
 	right: 0;
@@ -3789,11 +3823,14 @@ body.theme-dark .dynasty-house-dot {
 }
 
 /* The problem list (not a sheet) stands above the phone's bar. */
+.modal.dynasty-fullscreen.is-phone-side .dynasty-full .dynasty-popover:not(.is-anchored):not(.is-sheet),
 .modal.dynasty-fullscreen.is-phone .dynasty-full .dynasty-popover:not(.is-anchored):not(.is-sheet) {
 	top: auto;
-	left: var(--size-4-2);
-	right: var(--size-4-2);
+	left: max(var(--size-4-2), env(safe-area-inset-left));
+	right: max(var(--size-4-2), env(safe-area-inset-right));
 	bottom: calc(52px + env(safe-area-inset-bottom) + var(--size-4-2));
+	/* `max-content` (the base rule) made a long problem text wider than the screen and let the right edge go; auto fills the space between left and right. */
+	width: auto;
 	max-width: none;
 	max-height: calc(100% - 52px - env(safe-area-inset-bottom) - 4 * var(--size-4-2));
 }
@@ -3804,12 +3841,14 @@ body.dynasty-fullscreen-open .popover.hover-popover {
 	z-index: calc(var(--layer-modal) + 1);
 }
 
-/* Reads env(safe-area-inset-top) for the default view on a phone; added and removed at once. */
+/* Reads env(safe-area-inset-top), -left and -right for the default view on a phone (the sides: the notch of a phone held sideways); added and removed at once. */
 .dynasty-safe-probe {
 	position: absolute;
 	visibility: hidden;
 	pointer-events: none;
 	padding-top: env(safe-area-inset-top, 0px);
+	padding-left: env(safe-area-inset-left, 0px);
+	padding-right: env(safe-area-inset-right, 0px);
 }
 
 /* ---------- M6 windows: settings, keyboard, Houses window (WP6.3; spec §5.2, §6.10, §9, D32) ---------- */
@@ -3910,10 +3949,11 @@ body.dynasty-fullscreen-open .popover.hover-popover {
 }
 
 /* Phone: the bar is at the bottom, so the banner is at the top, inside the safe area (spec §13.2). */
+.modal.dynasty-fullscreen.is-phone-side .dynasty-full .dynasty-result,
 .modal.dynasty-fullscreen.is-phone .dynasty-full .dynasty-result {
 	top: max(0px, env(safe-area-inset-top));
 	min-height: 52px;
-	padding: 4px 0 4px 16px;
+	padding: 4px max(0px, env(safe-area-inset-right)) 4px max(16px, env(safe-area-inset-left));
 }
 
 .dynasty-result-text {
@@ -6533,6 +6573,7 @@ body.theme-dark .dynasty-lw .dynasty-lw-dot {
 	padding-top: calc(env(safe-area-inset-top, 0px) + 44px + var(--size-4-4));
 }
 
+.modal.dynasty-fullscreen.is-phone-side .dynasty-full .dynasty-large-viewport,
 .modal.dynasty-fullscreen.is-phone .dynasty-full .dynasty-large-viewport {
 	padding-top: max(var(--size-4-4), env(safe-area-inset-top));
 	padding-bottom: calc(52px + env(safe-area-inset-bottom) + var(--size-4-4));

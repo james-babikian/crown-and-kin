@@ -52,7 +52,7 @@ describe('F-KIN-01 the year rule reads a year text wrongly and shows the line as
 
 describe('F-KIN-06 (spec silent) a BC year shows as a minus number in the succession texts', () => {
 	it('F-KIN-06: the heading, the bar, the no-holder text and the age note write "225 BC", not "-225"', () => {
-		const shown = [SUCCESSION_UI.lineHeading('Antiochus', -225), SUCCESSION_UI.bar('Seleucid throne', -225), SUCCESSION_UI.noRuler(-300), SUCCESSION_UI.old('Hero', 111, -200)];
+		const shown = [SUCCESSION_UI.lineAfter('Antiochus', -225), SUCCESSION_UI.bar('Seleucid throne', -225), SUCCESSION_UI.noRuler(-300), SUCCESSION_UI.old('Hero', 111, -200)];
 		for (const s of shown) expect.soft(s, 'a minus sign before a year').not.toMatch(/-\d/);
 		expect.soft(shown[0]).toMatch(/225\s?B\.?C/);
 	});

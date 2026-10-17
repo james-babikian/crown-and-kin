@@ -18,7 +18,7 @@ import { noticeList, notices, resetObsidian } from './acceptance/fake-obsidian';
 
 const FAST = { resolved: 0, quiet: 0, cap: 50 };
 
-const tree = (...people: string[]) => ['```dynasty', 'people:', ...people, '```', ''].join('\n');
+const tree = (...people: string[]) => ['```kin', 'people:', ...people, '```', ''].join('\n');
 const person = (id: string, link?: string) => [`  - id: ${id}`, `    name: ${id.toUpperCase()}`, ...(link === undefined ? [] : [`    link: ${link}`])].join('\n');
 
 function fakeApp(files: Record<string, string>) {

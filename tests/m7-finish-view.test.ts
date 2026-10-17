@@ -49,7 +49,7 @@ afterEach(() => {
 	vi.restoreAllMocks();
 });
 
-const block = (file: string) => /```dynasty\n([\s\S]*?)```/.exec(readFileSync(fileURLToPath(new URL(`../fixtures/${file}`, import.meta.url)), 'utf8'))![1];
+const block = (file: string) => /```kin\n([\s\S]*?)```/.exec(readFileSync(fileURLToPath(new URL(`../fixtures/${file}`, import.meta.url)), 'utf8'))![1];
 const F03 = block('03-cousin-marriage.md');
 const F12 = sample12().source;
 /** Nine people in one line, p0 … p8, each the child of the one before: a tall line. */

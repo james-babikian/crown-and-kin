@@ -4,7 +4,7 @@
 - Piers is a ward of Duke Aldric, drawn under his birth parents.
 - Roderick's true father is rumoured to be Ser Gareth.
 
-```dynasty
+```kin
 houses:
   - id: valmont
     name: House Valmont

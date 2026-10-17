@@ -1,5 +1,5 @@
 /*
- * `TreeView` is the plugin's core Obsidian class: one instance draws and runs one `dynasty` code
+ * `TreeView` is the plugin's core Obsidian class: one instance draws and runs one `kin` code
  * block, as an embed in a note or inside the full-screen modal. `main.ts` creates an embed's
  * `TreeView` from the Markdown code block processor; `full-screen.ts` creates a second one, sharing
  * the same block handle and view state, when the user expands a tree. A `TreeView` parses the
@@ -85,6 +85,7 @@ import { fontsChanged, parsePx, usesFamily, type FontState } from '../render/fon
 import { clearMeasureCache, measureText, usableFamily } from '../render/dom/measure';
 import { calloutBackdrop } from '../render/dom/theme-read';
 import { wireCardTips, type CardTips } from '../render/dom/card-tip';
+import { buildFocusBar } from '../render/dom/focus-bar';
 import { PanZoom, visibleRect } from '../render/dom/pan-zoom';
 import type { PictureSlot } from '../render/dom/pictures';
 import { FILL_ALL_EVENT, buildLegend, buildScene, discPath, lodClass, type CardLink, type Scene, type SceneOptions } from '../render/dom/scene';
@@ -97,20 +98,25 @@ import { ADD_UI, BLOCK_UI, FINDER_UI, FOCUS_UI, FOLD_UI, FULL_UI, HINT_UI, PHONE
 import { TOOLBAR_UI } from '../render/view-text';
 import {
 	centreOn,
-	centredSmallTree,
+	cardShown,
+	centredOpening,
 	isPan,
 	chooseLod,
 	bandShift,
 	clearBand,
 	defaultView,
 	embedHeight,
-	enlargeHit,
 	FIT_MARGIN,
 	fitView,
+	READABLE_NAME_PX,
 	foldHit,
+	bringInView,
+	betweenSides,
+	keepPlaceShift,
 	keepSpot,
 	resizeView,
 	treeBounds,
+	type FreeArea,
 	type Lod,
 	type Size,
 	type View,
@@ -120,7 +126,7 @@ import type { Handle, HandleRegistry } from './block-handle';
 import { forgetHeight, lastHeight, rememberHeight } from './block-height';
 import { carryState, focusKey, newBlockState, type BlockState, type FinderState } from './block-state';
 import { EditSheet, type SheetFolds } from './edit-sheet';
-import { PHONE_FOCUS_MIN_PEOPLE, badgeTap, chooseFocus, clearToolbar, finderFirstView, finderOrientation, focusView, isPhoneWindow, keepTopCardWhole, orientationFor, outsideBox, parentsAbove, sidewaysView, tagHitBelow } from './focus-mode';
+import { PHONE_FOCUS_MIN_PEOPLE, badgeTap, chooseFocus, clearToolbar, finderFirstView, finderOrientation, focusView, isPhoneDevice, keepTopCardWhole, orientationFor, outsideBox, parentsAbove, sidewaysView, tagHitBelow, tagHitSide, tagNextTops } from './focus-mode';
 import { cutBack, planFolds, withFolds, type FoldPlan } from './fold-view';
 import type { FoldRef } from '../render/dom/folds';
 import { FullScreenModal } from './full-screen';
@@ -266,6 +272,19 @@ interface Anchor {
 	bandClear: boolean;
 }
 
+/** D244: how long the place of the edited card waits for the first view of the re-render, in ms, counted from the end of the render. */
+const EDIT_PLACE_MS = 5000;
+
+/** D244: the view and the card boxes before an edit, kept over its re-render so that the edited card keeps its place. */
+interface KeepPlace {
+	/** The person whose sheet was saved. */
+	id: string;
+	before: ReadonlyMap<string, Rect>;
+	view: View;
+	orientation: Orientation;
+	until: number;
+}
+
 /** The relation finder's result as one view draws it (spec §13.2). */
 interface FinderDrawn {
 	state: FinderState;
@@ -304,7 +323,7 @@ function later(fn: (idle: { timeRemaining(): number }) => void): void {
 }
 
 /** The page-preview source id for card names: `main.ts` registers it, and the tree view sends it with each hover-link event. */
-export const HOVER_SOURCE = 'dynasty-tree';
+export const HOVER_SOURCE = 'crown-and-kin';
 const HIGHLIGHT_MS = 2000;
 /** The person a save just changed in a phone list and the time the row flash ends; kept per block, so a second build keeps the flash. */
 const savedFlashes = new WeakMap<BlockState, { id: string; until: number }>();
@@ -350,6 +369,13 @@ function safeTop(probe: HTMLElement | null): number {
 	return probe?.isConnected ? (parsePx(getComputedStyle(probe).paddingTop) ?? 0) : 0;
 }
 
+/** `env(safe-area-inset-left)` and `-right` in px (the notch of a phone held sideways, 0.3.1 V1), read from the same probe element. */
+function safeSides(probe: HTMLElement | null): { left: number; right: number } {
+	if (!probe?.isConnected) return { left: 0, right: 0 };
+	const cs = getComputedStyle(probe);
+	return { left: Math.max(0, parsePx(cs.paddingLeft) ?? 0), right: Math.max(0, parsePx(cs.paddingRight) ?? 0) };
+}
+
 /** Stable, short text hash for a block key when Obsidian cannot say where the block is. */
 function shortHash(s: string): string {
 	let h = 0x811c9dc5;
@@ -377,7 +403,7 @@ const MIN_SIGN_TEXT_PX = 11;
 const MAX_SIGN_BOOST = 8;
 
 /**
- * One rendered `dynasty` block. It never throws into Obsidian: every entry point catches and,
+ * One rendered `kin` block. It never throws into Obsidian: every entry point catches and,
  * at worst, shows the internal-error box (spec §8).
  */
 export class TreeView extends MarkdownRenderChild implements HoverParent {
@@ -389,12 +415,19 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 	private fonts: FontState | null = null;
 	/** A view to restore after the next re-render (font change, late web font). */
 	private carry: Anchor | null = null;
+	/** D244: the edited card's place before the edit; the first view after the re-render uses it, once. */
+	private keepPlace: KeepPlace | null = null;
+	/** D244: the person whose sheet is about to save, for each block state (set just before the write; also for Add child, parent and partner). */
+	private static readonly sheetPerson = new WeakMap<BlockState, { id: string; until: number }>();
 	/** Height of the toolbar band at the top of the viewport, kept free in plugin-chosen views. */
 	private insetTop = 0;
 	/** The last value of `--dynasty-bars` set on the box, so that an unchanged height sets nothing. */
 	private barsPx = '';
 	/** The same at the bottom: the full-screen toolbar on a phone (spec §7.5). */
 	private insetBottom = 0;
+	/** V1: the side safe areas of the full-screen view (a phone held sideways); the views that the plugin chooses keep a card out of them. 0 in a note. */
+	private insetLeft = 0;
+	private insetRight = 0;
 	/** Set for the full-screen view (spec §7.1); null for an embed. */
 	private readonly full: FullHost | null;
 	/** The drawn graph: the whole tree, or the focus family in focus mode (spec §5.6). */
@@ -429,6 +462,8 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 	private pulseFrame = 0;
 	/** The session focus changed while a full-screen view of this block was open: draw again when it closes. */
 	private focusStale = false;
+	/** F5: the focus rules have run once in this view; only the first run looks at a stopped draw. */
+	private stopChecked = false;
 	/** The block's folds changed while this view had no size (the other mode of the note): it draws again when it shows (M10 F10). */
 	private foldsStale = false;
 	/** The last press on a fold control came from the keyboard (I37): the redraw puts the keyboard focus back on the new control only then. */
@@ -447,6 +482,8 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 	private viewport: HTMLElement | null = null;
 	/** The "Add first person" box of a block with no people (spec §5.9); null when a tree is drawn. */
 	private emptyEl: HTMLElement | null = null;
+	/** F8: the content of the error box that stands in place of a tree whose text cannot be read; it gets the button "Show the tree text" once the block is known. */
+	private errorBox: HTMLElement | null = null;
 	private panZoom: PanZoom | null = null;
 	/** The tip of a card (D145); null in list mode and before the first draw. */
 	private tips: CardTips | null = null;
@@ -1096,7 +1133,37 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 		this.dragHeight = null;
 		this.carry = this.keptAnchor();
 		if (this.carry) this.carry.byUser = true;
+		this.keepPlace = this.placeToKeep(h.state) ?? this.keepPlace;
 		this.render(this.fonts);
+		// G2 note 8: the window counts from the end of the render. A large tree on a phone can take longer than the window to draw, and the first view comes after that.
+		if (this.keepPlace) this.keepPlace.until = performance.now() + EDIT_PLACE_MS;
+	}
+
+	/**
+	 * D244: the card to keep in place over the re-render of a saved sheet. None when no sheet saved just now (a fold, a setting, a change in the
+	 * note text), and none in the static touch preview, which shows its first view (D1). The writes that have no highlight (delete, focus, mark) change no place:
+	 * a deleted person has no card after, a focus change draws another family.
+	 */
+	private placeToKeep(st: BlockState): KeepPlace | null {
+		const now = performance.now();
+		const sheet = TreeView.sheetPerson.get(st);
+		const hl = st.highlight;
+		if (!sheet || now > sheet.until || !hl || now > hl.until) return null;
+		const view = this.panZoom?.view;
+		const laid = this.laid;
+		if (!view || !laid || !(this.full || !this.coarse)) return null;
+		return { id: sheet.id, before: laid.layout.persons, view, orientation: laid.layout.orientation, until: now + EDIT_PLACE_MS };
+	}
+
+	/**
+	 * D244: the view that shows the edited card where it showed before the edit, clamped like a dragged view (D222). It replaces the carried view
+	 * and applies before `setView` (the one place, `resizedNow`); `reveal` in `showEdited` then brings a card in that is outside the free area.
+	 */
+	private keptPlaceView(place: KeepPlace | null, size: Size): View | null {
+		const laid = this.laid;
+		if (!place || !laid || performance.now() > place.until || laid.layout.orientation !== place.orientation) return null;
+		const free = this.full ? { free: { top: this.insetTop, bottom: this.insetBottom } } : {};
+		return keepPlaceShift(place.before, laid.layout.persons, place.id, place.view, { bounds: this.bounds, size, ...free });
 	}
 
 	/**
@@ -1283,7 +1350,7 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 		try {
 			fn();
 		} catch (e) {
-			console.error('Dynasty Tree: the tree view failed', e);
+			console.error('Crown and Kin: the tree view failed', e);
 			// S7: a tree hidden until its first view must not stay hidden after an error.
 			this.showTree();
 			if (this.full) {
@@ -1452,6 +1519,7 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 		const el = this.containerEl;
 		el.empty();
 		this.emptyEl = null;
+		this.errorBox = null;
 		this.large = null;
 		this.viewport = null;
 		this.fontProbe = null;
@@ -1482,7 +1550,17 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 			this.dropOpen();
 			const box = buildCallout(el, 'error', UI.errorTitle, 'dynasty-error');
 			box.root.setAttribute('data-dynasty-orientation', orientation);
-			box.content.createDiv({ cls: 'dynasty-error-detail', text: hardErrorText(parsed.error) });
+			box.content.createDiv({ cls: 'dynasty-error-detail', text: hardErrorText(parsed.error, this.source) });
+			this.errorBox = box.content;
+			this.updateEditUi();
+			// A block in a callout in Live Preview has no section: it is found once it is in the note (see lateResolve).
+			this.observer = new ResizeObserver(() =>
+				this.guard(() => {
+					this.lateResolve();
+					this.updateEditUi();
+				}),
+			);
+			this.observer.observe(box.root);
 			return;
 		}
 		// 0.3 (spec §7.7, size limits): the people are counted right after the parse, before the derive, the relations and the layout. A tree at or under the first
@@ -1723,6 +1801,8 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 		this.buildToolbar(viewport);
 		if (finder) this.buildResultBar(viewport, canvas, finder, whole);
 		if (succession) this.buildSuccessionBar(viewport, canvas, succession);
+		// One bar at a time (G2 S3): both bars stand at the same place at the top, so a finder result that draws no line ("not related") would be covered by the focus bar and its Close could not be reached.
+		if (sub && focus !== null && !finder) this.buildFocusBar(viewport, canvas, whole.byId.get(focus)?.name || focus);
 		this.wireCardPresses(viewport);
 		this.updateEditUi();
 
@@ -1778,6 +1858,26 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 		this.timing = { t0: open.start, t: timing };
 		this.host.recordTiming(timing);
 		if (sessionChanged) TreeView.redrawState(this.host, st, { except: this });
+	}
+
+	/**
+	 * D246 (F2): while a focus shows, the bar at the top of the tree says whose family it is and has the link Clear focus (one tap, on every device). The Focus list of
+	 * D132 stays as it is. A static touch embed (D1) has no controls, so it has no bar. Clear focus is `focusOn(null)`: it writes nothing, a pin stays in the note.
+	 */
+	private buildFocusBar(viewport: HTMLElement, before: HTMLElement, name: string): void {
+		if (!this.full && this.coarse) return;
+		buildFocusBar(viewport, before, {
+			sentence: FOCUS_UI.bar(name),
+			clear: FOCUS_UI.clear,
+			clearLabel: FOCUS_UI.clearLabel,
+			phone: this.barKind() === 'phone',
+			onClear: (byKeyboard) =>
+				this.guard(() => {
+					// The redraw builds the Focus button again; a key press has the keyboard focus on the new button.
+					if (byKeyboard) this.focusDue = '.dynasty-focus';
+					this.focusOn(null);
+				}),
+		});
 	}
 
 	/** The banner above a tree that has problems that stop editing (spec §8). */
@@ -2027,7 +2127,7 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 					this.guard(() => showListPicture(slot, c.url));
 				},
 				(e: unknown) => {
-					console.error('Dynasty Tree: cannot show a picture in the list', e);
+					console.error('Crown and Kin: cannot show a picture in the list', e);
 					if (live()) this.guard(() => failListPicture(slot));
 				},
 			);
@@ -2208,9 +2308,12 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 	 * family. The screen decides, not the window: an on-screen keyboard makes a tablet's window lower than 600 px, but not its screen.
 	 */
 	private isPhone(): boolean {
-		const win = this.containerEl.win;
-		const screen = win.screen;
-		return isPhoneWindow(this.coarse, screen?.width || win.innerWidth, screen?.height || win.innerHeight);
+		return isPhoneDevice(this.coarse, this.containerEl.win);
+	}
+
+	/** D242: the full-screen window has just got or lost the phone-sideways look; the bar is at another edge, so the free area is measured again. */
+	barMoved(): void {
+		this.guard(() => this.resized());
 	}
 
 	/**
@@ -2232,6 +2335,9 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 		const own = this.full?.focus;
 		if (own && (own.id === null || whole.byId.has(own.id))) return own.id;
 		const st = this.ensureState();
+		// F5: only the first render of a full-screen view asks. The user chose Clear focus before, and the draw of the whole tree stopped: Expand opens the family, not the stop bar.
+		const stopped = !!this.full && !this.stopChecked && wasStopped(this.key, peopleCount(tree), this.source);
+		this.stopChecked = true;
 		// D234: the stored automatic focus follows the mark; a mark added, changed or removed since it was chosen chooses again (an edit still does not move it).
 		const mark = validMe(whole, tree.options.me) ?? null;
 		if (st.autoFocus !== null && (st.autoMark ?? null) !== mark) st.autoFocus = null;
@@ -2244,6 +2350,7 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 			large: () => whole.people.length > PHONE_FOCUS_MIN_PEOPLE,
 			// Spec §5.5, D234: the person last edited, `options.start`, the marked person, the first root. So the full-screen view of a large tree starts on the family that the phone list shows. A mark that names nobody is no mark. Called only on a phone, so the computer is not changed.
 			start: () => startPerson(whole, [st.lastEdited, tree.options.start, mark].find((id) => id != null && whole.byId.has(id)) ?? undefined),
+			stopped,
 		});
 		if (choice.dropSession) st.focus = null;
 		st.autoFocus = choice.auto;
@@ -2530,9 +2637,13 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 		this.pickFinderDirection(size);
 		let carried = this.carry ? this.fromAnchor(this.carry) : null;
 		const carriedByUser = this.carry?.byUser ?? false;
+		// D244: after a saved sheet the edited card keeps its place, which also keeps the toolbar band as the user left it.
+		const kept = carried ? this.keptPlaceView(this.keepPlace, size) : null;
+		this.keepPlace = null;
+		if (kept) carried = kept;
 		// Larger cards around the same centre can reach up under the toolbar; if none was there
 		// before, move the view down just enough.
-		if (carried && this.carry?.bandClear) carried = this.clearTop(carried, size, [...this.laid.layout.persons.values()]);
+		else if (carried && this.carry?.bandClear) carried = this.clearTop(carried, size, [...this.laid.layout.persons.values()]);
 		this.carry = null;
 		const st = this.ensureState();
 		const targets = this.full?.target ? [this.full.target] : (this.pendingTarget ?? []);
@@ -2548,7 +2659,8 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 		}
 		// The touch embed is a static preview that always shows the default view (spec §7.2).
 		else {
-			const saved = this.savedView(st);
+			// F4: a saved view with no card on the screen (a pinch that left the tree, a window of another size) is not kept: the first view fits.
+			const saved = this.shownView(this.savedView(st), size);
 			if (saved && (this.full || !this.coarse)) pz.setView(saved);
 			else {
 				const v = this.firstView(this.laid, size);
@@ -2586,9 +2698,14 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 		if (vp.hasClass('is-flow')) {
 			this.insetTop = 0;
 			this.insetBottom = 0;
+			this.insetLeft = 0;
+			this.insetRight = 0;
 			this.barBox = null;
 			return;
 		}
+		const sides = this.full ? safeSides(this.safeProbe) : { left: 0, right: 0 };
+		this.insetLeft = sides.left;
+		this.insetRight = sides.right;
 		const bar = vp.querySelector<HTMLElement>('.dynasty-toolbar');
 		const atBottom = !!bar && bar.offsetTop > vp.clientHeight / 2;
 		// With the toolbar at the bottom, the top band is the phone's status bar or notch (safe area).
@@ -2596,8 +2713,11 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 		this.insetBottom = bar && atBottom ? vp.clientHeight - bar.offsetTop + 4 : 0;
 		// Spec §13.2: the finder's result bar is at the top of the view; a view chosen by the plugin keeps it free too.
 		const result = vp.querySelector<HTMLElement>(':scope > .dynasty-result');
-		if (result && result.offsetHeight > 0) this.insetTop = Math.max(this.insetTop, result.offsetTop + result.offsetHeight + 4);
+		const resultBottom = result && result.offsetHeight > 0 ? result.offsetTop + result.offsetHeight + 4 : 0;
+		if (resultBottom) this.insetTop = Math.max(this.insetTop, resultBottom);
 		this.barBox = bar && !atBottom && Number.isFinite(bar.offsetLeft) && bar.offsetWidth > 0 ? { left: bar.offsetLeft, right: bar.offsetLeft + bar.offsetWidth, top: bar.offsetTop, bottom: bar.offsetTop + bar.offsetHeight + 4 } : null;
+		// D246: the bar of focus mode (and the finder's bar) spans the whole width, so the band that the first view keeps clear of cards is the whole width too, down to its foot.
+		if (this.barBox && resultBottom) this.barBox = { left: 0, right: vp.clientWidth, top: this.barBox.top, bottom: Math.max(this.barBox.bottom, resultBottom) };
 	}
 
 	/**
@@ -2626,12 +2746,18 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 		this.viewport?.parentElement?.setAttribute('data-dynasty-orientation', alt.laid.layout.orientation);
 	}
 
-	/** A view chosen for the area above the bottom toolbar, shown in the whole viewport. */
+	/** A view chosen for the area above the bottom toolbar and between the side safe areas (V1), shown in the whole viewport. */
 	private aboveBottomBar(size: Size, make: (area: Size) => View): View {
 		const b = Math.max(0, Math.min(this.insetBottom, size.h - 1));
-		if (!b) return make(size);
-		const v = make({ w: size.w, h: size.h - b });
+		const inner = (area: Size) => betweenSides(area, this.insetLeft, this.insetRight, make);
+		if (!b) return inner(size);
+		const v = inner({ w: size.w, h: size.h - b });
 		return v.scale > 0 ? { scale: v.scale, cx: v.cx, cy: v.cy + b / 2 / v.scale } : v;
+	}
+
+	/** The bars and the side safe areas that the views chosen by the plugin keep free (D222, V1); none in a note. */
+	private freeArea(): FreeArea | undefined {
+		return this.full ? { top: this.insetTop, bottom: this.insetBottom, left: this.insetLeft, right: this.insetRight } : undefined;
 	}
 
 	/** Called when the full-screen view closes: a desktop embed of the same block shows the view state it left (spec §7.1). */
@@ -2643,7 +2769,7 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 		this.guard(() => {
 			const pz = this.panZoom;
 			const st = this.peekState();
-			const v = st ? this.savedView(st) : null;
+			const v = st && pz ? this.shownView(this.savedView(st), pz.size) : null;
 			if (this.full || this.coarse || !pz?.view || !v) return;
 			pz.setView(v);
 		});
@@ -2656,8 +2782,24 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 		const box = this.laid?.layout.persons.get(hl.id);
 		if (!box) return;
 		this.fillPerson(hl.id);
-		this.reveal(box);
+		// D245: the card that Add child, Add parent or Add partner made is not the card whose sheet was saved. If it is outside the free area the view moves only as far as needed,
+		// so the edited card moves as little as it can. Every other edit keeps the reveal of spec §5.5.
+		const sheet = TreeView.sheetPerson.get(st);
+		if (sheet && performance.now() <= sheet.until && sheet.id !== hl.id) this.bringIn(box);
+		// D244 wins over G3 F3 and V1 here: the edited card keeps its place when the card is whole, even if its badge reaches under a bar or its edge into the notch.
+		else this.reveal(box, true);
 		this.pulse([hl.id]);
+	}
+
+	/** D245: the smallest pan that brings a new card wholly into the free area; same guards as `reveal`, no centring and no scale change. */
+	private bringIn(box: Rect): void {
+		const pz = this.panZoom;
+		const v = pz?.view;
+		if (!pz || !v || pz.busy) return;
+		if (!this.full && this.coarse && this.modalAbove()) return;
+		const free = this.freeArea();
+		const next = bringInView(v, box, { size: pz.size, ...(free ? { free } : {}) });
+		if (next.cx !== v.cx || next.cy !== v.cy) pz.setView(next, { byUser: true });
 	}
 
 	/**
@@ -2695,7 +2837,10 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 		const parentIds = this.g?.placementParents.get(id) ?? [];
 		const atTop = !parentIds.length;
 		const parents = boxesOf(persons, parentIds);
-		const v = this.aboveBottomBar(size, (area) => focusView(this.bounds, area, laid.layout.geometry.fontPx, me, this.insetTop, children, atTop, parents));
+		// The near partners count with the focus person when the names must go smaller to show a child (G3 F4); a far partner is drawn elsewhere (D10).
+		const far = laid.layout.farTags.get(id)?.spouses ?? [];
+		const partners = this.g ? boxesOf(persons, familyOf(this.g, id).partners.filter((p) => !far.includes(p))) : [];
+		const v = this.aboveBottomBar(size, (area) => focusView(this.bounds, area, laid.layout.geometry.fontPx, me, this.insetTop, children, atTop, parents, partners));
 		// Not clearBand (which clears the whole width): only the cards and badges under the toolbar
 		// itself move the view down, and never so far that the focus card leaves the free area.
 		// With no toolbar over the tree (a note, D212) the top card is whole when nothing is cut by the top of the drawing area.
@@ -2732,8 +2877,9 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 		const bottom = Math.max(top + 1, size.h - this.insetBottom);
 		const me = id !== null ? (persons.get(id) ?? null) : null;
 		this.hintKids = boxesOf(persons, kids);
-		const view = sidewaysView(
-			size,
+		// V1: the column starts beside the left safe area, not under it.
+		const view = betweenSides(size, this.insetLeft, this.insetRight, (area) => sidewaysView(
+			area,
 			laid.layout.geometry.fontPx,
 			{
 				me,
@@ -2744,9 +2890,10 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 			top,
 			bottom,
 			{ x: 0, y: 0, w: 0, h: 0 },
-		).view;
+		).view);
 		// D222: a whole tree that fits between the bars opens centred there, at the same 14 px names. A focus family keeps its view (D18: the person near the top).
-		const small = this.focusId === null ? this.centredSmall(size, view.scale) : null;
+		// D246 F3 starts from the 14 px names; the smaller names of V4 are for a tree that is not centred.
+		const small = this.focusId === null ? this.centredSmall(size, READABLE_NAME_PX / (laid.layout.geometry.fontPx > 0 ? laid.layout.geometry.fontPx : 16)) : null;
 		if (small) {
 			this.hintKids = [];
 			return small;
@@ -2758,12 +2905,12 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 	}
 
 	/**
-	 * D222: in the full-screen view only, the view that puts a tree which fits between the bars (at `scale`) in the middle of the free area; else null. The
-	 * insets are the cached values of `measureInsets`.
+	 * D222, D246 (F3): in the full-screen view only, the view that puts a small tree in the middle of the free area between the bars: at `scale` if it fits or only its
+	 * empty margin is cut, else smaller so that no card is cut (see `centredOpening`); else null. The insets are the cached values of `measureInsets`.
 	 */
 	private centredSmall(size: Size, scale: number): View | null {
 		if (!this.full) return null;
-		return centredSmallTree(this.bounds, size, scale, { top: this.insetTop, bottom: this.insetBottom });
+		return centredOpening(this.bounds, size, scale, this.freeArea() ?? { top: 0, bottom: 0 }, this.laid?.layout.geometry.fontPx ?? 0);
 	}
 
 	/** The whole-tree view (§5.5). `centre`: the first view of the tree (not the Show view) centres a small tree in the full-screen view (D222). */
@@ -3017,21 +3164,23 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 			hit.setAttribute('width', String(r.w));
 			hit.setAttribute('height', String(r.h));
 		};
-		// D31: in `down` the tap area hangs below its card; `sideways` hit areas already do.
+		// D31: in `down` the tap area hangs below its card. 0.3.1 fix3: in `sideways` it hangs from the card too, down to the next card at most;
+		// a strip over the bottom of its own card wins when the gap is shorter than 44 screen px (`tagHitSide`).
 		const down = laid.layout.orientation !== 'sideways';
+		const below = down ? null : tagNextTops(laid.layout);
 		const areas: Rect[] = [];
 		for (const t of this.scene?.tags ?? []) {
-			const r = down ? tagHitBelow(t.tag.hit, laid.layout.persons.get(t.tag.person), view.scale) : enlargeHit(t.tag.hit, view.scale);
+			const card = laid.layout.persons.get(t.tag.person);
+			const side = below ? tagHitSide(t.tag.hit, card, below.get(t.tag.person) ?? Infinity, view.scale, laid.layout.geometry.fontPx) : null;
+			const r = side ? side.area : tagHitBelow(t.tag.hit, card, view.scale);
 			place(t.hit, r);
+			place(t.over, side?.over ?? { x: r.x, y: r.y, w: 0, h: 0 });
 			areas.push(r);
 		}
 		// The same for the `+` badges of focus mode (spec §7.5, contract 4.2): the square below the cards, capped (the layout's node gap in
 		// `sideways`, half the own card in `down`) and clipped at the tag tap areas of the other people; the disc above the cards.
-		const geo = laid.layout.geometry;
-		const tagHits = [...laid.layout.farTags.values()];
 		for (const b of this.scene?.badges ?? []) {
-			const cap = down ? (laid.layout.persons.get(b.person)?.h ?? geo.cardH) / 2 : geo.nodeGap;
-			const { square, disc } = badgeTap(b.mark, view.scale, geo.fontPx, cap, tagHits.filter((t) => t.person !== b.person).map((t) => t.hit));
+			const { square, disc } = this.badgeTapAt(laid, b.person, b.mark, view.scale);
 			place(b.hit, square);
 			b.disc.setAttribute('d', discPath(disc.cx, disc.cy, disc.r, disc.top));
 			// A fold control's tap area gives way to the disc only; elsewhere in the square the fold control wins (contract 4.2 E1).
@@ -3105,6 +3254,13 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 		st.views[this.orientation] = { view, viewFor: st.viewFor };
 	}
 
+	/** F4: `view` if a card of the drawn tree shows in it (in the free area between the bars of the full-screen view), else null. */
+	private shownView(view: View | null, size: Size): View | null {
+		const laid = this.laid;
+		if (!view || !laid) return view;
+		return cardShown(view, size, laid.layout.persons.values(), this.full ? { top: this.insetTop, bottom: this.insetBottom } : undefined) ? view : null;
+	}
+
 	/** The saved view of the drawn family in the drawn orientation (D24: kept per orientation), or null. */
 	private savedView(st: BlockState): View | null {
 		const s = st.views[this.orientation];
@@ -3125,7 +3281,7 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 	 * does not open behind it, and the tree note keeps its scroll position (spec §5.2, §7.1).
 	 */
 	private openNote(open: () => Promise<void>): void {
-		const go = () => void open().catch((err) => console.error('Dynasty Tree: cannot open the note', err));
+		const go = () => void open().catch((err) => console.error('Crown and Kin: cannot open the note', err));
 		if (this.full) this.full.leave(go);
 		else go();
 	}
@@ -3301,7 +3457,11 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 			handle: h,
 			personId: id,
 			sourcePath: this.sourcePath,
-			beforeWrite: () => this.keepView(),
+			// The sheet of a new person that Add child, Add parent or Add partner opens has this hook too, so the anchor stays the person of this sheet (D244).
+			beforeWrite: () => {
+				this.keepView();
+				TreeView.sheetPerson.set(h.state, { id, until: performance.now() + 3000 });
+			},
 			fromTap,
 			place: this.full ? 'full' : 'embed',
 			openNote: (open) => this.openNote(open),
@@ -3480,6 +3640,11 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 	private updateEditUi(): void {
 		// Spec §7.7: the low bar of a very large tree has no edit tools; the tree is edited after "Draw the tree" or in the text.
 		if (this.large) return;
+		const errorBox = this.errorBox;
+		if (errorBox) {
+			this.updateErrorUi(errorBox);
+			return;
+		}
 		const empty = this.emptyEl;
 		if (empty) {
 			const foreign = empty.isConnected && this.inForeignView();
@@ -3595,6 +3760,15 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 		}
 	}
 
+	/** F8: the error box has "Show the tree text" while the block is known and can be edited here; the button leaves again if it cannot (a read-only view). */
+	private updateErrorUi(content: HTMLElement): void {
+		const can = !this.readOnly && !this.inForeignView() && !!this.handle;
+		const button = content.querySelector<HTMLElement>('.dynasty-error-button');
+		if (can && !button) {
+			content.createEl('button', { cls: 'dynasty-error-button', text: BLOCK_UI.showText, attr: { type: 'button' } }).addEventListener('click', () => this.guard(() => void this.showText()));
+		} else if (!can && button) button.remove();
+	}
+
 	/** The block can be edited here (the same test as for "Add person" in the bar): the item "Show the tree text" needs it. */
 	private canShowText(): boolean {
 		return !this.readOnly && !this.blocked && !this.inForeignView() && !!this.handle;
@@ -3651,7 +3825,7 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 			}
 			this.guard(() => {
 				this.writeHeight(h).catch((e) => {
-					console.error('Dynasty Tree: cannot save the height', e);
+					console.error('Crown and Kin: cannot save the height', e);
 					this.heightFailed();
 				});
 			});
@@ -3871,7 +4045,7 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 	 */
 	private centreFree(v: View): View {
 		if (!this.full || !(v.scale > 0)) return v;
-		return { scale: v.scale, cx: v.cx, cy: v.cy - (this.insetTop - this.insetBottom) / 2 / v.scale };
+		return { scale: v.scale, cx: v.cx - (this.insetLeft - this.insetRight) / 2 / v.scale, cy: v.cy - (this.insetTop - this.insetBottom) / 2 / v.scale };
 	}
 
 	/**
@@ -3899,8 +4073,26 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 		if (box) this.reveal(box);
 	}
 
-	/** A card or tag that is off screen (after an edit, or when it gets the focus with Tab) is brought into view at once. */
-	private reveal(box: Rect): void {
+	/** The card with its `+` badge: the badge sticks out above the card's top edge, and a card is only whole on the screen when its badge is (G3 F3). */
+	private withBadge(box: Rect): Rect {
+		let out = box;
+		for (const { mark } of this.scene?.badges ?? []) {
+			const cx = mark.x + mark.w / 2;
+			const cy = mark.y + mark.h / 2;
+			if (cx < box.x - 1 || cx > box.x + box.w + 1 || cy < box.y - 1 || cy > box.y + box.h + 1) continue;
+			const x = Math.min(out.x, mark.x);
+			const y = Math.min(out.y, mark.y);
+			out = { x, y, w: Math.max(out.x + out.w, mark.x + mark.w) - x, h: Math.max(out.y + out.h, mark.y + mark.h) - y };
+		}
+		return out;
+	}
+
+	/**
+	 * A card or tag that is off screen (after an edit, or when it gets the focus with Tab) is brought into view at once. `kept` is the edit after a kept
+	 * place (D244): then only the card counts and only the bars, so a card that is whole on the screen stays where it is, even with its badge under a bar
+	 * or its edge in a side safe area.
+	 */
+	private reveal(box: Rect, kept = false): void {
 		const pz = this.panZoom;
 		const v = pz?.view;
 		if (!pz || !v || pz.busy) return;
@@ -3908,10 +4100,15 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 		// D222: a card never stays under a bar, so "inside" means inside the free area, not the whole viewport.
 		const top = this.full ? this.insetTop : 0;
 		const bottom = this.full ? this.insetBottom : 0;
-		const halfW = pz.size.w / 2 / v.scale;
+		// V1: nor in a side safe area (the notch of a phone held sideways).
+		const left = this.full && !kept ? this.insetLeft : 0;
+		const right = this.full && !kept ? this.insetRight : 0;
+		const worldLeft = v.cx + (left - pz.size.w / 2) / v.scale;
+		const worldRight = v.cx + (pz.size.w / 2 - right) / v.scale;
 		const worldTop = v.cy + (top - pz.size.h / 2) / v.scale;
 		const worldBottom = v.cy + (pz.size.h / 2 - bottom) / v.scale;
-		const inside = box.x >= v.cx - halfW && box.x + box.w <= v.cx + halfW && box.y >= worldTop && box.y + box.h <= worldBottom;
+		const seen = kept ? box : this.withBadge(box);
+		const inside = seen.x >= worldLeft && seen.x + seen.w <= worldRight && seen.y >= worldTop && seen.y + seen.h <= worldBottom;
 		if (inside) return;
 		pz.setView(this.centreFree({ scale: v.scale, cx: box.x + box.w / 2, cy: box.y + box.h / 2 }), { byUser: true });
 	}
@@ -4485,7 +4682,7 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 			try {
 				p = await store.check(file);
 			} catch (e) {
-				console.error('Dynasty Tree: cannot check the picture', e);
+				console.error('Crown and Kin: cannot check the picture', e);
 			}
 			const problem = p;
 			if (problem && current()) this.guard(() => this.fileProblem(info, file, problem));
@@ -4926,7 +5123,30 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 
 	/** D212 (bars-in-flow): a first view that the plugin chooses never leaves a card cut in two by the toolbar and the banner at the top (`keepTopCardWhole`). */
 	private keepTopWhole(v: View, size: Size, laid: LaidOut, keys: readonly Rect[]): View {
-		return keepTopCardWhole(v, size, this.insetTop, size.h - Math.max(0, this.insetBottom), laid.layout.persons.values(), keys);
+		// A `+` badge sticks out above its card: it is not cut by the bar (G3 F3), and it does not stand in the safe area above the bar either (V3).
+		// 0.3.1 fix3: in the full-screen view, where the bars lie over the tree, the badge's whole press square at this zoom keeps out of the band too,
+		// so no part of it is under the opaque focus bar. In a note the bars stand above the drawing area and the circle counts, as before.
+		const marks = (this.scene?.badges ?? []).map((b) => {
+			if (!this.full) return b.mark;
+			const sq = this.badgeTapAt(laid, b.person, b.mark, v.scale).square;
+			// The square's lower part lies on the own card, which the card rule keeps clear; the box ends at the circle's foot, so a raise is as before.
+			const x = Math.min(sq.x, b.mark.x);
+			const y = Math.min(sq.y, b.mark.y);
+			return { x, y, w: Math.max(sq.x + sq.w, b.mark.x + b.mark.w) - x, h: b.mark.y + b.mark.h - y };
+		});
+		return keepTopCardWhole(v, size, this.insetTop, size.h - Math.max(0, this.insetBottom), laid.layout.persons.values(), keys, marks);
+	}
+
+	/**
+	 * The tap shape of the `+` badge of `person` (visible circle `mark`) at `scale` (spec §7.5, contract 4.2): the square is capped at the layout's node gap in
+	 * `sideways` and at half the own card in `down`, and clipped at the tag tap areas of the other people (`badgeTap`). One place for the settle and the first view.
+	 */
+	private badgeTapAt(laid: LaidOut, person: string, mark: Rect, scale: number): ReturnType<typeof badgeTap> {
+		const geo = laid.layout.geometry;
+		const cap = laid.layout.orientation !== 'sideways' ? (laid.layout.persons.get(person)?.h ?? geo.cardH) / 2 : geo.nodeGap;
+		const avoid: Rect[] = [];
+		for (const t of laid.layout.farTags.values()) if (t.person !== person) avoid.push(t.hit);
+		return badgeTap(mark, scale, geo.fontPx, cap, avoid);
 	}
 
 	/**

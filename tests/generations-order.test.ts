@@ -166,7 +166,10 @@ unions:
 		expect(order.anchors.get('u0')).toBe('husband');
 	});
 
-	it('walks depth first: all of one child line before the next sibling, then the next union', () => {
+	// WP-4b (class c, D239 / contract W3): the families of a person are emitted in the order of their hang points on the card: the left spouse's family first (b is
+	// left of a), then the family of one parent alone (s1; list order, "elsewhere"), then the right spouse's family (c is right of a). Before the switch the family of
+	// one parent alone came last, after every union.
+	it('walks depth first: all of one child line before the next sibling, then the next family in the order of the hang points (W3)', () => {
 		const { order } = build(`people:
   - {id: a}
   - {id: b}
@@ -181,7 +184,7 @@ unions:
   - partners: [a, c]
 `);
 		const seq = order.items.map((i) => (i.kind === 'person' ? i.id : i.key));
-		expect(seq).toEqual(['b', 'a', 'c', 'u0', 'k1', 'g1', 'k2', 'u1', 'k3', 's1']);
+		expect(seq).toEqual(['b', 'a', 'c', 'u0', 'k1', 'g1', 'k2', 's1', 'u1', 'k3']);
 	});
 
 	it('a line of 20000 generations is ordered without a stack overflow', () => {

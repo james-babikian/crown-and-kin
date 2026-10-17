@@ -113,7 +113,9 @@ describe('fixture 2 (three successive spouses): spec §10, §5.1', () => {
 		expect(row.slice(start, start + 4)).toEqual(['agnes', 'edmund', 'beatrix', 'clarice']);
 	});
 
-	it('union dots: a bar for adjacent partners, below the row halfway between for the others (§5.1 step 5)', () => {
+	// WP-4b (class c, D239 V2; spec §5.1 step 2, rule (b), and step 5b): for the partners who do not stand side by side the dot is no longer "halfway
+	// between"; the outer partner (Clarice, two cards along) anchors, and the dot sits straight below her own card, on her hang port.
+	it('union dots: a bar for adjacent partners, below the anchor card for the others (§5.1 step 5, D239 V2 and W2)', () => {
 		const { g, layout } = layOut(fixtureSource('02'));
 		const point = (s: string) => layout.unions.get(g.unions.find((u) => u.partners.includes(s) && u.partners.includes('edmund'))!.key)!;
 		expect(point('agnes').bar).toBe(true);
@@ -122,7 +124,9 @@ describe('fixture 2 (three successive spouses): spec §10, §5.1', () => {
 		const edmund = box(layout, 'edmund');
 		expect(clarice.bar).toBe(false);
 		expect(clarice.y).toBeGreaterThanOrEqual(edmund.y + edmund.h);
-		expect(Math.abs(clarice.x - (centre(edmund) + centre(box(layout, 'clarice'))) / 2)).toBeLessThanOrEqual(1);
+		const outer = box(layout, 'clarice');
+		expect(clarice.x).toBeGreaterThan(outer.x);
+		expect(clarice.x).toBeLessThan(outer.x + outer.w);
 	});
 });
 

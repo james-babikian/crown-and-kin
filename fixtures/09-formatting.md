@@ -6,12 +6,12 @@ The archivist of Greyfen keeps the Harrow line in this note, typed by hand in se
 - Flow lists (`parents: [aldous, "0017"]`) and block lists, and one person (Joan) written as a flow map.
 - Mixed quoting: plain, single quotes, double quotes, a quoted date and a quoted id (`"0017"`).
 - Unknown keys at every level: the top level, `options`, a house, a person, a union and an object-form parent entry.
-- Six `dynasty` blocks: the main tree, one in a callout, one in a callout inside a callout, one in a list item, a second plain block, and one with a `~~~` fence.
-- A `dynasty` example inside a longer fence. It is only text, not a tree.
+- Six `kin` blocks: the main tree, one in a callout, one in a callout inside a callout, one in a list item, a second plain block, and one with a `~~~` fence.
+- A `kin` example inside a longer fence. It is only text, not a tree.
 
 ## The main tree
 
-```dynasty
+```kin
 # The Harrow line, as kept by the archivist of Greyfen.
 options:
   start: edric                # open on the heir
@@ -92,7 +92,7 @@ chronicle: Greyfen Rolls, vol. 2   # unknown top-level key
 The archivist's guide shows what a block looks like. The example sits inside a longer fence, so it is only text:
 
 ````markdown
-```dynasty
+```kin
 people:
   - id: example
     name: Example Person
@@ -104,7 +104,7 @@ people:
 > [!note] The Quill cadets
 > Maud's brother and his son, kept apart from the main tree.
 >
-> ```dynasty
+> ```kin
 > people:
 >   - id: osric
 >     name: Osric Quill         # an end-of-line comment
@@ -119,7 +119,7 @@ people:
 
 > [!info] From the rolls
 > > [!quote] A letter
-> > ```dynasty
+> > ```kin
 > > people:
 > >   - id: wat
 > >     name: "Wat of Greyfen"
@@ -132,7 +132,7 @@ Other branches:
 
 - The Marsh branch:
 
-  ```dynasty
+  ```kin
   options:
     height: 400
 
@@ -145,7 +145,7 @@ Other branches:
 
 ## A second tree
 
-```dynasty
+```kin
 people:
   - id: bertram
     name: Bertram Fenn
@@ -158,7 +158,7 @@ people:
 
 ## A tree with a tilde fence
 
-~~~dynasty
+~~~kin
 people:
   - id: cedric
     name: Cedric Vane

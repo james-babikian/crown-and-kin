@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { foldHidden, foldKey } from '../src/core/folds';
-import { foldExtent, foldSpots } from '../src/layout/fold-spots';
+import { foldExtent, placeFoldSpots } from '../src/layout/fold-spots';
 import { DEFAULT_LAYOUT_SETTINGS, clearLayoutCache, geometryFor, layoutTree } from '../src/layout/index';
 import type { LayoutSettings } from '../src/layout/model';
 import { block15, graphOf } from './acceptance/m10-support';
@@ -41,15 +41,15 @@ describe('folds in the layout (WP 10.2b)', () => {
 		}
 	});
 
-	it('foldSpots leaves out a control whose parent is not in the layout', () => {
+	it('placeFoldSpots leaves out a control whose parent is not in the layout', () => {
 		const { layout } = lay('down', [A]);
 		const gone = { key: 'x', parents: ['nobody'], folded: false, count: 0 };
-		expect(foldSpots([gone], layout.persons, layout.unions, layout.rowGaps, 16)).toEqual([]);
+		expect(placeFoldSpots([gone], layout.persons, layout.unions, layout.rowGaps, 16)).toEqual([]);
 	});
 
 	it('the stem of a folded family with a short stem ends at the middle of the stem', () => {
 		const persons = new Map([['a', { id: 'a', x: 0, y: 0, w: 100, h: 60, gen: 0 }]]);
-		const spots = foldSpots([{ key: '["a"]', parents: ['a'], folded: true, count: 3 }], persons, new Map(), [{ top: 60, bottom: 80 }], 16);
+		const spots = placeFoldSpots([{ key: '["a"]', parents: ['a'], folded: true, count: 3 }], persons, new Map(), [{ top: 60, bottom: 80 }], 16).map((r) => r.control);
 		expect(spots[0].spot).toEqual({ x: 50, y: 70 });
 	});
 });

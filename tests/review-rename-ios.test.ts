@@ -24,7 +24,7 @@ const RENAME_TEST = [
 	'',
 	'Use this tree for the rename test of the milestone 6 phone test.',
 	'',
-	'```dynasty',
+	'```kin',
 	'people:',
 	'  - id: aldric',
 	'    name: Aldric Valmont',

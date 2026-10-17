@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import type { EdgePath, StrokeKind } from '../../src/layout/model';
+import type { EdgeDrawing, EdgePath, StrokeKind, UnionPoint } from '../../src/layout/model';
 import { geometry, layOut } from './pipeline';
-import { COUPLE_KINDS, DESCENT_KINDS, hangsFrom } from './paths';
+import { COUPLE_KINDS, DESCENT_KINDS, pathPoints } from './paths';
 
 const lines = (...xs: string[]) => xs.join('\n') + '\n';
 
@@ -15,6 +15,31 @@ const trunkOf = (paths: EdgePath[], parents: string[], children: string[]) =>
 const dropTo = (paths: EdgePath[], child: string, siblings: string[] = []) =>
 	paths.filter((p) => DESCENT_KINDS.includes(p.kind) && p.people.includes(child) && !siblings.some((s) => p.people.includes(s)));
 const kinds = (paths: EdgePath[]) => [...new Set(paths.map((p) => p.kind))].sort();
+
+/**
+ * WP-4b (class c, the architecture notes §4.2.1 "ports"; the helper `hangsFrom` of ./paths assumed that a child's drop lands on the centre of its card): a child's drop lands on a
+ * port of the top edge of its card, which need not be the centre (an only child under a trunk at x 134 on a card whose centre is 98). This is `hangsFrom` with
+ * the x of the drop itself: True if the drop's top lies on a horizontal run (the sibling bar or the trunk) of a line that leaves the dot of this union.
+ */
+function hangsFromPort(edges: EdgeDrawing, u: UnionPoint, child: string, tol: number): boolean {
+	const mine = edges.paths.filter((p) => DESCENT_KINDS.includes(p.kind) && p.people.includes(child));
+	if (!mine.length) return false;
+	const fewest = Math.min(...mine.map((p) => p.people.length));
+	return mine
+		.filter((p) => p.people.length === fewest)
+		.some((drop) => {
+			const pts = pathPoints(drop.d);
+			const bottom = pts.reduce((a, q) => (q.y > a.y ? q : a));
+			const barY = Math.min(...pts.map((q) => q.y));
+			return edges.paths.some((t) => {
+				if (!DESCENT_KINDS.includes(t.kind)) return false;
+				const tp = pathPoints(t.d);
+				if (Math.abs(tp[0].x - u.x) > tol || Math.abs(tp[0].y - u.y) > tol) return false;
+				const onBar = tp.filter((q) => Math.abs(q.y - barY) <= 1).map((q) => q.x);
+				return onBar.length > 0 && Math.min(...onBar) - 1 <= bottom.x && bottom.x <= Math.max(...onBar) + 1;
+			});
+		});
+}
 
 describe('primary union when a couple has two unions: spec §4.3', () => {
 	const src = lines(
@@ -33,12 +58,12 @@ describe('primary union when a couple has two unions: spec §4.3', () => {
 		const first = layout.unions.get(g.unions.find((u) => u.id === 'first')!.key)!;
 		const second = layout.unions.get(g.unions.find((u) => u.id === 'second')!.key)!;
 		const tol = geometry().unionSize;
-		expect(hangsFrom(edges, layout, first, 'c', tol)).toBe(true);
-		expect(hangsFrom(edges, layout, second, 'd', tol)).toBe(true);
+		expect(hangsFromPort(edges, first, 'c', tol)).toBe(true);
+		expect(hangsFromPort(edges, second, 'd', tol)).toBe(true);
 		// Only decidable from the drawing when the two dots are not drawn on the same spot.
 		if (Math.hypot(first.x - second.x, first.y - second.y) > tol) {
-			expect(hangsFrom(edges, layout, first, 'd', tol)).toBe(false);
-			expect(hangsFrom(edges, layout, second, 'c', tol)).toBe(false);
+			expect(hangsFromPort(edges, first, 'd', tol)).toBe(false);
+			expect(hangsFromPort(edges, second, 'c', tol)).toBe(false);
 		}
 	});
 });

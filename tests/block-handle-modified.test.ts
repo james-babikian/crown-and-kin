@@ -17,7 +17,7 @@ import { HandleRegistry } from '../src/obsidian/block-handle';
 
 /* O3 (0.2.4): `modified` reads a note only when a handle holds it; a watcher is told in both cases. */
 
-const text = ['```dynasty', 'people:', '  - id: p', '    name: Alys', '```', ''].join('\n');
+const text = ['```kin', 'people:', '  - id: p', '    name: Alys', '```', ''].join('\n');
 
 function app(reads: { n: number }) {
 	const files = new Map<string, TFile>();

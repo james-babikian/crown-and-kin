@@ -261,19 +261,52 @@ export function panFrom(start: View, dx: number, dy: number): View {
 	return { scale: start.scale, cx: start.cx - dx / start.scale, cy: start.cy - dy / start.scale };
 }
 
-/** The bars of the full-screen view (D222): screen px at the top and at the bottom of the viewport that a card may not go under. The sides have none. */
+/**
+ * The bars of the full-screen view (D222): screen px at the top and at the bottom of the viewport that a card may not go under. `left` and `right` are the side safe
+ * areas of a phone held sideways (the notch, 0.3.1 V1): the views that the plugin chooses keep a card out of them; the drag limit (`panLimits`) does not look at them.
+ */
 export interface FreeArea {
 	top: number;
 	bottom: number;
+	left?: number;
+	right?: number;
 }
 
-/** The free area as far as `size` allows: both insets are kept apart by at least one px. */
-function insetsIn(free: FreeArea, size: Size): FreeArea {
-	// A NaN inset (a bar the browser cannot measure) counts as no bar; `Math.max(0, NaN)` would be NaN.
-	const t = Number.isFinite(free.top) ? free.top : 0;
-	const b = Number.isFinite(free.bottom) ? free.bottom : 0;
-	const top = Math.max(0, Math.min(t, size.h - 1));
-	return { top, bottom: Math.max(0, Math.min(b, size.h - 1 - top)) };
+/** A NaN inset (a bar the browser cannot measure) counts as no bar; `Math.max(0, NaN)` would be NaN. */
+const finiteInset = (v: number | undefined): number => (v !== undefined && Number.isFinite(v) ? v : 0);
+
+/** The free area as far as `size` allows: both insets of an axis are kept apart by at least one px. */
+function insetsIn(free: FreeArea, size: Size): Required<FreeArea> {
+	const top = Math.max(0, Math.min(finiteInset(free.top), size.h - 1));
+	const left = Math.max(0, Math.min(finiteInset(free.left), size.w - 1));
+	return { top, bottom: Math.max(0, Math.min(finiteInset(free.bottom), size.h - 1 - top)), left, right: Math.max(0, Math.min(finiteInset(free.right), size.w - 1 - left)) };
+}
+
+/**
+ * 0.3.1 (V1): a view that `make` chooses for the part of the viewport between the side safe areas, moved so that it shows there in the whole viewport.
+ * The scale stays; with no side inset this is `make(size)`.
+ */
+export function betweenSides(size: Size, left: number, right: number, make: (area: Size) => View): View {
+	const l = Math.max(0, Math.min(finiteInset(left), size.w - 1));
+	const r = Math.max(0, Math.min(finiteInset(right), size.w - 1 - l));
+	if (!l && !r) return make(size);
+	const v = make({ w: size.w - l - r, h: size.h });
+	return v.scale > 0 ? { scale: v.scale, cx: v.cx + (r - l) / 2 / v.scale, cy: v.cy } : v;
+}
+
+/**
+ * 0.3.1 (F4): true when at least one of `boxes` meets the area that `view` shows in a viewport of `size` (with `free`, the viewport minus the bars). A saved view for
+ * which this is false shows a blank screen: after a pinch, or after the window changed its size. A view that is not a real view shows nothing, so it is false too.
+ */
+export function cardShown(view: View, size: Size, boxes: Iterable<Rect>, free?: FreeArea): boolean {
+	if (!(view.scale > 0) || !Number.isFinite(view.cx) || !Number.isFinite(view.cy) || !validSize(size)) return false;
+	const { top, bottom } = free ? insetsIn(free, size) : { top: 0, bottom: 0 };
+	const x0 = view.cx - size.w / 2 / view.scale;
+	const x1 = view.cx + size.w / 2 / view.scale;
+	const y0 = view.cy + (top - size.h / 2) / view.scale;
+	const y1 = view.cy + (size.h / 2 - bottom) / view.scale;
+	for (const b of boxes) if (b.x < x1 && b.x + b.w > x0 && b.y < y1 && b.y + b.h > y0) return true;
+	return false;
 }
 
 /** A hair of room, so a tree that fits exactly (the fit scale) counts as fitting. */
@@ -308,20 +341,29 @@ export function clampTo(view: View, l: { x0: number; x1: number; y0: number; y1:
 	return { scale: view.scale, cx: Math.min(l.x1, Math.max(l.x0, view.cx)), cy: Math.min(l.y1, Math.max(l.y0, view.cy)) };
 }
 
-/** Pans stop when the tree would leave the viewport entirely; the centre stays over the tree. With `area`: see `panLimits`. */
-export function clampPan(view: View, bounds: Rect, area?: { free: FreeArea; size: Size }): View {
-	return clampTo(view, panLimits(bounds, view.scale, area?.size ?? { w: 0, h: 0 }, area?.free));
-}
+/** D246 (F3): the least space that a centred tree keeps between a card and the screen edge, in layout px (so `CENTRE_EDGE_MIN * scale` screen px). The rest of the 24 px margin may be cut. */
+export const CENTRE_EDGE_MIN = 8;
+
+/** D246 (F3): the smallest name size, in screen px, at which a tree that does not fit is made smaller to be centred. */
+export const CENTRE_MIN_NAME_PX = 11;
 
 /**
- * D222: the view that puts the middle of `bounds` at the middle of the free area (the viewport minus the bars), at `scale`. Null when the bounds at
- * that scale do not fit inside the free area: the caller then keeps its own view.
+ * D246 (F3, option C): the opening view of a small tree in the full-screen view. First as D222: the tree fits at `scale`, so it is centred there. Else, if only its
+ * empty margin would be cut (a card keeps at least CENTRE_EDGE_MIN px from each edge), it is centred at the same scale. Else it is made just small enough to fit
+ * whole, if the names stay at CENTRE_MIN_NAME_PX or more. Otherwise null: the caller keeps its own view.
  */
-export function centredSmallTree(bounds: Rect, size: Size, scale: number, free: FreeArea): View | null {
+export function centredOpening(bounds: Rect, size: Size, scale: number, free: FreeArea, fontPx: number): View | null {
 	if (!validSize(size) || !(scale > 0) || !(bounds.w > 0) || !(bounds.h > 0)) return null;
-	const { top, bottom } = insetsIn(free, size);
-	if (bounds.w * scale > size.w + FIT_EPS || bounds.h * scale > size.h - top - bottom + FIT_EPS) return null;
-	return { scale, cx: bounds.x + bounds.w / 2, cy: bounds.y + bounds.h / 2 + (bottom - top) / 2 / scale };
+	const { top, bottom, left, right } = insetsIn(free, size);
+	const room = size.h - top - bottom;
+	// V1: the side safe areas (a phone held sideways) are not free area either, so the tree is centred between them.
+	const wide = size.w - left - right;
+	const at = (k: number): View => ({ scale: k, cx: bounds.x + bounds.w / 2 + (right - left) / 2 / k, cy: bounds.y + bounds.h / 2 + (bottom - top) / 2 / k });
+	// The margin is in layout px, so the part of it that may be cut is too: at a small scale (names 14 px on a large note font) it is fewer screen px (G2 S4).
+	const cut = 2 * (FIT_MARGIN - CENTRE_EDGE_MIN) * scale;
+	if (bounds.w * scale <= wide + cut + FIT_EPS && bounds.h * scale <= room + cut + FIT_EPS) return at(scale);
+	const fit = Math.min(scale, wide / bounds.w, room / bounds.h);
+	return fit > 0 && fit * fontPx >= CENTRE_MIN_NAME_PX - FIT_EPS ? at(fit) : null;
 }
 
 /** M11: true when `box` meets `view` grown by one view width left and right and one view height above and below (layout px). */
@@ -457,6 +499,45 @@ export function foldHit(visible: Rect, scale: number, em = 0): Rect {
 /** M10 (F10): moves `view` so that the layout point `to` shows where the layout point `from` showed; the scale stays. */
 export function keepSpot(view: View, from: { x: number; y: number }, to: { x: number; y: number }): View {
 	return { scale: view.scale, cx: view.cx + (to.x - from.x), cy: view.cy + (to.y - from.y) };
+}
+
+/** What the pan limits need to clamp a kept-place view: the new tree bounds, the viewport and (full-screen view) the bars. */
+export interface KeepPlaceArea {
+	bounds: Rect;
+	size: Size;
+	free?: FreeArea;
+}
+
+/**
+ * 0.3.1 (D244): the view after an edit, so that the card of person `id` shows where it showed before. The scale stays. Null when no shift
+ * applies: the person has no card before or after the edit (a delete, a card a fold hides). With `area` the shifted view is clamped like
+ * a dragged view (D222), so the limits win over the exact place.
+ */
+export function keepPlaceShift(before: ReadonlyMap<string, Rect>, after: ReadonlyMap<string, Rect>, id: string, view: View, area?: KeepPlaceArea): View | null {
+	const was = before.get(id);
+	const now = after.get(id);
+	if (!was || !now || !(view.scale > 0)) return null;
+	const shifted = keepSpot(view, { x: was.x + was.w / 2, y: was.y + was.h / 2 }, { x: now.x + now.w / 2, y: now.y + now.h / 2 });
+	if (![shifted.cx, shifted.cy].every(Number.isFinite)) return null;
+	return area ? clampTo(shifted, panLimits(area.bounds, shifted.scale, area.size, area.free)) : shifted;
+}
+
+/**
+ * 0.3.1 (D245): the smallest pan that brings `box` wholly into the free area of the viewport (the viewport minus the bars). The scale stays. An axis in which the card is
+ * larger than the free area centres the card there. The view is returned as it is when the card is already wholly inside.
+ */
+export function bringInView(view: View, box: Rect, area: { size: Size; free?: FreeArea }): View {
+	if (!(view.scale > 0) || !validSize(area.size)) return view;
+	const { top, bottom, left, right } = area.free ? insetsIn(area.free, area.size) : { top: 0, bottom: 0, left: 0, right: 0 };
+	const axis = (lo: number, hi: number, centre: number, from: number, to: number): number => {
+		if (hi - lo > to - from) return centre + (lo + hi) / 2 - (from + to) / 2;
+		if (lo < from) return centre + (lo - from);
+		if (hi > to) return centre + (hi - to);
+		return centre;
+	};
+	const cx = axis(box.x, box.x + box.w, view.cx, view.cx + (left - area.size.w / 2) / view.scale, view.cx + (area.size.w / 2 - right) / view.scale);
+	const cy = axis(box.y, box.y + box.h, view.cy, view.cy + (top - area.size.h / 2) / view.scale, view.cy + (area.size.h / 2 - bottom) / view.scale);
+	return { scale: view.scale, cx, cy };
 }
 
 /** The grapheme splitter; undefined until the first need, null when the engine has none (T-X2-01). One instance serves every cut. */

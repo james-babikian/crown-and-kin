@@ -1,6 +1,6 @@
 /**
  * Turns a note's font size into the card and gap sizes a tree draws with (spec §5.8), and the line
- * lane layout of the gaps between rows. `layout.ts` and `lines.ts` call these functions to size
+ * lane layout of the gaps between rows. `plan.ts`, `ports.ts` and `route.ts` call these functions to size
  * and place cards; `render/dom/scene.ts` and `render/svg-string.ts` call `cardText` (with the
  * card's `PersonBox.tallName` and `tallTitle`) and `tagTop` to draw and measure the same card the
  * layout used, so every level of detail agrees on where the text sits (spec §5.4). `NORMAL_GEOMETRY` is used only by scripts and tests.
@@ -12,7 +12,7 @@
  * the numbers and the text places of the text card. `withRelationLine` sets every height that depends on the tree (plate, crown,
  * reach); `cardText`, `nameRoom`, `roundelPics`, `youTabRect` and `ordinalTabRect` place what the scene and the saved picture draw.
  * 0.2.7 (F.4): a card of the Show view of a line of succession can carry an ordinal tab ("2nd") on its top edge, as the marked card
- * carries its "You" tab; `LayoutSettings.ordinalCards` makes the reach for it and the line planner keeps the drop places clear of it.
+ * carries its "You" tab; `LayoutSettings.ordinalCards` makes the reach for it and the route stage keeps the drop places clear of it.
  */
 import type { Geometry, GeometryFor, LayoutSettings, NameLineCount, NameRoom, Orientation, Rect } from './model';
 
@@ -98,13 +98,6 @@ export function lineMetrics(geo: Geometry): LineMetrics {
 		legStep: 0.75 * f,
 		tagInset: 0.5 * f,
 	};
-}
-
-/** Height of a gap between rows that holds `couples` couple lanes and `bars` sibling-bar lanes. */
-export function gapHeight(geo: Geometry, couples: number, bars: number): number {
-	const m = lineMetrics(geo);
-	const need = m.coupleLane0 + Math.max(0, couples - 1) * m.coupleLaneStep + geo.unionSize / 2 + m.clearance + Math.max(0, bars - 1) * m.barLaneStep + m.barDrop;
-	return Math.max(geo.rowGap, need);
 }
 
 function sanitize(fontPx: number): number {
@@ -274,7 +267,7 @@ export function sideTagDepth(geo: Geometry): number {
 export const barClear = (geo: Geometry) => Math.max(lineMetrics(geo).tagInset, geo.unionSize / 2 + 2);
 
 /**
- * The frame the arranger and the line planner work in for a sideways layout: a card's extent
+ * The frame the placement and the route stages work in for a sideways layout: a card's extent
  * along its generation is its real height, and "below" is "to the right". Built from the sideways
  * geometry alone, so routing can rebuild it from a finished layout.
  */
@@ -473,12 +466,6 @@ export const roundelAxis = (geo: Geometry): number => geo.cardW / 2;
 const OLD_AXIS_SHIFT_EM = 0.25;
 
 /**
- * 0.2.5 (B.3.5): how far right of its card's middle a line from the parents lands. The Roundel takes its line on the axis; every other
- * form takes it at the middle. The layout adds it when it centres a sibling group under its parents, so an only child drops straight.
- */
-export const childAttach = (geo: Geometry): number => (isRoundel(geo) ? roundelAxis(geo) - geo.cardW / 2 : 0);
-
-/**
  * Text positions of a Roundel or a text card (B.3.2, B.3.10). The lines that exist are centred between the crown and the plate;
  * the Roundel centres them on its axis in a 10 em column, the text card keeps them at `padX`. `nameCount`, `tall` and `shown` are as for `cardText`.
  */
@@ -618,4 +605,16 @@ export function ordinalTabRect(geo: Geometry, hasPortrait: boolean, hasArms: boo
 		return { x: right - w, y: -ROUNDEL_EM.tabAbove * f, w, h };
 	}
 	return { x: E.textCardLeft * f, y: -ROUNDEL_EM.tabAboveText * f, w, h };
+}
+
+/**
+ * The one tolerance for comparing two computed positions (px), used by the card-and-line stages (the architecture notes §4.2.4). Plans made
+ * again on cards that moved by one amount differ in their last digits; a tie must go the same way in both (to the right, to the first
+ * candidate). It is a tolerance, not a size: sizes such as `SNAP` or `LEG_MIN` say how close, and never decide that two positions are equal.
+ */
+export const TIE = 1e-6;
+
+/** 0.2.7 (F.4): the cards that have a tab on the top edge: the "You" card and the ordinal cards of a layout. */
+export function tabbedCards(youTab: string | undefined, ordinalCards: readonly string[] | undefined): ReadonlySet<string> {
+	return new Set([...(ordinalCards ?? []), ...(youTab !== undefined ? [youTab] : [])]);
 }

@@ -133,22 +133,23 @@ describe('review M7: the finder\'s line has no gaps in the whole tree (D47, spec
 		expect(gaps).toEqual([]);
 	});
 
-	it('two legs from one side: P7 > P8 in random tree 47 lights the stretch from the end of P7\'s leg to the sign', () => {
-		// P2's and P7's legs reach the implicit union of P2 and P7 from the same side; P7's leg stops
-		// where it meets P2's leg (edges.ts), so the last part to the sign belongs to P2's leg. (N05: random tree 2 had this case until its dot moved between the legs.)
+	// WP-4b (class c, D239, spec §5.1 step 5c): in 0.3.0 P7's leg stopped on P2's leg short of the sign (an internal script) and the look had to light the stretch to the sign. The new
+	// pipeline puts the dot on the hang port of P2 and runs P7's leg to the dot, so there is no stretch to add. The claim stays: the line P7 > P8 is drawn on with no gap
+	// from P7's card, along its leg, through the sign, down the trunk to P8.
+	it('two legs from one side: P7 > P8 in random tree 47 lights an unbroken stretch from the end of P7\'s leg to the sign', () => {
 		const { g } = build(randomTree(47));
 		const laid = lay(g, { ...DEFAULT_LAYOUT_SETTINGS, relationLine: true });
 		const key = g.primaryUnion.get('p8')!;
 		const dot = laid.layout.unions.get(key)!;
 		const leg = laid.edges.paths.find((p) => p.union === key && p.parents?.length === 1 && p.parents[0] === 'p7')!;
 		const end = Number(/H(-?[\d.]+)$/.exec(leg.d)![1]);
-		expect(Math.abs(end - dot.x)).toBeGreaterThan(20);
+		expect(Math.abs(end - dot.x)).toBeLessThan(1);
 		const line = lineOf(g, 'p7', 'p8');
 		expect(line.links.map((l) => `${l.parent}>${l.child}`)).toEqual(['p7>p8']);
 		const { gaps, look } = lineGaps(g, laid, line, true);
-		// Every point between the leg's end and the sign lies on a piece drawn on.
+		// Every point of the leg, from its card to the sign, lies on a piece drawn on.
 		const on = look.paths.filter((p) => p.state === 'on').flatMap((p, i) => segsOf(p.d, i));
-		const missing = [0.25, 0.5, 0.75].map((f) => ({ x: end + f * (dot.x - end), y: dot.y })).filter((q) => !on.some((s) => onSeg(q, s)));
+		const missing = [0.25, 0.5, 0.75].map((f) => ({ x: end + f * (Number(/^M(-?[\d.]+)/.exec(leg.d)![1]) - end), y: dot.y })).filter((q) => !on.some((s) => onSeg(q, s)));
 		expect(missing).toEqual([]);
 		expect(gaps).toEqual([]);
 	});

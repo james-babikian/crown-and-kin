@@ -458,8 +458,6 @@ describe('C8: the accessible name starts with the visible text', () => {
 			[UI.FOCUS_UI.pin, UI.FOCUS_UI.pinLabel('Aldric')],
 			[UI.FOCUS_UI.unpin, UI.FOCUS_UI.unpinLabel('Aldric')],
 			[UI.FOCUS_UI.focusHere, UI.FOCUS_UI.focusHereLabel('Aldric')],
-			[UI.FAMILY.remove, UI.FAMILY.removeParentLabel('Aldric')],
-			[UI.FAMILY.removePartnership, UI.FAMILY.removePartnershipLabel('Aldric')],
 			[UI.FAMILY.edit, UI.FAMILY.editLabel('Aldric')],
 		];
 		for (const [visible, name] of pairs) expect(name.startsWith(visible), `"${name}" starts with "${visible}"`).toBe(true);

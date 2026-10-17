@@ -267,14 +267,14 @@ export class HousesWindow extends ListEditWindow {
 		try {
 			this.o.onClosed?.();
 		} catch (e) {
-			console.error('Dynasty Tree: cannot return the focus', e);
+			console.error('Crown and Kin: cannot return the focus', e);
 		}
 		const after = this.afterClose;
 		this.afterClose = null;
 		try {
 			after?.();
 		} catch (e) {
-			console.error('Dynasty Tree: cannot show the person', e);
+			console.error('Crown and Kin: cannot show the person', e);
 		}
 	}
 
@@ -495,7 +495,7 @@ export class HousesWindow extends ListEditWindow {
 			// The note opens after this window has closed (through its normal close, with its question about unsaved changes).
 			this.leaveThen(() => open?.(() => openMadeNote(this.app, file)));
 		} catch (e) {
-			console.error('Dynasty Tree: cannot make the house note', e);
+			console.error('Crown and Kin: cannot make the house note', e);
 			new Notice(HOUSE_PAGE_UI.noteFailed(name));
 		} finally {
 			this.tableBusy = false;
@@ -674,7 +674,7 @@ export class HousesWindow extends ListEditWindow {
 				this.copies.set(link, copy ?? 'problem');
 				this.redrawArms(link);
 			})
-			.catch((e) => console.error('Dynasty Tree: cannot show the arms', e));
+			.catch((e) => console.error('Crown and Kin: cannot show the arms', e));
 		return 'loading';
 	}
 
@@ -756,14 +756,14 @@ export class HousesWindow extends ListEditWindow {
 				try {
 					list = px ? armsColours(px, ARMS_PIXELS, ARMS_PIXELS) : null;
 				} catch (e) {
-					console.error('Dynasty Tree: cannot read the colours of the arms', e);
+					console.error('Crown and Kin: cannot read the colours of the arms', e);
 				}
 				this.colours.set(link, list);
 				const g = this.armsGroup;
 				const r = g ? this.rowByKey(g.key) : undefined;
 				if (this.shown && g && r && armsOf(r.arms) === link) this.fillArmsColours(g.el, r, link);
 			})
-			.catch((e) => console.error('Dynasty Tree: cannot read the colours of the arms', e));
+			.catch((e) => console.error('Crown and Kin: cannot read the colours of the arms', e));
 		return 'loading';
 	}
 
@@ -977,7 +977,7 @@ export class HousesWindow extends ListEditWindow {
 		if (this.saving) return;
 		const deleted = this.rows.filter((r) => r.id !== null && r.deleted).map((r) => r.base?.name || r.id!);
 		const h = this.o.handle;
-		const out = await this.writeBatch(h, ops, this.o.beforeWrite, 'Dynasty Tree: cannot save the houses');
+		const out = await this.writeBatch(h, ops, this.o.beforeWrite, 'Crown and Kin: cannot save the houses');
 		if (!out) return;
 		if (!out.ok) {
 			this.failed(out);
@@ -998,7 +998,7 @@ export class HousesWindow extends ListEditWindow {
 
 	/** Spec §6.1 stale write: a Notice, the new data in the window, and the draft kept with a message that says so. */
 	private stale(body: string): void {
-		new Notice(WRITE_TEXT.stale);
+		new Notice(WRITE_TEXT.staleWindow);
 		this.reload(body);
 		this.showError(HOUSES.stale);
 	}

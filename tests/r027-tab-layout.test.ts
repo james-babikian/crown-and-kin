@@ -1,14 +1,12 @@
 // 0.2.7 WP4 geometry (CONTRACT F.4): `LayoutSettings.ordinalCards` in the layout key, the reach it makes, `TreeLayout.ordinalCards`, and the line
 // planner: a card with a tab takes the drop places of the "You" card, so no line meets an ordinal tab. Ids only; the texts are never in a layout.
+// 0.3.1 (WP-4b): the line planner `planLines` is gone (one plan, the architecture notes §4.2.2); its two direct tests are written on the drawing (see the notes below).
 import { describe, expect, it } from 'vitest';
 import { deriveFamilies } from '../src/core/derive';
 import type { FamilyGraph } from '../src/core/derive';
-import { computeGenerations } from '../src/core/generations';
-import { computeModelOrder } from '../src/core/order';
 import { parseDynasty } from '../src/core/parse';
-import { cardForm, drawnGeometry, gapHeight, geometryFor, ordinalTabRect, roundelAxis } from '../src/layout/geometry';
+import { cardForm, drawnGeometry, geometryFor, ordinalTabRect, roundelAxis } from '../src/layout/geometry';
 import { DEFAULT_LAYOUT_SETTINGS, clearLayoutCache, layoutKey, layoutTree } from '../src/layout/index';
-import { planLines, tabbedCards } from '../src/layout/lines';
 import type { LaidOut, LayoutSettings } from '../src/layout/model';
 import { sampleSources } from './acceptance/m11-support';
 import { build } from './helpers';
@@ -121,7 +119,7 @@ describe('F.4: the layout', () => {
 	});
 });
 
-// ---------- the line planner against the sample trees ----------
+// ---------- the lines against the sample trees ----------
 
 type Pt = [number, number];
 /** Points along a path of M, H, V and C commands, about 1 px apart. */
@@ -169,7 +167,7 @@ function dropOffsets(laid: LaidOut): Map<string, number> {
 	return out;
 }
 
-describe('F.4: planLines gives a tabbed card the drop places of the "You" card', () => {
+describe('F.4: the lines give a tabbed card the drop places of the "You" card', () => {
 	const trees = sampleSources().map((s) => ({ id: s.id, g: parse(s.source) }));
 
 	function run(gg: FamilyGraph, f: number, ordinalCards: string[]) {
@@ -239,36 +237,20 @@ describe('F.4: planLines gives a tabbed card the drop places of the "You" card',
 		expect(bad.slice(0, 5)).toEqual([]);
 	});
 
-	it('the plan that sized the gaps is the plan of the router: every gap holds the lanes planned with the layout`s tabbed set', () => {
-		const bad: string[] = [];
-		let compared = 0;
-		for (const t of trees.filter((x) => ['07', '12', '15', '16'].includes(x.id))) {
-			const cards = heirsOf(t.g, 16);
-			const laid = run(t.g, 16, cards);
-			const L = laid.layout;
-			const order = computeModelOrder(t.g, computeGenerations(t.g));
-			const plan = planLines({ g: t.g, persons: L.persons, rows: L.rows, unions: L.unions, anchors: order.anchors, geo: L.geometry, tabbed: tabbedCards(L.youTab, L.ordinalCards) });
-			L.rowGaps.forEach((gap, k) => {
-				compared++;
-				const need = gapHeight(L.geometry, plan.coupleLanes[k], plan.barLanes[k]);
-				if (gap.bottom - gap.top < need - 1e-6) bad.push(`${t.id}: gap ${k} holds ${gap.bottom - gap.top}, the lines need ${need}`);
-			});
-		}
-		expect(compared).toBeGreaterThan(10);
-		expect(bad).toEqual([]);
-	});
+	// WP-4b (class c): "the plan that sized the gaps is the plan of the router" compared `planLines` with the finished gaps. There is one plan now and the
+	// gap is sized from the same nets that are drawn (the architecture notes §4.2.2); the claim "every lane and bar lies inside its gap, with a tabbed set" is the test
+	// `layout-stage-route` (`packLanes`, `rowYs`), and "no line meets a tab" is the test above on the drawing.
 
 	it('`tabbed` and `youTab` are the same for a single card; the "You" card and the ordinal cards are tabbed together', () => {
-		// 0.3 (D231): with the added step no card of tree 07 has a drop that another trunk moves; tree 12 still has one.
-		const t = trees.find((x) => x.id === '12')!;
-		const plainLaid = run(t.g, 12, []);
-		const L = plainLaid.layout;
-		const order = computeModelOrder(t.g, computeGenerations(t.g));
-		const input = { g: t.g, persons: L.persons, rows: L.rows, unions: L.unions, anchors: order.anchors, geo: L.geometry };
-		const off = [...dropOffsets(plainLaid)].filter(([, o]) => Math.abs(o) > 0.5).map(([id]) => id);
-		expect(off.length).toBeGreaterThan(0);
-		const dropsOf = (plan: ReturnType<typeof planLines>) => plan.families.map((fam) => fam.dropX);
-		expect(dropsOf(planLines({ ...input, tabbed: new Set([off[0]]) }))).toEqual(dropsOf(planLines({ ...input, youTab: off[0] })));
-		expect(dropsOf(planLines({ ...input, tabbed: tabbedCards(off[0], off.slice(1)) }))).toEqual(dropsOf(planLines({ ...input, tabbed: new Set(off) })));
+		// A tree and a size where a trunk moves a drop off the axis of its card (the cards that a tab matters for): the first sample tree that has one.
+		const [t, f, off] = trees.flatMap((x) => [12, 16].map((px) => [x, px, [...dropOffsets(run(x.g, px, []))].filter(([, o]) => Math.abs(o) > 0.5).map(([id]) => id)] as const)).find(([, , o]) => o.length > 1)!;
+		expect(off.length).toBeGreaterThan(1);
+		const drawn = (s: Partial<LayoutSettings>) => {
+			clearLayoutCache();
+			const { layout, edges } = layoutTree(t.g, cardForm(geometryFor(f), 'down'), { ...base, portraits: t.g.people.map((p) => p.id).sort(), ...s }, 'font');
+			return { persons: [...layout.persons], paths: edges.paths };
+		};
+		expect(drawn({ youTab: off[0] })).toEqual(drawn({ ordinalCards: [off[0]] }));
+		expect(drawn({ youTab: off[0], ordinalCards: off.slice(1) })).toEqual(drawn({ ordinalCards: off }));
 	});
 });

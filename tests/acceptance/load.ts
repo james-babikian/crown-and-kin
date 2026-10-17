@@ -7,12 +7,12 @@ export interface FixtureBlock {
 	/** The file name up to its first '-': a two-digit number such as '05', or '07b' (spec §13.0 item 9). */
 	id: string;
 	file: string;
-	/** Body of the first top-level dynasty block in the note, each line ending in '\n'. */
+	/** Body of the first top-level kin block in the note, each line ending in '\n'. */
 	source: string;
 }
 
 /**
- * Bodies of the dynasty blocks whose fences start at the beginning of a line (``` or ~~~, any
+ * Bodies of the kin blocks whose fences start at the beginning of a line (``` or ~~~, any
  * length), each line ending in '\n'. A fence line inside another fence is content: the closing
  * fence must use the same character and be at least as long (spec §6.1). This is a small scanner
  * of its own, so the tests stay independent of src/core/block-locate. Blocks in callouts or list
@@ -26,7 +26,7 @@ export function topLevelBlocks(md: string): string[] {
 			const m = /^(`{3,}|~{3,})(.*)$/.exec(line);
 			// A backtick fence's info string cannot contain a backtick (CommonMark).
 			if (!m || (m[1][0] === '`' && m[2].includes('`'))) continue;
-			open = { char: m[1][0], len: m[1].length, dynasty: /^dynasty(\s|$)/.test(m[2].trim()), lines: [] };
+			open = { char: m[1][0], len: m[1].length, dynasty: /^kin(\s|$)/.test(m[2].trim()), lines: [] };
 			continue;
 		}
 		const close = /^(`{3,}|~{3,})[ \t]*$/.exec(line);
@@ -40,7 +40,7 @@ export function topLevelBlocks(md: string): string[] {
 	return out;
 }
 
-/** Every fixture note that has a top-level dynasty block, in file order. */
+/** Every fixture note that has a top-level kin block, in file order. */
 export function allFixtures(): FixtureBlock[] {
 	const out: FixtureBlock[] = [];
 	for (const file of readdirSync(DIR).filter((f) => f.endsWith('.md')).sort()) {

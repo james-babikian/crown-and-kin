@@ -114,7 +114,7 @@ describe('Titles window: a refusal for a person who is not in the tree', () => {
 		dispatch(name, 'input');
 		for (let i = 0; i < 2; i++) {
 			await click(content.querySelector('.dynasty-sheet-save'));
-			expect(notices).not.toContain(WRITE_TEXT.stale);
+			expect(notices).not.toContain(WRITE_TEXT.staleWindow);
 			expect(notices[notices.length - 1]).toBe(TITLES_UI.personGone);
 			expect(content.querySelector('.dynasty-sheet-error')!.getText()).toBe(TITLES_UI.personGone);
 			expect(openModals.includes(win as never)).toBe(true);

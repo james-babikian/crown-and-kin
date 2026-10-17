@@ -1,8 +1,8 @@
 /**
  * Where the fold controls of a tree go (spec §13.10): the spot of each control
- * (`foldSpots`), the room a control needs in the drawing (`foldExtent`) and the bundle of fold facts
- * that `layoutTree` gives to `layoutFamilies` and to the line planner (`FoldInput`, `LineExtras`).
- * `layout.ts` works in the `down` frame (a sideways tree is arranged turned), so the spot rules are
+ * (`placeFoldSpots`), the room a control needs in the drawing (`foldExtent`) and the bundle of fold facts
+ * that `layoutTree` gives to `arrangeTree` (the plan and the route) (`FoldInput`).
+ * `pipeline.ts` works in the `down` frame (a sideways tree is arranged turned), so the spot rules are
  * written for `down` and the caller turns the result. Layout only: no DOM, no colours.
  *
  * How folds work in the layout (spec §13.10; the fold rules of the graph are in `core/folds.ts`):
@@ -67,7 +67,7 @@ export interface FoldMark {
  * The visible Full-level mark of `control` at `spot`: an open button is a circle (a capsule of length 0), a folded sign a pill. In a
  * `down` layout the pill is centred on the spot, on the line (0.2.8, D206). In a sideways layout the line runs along the sign and meets the middle of its near
  * end, so the pill starts where the open chip starts (`FOLD_EM.chip` / 2 before the spot, D207) and grows to the right: along x in the real frame (`anchored`), along y in the turned frame (`turned`). The text width is not known here, so the sign
- * is as long as the layout reserves for it (0.6 em for each of its characters), the same bound `planLines` uses for its reach.
+ * is as long as the layout reserves for it (0.6 em for each of its characters), the same bound the plan (`ports.ts`) uses for its reach.
  */
 export function foldMark(control: FoldControl, spot: FoldSpot, em: number, turned: boolean, anchored = false): FoldMark {
 	if (!control.folded) return { x1: spot.x, y1: spot.y, x2: spot.x, y2: spot.y, r: (FOLD_EM.button / 2) * em };
@@ -81,17 +81,7 @@ export function foldMark(control: FoldControl, spot: FoldSpot, em: number, turne
 	return { x1: spot.x - long / 2, y1: spot.y, x2: spot.x + long / 2, y2: spot.y, r };
 }
 
-/** What the line planner needs to know about folds (F3, F4). */
-export interface LineExtras {
-	/** People whose card has a tag only because of a hidden partner (`hiddenPartners`). */
-	tagged?: ReadonlySet<string>;
-	/** The folded families with shown parents and no shown child: each keeps its dot or exit and gets a stem. */
-	folded?: readonly FoldControl[];
-	/** Every control of the view: the planner places them once to see which ones the rules move down, and reserves room for those. */
-	controls?: readonly FoldControl[];
-}
-
-/** What `layoutFamilies` needs to know about folds (F2, F3, F5). */
+/** What `arrangeTree` needs to know about folds (F2, F3, F5). */
 export interface FoldInput {
 	/** The graph before pruning: names of hidden partners and the union order of a tag come from it. */
 	full: FamilyGraph;
@@ -99,7 +89,8 @@ export interface FoldInput {
 	partners: ReadonlyMap<string, string[]>;
 	/** The controls to place; absent when the view cannot fold (no `TreeLayout.folds`). */
 	controls?: readonly FoldControl[];
-	lines: LineExtras;
+	/** The folded families with shown parents and no shown child: each keeps its dot or exit and gets a stem. */
+	folded?: readonly FoldControl[];
 }
 
 /** What the spot rules may know beyond the cards (V2, V4). Every rect is in the frame of `persons`. */
@@ -127,20 +118,9 @@ const meets = (a: Rect, b: Rect) => a.x < b.x + b.w - 1e-6 && b.x < a.x + a.w - 
  * A control whose parents are not both in `persons` is left out.
  *
  * V2, V4, L1: a single parent's control sits at the trunk's x, not at the middle of the card. Then a control moves down its own stem, in the order
- * of `controls`, until its tap area meets no tag and no tap area of an earlier control.
+ * of `controls`, until its tap area meets no tag and no tap area of an earlier control. `pushed` says whether the rules moved a control down
+ * from its first spot.
  */
-export function foldSpots(
-	controls: readonly FoldControl[],
-	persons: ReadonlyMap<string, PersonBox>,
-	unions: ReadonlyMap<string, UnionPoint>,
-	rowGaps: readonly { top: number; bottom: number }[],
-	em: number,
-	hints: SpotHints = {},
-): PlacedFoldControl[] {
-	return placeFoldSpots(controls, persons, unions, rowGaps, em, hints).map((r) => r.control);
-}
-
-/** `foldSpots` with the fact whether a control was moved down (the line planner reserves room for those). */
 export function placeFoldSpots(
 	controls: readonly FoldControl[],
 	persons: ReadonlyMap<string, PersonBox>,
@@ -152,49 +132,43 @@ export function placeFoldSpots(
 	const out: SpotResult[] = [];
 	// The tap area as the caller's frame sees it: the sideways sign is long along the layout's x, which is y here.
 	const areaOf = (c: FoldControl, spot: FoldSpot): Rect => {
-		if (!hints.turned) return foldExtent(c, spot, em);
-		const r = foldExtent(c, { x: spot.y, y: spot.x }, em, true);
-		return { x: r.y, y: r.x, w: r.h, h: r.w };
+		return workExtent(c, spot, em, !!hints.turned);
 	};
 	const tags = [...(hints.tags?.values() ?? [])];
 	// D137 item 1: the "+" badge circle of every card is an obstacle, whether or not a badge shows now, so the layout never depends on it.
 	// It is centred on the card's real top right corner, which in the turned frame is the corner (x, y + h).
 	const badges = [...persons.values()].map((b) => (hints.turned ? { x: b.x, y: b.y + b.h } : { x: b.x + b.w, y: b.y }));
 	const badgeNeed = (FOLD_BADGE_EM + FOLD_BADGE_GAP_EM) * em;
+	// A control moves only along its own stem, so its x never changes and only an obstacle whose x extent can meet its own can stop it. The
+	// columns give those obstacles in list order, so the first one a move meets is the one a test of every obstacle meets (WP-E2 P2).
+	const tagCols = new Columns();
+	tags.forEach((t, i) => tagCols.add(i, t.x, t.x + t.w));
+	const badgeCols = new Columns();
+	badges.forEach((p, i) => badgeCols.add(i, p.x, p.x));
+	const placedCols = new Columns();
+	const placedAreas: Rect[] = [];
 	for (const c of controls) {
-		const boxes = c.parents.map((id) => persons.get(id));
-		if (!boxes.length || boxes.some((b) => !b)) continue;
-		const cards = boxes as PersonBox[];
-		const gen = Math.max(...cards.map((b) => b.gen));
-		const u = c.union === undefined ? undefined : unions.get(c.union);
-		let x: number;
-		let y: number;
-		let from: number;
-		if (u) {
-			x = u.x;
-			from = u.y;
-			y = u.bar ? Math.max(...cards.map((b) => b.y + b.h)) + FOLD_EM.below * em : u.y + FOLD_EM.afterMarker * em;
-		} else {
-			const b = cards[0];
-			// The trunk leaves at the exit the planner chose, which is the middle only when nothing else runs there.
-			x = hints.soloX?.get(b.id) ?? b.x + b.w / 2;
-			from = b.y + b.h;
-			y = from + FOLD_EM.below * em;
-		}
-		const next = rowGaps[gen]?.bottom;
-		if (next !== undefined && next - from < FOLD_EM.shortStem * em) y = from + (next - from) / 2;
-		const first = y;
+		const start = firstSpot(c, persons, unions, rowGaps, em, hints.soloX);
+		if (!start) continue;
+		const { x } = start;
+		let { y } = start;
 		// The shape of the mark does not change while the control moves along its stem. In the turned frame the clearance measures the sign from the spot, as it did
 		// before D207 moved the drawn sign 0.15 em to the right (still 0.25 em clear of every badge, tests/s025-fold-badge.test.ts): so no spot, and no room the planner reserves, changes.
 		const shape = foldMark(c, { x: 0, y: 0 }, em, !!hints.turned);
 		const along = hints.turned ? shape.y2 - shape.y1 : shape.x2;
 		const before = hints.turned ? 0 : shape.x1;
+		const need = shape.r + badgeNeed;
+		const span = areaOf(c, start);
+		const nearTags = tagCols.near(span.x, span.x + span.w);
+		const nearBadges = hints.turned ? badgeCols.near(x - need, x + need) : badgeCols.near(x + before - need, x + along + need);
+		const nearPlaced = placedCols.near(span.x, span.x + span.w);
 		// Each move clears one obstacle for good, so the loop ends.
 		for (let again = true; again; ) {
 			again = false;
 			const area = areaOf(c, { x, y });
 			const lift = y - area.y;
-			for (const t of tags) {
+			for (const i of nearTags) {
+				const t = tags[i];
 				if (meets(area, t)) {
 					y = t.y + t.h + lift;
 					again = true;
@@ -202,8 +176,8 @@ export function placeFoldSpots(
 				}
 			}
 			if (again) continue;
-			for (const p of badges) {
-				const down = clearOfBadge(x, y, before, along, p, shape.r + badgeNeed, !!hints.turned);
+			for (const i of nearBadges) {
+				const down = clearOfBadge(x, y, before, along, badges[i], need, !!hints.turned);
 				if (down !== undefined) {
 					y += down;
 					again = true;
@@ -211,8 +185,8 @@ export function placeFoldSpots(
 				}
 			}
 			if (again) continue;
-			for (const o of out) {
-				const other = areaOf(o.control, o.control.spot);
+			for (const i of nearPlaced) {
+				const other = placedAreas[i];
 				if (meets(area, other)) {
 					y = other.y + other.h + lift;
 					again = true;
@@ -220,9 +194,90 @@ export function placeFoldSpots(
 				}
 			}
 		}
-		out.push({ control: { ...c, spot: { x, y } }, pushed: y > first + 1e-6 });
+		const control = { ...c, spot: { x, y } };
+		out.push({ control, pushed: y > start.y + 1e-6 });
+		const area = areaOf(control, control.spot);
+		placedCols.add(placedAreas.push(area) - 1, area.x, area.x + area.w);
 	}
 	return out;
+}
+
+/**
+ * The first spot of a control (F5, V2, V4, L1), before any obstacle moves it; undefined when a parent is not in `persons`. See `placeFoldSpots`.
+ */
+function firstSpot(
+	c: FoldControl,
+	persons: ReadonlyMap<string, PersonBox>,
+	unions: ReadonlyMap<string, UnionPoint>,
+	rowGaps: readonly { top: number; bottom: number }[],
+	em: number,
+	soloX: ReadonlyMap<string, number> | undefined,
+): FoldSpot | undefined {
+	const boxes = c.parents.map((id) => persons.get(id));
+	if (!boxes.length || boxes.some((b) => !b)) return undefined;
+	const cards = boxes as PersonBox[];
+	const gen = Math.max(...cards.map((b) => b.gen));
+	const u = c.union === undefined ? undefined : unions.get(c.union);
+	let x: number;
+	let y: number;
+	let from: number;
+	if (u) {
+		x = u.x;
+		from = u.y;
+		y = u.bar ? Math.max(...cards.map((b) => b.y + b.h)) + FOLD_EM.below * em : u.y + FOLD_EM.afterMarker * em;
+	} else {
+		const b = cards[0];
+		// The trunk leaves at the exit the planner chose, which is the middle only when nothing else runs there.
+		x = soloX?.get(b.id) ?? b.x + b.w / 2;
+		from = b.y + b.h;
+		y = from + FOLD_EM.below * em;
+	}
+	const next = rowGaps[gen]?.bottom;
+	if (next !== undefined && next - from < FOLD_EM.shortStem * em) y = from + (next - from) / 2;
+	return { x, y };
+}
+
+/** Width of a column of `Columns`, in layout px (about one card's badge spacing; any width gives the same answers). */
+const COLUMN = 64;
+/** An extent over more columns than this is kept in one list that every query sees (never in a real tree: a guard for hostile numbers). */
+const MAX_COLUMNS = 4096;
+
+/**
+ * Obstacles kept in columns by their x extent. `near` gives, in ascending index order and once each, every index whose extent can meet a
+ * range: a superset of the ones that meet it, so a loop over them in order stops at the same obstacle as a loop over all of them.
+ */
+class Columns {
+	private readonly cols = new Map<number, number[]>();
+	private readonly wide: number[] = [];
+	private count = 0;
+
+	add(i: number, x0: number, x1: number): void {
+		this.count = Math.max(this.count, i + 1);
+		// A rect of negative width still meets a range that holds it, so its columns are those of its two ends in either order.
+		const first = Math.floor(Math.min(x0, x1) / COLUMN);
+		const last = Math.floor(Math.max(x0, x1) / COLUMN);
+		// NaN, an infinite or a huge extent: the obstacle is tested by every query, as before.
+		if (!(last - first <= MAX_COLUMNS)) {
+			this.wide.push(i);
+			return;
+		}
+		for (let k = first; k <= last; k++) {
+			const list = this.cols.get(k);
+			if (list) list.push(i);
+			else this.cols.set(k, [i]);
+		}
+	}
+
+	near(x0: number, x1: number): readonly number[] {
+		const first = Math.floor(Math.min(x0, x1) / COLUMN);
+		const last = Math.floor(Math.max(x0, x1) / COLUMN);
+		if (!(last - first <= MAX_COLUMNS)) return Array.from({ length: this.count }, (_, i) => i);
+		// The lists grow by ascending index, so one column with nothing wide is already in order; the caller reads it before the next `add`.
+		if (first === last && !this.wide.length) return this.cols.get(first) ?? [];
+		const seen = new Set<number>(this.wide);
+		for (let k = first; k <= last; k++) for (const i of this.cols.get(k) ?? []) seen.add(i);
+		return [...seen].sort((a, b) => a - b);
+	}
 }
 
 const SLACK = 1e-9;
@@ -243,8 +298,15 @@ function clearOfBadge(x: number, y: number, before: number, along: number, p: { 
 	return p.y + reach - y;
 }
 
-/** The turned copy of `spots` (x and y swapped), for a sideways layout. */
-export const turnSpots = (spots: readonly PlacedFoldControl[]): PlacedFoldControl[] => spots.map((c) => ({ ...c, spot: { x: c.spot.y, y: c.spot.x } }));
+/**
+ * The rectangle of a control in the working frame. `foldExtent` measures in the real frame; a sideways tree works in the turned frame, so the
+ * spot is turned back to the real frame, measured there (the sideways pill is anchored to the spot) and the rectangle is turned again.
+ */
+export function workExtent(control: FoldControl, spot: FoldSpot, em: number, turned: boolean): Rect {
+	if (!turned) return foldExtent(control, spot, em);
+	const r = foldExtent(control, { x: spot.y, y: spot.x }, em, true);
+	return { x: r.y, y: r.x, w: r.h, h: r.w };
+}
 
 /**
  * F5b: the rectangle a control needs, in layout px: its largest mark (the Overview sign, as wide as the longest "+ N" text can be, or the

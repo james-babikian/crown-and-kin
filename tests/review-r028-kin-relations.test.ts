@@ -17,7 +17,7 @@ import { describe, expect, it } from 'vitest';
 import { deriveFamilies, type FamilyGraph } from '../src/core/derive';
 import { parseDynasty } from '../src/core/parse';
 import { computeRelations, type RelationOptions } from '../src/core/relations';
-import { cardRelationText, relationInfo } from '../src/render/tree-info';
+import { cardRelationText, relationSummary } from '../src/render/tree-info';
 
 const ON: RelationOptions = { oneParentUnknown: true };
 const OFF: RelationOptions = { oneParentUnknown: false };
@@ -125,7 +125,7 @@ describe('F-KIN-08 the closed phone strip drops ", maybe full"', () => {
 		const rels = computeRelations(g, 'Fiona', ON).get('Helen')!;
 		expect.soft(cardRelationText(rels[0])).toBe('Half-sister, maybe full');
 		// §13.1 says the closed strip "shows the main relation"; the owner has the card words off, so the strip is the only place.
-		expect(relationInfo(rels, false).sentence).toMatch(/maybe full/);
+		expect(relationSummary(rels, false).main).toMatch(/maybe full/);
 	});
 });
 

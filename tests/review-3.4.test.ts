@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { routeEdges } from '../src/layout/edges';
 import { NORMAL_GEOMETRY, tagTop } from '../src/layout/geometry';
-import { DEFAULT_FAR_RULE, layoutFamilies } from '../src/layout/layout';
+import { DEFAULT_FAR_RULE } from '../src/layout/layout';
+import { arrangeTree } from '../src/layout/pipeline';
 import type { EdgeDrawing, FarCoupleRule, Rect, TreeLayout } from '../src/layout/model';
 import { build } from './helpers';
 
@@ -10,9 +10,9 @@ import { build } from './helpers';
 const COUPLE = new Set(['marriage', 'betrothal', 'concubinage', 'affair', 'implicit']);
 
 function lay(src: string, far: FarCoupleRule = DEFAULT_FAR_RULE) {
-	const { g, gen, order } = build(src);
-	const layout = layoutFamilies(g, gen, order, NORMAL_GEOMETRY, { sweeps: 4, far });
-	return { g, layout, edges: routeEdges(g, layout, order.anchors) };
+	const { g, gen } = build(src);
+	const { layout, edges } = arrangeTree(g, gen, NORMAL_GEOMETRY, { sweeps: 4, far });
+	return { g, layout, edges };
 }
 
 type Seg = { x1: number; y1: number; x2: number; y2: number };

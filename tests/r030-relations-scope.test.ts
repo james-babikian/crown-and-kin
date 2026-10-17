@@ -115,7 +115,7 @@ describe('relationLookup is the same as computeRelations (WP-K K.2)', () => {
 		expect(files.length).toBeGreaterThanOrEqual(16);
 		let trees = 0;
 		for (const f of files) {
-			const block = /^```dynasty\r?\n([\s\S]*?)^```/m.exec(readFileSync(`fixtures/${f}`, 'utf8'));
+			const block = /^```kin\r?\n([\s\S]*?)^```/m.exec(readFileSync(`fixtures/${f}`, 'utf8'));
 			const g = block && graphOf(block[1]);
 			if (!g) continue;
 			trees++;

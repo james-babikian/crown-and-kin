@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { cardText, geometryFor } from '../src/layout/geometry';
 import { illegitimateSigns } from '../src/layout/index';
-import { DEFAULT_FAR_RULE, layoutFamilies } from '../src/layout/layout';
-import { routeEdges } from '../src/layout/edges';
+import { DEFAULT_FAR_RULE } from '../src/layout/layout';
+import { arrangeTree } from '../src/layout/pipeline';
 import { NORMAL_GEOMETRY } from '../src/layout/geometry';
 import { renderSvg } from '../src/render/svg-string';
 import { build, fixture } from './helpers';
@@ -10,9 +10,8 @@ import { build, fixture } from './helpers';
 // Spec D14: an illegitimate child whose illegitimacy no dashed line shows gets a sign on the card.
 
 function signs(src: string) {
-	const { g, gen, order } = build(src);
-	const layout = layoutFamilies(g, gen, order, NORMAL_GEOMETRY, { sweeps: 4, far: DEFAULT_FAR_RULE });
-	const edges = routeEdges(g, layout, order.anchors);
+	const { g, gen } = build(src);
+	const { layout, edges } = arrangeTree(g, gen, NORMAL_GEOMETRY, { sweeps: 4, far: DEFAULT_FAR_RULE });
 	return { g, layout, edges, ids: [...illegitimateSigns(g, edges)].sort() };
 }
 

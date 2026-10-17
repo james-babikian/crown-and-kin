@@ -245,7 +245,7 @@ describe('T4 LinkUpdater on random vaults (spec §6.9; W3: after a rename only t
 function miniVault(treeLinkWritten: string): Vault {
 	const lines = (xs: VLine[]) => xs;
 	const tree = lines([
-		{ exact: '```dynasty' },
+		{ exact: '```kin' },
 		{ exact: 'people:' },
 		{ exact: '  - id: a' },
 		{ exact: '    name: A' },

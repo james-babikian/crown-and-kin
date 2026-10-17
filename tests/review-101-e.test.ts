@@ -190,7 +190,7 @@ function vault(files: [string, string][], enabled: () => boolean = () => true) {
 }
 
 const treeNote = (links: string[]) =>
-	['# Tree', '', '```dynasty', 'people:', ...links.flatMap((l, i) => [`  - id: p${i}`, `    name: P${i}`, `    link: ${JSON.stringify(l)}`]), '```', ''].join('\n');
+	['# Tree', '', '```kin', 'people:', ...links.flatMap((l, i) => [`  - id: p${i}`, `    name: P${i}`, `    link: ${JSON.stringify(l)}`]), '```', ''].join('\n');
 
 describe('review 0.1.1 E: link update after a rename', () => {
 	it('two notes swap names in quick succession: each tree link still opens the note it opened before', async () => {
@@ -275,7 +275,7 @@ describe('review 0.1.1 E: Insert family tree', () => {
 		const e = editor('Intro\n```js\nlet a = 1;', { line: 2, ch: 3 });
 		insertTree(e as never);
 		// The tree goes after the end of the note, which is still inside the open ```js block: the
-		// "```dynasty" line is code, and the tree's closing fence closes the js block.
+		// "```kin" line is code, and the tree's closing fence closes the js block.
 		expect(emptyTrees(e.state.text)).toHaveLength(1);
 	});
 
@@ -295,7 +295,7 @@ describe('review 0.1.1 E: Insert family tree', () => {
 
 describe('review 0.1.1 E: settings (note)', () => {
 	it('typing 1200 in the desktop height field stores 1200 only, not 120 on the way', async () => {
-		const plugin = new DynastyTreePlugin(fakeApp() as never, { id: 'dynasty-tree' } as never);
+		const plugin = new DynastyTreePlugin(fakeApp() as never, { id: 'crown-and-kin' } as never);
 		const fake = plugin as unknown as FakePlugin;
 		await fake.load();
 		(fake.settingTabs[0] as unknown as { display(): void }).display();
@@ -318,7 +318,7 @@ describe('review 0.1.1 E: a rename while the plugin loads (note)', () => {
 	it('a rename before data.json is read neither uses the default "update links" nor stores the default settings', async () => {
 		const app = fakeApp();
 		Object.assign(app.vault, { getMarkdownFiles: () => [], getAbstractFileByPath: () => null });
-		const plugin = new DynastyTreePlugin(app as never, { id: 'dynasty-tree' } as never);
+		const plugin = new DynastyTreePlugin(app as never, { id: 'crown-and-kin' } as never);
 		const fake = plugin as unknown as FakePlugin;
 		const stored = { embedHeightDesktop: 800, embedHeightPhone: 60, cardSize: 'compact', showDates: false, focusGenerations: 3, updateLinks: false };
 		let read!: (v: unknown) => void;
@@ -339,7 +339,7 @@ describe('review 0.1.1 E: a rename while the plugin loads (note)', () => {
 
 describe('review 0.1.1 E: after unload (note)', () => {
 	it('the Undo button of a delete Notice does nothing after the plugin is turned off', async () => {
-		const plugin = new DynastyTreePlugin(fakeApp() as never, { id: 'dynasty-tree' } as never);
+		const plugin = new DynastyTreePlugin(fakeApp() as never, { id: 'crown-and-kin' } as never);
 		const fake = plugin as unknown as FakePlugin;
 		await fake.load();
 		const h = fakeHandle('n.md', NO_IDS);

@@ -128,11 +128,11 @@ describe('F-CORE-04: a new key goes after the nested block and the comment that 
 describe('T-X4-01: a byte order mark before the front matter', () => {
 	it('is read as front matter, so a fenced example inside it is not block 0', () => {
 		const tree = 'people:\n  - id: a\n    name: Aldric';
-		const matter = '---\ndescription: |\n  ```dynasty\n  people: []\n  ```\n---\n';
-		expect(findBlocks(`﻿${matter}\`\`\`dynasty\n${tree}\n\`\`\`\n`).map((b) => b.body)).toEqual([tree]);
+		const matter = '---\ndescription: |\n  ```kin\n  people: []\n  ```\n---\n';
+		expect(findBlocks(`﻿${matter}\`\`\`kin\n${tree}\n\`\`\`\n`).map((b) => b.body)).toEqual([tree]);
 	});
 	it('a note that has a BOM and no front matter still finds its block', () => {
-		expect(findBlocks('﻿# T\n```dynasty\npeople: []\n```\n').map((b) => b.body)).toEqual(['people: []']);
+		expect(findBlocks('﻿# T\n```kin\npeople: []\n```\n').map((b) => b.body)).toEqual(['people: []']);
 	});
 });
 

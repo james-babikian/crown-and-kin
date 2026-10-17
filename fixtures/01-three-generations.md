@@ -1,6 +1,6 @@
 # Fixture 1 — Simple three-generation line
 
-```dynasty
+```kin
 houses:
   - id: valmont
     name: House Valmont

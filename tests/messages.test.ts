@@ -358,16 +358,16 @@ describe('hardErrorText', () => {
 	for (const [code, error] of Object.entries(HARD)) {
 		it(`${code}: filled and in STE`, () => {
 			const text = hardErrorText(error);
-			// The parser's own message follows "Details:" and is shown as it is (spec §8).
+			// F8: the parser's own message follows "Details:" in plain words (tests/r031-small-a.test.ts checks them).
 			checkText(text.split(' Details: ')[0]);
 			// "line" alone means a drawn line (project word list); a line of text is a "text line".
 			expect(text.split(' Details: ')[0]).not.toMatch(/(?<!text )line/i);
 		});
 	}
 
-	it('yaml-invalid shows the line and the parser message', () => {
+	it('yaml-invalid shows the line and the parser message in plain words (F8)', () => {
 		expect(hardErrorText(HARD['yaml-invalid'])).toBe(
-			'Text line 3 of the tree text has an error. Correct this text line to show the tree. Details: Nested mappings are not allowed',
+			'Text line 3 of the tree text has an error. Correct this text line to show the tree. Details: The value of a field has a colon “:” in it. Put the value in quote marks.',
 		);
 		expect(hardErrorText({ code: 'yaml-invalid' })).toBe('The tree text has an error. Correct the text to show the tree.');
 	});

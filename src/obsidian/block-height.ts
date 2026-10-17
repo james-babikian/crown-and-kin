@@ -8,7 +8,7 @@
 import type { App } from 'obsidian';
 
 /** The key of the local storage entry. */
-const STORE_KEY = 'dynasty-tree-block-heights';
+const STORE_KEY = 'crown-and-kin-block-heights';
 /** The most blocks whose height is kept. */
 const MAX_BLOCKS = 300;
 /** A change of this many px or less is not stored again. */

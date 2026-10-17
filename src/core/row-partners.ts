@@ -32,6 +32,11 @@ export class RowGroups {
 	private readonly up: Map<string, string>;
 	private readonly members: Map<string, string[]>;
 	private readonly kids = new Map<string, string[]>();
+	// Answers that depend on the grouping only, not on the rows: a merge or its undo is the only change of the grouping, and both empty them.
+	// The partner step asks them many times between two merges (WP-E2 P1).
+	private readonly childCache = new Map<string, Set<string>>();
+	private readonly parentCache = new Map<string, boolean>();
+	private readonly personParents = new Map<string, string[]>();
 
 	constructor(
 		readonly g: FamilyGraph,
@@ -77,23 +82,48 @@ export class RowGroups {
 		this.up.set(small, big);
 		for (const m of smallMembers) bigMembers.push(m);
 		this.members.delete(small);
+		this.regrouped();
 		return () => {
+			this.regrouped();
 			this.up.set(small, small);
 			bigMembers.length = bigLength;
 			this.members.set(small, smallMembers);
 		};
 	}
 
-	/** The groups that hold a child of the group, not counting the group itself. */
-	childGroups(rep: string): Set<string> {
-		const out = new Set<string>();
-		for (const m of this.members.get(rep)!) for (const c of this.kidsOf(m)) if (this.find(c) !== rep) out.add(this.find(c));
+	/** The groups that hold a child of the group, not counting the group itself (kept until the grouping changes; do not change the set). */
+	childGroups(rep: string): ReadonlySet<string> {
+		let out = this.childCache.get(rep);
+		if (out) return out;
+		out = new Set<string>();
+		for (const m of this.members.get(rep)!) {
+			for (const c of this.kidsOf(m)) {
+				const fc = this.find(c);
+				if (fc !== rep) out.add(fc);
+			}
+		}
+		this.childCache.set(rep, out);
+		return out;
+	}
+
+	/** The groups of the placement parents of a person, in the order of the parents (kept until the grouping changes). */
+	parentGroupsOf(id: string): readonly string[] {
+		let out = this.personParents.get(id);
+		if (!out) this.personParents.set(id, (out = this.g.placementParents.get(id)!.map((p) => this.find(p))));
 		return out;
 	}
 
 	/** Whether somebody in the group has a placement parent outside it (else it is a group of founders). */
 	hasParents(rep: string): boolean {
-		return this.members.get(rep)!.some((m) => this.g.placementParents.get(m)!.some((p) => this.find(p) !== rep));
+		let out = this.parentCache.get(rep);
+		if (out === undefined) this.parentCache.set(rep, (out = this.members.get(rep)!.some((m) => this.parentGroupsOf(m).some((p) => p !== rep))));
+		return out;
+	}
+
+	private regrouped(): void {
+		this.childCache.clear();
+		this.parentCache.clear();
+		this.personParents.clear();
 	}
 
 	/** The row a group is drawn in: a group of founders sits directly above its nearest child group (spec §5.1). */
@@ -184,9 +214,8 @@ export function equalisePartners(groups: RowGroups, row: Map<string, number>): v
 			const pulls: [string, number][] = [];
 			for (const k of touched) {
 				for (const b of groups.membersOf(k)) {
-					const ps = g.placementParents.get(b)!;
-					if (!ps.length) continue;
-					const parentGroups = ps.map((p) => groups.find(p));
+					const parentGroups = groups.parentGroupsOf(b);
+					if (!parentGroups.length) continue;
 					const top = Math.max(...parentGroups.map(cur));
 					if (cur(k) > top + 1) for (const p of parentGroups) if (cur(p) === top) pulls.push([p, cur(k) - 1]);
 				}

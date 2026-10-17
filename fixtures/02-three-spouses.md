@@ -2,7 +2,7 @@
 
 Edmund marries three times and has children with each wife.
 
-```dynasty
+```kin
 houses:
   - id: harrow
     name: House Harrow

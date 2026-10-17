@@ -50,7 +50,7 @@ import { pickPerson, type PickerContext } from './person-picker';
 import { currentPictureOf, pickPicture } from './picture-picker';
 import type { PictureCopy, PictureStore } from './picture-store';
 import { relationsFor, validMe } from './relation-cache';
-import { drawableColour, freshOrStale, nameDialog, onWriteFailed, sheetField, showErrorLine } from './sheet-parts';
+import { afterPaint, drawableColour, endEntryOnEnter, freshOrStale, nameDialog, onWriteFailed, sheetField, showErrorLine } from './sheet-parts';
 import { renderRelationLine, type RelationView } from './sheet-relation';
 import { titlesBody, titlesSummary, type TitlesHost } from './sheet-titles';
 import { buildShell, type Shell } from './window-shell';
@@ -343,6 +343,9 @@ interface ConfirmSpec {
 	onConfirm: () => void;
 }
 
+/** A tree with this many people or more draws for a noticeable time after a write, so the sheet shows its sign first (F6). */
+const SLOW_SAVE_PEOPLE = 300;
+
 /** The modal that shows and edits one person's fields, family and relationship actions. */
 export class EditSheet extends Modal {
 	private data: Loaded;
@@ -469,21 +472,35 @@ export class EditSheet extends Modal {
 		if (store) this.cleanup.push(store.onChange((paths) => this.portraitFilesChanged(paths)));
 		this.shown = true;
 		this.build();
-		if (this.isNew) {
-			this.focusName();
-			// Why: after `onOpen` returns, Obsidian moves the focus to the first control of the window when the device has a
-			// physical keyboard (a computer). That control is "Open all". A phone has no such step, so only a computer needs this.
-			void Promise.resolve().then(() => {
-				if (!this.shown || this.closing) return;
-				const active = this.modalEl.doc?.activeElement as HTMLElement | null | undefined;
-				const typing = !!active && this.contentEl.contains(active) && active.matches('input, textarea, select');
-				if (!typing) this.focusName();
-			});
-		} else if (!this.modalEl.contains(this.modalEl.doc?.activeElement ?? null)) {
-			// On a phone the sheet can open with the focus left on the page, so a Tab key would reach the tree below it.
-			this.modalEl.setAttribute('tabindex', '-1');
-			this.modalEl.focus({ preventScroll: true });
+		if (this.isNew) this.focusNameAfterOpen();
+		else {
+			if (!this.modalEl.contains(this.modalEl.doc?.activeElement ?? null)) {
+				// On a phone the sheet can open with the focus left on the page, so a Tab key would reach the tree below it.
+				this.modalEl.setAttribute('tabindex', '-1');
+				this.modalEl.focus({ preventScroll: true });
+			}
+			// F7: a computer has a keyboard, so the window starts in Name, as for a new person. A phone would open its keyboard.
+			if (this.startsInName()) this.focusNameAfterOpen();
 		}
+	}
+
+	/** True if a saved person's window starts with the focus in Name: not a read-only window, not a phone, not a touch screen (spec §7: the pointer and the width decide, not `Platform`). */
+	private startsInName(): boolean {
+		if (this.readOnly || this.gone || this.modalEl.hasClass('is-phone')) return false;
+		const win = this.modalEl.win ?? window;
+		return win.matchMedia?.('(pointer: coarse)')?.matches !== true;
+	}
+
+	private focusNameAfterOpen(): void {
+		this.focusName();
+		// Why: after `onOpen` returns, Obsidian moves the focus to the first control of the window when the device has a
+		// physical keyboard (a computer). That control is "Open all" or "Add portrait or arms". A phone has no such step.
+		void Promise.resolve().then(() => {
+			if (!this.shown || this.closing) return;
+			const active = this.modalEl.doc?.activeElement as HTMLElement | null | undefined;
+			const typing = !!active && this.contentEl.contains(active) && active.matches('input, textarea, select');
+			if (!typing) this.focusName();
+		});
 	}
 
 	/** Runs the cleanup functions `onOpen` registered and empties the modal. */
@@ -1066,10 +1083,10 @@ export class EditSheet extends Modal {
 				this.leaveFor(() => {
 					const open = () => this.app.workspace.openLinkText(linktext, this.o.sourcePath, false);
 					if (this.o.openNote) this.o.openNote(open);
-					else void open().catch((e) => console.error('Dynasty Tree: cannot open link', e));
+					else void open().catch((e) => console.error('Crown and Kin: cannot open link', e));
 				});
 			} catch (e) {
-				console.error('Dynasty Tree: the sheet action failed', e);
+				console.error('Crown and Kin: the sheet action failed', e);
 			}
 		});
 		// Left of "Open all", which stands last in the row.
@@ -1114,7 +1131,7 @@ export class EditSheet extends Modal {
 		try {
 			this.paintPortrait();
 		} catch (e) {
-			console.error('Dynasty Tree: cannot show the portrait', e);
+			console.error('Crown and Kin: cannot show the portrait', e);
 		}
 	}
 
@@ -1158,7 +1175,7 @@ export class EditSheet extends Modal {
 				else state.problem = problemText(c);
 				if (this.shown) this.paintPortrait();
 			})
-			.catch((e) => console.error('Dynasty Tree: cannot show the portrait', e));
+			.catch((e) => console.error('Crown and Kin: cannot show the portrait', e));
 		return state;
 	}
 
@@ -1284,6 +1301,8 @@ export class EditSheet extends Modal {
 			row.createDiv({ cls: ['dynasty-sheet-hint', 'is-on-focus'], text: o.hint, attr: { id: hintId } });
 			input.setAttribute('aria-describedby', hintId);
 		}
+		// A note is several text lines, so its Enter stays a new line.
+		if (!area) endEntryOnEnter(input as HTMLInputElement);
 		input.addEventListener('input', () => {
 			this.draft[key] = input.value;
 			this.clearError();
@@ -1324,6 +1343,7 @@ export class EditSheet extends Modal {
 			attr: { id: name.id, type: 'text', autocomplete: 'off', autocorrect: 'off', spellcheck: 'false', autocapitalize: 'off' },
 		});
 		nameInput.value = this.newHouse.name;
+		endEntryOnEnter(nameInput);
 		nameInput.addEventListener('input', () => {
 			this.newHouse.name = nameInput.value;
 			this.clearError();
@@ -1425,7 +1445,7 @@ export class EditSheet extends Modal {
 			try {
 				run();
 			} catch (e) {
-				console.error('Dynasty Tree: the sheet action failed', e);
+				console.error('Crown and Kin: the sheet action failed', e);
 			}
 		});
 		return b;
@@ -1439,7 +1459,7 @@ export class EditSheet extends Modal {
 				try {
 					run();
 				} catch (e) {
-					console.error('Dynasty Tree: the sheet action failed', e);
+					console.error('Crown and Kin: the sheet action failed', e);
 				}
 			},
 			cls: ['dynasty-action-row', cls, ...(danger ? ['is-danger', 'mod-warning'] : [])],
@@ -1466,7 +1486,7 @@ export class EditSheet extends Modal {
 			try {
 				run();
 			} catch (e) {
-				console.error('Dynasty Tree: the sheet action failed', e);
+				console.error('Crown and Kin: the sheet action failed', e);
 			}
 		});
 		return b;
@@ -1773,7 +1793,7 @@ export class EditSheet extends Modal {
 			});
 			this.afterNote(out, mode, wanted, p.id);
 		} catch (e) {
-			console.error('Dynasty Tree: cannot make the note', e);
+			console.error('Crown and Kin: cannot make the note', e);
 			new Notice(NOTE_UI.cannot(wanted));
 		} finally {
 			this.noteBusy = false;
@@ -1785,7 +1805,7 @@ export class EditSheet extends Modal {
 		const open = (file: TFile) => {
 			const go = () => openMadeNote(this.app, file);
 			if (this.o.openNote) this.o.openNote(go);
-			else void go().catch((e) => console.error('Dynasty Tree: cannot open the note', e));
+			else void go().catch((e) => console.error('Crown and Kin: cannot open the note', e));
 		};
 		switch (out.kind) {
 			case 'made':
@@ -2086,6 +2106,9 @@ export class EditSheet extends Modal {
 		const op: Op = ops.length === 1 ? ops[0] : { kind: 'batch', ops };
 		this.saving = true;
 		this.modalEl.addClass('is-saving');
+		// F6: a write of a large tree ends with a long draw of the tree. The sign must be on the screen before that work starts.
+		const slow = this.data.g.people.length >= SLOW_SAVE_PEOPLE;
+		if (slow) this.showSaving(true);
 		const prev = { lastEdited: h.state.lastEdited, highlight: h.state.highlight, shown: h.state.shown };
 		const restore = () => {
 			h.state.lastEdited = prev.lastEdited;
@@ -2099,6 +2122,7 @@ export class EditSheet extends Modal {
 			h.state.shown = { id: highlight, place: this.o.place ?? 'embed' };
 		}
 		try {
+			if (slow) await afterPaint(this.modalEl.win ?? window);
 			this.o.beforeWrite?.();
 			const out = await h.write(op);
 			if (out.ok) {
@@ -2109,14 +2133,22 @@ export class EditSheet extends Modal {
 			this.failed(out);
 			return null;
 		} catch (e) {
-			console.error('Dynasty Tree: cannot save', e);
+			console.error('Crown and Kin: cannot save', e);
 			restore();
 			this.refused(WRITE_TEXT.failed);
 			return null;
 		} finally {
 			this.saving = false;
 			this.modalEl.removeClass('is-saving');
+			if (slow) this.showSaving(false);
 		}
+	}
+
+	/** F6: the sign that a write runs: the Save button and the status line say "Wait" until the write ends. */
+	private showSaving(on: boolean): void {
+		this.shell?.save?.setText(on ? SHEET.saveWait : SHEET.save);
+		this.statusEl?.setText(on ? SHEET.savingStatus : this.status);
+		this.statusEl?.toggle(on || this.status !== '');
 	}
 
 	/** F12: tells the tree view about an ok write, so a person the fold hides (the sheet's or an added one) shows. It never fails the write. */
@@ -2127,7 +2159,7 @@ export class EditSheet extends Modal {
 		try {
 			folds.written([...new Set([...(own ? [own] : []), ...created])]);
 		} catch (e) {
-			console.error('Dynasty Tree: cannot show the people that folds hide', e);
+			console.error('Crown and Kin: cannot show the people that folds hide', e);
 		}
 	}
 
@@ -2447,9 +2479,9 @@ export class EditSheet extends Modal {
 
 	/** Spec §6.1 stale write: a Notice, the new data in the sheet, and the draft kept with a message that says so. */
 	private stale(body: string): void {
-		new Notice(WRITE_TEXT.stale);
+		new Notice(WRITE_TEXT.staleWindow);
 		this.reload(body);
-		if (!this.readOnly) this.showError(WRITE_TEXT.staleInSheet);
+		if (!this.readOnly) this.showError(WRITE_TEXT.staleWindow);
 	}
 
 	/** The person is not in the tree now: keep the sheet open, read-only, with the draft to copy (§8). */

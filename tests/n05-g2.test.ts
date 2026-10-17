@@ -2,54 +2,47 @@
 import { describe, expect, it } from 'vitest';
 import { foldFamilies, foldHidden, pruneGraph } from '../src/core/folds';
 import { foldMark } from '../src/layout/fold-spots';
-import { cardForm, geometryFor, lineMetrics } from '../src/layout/geometry';
+import { cardForm, geometryFor } from '../src/layout/geometry';
 import { clearLayoutCache, layoutTree } from '../src/layout/index';
-import { planLines } from '../src/layout/lines';
 import { build } from './helpers';
 import { lineProblems, randomTree } from './random-trees';
 
 const FAR = { maxCardWidths: 3, maxGenerations: 1 };
 
-/** The x of the last vertical run of a path: where the leg reaches the line of the dot's row (as in an internal test). */
-function column(d: string): number {
-	let x = 0;
-	let col = 0;
-	for (const m of d.matchAll(/([MHV])(-?[\d.]+)/g)) {
-		if (m[1] === 'M' || m[1] === 'H') x = Number(m[2]);
-		if (m[1] === 'V') col = x;
-	}
-	return col;
-}
-
-describe('G2 finding 1: the dot stays outside its legs when the span between them is crowded', () => {
-	it('random tree 204: the dot of p5 + p8 (rows 2 and 3) lies between the columns of its two legs', () => {
-		const { g } = build(randomTree(204));
+// WP-4b (triage class c, D239 V1, spec §5.1 step 5c): the N05 rule of D227 ("the dot lies between the columns of its two legs") is replaced: the dot of
+// partners on two rows sits on the hang port of the lower partner. Finding 1 of this review is written again on that rule.
+describe('G2 finding 1 (D239 V1): the dot of partners on two rows stays on the hang port of the lower partner when the span between them is crowded', () => {
+	/** The partnerships on two rows that are drawn near, with a dot (not a bar, not far). */
+	function dots(seed: number) {
+		const { g } = build(randomTree(seed));
 		clearLayoutCache();
-		const { layout, edges } = layoutTree(g, geometryFor(16), { sweeps: 4, far: FAR }, 'x');
-		const fu = g.unions.find((u) => u.partners.includes('p5') && u.partners.includes('p8'))!;
-		const u = layout.unions.get(fu.key)!;
-		expect(u.bar || u.far).toBe(false);
-		expect(layout.persons.get('p5')!.gen).not.toBe(layout.persons.get('p8')!.gen);
-		const cols = edges.paths.filter((p) => p.union === fu.key && p.kind !== 'descent' && p.people.length === 2).map((p) => column(p.d));
-		expect(cols).toHaveLength(2);
-		expect(u.x).toBeGreaterThanOrEqual(Math.min(...cols) - 0.5);
-		expect(u.x).toBeLessThanOrEqual(Math.max(...cols) + 0.5);
+		const { layout } = layoutTree(g, geometryFor(16), { sweeps: 4, far: FAR }, 'x');
+		return g.unions.flatMap((fu) => {
+			const u = layout.unions.get(fu.key)!;
+			const [a, b] = fu.partners.map((p) => layout.persons.get(p)!);
+			return u.bar || u.far || a.gen === b.gen ? [] : [{ u, lower: a.gen > b.gen ? a : b, fu }];
+		});
+	}
+
+	it('random tree 204: the dot of p5 + p8 (rows 2 and 3) lies under the card of the lower partner', () => {
+		const found = dots(204).filter((d) => d.fu.partners.includes('p5') && d.fu.partners.includes('p8'));
+		expect(found).toHaveLength(1);
+		const { u, lower } = found[0];
+		expect(u.x).toBeGreaterThanOrEqual(lower.x);
+		expect(u.x).toBeLessThanOrEqual(lower.x + lower.w);
+		expect(u.y).toBeGreaterThanOrEqual(lower.y + lower.h);
 	});
 
-	it('random trees 1 to 400 at 16 px: no dot of partners on two rows lies outside the columns of its legs', () => {
+	it('random trees 1 to 400 at 16 px: no dot of partners on two rows lies outside the card width of its lower partner', () => {
 		const stubs: string[] = [];
+		let checked = 0;
 		for (let seed = 1; seed <= 400; seed++) {
-			const { g } = build(randomTree(seed));
-			clearLayoutCache();
-			const { layout, edges } = layoutTree(g, geometryFor(16), { sweeps: 4, far: FAR }, 'x');
-			for (const fu of g.unions) {
-				const u = layout.unions.get(fu.key)!;
-				const [a, b] = fu.partners.map((p) => layout.persons.get(p)!);
-				if (u.bar || u.far || a.gen === b.gen) continue;
-				const cols = edges.paths.filter((p) => p.union === fu.key && p.kind !== 'descent' && p.people.length === 2).map((p) => column(p.d));
-				if (cols.length === 2 && (u.x < Math.min(...cols) - 0.5 || u.x > Math.max(...cols) + 0.5)) stubs.push(`seed ${seed} ${fu.key}`);
+			for (const { u, lower, fu } of dots(seed)) {
+				checked++;
+				if (u.x < lower.x || u.x > lower.x + lower.w || u.y < lower.y + lower.h) stubs.push(`seed ${seed} ${fu.key}`);
 			}
 		}
+		expect(checked).toBeGreaterThan(100);
 		expect(stubs).toEqual([]);
 	});
 });
@@ -77,46 +70,9 @@ describe('G2 finding 2: a moved dot can land on the sign of another folded famil
 	});
 });
 
-describe('G2 finding 3: the lane of a moved dot still holds the stretch the dot has left', () => {
-	/** The couple lanes of each gap, found again by the first-fit rule of `pack` from the lines that are really drawn. */
-	function lanesFromDrawnRuns(seed: number): { plan: number[]; drawn: number[] } {
-		const { g, order } = build(randomTree(seed));
-		clearLayoutCache();
-		const { layout } = layoutTree(g, geometryFor(16), { sweeps: 4, far: FAR }, 'x');
-		const plan = planLines({ g, persons: layout.persons, rows: layout.rows, unions: layout.unions, anchors: order.anchors, geo: layout.geometry });
-		const margin = lineMetrics(layout.geometry).laneMargin;
-		const runs: { gap: number; lo: number; hi: number }[] = [];
-		for (const fu of g.unions) {
-			if (!plan.dots.has(fu.key)) continue;
-			const mine = plan.legs.filter((l) => l.union === fu.key);
-			for (const leg of mine) {
-				let cur = leg.startX;
-				for (const hop of leg.hops) {
-					runs.push({ gap: hop.gap, lo: Math.min(cur, hop.x), hi: Math.max(cur, hop.x) });
-					cur = hop.x;
-				}
-			}
-			const xs = [plan.dotX.get(fu.key) ?? layout.unions.get(fu.key)!.x, ...mine.map((l) => l.entryX)];
-			runs.push({ gap: plan.dots.get(fu.key)!.gap, lo: Math.min(...xs), hi: Math.max(...xs) });
-		}
-		const drawn = plan.coupleLanes.map(() => 0);
-		for (let gap = 0; gap < drawn.length; gap++) {
-			const laneEnd: number[] = [];
-			for (const r of runs.filter((x) => x.gap === gap).sort((a, b) => a.lo - b.lo)) {
-				let lane = laneEnd.findIndex((end) => end + margin < r.lo);
-				if (lane === -1) lane = laneEnd.length;
-				laneEnd[lane] = r.hi;
-			}
-			drawn[gap] = laneEnd.length;
-		}
-		return { plan: plan.coupleLanes, drawn };
-	}
-
-	it('random tree 22: the gap needs as many couple lanes as the lines drawn in it', () => {
-		const { plan, drawn } = lanesFromDrawnRuns(22);
-		expect(plan).toEqual(drawn);
-	});
-});
+// G2 finding 3 ("the lane of a moved dot still holds the stretch the dot has left", checked by `planLines`) is deleted with `planLines` (WP-4b, class c):
+// there is one plan (the architecture notes §4.2.2) and the gap grows from the same net and lane objects that are drawn, so a second count of lanes cannot differ. The claim is
+// `layout-stages` (`packLanes`) and `layout-stage-route`, and that no two couple runs of one gap overlap is every `lineProblems` check.
 
 // Made-up trees (written out from a seeded generator of the review) with fold controls on, as the tree view has them.
 const FOLD_A = `people:
@@ -202,7 +158,7 @@ unions:
 
 describe('G2 finding 4: the router plan starts a moved dot from a recomputed place, so a tie can fall the other way', () => {
 	// With fold controls the layout moves every card by one amount after the first plan (room for a control). The first plan read the dot at its old
-	// place (a card centre exactly, 90 against 90); the router's plan finds it again from the moved cards ("home" in lines.ts) and gets 99.19999999999999
+	// place (a card centre exactly, 90 against 90); the router's plan finds it again from the moved cards ("home" in an internal script) and gets 99.19999999999999
 	// against 99.2, so a leg of p0 leaves the other side of the card and crosses the tag zone that the layout kept free.
 	const problems = (src: string) => {
 		const { g } = build(src);

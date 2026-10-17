@@ -348,7 +348,7 @@ export abstract class ListEditWindow extends Modal {
 			onCancel: () => this.finish(),
 			onSave: () =>
 				this.guard(() => {
-					this.save().catch((e) => console.error(`Dynasty Tree: the ${k.name} window could not save`, e));
+					this.save().catch((e) => console.error(`Crown and Kin: the ${k.name} window could not save`, e));
 				}),
 		});
 		this.shell = shell;
@@ -897,7 +897,7 @@ export abstract class ListEditWindow extends Modal {
 		try {
 			fn();
 		} catch (e) {
-			console.error(`Dynasty Tree: the ${KINDS[this.kind].name} window failed`, e);
+			console.error(`Crown and Kin: the ${KINDS[this.kind].name} window failed`, e);
 		}
 	}
 }

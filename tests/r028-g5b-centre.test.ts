@@ -3,7 +3,7 @@
  * middle, left over from the house strip of the old card (D197 replaced the strip by the top ribbon). The widths that fit names and relation words did not change.
  */
 import { describe, expect, it } from 'vitest';
-import { cardForm, cardText, childAttach, geometryFor, roundelAxis, roundelPics } from '../src/layout/geometry';
+import { cardForm, cardText, geometryFor, roundelAxis, roundelPics } from '../src/layout/geometry';
 import { clearLayoutCache, layoutTree } from '../src/layout/index';
 import { renderSvg } from '../src/render/svg-string';
 import { build } from './helpers';
@@ -11,7 +11,7 @@ import { build } from './helpers';
 const SIZES = [8, 10, 12, 14, 16, 20, 24, 36, 48];
 
 describe('P7: the Roundel axis is the middle of the card', () => {
-	it('axis, text anchor, portrait centre and child attach are cardW / 2 at every size', () => {
+	it('axis, text anchor, portrait centre are cardW / 2 at every size', () => {
 		for (const f of SIZES) {
 			const geo = cardForm({ ...geometryFor(f), relationLine: true }, 'down');
 			const t = cardText(geo, 1);
@@ -20,7 +20,6 @@ describe('P7: the Roundel axis is the middle of the card', () => {
 			expect(t.r1!.axis, `f${f}`).toBe(geo.cardW / 2);
 			expect(roundelPics(geo, { arms: false, portrait: true }).cx, `f${f}`).toBe(geo.cardW / 2);
 			expect(roundelPics(geo, { arms: true, portrait: false }).arms!.x + roundelPics(geo, { arms: true, portrait: false }).arms!.w / 2, `f${f}`).toBeCloseTo(geo.cardW / 2, 9);
-			expect(childAttach(geo), `f${f}`).toBe(0);
 		}
 	});
 

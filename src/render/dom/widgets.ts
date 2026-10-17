@@ -140,7 +140,7 @@ export class Popover {
 			try {
 				fn();
 			} catch (e) {
-				console.error('Dynasty Tree: cannot close the popover', e);
+				console.error('Crown and Kin: cannot close the popover', e);
 			}
 		};
 		if (this.el) this.cleanup.push(once);

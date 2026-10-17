@@ -15,12 +15,12 @@ const LINES = ['a: 1', '', 'b: 2', '', 'c:', '  d: 3', ''];
 
 describe('F3 (fix round): replaceBody keeps every line when the breaks are mixed', () => {
 	it('a kept lone CR next to the empty line that is left at the end is changed to a form that holds (R3)', () => {
-		const text = '```dynasty\na: 1\r\rb: 2\n```\n';
+		const text = '```kin\na: 1\r\rb: 2\n```\n';
 		const b = findBlocks(text)[0];
 		const out = replaceBody(text, b, 'a: 1\n');
 		expect(findBlocks(out)[0].body).toBe('a: 1\n');
 		// Only a break inside the body changed.
-		expect(out.startsWith('```dynasty\na: 1')).toBe(true);
+		expect(out.startsWith('```kin\na: 1')).toBe(true);
 		expect(out.endsWith('\n```\n')).toBe(true);
 	});
 
@@ -30,7 +30,7 @@ describe('F3 (fix round): replaceBody keeps every line when the breaks are mixed
 		for (let seed = 0; seed < COUNT && bad.length < 3; seed++) {
 			const rand = rng(seed + 7);
 			const n = 1 + Math.floor(rand() * 6);
-			let text = '```dynasty' + pick(rand, BREAKS);
+			let text = '```kin' + pick(rand, BREAKS);
 			for (let i = 0; i < n; i++) text += pick(rand, LINES) + (i < n - 1 ? pick(rand, BREAKS) : '');
 			text += pick(rand, BREAKS);
 			if (rand() < 0.8) text += '```' + (rand() < 0.5 ? pick(rand, BREAKS) : '');

@@ -19,7 +19,7 @@ import { HandleRegistry } from '../src/obsidian/block-handle';
  * Search round 0.2.3, area D: the handle registry (spec §6.1).
  */
 
-const fence = (body: string) => ['```dynasty', body, '```'].join('\n');
+const fence = (body: string) => ['```kin', body, '```'].join('\n');
 const X = 'people:\n  - id: a\n    name: Alys';
 const queen = { kind: 'set-person-fields', id: 'a', fields: { title: 'Queen' } } as const;
 const File = TFile as unknown as new (p: string) => { path: string; extension: string };

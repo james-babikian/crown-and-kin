@@ -1,29 +1,30 @@
 /*
  * Search round 0.2.8, area A3 (layout): speed with many rumoured lines.
  * Timing proof: median of 5 runs each, ratio between two sizes in the same process (the I34 lesson).
+ * WP-4b (the speed protocol, the architecture notes §6.4): `routeEdges` is gone, so the call is the whole `arrangeTree` (walk, plan, place, route); the ratio bound is as before.
  */
 import { describe, expect, it } from 'vitest';
-import { routeEdges } from '../src/layout/edges';
 import { cardForm, geometryFor } from '../src/layout/geometry';
-import { DEFAULT_LAYOUT_SETTINGS, layoutFamilies } from '../src/layout/layout';
+import { DEFAULT_LAYOUT_SETTINGS } from '../src/layout/layout';
+import { arrangeTree } from '../src/layout/pipeline';
 import { build } from './helpers';
 import { rumourTree } from './random-trees';
 
 function routeMs(source: string, runs: number): number {
-	const { g, gen, order } = build(source);
-	const layout = layoutFamilies(g, gen, order, { ...cardForm(geometryFor(16), 'down') }, { ...DEFAULT_LAYOUT_SETTINGS });
-	routeEdges(g, layout, order.anchors); // warm up
+	const { g, gen } = build(source);
+	const geo = { ...cardForm(geometryFor(16), 'down') };
+	arrangeTree(g, gen, geo, { ...DEFAULT_LAYOUT_SETTINGS }); // warm up
 	const times: number[] = [];
 	for (let i = 0; i < runs; i++) {
 		const t0 = performance.now();
-		routeEdges(g, layout, order.anchors);
+		arrangeTree(g, gen, geo, { ...DEFAULT_LAYOUT_SETTINGS });
 		times.push(performance.now() - t0);
 	}
 	times.sort((a, b) => a - b);
 	return times[Math.floor(runs / 2)];
 }
 
-describe('routeEdges with a rumoured parent on every person', () => {
+describe('arrangeTree with a rumoured parent on every person', () => {
 	it('grows about linearly: 4 times the people take less than 10 times as long (rumoured lines: "?" search scans every line and card)', () => {
 		const small = routeMs(rumourTree(250), 5);
 		const big = routeMs(rumourTree(1000), 5);

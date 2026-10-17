@@ -245,27 +245,18 @@ export const stepSentences: RelationTexts['stepSentences'] = (g, steps: readonly
 	more: Math.max(0, steps.length - MAX_STEP_SENTENCES),
 });
 
-// A plain function, so that `RELINFO.more` and `RELINFO.stripLabel` share one text and the object does not refer to itself.
-const moreText = (n: number) => `${n} more`;
-
 /** D146, D147: the texts of the relation infobox (computer) and the strip (phone). */
 export const RELINFO = {
 	title: 'Relation to you',
 	/** The short count in the closed strip: "7 more", "1 more". */
-	more: moreText,
-	/** The accessible name of the strip head. It holds the whole visible text word for word (WCAG 2.5.3): the sentence, then the count. "Relation to you: Second cousin. 7 more." */
-	stripLabel: (sentence: string, others: number) => (others === 0 ? sentence : `${sentence} ${moreText(others)}.`),
+	more: (n: number) => `${n} more`,
 } as const;
 
 /** What the infobox and the strip show for one person. */
 export interface RelationInfo {
 	kind: 'relation' | 'me' | 'none';
-	/** 'Relation to you' for kind 'relation'; '' for 'me' and 'none'. */
-	title: string;
 	/** 'Second cousin' (no full stop) for 'relation'; with a maybe it is the card text ('Half-sister, maybe full', F-KIN-08); 'This is you.' for 'me'; 'No relation to you in this tree.' for 'none'. */
 	value: string;
-	/** The whole first text line: 'Relation to you: Second cousin.' (= `relationSummary().main`). */
-	sentence: string;
 	/** `relationSummary().also` and `.maybe` (D123: only from the first relation). */
 	also?: string;
 	maybe?: string;
@@ -276,9 +267,9 @@ export interface RelationInfo {
 /** Builds `RelationInfo` from the same `Relation[]` as `relationSummary`; the sentences come from `relationSummary` (one source). */
 export function relationInfo(rels: readonly Relation[] | undefined, isMe: boolean): RelationInfo {
 	const sum = relationSummary(rels, isMe);
-	if (isMe) return { kind: 'me', title: '', value: sum.main, sentence: sum.main, others: 0 };
-	if (!rels?.length) return { kind: 'none', title: '', value: sum.main, sentence: sum.main, others: 0 };
-	const info: RelationInfo = { kind: 'relation', title: RELINFO.title, value: cardRelationText(rels[0]), sentence: sum.main, others: rels.length - 1 };
+	if (isMe) return { kind: 'me', value: sum.main, others: 0 };
+	if (!rels?.length) return { kind: 'none', value: sum.main, others: 0 };
+	const info: RelationInfo = { kind: 'relation', value: cardRelationText(rels[0]), others: rels.length - 1 };
 	if (sum.also !== undefined) info.also = sum.also;
 	if (sum.maybe !== undefined) info.maybe = sum.maybe;
 	return info;

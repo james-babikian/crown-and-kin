@@ -70,7 +70,7 @@ async function plugin(leaves: Leaf[]) {
 			for (const l of leaves) cb({ getViewState: () => ({ type: l.type, state: { file: l.file } }) });
 		},
 	});
-	const p = new DynastyTreePlugin(app as never, { id: 'dynasty-tree' } as never);
+	const p = new DynastyTreePlugin(app as never, { id: 'crown-and-kin' } as never);
 	await (p as unknown as FakePlugin).load();
 	const fire = (name: string) => {
 		for (const fn of on.get(name) ?? []) fn();

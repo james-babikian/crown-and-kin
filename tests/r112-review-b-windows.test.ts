@@ -148,7 +148,7 @@ describe('R1: the note changes while the id question is open (§13.17 rule 5: a 
 		await click(confirmOf(modal)!.querySelector('.dynasty-id-change'));
 		// Expected: the window sees the new body, writes nothing and shows the stale text, so the owner can read the new count.
 		expect(handle.ops).toHaveLength(0);
-		expect(notices).toContain(WRITE_TEXT.stale);
+		expect(notices).toContain(WRITE_TEXT.staleWindow);
 	});
 
 	it('Titles: Save, the note gets one more person with the title, "Change the id" must not write on the new body', async () => {
@@ -160,7 +160,7 @@ describe('R1: the note changes while the id question is open (§13.17 rule 5: a 
 		handle.body = `${handle.body}  - {id: c, name: Cora, card-title: baron}\n`;
 		await click(confirmOf(modal)!.querySelector('.dynasty-id-change'));
 		expect(handle.ops).toHaveLength(0);
-		expect(notices).toContain(WRITE_TEXT.stale);
+		expect(notices).toContain(WRITE_TEXT.staleWindow);
 	});
 });
 

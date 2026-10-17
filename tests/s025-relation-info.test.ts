@@ -11,23 +11,20 @@ const rel = (text: string, maybe?: Relation['maybe']): Relation => ({ text, lowe
 const SECOND = rel('Second cousin');
 const OTHERS = ['Brother-in-law', 'Third cousin', 'Uncle', 'Aunt', 'Nephew', 'Niece', 'Cousin'].map((t) => rel(t));
 
-// The same rule as `tests/s113-c-label-in-name.test.ts`.
-const norm = (s: string) => s.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
-
 describe('relationInfo (E.2)', () => {
 	it('nothing or an empty list: kind none', () => {
 		for (const rels of [undefined, []]) {
-			expect(relationInfo(rels, false)).toEqual({ kind: 'none', title: '', value: 'No relation to you in this tree.', sentence: 'No relation to you in this tree.', others: 0 });
+			expect(relationInfo(rels, false)).toEqual({ kind: 'none', value: 'No relation to you in this tree.', others: 0 });
 		}
 	});
 
 	it('the marked person: kind me, no title, no count', () => {
-		expect(relationInfo(undefined, true)).toEqual({ kind: 'me', title: '', value: 'This is you.', sentence: 'This is you.', others: 0 });
+		expect(relationInfo(undefined, true)).toEqual({ kind: 'me', value: 'This is you.', others: 0 });
 		expect(relationInfo([SECOND, ...OTHERS], true).others).toBe(0);
 	});
 
-	it('one relation: title, value without a full stop, no also, no others', () => {
-		expect(relationInfo([SECOND], false)).toEqual({ kind: 'relation', title: 'Relation to you', value: 'Second cousin', sentence: 'Relation to you: Second cousin.', others: 0 });
+	it('one relation: value without a full stop, no also, no others', () => {
+		expect(relationInfo([SECOND], false)).toEqual({ kind: 'relation', value: 'Second cousin', others: 0 });
 	});
 
 	it('a relation with Also names three of the others', () => {
@@ -49,7 +46,7 @@ describe('relationInfo (E.2)', () => {
 		expect(relationInfo([rel('Brother'), first], false).maybe).toBeUndefined();
 	});
 
-	it('sentence, also and maybe equal relationSummary for every case; value has no full stop for a relation', () => {
+	it('also and maybe equal relationSummary for every case; value has no full stop for a relation', () => {
 		const maybe = rel('Brother', { effect: 'full', text: 'Brother', lower: 'brother', cause: 'rumoured' });
 		const cases: [readonly Relation[] | undefined, boolean][] = [
 			[undefined, false],
@@ -63,7 +60,6 @@ describe('relationInfo (E.2)', () => {
 		for (const [rels, isMe] of cases) {
 			const sum = relationSummary(rels, isMe);
 			const info = relationInfo(rels, isMe);
-			expect(info.sentence).toBe(sum.main);
 			expect(info.also).toBe(sum.also);
 			expect(info.maybe).toBe(sum.maybe);
 			if (info.kind === 'relation') expect(info.value.endsWith('.')).toBe(false);
@@ -82,18 +78,8 @@ describe('RELINFO texts', () => {
 		expect(RELINFO.more(1)).toBe('1 more');
 	});
 
-	it('stripLabel holds the visible sentence and the visible count (WCAG 2.5.3) and equals the sentence for 0', () => {
-		const s = 'Relation to you: Second cousin.';
-		expect(RELINFO.stripLabel(s, 0)).toBe(s);
-		for (const n of [1, 7]) {
-			const label = RELINFO.stripLabel(s, n);
-			expect(label).toBe(`${s} ${n} more.`);
-			expect(` ${norm(label)} `).toContain(` ${norm(`${s} ${RELINFO.more(n)}`)} `);
-		}
-	});
-
 	it('the texts follow the STE rules and have no straight quote marks', () => {
-		const all = [RELINFO.title, RELINFO.more(7), RELINFO.stripLabel('Relation to you: Second cousin.', 7), ...['x'].map(() => relationInfo(undefined, true).value), relationInfo(undefined, false).value];
+		const all = [RELINFO.title, RELINFO.more(7), ...['x'].map(() => relationInfo(undefined, true).value), relationInfo(undefined, false).value];
 		for (const t of all) {
 			expect(t).not.toMatch(/["']/);
 			expect(t.split(/\s+/).length).toBeLessThanOrEqual(20);

@@ -17,7 +17,7 @@ The comments under each title give the expected result (read by `tests/acceptanc
 - `# named:` each named heir with the state (`first`, `not-alive`, `is-ruler`, `not-in-tree`, `excluded`), or `none`.
 - `# old:` the heirs with the warning `old`, or `none`.
 
-```dynasty
+```kin
 # Sample tree 16: the line of succession (spec §13.21, contract 0.2.7). Worked out by hand.
 #
 # The tree has no warning. The latest year in the tree is 1240 (the birth of Ronan), the reference year for "now".

@@ -9,7 +9,7 @@ import { isMap as isRawMap } from '../src/core/tolerate';
 export function fixture(prefix: string): string {
 	const file = readdirSync('fixtures').find((f) => f.startsWith(prefix + '-'))!;
 	const md = readFileSync(`fixtures/${file}`, 'utf8');
-	return md.match(/^```dynasty\r?\n([\s\S]*?)^```/m)![1];
+	return md.match(/^```kin\r?\n([\s\S]*?)^```/m)![1];
 }
 
 export function build(source: string) {

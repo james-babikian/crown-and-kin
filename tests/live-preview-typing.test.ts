@@ -20,7 +20,7 @@ vi.mock('../src/core/block-locate', async (importOriginal) => {
 
 import { TallBlockParser, TYPING_WAIT_MS } from '../src/obsidian/live-preview';
 
-const noteLines = ['# Title', ...Array.from({ length: 50 }, (_, i) => `Text ${i}`), '```dynasty', 'people:', '  - id: a', '    name: A', '```', 'After'];
+const noteLines = ['# Title', ...Array.from({ length: 50 }, (_, i) => `Text ${i}`), '```kin', 'people:', '  - id: a', '    name: A', '```', 'After'];
 const doc = Text.of(noteLines);
 const blockEnd = doc.line(noteLines.indexOf('```') + 1).to;
 

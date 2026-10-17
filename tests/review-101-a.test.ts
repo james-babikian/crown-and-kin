@@ -24,7 +24,7 @@ describe('A1: a callout written with ">" and no space', () => {
 	// CommonMark (and Obsidian) read ">" plus one optional space as the marker, so `>  - id: a`
 	// holds " - id: a". replaceBody writes a changed line as prefix + line = ">" + " - id: a",
 	// which reads back as "- id: a": one space is lost on every indented line.
-	const NOTE = '>```dynasty\n>people:\n>  - id: a\n>    name: A\n>```\n';
+	const NOTE = '>```kin\n>people:\n>  - id: a\n>    name: A\n>```\n';
 
 	it('replaceBody: a changed indented line reads back as written', () => {
 		const b = findBlocks(NOTE)[0];
@@ -43,7 +43,7 @@ describe('A1: a callout written with ">" and no space', () => {
 	});
 
 	it('planWrite: the first person in an empty tree in such a callout is written, not refused', () => {
-		const text = '>```dynasty\n>```\n';
+		const text = '>```kin\n>```\n';
 		const plan = planWrite(text, 0, '', (body) => {
 			const r = applyOp(body, { kind: 'add-person', id: 'a', fields: { name: 'A' } });
 			return r.ok ? { ok: true, body: r.body } : { ok: false, reason: r.code };
@@ -116,12 +116,12 @@ describe('A6 (note): slugs strip every Latin diacritic (spec §6.8)', () => {
 });
 
 describe('A7 (note): a fence on a list-marker line with tab-indented body lines', () => {
-	// CommonMark: in "- ```dynasty" the content column is 2; a body line "\tpeople:" has 4
+	// CommonMark: in "- ```kin" the content column is 2; a body line "\tpeople:" has 4
 	// columns of indentation, so the list item keeps it and the code line is "  people:" (the tab
 	// counts as 2 spaces after 2 columns are removed). stripColumns keeps the whole tab instead,
 	// so the located body starts with a tab, which YAML rejects: the edit path cannot parse it.
 	it('the located body has no leading tab', () => {
-		const b = findBlocks('- ```dynasty\n\tpeople:\n\t  - id: a\n  ```\n')[0];
+		const b = findBlocks('- ```kin\n\tpeople:\n\t  - id: a\n  ```\n')[0];
 		expect(b.body.startsWith('\t')).toBe(false);
 	});
 });

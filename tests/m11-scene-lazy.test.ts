@@ -197,7 +197,7 @@ describe('S1: the shells of a lazy scene', () => {
 		});
 	});
 
-	it('a far-couple tag shell has its attributes and no pill; its tap area is in the hit layer at once', () => {
+	it('a far-couple tag shell has its attributes and no pill, only its tap strip (0.3.1 fix3); its tap area is in the hit layer at once', () => {
 		const eager = build(false);
 		const lazy = build(true);
 		expect(lazy.s.tags).toHaveLength(eager.s.tags.length);
@@ -206,7 +206,9 @@ describe('S1: the shells of a lazy scene', () => {
 			expect(t.el.hasClass('dynasty-tag')).toBe(true);
 			expect([...el(t.el).attrs]).toEqual([...el(e.el).attrs]);
 			expect([...el(t.el).classes]).toEqual([...el(e.el).classes]);
-			expect(el(t.el).children).toHaveLength(0);
+			expect(el(t.el).children).toHaveLength(1);
+			expect(el(t.el).children[0]).toBe(el(t.over));
+			expect(serial(el(t.over))).toBe(serial(el(e.over)));
 			expect(el(t.hit).parentElement).not.toBeNull();
 			expect(serial(el(t.hit))).toBe(serial(el(e.hit)));
 		});
@@ -310,7 +312,7 @@ describe('S3, S4: fillNear', () => {
 		const n = lazy.fill.fillNear(view);
 		expect(n).toBe(expectedCards.length + expectedTags.length + expectedBadges.length);
 		for (const [id, card] of lazy.s.cards) expect(attached(el(card))).toBe(expectedCards.includes(id));
-		lazy.s.tags.forEach((t) => expect(el(t.el).children.length > 0).toBe(expectedTags.includes(t)));
+		lazy.s.tags.forEach((t) => expect(el(t.el).children.length > 1).toBe(expectedTags.includes(t)));
 		lazy.s.badges.forEach((b) => expect(el(b.el).children.length > 1).toBe(expectedBadges.includes(b)));
 		expect(lazy.fill.pending).toBe(lazy.s.cards.size + lazy.s.tags.length + lazy.s.badges.length - n);
 	});
@@ -360,7 +362,7 @@ describe('S4, S5c to S5f: fillPerson', () => {
 		if (!id) throw new Error('the sample needs a person with a tag and a badge');
 		expect(lazy.fill.fillPerson(id)).toBe(true);
 		for (const [k, card] of lazy.s.cards) expect(attached(el(card))).toBe(k === id);
-		lazy.s.tags.forEach((t) => expect(el(t.el).children.length > 0).toBe(t.tag.person === id));
+		lazy.s.tags.forEach((t) => expect(el(t.el).children.length > 1).toBe(t.tag.person === id));
 		lazy.s.badges.forEach((b) => expect(el(b.el).children.length > 1).toBe(b.person === id));
 	});
 

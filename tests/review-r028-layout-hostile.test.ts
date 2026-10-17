@@ -2,9 +2,9 @@
  * Search round 0.2.8, area A3 (layout): a tree with a parent loop (broken by the validator) still gets a line through a far-couple tag.
  */
 import { describe, expect, it } from 'vitest';
-import { routeEdges } from '../src/layout/edges';
 import { cardForm, geometryFor } from '../src/layout/geometry';
-import { DEFAULT_LAYOUT_SETTINGS, layoutFamilies } from '../src/layout/layout';
+import { DEFAULT_LAYOUT_SETTINGS } from '../src/layout/layout';
+import { arrangeTree } from '../src/layout/pipeline';
 import { build } from './helpers';
 import { lineProblems } from './random-trees';
 
@@ -32,9 +32,9 @@ unions:
 describe('a tree with a parent loop', () => {
 	// F-LAYOUT-04 is a note, not chosen for 0.2.8 (FINDINGS): the proof stays, skipped.
 	it.skip('draws no line through a far-couple tag (note font 8 px, top to bottom)', () => {
-		const { g, gen, order } = build(SRC);
-		const layout = layoutFamilies(g, gen, order, { ...cardForm(geometryFor(8), 'down') }, { ...DEFAULT_LAYOUT_SETTINGS });
-		const problems = lineProblems(g, layout, routeEdges(g, layout, order.anchors));
+		const { g, gen } = build(SRC);
+		const { layout, edges } = arrangeTree(g, gen, { ...cardForm(geometryFor(8), 'down') }, { ...DEFAULT_LAYOUT_SETTINGS });
+		const problems = lineProblems(g, layout, edges);
 		expect(problems).toEqual([]);
 	});
 });

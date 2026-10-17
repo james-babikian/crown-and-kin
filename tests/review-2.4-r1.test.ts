@@ -15,7 +15,7 @@ import { TFile } from 'obsidian';
 import { HandleRegistry } from '../src/obsidian/block-handle';
 import { findBlocks } from '../src/core/block-locate';
 
-const block = (body: string) => ['```dynasty', body, '```'].join('\n');
+const block = (body: string) => ['```kin', body, '```'].join('\n');
 const A = 'people:\n  - id: a\n    name: Alys';
 const B = 'people:\n  - id: b\n    name: Bran';
 

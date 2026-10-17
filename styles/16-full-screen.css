@@ -118,7 +118,8 @@
 
 .dynasty-full .dynasty-empty {
 	flex: 1 1 auto;
-	margin: max(var(--size-4-4), env(safe-area-inset-top)) var(--size-4-4);
+	/* The sides keep clear of the notch of a phone held sideways; the safe area is 0 elsewhere. */
+	margin: max(var(--size-4-4), env(safe-area-inset-top)) max(var(--size-4-4), env(safe-area-inset-right)) var(--size-4-4) max(var(--size-4-4), env(safe-area-inset-left));
 }
 
 /* The empty full-screen view keeps its toolbar (Close) clear of the empty box. */
@@ -126,6 +127,7 @@
 	margin-top: calc(env(safe-area-inset-top, 0px) + 44px + var(--size-4-3));
 }
 
+.modal.dynasty-fullscreen.is-phone-side .dynasty-full.dynasty-empty-root .dynasty-empty,
 .modal.dynasty-fullscreen.is-phone .dynasty-full.dynasty-empty-root .dynasty-empty {
 	margin-top: max(var(--size-4-4), env(safe-area-inset-top));
 	margin-bottom: calc(44px + env(safe-area-inset-bottom) + var(--size-4-4));
@@ -134,7 +136,10 @@
 /*
  * Phone layout (0.2.8, G.13): the bar sits at the bottom, flat, with a hairline above it and the safe area under it (spec §7.5): Add person, Houses,
  * Focus, Find, More, Close, spread over the width. Fit, Titles and the legend are in More.
+ * D242: a phone held sideways has the same bar. `is-phone` is a window narrower than 600 px; `is-phone-side` is a phone (by its screen) whose window is
+ * wider than high (`isPhoneSideways`). Every rule of the bar names both, so a rule cannot be added for one and forgotten for the other.
  */
+.modal.dynasty-fullscreen.is-phone-side .dynasty-full .dynasty-toolbar,
 .modal.dynasty-fullscreen.is-phone .dynasty-full .dynasty-toolbar {
 	top: auto;
 	left: 0;
@@ -150,6 +155,7 @@
 	border-radius: 0;
 }
 
+.modal.dynasty-fullscreen.is-phone-side .dynasty-full .dynasty-toolbar .dynasty-tool,
 .modal.dynasty-fullscreen.is-phone .dynasty-full .dynasty-toolbar .dynasty-tool {
 	color: var(--text-normal);
 }
@@ -159,6 +165,7 @@
  * text gives up its width first. If the buttons are still wider than the phone, Close stays at the
  * right edge over the others (sticky in the row, which clips instead of wrapping).
  */
+.modal.dynasty-fullscreen.is-phone-side .dynasty-full .dynasty-toolbar,
 .modal.dynasty-fullscreen.is-phone .dynasty-full .dynasty-toolbar {
 	flex-wrap: nowrap;
 	overflow-x: auto;
@@ -166,6 +173,7 @@
 	scrollbar-width: none;
 }
 
+.modal.dynasty-fullscreen.is-phone-side .dynasty-full .dynasty-toolbar .dynasty-read-only-label,
 .modal.dynasty-fullscreen.is-phone .dynasty-full .dynasty-toolbar .dynasty-read-only-label {
 	flex: 0 1 auto;
 	min-width: 0;
@@ -173,6 +181,7 @@
 	text-overflow: ellipsis;
 }
 
+.modal.dynasty-fullscreen.is-phone-side .dynasty-full .dynasty-toolbar .dynasty-close,
 .modal.dynasty-fullscreen.is-phone .dynasty-full .dynasty-toolbar .dynasty-close {
 	position: sticky;
 	right: 0;
@@ -180,11 +189,14 @@
 }
 
 /* The problem list (not a sheet) stands above the phone's bar. */
+.modal.dynasty-fullscreen.is-phone-side .dynasty-full .dynasty-popover:not(.is-anchored):not(.is-sheet),
 .modal.dynasty-fullscreen.is-phone .dynasty-full .dynasty-popover:not(.is-anchored):not(.is-sheet) {
 	top: auto;
-	left: var(--size-4-2);
-	right: var(--size-4-2);
+	left: max(var(--size-4-2), env(safe-area-inset-left));
+	right: max(var(--size-4-2), env(safe-area-inset-right));
 	bottom: calc(52px + env(safe-area-inset-bottom) + var(--size-4-2));
+	/* `max-content` (the base rule) made a long problem text wider than the screen and let the right edge go; auto fills the space between left and right. */
+	width: auto;
 	max-width: none;
 	max-height: calc(100% - 52px - env(safe-area-inset-bottom) - 4 * var(--size-4-2));
 }
@@ -195,11 +207,13 @@ body.dynasty-fullscreen-open .popover.hover-popover {
 	z-index: calc(var(--layer-modal) + 1);
 }
 
-/* Reads env(safe-area-inset-top) for the default view on a phone; added and removed at once. */
+/* Reads env(safe-area-inset-top), -left and -right for the default view on a phone (the sides: the notch of a phone held sideways); added and removed at once. */
 .dynasty-safe-probe {
 	position: absolute;
 	visibility: hidden;
 	pointer-events: none;
 	padding-top: env(safe-area-inset-top, 0px);
+	padding-left: env(safe-area-inset-left, 0px);
+	padding-right: env(safe-area-inset-right, 0px);
 }
 

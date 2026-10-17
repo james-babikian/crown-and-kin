@@ -109,7 +109,7 @@ export function createLivePictures(
 			try {
 				crop = opts.cropOf?.(s) ?? null;
 			} catch (e) {
-				console.error('Dynasty Tree: cannot read the selected part of a portrait', e);
+				console.error('Crown and Kin: cannot read the selected part of a portrait', e);
 			}
 			if (crop) box.crop = crop;
 		}
@@ -121,7 +121,7 @@ export function createLivePictures(
 		try {
 			opts.onPending?.(waiting);
 		} catch (e) {
-			console.error('Dynasty Tree: cannot report the pictures that wait', e);
+			console.error('Crown and Kin: cannot report the pictures that wait', e);
 		}
 	};
 
@@ -172,7 +172,7 @@ export function createLivePictures(
 		try {
 			f = fileOf(slots[i]);
 		} catch (e) {
-			console.error('Dynasty Tree: cannot find the picture of a card', e);
+			console.error('Crown and Kin: cannot find the picture of a card', e);
 			setProblem(i, 'other');
 			return null;
 		}
@@ -209,7 +209,7 @@ export function createLivePictures(
 		try {
 			p = store.acquire(file, box, ctl.signal);
 		} catch (e) {
-			console.error('Dynasty Tree: cannot ask for a picture', e);
+			console.error('Crown and Kin: cannot ask for a picture', e);
 			done();
 			return;
 		}
@@ -236,7 +236,7 @@ export function createLivePictures(
 			},
 			(e: unknown) => {
 				done();
-				console.error('Dynasty Tree: a picture did not load', e);
+				console.error('Crown and Kin: a picture did not load', e);
 			},
 		).finally(() => {
 			if (!destroyed) tellPending();
@@ -272,7 +272,7 @@ export function createLivePictures(
 		try {
 			fn();
 		} catch (e) {
-			console.error(`Dynasty Tree: cannot ${what}`, e);
+			console.error(`Crown and Kin: cannot ${what}`, e);
 		}
 	};
 

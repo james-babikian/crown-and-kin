@@ -1,5 +1,5 @@
 /*
- * Pure rules that tie a BlockHandle to one `dynasty` block of a note (spec §6.1):
+ * Pure rules that tie a BlockHandle to one `kin` block of a note (spec §6.1):
  * comparing a located body with the body Obsidian rendered, finding the block again after the
  * note changed, and the smallest text change for an editor transaction. No `obsidian` import.
  */

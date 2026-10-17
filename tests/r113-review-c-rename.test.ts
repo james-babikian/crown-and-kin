@@ -14,7 +14,7 @@ import { resetObsidian } from './acceptance/fake-obsidian';
  */
 
 const FAST: RenameTiming = { resolved: 0, quiet: 0, cap: 50 };
-const tree = (...links: string[]) => ['```dynasty', 'people:', ...links.map((l, i) => `  - id: p${i}\n    name: P${i}\n    link: ${l}`), '```', ''].join('\n');
+const tree = (...links: string[]) => ['```kin', 'people:', ...links.map((l, i) => `  - id: p${i}\n    name: P${i}\n    link: ${l}`), '```', ''].join('\n');
 
 function setup(files: Record<string, string>) {
 	const texts = new Map(Object.entries(files));

@@ -10,8 +10,9 @@
  *   page with `count` 0 and no rows; an id that is not in `g.houses` gives null.
  * - Generation (D88): `computeGenerations(g)`; the member's number is its generation minus the smallest
  *   generation among the members, plus 1. Numbers count on over a generation with no member.
- * - Order: by generation, then by the person's place in the model order (`computeModelOrder`, which
- *   keeps the sibling order of D2), not by the final left-to-right place of the layout.
+ * - Order: by generation, then by the person's place in the model order (`computeModelOrder`, the walk the
+ *   layout uses, with its anchors and its order of the families, D239; it keeps the sibling order of D2).
+ *   This is the left-to-right order of the cards in the whole, unfolded tree (D243 item 2).
  * - Cells: `name` is the regnal name of D58 for a numbered entry, else the full name (D131), then the sobriquet in curly marks if there is one (D122); `title` is the title text line as the card shows it, with
  *   the reign, joined with one space, or ''; `born` and `died` as written, or ''.
  * - Table note: only the table (header, separator, one row per member), every cell through `tableCell`,

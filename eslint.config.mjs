@@ -6,7 +6,7 @@ import tseslint from 'typescript-eslint';
 
 const ELK = {
 	group: ['elkjs', 'elkjs/*'],
-	message: 'Plugin code must not use elkjs (spec §3, D9). It is only for the picture scripts.',
+	message: 'Plugin code must not use elkjs (spec §3, D9).',
 };
 const NO_OBSIDIAN_IN_CORE = {
 	name: 'obsidian',

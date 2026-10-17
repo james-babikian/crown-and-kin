@@ -58,7 +58,7 @@ export function undoNotice(text: string, handle: Handle, written: string, onUndo
 					onUndone?.();
 				} else new Notice(out.code === 'missing' ? WRITE_TEXT.undoMissing : out.code === 'empty' ? WRITE_TEXT.undoEmpty : WRITE_TEXT.undoChanged);
 			} catch (err) {
-				console.error('Dynasty Tree: cannot undo', err);
+				console.error('Crown and Kin: cannot undo', err);
 				new Notice(WRITE_TEXT.undoChanged);
 			}
 		})();

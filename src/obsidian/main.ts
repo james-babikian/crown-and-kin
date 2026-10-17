@@ -1,5 +1,5 @@
 /*
- * The plugin's Obsidian entry point. It registers the `dynasty` code block processor, the editor
+ * The plugin's Obsidian entry point. It registers the `kin` code block processor, the editor
  * extension that keeps tall blocks parsed in Live Preview, the commands and the settings tab, and
  * it owns the state that outlives any one `TreeView`: the block handles, the settings, the loose
  * (read-only) block states and the render timings the test harness reads. It implements `TreeHost`
@@ -32,7 +32,7 @@ import { HOVER_SOURCE, START_LIMIT_MS, STYLES_LIMIT_MS, THEME_RECHECK_MS, TreeVi
 /** B16: vault events for picture files are grouped for this long, in ms, before the views refresh. */
 export const PICTURE_EVENT_MS = 250;
 
-/** The Dynasty Tree plugin: Obsidian loads one instance and calls `onload`/`onunload` on it. */
+/** The Crown and Kin plugin: Obsidian loads one instance and calls `onload`/`onunload` on it. */
 export default class DynastyTreePlugin extends Plugin implements TreeHost, SettingsHost {
 	/** Spec §9; the defaults until the stored settings are read. */
 	override settings: DynastySettings = { ...DEFAULT_SETTINGS };
@@ -96,13 +96,13 @@ export default class DynastyTreePlugin extends Plugin implements TreeHost, Setti
 	);
 
 	override async onload(): Promise<void> {
-		this.registerHoverLinkSource(HOVER_SOURCE, { display: 'Dynasty Tree', defaultMod: false });
-		this.registerMarkdownCodeBlockProcessor('dynasty', (source, el, ctx) => {
+		this.registerHoverLinkSource(HOVER_SOURCE, { display: 'Crown and Kin', defaultMod: false });
+		this.registerMarkdownCodeBlockProcessor('kin', (source, el, ctx) => {
 			try {
 				ctx.addChild(new TreeView(this, el, source, { kind: 'embed', ctx }));
 			} catch (e) {
 				// Nothing may throw into Obsidian or blank the note (spec §8).
-				console.error('Dynasty Tree: cannot show the tree', e);
+				console.error('Crown and Kin: cannot show the tree', e);
 				try {
 					el.empty();
 					buildCallout(el, 'error', UI.errorTitle, 'dynasty-error').content.createDiv({ text: UI.internalError });
@@ -197,7 +197,7 @@ export default class DynastyTreePlugin extends Plugin implements TreeHost, Setti
 				try {
 					insertTree(editor);
 				} catch (e) {
-					console.error('Dynasty Tree: cannot insert a tree', e);
+					console.error('Crown and Kin: cannot insert a tree', e);
 				}
 			},
 		});
@@ -220,7 +220,7 @@ export default class DynastyTreePlugin extends Plugin implements TreeHost, Setti
 				this.registerEvent(this.app.vault.on('create', (file) => this.pictureChanged(file)));
 			});
 		} catch (e) {
-			console.error('Dynasty Tree: cannot continue the link update of an earlier rename', e);
+			console.error('Crown and Kin: cannot continue the link update of an earlier rename', e);
 		}
 	}
 
@@ -236,7 +236,7 @@ export default class DynastyTreePlugin extends Plugin implements TreeHost, Setti
 			if (pick) body.style.setProperty('--dynasty-on-accent', pick);
 			else body.style.removeProperty('--dynasty-on-accent');
 		} catch (e) {
-			console.error('Dynasty Tree: cannot read the colour of the text on the accent', e);
+			console.error('Crown and Kin: cannot read the colour of the text on the accent', e);
 		}
 	}
 
@@ -271,7 +271,7 @@ export default class DynastyTreePlugin extends Plugin implements TreeHost, Setti
 			if (edge) body.style.setProperty('--dynasty-edge', edge);
 			if (error) body.style.setProperty('--dynasty-error', error);
 		} catch (e) {
-			console.error('Dynasty Tree: cannot read the colours of the theme for the grey text', e);
+			console.error('Crown and Kin: cannot read the colours of the theme for the grey text', e);
 		}
 	}
 
@@ -308,7 +308,7 @@ export default class DynastyTreePlugin extends Plugin implements TreeHost, Setti
 		try {
 			return { ok: true, data: await this.loadData() };
 		} catch (e) {
-			console.error('Dynasty Tree: cannot read the settings', e);
+			console.error('Crown and Kin: cannot read the settings', e);
 			return { ok: false };
 		}
 	}
@@ -410,7 +410,7 @@ export default class DynastyTreePlugin extends Plugin implements TreeHost, Setti
 		try {
 			await this.store();
 		} catch (e) {
-			console.error('Dynasty Tree: cannot save the settings', e);
+			console.error('Crown and Kin: cannot save the settings', e);
 		}
 	}
 
@@ -431,7 +431,7 @@ export default class DynastyTreePlugin extends Plugin implements TreeHost, Setti
 			try {
 				v.retire();
 			} catch (e) {
-				console.error('Dynasty Tree: cannot close a tree view', e);
+				console.error('Crown and Kin: cannot close a tree view', e);
 			}
 		}
 		this.views.clear();
@@ -460,7 +460,7 @@ export default class DynastyTreePlugin extends Plugin implements TreeHost, Setti
 				for (const face of (e as FontFaceSetLoadEvent).fontfaces ?? []) loaded.push(face.family);
 				if (loaded.length) flush();
 			} catch (err) {
-				console.error('Dynasty Tree: cannot handle a loaded font', err);
+				console.error('Crown and Kin: cannot handle a loaded font', err);
 			}
 		};
 		fonts.addEventListener('loadingdone', onDone);
@@ -486,7 +486,7 @@ export default class DynastyTreePlugin extends Plugin implements TreeHost, Setti
 			for (const h of this.handles.all()) if (!open.has(h.key.path)) endSessionFocus(h.state);
 			for (const [k, st] of this.looseStates) if (!open.has(k.slice(0, k.indexOf('\u0000')))) endSessionFocus(st);
 		} catch (e) {
-			console.error('Dynasty Tree: cannot end the focus of closed notes', e);
+			console.error('Crown and Kin: cannot end the focus of closed notes', e);
 		}
 	}
 
@@ -503,7 +503,7 @@ export default class DynastyTreePlugin extends Plugin implements TreeHost, Setti
 				this.looseStates.set(newPath + k.slice(oldPath.length), st);
 			}
 		} catch (e) {
-			console.error('Dynasty Tree: cannot follow the renamed note', e);
+			console.error('Crown and Kin: cannot follow the renamed note', e);
 		}
 	}
 
@@ -519,7 +519,7 @@ export default class DynastyTreePlugin extends Plugin implements TreeHost, Setti
 			this.changedPictures.add(path);
 			this.tellPictures();
 		} catch (e) {
-			console.error('Dynasty Tree: cannot follow the changed picture', e);
+			console.error('Crown and Kin: cannot follow the changed picture', e);
 		}
 	}
 
@@ -535,7 +535,7 @@ export default class DynastyTreePlugin extends Plugin implements TreeHost, Setti
 			if (out.ok) new Notice(WRITE_TEXT.undoDone);
 			else new Notice(out.code === 'empty' ? WRITE_TEXT.undoEmpty : out.code === 'missing' ? WRITE_TEXT.undoMissing : WRITE_TEXT.undoChanged);
 		} catch (e) {
-			console.error('Dynasty Tree: cannot undo', e);
+			console.error('Crown and Kin: cannot undo', e);
 			new Notice(WRITE_TEXT.undoChanged);
 		}
 	}

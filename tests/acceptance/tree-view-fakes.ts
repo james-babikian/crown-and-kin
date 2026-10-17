@@ -235,7 +235,7 @@ export async function embed(source: string, o: { host?: Host; handle?: FakeHandl
 /** The real plugin (main.ts), loaded; it is also the host of the views the test makes. */
 export async function loadPlugin() {
 	const app = fakeApp();
-	const plugin = new DynastyTreePlugin(app as never, { id: 'dynasty-tree' } as never);
+	const plugin = new DynastyTreePlugin(app as never, { id: 'crown-and-kin' } as never);
 	await (plugin as unknown as FakePlugin).load();
 	return { app, plugin, host: plugin as unknown as Host };
 }

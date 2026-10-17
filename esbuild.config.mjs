@@ -5,7 +5,7 @@ import { builtinModules } from 'node:module';
 import { writeStyles } from './styles/concat.mjs';
 
 const banner = `/*
-Dynasty Tree: generated file. Do not edit. Source: src/obsidian/main.ts.
+Crown and Kin: generated file. Do not edit. Source: src/obsidian/main.ts.
 */
 `;
 

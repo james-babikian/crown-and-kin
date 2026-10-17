@@ -173,7 +173,7 @@ class HolderFormModal extends SmallFormModal {
 			}
 			showErrorLine(this.errorEl, message);
 		} catch (e) {
-			console.error('Dynasty Tree: cannot save the holder', e);
+			console.error('Crown and Kin: cannot save the holder', e);
 		} finally {
 			this.saving = false;
 			this.modalEl.removeClass('is-saving');
@@ -189,7 +189,7 @@ class HolderFormModal extends SmallFormModal {
 		try {
 			this.spec.closed?.();
 		} catch (e) {
-			console.error('Dynasty Tree: cannot return the focus', e);
+			console.error('Crown and Kin: cannot return the focus', e);
 		}
 	}
 }

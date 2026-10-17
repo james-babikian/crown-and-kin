@@ -6,8 +6,10 @@
 	font-family: var(--font-interface);
 }
 
-/* The hit area is invisible but takes presses. It lies below the cards, so a card wins where they overlap. */
-.dynasty-tag-hit {
+/* The hit area is invisible but takes presses. It lies below the cards, so a card wins where they overlap,
+   except in the strip over the tag's own card (0.3.1 fix3), which is inside the tag and so above the cards. */
+.dynasty-tag-hit,
+.dynasty-tag-over {
 	cursor: pointer;
 	fill: none;
 	stroke: none;

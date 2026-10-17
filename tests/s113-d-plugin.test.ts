@@ -39,7 +39,7 @@ async function processed(plugin: Host, fake: FakePlugin) {
 	const el = new FEl('div');
 	const children: { load(): void; unload(): void }[] = [];
 	const ctx = { sourcePath: 'n.md', getSectionInfo: () => ({ lineStart: 0, lineEnd: 9, text: '' }), addChild: (c: { load(): void; unload(): void }) => (c.load(), children.push(c)) };
-	fake.codeBlockProcessors.get('dynasty')!(SRC, el, ctx);
+	fake.codeBlockProcessors.get('kin')!(SRC, el, ctx);
 	await settle();
 	const vp = el.querySelector('.dynasty-viewport')!;
 	vp.clientWidth = 360;

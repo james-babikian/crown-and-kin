@@ -2,7 +2,8 @@
  * T16 (the 0.3 contract E.4, the release plan W8): new code reads old trees.
  *
  * `tests/old-trees/` holds a copy of every sample tree of the tags v0.1.0 and v0.2.0, each with its tag in a header comment.
- * For every tree block in them this test checks that:
+ * The copies use the old block word `dynasty`; they are not edited, and `support/old-tag.ts` reads them with the word `kin`
+ * (0.3.1, D167). For every tree block in them this test checks that:
  * 1. the block parses and draws headless (or fails with the same hard error as before);
  * 2. its warnings equal the baseline in `tests/old-trees/baseline.json`, the warnings of the code of version 0.2.8
  *    (`main` when the file was recorded) for the same text. A change in a warning is a change in what the reader says
@@ -20,6 +21,7 @@ import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { parseDocument, isMap, isSeq } from 'yaml';
 import { describe, expect, it } from 'vitest';
 import { svgHash } from './acceptance/m11-support';
+import { oldTag } from './support/old-tag';
 import { findBlocks } from '../src/core/block-locate';
 import { planWrite } from '../src/core/block-write';
 import { deriveFamilies } from '../src/core/derive';
@@ -39,7 +41,7 @@ interface BlockBaseline {
 	warnings: { level: string; code: string; text: string }[];
 }
 
-const files = TAGS.flatMap((tag) => readdirSync(`${ROOT}/${tag}`).filter((f) => f.endsWith('.md')).sort().map((f) => ({ tag, file: f, key: `${tag}/${f}`, note: readFileSync(`${ROOT}/${tag}/${f}`, 'utf8') })));
+const files = TAGS.flatMap((tag) => readdirSync(`${ROOT}/${tag}`).filter((f) => f.endsWith('.md')).sort().map((f) => ({ tag, file: f, key: `${tag}/${f}`, note: oldTag(readFileSync(`${ROOT}/${tag}/${f}`, 'utf8')) })));
 
 function summarise(body: string): BlockBaseline {
 	const parsed = parseDynasty(body);

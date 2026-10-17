@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { routeEdges } from '../src/layout/edges';
 import { geometryFor, lineMetrics, MIN_HIT, sideTagDepth, sidewaysGeometry, tagTop, turnedGeometry } from '../src/layout/geometry';
 import { clearLayoutCache, layoutKey, layoutTree } from '../src/layout/index';
 import { sideTagHit } from '../src/layout/layout';
+import { arrangeTree } from '../src/layout/pipeline';
 import { measureLayout } from '../scripts/metrics';
 import type { FarCoupleRule, LayoutSettings } from '../src/layout/model';
 import { turnPath } from '../src/layout/turn';
@@ -66,10 +66,14 @@ describe('turned frame', () => {
 		expect(lineMetrics(turned).coupleLane0).toBeLessThan(lineMetrics(GEO).coupleLane0);
 	});
 
-	it('routing a finished sideways layout again gives the same lines', () => {
-		const { g, order } = build(fixture('07'));
+	// WP-4b (class c, the architecture notes §4.2.2 "one plan"): there is no second route over a finished layout any more (`routeEdges` is gone), so the old claim
+	// "route the finished layout again and get the same lines" is now: the pipeline run again on the same tree gives the same cards and lines.
+	it('laying out a sideways tree again gives the same cards and lines', () => {
+		const { g, gen } = build(fixture('07'));
 		const { layout, edges } = layoutTree(g, GEO, side(), 'test');
-		expect(routeEdges(g, layout, order.anchors)).toEqual(edges);
+		const again = arrangeTree(g, gen, GEO, side());
+		expect(again.layout).toEqual(layout);
+		expect(again.edges).toEqual(edges);
 	});
 
 	it('an absent orientation is down, and sideways has its own key', () => {
@@ -89,8 +93,10 @@ describe('lines leave a sideways card from its right edge', () => {
 			.map((m) => ({ x: Number(m[1]), y: Number(m[2]) }))
 			.filter((s) => Math.abs(s.x - (p.x + p.w)) < 0.2 && s.y > p.y - 1 && s.y < p.y + p.h + 1);
 		const ys = [...new Set(starts.map((s) => s.y))].sort((a, b) => a - b);
-		// Four legs to wives not beside him, the single-parent trunk, the ward and the rumour.
-		expect(ys).toHaveLength(7);
+		// WP-4b (class c, D239 item 3, spec §5.1 step 5d, "one line, then a fork"): the four legs to wives not beside him are marriages that leave on one
+		// side, so they share one port and part at their nets; the old count was 7 (four ports for the legs). Now: the one port of the four legs,
+		// the single-parent trunk, the ward and the rumour.
+		expect(ys).toHaveLength(4);
 		expect(ys[0]).toBeGreaterThanOrEqual(p.y + 8 - 0.1);
 		expect(ys[ys.length - 1]).toBeLessThanOrEqual(p.y + p.h - 8 + 0.1);
 		for (let i = 1; i < ys.length; i++) expect(ys[i] - ys[i - 1]).toBeGreaterThanOrEqual(7);
@@ -178,24 +184,30 @@ unions:
 		}
 	});
 
+	// WP-4b (class c, D239 V1/V2; a checker is changed only with a proof that it was wrong, the decision notes "0.3.1"): under the rule TIGHT every couple that does not stand side by side is far and has no line, so
+	// since the switch no line crosses a column there (0 of 724 tags in 150 random trees; the old code had 20 or more). The check below is kept for
+	// TIGHT and run too under a rule that leaves near couples across columns ({1 card width, 1 generation}: 40 crossings in the same 150 trees,
+	// and the spec default: 28), so the count of crossings that it needs is met without weakening a single assertion.
 	it('a line that crosses a column below a tagged card passes below the tag, clear of it and of the next card', () => {
 		const m = lineMetrics(GEO);
 		let seen = 0;
-		for (let seed = 1; seed <= 150; seed++) {
-			const { layout, edges } = lay(randomTree(seed), side(TIGHT));
-			const geo = layout.geometry;
-			for (const t of layout.farTags.values()) {
-				const b = layout.persons.get(t.person)!;
-				const col = layout.rows[b.gen];
-				const next = col[col.indexOf(t.person) + 1];
-				const nextTop = next ? layout.persons.get(next)!.y : Infinity;
-				for (const e of edges.paths) {
-					for (const h of horizontals(e.d)) {
-						// Lines across the whole column; a stacked couple's own trunk leaves its dot beside a left-half tag.
-						if (!(h.x1 < b.x && h.x2 > b.x + b.w && h.y > b.y + b.h && h.y < nextTop)) continue;
-						seen++;
-						expect(h.y, `seed ${seed}: ${e.kind} [${e.people}] under ${t.person}'s tag`).toBeGreaterThanOrEqual(tagTop(geo, t.y) + geo.tagH + m.exitStep / 2 - 0.1);
-						expect(nextTop - h.y).toBeGreaterThanOrEqual(m.exitStep / 2 - 0.1);
+		for (const far of [TIGHT, { maxCardWidths: 1, maxGenerations: 1 }, DEFAULT]) {
+			for (let seed = 1; seed <= 150; seed++) {
+				const { layout, edges } = lay(randomTree(seed), side(far));
+				const geo = layout.geometry;
+				for (const t of layout.farTags.values()) {
+					const b = layout.persons.get(t.person)!;
+					const col = layout.rows[b.gen];
+					const next = col[col.indexOf(t.person) + 1];
+					const nextTop = next ? layout.persons.get(next)!.y : Infinity;
+					for (const e of edges.paths) {
+						for (const h of horizontals(e.d)) {
+							// Lines across the whole column; a stacked couple's own trunk leaves its dot beside a left-half tag.
+							if (!(h.x1 < b.x && h.x2 > b.x + b.w && h.y > b.y + b.h && h.y < nextTop)) continue;
+							seen++;
+							expect(h.y, `seed ${seed}: ${e.kind} [${e.people}] under ${t.person}'s tag`).toBeGreaterThanOrEqual(tagTop(geo, t.y) + geo.tagH + m.exitStep / 2 - 0.1);
+							expect(nextTop - h.y).toBeGreaterThanOrEqual(m.exitStep / 2 - 0.1);
+						}
 					}
 				}
 			}

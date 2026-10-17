@@ -5,7 +5,7 @@ vi.mock('@codemirror/language', () => ({ forceParsing: () => false, syntaxTree: 
 vi.mock('@codemirror/view', () => ({ ViewPlugin: { fromClass: () => ({}) } }));
 
 import { EditSheet } from '../src/obsidian/edit-sheet';
-import { FEl, clock, fakeDoc, fakeWin, installDom, resetDom } from './acceptance/fake-dom';
+import { FEl, clock, fakeDoc, fakeWin, installDom, resetDom, settle } from './acceptance/fake-dom';
 import { resetObsidian } from './acceptance/fake-obsidian';
 import { click, stripNotDisabled, writingHandle } from './s113-c-support';
 
@@ -33,11 +33,13 @@ afterEach(() => vi.restoreAllMocks());
 
 const BODY = ['people:', '  - id: mara', '    name: Mara', '  - id: roland', '    name: Roland', '  - id: edda', '    name: Edda', '    parents: [mara, roland]', ''].join('\n');
 
-function open(personId = 'edda') {
+/** F7: a computer window moves the focus to Name in a microtask after the open; the tests start after that step. */
+async function open(personId = 'edda') {
 	const h = writingHandle(BODY);
 	const s = EditSheet.create({} as never, { handle: h as never, personId, sourcePath: 'n.md' })!;
 	s.open();
 	const modal = (s as unknown as { modalEl: FEl }).modalEl;
+	await settle();
 	return { h, s, modal };
 }
 
@@ -45,7 +47,7 @@ const inside = (modal: FEl) => fakeDoc.activeElement !== null && modal.contains(
 
 describe('O2: the focus after the sheet is drawn again', () => {
 	it('Remove parent: the focus goes to the Remove button of the next parent, not to the page', async () => {
-		const { h, modal } = open();
+		const { h, modal } = await open();
 		const buttons = modal.querySelectorAll('.dynasty-remove-parent');
 		expect(buttons).toHaveLength(2);
 		buttons[0]!.focus();
@@ -57,7 +59,7 @@ describe('O2: the focus after the sheet is drawn again', () => {
 	});
 
 	it('Remove parent on the last button of the list: the focus stays on the one that is left', async () => {
-		const { modal } = open();
+		const { modal } = await open();
 		const buttons = modal.querySelectorAll('.dynasty-remove-parent');
 		buttons[1]!.focus();
 		await click(buttons[1]);
@@ -67,7 +69,7 @@ describe('O2: the focus after the sheet is drawn again', () => {
 	});
 
 	it('a button that is gone (Pin becomes Unpin): the focus goes to the sheet', async () => {
-		const { modal } = open();
+		const { modal } = await open();
 		const pin = modal.querySelector('.dynasty-pin')!;
 		pin.focus();
 		await click(pin);
@@ -77,7 +79,7 @@ describe('O2: the focus after the sheet is drawn again', () => {
 	});
 
 	it('a field that had the focus when a write changed the sheet gets it again, with its caret', async () => {
-		const { h, s, modal } = open();
+		const { h, s, modal } = await open();
 		const set = vi.fn();
 		(FEl.prototype as unknown as { setSelectionRange: unknown }).setSelectionRange = set;
 		const old = modal.querySelector('[data-field="born"] input')!;
@@ -94,7 +96,7 @@ describe('O2: the focus after the sheet is drawn again', () => {
 	});
 
 	it('the new control gets the focus without a scroll (the scroll place is kept)', async () => {
-		const { modal } = open();
+		const { modal } = await open();
 		const buttons = modal.querySelectorAll('.dynasty-remove-parent');
 		buttons[0]!.focus();
 		const focus = vi.spyOn(FEl.prototype, 'focus');
@@ -104,7 +106,7 @@ describe('O2: the focus after the sheet is drawn again', () => {
 	});
 
 	it('a sheet that does not have the focus does not take it', async () => {
-		const { h, s } = open();
+		const { h, s } = await open();
 		fakeDoc.activeElement = null;
 		const body = h.body.replace('name: Roland', 'name: Roland II');
 		h.body = body;
@@ -113,7 +115,7 @@ describe('O2: the focus after the sheet is drawn again', () => {
 	});
 
 	it('the focus stays inside the dialog after the sheet was drawn again by a write, for every keyed action button', async () => {
-		const { modal } = open();
+		const { modal } = await open();
 		for (const cls of ['dynasty-mark-me']) {
 			const b = modal.querySelector(`.${cls}`)!;
 			b.focus();

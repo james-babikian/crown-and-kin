@@ -61,7 +61,7 @@ describe('yearOf agrees with the old phone list reader on the sample trees (K.5)
 		let texts = 0;
 		for (const file of readdirSync('fixtures').filter((f) => f.endsWith('.md'))) {
 			const md = readFileSync(`fixtures/${file}`, 'utf8');
-			const body = /^```dynasty\r?\n([\s\S]*?)^```/m.exec(md)?.[1];
+			const body = /^```kin\r?\n([\s\S]*?)^```/m.exec(md)?.[1];
 			if (body === undefined) continue;
 			const parsed = parseDynasty(body);
 			if (!parsed.ok) continue;

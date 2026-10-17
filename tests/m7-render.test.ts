@@ -215,9 +215,11 @@ unions:
 });
 
 describe('D47: two legs from one side (M7 fix round)', () => {
-	// Random tree 47: P7's leg stops on P2's leg (edges.ts), short of the sign of their implicit union. (Tree 2 had this until N05: its dot now lies
-	// between the legs. Partners in one row without a bar still meet the dot from one side.)
-	it('the nearer leg is split: its last run to the sign is on, the rest keeps its state', async () => {
+	// WP-4b (class c, D239, spec §5.1 step 5c): this case was built on random tree 47, where the old router stopped P7's leg on P2's leg, short of the sign of their implicit
+	// union, so the line look had to light "the last run" of the nearer leg. The new pipeline draws no such leg: the dot sits on the hang port of the anchor P2 and P7's leg
+	// runs to the dot itself. The same claim in the new picture: with only P7 > P8 on the line, P7's whole leg and the sign are on, P2's stem (the other partner's piece) keeps
+	// its state; with P2 on the line and the union, the stem is on too. (0.3.1 clean-up D5: no leg of the new pipeline stops short of its sign, so `lineLook` lost its rule for one.)
+	it('the farther leg is whole to the sign: its run to the sign is on, the nearer partner\'s stem keeps its state', async () => {
 		const { randomTree } = await import('./random-trees');
 		const { g } = build(randomTree(47));
 		const laid = lay(g);
@@ -227,16 +229,12 @@ describe('D47: two legs from one side (M7 fix round)', () => {
 		const near = legs.find((p) => p.parents![0] !== 'p7')!;
 		const look = lineLook(g, laid.layout, laid.edges, { people: new Set(['p7', 'p8']), unions: new Set(), links: new Set(['p7\0p8']), fade: true });
 		const dot = laid.edges.markers.find((m) => m.union === key)!;
-		const [, head, x] = /^(.*)H(-?[\d.]+)$/.exec(near.d)!;
-		expect(Number(x)).toBeCloseTo(dot.x, 1);
-		const from = Number(/H(-?[\d.]+)$/.exec(far.d)![1]);
+		// The farther leg ends at the sign.
+		expect(Number(/H(-?[\d.]+)$/.exec(far.d)![1])).toBeCloseTo(dot.x, 1);
 		expect(look.paths.find((p) => p.d === far.d)!.state).toBe('on');
-		expect(look.paths.find((p) => p.d === head)!.state).toBe('faded');
-		const y = Number(/V(-?[\d.]+)$/.exec(head)![1]);
-		expect(look.paths.find((p) => p.d === `M${from} ${y}H${Number(x)}`)!.state).toBe('on');
-		expect(look.paths.some((p) => p.d === near.d)).toBe(false);
+		expect(look.paths.find((p) => p.d === near.d)!.state).toBe('faded');
 		expect(look.markers[laid.edges.markers.indexOf(dot)]).toBe('on');
-		// With the nearer partner on the line, the leg is whole again.
+		// With the nearer partner on the line, the leg is on as well.
 		const both = lineLook(g, laid.layout, laid.edges, { people: new Set(['p2', 'p7', 'p8']), unions: new Set([key]), links: new Set(), fade: true });
 		expect(both.paths.find((p) => p.d === near.d)!.state).toBe('on');
 	});

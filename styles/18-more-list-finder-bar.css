@@ -44,10 +44,11 @@
 }
 
 /* Phone: the bar is at the bottom, so the banner is at the top, inside the safe area (spec §13.2). */
+.modal.dynasty-fullscreen.is-phone-side .dynasty-full .dynasty-result,
 .modal.dynasty-fullscreen.is-phone .dynasty-full .dynasty-result {
 	top: max(0px, env(safe-area-inset-top));
 	min-height: 52px;
-	padding: 4px 0 4px 16px;
+	padding: 4px max(0px, env(safe-area-inset-right)) 4px max(16px, env(safe-area-inset-left));
 }
 
 .dynasty-result-text {

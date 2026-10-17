@@ -91,8 +91,6 @@ describe('formatYear: a negative year shows as "N BC" (F-KIN-06)', () => {
 describe('every succession text that shows a year uses formatYear', () => {
 	const U = SUCCESSION_UI;
 	it('the heading, the bar, the texts of the named heirs, the no-holder texts and the age note', () => {
-		expect(U.lineHeading('Antiochus', -225)).toBe('Line of succession after Antiochus in 225 BC');
-		expect(U.lineHeading('Antiochus', null)).toBe('Line of succession after Antiochus now');
 		expect(U.lineAfter('Antiochus', -225)).toBe('After Antiochus in 225 BC');
 		expect(U.lineAfter('Antiochus', 1210)).toBe('After Antiochus in 1210');
 		expect(U.lineAfter('Antiochus', null)).toBe('After Antiochus now');

@@ -17,7 +17,7 @@ beforeEach(() => {
 });
 afterEach(() => vi.useRealTimers());
 
-const NOTE = ['# Note', '', '```dynasty', 'people:', '  - id: alys', '    name: Alys', '    link: "[[Old Name]]"', '```', ''].join('\n');
+const NOTE = ['# Note', '', '```kin', 'people:', '  - id: alys', '    name: Alys', '    link: "[[Old Name]]"', '```', ''].join('\n');
 
 function registry() {
 	const file = new TFile('n.md', 'md');

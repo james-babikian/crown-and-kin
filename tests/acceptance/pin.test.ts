@@ -173,13 +173,13 @@ describe('a block in a callout or a list item keeps its prefix (§6.1, §6.2)', 
 
 	it('callout: a new options section gets "> " on its lines and ">" on the blank line', () => {
 		expect(writeNote(NOTE, 1, pin('hugh'))).toBe(
-			replaceOnce(NOTE, '> ```dynasty\n> people:\n>   - id: osric\n', '> ```dynasty\n> options:\n>   focus: hugh\n>\n> people:\n>   - id: osric\n'),
+			replaceOnce(NOTE, '> ```kin\n> people:\n>   - id: osric\n', '> ```kin\n> options:\n>   focus: hugh\n>\n> people:\n>   - id: osric\n'),
 		);
 	});
 
 	it('callout inside a callout: "> > " and "> >"', () => {
 		expect(writeNote(NOTE, 2, pin('wat'))).toBe(
-			replaceOnce(NOTE, '> > ```dynasty\n> > people:\n', '> > ```dynasty\n> > options:\n> >   focus: wat\n> >\n> > people:\n'),
+			replaceOnce(NOTE, '> > ```kin\n> > people:\n', '> > ```kin\n> > options:\n> >   focus: wat\n> >\n> > people:\n'),
 		);
 	});
 

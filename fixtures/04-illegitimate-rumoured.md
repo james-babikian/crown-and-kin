@@ -2,7 +2,7 @@
 
 Wren has only one listed parent. Roderick's true father is rumoured to be Ser Gareth.
 
-```dynasty
+```kin
 houses:
   - id: valmont
     name: House Valmont

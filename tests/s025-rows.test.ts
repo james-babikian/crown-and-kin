@@ -9,9 +9,9 @@ import { computeGenerations } from '../src/core/generations';
 import { computeModelOrder } from '../src/core/order';
 import { rowStats } from '../src/core/row-partners';
 import { loneRumouredRoots } from '../src/core/rumoured-roots';
-import { routeEdges } from '../src/layout/edges';
 import { NORMAL_GEOMETRY } from '../src/layout/geometry';
-import { DEFAULT_FAR_RULE, layoutFamilies } from '../src/layout/layout';
+import { DEFAULT_FAR_RULE } from '../src/layout/layout';
+import { arrangeTree } from '../src/layout/pipeline';
 import { build, fixture } from './helpers';
 import { randomTree, rumourTree } from './random-trees';
 import { chains, freeFormTree, freeTree, genTree } from './s025-families';
@@ -54,10 +54,9 @@ describe('r1: a lone rumoured parent sits in the row of the child\'s placed pare
 		const block = order.blocks.find((b) => b.includes('rufus'))!;
 		expect(block).toContain('kay');
 		expect(block[block.length - 1]).toBe('rufus');
-		const layout = layoutFamilies(g, gen, order, NORMAL_GEOMETRY, SETTINGS);
+		const { layout, edges } = arrangeTree(g, gen, NORMAL_GEOMETRY, SETTINGS);
 		const x = (id: string) => layout.persons.get(id)!.x;
 		expect(Math.abs(x('rufus') - x('pia'))).toBeLessThanOrEqual(2 * NORMAL_GEOMETRY.cardW + 3 * NORMAL_GEOMETRY.nodeGap);
-		const edges = routeEdges(g, layout, order.anchors);
 		expect(edges.paths.length).toBeGreaterThan(0);
 		expect(edges.paths.some((p) => p.kind === 'rumoured' && p.child === 'oda' && p.parents?.includes('rufus'))).toBe(true);
 	});
@@ -252,9 +251,9 @@ unions:
 	});
 
 	it('keeps the far rule: a couple that stays 2 rows apart is far; a couple that r2 joined is not', () => {
-		const { g, gen, order } = build(ROWS_TWIN);
+		const { g, gen } = build(ROWS_TWIN);
 		for (const orientation of [undefined, 'sideways' as const]) {
-			const layout = layoutFamilies(g, gen, order, NORMAL_GEOMETRY, { ...SETTINGS, ...(orientation ? { orientation } : {}) });
+			const { layout } = arrangeTree(g, gen, NORMAL_GEOMETRY, { ...SETTINGS, ...(orientation ? { orientation } : {}) });
 			for (const u of g.unions) {
 				const apart = Math.abs(gen.get(u.partners[0])! - gen.get(u.partners[1])!);
 				const far = layout.unions.get(u.key)!.far;

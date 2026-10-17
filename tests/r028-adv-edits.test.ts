@@ -255,7 +255,7 @@ describe('X4 (1, 2, 3, 6) random edit sequences on notes of many forms', () => {
 // Odd values: a value written by an edit reads back, and never ends the block early
 
 describe('X4 odd values: what an edit writes reads back (spec §6.2), and never changes where the tree ends', () => {
-	const ODD = ['```', '~~~ x', '````', '> [!note]', '- item', '# heading', '---', '...', 'a: b', '{x}', '[y]', "'", '"', '\\', '#', '%', '@x', '`x', '*a', '&b', '!c', '|', '>', 'line1\nline2', 'tab\there', 'a b', 'a\rb', 'a\r\nb', '😀', 'x'.repeat(500), 'yes', 'null', '~', '1e3', '0x10', 'true', '"quoted"', "it's", 'a #b', 'a: b # c', '***', '\\n', 'é', '- ', '? x', ': x', '\n```\n', '\n~~~dynasty\n', 'x\n```\ny'];
+	const ODD = ['```', '~~~ x', '````', '> [!note]', '- item', '# heading', '---', '...', 'a: b', '{x}', '[y]', "'", '"', '\\', '#', '%', '@x', '`x', '*a', '&b', '!c', '|', '>', 'line1\nline2', 'tab\there', 'a b', 'a\rb', 'a\r\nb', '😀', 'x'.repeat(500), 'yes', 'null', '~', '1e3', '0x10', 'true', '"quoted"', "it's", 'a #b', 'a: b # c', '***', '\\n', 'é', '- ', '? x', ': x', '\n```\n', '\n~~~kin\n', 'x\n```\ny'];
 	for (const form of [FORMS[0], FORMS[11]]) {
 		it(`form "${form.name}": name, born, title and house name`, () => {
 			const base = baseBody(rng(5));
@@ -461,9 +461,9 @@ describe('X4 (5) a write over a body that changed after the read is refused as s
 describe('T-X4-01 a fence inside front matter is not a block, also when the note starts with a byte order mark (spec question)', () => {
 	it('T-X4-01: the tree after a BOM and front matter with a fenced example is block number 0', () => {
 		const tree = 'people:\n  - id: a\n    name: Aldric';
-		const matter = '---\ndescription: |\n  ```dynasty\n  people: []\n  ```\n---\n';
-		const plain = findBlocks(`${matter}\`\`\`dynasty\n${tree}\n\`\`\`\n`);
-		const withBom = findBlocks(`﻿${matter}\`\`\`dynasty\n${tree}\n\`\`\`\n`);
+		const matter = '---\ndescription: |\n  ```kin\n  people: []\n  ```\n---\n';
+		const plain = findBlocks(`${matter}\`\`\`kin\n${tree}\n\`\`\`\n`);
+		const withBom = findBlocks(`﻿${matter}\`\`\`kin\n${tree}\n\`\`\`\n`);
 		expect(plain.map((b) => b.body), 'without a BOM').toEqual([tree]);
 		expect(withBom.map((b) => b.body), 'with a BOM').toEqual([tree]);
 	});

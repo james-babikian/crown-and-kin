@@ -1,44 +1,44 @@
 orientation down
-size 1147.187 383
+size 1051.2 383
 geometry font 16 normal card 180x61 union 10 couple 36 node 20 row 100 tag 18
 row 0: godric elinor
 row 1: agnes edmund beatrix clarice cecily
 row 2: hugo maud piers sybil osric
 gap 0: 61 161
 gap 1: 222 322
-person agnes gen 1 at 119.203 161 size 180 61
-person beatrix gen 1 at 551.203 161 size 180 61
-person cecily gen 1 at 967.187 161 size 180 61
-person clarice gen 1 at 767.187 161 size 180 61
-person edmund gen 1 at 335.203 161 size 180 61
-person elinor gen 0 at 759.195 0 size 180 61
-person godric gen 0 at 543.195 0 size 180 61
+person agnes gen 1 at 39.2 161 size 180 61
+person beatrix gen 1 at 471.2 161 size 180 61
+person cecily gen 1 at 871.2 161 size 180 61
+person clarice gen 1 at 671.2 161 size 180 61
+person edmund gen 1 at 255.2 161 size 180 61
+person elinor gen 0 at 671.2 0 size 180 61
+person godric gen 0 at 455.2 0 size 180 61
 person hugo gen 2 at 0 322 size 180 61
 person maud gen 2 at 200 322 size 180 61
 person osric gen 2 at 800 322 size 180 61
 person piers gen 2 at 400 322 size 180 61
 person sybil gen 2 at 600 322 size 180 61
-union u0 at 741.195 30.5 bar
-union u1 at 317.203 191.5 bar
-union u2 at 533.203 191.5 bar
-union u3 at 641.195 244
-path marriage [godric elinor] M723.2 30.5H759.2
-path marriage [edmund agnes] M299.2 191.5H335.2
-path marriage [edmund beatrix] M515.2 191.5H551.2
-path marriage [edmund clarice] M425.2 222V244H641.2
-path marriage [edmund clarice] M857.2 222V244H641.2
-path descent [godric elinor edmund cecily] M741.2 30.5V131M425.2 131H1057.2
-path descent [edmund godric elinor] M425.2 131V161
-path descent [cecily godric elinor] M1057.2 131V161
-path descent [edmund agnes hugo maud] M317.2 191.5V292M90 292H317.2
+union u0 at 653.2 30.5 bar
+union u1 at 237.2 191.5 bar
+union u2 at 453.2 191.5 bar
+union u3 at 761.2 244
+path marriage [godric elinor] M635.2 30.5H671.2
+path marriage [edmund agnes] M219.2 191.5H255.2
+path marriage [edmund beatrix] M435.2 191.5H471.2
+path marriage [edmund clarice] M761.2 222V244
+path marriage [edmund clarice] M345.2 222V244H761.2
+path descent [godric elinor edmund cecily] M653.2 30.5V131M345.2 131H961.2
+path descent [edmund godric elinor] M345.2 131V161
+path descent [cecily godric elinor] M961.2 131V161
+path descent [edmund agnes hugo maud] M237.2 191.5V292M90 292H290
 path descent [hugo edmund agnes] M90 292V322
 path descent [maud edmund agnes] M290 292V322
-path descent [edmund beatrix piers] M533.2 191.5V292M490 292H533.2
-path descent [piers edmund beatrix] M490 292V322
-path descent [edmund clarice sybil osric] M641.2 244V292M641.2 292H890
+path descent [edmund beatrix piers] M453.2 191.5V292M453.2 292H466
+path descent [piers edmund beatrix] M466 292V322
+path descent [edmund clarice sybil osric] M761.2 244V292M690 292H890
 path descent [sybil edmund clarice] M690 292V322
 path descent [osric edmund clarice] M890 292V322
-marker union at 741.195 30.5
-marker union at 317.203 191.5
-marker union at 533.203 191.5
-marker union at 641.195 244
+marker union at 653.2 30.5
+marker union at 237.2 191.5
+marker union at 453.2 191.5
+marker union at 761.2 244

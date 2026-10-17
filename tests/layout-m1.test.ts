@@ -2,10 +2,10 @@ import { describe, expect, it } from 'vitest';
 import { deriveFamilies } from '../src/core/derive';
 import { hardErrorText } from '../src/core/messages';
 import { parseDynasty } from '../src/core/parse';
-import { routeEdges } from '../src/layout/edges';
-import { cardText, gapHeight, geometryFor, laneStep, lineMetrics, MIN_HIT, NORMAL_GEOMETRY, tagTop } from '../src/layout/geometry';
+import { cardText, geometryFor, lineMetrics, MIN_HIT, NORMAL_GEOMETRY, tagTop } from '../src/layout/geometry';
 import { clearLayoutCache, LAYOUT_CACHE_SIZE, layoutTree } from '../src/layout/index';
-import { DEFAULT_FAR_RULE, DEFAULT_LAYOUT_SETTINGS, isFarCouple, layoutFamilies } from '../src/layout/layout';
+import { DEFAULT_FAR_RULE, DEFAULT_LAYOUT_SETTINGS, isFarCouple } from '../src/layout/layout';
+import { arrangeTree } from '../src/layout/pipeline';
 import type { EdgeDrawing, FarCoupleRule, Geometry, LayoutSettings, PersonBox, Rect, TreeLayout } from '../src/layout/model';
 import { build, fixture } from './helpers';
 
@@ -13,9 +13,9 @@ const FIXTURES = ['01', '02', '03', '04', '06', '07', '08', '11'];
 const LOOSE: FarCoupleRule = { maxCardWidths: Infinity, maxGenerations: Infinity };
 
 function lay(source: string, far: FarCoupleRule = DEFAULT_FAR_RULE, geo: Geometry = NORMAL_GEOMETRY) {
-	const { g, gen, order } = build(source);
-	const layout = layoutFamilies(g, gen, order, geo, { sweeps: 4, far });
-	return { g, layout, edges: routeEdges(g, layout, order.anchors) };
+	const { g, gen } = build(source);
+	const { layout, edges } = arrangeTree(g, gen, geo, { sweeps: 4, far });
+	return { g, layout, edges };
 }
 
 type Seg = { x1: number; y1: number; x2: number; y2: number };
@@ -123,17 +123,10 @@ describe('geometryFor', () => {
 			expect(t.textW).toBeGreaterThan(0.5 * geo.cardW);
 		});
 
-		it(`${f} px: a gap between rows holds a tag, its couple lanes and its sibling-bar lanes`, () => {
+		it(`${f} px: the first couple lane lies below the tag`, () => {
 			const geo = geometryFor(f);
 			const m = lineMetrics(geo);
 			expect(m.coupleLane0 - geo.unionSize / 2).toBeGreaterThan(tagTop(geo, 0) + geo.tagH);
-			expect(gapHeight(geo, 1, 1)).toBe(geo.rowGap);
-			for (const [couples, bars] of [[1, 4], [3, 2], [8, 4]]) {
-				const h = gapHeight(geo, couples, bars);
-				const lowestDot = m.coupleLane0 + (couples - 1) * m.coupleLaneStep + geo.unionSize / 2;
-				const highestBar = h - m.barDrop - (bars - 1) * laneStep(geo);
-				expect(lowestDot + m.clearance).toBeLessThanOrEqual(highestBar + 1e-9);
-			}
 		});
 	}
 });
@@ -190,11 +183,15 @@ describe('far couples (D10)', () => {
 		expect(Math.abs(Number(start[2]) - u.y)).toBeLessThanOrEqual(0.05 + 1e-9);
 	});
 
-	it('the far rule moves no card sideways (rows only get the height their lines need)', () => {
+	// WP-4b, class c: the old claim was "the far rule moves no card sideways". Since D239 and D240 a near couple that is not side by side takes a
+	// passage (about 34 px) and a far couple takes a tag, so the rule may change the x of cards by design. What the rule must not change is
+	// the order of the cards in a row and the rows of the people: that part of the old claim is kept.
+	it('the far rule changes neither the rows nor the order of the cards in a row', () => {
 		for (const f of ['03', '06', '07']) {
 			const a = lay(fixture(f), { maxCardWidths: 0, maxGenerations: 0 }).layout;
 			const b = lay(fixture(f), LOOSE).layout;
-			for (const [id, p] of a.persons) expect(p.x).toBe(b.persons.get(id)!.x);
+			expect(a.rows).toEqual(b.rows);
+			for (const [id, p] of a.persons) expect(p.gen).toBe(b.persons.get(id)!.gen);
 		}
 	});
 

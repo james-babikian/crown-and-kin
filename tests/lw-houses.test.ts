@@ -27,6 +27,9 @@ import { click, stripNotDisabled, type, writingHandle, type Writing } from './s1
  * changes asks first. Names in this file are made up.
  */
 
+// The intro hint of 0.2.x, no longer in ui-text.ts: the Houses window must not show it again.
+const OLD_HOUSES_INTRO = 'The colour of a house shows on the cards of the people of that house.';
+
 beforeAll(() => {
 	installDom();
 	(globalThis as Record<string, unknown>).window ??= fakeWin;
@@ -174,8 +177,8 @@ describe('open: a list of the houses (D134)', () => {
 		for (const c of ['dynasty-btn', 'dynasty-lw-add', 'dynasty-house-add']) expect(add.hasClass(c)).toBe(true);
 		expect(add.getAttribute('data-focus')).toBe('add');
 		expect(searchBox(content).getAttribute('placeholder')).toBe(WIN_LIST_UI.searchHouses);
-		// The old intro hint is on the page, not on the list.
-		expect(content.getText()).not.toContain(HOUSES.intro);
+		// The old intro hint (removed from ui-text.ts) is on neither the list nor the page.
+		expect(content.getText()).not.toContain(OLD_HOUSES_INTRO);
 	});
 
 	it('shows one line for a tree with no houses', () => {
@@ -279,7 +282,7 @@ describe('the edit page (D.3.6, D.3.7)', () => {
 		expect(page.querySelector('.dynasty-lw-pagemeta')).toBeNull();
 		expect(page.querySelector('[data-section="people"] .dynasty-section-sum')!.getText()).toBe(WINDOW_UI.sumPeopleHeader(2, 1));
 		expect(page.querySelector('.dynasty-house-count')).toBeNull();
-		expect(page.getText()).not.toContain(HOUSES.intro);
+		expect(page.getText()).not.toContain(OLD_HOUSES_INTRO);
 		expect(page.querySelectorAll('section.dynasty-section').map((x) => x.getAttribute('data-section'))).toEqual(['details', 'people', 'more']);
 		expect(page.querySelector('.dynasty-house-palette')).not.toBeNull();
 		expect(page.querySelectorAll('.dynasty-house-colour')).toHaveLength(12);

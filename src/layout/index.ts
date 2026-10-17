@@ -1,6 +1,6 @@
 /**
- * The layout module's entry point. `layoutTree` runs generation and order finding, then
- * `layoutFamilies` and `routeEdges`, behind a small in-memory cache keyed on everything that could
+ * The layout module's entry point. `layoutTree` runs the generations and then `arrangeTree` (the card-and-line
+ * pipeline: walk, plan, place, route; `pipeline.ts`), behind a small in-memory cache keyed on everything that could
  * move a card or change a line (spec §5.1 step 6, D9). Renderers call `layoutTree`; they read the
  * shared shapes and helpers of `model.ts` and `geometry.ts` directly.
  */
@@ -8,12 +8,10 @@ import { deepFreeze } from '../core/deep-freeze';
 import type { FamilyGraph } from '../core/derive';
 import { computeGenerations } from '../core/generations';
 import { foldControls, foldFamilies, hiddenPartners, pruneGraph, type FoldControl } from '../core/folds';
-import { computeModelOrder } from '../core/order';
-import { routeEdges } from './edges';
 import type { FoldInput } from './fold-spots';
 import { withRelationLine } from './geometry';
-import { layoutFamilies } from './layout';
 import type { Geometry, LaidOut, LayoutSettings, LayoutTree } from './model';
+import { arrangeTree } from './pipeline';
 
 export { geometryFor, NORMAL_GEOMETRY } from './geometry';
 export { DEFAULT_FAR_RULE, DEFAULT_LAYOUT_SETTINGS, NEVER_FAR_RULE, armsCards, pictureSets } from './layout';
@@ -23,6 +21,13 @@ export { illegitimateSigns } from './illegitimate-sign';
 export const LAYOUT_CACHE_SIZE = 16;
 
 const cache = new Map<string, LaidOut>();
+
+/**
+ * The generations of each graph object whose layout finished (WP-E2 P5): `measuredLayout` lays the same graph out a second time when the tall
+ * cards need the first layout, and the generations depend on the graph only. Keyed by the object, never by a text: a graph is not changed after
+ * `deriveFamilies` makes it, and an entry lives only as long as its graph. The layout only reads the map.
+ */
+const generationsByGraph = new WeakMap<FamilyGraph, Map<string, number>>();
 
 /** Thrown by `layoutTree` when its `shouldStop` check answers true between two phases (spec §7.7, time budget). The caller shows the bar for a tree that took too long. */
 export class LayoutStopped extends Error {
@@ -121,7 +126,7 @@ function foldPlan(g: FamilyGraph, settings: LayoutSettings): { pruned: FamilyGra
 	// A folded family keeps a stem only when none of its children shows; a fold that hides nobody has no sign.
 	const byKey = new Map(foldFamilies(g).map((f) => [f.key, f]));
 	const folded: FoldControl[] = (controls ?? []).filter((c) => c.folded && byKey.get(c.key)?.children.every((id) => hidden.has(id)));
-	return { pruned: pruneGraph(g, hidden), input: { full: g, partners, controls, lines: { tagged: new Set(partners.keys()), folded, ...(controls ? { controls } : {}) } } };
+	return { pruned: pruneGraph(g, hidden), input: { full: g, partners, controls, folded } };
 }
 
 /**
@@ -138,21 +143,20 @@ export const layoutTree: LayoutTree = (g, geo, settings, fontFamily, shouldStop)
 		cache.set(key, hit);
 		return hit;
 	}
-	// Only between the phases, never inside one: a stopped layout leaves no partial result, and nothing of it is cached.
+	// Only between the phases, never inside one: a stopped layout leaves no partial result, and nothing of it is cached. The sites inside
+	// `arrangeTree` (after the walk, each plan, each placement round and the route) call the same check.
 	const check = () => {
 		if (shouldStop?.()) throw new LayoutStopped();
 	};
 	check();
-	const gen = computeGenerations(g);
+	const gen = generationsByGraph.get(g) ?? computeGenerations(g);
 	check();
 	const fold = foldPlan(g, settings);
-	// F2: the generations come from the whole graph; the arranger and the router get the graph without the hidden people.
+	// F2: the generations come from the whole graph; the arranger gets the graph without the hidden people.
 	const shown = fold ? fold.pruned : g;
-	const order = computeModelOrder(shown, gen);
-	check();
-	const layout = layoutFamilies(shown, gen, order, { ...geo }, settings, undefined, fold?.input);
-	check();
-	const out: LaidOut = deepFreeze({ layout, edges: routeEdges(shown, layout, order.anchors, fold?.input.lines) });
+	const out: LaidOut = deepFreeze(arrangeTree(shown, gen, { ...geo }, settings, fold?.input, { check }));
+	// Kept only now: a stopped layout leaves nothing behind.
+	generationsByGraph.set(g, gen);
 	cache.set(key, out);
 	while (cache.size > LAYOUT_CACHE_SIZE) cache.delete(cache.keys().next().value!);
 	return out;

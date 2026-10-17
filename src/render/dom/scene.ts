@@ -53,7 +53,7 @@ import { farTagSigns } from '../../layout/far-tag-sign';
 import { illegitimateSigns } from '../../layout/index';
 import type { FarTag, LaidOut, NameLineCount, PersonBox, PlacedFoldControl, Rect } from '../../layout/model';
 import type { BreakList } from '../break-words';
-import { legendRows, unionMarkClass, type LegendHouse, type LegendPart } from '../legend';
+import { legendRows, unionMarkClass, type LegendPart } from '../legend';
 import { isColour } from '../colour-check';
 import { lineLook, type LineMarks, type LineState } from '../line-highlight';
 import { cardNameLines, titleLines, type NameMeasure, type NameRun } from '../name-lines';
@@ -191,6 +191,11 @@ export interface TagRef {
 	el: SVGGElement;
 	/** The invisible tap area. It lies below the cards (see buildScene), so it is not inside `el`. */
 	hit: SVGRectElement;
+	/**
+	 * 0.3.1 fix3: the invisible strip of the tap area that lies over the bottom of the tag's own card, inside `el` and so above the cards:
+	 * the tag wins a press there. Empty (no size) until the tree view places it at a settled zoom (`tagHitSide`).
+	 */
+	over: SVGRectElement;
 }
 
 /** The `+` badge of a card in focus mode (spec §5.6). */
@@ -983,6 +988,7 @@ export function buildScene(parent: SVGGElement, g: FamilyGraph, laid: LaidOut, o
 			cls: tagState.length ? ['dynasty-tag', ...tagState] : 'dynasty-tag',
 			attr: { tabindex: 0, role: 'button', 'aria-label': farTagLabel(g, tag.spouses), 'data-person': tag.person },
 		});
+		const over = el.createSvg('rect', { cls: 'dynasty-tag-over', attr: { x: tag.hit.x, y: tag.hit.y, width: 0, height: 0 } });
 		const pills = holderFor(el);
 		const hit = hitsEl.createSvg('rect', { cls: 'dynasty-tag-hit', attr: { x: tag.hit.x, y: tag.hit.y, width: tag.hit.w, height: tag.hit.h, 'data-person': tag.person } });
 		// The pill never grows past its zone (FarTag.zoneW): in `sideways` the tap area can be wider than the card's edge.
@@ -1040,7 +1046,7 @@ export function buildScene(parent: SVGGElement, g: FamilyGraph, laid: LaidOut, o
 				tagFits();
 				attachChildren(pills, el);
 			});
-		tags.push({ tag, el, hit });
+		tags.push({ tag, el, hit, over });
 	}
 
 	// A tap area made later (a lazy button) lies after the tag areas; the group takes that place for every button, as before.
@@ -1179,16 +1185,13 @@ function addPart(parent: SVGElement, part: LegendPart): void {
 
 /**
  * Fills the legend popover (D25): one row per line kind, the D14 sign and the two dead signs, each sample drawn like the tree. 0.2.8 (D196 item 3, contract A.1): the
- * live legend shows the line styles only; the houses are in the Houses window, and the saved picture keeps its own house legend (`svg-string.ts`). The two extra
- * parameters of 0.2.7 (the houses and their callback) are still accepted and ignored, so a caller of 0.2.7 keeps working; `arms` is always empty.
+ * live legend shows the line styles only; the houses are in the Houses window, and the saved picture keeps its own house legend (`svg-string.ts`).
  */
-export function buildLegend(list: HTMLElement, _houses?: readonly LegendHouse[], _onHouse?: (houseId: string) => void): { arms: Map<string, HTMLElement> } {
-	void [_houses, _onHouse];
+export function buildLegend(list: HTMLElement): void {
 	for (const r of legendRows()) {
 		const row = list.createDiv({ cls: r.kind === 'sign' ? 'dynasty-legend-row dynasty-legend-sign' : 'dynasty-legend-row' });
 		const sample = row.createSvg('svg', { cls: 'dynasty-legend-sample', attr: { width: r.w, height: r.h, viewBox: `0 0 ${r.w} ${r.h}` } });
 		for (const part of r.parts) addPart(sample, part);
 		row.createSpan({ cls: 'dynasty-legend-label', text: r.label });
 	}
-	return { arms: new Map() };
 }

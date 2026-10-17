@@ -52,7 +52,7 @@ export function attachSheetSwipe(sheet: HTMLElement, hooks: SwipeHooks): () => v
 		try {
 			fn();
 		} catch (e) {
-			console.error('Dynasty Tree: the sheet swipe failed', e);
+			console.error('Crown and Kin: the sheet swipe failed', e);
 			reset();
 		}
 	};

@@ -3,11 +3,10 @@ import type { FamilyGraph } from '../src/core/derive';
 import { deriveFamilies } from '../src/core/derive';
 import { hardErrorText } from '../src/core/messages';
 import { parseDynasty } from '../src/core/parse';
-import { routeEdges } from '../src/layout/edges';
 import { NORMAL_GEOMETRY, tagTop } from '../src/layout/geometry';
 import { clearLayoutCache, layoutKey, layoutTree } from '../src/layout/index';
-import { DEFAULT_FAR_RULE, DEFAULT_LAYOUT_SETTINGS, layoutFamilies } from '../src/layout/layout';
-import { addTo } from '../src/layout/lines';
+import { DEFAULT_FAR_RULE, DEFAULT_LAYOUT_SETTINGS } from '../src/layout/layout';
+import { arrangeTree } from '../src/layout/pipeline';
 import type { EdgeDrawing, EdgePath, FarCoupleRule, Rect, TreeLayout } from '../src/layout/model';
 import { build, fixture } from './helpers';
 
@@ -22,9 +21,9 @@ const OPTIONS: [string, FarCoupleRule][] = [
 const COUPLE = new Set(['marriage', 'betrothal', 'concubinage', 'affair', 'implicit']);
 
 function lay(src: string, far: FarCoupleRule = DEFAULT_FAR_RULE) {
-	const { g, gen, order } = build(src);
-	const layout = layoutFamilies(g, gen, order, NORMAL_GEOMETRY, { sweeps: 4, far });
-	return { g, layout, edges: routeEdges(g, layout, order.anchors) };
+	const { g, gen } = build(src);
+	const { layout, edges } = arrangeTree(g, gen, NORMAL_GEOMETRY, { sweeps: 4, far });
+	return { g, layout, edges };
 }
 
 const graph = (src: string) => {
@@ -280,12 +279,14 @@ people:
   - {id: k1, name: K1, parents: [varian, n1]}
 `;
 		const { layout, edges } = lay(src);
-		const tag = layout.farTags.get('varian')!;
-		const leg = edges.paths.find((e) => COUPLE.has(e.kind) && e.people.includes('varian'))!;
-		// Supervisor decision: the far couple's line lists only the anchor partner.
-		expect(leg.people).toHaveLength(1);
+		// D239 (W1): the lower partner (n1) anchors the couple, so the far couple's one line lists only n1, not varian.
+		const leg = edges.paths.find((e) => COUPLE.has(e.kind) && e.people.length === 1 && ['varian', 'n1'].includes(e.people[0]))!;
+		expect(leg.people).toEqual(['n1']);
 		const x = Number(leg.d.match(/^M([\d.]+)/)![1]);
-		expect(x > tag.hit.x && x < tag.hit.x + tag.hit.w, `leg ${leg.d}, tag ${tag.hit.x}..${tag.hit.x + tag.hit.w}`).toBe(false);
+		for (const id of ['varian', 'n1']) {
+			const tag = layout.farTags.get(id)!;
+			expect(x > tag.hit.x && x < tag.hit.x + tag.hit.w, `leg ${leg.d}, tag of ${id} ${tag.hit.x}..${tag.hit.x + tag.hit.w}`).toBe(false);
+		}
 		expect(linesThroughTags(layout, edges)).toEqual([]);
 	});
 
@@ -339,21 +340,5 @@ people:
 		// Lisette has no other line leaving her card: her tag may use all but a small margin.
 		const lisette = layout.farTags.get('lisette')!;
 		expect(lisette.hit.w).toBeGreaterThanOrEqual(NORMAL_GEOMETRY.cardW - NORMAL_GEOMETRY.fontPx);
-	});
-});
-
-describe('addTo', () => {
-	it('keeps the order of keys and of the values of each key', () => {
-		const map = new Map<number, string[]>();
-		addTo(map, 2, 'a');
-		addTo(map, 1, 'b');
-		addTo(map, 2, 'c');
-		const first = map.get(2);
-		addTo(map, 2, 'd');
-		expect([...map]).toEqual([
-			[2, ['a', 'c', 'd']],
-			[1, ['b']],
-		]);
-		expect(map.get(2)).toBe(first);
 	});
 });

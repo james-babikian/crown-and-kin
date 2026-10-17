@@ -150,7 +150,7 @@ describe('F-VIEW-03: a view takes the state of the handle at its old ordinal bef
 		const { TFile: FakeTFile, MarkdownView: FakeMV } = await import('./acceptance/fake-obsidian');
 		const { TreeView } = await import('../src/obsidian/tree-view');
 		const { FEl, resizeAll } = await import('./acceptance/fake-dom');
-		const fence = (b: string) => ['```dynasty', b, '```'].join('\n');
+		const fence = (b: string) => ['```kin', b, '```'].join('\n');
 		const XA = 'people:\n  - id: alys\n    name: Alys';
 		const YB = 'people:\n  - id: yara\n    name: Yara';
 		const t0 = [fence(XA), '', fence(YB), ''].join('\n');
@@ -205,7 +205,7 @@ describe('F-VIEW-04: a link update meets a slow write and drops the whole note w
 		const { findBlocks } = await import('../src/core/block-locate');
 		const { TFile: FakeTFile } = await import('./acceptance/fake-obsidian');
 		const { LinkUpdater } = await import('../src/obsidian/rename-links');
-		const fence = (b: string) => ['```dynasty', b, '```'].join('\n');
+		const fence = (b: string) => ['```kin', b, '```'].join('\n');
 		const X = 'people:\n  - id: alys\n    name: Alys\n    link: "[[Old Name]]"';
 		let text = ['# Note', '', fence(X), ''].join('\n');
 		const file = new FakeTFile('n.md', 'md');

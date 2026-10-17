@@ -69,15 +69,15 @@ describe('the settings tab', () => {
 		return { tab, changes, rowOf };
 	}
 
-	it('has the two rows in the group Cards, with their names and descriptions', () => {
+	it('has the two rows in the group Line of succession (F10a), with their names and descriptions', () => {
 		const { rowOf } = open();
 		const length = rowOf(SETTINGS_UI.successionLength);
 		const age = rowOf(SETTINGS_UI.oldAge);
 		expect(length.descEl.getText()).toBe(SETTINGS_UI.successionLengthDesc);
 		expect(age.descEl.getText()).toBe(SETTINGS_UI.oldAgeDesc);
 		const group = (row: typeof length) => row.settingEl.closest('.setting-group')!.querySelector('.setting-item-heading')!.getText();
-		expect(group(length)).toBe(SETTINGS_UI.groups.cards);
-		expect(group(age)).toBe(SETTINGS_UI.groups.cards);
+		expect(group(length)).toBe(SETTINGS_UI.groups.succession);
+		expect(group(age)).toBe(SETTINGS_UI.groups.succession);
 		expect(length.controlEl.querySelector('input')!.value).toBe('5');
 		expect(age.controlEl.querySelector('input')!.value).toBe('110');
 		expect(length.controlEl.querySelector('input')!.getAttribute('aria-label')).toBe(SETTINGS_UI.successionLength);

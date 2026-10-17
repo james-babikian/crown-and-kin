@@ -1,6 +1,7 @@
 import type { FamilyGraph } from '../src/core/derive';
 import { tagTop } from '../src/layout/geometry';
 import type { EdgeDrawing, EdgePath, Rect, TreeLayout } from '../src/layout/model';
+import { isForkShare } from './support/fork-share';
 
 // Seeded random family trees (half-siblings, remarriages, parent–child and cousin marriages,
 // adoptions) checked for the line rules of spec §5.3 and review 1.3: no straight line passes
@@ -144,14 +145,15 @@ export function lineProblems(g: FamilyGraph, layout: TreeLayout, edges: EdgeDraw
 	for (let i = 0; i < lines.length; i++) {
 		for (let j = i + 1; j < lines.length; j++) {
 			if (lines[i].fam === lines[j].fam) continue;
-			for (const a of lines[i].segs) {
-				for (const b of lines[j].segs) {
+			for (const [ai, a] of lines[i].segs.entries()) {
+				for (const [bi, b] of lines[j].segs.entries()) {
 					const h = a.y1 === a.y2 && b.y1 === b.y2 && Math.abs(a.y1 - b.y1) < 0.5;
 					const v = a.x1 === a.x2 && b.x1 === b.x2 && Math.abs(a.x1 - b.x1) < 0.5;
 					if (!h && !v) continue;
 					const [a1, a2, b1, b2] = h ? [a.x1, a.x2, b.x1, b.x2] : [a.y1, a.y2, b.y1, b.y2];
 					const shared = Math.min(Math.max(a1, a2), Math.max(b1, b2)) - Math.max(Math.min(a1, a2), Math.min(b1, b2));
-					if (shared > 0.5) bad.push(`${lines[i].p.kind} [${lines[i].p.people}] and ${lines[j].p.kind} [${lines[j].p.people}] share ${Math.round(shared)} px`);
+					// The fork (D228) shares the stem of two legs of one person, and only that (tests/support/fork-share.ts).
+					if (shared > 0.5 && !isForkShare(lines[i].p, lines[j].p, lines[i].segs, lines[j].segs, ai, bi)) bad.push(`${lines[i].p.kind} [${lines[i].p.people}] and ${lines[j].p.kind} [${lines[j].p.people}] share ${Math.round(shared)} px`);
 				}
 			}
 		}

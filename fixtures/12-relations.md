@@ -15,7 +15,7 @@ The comments in the block give the expected names (read by `tests/acceptance/rel
 - `# <marked person>: <card text>`, then `; also: <the other names, best first>` for the sheet, and `; maybe: <names>` for names that depend on an open question (allowed, not required). `none` means no relation.
 - `# pair: <first> > <second> | <sentence> | <number of relations, or chain, or none> | <the people on the line, in order>`.
 
-```dynasty
+```kin
 # Marked people for the expected names: gwen, alan, leo.
 #
 # Finder pairs (spec §13.2): the second person as a relative of the first.

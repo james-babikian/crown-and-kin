@@ -1,5 +1,5 @@
 /*
- * Dynasty Tree styles.
+ * Crown and Kin styles.
  * Every class starts with `dynasty-`. Colours come only from Obsidian CSS variables (the roles in
  * THEME_VARS, src/render/styles.ts), so the tree follows the theme and light/dark mode live.
  * A house colour reaches the SVG only through the `--dynasty-house-color` custom property (spec §5.8).
@@ -141,6 +141,14 @@ body {
 
 .dynasty-error-detail {
 	white-space: pre-wrap;
+}
+
+/* The button of an error box ("Show the tree text"), with a hit area of at least 44 px (spec §7.5). */
+.dynasty-error .dynasty-error-button {
+	min-height: 44px;
+	min-width: 44px;
+	margin-top: var(--size-4-2);
+	padding: 0 var(--size-4-6);
 }
 
 

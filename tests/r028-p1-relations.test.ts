@@ -289,9 +289,8 @@ describe('F-KIN-08: one card text, and the unlisted-parent sentence that is true
 		const rels = computeRelations(fionaHelen, 'Fiona', ON).get('Helen')!;
 		const info = relationInfo(rels, false);
 		expect(cardRelationText(rels[0])).toBe('Half-sister, maybe full');
-		expect(info.sentence).toBe('Relation to you: Half-sister, maybe full.');
+		expect(relationSummary(rels, false).main).toBe('Relation to you: Half-sister, maybe full.');
 		expect(info.value).toBe('Half-sister, maybe full');
-		expect(relationSummary(rels, false).main).toBe(info.sentence);
 	});
 
 	it('F-KIN-08: Fiona lists both parents and Helen one: form "other-parent"', () => {

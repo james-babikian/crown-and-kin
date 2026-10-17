@@ -9,7 +9,7 @@ import { MarkdownView, TFile } from './acceptance/fake-obsidian';
 
 // Review U: HandleRegistry.showSource, second cursor after 120 ms and the order of the checks.
 
-const BLOCK = '```dynasty\npeople:\n  - {id: a, name: A}\n```\n';
+const BLOCK = '```kin\npeople:\n  - {id: a, name: A}\n```\n';
 const OLD = 'Intro\n\n' + BLOCK;
 const NEW = 'A new line above.\nAnother line above.\n' + OLD;
 

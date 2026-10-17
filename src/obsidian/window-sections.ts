@@ -27,8 +27,7 @@ export interface SectionSpec {
 export interface SectionsView {
 	/** The summary line of a section changes (for example the line of succession after a rule changed). */
 	setSummary(key: string, text: string): void;
-	/** Opens or closes one section. */
-	setOpen(key: string, open: boolean): void;
+	/** True when the section is open (only the tests read it). */
 	isOpen(key: string): boolean;
 	/** The element of a section (for a focus that must find a control in it). */
 	el(key: string): HTMLElement | null;
@@ -130,12 +129,6 @@ export function renderSections(parent: HTMLElement, kind: string, specs: readonl
 		setSummary(key, text) {
 			const d = find(key);
 			if (d && d.sum.getText() !== text) d.sum.setText(text);
-		},
-		setOpen(key, open) {
-			const d = find(key);
-			if (!d) return;
-			setOpen(d, open);
-			paintAll();
 		},
 		isOpen: (key) => find(key)?.el.hasClass('is-open') ?? false,
 		el: (key) => find(key)?.el ?? null,

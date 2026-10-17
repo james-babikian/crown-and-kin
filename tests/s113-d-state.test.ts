@@ -33,7 +33,7 @@ afterEach(() => {
 });
 
 const SRC = 'people:\n  - id: aldric\n    name: Aldric Valmont\n  - id: roderick\n    name: Roderick Valmont\n    parents: [aldric]\n';
-const fence = (b: string) => ['```dynasty', b.trimEnd(), '```'].join('\n');
+const fence = (b: string) => ['```kin', b.trimEnd(), '```'].join('\n');
 
 /** The real handle registry on a one-note vault, under the fake app of the tree view tests. */
 function world(initial: string) {

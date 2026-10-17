@@ -19,7 +19,7 @@ import { noticeList, notices, resetObsidian } from './acceptance/fake-obsidian';
 
 const FAST = { resolved: 0, quiet: 0, cap: 50 };
 
-const tree = (...people: string[]) => ['```dynasty', 'people:', ...people, '```', ''].join('\n');
+const tree = (...people: string[]) => ['```kin', 'people:', ...people, '```', ''].join('\n');
 const person = (id: string, link?: string) => [`  - id: ${id}`, `    name: ${id.toUpperCase()}`, ...(link === undefined ? [] : [`    link: ${link}`])].join('\n');
 
 interface Listener {
@@ -384,9 +384,9 @@ describe('Rename, fix round after the M6 iPhone test (the decision notes "M6 iPh
 			const s = setup({
 				'K.md': tree(person('k', '"[[Old]]"')),
 				'T.md': tree(person('t', '"[[Old]]"')),
-				'Q.md': '> [!note]\n> ```dynasty\n> people:\n>   - id: q\n>     name: Q\n>     link: "[[Old]]"\n> ```\n',
+				'Q.md': '> [!note]\n> ```kin\n> people:\n>   - id: q\n>     name: Q\n>     link: "[[Old]]"\n> ```\n',
 				'L.md': '- item\n',
-				'Plain.md': 'Text about [[Old]] and dynasty.\n',
+				'Plain.md': 'Text about [[Old]] and kin.\n',
 				'Fresh.md': 'No cache yet.\n',
 				'Old.md': '',
 			});

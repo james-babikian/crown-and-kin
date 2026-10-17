@@ -222,7 +222,7 @@ describe('the saved picture follows the direction that the tree is shown in (C.3
 describe('the settings row (spec §9)', () => {
 	async function loadPlugin(stored: unknown = null) {
 		const app = fakeApp();
-		const plugin = new DynastyTreePlugin(app as never, { id: 'dynasty-tree' } as never);
+		const plugin = new DynastyTreePlugin(app as never, { id: 'crown-and-kin' } as never);
 		const fake = plugin as unknown as FakePlugin;
 		fake.stored = stored;
 		await fake.load();

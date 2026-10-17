@@ -25,7 +25,7 @@ afterEach(() => vi.restoreAllMocks());
 
 async function loadPlugin(stored: unknown) {
 	const app = fakeApp();
-	const plugin = new DynastyTreePlugin(app as never, { id: 'dynasty-tree' } as never);
+	const plugin = new DynastyTreePlugin(app as never, { id: 'crown-and-kin' } as never);
 	const fake = plugin as unknown as FakePlugin;
 	fake.stored = stored;
 	await fake.load();
@@ -63,7 +63,7 @@ describe('G2 WP-F', () => {
 
 	it('3: a startup read error must not make the first save wipe the file', async () => {
 		const app = fakeApp();
-		const plugin = new DynastyTreePlugin(app as never, { id: 'dynasty-tree' } as never);
+		const plugin = new DynastyTreePlugin(app as never, { id: 'crown-and-kin' } as never);
 		const fake = plugin as unknown as FakePlugin;
 		fake.stored = { futureKey: 1, showDates: false, settingsVersion: 2 };
 		vi.spyOn(console, 'error').mockImplementation(() => undefined);
@@ -129,7 +129,7 @@ describe('G2 WP-F fix round', () => {
 
 	it('a read that fails again at the first save: the save goes on with the defaults', async () => {
 		const app = fakeApp();
-		const plugin = new DynastyTreePlugin(app as never, { id: 'dynasty-tree' } as never);
+		const plugin = new DynastyTreePlugin(app as never, { id: 'crown-and-kin' } as never);
 		const fake = plugin as unknown as FakePlugin;
 		vi.spyOn(console, 'error').mockImplementation(() => undefined);
 		fake.loadData = () => Promise.reject(new Error('EBUSY'));

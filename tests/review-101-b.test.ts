@@ -39,7 +39,7 @@ function fakeApp(path: string, initial: string) {
 	return { app, get: () => text, set: (t: string) => (text = t) };
 }
 
-const fence = (body: string) => ['```dynasty', body, '```'].join('\n');
+const fence = (body: string) => ['```kin', body, '```'].join('\n');
 const X = 'people:\n  - id: a\n    name: Alys';
 
 describe('review 101-b: a stale write must not land in another block', () => {

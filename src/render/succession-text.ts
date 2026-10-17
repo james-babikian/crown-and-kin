@@ -88,16 +88,14 @@ export const SUCCESSION_UI = {
 	excludePickerTitle: 'Select an excluded person',
 	pickerPlaceholder: PERSON_PLACEHOLDER,
 	removeLabel: (who: string) => `Remove ${who}`,
-	moveEarlierLabel: (who: string) => `Move earlier: ${who}`,
-	moveLaterLabel: (who: string) => `Move later: ${who}`,
+	moveEarlierLabel: (who: string) => `Move earlier: move ${who} earlier`,
+	moveLaterLabel: (who: string) => `Move later: move ${who} later`,
 	// The state of a named heir (K.3, L.9): `year` is a number, or null for "now".
 	heirNotAlive: (name: string, year: number | null) => (year === null ? `${name} is dead, so the plugin does not use ${name} as a named heir.` : `${name} is not alive in ${formatYear(year)}, so the plugin does not use ${name} as a named heir.`),
 	heirNotBorn: (name: string, year: number | null) => (year === null ? `${name} is not born yet, so the plugin does not use ${name} as a named heir.` : `${name} is not born yet in ${formatYear(year)}, so the plugin does not use ${name} as a named heir.`),
 	heirIsRuler: (name: string) => `${name} is the ruler of this line, so the plugin does not use ${name} as a named heir.`,
 	heirExcluded: (name: string) => `${name} is in the list of excluded people, so ${name} is not in the line.`,
 	heirNotInTree: 'No person in the tree has this ID.',
-	// The line.
-	lineHeading: (ruler: string, year: number | null) => (year === null ? `Line of succession after ${ruler} now` : `Line of succession after ${ruler} in ${formatYear(year)}`),
 	// The bold heading above the rows of the Line of succession section.
 	lineAfter: (ruler: string, year: number | null) => (year === null ? `After ${ruler} now` : `After ${ruler} in ${formatYear(year)}`),
 	lineRowLabel: (name: string, ordinal: string) => `${ordinal} ${name}: show the card in the tree`,

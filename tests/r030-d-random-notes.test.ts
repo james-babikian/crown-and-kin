@@ -11,7 +11,7 @@ import { genOp, modelOf, type Model } from './r028-advb-edits-support';
  * 0.3 package D, T3 (the 0.3 contract D.1; the release plan worst case W1): random notes with random edits.
  *
  * The notes come from `r030-d-note-gen.ts`, which builds a note from CommonMark rules and writes down where the real
- * `dynasty` blocks are while it builds. The oracle is that knowledge, not `findBlocks`. Spec §6.1: the locating
+ * `kin` blocks are while it builds. The oracle is that knowledge, not `findBlocks`. Spec §6.1: the locating
  * handles fences of any length, fences nested in longer fences, callouts (also nested) and list items; fence lines are
  * never changed; the prefix goes back on every body line. The checks:
  *
@@ -236,7 +236,7 @@ describe('T3 findings (known faults, minimal notes)', () => {
 
 	it('F1 a list that starts on the marker line of a list item inside a callout that starts there too ("- > -    item") hides the fence below it', () => {
 		// CommonMark: the fence is inside the inner list item (content column 5 inside the callout), so it is a block.
-		const text = ['- > -    item', '  >      ```dynasty', '  >      people: []', '  >      ```', ''].join('\n');
+		const text = ['- > -    item', '  >      ```kin', '  >      people: []', '  >      ```', ''].join('\n');
 		const found = findBlocks(text);
 		expect(found.map((b) => [b.openLine, b.closeLine, b.body])).toEqual([[1, 3, 'people: []']]);
 	});
@@ -244,7 +244,7 @@ describe('T3 findings (known faults, minimal notes)', () => {
 	it('F3 a line ending of a lone CR next to a blank line: the edit is refused (CR, empty line, LF read as one CRLF) in a note that the spec allows to edit', () => {
 		const body = 'people:\n  - id: a\n    name: A\n\nx-end: 1';
 		// Break after "  - id: a" is a lone CR; the blank line ends with LF.
-		const text = '```dynasty\npeople:\n  - id: a\r    name: A\n\nx-end: 1\n```\n';
+		const text = '```kin\npeople:\n  - id: a\r    name: A\n\nx-end: 1\n```\n';
 		const block = findBlocks(text)[0];
 		expect(block.body).toBe(body);
 		const plan = planWrite(text, 0, body, editFn({ kind: 'set-person-fields', id: 'a', fields: { name: 'Ab' } }));
@@ -253,7 +253,7 @@ describe('T3 findings (known faults, minimal notes)', () => {
 
 	it('F4 a thematic break written "- - -" is read as nested list items: a fence indented by 3 spaces after it is not closed by "```" at the margin and swallows the next tree', () => {
 		// CommonMark: "- - -" is a thematic break (it wins over a list item), so the fence below is a top level fence with a 3 space indent.
-		const text = ['- - -', '', '   ```dynasty', '   people: []', '```', '', '```dynasty', 'people: [] # second', '```', ''].join('\n');
+		const text = ['- - -', '', '   ```kin', '   people: []', '```', '', '```kin', 'people: [] # second', '```', ''].join('\n');
 		const found = findBlocks(text);
 		expect(found.map((b) => [b.openLine, b.closeLine, b.body])).toEqual([
 			[2, 4, 'people: []'],
@@ -263,14 +263,14 @@ describe('T3 findings (known faults, minimal notes)', () => {
 
 	it('the same notes without the fault shape are found (the shapes above are the only cause)', () => {
 		// F1 with a gap that keeps the inner content column at 3 or less: found.
-		const near = ['- > - item', '  >   ```dynasty', '  >   people: []', '  >   ```', ''].join('\n');
+		const near = ['- > - item', '  >   ```kin', '  >   people: []', '  >   ```', ''].join('\n');
 		expect(findBlocks(near).map((b) => b.body)).toEqual(['people: []']);
 		// F4 with "---": found, and the second tree too.
-		const rule = ['---', '', '   ```dynasty', '   people: []', '```', '', '```dynasty', 'people: [] # second', '```', ''].join('\n');
+		const rule = ['---', '', '   ```kin', '   people: []', '```', '', '```kin', 'people: [] # second', '```', ''].join('\n');
 		expect(findBlocks(`# t\n\n${rule}`).map((b) => b.body)).toEqual(['people: []', 'people: [] # second']);
 		// F3 with CRLF and with LF only: accepted.
 		for (const eol of ['\n', '\r\n']) {
-			const text = ['```dynasty', 'people:', '  - id: a', '    name: A', '', 'x-end: 1', '```', ''].join(eol);
+			const text = ['```kin', 'people:', '  - id: a', '    name: A', '', 'x-end: 1', '```', ''].join(eol);
 			const plan = planWrite(text, 0, 'people:\n  - id: a\n    name: A\n\nx-end: 1', editFn({ kind: 'set-person-fields', id: 'a', fields: { name: 'Ab' } }));
 			expect(plan.ok, JSON.stringify(eol)).toBe(true);
 		}

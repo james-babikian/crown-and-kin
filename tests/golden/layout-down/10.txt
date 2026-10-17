@@ -12,10 +12,10 @@ person piers gen 1 at 462 161 size 180 61
 person wren gen 1 at 0 161 size 180 61
 union u0 at 244 30.5 bar
 path marriage [aldric 42] M226 30.5H262
-path descent [aldric 42 43] M244 30.5V131M244 131H290
-path descent [43 aldric 42] M290 131V161
-path illegitimate [aldric wren] M136 61V131M90 131H136
-path illegitimate [wren aldric] M90 131V161
+path descent [aldric 42 43] M244 30.5V131M244 131H266
+path descent [43 aldric 42] M266 131V161
+path illegitimate [aldric wren] M136 61V131M126 131H136
+path illegitimate [wren aldric] M126 131V161
 path descent [0042 piers] M552 61V131
 path descent [piers 0042] M552 131V161
 marker union at 244 30.5

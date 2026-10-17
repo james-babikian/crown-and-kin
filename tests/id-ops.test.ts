@@ -107,7 +107,7 @@ describe('set-house-id: the item and every reference in one write', () => {
 	});
 
 	it('is one write that Undo restores byte for byte', () => {
-		const note = `# Note\n\n\`\`\`dynasty\n${HOUSES}\`\`\`\n\nText after.\n`;
+		const note = `# Note\n\n\`\`\`kin\n${HOUSES}\`\`\`\n\nText after.\n`;
 		// A block body has no final line break.
 		const first = planWrite(note, 0, HOUSES.replace(/\n$/, ''), (b) => {
 			const r = applyOp(b, setHouse('valmont', 'crown'));
@@ -267,7 +267,7 @@ describe('set-title-id: the item and every card-title in one write', () => {
 	});
 
 	it('Undo restores the text byte for byte', () => {
-		const note = `\`\`\`dynasty\n${TITLES}\`\`\`\n`;
+		const note = `\`\`\`kin\n${TITLES}\`\`\`\n`;
 		const plan = planWrite(note, 0, TITLES.replace(/\n$/, ''), (b) => {
 			const r = applyOp(b, setTitle('duke', 'count'));
 			return r.ok ? { ok: true, body: r.body } : { ok: false, reason: r.code };

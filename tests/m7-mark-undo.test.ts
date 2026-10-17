@@ -93,7 +93,7 @@ function fakeApp(path: string, initial: string, editor: boolean) {
 	};
 }
 
-const fence = (body: string) => ['```dynasty', body, '```'].join('\n');
+const fence = (body: string) => ['```kin', body, '```'].join('\n');
 const PEOPLE = 'people:\n  - id: alan\n    name: Alan\n  - id: leo\n    name: Leo\n    parents: [alan]\n';
 const NO_OPTIONS = ['# Note', '', fence(PEOPLE), '', 'After the tree.', ''].join('\n');
 const WITH_FOCUS = ['# Note', '', fence(`options:\n  focus: leo\n\n${PEOPLE}`), ''].join('\n');

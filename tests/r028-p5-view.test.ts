@@ -287,7 +287,7 @@ unions:
 		const close = root.querySelector('.dynasty-result-close')!;
 		expect(close.hasClass('dynasty-bar-x')).toBe(true);
 		expect(close.getText()).toBe('');
-		expect(close.getAttribute('aria-label')).toBe('Close: show the tree as it was before.');
+		expect(close.getAttribute('aria-label')).toBe('Close: show the tree as it was before');
 		// D212 (phone-banner-row): one row, the sentence, the link Options with its chevron, and the X; the actions are in the menu.
 		expect(root.querySelector('.dynasty-result-whole')).toBeNull();
 		const options = root.querySelector('.dynasty-result-options')!;

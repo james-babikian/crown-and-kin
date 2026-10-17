@@ -576,7 +576,7 @@ describe('Save writes the whole draft in ONE batch (D.3.8, spec §13.0 item 6)',
 		o.handle.change(BODY_13.replace('plural: Dukes of Valmont', 'plural: Dukes of the Keep'));
 		await save(o);
 		expect(o.handle.ops).toHaveLength(0);
-		expect(notices).toContain(WRITE_TEXT.stale);
+		expect(notices).toContain(WRITE_TEXT.staleWindow);
 		expect(pageOf(o.content).getAttribute('data-title')).toBe('king-of-the-vale');
 		expect(field(pageOf(o.content), 'dynasty-title-male').value).toBe('High King of the Vale');
 		expect(o.content.querySelector('.dynasty-sheet-error')!.getText()).toBe(TITLES_UI.stale);
@@ -594,7 +594,7 @@ describe('Save writes the whole draft in ONE batch (D.3.8, spec §13.0 item 6)',
 		expect(gone).not.toBe(BODY_13);
 		o.handle.change(gone);
 		await save(o);
-		expect(notices).toContain(WRITE_TEXT.stale);
+		expect(notices).toContain(WRITE_TEXT.staleWindow);
 		expect(isOpen(o.win)).toBe(true);
 		expect(backButton(o.content)).toBeNull();
 	});
@@ -645,7 +645,7 @@ describe('Change ID: the small ID window opens from the page (D.3.7, §13.17 rul
 		await save(o);
 		await click(question(o)!.querySelector('.dynasty-id-change'));
 		expect(notices[notices.length - 1]).toBe(ID_UI.inUse);
-		expect(notices).not.toContain(WRITE_TEXT.stale);
+		expect(notices).not.toContain(WRITE_TEXT.staleWindow);
 		expect(o.content.querySelector('.dynasty-sheet-error')!.getText()).toBe(ID_UI.inUse);
 		expect(isOpen(o.win)).toBe(true);
 	});

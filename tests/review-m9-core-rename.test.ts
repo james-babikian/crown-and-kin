@@ -85,7 +85,7 @@ function vault(files: Record<string, string>, pictures: string[]) {
 	return { texts, rename };
 }
 
-const NOTE = ['```dynasty', 'people:', '  - id: a', '    name: A', '    link: "[[x.png.md]]"', '    portrait: "[[x.png]]"', '```', ''].join('\n');
+const NOTE = ['```kin', 'people:', '  - id: a', '    name: A', '    link: "[[x.png.md]]"', '    portrait: "[[x.png]]"', '```', ''].join('\n');
 
 describe('review M9 core: a rename in the vault, note "x.png.md" and picture "x.png"', () => {
 	it('the rename of the note x.png.md keeps the portrait x.png', async () => {

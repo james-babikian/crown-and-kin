@@ -272,7 +272,7 @@ export class LinkUpdater {
 			this.persist();
 			this.start();
 		} catch (e) {
-			console.error('Dynasty Tree: cannot update the links after a rename', e);
+			console.error('Crown and Kin: cannot update the links after a rename', e);
 		}
 	}
 
@@ -313,7 +313,7 @@ export class LinkUpdater {
 			this.persist();
 			if (this.queue.length) this.start();
 		} catch (e) {
-			console.error('Dynasty Tree: cannot continue the link update of an earlier rename', e);
+			console.error('Crown and Kin: cannot continue the link update of an earlier rename', e);
 		}
 	}
 
@@ -348,7 +348,7 @@ export class LinkUpdater {
 				this.saveQueued = false;
 				return save();
 			})
-			.catch((e) => console.error('Dynasty Tree: cannot store the renames that wait for a link update', e));
+			.catch((e) => console.error('Crown and Kin: cannot store the renames that wait for a link update', e));
 	}
 
 	/** The notes with the name of `oldPath` now, other than `file`; for a picture, the vault files with its extension (O8). */
@@ -384,7 +384,7 @@ export class LinkUpdater {
 				try {
 					if (!this.halted() && (!st.scanned || st.found)) st.shown = new Notice(RENAME_UI.progressFor(kindOf(batch)), 0);
 				} catch (e) {
-					console.error('Dynasty Tree: cannot show the link update Notice', e);
+					console.error('Crown and Kin: cannot show the link update Notice', e);
 				}
 			}, this.timing.progress ?? RENAME_TIMING.progress);
 			let batch: Renamed[] = [];
@@ -399,7 +399,7 @@ export class LinkUpdater {
 				await this.update(batch, obsidian.done, st, report);
 				report.state = this.halted() ? 'stopped' : 'done';
 			} catch (e) {
-				console.error('Dynasty Tree: cannot update the links after a rename', e);
+				console.error('Crown and Kin: cannot update the links after a rename', e);
 				if (report) report.state = 'failed';
 				if (!this.stopped && batch.length) new Notice(RENAME_UI.stopped(renamedText(batch.map((r) => ({ from: shownPath(r.oldPath), picture: isPicturePath(r.oldPath) })))), 0);
 			} finally {
@@ -510,7 +510,7 @@ export class LinkUpdater {
 			for (const h of this.blocks.all()) known.add(h.key.path);
 			for (const p of this.hooks.known?.() ?? []) known.add(p);
 		} catch (e) {
-			console.error('Dynasty Tree: cannot list the notes that show a tree', e);
+			console.error('Crown and Kin: cannot list the notes that show a tree', e);
 		}
 		const first: TFile[] = [];
 		const cached: TFile[] = [];
@@ -568,7 +568,7 @@ export class LinkUpdater {
 			}
 			// Spec §6.9 step 1: only notes that name a tree and the old note.
 			const low = text.toLowerCase();
-			if (!low.includes('dynasty') || !names.some((n) => low.includes(n))) continue;
+			if (!low.includes('kin') || !names.some((n) => low.includes(n))) continue;
 			const count = findBlocks(text).length;
 			if (!count) continue;
 			st.found = true;
@@ -658,7 +658,7 @@ export class LinkUpdater {
 					return r.ok ? r.body.replace(/\r\n?/g, '\n') : body;
 				});
 			} catch (e) {
-				console.error('Dynasty Tree: cannot update the undo steps after a rename', e);
+				console.error('Crown and Kin: cannot update the undo steps after a rename', e);
 			}
 		}
 	}

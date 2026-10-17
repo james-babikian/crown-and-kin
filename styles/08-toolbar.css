@@ -328,7 +328,8 @@
 	max-width: none;
 	max-height: calc(100% - 60px);
 	box-sizing: border-box;
-	padding: 6px 12px calc(env(safe-area-inset-bottom, 0px) + 10px);
+	/* The sides keep clear of the notch of a phone held sideways (D242); the safe area is 0 on a phone held upright. */
+	padding: 6px max(12px, env(safe-area-inset-right, 0px)) calc(env(safe-area-inset-bottom, 0px) + 10px) max(12px, env(safe-area-inset-left, 0px));
 	/* Opaque in every theme (D212, sheet-opaque): Cupertino makes its window background translucent and blurs only its own windows, so the tree would show through the text. The @supports rule below drops the alpha of a theme colour where the browser can (var() hides a relative colour from the parser, so it cannot sit here as a second line). */
 	background: var(--background-primary);
 	backdrop-filter: none;

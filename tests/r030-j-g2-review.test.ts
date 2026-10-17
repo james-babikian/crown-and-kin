@@ -12,7 +12,7 @@ const shape = (f: typeof findBlocks, text: string) => f(text).map((b) => [b.open
 
 describe('R1 a callout opened on a list marker line ("- > q") forgets the list item for the lines below', () => {
 	// CommonMark: "- " opens an item with content column 2. The fence line is indented 4, so it is 2 columns inside the item: a fence.
-	const closed = ['- > Source', '    ```dynasty', '    people: []', '    ```', ''].join('\n');
+	const closed = ['- > Source', '    ```kin', '    people: []', '    ```', ''].join('\n');
 
 	it('release-0.3.0 finds the tree (control)', () => {
 		expect(shape(findBlocksBefore as never, closed)).toEqual([[1, 3, '    ', 'people: []']]);
@@ -23,14 +23,14 @@ describe('R1 a callout opened on a list marker line ("- > q") forgets the list i
 	});
 
 	it('numbered item: "1. > Source" and a fence indented 4', () => {
-		const text = ['1. > Source', '    ```dynasty', '    people: []', '    ```', ''].join('\n');
+		const text = ['1. > Source', '    ```kin', '    people: []', '    ```', ''].join('\n');
 		expect(shape(findBlocks, text)).toEqual([[1, 3, '    ', 'people: []']]);
 	});
 });
 
 describe('R2 an unclosed fence in such a list item swallows the next tree', () => {
 	// The fence is in the list item; the paragraph at the margin ends the item and the fence (CommonMark). The second tree is its own block.
-	const text = ['- > Source', '  ```dynasty', '  people: []', 'A paragraph.', '', '```dynasty', 'people: [] # second', '```', ''].join('\n');
+	const text = ['- > Source', '  ```kin', '  people: []', 'A paragraph.', '', '```kin', 'people: [] # second', '```', ''].join('\n');
 
 	it('release-0.3.0 finds two trees (control)', () => {
 		expect(findBlocksBefore(text).map((b) => b.body)).toEqual(['people: []', 'people: [] # second']);
@@ -44,7 +44,7 @@ describe('R2 an unclosed fence in such a list item swallows the next tree', () =
 describe('R3 F3: a lone CR that is a kept break next to an empty line', () => {
 	it('removing the last body line leaves a blank last line behind a lone CR, and the closing fence line ends with LF: the edit is accepted', () => {
 		// Lines: "a: 1" CR "" CR "b: 2" LF fence. The edit removes "b: 2"; the kept blank line is followed by the fence's LF, so CR + "" + LF reads as one CRLF.
-		const text = '```dynasty\na: 1\r\rb: 2\n```\n';
+		const text = '```kin\na: 1\r\rb: 2\n```\n';
 		const b = findBlocks(text)[0];
 		expect(b.body).toBe('a: 1\n\nb: 2');
 		const plan = planWrite(text, 0, b.body, () => ({ ok: true, body: 'a: 1\n' }));
@@ -55,7 +55,7 @@ describe('R3 F3: a lone CR that is a kept break next to an empty line', () => {
 
 describe('R4 a ">" after more than 4 columns behind a list marker is code, not a callout', () => {
 	// "-" + 7 spaces: the content column is 2 and the rest is indented code ("    > x"). The fence below is 2 columns inside the item.
-	const text = ['-       > x', '    ```dynasty', '    people: []', '    ```', ''].join('\n');
+	const text = ['-       > x', '    ```kin', '    people: []', '    ```', ''].join('\n');
 
 	it('release-0.3.0 finds the tree (control)', () => {
 		expect(shape(findBlocksBefore as never, text)).toEqual([[1, 3, '    ', 'people: []']]);

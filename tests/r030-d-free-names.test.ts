@@ -9,11 +9,11 @@ import { deriveFamilies } from '../src/core/derive';
 import { parseDynasty } from '../src/core/parse';
 import { cardForm, geometryFor } from '../src/layout/geometry';
 import { makePersonNote, type MakePersonNoteInput, type SameNameAnswer } from '../src/obsidian/make-note';
-import { pickPicture } from '../src/obsidian/picture-picker';
+import { pickPicture, type PickResult } from '../src/obsidian/picture-picker';
 import { savePicture, type SaveSource } from '../src/obsidian/save-picture';
 import { makeNote, makeTableNote } from '../src/obsidian/table-note';
 import { NOTE_UI } from '../src/render/ui-text';
-import { FEl, fakeWin, installDom, resetDom } from './acceptance/fake-dom';
+import { FEl, fakeWin, installDom, resetDom, settle } from './acceptance/fake-dom';
 import { openModals, resetObsidian } from './acceptance/fake-obsidian';
 import { pngHead } from './acceptance/m9-support';
 import { pick, rng } from './r028-advb-gen';
@@ -258,14 +258,16 @@ describe('W6 a picture copied from the device gets a free name and never overwri
 		const got = pickPicture(v.app as never, { sourcePath: 'Trees/Valmont.md', title: 'Select' });
 		return { got, picker: openModals[openModals.length - 1] as unknown as Picker };
 	};
-	const copy = async (v: Vault, name: string, fill: number) => {
-		const png = pngHead(400, 600);
-		const bytes = new Uint8Array(png);
+	const device = (name: string, fill: number) => {
+		const bytes = new Uint8Array(pngHead(400, 600));
 		bytes[bytes.length - 1] = fill;
+		return { name, size: bytes.length, arrayBuffer: async () => bytes.buffer.slice(0) };
+	};
+	const copy = async (v: Vault, name: string, fill: number) => {
 		const { got, picker } = open(v);
-		await picker.fromDevice({ name, size: bytes.length, arrayBuffer: async () => bytes.buffer.slice(0) });
+		await picker.fromDevice(device(name, fill));
 		const r = await got;
-		return { r, bytes };
+		return { r };
 	};
 
 	it('the same device file twice: two files, the first is not overwritten', async () => {
@@ -311,9 +313,17 @@ describe('W6 a picture copied from the device gets a free name and never overwri
 	it.fails('F6b before 1.5.7 on a vault that ignores case: a file "ME.png" makes the copy fail instead of giving "me 1.png"', async () => {
 		const v = makeVault({ files: { 'Trees/Valmont.md': 'x', 'Trees/ME.png': 'user' }, helper: false, insensitive: true });
 		const before = snapshot(v);
-		const { r } = await copy(v, 'me.png', 3);
+		// After a failed copy the picker stays open, so its promise never settles: read the answer once the copy has run,
+		// then close the picker. The test ends at once and fails on its last assertion, not on the test timeout.
+		const { got, picker } = open(v);
+		const seen: { r?: PickResult } = {};
+		void got.then((r) => (seen.r = r));
+		await picker.fromDevice(device('me.png', 3));
+		await settle();
+		const kind = seen.r?.kind;
+		picker.close();
 		expect(same(v, before)).toBeNull();
-		expect(r.kind, 'the picture was not copied').toBe('choose');
+		expect(kind, 'the picture was not copied').toBe('choose');
 	});
 });
 

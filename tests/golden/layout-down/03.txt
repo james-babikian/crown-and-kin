@@ -16,18 +16,18 @@ person giselle gen 1 at 632 161 size 180 61
 person lisette gen 2 at 408.308 322 size 180 61
 person rosamund gen 1 at 216 161 size 180 61
 person stefan gen 1 at 416 161 size 180 61
-person tristan gen 3 at 53.308 483 size 180 61
+person tristan gen 3 at 8.308 483 size 180 61
 person ulric gen 2 at 639.077 322 size 180 61
 person viviane gen 0 at 424 0 size 180 61
 union u0 at 406 30.5 bar
 union u1 at 198 191.5 bar
 union u2 at 614 191.5 bar
-union u3 at 143.308 405
+union u3 at 98.308 405
 path marriage [aurel viviane] M388 30.5H424
 path marriage [bastien rosamund] M180 191.5H216
 path marriage [stefan giselle] M596 191.5H632
-path marriage [conrad lisette] M98.3 383V405H143.3
-path marriage [conrad lisette] M498.3 383V405H143.3
+path marriage [conrad lisette] M98.3 383V405
+path marriage [conrad lisette] M498.3 383V405H98.3
 path descent [aurel viviane bastien giselle] M406 30.5V131M90 131H722
 path descent [bastien aurel viviane] M90 131V161
 path descent [giselle aurel viviane] M722 131V161
@@ -37,9 +37,9 @@ path descent [blanche bastien rosamund] M298.3 292V322
 path descent [stefan giselle lisette ulric] M614 191.5V292M498.3 292H729.1
 path descent [lisette stefan giselle] M498.3 292V322
 path descent [ulric stefan giselle] M729.1 292V322
-path descent [conrad lisette tristan] M143.3 405V453
-path descent [tristan conrad lisette] M143.3 453V483
+path descent [conrad lisette tristan] M98.3 405V453
+path descent [tristan conrad lisette] M98.3 453V483
 marker union at 406 30.5
 marker union at 198 191.5
 marker union at 614 191.5
-marker union at 143.308 405
+marker union at 98.308 405

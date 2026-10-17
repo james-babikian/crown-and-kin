@@ -20,7 +20,7 @@ vi.mock('../src/core/block-locate', async (importOriginal) => {
 
 import { TallBlockParser } from '../src/obsidian/live-preview';
 
-const noteLines = ['# Title', ...Array.from({ length: 50 }, (_, i) => `Text ${i}`), '```dynasty', 'people:', '  - id: a', '    name: A', '```', 'After'];
+const noteLines = ['# Title', ...Array.from({ length: 50 }, (_, i) => `Text ${i}`), '```kin', 'people:', '  - id: a', '    name: A', '```', 'After'];
 const doc = Text.of(noteLines);
 
 /** An editor view with the whole note in view; the parser has read only the first lines. */
@@ -37,7 +37,7 @@ function changed(userEvent?: string) {
 
 /*
  * G2b: the plugin's own write to the note (`applyToEditor` in src/obsidian/block-handle.ts) is dispatched with
- * `userEvent: 'input.dynasty-tree'`. `isUserEvent('input')` was true for it, so it waited like typing; `isTyping` now leaves it out.
+ * `userEvent: 'input.crown-and-kin'`. `isUserEvent('input')` was true for it, so it waited like typing; `isTyping` now leaves it out.
  */
 describe('G2b: the plugin write', () => {
 	beforeEach(() => {
@@ -49,11 +49,11 @@ describe('G2b: the plugin write', () => {
 		vi.useRealTimers();
 		vi.unstubAllGlobals();
 	});
-	it('a write with the plugin user event "input.dynasty-tree" scans at once', () => {
+	it('a write with the plugin user event "input.crown-and-kin" scans at once', () => {
 		const p = makeParser();
 		vi.advanceTimersByTime(1);
 		findBlocksSpy.mockClear();
-		p.update(changed('input.dynasty-tree'));
+		p.update(changed('input.crown-and-kin'));
 		vi.advanceTimersByTime(1);
 		expect(findBlocksSpy).toHaveBeenCalledTimes(1);
 	});

@@ -3,21 +3,9 @@
 import { describe, expect, it } from 'vitest';
 import { deriveFamilies } from '../src/core/derive';
 import { parseDynasty } from '../src/core/parse';
-import { cardForm, childAttach, geometryFor, roundelAxis } from '../src/layout/geometry';
+import { cardForm, geometryFor } from '../src/layout/geometry';
 import { DEFAULT_LAYOUT_SETTINGS, clearLayoutCache, layoutTree } from '../src/layout/index';
 import { sampleSources } from './acceptance/m11-support';
-
-describe('childAttach', () => {
-	it('is 0 for every form (0.2.8: the Roundel axis is the card middle; it was 0.25 em right of it)', () => {
-		for (const f of [12, 16]) {
-			const normal = geometryFor(f);
-			expect(childAttach(cardForm(normal, 'down'))).toBe(0);
-			expect(childAttach(cardForm(normal, 'down'))).toBeCloseTo(roundelAxis(normal) - normal.cardW / 2, 9);
-			expect(childAttach(normal)).toBe(0);
-			expect(childAttach(cardForm(normal, 'sideways'))).toBe(0);
-		}
-	});
-});
 
 function straightDrops(f: number, roundel: boolean) {
 	let straight = 0;
@@ -31,13 +19,12 @@ function straightDrops(f: number, roundel: boolean) {
 		const geo = roundel ? cardForm(geometryFor(f), 'down') : geometryFor(f);
 		const L = layoutTree(g, geo, { ...DEFAULT_LAYOUT_SETTINGS }, 'font').layout;
 		width += L.width;
-		const attach = childAttach(geo);
 		for (const fu of g.unions) {
 			if (fu.children.length !== 1) continue;
 			const c = L.persons.get(fu.children[0])!;
 			const u = L.unions.get(fu.key)!;
 			total++;
-			if (Math.abs(u.x - (c.x + c.w / 2 + attach)) < 0.5) straight++;
+			if (Math.abs(u.x - (c.x + c.w / 2)) < 0.5) straight++;
 		}
 	}
 	return { straight, total, width };

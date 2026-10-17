@@ -151,7 +151,7 @@ export interface VNote {
 	fileId: number;
 	lines: VLine[];
 	eol: '\n' | '\r\n';
-	/** True if the note has at least one real `dynasty` block. */
+	/** True if the note has at least one real `kin` block. */
 	hasTree: boolean;
 	/** True if a tree in the note has a YAML fault that stops every write: its links stay as they are. */
 	broken: boolean;
@@ -243,18 +243,18 @@ function proseLines(rand: () => number, v: Vault, n: number): string[] {
 		else if (r < 0.55) lines.push(`${sentence(rand)} [see](${encodeURI(f.path)}) ${sentence(rand, 2)}`);
 		else if (r < 0.65) lines.push(`# ${sentence(rand, 2)}`);
 		else if (r < 0.75) lines.push('');
-		else if (r < 0.85) lines.push(`The dynasty of [[${name}]] has a tree.`);
+		else if (r < 0.85) lines.push(`The kin of [[${name}]] has a tree.`);
 		else lines.push(sentence(rand));
 	}
 	return lines;
 }
 
-/** A code fence that is not a tree, with links and the word "dynasty" in it. */
+/** A code fence that is not a tree, with links and the word "kin" in it. */
 function decoyFence(rand: () => number, v: Vault): string[] {
 	const f = pick(rand, v.files);
 	const name = f.kind === 'note' ? stripMd(baseOf(f.path)) : baseOf(f.path);
-	const lang = pick(rand, ['python', 'dynasty-tree', 'text', 'yaml', 'Dynasty', 'js dynasty', 'dynasty2', '']);
-	return [`\`\`\`${lang}`, 'people:', '  - id: x', `    name: dynasty of ${name}`, `    link: "[[${name}]]"`, `    portrait: "${f.kind === 'picture' ? `[[${name}]]` : '[[ghost.png]]'}"`, '```'];
+	const lang = pick(rand, ['python', 'kin-tree', 'text', 'yaml', 'Kin', 'js kin', 'kin2', '']);
+	return [`\`\`\`${lang}`, 'people:', '  - id: x', `    name: kin of ${name}`, `    link: "[[${name}]]"`, `    portrait: "${f.kind === 'picture' ? `[[${name}]]` : '[[ghost.png]]'}"`, '```'];
 }
 
 /** The body lines of one tree. A link value stands in its own line (`templated`) with the text around it. */
@@ -372,7 +372,7 @@ export function genVault(seed: number): Vault {
 				if (where === 'callout') ex('> [!note] The tree');
 				if (where === 'list') ex('- an item');
 				const fence = pick(rand, ['`', '`', '~'] as const).repeat(3);
-				lines.push({ exact: `${pre}${fence}dynasty` });
+				lines.push({ exact: `${pre}${fence}kin` });
 				for (const l of treeBody(rand, v, pre, state)) lines.push(l);
 				lines.push({ exact: `${pre}${fence}` });
 				hasTree = true;

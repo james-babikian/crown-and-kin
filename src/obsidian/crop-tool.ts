@@ -212,7 +212,7 @@ class CropModal extends Modal {
 			try {
 				run();
 			} catch (e) {
-				console.error('Dynasty Tree: the crop tool action failed', e);
+				console.error('Crown and Kin: the crop tool action failed', e);
 			}
 		});
 		return b;
@@ -278,7 +278,7 @@ class CropModal extends Modal {
 			this.areaEl.addClass('has-picture');
 			this.paint();
 		} catch (e) {
-			console.error('Dynasty Tree: cannot load the picture for the crop tool', e);
+			console.error('Crown and Kin: cannot load the picture for the crop tool', e);
 			if (!this.settled) this.statusEl.setText(CROP_UI.problem);
 		}
 	}
@@ -447,7 +447,7 @@ export function openCropTool(options: CropToolOptions): Promise<CropResult> {
 		try {
 			new CropModal(options.app, options, resolve).open();
 		} catch (e) {
-			console.error('Dynasty Tree: cannot open the crop tool', e);
+			console.error('Crown and Kin: cannot open the crop tool', e);
 			resolve({ kind: 'cancel' });
 		}
 	});

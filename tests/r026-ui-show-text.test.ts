@@ -122,7 +122,7 @@ describe('the button "Show the tree text" in the list bar of a phone', () => {
 });
 
 describe('HandleRegistry.showSource', () => {
-	const NOTE = 'Intro\n\n```dynasty\npeople:\n  - {id: a, name: A}\n```\n\n```dynasty\npeople:\n  - {id: b, name: B}\n```\n';
+	const NOTE = 'Intro\n\n```kin\npeople:\n  - {id: a, name: A}\n```\n\n```kin\npeople:\n  - {id: b, name: B}\n```\n';
 
 	function setup(mode: 'preview' | 'source', text = NOTE) {
 		const file = new TFile('n.md');

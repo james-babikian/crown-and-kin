@@ -357,25 +357,26 @@ describe('P4: without `saved` (and without `pictures`), renderSvg draws exactly 
 		// 0.2.6 (D179): all 16 were recorded again, because the picture is drawn with the Roundel (the classic card is gone). The same hashes come from the code of 0.2.5 with `cardForm(geometryFor(16, 'normal'), 'down')`.
 		// 0.2.8 G5b (P7): all 17 were recorded again (the card content is centred on the middle of the card, not 0.25 em right of it).
 		// 0.2.8 look round (D212–D214): all 17 were recorded again (thin arms rim, You tab, 2 px You border, one heir outline, centred text).
+		// 0.3.1 (golden record of the card-and-line switch, an internal study): 15 of the 17 were recorded again, once (the trees 01 and 09 are as before).
 	const M8_SVG: Record<string, string> = {
 		'01': 'f13ea328e79a2b20',
-		'02': '0d0031e864263af0',
-		'03': '7b48f3df3836d59e',
-		'04': '6529721205f3e303',
-		'05': '42332f9712089e46',
-		'06': '7a1e0be81a42d154',
-		'07': 'de326e1fcb3508ab',
-		'07b': 'df8683b091e3896a',
-		'08': 'e1f43a48db41cabc',
+		'02': '4efc8b83af654c69',
+		'03': '725480c9b2dbf6ba',
+		'04': '5f5f132e44874a8c',
+		'05': 'cb8963c6b807ba9b',
+		'06': '2bfd0b5498362875',
+		'07': 'b18c05530b01adcd',
+		'07b': 'cb28889ad69db336',
+		'08': '00a6d31c8b89a7cb',
 		'09': '68c0e2e912ac4fb7',
-		'10': '66f1441c31cdc85a',
-		'11': 'd3a91fb6fc4cba1e',
-		'12': 'a55491c6b3371bc9',
-		'13': 'ec9750a2f1c5eb37',
-		'14': 'dde8521427bdcc5f',
-		'15': 'f0a5cdeb06b210bc',
+		'10': '6622fd33ba6d0ca9',
+		'11': '90e349535fc721fd',
+		'12': '2b4266467c785f25',
+		'13': 'e03b495aa083dd63',
+		'14': 'f5914a6b102c6e2b',
+		'15': '11ab5b061fa740d0',
 		// Sample tree 16 (0.2.7): recorded from the 0.2.6 build.
-		'16': '99560e1945080631',
+		'16': '2aea60397dc341f4',
 	};
 	for (const f of allFixtures()) {
 		it(`sample tree ${f.id}`, () => {

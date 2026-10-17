@@ -1,15 +1,15 @@
 orientation down
-size 2010.155 383
+size 2008.357 383
 geometry font 16 normal card 180x61 union 10 couple 36 node 20 row 100 tag 18
 row 0: osmund berta ranulf sela arn
 row 1: wynn hal maren joss piers tilda cole edda bram
 row 2: col
 gap 0: 61 161
 gap 1: 222 322
-person arn gen 0 at 1830.155 0 size 180 61
+person arn gen 0 at 1828.357 0 size 180 61
 person berta gen 0 at 716 0 size 180 61
-person bram gen 1 at 1830.155 161 size 180 61
-person col gen 2 at 1830.155 322 size 180 61
+person bram gen 1 at 1828.357 161 size 180 61
+person col gen 2 at 1828.357 322 size 180 61
 person cole gen 1 at 1216 161 size 180 61
 person edda gen 1 at 1416 161 size 180 61
 person hal gen 1 at 200 161 size 180 61
@@ -17,31 +17,31 @@ person joss gen 1 at 616 161 size 180 61
 person maren gen 1 at 416 161 size 180 61
 person osmund gen 0 at 500 0 size 180 61
 person piers gen 1 at 816 161 size 180 61
-person ranulf gen 0 at 1414.155 0 size 180 61
-person sela gen 0 at 1630.155 0 size 180 61
+person ranulf gen 0 at 1412.357 0 size 180 61
+person sela gen 0 at 1628.357 0 size 180 61
 person tilda gen 1 at 1016 161 size 180 61
 person wynn gen 1 at 0 161 size 180 61
 union u0 at 698 30.5 bar
 union u1 at 398 191.5 bar
-union u5 at 1612.155 30.5 bar
+union u5 at 1610.357 30.5 bar
 path marriage [osmund berta] M680 30.5H716
 path marriage [hal maren] M380 191.5H416
-path marriage [ranulf sela] M1594.2 30.5H1630.2
+path marriage [ranulf sela] M1592.4 30.5H1628.4
 path descent [osmund berta hal joss piers tilda cole] M698 30.5V131M290 131H1306
 path descent [hal osmund berta] M290 131V161
 path descent [joss osmund berta] M706 131V161
 path descent [piers osmund berta] M906 131V161
 path descent [tilda osmund berta] M1106 131V161
 path descent [cole osmund berta] M1306 131V161
-path descent [osmund wynn] M590 61V119M90 119H590
-path descent [wynn osmund] M90 119V161
-path descent [ranulf edda] M1504.2 61V131M1504.2 131H1506
-path descent [edda ranulf] M1506 131V161
-path descent [arn bram] M1920.2 61V131M1920.2 131H1920.2
-path descent [bram arn] M1920.2 131V161
-path adoptive [bram col] M1920.2 222V292
-path adoptive [col bram] M1920.2 292V322
-path birth-link [ranulf joss] M1492.2 61V83C1492.2 122 720 122 720 161
+path descent [osmund wynn] M590 61V119M126 119H590
+path descent [wynn osmund] M126 119V161
+path descent [ranulf edda] M1502.4 61V131
+path descent [edda ranulf] M1502.4 131V161
+path descent [arn bram] M1918.4 61V131
+path descent [bram arn] M1918.4 131V161
+path adoptive [bram col] M1918.4 222V292
+path adoptive [col bram] M1918.4 292V322
+path birth-link [ranulf joss] M1490.4 61V83C1490.4 122 720 122 720 161
 marker union at 698 30.5
 marker union at 398 191.5
-marker union at 1612.155 30.5
+marker union at 1610.357 30.5

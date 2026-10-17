@@ -26,7 +26,7 @@ function lay(src: string, settings: LayoutSettings, geo = GEO) {
 
 describe('C1: a listed union with an unknown type is drawn like a marriage (spec §5.3)', () => {
 	// `type: implicit` is not a union type (0.2.8 I13: no warning, as it is no near-typo of a known type). Its dot is the
-	// marriage dot, but edges.ts `coupleKind` gives its line the thin "no recorded partnership" style.
+	// marriage dot, but an internal script `coupleKind` gives its line the thin "no recorded partnership" style.
 	const src = `people:
   - {id: a, name: A, sex: m}
   - {id: b, name: B, sex: f}

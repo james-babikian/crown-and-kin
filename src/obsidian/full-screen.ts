@@ -8,6 +8,7 @@
 
 import { Modal, Notice, TFile, type EventRef } from 'obsidian';
 import { FULL_UI } from '../render/ui-text';
+import { isPhoneSideways } from './focus-mode';
 import { isPhoneWidth } from './modal-layout';
 import { nameDialog } from './sheet-parts';
 import { TreeView, type FullHost, type FullSource, type TreeHost } from './tree-view';
@@ -53,10 +54,33 @@ export class FullScreenModal extends Modal implements FullHost {
 		nameDialog(modalEl, this.titleEl);
 		contentEl.addClass('dynasty-fullscreen-content');
 		const win = modalEl.win ?? window;
-		const layout = () => modalEl.toggleClass('is-phone', isPhoneWidth(win));
+		// D242: `is-phone` (a window under 600 px) and `is-phone-side` (a phone held sideways) give the same bottom bar. The sideways test
+		// is the one that picks the phone's buttons, so the look and the button set agree. The tree reads the coarse pointer when it is made; so does this.
+		const coarse = win.matchMedia?.('(pointer: coarse)')?.matches === true;
+		const layout = () => {
+			modalEl.toggleClass('is-phone', isPhoneWidth(win));
+			const was = modalEl.hasClass('is-phone-side');
+			const now = isPhoneSideways(coarse, win);
+			if (was === now) return;
+			modalEl.toggleClass('is-phone-side', now);
+			// The bar is an overlay, so the box of the tree keeps its size when the bar changes edge: the free area is measured again.
+			this.tree?.barMoved();
+		};
 		layout();
+		// A turn can send the event before the window has its new size (iOS), so the class is checked again shortly after.
+		let later = 0;
+		const turned = () => {
+			layout();
+			win.clearTimeout(later);
+			later = win.setTimeout(layout, 300);
+		};
 		win.addEventListener('resize', layout);
-		this.cleanup.push(() => win.removeEventListener('resize', layout));
+		win.addEventListener('orientationchange', turned);
+		this.cleanup.push(() => {
+			win.removeEventListener('resize', layout);
+			win.removeEventListener('orientationchange', turned);
+			win.clearTimeout(later);
+		});
 		for (const type of STOPPED) {
 			const stop = (e: Event) => e.stopPropagation();
 			containerEl.addEventListener(type, stop);
@@ -80,7 +104,7 @@ export class FullScreenModal extends Modal implements FullHost {
 			this.tree = new TreeView(this.host, box, this.from.source, { kind: 'full', from: this.from, host: this });
 			this.tree.load();
 		} catch (e) {
-			console.error('Dynasty Tree: cannot show the full-screen view', e);
+			console.error('Crown and Kin: cannot show the full-screen view', e);
 			this.close(FULL_UI.failed);
 		}
 	}
@@ -146,7 +170,7 @@ export class FullScreenModal extends Modal implements FullHost {
 			try {
 				m.close(null);
 			} catch (e) {
-				console.error('Dynasty Tree: cannot close the full-screen view', e);
+				console.error('Crown and Kin: cannot close the full-screen view', e);
 			}
 		}
 		FullScreenModal.openViews.clear();
@@ -158,14 +182,14 @@ export class FullScreenModal extends Modal implements FullHost {
 			try {
 				c();
 			} catch (e) {
-				console.error('Dynasty Tree: cannot clean up the full-screen view', e);
+				console.error('Crown and Kin: cannot clean up the full-screen view', e);
 			}
 		}
 		const key = this.tree?.stateKey ?? this.from.key;
 		try {
 			this.tree?.unload();
 		} catch (e) {
-			console.error('Dynasty Tree: cannot close the full-screen view', e);
+			console.error('Crown and Kin: cannot close the full-screen view', e);
 		}
 		this.tree = null;
 		this.contentEl.empty();
@@ -191,7 +215,7 @@ export class FullScreenModal extends Modal implements FullHost {
 			try {
 				after?.();
 			} catch (e) {
-				console.error('Dynasty Tree: cannot open the note', e);
+				console.error('Crown and Kin: cannot open the note', e);
 			}
 		});
 	}

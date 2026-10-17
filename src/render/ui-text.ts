@@ -21,6 +21,9 @@ const MAKE_NOTE_TEXT = 'Make a note with this table';
 /** The edit sheet (spec §6.3, §7.4). */
 export const SHEET = {
 	save: 'Save',
+	/** F6: the label of Save and the status line while a write of a large tree runs. */
+	saveWait: 'Wait',
+	savingStatus: 'Wait. The plugin saves your changes.',
 	cancel: 'Cancel',
 	close: 'Close',
 	name: 'Name',
@@ -98,7 +101,6 @@ export const FAMILY = {
 	parents: 'Parents',
 	noParents: 'This person has no recorded parents.',
 	parentTypeLabel: (name: string) => `Type of parent: ${name}`,
-	remove: 'Remove as parent',
 	// C8: the name of a button starts with the text that the button shows, so voice control finds it by that text.
 	removeParentLabel: (name: string) => `Remove as parent: remove ${name} as a parent`,
 	partners: 'Partners',
@@ -106,7 +108,6 @@ export const FAMILY = {
 	noPartnership: 'No recorded partnership',
 	edit: 'Edit',
 	editLabel: (name: string) => `Edit the partnership with ${name}`,
-	removePartnership: 'Remove partnership',
 	removePartnershipLabel: (name: string) => `Remove partnership: remove the partnership with ${name}`,
 	siblings: 'Position among siblings',
 	position: (i: number, n: number) => `Position ${i} of ${n}`,
@@ -253,7 +254,6 @@ export const HOUSE_COLOUR_NAMES = ['Dark red', 'Red', 'Orange', 'Gold', 'Olive',
 /** The Houses window and its toolbar button (spec §6.10, D32, D36). */
 export const HOUSES = {
 	title: 'Houses',
-	intro: 'The colour of a house shows on the cards of the people of that house.',
 	none: 'This tree has no houses.',
 	newHouse: 'New house',
 	nameLabel: 'Name of the house',
@@ -296,7 +296,7 @@ export const ID_UI = {
 	aria: (item: string) => `ID of ${item}`,
 	/** The small button on a saved row of the Houses window and the Titles window (D110). */
 	open: 'Change ID',
-	openAria: (item: string) => `Change ID of ${item}`,
+	openAria: (item: string) => `Change ID: change the ID of ${item}`,
 	/** The title of the small window. */
 	windowTitle: (item: string) => `ID of ${item}`,
 	hint: (kind: 'house' | 'title') => `The ID is a short name. The plugin uses it to find this ${kind}. Most users never change it.`,
@@ -305,9 +305,9 @@ export const ID_UI = {
 	newId: (id: string) => `New ID: ${id}`,
 	/** The button that drops the new id of a row. "Reset" is the portrait crop button. */
 	keepOld: 'Keep old ID',
-	keepOldAria: (item: string) => `Keep old ID of ${item}`,
+	keepOldAria: (item: string) => `Keep old ID: keep the old ID of ${item}`,
 	make: 'Make ID from the name',
-	makeAria: (item: string) => `Make ID from the name for ${item}`,
+	makeAria: (item: string) => `Make ID from the name: make the ID of ${item} from the name`,
 	empty: 'Enter an ID.',
 	characters: 'Use only letters, digits and hyphens (-).',
 	taken: 'This ID is in use. Enter a different ID.',
@@ -509,7 +509,7 @@ export const WINDOW_UI = {
 
 /** The settings tab (spec §9, D33). */
 export const SETTINGS_UI = {
-	groups: { height: 'Height in a note', cards: 'Cards', housePage: 'House page', focus: 'Focus mode', links: 'Links', repair: 'Repair' },
+	groups: { view: 'Tree view', cards: 'Cards', relations: 'Relations and warnings', succession: 'Line of succession', housePage: 'House page', focus: 'Focus mode', links: 'Links', repair: 'Repair' },
 	heightDesktop: 'Height on a computer or tablet',
 	heightDesktopDesc: 'This is the height of a tree in a note, in pixels. The default is 500. If you drag the bottom edge of a tree, that tree keeps its new height.',
 	/** D118: the user's own break places in long names. */
@@ -569,7 +569,6 @@ export const SETTINGS_UI = {
 /** The command Insert family tree (spec §5.9, D34). */
 export const INSERT_UI = {
 	command: 'Insert family tree',
-	hint: `To add the first person, select ${quote('Add first person')} in Reading view or Live Preview.`,
 	/** The same sentence with straight marks: the plugin writes it into the owner's note, and it keeps that text plain ASCII (as in 0.2.0). */
 	noteHint: 'To add the first person, select "Add first person" in Reading view or Live Preview.',
 } as const;
@@ -671,8 +670,10 @@ function linkReportText(r: LinkReportText | null, enabled: boolean): string {
 
 /** Notices about writes (spec §6.1). */
 export const WRITE_TEXT = {
+	/** The drag of the tree's bottom edge: no window holds a draft, so the text does not speak of one. */
 	stale: 'The tree changed after you opened it. The plugin did not save your changes. It loaded the tree again.',
-	staleInSheet: STALE_TEXT,
+	/** F11: the one text of a stale Save in the edit sheet, the Houses window and the Titles window. The Notice and the red line in the window say the same words. */
+	staleWindow: STALE_TEXT,
 	missing: 'The plugin cannot find this tree in the note. It did not save your changes. Your changes are still in the window.',
 	personGone: 'This person is not in the tree now. The plugin cannot save your changes. You can copy your text from the window.',
 	personNotFound: 'This person is not in the tree now.',
@@ -701,7 +702,7 @@ export const PICTURES_UI = {
 	/** The accessible name of the arms box of a house; a tap on it opens the picker. */
 	armsLabel: (house: string) => `Select the arms of ${house}`,
 	/** The spoken name of the arms button of a house in the Houses window (it opens a menu). */
-	armsButtonLabel: (house: string) => `Arms of ${house}`,
+	armsButtonLabel: (house: string) => `Change the arms of ${house}`,
 	selectArms: 'Select arms',
 	removeArms: 'Remove arms',
 	coloursFromArms: 'Colours from the arms',

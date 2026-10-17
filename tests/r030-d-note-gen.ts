@@ -2,7 +2,7 @@
  * 0.3 package D (T3): a generator of random notes that knows where the real tree blocks are. Not a test file.
  *
  * The generator builds a note line by line from CommonMark rules (callouts and lists as containers, fences with
- * ``` and ~~~, front matter, decoys) and writes down the position of every real `dynasty` block while it builds. The
+ * ``` and ~~~, front matter, decoys) and writes down the position of every real `kin` block while it builds. The
  * tests compare `findBlocks` and `planWrite` with this knowledge. Nothing here calls `findBlocks`.
  *
  * What the generator makes (spec §6.1: fences of any length, fences nested in longer fences, callouts including nested
@@ -11,7 +11,7 @@
  *   spaces after them, tabs or spaces as the indent of a list, the quote mark written with and without a space;
  * - line endings LF, CRLF, mixed, and mixed with a lone CR; a byte order mark; front matter with a fenced example in it;
  * - decoys that are not blocks: other languages, other first words, a fence inside a longer fence, an indented code
- *   block (also inside a list item), a line with inline code, a word "dynasty" in a plain fence;
+ *   block (also inside a list item), a line with inline code, a word "kin" in a plain fence;
  * - one to three real trees; the last one may have no closing fence; an unclosed decoy may swallow the end;
  * - (package J, fix round) a callout opened on a list marker line ("- > q", also "- > - item"), with the tree below it
  *   in the list item; and a lone CR next to an empty line, in notes that mix the line endings.
@@ -88,7 +88,7 @@ function lead(chain: readonly Piece[], extra: number, text: string, tabs: boolea
 	return s.slice(0, s.length - text.length);
 }
 
-const WORDS = ['alpha', 'river', 'house', 'stone', 'crown', 'north', 'the', 'old', 'keep', 'grain', 'dynasty', 'of', 'Valmont', 'tower', 'lord', 'ash'];
+const WORDS = ['alpha', 'river', 'house', 'stone', 'crown', 'north', 'the', 'old', 'keep', 'grain', 'kin', 'of', 'Valmont', 'tower', 'lord', 'ash'];
 const sentence = (rand: () => number, n = 3 + Math.floor(rand() * 4)) => Array.from({ length: n }, () => pick(rand, WORDS)).join(' ');
 
 /** A random chain of containers: up to 3 callouts and up to 3 lists, at most 4 in all. */
@@ -168,7 +168,7 @@ class Builder {
 	/**
 	 * The marker lines of a chain; the innermost one carries `last`. A piece may share a line with the piece before it.
 	 * `fence`: `last` is a fence. A fence on the marker line of a list item inside a callout that starts on that line
-	 * ("- > - ```dynasty") stays unread (a known limit of package J), so then the callout ends its line.
+	 * ("- > - ```kin") stays unread (a known limit of package J), so then the callout ends its line.
 	 */
 	openers(chain: readonly Piece[], last: string, fence = false): void {
 		let done: Piece[] = [];
@@ -252,23 +252,23 @@ function treeBody(rand: () => number, closed: boolean): string[] {
 	return out;
 }
 
-const DECOY_INFO = ['python', 'js', 'text', 'yaml', 'markdown', 'dynasty-tree', 'Dynasty', 'DYNASTY', 'dynastyx', 'js dynasty', 'yaml dynasty', 'tree dynasty', '{dynasty}', '.dynasty', 'dynasty2', ''];
+const DECOY_INFO = ['python', 'js', 'text', 'yaml', 'markdown', 'kin-tree', 'Kin', 'KIN', 'kinx', 'js kin', 'yaml kin', 'tree kin', '{kin}', '.kin', 'kin2', ''];
 
-/** Lines inside a decoy fence of `char` and `len`: none can close it, some look like fences, some name the dynasty. */
+/** Lines inside a decoy fence of `char` and `len`: none can close it, some look like fences, some name the word kin. */
 function decoyLines(rand: () => number, char: '`' | '~', len: number): string[] {
 	const n = 1 + Math.floor(rand() * 5);
 	const other = char === '`' ? '~' : '`';
 	const pool = [
 		'people:',
-		'# dynasty',
-		'dynasty: yes',
-		'the dynasty fell',
-		`${other.repeat(3 + Math.floor(rand() * 3))}dynasty`,
+		'# kin',
+		'kin: yes',
+		'the kin fell',
+		`${other.repeat(3 + Math.floor(rand() * 3))}kin`,
 		`${other.repeat(len)}`,
 		`${other.repeat(len + 1)} x`,
 		char.repeat(Math.max(1, len - 1)),
 		`${char.repeat(len)} x`,
-		`${char.repeat(len)}dynasty`,
+		`${char.repeat(len)}kin`,
 		'  name: A',
 		'- item',
 		'> quote',
@@ -278,7 +278,7 @@ function decoyLines(rand: () => number, char: '`' | '~', len: number): string[] 
 	const out: string[] = [];
 	for (let i = 0; i < n; i++) out.push(pick(rand, pool));
 	// A fence of the same char that is shorter has no effect either; a closer of the right size is not in the pool.
-	return out.map((l) => (l.startsWith(char.repeat(len)) && !/^\S+\s+\S|dynasty/.test(l) ? `${l} x` : l));
+	return out.map((l) => (l.startsWith(char.repeat(len)) && !/^\S+\s+\S|kin/.test(l) ? `${l} x` : l));
 }
 
 /** Makes the note of `seed`. */
@@ -300,7 +300,7 @@ export function genNote(seed: number): GenNote {
 			features.add('fence in front matter');
 			b.push('description: |');
 			b.push('  Example:');
-			b.push('  ```dynasty');
+			b.push('  ```kin');
 			b.push('  people: []');
 			b.push('  ```');
 		}
@@ -333,7 +333,7 @@ export function genNote(seed: number): GenNote {
 		return {
 			char,
 			openLen,
-			info: pick(rand, ['dynasty', 'dynasty', 'dynasty', 'dynasty', ' dynasty', 'dynasty some words', '  dynasty']),
+			info: pick(rand, ['kin', 'kin', 'kin', 'kin', ' kin', 'kin some words', '  kin']),
 			closeLen: closed ? openLen + (rand() < 0.2 ? 1 + Math.floor(rand() * 2) : 0) : null,
 			extra: chain.length === 0 ? (rand() < 0.15 ? 1 + Math.floor(rand() * 3) : 0) : rand() < 0.2 ? 1 + Math.floor(rand() * 3) : 0,
 			closeExtra: rand() < 0.2 ? Math.floor(rand() * 4) : 0,
@@ -375,7 +375,7 @@ export function genNote(seed: number): GenNote {
 		if (spec.extra) features.add('indented fence');
 		if (spec.char === '~') features.add('tilde fence');
 		if (spec.openLen > 3) features.add('long fence');
-		if (spec.info !== 'dynasty') features.add('info string variant');
+		if (spec.info !== 'kin') features.add('info string variant');
 		if (!closed) {
 			features.add('unclosed tree');
 			clean = false;
@@ -400,7 +400,7 @@ export function genNote(seed: number): GenNote {
 		else if (kind === 'heading') b.push(pick(rand, ['## ', '### ', '# ']) + sentence(rand, 2));
 		else if (kind === 'rule') b.push(// Not "- - -": findBlocks reads it as nested list items (finding F4, written by hand in the test file).
 			pick(rand, ['---', '***', '___']));
-		else if (kind === 'inline') b.push('```dynasty``` is how the block starts (inline).');
+		else if (kind === 'inline') b.push('```kin``` is how the block starts (inline).');
 		else if (kind === 'list') {
 			listOpen = true;
 			const n = 2 + Math.floor(rand() * 3);
@@ -415,7 +415,7 @@ export function genNote(seed: number): GenNote {
 			b.push(sentence(rand, 3));
 			b.push('');
 			const ind = rand() < 0.5 ? '    ' : '\t';
-			b.push(`${ind}\`\`\`dynasty`);
+			b.push(`${ind}\`\`\`kin`);
 			b.push(`${ind}people:`);
 			b.push(`${ind}  - id: z`);
 			if (rand() < 0.5) b.push(`${ind}\`\`\``);
@@ -432,7 +432,7 @@ export function genNote(seed: number): GenNote {
 				features.add('fence in a fence');
 				const innerChar: '`' | '~' = rand() < 0.5 ? char : char === '`' ? '~' : '`';
 				const innerLen = innerChar === char ? 3 : 3 + Math.floor(rand() * 2);
-				body = [`${innerChar.repeat(innerLen)}dynasty`, ...treeBody(rand, true), innerChar.repeat(innerLen)];
+				body = [`${innerChar.repeat(innerLen)}kin`, ...treeBody(rand, true), innerChar.repeat(innerLen)];
 			} else body = decoyLines(rand, char, openLen);
 			if (info !== '') features.add(`decoy info ${info === 'markdown' || info === 'text' ? 'plain' : 'word'}`);
 			features.add('decoy fence');
@@ -461,7 +461,7 @@ export function genNote(seed: number): GenNote {
 		clean = false;
 		b.push(`~~~${pick(rand, ['python', 'text'])}`);
 		b.push('some text');
-		b.push('```dynasty');
+		b.push('```kin');
 		for (const l of treeBody(rand, false)) b.push(l);
 		b.push('```');
 		b.push('more text');

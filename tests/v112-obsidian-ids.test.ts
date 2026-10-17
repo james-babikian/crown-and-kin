@@ -411,7 +411,7 @@ describe('Houses window: the Id change (§13.17 rule 5, D109, D110)', () => {
 			const page = gotoPage(content, id);
 			const button = page.querySelector('.dynasty-id-open')!;
 			expect(button.querySelector('.dynasty-row-title')!.getText()).toBe('Change ID');
-			expect(button.getAttribute('aria-label')).toBe(`Change ID of ${name}`);
+			expect(button.getAttribute('aria-label')).toBe(`Change ID: change the ID of ${name}`);
 			expect(button.tag).toBe('button');
 			// The button comes before Delete, in the section "Other actions".
 			const row = button.parentElement!;
@@ -433,7 +433,7 @@ describe('Houses window: the Id change (§13.17 rule 5, D109, D110)', () => {
 		const { content } = await openHouses();
 		gotoPage(content, 'valmont');
 		type(nameField(content, 'dynasty-house-name'), 'Crown');
-		expect(idOpen(content)!.getAttribute('aria-label')).toBe('Change ID of Crown');
+		expect(idOpen(content)!.getAttribute('aria-label')).toBe('Change ID: change the ID of Crown');
 	});
 
 	it('the small window has the title, the hint, the Id field with the id of the draft, "Make ID from the name", the buttons, and the focus is in the field', async () => {
@@ -460,7 +460,7 @@ describe('Houses window: the Id change (§13.17 rule 5, D109, D110)', () => {
 		expect(noteOf(content)!.querySelector('.dynasty-id-new-text')!.getText()).toBe('New ID: crown');
 		const keep = noteOf(content)!.querySelector('button')!;
 		expect(keep.getText()).toBe('Keep old ID');
-		expect(keep.getAttribute('aria-label')).toBe('Keep old ID of House Valmont');
+		expect(keep.getAttribute('aria-label')).toBe('Keep old ID: keep the old ID of House Valmont');
 		expect(content.querySelectorAll('.dynasty-id-new')).toHaveLength(1);
 		expect(handle.ops).toHaveLength(0);
 		expect(win.isDirty()).toBe(true);
@@ -690,7 +690,7 @@ describe('Houses window: the Id change (§13.17 rule 5, D109, D110)', () => {
 		second.handle.body = `${second.handle.body}# changed elsewhere\n`;
 		second.handle.write.mockImplementationOnce((async () => ({ ok: false, code: 'stale' })) as never);
 		await click(confirmOf(second.modal)!.querySelector('.dynasty-id-change'));
-		expect(notices).toContain(WRITE_TEXT.stale);
+		expect(notices).toContain(WRITE_TEXT.staleWindow);
 		expect(second.handle.body).toContain('house: orsini');
 		expect(second.handle.body).not.toContain('house-orsini');
 		// The draft id stays in the note of the page after the window read the new body.
@@ -712,7 +712,7 @@ describe('Houses window: the Id change (§13.17 rule 5, D109, D110)', () => {
 			await click(saveOf(content));
 			await click(confirmOf(modal)!.querySelector('.dynasty-id-change'));
 			expect(notices[notices.length - 1]).toBe(text);
-			expect(notices).not.toContain(WRITE_TEXT.stale);
+			expect(notices).not.toContain(WRITE_TEXT.staleWindow);
 			expect(content.querySelector('.dynasty-sheet-error')!.getText()).toBe(text);
 			// The window stays open and the draft stays.
 			expect(openModals.includes(win as never)).toBe(true);
@@ -816,7 +816,7 @@ describe('Titles window: the Id change (§13.17 rule 5, D109, D110)', () => {
 		const page = gotoPage(content, 'duke');
 		const button = page.querySelector('.dynasty-id-open')!;
 		expect(button.querySelector('.dynasty-row-title')!.getText()).toBe('Change ID');
-		expect(button.getAttribute('aria-label')).toBe('Change ID of Duke');
+		expect(button.getAttribute('aria-label')).toBe('Change ID: change the ID of Duke');
 		// The button comes before Delete, in the section "Other actions".
 		const row = button.parentElement!;
 		expect(row.children.indexOf(button)).toBeLessThan(row.children.indexOf(row.querySelector('.dynasty-title-delete')!));
@@ -839,7 +839,7 @@ describe('Titles window: the Id change (§13.17 rule 5, D109, D110)', () => {
 		expect(openModals).toHaveLength(1);
 		const note = noteOf(content)!;
 		expect(note.querySelector('.dynasty-id-new-text')!.getText()).toBe('New ID: king');
-		expect(note.querySelector('button')!.getAttribute('aria-label')).toBe('Keep old ID of Duke');
+		expect(note.querySelector('button')!.getAttribute('aria-label')).toBe('Keep old ID: keep the old ID of Duke');
 		expect(win.isDirty()).toBe(true);
 		// Open again: the draft id.
 		const again = await openIdOf(pageOf(content));
@@ -933,7 +933,7 @@ describe('Titles window: the Id change (§13.17 rule 5, D109, D110)', () => {
 		await click(saveOf(content));
 		await click(confirmOf(modal)!.querySelector('.dynasty-id-change'));
 		expect(notices[notices.length - 1]).toBe(ID_UI.inUse);
-		expect(notices).not.toContain(WRITE_TEXT.stale);
+		expect(notices).not.toContain(WRITE_TEXT.staleWindow);
 		expect(content.querySelector('.dynasty-sheet-error')!.getText()).toBe(ID_UI.inUse);
 	});
 

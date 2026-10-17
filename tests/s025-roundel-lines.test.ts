@@ -9,12 +9,9 @@ import { describe, expect, it } from 'vitest';
 import { deriveFamilies } from '../src/core/derive';
 import type { FamilyGraph } from '../src/core/derive';
 import { foldFamilies, foldHidden } from '../src/core/folds';
-import { computeGenerations } from '../src/core/generations';
-import { computeModelOrder } from '../src/core/order';
 import { parseDynasty } from '../src/core/parse';
-import { cardForm, cardText, gapHeight, geometryFor, lineMetrics, roundelAxis, roundelLineEnd, roundelPics, tagTop, youTabRect, ROUNDEL_EM } from '../src/layout/geometry';
+import { cardForm, cardText, geometryFor, lineMetrics, roundelAxis, roundelLineEnd, roundelPics, tagTop, youTabRect, ROUNDEL_EM } from '../src/layout/geometry';
 import { foldMark } from '../src/layout/fold-spots';
-import { planLines } from '../src/layout/lines';
 import { DEFAULT_LAYOUT_SETTINGS, clearLayoutCache, layoutTree, pictureSets } from '../src/layout/index';
 import type { LaidOut, LayoutSettings, PersonBox } from '../src/layout/model';
 import { sampleSources } from './acceptance/m11-support';
@@ -314,7 +311,8 @@ describe('B.3.3: dotted side links that cross a picture are counted', () => {
 
 	it('sample 07b at 12 px, with its real pictures: 3 cards (the count of the prototype)', () => {
 		// 0.3 (D231): the added step moves cards of tree 07b, and one of the three cards no longer has a side link across its picture.
-		expect(count('07b', 12, 'real')).toBe(2);
+		// 0.3.1 golden record (an internal study): the new walk and ports move the cards again, and the count is 3 again (a dotted side link across a picture is counted, not a fault: B.3.3; the test 'no line enters a medallion' has 0 problems).
+		expect(count('07b', 12, 'real')).toBe(3);
 	});
 
 	it('the count at 16 px, and with a picture for everyone, is pinned (a change is a layout change that someone must look at)', () => {
@@ -473,51 +471,32 @@ describe('B.3.5: sideways, the text card draws the lines it drew in 0.2.4', () =
 	});
 });
 
-describe('B.3.3: the plan the layout sized the gaps with is the plan the lines are drawn from', () => {
-	it('every gap holds the lanes the router plans, also for the marked card whose drop skips the places left of the axis', () => {
-		const bad: string[] = [];
-		let compared = 0;
-		for (const f of [12, 16]) {
-			for (const s of ids()) {
-				const g = parse(s.source);
-				const base = lay(g, { f, orientation: 'down', pictures: 'all', plate: true });
-				const axis = (b: PersonBox) => b.x + roundelAxis(base.laid.layout.geometry);
-				const marks = new Set<string>();
-				for (const p of base.laid.edges.paths) {
-					const m = /^M([\d.-]+) ([\d.-]+)V([\d.-]+)$/.exec(p.d);
-					if (m && p.child !== undefined && Math.abs(Number(m[1]) - axis(base.laid.layout.persons.get(p.child)!)) > 0.5) marks.add(p.child);
-				}
-				for (const id of [undefined, ...marks]) {
-					const { laid } = lay(g, { f, orientation: 'down', pictures: 'all', plate: id === undefined, ...(id !== undefined ? { youTab: id } : {}) });
-					const L = laid.layout;
-					const order = computeModelOrder(g, computeGenerations(g));
-					const plan = planLines({ g, persons: L.persons, rows: L.rows, unions: L.unions, anchors: order.anchors, geo: L.geometry, youTab: L.youTab });
-					L.rowGaps.forEach((gap, k) => {
-						compared++;
-						const need = gapHeight(L.geometry, plan.coupleLanes[k], plan.barLanes[k]);
-						if (gap.bottom - gap.top < need - 1e-6) bad.push(`${s.id} ${f}px marked ${id}: gap ${k} holds ${gap.bottom - gap.top}, the lines need ${need}`);
-					});
-				}
+// WP-4b (class c): B.3.3 "the plan the layout sized the gaps with is the plan the lines are drawn from" compared `planLines` with the finished gaps. There is one
+// plan now and the gap is sized from the same nets that are drawn (the architecture notes §4.2.2); "every lane and bar lies inside its gap" is the test `layout-stage-route`
+// (`packLanes`, `rowYs`). The second test of the block, on the drop of a marked card, is written again on the drawing.
+describe('B.3.3: a marked card gets no drop left of its axis, every other card keeps its drop', () => {
+	it('the marked card of tree 12 (a card whose drop another trunk moved) has its drop on or right of the axis; the others do not move', () => {
+		// With the switch (0.3.1) tree 12 has no such card at 12 px; the first sample tree and size that has one is used (a precondition, checked below).
+		const drops = (laid: LaidOut) => {
+			const out = new Map<string, number>();
+			for (const p of laid.edges.paths) {
+				const m = /^M([\d.-]+) ([\d.-]+)V([\d.-]+)$/.exec(p.d);
+				if (m && p.child !== undefined) out.set(p.child, Number(m[1]));
 			}
-		}
-		expect(compared).toBeGreaterThan(100);
-		expect(bad.slice(0, 5)).toEqual([]);
-	});
-
-	it('planLines gives the marked card no drop left of the axis, and every other card the same drop as without a mark', () => {
-		// 0.3 (D231): with the added step no card of tree 07 has a drop that another trunk moves; tree 12 still has one.
-		const s = ids().find((x) => x.id === '12')!;
-		const g = parse(s.source);
-		const base = lay(g, { f: 12, orientation: 'down', pictures: 'all', plate: true });
-		const L = base.laid.layout;
-		const order = computeModelOrder(g, computeGenerations(g));
-		const input = { g, persons: L.persons, rows: L.rows, unions: L.unions, anchors: order.anchors, geo: L.geometry };
-		const plain = planLines(input);
-		const off = plain.families.flatMap((fam) => fam.kids.map((k, i) => ({ k, x: fam.dropX[i] }))).filter((d) => Math.abs(d.x - (L.persons.get(d.k)!.x + roundelAxis(L.geometry))) > 0.5);
-		expect(off.length).toBeGreaterThan(0);
-		const marked = planLines({ ...input, youTab: off[0].k });
-		const dropOf = (plan: typeof plain, kid: string) => plan.families.flatMap((fam) => fam.kids.map((k, i) => ({ k, x: fam.dropX[i] }))).find((d) => d.k === kid)!.x;
-		expect(dropOf(marked, off[0].k)).toBeGreaterThanOrEqual(L.persons.get(off[0].k)!.x + roundelAxis(L.geometry) - 0.5);
-		for (const d of off.slice(1)) expect(dropOf(marked, d.k)).toBe(d.x);
+			return out;
+		};
+		const axis = (laid: LaidOut, id: string) => laid.layout.persons.get(id)!.x + roundelAxis(laid.layout.geometry);
+		const found = ids().flatMap((x) => [12, 16].map((f) => {
+			const g = parse(x.source);
+			const base = lay(g, { f, orientation: 'down', pictures: 'all', plate: true }).laid;
+			const plain = drops(base);
+			return { g, f, base, plain, off: [...plain].filter(([id, dx]) => Math.abs(dx - axis(base, id)) > 0.5) };
+		})).find((c) => c.off.length > 0);
+		expect(found, 'a sample tree with a drop that another trunk moved off the axis').toBeDefined();
+		const { g, f, off } = found!;
+		const marked = lay(g, { f, orientation: 'down', pictures: 'all', plate: true, youTab: off[0][0] }).laid;
+		const after = drops(marked);
+		expect(after.get(off[0][0])!).toBeGreaterThanOrEqual(axis(marked, off[0][0]) - 0.5);
+		for (const [id, x] of off.slice(1)) expect(after.get(id)).toBe(x);
 	});
 });

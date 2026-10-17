@@ -13,7 +13,7 @@ Sample tree for milestone 10 (spec §13.0 item 12, §13.9 and §13.10). Generate
 
 **Block 2: long names.** Five children of Leopold and Cecilia with names of 1, 2 and 3 text lines and one that needs more than 3 (see the comments for the exact text lines at the default font).
 
-```dynasty
+```kin
 # Sample tree 15, block 1: branches and folds (spec §13.10, contract rules 1-9). Worked out by hand.
 #
 # people: 96
@@ -687,7 +687,7 @@ unions:
     start: 1095
 ```
 
-```dynasty
+```kin
 # Sample tree 15, block 2: long names (spec §13.9, D81, D82). Worked out by hand and checked with the headless measure
 # (`approxMeasure` of `src/render/svg-string.ts`, name font: bold, 13.6 px = 0.85 em of the default 16 px note font, D117; `cardNameLines`).
 #

@@ -4,7 +4,7 @@
 - Corwin marries his daughter Alys after his first wife's death (parent–child marriage).
 - Each person must appear once, with no warnings.
 
-```dynasty
+```kin
 houses:
   - id: veyle
     name: House Veyle

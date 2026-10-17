@@ -147,7 +147,7 @@ export class TitlesWindow extends ListEditWindow {
 		try {
 			this.o.onClosed?.();
 		} catch (e) {
-			console.error('Dynasty Tree: cannot return the focus', e);
+			console.error('Crown and Kin: cannot return the focus', e);
 		}
 	}
 
@@ -459,7 +459,7 @@ protected labelOf(key: string): string {
 				cls: 'mod-cta dynasty-confirm-show',
 				run: () => {
 					this.hideConfirm();
-					void this.save(null, t.key).catch((e) => console.error('Dynasty Tree: the Titles window could not save', e));
+					void this.save(null, t.key).catch((e) => console.error('Crown and Kin: the Titles window could not save', e));
 				},
 			},
 		]);
@@ -775,7 +775,7 @@ protected labelOf(key: string): string {
 		const showId = showRow && showRow.id !== null ? (idChanged(titleIdRow(showRow)) ? draftId(titleIdRow(showRow)) : showRow.id) : null;
 		const deleted = this.rows.filter((t) => t.id !== null && t.deleted).map((t) => t.baseName || t.id!);
 		const h = this.o.handle;
-		const out = await this.writeBatch(h, ops, this.o.beforeWrite, 'Dynasty Tree: cannot save the titles');
+		const out = await this.writeBatch(h, ops, this.o.beforeWrite, 'Crown and Kin: cannot save the titles');
 		if (!out) return;
 		if (!out.ok) {
 			this.failed(out);
@@ -786,7 +786,7 @@ protected labelOf(key: string): string {
 			try {
 				this.o.showLine?.(showId);
 			} catch (e) {
-				console.error('Dynasty Tree: cannot show the line of succession', e);
+				console.error('Crown and Kin: cannot show the line of succession', e);
 			}
 		}
 		this.undoAfterWrite(h, out, ops, deleted, TITLES_UI.deleted);
@@ -810,7 +810,7 @@ protected labelOf(key: string): string {
 
 	/** Spec §6.1 stale write: a Notice, the new data in the window, and the draft kept with a message that says so. */
 	private stale(body: string): void {
-		new Notice(WRITE_TEXT.stale);
+		new Notice(WRITE_TEXT.staleWindow);
 		this.reload(body);
 		this.showError(TITLES_UI.stale);
 	}

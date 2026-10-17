@@ -146,7 +146,7 @@ export const STEP_LIMIT_MS = 8000;
 export const NO_READ_BYTES = 256 * 1024 * 1024;
 export const NO_READ_BYTES_COARSE = 64 * 1024 * 1024;
 /** B14: the header results kept across sessions, in the plugin's local storage. */
-export const HEADER_STORE_KEY = 'dynasty-tree-picture-headers';
+export const HEADER_STORE_KEY = 'crown-and-kin-picture-headers';
 export const HEADER_STORE_MAX = 2000;
 /** O7: the size of the copy that "Colours from the arms" reads. */
 export const ARMS_PIXELS = 64;
@@ -471,7 +471,7 @@ export function createPictureStore(app: App, io: PictureIO = defaultIO(app)): Pi
 			if (typeof put !== 'function' || !saved) return;
 			put.call(app, HEADER_STORE_KEY, { v: 1, e: [...saved].map(([p, x]) => [p, x.sig, x.result]) });
 		} catch (e) {
-			console.error('Dynasty Tree: cannot keep the picture checks', e);
+			console.error('Crown and Kin: cannot keep the picture checks', e);
 		}
 	}
 
@@ -556,7 +556,7 @@ export function createPictureStore(app: App, io: PictureIO = defaultIO(app)): Pi
 			const exclusive = t.exclusive;
 			void t
 				.run()
-				.catch((e) => console.error('Dynasty Tree: a picture job failed', e))
+				.catch((e) => console.error('Crown and Kin: a picture job failed', e))
 				.finally(() => {
 					running--;
 					if (exclusive) solo = false;
@@ -622,7 +622,7 @@ export function createPictureStore(app: App, io: PictureIO = defaultIO(app)): Pi
 	function failed(file: TFile, e: unknown, fault = false): PictureProblem {
 		const p = notImage(file);
 		if (fault) remember(file, p, false);
-		if (!(e instanceof StepTimeout)) console.warn('Dynasty Tree: cannot read the picture', file.path, e);
+		if (!(e instanceof StepTimeout)) console.warn('Crown and Kin: cannot read the picture', file.path, e);
 		return p;
 	}
 
@@ -788,7 +788,7 @@ export function createPictureStore(app: App, io: PictureIO = defaultIO(app)): Pi
 			const job = keep ? jobs.get(key) : undefined;
 			return job ? join(job, signal) : startCopy(file, px, fit, key, signal, keep, part);
 		} catch (e) {
-			console.error('Dynasty Tree: cannot make a copy of the picture', e);
+			console.error('Crown and Kin: cannot make a copy of the picture', e);
 			return Promise.resolve(notImage(file));
 		}
 	}
@@ -906,7 +906,7 @@ export function createPictureStore(app: App, io: PictureIO = defaultIO(app)): Pi
 				if (v.kind === 'other') return { ok: false, code: 'picture-not-image', file: file.name };
 				return { ok: true, file, format: v.format };
 			} catch (e) {
-				console.error('Dynasty Tree: cannot find the picture', e);
+				console.error('Crown and Kin: cannot find the picture', e);
 				return { ok: false, code: 'missing-picture', file: String(link ?? '') };
 			}
 		},
@@ -951,7 +951,7 @@ export function createPictureStore(app: App, io: PictureIO = defaultIO(app)): Pi
 				p.then(done, done);
 				return p;
 			} catch (e) {
-				console.error('Dynasty Tree: cannot check the picture', e);
+				console.error('Crown and Kin: cannot check the picture', e);
 				return Promise.resolve(null);
 			}
 		},
@@ -1054,7 +1054,7 @@ export function createPictureStore(app: App, io: PictureIO = defaultIO(app)): Pi
 						},
 					});
 				} catch (e) {
-					console.error('Dynasty Tree: cannot make the picture for the saved file', e);
+					console.error('Crown and Kin: cannot make the picture for the saved file', e);
 					resolve(notImage(file));
 				}
 			});
@@ -1098,7 +1098,7 @@ export function createPictureStore(app: App, io: PictureIO = defaultIO(app)): Pi
 					}
 				}
 			} catch (e) {
-				console.error('Dynasty Tree: cannot forget the picture', e);
+				console.error('Crown and Kin: cannot forget the picture', e);
 			}
 		},
 
@@ -1107,7 +1107,7 @@ export function createPictureStore(app: App, io: PictureIO = defaultIO(app)): Pi
 				try {
 					fn(paths);
 				} catch (e) {
-					console.error('Dynasty Tree: cannot show the changed pictures', e);
+					console.error('Crown and Kin: cannot show the changed pictures', e);
 				}
 			}
 		},

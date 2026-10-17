@@ -1,4 +1,5 @@
 // 0.3 (D231, WP-Q): the hashes of this file were recorded again, once, because the added step of the placement moves cards.
+// 0.3.1 (golden record of the card-and-line switch, an internal study): all four recorded again, once, for the new walk, the passages and the ports.
 import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 import { deriveFamilies } from '../src/core/derive';
@@ -38,10 +39,10 @@ function sidewaysHash(source: string): string {
 }
 
 const RECORDED: Record<string, string> = {
-	'07': 'be1e8efd407dc7d6395ee4fb808baeb34d495e6b9dd2451acbd834b616215ae2',
-	'07b': 'be1e8efd407dc7d6395ee4fb808baeb34d495e6b9dd2451acbd834b616215ae2',
-	'12': '61afce3056b2d6045d11532f263188686579add8e4a08a971b5a5d3c800b907b',
-	'15': 'cb891a39822ade5a727be399dffd4e3db55bf7cf69ad66ede792b4eecbfbd107',
+	'07': '08f4440d038713d1f6e98e6fa11178bc2806e839234c5a9ad2f60c52f750cfce',
+	'07b': '08f4440d038713d1f6e98e6fa11178bc2806e839234c5a9ad2f60c52f750cfce',
+	'12': 'f47adc67b56a733ba992f42d73c76530043e8f19156594b366430403082d5e48',
+	'15': '49b3341b6ea7c4e70da561037c05a609433ca4d8e3b4311de94fa2a716209d16',
 };
 
 const SAMPLES = sampleSources().filter((s) => IDS.includes(s.id));

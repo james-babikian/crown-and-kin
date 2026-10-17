@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { NORMAL_GEOMETRY } from '../src/layout/geometry';
-import { DEFAULT_FAR_RULE, layoutFamilies } from '../src/layout/layout';
+import { DEFAULT_FAR_RULE } from '../src/layout/layout';
+import { arrangeTree } from '../src/layout/pipeline';
 import { measureLayout } from '../scripts/metrics';
 import { placeInOrder } from '../src/layout/pava';
 import { build, fixture } from './helpers';
@@ -14,10 +15,10 @@ describe('placeInOrder', () => {
 	});
 });
 
-describe('layoutFamilies (custom placement)', () => {
+describe('arrangeTree (custom placement)', () => {
 	const lay = (f: string) => {
-		const { g, gen, order } = build(fixture(f));
-		const layout = layoutFamilies(g, gen, order, NORMAL_GEOMETRY, { sweeps: 4, far: DEFAULT_FAR_RULE });
+		const { g, gen } = build(fixture(f));
+		const { layout } = arrangeTree(g, gen, NORMAL_GEOMETRY, { sweeps: 4, far: DEFAULT_FAR_RULE });
 		return { g, layout };
 	};
 

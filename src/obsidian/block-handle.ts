@@ -1,5 +1,5 @@
 /*
- * BlockHandle (spec §6.1): the one way the plugin writes a `dynasty` block. The pure steps (locate,
+ * BlockHandle (spec §6.1): the one way the plugin writes a `kin` block. The pure steps (locate,
  * stale check, new body, undo rules, finding a block again) live in src/core; this file adds file
  * I/O, the queue, the choice between an editor transaction and `vault.process`, and the events.
  */
@@ -28,10 +28,10 @@ function applyToEditor(view: MarkdownView, c: { from: number; to: number; text: 
 	const cm = (ed as unknown as { cm?: Pick<EditorView, 'dispatch' | 'state'> }).cm;
 	if (cm && typeof cm.dispatch === 'function' && cm.state?.doc?.length === ed.getValue().length) {
 		// A link update after a rename (spec §6.9) is not the user's edit: Ctrl/Cmd+Z must not bring the old link back.
-		cm.dispatch({ changes: { from: c.from, to: c.to, insert: c.text }, userEvent: 'input.dynasty-tree', ...(history ? {} : { annotations: Transaction.addToHistory.of(false) }) });
+		cm.dispatch({ changes: { from: c.from, to: c.to, insert: c.text }, userEvent: 'input.crown-and-kin', ...(history ? {} : { annotations: Transaction.addToHistory.of(false) }) });
 		return;
 	}
-	ed.transaction({ changes: [{ from: ed.offsetToPos(c.from), to: ed.offsetToPos(c.to), text: c.text }] }, 'dynasty-tree');
+	ed.transaction({ changes: [{ from: ed.offsetToPos(c.from), to: ed.offsetToPos(c.to), text: c.text }] }, 'crown-and-kin');
 }
 
 const keyString = (path: string, ordinal: number) => `${path}\u0000#${ordinal}`;
@@ -45,7 +45,7 @@ const MAINTAINED_MAX = 20;
 
 type Listener = (body: string) => void;
 
-/** Where a block is: the vault path of its note (re-keyed on rename) and its index among the note's `dynasty` blocks (`LocatedBlock.ordinal`). */
+/** Where a block is: the vault path of its note (re-keyed on rename) and its index among the note's `kin` blocks (`LocatedBlock.ordinal`). */
 export interface BlockKey {
 	path: string;
 	ordinal: number;
@@ -76,11 +76,11 @@ export type HandleWriteOutcome =
 /** The result of `Handle.undo`: the restored body, or why it did not undo. */
 export type UndoOutcome = { ok: true; body: string } | { ok: false; code: 'empty' | 'changed' | 'missing' };
 
-/** The one handle of a `dynasty` block (spec §6.1), shared by every view of that block. */
+/** The one handle of a `kin` block (spec §6.1), shared by every view of that block. */
 export class Handle {
 	/** `expectedBody` (§6.1): only ever our own write, or an unambiguous re-read of this block. */
 	body: string;
-	/** Number of `dynasty` blocks in the note when `body` was taken; tells whether blocks moved. */
+	/** Number of `kin` blocks in the note when `body` was taken; tells whether blocks moved. */
 	count: number;
 	/**
 	 * The plugin cannot tell which block this handle meant any more (blocks were added or removed
@@ -153,7 +153,7 @@ export class Handle {
 			try {
 				l(body);
 			} catch (e) {
-				console.error('Dynasty Tree: a tree view failed to update', e);
+				console.error('Crown and Kin: a tree view failed to update', e);
 			}
 		}
 	}
@@ -168,11 +168,6 @@ export class Handle {
 	/** Reads the note again and updates every handle of it (see `HandleRegistry.sync`). */
 	refresh(): Promise<void> {
 		return this.reg.sync(this.key.path);
-	}
-
-	/** A view rendered `source`: if the handle holds another body, the note changed. Never takes `source` as the body. */
-	seen(source: string): void {
-		if (!sameBody(source, this.body)) void this.refresh();
 	}
 
 	/** Queued: writes on one handle never overlap. */
@@ -195,7 +190,7 @@ export class Handle {
 				if ((out === 'stale' || out === 'missing') && !this.detached && this.body === expected) out = await this.apply(expected, edit, mode);
 			} catch (e) {
 				// §8: a failed file write is an outcome for the caller, never an unhandled rejection.
-				console.error('Dynasty Tree: cannot write the note', e);
+				console.error('Crown and Kin: cannot write the note', e);
 				return { ok: false, code: 'refused', refusal: { ok: false, code: 'bad-value', detail: e instanceof Error ? e.message : String(e) } };
 			}
 			if (out === 'written') {
@@ -235,7 +230,7 @@ export class Handle {
 			try {
 				out = await this.apply(this.body, () => ({ ok: true, body: step.body }), 'undo');
 			} catch (e) {
-				console.error('Dynasty Tree: cannot write the note', e);
+				console.error('Crown and Kin: cannot write the note', e);
 				out = 'rejected';
 			}
 			if (out === 'written') return { ok: true, body: this.body };
@@ -441,7 +436,7 @@ export class HandleRegistry {
 		try {
 			return await this.app.vault.read(file);
 		} catch (e) {
-			console.error('Dynasty Tree: cannot read the note', e);
+			console.error('Crown and Kin: cannot read the note', e);
 			return null;
 		}
 	}

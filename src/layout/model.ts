@@ -1,7 +1,7 @@
 /**
  * The shapes the layout hands to renderers: card boxes, union points, far-couple tags, the line
- * kinds and the finished `TreeLayout` and `EdgeDrawing`. `layout.ts`, `edges.ts` and `geometry.ts`
- * build these shapes (`layout.ts` places cards, `edges.ts` draws lines, `geometry.ts` sizes cards
+ * kinds and the finished `TreeLayout` and `EdgeDrawing`. `pipeline.ts`, `draw.ts` and `geometry.ts`
+ * build these shapes (`pipeline.ts` and `draw.ts` place cards and draw lines, `geometry.ts` sizes cards
  * and gaps); `src/render` only reads them. `StrokeKind` here and `STROKES` in `render/styles.ts`
  * list the same line kinds in the same order: add a new kind to both.
  */
@@ -54,7 +54,7 @@ export interface Geometry {
 	 * D40 (M7): set by the layout from `LayoutSettings.relationLine`, in every layout;
 	 * `cardH` then already includes one small text line (`relationExtra(geo)` = round(line height ×
 	 * 0.85 × fontPx)), so `cardText`, `tagTop` and the lines need no other change. `drawnGeometry` and
-	 * `layoutFamilies` apply it before anything else. `cardText` then centres three small lines.
+	 * `arrangeTree` apply it before anything else. `cardText` then centres three small lines.
 	 */
 	relationLine?: boolean;
 	/** 0.2.5 (D143, D150): the card form. 'roundel' = the top-to-bottom card with a medallion; 'text' = the sideways text card. Absent = a plain geometry (tests): the numbers of the text card. Set by `cardForm` only, never by `withRelationLine`. */

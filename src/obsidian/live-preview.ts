@@ -2,7 +2,7 @@
  * Live Preview draws a code block only after the editor's Markdown parser has read the block's
  * closing fence, and the parser stops a little below the visible part of the note. A tall tree
  * (sample trees 6 and 7) therefore stayed as source text until the user scrolled to its end
- * (the decision notes). When a dynasty block is visible but not yet parsed to its end, this asks the
+ * (the decision notes). When a kin block is visible but not yet parsed to its end, this asks the
  * parser to read to the end of the block, and the block is drawn at once. The scan of the note for blocks waits
  * until the user stops typing (WP-H2, P3), because it costs a few ms for each key press in a note of 1 MB.
  */
@@ -16,12 +16,12 @@ const MAX_TRIES = 40;
 /** The quiet time after the last text change before the note is scanned for blocks. */
 export const TYPING_WAIT_MS = 200;
 /** The user event of the plugin's own writes (`block-handle.ts` `applyToEditor`). */
-const PLUGIN_EVENT = 'input.dynasty-tree';
+const PLUGIN_EVENT = 'input.crown-and-kin';
 
 /**
  * The update holds a keyboard change by the user: text typed, pasted or dropped ("input" and its kinds, such as "input.type"
  * and "input.paste") or deleted ("delete" and its kinds). Undo and redo are single steps, so they scan at once. The plugin's
- * own writes carry "input.dynasty-tree" (`block-handle.ts`); they are not typing, so they scan at once too.
+ * own writes carry "input.crown-and-kin" (`block-handle.ts`); they are not typing, so they scan at once too.
  */
 function isTyping(u: ViewUpdate): boolean {
 	return u.transactions.some((tr) => (tr.isUserEvent('input') && !tr.isUserEvent(PLUGIN_EVENT)) || tr.isUserEvent('delete'));
@@ -54,7 +54,7 @@ export class TallBlockParser {
 			try {
 				this.run();
 			} catch (e) {
-				console.error('Dynasty Tree: cannot prepare the tree in Live Preview', e);
+				console.error('Crown and Kin: cannot prepare the tree in Live Preview', e);
 			}
 		}, delay);
 	}
@@ -98,5 +98,5 @@ export class TallBlockParser {
 	}
 }
 
-/** The CodeMirror view plugin, registered by `main.ts`, that forces tall dynasty blocks to parse fully. */
+/** The CodeMirror view plugin, registered by `main.ts`, that forces tall kin blocks to parse fully. */
 export const tallBlockParser = ViewPlugin.fromClass(TallBlockParser);

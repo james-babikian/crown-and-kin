@@ -139,7 +139,7 @@ describe('review M8 obsidian: Titles window, Add holder of a person with no id',
 		expect(box().querySelectorAll('.dynasty-holder-row')).toHaveLength(3);
 		await click(content.querySelector('.dynasty-sheet-save'));
 		// The tree did not change under the window: no stale message.
-		expect(notices).not.toContain(WRITE_TEXT.stale);
+		expect(notices).not.toContain(WRITE_TEXT.staleWindow);
 		const g = graph(handle.body);
 		const bran = g.people.find((p) => p.name === 'Bran Valmont')!;
 		expect(g.titles[0].holders.map((h) => h.person ?? h.name)).toEqual(['a', 'Orso the Old', bran.id]);

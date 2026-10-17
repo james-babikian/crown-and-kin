@@ -1,6 +1,6 @@
 /*
  * Hostile tree texts for `tests/fuzz-hostile.test.ts` (0.3, WP-H, the release plan W4): alias bombs, very long values, blocks
- * with very many keys and deeply nested flow collections. Each case is a note with one `dynasty` block. `runCase`
+ * with very many keys and deeply nested flow collections. Each case is a note with one `kin` block. `runCase`
  * pushes the note through the plugin's read and write path (locate, parse, derive, layout, relations, one edit) and
  * reports what happened. The test runs it in a child process (`hostile-child.ts`), so a hang can be stopped and named.
  */
@@ -29,7 +29,7 @@ export interface HostileCase {
 /** A small valid tree around hostile parts: two people and a house, so layout, relations and an edit have something to do. */
 const BASE = 'people:\n  - id: aldric\n    name: Aldric\n  - id: isolde\n    name: Isolde\n    parents: [aldric]\n';
 
-export const wrapNote = (body: string): string => `# Hostile\n\nBefore the tree.\n\n\`\`\`dynasty\n${body}${body.endsWith('\n') ? '' : '\n'}\`\`\`\n\nAfter the tree.\n`;
+export const wrapNote = (body: string): string => `# Hostile\n\nBefore the tree.\n\n\`\`\`kin\n${body}${body.endsWith('\n') ? '' : '\n'}\`\`\`\n\nAfter the tree.\n`;
 
 // --- alias bombs --------------------------------------------------------------------------
 

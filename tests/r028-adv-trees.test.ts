@@ -21,6 +21,12 @@ import { lineProblems } from './random-trees';
 const DEEP = process.env.R028_DEEP === '1';
 /** Seeds per case: normal and deep. */
 const K = DEEP ? 5 : 1;
+/**
+ * The timeout of every test in this file. The tests check what is drawn, not how fast (the speed test of X1 is a
+ * ratio, below). It only stops a hang: "every drawing option together" takes 2 s alone and took 126 s in a full
+ * parallel test run on a busy machine, over the old 30 s, so the timeout is 300 s.
+ */
+const NO_HANG_MS = 300_000;
 
 const DOWN = cardForm(geometryFor(16), 'down');
 const SIDEWAYS = cardForm(geometryFor(16), 'sideways');
@@ -176,7 +182,7 @@ describe('X1 (1, 2): the pipeline never throws, one card for each person, no NaN
 				}
 			}
 			expect(problems).toEqual([]);
-		}, 30000);
+		}, NO_HANG_MS);
 	}
 });
 
@@ -193,7 +199,7 @@ describe('X1 (3): the same text twice gives the same layout (spec §5.1 step 6, 
 			}
 		}
 		expect(problems).toEqual([]);
-	}, 30000);
+	}, NO_HANG_MS);
 
 	it('the layout cache gives the same result as a fresh layout', () => {
 		const problems: string[] = [];
@@ -244,7 +250,7 @@ describe('X1 (4): the written order of siblings survives (spec §4.3 D2, §5.1 s
 		// A guard against a check that compares nothing.
 		expect(compared).toBeGreaterThan(200);
 		expect(problems).toEqual([]);
-	}, 30000);
+	}, NO_HANG_MS);
 
 	it('the order follows a reordered text: the same family written in another order keeps that order', () => {
 		const problems: string[] = [];
@@ -391,7 +397,7 @@ describe('X1 (5): relation names do not change when people move in the text (spe
 		console.log(`X1 (5): the derivation checked ${checked} pairs and left ${skipped} (ties, double names, several children of one ancestor) out`);
 		expect(checked).toBeGreaterThan(2000);
 		expect(problems.slice(0, 5)).toEqual([]);
-	}, 30000);
+	}, NO_HANG_MS);
 
 	it('the names by marriage of the six plain cases (sibling-in-law, parent-in-law, child-in-law, step-parent, stepchild) are among the names of each person (spec §13.1 rules 1 and 2)', () => {
 		const problems: string[] = [];
@@ -415,7 +421,7 @@ describe('X1 (5): relation names do not change when people move in the text (spe
 		}
 		expect(checked).toBeGreaterThan(100);
 		expect(problems.slice(0, 5)).toEqual([]);
-	}, 30000);
+	}, NO_HANG_MS);
 
 	it('a partner is named by the type of the last-listed partnership of the pair and by the sex of the partner; an implicit partnership is a "Co-parent" (spec §13.1 table "Partner", same-sex pairs too)', () => {
 		const WORD: Record<string, [string, string, string]> = {
@@ -458,7 +464,7 @@ describe('X1 (5): relation names do not change when people move in the text (spe
 		}
 		expect(checked).toBeGreaterThan(300);
 		expect(problems.slice(0, 5)).toEqual([]);
-	}, 30000);
+	}, NO_HANG_MS);
 
 	it('the finder agrees with the card for every person (spec §13.2, same names from one function)', () => {
 		const problems: string[] = [];
@@ -507,7 +513,7 @@ describe('X1 (6): no straight line behind a card (spec §5.3)', () => {
 			if (d) problems.push(...lineProblems(d.g, d.layout, d.edges).filter((p) => p.includes(' behind ')));
 		}
 		expect(problems).toEqual([]);
-	}, 30000);
+	}, NO_HANG_MS);
 });
 
 describe('X1 (7): a cycle gives a warning and still a drawing (spec §8)', () => {
@@ -554,7 +560,7 @@ describe('X1 (7): a cycle gives a warning and still a drawing (spec §8)', () =>
 		}
 		expect(withCycle).toBeGreaterThan(5);
 		expect(problems).toEqual([]);
-	}, 30000);
+	}, NO_HANG_MS);
 });
 
 describe('X1 (8): a measure, not an assertion: time, lines and "maybe" texts with 2, 4, 8 and 12 rumoured parents', () => {
@@ -618,7 +624,7 @@ describe('X1 (1): text that is damaged in odd ways still gives a drawing or an e
 		// A guard: most damaged texts are still trees.
 		expect(hard).toBeLessThan(100 * K);
 		expect(problems).toEqual([]);
-	}, 30000);
+	}, NO_HANG_MS);
 });
 
 describe('X1 (1): every drawing option together: finder line, "You" tab, ordinal tabs, heirs, folds, pictures, dark palette, saved picture (spec §8, §13.8)', () => {
@@ -681,7 +687,7 @@ describe('X1 (1): every drawing option together: finder line, "You" tab, ordinal
 		}
 		expect(rendered).toBeGreaterThanOrEqual(6);
 		expect(problems).toEqual([]);
-	}, 30000);
+	}, NO_HANG_MS);
 });
 
 describe('X1 (6, 2): folds on generated trees (spec §13.10 rule 3) and lines behind cards in a sideways tree', () => {
@@ -728,7 +734,7 @@ describe('X1 (6, 2): folds on generated trees (spec §13.10 rule 3) and lines be
 		}
 		expect(folded).toBeGreaterThan(10);
 		expect(problems).toEqual([]);
-	}, 30000);
+	}, NO_HANG_MS);
 
 	it('no straight line behind a card in a sideways tree', () => {
 		const problems: string[] = [];
@@ -741,7 +747,7 @@ describe('X1 (6, 2): folds on generated trees (spec §13.10 rule 3) and lines be
 			problems.push(...fail('sideways', seed, lineProblems(g, layout, edges).filter((x) => x.includes(' behind '))));
 		}
 		expect(problems).toEqual([]);
-	}, 30000);
+	}, NO_HANG_MS);
 });
 
 describe('X1: the time of the layout grows with the size of the tree (a ratio in one process; the limit is 10 times the linear growth)', () => {

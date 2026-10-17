@@ -67,40 +67,6 @@ const axisOf = (s: Sub): Axis => (s.cmd === 'H' ? 'x' : 'y');
 /** A piece `lo`–`hi` of the straight run `s`, along its own axis. */
 const piece = (s: Sub, lo: number, hi: number) => (s.cmd === 'H' ? `M${lo} ${s.y}H${hi}` : `M${s.x} ${lo}V${hi}`);
 
-/** The points a path of `M`, `H` and `V` commands visits, in order. Null for anything else. */
-function corners(d: string): { x: number; y: number; at: number }[] | null {
-	const out: { x: number; y: number; at: number }[] = [];
-	let x = 0;
-	let y = 0;
-	let used = 0;
-	for (const m of d.matchAll(/([MHV])(-?[\d.]+)(?: (-?[\d.]+))?/g)) {
-		if (m.index !== used) return null;
-		used += m[0].length;
-		if (m[1] === 'M') [x, y] = [Number(m[2]), Number(m[3])];
-		else if (m[1] === 'H') x = Number(m[2]);
-		else y = Number(m[2]);
-		out.push({ x, y, at: m.index });
-	}
-	return used === d.length && out.length ? out : null;
-}
-
-/** Two points are one: paths are rounded to 0.1 px, the union signs are not. */
-const near = (a: { x: number; y: number } | undefined, b: { x: number; y: number } | undefined) => !!a && !!b && Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y)) < 0.1;
-
-/** Where a leg ends. */
-function endOf(d: string): { x: number; y: number } | undefined {
-	const c = corners(d);
-	return c ? c[c.length - 1] : undefined;
-}
-
-/** A leg's last run, along the sign's row (sideways: column): the path without it (`head`), the run alone, and where it starts. */
-function lastRun(d: string): { head: string; run: string; from: { x: number; y: number } } | undefined {
-	const c = corners(d);
-	if (!c || c.length < 3) return undefined;
-	const [a, b] = c.slice(-2);
-	return { head: d.slice(0, b.at), run: d[b.at] === 'H' ? `M${a.x} ${a.y}H${b.x}` : `M${a.x} ${a.y}V${b.y}`, from: a };
-}
-
 /** Splits the run `s` into pieces: those inside `on` and the rest. */
 function split(s: Sub, on: [number, number][]): { on: string[]; off: string[] } {
 	const from = axisOf(s) === 'x' ? s.x : s.y;
@@ -133,8 +99,8 @@ function split(s: Sub, on: [number, number][]): { on: string[]; off: string[] } 
  * union is in `unions` or one of its legs, its part of the bar, a trunk or a side link from it is on;
  * a far tag of X if X is on the line and a union of X with one of the tag's partners is in `unions`.
  * M7 fix round: a line link from the partner who is not a far couple's anchor turns on both tags and
- * the anchor's leg; a leg that ends on the nearer leg of the same side turns on that leg's last run.
- * Each rumoured line with a `child` has one "?" marker, in path order (`edges.ts`); the marker
+ * the anchor's leg. Every leg of the 0.3 lines ends on its union sign, so a leg is on or off as a whole.
+ * Each rumoured line with a `child` has one "?" marker, in path order (`layout/draw.ts`); the marker
  * follows its line.
  */
 export function lineLook(g: FamilyGraph, layout: TreeLayout, edges: EdgeDrawing, line?: LineMarks): LineLook {
@@ -172,16 +138,6 @@ export function lineLook(g: FamilyGraph, layout: TreeLayout, edges: EdgeDrawing,
 	const signOn = new Set<string>(line.unions);
 	const dotAt = new Map<string, { x: number; y: number }>();
 	for (const m of edges.markers) if (m.union !== undefined) dotAt.set(m.union, { x: m.x, y: m.y });
-	// Two legs from one side (`edges.ts`): the farther one stops on the nearer one, so when only the
-	// farther is on, the nearer one's last run, from that point to the sign, is on too.
-	const lastRunOn = new Set<EdgePath>();
-	for (const p of edges.paths) {
-		if (p.union === undefined || p.child !== undefined || p.parents?.length !== 1 || !legOn(p.union, p.parents[0])) continue;
-		const end = endOf(p.d);
-		if (!end || near(end, dotAt.get(p.union))) continue;
-		const nearer = edges.paths.find((q) => q !== p && q.union === p.union && q.child === undefined && q.parents?.length === 1 && !legOn(p.union!, q.parents[0]) && near(lastRun(q.d)?.from, end));
-		if (nearer) lastRunOn.add(nearer);
-	}
 
 	const normal: DrawnPath[] = [];
 	const onLine: DrawnPath[] = [];
@@ -241,14 +197,7 @@ export function lineLook(g: FamilyGraph, layout: TreeLayout, edges: EdgeDrawing,
 			// A leg from one partner to the union sign (a trunk from a union names both partners).
 			const on = legOn(p.union, p.parents[0]);
 			if (on) signOn.add(p.union);
-			const run = lastRunOn.has(p) ? lastRun(p.d) : undefined;
-			if (!run) {
-				whole(p, on);
-				continue;
-			}
-			signOn.add(p.union);
-			pathOn.push(true);
-			add(p.kind, [run.run], [run.head]);
+			whole(p, on);
 		} else if (p.parents !== undefined) {
 			// A trunk: from the union sign or the single parent down to the sibling bar.
 			const kids = p.people.slice(p.parents.length);

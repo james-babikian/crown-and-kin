@@ -685,7 +685,7 @@ describe('picture renames (O8, B16)', () => {
 		return { texts, rename };
 	}
 
-	const NOTE = ['```dynasty', 'houses:', '  - id: v', '    name: V', '    arms: "[[old-arms.png]]"', 'people:', '  - id: a', '    name: A', '    portrait: "![[Pictures/old-arms.png|A]]"', '    link: "[[x.png]]"', '```', ''].join('\n');
+	const NOTE = ['```kin', 'houses:', '  - id: v', '    name: V', '    arms: "[[old-arms.png]]"', 'people:', '  - id: a', '    name: A', '    portrait: "![[Pictures/old-arms.png|A]]"', '    link: "[[x.png]]"', '```', ''].join('\n');
 
 	it('a picture rename updates arms and portrait with the extension kept; the Notice counts the values', async () => {
 		const v = vault({ 'Tree.md': NOTE }, ['Pictures/old-arms.png', 'x.png']);

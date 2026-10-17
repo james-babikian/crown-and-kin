@@ -64,8 +64,38 @@ export function onWriteFailed(
 		else on.missing();
 		return;
 	}
-	if (out.refusal.detail) console.warn('Dynasty Tree: the edit was refused:', out.refusal.detail);
+	if (out.refusal.detail) console.warn('Crown and Kin: the edit was refused:', out.refusal.detail);
 	on.refused(out.refusal.code);
+}
+
+/**
+ * F7: Enter in a single-line field ends the entry (the field loses the focus, so a phone keyboard closes) and never saves.
+ * An input method uses Enter to accept its text (keyCode 229): that press is left alone.
+ */
+export function endEntryOnEnter(input: HTMLInputElement): void {
+	input.addEventListener('keydown', (e: KeyboardEvent) => {
+		if (e.key !== 'Enter' || e.isComposing || e.keyCode === 229) return;
+		e.preventDefault();
+		input.blur();
+	});
+}
+
+/**
+ * Resolves after the browser has painted what the caller changed just before (one frame). A frame callback runs before the paint, so the
+ * timer inside it runs after the paint. `maxMs` ends the wait if frames are paused (a hidden window), so a write is never held for long.
+ */
+export function afterPaint(win: Pick<Window, 'requestAnimationFrame' | 'setTimeout' | 'clearTimeout'>, maxMs = 100): Promise<void> {
+	return new Promise((resolve) => {
+		let done = false;
+		const finish = () => {
+			if (done) return;
+			done = true;
+			win.clearTimeout(limit);
+			resolve();
+		};
+		const limit = win.setTimeout(finish, maxMs);
+		win.requestAnimationFrame(() => win.setTimeout(finish, 0));
+	});
 }
 
 /** Shows `text` in the error line of a window (a `role="alert"` element) and scrolls it into view. */

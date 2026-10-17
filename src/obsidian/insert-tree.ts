@@ -1,5 +1,5 @@
 /*
- * The command Insert family tree (spec §5.9, D34): an empty `dynasty` block with a help comment at
+ * The command Insert family tree (spec §5.9, D34): an empty `kin` block with a help comment at
  * the cursor. The note then shows "Add first person". The text is planned by a pure function, so the
  * prefixes of callouts and list items have tests.
  */
@@ -115,8 +115,8 @@ export function planInsert(head: string, tail: string): InsertPlan {
 	// Only markers (or nothing) before the cursor: the fence takes the cursor's line, after them.
 	const onLine = head.trimEnd() === p.first.trimEnd();
 	const lines: string[] = [];
-	if (onLine) lines.push(`${p.first}\`\`\`dynasty`);
-	else lines.push(head.trimEnd(), blank, `${p.rest}\`\`\`dynasty`);
+	if (onLine) lines.push(`${p.first}\`\`\`kin`);
+	else lines.push(head.trimEnd(), blank, `${p.rest}\`\`\`kin`);
 	lines.push(`${p.rest}# ${INSERT_UI.noteHint}`, `${p.rest}\`\`\``, blank);
 	const cursor = { line: lines.length - 1, ch: blank.length };
 	const rest = tail.trim();
@@ -139,7 +139,7 @@ export function insertTree(editor: Editor): void {
 	const props = propertiesEnd(lines, from.line);
 	if (props !== null) {
 		const end = { line: props, ch: lines[props].length };
-		const text = ['', '```dynasty', `# ${INSERT_UI.noteHint}`, '```', ''].join('\n');
+		const text = ['', '```kin', `# ${INSERT_UI.noteHint}`, '```', ''].join('\n');
 		editor.transaction({ changes: [{ from: end, to: end, text }], selection: { from: { line: props + 4, ch: 0 } } });
 		return;
 	}
@@ -151,7 +151,7 @@ export function insertTree(editor: Editor): void {
 			const blank = rest.trimEnd();
 			// D224: a block that opens on line 0 would put the new fence on line 0 too.
 			const lead = around.open === 0 ? [blank] : [];
-			const text = [...lead, `${around.openPrefix}\`\`\`dynasty`, `${rest}# ${INSERT_UI.noteHint}`, `${rest}\`\`\``, blank, ''].join('\n');
+			const text = [...lead, `${around.openPrefix}\`\`\`kin`, `${rest}# ${INSERT_UI.noteHint}`, `${rest}\`\`\``, blank, ''].join('\n');
 			const start = { line: around.open, ch: 0 };
 			editor.transaction({ changes: [{ from: start, to: start, text }], selection: { from: { line: around.open + lead.length + 3, ch: blank.length } } });
 			return;
@@ -161,7 +161,7 @@ export function insertTree(editor: Editor): void {
 		// The block's own container: quote markers and list indentation, as its closing fence has them.
 		const pre = markerAsSpaces(around.prefix);
 		const blank = pre.trimEnd();
-		const text = ['', blank, `${pre}\`\`\`dynasty`, `${pre}# ${INSERT_UI.noteHint}`, `${pre}\`\`\``, blank].join('\n');
+		const text = ['', blank, `${pre}\`\`\`kin`, `${pre}# ${INSERT_UI.noteHint}`, `${pre}\`\`\``, blank].join('\n');
 		editor.transaction({ changes: [{ from: end, to: end, text }], selection: { from: { line: at + 5, ch: blank.length } } });
 		return;
 	}

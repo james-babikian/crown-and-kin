@@ -80,7 +80,7 @@ export async function makeNote(app: App, sourcePath: string, baseName: string, c
 		}
 		return { ok: false, why: 'failed' };
 	} catch (e) {
-		console.error('Dynasty Tree: cannot make the note', e);
+		console.error('Crown and Kin: cannot make the note', e);
 		return { ok: false, why: 'failed' };
 	}
 }

@@ -101,7 +101,7 @@ describe('fixture 9: every block, in text order (§6.1, §10 item 9)', () => {
 		for (const b of findBlocks(NOTE)) expectBodyRange(NOTE, b);
 	});
 
-	it('skips the dynasty example inside the longer ```` fence', () => {
+	it('skips the kin example inside the longer ```` fence', () => {
 		expect(findBlocks(NOTE).some((b) => b.openLine === 94)).toBe(false);
 		expect(ordinalForSection(NOTE, 93, 99, 'people:\n  - id: example\n    name: Example Person\n')).toBeNull();
 	});
@@ -148,26 +148,26 @@ describe('replaceBody puts the prefix back (§6.1)', () => {
 	});
 
 	it('a blank line written "> " (with a space) survives an edit of another line', () => {
-		const text = '> [!note]\n> ```dynasty\n> a: 1\n> \n> b: 2\n> ```\n';
+		const text = '> [!note]\n> ```kin\n> a: 1\n> \n> b: 2\n> ```\n';
 		const b = only(text);
 		expect(b.body).toBe('a: 1\n\nb: 2');
 		expect(replaceBody(text, b, b.body)).toBe(text);
-		expect(replaceBody(text, b, 'a: 1\n\nb: 3')).toBe('> [!note]\n> ```dynasty\n> a: 1\n> \n> b: 3\n> ```\n');
+		expect(replaceBody(text, b, 'a: 1\n\nb: 3')).toBe('> [!note]\n> ```kin\n> a: 1\n> \n> b: 3\n> ```\n');
 	});
 
 	it('a new blank line gets the prefix without trailing spaces', () => {
 		// Decision (the contract does not fix it): a new blank body line is written as the prefix with
 		// trailing whitespace removed, as Obsidian writes a blank line in a callout (">").
-		const text = '> [!note]\n> ```dynasty\n> a: 1\n> b: 2\n> ```\n';
-		expect(replaceBody(text, only(text), 'a: 1\n\nb: 2')).toBe('> [!note]\n> ```dynasty\n> a: 1\n>\n> b: 2\n> ```\n');
-		const list = '- item\n\n  ```dynasty\n  a: 1\n  b: 2\n  ```\n';
-		expect(replaceBody(list, only(list), 'a: 1\n\nb: 2')).toBe('- item\n\n  ```dynasty\n  a: 1\n\n  b: 2\n  ```\n');
+		const text = '> [!note]\n> ```kin\n> a: 1\n> b: 2\n> ```\n';
+		expect(replaceBody(text, only(text), 'a: 1\n\nb: 2')).toBe('> [!note]\n> ```kin\n> a: 1\n>\n> b: 2\n> ```\n');
+		const list = '- item\n\n  ```kin\n  a: 1\n  b: 2\n  ```\n';
+		expect(replaceBody(list, only(list), 'a: 1\n\nb: 2')).toBe('- item\n\n  ```kin\n  a: 1\n\n  b: 2\n  ```\n');
 	});
 
 	it('the fence lines are never modified', () => {
-		const text = '> ````dynasty\n> a: 1\n> `````   \n';
+		const text = '> ````kin\n> a: 1\n> `````   \n';
 		const b = only(text);
-		expect(replaceBody(text, b, 'a: 2')).toBe('> ````dynasty\n> a: 2\n> `````   \n');
+		expect(replaceBody(text, b, 'a: 2')).toBe('> ````kin\n> a: 2\n> `````   \n');
 	});
 });
 
@@ -201,57 +201,57 @@ describe('fences: ``` and ~~~ of any length (§6.1)', () => {
 	for (const ch of ['`', '~']) {
 		for (const len of [3, 4, 5]) {
 			const f = ch.repeat(len);
-			it(`${f}dynasty closes only on ${ch} × ${len} or more, never on a shorter fence or the other character`, () => {
+			it(`${f}kin closes only on ${ch} × ${len} or more, never on a shorter fence or the other character`, () => {
 				const other = (ch === '`' ? '~' : '`').repeat(len);
 				const shorter = len > 3 ? `${ch.repeat(len - 1)}\n` : '';
-				const text = `${f}dynasty\na: 1\n${shorter}${other}\n${f}${ch}\nafter\n`;
+				const text = `${f}kin\na: 1\n${shorter}${other}\n${f}${ch}\nafter\n`;
 				const b = only(text);
 				expect(b.body).toBe(`a: 1\n${shorter}${other}`);
 				expect(b.openLine).toBe(0);
 				expect(b.closeLine).toBe(len > 3 ? 4 : 3);
-				expect(replaceBody(text, b, 'a: 2')).toBe(`${f}dynasty\na: 2\n${f}${ch}\nafter\n`);
+				expect(replaceBody(text, b, 'a: 2')).toBe(`${f}kin\na: 2\n${f}${ch}\nafter\n`);
 			});
 		}
 	}
 
 	it('a closing fence may have trailing spaces', () => {
-		expect(shape(only('```dynasty\na: 1\n```   \nafter\n'))).toEqual({ ordinal: 0, openLine: 0, closeLine: 2, prefix: '', body: 'a: 1' });
+		expect(shape(only('```kin\na: 1\n```   \nafter\n'))).toEqual({ ordinal: 0, openLine: 0, closeLine: 2, prefix: '', body: 'a: 1' });
 	});
 
 	it('a fence line with an info string never closes a fence (CommonMark)', () => {
-		expect(only('```dynasty\na: 1\n```js\n```\n').body).toBe('a: 1\n```js');
+		expect(only('```kin\na: 1\n```js\n```\n').body).toBe('a: 1\n```js');
 	});
 
-	it('two backticks are not a fence, and other languages are not dynasty blocks', () => {
-		expect(findBlocks('``dynasty\na: 1\n``\n')).toEqual([]);
-		expect(findBlocks('```dynastyx\na: 1\n```\n')).toEqual([]);
-		expect(findBlocks('```python\nx = 1\n```\n```dynasty\na: 1\n```\n').map(shape)).toEqual([
+	it('two backticks are not a fence, and other languages are not kin blocks', () => {
+		expect(findBlocks('``kin\na: 1\n``\n')).toEqual([]);
+		expect(findBlocks('```kinx\na: 1\n```\n')).toEqual([]);
+		expect(findBlocks('```python\nx = 1\n```\n```kin\na: 1\n```\n').map(shape)).toEqual([
 			{ ordinal: 0, openLine: 3, closeLine: 5, prefix: '', body: 'a: 1' },
 		]);
 	});
 
 	it('an empty block has an empty body, and a body can be written into it', () => {
-		const text = 'x\n```dynasty\n```\ny\n';
+		const text = 'x\n```kin\n```\ny\n';
 		const b = only(text);
 		expect(shape(b)).toEqual({ ordinal: 0, openLine: 1, closeLine: 2, prefix: '', body: '' });
 		expect(b.bodyStart).toBe(b.bodyEnd);
 		expect(replaceBody(text, b, '')).toBe(text);
-		expect(replaceBody(text, b, 'people: []')).toBe('x\n```dynasty\npeople: []\n```\ny\n');
-		const quoted = '> ```dynasty\n> ```\n';
-		expect(replaceBody(quoted, only(quoted), 'people: []')).toBe('> ```dynasty\n> people: []\n> ```\n');
+		expect(replaceBody(text, b, 'people: []')).toBe('x\n```kin\npeople: []\n```\ny\n');
+		const quoted = '> ```kin\n> ```\n';
+		expect(replaceBody(quoted, only(quoted), 'people: []')).toBe('> ```kin\n> people: []\n> ```\n');
 	});
 
 	it('a block with no closing fence runs to the end of the note', () => {
-		const text = '# T\n\n```dynasty\npeople:\n  - id: a\n    name: A';
+		const text = '# T\n\n```kin\npeople:\n  - id: a\n    name: A';
 		const b = only(text);
 		expect(shape(b)).toEqual({ ordinal: 0, openLine: 2, closeLine: null, prefix: '', body: 'people:\n  - id: a\n    name: A' });
 		expectBodyRange(text, b);
 		expect(replaceBody(text, b, b.body)).toBe(text);
-		expect(replaceBody(text, b, 'people: []')).toBe('# T\n\n```dynasty\npeople: []');
+		expect(replaceBody(text, b, 'people: []')).toBe('# T\n\n```kin\npeople: []');
 	});
 
 	it('an unclosed block after a closed one gets the next ordinal', () => {
-		const text = '```dynasty\na: 1\n```\n\n~~~dynasty\nb: 2';
+		const text = '```kin\na: 1\n```\n\n~~~kin\nb: 2';
 		expect(findBlocks(text).map(shape)).toEqual([
 			{ ordinal: 0, openLine: 0, closeLine: 2, prefix: '', body: 'a: 1' },
 			{ ordinal: 1, openLine: 4, closeLine: null, prefix: '', body: 'b: 2' },
@@ -260,40 +260,40 @@ describe('fences: ``` and ~~~ of any length (§6.1)', () => {
 });
 
 describe('nested fences are skipped (§6.1)', () => {
-	it('a dynasty fence inside a longer backtick fence is text', () => {
-		const text = '````markdown\n```dynasty\na: 1\n```\n````\n```dynasty\nb: 2\n```\n';
+	it('a kin fence inside a longer backtick fence is text', () => {
+		const text = '````markdown\n```kin\na: 1\n```\n````\n```kin\nb: 2\n```\n';
 		expect(findBlocks(text).map(shape)).toEqual([{ ordinal: 0, openLine: 5, closeLine: 7, prefix: '', body: 'b: 2' }]);
 		expect(ordinalForSection(text, 0, 4, 'a: 1\n')).toBeNull();
 		expect(ordinalForSection(text, 5, 7, 'b: 2\n')).toBe(0);
 	});
 
-	it('a backtick dynasty fence inside a tilde fence is text, and the other way round', () => {
-		expect(findBlocks('~~~\n```dynasty\na: 1\n```\n~~~\n')).toEqual([]);
-		expect(findBlocks('```\n~~~dynasty\na: 1\n~~~\n```\n')).toEqual([]);
+	it('a backtick kin fence inside a tilde fence is text, and the other way round', () => {
+		expect(findBlocks('~~~\n```kin\na: 1\n```\n~~~\n')).toEqual([]);
+		expect(findBlocks('```\n~~~kin\na: 1\n~~~\n```\n')).toEqual([]);
 	});
 
-	it('a dynasty fence inside a longer fence in a callout is text', () => {
-		expect(findBlocks('> ````md\n> ```dynasty\n> a: 1\n> ```\n> ````\n')).toEqual([]);
+	it('a kin fence inside a longer fence in a callout is text', () => {
+		expect(findBlocks('> ````md\n> ```kin\n> a: 1\n> ```\n> ````\n')).toEqual([]);
 	});
 });
 
 describe('containers: callouts and list items (§6.1)', () => {
 	it('a numbered list item: the prefix is its three-space indentation', () => {
-		const text = '1. First\n   ```dynasty\n   a: 1\n   ```\n2. Second\n';
+		const text = '1. First\n   ```kin\n   a: 1\n   ```\n2. Second\n';
 		expect(shape(only(text))).toEqual({ ordinal: 0, openLine: 1, closeLine: 3, prefix: '   ', body: 'a: 1' });
-		expect(replaceBody(text, only(text), 'a: 2\nb: 3')).toBe('1. First\n   ```dynasty\n   a: 2\n   b: 3\n   ```\n2. Second\n');
+		expect(replaceBody(text, only(text), 'a: 2\nb: 3')).toBe('1. First\n   ```kin\n   a: 2\n   b: 3\n   ```\n2. Second\n');
 	});
 
 	it('a nested list item: the prefix is four spaces', () => {
-		const text = '- outer\n  - inner\n\n    ```dynasty\n    a: 1\n    ```\n';
+		const text = '- outer\n  - inner\n\n    ```kin\n    a: 1\n    ```\n';
 		expect(shape(only(text))).toEqual({ ordinal: 0, openLine: 3, closeLine: 5, prefix: '    ', body: 'a: 1' });
 	});
 
 	it('a callout inside a list item: the prefix is "  > "', () => {
-		const text = '- item\n  > [!note]\n  > ```dynasty\n  > a: 1\n  > ```\n';
+		const text = '- item\n  > [!note]\n  > ```kin\n  > a: 1\n  > ```\n';
 		const b = only(text);
 		expect(shape(b)).toEqual({ ordinal: 0, openLine: 2, closeLine: 4, prefix: '  > ', body: 'a: 1' });
-		expect(replaceBody(text, b, 'a: 2')).toBe('- item\n  > [!note]\n  > ```dynasty\n  > a: 2\n  > ```\n');
+		expect(replaceBody(text, b, 'a: 2')).toBe('- item\n  > [!note]\n  > ```kin\n  > a: 2\n  > ```\n');
 	});
 });
 
@@ -314,19 +314,19 @@ describe('ordinalForSection: the block Obsidian rendered (§6.1 identity, contra
 	});
 
 	it('a container with two blocks: the source tells them apart', () => {
-		const callout = '> [!note]\n> ```dynasty\n> a: 1\n> ```\n> Between.\n> ```dynasty\n> b: 2\n> ```\n';
+		const callout = '> [!note]\n> ```kin\n> a: 1\n> ```\n> Between.\n> ```kin\n> b: 2\n> ```\n';
 		expect(ordinalForSection(callout, 0, 7, 'a: 1\n')).toBe(0);
 		expect(ordinalForSection(callout, 0, 7, 'b: 2\n')).toBe(1);
 		expect(ordinalForSection(callout, 0, 7, 'b: 2')).toBe(1);
 		expect(ordinalForSection(callout.replace(/\n/g, '\r\n'), 0, 7, 'b: 2\r\n')).toBe(1);
 		expect(ordinalForSection(callout, 0, 7, 'c: 3\n')).toBeNull();
-		const list = '- item\n\n  ```dynasty\n  a: 1\n  ```\n\n  ```dynasty\n  b: 2\n  ```\n';
+		const list = '- item\n\n  ```kin\n  a: 1\n  ```\n\n  ```kin\n  b: 2\n  ```\n';
 		expect(ordinalForSection(list, 0, 8, 'a: 1\n')).toBe(0);
 		expect(ordinalForSection(list, 0, 8, 'b: 2\n')).toBe(1);
 	});
 
 	it('two blocks with identical bodies in one range: null (the view is read-only)', () => {
-		const callout = '> [!note]\n> ```dynasty\n> a: 1\n> ```\n> Between.\n> ```dynasty\n> a: 1\n> ```\n';
+		const callout = '> [!note]\n> ```kin\n> a: 1\n> ```\n> Between.\n> ```kin\n> a: 1\n> ```\n';
 		expect(ordinalForSection(callout, 0, 7, 'a: 1\n')).toBeNull();
 		// Narrowed to one fence, the same text is found.
 		expect(ordinalForSection(callout, 5, 7, 'a: 1\n')).toBe(1);
@@ -342,15 +342,15 @@ describe('ordinalForSection: the block Obsidian rendered (§6.1 identity, contra
 
 describe('unclosed blocks end at their container (contract LocatedBlock.closeLine)', () => {
 	it('in a callout: the block ends where the callout ends', () => {
-		const text = '> ```dynasty\n> a: 1\n\nProse\n';
+		const text = '> ```kin\n> a: 1\n\nProse\n';
 		const b = only(text);
 		expect(shape(b)).toEqual({ ordinal: 0, openLine: 0, closeLine: null, prefix: '> ', body: 'a: 1' });
 		expect(replaceBody(text, b, b.body)).toBe(text);
-		expect(replaceBody(text, b, 'a: 2\nb: 3')).toBe('> ```dynasty\n> a: 2\n> b: 3\n\nProse\n');
+		expect(replaceBody(text, b, 'a: 2\nb: 3')).toBe('> ```kin\n> a: 2\n> b: 3\n\nProse\n');
 	});
 
 	it('a block after the callout is found with the next ordinal', () => {
-		const text = '> ```dynasty\n> a: 1\n\nProse\n\n```dynasty\nb: 2\n```\n';
+		const text = '> ```kin\n> a: 1\n\nProse\n\n```kin\nb: 2\n```\n';
 		expect(findBlocks(text).map(shape)).toEqual([
 			{ ordinal: 0, openLine: 0, closeLine: null, prefix: '> ', body: 'a: 1' },
 			{ ordinal: 1, openLine: 5, closeLine: 7, prefix: '', body: 'b: 2' },
@@ -358,63 +358,63 @@ describe('unclosed blocks end at their container (contract LocatedBlock.closeLin
 	});
 
 	it('at the top level with a final line break: no empty body line (supervisor decision)', () => {
-		const text = '```dynasty\na: 1\n';
+		const text = '```kin\na: 1\n';
 		const b = only(text);
 		expect(shape(b)).toEqual({ ordinal: 0, openLine: 0, closeLine: null, prefix: '', body: 'a: 1' });
 		expect(replaceBody(text, b, b.body)).toBe(text);
-		expect(replaceBody(text, b, 'a: 2')).toBe('```dynasty\na: 2\n');
+		expect(replaceBody(text, b, 'a: 2')).toBe('```kin\na: 2\n');
 	});
 });
 
 describe('more fence and container forms (CommonMark, §6.1)', () => {
 	it('a tab-indented list item: the prefix is the tab', () => {
-		const text = '- item\n\t```dynasty\n\ta: 1\n\t```\n';
+		const text = '- item\n\t```kin\n\ta: 1\n\t```\n';
 		const b = only(text);
 		expect(shape(b)).toEqual({ ordinal: 0, openLine: 1, closeLine: 3, prefix: '\t', body: 'a: 1' });
-		expect(replaceBody(text, b, 'a: 2\nb: 3')).toBe('- item\n\t```dynasty\n\ta: 2\n\tb: 3\n\t```\n');
+		expect(replaceBody(text, b, 'a: 2\nb: 3')).toBe('- item\n\t```kin\n\ta: 2\n\tb: 3\n\t```\n');
 	});
 
 	it('a fence on the list-marker line: the body prefix is the content indentation; the fence line is kept', () => {
-		const text = '- ```dynasty\n  a: 1\n  b: 2\n  ```\nafter\n';
+		const text = '- ```kin\n  a: 1\n  b: 2\n  ```\nafter\n';
 		const b = only(text);
 		expect(shape(b)).toEqual({ ordinal: 0, openLine: 0, closeLine: 3, prefix: '  ', body: 'a: 1\nb: 2' });
 		expectBodyRange(text, b);
 		expect(replaceBody(text, b, b.body)).toBe(text);
-		expect(replaceBody(text, b, 'a: 1\nb: 3')).toBe('- ```dynasty\n  a: 1\n  b: 3\n  ```\nafter\n');
-		const numbered = '1. ```dynasty\n   a: 1\n   ```\n';
+		expect(replaceBody(text, b, 'a: 1\nb: 3')).toBe('- ```kin\n  a: 1\n  b: 3\n  ```\nafter\n');
+		const numbered = '1. ```kin\n   a: 1\n   ```\n';
 		expect(shape(only(numbered))).toEqual({ ordinal: 0, openLine: 0, closeLine: 2, prefix: '   ', body: 'a: 1' });
 	});
 
 	it('callout lines written ">" with no space: the prefix is ">"', () => {
-		const text = '>```dynasty\n>a: 1\n>b: 2\n>```\n';
+		const text = '>```kin\n>a: 1\n>b: 2\n>```\n';
 		const b = only(text);
 		expect(shape(b)).toEqual({ ordinal: 0, openLine: 0, closeLine: 3, prefix: '>', body: 'a: 1\nb: 2' });
-		expect(replaceBody(text, b, 'a: 1\nb: 3')).toBe('>```dynasty\n>a: 1\n>b: 3\n>```\n');
+		expect(replaceBody(text, b, 'a: 1\nb: 3')).toBe('>```kin\n>a: 1\n>b: 3\n>```\n');
 	});
 
 	it('a top-level fence indented 1 to 3 spaces is a block; its indentation is the prefix', () => {
-		expect(shape(only(' ```dynasty\n a: 1\n ```\n'))).toEqual({ ordinal: 0, openLine: 0, closeLine: 2, prefix: ' ', body: 'a: 1' });
-		const text = '   ```dynasty\n   a:\n     b: 1\n   ```\n';
+		expect(shape(only(' ```kin\n a: 1\n ```\n'))).toEqual({ ordinal: 0, openLine: 0, closeLine: 2, prefix: ' ', body: 'a: 1' });
+		const text = '   ```kin\n   a:\n     b: 1\n   ```\n';
 		const b = only(text);
 		expect(shape(b)).toEqual({ ordinal: 0, openLine: 0, closeLine: 3, prefix: '   ', body: 'a:\n  b: 1' });
-		expect(replaceBody(text, b, 'a:\n  b: 2')).toBe('   ```dynasty\n   a:\n     b: 2\n   ```\n');
+		expect(replaceBody(text, b, 'a:\n  b: 2')).toBe('   ```kin\n   a:\n     b: 2\n   ```\n');
 	});
 
 	it('a top-level fence indented 4 spaces is indented code, not a block', () => {
-		expect(findBlocks('    ```dynasty\n    a: 1\n    ```\n')).toEqual([]);
+		expect(findBlocks('    ```kin\n    a: 1\n    ```\n')).toEqual([]);
 	});
 
 	it('a closing fence may be indented up to 3 spaces; 4 spaces is body text', () => {
-		expect(shape(only('```dynasty\na: 1\n   ```\nafter\n'))).toEqual({ ordinal: 0, openLine: 0, closeLine: 2, prefix: '', body: 'a: 1' });
-		expect(shape(only('```dynasty\na: 1\n    ```\n```\n'))).toEqual({ ordinal: 0, openLine: 0, closeLine: 3, prefix: '', body: 'a: 1\n    ```' });
+		expect(shape(only('```kin\na: 1\n   ```\nafter\n'))).toEqual({ ordinal: 0, openLine: 0, closeLine: 2, prefix: '', body: 'a: 1' });
+		expect(shape(only('```kin\na: 1\n    ```\n```\n'))).toEqual({ ordinal: 0, openLine: 0, closeLine: 3, prefix: '', body: 'a: 1\n    ```' });
 	});
 
-	it('the info string "dynasty foo" is a dynasty block', () => {
-		expect(shape(only('```dynasty foo\na: 1\n```\n'))).toEqual({ ordinal: 0, openLine: 0, closeLine: 2, prefix: '', body: 'a: 1' });
+	it('the info string "kin foo" is a kin block', () => {
+		expect(shape(only('```kin foo\na: 1\n```\n'))).toEqual({ ordinal: 0, openLine: 0, closeLine: 2, prefix: '', body: 'a: 1' });
 	});
 
 	it('a block holding one blank line round-trips it', () => {
-		const text = '```dynasty\n\n```\n';
+		const text = '```kin\n\n```\n';
 		const b = only(text);
 		expect(shape(b)).toEqual({ ordinal: 0, openLine: 0, closeLine: 2, prefix: '', body: '' });
 		expect(replaceBody(text, b, b.body)).toBe(text);
@@ -422,7 +422,7 @@ describe('more fence and container forms (CommonMark, §6.1)', () => {
 
 	it('a ```` line with an info string inside a ``` fence is text; a later bare ```` closes the ``` fence', () => {
 		// A naive nesting stack would open a fence at "````md" and let "````" close that instead.
-		const text = '```dynasty\na: 1\n````md\nb: 2\n````\nprose\n```dynasty\nc: 3\n```\n';
+		const text = '```kin\na: 1\n````md\nb: 2\n````\nprose\n```kin\nc: 3\n```\n';
 		expect(findBlocks(text).map(shape)).toEqual([
 			{ ordinal: 0, openLine: 0, closeLine: 4, prefix: '', body: 'a: 1\n````md\nb: 2' },
 			{ ordinal: 1, openLine: 6, closeLine: 8, prefix: '', body: 'c: 3' },

@@ -21,8 +21,7 @@ describe('review A: text that the plugin writes into a note', () => {
 		}
 	});
 
-	it('the display hint keeps the curly marks, the note hint has straight marks', () => {
-		expect(INSERT_UI.hint).toContain('“Add first person”');
+	it('the note hint has straight marks', () => {
 		expect(INSERT_UI.noteHint).toContain('"Add first person"');
 	});
 });

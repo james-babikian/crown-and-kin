@@ -71,7 +71,7 @@ export interface Person {
 	link?: string;
 	/** Spec §13.7: the portrait picture link, as written (flattened like `link`); absent when not written or empty. */
 	portrait?: string;
-	/** 0.2.8 contract A.1: the personal arms picture link, as written (flattened like `link`); absent when not written or empty. Not read yet. */
+	/** 0.2.8 contract A.1: the personal arms picture link, as written (flattened like `link`); absent when not written or empty. */
 	arms?: string;
 	/** Spec §13.13, D79: the text of `portrait-crop` as written (a list or map as JSON text); absent when not written or empty. */
 	portraitCrop?: string;
@@ -113,7 +113,7 @@ export interface Holder {
 	number?: string;
 	from?: string;
 	to?: string;
-	/** 0.2.8 contract A.2, key `through-spouse`: `true` when the person holds the title through a spouse that the plugin finds, or the id of that spouse as written. Absent when not written or off. Not read yet. */
+	/** 0.2.8 contract A.2, key `through-spouse`: `true` when the person holds the title through a spouse that the plugin finds, or the id of that spouse as written. Absent when not written or off. */
 	throughSpouse?: true | string;
 	/** Position of the item in the written `holders` list, counting skipped items. */
 	index: number;

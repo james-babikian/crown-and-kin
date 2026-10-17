@@ -23,7 +23,7 @@ export function closePluginModals(): void {
 		try {
 			close();
 		} catch (e) {
-			console.error('Dynasty Tree: cannot close a window of the plugin', e);
+			console.error('Crown and Kin: cannot close a window of the plugin', e);
 		}
 	}
 }

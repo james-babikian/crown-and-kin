@@ -10,7 +10,7 @@ House Ashford's records were copied by a careless scribe. The tree must still re
 - Unknown values: a placement and a parent type. A partnership word that the plugin does not know (`handfasting`) gives no warning; it is drawn as a marriage (D188 item 12).
 - House Brennock's colour is not quoted, so YAML reads it as a comment.
 
-```dynasty
+```kin
 options:
   start: aldous               # missing: there is no aldous
   focus: lost-heir            # missing

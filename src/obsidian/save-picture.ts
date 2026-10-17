@@ -168,7 +168,7 @@ export class SaveWindow extends Modal {
 		try {
 			this.o.onClosed?.();
 		} catch (e) {
-			console.error('Dynasty Tree: cannot give the focus back', e);
+			console.error('Crown and Kin: cannot give the focus back', e);
 		}
 	}
 }
@@ -202,7 +202,7 @@ export async function savePicture(app: App, store: PictureStore | undefined, src
 		// One write with every byte: a failure leaves no half-written file of ours.
 		file = await app.vault.createBinary(path, made.bytes);
 	} catch (e) {
-		console.error('Dynasty Tree: cannot save the picture', e);
+		console.error('Crown and Kin: cannot save the picture', e);
 		stop();
 		new Notice(SAVE_UI.failed);
 		return null;
@@ -211,7 +211,7 @@ export async function savePicture(app: App, store: PictureStore | undefined, src
 	try {
 		resultNotice(file, made);
 	} catch (e) {
-		console.error('Dynasty Tree: cannot show the result of the save', e);
+		console.error('Crown and Kin: cannot show the result of the save', e);
 		new Notice(SAVE_UI.saved(file.name, folderOf(file.path)), 0);
 	}
 	return file;
@@ -371,8 +371,8 @@ function loadImage(url: string): Promise<HTMLImageElement> {
 	});
 }
 
-/** D70: a free path in Obsidian's attachment folder of the note; before Obsidian 1.5.7, the note's folder with " 1", " 2", …. */
-async function freePath(app: App, name: string, sourcePath: string): Promise<string> {
+/** D70: a free path in Obsidian's attachment folder of the note; before Obsidian 1.5.7, the note's folder with " 1", " 2", …. The picture picker uses it too. */
+export async function freePath(app: App, name: string, sourcePath: string): Promise<string> {
 	const fm = app.fileManager as { getAvailablePathForAttachment?: (n: string, s?: string) => Promise<string> };
 	if (typeof fm.getAvailablePathForAttachment === 'function') return fm.getAvailablePathForAttachment(name, sourcePath);
 	return numberedFreePath(folderOf(sourcePath), name, (p) => !!app.vault.getAbstractFileByPath(p));
@@ -401,7 +401,7 @@ function resultNotice(file: TFile, made: Made): void {
 				// The Notice stays: a press on it would close it.
 				e.stopPropagation();
 				navigator.share({ files: [shared] }).catch((err: unknown) => {
-					if ((err as { name?: string })?.name !== 'AbortError') console.error('Dynasty Tree: cannot share the picture', err);
+					if ((err as { name?: string })?.name !== 'AbortError') console.error('Crown and Kin: cannot share the picture', err);
 				});
 			});
 		}

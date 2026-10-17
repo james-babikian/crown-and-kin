@@ -44,7 +44,7 @@ afterEach(() => vi.restoreAllMocks());
 
 async function realPlugin() {
 	const app = fakeApp();
-	const p = new DynastyTreePlugin(app as never, { id: 'dynasty-tree' } as never);
+	const p = new DynastyTreePlugin(app as never, { id: 'crown-and-kin' } as never);
 	await (p as unknown as FakePlugin).load();
 	const h = fakeHandle('n.md', SRC);
 	Object.assign((p as unknown as Host).handles, { quickOrdinal: () => 0, peek: () => h, resolve: async () => h, resolveByBody: () => h, inEditorOf: () => false });

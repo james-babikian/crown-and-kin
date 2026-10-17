@@ -62,7 +62,7 @@ const LINE = `options:\n  focus: p4\n\npeople:\n${Array.from({ length: 9 }, (_, 
 /** The real plugin with `stored` as its data.json, loaded. */
 async function loadPlugin(stored: unknown = null) {
 	const app = fakeApp();
-	const plugin = new DynastyTreePlugin(app as never, { id: 'dynasty-tree' } as never);
+	const plugin = new DynastyTreePlugin(app as never, { id: 'crown-and-kin' } as never);
 	const fake = plugin as unknown as FakePlugin;
 	fake.stored = stored;
 	await fake.load();
@@ -88,22 +88,24 @@ function openTab(fake: FakePlugin): void {
 }
 
 describe('the settings tab (spec §9, D33)', () => {
-	it('groups the settings under six short headings, in order', async () => {
+	it('groups the settings under eight short headings, in order', async () => {
 		const { fake } = await loadPlugin();
 		openTab(fake);
 		const g = SETTINGS_UI.groups;
-		expect(settingGroups.map((x) => x.heading)).toEqual([g.height, g.cards, g.housePage, g.focus, g.links, g.repair]);
+		expect(settingGroups.map((x) => x.heading)).toEqual([g.view, g.cards, g.relations, g.succession, g.housePage, g.focus, g.links, g.repair]);
 		const names = (i: number) => settingGroups[i].listEl.querySelectorAll('.setting-item-name').map((n) => n.getText());
-		// 0.2.5 (D144): a tree in a note on a phone is a list with its natural height, so only the computer row stays.
-		expect(names(0)).toEqual([SETTINGS_UI.heightDesktop]);
-		// M7 (spec §13.1): the relation names are in the Cards group. 0.2.7 (E.6, J.8): the settings of the line of succession come last.
-		// 0.2.4 (D118, D126): 0.2.5 (D150): the direction row comes first, then the break list and "Reduce movement"; the card style of the phone preview is gone (D144), and 0.2.6 (D179) removes "Card size".
-		expect(names(1)).toEqual([SETTINGS_UI.phoneDirection, SETTINGS_UI.armsOnCards, SETTINGS_UI.breakWords, SETTINGS_UI.reduceMotion, SETTINGS_UI.dates, SETTINGS_UI.relations, SETTINGS_UI.oneParentUnknown, SETTINGS_UI.portraits, SETTINGS_UI.manyParents, SETTINGS_UI.successionLength, SETTINGS_UI.oldAge, SETTINGS_UI.youngDeathAge]);
+		// 0.2.5 (D144): a tree in a note on a phone is a list with its natural height, so only the computer row stays. D246 (F10a): the group "Tree view" also holds the direction on an upright phone and Reduce movement.
+		expect(names(0)).toEqual([SETTINGS_UI.heightDesktop, SETTINGS_UI.phoneDirection, SETTINGS_UI.reduceMotion]);
+		// M7 (spec §13.1): the relation names are in the Cards group. D246: Cards holds only card settings; the two settings about relations and warnings have their own group.
+		expect(names(1)).toEqual([SETTINGS_UI.armsOnCards, SETTINGS_UI.breakWords, SETTINGS_UI.dates, SETTINGS_UI.relations, SETTINGS_UI.portraits]);
+		expect(names(2)).toEqual([SETTINGS_UI.oneParentUnknown, SETTINGS_UI.manyParents]);
+		// F10a: the three settings of the line of succession have their own group.
+		expect(names(3)).toEqual([SETTINGS_UI.successionLength, SETTINGS_UI.oldAge, SETTINGS_UI.youngDeathAge]);
 		// D113 item 4: the house page has its own group.
-		expect(names(2)).toEqual([SETTINGS_UI.houseGeneration]);
-		expect(names(3)).toEqual([SETTINGS_UI.generations]);
-		expect(names(4)).toEqual([SETTINGS_UI.links]);
-		expect(names(5)).toEqual([SETTINGS_UI.cache]);
+		expect(names(4)).toEqual([SETTINGS_UI.houseGeneration]);
+		expect(names(5)).toEqual([SETTINGS_UI.generations]);
+		expect(names(6)).toEqual([SETTINGS_UI.links]);
+		expect(names(7)).toEqual([SETTINGS_UI.cache]);
 		// Every setting has a description.
 		expect(settingRows.every((r) => r.descEl.getText().length > 0)).toBe(true);
 	});

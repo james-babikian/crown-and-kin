@@ -1,5 +1,5 @@
 orientation down
-size 1229.078 383
+size 1228 383
 geometry font 16 normal card 180x61 union 10 couple 36 node 20 row 100 tag 18
 row 0: aldric isolde marek anna gareth odette
 row 1: tomas sabine jasper piers roderick
@@ -7,39 +7,39 @@ row 2: lucan
 gap 0: 61 161
 gap 1: 222 322
 person aldric gen 0 at 0 0 size 180 61
-person anna gen 0 at 633.078 0 size 180 61
-person gareth gen 0 at 833.078 0 size 180 61
+person anna gen 0 at 632 0 size 180 61
+person gareth gen 0 at 832 0 size 180 61
 person isolde gen 0 at 216 0 size 180 61
-person jasper gen 1 at 525.078 161 size 180 61
-person lucan gen 2 at 216 322 size 180 61
-person marek gen 0 at 417.078 0 size 180 61
-person odette gen 0 at 1049.078 0 size 180 61
-person piers gen 1 at 836.85 161 size 180 61
-person roderick gen 1 at 1045.141 161 size 180 61
-person sabine gen 1 at 324 161 size 180 61
-person tomas gen 1 at 108 161 size 180 61
+person jasper gen 1 at 524 161 size 180 61
+person lucan gen 2 at 214.891 322 size 180 61
+person marek gen 0 at 416 0 size 180 61
+person odette gen 0 at 1048 0 size 180 61
+person piers gen 1 at 835.782 161 size 180 61
+person roderick gen 1 at 1044.052 161 size 180 61
+person sabine gen 1 at 322.891 161 size 180 61
+person tomas gen 1 at 106.891 161 size 180 61
 union u0 at 198 30.5 bar
-union u1 at 615.078 30.5 bar
-union u2 at 1031.078 30.5 bar
-union u3 at 306 191.5 bar
+union u1 at 614 30.5 bar
+union u2 at 1030 30.5 bar
+union u3 at 304.891 191.5 bar
 path marriage [aldric isolde] M180 30.5H216
-path marriage [marek anna] M597.1 30.5H633.1
-path marriage [gareth odette] M1013.1 30.5H1049.1
-path marriage [tomas sabine] M288 191.5H324
+path marriage [marek anna] M596 30.5H632
+path marriage [gareth odette] M1012 30.5H1048
+path marriage [tomas sabine] M286.9 191.5H322.9
 path adoptive [aldric isolde tomas] M198 30.5V131
 path adoptive [tomas aldric isolde] M198 131V161
-path descent [marek anna jasper] M615.1 30.5V131
-path descent [jasper marek anna] M615.1 131V161
-path descent [gareth odette piers roderick] M1031.1 30.5V131M926.8 131H1135.1
-path descent [piers gareth odette] M926.8 131V161
-path descent [roderick gareth odette] M1135.1 131V161
-path descent [tomas sabine lucan] M306 191.5V292
-path descent [lucan tomas sabine] M306 292V322
-path birth-link [marek anna tomas] M615.1 30.5V83C615.1 122 212 122 212 161
-path ward [aldric piers] M90 61V83C90 122 940.8 122 940.8 161
-path rumoured [marek roderick] M507.1 61V83C507.1 122 1149.1 122 1149.1 161
+path descent [marek anna jasper] M614 30.5V131
+path descent [jasper marek anna] M614 131V161
+path descent [gareth odette piers roderick] M1030 30.5V131M925.8 131H1134.1
+path descent [piers gareth odette] M925.8 131V161
+path descent [roderick gareth odette] M1134.1 131V161
+path descent [tomas sabine lucan] M304.9 191.5V292
+path descent [lucan tomas sabine] M304.9 292V322
+path birth-link [marek anna tomas] M614 30.5V83C614 122 210.9 122 210.9 161
+path ward [aldric piers] M90 61V83C90 122 939.8 122 939.8 161
+path rumoured [marek roderick] M506 61V83C506 122 1148.1 122 1148.1 161
 marker union at 198 30.5
-marker union at 615.078 30.5
-marker union at 1031.078 30.5
-marker union at 306 191.5
-marker rumour at 828.11 122
+marker union at 614 30.5
+marker union at 1030 30.5
+marker union at 304.891 191.5
+marker rumour at 827.026 122

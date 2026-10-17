@@ -1,5 +1,5 @@
 /*
- * Turns the YAML body of a `dynasty` block into a `Tree`: houses, titles, people and unions, plus
+ * Turns the YAML body of a `kin` block into a `Tree`: houses, titles, people and unions, plus
  * any shape issues found while reading (spec §4, §8, §13.4). `parseDynasty` is the entry point;
  * `tree-view.ts` and `houses-window.ts` call it. `parseBody` is shared with the edit code in
  * `yaml-patch.ts`, so both work from the same parsed document. Depends on `tolerate.ts` for
@@ -662,7 +662,7 @@ export function parseBody(source: string): ParsedBody {
 	}
 }
 
-/** Parses a dynasty block body into a read-only model. Never throws. */
+/** Parses a kin block body into a read-only model. Never throws. */
 export function parseDynasty(source: string): ParseResult {
 	const parsed = parseBody(source);
 	if (!parsed.ok) return parsed;

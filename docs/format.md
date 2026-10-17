@@ -13,7 +13,7 @@ Format 1 is the form of the tree text in plugin version 0.3 and in every plugin 
 
 ## How the plugin reads a tree
 
-- The tree is YAML in a code block with the language `dynasty`. If the YAML is not valid, or the top level is not a map, the plugin shows an error box and no tree.
+- The tree is YAML in a code block with the language `kin`. If the YAML is not valid, or the top level is not a map, the plugin shows an error box and no tree.
 - Every value is read as text, exactly as you wrote it. `born: 1102` is the text "1102". The plugin never reads a date as a date.
 - If two people have the same `id`, or two partnerships have the same `id`, the plugin shows the tree but does not let you edit it.
 - Every other fault is a warning. The tree still shows, with a warning button and a list.

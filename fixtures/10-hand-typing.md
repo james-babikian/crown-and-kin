@@ -9,7 +9,7 @@ A small tree typed quickly by hand, without quotes (spec §8 "Tolerated silently
 - Wren's single parent is written as `parents: aldric`, not as a list.
 - House Valmont's colour is not quoted. This is the only fault the tree reports: YAML reads it as a comment, so the plugin suggests quotes.
 
-```dynasty
+```kin
 options:
   start: 43
 

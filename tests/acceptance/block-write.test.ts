@@ -86,7 +86,7 @@ describe('planWrite refusals (§6.1 "On a mismatch … abort")', () => {
 	});
 
 	it('missing: the block was deleted from the note', () => {
-		const cut = replaceOnce(NOTE, '~~~dynasty\npeople:\n  - id: cedric\n    name: Cedric Vane\n~~~\n', '');
+		const cut = replaceOnce(NOTE, '~~~kin\npeople:\n  - id: cedric\n    name: Cedric Vane\n~~~\n', '');
 		expect(planWrite(cut, 5, 'people:\n  - id: cedric\n    name: Cedric Vane', (body) => ({ ok: true, body }))).toMatchObject({
 			ok: false,
 			code: 'missing',
@@ -94,8 +94,8 @@ describe('planWrite refusals (§6.1 "On a mismatch … abort")', () => {
 	});
 
 	it('stale, not a silent write to the wrong block, when the ordinals shift', () => {
-		// The callout block is no longer a dynasty block, so the nested-callout block becomes ordinal 1.
-		const cut = replaceOnce(NOTE, '> ```dynasty\n> people:\n>   - id: osric\n', '> ```text\n> people:\n>   - id: osric\n');
+		// The callout block is no longer a kin block, so the nested-callout block becomes ordinal 1.
+		const cut = replaceOnce(NOTE, '> ```kin\n> people:\n>   - id: osric\n', '> ```text\n> people:\n>   - id: osric\n');
 		expect(planWrite(cut, 1, CALLOUT, swap('Hugh Quill', 'Hugh of Greyfen'))).toMatchObject({ ok: false, code: 'stale' });
 	});
 

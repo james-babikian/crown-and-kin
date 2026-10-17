@@ -56,7 +56,7 @@ export class DynastySettingTab extends PluginSettingTab {
 		this.pendingNumbers = [];
 		const t = SETTINGS_UI;
 		const s = this.host.settings;
-		this.group(el, t.groups.height, (add) => {
+		this.group(el, t.groups.view, (add) => {
 			add((row) => {
 				row.setName(t.heightDesktop).setDesc(t.heightDesktopDesc);
 				row.addText((text) => {
@@ -85,8 +85,6 @@ export class DynastySettingTab extends PluginSettingTab {
 					});
 				});
 			});
-		});
-		this.group(el, t.groups.cards, (add) => {
 			add((row) => {
 				row.setName(t.phoneDirection).setDesc(t.phoneDirectionDesc);
 				row.addDropdown((d) => {
@@ -96,6 +94,17 @@ export class DynastySettingTab extends PluginSettingTab {
 					d.onChange((v) => void this.host.changeSettings({ phoneDirection: PHONE_DIRECTIONS.find((x) => x === v) ?? 'sideways' }));
 				});
 			});
+			add((row) => {
+				row.setName(t.reduceMotion).setDesc(t.reduceMotionDesc);
+				row.addDropdown((d) => {
+					name(d.selectEl, t.reduceMotion);
+					for (const v of REDUCE_MOTIONS) d.addOption(v, REDUCE_LABEL[v]);
+					d.setValue(s.reduceMotion);
+					d.onChange((v) => void this.host.changeSettings({ reduceMotion: REDUCE_MOTIONS.find((x) => x === v) ?? 'system' }));
+				});
+			});
+		});
+		this.group(el, t.groups.cards, (add) => {
 			// 0.2.8 contract A.4, D204: which cards show the arms of a house.
 			add((row) => {
 				row.setName(t.armsOnCards).setDesc(t.armsOnCardsDesc);
@@ -129,15 +138,6 @@ export class DynastySettingTab extends PluginSettingTab {
 				});
 			});
 			add((row) => {
-				row.setName(t.reduceMotion).setDesc(t.reduceMotionDesc);
-				row.addDropdown((d) => {
-					name(d.selectEl, t.reduceMotion);
-					for (const v of REDUCE_MOTIONS) d.addOption(v, REDUCE_LABEL[v]);
-					d.setValue(s.reduceMotion);
-					d.onChange((v) => void this.host.changeSettings({ reduceMotion: REDUCE_MOTIONS.find((x) => x === v) ?? 'system' }));
-				});
-			});
-			add((row) => {
 				row.setName(t.dates).setDesc(t.datesDesc);
 				row.addToggle((tg) => {
 					name(tg.toggleEl, t.dates);
@@ -156,21 +156,24 @@ export class DynastySettingTab extends PluginSettingTab {
 				});
 			});
 			add((row) => {
-				row.setName(t.oneParentUnknown).setDesc(t.oneParentUnknownDesc);
-				row.addToggle((tg) => {
-					name(tg.toggleEl, t.oneParentUnknown);
-					name(tg.toggleEl.querySelector('input'), t.oneParentUnknown);
-					tg.setValue(s.oneParentUnknown);
-					tg.onChange((v) => void this.host.changeSettings({ oneParentUnknown: v }));
-				});
-			});
-			add((row) => {
 				row.setName(t.portraits).setDesc(t.portraitsDesc);
 				row.addToggle((tg) => {
 					name(tg.toggleEl, t.portraits);
 					name(tg.toggleEl.querySelector('input'), t.portraits);
 					tg.setValue(s.showPortraits);
 					tg.onChange((v) => void this.host.changeSettings({ showPortraits: v }));
+				});
+			});
+		});
+		// F10a, D246: the two settings about relations and warnings are not card settings.
+		this.group(el, t.groups.relations, (add) => {
+			add((row) => {
+				row.setName(t.oneParentUnknown).setDesc(t.oneParentUnknownDesc);
+				row.addToggle((tg) => {
+					name(tg.toggleEl, t.oneParentUnknown);
+					name(tg.toggleEl.querySelector('input'), t.oneParentUnknown);
+					tg.setValue(s.oneParentUnknown);
+					tg.onChange((v) => void this.host.changeSettings({ oneParentUnknown: v }));
 				});
 			});
 			// 0.2.8 contract A.5, D188 item 10: the warning about more than 2 parents of a type.
@@ -183,6 +186,9 @@ export class DynastySettingTab extends PluginSettingTab {
 					tg.onChange((v) => void this.host.changeSettings({ warnManyParents: v }));
 				});
 			});
+		});
+		// F10a: the three settings of the line of succession are not card settings.
+		this.group(el, t.groups.succession, (add) => {
 			add((row) => {
 				row.setName(t.successionLength).setDesc(t.successionLengthDesc);
 				this.numberField(row, 'dynasty-setting-succession-length', t.successionLength, () => this.host.settings.successionLength, SUCCESSION_LENGTH, (n) => void this.host.changeSettings({ successionLength: n }));

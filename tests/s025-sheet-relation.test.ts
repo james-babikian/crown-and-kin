@@ -209,11 +209,11 @@ describe('the renderer alone', () => {
 
 	it('draws the kind none and the kind me with their classes, and a "maybe" line of its own', () => {
 		const parent = new FEl('div');
-		const me = renderRelationLine(parent as never, { kind: 'me', title: '', value: 'This is you.', sentence: 'This is you.', others: 0 }) as unknown as FEl;
+		const me = renderRelationLine(parent as never, { kind: 'me', value: 'This is you.', others: 0 }) as unknown as FEl;
 		expect(me.hasClass('is-me')).toBe(true);
-		const none = renderRelationLine(parent as never, { kind: 'none', title: '', value: 'No relation to you in this tree.', sentence: 'No relation to you in this tree.', others: 0 }) as unknown as FEl;
+		const none = renderRelationLine(parent as never, { kind: 'none', value: 'No relation to you in this tree.', others: 0 }) as unknown as FEl;
 		expect(none.hasClass('is-none')).toBe(true);
-		const v: RelationView = { kind: 'relation', title: RELINFO.title, value: 'Half-sister, maybe full', sentence: 'Relation to you: Half-sister, maybe full.', others: 0, maybe: 'If the parent … is the same person, this person is your full sister.' };
+		const v: RelationView = { kind: 'relation', value: 'Half-sister, maybe full', others: 0, maybe: 'If the parent … is the same person, this person is your full sister.' };
 		const box = new FEl('div');
 		renderRelationLine(box as never, v);
 		expect(box.querySelector('.dynasty-head-rel')!.getText()).toBe('Your half-sister, maybe full');

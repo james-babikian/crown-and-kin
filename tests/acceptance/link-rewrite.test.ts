@@ -385,7 +385,7 @@ describe('rewrite-links: blocked trees and refusals (contract, §8)', () => {
 describe('rewrite-links in a note: a callout block keeps its prefix (§6.1)', () => {
 	it('sample tree 4 inside a callout', () => {
 		const block = fixtureSource('04');
-		const note = `Intro.\n\n> [!note] Wren\n> \`\`\`dynasty\n${block.split('\n').slice(0, -1).map((l) => (l ? `> ${l}` : '>')).join('\n')}\n> \`\`\`\n`;
+		const note = `Intro.\n\n> [!note] Wren\n> \`\`\`kin\n${block.split('\n').slice(0, -1).map((l) => (l ? `> ${l}` : '>')).join('\n')}\n> \`\`\`\n`;
 		const b = locateBlock(note, 0);
 		if (!b) throw new Error('no block');
 		const r = planWrite(note, 0, b.body, (body) => {

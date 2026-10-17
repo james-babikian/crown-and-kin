@@ -111,7 +111,7 @@ export async function makePersonNote(input: MakePersonNoteInput & Partial<MakePe
 	try {
 		return await run(input);
 	} catch (e) {
-		console.error('Dynasty Tree: the note flow failed', e);
+		console.error('Crown and Kin: the note flow failed', e);
 		return { kind: 'failed' };
 	}
 }

@@ -35,7 +35,7 @@ function fakeApp(path: string, initial: string) {
 	return { app, get: () => text, set: (t: string) => (text = t) };
 }
 
-const block = (body: string) => ['```dynasty', body, '```'].join('\n');
+const block = (body: string) => ['```kin', body, '```'].join('\n');
 const A = 'people:\n  - id: a\n    name: Alys';
 const B = 'people:\n  - id: a\n    name: Alys\n  - id: b\n    name: Bran';
 

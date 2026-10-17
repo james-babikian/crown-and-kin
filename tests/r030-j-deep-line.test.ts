@@ -13,7 +13,7 @@ describe('a hostile line of nested list and quote markers', () => {
 	});
 
 	it('and still finds the tree below it', () => {
-		const blocks = findBlocks(`${line}\n\n\`\`\`dynasty\npeople: []\n\`\`\`\n`);
+		const blocks = findBlocks(`${line}\n\n\`\`\`kin\npeople: []\n\`\`\`\n`);
 		expect(blocks.map((b) => b.body)).toEqual(['people: []']);
 	});
 

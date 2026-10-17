@@ -450,7 +450,7 @@ describe('a block in a callout or a list item keeps its prefix (§6.1, §6.2)', 
 		'# Houses in containers',
 		'',
 		'> [!note] The Fenn and Marsh houses',
-		'> ```dynasty',
+		'> ```kin',
 		'> houses:',
 		'>   - id: fenn',
 		'>     name: House Fenn',
@@ -469,7 +469,7 @@ describe('a block in a callout or a list item keeps its prefix (§6.1, §6.2)', 
 		'',
 		'- The Fenn branch:',
 		'',
-		'  ```dynasty',
+		'  ```kin',
 		'  houses:',
 		'    - id: fenn',
 		'      name: House Fenn',
@@ -523,7 +523,7 @@ describe('a block in a callout or a list item keeps its prefix (§6.1, §6.2)', 
 
 	it('list item: deleting the only house removes the section, its blank line and the house: line', () => {
 		expect(writeNote(NOTE, 1, del('fenn', 'clear'))).toBe(
-			replaceOnce(NOTE, '  ```dynasty\n  houses:\n    - id: fenn\n      name: House Fenn\n\n  people:\n    - id: ysolde\n      name: Ysolde Fenn\n      house: fenn\n', '  ```dynasty\n  people:\n    - id: ysolde\n      name: Ysolde Fenn\n'),
+			replaceOnce(NOTE, '  ```kin\n  houses:\n    - id: fenn\n      name: House Fenn\n\n  people:\n    - id: ysolde\n      name: Ysolde Fenn\n      house: fenn\n', '  ```kin\n  people:\n    - id: ysolde\n      name: Ysolde Fenn\n'),
 		);
 	});
 

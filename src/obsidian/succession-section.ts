@@ -144,7 +144,7 @@ export function successionSection(host: SectionHost): SuccessionView {
 			if (!title) return null;
 			return successionLine(host.g(), title, draftSpec(s()), host.limit(), host.oldAge(), host.youngDeathAge());
 		} catch (e) {
-			console.error('Dynasty Tree: cannot compute the line of succession', e);
+			console.error('Crown and Kin: cannot compute the line of succession', e);
 			return null;
 		}
 	}
@@ -431,7 +431,7 @@ export function successionSection(host: SectionHost): SuccessionView {
 								else draw(`succ-${kind}-add`);
 							});
 						},
-						(e) => console.error('Dynasty Tree: the picker failed', e),
+						(e) => console.error('Crown and Kin: the picker failed', e),
 					);
 				}),
 			{ icon: 'plus', label: kind === 'heir' ? T.addHeirLabel(title) : T.addExcludeLabel(title), focus: `succ-${kind}-add` },

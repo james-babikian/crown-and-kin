@@ -18,7 +18,7 @@ describe('review 6.3: Insert family tree', () => {
 	});
 
 	it('with the cursor inside a tree (source mode), the tree that is there does not change', () => {
-		const tree = '```dynasty\npeople:\n  - id: a\n    name: A\n\n  - id: b\n    name: B\n```';
+		const tree = '```kin\npeople:\n  - id: a\n    name: A\n\n  - id: b\n    name: B\n```';
 		let text = `${tree}\n\nAfter.`;
 		// The cursor is on the empty line between person a and person b. (Build: the command, not the
 		// planner alone, knows the note around the cursor, so the test runs the command.)

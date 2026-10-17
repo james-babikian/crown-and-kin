@@ -121,7 +121,7 @@ export function renderScalar(value: string, old: Node | null | undefined, ctx: S
 }
 
 /**
- * A written line that Markdown could read as a code fence would end the `dynasty` block and spill
+ * A written line that Markdown could read as a code fence would end the `kin` block and spill
  * the rest of the tree into the note (CommonMark allows up to 3 spaces before a closing fence).
  */
 const FENCE_LINE = /^[ \t]{0,3}(`{3,}|~{3,})/;

@@ -39,12 +39,12 @@ export const PROBLEMS_HINT = 'Select a problem to show the people it is about.';
 /** Read-only trees (spec §6.1) and the resize handle (spec §7.5). */
 export const BLOCK_UI = {
 	openSource: 'Open note',
-	openSourceLabel: 'Open the note that contains this tree.',
+	openSourceLabel: 'Open note: open the note that contains this tree',
 	// D176 (2): the same result as the hidden "Edit this block" button of Obsidian.
 	showText: 'Show the tree text',
-	showTextLabel: 'Show the tree text: open the note for edits and show the text of this tree.',
+	showTextLabel: 'Show the tree text: open the note and show the text of this tree',
 	readOnly: 'Read only',
-	resizeLabel: 'Drag to change the height of the tree.',
+	resizeLabel: 'Drag to change the height of the tree',
 } as const;
 
 /** The empty block (spec §5.9) and the toolbar button (spec §6.10). */
@@ -77,6 +77,8 @@ export const FOCUS_UI = {
 	chooseLabel: 'Choose a person: show only the family of the person that you choose',
 	clear: 'Clear focus',
 	clearLabel: 'Clear focus: show all people again',
+	/** D246 (F2): the sentence of the bar at the top of the tree while a focus shows. */
+	bar: (name: string) => `Focus on ${name}`,
 	/** The accessible name of the Focus button while a focus shows. */
 	focusOn: 'Focus is on. Choose a person to change it. Clear the focus to show all people.',
 	focusHere: 'Focus here',
@@ -113,7 +115,7 @@ export const FINDER_UI = {
 	options: 'Options',
 	optionsLabel: 'Options: open a list of actions for this relation',
 	close: 'Close',
-	closeLabel: 'Close: show the tree as it was before.',
+	closeLabel: 'Close: show the tree as it was before',
 } as const;
 
 /** D28: the first view on an upright phone leaves children of the person outside the box. */
@@ -181,7 +183,8 @@ export const LINK_WORDS = {
 
 /** Toolbar of the tree view (0.2.8 contract C, G.13): the name of the row, the Houses button and the Focus menu item for the marked person. */
 export const TOOLBAR_UI = {
-	region: 'Tree',
+	/** F13: Obsidian shows this name as a tooltip over the free points of the toolbar, so it says what the bar holds (it was only "Tree"). */
+	region: 'Tools for this tree',
 	housesLabel: 'Houses: edit the houses of the tree',
 	focusOnYou: 'Focus on you',
 } as const;

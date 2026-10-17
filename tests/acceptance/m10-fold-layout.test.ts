@@ -403,21 +403,28 @@ describe('F5b: width and height include every mark and every hit area (spec §13
 		}
 	});
 
-	it('moving by the same amount keeps the picture: the distance between two cards is the same with and without controls', () => {
+	it('the controls move no card by more than the room of one control, and none up (nothing folded)', () => {
+		// 0.3.1 golden record, supervisor ruling (the decision notes, WP-4b "Rulings for the record step", item 1): the old claim "every card moves by the same
+		// amount" (equal distances with and without controls) is replaced. The hang ports of the new pipeline keep room for the controls, so the distance
+		// between two cards may differ by a few px (2.7 px at most in this tree); spec §13.10 asks for no equal distance. What the spec does ask: the
+		// controls make no card jump. The room of one control is its hit area, 2 x HALF_HIT = 44 px at scale 1. No card moves by that much, along the
+		// row or across it, and no card moves up (a gap may grow for a control that moved down its stem, so rows below can move down, never up).
 		clearLayoutCache();
 		const g = graphOf(SOURCE);
 		const off = layoutTree(g, GEO, { ...DEFAULT_LAYOUT_SETTINGS } as Settings, 'font');
 		const on = lay('none').layout;
-		const dx = on.persons.get('aldric')!.x - off.layout.persons.get('aldric')!.x;
-		const dy = on.persons.get('aldric')!.y - off.layout.persons.get('aldric')!.y;
-		for (const id of ['isolde', 'osric', 'lucan', 'zenobia']) {
-			const a = off.layout.persons.get(id);
+		const room = 2 * HALF_HIT;
+		let compared = 0;
+		for (const [id, a] of off.layout.persons) {
 			const b = on.persons.get(id);
-			if (!a || !b) continue;
-			expect(b.x - a.x).toBeCloseTo(dx, 6);
-			// V2/V4: a gap may grow for a control that moved down its stem, so rows below can move down, never up.
-			expect(b.y - a.y).toBeGreaterThanOrEqual(dy - 1e-6);
+			expect(b, id).toBeDefined();
+			expect(Math.abs(b!.x - a.x), `${id} along the row`).toBeLessThanOrEqual(room);
+			expect(b!.y - a.y, `${id} down, never up`).toBeGreaterThanOrEqual(-1e-6);
+			expect(b!.y - a.y, `${id} across the row`).toBeLessThanOrEqual(room);
+			compared++;
 		}
+		expect(compared, 'every card is compared').toBe(off.layout.persons.size);
+		expect(compared).toBeGreaterThan(20);
 	});
 });
 

@@ -1,11 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import type { FamilyGraph } from '../src/core/derive';
-import { routeEdges } from '../src/layout/edges';
 import { NORMAL_GEOMETRY } from '../src/layout/geometry';
-import { DEFAULT_FAR_RULE, layoutFamilies } from '../src/layout/layout';
+import { DEFAULT_FAR_RULE } from '../src/layout/layout';
+import { arrangeTree } from '../src/layout/pipeline';
 import { measureLayout } from '../scripts/metrics';
 import type { EdgeDrawing, EdgePath, FarCoupleRule } from '../src/layout/model';
-import { soloFamiliesOutside } from '../src/layout/solo-side';
 import { build, fixture } from './helpers';
 import { randomTree } from './random-trees';
 
@@ -71,8 +70,8 @@ const RULES: [string, FarCoupleRule][] = [
 
 function lay(src: string, far: FarCoupleRule = DEFAULT_FAR_RULE) {
 	const { g, gen, order } = build(src);
-	const layout = layoutFamilies(g, gen, order, NORMAL_GEOMETRY, { sweeps: 4, far });
-	return { g, gen, order, layout, edges: routeEdges(g, layout, order.anchors) };
+	const { layout, edges } = arrangeTree(g, gen, NORMAL_GEOMETRY, { sweeps: 4, far });
+	return { g, gen, order, layout, edges };
 }
 
 type Seg = { x1: number; y1: number; x2: number; y2: number };
@@ -192,20 +191,7 @@ describe('single-parent children sit on the outer side of the couple children', 
 		expect(failures.slice(0, 10), `${failures.length} of ${TREES} trees`).toEqual([]);
 	});
 
-	it('keeps the model order when no person has single-parent children', () => {
-		for (const f of ['01', '02', '03', '11']) {
-			const { g, order } = build(fixture(f));
-			if (g.soloChildren.size) continue;
-			expect(soloFamiliesOutside(g, order)).toBe(order.blocks);
-		}
-	});
-
-	it('moves whole blocks only: every block once, members unchanged', () => {
-		for (let seed = 1; seed <= 200; seed++) {
-			const { g, order } = build(randomTree(seed));
-			const out = soloFamiliesOutside(g, order);
-			expect(out.length).toBe(order.blocks.length);
-			expect(new Set(out)).toEqual(new Set(order.blocks));
-		}
-	});
+	// WP-4b (class c, the architecture notes §4.2.3 and W3): the two tests of `soloFamiliesOutside` (keeps the model order when no person has single-parent children; moves whole
+	// blocks only) are gone with the function. W3 puts the families of one parent alone in the walk (`familyOrder`) so nothing is moved after it: the claim
+	// "the cards stand in the model order" is `review-3.4-order` (400 random trees) and the walk's own rules are `order-next-rules` (W3).
 });

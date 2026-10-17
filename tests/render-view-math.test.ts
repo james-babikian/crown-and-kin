@@ -9,7 +9,6 @@ import {
 	centreOn,
 	chooseLod,
 	clampCentre,
-	clampPan,
 	bandShift,
 	clearBand,
 	defaultView,
@@ -25,10 +24,20 @@ import {
 	truncate,
 	wheelFactor,
 	zoomAt,
+	clampTo,
+	panLimits,
+	type FreeArea,
 	type Lod,
+	type Size,
+	type View,
 } from '../src/render/view-math';
 
 const size = { w: 800, h: 500 };
+
+/** The drag clamp of the view: the centre inside `panLimits` (the pan code does `clampTo(view, panLimits(...))`). */
+function clampPan(view: View, bounds: { x: number; y: number; w: number; h: number }, area?: { free: FreeArea; size: Size }): View {
+	return clampTo(view, panLimits(bounds, view.scale, area?.size ?? { w: 0, h: 0 }, area?.free));
+}
 
 describe('level of detail (spec §5.4)', () => {
 	it('starts in the middle of each hysteresis band', () => {

@@ -1,8 +1,20 @@
-# Dynasty Tree
+# Crown and Kin
 
-Dynasty Tree is an Obsidian plugin. It shows the family tree of a fictional dynasty in a note. You can edit the tree on the computer and on the phone.
+Crown and Kin is an Obsidian plugin. It shows the family tree of a fictional dynasty in a note. You can edit the tree on the computer and on the phone.
 
-The plugin stores the tree as text in a `dynasty` code block in your note. The plugin draws the tree from that text. When you edit the tree, the plugin changes only the text lines that must change. It keeps your comments and the way you wrote the text.
+The plugin stores the tree as text in a `kin` code block in your note. The plugin draws the tree from that text. When you edit the tree, the plugin changes only the text lines that must change. It keeps your comments and the way you wrote the text.
+
+## Change from Dynasty Tree
+
+In version 0.3.0 and earlier, this plugin had the name Dynasty Tree. Crown and Kin is a new plugin in a new folder. Your old settings do not move by themselves.
+
+To keep your settings, copy the file `data.json` from the folder `.obsidian/plugins/dynasty-tree` to the folder `.obsidian/plugins/crown-and-kin`. Do this before you turn on Crown and Kin. If there is no `data.json`, you used the default settings: skip this step. If you do not copy the file, Crown and Kin starts with the default settings.
+
+Then open Settings, then Community plugins. If Crown and Kin is not in the list, click Reload plugins (the button with two arrows next to "Installed plugins"). Turn on Crown and Kin. Turn off Dynasty Tree.
+
+In version 0.3.0 and earlier, a tree was a code block that starts with three backticks and the word `dynasty`. Crown and Kin does not read a `dynasty` block. Obsidian shows the text of the block and not the tree. It gives no message.
+
+To show the tree again, change `dynasty` to `kin` in the first line of the block. To find these notes, search your vault for `` ```dynasty `` and for `` ~~~dynasty ``. Open each note for editing: if the note is in Reading view, click the pencil icon at the top right first. A note that you changed leaves the search results.
 
 ## Start a tree
 
@@ -22,7 +34,7 @@ You can also type the code block yourself. See "The tree text" below.
 - **Move and zoom on a phone or a tablet.** On a phone, a tree in a note is a list (see "The tree in a note on a phone"). On a tablet, the tree in a note does not move. Tap Expand to open the full-screen view. Move the tree with one finger. Zoom with two fingers.
 - **Full-screen view.** Select Expand. Select the X button to close it. You can also push Esc. See "The full-screen view".
 - **Find.** Select Find. Type a name. Find ignores capital letters, accents and the look of the apostrophe. Each row shows the name, the relation to you, the years and the title.
-- **Focus.** Select Focus. A short list opens. Select Choose a person to focus on a person. If a person has the mark "This is me", the list also has Focus on you. While a focus shows, the list also has Clear focus. The tree shows only the family of the person in focus.
+- **Focus.** Select Focus. A short list opens. Select Choose a person to focus on a person. If a person has the mark "This is me", the list also has Focus on you. While a focus shows, the list also has Clear focus. The tree shows only the family of the person in focus. While a focus shows, a bar at the top of the tree says "Focus on" and then the name. The bar has the link **Clear focus** at the right. Select it one time to show all people again.
 - **The "+" sign.** A "+" sign on a card shows that the person has more relatives outside the view. Select the sign to show the family of that person.
 - **Pin.** In the person window, open the section Actions. Select "Pin focus here". The tree then always opens on the family of that person. Select "Remove pin" to stop this. The pin stays in the tree text. Clear focus shows all people until you close the note. It does not remove the pin. When you open the note again, the tree opens on the pin again.
 - **Houses.** Select the Houses button (the castle). The Houses window shows a list of the houses. You can search the list and add a house. Select a house to change its name, colour or arms, or to delete it (see "The Houses window"). On a phone, the Houses button is only in the full-screen view.
@@ -57,7 +69,7 @@ The full-screen view shows the tree in the whole window. Select Expand to open i
 To change the direction on a phone:
 
 1. Open the settings.
-2. In the group Cards, find "Tree direction on a phone held upright".
+2. In the group "Tree view", find "Tree direction on a phone held upright".
 3. Select "Like the computer".
 
 The generations then go from top to bottom. The setting is the same for all trees. If you change the setting while the full-screen view is open, the tree turns at once.
@@ -88,7 +100,7 @@ On a phone, a tree in a note is a list. The list shows one person and the family
 - **Where the list starts.** The plugin picks the start person in this order. First is the person that you chose last in this note. Next are the pin, then the marked person, then the person that you edited last. Then comes the oldest person who has children. The last choice is the first person in the tree.
 - **The bar.** The bar above the list has icon buttons and no words. The buttons are Add person (a person with a plus), Tree text (code), Find (a magnifier), Back (an arrow, after you move the list), the warning button (if the tree has problems) and Expand (arrows that point out). A screen reader says the full name of each button.
 - **Expand.** Tap **Expand** to open the full-screen view. You can move and zoom the tree in the full-screen view.
-- **What the full-screen view shows first.** If you pinned a person, the view shows the family of that person. If you moved the list, the view shows the family of the person that the list shows. If you did neither, a tree of 100 people or fewer shows all people. A tree of more than 100 people shows the family of one person. The plugin picks this person in this order: the person that you edited last in this session, the person in the option `start` of the tree text, the marked person ("This is me"), and then the first person in the tree. When the view shows one family, select Focus to see all people. Then select Clear focus.
+- **What the full-screen view shows first.** If you pinned a person, the view shows the family of that person. If you moved the list, the view shows the family of the person that the list shows. If you did neither, a tree of 100 people or fewer shows all people. A tree of more than 100 people shows the family of one person. The plugin picks this person in this order: the person that you edited last in this session, the person in the option `start` of the tree text, the marked person ("This is me"), and then the first person in the tree. When the view shows one family, a bar at the top says "Focus on" and the name of the person. Select **Clear focus** in the bar to see all people.
 - **After you save a person.** The list moves only if you have not chosen a person in the list, and the tree has no pin and no mark. In that case the list shows the person that you saved. In all other cases the list does not move. If the saved person is in the list, the row has a thin outline for two seconds. If the person is not in the list, a message tells you to tap Find.
 - **A tablet** does not show the list. It shows the tree in the note, and you cannot move or zoom this tree. Tap Expand to move the tree.
 - **Settings.** The list follows "Show dates on cards", "Show relation names on cards", "Show portraits on cards" and "Assume an unknown second parent". The height of a tree in a note does not change the list.
@@ -258,7 +270,7 @@ The tree text keys are `succession`, `inherit`, `inherit-through`, `inherit-ille
 The person key `childless: true` closes the open branch of a person who died with no children. The person window writes it when you tick **No children**.
 
 ````markdown
-```dynasty
+```kin
 titles:
   - id: duchy-of-valmont
     name: Duchy of Valmont
@@ -478,27 +490,29 @@ The page of a house has the section People. It shows the people of one house. Ge
 
 ## Settings
 
-Open Settings. Select Dynasty Tree. The settings are in six groups. Each setting has the name that the settings page shows.
+Open Settings. Select Crown and Kin. The settings are in eight groups. Each setting has the name that the settings page shows.
 
-- **Group "Height in a note".**
-  - "Height on a computer or tablet" is the height of a tree in a note, in pixels. It is 500 at first.
-- **Group "Cards".**
+- **Group "Tree view".**
+  - "Height on a computer or tablet" is the height of a tree in a note, in pixels. The default is 500.
   - "Tree direction on a phone held upright" (Sideways or Like the computer; see "The full-screen view").
+  - "Reduce movement" (Follow the device, On or Off; see "Reduce movement").
+- **Group "Cards".**
   - "Arms on cards" ("Founders, married-in people and holders" or "Every card"; see "Coats of arms").
   - "Break places in long names" (see "Long names").
-  - "Reduce movement" (Follow the device, On or Off; see "Reduce movement").
   - "Show dates on cards" (on or off; see "Titles and reigns").
   - "Show relation names on cards" (on or off; see "This is me and relations").
-  - "Assume an unknown second parent" (on or off; see "One listed parent" in "This is me and relations").
   - "Show portraits on cards" (on or off; see "Portraits").
+- **Group "Relations and warnings".**
+  - "Assume an unknown second parent" (on or off; see "One listed parent" in "This is me and relations").
   - "Warn about more than 2 parents of a type" (on or off; see "The tree text").
-  - "Length of the line of succession" (1 to 20 people, 5 at first; see "Succession").
-  - "Warn about people older than" is the age from which the line of succession warns about a person with no death year. It is 110 years at first. Use a number from 0 to 1000. The number 0 stops the warning.
-  - "Age for open branches" (0 at first; use a number from 0 to 1000). The line of succession shows no open branch for a person who died younger than this age.
+- **Group "Line of succession".**
+  - "Length of the line of succession" is the number of people that the line shows. Use a number from 1 to 20. The default is 5 (see "Succession").
+  - "Warn about people older than" is an age. The line of succession warns about a person who is older than this age and has no death year. Use a number from 0 to 1000. The number 0 stops the warning. The default is 110 years.
+  - "Age for open branches" is an age. The line of succession shows no open branch for a person who died younger than this age. The note must give the birth year and the death year. Use a number from 0 to 1000. The number 0 shows every open branch. The default is 0.
 - **Group "House page".**
   - "Show generation on the house page" (on or off).
 - **Group "Focus mode".**
-  - "Generations in focus mode" is the number of generations above and below the person in focus. It is 3 at first. Use a number from 0 to 10.
+  - "Generations in focus mode" is the number of generations above and below the person in focus. Use a number from 0 to 10. The default is 3.
 - **Group "Links".**
   - "Update tree links when you rename a note or a picture" (on or off).
 - **Group "Repair".**
@@ -516,12 +530,12 @@ When the plugin reduces movement, Fit, Find and a double tap change the view at 
 
 ## The tree text
 
-A tree is a `dynasty` code block with the lists `houses`, `titles`, `people` and `unions`, and an optional `options` map.
+A tree is a `kin` code block with the lists `houses`, `titles`, `people` and `unions`, and an optional `options` map.
 
 Keep an empty text line or a heading above a tree. If a tree is the first thing in a note, Live Preview opens the note with the cursor in the tree. Then you see the text of the tree, not the tree. To see the tree, move the cursor out of the tree.
 
 ````markdown
-```dynasty
+```kin
 houses:
   - id: valmont
     name: House Valmont
@@ -713,6 +727,6 @@ The file [docs/format.md](docs/format.md) also shows how you can write each key 
 - **Older plugin versions and pictures.** A phone with version 0.1.x does not show arms or portraits. If you rename a picture there, the links to it in the trees do not change. Update the plugin on all your devices.
 - **Numbers are not counted.** The plugin does not count the numbers of the holders. You write each number.
 - **Positions are automatic.** You cannot drag cards to a new position. You can change the order of brothers and sisters in the section Family of the person window, in the group "Position among siblings". The line of succession puts brothers and sisters in the order of their birth years (see "The order of brothers and sisters").
-- **Very large trees.** If a tree has more than 1,500 people, a note on a computer or a tablet shows a bar in place of the tree. Select **Draw the tree** to draw it. The draw can take several seconds. Obsidian does not answer in that time. The bar shows again each time you open the note. On a phone, the list in a note works at any size. In the full-screen view on a phone, select Clear focus to see the whole tree. The bar then shows **Draw the tree**. If a tree has more than 5,000 people (on a phone: more than 3,000), the plugin does not draw the whole tree. The bar then has **Choose a person** in place of **Draw the tree**. Select it to open a list of people. Select a person, and the tree shows the family of that person. The family of a person draws also in a very large tree. If that family is too large too, the bar says so and has **Choose another person**. If a draw takes more than 15 seconds, the plugin stops it. The bar says so and has **Choose a person**. The plugin does not try again until you change the tree text. To draw the whole tree, make the tree smaller in the note.
+- **Very large trees.** If a tree has more than 1,500 people, a note on a computer or a tablet shows a bar in place of the tree. Select **Draw the tree** to draw it. The draw can take several seconds. Obsidian does not answer in that time. The bar shows again each time you open the note. On a phone, the list in a note works at any size. In the full-screen view on a phone, select Clear focus to see the whole tree. A bar with **Draw the tree** then shows. If a tree has more than 5,000 people (on a phone: more than 3,000), the plugin does not draw the whole tree. The bar then has **Choose a person** in place of **Draw the tree**. Select it to open a list of people. Select a person, and the tree shows the family of that person. The family of a person draws also in a very large tree. If that family is too large too, the bar says so and has **Choose another person**. If a draw takes more than 15 seconds, the plugin stops it. The bar says so and has **Choose a person**. The plugin does not try again until you change the tree text. To draw the whole tree, make the tree smaller in the note.
 - **Two devices.** If you use the same vault on two devices, wait until the sync is complete before you edit a tree on the other device. If you do not wait, the other device changes an old copy of the note, and the sync can lose one of the two edits.
 - **Tested devices.** The developer tested the plugin on Windows and on an iPhone. The developer did not test it on an Android phone.
