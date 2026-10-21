@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseLink } from '../src/core/link-rewrite';
+import { parseLink } from '../src/core/picture-link';
 import { linkedNotePath } from '../src/core/note-make';
 import { linkTarget } from '../src/render/tree-info';
 

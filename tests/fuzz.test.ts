@@ -1343,7 +1343,7 @@ describe('fuzz: fold sets, the pruned graph, the folded layout, the crop helpers
 const SOBRIQUET_TEXTS = ['the Wise', '“the Wise”', '"the Wise"', '‘Fox’', '“the ‘Wise’ one”', '„der Weise“', 'the  Old\tOne', '#1', 'a: b', '[x]', '- x', '"', "it's", 'x'.repeat(400), '日本語', '', '   ', 'null', '1066', 'true'];
 const SOBRIQUET_RAW: unknown[] = ['the Wise', '“the Wise”', 1066, true, [], ['x'], { a: 1 }, '', null, '  ', '"the Wise"', '‘Fox’', '“a” “b”', 'x'.repeat(2000)];
 
-/** The model value the reader must give for typed text (contract 1.1), with the parser itself as the proof. */
+/** The model value the reader must give for typed text (the architecture notes §5.7), with the parser itself as the proof. */
 function readBack(body: string, id: string): { found: boolean; sobriquet?: string } {
 	const r = parseDynasty(body);
 	if (!r.ok) return { found: false };

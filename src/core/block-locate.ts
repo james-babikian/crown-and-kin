@@ -2,12 +2,19 @@
  * Finds `kin` fenced code blocks the way CommonMark reads fences (spec §6.1), without a
  * full Markdown parser. Containers are blockquotes and callouts (`>` markers) and list items
  * (tracked by their content column). Every fence, whatever its language, is tracked, so a
- * `kin` example inside a longer or different fence is content and not a block.
+ * `kin` example inside a longer or different fence is content and not a block. The language is
+ * a parameter (default `kin`; the calendar notes use `kin-calendar`, spec §14 rule 2), and the
+ * blocks are numbered for each language on its own.
  */
 
-/** One `kin` fenced code block found in a note: its position, body and container prefix. */
+/** The fence language of a tree block. */
+export const KIN_LANGUAGE = 'kin';
+/** The fence language of a calendar block (spec §14 rule 2). */
+export const CALENDAR_LANGUAGE = 'kin-calendar';
+
+/** One fenced code block of the wanted language found in a note: its position, body and container prefix. */
 export interface LocatedBlock {
-	/** Index of this block among the `kin` blocks of the note, from 0, in text order. */
+	/** Index of this block among the blocks of the same language in the note, from 0, in text order. */
 	ordinal: number;
 	/**
 	 * 0-based line numbers of the opening and closing fence lines. `closeLine` is null for a block
@@ -129,7 +136,7 @@ function openingFence(s: string): Fence | null {
 }
 
 /** Obsidian keys code-block processors by the first word of the info string, case-sensitive. */
-const isKin = (info: string) => info.split(/[ \t]/, 1)[0] === 'kin';
+const isLanguage = (info: string, language: string) => info.split(/[ \t]/, 1)[0] === language;
 
 /** The line after YAML front matter, or 0. Fences inside front matter are not Markdown. */
 function afterFrontMatter(lines: Line[]): number {
@@ -247,11 +254,11 @@ class ListStack {
 	}
 }
 
-/** All `kin` blocks of a note in text order. Fences inside longer fences are skipped (§6.1). */
-export type FindBlocks = (text: string) => LocatedBlock[];
+/** All blocks of one language (default `kin`) in a note, in text order. Fences inside longer fences are skipped (§6.1). */
+export type FindBlocks = (text: string, language?: string) => LocatedBlock[];
 
 /** Implements `FindBlocks`. */
-export const findBlocks: FindBlocks = (text) => {
+export const findBlocks: FindBlocks = (text, language = KIN_LANGUAGE) => {
 	const blocks: LocatedBlock[] = [];
 	if (typeof text !== 'string') return blocks;
 	const lines = splitLines(text);
@@ -288,7 +295,7 @@ export const findBlocks: FindBlocks = (text) => {
 		// An unclosed block at the end of a note that ends with a line break: that break ends the
 		// last body line; it does not start an extra empty one.
 		if (closeLine === null && j === lines.length && bodyLast > i && endsWithBreak(text)) bodyLast--;
-		if (isKin(fence.info)) {
+		if (isLanguage(fence.info, language)) {
 			let prefix: string | null = null;
 			const body: string[] = [];
 			for (let k = i + 1; k <= bodyLast; k++) {
@@ -327,11 +334,11 @@ const normalise = (s: string) => s.replace(/\r\n?/g, '\n').replace(/\n$/, '');
  * several, return the one whose `body` equals `source` (line endings normalised, trailing newline
  * ignored). Null if there is none or the match is ambiguous (the view is then read-only).
  */
-export type OrdinalForSection = (text: string, lineStart: number, lineEnd: number, source: string) => number | null;
+export type OrdinalForSection = (text: string, lineStart: number, lineEnd: number, source: string, language?: string) => number | null;
 
 /** Implements `OrdinalForSection`. */
-export const ordinalForSection: OrdinalForSection = (text, lineStart, lineEnd, source) => {
-	const inside = findBlocks(text).filter((b) => b.openLine >= lineStart && b.openLine <= lineEnd);
+export const ordinalForSection: OrdinalForSection = (text, lineStart, lineEnd, source, language = KIN_LANGUAGE) => {
+	const inside = findBlocks(text, language).filter((b) => b.openLine >= lineStart && b.openLine <= lineEnd);
 	if (inside.length === 1) return inside[0].ordinal;
 	if (inside.length === 0 || typeof source !== 'string') return null;
 	const wanted = normalise(source);

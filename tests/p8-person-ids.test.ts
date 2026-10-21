@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { deriveFamilies } from '../src/core/derive';
 import type { Op } from '../src/core/edit';
 import { parseBody, readTree } from '../src/core/parse';
-import { hasNoWrittenId, idsForPeople } from '../src/obsidian/person-ids';
-import { withHolderIds } from '../src/obsidian/titles-draft';
+import { hasNoWrittenId, idsForPeople } from '../src/view/person-ids';
+import { withHolderIds } from '../src/view/titles-draft';
 
 /*
  * P8-23: the edit sheet and the Titles window give an id to a person who has none by the same rule (D104): the new numbers follow the

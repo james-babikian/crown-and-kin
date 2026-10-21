@@ -6,9 +6,9 @@ vi.mock('@codemirror/view', () => ({ ViewPlugin: { fromClass: () => ({}) } }));
 
 import { hardErrorText } from '../src/core/messages';
 import { parseDynasty } from '../src/core/parse';
-import { chooseFocus, type FocusFacts } from '../src/obsidian/focus-mode';
+import { chooseFocus, type FocusFacts } from '../src/view/focus-mode';
 import { FullScreenModal } from '../src/obsidian/full-screen';
-import { clearStops, rememberStop } from '../src/obsidian/large-tree';
+import { clearStops, rememberStop } from '../src/view/large-tree';
 import { cardShown, type View } from '../src/render/view-math';
 import { BLOCK_UI, FOCUS_UI } from '../src/render/ui-text';
 import { TOOLBAR_UI } from '../src/render/view-text';

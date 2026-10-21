@@ -7,7 +7,7 @@
 import { Modal } from 'obsidian';
 import { SHEET } from '../render/ui-text';
 import { ignoreGhostClick, phoneLayout } from './modal-layout';
-import { trackModal } from './plugin-modals';
+import { trackModal } from '../view/plugin-modals';
 import { revealFocused } from './sheet-parts';
 import type { Shell } from './window-shell';
 

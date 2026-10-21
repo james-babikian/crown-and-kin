@@ -6,9 +6,9 @@ vi.mock('@codemirror/view', () => ({ ViewPlugin: { fromClass: () => ({}) } }));
 
 import type { Geometry } from '../src/layout/model';
 import { FullScreenModal } from '../src/obsidian/full-screen';
-import { clearRelationCache } from '../src/obsidian/relation-cache';
+import { clearRelationCache } from '../src/view/relation-cache';
 import { makePicture, type SaveSource } from '../src/obsidian/save-picture';
-import { DEFAULT_SETTINGS } from '../src/obsidian/settings';
+import { DEFAULT_SETTINGS } from '../src/view/settings';
 import { parseBreakList } from '../src/render/break-words';
 import { clearMeasureCache } from '../src/render/dom/measure';
 import { clock, installDom, resetDom } from './acceptance/fake-dom';

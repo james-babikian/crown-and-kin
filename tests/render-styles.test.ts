@@ -2,7 +2,8 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { cardText, geometryFor } from '../src/layout/geometry';
-import { COMPACT_NAME_EM, RUMOUR_FONT_EM, TAG_COMPACT_FONT_EM, TAG_FONT_EM } from '../src/render/dom/scene';
+import { COMPACT_NAME_EM, TAG_COMPACT_FONT_EM, TAG_FONT_EM } from '../src/render/dom/scene';
+import { RUMOUR_FONT_EM } from '../src/render/scene-model';
 import { DEAD_STRIP_OPACITY, HOUSE_DARK_LIFT, STROKES, UNION_MARKS } from '../src/render/styles';
 import { roleCss } from './role-css';
 

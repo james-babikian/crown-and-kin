@@ -11,9 +11,10 @@ vi.mock('../src/obsidian/picture-picker', async (orig) => ({ ...(await orig<Reco
 import { TFile as VaultFile } from 'obsidian';
 import { parseDynasty } from '../src/core/parse';
 import { HousesWindow, type HousesOptions } from '../src/obsidian/houses-window';
-import { closePluginModals } from '../src/obsidian/plugin-modals';
+import { closePluginModals } from '../src/view/plugin-modals';
 import type { PictureCopy, PictureStore } from '../src/obsidian/picture-store';
 import { HOUSE_PALETTE } from '../src/render/styles';
+import { VIEWER_UI } from '../src/render/viewer-text';
 import { HOUSES, HOUSE_PAGE_UI, ID_UI, PICTURES_UI, WIN_LIST_UI, WINDOW_UI } from '../src/render/ui-text';
 import { FEl, clock, dispatch, fakeDoc, fakeWin, installDom, resetDom, runTimers, settle } from './acceptance/fake-dom';
 import { lastMenu, noticeList, notices, openModals, resetObsidian } from './acceptance/fake-obsidian';
@@ -353,9 +354,9 @@ describe('the edit page (D.3.6, D.3.7)', () => {
 		expect(fromArms.getAttribute('data-colour')).toBe('#ffffff');
 		// The colours of the arms are round swatches like the house colours (a small dot is drawn by the style sheet).
 		expect(fromArms.hasClass('dynasty-swatch')).toBe(true);
-		// A tap on the arms opens the short menu: Select arms, and Remove arms because the house has arms.
+		// A tap on the arms opens the short menu: View arms (D256), Select arms, and Remove arms because the house has arms.
 		click(box);
-		expect(lastMenu()!.items.filter((i) => i !== 'sep').map((i) => (i as { title: string }).title)).toEqual([PICTURES_UI.selectArms, PICTURES_UI.removeArms]);
+		expect(lastMenu()!.items.filter((i) => i !== 'sep').map((i) => (i as { title: string }).title)).toEqual([VIEWER_UI.viewArms, PICTURES_UI.selectArms, PICTURES_UI.removeArms]);
 		// One label "Colour" for the whole choice (arms-colours): no label over the colours of the arms, none over the house colours.
 		const labels = page.querySelectorAll('.dynasty-house-palette .dynasty-sheet-label').map((l) => l.getText());
 		expect(labels).toEqual([WINDOW_UI.colour]);
@@ -365,6 +366,36 @@ describe('the edit page (D.3.6, D.3.7)', () => {
 		expect(groups).toHaveLength(2);
 		expect(groups[0]!.querySelectorAll('.dynasty-house-colour')).toHaveLength(12);
 		expect(groups[1]!.hasClass('dynasty-house-arms-colours')).toBe(true);
+	});
+
+	it('View arms (D256) opens the picture viewer on the arms of the page; it writes nothing, Close leaves the page as it was, and the focus returns to the arms', async () => {
+		const { store } = fakeStore();
+		const big: PictureCopy[] = [];
+		(store as unknown as { transient: unknown }).transient = async () => {
+			const c = { url: 'blob:big', w: 300, h: 400, release: () => void big.push(c) } satisfies PictureCopy;
+			return c;
+		};
+		const { content, handle } = open({ pictures: store });
+		const page = openPage(content, 'valmont');
+		await settle();
+		const box = page.querySelector('button.dynasty-house-arms')!;
+		click(box);
+		lastMenu()!.item(VIEWER_UI.viewArms)!.click();
+		await settle();
+		const viewer = openModals[openModals.length - 1] as unknown as { modalEl: FEl; contentEl: FEl };
+		expect(viewer.modalEl.hasClass('dynasty-viewer')).toBe(true);
+		// The dialog is labelled by a hidden name (`aria-labelledby`), not by `aria-label`, which Obsidian shows as a tooltip.
+		expect(viewer.modalEl.getAttribute('aria-labelledby')).toBeTruthy();
+		expect(viewer.modalEl.querySelector('.dynasty-sr-only')?.textContent).toBe(VIEWER_UI.armsOf('House Valmont'));
+		expect(viewer.contentEl.querySelector('.dynasty-viewer-name')!.getText()).toBe('House Valmont');
+		// The name above says the house, so the text line is one word; the label for a screen reader keeps the owner (look round 0.3.2).
+		expect(viewer.contentEl.querySelector('.dynasty-viewer-line')!.getText()).toBe(VIEWER_UI.arms);
+		expect(viewer.contentEl.querySelectorAll('.dynasty-viewer-thumb')).toHaveLength(0);
+		click(viewer.contentEl.querySelector('button.dynasty-viewer-close'));
+		expect(big).toHaveLength(1);
+		expect(openModals.some((m) => (m as unknown as { modalEl: FEl }).modalEl.hasClass('dynasty-houses'))).toBe(true);
+		expect(handle.write).not.toHaveBeenCalled();
+		expect(fakeDoc.activeElement).toBe(box);
 	});
 
 	it('shows no colours of the arms, and no text and no empty box, when the plugin cannot read the pixels (arms-colours)', async () => {

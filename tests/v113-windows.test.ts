@@ -9,7 +9,7 @@ import { parseDynasty } from '../src/core/parse';
 import * as UI from '../src/render/ui-text';
 import { EditSheet } from '../src/obsidian/edit-sheet';
 import { HousesWindow } from '../src/obsidian/houses-window';
-import { closePluginModals } from '../src/obsidian/plugin-modals';
+import { closePluginModals } from '../src/view/plugin-modals';
 import { TitlesWindow } from '../src/obsidian/titles-window';
 import { FEl, clock, fakeDoc, fakeWin, installDom, resetDom, settle } from './acceptance/fake-dom';
 import { openModals, resetObsidian } from './acceptance/fake-obsidian';

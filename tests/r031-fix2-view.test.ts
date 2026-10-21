@@ -10,7 +10,7 @@ vi.mock('@codemirror/view', () => ({ ViewPlugin: { fromClass: () => ({}) } }));
 
 import type { Rect } from '../src/layout/model';
 import { FullScreenModal } from '../src/obsidian/full-screen';
-import { keepTopCardWhole, sidewaysView } from '../src/obsidian/focus-mode';
+import { keepTopCardWhole, sidewaysView } from '../src/view/focus-mode';
 import { betweenSides, bringInView, centredOpening, treeBounds, type View } from '../src/render/view-math';
 import { FEl, clock, device, fakeWin, flushFrames, installDom, resetDom, resizeAll, settle } from './acceptance/fake-dom';
 import { resetObsidian } from './acceptance/fake-obsidian';
@@ -228,9 +228,11 @@ describe('V4: an upright phone 360 points wide shows the children of the start p
 		});
 	}
 
-	it('sample tree 7 at 390 points: the children fit at 14 px names, which stay', async () => {
+	it('sample tree 7 at 390 points: the children fit at 14 px names, but a "+ N" sign of a folded family would be cut, so the names go to about 12.5 px (D257)', async () => {
 		const view = await open(sample('07-four-hundred-people.md'), upright(390, 844));
-		expect(view.panZoom.view!.scale * view.laid.layout.geometry.fontPx).toBeCloseTo(14, 6);
+		const names = view.panZoom.view!.scale * view.laid.layout.geometry.fontPx;
+		expect(names).toBeGreaterThanOrEqual(11);
+		expect(names).toBeCloseTo(12.45, 1);
 	});
 
 	it('sidewaysView: a children column that needs names under 11 px keeps 14 px, as before', () => {

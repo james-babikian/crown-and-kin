@@ -27,7 +27,7 @@ import { sameBody } from '../core/block-match';
 import { linkedNotePath, personNoteName } from '../core/note-make';
 import { NOTE_UI } from '../render/ui-text';
 import type { Handle, Written } from './block-handle';
-import { isPhoneWindow } from './focus-mode';
+import { isPhoneWindow } from '../view/focus-mode';
 import { freeName, makeNote, namesIn } from './table-note';
 
 /** Which button the sheet offers (N1): 'new' makes a note for the person; 'linked' makes the note that the link already names. */

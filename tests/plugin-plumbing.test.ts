@@ -34,8 +34,8 @@ vi.mock('@codemirror/view', () => ({ ViewPlugin: { fromClass: () => ({}) } }));
 
 import { TFile } from 'obsidian';
 import DynastyTreePlugin from '../src/obsidian/main';
-import { pluginModalOpen } from '../src/obsidian/plugin-modals';
-import { PENDING_KEY } from '../src/obsidian/settings';
+import { pluginModalOpen } from '../src/view/plugin-modals';
+import { PENDING_KEY } from '../src/view/settings';
 import { undoNotice } from '../src/obsidian/undo-notice';
 import { SETTINGS_UI } from '../src/render/ui-text';
 import { clock, dispatch, fakeWin, installDom, resetDom, runTimers, settle } from './acceptance/fake-dom';

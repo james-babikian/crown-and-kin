@@ -66,19 +66,7 @@ import { drawFold, type FoldRef } from './folds';
 // The word moved to view-text.ts (all plugin texts live there); other modules still read it from here.
 export { ME_WORD };
 import type { PictureOwner, PictureSlot } from './pictures';
-
-/** Text width in px for a CSS font shorthand. */
-export type Measure = (text: string, font: string) => number;
-
-/** The resolved font families and weight the scene measures and draws text with. */
-export interface SceneFonts {
-	/** Resolved `font-family` of the note text (card text). */
-	text: string;
-	/** Resolved `font-family` of the interface (tags). */
-	ui: string;
-	/** Resolved bold weight, for measuring names. */
-	bold: string;
-}
+import { FRAME_STROKE_PX, RUMOUR_FONT_EM, TAB_TEXT_BASE_EM, type Measure, type SceneFonts } from '../scene-model';
 
 /** A card name's internal link, as `buildScene`'s `link` option returns it. */
 export interface CardLink {
@@ -302,14 +290,6 @@ export const TAG_COMPACT_FONT_EM = COMPACT_NAME_EM;
 export const TAG_COMPACT_PILL_EM = 2;
 /** Radius of the focus-mode `+` badge, in em. 0.2.8 (I01): its centre lies on the arc of the card's rounded top right corner, the middle of that arc. */
 export const BADGE_RADIUS_EM = 0.55;
-/** The word on the "You" tab, in em of the note font (B.3.4). */
-export const TAB_TEXT_EM = 0.8;
-/** The baseline of the text of a tab, in em below the middle of the tab (0.3 em). */
-export const TAB_TEXT_BASE_EM = 0.3;
-/** D219: the width of the frame of an empty portrait, in px (the style gives it the same number); the frame lies inside the picture's edge. */
-export const FRAME_STROKE_PX = 1;
-/** "?" of the rumoured-parent marker, in em. */
-export const RUMOUR_FONT_EM = 0.7;
 // All font sizes are set in styles.css from --dynasty-font-size (spec §5.8: nothing that styles
 // text is written into SVG attributes); these constants are what the measurement assumes.
 
@@ -723,7 +703,7 @@ export function buildScene(parent: SVGGElement, g: FamilyGraph, laid: LaidOut, o
 		const cl = opts.labels?.get(p.id);
 		const shownName = cl ? cl.name : p.name;
 		// §13.1: the label names the relation, also when a class hides the text on the card.
-		const label = cardLabel(p, isMe ? 'you' : relation?.lower, cl);
+		const label = cardLabel(p, isMe ? 'you' : relation?.lower, cl, undefined, g.dates);
 		const cls = ['dynasty-card', ...(roundel ? ['dynasty-card-r1'] : ['dynasty-card-tc']), ...(isDead(p) ? ['dynasty-deceased'] : []), ...(heirIds.has(p.id) ? ['dynasty-heir'] : []), ...(isMe ? ['dynasty-card-me'] : []), ...stateCls(look.card(p.id))];
 		const card = cardsEl.createSvg('g', {
 			cls: cls.length === 1 ? 'dynasty-card' : cls,
@@ -782,7 +762,7 @@ export function buildScene(parent: SVGGElement, g: FamilyGraph, laid: LaidOut, o
 		// B.3.2: the lines that exist are centred in the body, so the text block needs to know which small lines the person has. The dates line counts even when "Show dates on cards" is off (the class hides it), as the saved picture centres it.
 		const titleText = cl ? cl.title : p.title;
 		const reign = cl && opts.showDates !== false ? cl.reign : undefined;
-		const shown: ShownLines = { title: !!(titleText || reign), dates: !!dateLine(p) };
+		const shown: ShownLines = { title: !!(titleText || reign), dates: !!dateLine(p, g.dates) };
 		// D177 (10): a card with no relation word, in a tree with relation words, centres its text in the whole card.
 		const ct = textOf(box, shown, geo.relationLine === true && !!opts.relations && !relation?.text);
 		const tx = box.x + (ct.anchorX ?? t.padX);
@@ -839,7 +819,7 @@ export function buildScene(parent: SVGGElement, g: FamilyGraph, laid: LaidOut, o
 		} else if (p.title) {
 			fitted(full.createSvg('text', { cls: 'dynasty-card-title', attr: { x: tx, y: box.y + ct.titleBaseline } }), p.title, ct.textW, smallFont);
 		}
-		const dates = dateLine(p);
+		const dates = dateLine(p, g.dates);
 		const datesBaseline = hasTitle ? ct.datesBaseline : ct.titleBaseline;
 		if (dates) {
 			fitted(full.createSvg('text', { cls: 'dynasty-card-dates', attr: { x: tx, y: box.y + datesBaseline } }), dates, ct.textW, smallFont);
@@ -861,9 +841,9 @@ export function buildScene(parent: SVGGElement, g: FamilyGraph, laid: LaidOut, o
 				const el = full.createSvg('g', { cls: 'dynasty-arms' });
 				const rect = { x: box.x + r.x, y: box.y + r.y, w: r.w, h: r.h };
 				// D219: the gap round the arms follows the outline of the picture. It is drawn when the picture and its outline are in the slot (`setArmsGap`), never before.
-				// The slot's owner: the person (personal arms) or the house; `house` stays for a reader that knows no owner.
+				// The slot's owner: the person (personal arms) or the house.
 				const owner: PictureOwner = p.arms ? { person: p.id } : { house: p.house! };
-				full2.push({ kind: 'arms', lod: 'full', person: p.id, ...(p.house !== undefined ? { house: p.house } : {}), owner, rect, el, gap: ROUNDEL_EM.halo * f });
+				full2.push({ kind: 'arms', lod: 'full', person: p.id, owner, rect, el, gap: ROUNDEL_EM.halo * f });
 			}
 			if (rp.portrait) {
 				const r = rp.portrait;

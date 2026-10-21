@@ -193,5 +193,5 @@ describe('single-parent children sit on the outer side of the couple children', 
 
 	// WP-4b (class c, the architecture notes §4.2.3 and W3): the two tests of `soloFamiliesOutside` (keeps the model order when no person has single-parent children; moves whole
 	// blocks only) are gone with the function. W3 puts the families of one parent alone in the walk (`familyOrder`) so nothing is moved after it: the claim
-	// "the cards stand in the model order" is `review-3.4-order` (400 random trees) and the walk's own rules are `order-next-rules` (W3).
+	// "the cards stand in the model order" is `review-3.4-order` (400 random trees) and the walk's own rules are `order-rules` (W3).
 });

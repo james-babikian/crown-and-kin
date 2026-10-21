@@ -11,7 +11,7 @@ import { deriveFamilies } from '../src/core/derive';
 import { parseDynasty } from '../src/core/parse';
 import { applyOp } from '../src/core/yaml-edit';
 import { FullScreenModal } from '../src/obsidian/full-screen';
-import { focusView } from '../src/obsidian/focus-mode';
+import { focusView } from '../src/view/focus-mode';
 import { TreeView } from '../src/obsidian/tree-view';
 import { centredOpening, treeBounds, type View } from '../src/render/view-math';
 import { FEl, clock, device, fakeWin, flushFrames, installDom, resetDom, resizeAll, settle } from './acceptance/fake-dom';

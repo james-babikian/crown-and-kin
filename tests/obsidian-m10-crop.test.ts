@@ -13,6 +13,7 @@ import { EditSheet } from '../src/obsidian/edit-sheet';
 import type { CropResult } from '../src/obsidian/crop-tool';
 import { createPictureStore, type CopyBox, type PictureCopy, type PictureIO, type PictureStore } from '../src/obsidian/picture-store';
 import { CROP_UI, PICTURES_UI, WINDOW_UI } from '../src/render/ui-text';
+import { VIEWER_UI } from '../src/render/viewer-text';
 import { FEl, device, dispatch, fakeWin, installDom, pointer, resetDom, wheel } from './acceptance/fake-dom';
 import { lastMenu, notices, openModals, resetObsidian } from './acceptance/fake-obsidian';
 import { pngHead } from './acceptance/m9-support';
@@ -606,7 +607,8 @@ describe('C7, D91: the person window and the part of the portrait', () => {
 		await settle();
 		const m = menuOf(content);
 		const titles = m.items.filter((i) => i !== 'sep').map((i) => (i as { title: string }).title);
-		expect(titles).toEqual([PICTURES_UI.selectPortrait, WINDOW_UI.selectPart, PICTURES_UI.removePortrait, WINDOW_UI.selectPersonalArms]);
+		// D256: View portrait is the first item.
+		expect(titles).toEqual([VIEWER_UI.viewPortrait, PICTURES_UI.selectPortrait, WINDOW_UI.selectPart, PICTURES_UI.removePortrait, WINDOW_UI.selectPersonalArms]);
 		expect(WINDOW_UI.selectPart).toBe('Select the part of the portrait');
 	});
 

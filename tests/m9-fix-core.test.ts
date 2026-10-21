@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { EditResult, Op } from '../src/core/edit';
-import { linkTargets, matchKey, parseLink, parsePictureLink } from '../src/core/link-rewrite';
+import { linkTargets, matchKey } from '../src/core/link-rewrite';
+import { parseLink, parsePictureLink } from '../src/core/picture-link';
 import { parseDynasty } from '../src/core/parse';
 import { pictureTarget } from '../src/core/pictures';
 import { noteName } from '../src/core/titles';

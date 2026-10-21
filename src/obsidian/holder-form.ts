@@ -14,7 +14,7 @@ import { TITLES_UI } from '../render/ui-text';
 import { buildShell } from './window-shell';
 import { nameDialog, sheetField, showErrorLine } from './sheet-parts';
 import { SmallFormModal } from './small-form';
-import { formResult, formStart, previewParts, rulerHint, type HolderFormFields, type HolderValues } from './titles-draft';
+import { formResult, formStart, previewParts, rulerHint, type HolderFormFields, type HolderValues } from '../view/titles-draft';
 
 /** What the holder form shows and where its values go. */
 export interface HolderFormSpec {

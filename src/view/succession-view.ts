@@ -59,7 +59,7 @@ export function successionDrawn(whole: FamilyGraph, titleId: string, s: LineSett
 	heirs.forEach((id, i) => ordinals.set(id, ordinal(i + 1)));
 	for (const id of branches) ordinals.set(id, BRANCH_MARK);
 	const name = title.name || title.id;
-	const sentence = heirs.length ? SUCCESSION_UI.bar(name, result.year) : SUCCESSION_UI.barNoHeir(name, result.year);
+	const sentence = heirs.length ? SUCCESSION_UI.bar(name, result.yearText) : SUCCESSION_UI.barNoHeir(name, result.yearText);
 	return { titleId, result, ruler: result.ruler, heirs, branches, ordinals, sentence };
 }
 

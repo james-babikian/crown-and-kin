@@ -3,7 +3,7 @@ import type { CardLabel } from '../src/core/titles';
 import { geometryFor } from '../src/layout/geometry';
 import { DEFAULT_LAYOUT_SETTINGS, clearLayoutCache } from '../src/layout/index';
 import type { LayoutSettings } from '../src/layout/model';
-import { measuredLayout } from '../src/obsidian/measured-layout';
+import { measuredLayout } from '../src/view/measured-layout';
 import { parseBreakList } from '../src/render/break-words';
 import { build } from './helpers';
 

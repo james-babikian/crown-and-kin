@@ -7,8 +7,8 @@ vi.mock('@codemirror/language', () => ({ forceParsing: () => false, syntaxTree: 
 vi.mock('@codemirror/view', () => ({ ViewPlugin: { fromClass: () => ({}) } }));
 
 import { EditSheet } from '../src/obsidian/edit-sheet';
-import { closePluginModals } from '../src/obsidian/plugin-modals';
-import { clearRelationCache, relationStats } from '../src/obsidian/relation-cache';
+import { closePluginModals } from '../src/view/plugin-modals';
+import { clearRelationCache, relationStats } from '../src/view/relation-cache';
 import { lowerFirst, renderRelationLine, type RelationView } from '../src/obsidian/sheet-relation';
 import { RELINFO } from '../src/render/tree-info';
 import { ME_UI, SHEET, WINDOW_UI } from '../src/render/ui-text';

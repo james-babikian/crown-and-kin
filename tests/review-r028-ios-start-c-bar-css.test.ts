@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 
 /*
  * Review r028-ios-start, cause (c): the "Open note" chip is drawn over the words "Read only".
- * updateEditUi (tree-view.ts:3088-3104) puts a button `.dynasty-tool.dynasty-open-source` with an icon and the text "Open note" next to the label
+ * updateEditUi (tree-view.ts) puts a button `.dynasty-tool.dynasty-open-source` with an icon and the text "Open note" next to the label
  * `.dynasty-read-only-label`. The bar rule `.dynasty-toolbar .dynasty-tool` (styles.css:816-838) gives EVERY tool `flex: none; width: 44px; min-width: 44px;
  * justify-content: center; overflow: visible`. Only `.dynasty-tool-main` (Add person) and the warning badge set `width: auto`. The chip has no such rule
  * (styles.css:1235 only sets `white-space: nowrap` on its text), so the text of ~70 px runs out of a 44 px box on both sides (centred) and covers the label

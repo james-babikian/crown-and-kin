@@ -7,7 +7,7 @@ vi.mock('@codemirror/view', () => ({ ViewPlugin: { fromClass: () => ({}) } }));
 import { TFile as VaultFile } from 'obsidian';
 import { createLivePictures } from '../src/obsidian/live-pictures';
 import { createPictureStore, type CopyBox, type PictureCopy, type PictureIO, type PictureStore } from '../src/obsidian/picture-store';
-import { DEFAULT_SETTINGS } from '../src/obsidian/settings';
+import { DEFAULT_SETTINGS } from '../src/view/settings';
 import type { PictureSlot } from '../src/render/dom/pictures';
 import { Popover } from '../src/render/dom/widgets';
 import { FEl, dispatch, fakeDoc, fakeWin, flushFrames, installDom, resetDom, resizeAll, runTimers } from './acceptance/fake-dom';

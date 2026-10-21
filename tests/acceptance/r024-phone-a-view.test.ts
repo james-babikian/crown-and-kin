@@ -6,8 +6,8 @@ vi.mock('@codemirror/view', () => ({ ViewPlugin: { fromClass: () => ({}) } }));
 
 import { FullScreenModal } from '../../src/obsidian/full-screen';
 import { HousesWindow } from '../../src/obsidian/houses-window';
-import { clearRelationCache } from '../../src/obsidian/relation-cache';
-import { DEFAULT_SETTINGS, type DynastySettings } from '../../src/obsidian/settings';
+import { clearRelationCache } from '../../src/view/relation-cache';
+import { DEFAULT_SETTINGS, type DynastySettings } from '../../src/view/settings';
 import { clearMeasureCache } from '../../src/render/dom/measure';
 import { FEl, clock, device, flushFrames, installDom, resetDom, runFrame, runTimers, settle, dispatch } from './fake-dom';
 import { resetObsidian } from './fake-obsidian';

@@ -5,6 +5,7 @@
  * this file re-exports their names, so old imports keep working.
  */
 
+import type { DeleteSummary } from '../core/family-query';
 import type { PictureProblem } from '../core/pictures';
 import { quote } from '../core/quote';
 import { SUCCESSION_UI } from './succession-text';
@@ -216,10 +217,7 @@ export const REMOVE = {
  * The delete confirmation (spec §6.7), in STE with the same meaning as the spec example:
  * what else changes, then that nobody else is deleted.
  */
-export function deleteText(
-	name: string,
-	s: { unions: number; childLinks: number; clearsStart: boolean; clearsFocus: boolean; clearsMe?: boolean; holders?: { titles: number; entries: number }; heirs?: number; excluded?: number },
-): string[] {
+export function deleteText(name: string, s: DeleteSummary): string[] {
 	const out: string[] = [];
 	if (s.unions > 0) out.push(s.unions === 1 ? 'The plugin also removes 1 partnership of this person.' : `The plugin also removes ${s.unions} partnerships of this person.`);
 	if (s.childLinks > 0) out.push(s.childLinks === 1 ? `The plugin removes ${name} as a parent of 1 person.` : `The plugin removes ${name} as a parent of ${s.childLinks} people.`);
@@ -783,7 +781,6 @@ export const SAVE_UI = {
  * its hints. The buttons also show their label as a tooltip.
  */
 export const CROP_UI = {
-	selectLabel: 'Select the part of the portrait that the card shows',
 	title: (name: string) => `Select the part of the portrait of ${name}`,
 	hintTouch: 'Move the picture with one finger. Zoom with two fingers.',
 	hintMouse: 'Drag the picture to move it. Use the mouse wheel or the slider to zoom.',

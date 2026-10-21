@@ -193,7 +193,7 @@ function itemColumn(src: Source, seq: YAMLSeq, dashCol: number): number {
 }
 
 /** Inserts a new item into a top-level list section, creating the section if needed. `block` lines are relative to the item's keys. */
-export function insertItem(p: Parsed, key: 'people' | 'unions', where: Where, block: string[], flow: string): Patch | Refusal {
+export function insertItem(p: Parsed, key: 'people' | 'unions' | 'calendars', where: Where, block: string[], flow: string): Patch | Refusal {
 	const top = topMap(p);
 	if (isRefusal(top)) return top;
 	const src = p.src;
@@ -219,7 +219,7 @@ export function insertItem(p: Parsed, key: 'people' | 'unions', where: Where, bl
 }
 
 /** The top-level list and the key that holds it. */
-export function section(p: Parsed, key: 'people' | 'unions' | 'houses' | 'titles'): { top: YAMLMap; pair: Pair; seq: YAMLSeq } | null {
+export function section(p: Parsed, key: 'people' | 'unions' | 'houses' | 'titles' | 'calendars'): { top: YAMLMap; pair: Pair; seq: YAMLSeq } | null {
 	const top = topMap(p);
 	if (!top || isRefusal(top)) return null;
 	const pair = findPair(top, key);

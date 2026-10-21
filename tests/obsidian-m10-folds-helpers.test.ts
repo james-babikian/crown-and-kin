@@ -2,11 +2,11 @@ import { describe, expect, it } from 'vitest';
 import { deriveFamilies } from '../src/core/derive';
 import { foldFamilies } from '../src/core/folds';
 import { parseDynasty } from '../src/core/parse';
-import { cutBack, planFolds, withFolds } from '../src/obsidian/fold-view';
+import { cutBack, planFolds, withFolds } from '../src/view/fold-view';
 import { fixtureNote, topLevelBlocks } from './acceptance/load';
 
 /*
- * WP 10.3c: the pure helpers of the tree view for folds (`src/obsidian/fold-view.ts`): the plan of one
+ * WP 10.3c: the pure helpers of the tree view for folds (`src/view/fold-view.ts`): the plan of one
  * draw (F1), the layout settings that carry it, and the cut back of a fold's tap area (F7).
  */
 

@@ -858,8 +858,21 @@ body.theme-dark .dynasty-house-dot {
 	border-color: var(--interactive-accent);
 }
 
+/* Obsidian draws its own tick on `input[type=checkbox]:checked:after` (absolute, inset -1px, a mask image on the marker colour). Without the reset, that rule and this border tick mix, and on a phone only a corner of the tick shows. The reset makes the border tick the only mark, whatever the theme sets. */
 .dynasty-sheet .dynasty-check input[type='checkbox']:checked::after {
 	content: '';
+	display: block;
+	position: static;
+	inset: auto;
+	top: auto;
+	inset-inline-start: auto;
+	margin: 0;
+	box-sizing: content-box;
+	background: none;
+	background-color: transparent;
+	-webkit-mask-image: none;
+	mask-image: none;
+	filter: none;
 	width: 9px;
 	height: 5px;
 	border: 2px solid var(--dynasty-on-accent);

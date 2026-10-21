@@ -31,7 +31,7 @@
  */
 
 import type { App, TFile } from 'obsidian';
-import { fitMeet, judgeHeader, pictureFormat, pictureTarget, readPictureHeader, type PictureProblem, type SupportedFormat } from '../core/pictures';
+import { copyPixels, fitMeet, judgeHeader, limitBox, type CopyPx, pictureFormat, pictureTarget, readPictureHeader, type PictureProblem, type SupportedFormat } from '../core/pictures';
 import { cropSquare, formatPortraitCrop, type CropFraction } from '../core/portrait-crop';
 import { outlineGrid, traceOutline, type ArmsOutline } from '../layout/arms-outline';
 
@@ -44,6 +44,11 @@ export interface CopyBox {
 	fit: 'meet' | 'portrait';
 	/** Spec §13.13: the selected part, used only with `fit: 'portrait'`; absent = the automatic part. */
 	crop?: CropFraction;
+	/**
+	 * The picture viewer (D256): a raster copy is never larger than the picture itself, so a small picture does not turn into a large blurred copy. An SVG has no
+	 * pixels of its own and fills the box. The key does not hold this flag, so use it only with `transient`, which keeps no copy in the list.
+	 */
+	noEnlarge?: boolean;
 }
 
 /** A small copy in use; `release` lets the store forget it (it acts once). */
@@ -626,29 +631,24 @@ export function createPictureStore(app: App, io: PictureIO = defaultIO(app)): Pi
 		return p;
 	}
 
-	/** The copy's pixels (O3, B10): box CSS px × min(max(dpr, 1), 3). */
-	function copyPx(box: CopyBox): { w: number; h: number } {
-		const d = io.dpr();
-		const k = Math.min(Math.max(Number.isFinite(d) ? d : 1, 1), 3);
-		const size = (v: number) => Math.max(1, Math.round((Number.isFinite(v) && v > 0 ? v : 1) * k));
-		return { w: size(box.w), h: size(box.h) };
-	}
+	/** The copy's pixels (O3, B10): box CSS px × min(max(dpr, 1), 3). `noEnlarge` counts only for a transient copy: the key of a kept copy lacks it. */
+	const copyPx = (box: CopyBox, still = false): CopyPx => copyPixels(still ? box : { ...box, noEnlarge: false }, io.dpr());
 
 	/** The part is in the key only for a portrait with a crop, so every other key stays as it was. */
-	const keyOf = (file: TFile, px: { w: number; h: number }, fit: CopyBox['fit'], crop?: CropFraction) =>
+	const keyOf = (file: TFile, px: CopyPx, fit: CopyBox['fit'], crop?: CropFraction) =>
 		`${file.path}\u0000${sigOf(file)}\u0000${px.w}x${px.h}\u0000${fit}${fit === 'portrait' && crop ? `\u0000${formatPortraitCrop(crop)}` : ''}`;
 
 	/** Draws the copy of a decoded picture and encodes it; the full-size picture is freed right after the draw. */
-	async function encodeCopy(file: TFile, d: { picture: DecodedPicture; close: () => void }, px: { w: number; h: number }, fit: CopyBox['fit'], png: boolean, part?: CropFraction): Promise<{ blob: Blob; w: number; h: number } | PictureProblem> {
+	async function encodeCopy(file: TFile, d: { picture: DecodedPicture; close: () => void }, px: CopyPx, fit: CopyBox['fit'], png: boolean, part?: CropFraction): Promise<{ blob: Blob; w: number; h: number } | PictureProblem> {
 		const { picture } = d;
 		let crop: { sx: number; sy: number; sw: number; sh: number };
 		let out: { w: number; h: number };
 		if (fit === 'portrait') {
 			const c = cropSquare(part ?? null, picture.width, picture.height);
 			crop = { sx: c.sx, sy: c.sy, sw: c.size, sh: c.size };
-			out = px;
+			out = { w: px.w, h: px.h };
 		} else {
-			const f = fitMeet(picture.width, picture.height, px.w, px.h);
+			const f = fitMeet(picture.width, picture.height, ...limitBox(picture, px, file.extension));
 			crop = { sx: 0, sy: 0, sw: picture.width, sh: picture.height };
 			out = { w: Math.max(1, Math.round(f.w)), h: Math.max(1, Math.round(f.h)) };
 		}
@@ -769,7 +769,7 @@ export function createPictureStore(app: App, io: PictureIO = defaultIO(app)): Pi
 		try {
 			if (closed || signal?.aborted) return Promise.resolve(null);
 			const fit: CopyBox['fit'] = box?.fit === 'portrait' ? 'portrait' : 'meet';
-			const px = copyPx(box);
+			const px = copyPx(box, !keep);
 			const part = fit === 'portrait' ? box?.crop : undefined;
 				const key = keyOf(file, px, fit, part);
 			if (keep) {
@@ -826,7 +826,7 @@ export function createPictureStore(app: App, io: PictureIO = defaultIO(app)): Pi
 		};
 	}
 
-	function startCopy(file: TFile, px: { w: number; h: number }, fit: CopyBox['fit'], key: string, signal: AbortSignal | undefined, keep: boolean, part?: CropFraction): Promise<Given> {
+	function startCopy(file: TFile, px: CopyPx, fit: CopyBox['fit'], key: string, signal: AbortSignal | undefined, keep: boolean, part?: CropFraction): Promise<Given> {
 		const job = { waiters: new Set<Waiter>() };
 		if (keep) jobs.set(key, job);
 		const result = join(job, signal);

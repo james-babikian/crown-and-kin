@@ -10,7 +10,7 @@ import type { Op } from '../src/core/edit';
 import { applyOp } from '../src/core/yaml-edit';
 import { FullScreenModal } from '../src/obsidian/full-screen';
 import { HousesWindow } from '../src/obsidian/houses-window';
-import { closePluginModals } from '../src/obsidian/plugin-modals';
+import { closePluginModals } from '../src/view/plugin-modals';
 import { TitlesWindow } from '../src/obsidian/titles-window';
 import { ID_UI, TITLES_UI, WRITE_TEXT } from '../src/render/ui-text';
 import { FEl, clock, dispatch, installDom, resetDom, settle, fakeWin } from './acceptance/fake-dom';

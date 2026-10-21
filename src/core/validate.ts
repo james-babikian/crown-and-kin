@@ -7,15 +7,18 @@
  * `through-spouse` key of a holder.
  */
 
+import { PLAIN_READER, type DateReader, type ReadDate, type TreeDates } from './dates';
 import { codedIssue, type CodedIssue, type IssueCode, type IssueParams } from './messages';
 import { readPortraitCrop } from './portrait-crop';
-import { DOUBTFUL_DIED, isDead, readInherit, readRule, resolveSpouse, yearOf, type SpouseWorld } from './succession-keys';
+import { DOUBTFUL_DIED, isDead, readInherit, readRule, resolveSpouse, type SpouseWorld } from './succession-keys';
 import { isParentType, isPlacementType, isUnionType, PARENT_LIMIT, parentKind, PARENT_TYPES, PLACEMENT_TYPES, UNION_TYPES, type Holder, type House, type ParentRef, type ParentType, type Person, type Title, type Tree, type Union } from './types';
 
 /** What the caller can switch in validation. Absent fields mean the default. */
 export interface ValidateOptions {
 	/** The setting "Warn about more than 2 parents of a type" (0.2.8 A.5). Off stops `too-many-parents` for birth, adoptive and ward parents; the limit for rumoured parents stays. Default: on. */
 	warnManyParents?: boolean;
+	/** Spec §14: the date reader of the tree (calendars). Absent: plain years. Validation reads the dates of a title with a rule or a named heir through it and turns its problems into issues; `deriveFamilies` puts it in `FamilyGraph.dates`. */
+	dates?: DateReader;
 }
 
 /** The parts of a tree that are safe to draw, and every problem found on the way (spec §8, §4.1). */
@@ -179,6 +182,14 @@ function breakCycles(people: Person[], refs: Map<string, ParentRef[]>, byId: Map
 	}
 }
 
+/** The options that name a person who is not in the tree: `start`, `focus` and `me`. */
+function optionWarnings(options: Tree['options'], byId: Map<string, Person>, out: Collector) {
+	const refs = [['missing-start', options.start], ['missing-focus', options.focus], ['missing-me', options.me]] as const;
+	for (const [code, ref] of refs) {
+		if (ref !== undefined && !byId.has(ref)) out.warn(code, { ref });
+	}
+}
+
 /**
  * Checks references and values, and returns only what is safe to draw. Everything that needs
  * the derived families (primary unions) is checked in `derive.ts`.
@@ -225,10 +236,7 @@ export function validateTree(tree: Tree, options: ValidateOptions = {}): Validat
 		out.blocking('duplicate-union-id', { id }, partners);
 	}
 
-	const optionRefs = [['missing-start', tree.options.start], ['missing-focus', tree.options.focus], ['missing-me', tree.options.me]] as const;
-	for (const [code, ref] of optionRefs) {
-		if (ref !== undefined && !byId.has(ref)) out.warn(code, { ref });
-	}
+	optionWarnings(tree.options, byId, out);
 
 	// People: values, then parent links.
 	const refs = new Map<string, ParentRef[]>();
@@ -307,14 +315,16 @@ export function validateTree(tree: Tree, options: ValidateOptions = {}): Validat
 	}
 
 	breakCycles(people, refs, byId, out);
-	const titles = validateTitles(tree.titles ?? [], people, byId, refs, unions, out);
+	const titles = validateTitles(tree.titles ?? [], people, byId, refs, unions, out, options.dates);
+	calendarProblems(options.dates, out);
 
 	return { people, byId, houses, unions, refs, unionIds, titles, issues: out.issues };
 }
 
 /** Spec §13.3, §13.4 rules for titles, holders and `card-title` (the first title with an id wins). */
-function validateTitles(written: readonly Title[], people: Person[], byId: Map<string, Person>, refs: Map<string, ParentRef[]>, unions: readonly Union[], out: Collector): Title[] {
+function validateTitles(written: readonly Title[], people: Person[], byId: Map<string, Person>, refs: Map<string, ParentRef[]>, unions: readonly Union[], out: Collector, reader: DateReader = PLAIN_READER): Title[] {
 	let world: SpouseWorld | undefined;
+	const needing: { t: Title; holders: Holder[] }[] = [];
 	const titles: Title[] = [];
 	const byTitleId = new Map<string, Title>();
 	const dup = new Set<string>();
@@ -336,7 +346,11 @@ function validateTitles(written: readonly Title[], people: Person[], byId: Map<s
 			}
 			holders.push(h);
 		}
-		successionWarnings(t, byId, out);
+		successionWarnings(t, byId, out, reader);
+		if (reader.ready && needsYear(t)) {
+			titleDateWarnings(t, holders, reader, out);
+			needing.push({ t, holders });
+		}
 		if ((t.succession !== undefined || t.heirs !== undefined) && holders.some((h) => h.throughSpouse !== undefined && h.person !== undefined && byId.has(h.person))) {
 			throughSpouseWarnings(t, holders, byId, (world ??= spouseWorld(people, byId, refs, unions)), out);
 		}
@@ -344,6 +358,7 @@ function validateTitles(written: readonly Title[], people: Person[], byId: Map<s
 		byTitleId.set(t.id, title);
 		titles.push(title);
 	}
+	if (needing.length) personDateWarnings(needing, people, byId, refs, reader, out);
 	for (const p of people) {
 		if (p.cardTitle === undefined) continue;
 		if (!byTitleId.get(p.cardTitle)?.holders.some((h) => h.person === p.id)) out.warn('card-title-not-held', { person: p.name, ref: p.cardTitle }, [p.id]);
@@ -352,7 +367,7 @@ function validateTitles(written: readonly Title[], people: Person[], byId: Map<s
 }
 
 /** Contract 0.2.7 A.5, K.3, K.4: the warnings about the succession keys of one title (the first title with its id). */
-function successionWarnings(t: Title, byId: Map<string, Person>, out: Collector) {
+function successionWarnings(t: Title, byId: Map<string, Person>, out: Collector, reader: DateReader) {
 	const bad = t.badKeys ?? {};
 	const at = (code: IssueCode, value: string, key: 'value' | 'ref' = 'value') => out.warn(code, { title: t.name, [key]: value });
 	const rule = bad.succession ?? (t.succession !== undefined && readRule(t.succession) === undefined ? t.succession : undefined);
@@ -361,14 +376,110 @@ function successionWarnings(t: Title, byId: Map<string, Person>, out: Collector)
 	if (inherit !== undefined) at('unknown-inherit', inherit);
 	if (bad['inherit-through'] !== undefined) at('unknown-inherit-through', bad['inherit-through']);
 	if (bad['inherit-illegitimate'] !== undefined) at('unknown-inherit-illegitimate', bad['inherit-illegitimate']);
-	const year = bad.year ?? (t.year !== undefined && yearOf(t.year) === undefined ? t.year : undefined);
-	if (year !== undefined && (t.succession !== undefined || t.heirs !== undefined)) at('year-unreadable', year);
+	// Before the calendars are ready a calendar date reads as plain text and has no year, which is not the user's fault (spec §14 rule 7).
+	const year = bad.year ?? (reader.ready && t.year !== undefined && reader.read(t.year)?.year === undefined ? t.year : undefined);
+	// A date that fits two calendars has its own warning, so it gets no second one (ruling 4.2 fix 2).
+	if (year !== undefined && needsYear(t) && !reader.read(year)?.warnings.includes('fits-two-calendars')) at('year-unreadable', year);
 	const missing = (ids: readonly string[] | undefined, text: string | undefined, code: IssueCode) => {
 		for (const id of new Set((ids ?? []).filter((x) => !byId.has(x)))) at(code, id, 'ref');
 		if (text !== undefined) at(code, text, 'ref');
 	};
 	missing(t.heirs, bad.heir, 'missing-heir');
 	missing(t.exclude, bad.exclude, 'missing-excluded');
+}
+
+/** Spec §13.21 rule 9, §14 rule 5: a title with a rule of succession or a named heir needs the year, so only its dates give warnings and notes. */
+const needsYear = (t: Title): boolean => t.succession !== undefined || t.heirs !== undefined;
+
+/** The children of each person, from the cleaned parent links (a ward link is no descent). */
+function childMap(people: readonly Person[], refs: Map<string, ParentRef[]>): Map<string, string[]> {
+	const kids = new Map<string, string[]>();
+	for (const p of people) for (const r of refs.get(p.id) ?? []) if (r.type !== 'ward') push(kids, r.id, p.id);
+	return kids;
+}
+
+/** The people a line can read dates of, found without the line: the seeds and everyone who descends from them. */
+function descendants(seeds: readonly string[], people: readonly Person[], byId: Map<string, Person>, kids: Map<string, string[]>): Person[] {
+	const seen = new Set<string>();
+	const stack = seeds.filter((id) => byId.has(id));
+	while (stack.length) {
+		const id = stack.pop()!;
+		if (seen.has(id)) continue;
+		seen.add(id);
+		stack.push(...(kids.get(id) ?? []));
+	}
+	return people.filter((p) => seen.has(p.id));
+}
+
+/** The seeds and all their ancestors by the cleaned parent links (a ward link is no descent). */
+function withAncestors(seeds: readonly string[], byId: Map<string, Person>, refs: Map<string, ParentRef[]>): string[] {
+	const seen = new Set<string>();
+	const stack = seeds.filter((id) => byId.has(id));
+	while (stack.length) {
+		const id = stack.pop()!;
+		if (seen.has(id)) continue;
+		seen.add(id);
+		for (const r of refs.get(id) ?? []) if (r.type !== 'ward') stack.push(r.id);
+	}
+	return [...seen];
+}
+
+/** The names of the calendars that a date fits, for `fits-two-calendars`. */
+const calendarsOf = (r: ReadDate): string[] => [...(r.calendar !== undefined ? [r.calendar] : []), ...(r.also ?? [])];
+
+/** The warnings of one date text, as issues. `owner` is the person whose date it is, or the name of the title that the date belongs to. */
+function warnDate(reader: DateReader, text: string | undefined, where: 'year' | 'reign' | 'born' | 'died', owner: Person | string, out: Collector, seen?: Set<string>) {
+	const r = text === undefined ? undefined : reader.read(text);
+	for (const w of r?.warnings ?? []) {
+		const key = `${w}|${where}|${text}`;
+		if (seen?.has(key)) continue;
+		seen?.add(key);
+		const base: IssueParams = typeof owner === 'string' ? { where, value: text!, title: owner } : { where, value: text!, person: owner.name };
+		out.warn(w, w === 'fits-two-calendars' ? { ...base, calendars: calendarsOf(r!) } : base, typeof owner === 'string' ? undefined : [owner.id]);
+	}
+}
+
+/** Spec §14 rule 5: the warnings of the dates that belong to a title that needs the year: the title `year` and every holder `from` and `to`. One warning for each text and place. */
+function titleDateWarnings(t: Title, holders: readonly Holder[], reader: DateReader, out: Collector) {
+	const seen = new Set<string>();
+	warnDate(reader, t.year, 'year', t.name, out, seen);
+	for (const h of holders) {
+		warnDate(reader, h.from, 'reign', t.name, out, seen);
+		warnDate(reader, h.to, 'reign', t.name, out, seen);
+	}
+}
+
+/**
+ * Spec §14 rule 5: the warnings of the `born` and `died` of every person that a line can read, for all titles that need the year
+ * together (ruling 4.2 fix 1): the holders and the named heirs, their ancestors and all descendants of those ancestors. This is done
+ * once for the tree, so a date gives one warning, not one for each title.
+ */
+function personDateWarnings(needing: readonly { t: Title; holders: readonly Holder[] }[], people: readonly Person[], byId: Map<string, Person>, refs: Map<string, ParentRef[]>, reader: DateReader, out: Collector) {
+	const seeds = needing.flatMap(({ t, holders }) => [...(t.heirs ?? []), ...holders.flatMap((h) => (h.person !== undefined ? [h.person] : []))]);
+	const kids = childMap(people, refs);
+	for (const p of descendants(withAncestors(seeds, byId, refs), people, byId, kids)) {
+		warnDate(reader, p.born, 'born', p, out);
+		warnDate(reader, p.died, 'died', p, out);
+	}
+}
+
+/** The problems of the calendar set (a missing or doubled calendar note) as tree warnings, once the calendars are ready (spec §14 rules 3 and 7). */
+function calendarProblems(reader: DateReader | undefined, out: Collector) {
+	if (!reader?.ready) return;
+	for (const p of reader.problems) {
+		if (p.key === 'calendar-note-missing') out.warn(p.key, { note: p.note ?? '' });
+		else out.warn(p.key, { calendar: p.calendar ?? '', note: p.note ?? '', other: p.other ?? '' });
+	}
+}
+
+/**
+ * `calendar-no-anchor` for the tree (spec §14 rule 5): a calendar that starts at year 1 beside plain years or another calendar, once for each
+ * calendar, and only when some title needs the year. `deriveFamilies` calls it after it built the dates view.
+ */
+export function anchorIssues(titles: readonly Title[], dates: TreeDates): CodedIssue[] {
+	// A reader with no calendar has no calendar that starts at year 1, so there is nothing to read ('plain' is the exact key of such a reader).
+	if (!dates.ready || dates.reader.key === 'plain' || !titles.some(needsYear)) return [];
+	return dates.unanchored().map((calendar) => codedIssue('calendar-no-anchor', 'warning', { calendar }));
 }
 
 /**

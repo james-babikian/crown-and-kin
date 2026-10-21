@@ -11,6 +11,7 @@
  *   without case). It gives null for no link, an empty target, a web address, a path with a ".."
  *   segment, or a target whose extension is in `NON_NOTE_EXTENSIONS`, so the plugin never makes
  *   "Report.pdf.md". Any other extension is part of the name: "St.John" is a note.
+ * - `uniqueNotePath` and `calendarNotePath` choose the path of a note the plugin makes, so that no name takes an existing note.
  */
 
 import { linkText } from './link-text';
@@ -59,3 +60,22 @@ export function linkedNotePath(link: string | undefined): LinkedNotePath | null 
 	const fileName = isNote ? file : `${file}.md`;
 	return { folder, name, path: folder ? `${folder}/${fileName}` : fileName };
 }
+
+/** The most numbers `uniqueNotePath` tries before it takes the next one without a check (a vault with that many copies is not real). */
+const UNIQUE_TRIES = 10000;
+
+/**
+ * The path of a new note that takes no existing path: `Name.md`, then `Name 1.md`, `Name 2.md` and so on (spec §14 rule 2).
+ * `taken` tells if a path exists; the caller compares without case, as a vault does. `folder` '' is the root of the vault.
+ */
+export function uniqueNotePath(name: string, taken: (path: string) => boolean, folder = ''): string {
+	const at = (n: number) => {
+		const file = `${n === 0 ? name : `${name} ${n}`}.md`;
+		return folder ? `${folder}/${file}` : file;
+	};
+	for (let n = 0; n < UNIQUE_TRIES; n++) if (!taken(at(n))) return at(n);
+	return at(UNIQUE_TRIES);
+}
+
+/** The note that the Calendars window makes the first time it saves: `Calendars.md` at the root of the vault, else `Calendars 1.md` and so on. */
+export const calendarNotePath = (taken: (path: string) => boolean): string => uniqueNotePath('Calendars', taken);

@@ -4,7 +4,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vite
 vi.mock('obsidian', () => import('./acceptance/fake-obsidian'));
 
 import { ListEditWindow, type ListKind, type ListRowView, type PageHead } from '../src/obsidian/list-window';
-import { matchesAll } from '../src/obsidian/list-search';
+import { matchesAll } from '../src/view/list-search';
 import type { Op } from '../src/core/edit';
 import { HOUSES, ID_UI, REMOVE, SHEET, TITLES_UI, WIN_LIST_UI, WINDOW_UI, WRITE_TEXT } from '../src/render/ui-text';
 import { FEl, dispatch, dispatchWindow, fakeDoc, fakeWin, installDom, resetDom, runTimers } from './acceptance/fake-dom';

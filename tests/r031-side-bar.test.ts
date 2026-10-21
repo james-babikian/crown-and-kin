@@ -6,10 +6,10 @@ vi.mock('obsidian', () => import('./acceptance/fake-obsidian'));
 vi.mock('@codemirror/language', () => ({ forceParsing: () => false, syntaxTree: () => ({ length: 0 }) }));
 vi.mock('@codemirror/view', () => ({ ViewPlugin: { fromClass: () => ({}) } }));
 
-import { isPhoneDevice, isPhoneSideways } from '../src/obsidian/focus-mode';
+import { isPhoneDevice, isPhoneSideways } from '../src/view/focus-mode';
 import { FullScreenModal } from '../src/obsidian/full-screen';
-import { closePluginModals } from '../src/obsidian/plugin-modals';
-import { clearRelationCache } from '../src/obsidian/relation-cache';
+import { closePluginModals } from '../src/view/plugin-modals';
+import { clearRelationCache } from '../src/view/relation-cache';
 import { FEl, clock, device, dispatchWindow, fakeWin, installDom, resetDom } from './acceptance/fake-dom';
 import { resetObsidian } from './acceptance/fake-obsidian';
 import { sample12 } from './acceptance/relations-support';

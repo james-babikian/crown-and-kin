@@ -77,7 +77,7 @@
  * for placement (F-KIN-05); a pair with a sure and a rumoured line of equal length can have different "Also" lists in
  * the two directions (F-KIN-09); rule 1 of the names by marriage skips a blood relative of M, rule 2 does not
  * (F-KIN-12); a rumoured link plus a person married to their own child can still make a name by marriage depend on
- * the order of the people (I10); BC ages are one year too large across the era.
+ * the order of the people (I10).
  *
  * Steps (the finder and "Show the steps"). There is one step per link, except that a step up to a
  * parent followed by a step down to another child of that parent is one sibling step ("brother",
@@ -2254,6 +2254,7 @@ export const lineSubgraph: LineSubgraph = (g, line) => {
 	// Spec §13.4, titles rule 3 (`titles.ts` header): the whole tree's titles, unchanged, so the cards show the same texts.
 	sub.titles = g.titles;
 	sub.writtenTitles = g.writtenTitles;
+	sub.dates = g.dates;
 
 	// A child on the line only through rumoured links hangs from its first rumoured parent (drawn
 	// with the rumoured line and its "?"), not as a separate root.

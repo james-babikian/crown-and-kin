@@ -18,8 +18,6 @@ import { familyKeyOf, soloKey, type Couple, type CoupleSpec, type Family, type F
 import { barred, forkLegs, hangRooms, markHalf, nearOf, overflowHangs, packPorts, pairKey, requestPorts, unitEnd, type DirOf } from './ports';
 import { consistentRows } from './row-blocks';
 
-export { nearOf, markHalf, type DirOf } from './ports';
-
 /** What the plan stage needs beyond the graph: the rows, the order, the geometry of the working frame, the far rule and the settings. */
 export interface PlanInput {
 	g: FamilyGraph;

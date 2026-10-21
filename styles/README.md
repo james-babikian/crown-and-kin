@@ -45,3 +45,5 @@
 | `34-succession-bar.css` | 4239–4305 |
 | `35-list-windows.css` | 4306–4637 |
 | `36-large-tree.css` | new in 0.3 |
+| `37-calendars.css` | new in 0.3.2 |
+| `38-picture-viewer.css` | new in 0.3.2 |

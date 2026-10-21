@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { build } from './helpers';
 import { parseDynasty } from '../src/core/parse';
-import { linkTargets, parsePictureLink } from '../src/core/link-rewrite';
+import { linkTargets } from '../src/core/link-rewrite';
+import { parsePictureLink } from '../src/core/picture-link';
 import { curlyParts, unwrapCurly } from '../src/core/tolerate';
 
 // Version 0.2.1, D103 (spec §13.16 rule 11): one pair of curly quote marks around a structural value

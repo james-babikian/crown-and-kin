@@ -126,7 +126,7 @@ export function unwrapCurlyKeys(data: Raw): void {
 	const each = (section: Raw, fn: (item: RawMap) => void) => {
 		if (Array.isArray(section)) for (const item of section) if (isMap(item)) fn(item);
 	};
-	if (isMap(data.options)) for (const key of ['start', 'focus', 'me']) unwrapKey(data.options, key);
+	if (isMap(data.options)) for (const key of ['start', 'focus', 'me', 'calendar']) unwrapKey(data.options, key);
 	each(data.houses, (h) => ['id', 'color', 'arms'].forEach((key) => unwrapKey(h, key)));
 	each(data.people, (p) => {
 		for (const key of ['id', 'house', 'placement', 'union', 'link', 'portrait', 'arms']) unwrapKey(p, key);

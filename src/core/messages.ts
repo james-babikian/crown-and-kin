@@ -9,8 +9,9 @@
 
 import { slugify } from './id-gen';
 import { quote } from './quote';
+import { REFUSAL_TEXT } from './refusal-text';
 import { INHERIT_ILLEGITIMATE, INHERIT_RULES, INHERIT_THROUGH, SUCCESSION_RULES } from './succession-keys';
-import { PARENT_LIMIT } from './types';
+import { PARENT_LIMIT } from './parent-types';
 
 /** Tree not rendered (spec §8). */
 export type HardErrorCode =
@@ -111,6 +112,27 @@ export type WarningCode =
 	| 'died-doubtful'
 	/** A dead person with `childless: true` who is the birth parent of another person (M.6). params: person (name), child (name) */
 	| 'childless-has-child'
+	// Dates and calendars (spec §14). Found by `validate.ts` and `derive.ts`, only for a title with a rule or a named heir (rule 5), and never before the calendars are ready (rule 7).
+	// params of the four date warnings: where ('year' | 'born' | 'died' | 'reign'), value (the date text), title (name) for 'year' and 'reign', person (name) for 'born' and 'died'; `fits-two-calendars` adds calendars (names).
+	/** A plain year 0 (the plugin reads it as 1 BC). */
+	| 'year-zero'
+	/** Year 0 of a cycle or an era. */
+	| 'calendar-year-zero'
+	/** A year above the length of its cycle or era. */
+	| 'calendar-year-past-end'
+	/** A date that fits two calendars with different years. */
+	| 'fits-two-calendars'
+	/** A calendar with no example, used beside plain years or another calendar. params: calendar (name) */
+	| 'calendar-no-anchor'
+	/** The `calendar` option names a note that does not exist or holds no calendar. params: note (the link as written) */
+	| 'calendar-note-missing'
+	/** The same cycle format or era name in two calendar notes. params: calendar (name), note (path), other (path) */
+	| 'calendar-duplicate'
+	// The `kin-calendar` block (spec §14 rule 2). Found by `parseCalendarBlock`.
+	/** The block is not YAML, or is not a map with a list `calendars`. params: note (path) */
+	| 'calendar-block-invalid'
+	/** One calendar of the list cannot be used. params: note (path), index (1-based), why ('not-map' | 'no-name' | 'kind' | 'era') */
+	| 'calendar-entry-invalid'
 	// Holding a title through the spouse (0.2.8 contract A.2, D195). Only for a title with `succession` or `heir`; the key is then ignored.
 	/** The holder has no partner. params: person, title (name) */
 	| 'through-spouse-no-partner'
@@ -323,6 +345,20 @@ function pictureTooLarge(p: P): string {
 	return `${o.who} ${o.uses} the picture ${quote(s(p, 'file', '?'))}, which is too large${pixels}. Use a picture with 40 million pixels or less.`;
 }
 
+/** The start of a date warning: which text it is about (spec §14 rule 5). */
+function dateHead(p: P): string {
+	const value = s(p, 'value', '?');
+	switch (s(p, 'where', 'year')) {
+		case 'born':
+		case 'died':
+			return `${person(p)} has “${s(p, 'where', 'born')}: ${value}”.`;
+		case 'reign':
+			return `${cap(titleOf(p))} has the reign date ${quote(value)}.`;
+		default:
+			return `${cap(titleOf(p))} has “year: ${value}”.`;
+	}
+}
+
 const ISSUE_TEXT: { [C in IssueCode]: (p: P) => string } = {
 	'duplicate-person-id': duplicatePersonId,
 	'duplicate-union-id': (p) => `More than one partnership has the ID ${quote(s(p, 'id', '?'))}. To edit the tree again, give each partnership a different ID.`,
@@ -456,6 +492,28 @@ const ISSUE_TEXT: { [C in IssueCode]: (p: P) => string } = {
 		return `${name} has “childless: true”, but ${s(p, 'child', 'a person')} is a child of ${name} in the tree. Remove “childless: true”, or correct the parents of ${s(p, 'child', 'a person')}.`;
 	},
 
+	'year-zero': (p) => `${dateHead(p)} There is no year 0. The plugin reads 0 as 1 BC. If you mean AD 1, write “1”. For a year before that, write a number with a minus sign, such as ${quote('-5')}, for 5 BC.`,
+	'calendar-year-zero': (p) => `${dateHead(p)} A cycle or an era has no Year 0. The plugin counts this date as the year before Year 1. If you mean Year 1, correct the date.`,
+	'calendar-year-past-end': (p) =>
+		`${dateHead(p)} The year in this date is after the last year of its cycle or era. The plugin continues the count past the end. If this is a mistake, correct the date. If the cycle or era is longer, change its length in the Calendars window.`,
+	'fits-two-calendars': (p) => {
+		const calendars = strings(p, 'calendars');
+		const which = calendars.length > 1 ? `the calendars ${andList(calendars.map(quote))}` : 'two calendars';
+		return `${dateHead(p)} The date fits ${which} and gives a different year in each. As a result, the plugin uses no year for this date. Change the date, or change a calendar so that only one calendar fits it.`;
+	},
+	'calendar-no-anchor': (p) =>
+		`The calendar ${quote(s(p, 'calendar', '?'))} has no “Same year as” date that links it to plain years. So the plugin counts its Year 1 as plain year 1. The tree also has plain years or dates of another calendar. As a result, the order of dates and the ages can be wrong. In the Calendars window, add a “Same year as” date to the calendar.`,
+	'calendar-note-missing': (p) =>
+		`The tree uses the calendar note ${quote(s(p, 'note', '?'))}, but this note does not exist or has no calendar. As a result, the plugin reads no dates in your own calendars. Correct the link, or choose another calendar note with “Calendar note” in the More list.`,
+	'calendar-duplicate': (p) =>
+		`The notes ${quote(s(p, 'note', '?'))} and ${quote(s(p, 'other', '?'))} both have the calendar ${quote(s(p, 'calendar', '?'))} with the same cycle format or era name. A date that fits both can have no year. Change a format or an era name in one note.`,
+	'calendar-block-invalid': (p) =>
+		`The calendar block in the note ${quote(s(p, 'note', '?'))} has an error, so the plugin ignores it. The tree uses no calendar from this block. Edit the text of the block in the note. The block must have a list under “calendars:”.`,
+	'calendar-entry-invalid': (p) => {
+		const why = { 'not-map': 'it is not a group of keys, such as “name:”', 'no-name': 'it has no name', kind: 'its “kind:” is not “cycles” or “eras”', era: 'one of its eras has no name' }[s(p, 'why', 'kind')] ?? 'it has an error';
+		return `Calendar ${s(p, 'index', '?')} in the block of the note ${quote(s(p, 'note', '?'))} cannot be used, because ${why}. The plugin ignores it. Edit the text of the block in the note.`;
+	},
+
 	'through-spouse-no-partner': (p) =>
 		`${person(p)} holds ${titleOf(p)} with “through-spouse”, but ${person(p)} has no partner in the tree. The plugin ignores “through-spouse”. Add a partnership for ${person(p)}, or remove “through-spouse”.`,
 	'through-spouse-no-marriage': (p) =>
@@ -481,6 +539,29 @@ const ISSUE_TEXT: { [C in IssueCode]: (p: P) => string } = {
 	'missing-id': missingId,
 	'section-wrong-shape': sectionWrongShape,
 };
+
+/**
+ * The refusals of the Calendars window (spec §14 rule 3): `checkFormat` and `checkCalendars` give a key, and this table gives
+ * the sentence. `other` is the name of the other calendar that the refusal names. Like the issue texts, they are plugin texts.
+ */
+export const CALENDAR_REFUSAL_TEXT = {
+	'calendar-format-cycle': () => 'A cycle format needs {year} and {cycle}, one time each. It cannot have any other word in curly brackets. An example is “{year} Year of the {cycle} Cycle”.',
+	'calendar-format-era': () => 'An era format needs {year} and {era}, one time each. It cannot have any other word in curly brackets. An example is “{era} {year}”.',
+	'calendar-format-touching': () => 'In this format, {cycle} and {year} are next to each other, so the plugin cannot tell where one ends. Put a word or a space between them.',
+	'calendar-format-duplicate': (calendar: string, other?: string) =>
+		other ? `The calendar ${quote(calendar)} and the calendar ${quote(other)} have the same format. A date in this format would fit both. Change one format.` : `The calendar ${quote(calendar)} has the same format two times. Change one format.`,
+	'calendar-era-duplicate': (calendar: string, other?: string) =>
+		other ? `The calendar ${quote(calendar)} and the calendar ${quote(other)} have the same era name. A date with this name would fit both. Change one era name.` : `The calendar ${quote(calendar)} has the same era name two times. Change one era name.`,
+	// The two sentences that a refused edit also gives are written once, in `refusal-text.ts`.
+	'calendar-length': () => REFUSAL_TEXT.calendarLength,
+	'calendar-number': () => REFUSAL_TEXT.calendarNumber,
+} as const;
+
+/** The sentence for a refusal of `checkFormat` or `checkCalendars`; any other key gives a plain fallback (spec §8: never throw). */
+export function calendarRefusalText(refusal: { calendar: string; key: string; other?: string }): string {
+	const make = refusal ? (CALENDAR_REFUSAL_TEXT as Record<string, ((calendar: string, other?: string) => string) | undefined>)[refusal.key] : undefined;
+	return make ? make(refusal.calendar, refusal.other) : 'The calendar has an error. Correct the calendar.';
+}
 
 /** Every issue code that has a message, for tests that read the whole table. */
 export const ISSUE_CODES = Object.keys(ISSUE_TEXT) as IssueCode[];

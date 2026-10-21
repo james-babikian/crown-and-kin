@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { idFromName, idProblemFor, idProblems, reasonText, type IdKind, type IdRow } from '../src/obsidian/id-draft';
+import { idFromName, idProblemFor, idProblems, reasonText, type IdKind, type IdRow } from '../src/view/id-draft';
 import { ID_UI } from '../src/render/ui-text';
 
 /*

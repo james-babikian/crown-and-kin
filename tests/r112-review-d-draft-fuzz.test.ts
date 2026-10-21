@@ -10,8 +10,8 @@ import { parseBody, readTree } from '../src/core/parse';
 import { newTitleId } from '../src/core/title-ops';
 import { applyOp } from '../src/core/yaml-edit';
 import { houseOps, loadHouses, rowsOf, type HouseRow } from '../src/obsidian/houses-window';
-import { idProblems } from '../src/obsidian/id-draft';
-import { titleIdRow, titleRows, windowOps, withHolderIds } from '../src/obsidian/titles-draft';
+import { idProblems } from '../src/view/id-draft';
+import { titleIdRow, titleRows, windowOps, withHolderIds } from '../src/view/titles-draft';
 
 /*
  * Review D: when the windows' own check (`idProblems`) finds no refused id, the one batch of Save must

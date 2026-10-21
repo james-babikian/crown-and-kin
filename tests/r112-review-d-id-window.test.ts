@@ -13,7 +13,7 @@ import type { Op } from '../src/core/edit';
 import { applyOp } from '../src/core/yaml-edit';
 import { FullScreenModal } from '../src/obsidian/full-screen';
 import { HousesWindow } from '../src/obsidian/houses-window';
-import { closePluginModals } from '../src/obsidian/plugin-modals';
+import { closePluginModals } from '../src/view/plugin-modals';
 import { FEl, clock, dispatch, fakeWin, installDom, resetDom, settle } from './acceptance/fake-dom';
 import { openPage } from './lw-support';
 import { openModals, resetObsidian } from './acceptance/fake-obsidian';

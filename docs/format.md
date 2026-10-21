@@ -2,7 +2,7 @@
 
 This file is generated. Do not edit it by hand. Change `scripts/format/keys.ts` and run `npm run format-doc`.
 
-Format 1 is the form of the tree text in plugin version 0.3 and in every plugin version 1.x. Format 1 has 65 keys, 3 of them reserved. The plugin reads the other 62. The README has a short list of them.
+Format 1 is the form of the tree text in plugin version 0.3 and in every plugin version 1.x. Format 1 has 66 keys, 3 of them reserved. The plugin reads the other 63. The README has a short list of them.
 
 ## The rules of Format 1
 
@@ -14,7 +14,7 @@ Format 1 is the form of the tree text in plugin version 0.3 and in every plugin 
 ## How the plugin reads a tree
 
 - The tree is YAML in a code block with the language `kin`. If the YAML is not valid, or the top level is not a map, the plugin shows an error box and no tree.
-- Every value is read as text, exactly as you wrote it. `born: 1102` is the text "1102". The plugin never reads a date as a date.
+- Every value is read as text, exactly as you wrote it. `born: 1102` is the text "1102". The plugin reads a date only to find its year (see "The calendar note"). It never changes the text of a date.
 - If two people have the same `id`, or two partnerships have the same `id`, the plugin shows the tree but does not let you edit it.
 - Every other fault is a warning. The tree still shows, with a warning button and a list.
 - A key that the plugin does not know gives no warning. It stays in the note at every level.
@@ -55,9 +55,10 @@ A map under `options:`.
 | `me` | The person with the mark "This is me". The relation names start from this person. | A person ID. A number is read as text. A pair of curly quote marks around the ID is ignored. A list or a map gives a warning. If no person has this ID, the plugin shows a warning. | Plain text. "This is me" writes it. "Remove This is me" removes it. | 0.2 |
 | `generations` | How many generations up and down the tree shows in focus mode. | A whole number, 0 or more. Any other text is ignored. With no key, the setting of the plugin counts. | Typed by hand. No window of the plugin writes it. | 0.1 |
 | `height` | The height in pixels of the tree in a note, on a computer. | A whole number from 100 to 5000. Any other text or number is ignored and the usual height counts. A phone list does not use it. | A plain number. The resize handle of the tree writes it. | 0.1 |
+| `calendar` | The calendar note that this tree uses to read dates. With no key, the tree uses every calendar note. | A link to a note: [[x]], [Alias](x.md) or a plain path. A link in [[ ]] without quotes is accepted. A note that does not exist, or has no calendar, gives a warning and the tree reads dates with no calendar. | In double quotes. The item "Calendar note" in the More list writes it. "Every calendar note" removes it. The plugin keeps the link up to date when you rename the note. | 0.3.2 |
 | `format` (reserved) | Reserved for Format 2. The plugin ignores it today, keeps it and never writes it. | Any value. The plugin ignores it and keeps it. | Never written. A key that is in the note stays as it is. | 0.3 |
 
-Write order: `start`, `focus`, `me`, `generations`, `height`.
+Write order: `start`, `focus`, `me`, `generations`, `height`, `calendar`.
 
 ### houses
 
@@ -194,6 +195,47 @@ Some keys take one of a fixed list of values. The plugin compares the values aft
 - A `through-spouse` value in any case, and an ID after it with curly quote marks.
 - The words false, no, alive, living and never in `died` mean that the person is alive.
 - A YAML anchor or alias is read as usual. The plugin does not change an item that is an alias.
+
+## The calendar note
+
+The calendars of your own world are not in the tree text. They are in a normal note, in a code block with the language `kin-calendar` (the block of a tree has the language `kin`). The Calendars window writes this note. You can also edit it by hand. The plugin changes only the text lines that must change, and it keeps your comments and the keys that it does not know, as in a tree.
+
+```kin-calendar
+calendars:
+  - name: The Long Count
+    kind: cycles
+    length: 60
+    start: 1
+    formats: ["{year} Year of the {cycle} Cycle", "Year {year} of Cycle {cycle}"]
+  - name: Reign names
+    kind: eras
+    formats: ["{year} Year of the {era}", "{era} {year}"]
+    eras:
+      - {name: Qinglong Emperor, start: 130, length: 11}
+      - {name: Jianwen Emperor, start: 141}
+```
+
+- A note can hold several blocks, and a block can hold several calendars. The plugin makes the note `Calendars` at the root of the vault the first time you save in the Calendars window.
+- The plugin counts every year on one scale of whole years (the plain years). A plain year 1210 is year 1210. The number `start` gives the plain year of Year 1 of a calendar. The window works it out from an example: "Year 21 of Cycle 3 is the same year as 1203". So a calendar never depends on another calendar.
+- A tree uses every calendar note of the vault. If the tree has the key `calendar` in `options`, it uses only that note. The item "Calendar note" in the More list writes this key.
+- A date that fits a format gets the year of the calendar. A date that fits no format is read as a plain year, as before. A date that fits two calendars with different years gets no year.
+- The plugin never changes the text of a date. It reads the text to find a year, and it shows the date as you wrote it.
+- A plugin version before 0.3.2 shows the block as plain code. It reads a date in a calendar as a plain year: a date with no run of three or four digits has no year, and a date such as "Third Age 3019" gives the wrong year 3019, with no note. A device whose calendar note has not synced yet reads dates in the same way. If you delete the calendar note, such dates have no year until you add the calendars again.
+
+| Level | Key | Meaning | Accepted forms | Written form |
+|---|---|---|---|---|
+| block | `calendars` | The list of calendars of this block. | A list of maps. Any other shape gives a warning and the plugin ignores the block. | A block list. |
+| calendar | `name` | The name of the calendar. The grey line and the test line show it. | Text. A calendar with no name is not used. | Plain text, in double quotes if plain YAML would read it as another value. |
+| calendar | `kind` | The kind of the calendar. | `cycles` or `eras`, in any case. Any other word: the plugin ignores the calendar and gives a warning. | Plain text. |
+| calendar | `length` | Cycle calendar: the number of years in one cycle. | A whole number, 1 or more. | Plain number. |
+| calendar | `start` | Cycle calendar: the plugin year of Year 1 of Cycle 1. The Calendars window works this number out from "Same year as". With no number, the start is 1. | A whole number, also below 1. | Plain number. |
+| calendar | `formats` | The ways in which a date of this calendar is written. A cycle format needs `{year}` and `{cycle}` one time each. An era format needs `{year}` and `{era}` one time each. | A list of texts, or one text. Case and extra spaces do not matter. A format can be part of a longer text. | A flow list on one line, each format in double quotes. |
+| calendar | `eras` | Era calendar: the eras, each with its own start. | A list of maps. | A block list. Each era is a map on one line. |
+| era | `name` | The name of the era. The same name in two eras is not allowed. | Text. | Plain text. |
+| era | `start` | The plugin year of Year 1 of this era. | A whole number, also below 1. | Plain number. |
+| era | `length` | The number of years of the era. A date after the last year gives a warning. With no length, the era has no end. | A whole number, 1 or more. | Plain number. |
+
+Write order of a calendar: `name`, `kind`, `length`, `start`, `formats`, `eras`. Write order of an era: `name`, `start`, `length`.
 
 ## Reserved keys
 

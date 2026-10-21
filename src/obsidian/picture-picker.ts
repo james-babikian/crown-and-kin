@@ -79,7 +79,7 @@ import { judgeHeader, readPictureHeader, type PictureProblem, type SupportedForm
 import { PICKER_UI, PICTURES_UI, deviceNotice } from '../render/ui-text';
 import { NO_READ_BYTES, NO_READ_BYTES_COARSE, isShownPictureExtension, type CopyBox, type PictureCopy, type PictureStore } from './picture-store';
 import { phoneLayout } from './modal-layout';
-import { trackModal } from './plugin-modals';
+import { trackModal } from '../view/plugin-modals';
 import { freePath } from './save-picture';
 import { nameDialog } from './sheet-parts';
 import { buildShell, type Shell } from './window-shell';

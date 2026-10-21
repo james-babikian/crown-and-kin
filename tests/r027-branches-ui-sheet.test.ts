@@ -5,8 +5,8 @@ vi.mock('@codemirror/language', () => ({ forceParsing: () => false, syntaxTree: 
 vi.mock('@codemirror/view', () => ({ ViewPlugin: { fromClass: () => ({}) } }));
 
 import { EditSheet } from '../src/obsidian/edit-sheet';
-import { closePluginModals } from '../src/obsidian/plugin-modals';
-import { DEFAULT_SETTINGS, YOUNG_DEATH_AGE, normaliseSettings } from '../src/obsidian/settings';
+import { closePluginModals } from '../src/view/plugin-modals';
+import { DEFAULT_SETTINGS, YOUNG_DEATH_AGE, normaliseSettings } from '../src/view/settings';
 import { SETTINGS_UI, SHEET } from '../src/render/ui-text';
 import { FEl, clock, device, dispatch, fakeWin, installDom, resetDom } from './acceptance/fake-dom';
 import { resetObsidian } from './acceptance/fake-obsidian';

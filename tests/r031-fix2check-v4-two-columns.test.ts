@@ -11,7 +11,7 @@ vi.mock('@codemirror/language', () => ({ forceParsing: () => false, syntaxTree: 
 vi.mock('@codemirror/view', () => ({ ViewPlugin: { fromClass: () => ({}) } }));
 
 import type { Rect } from '../src/layout/model';
-import { sidewaysView } from '../src/obsidian/focus-mode';
+import { sidewaysView } from '../src/view/focus-mode';
 import { FullScreenModal } from '../src/obsidian/full-screen';
 import type { View } from '../src/render/view-math';
 import { FEl, clock, device, fakeWin, flushFrames, installDom, resetDom, resizeAll, settle } from './acceptance/fake-dom';

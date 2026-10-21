@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { badgeTap } from '../src/obsidian/focus-mode';
+import { badgeTap } from '../src/view/focus-mode';
 import { badgeSquare } from './badge-square';
 import type { Rect } from '../src/layout/model';
 import { discPath, BADGE_RADIUS_EM } from '../src/render/dom/scene';

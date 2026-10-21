@@ -1383,11 +1383,11 @@ body.is-phone,
 /*
  * D28: "↑ 1 more child" at the top edge (left of the note's toolbar) and "↓ 3 more children" at the
  * bottom edge. A plain label: a tap goes through it to the tree. Its place comes from the tree view
- * (--dynasty-hint-*); its height is HINT_HEIGHT in tree-view.ts.
+ * (--dynasty-hint-top, --dynasty-hint-bottom); its height is HINT_HEIGHT in tree-view.ts.
  */
 .dynasty-hint {
 	position: absolute;
-	right: var(--dynasty-hint-right, var(--size-4-2));
+	right: var(--size-4-2);
 	z-index: 1;
 	display: flex;
 	align-items: center;
@@ -2319,8 +2319,21 @@ body.theme-dark .dynasty-house-dot {
 	border-color: var(--interactive-accent);
 }
 
+/* Obsidian draws its own tick on `input[type=checkbox]:checked:after` (absolute, inset -1px, a mask image on the marker colour). Without the reset, that rule and this border tick mix, and on a phone only a corner of the tick shows. The reset makes the border tick the only mark, whatever the theme sets. */
 .dynasty-sheet .dynasty-check input[type='checkbox']:checked::after {
 	content: '';
+	display: block;
+	position: static;
+	inset: auto;
+	top: auto;
+	inset-inline-start: auto;
+	margin: 0;
+	box-sizing: content-box;
+	background: none;
+	background-color: transparent;
+	-webkit-mask-image: none;
+	mask-image: none;
+	filter: none;
 	width: 9px;
 	height: 5px;
 	border: 2px solid var(--dynasty-on-accent);
@@ -4265,12 +4278,14 @@ body.dynasty-fullscreen-open .popover.hover-popover {
 	align-items: center;
 	gap: 4px 16px;
 	min-height: 44px;
+	padding-block: 6px;
 	cursor: pointer;
 }
 
 .dynasty-rule-text {
 	display: flex;
 	flex-direction: column;
+	gap: 3px;
 }
 
 .dynasty-succ-switch-text {
@@ -4330,6 +4345,26 @@ body.dynasty-fullscreen-open .popover.hover-popover {
 	margin-top: 2px;
 }
 
+/*
+ * The quiet notes of the line stand apart (look round 0.3.2): 8 px between two notes, and 12 px above the first note after a row, so the notes do not look like a part of the last
+ * row. A note in the box has the 2 px gap of the box and 3 px each side. A note in the list has only a top margin; a note that starts the list has 10 px, with the 2 px of the box.
+ */
+.dynasty-line-box > .dynasty-succ-note {
+	margin: 3px 0;
+}
+
+.dynasty-succ-list > .dynasty-succ-note {
+	margin: 8px 0 0;
+}
+
+.dynasty-succ-list > :not(.dynasty-succ-note) + .dynasty-succ-note {
+	margin-top: 12px;
+}
+
+.dynasty-succ-list > .dynasty-succ-note:first-child {
+	margin-top: 10px;
+}
+
 /* G.6, quiet-warnings; D218 item 4: a note of the line is a quiet grey roman text line at the Small size, with no sign; a warning is in the text colour. */
 .dynasty-succ-note,
 .dynasty-succ-subnote {
@@ -4360,8 +4395,9 @@ body.dynasty-fullscreen-open .popover.hover-popover {
 	margin-left: 42px;
 }
 
+/* 8 px, as between two notes of the list (look round 0.3.2, G5: the branch hint stood 2 px under the last note). */
 .dynasty-succ-branch-note {
-	margin-top: var(--size-4-1);
+	margin-top: 8px;
 }
 
 .dynasty-succ-people .dynasty-actions {
@@ -6577,4 +6613,593 @@ body.theme-dark .dynasty-lw .dynasty-lw-dot {
 .modal.dynasty-fullscreen.is-phone .dynasty-full .dynasty-large-viewport {
 	padding-top: max(var(--size-4-4), env(safe-area-inset-top));
 	padding-bottom: calc(52px + env(safe-area-inset-bottom) + var(--size-4-4));
+}
+/* ===== calendars (0.3.2, spec §14, D251) ===== */
+
+/* The grey line under Born and Died and the test line: the hint style of the window (`dynasty-sheet-hint`). It takes no room when it is empty, and a long text wraps under its own field. */
+.dynasty-date-line:empty {
+	display: none;
+}
+
+.dynasty-date-line {
+	overflow-wrap: anywhere;
+}
+
+/* ---------- the Calendars window ---------- */
+
+.dynasty-calendars .dynasty-sheet-body {
+	display: flex;
+	flex-direction: column;
+	gap: 14px;
+}
+
+.dynasty-cal-note {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	align-items: flex-start;
+}
+
+.dynasty-cal-note > .dynasty-sheet-field,
+.dynasty-cal-note > .dynasty-grid {
+	width: 100%;
+}
+
+/* The fields of a note that does not exist yet stand the normal distance (12 px, as in a card) under the hint above them. */
+.dynasty-cal-note > .dynasty-grid {
+	margin-top: 4px;
+}
+
+/* The head is the one of the other windows (`dynasty-head`); the link "New calendar note" stands under the text line, and the intro stands close under it. */
+.dynasty-cal-top {
+	grid-template-columns: minmax(0, 1fr);
+	padding-bottom: 0;
+}
+
+.dynasty-cal-top .dynasty-head-meta {
+	overflow-wrap: anywhere;
+}
+
+.dynasty-cal-links {
+	display: flex;
+	align-items: center;
+	min-height: 30px;
+	margin-top: 6px;
+}
+
+/* The link takes the size of "Add portrait or arms" in the person window. */
+.dynasty-sheet .dynasty-cal-links button.dynasty-cal-new-note {
+	font-size: var(--dynasty-type-control);
+}
+
+.dynasty-cal-links:empty {
+	display: none;
+}
+
+.dynasty-cal-top + .dynasty-cal-intro {
+	margin-top: -4px;
+}
+
+.dynasty-cal-note:empty {
+	display: none;
+}
+
+/* The calendars are parts of the window, as Details and Family are in the person window: one thin line above each, and no frame. */
+.dynasty-cal-cards {
+	display: flex;
+	flex-direction: column;
+	gap: 0;
+}
+
+.dynasty-cal-card,
+.dynasty-cal-block {
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+}
+
+.dynasty-cal-card {
+	padding: 14px 0 26px;
+	border: 0;
+	border-top: 1px solid var(--background-modifier-border);
+	border-radius: 0;
+	background: none;
+}
+
+.dynasty-cal-card:last-child {
+	border-bottom: 1px solid var(--background-modifier-border);
+}
+
+/* A calendar in a note keeps its frame: it stands among the text of the note. */
+.dynasty-cal-block {
+	padding: 14px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: var(--radius-m, 8px);
+	background: var(--background-primary);
+}
+
+.dynasty-cal-head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+}
+
+.dynasty-cal-kind {
+	font-size: var(--dynasty-type-heading);
+}
+
+/* "Start" and "Eras": a sub-heading of the Small role, semibold, quiet grey (as `dynasty-succ-heading` in the Titles window). */
+.dynasty-cal-subhead {
+	color: var(--dynasty-muted);
+	font-size: var(--dynasty-type-small);
+	font-weight: var(--font-semibold);
+}
+
+/* A label with a link at its right end (Remove of an era). The negative margin keeps the line the height of a label; the touch area stays. */
+.dynasty-cal-labelrow {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+}
+
+.dynasty-cal-labelrow .dynasty-cal-remove {
+	margin-block: -6px;
+}
+
+.dynasty-sheet.is-phone .dynasty-cal-labelrow .dynasty-cal-remove {
+	margin-block: -14px;
+}
+
+/* A text button in a card has a touch area of 44 px on a screen that is touched (spec §7.5). */
+.dynasty-cal-remove {
+	min-height: 30px;
+	min-width: 44px;
+	padding: 0 8px;
+	border: 0;
+	background: none;
+	box-shadow: none;
+	color: var(--dynasty-link);
+	cursor: pointer;
+}
+
+.dynasty-sheet.is-phone .dynasty-cal-remove,
+.dynasty-sheet.is-phone .dynasty-cal-new-note,
+.dynasty-sheet.is-phone .dynasty-cal-existing-note {
+	min-height: 44px;
+}
+
+.dynasty-cal-start,
+.dynasty-cal-era {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	padding-top: 4px;
+}
+
+.dynasty-cal-era {
+	padding: 0;
+}
+
+/* One thin line between two eras, none above the first. */
+.dynasty-cal-era + .dynasty-cal-era {
+	padding-top: 14px;
+	border-top: 1px solid var(--background-modifier-border);
+}
+
+/* Cycle, Year, "=" and "Same year as" in the order that the help text names them. The labels stand over the fields, so the fields stand on one line. */
+.dynasty-cal-start-row {
+	display: grid;
+	grid-template-columns: 6.5em 6.5em auto minmax(0, 1fr);
+	gap: 0 10px;
+	align-items: end;
+}
+
+.dynasty-cal-start-row.is-era {
+	grid-template-columns: 6.5em auto minmax(0, 1fr);
+}
+
+.dynasty-cal-equals {
+	padding-bottom: 6px;
+	color: var(--dynasty-muted);
+	font-size: var(--dynasty-type-heading);
+}
+
+/* A phone: Cycle and Year share one row, "Same year as" stands under them, and the "=" is not needed. */
+.dynasty-sheet.is-phone .dynasty-cal-start-row,
+.dynasty-sheet.is-phone .dynasty-cal-start-row.is-era {
+	grid-template-columns: 1fr 1fr;
+	gap: 12px;
+}
+
+.dynasty-sheet.is-phone .dynasty-cal-start-row > .is-wide {
+	grid-column: 1 / -1;
+}
+
+.dynasty-sheet.is-phone .dynasty-cal-equals {
+	display: none;
+}
+
+.dynasty-cal-messages {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+}
+
+.dynasty-cal-messages:empty {
+	display: none;
+}
+
+/* A warning of a card is a note of the Titles window: the text colour at the small size (`dynasty-succ-note.is-warning`), not a grey hint. */
+.dynasty-cal-messages .dynasty-sheet-hint.is-warning {
+	color: var(--text-normal);
+}
+
+/* A refusal stands under its field, in red, and the field has a red edge (as in the ID window). */
+.dynasty-cal-field-error {
+	font-size: var(--dynasty-type-text);
+	font-weight: var(--font-normal);
+}
+
+.dynasty-cal-field-error:empty {
+	display: none;
+}
+
+.dynasty-cal-card input[aria-invalid='true'],
+.dynasty-cal-card textarea[aria-invalid='true'] {
+	border-color: var(--dynasty-error);
+}
+
+.dynasty-cal-add {
+	justify-content: flex-start;
+}
+
+/* Add era is as wide as its text, at the left, as the other Add buttons are. */
+.dynasty-sheet button.dynasty-cal-add-era {
+	align-self: flex-start;
+}
+
+/* A refusal that the window scrolls to (`block: 'nearest'`) keeps clear of the footer line. */
+.dynasty-cal-card [data-refusal] {
+	scroll-margin-bottom: 24px;
+}
+
+/* ---------- the block in a note ---------- */
+
+.dynasty-cal-view {
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+}
+
+/* The table of a block takes no margin of the note: the gaps in the block are the 12 px of the box, the same above every table. The second selector outranks the table rule of the reading view. */
+.dynasty-cal-table,
+.dynasty-cal-view table.dynasty-cal-table {
+	width: 100%;
+	margin: 0;
+	border-collapse: collapse;
+	font-size: var(--dynasty-type-text);
+}
+
+/* One label column width in every table of every block, so the values line up (the era table has its own columns). */
+.dynasty-cal-table:not(.dynasty-cal-eras) th {
+	width: 9em;
+}
+
+.dynasty-cal-table th,
+.dynasty-cal-table td {
+	padding: 4px 8px 4px 0;
+	border: 0;
+	text-align: left;
+	vertical-align: top;
+}
+
+.dynasty-cal-table th {
+	color: var(--dynasty-muted);
+	font-weight: var(--font-normal);
+	white-space: nowrap;
+}
+
+.dynasty-cal-eras th,
+.dynasty-cal-eras td {
+	border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.dynasty-cal-block-error {
+	color: var(--dynasty-error);
+}
+
+/* The kind stands after the name, quiet and regular. */
+.dynasty-cal-block-kind {
+	color: var(--dynasty-muted);
+	font-weight: var(--font-normal);
+}
+
+/* The test field is no wider than 360 px; its label may use the whole width, so the label stays on one text line. */
+.dynasty-cal-block .dynasty-cal-test input.dynasty-sheet-input {
+	max-width: 360px;
+}
+
+/* The answer of the test is the thing that the reader wants: the text size and the text colour. */
+.dynasty-cal-view .dynasty-date-line {
+	color: var(--text-normal);
+	font-size: var(--dynasty-type-text);
+}
+
+/* The test field of a block stands in the note, outside a window: it takes the look of a window field. */
+.dynasty-cal-view input.dynasty-sheet-input {
+	width: 100%;
+	min-height: var(--input-height);
+	padding: 0 10px;
+	border: 1px solid var(--dynasty-edge);
+	border-radius: var(--input-radius);
+	background: var(--background-modifier-form-field);
+	color: var(--text-normal);
+	font-family: var(--font-interface);
+	font-size: var(--dynasty-type-control);
+	font-weight: var(--font-normal);
+	box-shadow: none;
+}
+
+.dynasty-cal-view input.dynasty-sheet-input:focus {
+	border-color: var(--interactive-accent);
+	box-shadow: 0 0 0 1px var(--interactive-accent);
+}
+
+/* On a screen that is touched: fields of at least 16 px (iOS does not zoom) and buttons of 44 px (spec §7.4, §7.5). */
+@media (pointer: coarse) {
+	.dynasty-cal-view input.dynasty-sheet-input {
+		min-height: 44px;
+		font-size: max(16px, var(--dynasty-type-control));
+	}
+
+	.dynasty-cal-view .dynasty-cal-edit {
+		min-height: 44px;
+	}
+}
+/* ---------- The picture viewer (spec §0 D256; src/obsidian/picture-viewer.ts) ---------- */
+
+/*
+ * A window that shows one picture whole. It has the class `dynasty-sheet`, so the surface is the plain window colour of the theme in light and dark (the rule of
+ * 10-edit-sheet.css), and the colours below are only theme tokens. On a computer the window is large, 48 px from the edges, and keeps its size when the picture
+ * changes. On a phone it fills the screen, with a grip at the top, the name and the text line at the left, and Close at the right.
+ * The picture sits in the stage and takes all touches (`touch-action: none`): the code moves it through custom properties, so no style text is written.
+ */
+
+.modal.dynasty-sheet.dynasty-viewer:not(.is-phone) {
+	width: min(1000px, calc(100vw - 96px));
+	height: calc(100vh - 96px);
+	max-height: none;
+	margin-top: 48px;
+}
+
+.modal.dynasty-viewer:focus {
+	outline: none;
+}
+
+.dynasty-viewer .modal-content.dynasty-viewer-content {
+	display: grid;
+	flex: 1 1 auto;
+	min-height: 0;
+	padding: 0;
+	grid-template-columns: minmax(0, 1fr) auto;
+	grid-template-rows: auto minmax(0, 1fr) auto;
+	grid-template-areas:
+		'head head'
+		'stage stage'
+		'thumbs close';
+}
+
+.dynasty-viewer.is-phone .modal-content.dynasty-viewer-content {
+	grid-template-rows: auto auto minmax(0, 1fr) auto;
+	grid-template-areas:
+		'grip grip'
+		'head close'
+		'stage stage'
+		'thumbs thumbs';
+}
+
+/* The grip is for the swipe down on a phone; a computer has none. */
+.dynasty-viewer:not(.is-phone) .dynasty-sheet-grip {
+	display: none;
+}
+
+.dynasty-viewer.is-phone .dynasty-sheet-grip {
+	grid-area: grip;
+	margin: max(8px, env(safe-area-inset-top)) auto 4px;
+}
+
+.dynasty-viewer-head {
+	grid-area: head;
+	min-width: 0;
+	padding: 22px 24px 10px;
+}
+
+.dynasty-viewer.is-phone .dynasty-viewer-head {
+	padding: 4px 8px 8px 16px;
+}
+
+.dynasty-viewer-name {
+	font-family: var(--font-text);
+	font-size: var(--dynasty-type-title);
+	font-weight: var(--font-semibold);
+	line-height: 1.2;
+	overflow-wrap: anywhere;
+}
+
+.dynasty-viewer-line {
+	margin-top: 2px;
+	font-family: var(--font-text);
+	font-size: var(--dynasty-type-text);
+	line-height: 1.45;
+	color: var(--dynasty-muted);
+}
+
+.dynasty-viewer-stage {
+	grid-area: stage;
+	position: relative;
+	min-width: 0;
+	min-height: 0;
+	margin: 0 24px;
+	overflow: hidden;
+	/* The picture takes every touch and pointer gesture itself: the browser must not scroll or zoom the page from it. */
+	touch-action: none;
+	user-select: none;
+	-webkit-user-select: none;
+}
+
+.dynasty-viewer.is-phone .dynasty-viewer-stage {
+	margin: 0;
+}
+
+/*
+ * The whole picture, in the size that the code works out (`--dynasty-vw-w`, `--dynasty-vw-h`). The zoom and the move are one transform. The picture shows at
+ * once: there is no opening motion (D262).
+ */
+.dynasty-viewer-img {
+	display: none;
+	position: absolute;
+	left: 50%;
+	top: 50%;
+	width: var(--dynasty-vw-w, 0px);
+	height: var(--dynasty-vw-h, 0px);
+	max-width: none;
+	transform-origin: 50% 50%;
+	transform: translate(-50%, -50%) translate(var(--dynasty-vw-x, 0px), var(--dynasty-vw-y, 0px)) scale(var(--dynasty-vw-s, 1));
+	-webkit-user-drag: none;
+	pointer-events: none;
+}
+
+.dynasty-viewer-stage.has-picture .dynasty-viewer-img {
+	display: block;
+}
+
+/* D126: with reduced movement the swipe down does not slide the window back or out. */
+.dynasty-viewer.dynasty-reduce-motion.is-settling {
+	transition: none;
+}
+
+.dynasty-viewer-status {
+	position: absolute;
+	inset: 0;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: 16px;
+	text-align: center;
+	font-size: var(--dynasty-type-text);
+	color: var(--dynasty-muted);
+}
+
+.dynasty-viewer-status.is-hidden {
+	display: none;
+}
+
+/* The two small pictures; the one that shows has a 2 px ring in the text colour. They hide while the picture is zoomed. */
+.dynasty-viewer-thumbs {
+	grid-area: thumbs;
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	padding: 14px 0 18px 24px;
+}
+
+.dynasty-viewer.is-phone .dynasty-viewer-thumbs {
+	justify-content: center;
+	padding: 10px 16px max(18px, env(safe-area-inset-bottom));
+}
+
+.dynasty-viewer.is-zoomed .dynasty-viewer-thumbs {
+	visibility: hidden;
+}
+
+.dynasty-sheet button.dynasty-viewer-thumb {
+	flex: none;
+	width: 44px;
+	height: 44px;
+	min-width: 44px;
+	min-height: 44px;
+	padding: 3px;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	border: 0;
+	border-radius: var(--radius-m);
+	background: transparent;
+	box-shadow: none;
+	cursor: pointer;
+}
+
+.dynasty-sheet.dynasty-viewer.is-phone button.dynasty-viewer-thumb {
+	width: 52px;
+	height: 52px;
+}
+
+.dynasty-sheet button.dynasty-viewer-thumb.is-on {
+	box-shadow: 0 0 0 2px var(--text-normal);
+}
+
+.dynasty-sheet button.dynasty-viewer-thumb:focus-visible {
+	outline: 2px solid var(--interactive-accent);
+	outline-offset: 2px;
+}
+
+.dynasty-viewer-thumb img {
+	max-width: 100%;
+	max-height: 100%;
+	border-radius: 3px;
+	object-fit: contain;
+}
+
+/* Close: a button at the lower right on a computer, a text link at the upper right on a phone. At least 44 px each way. */
+.dynasty-sheet button.dynasty-viewer-close {
+	grid-area: close;
+	align-self: center;
+	min-width: 44px;
+	min-height: 44px;
+	margin: 14px 24px 18px 10px;
+}
+
+.dynasty-sheet.dynasty-viewer.is-phone button.dynasty-viewer-close {
+	align-self: start;
+	margin: 0 6px 0 0;
+	padding: 0 14px;
+	border: 0;
+	background: none;
+	box-shadow: none;
+	color: var(--dynasty-link);
+}
+
+/* D220: the window follows the finger of a swipe down. At rest it has no transform. */
+.modal.dynasty-viewer.is-pulled {
+	transform: translateY(var(--dynasty-sheet-pull, 0px));
+	will-change: transform;
+}
+
+.modal.dynasty-viewer.is-settling {
+	transition: transform 200ms ease-out;
+}
+
+/* Look round 0.3.2 (D261): the screen behind the viewer. In a light theme the picture needs a darker screen to stand out; the colour is the text colour of the theme, so it fits each theme. A dark theme keeps the dark screen of Obsidian. */
+.theme-light .modal-container.dynasty-viewer-container > .modal-bg {
+	/* Obsidian keeps its own opacity on the screen (about 0.85, G5 measure), so the half-dark screen of the preview comes from a colour at 60 %: 0.6 × 0.85 ≈ 0.5. */
+	/* iOS before 16.2 has no color-mix(): it keeps the plain text colour (a darker screen), the rule of every color-mix() in the style sheet. */
+	background-color: var(--text-normal);
+	background-color: color-mix(in srgb, var(--text-normal) 60%, transparent);
+}
+
+/* The top corners of the phone window are round while it follows the finger (the rule of the full-screen sheet has square corners and is more specific than `.is-pulled` alone). */
+.modal.dynasty-viewer.is-phone.is-pulled {
+	border-top-left-radius: var(--radius-l, 12px);
+	border-top-right-radius: var(--radius-l, 12px);
+}
+
+/*
+ * A zoomed picture on a phone fills the screen to the bottom edge: the two small pictures hide, and the stage lets the picture grow into their place. The clip
+ * cuts the picture at the top, so it never covers the grip, the name and Close; it is open at the sides and the bottom, and the window clips it at the screen edge.
+ */
+.dynasty-viewer.is-phone.is-zoomed .dynasty-viewer-stage {
+	overflow: visible;
+	clip-path: inset(0 -100vmax -100vmax -100vmax);
 }

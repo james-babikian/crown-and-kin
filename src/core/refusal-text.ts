@@ -23,4 +23,16 @@ export const REFUSAL_TEXT = {
 	notWritable: 'The change cannot be written. Edit the note text.',
 	commentWouldChange: 'The change cannot be written without a change to a comment. Edit the note text.',
 	otherValuesWouldChange: 'The change cannot be written without a change to other values. Edit the note text.',
+	// The calendar block (spec §14 rule 2).
+	calendarName: 'A calendar must have a name.',
+	calendarKind: 'A calendar is a cycle calendar or an era calendar.',
+	calendarFormats: 'The formats must be a list of texts.',
+	calendarNumber: 'The start and the length of a calendar or an era must be whole numbers.',
+	calendarLength: 'The length of a cycle or an era is a number of years. Write a whole number, 1 or more.',
+	eraName: 'An era must have a name.',
+	unknownCalendar: 'The note has no calendar at this place. Edit the note text.',
+	unknownEra: 'The calendar has no era at this place. Edit the note text.',
+	calendarsNotList: 'The calendars of this block are not a list. Edit the note text.',
+	calendarAlias: 'This calendar is written as a YAML alias. Edit the note text.',
+	notEraCalendar: 'Only an era calendar has eras.',
 } as const;

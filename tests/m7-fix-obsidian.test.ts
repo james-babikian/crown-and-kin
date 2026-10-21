@@ -8,10 +8,10 @@ vi.mock('@codemirror/view', () => ({ ViewPlugin: { fromClass: () => ({}) } }));
 
 import type { Op } from '../src/core/edit';
 import { applyOp } from '../src/core/yaml-edit';
-import { finderOrientation, fittedNamePx } from '../src/obsidian/focus-mode';
+import { finderOrientation, fittedNamePx } from '../src/view/focus-mode';
 import { FullScreenModal } from '../src/obsidian/full-screen';
-import { closePluginModals } from '../src/obsidian/plugin-modals';
-import { clearRelationCache } from '../src/obsidian/relation-cache';
+import { closePluginModals } from '../src/view/plugin-modals';
+import { clearRelationCache } from '../src/view/relation-cache';
 import { COMPACT_NAME_EM } from '../src/render/dom/scene';
 import { BLOCK_UI, FINDER_UI, UI } from '../src/render/ui-text';
 import { FEl, clock, dispatch, dispatchWindow, fakeDoc, fakeWin, flushFrames, installDom, resetDom, resizeAll, runTimers, settle } from './acceptance/fake-dom';

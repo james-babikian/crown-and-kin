@@ -14,15 +14,10 @@ import {
 	LEGEND_DEAD_DOUBT_SAMPLE,
 	LEGEND_DEAD_LABEL,
 	LEGEND_DEAD_SAMPLE,
-	LEGEND_HOUSES_LABEL,
 	LEGEND_LABELS,
-	LEGEND_LINES_LABEL,
 	LEGEND_ORDER,
 	SIGN_LEGEND_LABEL,
 } from './legend-text';
-
-// The legend texts are in legend-text.ts; they stay importable from here.
-export { LEGEND_DEAD_DOUBT_LABEL, LEGEND_DEAD_DOUBT_SAMPLE, LEGEND_DEAD_LABEL, LEGEND_DEAD_SAMPLE, LEGEND_HOUSES_LABEL, LEGEND_LABELS, LEGEND_LINES_LABEL, LEGEND_ORDER, SIGN_LEGEND_LABEL };
 
 /** One SVG element of a sample; `cls` are dynasty- classes, never colours. */
 export interface LegendPart {

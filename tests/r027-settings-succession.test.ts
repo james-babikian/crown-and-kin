@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 vi.mock('obsidian', () => import('./acceptance/fake-obsidian'));
 
 import { deleteText, SETTINGS_UI, SUCCESSION_UI as T } from '../src/render/ui-text';
-import { DEFAULT_SETTINGS, OLD_AGE, SUCCESSION_LENGTH, normaliseSettings, parseWhole, settingsChanges } from '../src/obsidian/settings';
+import { DEFAULT_SETTINGS, OLD_AGE, SUCCESSION_LENGTH, normaliseSettings, parseWhole, settingsChanges } from '../src/view/settings';
 import { DynastySettingTab, type SettingsHost } from '../src/obsidian/settings-tab';
 import { FEl, dispatch, installDom, resetDom, settle } from './acceptance/fake-dom';
 import { resetObsidian, settingRows, type TextComponent } from './acceptance/fake-obsidian';

@@ -19,7 +19,9 @@
  */
 
 import { Modal, Notice, setIcon, type App, type TFile } from 'obsidian';
-import { deriveFamilies, type FamilyGraph } from '../core/derive';
+import type { FamilyGraph } from '../core/derive';
+import { deriveDated, readerOfTree, type DatesFor } from '../view/calendar-index';
+import { attachDateLine } from '../render/dom/date-line';
 import type { FieldValue, Op, ParentKind, PersonField, UnionKind, UnionRef } from '../core/edit';
 import type { PersonFolds } from '../core/folds';
 import { issueText } from '../core/messages';
@@ -39,17 +41,17 @@ import { makePersonNote, openMadeNote, type MakeNoteMode, type MakePersonNoteOut
 import { normBody } from '../core/block-match';
 import { cardLabels, needsLabels } from '../core/titles';
 import type { Handle, HandleWriteOutcome, Written } from './block-handle';
-import type { ViewKind } from './block-state';
+import type { ViewKind } from '../view/block-state';
 import { describeDelete, familyOf, type FamilyView, type ParentLink, type PartnerLink } from '../core/family-query';
 import type { RelationOptions } from '../core/relations';
 import { openCropTool, startCropOf } from './crop-tool';
 import { addChild, addParent, addPartner, autoUnionNotice, unionOp, type FlowHost, type NewRelation } from './family-flows';
 import { ignoreGhostClick, phoneLayout } from './modal-layout';
-import { hasNoWrittenId, idsForPeople } from './person-ids';
+import { hasNoWrittenId, idsForPeople } from '../view/person-ids';
 import { pickPerson, type PickerContext } from './person-picker';
 import { currentPictureOf, pickPicture } from './picture-picker';
 import type { PictureCopy, PictureStore } from './picture-store';
-import { relationsFor, validMe } from './relation-cache';
+import { relationsFor, validMe } from '../view/relation-cache';
 import { afterPaint, drawableColour, endEntryOnEnter, freshOrStale, nameDialog, onWriteFailed, sheetField, showErrorLine } from './sheet-parts';
 import { renderRelationLine, type RelationView } from './sheet-relation';
 import { titlesBody, titlesSummary, type TitlesHost } from './sheet-titles';
@@ -57,8 +59,9 @@ import { buildShell, type Shell } from './window-shell';
 import { renderSections, type SectionsView, type SectionSpec } from './window-sections';
 import { RowPictures, buildRow, iconButton, iconLead, personLead, showMenu, textButton, type MenuEntry } from './window-parts';
 import { undoNotice } from './undo-notice';
+import { personViewItems, viewPerson } from './viewer-sources';
 import { editUnion } from './union-edit';
-import { trackModal } from './plugin-modals';
+import { trackModal } from '../view/plugin-modals';
 
 const TEXT_FIELDS = ['name', 'sobriquet', 'title', 'born', 'died', 'link', 'notes'] as const;
 const NEW_HOUSE = '\u0000new';
@@ -111,11 +114,11 @@ const blankHouse = () => ({ name: '', color: '#888888' });
 const blankPerson = (): Person => ({ id: '', name: '', parents: [], illegitimate: false, index: -1 });
 
 /** The sheet's data for a person (or a new person, `id` null), or why there is none. */
-export function loadSheet(body: string, id: string | null): SheetLoad {
+export function loadSheet(body: string, id: string | null, dates?: DatesFor): SheetLoad {
 	const parsed = parseBody(body);
 	if (!parsed.ok) return { kind: 'invalid' };
 	const tree = readTree(parsed.doc, parsed.data, body);
-	const g = deriveFamilies(tree);
+	const g = deriveDated(tree, dates);
 	const person = id === null ? blankPerson() : g.byId.get(id);
 	if (!person) return { kind: 'gone' };
 	const blocking = g.issues.filter((i) => i.level === 'blocking').map(issueText);
@@ -316,6 +319,8 @@ interface SheetBase {
 	folds?: SheetFolds;
 	/** The kind of view that opened the sheet: the saved person is shown there (§5.5). */
 	place?: ViewKind;
+	/** Spec §14 rule 9: the date reader for the calendar link of the block; absent: plain years. */
+	dates?: DatesFor;
 	/** The plugin's picture store (M9 contract O3): the portrait picture and the picker's preview. */
 	pictures?: PictureStore;
 	/** D174: the sibling setting of the plugin, so the sheet names the relation as the cards do. Absent: the defaults. */
@@ -397,6 +402,14 @@ export class EditSheet extends Modal {
 	private addPortraitEl: HTMLElement | null = null;
 	/** Gives the hidden names of the parent type chips their ids. */
 	private static chipCounter = 0;
+	/**
+	 * The parent link that each parent-type select shows now. A change of a parent type updates the page in place (r032: a native
+	 * select that is destroyed under the finger can keep its phone menu open), so the one listener of a select reads its link here.
+	 */
+	private parentSelects = new WeakMap<HTMLElement, ParentLink>();
+	/** The text block of the header that holds the relation text lines, and a text of the relation that it shows (to draw it again only when it changes). */
+	private relHost: HTMLElement | null = null;
+	private relSig = '';
 	/** The frame of the window (Cancel, Save, the scrolling body) and its sections, drawn again with the form. */
 	private shell: Shell | null = null;
 	private sections: SectionsView | null = null;
@@ -419,13 +432,13 @@ export class EditSheet extends Modal {
 
 	/** Returns null if the person is not in the block (the view was out of date). */
 	static create(app: App, o: PersonSheetOptions): EditSheet | null {
-		const l = loadSheet(o.handle.body, o.personId);
+		const l = loadSheet(o.handle.body, o.personId, o.dates);
 		return l.kind === 'ok' ? new EditSheet(app, o, l.data) : null;
 	}
 
 	/** A sheet for a new person; null if the block does not parse. */
 	static createNew(app: App, o: NewSheetOptions): EditSheet | null {
-		const l = loadSheet(o.parentSheet?.data.body ?? o.handle.body, null);
+		const l = loadSheet(o.parentSheet?.data.body ?? o.handle.body, null, o.dates);
 		return l.kind === 'ok' ? new EditSheet(app, o, l.data) : null;
 	}
 
@@ -668,7 +681,7 @@ export class EditSheet extends Modal {
 		const d = this.draft;
 		const house = d.house === NEW_HOUSE ? this.newHouse.name.trim() : (this.data.g.houses?.get(d.house)?.name ?? '');
 		const sex = d.sex === 'm' ? SHEET.sexMale : d.sex === 'f' ? SHEET.sexFemale : '';
-		return this.sum([house || SHEET.noHouse, sex, dateLine({ ...this.data.person, born: d.born.trim() || undefined, died: d.died.trim() || undefined })]);
+		return this.sum([house || SHEET.noHouse, sex, dateLine({ ...this.data.person, born: d.born.trim() || undefined, died: d.died.trim() || undefined }, this.data.g.dates)]);
 	}
 
 	private familySummary(): string {
@@ -724,6 +737,8 @@ export class EditSheet extends Modal {
 		const nameText = nameLine.createSpan();
 		let armsMark: HTMLElement | null = null;
 		const metaHost = text.createDiv({ cls: 'dynasty-head-metahost' });
+		this.relHost = text;
+		this.relSig = this.relationSig();
 		if (this.relView) renderRelationLine(text, this.relView);
 		// D209 item 4: the portrait stands at the right of the name.
 		const pic = head.createEl('button', { cls: 'dynasty-pic', attr: { type: 'button', 'aria-haspopup': 'menu', 'data-focus': 'portrait' } });
@@ -758,7 +773,7 @@ export class EditSheet extends Modal {
 			const label = this.cardLabel();
 			const titleText = label?.title ?? this.draft.title.trim();
 			if (titleText) parts.push(nb(label?.title && label.reign ? `${titleText} ${label.reign}` : titleText));
-			const dates = dateLine({ ...this.data.person, born: this.draft.born.trim() || undefined, died: this.draft.died.trim() || undefined });
+			const dates = dateLine({ ...this.data.person, born: this.draft.born.trim() || undefined, died: this.draft.died.trim() || undefined }, this.data.g.dates);
 			if (dates) parts.push(dates);
 			if (this.isNew && this.rel) parts.push(this.newDetail());
 			if (parts.length) joined(metaHost, 'dynasty-head-meta', parts);
@@ -817,16 +832,17 @@ export class EditSheet extends Modal {
 		return this.sum([kind, detail]);
 	}
 
-	/** The short menu of the portrait and the personal arms (D198 Q6H A). A new person has no portrait yet. */
+	/** The short menu of the portrait and the personal arms (D198 Q6H A). It starts with View portrait or View arms (D256); a window that cannot change the note opens the viewer at once. A new person has no portrait yet. */
 	private pictureMenu(anchor: HTMLElement): void {
-		if (this.readOnly) return;
+		const kit = { app: this.app, pictures: this.o.pictures, sourcePath: this.o.sourcePath, g: this.data.g, person: this.data.person, draft: this.draft };
+		if (this.readOnly) return viewPerson(kit, anchor);
 		if (this.isNew) {
 			new Notice(WINDOW_UI.saveFirst);
 			return;
 		}
 		const link = this.draft.portrait.trim();
 		const p = link ? this.portraitFor(link) : null;
-		const items: (MenuEntry | 'sep')[] = [{ icon: 'image', label: PICTURES_UI.selectPortrait, run: () => void this.selectPortrait() }];
+		const items: (MenuEntry | 'sep')[] = [...personViewItems(kit, anchor), { icon: 'image', label: PICTURES_UI.selectPortrait, run: () => void this.selectPortrait() }];
 		if (link) {
 			// Shown once the portrait can show; a picture with a problem has no part to select.
 			if (p && p.path !== null && p.problem === null) items.push({ icon: 'crop', label: WINDOW_UI.selectPart, run: () => void this.selectPart() });
@@ -882,7 +898,11 @@ export class EditSheet extends Modal {
 		if (mark !== 'sheet') {
 			const same = Array.from(this.contentEl.querySelectorAll<HTMLInputElement>(`[data-focus="${mark.key}"]`)).filter((c) => !c.disabled);
 			const target = same[Math.min(mark.index, same.length - 1)];
-			if (target) {
+			// Every control here was made by the build that just ran. A select that is new and gets the focus in code can open its phone
+			// menu again, so a touch screen leaves the focus on the sheet instead (r032). A select that the user used is not rebuilt (the
+			// changes of a select update the page in place), so it never comes here and keeps the focus it has.
+			const touch = (this.modalEl.win ?? window).matchMedia?.('(pointer: coarse)')?.matches === true;
+			if (target && !(touch && target.matches('select'))) {
 				target.focus({ preventScroll: true });
 				if (mark.start !== null && mark.end !== null && target.setSelectionRange) target.setSelectionRange(mark.start, mark.end);
 				return;
@@ -1007,7 +1027,10 @@ export class EditSheet extends Modal {
 			rel.union = couple[Number(sel.value)];
 			this.relNote = null;
 			this.relBlocked = false;
-			this.build();
+			// r032: no build inside the change event of this select (a native select that is taken out under the finger can keep its
+			// phone menu open). What the choice changes is only the note that asked for it and the empty choice; both go away here.
+			for (const el of Array.from(box.children)) if (el.hasClass('dynasty-sheet-relation-note')) el.remove();
+			for (const opt of Array.from(sel.querySelectorAll<HTMLOptionElement>('option'))) if (opt.getAttribute('value') === '') opt.remove();
 		});
 	}
 
@@ -1294,6 +1317,7 @@ export class EditSheet extends Modal {
 					attr: { id, type: 'text', autocomplete: 'off', autocorrect: 'off', spellcheck: 'false', autocapitalize: extra.autocapitalize, placeholder: extra.placeholder, 'data-focus': `field:${key}` },
 				});
 		input.value = this.draft[key];
+		if (key === 'born' || key === 'died') attachDateLine(row, input, () => readerOfTree(this.o.dates, this.data.tree) ?? this.data.g.dates.reader, this.o.dates?.onChange, (stop) => this.cleanup.push(stop));
 		// Read-only, not disabled: the user can still select and copy the text.
 		input.readOnly = this.readOnly;
 		if (o.hint) {
@@ -1522,7 +1546,7 @@ export class EditSheet extends Modal {
 		const word = this.relationWord(id);
 		if (me && word) sub.createEl(id === me ? 'b' : 'i', { text: word.text });
 		const p = this.data.g.byId.get(id);
-		const dates = p ? dateLine(p) : '';
+		const dates = p ? dateLine(p, this.data.g.dates) : '';
 		if (dates) sub.appendText(`${word ? ' · ' : ''}${dates}`);
 	}
 
@@ -1535,16 +1559,9 @@ export class EditSheet extends Modal {
 	private familyBody(body: HTMLElement): void {
 		const fam = this.data.fam;
 		if (!fam) return;
-		const ro = this.readOnly;
 		this.warmRelationWords(fam);
 
-		// D212: a quiet "+ Add" link at the right of each group heading, in place of the row of three buttons.
-		const group = (key: string, heading: string, add?: { text: string; cls: string; run: () => void }) => {
-			const head = body.createDiv({ cls: 'dynasty-sub-row' });
-			head.createDiv({ cls: 'dynasty-sub', text: heading });
-			if (add && !ro) this.addLink(head, add.text, add.cls, add.run);
-			return body.createDiv({ cls: ['dynasty-rows', 'dynasty-family-group'], attr: { 'data-family': key } });
-		};
+		const group = (key: string, heading: string, add?: { text: string; cls: string; run: () => void }) => this.familyGroup(body, key, heading, add);
 		const parents = group('parents', FAMILY.parents, { text: FAMILY.addParent, cls: 'dynasty-add-parent', run: () => void addParent(this.flowHost()) });
 		if (!fam.parents.length) parents.createDiv({ cls: ['dynasty-sheet-none', 'dynasty-family-empty'], text: FAMILY.noParents });
 		for (const link of fam.parents) this.parentRow(parents, fam, link);
@@ -1571,17 +1588,29 @@ export class EditSheet extends Modal {
 			this.rowSub(r.sub, kid.id);
 		}
 
+		this.siblingsGroup(body, fam);
+	}
+
+	/** D212: a group of the Family section: a heading with a quiet "+ Add" link at its right, then the rows. */
+	private familyGroup(body: HTMLElement, key: string, heading: string, add?: { text: string; cls: string; run: () => void }): HTMLElement {
+		const head = body.createDiv({ cls: 'dynasty-sub-row' });
+		head.createDiv({ cls: 'dynasty-sub', text: heading });
+		if (add && !this.readOnly) this.addLink(head, add.text, add.cls, add.run);
+		return body.createDiv({ cls: ['dynasty-rows', 'dynasty-family-group'], attr: { 'data-family': key } });
+	}
+
+	/** The place among the siblings, with the two buttons that move the person; nothing for a person with no sibling group. */
+	private siblingsGroup(body: HTMLElement, fam: FamilyView): void {
 		const sib = fam.siblings;
-		if (sib) {
-			const place = group('siblings', FAMILY.siblings);
-			const r = buildRow(place, { cls: 'dynasty-family-row' });
-			r.title.addClass('dynasty-family-position');
-			r.title.setText(FAMILY.position(sib.index + 1, sib.group.length));
-			if (!ro) {
-				const actions = r.actions();
-				this.button(actions, FAMILY.moveEarlier, 'dynasty-move-earlier', () => void this.moveSibling('earlier')).disabled = !sib.canMoveEarlier;
-				this.button(actions, FAMILY.moveLater, 'dynasty-move-later', () => void this.moveSibling('later')).disabled = !sib.canMoveLater;
-			}
+		if (!sib) return;
+		const place = this.familyGroup(body, 'siblings', FAMILY.siblings);
+		const r = buildRow(place, { cls: 'dynasty-family-row' });
+		r.title.addClass('dynasty-family-position');
+		r.title.setText(FAMILY.position(sib.index + 1, sib.group.length));
+		if (!this.readOnly) {
+			const actions = r.actions();
+			this.button(actions, FAMILY.moveEarlier, 'dynasty-move-earlier', () => void this.moveSibling('earlier')).disabled = !sib.canMoveEarlier;
+			this.button(actions, FAMILY.moveLater, 'dynasty-move-later', () => void this.moveSibling('later')).disabled = !sib.canMoveLater;
 		}
 	}
 
@@ -1610,7 +1639,7 @@ export class EditSheet extends Modal {
 		const was = this.data.person.id;
 		const fresh = this.fresh();
 		if (!fresh) return;
-		const r = loadSheet(this.o.handle.body, id);
+		const r = loadSheet(this.o.handle.body, id, this.o.dates);
 		if (r.kind !== 'ok') return;
 		if (forward) this.trail.push(was);
 		else this.trail.pop();
@@ -1665,24 +1694,144 @@ export class EditSheet extends Modal {
 		const chipId = `dynasty-chip-${++EditSheet.chipCounter}`;
 		chip.createSpan({ cls: 'dynasty-sr-only', text: FAMILY.parentTypeLabel(name), attr: { id: chipId } });
 		const sel = chip.createEl('select', { cls: ['dropdown', 'dynasty-family-select'], attr: { 'aria-labelledby': chipId, 'data-focus': 'parent-type' } });
+		for (const t of PARENT_TYPES) sel.createEl('option', { text: parentTypeText(t), attr: { value: t } });
+		this.paintParentSelect(sel, fam, link);
+		sel.disabled = this.readOnly;
+		setIcon(chip.createSpan({ cls: 'dynasty-chip-chevron', attr: { 'aria-hidden': 'true' } }), 'chevron-down');
+		sel.addEventListener('change', () => {
+			const now = this.parentSelects.get(sel) ?? link;
+			const to = sel.value as ParentKind;
+			if (to === now.type) return;
+			// The page changes in place after the write: this select is never taken out of the page while the user uses it.
+			void this.writeWithDraft([{ kind: 'set-parent-type', child: this.data.person.id, parent: now.id, from: now.type, to }], this.data.person.id, 'in-place').then(
+				(out) => {
+					const cur = this.parentSelects.get(sel);
+					if (!out && cur) sel.value = cur.type;
+				},
+				(e) => console.error('Crown and Kin: cannot change the type of the parent', e),
+			);
+		});
+		if (this.readOnly) return;
+		iconButton(controls, 'x', FAMILY.removeParentLabel(name), () => void this.removeParent(this.parentSelects.get(sel) ?? link), { cls: 'dynasty-remove-parent', focus: 'dynasty-remove-parent' });
+	}
+
+	/** Sets what a parent-type select derives from the parent types: the link it answers for, its value, and the types that are full. */
+	private paintParentSelect(sel: HTMLSelectElement, fam: FamilyView, link: ParentLink): void {
+		this.parentSelects.set(sel, link);
 		const count = (t: string) => fam.parents.filter((l) => l.type === t).length;
-		for (const t of PARENT_TYPES) {
-			const opt = sel.createEl('option', { text: parentTypeText(t), attr: { value: t } });
+		for (const opt of Array.from(sel.querySelectorAll<HTMLOptionElement>('option'))) {
+			const t = opt.getAttribute('value') as ParentKind;
 			// A type that has its most parents already is full (spec §4.2, `PARENT_LIMIT`).
 			opt.disabled = t !== link.type && count(t) >= PARENT_LIMIT[t];
 		}
 		sel.value = link.type;
-		sel.disabled = this.readOnly;
-		setIcon(chip.createSpan({ cls: 'dynasty-chip-chevron', attr: { 'aria-hidden': 'true' } }), 'chevron-down');
-		sel.addEventListener('change', () => {
-			const to = sel.value as ParentKind;
-			if (to === link.type) return;
-			void this.writeWithDraft([{ kind: 'set-parent-type', child: this.data.person.id, parent: link.id, from: link.type, to }]).then((out) => {
-				if (!out) sel.value = link.type;
-			});
+	}
+
+	/**
+	 * r032: shows the result of a changed parent type without a build. The select that the user used stays in the page (a native select
+	 * that is taken out under the finger can keep its phone menu open), so only what depends on the types is set again: the rows of
+	 * the parents, the relation text line, the place among the siblings, the Titles section and the summaries. A page that differs from
+	 * what a build gives (the rows are not there, the person did not load) is built again.
+	 */
+	private showParentTypes(body: string, ids?: ReadonlyMap<string, string>): void {
+		const id = ids?.get(this.data.person.id) ?? this.data.person.id;
+		const r = loadSheet(body, id, this.o.dates);
+		const fam = r.kind === 'ok' ? r.data.fam : null;
+		const rows = this.bodyEl ? Array.from(this.bodyEl.querySelectorAll<HTMLElement>('.dynasty-family-row[data-parent]')) : [];
+		if (r.kind !== 'ok' || !fam || rows.length !== fam.parents.length) {
+			this.afterWrite(body, ids);
+			return;
+		}
+		// A build hides an old refusal or stale message; the in-place path must too.
+		this.clearError();
+		const placementBefore = this.placementSig();
+		const was = this.base;
+		const firstId = id !== this.data.person.id;
+		this.data = r.data;
+		// The write gave the sheet person a first id: the "ID" line at the end of the body appears, as after a build.
+		const actions = firstId ? this.bodyEl?.querySelector<HTMLElement>('.dynasty-actions-list')?.parentElement : null;
+		if (actions) {
+			actions.querySelector('.dynasty-sheet-id')?.remove();
+			this.idLine(actions);
+		}
+		this.base = this.baseOf(r.data);
+		// A field that the user did not change follows the note (the shown-under type comes from the parent types); text typed since stays.
+		const next = { ...this.base };
+		for (const k of Object.keys(next) as (keyof Draft)[]) if (this.draft[k] !== was[k]) (next as Record<string, unknown>)[k] = this.draft[k];
+		this.draft = next;
+		this.gone = false;
+		this.relView = this.makeRelationView();
+		this.warmRelationWords(fam);
+		fam.parents.forEach((link, i) => {
+			const row = rows[i];
+			// The id of a parent with no written id changes with the write; the row follows the parent by its place in the list.
+			row.setAttribute('data-parent', link.id);
+			row.setAttribute('data-type', link.type);
+			const sub = row.querySelector<HTMLElement>('.dynasty-row-sub');
+			if (sub) {
+				sub.empty();
+				this.rowSub(sub, link.id);
+			}
+			const sel = row.querySelector<HTMLSelectElement>('select.dynasty-family-select');
+			if (sel) this.paintParentSelect(sel, fam, link);
 		});
-		if (this.readOnly) return;
-		iconButton(controls, 'x', FAMILY.removeParentLabel(name), () => void this.removeParent(link), { cls: 'dynasty-remove-parent', focus: 'dynasty-remove-parent' });
+		this.paintRelation();
+		this.paintSiblings(fam);
+		if (this.placementSig() !== placementBefore) this.paintPlacement();
+		const titles = this.sections?.el('titles')?.querySelector<HTMLElement>('.dynasty-section-body');
+		if (titles) {
+			titles.empty();
+			titlesBody(titles, this.titlesHost());
+		}
+		this.head?.paint();
+		this.sections?.setSummary('family', this.familySummary());
+		this.sections?.setSummary('titles', titlesSummary(this.titlesHost()));
+		this.updateSummaries();
+		this.shell?.checkOverflow();
+	}
+
+	/** What decides the field "Shown under": the types the person has parents of, and the type that the note has. */
+	private placementSig(): string {
+		return `${placementChoices(this.data.person).join(',')}|${this.base.placement}`;
+	}
+
+	/** Makes the field "Shown under" again, as the last field of Details: a type change can show it, hide it or change its choices. It is not the select that the user used. */
+	private paintPlacement(): void {
+		const grid = this.sections?.el('details')?.querySelector<HTMLElement>('.dynasty-grid');
+		if (!grid) return;
+		grid.querySelector('select[data-focus="field:placement"]')?.parentElement?.parentElement?.remove();
+		this.placementField(grid);
+	}
+
+	/** A text of the relation line that changes when the relation changes; the line is drawn again only then (its "more" text keeps its state). */
+	private relationSig(): string {
+		return JSON.stringify(this.relView, (_k, v: unknown) => (typeof v === 'function' ? undefined : v));
+	}
+
+	/** Draws the relation text lines of the header again, if the relation to the marked person changed. */
+	private paintRelation(): void {
+		const host = this.relHost;
+		const sig = this.relationSig();
+		if (!host || sig === this.relSig) return;
+		this.relSig = sig;
+		for (const el of Array.from(host.children)) {
+			if (el.hasClass('dynasty-head-rel') || el.hasClass('dynasty-relation-also') || el.hasClass('dynasty-relation-maybe')) el.remove();
+		}
+		if (this.relView) renderRelationLine(host, this.relView);
+	}
+
+	/** Draws the place among the siblings again: a type change can give a person a sibling group, or take it away. It stands last in the section. */
+	private paintSiblings(fam: FamilyView): void {
+		const old = this.bodyEl?.querySelector<HTMLElement>('[data-family="siblings"]');
+		const body = (this.bodyEl?.querySelector<HTMLElement>('[data-family="parents"]'))?.parentElement;
+		if (!body) return;
+		if (old) {
+			// The heading stands just before its group.
+			const kids = Array.from(body.children);
+			kids[kids.indexOf(old) - 1]?.remove();
+			old.remove();
+		}
+		this.siblingsGroup(body, fam);
 	}
 
 	private partnerRow(parent: HTMLElement, link: PartnerLink): void {
@@ -1750,16 +1899,12 @@ export class EditSheet extends Modal {
 		return dest ? null : 'linked';
 	}
 
-	private noteLabelName(): string {
-		return this.draft.name.trim() || this.data.person.name || SHEET.unnamed;
-	}
-
 	/** Shows, changes or removes the button when the draft name or link changes; it keeps the button when nothing changed. */
 	private updateNoteButton(): void {
 		const slot = this.noteSlot;
 		if (!slot) return;
 		const mode = this.noteMode();
-		const name = this.noteLabelName();
+		const name = this.draft.name.trim() || this.data.person.name || SHEET.unnamed;
 		const key = mode ? `${mode}|${name}` : '';
 		if (key === this.noteKey) return;
 		this.noteKey = key;
@@ -1847,7 +1992,7 @@ export class EditSheet extends Modal {
 			() => {
 				if (!this.shown) return;
 				const id = this.data.person.id;
-				this.reload(h.body, id !== was && loadSheet(h.body, id).kind === 'gone' ? was : id);
+				this.reload(h.body, id !== was && loadSheet(h.body, id, this.o.dates).kind === 'gone' ? was : id);
 			},
 			NOTE_UI.undone(name),
 		);
@@ -1985,17 +2130,9 @@ export class EditSheet extends Modal {
 			ready: () => this.pendingOps() !== null && this.fresh(),
 			commit: (ops, highlight) => this.writeWithDraft(ops, highlight),
 			openNew: (rel, name) => this.openNew(rel, name),
-			picker: () => this.flowPickerContext(),
+			// D211: the lists of Add parent, Add child and Add partner name no relation, unless this window is about the marked person: the words say "to You", and in the window of another person they would be read as relations to that person.
+			picker: () => ({ ...this.pickerContext(), ...(this.me() === this.data.person.id ? {} : { me: null }) }),
 		};
-	}
-
-	/**
-	 * D211: the lists of Add parent, Add child and Add partner name no relation, unless this window is about the marked person: the words
-	 * say "to You", and in the window of another person they would be read as relations to that person.
-	 */
-	private flowPickerContext(): PickerContext {
-		const ctx = this.pickerContext();
-		return this.me() === this.data.person.id ? ctx : { ...ctx, me: null };
 	}
 
 	/** The rows of the person picker: portraits, the marked person for the relation word, and the relation settings (G.3). */
@@ -2005,7 +2142,7 @@ export class EditSheet extends Modal {
 	}
 
 	private openNew(rel: NewRelation, name?: string): void {
-		const sheet = EditSheet.createNew(this.app, { handle: this.o.handle, sourcePath: this.o.sourcePath, beforeWrite: this.o.beforeWrite, openNote: this.o.openNote, newPerson: rel, initialName: name, parentSheet: this, place: this.o.place, pictures: this.o.pictures, folds: this.o.folds, relationOptions: this.o.relationOptions });
+		const sheet = EditSheet.createNew(this.app, { handle: this.o.handle, sourcePath: this.o.sourcePath, beforeWrite: this.o.beforeWrite, openNote: this.o.openNote, newPerson: rel, initialName: name, parentSheet: this, place: this.o.place, pictures: this.o.pictures, folds: this.o.folds, relationOptions: this.o.relationOptions, dates: this.o.dates });
 		sheet?.open();
 	}
 
@@ -2188,9 +2325,9 @@ export class EditSheet extends Modal {
 	/**
 	 * A relationship action with the draft in the same write; the sheet stays open and shows the
 	 * result. A person of the write with no written id gets one in it; the sheet's own person always
-	 * does, so the sheet follows them by that id afterwards.
+	 * does, so the sheet follows them by that id afterwards. `show`: 'in-place' updates the page without a build (see `showParentTypes`).
 	 */
-	private async writeWithDraft(ops: Op[], highlight: string | null = this.data.person.id): Promise<DraftWritten | null> {
+	private async writeWithDraft(ops: Op[], highlight: string | null = this.data.person.id, show: 'build' | 'in-place' = 'build'): Promise<DraftWritten | null> {
 		this.lastError = '';
 		const pending = this.pendingOps();
 		if (pending === null) return null;
@@ -2200,7 +2337,9 @@ export class EditSheet extends Modal {
 		const ids = idsFor(this.data, [this.data.person.id, ...namesIn(all), ...holderNames(all)]);
 		const out = await this.write(withIds(all, ids), highlight === null ? null : (ids.get(highlight) ?? highlight));
 		if (!out) return null;
-		this.afterWrite(out.body, ids);
+		// 'in-place' is for a control that the user is using now (r032). A write that carries field changes needs the full form again.
+		if (show === 'in-place' && pending.length === 0) this.showParentTypes(out.body, ids);
+		else this.afterWrite(out.body, ids);
 		return { ...out, withFields: pending.length > 0 };
 	}
 
@@ -2215,7 +2354,7 @@ export class EditSheet extends Modal {
 			if (!this.shown) return;
 			const id = this.data.person.id;
 			// reload, not afterWrite: text typed after the removal stays in the draft.
-			this.reload(h.body, id !== was && loadSheet(h.body, id).kind === 'gone' ? was : id);
+			this.reload(h.body, id !== was && loadSheet(h.body, id, this.o.dates).kind === 'gone' ? was : id);
 		});
 	}
 
@@ -2271,7 +2410,7 @@ export class EditSheet extends Modal {
 			if (n !== undefined) this.relNames.set(now, n);
 		}
 		// "Save and add another child": a fresh draft with the same parents, from the new body.
-		const r = loadSheet(out.body, null);
+		const r = loadSheet(out.body, null, this.o.dates);
 		if (r.kind !== 'ok') {
 			this.finish();
 			return;
@@ -2299,7 +2438,7 @@ export class EditSheet extends Modal {
 	 */
 	afterWrite(body: string, ids?: ReadonlyMap<string, string>): void {
 		const id = ids?.get(this.data.person.id) ?? this.data.person.id;
-		const r = loadSheet(body, this.isNew ? null : id);
+		const r = loadSheet(body, this.isNew ? null : id, this.o.dates);
 		if (r.kind !== 'ok') {
 			this.reload(body, id);
 			return;
@@ -2507,7 +2646,7 @@ export class EditSheet extends Modal {
 		let target = id;
 		// A person with no written id is named `~N`, which follows the place in the list: find them again (C2).
 		if (!this.isNew && unwritten(this.data, id)) {
-			const now = loadSheet(body, null);
+			const now = loadSheet(body, null, this.o.dates);
 			if (now.kind === 'ok') {
 				const same = sameUnwritten(this.data, id, now.data);
 				if (same === null) {
@@ -2517,7 +2656,7 @@ export class EditSheet extends Modal {
 				target = same;
 			}
 		}
-		const r = loadSheet(body, this.isNew ? null : target);
+		const r = loadSheet(body, this.isNew ? null : target, this.o.dates);
 		if (r.kind === 'invalid') {
 			// The draft stays, editable; a later Save compares with the new body and says so again.
 			this.refused(WRITE_TEXT.invalid);

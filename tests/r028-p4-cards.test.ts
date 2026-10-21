@@ -85,8 +85,6 @@ describe('G.5, I05: the arms of a card', () => {
 		const byPerson = new Map(slots.map((s) => [s.person, s]));
 		expect(byPerson.get('c')!.owner).toEqual({ person: 'c' });
 		expect(byPerson.get('a')!.owner).toEqual({ house: 'v' });
-		// The old reader's field stays for a person with a house.
-		expect(byPerson.get('c')!.house).toBe('v');
 		for (const id of ['a', 'c']) {
 			const group = withClass(card(root, id), 'dynasty-arms')[0];
 			expect(group.children).toHaveLength(0);

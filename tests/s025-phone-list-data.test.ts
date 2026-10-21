@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { linkWord, listData, listStart, listWord, oldestParent, BACK_LIMIT, popTrail, pushTrail } from '../src/obsidian/phone-list';
+import { linkWord, listData, listStart, listWord, oldestParent, BACK_LIMIT, popTrail, pushTrail } from '../src/view/phone-list';
 import type { ListGroup, ListRow } from '../src/render/dom/phone-list-dom';
 import { build, fixture } from './helpers';
 

@@ -9,7 +9,7 @@ import * as UI from '../src/render/ui-text';
 import { EditSheet } from '../src/obsidian/edit-sheet';
 import { FullScreenModal } from '../src/obsidian/full-screen';
 import { HousesWindow } from '../src/obsidian/houses-window';
-import { closePluginModals } from '../src/obsidian/plugin-modals';
+import { closePluginModals } from '../src/view/plugin-modals';
 import { FEl, clock, fakeWin, installDom, resetDom, settle } from './acceptance/fake-dom';
 import { openModals, resetObsidian } from './acceptance/fake-obsidian';
 import { fakeApp, openFullScreen } from './acceptance/tree-view-fakes';

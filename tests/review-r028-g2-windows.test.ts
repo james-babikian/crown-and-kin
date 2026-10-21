@@ -4,7 +4,7 @@ vi.mock('obsidian', () => import('./acceptance/fake-obsidian'));
 vi.mock('@codemirror/language', () => ({ forceParsing: () => false, syntaxTree: () => ({ length: 0 }) }));
 vi.mock('@codemirror/view', () => ({ ViewPlugin: { fromClass: () => ({}) } }));
 
-import { closePluginModals } from '../src/obsidian/plugin-modals';
+import { closePluginModals } from '../src/view/plugin-modals';
 import { resetOpenSections } from '../src/obsidian/window-sections';
 import { TitlesWindow } from '../src/obsidian/titles-window';
 import { FEl, clock, device, dispatch, fakeWin, installDom, resetDom } from './acceptance/fake-dom';

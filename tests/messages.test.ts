@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { CodedIssue, HardError, HardErrorCode, IssueCode, IssueParams } from '../src/core/messages';
-import { codedIssue, hardErrorText, ISSUE_CODES, issueText, LIMIT_DETAIL } from '../src/core/messages';
+import { calendarRefusalText, CALENDAR_REFUSAL_TEXT, codedIssue, hardErrorText, ISSUE_CODES, issueText, LIMIT_DETAIL } from '../src/core/messages';
+import { checkCalendars, checkFormat } from '../src/core/dates';
 import { CURLY_APOSTROPHE, quote } from '../src/core/quote';
 
 // Typed as a full record, so a new code in messages.ts fails the typecheck until it gets a sample here.
@@ -59,6 +60,16 @@ const SAMPLES: Record<IssueCode, IssueParams> = {
 	'died-doubtful': { person: 'Hugo Valmont', value: 'maybe' },
 	// Contract 0.2.7 M.6: the person key `childless` on a person who has a birth child.
 	'childless-has-child': { person: 'Aldric Valmont', child: 'Hugo Valmont' },
+	// WP-4 step 4.2 (spec §14): the date warnings, the calendar problems and the calendar block.
+	'year-zero': { where: 'year', title: 'Duke of Valmont', value: '0' },
+	'calendar-year-zero': { where: 'born', person: 'Hugo Valmont', value: 'Qinglong Emperor 0' },
+	'calendar-year-past-end': { where: 'reign', title: 'Duke of Valmont', value: 'Qinglong Emperor 12' },
+	'fits-two-calendars': { where: 'died', person: 'Hugo Valmont', value: 'Qinglong Emperor 3', calendars: ['Reign names', 'Reign names (copy)'] },
+	'calendar-no-anchor': { calendar: 'The Long Count' },
+	'calendar-note-missing': { note: '[[Calendars of the Far Land]]' },
+	'calendar-duplicate': { calendar: 'Reign names', note: 'Calendars 1.md', other: 'Calendars.md' },
+	'calendar-block-invalid': { note: 'Calendars.md' },
+	'calendar-entry-invalid': { note: 'Calendars.md', index: 2, why: 'no-name' },
 };
 
 /** Spec §13.3 gives this warning three short sentences, §13.6 the HEIC text four (checked by ste-editor). */
@@ -87,10 +98,21 @@ const MOST_SENTENCES: Partial<Record<IssueCode, number>> = {
 	'through-spouse-unknown-person': 3,
 	'sex-spelling': 3,
 	'died-doubtful': 3,
+	// ruling 4.2 fix: the clarity editor's rewrites of the date texts say what the plugin does and what the user can do.
+	'year-zero': 5,
+	'calendar-year-zero': 4,
+	'calendar-year-past-end': 5,
+	'fits-two-calendars': 4,
+	'calendar-no-anchor': 5,
+	'calendar-note-missing': 3,
+	'calendar-duplicate': 5,
+	'calendar-block-invalid': 4,
+	'calendar-entry-invalid': 3,
 };
 
 /** Texts whose first sentence is a description of 21 to 25 words (STE allows 25 for a description; D205 words). */
-const LONG_SENTENCE: IssueCode[] = ['through-spouse-no-claim', 'through-spouse-several-claims'];
+// ruling 4.2 fix: the first sentence of calendar-note-missing is 15 words and holds the link, which the sample makes 5 words.
+const LONG_SENTENCE: IssueCode[] = ['through-spouse-no-claim', 'through-spouse-several-claims', 'calendar-note-missing'];
 
 /** Picture warnings name a picture file, which is not a note, so the word list allows "file" there (spec §13.6). */
 const FILE_WORD: IssueCode[] = ['missing-picture', 'picture-not-image'];
@@ -452,5 +474,47 @@ describe('codedIssue', () => {
 		expect(codedIssue('self-parent', 'warning', { person: 'A' }, ['a'])).toEqual({ code: 'self-parent', level: 'warning', params: { person: 'A' }, ids: ['a'] });
 		expect('ids' in codedIssue('duplicate-union-id', 'blocking', { id: 'u' }, [])).toBe(false);
 		expect('ids' in codedIssue('missing-start', 'warning', { ref: 'x' })).toBe(false);
+	});
+});
+
+describe('calendarRefusalText: the refusals of the Calendars window (spec §14 rule 3)', () => {
+	const KEYS = Object.keys(CALENDAR_REFUSAL_TEXT);
+
+	it('has a sentence for every key that checkFormat and checkCalendars give', () => {
+		const given = new Set<string>();
+		for (const [kind, format] of [['cycles', '{year}'], ['cycles', '{cycle}{year}'], ['eras', '{cycle} {year}'], ['eras', '{era} {era} {year}'], ['cycles', '{year} {cycle} {nope}']] as const) {
+			const key = checkFormat(kind, format);
+			if (key) given.add(key);
+		}
+		const cycles = (name: string, formats: string[], length = 5, start = 1) => ({ id: name, name, note: 'C.md', formats, kind: { type: 'cycles' as const, length, start } });
+		const eras = (name: string, ...names: string[]) => ({ id: name, name, note: 'C.md', formats: ['{era} {year}'], kind: { type: 'eras' as const, eras: names.map((n) => ({ name: n, start: 1 })) } });
+		for (const r of [...checkCalendars([cycles('A', ['{cycle} {year}']), cycles('B', ['{CYCLE} {year}'])]), ...checkCalendars([eras('A', 'Tang'), eras('B', 'tang')]), ...checkCalendars([eras('A', 'Tang', 'TANG')]), ...checkCalendars([cycles('A', ['{cycle} {year}'], 0, 1.5)])]) given.add(r.key);
+		expect([...given].sort()).toEqual([...KEYS].sort());
+	});
+
+	it('is short, in the active voice, names the other calendar and fills every place', () => {
+		const samples: { calendar: string; key: string; other?: string }[] = [
+			...KEYS.map((key) => ({ calendar: 'Reign names', key })),
+			{ calendar: 'Reign names', key: 'calendar-format-duplicate', other: 'The Long Count' },
+			{ calendar: 'Reign names', key: 'calendar-era-duplicate', other: 'Dynasties' },
+		];
+		for (const sample of samples) {
+			const text = calendarRefusalText(sample);
+			expect(text.trim(), sample.key).not.toBe('');
+			expect(text, sample.key).not.toMatch(UNFILLED);
+			const parts = sentences(text);
+			// ruling 4.2 fix: a format refusal gives its rule, what is wrong with the format, and an example (3 sentences).
+			expect(parts.length, text).toBeLessThanOrEqual(3);
+			for (const part of parts) expect(part.split(/\s+/).length, part).toBeLessThanOrEqual(20);
+			expect(unquoted(text), text).not.toMatch(FORBIDDEN);
+		}
+		expect(calendarRefusalText({ calendar: 'Reign names', key: 'calendar-era-duplicate', other: 'Dynasties' })).toBe('The calendar “Reign names” and the calendar “Dynasties” have the same era name. A date with this name would fit both. Change one era name.');
+		expect(calendarRefusalText({ calendar: 'A', key: 'calendar-format-cycle' })).toBe('A cycle format needs {year} and {cycle}, one time each. It cannot have any other word in curly brackets. An example is “{year} Year of the {cycle} Cycle”.');
+	});
+
+	it('gives a plain sentence for a key it does not know, and never throws', () => {
+		expect(calendarRefusalText({ calendar: 'A', key: 'something-new' })).toBe('The calendar has an error. Correct the calendar.');
+		expect(() => calendarRefusalText(null as never)).not.toThrow();
+		expect(calendarRefusalText(null as never)).toBe('The calendar has an error. Correct the calendar.');
 	});
 });

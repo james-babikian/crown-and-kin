@@ -77,11 +77,11 @@
 /*
  * D28: "↑ 1 more child" at the top edge (left of the note's toolbar) and "↓ 3 more children" at the
  * bottom edge. A plain label: a tap goes through it to the tree. Its place comes from the tree view
- * (--dynasty-hint-*); its height is HINT_HEIGHT in tree-view.ts.
+ * (--dynasty-hint-top, --dynasty-hint-bottom); its height is HINT_HEIGHT in tree-view.ts.
  */
 .dynasty-hint {
 	position: absolute;
-	right: var(--dynasty-hint-right, var(--size-4-2));
+	right: var(--size-4-2);
 	z-index: 1;
 	display: flex;
 	align-items: center;

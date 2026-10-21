@@ -4,7 +4,7 @@ vi.mock('obsidian', () => import('./acceptance/fake-obsidian'));
 vi.mock('@codemirror/language', () => ({ forceParsing: () => false, syntaxTree: () => ({ length: 0 }) }));
 vi.mock('@codemirror/view', () => ({ ViewPlugin: { fromClass: () => ({}) } }));
 
-import { DEFAULT_SETTINGS } from '../src/obsidian/settings';
+import { DEFAULT_SETTINGS } from '../src/view/settings';
 import { ME_WORD as SCENE_ME_WORD } from '../src/render/dom/scene';
 import { ME_WORD, VIEW_NOTICE } from '../src/render/view-text';
 import { fakeWin, installDom, resetDom, settle } from './acceptance/fake-dom';

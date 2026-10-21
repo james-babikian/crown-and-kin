@@ -8,7 +8,7 @@ import { deriveFamilies, type FamilyGraph } from '../src/core/derive';
 import { parseDynasty } from '../src/core/parse';
 import { computeRelations, relationCallStats } from '../src/core/relations';
 import { FIRST_ROWS, IDLE_CHUNK, PICKER_PAGE, pickPerson } from '../src/obsidian/person-picker';
-import { clearRelationCache } from '../src/obsidian/relation-cache';
+import { clearRelationCache } from '../src/view/relation-cache';
 import { cardRelationText } from '../src/render/tree-info';
 import { FEl, clock, fakeWin, installDom, resetDom, runTimers } from './acceptance/fake-dom';
 import { openModals, resetObsidian } from './acceptance/fake-obsidian';

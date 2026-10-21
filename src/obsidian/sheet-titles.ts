@@ -18,7 +18,7 @@ import type { Holder, Person } from '../core/types';
 import { TITLES_UI, WINDOW_UI, WRITE_TEXT } from '../render/ui-text';
 import { choose } from './choice-modal';
 import { holderForm } from './holder-form';
-import { addFields, changedFields, refOf, valuesOf } from './titles-draft';
+import { addFields, changedFields, refOf, valuesOf } from '../view/titles-draft';
 import { buildRow, textButton } from './window-parts';
 
 /** What the Titles section needs from the edit sheet. */

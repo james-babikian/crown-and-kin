@@ -7,7 +7,7 @@ vi.mock('@codemirror/view', () => ({ ViewPlugin: { fromClass: () => ({}) } }));
 import { parseDynasty } from '../src/core/parse';
 import { HousesWindow } from '../src/obsidian/houses-window';
 import { TitlesWindow } from '../src/obsidian/titles-window';
-import { closePluginModals } from '../src/obsidian/plugin-modals';
+import { closePluginModals } from '../src/view/plugin-modals';
 import { FEl, clock, fakeWin, installDom, resetDom } from './acceptance/fake-dom';
 import { openModals, resetObsidian } from './acceptance/fake-obsidian';
 import { fakeApp } from './acceptance/tree-view-fakes';

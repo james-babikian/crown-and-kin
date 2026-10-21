@@ -1,4 +1,4 @@
-import { FEl } from './fake-dom';
+import { FEl, fakeDoc, fakeWin } from './fake-dom';
 
 /*
  * The parts of the `obsidian` module that the tree view, the full-screen view and the edit sheet
@@ -30,6 +30,9 @@ export class Modal {
 	readonly modalEl: FEl;
 	readonly titleEl: FEl;
 	readonly contentEl: FEl;
+	// Obsidian sets these two as instance properties of every modal: a method of the same name in a subclass is hidden by them (WP-5 fix).
+	readonly win: typeof fakeWin = fakeWin;
+	readonly doc: typeof fakeDoc = fakeDoc;
 
 	constructor(public app: unknown) {
 		this.containerEl = new FEl('div', { cls: 'modal-container' });

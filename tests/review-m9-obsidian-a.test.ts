@@ -9,7 +9,7 @@ import { applyOp } from '../src/core/yaml-edit';
 import type { Op } from '../src/core/edit';
 import { EditSheet } from '../src/obsidian/edit-sheet';
 import { STORE_BYTES, createPictureStore, type CopyBox, type PictureCopy, type PictureIO, type PictureStore } from '../src/obsidian/picture-store';
-import { DEFAULT_SETTINGS } from '../src/obsidian/settings';
+import { DEFAULT_SETTINGS } from '../src/view/settings';
 import { FEl, fakeDoc, fakeWin, flushFrames, installDom, resetDom, resizeAll, runTimers, settle } from './acceptance/fake-dom';
 import { resetObsidian } from './acceptance/fake-obsidian';
 import { fixtureSource } from './acceptance/load';

@@ -8,7 +8,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import type { Rect } from '../src/layout/model';
 import { FullScreenModal } from '../src/obsidian/full-screen';
-import { DEFAULT_SETTINGS, type DynastySettings } from '../src/obsidian/settings';
+import { DEFAULT_SETTINGS, type DynastySettings } from '../src/view/settings';
 import type { View } from '../src/render/view-math';
 import { FEl, device, flushFrames, resizeAll, settle } from './acceptance/fake-dom';
 import { topLevelBlocks } from './acceptance/load';

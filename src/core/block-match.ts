@@ -45,6 +45,8 @@ export function dedent(s: string): string {
  * view removes it); an indentation shared by all lines cannot change which block it is.
  */
 export function sameBody(a: string, b: string): boolean {
+	// The same text is the usual answer, and it needs no copy of the whole body.
+	if (a === b) return true;
 	const x = normBody(a);
 	const y = normBody(b);
 	return x === y || dedent(x) === dedent(y);

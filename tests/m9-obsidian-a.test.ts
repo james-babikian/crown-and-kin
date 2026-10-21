@@ -12,7 +12,7 @@ import { HousesWindow, houseOps, loadHouses, rowsOf } from '../src/obsidian/hous
 import { pickPicture, pictureLink, safePictureName } from '../src/obsidian/picture-picker';
 import { HEADER_STORE_KEY, NO_READ_BYTES, NO_READ_BYTES_COARSE, createPictureStore, type CopyBox, type PictureCopy, type PictureIO, type PictureStore } from '../src/obsidian/picture-store';
 import { LinkUpdater, renameKind } from '../src/obsidian/rename-links';
-import { DEFAULT_SETTINGS, normaliseSettings } from '../src/obsidian/settings';
+import { DEFAULT_SETTINGS, normaliseSettings } from '../src/view/settings';
 import { HandleRegistry } from '../src/obsidian/block-handle';
 import { PICTURES_UI, RENAME_UI, WINDOW_UI, deviceNotice, renamedText } from '../src/render/ui-text';
 import { FEl, dispatch, fakeWin, installDom, resetDom, runTimers, settle } from './acceptance/fake-dom';

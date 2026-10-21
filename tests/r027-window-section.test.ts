@@ -15,9 +15,9 @@ vi.mock('../src/obsidian/person-picker', () => ({
 	},
 }));
 
-import { closePluginModals } from '../src/obsidian/plugin-modals';
+import { closePluginModals } from '../src/view/plugin-modals';
 import { successionHints } from '../src/obsidian/succession-section';
-import type { SuccessionDraft } from '../src/obsidian/titles-draft';
+import type { SuccessionDraft } from '../src/view/titles-draft';
 import { SUCCESSION_UI as T, WINDOW_UI } from '../src/render/ui-text';
 import { FEl, clock, device, dispatch, dispatchWindow, fakeWin, installDom, resetDom, runTimers, settle } from './acceptance/fake-dom';
 import { openModals, resetObsidian } from './acceptance/fake-obsidian';
@@ -398,6 +398,20 @@ describe('the fields', () => {
 		box.checked = true;
 		dispatch(box, 'change');
 		expect(lineRows(p).some((r) => r.includes('Ward'))).toBe(true);
+	});
+
+	it('the hint of a switch stands inside the text of its own row, and the switch is described by it (look round 0.3.2)', () => {
+		const o = openWin();
+		const p = page(o, 'lord-of-wetherby');
+		for (const key of ['adopted', 'body']) {
+			const pair = ctl(p, key)!;
+			const hint = pair.querySelector('.dynasty-rule-text .dynasty-sheet-hint')!;
+			expect(hint).not.toBeNull();
+			expect(hint.getText()).not.toBe('');
+			// Nothing of the hint stands outside the row, under it.
+			expect(pair.querySelectorAll('.dynasty-sheet-hint')).toHaveLength(1);
+			expect(pair.querySelector('input')!.getAttribute('aria-describedby')).toBe(hint.getAttribute('id'));
+		}
 	});
 
 	it('the hint of the body switch names the first holder', () => {

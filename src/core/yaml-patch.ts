@@ -17,7 +17,7 @@ import { normaliseSobriquet } from './sobriquet';
 /** §4.1 and §13.0 field order; a new key goes after the nearest earlier key that is present. */
 export const PERSON_ORDER = ['id', 'name', 'sobriquet', 'title', 'card-title', 'house', 'sex', 'born', 'died', 'parents', 'placement', 'illegitimate', 'childless', 'union', 'link', 'portrait', 'portrait-crop', 'arms', 'notes'];
 /** §4.1 and §13.0 order of the `options` keys. */
-export const OPTION_ORDER = ['start', 'focus', 'me', 'generations', 'height'];
+export const OPTION_ORDER = ['start', 'focus', 'me', 'generations', 'height', 'calendar'];
 /** §4.1 and §13.0 order of the top-level sections. */
 export const TOP_ORDER = ['options', 'houses', 'titles', 'people', 'unions'];
 

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { EditResult, Op } from '../src/core/edit';
-import { linkTargets, parseLink } from '../src/core/link-rewrite';
+import { linkTargets } from '../src/core/link-rewrite';
+import { parseLink } from '../src/core/picture-link';
 import { parseDynasty } from '../src/core/parse';
 import type { Tree } from '../src/core/types';
 import { applyOp } from '../src/core/yaml-edit';

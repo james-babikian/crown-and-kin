@@ -10,7 +10,7 @@ import { parseDynasty } from '../../src/core/parse';
 import { geometryFor } from '../../src/layout/geometry';
 import { FullScreenModal } from '../../src/obsidian/full-screen';
 import DynastyTreePlugin from '../../src/obsidian/main';
-import { DEFAULT_SETTINGS } from '../../src/obsidian/settings';
+import { DEFAULT_SETTINGS } from '../../src/view/settings';
 import { Popover } from '../../src/render/dom/widgets';
 import { ADD_UI, INSERT_UI, RENAME_UI, SETTINGS_UI } from '../../src/render/ui-text';
 import { TreeView } from '../../src/obsidian/tree-view';

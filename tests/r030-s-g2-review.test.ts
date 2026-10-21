@@ -5,7 +5,7 @@ vi.mock('@codemirror/language', () => ({ forceParsing: () => false, syntaxTree: 
 vi.mock('@codemirror/view', () => ({ ViewPlugin: { fromClass: () => ({}) } }));
 
 import { FullScreenModal } from '../src/obsidian/full-screen';
-import { clearRelationCache } from '../src/obsidian/relation-cache';
+import { clearRelationCache } from '../src/view/relation-cache';
 import { FEl, clock, dispatch, fakeWin, flushFrames, installDom, resetDom, resizeAll, settle } from './acceptance/fake-dom';
 import { openModals, resetObsidian } from './acceptance/fake-obsidian';
 import { embed, fakeHandle, fakeHost, fullViews, phone } from './acceptance/tree-view-fakes';

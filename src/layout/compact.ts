@@ -49,7 +49,7 @@ const ints = (n: number, fill = 0): Int32Array => new Int32Array(n).fill(fill);
 /**
  * Reads the structure of the placed rows once and returns the step; see the file header. `blocks` are the partners placed together,
  * `rowBlocks` the blocks of each row in order, `families` the children of each family.
- * Exempt from the size rule of the architecture notes §4.2.7 (an internal test holds its size): 374 code lines and 119 branches in 0.3.1 (0.3.0: 287 and 85; part (c)
+ * Exempt from the size rule of the architecture notes §4.2.7 (`tests/layout-size-rule.test.ts` holds its size): 374 code lines and 119 branches in 0.3.1 (0.3.0: 287 and 85; part (c)
  * and the push train grew it). Its parts (a), (b) and (c) share closures over typed arrays that one pass fills, and a split costs the hot path; a split waits for WP-E2.
  */
 export function compactor(g: FamilyGraph, anchors: ReadonlyMap<string, string>, persons: ReadonlyMap<string, Placed>, blocks: string[][], rowBlocks: number[][], families: string[][], dropInset?: number): CompactStep {

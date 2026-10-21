@@ -6,10 +6,10 @@ vi.mock('obsidian', () => import('./acceptance/fake-obsidian'));
 vi.mock('@codemirror/language', () => ({ forceParsing: () => false, syntaxTree: () => ({ length: 0 }) }));
 vi.mock('@codemirror/view', () => ({ ViewPlugin: { fromClass: () => ({}) } }));
 
-import { finderFirstView, finderLevel, finderOrientation } from '../src/obsidian/focus-mode';
+import { finderFirstView, finderLevel, finderOrientation } from '../src/view/focus-mode';
 import { FullScreenModal } from '../src/obsidian/full-screen';
-import { closePluginModals } from '../src/obsidian/plugin-modals';
-import { clearRelationCache } from '../src/obsidian/relation-cache';
+import { closePluginModals } from '../src/view/plugin-modals';
+import { clearRelationCache } from '../src/view/relation-cache';
 import { clearMeasureCache } from '../src/render/dom/measure';
 import { FEl, clock, dispatch, fakeWin, flushFrames, installDom, resetDom, resizeAll, runTimers, settle } from './acceptance/fake-dom';
 import { openModals, resetObsidian } from './acceptance/fake-obsidian';

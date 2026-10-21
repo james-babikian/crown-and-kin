@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 vi.mock('obsidian', () => import('./acceptance/fake-obsidian'));
 
 import { applyOp } from '../src/core/yaml-edit';
-import { idRefusalText } from '../src/obsidian/id-draft';
+import { idRefusalText } from '../src/view/id-draft';
 import { ID_UI } from '../src/render/ui-text';
 
 /*

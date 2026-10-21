@@ -12,7 +12,7 @@ import { parseDynasty } from '../src/core/parse';
 import { cardLabels } from '../src/core/titles';
 import { applyOp } from '../src/core/yaml-edit';
 import { FullScreenModal } from '../src/obsidian/full-screen';
-import { closePluginModals } from '../src/obsidian/plugin-modals';
+import { closePluginModals } from '../src/view/plugin-modals';
 import { TitlesWindow } from '../src/obsidian/titles-window';
 import { SETTINGS_UI } from '../src/render/ui-text';
 import { FEl, clock, dispatch, fakeWin, installDom, resetDom, settle } from './acceptance/fake-dom';

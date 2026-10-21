@@ -8,7 +8,7 @@ vi.mock('@codemirror/view', () => ({ ViewPlugin: { fromClass: () => ({}) } }));
 
 import type { Rect } from '../../src/layout/model';
 import { FullScreenModal } from '../../src/obsidian/full-screen';
-import { DEFAULT_SETTINGS } from '../../src/obsidian/settings';
+import { DEFAULT_SETTINGS } from '../../src/view/settings';
 import type { TreeView } from '../../src/obsidian/tree-view';
 import type { View } from '../../src/render/view-math';
 import { FEl, clock, device, flushFrames, installDom, resetDom, resizeAll, runFrame, settle } from './fake-dom';

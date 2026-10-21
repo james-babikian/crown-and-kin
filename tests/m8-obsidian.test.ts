@@ -12,8 +12,8 @@ import { newTitleId } from '../src/core/title-ops';
 import { cardLabels, holderTable } from '../src/core/titles';
 import { applyOp } from '../src/core/yaml-edit';
 import { FullScreenModal } from '../src/obsidian/full-screen';
-import { closePluginModals } from '../src/obsidian/plugin-modals';
-import { DEFAULT_SETTINGS } from '../src/obsidian/settings';
+import { closePluginModals } from '../src/view/plugin-modals';
+import { DEFAULT_SETTINGS } from '../src/view/settings';
 import { entryText, titleOnCard } from '../src/obsidian/sheet-titles';
 import { freeName } from '../src/obsidian/table-note';
 import {
@@ -34,7 +34,7 @@ previewParts,
 	type HolderRow,
 	type HolderValues,
 	type TitleRow,
-} from '../src/obsidian/titles-draft';
+} from '../src/view/titles-draft';
 import { TitlesWindow } from '../src/obsidian/titles-window';
 import { TITLES_UI, deleteText } from '../src/render/ui-text';
 import { FEl, clock, dispatch, fakeWin, installDom, resetDom, settle } from './acceptance/fake-dom';

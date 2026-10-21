@@ -5,7 +5,7 @@ vi.mock('@codemirror/language', () => ({ forceParsing: () => false, syntaxTree: 
 vi.mock('@codemirror/view', () => ({ ViewPlugin: { fromClass: () => ({}) } }));
 
 import { FullScreenModal } from '../src/obsidian/full-screen';
-import { clearRelationCache } from '../src/obsidian/relation-cache';
+import { clearRelationCache } from '../src/view/relation-cache';
 import { TreeView } from '../src/obsidian/tree-view';
 import { FEl, clock, fakeWin, installDom, resetDom, settle } from './acceptance/fake-dom';
 import { openModals, resetObsidian } from './acceptance/fake-obsidian';
@@ -52,7 +52,7 @@ async function block(classes: string[], inEditor: () => boolean) {
 	const view = new TreeView(host as never, el as never, SRC, { kind: 'embed', ctx } as never);
 	view.load();
 	await settle();
-	return { view: view as unknown as { lateTried: boolean; handle: unknown; lateResolve(): void }, top };
+	return { view: view as unknown as { binding: { lateTried: boolean; handle: unknown }; lateResolve(): void }, top };
 }
 
 describe('lateResolve: where the wait for the block place goes on', () => {
@@ -63,7 +63,7 @@ describe('lateResolve: where the wait for the block place goes on', () => {
 	])('%s: no sure answer yet means the wait goes on', async (_n, classes) => {
 		const b = await block(classes, () => false);
 		b.view.lateResolve();
-		expect(b.view.lateTried).toBe(false);
+		expect(b.view.binding.lateTried).toBe(false);
 	});
 
 	it('Live Preview: once the editor holds the block the handle is found', async () => {
@@ -71,8 +71,8 @@ describe('lateResolve: where the wait for the block place goes on', () => {
 		const b = await block(['markdown-source-view', 'cm-editor'], () => there);
 		there = true;
 		b.view.lateResolve();
-		expect(b.view.lateTried).toBe(true);
-		expect(b.view.handle).toBeTruthy();
+		expect(b.view.binding.lateTried).toBe(true);
+		expect(b.view.binding.handle).toBeTruthy();
 	});
 
 	it.each([
@@ -83,6 +83,6 @@ describe('lateResolve: where the wait for the block place goes on', () => {
 	])('%s: the wait ends at once', async (_n, classes) => {
 		const b = await block(classes, () => false);
 		b.view.lateResolve();
-		expect(b.view.lateTried).toBe(true);
+		expect(b.view.binding.lateTried).toBe(true);
 	});
 });

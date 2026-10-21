@@ -7,7 +7,7 @@ vi.mock('@codemirror/view', () => ({ ViewPlugin: { fromClass: () => ({}) } }));
 import { parseDynasty } from '../src/core/parse';
 import { FullScreenModal } from '../src/obsidian/full-screen';
 import { TreeView, type OpenTime } from '../src/obsidian/tree-view';
-import { clearRelationCache } from '../src/obsidian/relation-cache';
+import { clearRelationCache } from '../src/view/relation-cache';
 import type { RenderTiming } from '../src/render/tree-info';
 import { FEl, clock, fakeWin, flushFrames, installDom, resetDom, resizeAll, settle } from './acceptance/fake-dom';
 import { resetObsidian } from './acceptance/fake-obsidian';

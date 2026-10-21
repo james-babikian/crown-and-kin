@@ -14,7 +14,7 @@ import type { CardLabel } from '../core/titles';
 import { drawnGeometry } from '../layout/geometry';
 import { LayoutStopped, illegitimateSigns, layoutTree, pictureSets } from '../layout/index';
 import type { Geometry, LaidOut, LayoutSettings } from '../layout/model';
-import type { Measure, SceneFonts } from '../render/dom/scene';
+import type { Measure, SceneFonts } from '../render/scene-model';
 import type { BreakList } from '../render/break-words';
 import { tallCardsFor, tallTitlesFor, titleMeasure } from '../render/dom/tall-cards';
 

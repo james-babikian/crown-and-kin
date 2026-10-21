@@ -203,7 +203,7 @@ describe('yearOf: more fragments of a grouped number are no year', () => {
 
 	it('a date with a day before the comma keeps its year', () => {
 		expect(yearOf('Jan 5, 624')).toBe(624);
-		expect(yearOf('March 5, 250 BC')).toBe(-250);
+		expect(yearOf('March 5, 250 BC')).toBe(-249); // §14 rule 8 (0.3.2): n BC is internal 1 - n.
 		expect(yearOf('5 Jan, 624')).toBe(624);
 	});
 
@@ -213,7 +213,7 @@ describe('yearOf: more fragments of a grouped number are no year', () => {
 
 	it('the old readings stay', () => {
 		expect(yearOf('1,250')).toBe(1250);
-		expect(yearOf('12,000 BC')).toBe(-12000);
+		expect(yearOf('12,000 BC')).toBe(-11999); // §14 rule 8 (0.3.2): n BC is internal 1 - n.
 		expect(yearOf('March 3, 1250')).toBe(1250);
 		expect(yearOf('12 May 1203')).toBe(1203);
 		expect(yearOf('1203')).toBe(1203);

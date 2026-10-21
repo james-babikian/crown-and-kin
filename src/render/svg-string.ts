@@ -25,8 +25,7 @@ import { farTagSigns } from '../layout/far-tag-sign';
 import { illegitimateSigns } from '../layout/illegitimate-sign';
 import { FOLD_EM } from '../layout/fold-spots';
 import type { EdgeDrawing, NameLineCount, StrokeKind, TreeLayout } from '../layout/model';
-import { FOLD_CHIP_EM, signText } from './dom/folds';
-import { FRAME_STROKE_PX, RUMOUR_FONT_EM, TAB_TEXT_BASE_EM, TAB_TEXT_EM, type Measure, type SceneFonts } from './dom/scene';
+import { FOLD_CHIP_EM, FRAME_STROKE_PX, RUMOUR_FONT_EM, TAB_TEXT_BASE_EM, TAB_TEXT_EM, signText, type Measure, type SceneFonts } from './scene-model';
 import { legendRows, type LegendHouse, type LegendPart } from './legend';
 import { lineLook, type LineMarks, type LineState } from './line-highlight';
 import type { BreakList } from './break-words';
@@ -216,7 +215,7 @@ export function renderSvg(g: FamilyGraph, layout: TreeLayout, edges: EdgeDrawing
 		const titleText = cl ? cl.title : p.title;
 		const reign = cl && opts.showDates !== false ? cl.reign : undefined;
 		// B.3.2: the scene passes the same lines, and the dates line counts even when "Show dates on cards" is off (the scene hides it by a class and keeps its room).
-		const shown: ShownLines = { title: !!(titleText || reign), dates: !!dateLine(p) };
+		const shown: ShownLines = { title: !!(titleText || reign), dates: !!dateLine(p, g.dates) };
 		// D177 (10): a card with no relation word, in a tree with relation words, centres its text in the whole card.
 		const t = textOf(count, box.tallTitle, shown, geo.relationLine === true && !!opts.relations && !opts.relations.get(p.id)?.text);
 		const tx = box.x + (t.anchorX ?? t.padX);
@@ -278,7 +277,7 @@ export function renderSvg(g: FamilyGraph, layout: TreeLayout, edges: EdgeDrawing
 		titles.forEach((line, i) => {
 			out.push(`<text x="${tx}" y="${box.y + (i ? t.title2Baseline! : t.titleBaseline)}"${anchor} font-size="${t.smallSize}" fill="${c.textMuted}">${esc(line)}</text>`);
 		});
-		const dates = dateLine(p);
+		const dates = dateLine(p, g.dates);
 		const datesY = hasTitle ? t.datesBaseline : t.titleBaseline;
 		const showYears = !!dates && !(saved && opts.showDates === false);
 		if (showYears) out.push(`<text x="${tx}" y="${box.y + datesY}"${anchor} font-size="${t.smallSize}" fill="${c.dates}">${esc(cutSmall(dates!, t.textW))}</text>`);

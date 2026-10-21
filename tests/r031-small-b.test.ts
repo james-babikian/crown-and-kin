@@ -7,7 +7,7 @@ vi.mock('@codemirror/view', () => ({ ViewPlugin: { fromClass: () => ({}) } }));
 
 import { EditSheet } from '../src/obsidian/edit-sheet';
 import { afterPaint } from '../src/obsidian/sheet-parts';
-import { DEFAULT_SETTINGS } from '../src/obsidian/settings';
+import { DEFAULT_SETTINGS } from '../src/view/settings';
 import { DynastySettingTab, type SettingsHost } from '../src/obsidian/settings-tab';
 import * as UIT from '../src/render/ui-text';
 import { HOUSES, SETTINGS_UI, SHEET, TITLES_UI, WRITE_TEXT } from '../src/render/ui-text';

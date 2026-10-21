@@ -100,7 +100,9 @@ class Reader {
 		// Spec §13.1: a list or a map is not one person id. A numeric id is text (§6.8).
 		const me = str(v.me);
 		if (me === undefined && !isEmpty(v.me)) this.warn('me-not-id', {});
-		return { start: str(v.start), focus: str(v.focus), me, generations: int(v.generations), height: int(v.height) };
+		// Only when written, so a tree without a calendar note reads exactly as before (spec §14 rule 7).
+		const calendar = linkValue(v.calendar, () => this.sourceText(['options', 'calendar']));
+		return { start: str(v.start), focus: str(v.focus), me, generations: int(v.generations), height: int(v.height), ...(calendar !== undefined ? { calendar } : {}) };
 	}
 
 	houses(v: Raw): House[] {

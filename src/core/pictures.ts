@@ -15,7 +15,7 @@
  *   still draws, and they follow the core issues: houses first, then people, each in list order.
  */
 
-import { parsePictureLink } from './link-rewrite';
+import { parsePictureLink } from './picture-link';
 import { codedIssue, type CodedIssue, type IssueParams } from './messages';
 import type { House, Person } from './types';
 
@@ -38,7 +38,7 @@ const WEB = /^(?:[a-z]{2,}:|\/\/|www\.)/i;
 /**
  * Reads a written `arms` or `portrait` value (rule 4): `[[p]]`, `[[p|text]]`, `[[p#sub]]`,
  * `[text](p)`, `[text](<p>)` or a bare `p`, each with an optional "!". Null when it names nothing.
- * It uses `parsePictureLink`, the parser of the link rewrite, so a rename and the picture agree.
+ * It uses `parsePictureLink` (`picture-link.ts`), the parser of the link rewrite, so a rename and the picture agree.
  */
 export function pictureTarget(value: string | undefined): PictureTarget | null {
 	try {
@@ -427,6 +427,30 @@ export function fitMeet(w: number, h: number, boxW: number, boxH: number): { x: 
 	}
 	const fw = (bh * w) / h;
 	return { x: (bw - fw) / 2, y: 0, w: fw, h: bh };
+}
+
+// ---------- Copy sizes (the picture store) ----------
+
+/** The pixel size of a copy; `still` is `CopyBox.noEnlarge` of the picture store: a raster copy is never larger than the picture itself. */
+export interface CopyPx {
+	w: number;
+	h: number;
+	still?: boolean;
+}
+
+/**
+ * The pixels of a copy (O3, B10): the box in CSS px times min(max(dpr, 1), 3). `noEnlarge` is carried only when it is set, so a copy
+ * without it has the same size record as before.
+ */
+export function copyPixels(box: { w: number; h: number; noEnlarge?: boolean }, dpr: number): CopyPx {
+	const k = Math.min(Math.max(Number.isFinite(dpr) ? dpr : 1, 1), 3);
+	const size = (v: number) => Math.max(1, Math.round((Number.isFinite(v) && v > 0 ? v : 1) * k));
+	return { w: size(box.w), h: size(box.h), ...(box.noEnlarge ? { still: true } : {}) };
+}
+
+/** The box a copy fits into: the pixel box, or for `still` the part of it that the picture itself covers. An SVG has no pixels of its own, so it fills the box. */
+export function limitBox(picture: { width: number; height: number }, px: CopyPx, ext: string): [number, number] {
+	return px.still && ext.toLowerCase() !== 'svg' ? [Math.min(px.w, picture.width), Math.min(px.h, picture.height)] : [px.w, px.h];
 }
 
 // ---------- Warnings (rule 12, A1) ----------

@@ -1,0 +1,245 @@
+/* ---------- The picture viewer (spec §0 D256; src/obsidian/picture-viewer.ts) ---------- */
+
+/*
+ * A window that shows one picture whole. It has the class `dynasty-sheet`, so the surface is the plain window colour of the theme in light and dark (the rule of
+ * 10-edit-sheet.css), and the colours below are only theme tokens. On a computer the window is large, 48 px from the edges, and keeps its size when the picture
+ * changes. On a phone it fills the screen, with a grip at the top, the name and the text line at the left, and Close at the right.
+ * The picture sits in the stage and takes all touches (`touch-action: none`): the code moves it through custom properties, so no style text is written.
+ */
+
+.modal.dynasty-sheet.dynasty-viewer:not(.is-phone) {
+	width: min(1000px, calc(100vw - 96px));
+	height: calc(100vh - 96px);
+	max-height: none;
+	margin-top: 48px;
+}
+
+.modal.dynasty-viewer:focus {
+	outline: none;
+}
+
+.dynasty-viewer .modal-content.dynasty-viewer-content {
+	display: grid;
+	flex: 1 1 auto;
+	min-height: 0;
+	padding: 0;
+	grid-template-columns: minmax(0, 1fr) auto;
+	grid-template-rows: auto minmax(0, 1fr) auto;
+	grid-template-areas:
+		'head head'
+		'stage stage'
+		'thumbs close';
+}
+
+.dynasty-viewer.is-phone .modal-content.dynasty-viewer-content {
+	grid-template-rows: auto auto minmax(0, 1fr) auto;
+	grid-template-areas:
+		'grip grip'
+		'head close'
+		'stage stage'
+		'thumbs thumbs';
+}
+
+/* The grip is for the swipe down on a phone; a computer has none. */
+.dynasty-viewer:not(.is-phone) .dynasty-sheet-grip {
+	display: none;
+}
+
+.dynasty-viewer.is-phone .dynasty-sheet-grip {
+	grid-area: grip;
+	margin: max(8px, env(safe-area-inset-top)) auto 4px;
+}
+
+.dynasty-viewer-head {
+	grid-area: head;
+	min-width: 0;
+	padding: 22px 24px 10px;
+}
+
+.dynasty-viewer.is-phone .dynasty-viewer-head {
+	padding: 4px 8px 8px 16px;
+}
+
+.dynasty-viewer-name {
+	font-family: var(--font-text);
+	font-size: var(--dynasty-type-title);
+	font-weight: var(--font-semibold);
+	line-height: 1.2;
+	overflow-wrap: anywhere;
+}
+
+.dynasty-viewer-line {
+	margin-top: 2px;
+	font-family: var(--font-text);
+	font-size: var(--dynasty-type-text);
+	line-height: 1.45;
+	color: var(--dynasty-muted);
+}
+
+.dynasty-viewer-stage {
+	grid-area: stage;
+	position: relative;
+	min-width: 0;
+	min-height: 0;
+	margin: 0 24px;
+	overflow: hidden;
+	/* The picture takes every touch and pointer gesture itself: the browser must not scroll or zoom the page from it. */
+	touch-action: none;
+	user-select: none;
+	-webkit-user-select: none;
+}
+
+.dynasty-viewer.is-phone .dynasty-viewer-stage {
+	margin: 0;
+}
+
+/*
+ * The whole picture, in the size that the code works out (`--dynasty-vw-w`, `--dynasty-vw-h`). The zoom and the move are one transform. The picture shows at
+ * once: there is no opening motion (D262).
+ */
+.dynasty-viewer-img {
+	display: none;
+	position: absolute;
+	left: 50%;
+	top: 50%;
+	width: var(--dynasty-vw-w, 0px);
+	height: var(--dynasty-vw-h, 0px);
+	max-width: none;
+	transform-origin: 50% 50%;
+	transform: translate(-50%, -50%) translate(var(--dynasty-vw-x, 0px), var(--dynasty-vw-y, 0px)) scale(var(--dynasty-vw-s, 1));
+	-webkit-user-drag: none;
+	pointer-events: none;
+}
+
+.dynasty-viewer-stage.has-picture .dynasty-viewer-img {
+	display: block;
+}
+
+/* D126: with reduced movement the swipe down does not slide the window back or out. */
+.dynasty-viewer.dynasty-reduce-motion.is-settling {
+	transition: none;
+}
+
+.dynasty-viewer-status {
+	position: absolute;
+	inset: 0;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: 16px;
+	text-align: center;
+	font-size: var(--dynasty-type-text);
+	color: var(--dynasty-muted);
+}
+
+.dynasty-viewer-status.is-hidden {
+	display: none;
+}
+
+/* The two small pictures; the one that shows has a 2 px ring in the text colour. They hide while the picture is zoomed. */
+.dynasty-viewer-thumbs {
+	grid-area: thumbs;
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	padding: 14px 0 18px 24px;
+}
+
+.dynasty-viewer.is-phone .dynasty-viewer-thumbs {
+	justify-content: center;
+	padding: 10px 16px max(18px, env(safe-area-inset-bottom));
+}
+
+.dynasty-viewer.is-zoomed .dynasty-viewer-thumbs {
+	visibility: hidden;
+}
+
+.dynasty-sheet button.dynasty-viewer-thumb {
+	flex: none;
+	width: 44px;
+	height: 44px;
+	min-width: 44px;
+	min-height: 44px;
+	padding: 3px;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	border: 0;
+	border-radius: var(--radius-m);
+	background: transparent;
+	box-shadow: none;
+	cursor: pointer;
+}
+
+.dynasty-sheet.dynasty-viewer.is-phone button.dynasty-viewer-thumb {
+	width: 52px;
+	height: 52px;
+}
+
+.dynasty-sheet button.dynasty-viewer-thumb.is-on {
+	box-shadow: 0 0 0 2px var(--text-normal);
+}
+
+.dynasty-sheet button.dynasty-viewer-thumb:focus-visible {
+	outline: 2px solid var(--interactive-accent);
+	outline-offset: 2px;
+}
+
+.dynasty-viewer-thumb img {
+	max-width: 100%;
+	max-height: 100%;
+	border-radius: 3px;
+	object-fit: contain;
+}
+
+/* Close: a button at the lower right on a computer, a text link at the upper right on a phone. At least 44 px each way. */
+.dynasty-sheet button.dynasty-viewer-close {
+	grid-area: close;
+	align-self: center;
+	min-width: 44px;
+	min-height: 44px;
+	margin: 14px 24px 18px 10px;
+}
+
+.dynasty-sheet.dynasty-viewer.is-phone button.dynasty-viewer-close {
+	align-self: start;
+	margin: 0 6px 0 0;
+	padding: 0 14px;
+	border: 0;
+	background: none;
+	box-shadow: none;
+	color: var(--dynasty-link);
+}
+
+/* D220: the window follows the finger of a swipe down. At rest it has no transform. */
+.modal.dynasty-viewer.is-pulled {
+	transform: translateY(var(--dynasty-sheet-pull, 0px));
+	will-change: transform;
+}
+
+.modal.dynasty-viewer.is-settling {
+	transition: transform 200ms ease-out;
+}
+
+/* Look round 0.3.2 (D261): the screen behind the viewer. In a light theme the picture needs a darker screen to stand out; the colour is the text colour of the theme, so it fits each theme. A dark theme keeps the dark screen of Obsidian. */
+.theme-light .modal-container.dynasty-viewer-container > .modal-bg {
+	/* Obsidian keeps its own opacity on the screen (about 0.85, G5 measure), so the half-dark screen of the preview comes from a colour at 60 %: 0.6 × 0.85 ≈ 0.5. */
+	/* iOS before 16.2 has no color-mix(): it keeps the plain text colour (a darker screen), the rule of every color-mix() in the style sheet. */
+	background-color: var(--text-normal);
+	background-color: color-mix(in srgb, var(--text-normal) 60%, transparent);
+}
+
+/* The top corners of the phone window are round while it follows the finger (the rule of the full-screen sheet has square corners and is more specific than `.is-pulled` alone). */
+.modal.dynasty-viewer.is-phone.is-pulled {
+	border-top-left-radius: var(--radius-l, 12px);
+	border-top-right-radius: var(--radius-l, 12px);
+}
+
+/*
+ * A zoomed picture on a phone fills the screen to the bottom edge: the two small pictures hide, and the stage lets the picture grow into their place. The clip
+ * cuts the picture at the top, so it never covers the grip, the name and Close; it is open at the sides and the bottom, and the window clips it at the screen edge.
+ */
+.dynasty-viewer.is-phone.is-zoomed .dynasty-viewer-stage {
+	overflow: visible;
+	clip-path: inset(0 -100vmax -100vmax -100vmax);
+}

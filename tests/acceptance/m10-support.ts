@@ -96,9 +96,6 @@ export function treeOf(source: string): Tree {
 /** Parse and derive a block that must not have a hard error. */
 export const graphOf = (source: string): FamilyGraph => deriveFamilies(treeOf(source));
 
-/** A fresh graph of the same text (the fold functions memoise per graph object). */
-export const freshGraph = (source: string): FamilyGraph => graphOf(source);
-
 // ---------- Sample tree 15 ----------
 
 /** Block 0 of sample tree 15: the branches and folds. Block 1: the long names. */

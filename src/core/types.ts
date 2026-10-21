@@ -5,12 +5,10 @@
  */
 
 import type { CodedIssue, HardError } from './messages';
+import { PARENT_LIMIT, PARENT_TYPES, type ParentType } from './parent-types';
 import type { InheritThrough } from './succession-keys';
 
-/** The parent types a parent entry can have (spec §4.2). */
-export const PARENT_TYPES = ['birth', 'adoptive', 'ward', 'rumoured'] as const;
-/** One of `PARENT_TYPES`. */
-export type ParentType = (typeof PARENT_TYPES)[number];
+export { PARENT_LIMIT, PARENT_TYPES, type ParentType };
 
 /** Parent types that can decide where a card is drawn. Rumoured never can. */
 export const PLACEMENT_TYPES = ['birth', 'adoptive', 'ward'] as const;
@@ -30,12 +28,6 @@ export const isPlacementType = (t: unknown): t is PlacementType => isOneOf(PLACE
 
 /** True if `t` is a known union type. */
 export const isUnionType = (t: unknown): t is (typeof UNION_TYPES)[number] => isOneOf(UNION_TYPES, t);
-
-/**
- * The most parents of each type that a person may have (0.2.8 contract B.3). Birth, adoptive and ward parents warn above 2;
- * a rumoured parent is a guess, so a person may have more of them. Read by the family query, the warning text and the relation rules.
- */
-export const PARENT_LIMIT: Record<ParentType, number> = { birth: 2, adoptive: 2, ward: 2, rumoured: 8 };
 
 /** Unknown parent types are read as birth, as validation does (§8). */
 export function parentKind(type: string | undefined): ParentType {
@@ -163,7 +155,7 @@ export interface Title {
 /** The title keys that can hold a value the plugin cannot use (A.1, K.4). */
 export type BadKey = 'succession' | 'inherit' | 'inherit-through' | 'inherit-illegitimate' | 'year' | 'heir' | 'exclude';
 
-/** The `options` section of a block: the start person, the focus person, and the generation and height limits. */
+/** The `options` section of a block: the start person, the focus person, the generation and height limits, and the calendar note. */
 export interface TreeOptions {
 	start?: string;
 	focus?: string;
@@ -171,6 +163,8 @@ export interface TreeOptions {
 	me?: string;
 	generations?: number;
 	height?: number;
+	/** Spec §14 rule 7: the calendar note this tree uses, a link as written (`[[Calendars of the Far Land]]`); absent = every calendar note. */
+	calendar?: string;
 }
 
 /** A whole parsed block: its houses, titles, people and unions, plus any shape issues found while reading. */

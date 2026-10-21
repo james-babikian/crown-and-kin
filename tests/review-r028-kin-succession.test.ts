@@ -35,9 +35,10 @@ describe('F-KIN-01 the year rule reads a year text wrongly and shows the line as
 	it('F-KIN-01: "BC 300" is -300, "1,250" is 1250, "12,000 BC" is -12000 (today 300, 250, 0)', () => {
 		// Spec §13.21 rule 5 item 2 says "a number followed by BC", item 4 takes the first run of 3 or 4 digits. A
 		// reader of a date text expects these three; the plugin gives a wrong year and no warning.
-		expect.soft(yearOf('BC 300'), 'BC before the number').toBe(-300);
+		// §14 rule 8 (0.3.2): n BC is internal 1 - n, so "BC 300" is -299 and "12,000 BC" is -11999.
+		expect.soft(yearOf('BC 300'), 'BC before the number').toBe(-299);
 		expect.soft(yearOf('1,250'), 'comma as a thousands mark').toBe(1250);
-		expect.soft(yearOf('12,000 BC'), 'comma and BC').toBe(-12000);
+		expect.soft(yearOf('12,000 BC'), 'comma and BC').toBe(-11999);
 	});
 
 	it('F-KIN-01: a child born "1,250" is not in the line of the year 1200', () => {
@@ -52,7 +53,8 @@ describe('F-KIN-01 the year rule reads a year text wrongly and shows the line as
 
 describe('F-KIN-06 (spec silent) a BC year shows as a minus number in the succession texts', () => {
 	it('F-KIN-06: the heading, the bar, the no-holder text and the age note write "225 BC", not "-225"', () => {
-		const shown = [SUCCESSION_UI.lineAfter('Antiochus', -225), SUCCESSION_UI.bar('Seleucid throne', -225), SUCCESSION_UI.noRuler(-300), SUCCESSION_UI.old('Hero', 111, -200)];
+		// §14 rule 8 (0.3.2): the texts get internal years; -224 shows as 225 BC.
+		const shown = [SUCCESSION_UI.lineAfter('Antiochus', -224), SUCCESSION_UI.bar('Seleucid throne', -224), SUCCESSION_UI.noRuler(-299), SUCCESSION_UI.old('Hero', 111, -199)];
 		for (const s of shown) expect.soft(s, 'a minus sign before a year').not.toMatch(/-\d/);
 		expect.soft(shown[0]).toMatch(/225\s?B\.?C/);
 	});

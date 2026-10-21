@@ -9,7 +9,7 @@ vi.mock('../src/obsidian/person-picker', () => ({ pickPerson: async () => null }
 import { deriveFamilies } from '../src/core/derive';
 import { parseDynasty } from '../src/core/parse';
 import { specOf, successionLine } from '../src/core/succession';
-import { closePluginModals } from '../src/obsidian/plugin-modals';
+import { closePluginModals } from '../src/view/plugin-modals';
 import { clock, device, fakeWin, installDom, resetDom } from './acceptance/fake-dom';
 import { openModals, resetObsidian } from './acceptance/fake-obsidian';
 import { choose, ctl, lineTexts, openWin, page } from './r027-window-support';

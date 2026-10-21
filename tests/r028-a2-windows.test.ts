@@ -15,7 +15,7 @@ vi.mock('../src/obsidian/person-picker', () => ({
 const chosen: unknown[] = [];
 vi.mock('../src/obsidian/choice-modal', () => ({ choose: async () => chosen.shift() ?? null }));
 
-import { closePluginModals } from '../src/obsidian/plugin-modals';
+import { closePluginModals } from '../src/view/plugin-modals';
 import { openState, renderSections, resetOpenSections } from '../src/obsidian/window-sections';
 import { RowPictures, buildRow } from '../src/obsidian/window-parts';
 import { addChild, addParent, addPartner, type FlowHost } from '../src/obsidian/family-flows';

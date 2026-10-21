@@ -65,15 +65,15 @@ describe('yearOf (contract K.5)', () => {
 		['spring of 870', 870],
 		['1203', 1203],
 		[' 1203 ', 1203],
-		['-200', -200],
-		['−200', -200],
-		['200 BC', -200],
-		['200 bc', -200],
-		['200BC', -200],
-		['c. 200 BC', -200],
-		['200 BCE', -200],
-		['200 B.C.', -200],
-		['200 B.C.E.', -200],
+		['-200', -199], // §14 rule 8 (0.3.2): n BC and -n are internal 1 - n.
+		['−200', -199], // §14 rule 8 (0.3.2): n BC and -n are internal 1 - n.
+		['200 BC', -199], // §14 rule 8 (0.3.2): n BC and -n are internal 1 - n.
+		['200 bc', -199], // §14 rule 8 (0.3.2): n BC and -n are internal 1 - n.
+		['200BC', -199], // §14 rule 8 (0.3.2): n BC and -n are internal 1 - n.
+		['c. 200 BC', -199], // §14 rule 8 (0.3.2): n BC and -n are internal 1 - n.
+		['200 BCE', -199], // §14 rule 8 (0.3.2): n BC and -n are internal 1 - n.
+		['200 B.C.', -199], // §14 rule 8 (0.3.2): n BC and -n are internal 1 - n.
+		['200 B.C.E.', -199], // §14 rule 8 (0.3.2): n BC and -n are internal 1 - n.
 		['AD 45', 45],
 		['45 AD', 45],
 		['A.D. 45', 45],
@@ -103,7 +103,7 @@ describe('yearOf (contract K.5)', () => {
 
 	it('the first run of three or four digits wins', () => {
 		expect(yearOf('1203 and 1250')).toBe(1203);
-		expect(yearOf('c. 1203/4')).toBe(1203);
+		expect(yearOf('c. 1203/4')).toBe(1204); // §14 rule 8 (0.3.2): a dual date reads the later year.
 	});
 
 	it('agrees with the old phone-list reader on every date text of sample trees 1 to 15 (K.5)', () => {

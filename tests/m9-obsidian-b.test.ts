@@ -12,7 +12,7 @@ import { cardForm, geometryFor } from '../src/layout/geometry';
 import { createLivePictures, zoomStep } from '../src/obsidian/live-pictures';
 import type { CopyBox, PictureCopy, PictureStore } from '../src/obsidian/picture-store';
 import { makePicture, savePicture, type SaveSource } from '../src/obsidian/save-picture';
-import { DEFAULT_SETTINGS } from '../src/obsidian/settings';
+import { DEFAULT_SETTINGS } from '../src/view/settings';
 import type { PictureSlot } from '../src/render/dom/pictures';
 import { SAVE_UI } from '../src/render/ui-text';
 import { FEl, fakeWin, flushFrames, installDom, resetDom, runTimers, settle } from './acceptance/fake-dom';

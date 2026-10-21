@@ -10,10 +10,10 @@ import { cardForm, geometryFor } from '../src/layout/geometry';
 import { DEFAULT_FAR_RULE } from '../src/layout/index';
 import type { ArmsOutline } from '../src/layout/arms-outline';
 import type { LaidOut, LayoutSettings } from '../src/layout/model';
-import { measuredLayout } from '../src/obsidian/measured-layout';
+import { measuredLayout } from '../src/view/measured-layout';
 import type { PictureMap } from '../src/render/saved-picture';
 import { DEFAULT_DARK, DEFAULT_LIGHT } from '../src/render/styles';
-import type { Measure } from '../src/render/dom/scene';
+import type { Measure } from '../src/render/scene-model';
 import { approxMeasure, renderSvg } from '../src/render/svg-string';
 
 /** The four drawings of a tree: the direction (down = Roundel, side = text card) and the plate (on = relation words, off = the "You" tab). */

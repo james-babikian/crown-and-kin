@@ -9,7 +9,7 @@ vi.mock('@codemirror/view', () => ({ ViewPlugin: { fromClass: () => ({}) } }));
 import type { Op } from '../src/core/edit';
 import { applyOp } from '../src/core/yaml-edit';
 import { FullScreenModal } from '../src/obsidian/full-screen';
-import { closePluginModals } from '../src/obsidian/plugin-modals';
+import { closePluginModals } from '../src/view/plugin-modals';
 import { FOCUS_UI } from '../src/render/ui-text';
 import { FEl, clock, dispatch, fakeDoc, fakeWin, flushFrames, installDom, pointer, resetDom, resizeAll, runTimers, settle } from './acceptance/fake-dom';
 import { openModals, resetObsidian } from './acceptance/fake-obsidian';

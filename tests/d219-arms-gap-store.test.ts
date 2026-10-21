@@ -157,7 +157,7 @@ describe('the picture store reads the outline of arms (D219)', () => {
 describe('the live pictures draw the gap from the outline (D219)', () => {
 	function slotFor(): PictureSlot {
 		const el = new FEl('g', { cls: 'dynasty-arms' });
-		return { kind: 'arms', lod: 'full', person: 'a', house: 'v', owner: { house: 'v' }, rect: { x: 100, y: -20, w: 20, h: 24 }, el: el as unknown as SVGGElement, gap: 3.2 };
+		return { kind: 'arms', lod: 'full', person: 'a', owner: { house: 'v' }, rect: { x: 100, y: -20, w: 20, h: 24 }, el: el as unknown as SVGGElement, gap: 3.2 };
 	}
 
 	it('the gap path comes with the copy, under the picture, sized by the slot\'s gap; it goes when the slot leaves the view', async () => {

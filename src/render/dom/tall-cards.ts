@@ -19,7 +19,7 @@ import type { Geometry, NameLineCount, NameRoom } from '../../layout/model';
 import type { BreakList } from '../break-words';
 import { cardNameLines, titleLines, type NameMeasure } from '../name-lines';
 import { ME_RING_INNER } from '../styles';
-import type { Measure, SceneFonts } from './scene';
+import type { Measure, SceneFonts } from '../scene-model';
 
 /** D29, D81: the people whose name needs two or three text lines (`tall`) and the ones that need three (`long`, a subset of `tall`), both sorted. */
 export interface TallNames {

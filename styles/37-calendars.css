@@ -1,0 +1,344 @@
+/* ===== calendars (0.3.2, spec §14, D251) ===== */
+
+/* The grey line under Born and Died and the test line: the hint style of the window (`dynasty-sheet-hint`). It takes no room when it is empty, and a long text wraps under its own field. */
+.dynasty-date-line:empty {
+	display: none;
+}
+
+.dynasty-date-line {
+	overflow-wrap: anywhere;
+}
+
+/* ---------- the Calendars window ---------- */
+
+.dynasty-calendars .dynasty-sheet-body {
+	display: flex;
+	flex-direction: column;
+	gap: 14px;
+}
+
+.dynasty-cal-note {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	align-items: flex-start;
+}
+
+.dynasty-cal-note > .dynasty-sheet-field,
+.dynasty-cal-note > .dynasty-grid {
+	width: 100%;
+}
+
+/* The fields of a note that does not exist yet stand the normal distance (12 px, as in a card) under the hint above them. */
+.dynasty-cal-note > .dynasty-grid {
+	margin-top: 4px;
+}
+
+/* The head is the one of the other windows (`dynasty-head`); the link "New calendar note" stands under the text line, and the intro stands close under it. */
+.dynasty-cal-top {
+	grid-template-columns: minmax(0, 1fr);
+	padding-bottom: 0;
+}
+
+.dynasty-cal-top .dynasty-head-meta {
+	overflow-wrap: anywhere;
+}
+
+.dynasty-cal-links {
+	display: flex;
+	align-items: center;
+	min-height: 30px;
+	margin-top: 6px;
+}
+
+/* The link takes the size of "Add portrait or arms" in the person window. */
+.dynasty-sheet .dynasty-cal-links button.dynasty-cal-new-note {
+	font-size: var(--dynasty-type-control);
+}
+
+.dynasty-cal-links:empty {
+	display: none;
+}
+
+.dynasty-cal-top + .dynasty-cal-intro {
+	margin-top: -4px;
+}
+
+.dynasty-cal-note:empty {
+	display: none;
+}
+
+/* The calendars are parts of the window, as Details and Family are in the person window: one thin line above each, and no frame. */
+.dynasty-cal-cards {
+	display: flex;
+	flex-direction: column;
+	gap: 0;
+}
+
+.dynasty-cal-card,
+.dynasty-cal-block {
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+}
+
+.dynasty-cal-card {
+	padding: 14px 0 26px;
+	border: 0;
+	border-top: 1px solid var(--background-modifier-border);
+	border-radius: 0;
+	background: none;
+}
+
+.dynasty-cal-card:last-child {
+	border-bottom: 1px solid var(--background-modifier-border);
+}
+
+/* A calendar in a note keeps its frame: it stands among the text of the note. */
+.dynasty-cal-block {
+	padding: 14px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: var(--radius-m, 8px);
+	background: var(--background-primary);
+}
+
+.dynasty-cal-head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+}
+
+.dynasty-cal-kind {
+	font-size: var(--dynasty-type-heading);
+}
+
+/* "Start" and "Eras": a sub-heading of the Small role, semibold, quiet grey (as `dynasty-succ-heading` in the Titles window). */
+.dynasty-cal-subhead {
+	color: var(--dynasty-muted);
+	font-size: var(--dynasty-type-small);
+	font-weight: var(--font-semibold);
+}
+
+/* A label with a link at its right end (Remove of an era). The negative margin keeps the line the height of a label; the touch area stays. */
+.dynasty-cal-labelrow {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+}
+
+.dynasty-cal-labelrow .dynasty-cal-remove {
+	margin-block: -6px;
+}
+
+.dynasty-sheet.is-phone .dynasty-cal-labelrow .dynasty-cal-remove {
+	margin-block: -14px;
+}
+
+/* A text button in a card has a touch area of 44 px on a screen that is touched (spec §7.5). */
+.dynasty-cal-remove {
+	min-height: 30px;
+	min-width: 44px;
+	padding: 0 8px;
+	border: 0;
+	background: none;
+	box-shadow: none;
+	color: var(--dynasty-link);
+	cursor: pointer;
+}
+
+.dynasty-sheet.is-phone .dynasty-cal-remove,
+.dynasty-sheet.is-phone .dynasty-cal-new-note,
+.dynasty-sheet.is-phone .dynasty-cal-existing-note {
+	min-height: 44px;
+}
+
+.dynasty-cal-start,
+.dynasty-cal-era {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	padding-top: 4px;
+}
+
+.dynasty-cal-era {
+	padding: 0;
+}
+
+/* One thin line between two eras, none above the first. */
+.dynasty-cal-era + .dynasty-cal-era {
+	padding-top: 14px;
+	border-top: 1px solid var(--background-modifier-border);
+}
+
+/* Cycle, Year, "=" and "Same year as" in the order that the help text names them. The labels stand over the fields, so the fields stand on one line. */
+.dynasty-cal-start-row {
+	display: grid;
+	grid-template-columns: 6.5em 6.5em auto minmax(0, 1fr);
+	gap: 0 10px;
+	align-items: end;
+}
+
+.dynasty-cal-start-row.is-era {
+	grid-template-columns: 6.5em auto minmax(0, 1fr);
+}
+
+.dynasty-cal-equals {
+	padding-bottom: 6px;
+	color: var(--dynasty-muted);
+	font-size: var(--dynasty-type-heading);
+}
+
+/* A phone: Cycle and Year share one row, "Same year as" stands under them, and the "=" is not needed. */
+.dynasty-sheet.is-phone .dynasty-cal-start-row,
+.dynasty-sheet.is-phone .dynasty-cal-start-row.is-era {
+	grid-template-columns: 1fr 1fr;
+	gap: 12px;
+}
+
+.dynasty-sheet.is-phone .dynasty-cal-start-row > .is-wide {
+	grid-column: 1 / -1;
+}
+
+.dynasty-sheet.is-phone .dynasty-cal-equals {
+	display: none;
+}
+
+.dynasty-cal-messages {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+}
+
+.dynasty-cal-messages:empty {
+	display: none;
+}
+
+/* A warning of a card is a note of the Titles window: the text colour at the small size (`dynasty-succ-note.is-warning`), not a grey hint. */
+.dynasty-cal-messages .dynasty-sheet-hint.is-warning {
+	color: var(--text-normal);
+}
+
+/* A refusal stands under its field, in red, and the field has a red edge (as in the ID window). */
+.dynasty-cal-field-error {
+	font-size: var(--dynasty-type-text);
+	font-weight: var(--font-normal);
+}
+
+.dynasty-cal-field-error:empty {
+	display: none;
+}
+
+.dynasty-cal-card input[aria-invalid='true'],
+.dynasty-cal-card textarea[aria-invalid='true'] {
+	border-color: var(--dynasty-error);
+}
+
+.dynasty-cal-add {
+	justify-content: flex-start;
+}
+
+/* Add era is as wide as its text, at the left, as the other Add buttons are. */
+.dynasty-sheet button.dynasty-cal-add-era {
+	align-self: flex-start;
+}
+
+/* A refusal that the window scrolls to (`block: 'nearest'`) keeps clear of the footer line. */
+.dynasty-cal-card [data-refusal] {
+	scroll-margin-bottom: 24px;
+}
+
+/* ---------- the block in a note ---------- */
+
+.dynasty-cal-view {
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+}
+
+/* The table of a block takes no margin of the note: the gaps in the block are the 12 px of the box, the same above every table. The second selector outranks the table rule of the reading view. */
+.dynasty-cal-table,
+.dynasty-cal-view table.dynasty-cal-table {
+	width: 100%;
+	margin: 0;
+	border-collapse: collapse;
+	font-size: var(--dynasty-type-text);
+}
+
+/* One label column width in every table of every block, so the values line up (the era table has its own columns). */
+.dynasty-cal-table:not(.dynasty-cal-eras) th {
+	width: 9em;
+}
+
+.dynasty-cal-table th,
+.dynasty-cal-table td {
+	padding: 4px 8px 4px 0;
+	border: 0;
+	text-align: left;
+	vertical-align: top;
+}
+
+.dynasty-cal-table th {
+	color: var(--dynasty-muted);
+	font-weight: var(--font-normal);
+	white-space: nowrap;
+}
+
+.dynasty-cal-eras th,
+.dynasty-cal-eras td {
+	border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.dynasty-cal-block-error {
+	color: var(--dynasty-error);
+}
+
+/* The kind stands after the name, quiet and regular. */
+.dynasty-cal-block-kind {
+	color: var(--dynasty-muted);
+	font-weight: var(--font-normal);
+}
+
+/* The test field is no wider than 360 px; its label may use the whole width, so the label stays on one text line. */
+.dynasty-cal-block .dynasty-cal-test input.dynasty-sheet-input {
+	max-width: 360px;
+}
+
+/* The answer of the test is the thing that the reader wants: the text size and the text colour. */
+.dynasty-cal-view .dynasty-date-line {
+	color: var(--text-normal);
+	font-size: var(--dynasty-type-text);
+}
+
+/* The test field of a block stands in the note, outside a window: it takes the look of a window field. */
+.dynasty-cal-view input.dynasty-sheet-input {
+	width: 100%;
+	min-height: var(--input-height);
+	padding: 0 10px;
+	border: 1px solid var(--dynasty-edge);
+	border-radius: var(--input-radius);
+	background: var(--background-modifier-form-field);
+	color: var(--text-normal);
+	font-family: var(--font-interface);
+	font-size: var(--dynasty-type-control);
+	font-weight: var(--font-normal);
+	box-shadow: none;
+}
+
+.dynasty-cal-view input.dynasty-sheet-input:focus {
+	border-color: var(--interactive-accent);
+	box-shadow: 0 0 0 1px var(--interactive-accent);
+}
+
+/* On a screen that is touched: fields of at least 16 px (iOS does not zoom) and buttons of 44 px (spec §7.4, §7.5). */
+@media (pointer: coarse) {
+	.dynasty-cal-view input.dynasty-sheet-input {
+		min-height: 44px;
+		font-size: max(16px, var(--dynasty-type-control));
+	}
+
+	.dynasty-cal-view .dynasty-cal-edit {
+		min-height: 44px;
+	}
+}

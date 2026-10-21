@@ -9,11 +9,12 @@
 
 import { setIcon } from 'obsidian';
 import type { FamilyGraph } from '../core/derive';
-import { successionLine, type NamedHeirState, type SuccessionNote, type SuccessionResult } from '../core/succession';
-import { INHERIT_ILLEGITIMATE, INHERIT_RULES, INHERIT_THROUGH, SUCCESSION_RULES, ordinal, yearOf, type InheritIllegitimate } from '../core/succession-keys';
+import { successionLine, type SuccessionNote, type SuccessionResult } from '../core/succession';
+import { INHERIT_ILLEGITIMATE, INHERIT_RULES, INHERIT_THROUGH, SUCCESSION_RULES, ordinal, type InheritIllegitimate } from '../core/succession-keys';
 import { dateLine } from '../render/tree-info';
 import { SUCCESSION_UI as T, TITLES_UI } from '../render/ui-text';
-import { draftSpec, draftTitle, holderText, type SuccessionDraft, type TitleRow } from './titles-draft';
+import { draftSpec, draftTitle, holderText, type SuccessionDraft, type TitleRow } from '../view/titles-draft';
+import { afterNotes, heirNotes, rulerLabelOf } from '../view/succession-notes';
 import { RowPictures, buildRow, iconButton, personLead, textButton } from './window-parts';
 import type { PictureStore } from './picture-store';
 
@@ -107,6 +108,36 @@ export function rulesSummary(s: SuccessionDraft): string {
 	return [rule, inherit].filter(Boolean).join(' · ');
 }
 
+/** A switch with its label and an optional hint: one row (`dynasty-rule`), the switch at the right. */
+function switchRow(box: HTMLElement, o: { key: string; label: string; hint: string; on: boolean; set: (v: boolean) => void }): HTMLElement {
+	const pair = box.createDiv({ cls: 'dynasty-succ-pair', attr: { 'data-succ': o.key } });
+	const row = pair.createEl('label', { cls: ['dynasty-succ-switch', 'dynasty-rule'] });
+	const text = row.createSpan({ cls: 'dynasty-rule-text' });
+	text.createSpan({ cls: 'dynasty-succ-switch-text', text: o.label });
+	// The hint stands in the text span, under its own label, as in the settings of Obsidian: it is then never nearer to the next switch.
+	const hint = o.hint ? text.createSpan({ cls: 'dynasty-sheet-hint', text: o.hint, attr: { id: `dynasty-succ-hint-${o.key}-${Math.random().toString(36).slice(2, 8)}` } }) : null;
+	const track = row.createDiv({ cls: o.on ? ['checkbox-container', 'is-enabled'] : ['checkbox-container'] });
+	const input = track.createEl('input', { attr: { type: 'checkbox', role: 'switch', 'aria-label': o.label, 'aria-describedby': hint?.getAttribute('id') ?? null, 'data-focus': `succ-${o.key}` } });
+	input.checked = o.on;
+	input.addEventListener('change', () => o.set(input.checked));
+	return pair;
+}
+
+/** The parts of the rules body that stay on the page between two choices. */
+interface RulesUi {
+	/** Each pair is one choice and its hints. */
+	rulePair: HTMLElement;
+	inheritPair: HTMLElement | null;
+	throughPair: HTMLElement | null;
+	/** The pair of the year: the pairs "Who can inherit" and "Inherit through" stand before it. */
+	yearPair: HTMLElement;
+	illPair: HTMLElement;
+	/** The box of the switches and the row of the switch "body", which exists only when the rule is real. */
+	switches: HTMLElement;
+	bodyRow: HTMLElement | null;
+	grid: HTMLElement;
+}
+
 /** Makes the succession view of a saved title; the window puts `renderLine` and `renderRules` in its two sections. */
 export function successionSection(host: SectionHost): SuccessionView {
 	const s = () => host.row.succ!;
@@ -115,6 +146,10 @@ export function successionSection(host: SectionHost): SuccessionView {
 	let lineEl: HTMLElement | null = null;
 	let result: SuccessionResult | null = null;
 	let timer: number | null = null;
+	// The year that the line shows now (the year field redraws the line only when the draft year differs from it).
+	let shown = '';
+	// The parts of the rules body that a choice can add, remove or change; a choice updates these in place (r032).
+	let ui: RulesUi | null = null;
 	// One short sentence that a screen reader says when the line changes. It stays outside the bodies, which draw again at each change.
 	let live: HTMLElement | null = null;
 
@@ -135,6 +170,14 @@ export function successionSection(host: SectionHost): SuccessionView {
 			fn();
 			host.edited();
 			draw(focus);
+		});
+	// A choice in a dropdown: the dropdown that the user used stays on the page, and the focus does not move. On a phone, a select
+	// that is destroyed and made again inside its own change event keeps its menu open, and a new select that gets the focus opens (r032).
+	const changeInPlace = (fn: () => void) =>
+		host.guard(() => {
+			fn();
+			host.edited();
+			update();
 		});
 
 	/** The line for the draft, on the current graph (E.2). Null if the title is not in the tree. */
@@ -169,11 +212,19 @@ export function successionSection(host: SectionHost): SuccessionView {
 		const sel = wrap.createEl('select', { cls: ['dropdown', 'dynasty-sheet-input', 'dynasty-input'], attr: { 'aria-label': o.label, 'data-focus': `succ-${o.key}` } });
 		// A written value that the plugin cannot read has its own first option, so that choosing the default can remove it.
 		const options: [string, string][] = o.value === UNKNOWN ? [[UNKNOWN, T.unknownValue(o.unknown ?? null)], ...o.options] : o.options;
-		for (const [value, text] of options) sel.createEl('option', { text, attr: { value } });
+		let unknownOption: HTMLElement | null = null;
+		for (const [value, text] of options) {
+			const opt = sel.createEl('option', { text, attr: { value } });
+			if (value === UNKNOWN) unknownOption = opt;
+		}
 		sel.value = o.value;
 		setIcon(wrap.createSpan({ cls: 'dynasty-select-chevron', attr: { 'aria-hidden': 'true' } }), 'chevron-down');
 		sel.addEventListener('change', () => {
-			if (sel.value !== UNKNOWN) o.pick(sel.value);
+			if (sel.value === UNKNOWN) return;
+			o.pick(sel.value);
+			// The draft has a value now, so the entry for the unreadable text goes (it stood only until the first choice).
+			unknownOption?.remove();
+			unknownOption = null;
 		});
 	}
 
@@ -181,20 +232,127 @@ export function successionSection(host: SectionHost): SuccessionView {
 		if (text) box.createDiv({ cls: ['dynasty-sheet-hint'], text, attr: { 'data-hint': name } });
 	};
 
-	/** A switch with its label and an optional hint: one row (`dynasty-rule`), the switch at the right. */
-	function switchRow(box: HTMLElement, o: { key: string; label: string; hint: string; on: boolean; set: (v: boolean) => void }): void {
-		const pair = box.createDiv({ cls: 'dynasty-succ-pair', attr: { 'data-succ': o.key } });
-		const row = pair.createEl('label', { cls: ['dynasty-succ-switch', 'dynasty-rule'] });
-		const text = row.createSpan({ cls: 'dynasty-rule-text' });
-		text.createSpan({ cls: 'dynasty-succ-switch-text', text: o.label });
-		const track = row.createDiv({ cls: o.on ? ['checkbox-container', 'is-enabled'] : ['checkbox-container'] });
-		const input = track.createEl('input', { attr: { type: 'checkbox', role: 'switch', 'aria-label': o.label, 'data-focus': `succ-${o.key}` } });
-		input.checked = o.on;
-		input.addEventListener('change', () => o.set(input.checked));
-		if (o.hint) pair.createDiv({ cls: ['dynasty-sheet-hint'], text: o.hint });
+	// ---------- the whole view ----------
+
+	/** Puts the hints of one name in a pair again (the choice itself stays). */
+	function setHints(box: HTMLElement, name: string, texts: readonly string[]): void {
+		for (const c of Array.from(box.children)) if (c.getAttribute('data-hint') === name) c.remove();
+		for (const t of texts) hint(box, t, name);
 	}
 
-	// ---------- the whole view ----------
+	/**
+	 * What follows a choice in a dropdown. It changes only the parts that depend on the choice: the hints, the two choices that
+	 * exist only for a real rule, the switch "body", the line and the notes under the named heirs. No dropdown is made again
+	 * and the focus stays where it is.
+	 */
+	function update(): void {
+		stop();
+		result = compute();
+		shown = s().year;
+		if (rulesEl && ui) patchRules(ui);
+		if (lineEl) drawLine(false);
+		refreshStates();
+		summaries();
+	}
+
+	function patchRules(u: RulesUi): void {
+		const d = s();
+		const hints = successionHints(d);
+		const real = d.rule !== '' && d.rule !== '?';
+		setHints(u.rulePair, 'rule', hints.rule ? [hints.rule] : []);
+		if (real) {
+			if (!u.inheritPair || !u.throughPair) {
+				u.inheritPair = pairBefore(u, u.yearPair);
+				inheritChoice(u.inheritPair);
+				u.throughPair = pairBefore(u, u.yearPair);
+				throughChoice(u.throughPair);
+			}
+			setHints(u.inheritPair, 'inherit', hints.inherit);
+			setHints(u.throughPair, 'through', hints.through ? [hints.through] : []);
+		} else {
+			u.inheritPair?.remove();
+			u.throughPair?.remove();
+			u.inheritPair = null;
+			u.throughPair = null;
+		}
+		setHints(u.illPair, 'illegitimate', hints.illegitimate ? [T.illHint] : []);
+		// The hint of the switch depends on the line, so its row is made again; it holds no dropdown.
+		u.bodyRow?.remove();
+		u.bodyRow = real ? bodyRow(u.switches) : null;
+	}
+
+	/** A new pair in the grid, before `ref`. */
+	function pairBefore(u: RulesUi, ref: HTMLElement): HTMLElement {
+		const pair = u.grid.createDiv({ cls: ['dynasty-succ-pair', 'is-wide'] });
+		u.grid.insertBefore(pair, ref);
+		return pair;
+	}
+
+	// The four choices of the rules body. Each one reads the draft when it is made.
+	function ruleChoice(box: HTMLElement): void {
+		const d = s();
+		const real = d.rule !== '' && d.rule !== '?';
+		choice(box, {
+			key: 'rule',
+			label: T.ruleLabel,
+			value: d.rule === UNKNOWN ? UNKNOWN : real ? d.rule : '',
+			unknown: badText('succession'),
+			options: [['', T.ruleNone], ...SUCCESSION_RULES.map((r): [string, string] => [r, T.rules[r]])],
+			// Choosing None removes the rule and the choice of who can inherit (E.3).
+			pick: (v) =>
+				changeInPlace(() => {
+					d.rule = v as SuccessionDraft['rule'];
+					if (v === '') d.inherit = '';
+				}),
+		});
+	}
+
+	function inheritChoice(box: HTMLElement): void {
+		const d = s();
+		// An unwritten key shows as "No preference" (E.3).
+		choice(box, {
+			key: 'inherit',
+			label: T.inheritLabel,
+			value: d.inherit === '' ? 'no-preference' : d.inherit,
+			unknown: badText('inherit'),
+			options: INHERIT_RULES.map((r): [string, string] => [r, T.inherits[r]]),
+			pick: (v) => changeInPlace(() => void (d.inherit = v as SuccessionDraft['inherit'])),
+		});
+	}
+
+	function throughChoice(box: HTMLElement): void {
+		const d = s();
+		choice(box, {
+			key: 'through',
+			label: T.throughLabel,
+			value: d.through,
+			unknown: badText('inherit-through'),
+			options: [['', T.throughSame], ...INHERIT_THROUGH.map((r): [string, string] => [r, T.throughs[r]])],
+			pick: (v) => changeInPlace(() => void (d.through = v as SuccessionDraft['through'])),
+		});
+	}
+
+	function illChoice(box: HTMLElement): void {
+		const d = s();
+		choice(box, {
+			key: 'illegitimate',
+			label: T.illLabel,
+			value: d.illegitimate,
+			unknown: badText('inherit-illegitimate'),
+			options: INHERIT_ILLEGITIMATE.map((r): [string, string] => [r, T.ills[r]]),
+			pick: (v) => changeInPlace(() => void (d.illegitimate = v as InheritIllegitimate)),
+			wide: true,
+		});
+	}
+
+	/** The switch "body" with the hint that names the holder (L.2, F-KIN-07). */
+	function bodyRow(switches: HTMLElement): HTMLElement {
+		const d = s();
+		const first = firstHolder();
+		const skipped = result?.notes.find((n) => n.kind === 'body-skipped');
+		const bodyHint = skipped ? T.bodyHintSkipped(nameOf(String(skipped.params.first)), String(skipped.params.entry)) : first ? T.bodyHint(first) : '';
+		return switchRow(switches, { key: 'body', label: T.body, hint: bodyHint, on: d.body, set: (v) => change(() => void (d.body = v), 'succ-body') });
+	}
 
 	function draw(focus?: string): void {
 		const mounted = rulesEl ?? lineEl;
@@ -220,55 +378,30 @@ export function successionSection(host: SectionHost): SuccessionView {
 
 		const grid = body.createDiv({ cls: ['dynasty-grid', 'is-stack'] });
 		const pair = () => grid.createDiv({ cls: ['dynasty-succ-pair', 'is-wide'] });
-		// Rule. Choosing None removes the rule and the choice of who can inherit (E.3).
-		let box = pair();
-		choice(box, {
-			key: 'rule',
-			label: T.ruleLabel,
-			value: d.rule === UNKNOWN ? UNKNOWN : real ? d.rule : '',
-			unknown: badText('succession'),
-			options: [['', T.ruleNone], ...SUCCESSION_RULES.map((r): [string, string] => [r, T.rules[r]])],
-			pick: (v) =>
-				change(() => {
-					d.rule = v as SuccessionDraft['rule'];
-					if (v === '') d.inherit = '';
-				}, 'succ-rule'),
-		});
-		hint(box, hints.rule, 'rule');
+		const rulePair = pair();
+		ruleChoice(rulePair);
+		hint(rulePair, hints.rule, 'rule');
+		let inheritPair: HTMLElement | null = null;
+		let throughPair: HTMLElement | null = null;
 		if (real) {
-			// Who can inherit. An unwritten key shows as "No preference" (E.3).
-			box = pair();
-			choice(box, {
-				key: 'inherit',
-				label: T.inheritLabel,
-				value: d.inherit === '' ? 'no-preference' : d.inherit,
-				unknown: badText('inherit'),
-				options: INHERIT_RULES.map((r): [string, string] => [r, T.inherits[r]]),
-				pick: (v) => change(() => void (d.inherit = v as SuccessionDraft['inherit']), 'succ-inherit'),
-			});
-			for (const h of hints.inherit) hint(box, h, 'inherit');
-			box = pair();
-			choice(box, {
-				key: 'through',
-				label: T.throughLabel,
-				value: d.through,
-				unknown: badText('inherit-through'),
-				options: [['', T.throughSame], ...INHERIT_THROUGH.map((r): [string, string] => [r, T.throughs[r]])],
-				pick: (v) => change(() => void (d.through = v as SuccessionDraft['through']), 'succ-through'),
-			});
-			hint(box, hints.through, 'through');
+			inheritPair = pair();
+			inheritChoice(inheritPair);
+			for (const h of hints.inherit) hint(inheritPair, h, 'inherit');
+			throughPair = pair();
+			throughChoice(throughPair);
+			hint(throughPair, hints.through, 'through');
 		}
 
 		// Year. The field changes the draft at once; the line follows on blur and 300 ms after the last key press.
-		box = pair();
-		const field = box.createEl('label', { cls: 'dynasty-sheet-field', attr: { 'data-succ': 'year' } });
+		const yearPair = pair();
+		const field = yearPair.createEl('label', { cls: 'dynasty-sheet-field', attr: { 'data-succ': 'year' } });
 		field.createSpan({ cls: 'dynasty-sheet-label', text: T.yearLabel });
 		const year = field.createEl('input', {
 			cls: ['dynasty-sheet-input', 'dynasty-input', 'dynasty-succ-year'],
-			attr: { type: 'text', autocomplete: 'off', autocorrect: 'off', autocapitalize: 'off', spellcheck: 'false', enterkeyhint: 'done', inputmode: 'numeric', 'aria-label': T.yearLabel, 'data-focus': 'succ-year' },
+			attr: { type: 'text', autocomplete: 'off', autocorrect: 'off', autocapitalize: 'off', spellcheck: 'false', enterkeyhint: 'done', inputmode: 'text', 'aria-label': T.yearLabel, 'data-focus': 'succ-year' },
 		});
 		year.value = d.year;
-		let shown = d.year;
+		shown = d.year;
 		const refresh = () => {
 			stop();
 			if (shown === s().year) return;
@@ -299,27 +432,14 @@ export function successionSection(host: SectionHost): SuccessionView {
 		}
 
 		// Children marked as illegitimate.
-		box = pair();
-		choice(box, {
-			key: 'illegitimate',
-			label: T.illLabel,
-			value: d.illegitimate,
-			unknown: badText('inherit-illegitimate'),
-			options: INHERIT_ILLEGITIMATE.map((r): [string, string] => [r, T.ills[r]]),
-			pick: (v) => change(() => void (d.illegitimate = v as InheritIllegitimate), 'succ-illegitimate'),
-			wide: true,
-		});
-		if (hints.illegitimate) hint(box, T.illHint, 'illegitimate');
+		const illPair = pair();
+		illChoice(illPair);
+		if (hints.illegitimate) hint(illPair, T.illHint, 'illegitimate');
 
 		const switches = body.createDiv({ cls: 'dynasty-rows' });
 		switchRow(switches, { key: 'adopted', label: T.adopted, hint: T.adoptedHint, on: d.adopted, set: (v) => change(() => void (d.adopted = v), 'succ-adopted') });
-		if (real) {
-			const first = firstHolder();
-			const skipped = result?.notes.find((n) => n.kind === 'body-skipped');
-			// F-KIN-07: the first entry has a name only, so the hint says which holder the plugin uses instead.
-			const bodyHint = skipped ? T.bodyHintSkipped(nameOf(String(skipped.params.first)), String(skipped.params.entry)) : first ? T.bodyHint(first) : '';
-			switchRow(switches, { key: 'body', label: T.body, hint: bodyHint, on: d.body, set: (v) => change(() => void (d.body = v), 'succ-body') });
-		}
+		const bodySwitch = real ? bodyRow(switches) : null;
+		ui = { grid, rulePair, inheritPair, throughPair, yearPair, illPair, switches, bodyRow: bodySwitch };
 
 		peopleList(body, 'heir');
 		peopleList(body, 'exclude');
@@ -329,8 +449,8 @@ export function successionSection(host: SectionHost): SuccessionView {
 	function summary(res: SuccessionResult | null): string {
 		if (!res || res.kind === 'no-rule') return '';
 		if (res.kind === 'bad-rule') return T.badRule;
-		if (res.kind === 'no-ruler') return T.noRuler(res.year);
-		if (res.kind === 'ruler-not-in-tree') return T.rulerNotInTree(res.year);
+		if (res.kind === 'no-ruler') return T.noRuler(res.yearText);
+		if (res.kind === 'ruler-not-in-tree') return T.rulerNotInTree(res.yearText);
 		return res.heirs.length ? T.heirCount(res.heirs.length) : T.noHeir;
 	}
 
@@ -378,12 +498,7 @@ export function successionSection(host: SectionHost): SuccessionView {
 				r.title.createSpan({ cls: 'dynasty-holder-name', text: id });
 				r.sub.createSpan({ cls: 'dynasty-holder-note', text: T.heirNotInTree });
 			}
-			const state = kind === 'heir' ? result?.namedHeirs.find((h) => h.id === id)?.state : undefined;
-			const text = state ? stateText(state, id) : null;
-			const text2 = r.sub.parentElement;
-			if (text) text2?.createSpan({ cls: ['dynasty-holder-note', 'dynasty-row-sub'], text, attr: { 'data-note': state ?? '' } });
-			const born = result?.noYear.find((n) => n.id === id && n.what === 'born');
-			if (kind === 'heir' && born) text2?.createSpan({ cls: ['dynasty-holder-note', 'dynasty-row-sub'], text: T.noYearDate(who), attr: { 'data-note': 'no-year' } });
+			for (const x of kind === 'heir' ? heirNotes(result, id, nameOf) : []) r.sub.parentElement?.createSpan({ cls: ['dynasty-holder-note', 'dynasty-row-sub'], text: x.text, attr: { 'data-note': x.note } });
 			const buttons = r.actions();
 			buttons.addClass('dynasty-holder-buttons');
 			const removeIt = () => {
@@ -438,16 +553,6 @@ export function successionSection(host: SectionHost): SuccessionView {
 		);
 	}
 
-	function stateText(state: NamedHeirState, id: string): string | null {
-		const name = nameOf(id);
-		const y = result?.year ?? null;
-		if (state === 'not-alive') return T.heirNotAlive(name, y);
-		if (state === 'not-born') return T.heirNotBorn(name, y);
-		if (state === 'is-ruler') return T.heirIsRuler(name);
-		if (state === 'excluded') return T.heirExcluded(name);
-		return null;
-	}
-
 	// ---------- the line ----------
 
 	/** The text of a quiet note of the result (G.6), or null when the note has no text here. `body-skipped` is the hint of its switch. */
@@ -459,12 +564,15 @@ export function successionSection(host: SectionHost): SuccessionView {
 		if (n.kind === 'co-rulers-not-in-line') return T.coRulersNotInLine;
 		if (n.kind === 'born-in-reign-no-from') return T.bornInReignNoFrom(name(p.parent));
 		if (n.kind === 'through-spouse') return T.throughSpouseNote(name(p.holder), name(p.spouse));
+		if (n.kind === 'died-no-year') return T.diedNoYear(name(p.person), String(p.year ?? ''));
 		return null;
 	}
 
 	/** The heir after whose row a note stands: the last person of the note in the line (G.6); null when no row of the line has it. */
 	function anchorOf(n: SuccessionNote, heirs: readonly string[]): string | null {
 		const p = n.params;
+		// A death date with no year: the note stands under the row of the person, if the line has one (`afterNotes` places the others).
+		if (n.kind === 'died-no-year') return String(p.person ?? '');
 		let ids: string[] = [];
 		if (n.kind === 'order-from-note') ids = [String(p.b ?? '')];
 		else if (n.kind === 'order-contradiction') ids = Array.isArray(p.people) ? p.people : [];
@@ -490,7 +598,7 @@ export function successionSection(host: SectionHost): SuccessionView {
 			if (recompute) refreshStates();
 			return;
 		}
-		const y = res.year;
+		const y = res.yearText;
 		if (res.kind === 'bad-rule') {
 			box.createDiv({ cls: 'dynasty-succ-msg', text: T.badRule, attr: { 'data-msg': 'bad-rule' } });
 			return;
@@ -508,7 +616,7 @@ export function successionSection(host: SectionHost): SuccessionView {
 		const g = host.g();
 		const ruler = res.ruler ?? '';
 		const head = box.createDiv({ cls: 'dynasty-line-head' });
-		head.createEl('b', { cls: 'dynasty-succ-heading', text: T.lineAfter(rulerLabel(ruler, y), y), attr: { role: 'heading', 'aria-level': '3' } });
+		head.createEl('b', { cls: 'dynasty-succ-heading', text: T.lineAfter(rulerLabel(ruler, res.year), y), attr: { role: 'heading', 'aria-level': '3' } });
 		// Show works for a line, also an empty one (E.4).
 		textButton(head, ['dynasty-btn', 'dynasty-succ-show'], T.show, () => host.guard(() => host.show()), { icon: 'eye', label: T.showLabel, focus: 'succ-show' });
 		const note = (parent: HTMLElement, text: string, name: string, warn = false) => {
@@ -518,7 +626,7 @@ export function successionSection(host: SectionHost): SuccessionView {
 		const notes = res.notes.map((n) => ({ n, text: noteText(n) })).filter((x): x is { n: SuccessionNote; text: string } => x.text !== null);
 		// The holder who holds through the spouse comes first, then the other holders; each note that belongs to a row stands under that row.
 		for (const x of notes) if (x.n.kind === 'through-spouse') note(box, x.text, x.n.kind);
-		if (res.coRulers.length) note(box, T.coRulers(res.coRulers.length + 1, rulerLabel(ruler, y), y), 'co-rulers');
+		if (res.coRulers.length) note(box, T.coRulers(res.coRulers.length + 1, rulerLabel(ruler, res.year), y), 'co-rulers');
 		for (const x of notes) if (x.n.kind === 'co-rulers-not-in-line') note(box, x.text, x.n.kind);
 		for (const n of res.noYear) {
 			if (n.what !== 'reign') continue;
@@ -528,12 +636,16 @@ export function successionSection(host: SectionHost): SuccessionView {
 		if (d.through !== '' && d.through !== '?' && ruler && g.byId.has(ruler) && !g.byId.get(ruler)?.sex) note(box, T.rulerNoSex(nameOf(ruler)), 'ruler-no-sex', true);
 		if (res.leftOutNoSex > 0) note(box, T.leftOutNoSex(res.leftOutNoSex), 'no-sex', true);
 		if (res.noBirthYear > 0) note(box, T.noBirthYear(res.noBirthYear), 'no-birth-year', true);
-		if (res.outsideBody) note(box, T.outsideBody(rulerLabel(ruler, y), firstHolder() ?? ''), 'outside-body', true);
+		if (res.outsideBody) note(box, T.outsideBody(rulerLabel(ruler, res.year), firstHolder() ?? ''), 'outside-body', true);
 		const list = box.createDiv({ cls: ['dynasty-rows', 'dynasty-succ-list'], attr: { role: 'list' } });
 		// M.2, M.3: a grey row stands before the heir at its `before` place (after that many heirs); the rows that remain stand after the last heir.
 		let nextBranch = 0;
 		const branches = (upTo: number) => {
-			while (nextBranch < res.openBranches.length && res.openBranches[nextBranch].before <= upTo) branchRow(list, res.openBranches[nextBranch++].id);
+			while (nextBranch < res.openBranches.length && res.openBranches[nextBranch].before <= upTo) {
+				const id = res.openBranches[nextBranch++].id;
+				branchRow(list, id);
+				for (const x of under.get(id) ?? []) note(list, x.text, x.n.kind);
+			}
 		};
 		const under = new Map<string, { n: SuccessionNote; text: string }[]>();
 		for (const x of notes) {
@@ -555,7 +667,7 @@ export function successionSection(host: SectionHost): SuccessionView {
 			});
 			r.title.createSpan({ cls: 'dynasty-holder-label', text: nameOf(id) });
 			const p = g.byId.get(id);
-			const dates = p ? dateLine(p) : '';
+			const dates = p ? dateLine(p, g.dates) : '';
 			if (dates) r.sub.setText(dates);
 			const sub = (text: string, kind: string, warn: boolean) => {
 				r.row.parentElement?.createDiv({ cls: warn ? ['dynasty-succ-subnote', 'is-warning'] : ['dynasty-succ-subnote'], attr: { 'data-note': kind }, text });
@@ -565,6 +677,7 @@ export function successionSection(host: SectionHost): SuccessionView {
 			for (const x of under.get(id) ?? []) note(list, x.text, x.n.kind);
 		});
 		branches(Infinity);
+		for (const x of afterNotes(res, g, under, nameOf, host.row.name)) note(list, x.text, x.kind);
 		if (!res.heirs.length && !res.outsideBody) box.createDiv({ cls: ['dynasty-sheet-none', 'dynasty-succ-msg'], text: T.noHeir, attr: { 'data-msg': 'no-heir' } });
 		if (res.more) box.createDiv({ cls: ['dynasty-sheet-hint', 'dynasty-succ-more'], text: T.more });
 		if (res.moreBranches) box.createDiv({ cls: ['dynasty-sheet-hint', 'dynasty-succ-more', 'dynasty-succ-more-branches'], text: T.moreBranches });
@@ -597,24 +710,11 @@ export function successionSection(host: SectionHost): SuccessionView {
 			const words = row.querySelector('.dynasty-row-text');
 			if (!words) continue;
 			for (const n of Array.from(words.querySelectorAll('[data-note]'))) n.remove();
-			const state = res?.namedHeirs.find((h) => h.id === id)?.state;
-			const text = state ? stateText(state, id) : null;
-			if (text) words.createSpan({ cls: ['dynasty-holder-note', 'dynasty-row-sub'], text, attr: { 'data-note': state ?? '' } });
-			if (res?.noYear.some((n) => n.id === id && n.what === 'born')) words.createSpan({ cls: ['dynasty-holder-note', 'dynasty-row-sub'], text: T.noYearDate(nameOf(id)), attr: { 'data-note': 'no-year' } });
+			for (const x of heirNotes(res, id, nameOf)) words.createSpan({ cls: ['dynasty-holder-note', 'dynasty-row-sub'], text: x.text, attr: { 'data-note': x.note } });
 		}
 	}
 
-	/** "Aldric II": the ruler text of the holder entry of R that the year reaches; else the name. */
-	function rulerLabel(id: string, year: number | null): string {
-		const g = host.g();
-		let pick: string | null = null;
-		for (const h of host.row.holders) {
-			if (h.values.person !== id) continue;
-			const from = yearOf(h.values.from);
-			if (pick === null || year === null || from === undefined || from <= year) pick = holderText(g, h.values).ruler;
-		}
-		return pick || nameOf(id);
-	}
+	const rulerLabel = (id: string, year: number | null) => rulerLabelOf(host.g(), host.row.holders, id, year, nameOf(id));
 
 	result = compute();
 	return {

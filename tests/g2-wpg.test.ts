@@ -6,7 +6,7 @@ vi.mock('@codemirror/view', () => ({ ViewPlugin: { fromClass: () => ({}) } }));
 
 import * as generations from '../src/core/generations';
 import { FullScreenModal } from '../src/obsidian/full-screen';
-import { FIRST_LIMIT, SECOND_LIMIT, clearStops } from '../src/obsidian/large-tree';
+import { FIRST_LIMIT, SECOND_LIMIT, clearStops } from '../src/view/large-tree';
 import { TreeView } from '../src/obsidian/tree-view';
 import { clearLayoutCache } from '../src/layout/index';
 import { FEl, clock, dispatch, flushFrames, installDom, resetDom, resizeAll, settle, fakeWin } from './acceptance/fake-dom';

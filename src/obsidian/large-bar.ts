@@ -8,7 +8,7 @@
 
 import { setIcon } from 'obsidian';
 import { LARGE_UI } from '../render/ui-text';
-import type { LargeBar } from './large-tree';
+import type { LargeBar } from '../view/large-tree';
 
 /** The parts of a built bar that the tree view keeps. */
 export interface LargeBarParts {

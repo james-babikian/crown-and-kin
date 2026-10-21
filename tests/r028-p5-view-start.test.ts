@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parentsAbove } from '../src/obsidian/focus-mode';
+import { parentsAbove } from '../src/view/focus-mode';
 import { defaultView, type View } from '../src/render/view-math';
 
 /*

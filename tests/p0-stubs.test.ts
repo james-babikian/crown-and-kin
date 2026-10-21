@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { PARENT_LIMIT, PARENT_TYPES } from '../src/core/types';
-import { DEFAULT_SETTINGS, normaliseSettings } from '../src/obsidian/settings';
+import { DEFAULT_SETTINGS, normaliseSettings } from '../src/view/settings';
 
 // 0.2.8 P0: the stubs that later packages fill. They must exist, have their defaults and change nothing yet.
 

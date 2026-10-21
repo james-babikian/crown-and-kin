@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { Rect } from '../../src/layout/model';
-import { chooseFocus, focusView, isPhoneWindow, type FocusFacts } from '../../src/obsidian/focus-mode';
+import { chooseFocus, focusView, isPhoneWindow, type FocusFacts } from '../../src/view/focus-mode';
 
 /*
- * The pure rules of focus mode (WP5.2, src/obsidian/focus-mode.ts), from spec §5.5, §5.6, §7,
+ * The pure rules of focus mode (WP5.2, src/view/focus-mode.ts), from spec §5.5, §5.6, §7,
  * D18, D20 and the decision notes "M5 — Focus mode and scale":
  * - which focus a view shows: the session focus of the block (Show all people = none), then the
  *   pin, then on a phone the start person's family of a large tree, else the whole tree; a

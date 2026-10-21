@@ -8,10 +8,21 @@ const ELK = {
 	group: ['elkjs', 'elkjs/*'],
 	message: 'Plugin code must not use elkjs (spec §3, D9).',
 };
-const NO_OBSIDIAN_IN_CORE = {
+const NO_OBSIDIAN_BELOW_SHELL = {
 	name: 'obsidian',
-	message: 'src/core must not import obsidian (spec §3).',
+	message: 'Only src/obsidian may import obsidian (MAINTAINERS.md, "The layers"). Pass what you need in as an argument.',
 };
+// The layer order is obsidian -> view -> render/dom -> render -> layout -> core: a layer never imports one to its right.
+// An internal test checks the same rule on every import, and also the cycles that lint cannot see.
+const UP = (layer, names) => ({
+	group: names.flatMap((n) => [n, `${n}/**`]),
+	message: `src/${layer} must not import a higher layer (MAINTAINERS.md, "The layers": obsidian -> view -> render/dom -> render -> layout -> core).`,
+});
+const ABOVE_CORE = UP('core', ['../layout', '../render', '../view', '../obsidian']);
+const ABOVE_LAYOUT = UP('layout', ['../render', '../view', '../obsidian']);
+const ABOVE_RENDER = UP('render', ['./dom', '../view', '../obsidian']);
+const ABOVE_DOM = UP('render/dom', ['../../view', '../../obsidian']);
+const ABOVE_VIEW = UP('view', ['../obsidian']);
 const NO_PLATFORM_IMPORT = {
 	name: 'obsidian',
 	importNames: ['Platform'],
@@ -135,7 +146,25 @@ export default tseslint.config(
 	{
 		files: ['src/core/**/*.ts'],
 		rules: {
-			'no-restricted-imports': ['error', { paths: [NO_OBSIDIAN_IN_CORE], patterns: [ELK] }],
+			'no-restricted-imports': ['error', { paths: [NO_OBSIDIAN_BELOW_SHELL], patterns: [ELK, ABOVE_CORE] }],
+		},
+	},
+	{
+		files: ['src/layout/**/*.ts'],
+		rules: {
+			'no-restricted-imports': ['error', { paths: [NO_OBSIDIAN_BELOW_SHELL], patterns: [ELK, ABOVE_LAYOUT] }],
+		},
+	},
+	{
+		files: ['src/render/*.ts'],
+		rules: {
+			'no-restricted-imports': ['error', { paths: [NO_OBSIDIAN_BELOW_SHELL], patterns: [ELK, ABOVE_RENDER] }],
+		},
+	},
+	{
+		files: ['src/view/**/*.ts'],
+		rules: {
+			'no-restricted-imports': ['error', { paths: [NO_OBSIDIAN_BELOW_SHELL], patterns: [ELK, ABOVE_VIEW] }],
 		},
 	},
 	// The colour rule of src/render/dom holds for the plugin's windows too (M6: the Houses window writes house colours).
@@ -156,6 +185,7 @@ export default tseslint.config(
 	{
 		files: ['src/render/dom/**/*.ts'],
 		rules: {
+			'no-restricted-imports': ['error', { paths: [NO_OBSIDIAN_BELOW_SHELL], patterns: [ELK, ABOVE_DOM] }],
 			'no-restricted-syntax': [
 				'error',
 				...SYNTAX_HTML,

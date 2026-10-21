@@ -39,14 +39,12 @@ const FALLBACK_REACH = 4;
 const GRID_CELL_PX = 64;
 const GRID_OFFSET = 1e6;
 const GRID_STRIDE = 2000003;
-/** Character codes the path reader tests: the digits, the minus and plus signs, the point, the letter e and the space. */
+/** Character codes the path reader tests: the digits, the minus sign, the point and the space. The router writes numbers rounded to 0.001, so none is in exponent form. */
 const CHAR_SPACE = 32;
 const CHAR_0 = 48;
 const CHAR_9 = 57;
 const CHAR_MINUS = 45;
-const CHAR_PLUS = 43;
 const CHAR_POINT = 46;
-const CHAR_E = 101;
 
 /** The point of a curve at `t` (0 to 1). */
 export function bezier([sx, sy, my, tx, ty]: Curve, t: number): Spot {
@@ -71,7 +69,7 @@ function readNumbers(d: string, from: number): { n: number[]; next: number } {
 		let j = i + 1;
 		for (; j < d.length; j++) {
 			const c2 = d.charCodeAt(j);
-			if (!(isDigit(c2) || c2 === CHAR_POINT || c2 === CHAR_E || ((c2 === CHAR_MINUS || c2 === CHAR_PLUS) && d.charCodeAt(j - 1) === CHAR_E))) break;
+			if (!(isDigit(c2) || c2 === CHAR_POINT)) break;
 		}
 		n.push(+d.slice(i, j));
 		i = j;

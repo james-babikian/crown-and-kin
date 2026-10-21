@@ -5,7 +5,7 @@ vi.mock('@codemirror/language', () => ({ forceParsing: () => false, syntaxTree: 
 vi.mock('@codemirror/view', () => ({ ViewPlugin: { fromClass: () => ({}) } }));
 
 import { FullScreenModal } from '../src/obsidian/full-screen';
-import { DEFAULT_SETTINGS } from '../src/obsidian/settings';
+import { DEFAULT_SETTINGS } from '../src/view/settings';
 import { SWIPE_SETTLE_MS } from '../src/render/dom/sheet-swipe';
 import { FEl, clock, device, dispatch, fakeDoc, flushFrames, installDom, pointer, resetDom, resizeAll, runTimers, settle } from './acceptance/fake-dom';
 import { resetObsidian } from './acceptance/fake-obsidian';

@@ -10,8 +10,10 @@
  * (F-KIN-11), and `SuccessionResult.notes` for the quiet notes of the window.
  */
 
+import type { TreeDates } from './dates';
 import { drawnParentMap, partnerOf, type DrawnParent, type FamilyGraph } from './derive';
-import { isDead, readInherit, readRule, resolveSpouse, yearOf, type InheritRule, type InheritThrough, type SpouseWorld, type SuccessionRule } from './succession-keys';
+import { isDead, readInherit, readRule, resolveSpouse, type InheritRule, type InheritThrough, type SpouseWorld, type SuccessionRule } from './succession-keys';
+import { bornNoYear, dateRows, deathNotes, findRuler, fitsTwoCalendars, lineYear, makeLife, missingBirthYears, personTexts, yearNotes, type DateText, type DateWarningRow, type Life, type NoYearRow, type YearReader } from './succession-dates';
 import type { Holder, Person, Title } from './types';
 
 /** The succession keys of one title as the engine reads them; the Titles window passes its draft in the same shape. */
@@ -62,9 +64,12 @@ export function specOf(title: Title): SuccessionSpec {
  * - `born-in-reign-no-from` {parent}: the parent holds this title, but no entry has a readable start year, so the children keep their rank.
  * - `through-spouse` {holder, spouse}: the holder holds the title through the spouse; the line is for the spouse.
  * - `body-skipped` {first, entry}: with `heirs-of-body`, the first holder is `first` because the first entry `entry` is not a person in the tree.
+ * - `died-no-year` {person, year} (spec §14 rule 5): the `died` text of `person` has text but no year, so the plugin counts the person as dead in `year`,
+ *   the text that gives Y, as written. For a person the walk reached who is out of the line only for this reason, for a named heir who is not alive only for
+ *   this reason, and for an open-branch row that this death date causes; once for a person.
  */
 export interface SuccessionNote {
-	kind: 'order-from-note' | 'order-contradiction' | 'co-rulers-not-in-line' | 'born-in-reign-no-from' | 'through-spouse' | 'body-skipped';
+	kind: 'order-from-note' | 'order-contradiction' | 'co-rulers-not-in-line' | 'born-in-reign-no-from' | 'through-spouse' | 'body-skipped' | 'died-no-year';
 	params: Record<string, string | string[]>;
 }
 
@@ -80,6 +85,8 @@ export interface SuccessionResult {
 	/** The year Y of the line; null for "now". */
 	year: number | null;
 	yearFrom: 'field' | 'reign-end' | 'now';
+	/** The text that gives Y (the title `year`, else the `to` of the last holder), as written; null for "now". Every sentence of the line names this text (spec §14 rule 7). */
+	yearText: string | null;
 	/** The ruler R: the person the line is computed after. */
 	ruler?: string;
 	heirs: string[];
@@ -88,8 +95,8 @@ export interface SuccessionResult {
 	namedHeirs: { id: string; state: NamedHeirState }[];
 	/** K.6: holders other than R who rule at the same time. */
 	coRulers: string[];
-	/** J.2: a holder entry or a person whose date text has no year. `entry` is the `index` of the holder entry. */
-	noYear: { id: string; what: 'born' | 'reign'; entry?: number }[];
+	/** J.2: a holder entry or a person whose date text has no year. `entry` is the `index` of the holder entry. Empty before the calendars are ready (spec §14 rule 7). */
+	noYear: NoYearRow[];
 	/** K.9: people that a one-sex rule or pass left out only because they have no `sex: m` or `sex: f`. */
 	leftOutNoSex: number;
 	/** K.8: heirs in the returned line with no birth year, only for `born-in-reign`. */
@@ -106,6 +113,8 @@ export interface SuccessionResult {
 	moreBranches: boolean;
 	/** 0.2.8: quiet notes for the window (see `SuccessionNote`); empty when there is nothing to say. */
 	notes: SuccessionNote[];
+	/** Spec §14 rule 5: the warnings of the date texts the line read (the title year, the holder texts and the dates of the people in the line), and `calendar-no-anchor`. Empty before the calendars are ready. */
+	dateWarnings: DateWarningRow[];
 }
 
 /** M.2: a line entry inside the engine, an heir or an open branch. */
@@ -119,16 +128,15 @@ function mergeItems(a: Item[], b: Item[]): Item[] {
 	return [...a, ...b.filter((x) => !seen.has(itemKey(x)))];
 }
 
-/** L.9: `to` texts that mean the reign is not over. */
-const OPEN_END: readonly string[] = ['present', 'now', 'current', 'ongoing', 'living', 'alive', 'reigning'];
 const NONE: Person[] = [];
 const NONE_DRAWN: DrawnParent[] = [];
 const NO_IDS: string[] = [];
 
-const empty = (kind: SuccessionKind, year: number | null, yearFrom: SuccessionResult['yearFrom']): SuccessionResult => ({
+const empty = (kind: SuccessionKind, year: number | null, yearFrom: SuccessionResult['yearFrom'], yearText: string | null = null): SuccessionResult => ({
 	kind,
 	year,
 	yearFrom,
+	yearText,
 	heirs: [],
 	more: false,
 	namedHeirs: [],
@@ -141,6 +149,7 @@ const empty = (kind: SuccessionKind, year: number | null, yearFrom: SuccessionRe
 	openBranches: [],
 	moreBranches: false,
 	notes: [],
+	dateWarnings: [],
 });
 
 /** The list `a`, then the items of `b` that `a` does not have, in the order of `b`. */
@@ -155,65 +164,28 @@ type ClaimKids = Map<string, Person[]>;
 /**
  * The line after the ruler (sections B and C). Pure. `title.holders` is the list the caller wants (the window passes
  * a copy). `limit` is the length of the line; `oldAge` is the age in years from which an heir with no death date gets
- * a warning (0 for none). `youngDeathAge` (M.1) is the age under which a death opens no branch (0 for none).
+ * a warning (0 for none). `youngDeathAge` (M.1) is the age under which a death opens no branch (0 for none). `dates` reads every
+ * date text (spec §14): the graph's own, or another view when the window passes a draft. Before the calendars are ready it reads
+ * plain years and reports no date note and no date warning (rule 7).
  */
-export function successionLine(g: FamilyGraph, title: Title, spec: SuccessionSpec, limit: number, oldAge: number, youngDeathAge = 0): SuccessionResult {
+export function successionLine(g: FamilyGraph, title: Title, spec: SuccessionSpec, limit: number, oldAge: number, youngDeathAge = 0, dates: TreeDates = g.dates): SuccessionResult {
 	if (spec.bad) return empty('bad-rule', null, 'now');
 	const hasHeirs = (spec.heirs?.length ?? 0) > 0;
 	if (!spec.rule && !hasHeirs) return empty('no-rule', null, 'now');
 
 	const entries = title.holders;
-	// B.2: the year of the line.
-	let Y: number | null;
-	let yearFrom: SuccessionResult['yearFrom'];
-	const fieldYear = yearOf(spec.year);
-	const lastTo = entries.length ? yearOf(entries[entries.length - 1].to) : undefined;
-	if (fieldYear !== undefined) [Y, yearFrom] = [fieldYear, 'field'];
-	else if (lastTo !== undefined) [Y, yearFrom] = [lastTo, 'reign-end'];
-	else [Y, yearFrom] = [null, 'now'];
-
-	// L.9: a holder text with no year is reported only when it could change R: the entries the B.3 scan reads up to R's
-	// entry, and the last entry when the year of the line comes from it. A `to` that means "still ruling" is an open end.
-	const noYear: SuccessionResult['noYear'] = [];
-	const reigned = new Set<number>();
-	const reignText = (h: Holder, fromToo: boolean, toToo: boolean) => {
-		if (reigned.has(h.index)) return;
-		const unreadable = (text: string | undefined) => text !== undefined && yearOf(text) === undefined;
-		if ((fromToo && unreadable(h.from)) || (toToo && unreadable(h.to) && !OPEN_END.includes(h.to!.trim().toLowerCase()))) {
-			reigned.add(h.index);
-			noYear.push({ id: h.person ?? h.name ?? '', what: 'reign', entry: h.index });
-		}
-	};
-
-	// B.3: the ruler. An entry has started at Y when Y is now, its `from` year is <= Y, or it has no `from` year and
-	// no earlier entry ends after Y.
-	const startedAt = (i: number, maxTo: number): boolean => {
-		if (Y === null) return true;
-		const from = yearOf(entries[i].from);
-		return from !== undefined ? from <= Y : !(maxTo > Y);
-	};
-	let rIdx = -1;
-	let maxTo = -Infinity;
-	for (let i = 0; i < entries.length; i++) {
-		if (!startedAt(i, maxTo)) {
-			// The entry that did not start: a year in its `from` could have started it, so its `from` text is reported.
-			reignText(entries[i], Y !== null, false);
-			break;
-		}
-		// With "now" every entry has started, so no `from` text can change R.
-		reignText(entries[i], Y !== null, false);
-		rIdx = i;
-		const to = yearOf(entries[i].to);
-		if (to !== undefined) maxTo = Math.max(maxTo, to);
-	}
-	// The `to` of an entry before R fed the start test of a later entry. R's own `to` feeds the test of the next entry only,
-	// and it decides nothing when the title names the year. The `to` of the last entry gives the year of the line.
-	for (let i = 0; i <= rIdx && Y !== null; i++) if (i < rIdx || (yearFrom !== 'field' && i < entries.length - 1)) reignText(entries[i], false, true);
-	if (yearFrom !== 'field' && entries.length) reignText(entries[entries.length - 1], false, true);
-	noYear.sort((p, q) => p.entry! - q.entry!);
-	if (rIdx < 0) return { ...empty('no-ruler', Y, yearFrom), noYear };
+	const yr: YearReader = (text) => dates.read(text)?.year;
+	// B.2: the year of the line, and the text that gives it (the sentences of the line name that text, spec §14 rule 7).
+	const { Y, yearFrom, yearText } = lineYear(entries, spec.year, yr);
+	// B.3, L.9: the ruler, and the holder texts with no year (a note shows only when the calendars are ready, rule 7).
+	const found = findRuler(entries, Y, yearFrom, yr, fitsTwoCalendars(dates));
+	const rIdx = found.rIdx;
+	const noYear = dates.ready ? found.noYear : [];
+	// The date texts the line reads: the title year and the holder texts. People are added below.
+	const texts: DateText[] = [...(spec.year !== undefined ? [{ text: spec.year, what: 'year' as const }] : []), ...found.reads];
+	if (rIdx < 0) return { ...empty('no-ruler', Y, yearFrom, yearText), noYear, dateWarnings: dateRows(dates, texts) };
 	const ruler = entries[rIdx].person !== undefined && g.byId.has(entries[rIdx].person!) ? entries[rIdx].person! : undefined;
-	if (ruler === undefined) return { ...empty('ruler-not-in-tree', Y, yearFrom), noYear };
+	if (ruler === undefined) return { ...empty('ruler-not-in-tree', Y, yearFrom, yearText), noYear, dateWarnings: dateRows(dates, texts) };
 	const X: string = ruler;
 
 	// D195, rule 13a: a holder entry with `through-spouse` (up to R's entry) is read as its spouse S. The key is ignored when
@@ -236,47 +208,15 @@ export function successionLine(g: FamilyGraph, title: Title, spec: SuccessionSpe
 
 	const P = (id: string): Person => g.byId.get(id)!;
 	const excluded = new Set(spec.exclude ?? []);
+	const max = Number.isFinite(limit) ? Math.max(0, Math.floor(limit)) : 5;
 
-	// B.4: alive at Y. The answer is kept for each person (`index` is the place in the written list).
-	let size = 0;
-	for (const p of g.people) if (p.index >= size) size = p.index + 1;
-	const aliveMemo = new Int8Array(size);
-	// The birth year of a person, read once (NaN for no year).
-	const yearKnown = new Uint8Array(size);
-	const yearValue = new Float64Array(size);
-	const bornOf = (p: Person): number | undefined => {
-		if (!yearKnown[p.index]) {
-			const y = yearOf(p.born);
-			yearValue[p.index] = y === undefined ? NaN : y;
-			yearKnown[p.index] = 1;
-		}
-		const v = yearValue[p.index];
-		return Number.isNaN(v) ? undefined : v;
-	};
-	const bornYear = (id: string) => bornOf(P(id));
-	const aliveOf = (p: Person): boolean => {
-		let a = aliveMemo[p.index];
-		if (a === 0) {
-			let alive: boolean;
-			if (Y === null) alive = !isDead(p);
-			else {
-				const by = bornYear(p.id);
-				if (by !== undefined && by > Y) alive = false;
-				else if (!isDead(p)) alive = true;
-				else {
-					const dy = yearOf(p.died);
-					alive = dy !== undefined && dy > Y;
-				}
-			}
-			a = alive ? 1 : 2;
-			aliveMemo[p.index] = a;
-		}
-		return a === 1;
-	};
-	const aliveAt = (id: string) => aliveOf(P(id));
+	// B.4: alive at Y, the birth year of a person, and the people whose death text has no year (spec §14 rule 5).
+	const life = makeLife(g.people, Y, yr, dates.ready && Y !== null);
+	const aliveAt = (id: string) => life.alive(P(id));
+	const bornYear = (id: string) => life.born(P(id));
 
 	// K.6: the holders who rule at the same time as R.
-	const coRulers = findCoRulers(g, entries, X, Y, startedFor(entries, Y));
+	const coRulers = findCoRulers(g, entries, X, Y, startedFor(entries, Y, yr), yr);
 
 	// The rule line.
 	const rule = spec.rule;
@@ -285,7 +225,7 @@ export function successionLine(g: FamilyGraph, title: Title, spec: SuccessionSpe
 	const firstHolder = firstIdx >= 0 ? spouseAt.get(firstIdx) ?? entries[firstIdx].person : undefined;
 	// Who held the title (an open branch needs none of them), who the climb follows, and who is never in the line (S2, D195).
 	const hold = holdersOf(g, entries, rIdx, R, X, spouseAt, coRulers);
-	const engine = rule ? makeEngine(g, entries, spec, rule, R, Y, aliveOf, bornYear, bornOf, excluded, firstHolder, youngDeathAge, hold, spouseAt) : undefined;
+	const engine = rule ? makeEngine(g, entries, spec, rule, R, Y, life, excluded, firstHolder, youngDeathAge, hold, spouseAt, yr) : undefined;
 	const items = engine ? engine.line() : [];
 	const ruleLine = items.filter((i) => !i.branch).map((i) => i.id);
 
@@ -309,7 +249,6 @@ export function successionLine(g: FamilyGraph, title: Title, spec: SuccessionSpe
 		namedHeirs.push({ id, state });
 	}
 	const all = merge(first, ruleLine);
-	const max = Number.isFinite(limit) ? Math.max(0, Math.floor(limit)) : 5;
 	const heirs = all.slice(0, max);
 	// M.3: the rows. `before` counts the named heirs and the rule-line heirs that stay after the merge.
 	const firstSet = new Set(first);
@@ -325,23 +264,12 @@ export function successionLine(g: FamilyGraph, title: Title, spec: SuccessionSpe
 
 	// J.2: the births that the line read and could not use.
 	const readsBorn = Y !== null || rule === 'born-in-reign';
-	if (readsBorn) {
-		const ids = merge(heirs, namedHeirs.filter((n) => n.state === 'first' || n.state === 'not-alive').map((n) => n.id));
-		for (const id of ids) {
-			const born = P(id).born;
-			if (born !== undefined && yearOf(born) === undefined) noYear.push({ id, what: 'born' });
-		}
-	}
-	const noBirthYear = rule === 'born-in-reign' ? heirs.filter((id) => bornYear(id) === undefined).length : 0;
+	const shownNamed = namedHeirs.filter((n) => n.state === 'first' || n.state === 'not-alive').map((n) => n.id);
+	const people = merge(heirs, shownNamed);
+	if (readsBorn) noYear.push(...bornNoYear(people.map(P), dates));
+	const noBirthYear = missingBirthYears(rule === 'born-in-reign' && dates.ready, heirs, bornYear);
 	// The reference year with "now" scans the whole tree: do it once, and only if an heir needs it.
-	let latest: number | undefined;
-	let latestDone = false;
-	const reference = () => {
-		if (Y !== null) return Y;
-		if (!latestDone) [latest, latestDone] = [latestYear(g), true];
-		return latest;
-	};
-	const old = oldAge > 0 ? heirs.filter((id) => isOld(P(id), reference, oldAge)) : [];
+	const old = oldAge > 0 ? heirs.filter((id) => isOld(P(id), () => (Y !== null ? Y : dates.latestYear()), oldAge, yr)) : [];
 
 	// 0.2.8: the notes. The order of the groups is the order the window shows them in.
 	const notes: SuccessionNote[] = [];
@@ -351,12 +279,18 @@ export function successionLine(g: FamilyGraph, title: Title, spec: SuccessionSpe
 		const skipped = entries[0];
 		notes.push({ kind: 'body-skipped', params: { first: firstHolder, entry: skipped.name ?? skipped.person ?? '' } });
 	}
-	if (engine) notes.push(...engine.notes(new Set(heirs)));
+	if (engine) notes.push(...yearNotes(dates.ready, engine.notes(new Set(heirs))));
+	// Spec §14 rule 5: a death date with no year, for the people the line meets (the note names the text that gives Y).
+	notes.push(...deathNotes(life, P, namedHeirs, rows, max, yearText));
+
+	// Spec §14 rule 5: the warnings of the date texts of the people in the line.
+	for (const id of people) texts.push(...personTexts(P(id)));
 
 	return {
 		kind: 'line',
 		year: Y,
 		yearFrom,
+		yearText,
 		ruler: X,
 		heirs,
 		more: all.length > max,
@@ -370,6 +304,7 @@ export function successionLine(g: FamilyGraph, title: Title, spec: SuccessionSpe
 		openBranches: rows,
 		moreBranches,
 		notes,
+		dateWarnings: dateRows(dates, texts, life.texts()),
 		...(engine && firstHolder !== undefined ? { firstHolder } : {}),
 	};
 }
@@ -419,12 +354,12 @@ function holdersOf(g: FamilyGraph, entries: readonly Holder[], rIdx: number, R: 
 }
 
 /** True when the entry at index `i` has started at `Y`, for every entry in the list (the B.3 test without the stop). */
-function startedFor(entries: readonly Holder[], Y: number | null): boolean[] {
+function startedFor(entries: readonly Holder[], Y: number | null, yr: YearReader): boolean[] {
 	let maxTo = -Infinity;
 	return entries.map((h) => {
-		const from = yearOf(h.from);
+		const from = yr(h.from);
 		const started = Y === null ? true : from !== undefined ? from <= Y : !(maxTo > Y);
-		const to = yearOf(h.to);
+		const to = yr(h.to);
 		if (to !== undefined) maxTo = Math.max(maxTo, to);
 		return started;
 	});
@@ -435,10 +370,10 @@ function startedFor(entries: readonly Holder[], Y: number | null): boolean[] {
  * once; `later[i]` is the largest start year among the entries after `i` that have started (an entry with no start year
  * counts as infinite), so the "ended" test of an entry with no `to` year is one comparison.
  */
-function findCoRulers(g: FamilyGraph, entries: readonly Holder[], R: string, Y: number | null, started: boolean[]): string[] {
+function findCoRulers(g: FamilyGraph, entries: readonly Holder[], R: string, Y: number | null, started: boolean[], yr: YearReader): string[] {
 	const n = entries.length;
-	const from = entries.map((e) => yearOf(e.from));
-	const to = entries.map((e) => yearOf(e.to));
+	const from = entries.map((e) => yr(e.from));
+	const to = entries.map((e) => yr(e.to));
 	const later: number[] = new Array<number>(n);
 	let best = -Infinity;
 	for (let i = n - 1; i >= 0; i--) {
@@ -459,32 +394,43 @@ function findCoRulers(g: FamilyGraph, entries: readonly Holder[], R: string, Y: 
 }
 
 /** K.8: an heir with no death date who is older than `oldAge` years at the reference year (`ref`, read when first needed). */
-function isOld(p: Person, ref: () => number | undefined, oldAge: number): boolean {
+function isOld(p: Person, ref: () => number | undefined, oldAge: number, yr: YearReader): boolean {
 	if (isDead(p)) return false;
-	const by = yearOf(p.born);
+	const by = yr(p.born);
 	if (by === undefined) return false;
 	const r = ref();
 	return r !== undefined && r - by > oldAge;
 }
 
-/** The latest year in the `born`, `died`, `from` and `to` texts of the whole tree. */
-function latestYear(g: FamilyGraph): number | undefined {
-	let latest: number | undefined;
-	const see = (text: string | undefined) => {
-		const y = yearOf(text);
-		if (y !== undefined && (latest === undefined || y > latest)) latest = y;
-	};
-	for (const p of g.people) {
-		see(p.born);
-		see(p.died);
-	}
-	for (const t of g.titles) {
-		for (const h of t.holders) {
-			see(h.from);
-			see(h.to);
+/**
+ * C.7, C.8: the least value over the paths down from the sources, in one pass: each source starts with its own value, a child is one more than its
+ * parent, and a person who does not pass a claim on (a source excepted) ends a path.
+ */
+function reachFrom(size: number, sources: { x: Person; v: number }[], claimKids: (id: string) => readonly Person[], passesP: (x: Person) => boolean): Int32Array {
+	const best = new Int32Array(size);
+	const done = new Uint8Array(size);
+	const starts = sources.slice().sort((a, b) => a.v - b.v);
+	const isSource = new Uint8Array(size);
+	for (const st of starts) isSource[st.x.index] = 1;
+	const qx: Person[] = [];
+	const qv: number[] = [];
+	let s = 0;
+	let h = 0;
+	while (s < starts.length || h < qx.length) {
+		const fromQueue = h < qx.length && (s >= starts.length || qv[h] <= starts[s].v);
+		const x = fromQueue ? qx[h] : starts[s].x;
+		const v = fromQueue ? qv[h++] : starts[s++].v;
+		if (done[x.index]) continue;
+		done[x.index] = 1;
+		best[x.index] = v;
+		if (!isSource[x.index] && !passesP(x)) continue;
+		for (const k of claimKids(x.id)) {
+			if (done[k.index]) continue;
+			qx.push(k);
+			qv.push(v + 1);
 		}
 	}
-	return latest;
+	return best;
 }
 
 /** The pieces of one pass: the sex tests that follow from `inherit`. */
@@ -512,15 +458,15 @@ function makeEngine(
 	rule: SuccessionRule,
 	R: string,
 	Y: number | null,
-	alive: (p: Person) => boolean,
-	bornYear: (id: string) => number | undefined,
-	yearAt: (p: Person) => number | undefined,
+	life: Life,
 	excluded: ReadonlySet<string>,
 	body: string | undefined,
 	youngDeath: number,
 	hold: Holders,
 	spouseAt: ReadonlyMap<number, string>,
+	yr: YearReader,
 ): Engine {
+	const { alive, born: yearAt } = life;
 	const P = (id: string): Person => g.byId.get(id)!;
 	const drawn = drawnParentMap(g);
 	const noSex = new Set<string>();
@@ -561,9 +507,9 @@ function makeEngine(
 	const reigns = new Map<string, { from: number; to?: number }[]>();
 	if (rule === 'born-in-reign') {
 		entries.forEach((h, i) => {
-			const from = yearOf(h.from);
+			const from = yr(h.from);
 			if (h.person === undefined || from === undefined) return;
-			const to = yearOf(h.to);
+			const to = yr(h.to);
 			// D195: the years of a keyed entry are also reigns of the spouse.
 			for (const id of [h.person, spouseAt.get(i)]) {
 				if (id === undefined) continue;
@@ -584,7 +530,7 @@ function makeEngine(
 	const unstarted = new Set<string>();
 	if (rule === 'born-in-reign') {
 		entries.forEach((h, i) => {
-			if (h.person === undefined || yearOf(h.from) !== undefined) return;
+			if (h.person === undefined || yr(h.from) !== undefined) return;
 			unstarted.add(h.person);
 			const spouse = spouseAt.get(i);
 			if (spouse !== undefined) unstarted.add(spouse);
@@ -613,11 +559,11 @@ function makeEngine(
 	const openBranch = (x: Person): boolean => {
 		// M.1: R, and a person who held the title before R (the title passed on, so the line of the holder is closed).
 		if (x.id === R || hold.held.has(x.id) || alive(x)) return false;
-		if (Y !== null && (bornYear(x.id) ?? -Infinity) > Y) return false;
+		if (Y !== null && (yearAt(x) ?? -Infinity) > Y) return false;
 		if (x.childless === true || hasChild(x.id)) return false;
 		if (youngDeath > 0) {
-			const b = bornYear(x.id);
-			const d = yearOf(x.died);
+			const b = yearAt(x);
+			const d = yr(x.died);
 			if (b !== undefined && d !== undefined && d - b < youngDeath) return false;
 		}
 		return true;
@@ -758,7 +704,7 @@ function makeEngine(
 		// C.4: the claim children of one person in sibling rank.
 		const reigning = rule === 'born-in-reign';
 		const reignOk = (parent: string, child: Person): boolean => {
-			const by = bornYear(child.id);
+			const by = yearAt(child);
 			return by !== undefined && (reigns.get(parent) ?? []).some((r) => by >= r.from && (r.to === undefined || by <= r.to));
 		};
 		// D193 key 3 (slot-fill): the children with a birth year are put in year order, the earlier first, and fill the places
@@ -916,12 +862,13 @@ function makeEngine(
 					continue;
 				}
 				const c = kids[at[top]++];
-				if (!(flags[c.index] & (REACHED | BLOCKED)) && alive(c)) {
+				const free = !(flags[c.index] & (REACHED | BLOCKED));
+				if (free && alive(c)) {
 					if (sexOk(c)) {
 						flags[c.index] |= REACHED;
 						outP.push({ x: c, branch: false });
 					} else lost(c);
-				}
+				} else if (free && sexOk(c)) life.reach(c);
 				if (!(flags[c.index] & WALKED)) {
 					if (walks(c)) {
 						flags[c.index] |= WALKED;
@@ -939,32 +886,7 @@ function makeEngine(
 
 		// C.7, C.8: rules without representation. Level and degree from one pass over all people of `up`.
 		const sources = up.filter(walkable);
-		const reach = (sign: 1 | -1): Int32Array => {
-			const best = new Int32Array(size);
-			const done = new Uint8Array(size);
-			const starts = sources.map((u) => ({ x: P(u), v: sign * dist.get(u)! })).sort((a, b) => a.v - b.v);
-			const isSource = new Uint8Array(size);
-			for (const st of starts) isSource[st.x.index] = 1;
-			const qx: Person[] = [];
-			const qv: number[] = [];
-			let s = 0;
-			let h = 0;
-			while (s < starts.length || h < qx.length) {
-				const fromQueue = h < qx.length && (s >= starts.length || qv[h] <= starts[s].v);
-				const x = fromQueue ? qx[h] : starts[s].x;
-				const v = fromQueue ? qv[h++] : starts[s++].v;
-				if (done[x.index]) continue;
-				done[x.index] = 1;
-				best[x.index] = v;
-				if (!isSource[x.index] && !passesP(x)) continue;
-				for (const k of claimKids(x.id)) {
-					if (done[k.index]) continue;
-					qx.push(k);
-					qv.push(v + 1);
-				}
-			}
-			return best;
-		};
+		const reach = (sign: 1 | -1) => reachFrom(size, sources.map((u) => ({ x: P(u), v: sign * dist.get(u)! })), claimKids, passesP);
 		if (rule === 'siblings-first') {
 			const level = reach(-1);
 			const keyed = outP.map((o, i) => ({ o, i, a: level[o.x.index] + (o.branch ? 1 : 0), b: o.branch ? 0 : step(o.x) }));

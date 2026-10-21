@@ -7,7 +7,7 @@ vi.mock('@codemirror/view', () => ({ ViewPlugin: { fromClass: () => ({}) } }));
 import { EditSheet } from '../src/obsidian/edit-sheet';
 import { HousesWindow } from '../src/obsidian/houses-window';
 import { TitlesWindow } from '../src/obsidian/titles-window';
-import { closePluginModals } from '../src/obsidian/plugin-modals';
+import { closePluginModals } from '../src/view/plugin-modals';
 import { resetOpenSections } from '../src/obsidian/window-sections';
 import { clock, device, dispatch, fakeWin, installDom, resetDom, runTimers, windowListenerCount, FEl } from './acceptance/fake-dom';
 import { openModals, resetObsidian } from './acceptance/fake-obsidian';

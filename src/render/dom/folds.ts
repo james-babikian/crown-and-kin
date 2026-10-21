@@ -20,13 +20,10 @@
  *   the mouse-pointer tooltip (Obsidian's `aria-label` tooltip does not work on SVG elements).
  */
 
-import { FOLD_EM, FOLD_HIT_PX } from '../../layout/fold-spots';
+import { FOLD_EM } from '../../layout/fold-spots';
 import type { PlacedFoldControl, Rect } from '../../layout/model';
 import { foldHit } from '../view-math';
-import type { Measure, SceneFonts } from './scene';
-
-/** The control sizes in em and the smallest hit area in px, re-exported from the layout, which needs the same numbers to place a control. */
-export { FOLD_EM, FOLD_HIT_PX };
+import { FOLD_CHIP_EM, signText, type Measure, type SceneFonts } from '../scene-model';
 
 /** One drawn control in the scene. */
 export interface FoldRef {
@@ -45,13 +42,8 @@ export interface FoldRef {
 	markOverview?: Rect;
 }
 
-/** The side of the square chip of an open button, in em (0.95 em). */
-export const FOLD_CHIP_EM = FOLD_EM.chip;
 /** The corner radius of the chip and of the sign, in em. */
 const FOLD_CORNER_EM = { chip: 0.15, sign: 0.25 } as const;
-
-/** The text of a sign for `count` hidden people. */
-export const signText = (count: number) => `+ ${count}`;
 
 /** Where the text of a sign of a sideways layout starts at Full and Compact: 0.45 em inside the pill, which starts where the open chip starts. */
 const textStart = (spot: { x: number }, em: number) => spot.x - (FOLD_CHIP_EM / 2) * em + 0.45 * em;

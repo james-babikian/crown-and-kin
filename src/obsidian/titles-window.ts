@@ -12,7 +12,8 @@
 
 import { Notice, type App } from 'obsidian';
 import { nb } from '../render/text-join';
-import { deriveFamilies, type FamilyGraph } from '../core/derive';
+import type { FamilyGraph } from '../core/derive';
+import { deriveDated, type DatesFor } from '../view/calendar-index';
 import type { Op } from '../core/edit';
 import type { RelationOptions } from '../core/relations';
 import { normBody } from '../core/block-match';
@@ -23,11 +24,11 @@ import { describeDeleteTitle, describeTitleIdChange } from '../core/titles';
 import { HOUSES, ID_UI, REMOVE, SUCCESSION_UI, TITLES_UI, WIN_LIST_UI, WINDOW_UI, WRITE_TEXT } from '../render/ui-text';
 import type { Handle, HandleWriteOutcome } from './block-handle';
 import { holderForm } from './holder-form';
-import { danglingIds, draftId, idChanged, idFromName, idProblemFor, idProblems, reasonText } from './id-draft';
+import { danglingIds, draftId, idChanged, idFromName, idProblemFor, idProblems, reasonText } from '../view/id-draft';
 import { idNewNameNote, idNote, type IdRowView } from './id-field';
 import { openIdWindow } from './id-window';
 import { ListEditWindow, findableArms, type ListRowView, type PageHead } from './list-window';
-import { matchesAll } from './list-search';
+import { matchesAll } from '../view/list-search';
 import { pickPerson, type PickerContext } from './person-picker';
 import { freshOrStale } from './sheet-parts';
 import { successionSection, type SuccessionView } from './succession-section';
@@ -35,7 +36,7 @@ import type { PictureStore } from './picture-store';
 import { RowPictures, buildRow, iconButton, personLead, showMenu, textButton } from './window-parts';
 import type { SectionSpec } from './window-sections';
 import { makeTableNote } from './table-note';
-import { draftChanged, emptyNames, holderText, personNameOf, rebase, savedListName, titleIdRow, titleRows, windowOps, withHolderIds, type HolderRow, type HolderValues, type TitleRow } from './titles-draft';
+import { draftChanged, emptyNames, holderText, personNameOf, rebase, savedListName, titleIdRow, titleRows, windowOps, withHolderIds, type HolderRow, type HolderValues, type TitleRow } from '../view/titles-draft';
 
 /** The tree that the window edits, loaded from one block body. */
 export interface LoadedTitles {
@@ -48,10 +49,10 @@ export interface LoadedTitles {
 }
 
 /** The titles of a block body, or why the window cannot edit them. */
-export function loadTitles(body: string): { kind: 'ok'; data: LoadedTitles } | { kind: 'invalid' } | { kind: 'blocked' } {
+export function loadTitles(body: string, dates?: DatesFor): { kind: 'ok'; data: LoadedTitles } | { kind: 'invalid' } | { kind: 'blocked' } {
 	const parsed = parseBody(body);
 	if (!parsed.ok) return { kind: 'invalid' };
-	const g = deriveFamilies(readTree(parsed.doc, parsed.data, body));
+	const g = deriveDated(readTree(parsed.doc, parsed.data, body), dates);
 	if (g.issues.some((i) => i.level === 'blocking')) return { kind: 'blocked' };
 	return { kind: 'ok', data: { body, raw: parsed.data, g, dangling: danglingIds(parsed.data, 'title') } };
 }
@@ -61,6 +62,8 @@ export interface TitlesOptions {
 	handle: Handle;
 	/** The tree's note: the table note's folder can depend on it (D60). */
 	sourcePath: string;
+	/** Spec §14 rule 9: the date reader for the calendar link of the block; absent: plain years. */
+	dates?: DatesFor;
 	/** Runs just before the write, so the tree view keeps its view (spec §5.5). */
 	beforeWrite?: () => void;
 	/** Runs when the window has closed: the focus goes back to More (spec §5.2). */
@@ -100,7 +103,7 @@ export class TitlesWindow extends ListEditWindow {
 
 	/** Null, with a Notice, if the block cannot be edited now. */
 	static create(app: App, o: TitlesOptions): TitlesWindow | null {
-		const l = loadTitles(o.handle.body);
+		const l = loadTitles(o.handle.body, o.dates);
 		if (l.kind === 'ok') return new TitlesWindow(app, o, l.data);
 		new Notice(l.kind === 'blocked' ? WRITE_TEXT.blocked : TITLES_UI.cannotOpen);
 		return null;
@@ -178,15 +181,10 @@ protected labelOf(key: string): string {
 				key: t.key,
 				id: t.id,
 				name: this.label(t),
-				summary: this.summary(t),
+				summary: this.holdersSummary(t),
 				state: problems.has(t.key) ? 'check-id' : t.id === null ? 'new' : draftChanged([t]) ? 'changed' : '',
 				arms: this.armsOfRow(t),
 			}));
-	}
-
-	/** "3 holders · newest: Aldric Valmont": the newest holder is the last one of the draft (the page of the Titles window, D197). */
-	private summary(t: TitleRow): string {
-		return this.holdersSummary(t);
 	}
 
 	/** The arms link of the house of the newest holder, when the picture store can find its file; null when the house has no arms (D213: the row then has no lead, no crown). */
@@ -704,7 +702,7 @@ protected labelOf(key: string): string {
 	}
 
 	private async makeNote(id: string, from: string): Promise<void> {
-		const out = await makeTableNote(this.app, this.o.handle.body, id, this.o.sourcePath);
+		const out = await makeTableNote(this.app, this.o.handle.body, id, this.o.sourcePath, this.o.dates);
 		new Notice(out.ok ? TITLES_UI.noteMade(out.name) : out.why === 'gone' ? TITLES_UI.noteGone : TITLES_UI.noteFailed);
 		this.refocus(from);
 	}
@@ -817,7 +815,7 @@ protected labelOf(key: string): string {
 
 	/** Shows the block's new titles, with the owner's changes on top (`rebase`). An open page stays when its title is still there. */
 	private reload(body: string): void {
-		const l = loadTitles(body);
+		const l = loadTitles(body, this.o.dates);
 		if (l.kind !== 'ok') {
 			this.refused(l.kind === 'blocked' ? WRITE_TEXT.blocked : HOUSES.invalid);
 			return;

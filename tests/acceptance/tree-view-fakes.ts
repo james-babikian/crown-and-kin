@@ -1,6 +1,6 @@
 import { expect, vi } from 'vitest';
-import { newBlockState } from '../../src/obsidian/block-state';
-import type { DynastySettings } from '../../src/obsidian/settings';
+import { newBlockState } from '../../src/view/block-state';
+import type { DynastySettings } from '../../src/view/settings';
 import { EditSheet } from '../../src/obsidian/edit-sheet';
 import { FullScreenModal } from '../../src/obsidian/full-screen';
 import DynastyTreePlugin from '../../src/obsidian/main';
@@ -168,6 +168,10 @@ export interface Host {
 	/** The plugin settings; absent means `DEFAULT_SETTINGS`. */
 	settings?: DynastySettings;
 	recordTiming(): void;
+	/** The full-screen part of the plugin as `TreeHost` has it (WP-1a): the real modal, made by the host. */
+	openFull(from: unknown, target: string | null, opener: HTMLElement, focus: string | null): void;
+	isFullOpenFor(key: string): boolean;
+	hasFullOpen(): boolean;
 }
 
 export function fakeHost(settings?: DynastySettings): Host {
@@ -181,6 +185,11 @@ export function fakeHost(settings?: DynastySettings): Host {
 		recordTiming() {
 			this.renders = (this.renders ?? 0) + 1;
 		},
+		openFull(from, target, opener, focus) {
+			new FullScreenModal(this as never, from as never, target, opener, focus).open();
+		},
+		isFullOpenFor: (key) => FullScreenModal.isOpenFor(key),
+		hasFullOpen: () => FullScreenModal.openViews.size > 0,
 	};
 }
 

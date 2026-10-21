@@ -4,7 +4,7 @@ vi.mock('obsidian', () => import('./acceptance/fake-obsidian'));
 vi.mock('@codemirror/language', () => ({ forceParsing: () => false, syntaxTree: () => ({ length: 0 }) }));
 vi.mock('@codemirror/view', () => ({ ViewPlugin: { fromClass: () => ({}) } }));
 
-import { DEFAULT_SETTINGS } from '../src/obsidian/settings';
+import { DEFAULT_SETTINGS } from '../src/view/settings';
 import { fakeWin, installDom, resetDom } from './acceptance/fake-dom';
 import { resetObsidian } from './acceptance/fake-obsidian';
 import { loadPlugin } from './acceptance/tree-view-fakes';

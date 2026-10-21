@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Rect } from '../src/layout/model';
-import { focusView } from '../src/obsidian/focus-mode';
+import { focusView } from '../src/view/focus-mode';
 import type { View } from '../src/render/view-math';
 
 // Check of the WP-8 view fix, item 6 (G3 F4): the names go under 14 px only when a child then shows whole beside the focus card ("If no child shows even then, the view is as before").

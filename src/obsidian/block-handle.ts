@@ -9,14 +9,11 @@ import { Transaction } from '@codemirror/state';
 import type { EditorView } from '@codemirror/view';
 import type { WritePlan } from '../core/block-write';
 import { findBlocks, ordinalForSection, type LocatedBlock } from '../core/block-locate';
-import { relocate, relocateAll, sameBody as sameBodyAfterTidy, smallestChange, undoBlock } from '../core/block-match';
+import { relocate, relocateAll, sameBody, smallestChange, undoBlock } from '../core/block-match';
 import { createUndoStack, planWrite } from '../core/block-write';
 import type { EditResult, Op } from '../core/edit';
 import { applyOp } from '../core/yaml-edit';
-import { newBlockState, type BlockState } from './block-state';
-
-/** The same text is the usual answer, and it needs no copy of the whole body (`sameBody` tidies both texts first). */
-const sameBody = (a: string, b: string): boolean => a === b || sameBodyAfterTidy(a, b);
+import { newBlockState, type BlockState } from '../view/block-state';
 
 /**
  * One change as an editor transaction, so Ctrl/Cmd+Z undoes it (spec §6.1). Obsidian's

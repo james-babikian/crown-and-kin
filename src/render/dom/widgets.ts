@@ -4,8 +4,10 @@
  * with a hook for what must happen when it closes (the legend lets go of its arms pictures). A phone sheet also closes with a swipe down (D220).
  */
 
-import { setIcon } from 'obsidian';
 import { attachSheetSwipe } from './sheet-swipe';
+
+/** Puts a named icon into an element. The plugin shell passes Obsidian's `setIcon`; this layer never imports `obsidian` itself. */
+export type IconFn = (el: HTMLElement, name: string) => void;
 
 /** The two elements of a built callout: the whole box, and the element to fill with its content. */
 export interface Callout {
@@ -14,10 +16,10 @@ export interface Callout {
 }
 
 /** Builds an Obsidian-style warning or error callout inside `parent`, with an empty content area. */
-export function buildCallout(parent: HTMLElement, type: 'warning' | 'error', title: string, cls: string): Callout {
+export function buildCallout(parent: HTMLElement, type: 'warning' | 'error', title: string, cls: string, icon: IconFn): Callout {
 	const root = parent.createDiv({ cls: ['callout', cls], attr: { 'data-callout': type } });
 	const head = root.createDiv({ cls: 'callout-title' });
-	setIcon(head.createDiv({ cls: 'callout-icon' }), type === 'error' ? 'zap' : 'alert-triangle');
+	icon(head.createDiv({ cls: 'callout-icon' }), type === 'error' ? 'zap' : 'alert-triangle');
 	head.createDiv({ cls: 'callout-title-inner', text: title });
 	const content = root.createDiv({ cls: 'callout-content' });
 	return { root, content };

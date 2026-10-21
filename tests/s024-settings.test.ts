@@ -1,6 +1,6 @@
 // Tests of the 0.2.4 settings names (contract 3) that stay in 0.2.5: the break list and Reduce movement, their defaults, the read of old data and reducedMotion. The card style and the phone heights of 0.2.4 are gone (D144).
 import { describe, expect, it } from 'vitest';
-import { BREAK_WORDS_MAX, DEFAULT_SETTINGS, PHONE_DIRECTIONS, REDUCE_MOTIONS, normaliseSettings, reducedMotion, settingsChanges } from '../src/obsidian/settings';
+import { BREAK_WORDS_MAX, DEFAULT_SETTINGS, PHONE_DIRECTIONS, REDUCE_MOTIONS, normaliseSettings, reducedMotion, settingsChanges } from '../src/view/settings';
 
 describe('0.2.4 settings keys', () => {
 	it('has the two keys with their defaults', () => {

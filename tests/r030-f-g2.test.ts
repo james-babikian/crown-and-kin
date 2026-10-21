@@ -5,7 +5,7 @@ vi.mock('@codemirror/language', () => ({ forceParsing: () => false, syntaxTree: 
 vi.mock('@codemirror/view', () => ({ ViewPlugin: { fromClass: () => ({}) } }));
 
 import DynastyTreePlugin from '../src/obsidian/main';
-import { BREAK_WORDS_MAX } from '../src/obsidian/settings';
+import { BREAK_WORDS_MAX } from '../src/view/settings';
 import { SETTINGS_UI } from '../src/render/ui-text';
 import { clock, dispatch, fakeWin, installDom, resetDom, settle } from './acceptance/fake-dom';
 import { resetObsidian, settingRows, type Plugin as FakePlugin, type TextComponent } from './acceptance/fake-obsidian';

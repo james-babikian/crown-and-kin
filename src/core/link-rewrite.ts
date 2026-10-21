@@ -1,84 +1,26 @@
 /*
  * Link maintenance (spec §6.9, D6, §13.0 item 3). The core only reads and rewrites link text; the
  * plugin resolves targets against the vault and passes the old → new map. The values it handles
- * are a person's `link`, `portrait` and `arms` and a house's `arms`. A link is read in the forms the
- * renderer opens (`linkTarget` in `src/render/tree-info.ts`): `[[Note#Heading|Alias]]`,
- * `[Alias](Note.md#Heading)`, `[Alias](<Note.md>)` and a bare `Note#Heading`, each with an
- * optional `!`. `parsePictureLink` is shared with `pictures.ts`, so a rename and the picture lookup
- * read a picture link the same way.
+ * are a person's `link`, `portrait` and `arms`, a house's `arms` and the option `calendar` (the calendar note of the
+ * tree, spec §14 rule 7; it is a note link, read like `link`). A link is read in the forms the
+ * renderer opens (see `picture-link.ts`). `parsePictureLink` there is shared with `pictures.ts`, so a
+ * rename and the picture lookup read a picture link the same way.
  */
 
 import { isAlias, isMap, isScalar, isSeq, parseDocument, Scalar, type Node, type YAMLMap } from 'yaml';
 import type { EditResult, RewriteLinksOp } from './edit';
-import { closesBalanced } from './link-text';
 import { parseBody } from './parse';
+import { parseLink, parsePictureLink } from './picture-link';
 import { pictureFormat } from './pictures';
 import { curlyParts, isMap as isRawMap, linkValue, type Raw, type RawMap } from './tolerate';
 import { section } from './yaml-list';
-import { clone, doubleQuoted, findPair, finish, layoutOf, refuse, renderScalar, setPairValue, sourceText, type Parsed, type Patch, type Source, type Step } from './yaml-patch';
-
-/** A link's text split around its target: `head + written target + tail` is the whole text. */
-export interface LinkParts {
-	head: string;
-	/** The target as Obsidian resolves it: trimmed, and percent-decoded in a Markdown link. */
-	target: string;
-	tail: string;
-	kind: 'wiki' | 'md' | 'md-angle' | 'bare';
-}
-
-function decode(s: string): string {
-	try {
-		return decodeURIComponent(s);
-	} catch {
-		return s;
-	}
-}
+import { clone, doubleQuoted, findPair, finish, isRefusal, layoutOf, refuse, renderScalar, setPairValue, sourceText, topMap, type Parsed, type Patch, type Source, type Step } from './yaml-patch';
 
 /** Percent-encodes what a Markdown link destination cannot hold as written (the rename search looks for this form too). */
 export const encode = (s: string) => s.replace(/%/g, '%25').replace(/ /g, '%20').replace(/\(/g, '%28').replace(/\)/g, '%29');
 
-/** The target is the text up to the first of `cut`; whitespace around it goes to head and tail. */
-function split(head: string, text: string, tail: string, cut: RegExp, kind: LinkParts['kind']): LinkParts | null {
-	const at = text.search(cut);
-	const path = at < 0 ? text : text.slice(0, at);
-	const rest = at < 0 ? '' : text.slice(at);
-	const lead = /^\s*/.exec(path)![0];
-	const core = path.trim();
-	const target = kind === 'md' ? decode(core).trim() : core;
-	if (target === '') return null;
-	return { head: head + lead, target, tail: path.slice(lead.length + core.length) + rest + tail, kind };
-}
-
-/**
- * Splits a link value into its parts, or null when it names no target (for example `[[]]` or
- * `#heading`). A text that matches no link form is a bare target. A Markdown destination runs to
- * the last `)` if its parentheses are balanced; the angle form runs to the last `>` before it.
- */
-export function parseLink(v: string): LinkParts | null {
-	const wiki = /^(\s*!?\[\[)([^\]]*)(\]\]\s*)$/.exec(v);
-	if (wiki) return split(wiki[1], wiki[2], wiki[3], /[|#]/, 'wiki');
-	const md = /^(\s*!?\[[^\]]*\]\()([\s\S]*)(\)\s*)$/.exec(v);
-	if (md) {
-		const angle = /^(\s*<)([\s\S]*)(>\s*)$/.exec(md[2]);
-		if (angle) return split(md[1] + angle[1], angle[2], angle[3] + md[3], /#/, 'md-angle');
-		if (closesBalanced(md[2])) return split(md[1], md[2], md[3], /#/, 'md');
-	}
-	return split('', v, '', /#/, 'bare');
-}
-
-/**
- * `parseLink` for a picture value (`portrait`, `arms`; contract rule 4): a bare value may also start
- * with "!", which goes to the head, so `!Pictures/x.png` names `Pictures/x.png`. A bare `link` keeps
- * its "!", as the renderer opens it.
- */
-export function parsePictureLink(v: string): LinkParts | null {
-	const parts = parseLink(v);
-	const bang = parts?.kind === 'bare' ? /^(\s*!)([\s\S]*)$/.exec(v) : null;
-	return bang ? split(bang[1], bang[2], '', /#/, 'bare') : parts;
-}
-
 /** The link parser of a field: pictures read a bare leading "!" as an embed mark. */
-const parserFor = (key: string) => (key === 'link' ? parseLink : parsePictureLink);
+const parserFor = (key: string) => (key === 'link' || key === 'calendar' ? parseLink : parsePictureLink);
 
 /**
  * The form of a link target used for comparison and for `RewriteLinksOp.map` keys: backslashes
@@ -125,6 +67,13 @@ export const linkTargets: LinkTargets = (body) => {
 		const out: string[] = [];
 		// The data keeps the written key order, so this is text order: sections, items, then keys.
 		for (const [name, items] of Object.entries(parsed.data)) {
+			if (name === 'options' && isRawMap(items)) {
+				// The calendar note of the tree (spec §14 rule 7) is a note link, like a person `link`.
+				const text = linkValue(items.calendar, () => sourceText(parsed.doc, body, ['options', 'calendar']));
+				const parts = text === undefined ? null : parseLink(text);
+				if (parts) out.push(parts.target);
+				continue;
+			}
 			const keys = name === 'houses' || name === 'people' ? LINK_FIELDS[name] : undefined;
 			if (!keys || !Array.isArray(items)) continue;
 			items.forEach((item: Raw, index) => {
@@ -225,6 +174,18 @@ function linkPatch(p: Parsed, item: YAMLMap, key: string, map: Map<string, strin
 	return { patch: { ...range, text: renderScalar(text, null, { flow, text: false, indent: '' }) }, raw: text };
 }
 
+/** The patch for `options.calendar` (the link to the calendar note of the tree), with the expected data updated; null when it does not change. */
+function optionsLink(first: Parsed, expected: RawMap, map: Map<string, string>): Patch | null | 'refused' {
+	const top = topMap(first);
+	if (!top || isRefusal(top)) return null;
+	const node = findPair(top, 'options')?.value;
+	if (!isMap(node)) return null;
+	const c = linkPatch(first, node, 'calendar', map);
+	if (!c || c === 'refused') return c;
+	if (isRawMap(expected.options)) expected.options.calendar = clone(c.raw);
+	return c.patch;
+}
+
 /**
  * Rewrites every person `link` and `portrait` and every house `arms` whose target moved, leaving
  * the rest of the body unchanged (spec §6.9, §13.0 item 3). `changed` counts values.
@@ -270,6 +231,9 @@ export function rewriteLinks(first: Parsed, data: RawMap, op: RewriteLinksOp): E
 			for (const [key, v] of values) raw[key] = clone(v);
 		});
 	}
+	const calendar = optionsLink(first, expected, map);
+	if (calendar === 'refused') return refuse('bad-value', 'A new link target cannot be written as a link.');
+	if (calendar) patches.push(calendar);
 	if (patches.length === 0) return unchanged;
 	// Computed on the first parse, so one step.
 	const step: Step = () => patches;

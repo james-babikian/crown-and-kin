@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { deriveFamilies } from '../src/core/derive';
 import { housePage, houseTableNote } from '../src/core/house-page';
 import { parseDynasty } from '../src/core/parse';
-import { oldestParent } from '../src/obsidian/phone-list';
+import { oldestParent } from '../src/view/phone-list';
 import { yearOf } from '../src/core/succession-keys';
 import { readdirSync, readFileSync } from 'node:fs';
 

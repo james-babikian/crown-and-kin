@@ -137,7 +137,7 @@ function sceneItems(d: Drawn, saved: SavedParts): string[] {
 		if (e.hasClass('dynasty-tag')) out.push(`tag:${e.getAttribute('data-person')}`);
 	}
 	for (const s of d.scene.pictures.filter((x) => x.lod === 'full')) {
-		if (s.kind === 'arms' && isUri(saved.pictures.get(`arms:${s.house}`))) out.push(`arms:${s.person}`);
+		if (s.kind === 'arms' && isUri(saved.pictures.get(`arms:${(s.owner && 'house' in s.owner ? s.owner.house : undefined)}`))) out.push(`arms:${s.person}`);
 		if (s.kind === 'portrait') {
 			// D219: a portrait that shows has no frame; one that is missing or cannot be read keeps its thin frame.
 			if (isUri(saved.pictures.get(`portrait:${s.person}`))) out.push(`portrait:${s.person}`);
@@ -398,7 +398,7 @@ describe('B9: `pictures` without `saved` (the spike): pictures, but no heading, 
 		const images = nodes(doc).filter((n) => n.tag === 'image');
 		const uris = [...d.pictures.entries()].filter(([, v]) => typeof v === 'string' && v.startsWith('data:'));
 		// Every card with arms whose house has a URI, and every portrait with a URI, gets one picture.
-		const armsCards = d.scene.pictures.filter((s) => s.lod === 'full' && s.kind === 'arms' && typeof d.pictures.get(`arms:${s.house}`) === 'string' && d.pictures.get(`arms:${s.house}`)!.startsWith('data:')).length;
+		const armsCards = d.scene.pictures.filter((s) => s.lod === 'full' && s.kind === 'arms' && typeof d.pictures.get(`arms:${(s.owner && 'house' in s.owner ? s.owner.house : undefined)}`) === 'string' && d.pictures.get(`arms:${(s.owner && 'house' in s.owner ? s.owner.house : undefined)}`)!.startsWith('data:')).length;
 		const portraitCards = uris.filter(([k]) => k.startsWith('portrait:')).length;
 		expect(images.length).toBe(armsCards + portraitCards);
 		expect(nodes(doc).map((n) => n.text.trim())).not.toContain('Line styles');

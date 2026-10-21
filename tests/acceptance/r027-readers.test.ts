@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { deriveFamilies } from '../../src/core/derive';
 import { housePage, houseTableNote } from '../../src/core/house-page';
 import { parseDynasty } from '../../src/core/parse';
-import { oldestParent } from '../../src/obsidian/phone-list';
+import { oldestParent } from '../../src/view/phone-list';
 
 /*
  * Version 0.2.7, WP2: the other readers of the date texts that move to the new helpers (the 0.2.7 contract K.7, K.5,

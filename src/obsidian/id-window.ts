@@ -8,10 +8,10 @@
 
 import { Modal, type App } from 'obsidian';
 import { ID_UI } from '../render/ui-text';
-import { reasonText, type IdKind, type IdReason } from './id-draft';
+import { reasonText, type IdKind, type IdReason } from '../view/id-draft';
 import { idField } from './id-field';
 import { ignoreGhostClick, phoneLayout } from './modal-layout';
-import { trackModal } from './plugin-modals';
+import { trackModal } from '../view/plugin-modals';
 import { nameDialog } from './sheet-parts';
 import { buildShell, type Shell } from './window-shell';
 

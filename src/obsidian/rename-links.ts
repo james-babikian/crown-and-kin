@@ -16,7 +16,7 @@ import { applyOp } from '../core/yaml-edit';
 import { RENAME_UI, renamedKind, renamedText, type LinkReportText } from '../render/ui-text';
 import { VIEW_NOTICE } from '../render/view-text';
 import type { Handle } from './block-handle';
-import type { PendingRename } from './settings';
+import type { PendingRename } from '../view/settings';
 
 /** What the updater needs from the handle registry (`HandleRegistry.forBlock`). */
 export interface BlockSource {

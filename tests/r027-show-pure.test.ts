@@ -7,7 +7,7 @@ vi.mock('@codemirror/view', () => ({ ViewPlugin: { fromClass: () => ({}) } }));
 
 import { cardLabel } from '../src/render/tree-info';
 import { SUCCESSION_UI as T } from '../src/render/ui-text';
-import { PHONE_MIN_SCALE, cardPosition, lineWords, linePeople, successionDrawn, successionFirstView } from '../src/obsidian/succession-view';
+import { PHONE_MIN_SCALE, cardPosition, lineWords, linePeople, successionDrawn, successionFirstView } from '../src/view/succession-view';
 import { build } from './helpers';
 import { BODY_16 } from './r027-window-support';
 

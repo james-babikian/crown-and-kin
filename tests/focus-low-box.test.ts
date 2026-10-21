@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Rect } from '../src/layout/model';
-import { familyFits, focusView } from '../src/obsidian/focus-mode';
+import { familyFits, focusView } from '../src/view/focus-mode';
 import { START_TOP_GAP } from '../src/render/view-math';
 
 /*

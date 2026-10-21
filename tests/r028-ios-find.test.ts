@@ -199,6 +199,7 @@ describe('Find on an iPhone: the hidden names do not grow the scroll area of the
 		['parent-type chip (edit-sheet.ts)', () => el('span', ['dynasty-sr-only'], el('span', ['dynasty-chip-select'], el('div', ['dynasty-family-controls'], windowOf())))],
 		['title of a computer window (window-shell.ts)', () => el('div', ['dynasty-sheet-title', 'dynasty-sr-only'], el('div', ['modal-content'], windowOf())), (h) => h.parent?.parent ?? null],
 		['low bar of a very large tree (large-bar.ts)', () => el('span', ['dynasty-sr-only'], el('div', ['dynasty-large-bar'], el('div', ['dynasty-large-root'], windowOf())))],
+		['label of the picture viewer (picture-viewer.ts)', () => el('span', ['dynasty-sr-only'], el('div', ['modal-content', 'dynasty-viewer-content'], windowOf())), (h) => h.parent?.parent ?? null],
 		['button of the phone list (phone-list-dom.ts nameBy)', () => el('span', ['dynasty-sr-only'], el('button', ['dynasty-list-go'], el('div', ['dynasty-list-row'], el('div', ['dynasty-list-root'], windowOf()))))],
 	];
 	for (const [name, make, box] of places) {
@@ -234,7 +235,7 @@ describe('Find on an iPhone: the hidden names do not grow the scroll area of the
 			}
 		};
 		walk(new URL('../src/', import.meta.url));
-		expect(found.sort()).toEqual(['edit-sheet.ts', 'large-bar.ts', 'person-picker.ts', 'phone-list-dom.ts', 'window-shell.ts']);
+		expect(found.sort()).toEqual(['edit-sheet.ts', 'large-bar.ts', 'person-picker.ts', 'phone-list-dom.ts', 'picture-viewer.ts', 'window-shell.ts']);
 	});
 });
 

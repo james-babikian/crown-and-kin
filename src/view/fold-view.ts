@@ -1,8 +1,8 @@
 /*
  * Pure helpers of the tree view for folds (spec §13.10): which folds count for a
  * draw, the people they hide and the layout settings that carry them, and the cut back of a fold's tap
- * area where it meets another tap area. No DOM here, so all of it runs under vitest. `tree-view.ts`
- * calls these at each draw and at each settle.
+ * area where it meets another tap area, and the automatic folds of a focus view (D257: `setFolds`, `autoFoldPatch`; the rule that chooses them is `start-folds.ts`).
+ * No DOM here, so all of it runs under vitest. `tree-view.ts` calls these at each draw and at each settle.
  */
 
 import { foldFamilies, foldHidden, unfoldFor, type FoldKey, type FoldSet } from '../core/folds';
@@ -46,6 +46,51 @@ export function withFolds(base: LayoutSettings, plan: FoldPlan, canFold: boolean
 	if (plan.foldedList.length) out.foldedFamilies = plan.foldedList;
 	if (canFold) out.foldControls = true;
 	return out;
+}
+
+/** The block memory that `setFolds` changes. */
+interface FoldMemory {
+	folds: Set<FoldKey>;
+	autoFolds?: Set<FoldKey>;
+}
+
+/** The keys of `auto` that are still in `folds` (D257: a key that is not folded any more is the owner's open family, not an automatic fold). `auto` itself when all are. */
+export function stillAuto(folds: FoldSet, auto: ReadonlySet<FoldKey> | undefined): Set<FoldKey> | undefined {
+	if (!auto || [...auto].every((k) => folds.has(k))) return auto as Set<FoldKey> | undefined;
+	return new Set([...auto].filter((k) => folds.has(k)));
+}
+
+/**
+ * Sets the folds of a block and keeps its automatic folds (D257) to the keys that are still folded. Every change of `folds` by a tap, the edit sheet or a focus
+ * on a hidden person goes through here, so an automatic fold that the owner opened is a normal fold at once, and one that the owner folds again is the owner's own.
+ */
+export function setFolds(st: FoldMemory, next: FoldSet): void {
+	st.folds = new Set(next);
+	st.autoFolds = stillAuto(st.folds, st.autoFolds);
+}
+
+/** What a draw does with the automatic folds: nothing (a view that is only temporary or cannot fold), the end of a focus view, or the start of one. */
+export type AutoFocus = { kind: 'keep' } | { kind: 'clear' } | { kind: 'enter'; key: string; startKeys: () => readonly FoldKey[] };
+
+/** The changes to the block's folds that a draw makes for its automatic folds. A field that is absent means no change. */
+export interface AutoFoldPatch {
+	folds?: Set<FoldKey>;
+	autoFolds?: Set<FoldKey>;
+	autoFor?: string | null;
+}
+
+/**
+ * D257: the changes for `step`. A focus that is new (its key differs from `autoFor`) takes the automatic folds of the old focus out and puts its own `startKeys`
+ * in, except the families that are folded already (the owner's own). The same focus changes nothing, so a family the owner opened stays open. The end of a focus view
+ * takes its automatic folds out and keeps the owner's. `startKeys` runs only when a focus is new.
+ */
+export function autoFoldPatch(folds: FoldSet, auto: ReadonlySet<FoldKey> | undefined, autoFor: string | null | undefined, step: AutoFocus): AutoFoldPatch {
+	if (step.kind === 'keep' || (step.kind === 'enter' && autoFor === step.key)) return {};
+	const mine = stillAuto(folds, auto);
+	const base = mine?.size ? new Set([...folds].filter((k) => !mine.has(k))) : folds;
+	if (step.kind === 'clear') return mine?.size || auto?.size || autoFor != null ? { folds: new Set(base), autoFolds: new Set(), autoFor: null } : {};
+	const added = step.startKeys().filter((k) => !base.has(k));
+	return { folds: new Set([...base, ...added]), autoFolds: new Set(added), autoFor: step.key };
 }
 
 const overlap = (a: Rect, b: Rect) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;

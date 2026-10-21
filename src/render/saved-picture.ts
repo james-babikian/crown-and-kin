@@ -11,7 +11,7 @@ import type { FoldSet } from '../core/folds';
 import { noteName } from '../core/titles';
 import { illegitimateSigns } from '../layout/illegitimate-sign';
 import type { LaidOut, StrokeKind } from '../layout/model';
-import type { Measure, SceneFonts } from './dom/scene';
+import type { Measure, SceneFonts } from './scene-model';
 import { LEGEND_DEAD_SAMPLE_W, LEGEND_SAMPLE_H, LEGEND_SAMPLE_W, legendHouses, type LegendExtraKind, type LegendHouse } from './legend';
 import { LEGEND_DEAD_DOUBT_LABEL, LEGEND_DEAD_LABEL, LEGEND_HOUSES_LABEL, LEGEND_LABELS, LEGEND_LINES_LABEL, LEGEND_ORDER, SIGN_LEGEND_LABEL } from './legend-text';
 import { dateLine } from './tree-info';
@@ -52,7 +52,7 @@ export function savedLegend(g: FamilyGraph, laid: LaidOut): SavedLegendContent {
 	let doubt = false;
 	for (const id of laid.layout.persons.keys()) {
 		const p = g.byId.get(id);
-		const text = p ? dateLine(p) : undefined;
+		const text = p ? dateLine(p, g.dates) : undefined;
 		if (!text?.includes('†')) continue;
 		if (text.includes('†?')) doubt = true;
 		else dead = true;

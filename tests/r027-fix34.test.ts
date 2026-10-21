@@ -9,9 +9,9 @@ vi.mock('../src/obsidian/person-picker', () => ({ pickPerson: async () => null }
 import { deriveFamilies } from '../src/core/derive';
 import { parseDynasty } from '../src/core/parse';
 import { specOf } from '../src/core/succession';
-import { carryState, newBlockState } from '../src/obsidian/block-state';
-import { closePluginModals } from '../src/obsidian/plugin-modals';
-import { draftSpec, successionOf } from '../src/obsidian/titles-draft';
+import { carryState, newBlockState } from '../src/view/block-state';
+import { closePluginModals } from '../src/view/plugin-modals';
+import { draftSpec, successionOf } from '../src/view/titles-draft';
 import { HEIR_LOOK } from '../src/render/styles';
 import { SETTINGS_UI, SHEET, SUCCESSION_UI as T } from '../src/render/ui-text';
 import { FEl, clock, device, fakeWin, installDom, resetDom } from './acceptance/fake-dom';

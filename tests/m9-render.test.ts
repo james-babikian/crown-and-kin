@@ -100,7 +100,7 @@ describe('slots and the legend (S1, S2, S4)', () => {
 	it('a deceased card keeps its class, so the pictures can be muted by styles.css (G4); slots carry the house', () => {
 		const g = graph();
 		const s = scene(g, lay(g)) as Scene;
-		expect(s.pictures.map((x) => `${x.person}:${x.kind}:${x.lod}:${x.house ?? ''}`)).toEqual(['a:arms:full:v', 'a:portrait:full:', 'a:arms:compact:v', 'a:portrait:compact:', 'b:arms:full:v', 'b:arms:compact:v', 'c:portrait:full:', 'c:portrait:compact:']);
+		expect(s.pictures.map((x) => `${x.person}:${x.kind}:${x.lod}:${x.owner && 'house' in x.owner ? x.owner.house : ''}`)).toEqual(['a:arms:full:v', 'a:portrait:full:', 'a:arms:compact:v', 'a:portrait:compact:', 'b:arms:full:v', 'b:arms:compact:v', 'c:portrait:full:', 'c:portrait:compact:']);
 		expect((s.cards.get('a') as unknown as FEl).hasClass('dynasty-deceased')).toBe(true);
 	});
 

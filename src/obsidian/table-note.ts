@@ -7,9 +7,9 @@
  */
 
 import type { App, TFile, TFolder } from 'obsidian';
-import { deriveFamilies } from '../core/derive';
 import { parseDynasty } from '../core/parse';
 import { holderTable, noteName } from '../core/titles';
+import { deriveDated, type DatesFor } from '../view/calendar-index';
 
 /** Where a made note goes. The default is the folder that Obsidian picks for new notes next to sourcePath (D60); older is a vault folder path ('' = the vault root). */
 export interface NoteWhere {
@@ -92,10 +92,10 @@ export type TableNoteResult = { ok: true; name: string; path: string } | { ok: f
  * Makes the table note of title `id` from the block text `body` (the saved list, spec §13.4).
  * `sourcePath` is the tree's note: Obsidian's "same folder as current file" setting uses it.
  */
-export async function makeTableNote(app: App, body: string, id: string, sourcePath: string): Promise<TableNoteResult> {
+export async function makeTableNote(app: App, body: string, id: string, sourcePath: string, dates?: DatesFor): Promise<TableNoteResult> {
 	const parsed = parseDynasty(body);
 	if (!parsed.ok) return { ok: false, why: 'gone' };
-	const g = deriveFamilies(parsed.tree);
+	const g = deriveDated(parsed.tree, dates);
 	const title = g.titles.find((t) => t.id === id);
 	if (!title) return { ok: false, why: 'gone' };
 	const made = await makeNote(app, sourcePath, noteName(title.plural, title.id), holderTable(g, title));

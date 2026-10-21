@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { matchesAll, queryWords } from '../src/obsidian/list-search';
+import { matchesAll, queryWords } from '../src/view/list-search';
 
 /*
  * The search rule of the Titles window and the Houses window (the 0.2.5 contract D.3.3, D134): every word of the

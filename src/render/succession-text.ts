@@ -9,12 +9,19 @@ import { PERSON_PLACEHOLDER } from './view-text';
 /** "A", "A and B", "A, B and C". */
 const andList = (xs: readonly string[]): string => (xs.length <= 1 ? (xs[0] ?? '') : `${xs.slice(0, -1).join(', ')} and ${xs[xs.length - 1]}`);
 
+/**
+ * The year in a sentence of the line: the text that gives Y, as written (`SuccessionResult.yearText`, spec §14 rule 7), or null for "now".
+ * A number is the internal year and shows with `formatYear`; the Titles window still passes `result.year` until step 4.3 moves it to `yearText`.
+ */
+export type YearInText = string | number | null;
+const yearIn = (year: string | number): string => (typeof year === 'number' ? formatYear(year) : year);
+
 /** A `died` text that only says "yes": the row of an open branch then gives no date. */
 const BARE_DEATH_WORDS: readonly string[] = ['yes', 'true', 'dead', 'died', 'deceased'];
 
 /**
  * The Succession section of the Titles window (contract 0.2.7 D.3, J, K, L), the line of succession, and the texts of the
- * Show button and its question. A text with a year has two forms: `year` is the number, or null for "now".
+ * Show button and its question. A text with a year has two forms: `year` is the text that gives Y (`YearInText`), or null for "now".
  */
 export const SUCCESSION_UI = {
 	heading: 'Succession',
@@ -91,13 +98,13 @@ export const SUCCESSION_UI = {
 	moveEarlierLabel: (who: string) => `Move earlier: move ${who} earlier`,
 	moveLaterLabel: (who: string) => `Move later: move ${who} later`,
 	// The state of a named heir (K.3, L.9): `year` is a number, or null for "now".
-	heirNotAlive: (name: string, year: number | null) => (year === null ? `${name} is dead, so the plugin does not use ${name} as a named heir.` : `${name} is not alive in ${formatYear(year)}, so the plugin does not use ${name} as a named heir.`),
-	heirNotBorn: (name: string, year: number | null) => (year === null ? `${name} is not born yet, so the plugin does not use ${name} as a named heir.` : `${name} is not born yet in ${formatYear(year)}, so the plugin does not use ${name} as a named heir.`),
+	heirNotAlive: (name: string, year: YearInText) => (year === null ? `${name} is dead, so the plugin does not use ${name} as a named heir.` : `${name} is not alive in ${yearIn(year)}, so the plugin does not use ${name} as a named heir.`),
+	heirNotBorn: (name: string, year: YearInText) => (year === null ? `${name} is not born yet, so the plugin does not use ${name} as a named heir.` : `${name} is not born yet in ${yearIn(year)}, so the plugin does not use ${name} as a named heir.`),
 	heirIsRuler: (name: string) => `${name} is the ruler of this line, so the plugin does not use ${name} as a named heir.`,
 	heirExcluded: (name: string) => `${name} is in the list of excluded people, so ${name} is not in the line.`,
 	heirNotInTree: 'No person in the tree has this ID.',
 	// The bold heading above the rows of the Line of succession section.
-	lineAfter: (ruler: string, year: number | null) => (year === null ? `After ${ruler} now` : `After ${ruler} in ${formatYear(year)}`),
+	lineAfter: (ruler: string, year: YearInText) => (year === null ? `After ${ruler} now` : `After ${ruler} in ${yearIn(year)}`),
 	lineRowLabel: (name: string, ordinal: string) => `${ordinal} ${name}: show the card in the tree`,
 	more: 'and more people',
 	// Open branches (M.8): a person who died and has no children in the tree. DIED is the text of the note.
@@ -117,16 +124,16 @@ export const SUCCESSION_UI = {
 	// A written value that the plugin cannot read (the first option of a dropdown): VALUE is the text of the note, if the window can show it.
 	unknownValue: (value: string | null) => (value === null ? 'Unknown value' : `Unknown value (${value})`),
 	yearBad: (text: string) => `The plugin cannot read the year in the note: ${text}. If you type a year here, the plugin replaces it.`,
-	old: (name: string, age: number, year: number | null) => {
+	old: (name: string, age: number, year: YearInText) => {
 		const years = age === 1 ? '1 year' : `${age} years`;
-		return year === null ? `${name} is older than ${years}. If ${name} is dead, add a death date.` : `${name} is older than ${years} in ${formatYear(year)}. If ${name} is dead, add a death date.`;
+		return year === null ? `${name} is older than ${years}. If ${name} is dead, add a death date.` : `${name} is older than ${years} in ${yearIn(year)}. If ${name} is dead, add a death date.`;
 	},
-	noRuler: (year: number | null) => (year === null ? 'The title has no holder now, so there is no line of succession.' : `The title has no holder in ${formatYear(year)}, so there is no line of succession.`),
-	rulerNotInTree: (year: number | null) =>
-		year === null ? 'The holder of the title is not in the tree now. The plugin cannot show the line of succession.' : `The holder of the title in ${formatYear(year)} is not in the tree. The plugin cannot show the line of succession.`,
+	noRuler: (year: YearInText) => (year === null ? 'The title has no holder now, so there is no line of succession.' : `The title has no holder in ${yearIn(year)}, so there is no line of succession.`),
+	rulerNotInTree: (year: YearInText) =>
+		year === null ? 'The holder of the title is not in the tree now. The plugin cannot show the line of succession.' : `The holder of the title in ${yearIn(year)} is not in the tree. The plugin cannot show the line of succession.`,
 	badRule: 'The succession rule in the tree text has an error. Open the list of warnings.',
 	newTitle: 'Save the title first. Then you can set a succession rule.',
-	coRulers: (n: number, ruler: string, year: number | null) => (year === null ? `${n} holders rule now. The line is after ${ruler}.` : `${n} holders rule in ${formatYear(year)}. The line is after ${ruler}.`),
+	coRulers: (n: number, ruler: string, year: YearInText) => (year === null ? `${n} holders rule now. The line is after ${ruler}.` : `${n} holders rule in ${yearIn(year)}. The line is after ${ruler}.`),
 	// The notes under and above the line (SuccessionResult.notes, 0.2.8). The window shows them as quiet text lines.
 	orderFromNote: (a: string, b: string) => `The order of ${a} and ${b} comes from the order in the note. Add a birth year to change it.`,
 	orderFromNoteSameYear: (a: string, b: string) => `The order of ${a} and ${b} comes from the order in the note, because both have the same birth year.`,
@@ -138,13 +145,15 @@ export const SUCCESSION_UI = {
 	throughSpouseNote: (holder: string, spouse: string) => `${holder} holds the title through the spouse, ${spouse}. The line of succession is for ${spouse}.`,
 	noYearDate: (name: string) => `The plugin cannot read a year in the date of ${name}.`,
 	noYearReign: (name: string) => `The plugin cannot read a year in the reign of ${name}.`,
+	// Spec §14 rule 5: a `died` text with text and no year. `year` is the text that gives Y, as written.
+	diedNoYear: (name: string, year: string) => `The plugin cannot read a year in the death date of ${name}. So in this line, it counts ${name} as dead in ${year}. To change this, write a year in the death date.`,
 	leftOutNoSex: (n: number) => (n === 1 ? '1 person has no “sex: m” or “sex: f”, so this rule does not include this person.' : `${n} people have no “sex: m” or “sex: f”, so this rule does not include them.`),
 	noBirthYear: (n: number) => (n === 1 ? '1 heir has no birth year, so this rule cannot put this heir in order.' : `${n} heirs have no birth year, so this rule cannot put them in order.`),
 	show: 'Show',
 	showLabel: 'Show the line of succession on the tree',
 	// The Show view (F.3, F.6): the bar above the tree, the card label and the row of the phone list.
-	bar: (title: string, year: number | null) => (year === null ? `Line of succession: ${title}, now` : `Line of succession: ${title}, ${formatYear(year)}`),
-	barNoHeir: (title: string, year: number | null) => `${year === null ? `Line of succession: ${title}, now` : `Line of succession: ${title}, ${formatYear(year)}`}. No heir in the tree.`,
+	bar: (title: string, year: YearInText) => (year === null ? `Line of succession: ${title}, now` : `Line of succession: ${title}, ${yearIn(year)}`),
+	barNoHeir: (title: string, year: YearInText) => `${year === null ? `Line of succession: ${title}, now` : `Line of succession: ${title}, ${yearIn(year)}`}. No heir in the tree.`,
 	barClose: 'Close',
 	barCloseLabel: 'Close the line of succession',
 	inLine: (ordinal: string) => `${ordinal} in line`,

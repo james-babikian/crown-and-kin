@@ -5,7 +5,7 @@
  * past writes. No `obsidian` import: the caller does the actual file write.
  */
 
-import { findBlocks, replaceBody } from './block-locate';
+import { findBlocks, KIN_LANGUAGE, replaceBody } from './block-locate';
 
 /** The result of `planWrite`: the new text and bodies on success, or why the write did not happen. */
 export type WritePlan =
@@ -17,13 +17,15 @@ export type WritePlan =
 /**
  * Steps 1–6 of the §6.1 stale check as one pure function: locate, compare with
  * `expectedBody`, run `edit` on the body, and build the new note text.
- * `edit` returns the new body or a refusal reason.
+ * `edit` returns the new body or a refusal reason. `language` is the fence language the ordinal counts in (default `kin`;
+ * the Calendars window writes `kin-calendar` blocks, spec §14 rule 2).
  */
 export type PlanWrite = (
 	text: string,
 	ordinal: number,
 	expectedBody: string,
 	edit: (body: string) => { ok: true; body: string } | { ok: false; reason: string },
+	language?: string,
 ) => WritePlan;
 
 /** Plugin undo (§6.1, D8): the last 20 bodies a handle replaced. */
@@ -40,8 +42,8 @@ export interface UndoStack {
 }
 
 /** Implements `PlanWrite`. */
-export const planWrite: PlanWrite = (text, ordinal, expectedBody, edit) => {
-	const blocks = findBlocks(text);
+export const planWrite: PlanWrite = (text, ordinal, expectedBody, edit, language = KIN_LANGUAGE) => {
+	const blocks = findBlocks(text, language);
 	const block = blocks[ordinal];
 	if (!block) return { ok: false, code: 'missing' };
 	if (block.body !== expectedBody) return { ok: false, code: 'stale', currentBody: block.body };
@@ -58,7 +60,7 @@ export const planWrite: PlanWrite = (text, ordinal, expectedBody, edit) => {
 	const newText = replaceBody(text, block, newBody);
 	// A body line that reads as a fence would end the block early and spill the tree into the
 	// note: the write must read back as the same blocks with this body.
-	const after = findBlocks(newText);
+	const after = findBlocks(newText, language);
 	if (after.length !== blocks.length || after[ordinal]?.body !== newBody) {
 		return { ok: false, code: 'rejected', reason: 'The new text would change where the tree ends in the note.' };
 	}

@@ -7,7 +7,7 @@ vi.mock('@codemirror/view', () => ({ ViewPlugin: { fromClass: () => ({}) } }));
 import { focusSubgraph } from '../src/core/focus-subgraph';
 import { parseDynasty } from '../src/core/parse';
 import { FullScreenModal } from '../src/obsidian/full-screen';
-import { chooseFocus, type FocusFacts } from '../src/obsidian/focus-mode';
+import { chooseFocus, type FocusFacts } from '../src/view/focus-mode';
 import { FEl, clock, dispatch, fakeWin, flushFrames, installDom, resetDom, resizeAll, settle } from './acceptance/fake-dom';
 import { resetObsidian } from './acceptance/fake-obsidian';
 import { desktop, embed, fakeHandle, fullViews, openFullScreen, phone } from './acceptance/tree-view-fakes';

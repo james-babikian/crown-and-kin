@@ -5,9 +5,9 @@ vi.mock('@codemirror/language', () => ({ forceParsing: () => false, syntaxTree: 
 vi.mock('@codemirror/view', () => ({ ViewPlugin: { fromClass: () => ({}) } }));
 
 import { FullScreenModal } from '../src/obsidian/full-screen';
-import { isPhoneWindow, orientationFor } from '../src/obsidian/focus-mode';
+import { isPhoneWindow, orientationFor } from '../src/view/focus-mode';
 import DynastyTreePlugin from '../src/obsidian/main';
-import { DEFAULT_SETTINGS, type DynastySettings } from '../src/obsidian/settings';
+import { DEFAULT_SETTINGS, type DynastySettings } from '../src/view/settings';
 import { TreeView } from '../src/obsidian/tree-view';
 import { SETTINGS_UI } from '../src/render/ui-text';
 import { FEl, clock, device, flushFrames, installDom, resetDom, resizeAll, settle } from './acceptance/fake-dom';

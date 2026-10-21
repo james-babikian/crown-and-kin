@@ -2,11 +2,11 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vites
 
 vi.mock('obsidian', () => import('./acceptance/fake-obsidian'));
 
-import { linkWord, listData, listWord } from '../src/obsidian/phone-list';
+import { linkWord, listData, listWord } from '../src/view/phone-list';
 import { buildPhoneList, setListEditable, showListPicture, type PhoneListSpec } from '../src/render/dom/phone-list-dom';
 import { PHONE_LIST_UI } from '../src/render/ui-text';
 import { FEl, dispatch, installDom, resetDom } from './acceptance/fake-dom';
-import { iconCalls, resetObsidian } from './acceptance/fake-obsidian';
+import { iconCalls, resetObsidian, setIcon } from './acceptance/fake-obsidian';
 import { build } from './helpers';
 import { accName } from './acceptance/accessible-name';
 
@@ -51,6 +51,7 @@ function make(over: Partial<PhoneListSpec> & { centre?: string } = {}): { parent
 		showDates: true,
 		editable: true,
 		word: (id) => listWord(id, { me: 'roderick', showRelations: true, cards }),
+		icon: setIcon as unknown as PhoneListSpec['icon'],
 		pictures: (_slots, id) => void spy.slots.push(id),
 		onGo: (id) => void spy.go.push(id),
 		onEdit: (id, tap) => void spy.edit.push([id, tap]),
@@ -343,7 +344,7 @@ people:
   - {id: b, name: B, house: h, portrait: "[[b.png]]", parents: [a]}
   - {id: c, name: C, parents: [a]}
 `).g;
-		const base = { g: withPics, data: listData(withPics, 'a'), me: null, showDates: false, editable: true, word: () => null, onGo: () => undefined, onEdit: () => undefined };
+		const base = { g: withPics, data: listData(withPics, 'a'), me: null, showDates: false, editable: true, word: () => null, icon: setIcon as unknown as PhoneListSpec['icon'], onGo: () => undefined, onEdit: () => undefined };
 		const list = buildPhoneList(new FEl('div', { cls: 'dynasty-viewport' }) as unknown as HTMLElement, base).list as unknown as FEl;
 		expect(list.querySelectorAll('.dynasty-hero-arms')).toHaveLength(1);
 		expect(list.querySelectorAll('.dynasty-hero-portrait')).toHaveLength(1);

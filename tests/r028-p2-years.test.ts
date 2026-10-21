@@ -8,29 +8,30 @@ import { formatYear, yearOf } from '../src/core/succession-keys';
 import { SUCCESSION_UI } from '../src/render/succession-text';
 
 describe('yearOf: a text that is wholly a grouped number is one number (S1, gate vet row S1)', () => {
+	// §14 rule 8 (0.3.2): n BC is internal 1 - n, so every BC row below is one year higher than before.
 	const cases: [string, number | undefined][] = [
 		['1,250', 1250],
-		['12 000 BC', -12000],
+		['12 000 BC', -11999],
 		['12,000', 12000],
-		['BC 300', -300],
+		['BC 300', -299],
 		['AD 1,250', 1250],
 		['c. 12,000', 12000],
 		// The rest of the family of forms.
 		['1,250 AD', 1250],
-		['12,000 BC', -12000],
+		['12,000 BC', -11999],
 		['1,250,000', 1250000],
 		['ca. 1,250', 1250],
 		['about 12 000', 12000],
 		['circa 1,250 CE', 1250],
 		['~1,250', 1250],
 		['12 000', 12000],
-		['12 000 BC', -12000],
+		['12 000 BC', -11999],
 		['12 000', 12000],
-		['BC 1,250', -1250],
-		['B.C. 300', -300],
-		['BCE 300', -300],
-		['300 BC', -300],
-		['c. BC 300', -300],
+		['BC 1,250', -1249],
+		['B.C. 300', -299],
+		['BCE 300', -299],
+		['300 BC', -299],
+		['c. BC 300', -299],
 	];
 	for (const [text, want] of cases) {
 		it(`${JSON.stringify(text)} reads ${want}`, () => {
@@ -45,11 +46,12 @@ describe('yearOf: a text that is wholly a grouped number is one number (S1, gate
 	});
 
 	it('the old readings stay', () => {
+		// §14 rule 8 (0.3.2): -200 and 200 BC are internal -199.
 		const same: [string, number | undefined][] = [
 			['12', 12],
-			['-200', -200],
-			['−200', -200],
-			['c. 200 BC', -200],
+			['-200', -199],
+			['−200', -199],
+			['c. 200 BC', -199],
 			['AD 45', 45],
 			['45 AD', 45],
 			['c. 1203', 1203],
@@ -79,29 +81,31 @@ describe('yearOf: a text that is wholly a grouped number is one number (S1, gate
 	});
 });
 
-describe('formatYear: a negative year shows as "N BC" (F-KIN-06)', () => {
+describe('formatYear: an internal year of 0 or less shows as "N BC" (F-KIN-06)', () => {
 	it('shows BC years and plain years', () => {
-		expect(formatYear(-225)).toBe('225 BC');
-		expect(formatYear(-1)).toBe('1 BC');
-		expect(formatYear(0)).toBe('0');
+		// §14 rule 8 (0.3.2): the internal year y shows as (1 - y) BC, so 0 is 1 BC and -224 is 225 BC.
+		expect(formatYear(-224)).toBe('225 BC');
+		expect(formatYear(0)).toBe('1 BC');
+		expect(formatYear(-1)).toBe('2 BC');
 		expect(formatYear(1210)).toBe('1210');
 	});
 });
 
+// §14 rule 8 (0.3.2): the years given to the texts are internal; -224 is 225 BC, -299 is 300 BC, -199 is 200 BC.
 describe('every succession text that shows a year uses formatYear', () => {
 	const U = SUCCESSION_UI;
 	it('the heading, the bar, the texts of the named heirs, the no-holder texts and the age note', () => {
-		expect(U.lineAfter('Antiochus', -225)).toBe('After Antiochus in 225 BC');
+		expect(U.lineAfter('Antiochus', -224)).toBe('After Antiochus in 225 BC');
 		expect(U.lineAfter('Antiochus', 1210)).toBe('After Antiochus in 1210');
 		expect(U.lineAfter('Antiochus', null)).toBe('After Antiochus now');
-		expect(U.bar('Seleucid throne', -225)).toBe('Line of succession: Seleucid throne, 225 BC');
-		expect(U.barNoHeir('Seleucid throne', -225)).toBe('Line of succession: Seleucid throne, 225 BC. No heir in the tree.');
-		expect(U.heirNotAlive('Hero', -225)).toContain('is not alive in 225 BC');
-		expect(U.heirNotBorn('Hero', -225)).toContain('is not born yet in 225 BC');
-		expect(U.noRuler(-300)).toBe('The title has no holder in 300 BC, so there is no line of succession.');
-		expect(U.rulerNotInTree(-300)).toBe('The holder of the title in 300 BC is not in the tree. The plugin cannot show the line of succession.');
-		expect(U.old('Hero', 111, -200)).toBe('Hero is older than 111 years in 200 BC. If Hero is dead, add a death date.');
-		expect(U.coRulers(2, 'Hero', -200)).toBe('2 holders rule in 200 BC. The line is after Hero.');
+		expect(U.bar('Seleucid throne', -224)).toBe('Line of succession: Seleucid throne, 225 BC');
+		expect(U.barNoHeir('Seleucid throne', -224)).toBe('Line of succession: Seleucid throne, 225 BC. No heir in the tree.');
+		expect(U.heirNotAlive('Hero', -224)).toContain('is not alive in 225 BC');
+		expect(U.heirNotBorn('Hero', -224)).toContain('is not born yet in 225 BC');
+		expect(U.noRuler(-299)).toBe('The title has no holder in 300 BC, so there is no line of succession.');
+		expect(U.rulerNotInTree(-299)).toBe('The holder of the title in 300 BC is not in the tree. The plugin cannot show the line of succession.');
+		expect(U.old('Hero', 111, -199)).toBe('Hero is older than 111 years in 200 BC. If Hero is dead, add a death date.');
+		expect(U.coRulers(2, 'Hero', -199)).toBe('2 holders rule in 200 BC. The line is after Hero.');
 		expect(U.coRulers(2, 'Hero', null)).toBe('2 holders rule now. The line is after Hero.');
 	});
 

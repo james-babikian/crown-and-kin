@@ -8,7 +8,7 @@ vi.mock('@codemirror/view', () => ({ ViewPlugin: { fromClass: () => ({}) } }));
 
 import type { Rect } from '../../src/layout/model';
 import { FullScreenModal } from '../../src/obsidian/full-screen';
-import { DEFAULT_SETTINGS } from '../../src/obsidian/settings';
+import { DEFAULT_SETTINGS } from '../../src/view/settings';
 import type { TreeView } from '../../src/obsidian/tree-view';
 import type { View } from '../../src/render/view-math';
 import { FEl, clock, device, dispatch, flushFrames, installDom, pointer, resetDom, resizeAll, runFrame, settle } from './fake-dom';
@@ -125,7 +125,8 @@ const rounded = (v: View) => ({ scale: round(v.scale), cx: round(v.cx), cy: roun
 const BASE = {
 	f06Phone: { scale: 0.875, cx: 213.714, cy: 404.571 },
 	f06Computer: { scale: 0.875, cx: 490.286, cy: 312 },
-	f07Phone: { scale: 0.875, cx: 213.714, cy: 787.071 },
+	// D257 (0.3.2): the focus family of sample tree 7 starts with the far families folded, and the names go to 12.45 px so that the "+ N" sign is whole. 0.2.8 value: { scale: 0.875, cx: 213.714, cy: 787.071 }.
+	f07Phone: { scale: 0.778, cx: 240.293, cy: 776.622 },
 	pinnedPhone: { scale: 0.875, cx: 213.714, cy: 404.571 },
 };
 

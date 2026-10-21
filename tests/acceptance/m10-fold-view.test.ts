@@ -7,7 +7,7 @@ vi.mock('@codemirror/view', () => ({ ViewPlugin: { fromClass: () => ({}) } }));
 
 import { DEFAULT_LAYOUT_SETTINGS, clearLayoutCache, geometryFor, layoutTree } from '../../src/layout/index';
 import type { LaidOut, LayoutSettings } from '../../src/layout/model';
-import { endSessionFocus, focusKey, newBlockState } from '../../src/obsidian/block-state';
+import { endSessionFocus, focusKey, newBlockState } from '../../src/view/block-state';
 import { buildScene, type Scene, type SceneFolds, type SceneOptions } from '../../src/render/dom/scene';
 import type { SavedParts } from '../../src/render/saved-picture';
 import type { foldHit as FoldHitFn, keepSpot as KeepSpotFn } from '../../src/render/view-math';

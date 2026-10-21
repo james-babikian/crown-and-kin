@@ -7,7 +7,7 @@ import { Modal, type App } from 'obsidian';
 import { FLOW } from '../render/ui-text';
 import { buildShell, type Shell } from './window-shell';
 import { ignoreGhostClick, phoneLayout } from './modal-layout';
-import { trackModal } from './plugin-modals';
+import { trackModal } from '../view/plugin-modals';
 import { nameDialog } from './sheet-parts';
 
 /** One large button in a choice step, and what choosing it returns. */

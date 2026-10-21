@@ -349,7 +349,7 @@ unions:
 				const box = laid.layout.persons.get(id)!;
 				// D177 (10): in the relation view, a card with no relation word centres its text.
 				// The card form centres the lines that exist (B.3.2): the scene passes which small lines this person has.
-				const plain = cardText(laid.layout.geometry, box.tallName, box.tallTitle, { title: !!(l.title || l.reign), dates: !!dateLine(g.byId.get(id)!) });
+				const plain = cardText(laid.layout.geometry, box.tallName, box.tallTitle, { title: !!(l.title || l.reign), dates: !!dateLine(g.byId.get(id)!, g.dates) });
 				const t = relationLine && !relations.has(id) ? centredWithoutWord(laid.layout.geometry, plain) : plain;
 				expect(texts(root, id, 'dynasty-card-name').map((e) => e.text), id).toEqual([l.name]);
 				// Compact names are 1.5 times larger, so a long one ends with "…".
@@ -414,7 +414,7 @@ unions:
 		const root = scene(laid, { labels: long });
 		const names = texts(root, 'kit', 'dynasty-card-name');
 		expect(names.map((e) => e.text)).toEqual(['Kit Aurelian', 'Maximilian IV']);
-		const t = cardText(laid.layout.geometry, true, false, { title: true, dates: !!dateLine(g.byId.get('kit')!) });
+		const t = cardText(laid.layout.geometry, true, false, { title: true, dates: !!dateLine(g.byId.get('kit')!, g.dates) });
 		expect(names.map((e) => Number(e.getAttribute('y')))).toEqual([t.nameBaseline, t.name2Baseline!].map((y) => laid.layout.persons.get('kit')!.y + y));
 		expect(Number(texts(root, 'kit', 'dynasty-card-title')[0].getAttribute('y'))).toBe(laid.layout.persons.get('kit')!.y + t.titleBaseline);
 	});

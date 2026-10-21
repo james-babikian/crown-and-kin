@@ -11,7 +11,7 @@ import { deriveFamilies } from '../src/core/derive';
 import { parseDynasty } from '../src/core/parse';
 import { EditSheet } from '../src/obsidian/edit-sheet';
 import { pickPerson } from '../src/obsidian/person-picker';
-import { clearRelationCache } from '../src/obsidian/relation-cache';
+import { clearRelationCache } from '../src/view/relation-cache';
 import { SUCCESSION_UI } from '../src/render/succession-text';
 import { SETTINGS_UI, WINDOW_UI } from '../src/render/ui-text';
 import { FEl, clock, fakeWin, installDom, resetDom } from './acceptance/fake-dom';

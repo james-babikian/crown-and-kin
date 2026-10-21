@@ -86,9 +86,6 @@ export function readIllegitimate(v: string | undefined): InheritIllegitimate | u
 	return t === 'true' || t === 'yes' ? 'after' : undefined;
 }
 
-/** True if `n` is a whole number that a year can be (the regular expressions below allow 15 digits). */
-const safe = (n: number) => (Number.isSafeInteger(n) ? (n === 0 ? 0 : n) : undefined);
-
 const PLAIN = /^\d{1,15}$/;
 const WHOLE = /^(-?)(\d{1,15})$/;
 const BC = /(?:^|\D)(\d{1,15})(?!\d)\s*B\.?\s*C\.?(?:\s*E\.?)?(?![A-Za-z0-9])/i;
@@ -96,7 +93,9 @@ const BC_BEFORE = /(?:^|[^A-Za-z])B\.?\s*C\.?(?:\s*E\.?)?(?![A-Za-z])\s*(\d{1,15
 const AD_AFTER = /(?:^|[^A-Za-z])(?:A\.?\s*D\.?|C\.?\s*E\.?)(?![A-Za-z])\s*(\d{1,15})(?!\d)/i;
 const AD_BEFORE = /(?:^|\D)(\d{1,15})(?!\d)\s*(?:A\.?\s*D\.?|C\.?\s*E\.?)(?![A-Za-z0-9])/i;
 // No lookbehind: iOS before 16.4 cannot parse one.
-const THREE_OR_FOUR = /(?:^|\D)(\d{3,4})(?!\d)/;
+const THREE_OR_FOUR = /(?:^|\D)(\d{3,4})(?!\d)/g;
+// "BP" (before present) right after a number: a count of years back from now, which has no place on the line (rule 8).
+const BP_AFTER = /^\s*B\.?\s*P\.?(?![A-Za-z0-9])/i;
 
 // S1 (0.2.8): a grouped number has groups of exactly 3 digits joined by a comma, a space, a no-break space (U+00A0, U+202F)
 // or a thin space (U+2009). A text that is wholly one, with an optional prefix and an optional era mark, is one number.
@@ -111,39 +110,124 @@ const FRAGMENT_WHOLE = /^(?:\d{1,3}\.\d{3}|\d{1,3}(?:,\d{3})*,\d{4,})$/;
 // in "Jan 5, 624" the comma follows a day.
 const STRAY_WHOLE = new RegExp(`^(?:(?:c\\.|ca\\.|about|circa|~)\\s*)?(?:${ERA}\\s*)?\\d{1,3} ?, ?\\d{3}(?:\\s*${ERA})?$`, 'i');
 
+const NON_ASCII = /[^\x00-\x7f]/;
+const DECIMAL = /\p{Nd}/u;
+const DECIMAL_ALL = /\p{Nd}/gu;
+
 /**
- * K.5: the year in a free text. A whole number ("12", "-200"), a grouped number ("1,250"), a number with BC, BCE or AD, CE
- * ("200 BC" and "BC 200" are -200), else the first run of three or four digits with no digit beside it ("12 May 1203").
- * Undefined when there is none, and for a fragment of a grouped number ("1.250", "1,2500", "1, 250"). It can return 0 and
- * negative numbers, so callers test `!== undefined`.
+ * Rule 8: every Unicode decimal digit reads as 0 to 9. The digits of a script come in one run of ten code points in the
+ * order 0 to 9 (the 50 mathematical digits are five runs in a row), so the place in the run of consecutive digits, modulo
+ * ten, is the value.
  */
-export function yearOf(text: string | undefined): number | undefined {
-	if (typeof text !== 'string') return undefined;
-	// The common case (a plain year) skips the clean-up below.
-	if (PLAIN.test(text)) return Number(text);
+function asciiDigits(text: string): string {
+	if (!NON_ASCII.test(text)) return text;
+	return text.replace(DECIMAL_ALL, (ch) => {
+		const cp = ch.codePointAt(0)!;
+		if (cp < 128) return ch;
+		let k = 0;
+		while (DECIMAL.test(String.fromCodePoint(cp - k - 1))) k++;
+		return String(k % 10);
+	});
+}
+
+/** A magnitude with its sign as an internal year (rule 8): there is no year 0, so n BC is 1 - n; a written zero is 0 with the flag. */
+function internal(n: number, bc: boolean): { year: number; zero?: true } | undefined {
+	if (!Number.isSafeInteger(n)) return undefined;
+	if (n === 0) return { year: 0, zero: true };
+	return { year: bc ? 1 - n : n };
+}
+
+/**
+ * K.5: the year in a free text, as an internal year (rule 8). A whole number ("12", "-200"), a grouped number ("1,250"),
+ * a number with BC, BCE or AD, CE ("200 BC" and "BC 200" are -199), else the first run of three or four digits with no
+ * digit beside it ("12 May 1203") that is not followed by BP. Undefined when there is none, and for a fragment of a grouped
+ * number ("1.250", "1,2500", "1, 250"). It can return 0 and negative numbers, so callers test `!== undefined`. `text` has
+ * ASCII digits already. (This is the year of `readPlain`; `yearOf` gives it too.)
+ */
+function plainYear(text: string): { year: number; zero?: true } | undefined {
 	const t = text.trim().replace(/−/g, '-');
 	if (t === '') return undefined;
 	let m = WHOLE.exec(t);
-	if (m) return safe(Number(m[2]) * (m[1] === '-' ? -1 : 1));
+	if (m) return internal(Number(m[2]), m[1] === '-');
 	const g = GROUPED_WHOLE.exec(t);
 	if (g) {
 		const digits = (g[2] ?? g[3]).replace(/\D/g, '');
 		if (digits.length > 15) return undefined;
 		const era = (g[1] ?? g[4] ?? '').replace(/[.\s]/g, '').toUpperCase();
-		return safe(Number(digits) * (era.startsWith('B') ? -1 : 1));
+		return internal(Number(digits), era.startsWith('B'));
 	}
 	if (FRAGMENT_WHOLE.test(t) || STRAY_WHOLE.test(t) || GROUPED_ANY.test(t)) return undefined;
 	m = BC.exec(t) ?? BC_BEFORE.exec(t);
-	if (m) return safe(-Number(m[1]));
+	if (m) return internal(Number(m[1]), true);
 	m = AD_AFTER.exec(t) ?? AD_BEFORE.exec(t);
-	if (m) return safe(Number(m[1]));
-	m = THREE_OR_FOUR.exec(t);
-	return m ? safe(Number(m[1])) : undefined;
+	if (m) return internal(Number(m[1]), false);
+	for (THREE_OR_FOUR.lastIndex = 0; (m = THREE_OR_FOUR.exec(t)); ) {
+		if (!BP_AFTER.test(t.slice(THREE_OR_FOUR.lastIndex))) return internal(Number(m[1]), false);
+	}
+	return undefined;
 }
 
-/** F-KIN-06: a year as the succession texts show it. A negative year shows as "225 BC", every other year as a plain number. */
+// A prefix that makes a year approximate (spec section 14 rule 4); `about` and `circa` are whole words, and `c.` needs a space or a digit after it ("C.E. 200" is an era mark).
+const APPROX = /^(?:(?:c|ca)\.(?=[\s\d])|~|(?:about|circa)(?![a-z]))/i;
+// An old double date: four digits, a slash and the last one or two digits of the next year ("1700/01", "1799/00").
+// Nothing like a further date part may follow (`1203/04/12` is a year, a month and a day).
+// Old Style / New Style dual dating ended by 1800, so a later "1905/06" is a year and a month or a season, not a dual date.
+const DUAL_LAST = 1800;
+const DUAL = /(?:^|\D)(\d{4})\/(\d{1,2})(?!\d)(?![/.-]\d)/;
+
+/** What the plain reader found: the year of `yearOf`, and flags for the cases that spec section 14 rule 8 treats in a special way. */
+export interface PlainRead {
+	year?: number;
+	/** The text starts with `c.`, `ca.`, `~`, `about` or `circa`; the year is the same. */
+	approx?: true;
+	/** The text is a written zero (`0`, `-0`, `0 BC`): the year is 0, which is 1 BC, and the plain reader warns. */
+	zero?: true;
+	/** The text is an old double date ("1700/01"); the year is the later one. */
+	dual?: true;
+}
+
+/**
+ * The plain-year reader with its flags (spec section 14 rule 8). Years are internal: there is no year 0, so 1 BC is 0 and
+ * AD 1 is 1. Never throws.
+ */
+export function readPlain(text: string | undefined): PlainRead {
+	if (typeof text !== 'string') return {};
+	const out: PlainRead = {};
+	// The common case (a plain year) skips the clean-up below.
+	if (PLAIN.test(text)) {
+		out.year = Number(text);
+		if (out.year === 0) out.zero = true;
+		return out;
+	}
+	const t = asciiDigits(text);
+	const r = plainYear(t);
+	if (r === undefined) return out;
+	out.year = r.year;
+	if (r.zero) out.zero = true;
+	if (APPROX.test(t.trim())) out.approx = true;
+	if (t.includes('/')) {
+		const m = DUAL.exec(t);
+		if (m) {
+			const first = Number(m[1]);
+			const next = first + 1;
+			const tail = m[2].length === 1 ? next % 10 : next % 100;
+			if (Number(m[2]) === tail && first === r.year && first <= DUAL_LAST) {
+				out.year = next;
+				out.dual = true;
+			}
+		}
+	}
+	return out;
+}
+
+/** K.5: the year in a free text, as `readPlain` reads it. */
+export function yearOf(text: string | undefined): number | undefined {
+	return readPlain(text).year;
+}
+
+/** F-KIN-06: a year as the succession texts show it. An internal year of 0 or less shows as "(1 - y) BC" ("225 BC"), every other year as a plain number. */
 export function formatYear(n: number): string {
-	return n < 0 ? `${-n} BC` : String(n);
+	return n <= 0 ? `${1 - n} BC` : String(n);
 }
 
 /** "1st", "2nd", "3rd", "4th", … "11th", "12th", "13th", … "21st". */

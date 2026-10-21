@@ -9,7 +9,8 @@ import { cardLabels } from '../src/core/titles';
 import { ROUNDEL_EM, cardForm, cardText, centredWithoutWord, footSpan, geometryFor, roundelAxis, roundelPics, youTabRect } from '../src/layout/geometry';
 import { DEFAULT_LAYOUT_SETTINGS, clearLayoutCache, layoutTree, pictureSets } from '../src/layout/index';
 import type { Geometry, LaidOut, LayoutSettings } from '../src/layout/model';
-import { FRAME_STROKE_PX, TAB_TEXT_BASE_EM, TAB_TEXT_EM, buildScene, type Scene } from '../src/render/dom/scene';
+import { buildScene, type Scene } from '../src/render/dom/scene';
+import { FRAME_STROKE_PX, TAB_TEXT_BASE_EM, TAB_TEXT_EM } from '../src/render/scene-model';
 import { DEFAULT_DARK, DEFAULT_LIGHT, HEIR_LOOK, ME_RING_INNER, mixHex } from '../src/render/styles';
 import { renderSvg } from '../src/render/svg-string';
 import { FEl, installDom } from './acceptance/fake-dom';
@@ -136,7 +137,7 @@ describe('B.3.11: the saved picture has the elements of the live scene, for each
 				if (all(e).some((x) => x.hasClass('dynasty-card-relation'))) want.push(`relation:${id}`);
 			}
 			for (const s of scene.pictures.filter((x) => x.lod === 'full')) {
-				if (s.kind === 'arms' && PICTURES.get(`arms:${s.house}`)?.startsWith('data:')) want.push(`arms:${s.person}`);
+				if (s.kind === 'arms' && PICTURES.get(`arms:${(s.owner && 'house' in s.owner ? s.owner.house : undefined)}`)?.startsWith('data:')) want.push(`arms:${s.person}`);
 				if (s.kind === 'portrait') {
 					// D219: a portrait that shows has no frame; an empty one keeps its thin frame.
 					if (PICTURES.get(`portrait:${s.person}`)?.startsWith('data:')) want.push(`portrait:${s.person}`);

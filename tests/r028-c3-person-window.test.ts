@@ -141,7 +141,8 @@ describe('D212 window-hints: a window never uses the two names of the tree', () 
 
 	it('the hints are quiet text lines that show while the field has the focus; an empty list is a plain text line', () => {
 		const { content } = open('a');
-		const hints = content.querySelectorAll('.dynasty-sheet-hint');
+		// The grey line under Born and Died (0.3.2, spec §14 rule 6) always shows: it is the one hint that is not on focus.
+		const hints = content.querySelectorAll('.dynasty-sheet-hint').filter((h) => !h.hasClass('dynasty-date-line'));
 		expect(hints.length).toBeGreaterThan(0);
 		expect(hints.every((h) => h.hasClass('is-on-focus'))).toBe(true);
 		const none = content.querySelectorAll('.dynasty-sheet-none');

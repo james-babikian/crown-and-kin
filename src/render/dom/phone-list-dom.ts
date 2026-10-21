@@ -1,6 +1,6 @@
 /*
  * The DOM of the phone list (D144, contract C.3.1): the family of one person as a list of rows that a thumb can
- * tap. `src/obsidian/phone-list.ts` works out WHAT the list holds (`ListData`, from the pure `listData`); this file
+ * tap. `src/view/phone-list.ts` works out WHAT the list holds (`ListData`, from the pure `listData`); this file
  * only builds it. The tree view (WP-C2b) calls `buildPhoneList` into the viewport, after the toolbar, and keeps the
  * result. Nothing in here reads the settings or the note: the caller passes in what it needs and the two actions.
  *
@@ -29,7 +29,6 @@
  * A picture place that cannot fill (the file is missing for good, or the store has no copy) is taken out of its row with `failListPicture`, and put back with `restoreListPictures`. The look is in the block "C: phone list" of `styles.css`.
  */
 
-import { setIcon } from 'obsidian';
 import type { FamilyGraph } from '../../core/derive';
 import { quote } from '../../core/quote';
 import { cardLabels, needsLabels, type CardLabel } from '../../core/titles';
@@ -38,6 +37,7 @@ import { isColour } from '../colour-check';
 import { joined, nb } from '../text-join';
 import { dateLine } from '../tree-info';
 import { PHONE_LIST_UI } from '../ui-text';
+import type { IconFn } from './widgets';
 
 /** One row of the list: a person and why the person is in this section. */
 export interface ListRow {
@@ -100,6 +100,8 @@ export interface PhoneListSpec {
 	labels?: ReadonlyMap<string, CardLabel> | undefined;
 	/** Called once for each row, so the caller can load the pictures. */
 	pictures?(slots: ListPictureSlots, id: string): void;
+	/** Obsidian's `setIcon`, passed by the shell (this layer does not import `obsidian`). */
+	icon: IconFn;
 	onGo(id: string): void;
 	onEdit(id: string, fromTap: boolean): void;
 	/** 0.2.7 F.6: while the Show view of a line of succession is open, the bar at the top of the list: the sentence and an icon-only Close (D182). */
@@ -206,7 +208,7 @@ export function buildPhoneList(parent: HTMLElement, spec: PhoneListSpec): PhoneL
 		el.createDiv({ cls: 'dynasty-succession-text', text: bar.sentence });
 		// D182: an icon with an aria-label, 44 px; the sentence is the visible text.
 		const close = el.createEl('button', { cls: ['clickable-icon', 'dynasty-succession-close', 'dynasty-succession-close-icon'], attr: { type: 'button', 'aria-label': bar.closeLabel } });
-		setIcon(close.createSpan({ cls: 'dynasty-tool-icon', attr: { 'aria-hidden': 'true' } }), 'x');
+		spec.icon(close.createSpan({ cls: 'dynasty-tool-icon', attr: { 'aria-hidden': 'true' } }), 'x');
 		close.addEventListener('click', () => bar.onClose());
 	}
 
@@ -238,7 +240,7 @@ export function buildPhoneList(parent: HTMLElement, spec: PhoneListSpec): PhoneL
 			name.appendText(' ');
 			name.createSpan({ cls: 'dynasty-list-sob', text: quote(sob) });
 		}
-		const years = spec.showDates ? dateLine(p) : undefined;
+		const years = spec.showDates ? dateLine(p, g.dates) : undefined;
 		const title = label?.title ?? p.title;
 		// D210: in a list about You the kind of link takes the place of the relation word. A strong word ("You", a place in the line) stays.
 		const shown = link && aboutYou && id !== me && !word?.strong ? null : word;
@@ -299,7 +301,7 @@ export function buildPhoneList(parent: HTMLElement, spec: PhoneListSpec): PhoneL
 			nameBy(whole, PHONE_LIST_UI.editLabel(display));
 			// The picture column starts level with the first text line of the name, so the text stands at the top only when there is a column.
 			if (slots.portrait || slots.arms) whole.addClass('has-column');
-			setIcon(whole.createSpan({ cls: 'dynasty-list-edit-icon', attr: { 'aria-hidden': 'true' } }), 'pencil');
+			spec.icon(whole.createSpan({ cls: 'dynasty-list-edit-icon', attr: { 'aria-hidden': 'true' } }), 'pencil');
 			whole.addEventListener('click', (e) => {
 				if (!list.hasClass('is-read-only')) spec.onEdit(r.id, fromTouch(e));
 			});
@@ -311,7 +313,7 @@ export function buildPhoneList(parent: HTMLElement, spec: PhoneListSpec): PhoneL
 			nameBy(go, PHONE_LIST_UI.goLabel(display, made.shown?.lower, link ? { lower: link.lower, of: nameOf(data.centre) } : undefined, { you: r.id === me, place: !!made.shown?.strong && made.shown.lower !== PHONE_LIST_UI.you.toLowerCase() }));
 			go.addEventListener('click', () => spec.onGo(r.id));
 			const edit = el.createEl('button', { cls: 'dynasty-list-edit', attr: { type: 'button' } });
-			setIcon(edit.createSpan({ cls: 'dynasty-list-edit-icon', attr: { 'aria-hidden': 'true' } }), 'pencil');
+			spec.icon(edit.createSpan({ cls: 'dynasty-list-edit-icon', attr: { 'aria-hidden': 'true' } }), 'pencil');
 			nameBy(edit, PHONE_LIST_UI.editLabel(display));
 			edit.addEventListener('click', (e) => {
 				if (!list.hasClass('is-read-only')) spec.onEdit(r.id, fromTouch(e));

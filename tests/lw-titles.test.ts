@@ -9,7 +9,7 @@ import { deriveFamilies } from '../src/core/derive';
 import { parseDynasty } from '../src/core/parse';
 import { holderTable } from '../src/core/titles';
 import { TitlesWindow, type TitlesOptions } from '../src/obsidian/titles-window';
-import { closePluginModals } from '../src/obsidian/plugin-modals';
+import { closePluginModals } from '../src/view/plugin-modals';
 import { ID_UI, SHEET, TITLES_UI, WIN_LIST_UI, WINDOW_UI, WRITE_TEXT } from '../src/render/ui-text';
 import { FEl, clock, device, dispatch, fakeDoc, fakeWin, installDom, resetDom, runTimers, settle } from './acceptance/fake-dom';
 import { lastMenu, notices, openModals, resetObsidian } from './acceptance/fake-obsidian';

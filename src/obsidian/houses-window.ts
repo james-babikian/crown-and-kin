@@ -20,14 +20,15 @@ import { Notice, type App } from 'obsidian';
 import { armsColours } from '../core/arms-colours';
 import { houseNoteName, housePage, houseTableNote, type HousePage } from '../core/house-page';
 import { nb } from '../render/text-join';
-import { deriveFamilies, type FamilyGraph } from '../core/derive';
+import type { FamilyGraph } from '../core/derive';
+import { deriveDated, type DatesFor } from '../view/calendar-index';
 import type { Op } from '../core/edit';
 import { describeHouseIdChange } from '../core/house-ops';
 import { parseBody, parseDynasty } from '../core/parse';
 import { HOUSE_PALETTE } from '../render/styles';
 import { HOUSES, HOUSE_COLOUR_NAMES, HOUSE_PAGE_UI, ID_UI, PICTURES_UI, WIN_LIST_UI, WINDOW_UI, WRITE_TEXT } from '../render/ui-text';
 import type { Handle, HandleWriteOutcome } from './block-handle';
-import { danglingIds, draftId, idChanged, idFromName, idOps, idProblemFor, idProblems, reasonText, type IdRow } from './id-draft';
+import { danglingIds, draftId, idChanged, idFromName, idOps, idProblemFor, idProblems, reasonText, type IdRow } from '../view/id-draft';
 import { idNewNameNote, idNote, type IdRowView } from './id-field';
 import { openIdWindow } from './id-window';
 import { ListEditWindow, findableArms, type ListRowView, type PageHead } from './list-window';
@@ -35,10 +36,11 @@ import { openMadeNote } from './make-note';
 import { makeNote } from './table-note';
 import type { SectionSpec } from './window-sections';
 import { buildRow, showMenu, textButton, type MenuEntry } from './window-parts';
-import { matchesAll } from './list-search';
+import { matchesAll } from '../view/list-search';
 import { currentPictureOf, pickPicture } from './picture-picker';
 import { ARMS_PIXELS, type PictureCopy, type PictureStore } from './picture-store';
 import { freshOrStale } from './sheet-parts';
+import { houseViewItems } from './viewer-sources';
 
 const HEX = /^#[0-9a-f]{6}$/i;
 /** D202 (2), G.10: the People section shows this many people, then "and N more". */
@@ -84,21 +86,20 @@ export interface HouseRow {
 }
 
 /** The houses of a block body, or why the window cannot edit them. */
-export function loadHouses(body: string): { kind: 'ok'; data: LoadedHouses } | { kind: 'invalid' } | { kind: 'blocked' } {
+export function loadHouses(body: string, dates?: DatesFor): { kind: 'ok'; data: LoadedHouses } | { kind: 'invalid' } | { kind: 'blocked' } {
 	const parsed = parseDynasty(body);
 	if (!parsed.ok) return { kind: 'invalid' };
-	const tree = parsed.tree;
-	const g = deriveFamilies(tree);
+	const g = deriveDated(parsed.tree, dates);
 	if (g.issues.some((i) => i.level === 'blocking')) return { kind: 'blocked' };
 	const seen = new Set<string>();
 	const houses: LoadedHouse[] = [];
-	for (const h of tree.houses) {
+	for (const h of parsed.tree.houses) {
 		// The first house with an id is the one the tree uses (spec §8, the decision notes "Validation rules").
 		if (seen.has(h.id)) continue;
 		seen.add(h.id);
 		const people: string[] = [];
 		const ids = new Set<string>();
-		for (const p of tree.people) {
+		for (const p of parsed.tree.people) {
 			if (p.house !== h.id || ids.has(p.id)) continue;
 			ids.add(p.id);
 			people.push(p.name || p.id);
@@ -172,6 +173,8 @@ export interface HousesOptions {
 	reduced?: () => boolean;
 	/** The tree's note: arms links are found and made from it (spec §13.6). */
 	sourcePath?: string;
+	/** Spec §14 rule 9: the date reader for the calendar link of the block; absent: plain years. */
+	dates?: DatesFor;
 	/** The plugin's picture store (M9 contract O3); without it the window shows no arms pictures. */
 	pictures?: PictureStore;
 	/**
@@ -220,7 +223,7 @@ export class HousesWindow extends ListEditWindow {
 
 	/** Null, with a Notice, if the block cannot be edited now. */
 	static create(app: App, o: HousesOptions): HousesWindow | null {
-		const l = loadHouses(o.handle.body);
+		const l = loadHouses(o.handle.body, o.dates);
 		if (l.kind === 'ok') return new HousesWindow(app, o, l.data);
 		new Notice(l.kind === 'blocked' ? WRITE_TEXT.blocked : HOUSES.cannotOpen);
 		return null;
@@ -462,7 +465,8 @@ export class HousesWindow extends ListEditWindow {
 		if (all.length > PEOPLE_ROWS) body.createDiv({ cls: ['dynasty-sheet-none', 'dynasty-hp-more'], text: WINDOW_UI.andMore(all.length - PEOPLE_ROWS) });
 		if (!all.length || !this.o.people || !hp) return;
 		const id = r.id!;
-		const name = this.savedName(id) ?? this.label(r);
+		const saved = this.data.houses.find((x) => x.id === id);
+		const name = (saved ? saved.name.trim() || saved.id : null) ?? this.label(r);
 		textButton(body.createDiv({ cls: 'dynasty-actions' }), ['dynasty-btn', 'dynasty-hp-make-note', 'dynasty-house-people'], HOUSE_PAGE_UI.makeNote, () => this.guard(() => void this.makeTable(hp)), {
 			label: HOUSE_PAGE_UI.makeNoteLabel(name),
 			focus: `people:${r.key}`,
@@ -511,12 +515,6 @@ export class HousesWindow extends ListEditWindow {
 		this.close();
 		// Only a question about unsaved changes keeps the window open with the action waiting.
 		if (!this.closing && !this.confirmEl) this.afterClose = null;
-	}
-
-	/** The name of a saved house, as the page shows it (the name, else the id). */
-	private savedName(id: string): string | null {
-		const h = this.data.houses.find((x) => x.id === id);
-		return h ? h.name.trim() || h.id : null;
 	}
 
 	/** Shows the reason in the note of the open page when its draft id is refused, without drawing the page again. */
@@ -614,9 +612,9 @@ export class HousesWindow extends ListEditWindow {
 		return (link ? this.copyFor(link) : 'problem') === 'problem' ? `add-arms:${r.key}` : `arms:${r.key}`;
 	}
 
-	/** The menu of the arms: Select arms, and Remove arms when the draft has arms (D97). */
+	/** The menu of the arms: View arms (D256), Select arms, and Remove arms when the draft has arms (D97). */
 	private armsMenu(anchor: HTMLElement, r: HouseRow): void {
-		const items: (MenuEntry | 'sep')[] = [{ icon: 'image', label: PICTURES_UI.selectArms, run: () => void this.selectArms(r) }];
+		const items: (MenuEntry | 'sep')[] = [...houseViewItems({ app: this.app, pictures: this.o.pictures, sourcePath: this.o.sourcePath, name: this.label(r), arms: r.arms }, anchor), { icon: 'image', label: PICTURES_UI.selectArms, run: () => void this.selectArms(r) }];
 		if (armsOf(r.arms)) {
 			items.push({
 				icon: 'trash-2',
@@ -1009,7 +1007,7 @@ export class HousesWindow extends ListEditWindow {
 	 * stays when its house is still there; else the list shows.
 	 */
 	private reload(body: string): void {
-		const l = loadHouses(body);
+		const l = loadHouses(body, this.o.dates);
 		if (l.kind !== 'ok') {
 			this.refused(l.kind === 'blocked' ? WRITE_TEXT.blocked : HOUSES.invalid);
 			return;

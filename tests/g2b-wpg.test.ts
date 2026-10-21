@@ -16,7 +16,7 @@ vi.mock('../src/obsidian/person-picker', () => ({
 
 import { FullScreenModal } from '../src/obsidian/full-screen';
 import { forgetHeights, lastHeight, rememberHeight } from '../src/obsidian/block-height';
-import { PHONE_WHOLE_LIMIT, SECOND_LIMIT, clearStops } from '../src/obsidian/large-tree';
+import { PHONE_WHOLE_LIMIT, SECOND_LIMIT, clearStops } from '../src/view/large-tree';
 import { TreeView } from '../src/obsidian/tree-view';
 import { clearLayoutCache } from '../src/layout/index';
 import { groupCount } from '../src/render/ui-text';

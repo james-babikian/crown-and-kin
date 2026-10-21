@@ -5,7 +5,7 @@
 
 import { Notice, PluginSettingTab, Setting, SettingGroup, debounce, type App, type Plugin } from 'obsidian';
 import { SETTINGS_UI } from '../render/ui-text';
-import { ARMS_ON_CARDS, BREAK_WORDS_MAX, GENERATIONS, OLD_AGE, PHONE_DIRECTIONS, REDUCE_MOTIONS, SUCCESSION_LENGTH, YOUNG_DEATH_AGE, parseDesktopHeight, parseWhole, type ArmsOnCards, type DynastySettings, type PhoneDirection, type ReduceMotion } from './settings';
+import { ARMS_ON_CARDS, BREAK_WORDS_MAX, GENERATIONS, OLD_AGE, PHONE_DIRECTIONS, REDUCE_MOTIONS, SUCCESSION_LENGTH, YOUNG_DEATH_AGE, parseDesktopHeight, parseWhole, type ArmsOnCards, type DynastySettings, type PhoneDirection, type ReduceMotion } from '../view/settings';
 
 /** What the tab needs from the plugin. */
 export interface SettingsHost extends Plugin {

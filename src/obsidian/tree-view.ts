@@ -11,14 +11,16 @@
  * Reading guide, in the order the file lays them out:
  * - Host and view-place types (`TreeHost`, `FullSource`, `FullHost`, `ViewPlace`) that connect a
  *   `TreeView` to the plugin and to the full-screen modal.
- * - Small free functions that read fonts and the safe-area inset from probe elements, and hash a
- *   block's text for its key.
+ * - Small free functions that read fonts and the safe-area inset from probe elements.
  * - The `TreeView` class:
  *   - Fields: everything remembered between renders (the drawn graph, the view, focus, layout cache).
- *   - Construction and block resolution: finding and keeping the block's `Handle` (spec §6.1),
- *     across renames, edits from elsewhere and Live Preview's late-resolved blocks.
+ *   - Construction and block resolution: the view owns a `BlockBinding` (`block-binding.ts`), which finds and keeps the
+ *     block's `Handle` (spec §6.1) across renames, edits from elsewhere and Live Preview's late-resolved blocks, and
+ *     runs the cold-start wait. The view reads its state through small getters.
  *   - Fonts and theme: reading the note's resolved fonts and theme colours (spec §5.8, §7.7).
- *   - `render`: the main render pipeline, from parsed text to a drawn scene.
+ *   - `render`: the main render pipeline, from parsed text to a drawn scene. It does not decide: `planRender`
+ *     (`view/render-plan.ts`) returns what to draw and what to change in the block's memory; `render` applies the
+ *     changes (`applyChanges`) and builds the DOM of the plan (`drawTree` and the methods it calls).
  *   - Focus mode: choosing and applying the session, pin or phone focus (spec §5.6), and the static
  *     `focusState`/`redrawState`/`dropOwnFocus` helpers that other views and sheets use to redraw
  *     every `TreeView` that shares one block's state.
@@ -62,27 +64,28 @@
  *   are the harness hooks: the harness fills everything, then reads card content.
  */
 
-import { Keymap, MarkdownRenderChild, Notice, getLinkpath, setIcon, type App, type HoverParent, type HoverPopover, type MarkdownPostProcessorContext, type MarkdownSectionInformation, type TFile } from 'obsidian';
+import { Keymap, MarkdownRenderChild, Notice, getLinkpath, setIcon, type App, type HoverParent, type HoverPopover, type MarkdownPostProcessorContext, type TFile } from 'obsidian';
+import { sameBody } from '../core/block-match';
 import { deriveFamilies, type FamilyGraph } from '../core/derive';
-import type { CodedIssue } from '../core/messages';
+import type { CodedIssue, HardError } from '../core/messages';
 import { hardErrorText, issueText } from '../core/messages';
-import { findBlocks } from '../core/block-locate';
 import { focusGenerationsFor, focusSubgraph } from '../core/focus-subgraph';
 import { foldHidden, personFolds, pruneFolds, unfoldFor, type FoldControl, type FoldKey } from '../core/folds';
+import type { DateReader } from '../core/dates';
 import type { ParseCache } from '../core/parse-cache';
 import { parseDynasty } from '../core/parse';
 import { portraitCropOf } from '../core/portrait-crop';
 import { pictureIssue, type PictureOwner, type PictureProblem } from '../core/pictures';
-import { findRelation, lineSubgraph, type RelationOptions } from '../core/relations';
-import type { FinderResult, RelationLine } from '../core/relations';
+import type { RelationOptions } from '../core/relations';
 import { cardLabels, needsLabels, type CardLabel } from '../core/titles';
 import type { ParseResult, Person, Tree } from '../core/types';
 import { FOLD_EM } from '../layout/fold-spots';
 import { cardForm, geometryFor } from '../layout/geometry';
-import { DEFAULT_FAR_RULE, LayoutStopped, NEVER_FAR_RULE } from '../layout/index';
+import { LayoutStopped } from '../layout/index';
 import type { Geometry, LaidOut, LayoutSettings, Orientation, PersonBox, Rect } from '../layout/model';
-import { fontsChanged, parsePx, usesFamily, type FontState } from '../render/fonts';
-import { clearMeasureCache, measureText, usableFamily } from '../render/dom/measure';
+import { fontsChanged, usesFamily, type FontState } from '../render/fonts';
+import { clearMeasureCache, measureText } from '../render/dom/measure';
+import { fontsOf, readFonts, safeSides, safeTop } from '../render/dom/page-reads';
 import { calloutBackdrop } from '../render/dom/theme-read';
 import { wireCardTips, type CardTips } from '../render/dom/card-tip';
 import { buildFocusBar } from '../render/dom/focus-bar';
@@ -94,7 +97,8 @@ import { parseBreakList } from '../render/break-words';
 import { buildPhoneList, failListPicture, restoreListPictures, setListEditable, showListPicture, type ListPictureSlots } from '../render/dom/phone-list-dom';
 import { buildCallout, fitLegend, Popover, type PopoverOptions } from '../render/dom/widgets';
 import { SIGN_CARD_LABEL, cardLabel, familyOf, finderSentence, linkTarget, startPerson, stepSentences, type RenderTiming } from '../render/tree-info';
-import { ADD_UI, BLOCK_UI, FINDER_UI, FOCUS_UI, FOLD_UI, FULL_UI, HINT_UI, PHONE_LIST_UI, PROBLEMS_HINT, SAVE_UI, SHEET, SUCCESSION_UI, TITLES_UI, UI, WRITE_TEXT, problemsLabel, problemsTitle } from '../render/ui-text';
+import { ADD_UI, BLOCK_UI, FINDER_UI, FOCUS_UI, FULL_UI, HINT_UI, PHONE_LIST_UI, PROBLEMS_HINT, SAVE_UI, SHEET, SUCCESSION_UI, TITLES_UI, UI, WRITE_TEXT, problemsLabel, problemsTitle } from '../render/ui-text';
+import { CALENDAR_UI } from '../render/calendar-text';
 import { TOOLBAR_UI } from '../render/view-text';
 import {
 	centreOn,
@@ -106,7 +110,6 @@ import {
 	clearBand,
 	defaultView,
 	embedHeight,
-	FIT_MARGIN,
 	fitView,
 	READABLE_NAME_PX,
 	foldHit,
@@ -121,29 +124,33 @@ import {
 	type Size,
 	type View,
 } from '../render/view-math';
-import { sameBody as sameBodyAfterTidy } from '../core/block-match';
 import type { Handle, HandleRegistry } from './block-handle';
+import { BlockBinding, START_LIMIT_MS, STYLES_LIMIT_MS } from './block-binding';
 import { forgetHeight, lastHeight, rememberHeight } from './block-height';
-import { carryState, focusKey, newBlockState, type BlockState, type FinderState } from './block-state';
+import { newBlockState, type BlockState, type FinderState } from '../view/block-state';
+import { datesForTree, type CalendarIndex, type DatesFor } from '../view/calendar-index';
 import { EditSheet, type SheetFolds } from './edit-sheet';
-import { PHONE_FOCUS_MIN_PEOPLE, badgeTap, chooseFocus, clearToolbar, finderFirstView, finderOrientation, focusView, isPhoneDevice, keepTopCardWhole, orientationFor, outsideBox, parentsAbove, sidewaysView, tagHitBelow, tagHitSide, tagNextTops } from './focus-mode';
-import { cutBack, planFolds, withFolds, type FoldPlan } from './fold-view';
+import { badgeTap, clearToolbar, finderFirstView, finderOrientation, focusView, isPhoneDevice, keepTopCardWhole, orientationFor, outsideBox, parentsAbove, sidewaysView, signRights, tagHitBelow, tagHitSide, tagNextTops } from '../view/focus-mode';
+import { cutBack, planFolds, setFolds, withFolds, type FoldPlan } from '../view/fold-view';
 import type { FoldRef } from '../render/dom/folds';
-import { FullScreenModal } from './full-screen';
 import { HousesWindow } from './houses-window';
 import { createLivePictures, zoomStep, type LivePictures } from './live-pictures';
 import { buildLargeBar, showBusy, type LargeBarParts } from './large-bar';
-import { askInGroups, drawBudget, drawnBar, largeBar, peopleCount, rememberStop, wasStopped, type LargeBar } from './large-tree';
-import { measuredLayout, type MeasuredResult } from './measured-layout';
-import { linkWord, listData, listIds, listStart, listWord, popTrail, pushTrail } from './phone-list';
+import { askInGroups, drawBudget, rememberStop, wasStopped, type LargeBar } from '../view/large-tree';
+import { measuredLayout, type MeasuredResult } from '../view/measured-layout';
+import { linkWord, listData, listIds, listStart, listWord, popTrail, pushTrail, type ListFrom, type ListStartFacts } from '../view/phone-list';
 import { pickPerson, type PickerContext } from './person-picker';
 import type { CopyBox, PictureCopy, PictureStore, ResolvedPicture } from './picture-store';
-import { pluginModalOpen } from './plugin-modals';
-import { relationsFor, validMe } from './relation-cache';
+import { pluginModalOpen } from '../view/plugin-modals';
+import { relationsFor, validMe, type TreeRelations } from '../view/relation-cache';
+import { planRender, showViewOf, type FinderDrawn, type RenderInputs, type StateChanges, type TreePlan } from '../view/render-plan';
 import { SaveWindow, savePicture, type SaveSource } from './save-picture';
-import { DEFAULT_SETTINGS, reducedMotion, type DynastySettings } from './settings';
-import { PHONE_MIN_SCALE, cardPosition, lineWords, linePeople, successionDrawn, successionFirstView, type SuccessionDrawn } from './succession-view';
+import { DEFAULT_SETTINGS, reducedMotion, type DynastySettings } from '../view/settings';
+import { PHONE_MIN_SCALE, cardPosition, lineWords, linePeople, successionFirstView, type SuccessionDrawn } from '../view/succession-view';
 import { TitlesWindow } from './titles-window';
+import { openCalendars } from './calendar-window';
+import { chooseCalendarNote } from './calendar-note-choice';
+import { around, boxesOf, foldLabel, hasArms, hasPortraits, hasReign, lineMarks, ownerKey } from '../view/tree-view-helpers';
 
 /** D144: after a move the keyboard focus (and so a screen reader) goes to the heading of the centre section of the list. */
 const LIST_FOCUS = '.dynasty-list-section[data-section="person"] .dynasty-list-head';
@@ -160,9 +167,6 @@ const IDLE_CARDS_PER_CHUNK = 25;
 /** An idle chunk stops when the idle callback has less than this many ms left. */
 const IDLE_STOP_MS = 4;
 
-/** The same text is the usual answer, and it needs no copy of the whole body (`sameBody` tidies both texts first). */
-const sameBody = (a: string, b: string): boolean => a === b || sameBodyAfterTidy(a, b);
-
 /** What a tree view needs from the plugin. */
 export interface TreeHost {
 	app: App;
@@ -172,10 +176,21 @@ export interface TreeHost {
 	looseStates: Map<string, BlockState>;
 	views: Set<TreeView>;
 	recordTiming(t: RenderTiming): void;
+	/**
+	 * Opens the full-screen view of a block (spec §7.1). The plugin makes the modal; `tree-view.ts` does not import `full-screen.ts`, which itself
+	 * hosts a `TreeView`, so the two files do not import each other. `focus` is D21: the family to show, from a badge tap in a static embed.
+	 */
+	openFull(from: FullSource, target: string | null, opener: HTMLElement, focus: string | null): void;
+	/** Is a full-screen view of the block with view-state key `key` open? */
+	isFullOpenFor(key: string): boolean;
+	/** Is any full-screen view open? */
+	hasFullOpen(): boolean;
 	/** Spec §9: read on every render; `onSettingsChange` follows a change. */
 	readonly settings: DynastySettings;
 	/** M9 contract O3: the plugin's one picture store (absent in hosts without pictures, for example the unit fakes). */
 	readonly pictures?: PictureStore;
+	/** Spec §14 rule 9: the calendar index. A tree gets its date reader from it; absent in a host with no calendars (the unit fakes): plain years. */
+	readonly dates?: CalendarIndex;
 	/** M11: the parse that the read paths share; a host without one (a unit fake) parses each time. */
 	readonly parseCache?: ParseCache;
 	/**
@@ -210,21 +225,7 @@ export interface OpenTime {
  */
 export const OPEN_GAP_MS = 5_000;
 
-/** D183: the longest a tree waits for the styles, the settings and its block place on a cold start, in ms. */
-export const START_LIMIT_MS = 2000;
-/**
- * The hard cap of the wait for the plugin styles, in ms. Obsidian reads styles.css after `onload`, and on a cold iPhone that can take longer than
- * `START_LIMIT_MS`; a tree drawn before the styles has no layout at all. The settings and the block place keep the shorter limit.
- */
-export const STYLES_LIMIT_MS = 8000;
-/** A block whose section Obsidian does not tell yet is asked again for this long (ms) before it is called read only. */
-const SECTION_LIMIT_MS = 5000;
-/** The wait between two asks for the section of a block, in ms. */
-const SECTION_STEP_MS = 250;
-/** The wait between two looks at the start conditions, in ms. */
-const START_STEP_MS = 50;
-/** The least time between two asks for the section during the start wait. */
-const ASK_GAP_MS = 100;
+export { START_LIMIT_MS, STYLES_LIMIT_MS };
 /** The height of the box that stands in for a tree on a phone, when no height of the block is known, in px. */
 const PHONE_PLACEHOLDER_PX = 260;
 
@@ -261,6 +262,23 @@ export type ViewPlace = { kind: 'embed'; ctx: MarkdownPostProcessorContext } | {
 /** What stays in place when the folds change (F10): the control that was tapped ('spot'), or a person's card (the sheet actions). */
 type FoldAnchor = { kind: 'spot'; key: FoldKey } | { kind: 'person'; id: string };
 
+/** What a render of a tree carries from `render` into the methods that draw it. */
+interface DrawContext {
+	/** The start of the render, for the timing. */
+	t0: number;
+	/** The start of the time budget: the render, or the tap that asked for the draw. */
+	clockFrom: number;
+	orientation: Orientation;
+}
+
+/** The parts of the DOM of a tree that the other parts of the draw build into. */
+interface TreeFrame {
+	root: HTMLElement;
+	viewport: HTMLElement;
+	canvas: HTMLElement;
+	sceneEl: SVGGElement;
+}
+
 /** Where the view was, relative to the card nearest its centre, in em: survives a font change. */
 interface Anchor {
 	person: string;
@@ -283,14 +301,6 @@ interface KeepPlace {
 	view: View;
 	orientation: Orientation;
 	until: number;
-}
-
-/** The relation finder's result as one view draws it (spec §13.2). */
-interface FinderDrawn {
-	state: FinderState;
-	result: FinderResult;
-	/** The line of the relation that shows, or of the chain; null when the two people have no relation. */
-	line: RelationLine | null;
 }
 
 /** One arms or portrait link of the whole tree, and whose it is (M9 contract O2). */
@@ -329,59 +339,12 @@ const HIGHLIGHT_MS = 2000;
 const savedFlashes = new WeakMap<BlockState, { id: string; until: number }>();
 /** After css-change, the theme colours are read once more this much later (a theme's sheet can still load). */
 export const THEME_RECHECK_MS = 400;
-const RESOLVE_RETRIES_MS = [250, 1000];
 // Events that must not reach the editor: in Live Preview they would move the cursor into the
 // block and show its source (spec §7.2).
 const STOPPED_EVENTS = ['pointerdown', 'mousedown', 'mouseup', 'click', 'dblclick', 'auxclick', 'touchstart', 'touchend'];
 
-/**
- * Reads the fonts with a probe element styled `font-size: var(--font-text-size)`: its computed
- * size is always in px, whatever unit the theme or a snippet uses (rem, calc(), ...). `el` is the
- * block's container, the parent of `.dynasty-root`, so an em value resolves once, exactly as it
- * does for the root; when the block is not in the document yet, the body is used.
- */
-function readFonts(el: HTMLElement): FontState {
-	const host = el.isConnected ? el : (el.doc ?? document).body;
-	const probe = host.createDiv({ cls: 'dynasty-font-probe' });
-	try {
-		return fontsOf(probe);
-	} finally {
-		probe.remove();
-	}
-}
-
 /** The `--dynasty-callout-bg` value set on each toolbar and hint (so an equal value is not set again). */
 const calloutBgSet = new WeakMap<HTMLElement, string | null>();
-
-function fontsOf(probe: HTMLElement): FontState {
-	const cs = getComputedStyle(probe);
-	const v = (name: string) => cs.getPropertyValue(name).trim();
-	return {
-		px: parsePx(cs.fontSize) ?? 16,
-		text: usableFamily(cs.fontFamily || 'sans-serif'),
-		ui: usableFamily(v('--font-interface') || 'sans-serif'),
-		bold: /^\d{3}$/.test(v('--bold-weight')) ? v('--bold-weight') : '600',
-	};
-}
-
-/** `env(safe-area-inset-top)` in px, read from the view's probe element (spec §7.5). */
-function safeTop(probe: HTMLElement | null): number {
-	return probe?.isConnected ? (parsePx(getComputedStyle(probe).paddingTop) ?? 0) : 0;
-}
-
-/** `env(safe-area-inset-left)` and `-right` in px (the notch of a phone held sideways, 0.3.1 V1), read from the same probe element. */
-function safeSides(probe: HTMLElement | null): { left: number; right: number } {
-	if (!probe?.isConnected) return { left: 0, right: 0 };
-	const cs = getComputedStyle(probe);
-	return { left: Math.max(0, parsePx(cs.paddingLeft) ?? 0), right: Math.max(0, parsePx(cs.paddingRight) ?? 0) };
-}
-
-/** Stable, short text hash for a block key when Obsidian cannot say where the block is. */
-function shortHash(s: string): string {
-	let h = 0x811c9dc5;
-	for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 16777619);
-	return (h >>> 0).toString(36);
-}
 
 /** Options of `TreeView.redrawState`. */
 interface RedrawOptions {
@@ -408,13 +371,18 @@ const MAX_SIGN_BOOST = 8;
  */
 export class TreeView extends MarkdownRenderChild implements HoverParent {
 	hoverPopover: HoverPopover | null = null;
-	private key: string;
-	private sourcePath: string;
+	/** The binding to the block in the note: handle, place, retries and the cold-start wait (`block-binding.ts`). */
+	private readonly binding: BlockBinding;
 	private readonly coarse: boolean;
 	/** Fonts as read, not clamped: compared with `fontsChanged` only. */
 	private fonts: FontState | null = null;
 	/** A view to restore after the next re-render (font change, late web font). */
 	private carry: Anchor | null = null;
+	/** The person the phone list stood on at its last render, and whether a redraw by the calendar index must keep it (a birth year can change who is the oldest). */
+	private listStartWas: { id: string; from: ListFrom } | null = null;
+	private keepStart = false;
+	/** The calendar link and the reader key of the last render: a change of the index draws again only when the key differs (spec §14 rule 9). */
+	private reading: { link: string | undefined; key: string } | null = null;
 	/** D244: the edited card's place before the edit; the first view after the re-render uses it, once. */
 	private keepPlace: KeepPlace | null = null;
 	/** D244: the person whose sheet is about to save, for each block state (set just before the write; also for Add child, parent and partner). */
@@ -511,33 +479,6 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 	private readonly timers = new Set<number>();
 	/** The timer that ends the ring of each card, so a new ring can clear the old one. */
 	private readonly ringTimers = new Map<Element, number>();
-	/** The section of the block; null until Obsidian tells it (on a cold start it can answer null first and a section later). */
-	private info: MarkdownSectionInformation | null;
-	/** What Obsidian reported for this block, on the root as `data-dynasty-section` for the test harness. */
-	private sectionNote: string;
-	/** The render context, kept to ask for the section again; null in the full-screen view. */
-	private readonly ctx: MarkdownPostProcessorContext | null;
-	/**
-	 * The place of the block is not known YET (D183): a retry or a new ask for the section is still to come. The "Read only" label and the "Open note" chip
-	 * wait for it to end, so they never flash on a block that is only late.
-	 */
-	private placePending = false;
-	private sectionTimer = 0;
-	/** `onload` has run: a section found later starts its own look for the handle. */
-	private started = false;
-	private lastAskAt = -Infinity;
-	/** The block's handle once known; null while it resolves, and for a read-only view. */
-	private handle: Handle | null = null;
-	/** The handle this view lost (detached): its session state moves to the next handle of the block (D6). */
-	private lost: Handle | null = null;
-	/** A look for the block after a change of the note is under way (D7). */
-	private lateBusy = false;
-	private unwatch: (() => void) | null = null;
-	private peeked: Handle | null = null;
-	private ready: Promise<Handle | null>;
-	/** No handle (transclusion, Canvas card, hover popover, or the block cannot be told apart): no edits (spec §6.1). */
-	private readOnly: boolean;
-	private unsubscribe: (() => void) | null = null;
 	/** Height set by a resize drag, until the note has the new `options.height`. */
 	private dragHeight: number | null = null;
 	/** A touch or pen press on a card that can still become a tap (spec §7.2). */
@@ -548,7 +489,6 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 	private unloaded = false;
 	/** Expand was pressed and the full-screen view is about to open. */
 	private opening = false;
-	private lateTried = false;
 	/** Timing of the last render, until its first view has been painted (spec §7.7). */
 	private timing: { t0: number; t: RenderTiming } | null = null;
 	/** The first call of the processor for this view (ms of `performance.now`). */
@@ -571,13 +511,6 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 	private focusDue: string | null = null;
 	/** D51: the finder's small tree laid out top to bottom on an upright phone, until the first view picks the direction. */
 	private finderAlt: (MeasuredResult & { geo: Geometry }) | null = null;
-	private retries = 0;
-	private retryTimer = 0;
-	/** D183: when this view started (ms of `performance.now`), and the timer of the cold-start wait. */
-	private startAt = 0;
-	private startTimer = 0;
-	/** The box of the last known height is on the page (the tree draws once the start conditions hold). */
-	private waiting = false;
 	/** The problems of the whole tree's text (spec §8); the picture warnings come on top (`allIssues`). */
 	private textIssues: CodedIssue[] = [];
 	/** M9: the pictures of the whole tree, resolved at render (O1, O2); null with no picture store. */
@@ -612,40 +545,36 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 	) {
 		super(containerEl);
 		this.coarse = containerEl.win.matchMedia('(pointer: coarse)').matches;
-		if (place.kind === 'full') {
-			// The same handle, key and so view state as the embed (spec §7.1).
-			const f = place.from;
-			this.full = place.host;
-			this.sourcePath = f.sourcePath;
-			this.info = null;
-			this.ctx = null;
-			this.readOnly = f.readOnly || !f.handle;
-			this.sectionNote = 'full';
-			this.peeked = f.handle ?? f.peeked;
-			this.key = f.key;
-			this.ready = Promise.resolve(this.readOnly ? null : f.handle);
-			this.focusDue = f.focusDue ?? null;
-			this.openNow(this.born);
-			return;
-		}
-		const ctx = place.ctx;
-		this.ctx = ctx;
-		this.full = null;
-		this.sourcePath = ctx.sourcePath;
-		const info = ctx.getSectionInfo(containerEl);
-		this.info = info;
-		this.readOnly = info === null;
-		this.placePending = info === null;
-		this.sectionNote = info ? `${info.lineStart}-${info.lineEnd}` : 'none';
-		const ordinal = info ? host.handles.quickOrdinal(info, source) : null;
-		// Only for the view state until `resolve` has checked the block: never written through.
-		// F-VIEW-03: a handle whose body is not this block's text belongs to another block (the registry has not read a change of the note yet),
-		// so the view starts with a state of its own and takes the right handle's state in `attach`.
-		const peek = ordinal === null ? null : host.handles.peek(ctx.sourcePath, ordinal);
-		this.peeked = peek && sameBody(peek.body, source) ? peek : null;
-		this.key = `${ctx.sourcePath}\u0000${ordinal !== null ? `#${ordinal}` : `text ${shortHash(source)}`}`;
-		this.ready = info ? host.handles.resolve(ctx.sourcePath, info, source).catch(() => null) : Promise.resolve(null);
+		this.full = place.kind === 'full' ? place.host : null;
+		this.binding = new BlockBinding(host, containerEl, place, {
+			source: () => this.source,
+			unloaded: () => this.unloaded,
+			guard: (fn) => this.guard(fn),
+			updateEditUi: () => this.updateEditUi(),
+			render: () => this.render(null),
+			showPlaceholder: () => this.showPlaceholder(),
+			changed: (h, body) => this.changed(h, body),
+		});
+		if (place.kind === 'full') this.focusDue = place.from.focusDue ?? null;
 		this.openNow(this.born);
+	}
+
+	private get key(): string {
+		return this.binding.key;
+	}
+
+	private get sourcePath(): string {
+		return this.binding.sourcePath;
+	}
+
+	/** No handle (transclusion, Canvas card, hover popover, or the block cannot be told apart): no edits (spec §6.1). */
+	private get readOnly(): boolean {
+		return this.binding.readOnly;
+	}
+
+	/** The block's handle once known; null while it resolves, and for a read-only view. */
+	private get handle(): Handle | null {
+		return this.binding.handle;
 	}
 
 	/** The open that the renders add to: the pending open of this block when the last render was lately, else a new one that starts at `from`. */
@@ -702,6 +631,11 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 		return this.sourcePath;
 	}
 
+	/** The calendar note that the tree names in its `calendar` option, as written; undefined when it names none or has not drawn yet. */
+	get calendarLink(): string | undefined {
+		return this.reading?.link;
+	}
+
 	/** The key of the block's view state, shared by the embed and the full-screen view. */
 	get stateKey(): string {
 		return this.key;
@@ -715,6 +649,42 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 	/** G.1, G.3: what the person picker needs for portraits and relation words (Find, Focus, the finder). */
 	private pickerContext(): PickerContext {
 		return { sourcePath: this.sourcePath, me: this.meId, relationOptions: this.relationOptions, ...(this.host.pictures ? { pictures: this.host.pictures } : {}) };
+	}
+
+	/** Spec §14: the date reader of a tree for the link it names as its calendar note; undefined without an index (a unit fake): plain years. */
+	private get datesFor(): DatesFor | undefined {
+		const index = this.host.dates;
+		return index && datesForTree(index, this.sourcePath);
+	}
+
+	/** The start of the phone list (spec §5.5): the rules of `listStart`, or the person the list stood on when only the calendars changed. */
+	private startOf(facts: ListStartFacts): ReturnType<typeof listStart> {
+		const kept = this.keepStart ? this.listStartWas : null;
+		this.keepStart = false;
+		this.listStartWas = kept && facts.g.byId.has(kept.id) ? kept : listStart(facts);
+		return this.listStartWas;
+	}
+
+	/** The reader of this parse, and its key for `datesChanged`. */
+	private readerOf(parsed: ParseResult): DateReader | undefined {
+		const link = parsed.ok ? parsed.tree.options.calendar : undefined;
+		const reader = this.datesFor?.(link);
+		this.reading = reader ? { link, key: reader.key } : null;
+		return reader;
+	}
+
+	/**
+	 * The calendar index changed (a scan ended, a calendar note changed): when this tree's reader key is another one, draw again with the kept anchor.
+	 * Dates move no card, so the layout comes from the cache; the phone list keeps its centre person (spec §14 rule 9).
+	 */
+	datesChanged(): void {
+		this.guard(() => {
+			const was = this.reading;
+			if (this.unloaded || !was || this.datesFor?.(was.link).key === was.key) return;
+			if (!this.listMode) this.carry = this.keptAnchor();
+			this.keepStart = this.listMode;
+			this.render(this.fonts);
+		});
 	}
 
 	/** D174: the options of every relation call of this view (cards, finder, sheet, saved picture), from the settings. */
@@ -789,7 +759,7 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 
 	/** Obsidian calls this once the block's container is in the DOM: wires listeners and renders it. */
 	override onload(): void {
-		this.startAt = performance.now();
+		this.binding.startAt = performance.now();
 		this.host.views.add(this);
 		for (const type of STOPPED_EVENTS) {
 			this.registerDomEvent(this.containerEl, type as keyof HTMLElementEventMap, (e) => e.stopPropagation(), { passive: true });
@@ -842,14 +812,7 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 		// The metadata cache indexes a new picture file late: a list with a missing link looks again when it has resolved.
 		const mc = this.host.app?.metadataCache;
 		if (store && mc && typeof mc.on === 'function') this.registerEvent(mc.on('resolved', () => this.guard(() => this.linksResolved())));
-		// D7: a view that gave up finding its block tries again when the note changes (the pasted copy is deleted).
-		if (this.info && !this.full) this.unwatch ??= this.host.handles.watchNote?.((path) => this.guard(() => this.noteModified(path))) ?? null;
-		this.guard(() => this.begin());
-		if (this.info || this.full) {
-			void this.ready.then((h) => this.guard(() => this.attach(h)));
-		}
-		this.started = true;
-		if (!this.info && this.ctx) this.watchSection();
+		this.binding.onload();
 	}
 
 	/** Obsidian calls this when the block leaves the note: stops timers and tears the scene down. */
@@ -859,17 +822,12 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 		// that still waited for its start) keeps the open for the gap, because Obsidian often renders the block again at once and the
 		// next call continues that wait (spec §7.7); sweepOpens takes it out after the gap, so no idle time is added (0.3 second G2).
 		if (this.seenTree && this.opened && !this.openHeldElsewhere()) this.dropOpen();
-		if (this.startTimer) this.containerEl.win.clearTimeout(this.startTimer);
-		if (this.sectionTimer) this.containerEl.win.clearTimeout(this.sectionTimer);
-		if (this.retryTimer) this.containerEl.win.clearTimeout(this.retryTimer);
+		this.binding.clearTimers();
 		if (this.turnTimer) this.containerEl.win.clearTimeout(this.turnTimer);
 		this.host.views.delete(this);
-		this.unsubscribe?.();
-		this.unsubscribe = null;
+		this.binding.release();
 		this.unsubPictures?.();
 		this.unsubPictures = null;
-		this.unwatch?.();
-		this.unwatch = null;
 		this.teardown();
 	}
 
@@ -880,15 +838,15 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 	 */
 	retire(): void {
 		if (this.unloaded) return;
-		this.readOnly = true;
-		this.placePending = false;
+		this.binding.readOnly = true;
+		this.binding.placePending = false;
 		this.guard(() => this.updateEditUi());
 		this.unload();
 	}
 
 	/** Plugin memory for this block (spec §5.5): on the handle, or keyed by text for a read-only block; null if there is none yet. */
 	private peekState(): BlockState | null {
-		const h = this.handle ?? this.peeked;
+		const h = this.handle ?? this.binding.peeked;
 		return h ? h.state : (this.host.looseStates.get(this.key) ?? null);
 	}
 
@@ -903,213 +861,19 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 		return st;
 	}
 
-	/**
-	 * The block's handle is known. With none, the view becomes read-only. With one, the view follows
-	 * its `changed` events: after a write or an outside change it shows the new body (spec §6.1).
-	 */
-	private attach(h: Handle | null): void {
-		if (this.unloaded) return;
-		if (!h) {
-			this.handle = null;
-			// A retry is still to come: the block may only be late (D183), so it is not read only yet and nothing says so.
-			if (this.info && this.retries < RESOLVE_RETRIES_MS.length) {
-				this.placePending = true;
-				this.retryResolve();
-				return;
-			}
-			if (!this.readOnly || this.placePending) {
-				this.readOnly = true;
-				this.placePending = false;
-				this.updateEditUi();
-			}
-			this.retryResolve();
-			return;
-		}
-		this.readOnly = false;
-		this.placePending = false;
-		if (this.handle !== h) {
-			// A new handle of the same block (the old one was detached): the session state follows the block.
-			if (this.lost) carryState(this.lost.state, h.state);
-			this.lost = null;
-			// The body tells a different block from the one the lines suggested: move a view state across.
-			const loose = this.host.looseStates.get(this.key);
-			if (loose?.view && !h.state.view) {
-				h.state.view = loose.view;
-				h.state.viewFor = loose.viewFor;
-				h.state.views = { ...loose.views };
-			}
-			if (loose && !h.state.focus) h.state.focus = loose.focus;
-			// D144: the Back trail of the phone list belongs to the session position, so it moves with it.
-			if (loose && h.state.listBack === undefined) h.state.listBack = loose.listBack;
-			if (loose && h.state.autoFocus === null) {
-				h.state.autoFocus = loose.autoFocus;
-				h.state.autoMark = loose.autoMark;
-			}
-			if (loose && !h.state.folds.size) h.state.folds = new Set(loose.folds);
-			// Spec §7.7 (tap memory): a tap on "Draw the tree" before the handle was known still counts.
-			if (loose && h.state.largeTapped === undefined) h.state.largeTapped = loose.largeTapped;
-		}
-		this.handle = h;
-		this.unsubscribe?.();
-		this.unsubscribe = h.onChanged((body) => this.guard(() => this.changed(h, body)));
-		this.updateEditUi();
-	}
-
-	/**
-	 * Obsidian gives no section for a block in a callout in Live Preview. If the block is in the
-	 * note's own editor (not an embed) and its body matches exactly one block of the note, it is
-	 * that block, and the view can edit it. Synchronous, so the block's view state applies at once.
-	 */
+	/** A block in a callout in Live Preview has no section: it is found once it is in the note (`BlockBinding.lateResolve`). */
 	private lateResolve(ask = true): void {
-		if (ask) this.askSection();
-		if (this.info || this.full || this.lateTried || this.handle) return;
-		// I07: a call before the block is in the page, or before it is in the note's editor, says nothing yet; only a sure answer ends the tries.
-		if (!this.containerEl.isConnected) return;
-		// A side view of another plugin is no editor and no reading view: nothing will ever make this block known, so there is no wait.
-		if (this.inForeignView() || !this.inNoteView()) {
-			this.lateTried = true;
-			this.endPlacePending();
-			return;
-		}
-		if (!this.host.handles.inEditorOf(this.containerEl, this.sourcePath)) return;
-		this.lateTried = true;
-		const h = this.host.handles.resolveByBody(this.sourcePath, this.source);
-		this.ready = Promise.resolve(h);
-		if (h) this.attach(h);
+		this.binding.lateResolve(ask);
 	}
 
-	/**
-	 * Asks Obsidian for the section of the block once more (D183). In a Reading view on a cold start the first answer can be null and a later one a section;
-	 * `lateResolve` cannot help there. When a section comes, the view takes the place of a block it can edit and looks for its handle.
-	 */
-	private askSection(minGap = 0): void {
-		const ctx = this.ctx;
-		if (!ctx || this.info || this.full || this.unloaded) return;
-		// The start tick and the section timer both ask: within one gap, one ask is enough (a note with many trees makes many asks).
-		const now = performance.now();
-		if (now - this.lastAskAt < minGap) return;
-		this.lastAskAt = now;
-		let info: MarkdownSectionInformation | null = null;
-		try {
-			info = ctx.getSectionInfo(this.containerEl);
-		} catch {
-			// Obsidian cannot tell yet: the next look asks again.
-		}
-		if (!info) return;
-		this.info = info;
-		this.sectionNote = `${info.lineStart}-${info.lineEnd}`;
-		const ordinal = this.host.handles.quickOrdinal(info, this.source);
-		const peek = ordinal === null ? null : this.host.handles.peek(this.sourcePath, ordinal);
-		this.peeked = peek && sameBody(peek.body, this.source) ? peek : null;
-		const oldKey = this.key;
-		this.key = `${this.sourcePath}\u0000${ordinal !== null ? `#${ordinal}` : `text ${shortHash(this.source)}`}`;
-		// The view state that the session kept under the text key follows the block to its place key.
-		const loose = this.host.looseStates.get(oldKey);
-		if (loose && oldKey !== this.key && !this.host.looseStates.has(this.key)) {
-			this.host.looseStates.set(this.key, loose);
-			this.host.looseStates.delete(oldKey);
-		}
-		this.readOnly = false;
-		this.placePending = false;
-		this.ready = this.host.handles.resolve(this.sourcePath, info, this.source).catch(() => null);
-		// D7: also for a section that comes before `onload` ends, so a view that loses its block tries again when the note changes.
-		this.unwatch ??= this.host.handles.watchNote?.((path) => this.guard(() => this.noteModified(path))) ?? null;
-		if (!this.started) return;
-		void this.ready.then((h) => this.guard(() => this.attach(h)));
-	}
-
-	/** The look for the section goes on every `SECTION_STEP_MS` until `SECTION_LIMIT_MS` has passed since the start; then the block is read only for good. */
-	private watchSection(): void {
-		if (this.sectionTimer || this.unloaded || this.info) return;
-		this.sectionTimer = this.containerEl.win.setTimeout(() => {
-			this.sectionTimer = 0;
-			this.guard(() => {
-				this.askSection(ASK_GAP_MS);
-				if (this.info || this.unloaded) return;
-				if (performance.now() - this.startAt >= SECTION_LIMIT_MS) this.endPlacePending();
-				else this.watchSection();
-			});
-		}, SECTION_STEP_MS);
-	}
-
-	/** No more asks are to come: a block with no place is read only, and now the label and the chip say so. */
-	private endPlacePending(): void {
-		if (!this.placePending) return;
-		this.placePending = false;
-		this.updateEditUi();
-	}
-
-	/** Finds this view's block again, from Obsidian's section and the rendered body (spec §6.1). */
-	private async reResolve(): Promise<Handle | null> {
-		this.unsubscribe?.();
-		this.unsubscribe = null;
-		this.lost = this.handle ?? this.lost;
-		this.handle = null;
-		const info = this.info;
-		let h: Handle | null = null;
-		if (info) h = await this.host.handles.resolve(this.sourcePath, info, this.source).catch(() => null);
-		else if (!this.inForeignView() && this.host.handles.inEditorOf(this.containerEl, this.sourcePath)) h = this.host.handles.resolveByBody(this.sourcePath, this.source);
-		this.ready = Promise.resolve(h);
-		if (this.unloaded) return null;
-		this.guard(() => this.attach(h));
-		return h;
-	}
-
-	/**
-	 * The handle this view may write through: only one whose body is what this view rendered.
-	 * A stale view re-reads, then finds its block again, or writes nothing.
-	 */
-	private async validHandle(): Promise<Handle | null> {
-		let h = await this.ready;
-		if (h && !h.detached && sameBody(h.body, this.source)) return h;
-		if (h) await h.refresh();
-		h = this.handle;
-		if (h && !h.detached && sameBody(h.body, this.source)) return h;
-		h = await this.reResolve();
-		return h && !h.detached && sameBody(h.body, this.source) ? h : null;
+	/** The handle this view may write through (`BlockBinding.validHandle`). */
+	private validHandle(): Promise<Handle | null> {
+		return this.binding.validHandle();
 	}
 
 	/** The note was renamed: later writes and "Open note" use the new path. */
 	renamed(oldPath: string, newPath: string): void {
-		if (this.sourcePath !== oldPath) return;
-		this.sourcePath = newPath;
-		if (this.key.startsWith(`${oldPath}\u0000`)) this.key = newPath + this.key.slice(oldPath.length);
-	}
-
-	/**
-	 * Right after a note opens, or after an outside change, the editor text can briefly differ from
-	 * what Obsidian rendered. Try again a little later before the view stays read-only.
-	 */
-	private retryResolve(): void {
-		const info = this.info;
-		if (!info || this.retries >= RESOLVE_RETRIES_MS.length) return;
-		// Not in `timers`: a re-render clears those, and this must still run.
-		this.retryTimer = this.containerEl.win.setTimeout(() => {
-			this.retryTimer = 0;
-			if (this.unloaded || this.handle) return;
-			this.ready = this.host.handles.resolve(this.sourcePath, info, this.source).catch(() => null);
-			void this.ready.then((h) => this.guard(() => this.attach(h)));
-		}, RESOLVE_RETRIES_MS[this.retries++]);
-	}
-
-	/**
-	 * The note changed after this view gave up finding its block (`retryResolve` made its last try): look
-	 * once more, so that the view is editable again when the copy that made two blocks alike is gone.
-	 */
-	private noteModified(path: string): void {
-		const info = this.info;
-		if (path !== this.sourcePath || !info || this.unloaded || this.handle || this.lateBusy || this.retryTimer) return;
-		if (this.retries < RESOLVE_RETRIES_MS.length) return;
-		this.lateBusy = true;
-		this.ready = this.host.handles.resolve(this.sourcePath, info, this.source).catch(() => null);
-		void this.ready
-			.then((h) => {
-				this.lateBusy = false;
-				if (h && !this.handle) this.guard(() => this.attach(h));
-			})
-			.catch(() => {
-				this.lateBusy = false;
-			});
+		this.binding.renamed(oldPath, newPath);
 	}
 
 	/**
@@ -1119,8 +883,8 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 	private changed(h: Handle, body: string): void {
 		if (h !== this.handle) return;
 		if (h.detached) {
-			if (this.full) void this.fullReattach();
-			else void this.reResolve();
+			if (this.full) void this.binding.fullReattach();
+			else void this.binding.reResolve();
 			return;
 		}
 		if (sameBody(body, this.source)) return;
@@ -1166,42 +930,14 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 		return keepPlaceShift(place.before, laid.layout.persons, place.id, place.view, { bounds: this.bounds, size, ...free });
 	}
 
-	/**
-	 * The full-screen view has no section to find its block again: only a block with the same body,
-	 * unique in the note, is still its block. Otherwise it closes with a Notice (spec §7.1).
-	 */
-	private async fullReattach(): Promise<void> {
-		this.unsubscribe?.();
-		this.unsubscribe = null;
-		this.lost = this.handle ?? this.lost;
-		this.handle = null;
-		const h = await this.host.handles.resolveUnique(this.sourcePath, this.source).catch(() => null);
-		if (this.unloaded) return;
-		if (!h) {
-			this.full?.close(FULL_UI.gone);
-			return;
-		}
-		this.ready = Promise.resolve(h);
-		this.guard(() => this.attach(h));
-	}
-
 	/** Read-only full-screen view: the note changed. Close unless the block is still there with the same text. */
 	stillThere(text: string | null): void {
-		if (!this.full || this.handle || this.unloaded) return;
-		if (text === null || !findBlocks(text).some((b) => sameBody(b.body, this.source))) this.full.close(FULL_UI.gone);
+		this.binding.stillThere(text);
 	}
 
-	/**
-	 * Is this block inside something that shows another note's content (an embed, a Canvas card, a
-	 * hover preview)? Obsidian can report a section there, but spec §6.1 wants such views read-only.
-	 */
+	/** Is this block inside something that shows another note's content (`BlockBinding.inForeignView`)? Spec §6.1 wants such views read-only. */
 	private inForeignView(): boolean {
-		return !!this.containerEl.closest('.markdown-embed, .internal-embed, .canvas-node, .hover-popover, .popover');
-	}
-
-	/** Is this block inside a note's own editor or reading view? Not so in the side view of another plugin. */
-	private inNoteView(): boolean {
-		return !!this.containerEl.closest('.markdown-source-view, .markdown-reading-view, .markdown-preview-view, .cm-editor');
+		return this.binding.inForeignView();
 	}
 
 	/** Called by the plugin on `css-change`: re-measure and re-layout only if a font changed (§5.8). */
@@ -1366,7 +1102,7 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 			try {
 				this.teardown();
 				this.containerEl.empty();
-				buildCallout(this.containerEl, 'error', UI.errorTitle, 'dynasty-error').content.createDiv({ text: UI.internalError });
+				buildCallout(this.containerEl, 'error', UI.errorTitle, 'dynasty-error', setIcon).content.createDiv({ text: UI.internalError });
 			} catch {
 				// Nothing more can be done safely; the rest of the note still renders.
 			}
@@ -1399,75 +1135,25 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 	}
 
 	/**
-	 * D183: the first draw. On a cold start the page can show the block before the plugin styles are applied and before Obsidian says where the block is,
-	 * so the tree would show without style, read only, with a count of warnings that are not true yet. Until the styles and the settings are in and the
-	 * block place is known (or known to be out of reach: an embed, a Canvas card, a page preview), the view shows an empty box of the last known height. A timer
-	 * looks again every `START_STEP_MS`, not only the resize observer, and after `START_LIMIT_MS` the tree draws as it is.
-	 */
-	private begin(): void {
-		if (!this.waitingToStart()) {
-			this.render(null);
-			return;
-		}
-		this.showPlaceholder();
-		this.startTick();
-	}
-
-	/** True while the start conditions do not hold yet. A host with no `startedUp` and a full-screen view never wait. */
-	private waitingToStart(): boolean {
-		const su = this.host.startedUp;
-		if (!su || this.full || this.unloaded) return false;
-		this.askSection(ASK_GAP_MS);
-		const age = performance.now() - this.startAt;
-		// Only the cap of the styles ends the wait for them; the shorter limit holds for the settings and the block place (see `STYLES_LIMIT_MS`).
-		if (age >= STYLES_LIMIT_MS) return false;
-		if (!su.ready(this.containerEl)) return true;
-		if (age >= START_LIMIT_MS) return false;
-		if (this.info || this.handle) return false;
-		this.lateResolve(false);
-		return !(this.handle || this.lateTried);
-	}
-
-	/**
 	 * The box that stands in for the tree. An svg of the height, because the plugin styles may not be there yet and a style attribute is not allowed.
 	 * The `display` attribute makes it a block with no style sheet: an inline svg sits on a text baseline and the root grows by the gap under it.
 	 */
 	private showPlaceholder(): void {
 		const el = this.containerEl;
 		el.empty();
-		this.waiting = true;
+		this.binding.waiting = true;
 		const phone = this.coarse && this.isPhone();
 		const px = lastHeight(this.host.app, this.key) ?? (phone ? PHONE_PLACEHOLDER_PX : this.settings.embedHeightDesktop);
 		const box = el.createDiv({ cls: ['dynasty-root', 'dynasty-placeholder'], attr: { 'aria-busy': 'true', 'data-dynasty-placeholder': '' } });
 		box.createSvg('svg', { cls: 'dynasty-placeholder-box', attr: { width: '100%', height: String(Math.round(px)), display: 'block', 'aria-hidden': 'true' } });
 	}
 
-	private startTick(): void {
-		if (this.startTimer || this.unloaded) return;
-		const win = this.containerEl.win;
-		this.startTimer = win.setTimeout(() => {
-			this.startTimer = 0;
-			this.guard(() => this.startLook());
-		}, START_STEP_MS);
-	}
-
-	/** One look at the start conditions: the tree draws when they hold, else the timer looks again. */
-	private startLook(): void {
-		if (!this.waiting || this.unloaded) return;
-		if (this.waitingToStart()) {
-			this.startTick();
-			return;
-		}
-		this.waiting = false;
-		this.render(null);
-	}
-
 	/** The plugin tells that a start condition came (the styles, the stored settings, the metadata cache): look at once, and count the pictures again. */
 	startUpDone(): void {
 		this.guard(() => {
 			if (this.unloaded) return;
-			if (this.waiting) {
-				this.startLook();
+			if (this.binding.waiting) {
+				this.binding.startLook();
 				return;
 			}
 			// A tree that drew before the metadata cache was ready had no count of missing pictures: look again.
@@ -1511,13 +1197,8 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 		if (root.isConnected && root.offsetHeight > 0) rememberHeight(this.host.app, this.key, root.offsetHeight);
 	}
 
-	private render(fontsOverride: FontState | null): void {
-		this.waiting = false;
-		this.foldsStale = false;
-		this.teardown();
-		this.listMode = false;
-		const el = this.containerEl;
-		el.empty();
+	/** The fields that a render starts from: nothing of the old draw is left. */
+	private resetDrawn(): void {
 		this.emptyEl = null;
 		this.errorBox = null;
 		this.large = null;
@@ -1531,6 +1212,50 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 		this.finderDrawn = null;
 		this.successionDrawn = null;
 		this.finderAlt = null;
+	}
+
+	/** What `planRender` reads (`view/render-plan.ts`): the parse and the facts of this view; it changes none of it. */
+	private renderInputs(parsed: ParseResult, orientation: Orientation, fontsOverride: FontState | null): RenderInputs {
+		return {
+			parsed,
+			settings: this.settings,
+			// A block with no memory yet reads a fresh one; the memory is made in `applyChanges`, only when a tree or a bar is drawn.
+			state: this.peekState() ?? newBlockState(),
+			coarse: this.coarse,
+			phone: this.isPhone(),
+			full: this.full ? { focus: this.full.focus, target: this.full.target } : null,
+			orientation,
+			pendingTarget: this.pendingTarget,
+			stopChecked: this.stopChecked,
+			stopped: (count) => wasStopped(this.key, count, this.source),
+			fonts: () => fontsOverride ?? readFonts(this.containerEl),
+			clock: () => performance.now(),
+			dates: this.readerOf(parsed),
+		};
+	}
+
+	/** Applies the changes that `planRender` asked for to the block's memory and to this view, and returns the block's memory. */
+	private applyChanges(c: StateChanges): BlockState {
+		const st = this.ensureState();
+		Object.assign(st, c.block);
+		const finder = st.finder;
+		if (finder && c.finderIndex !== undefined) finder.index = c.finderIndex;
+		if (finder && c.finderWhole) finder.whole = true;
+		if (c.fullFocus && this.full) this.full.focus = c.fullFocus;
+		if (c.pendingTarget) this.pendingTarget = c.pendingTarget;
+		if (c.stopChecked) this.stopChecked = true;
+		return st;
+	}
+
+	/** Draws the block again. The decisions are in `planRender`; this applies its changes and builds the DOM of the plan. */
+	private render(fontsOverride: FontState | null): void {
+		this.binding.waiting = false;
+		this.foldsStale = false;
+		this.teardown();
+		this.listMode = false;
+		const el = this.containerEl;
+		el.empty();
+		this.resetDrawn();
 		// D24: sideways on a phone in portrait. Set first, so a block with no tree follows a turn too.
 		const orientation = this.orientationNow();
 		this.orientation = orientation;
@@ -1538,189 +1263,128 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 		// Spec §7.7 (time budget): the time budget counts from the start of this render, or from the tap that asked for it. Read at once, so a stale tap never counts later.
 		const clockFrom = this.budgetFrom ?? t0;
 		this.budgetFrom = null;
-		const parsed = this.parse(this.source);
-		if (!parsed.ok && this.full) {
+		const { plan, stateChanges } = planRender(this.renderInputs(this.parse(this.source), orientation, fontsOverride));
+		if (plan.kind === 'invalid-full') {
 			// No tree comes of this open: the next open of the full-screen view is a new wait.
 			this.dropOpen();
-			this.full.close(FULL_UI.invalid);
+			this.full?.close(FULL_UI.invalid);
 			return;
 		}
-		if (!parsed.ok) {
-			this.laid = null;
+		if (plan.kind === 'error') {
+			this.renderError(el, plan.error, orientation);
+			return;
+		}
+		if (plan.kind === 'empty') {
 			this.dropOpen();
-			const box = buildCallout(el, 'error', UI.errorTitle, 'dynasty-error');
-			box.root.setAttribute('data-dynasty-orientation', orientation);
-			box.content.createDiv({ cls: 'dynasty-error-detail', text: hardErrorText(parsed.error, this.source) });
-			this.errorBox = box.content;
-			this.updateEditUi();
-			// A block in a callout in Live Preview has no section: it is found once it is in the note (see lateResolve).
-			this.observer = new ResizeObserver(() =>
-				this.guard(() => {
-					this.lateResolve();
-					this.updateEditUi();
-				}),
-			);
-			this.observer.observe(box.root);
+			this.renderEmpty(el, plan.whole);
 			return;
 		}
-		// 0.3 (spec §7.7, size limits): the people are counted right after the parse, before the derive, the relations and the layout. A tree at or under the first
-		// limit does nothing more with the count; the focus decides below whether a larger one draws.
-		const count = peopleCount(parsed.tree);
-		// A.5: "Warn about more than 2 parents of a type". The derive is not cached (`parse-cache.ts`), so the setting needs no cache key; `onSettingsChange` draws again.
-		const whole = deriveFamilies(parsed.tree, { warnManyParents: this.settings.warnManyParents });
-		const t1 = performance.now();
-		if (!whole.people.length && !whole.issues.some((i) => i.level === 'blocking')) {
-			this.dropOpen();
-			this.renderEmpty(el, whole);
+		if (plan.kind === 'list') {
+			this.renderList(el, plan.tree, plan.whole, t0, plan.t1);
 			return;
 		}
-		// D144: a tree in a note on a phone is a list. No fonts, no layout, no scene.
-		if (!this.full && this.coarse && this.isPhone()) {
-			this.renderList(el, parsed.tree, whole, t0, t1);
-			return;
-		}
-		const fonts = fontsOverride ?? readFonts(el);
-		// D143, D150: the card form of the direction (the Roundel top to bottom, the text card sideways).
-		const geo = cardForm(geometryFor(fonts.px), orientation);
-		const base: LayoutSettings = orientation === 'sideways' ? { sweeps: 4, far: DEFAULT_FAR_RULE, orientation } : { sweeps: 4, far: DEFAULT_FAR_RULE };
-		const focus = this.updateFocus(parsed.tree, whole);
-		const st = this.ensureState();
-		// F9: a fold whose family has no child any more (or no parent) ends with the parse; a text that does not parse keeps the folds.
-		const kept = pruneFolds(whole, st.folds);
-		if (kept !== st.folds) st.folds = new Set(kept);
-		// Spec §13.2: the finder's result is computed again from the new text at each render; with a
-		// line it replaces the focus family (the search uses the whole tree), and Close brings it back.
-		// 0.2.7 F.1: the Show view of a line of succession is computed from the new text too; it replaces the finder's result (one temporary view at a time).
-		const succession = this.successionFor(st, whole);
-		this.successionDrawn = succession;
-		const finder = succession ? null : this.finderFor(st, whole);
-		this.finderDrawn = finder;
-		// A tag or a problem in the static preview opened this view on a person (D17). If the small tree
-		// of the line does not draw them, the result shows in the whole tree, so the person can be centred.
-		const target = this.full?.target;
-		if (finder?.line && !finder.state.whole && target && whole.byId.has(target) && !finder.line.people.includes(target)) finder.state.whole = true;
-		const small = finder?.line && !finder.state.whole ? finder.line : null;
-		// Focus mode (spec §5.6): only the focus family is laid out and drawn; the whole tree's
-		// problems stay on the badge, and every edit reads the whole block.
-		const n = focusGenerationsFor(parsed.tree.options, this.settings.focusGenerations);
-		let sub = focus !== null && !finder?.line && !succession ? focusSubgraph(parsed.tree, focus, n) : null;
-		// A tag or a problem in the static preview opened this view on a person its family does not draw:
-		// this view shows all people (D21: its own focus), so the person can be centred.
-		if (this.full && sub && target && whole.byId.has(target) && !sub.tree.people.some((p) => p.id === target)) {
-			this.full.focus = { id: null };
-			sub = null;
-		}
-		// §5.5: a person just saved is shown once, by the first view of the kind that saved them.
-		// If its family does not draw them, it shows all people, like Find.
-		const saved = st.shown;
-		let sessionChanged = false;
-		if (saved && saved.place === (this.full ? 'full' : 'embed')) {
-			st.shown = null;
-			if (sub && whole.byId.has(saved.id) && !sub.tree.people.some((p) => p.id === saved.id)) {
-				// A D21 full-screen view changes only its own focus; otherwise the session changes.
-				if (this.full?.focus) this.full.focus = { id: null };
-				else {
-					st.focus = { id: null };
-					sessionChanged = true;
-				}
-				this.pendingTarget = [saved.id];
-				sub = null;
-			}
-		}
-		// 0.3 (spec §7.7, size limits): a render that would draw the WHOLE tree (no focus family, no short finder line) of a very large tree shows the low bar.
-		// The time budget counts from the start of this render, or from the tap that asked for the draw (spec §7.7).
-		const wholeDraw = !small && !sub;
-		if (wholeDraw) {
-			const bar = largeBar({ count, whole: true, full: !!this.full, phone: this.isPhone(), tapped: st.largeTapped === true, stopped: wasStopped(this.key, count, this.source) });
-			if (bar) {
-				this.renderBar(el, parsed.tree, whole, bar, count, orientation);
-				if (sessionChanged) TreeView.redrawState(this.host, st, { except: this });
-				return;
-			}
-		}
-		// D227 item 2: a focus family that passes the top (a pin with a large `generations`) shows the bar like a whole tree. Its count is the people it would draw.
-		if (sub) {
-			const bar = drawnBar(sub.tree.people.length, !!this.full, this.isPhone());
-			if (bar) {
-				this.renderBar(el, parsed.tree, whole, { ...bar, family: true }, sub.tree.people.length, orientation);
-				if (sessionChanged) TreeView.redrawState(this.host, st, { except: this });
-				return;
-			}
-		}
-		const stop = wholeDraw ? drawBudget(clockFrom) : undefined;
-		// D47: the small tree of the line has only its people, and a couple on it is never split.
-		const g = small ? lineSubgraph(whole, small) : sub ? deriveFamilies(sub.tree) : whole;
-		// Spec §13.1: the names come from the whole tree, also in focus mode, and are kept per tree and
-		// mark (relation-cache.ts). Their time counts in the §7.7 time: it is in the layout part.
-		const me = validMe(whole, parsed.tree.options.me);
-		this.meId = me;
-		const rel = me !== null && !small ? relationsFor(whole, me, this.relationOptions) : null;
-		// M10 (F1, F8): the computer and the full-screen view apply the folds; the static phone preview never does.
-		const canFold = !!this.full || !this.coarse;
-		const lineIds = this.linePeopleNow();
-		let plan = planFolds(g, whole, st.folds, canFold, lineIds);
-		// F11: a person that a flow asked for (a tag or a problem in the preview, Find outside the focus family) is shown.
-		if (canFold && plan.hidden.size) {
-			const asked = (this.full?.target ? [this.full.target] : (this.pendingTarget ?? [])).filter((id) => plan.hidden.has(id));
-			if (asked.length) {
-				st.folds = new Set(unfoldFor(g, whole, st.folds, asked));
-				plan = planFolds(g, whole, st.folds, canFold, lineIds);
-			}
-		}
-		this.foldPlan = plan;
-		// D145: the plate with the relation word is part of the card only while the setting shows it, so the setting changes the layout.
-		// Without the plate a marked person gets the "You" tab; so does the finder's small tree, which has no relation words (`rel` is null there).
-		const relationLine = rel !== null && this.settings.showRelations;
-		const marked = (s: LayoutSettings): LayoutSettings => (relationLine ? { ...s, relationLine: true } : me !== null ? { ...s, youTab: me } : s);
-		// 0.2.7 F.4: the heirs and the open branches get a tab above their cards; the ids only, never the texts (a cached layout would keep a stale text).
-		const shaped = (s: LayoutSettings): LayoutSettings => (succession ? { ...marked(s), ordinalCards: [...succession.ordinals.keys()] } : marked(s));
-		const laidBase: LayoutSettings = withFolds(shaped(small ? { ...base, far: NEVER_FAR_RULE } : base), plan, canFold);
-		// Spec §13.3, §13.5: the card labels of the drawn graph. A tree with no titles draws as in M7 (no labels).
-		const labels = needsLabels(g) ? cardLabels(g) : undefined;
-		let laid: LaidOut;
-		let settings: LayoutSettings;
+		const st = this.applyChanges(stateChanges);
+		if (plan.kind === 'bar') this.renderBar(el, plan.tree, plan.whole, plan.bar, plan.barCount, orientation);
+		else this.drawTree(el, plan, { t0, clockFrom, orientation });
+		if (stateChanges.sessionChanged) TreeView.redrawState(this.host, st, { except: this });
+	}
+
+	/** The text of the block cannot be read: the error box stands in place of a tree. */
+	private renderError(el: HTMLElement, error: HardError, orientation: Orientation): void {
+		this.laid = null;
+		this.dropOpen();
+		const box = buildCallout(el, 'error', UI.errorTitle, 'dynasty-error', setIcon);
+		box.root.setAttribute('data-dynasty-orientation', orientation);
+		box.content.createDiv({ cls: 'dynasty-error-detail', text: hardErrorText(error, this.source) });
+		this.errorBox = box.content;
+		this.updateEditUi();
+		// A block in a callout in Live Preview has no section: it is found once it is in the note (see lateResolve).
+		this.observer = new ResizeObserver(() =>
+			this.guard(() => {
+				this.lateResolve();
+				this.updateEditUi();
+			}),
+		);
+		this.observer.observe(box.root);
+	}
+
+	/** Lays the planned tree out. Null when the time budget stopped it: the bar with no button then stands in place of the tree. */
+	private layOutPlan(el: HTMLElement, plan: TreePlan, rel: TreeRelations | null, c: DrawContext): MeasuredResult | null {
+		// Spec §7.7 (time budget): the draw of a whole tree stops before its next phase when it passes the budget.
+		const stop = plan.budget ? drawBudget(c.clockFrom) : undefined;
+		let result: MeasuredResult;
 		try {
-			({ laid, settings } = this.layOut(g, geo, laidBase, fonts, labels, plan.hidden, stop));
+			result = this.layOut(plan.g, plan.geo, plan.laidBase, plan.fonts, plan.labels, plan.foldPlan.hidden, stop);
 			// WP-K: the names of the cards that are drawn, in one request (all cards of the whole tree, the people of a focus family); the scene reads each from the lookup.
 			// Spec §7.7 (time budget): the request of a whole tree is cut into groups, with the time check between them.
-			if (rel) askInGroups((ids) => rel.cards.getMany(ids), laid.layout.persons.keys(), stop);
+			if (rel) askInGroups((ids) => rel.cards.getMany(ids), result.laid.layout.persons.keys(), stop);
 		} catch (e) {
 			if (!(e instanceof LayoutStopped)) throw e;
 			// Spec §7.7 (time budget): the draw passed its time budget before its next phase. Nothing of it was cached; the bar with no button stays until the tree text changes.
-			rememberStop(this.key, count, this.source);
-			this.renderBar(el, parsed.tree, whole, { kind: 'slow', limit: 0 }, count, orientation);
-			if (sessionChanged) TreeView.redrawState(this.host, st, { except: this });
-			return;
+			rememberStop(this.key, plan.count, this.source);
+			this.renderBar(el, plan.tree, plan.whole, plan.onStop, plan.count, c.orientation);
+			return null;
 		}
 		// D51: on an upright phone the small tree is also laid out top to bottom. The first view, which
 		// knows the free area between the result bar and the toolbar, draws the direction with larger names.
-		// The other direction has its own card form (the Roundel), so it gets its own geometry; `geo` has the text card.
-		const altGeo = cardForm(geometryFor(fonts.px), 'down');
-		this.finderAlt = small && orientation === 'sideways' ? { ...this.layOut(g, altGeo, withFolds(shaped({ sweeps: 4, far: NEVER_FAR_RULE }), plan, canFold), fonts, labels, plan.hidden), geo: altGeo } : null;
-		const t2 = performance.now();
-		// The finder's tree has its own key: its views never replace the saved view of the family.
-		const finderKey = succession ? `succession:${succession.titleId}|` : finder?.line ? `finder:${finder.state.first}>${finder.state.second}:${finder.state.index}:${finder.state.whole ? 'whole' : 'line'}|` : '';
-		const family = finderKey + focusKey(sub ? focus : null, n);
+		const alt = plan.alt;
+		this.finderAlt = alt ? { ...this.layOut(plan.g, alt.geo, alt.base, plan.fonts, plan.labels, plan.foldPlan.hidden), geo: alt.geo } : null;
+		return result;
+	}
+
+	/** Takes the planned tree and its layout as the drawn one. */
+	private adoptDrawn(plan: TreePlan, laid: LaidOut): void {
 		// A view of one family means nothing in another: the new family gets its own first view.
-		if (this.familyKey !== null && this.familyKey !== family) this.carry = null;
-		this.familyKey = family;
-		this.drawnKey = finderKey + focusKey(sub ? focus : null, n, orientation);
-		this.focusId = sub ? focus : null;
+		if (this.familyKey !== null && this.familyKey !== plan.familyKey) this.carry = null;
+		this.familyKey = plan.familyKey;
+		this.drawnKey = plan.drawnKey;
+		this.focusId = plan.focusId;
 		this.focusStale = false;
-		this.g = g;
-		this.whole = whole;
+		this.g = plan.g;
+		this.whole = plan.whole;
 		this.laid = laid;
-		this.fonts = fonts;
+		this.fonts = plan.fonts;
 		this.bounds = treeBounds(laid.layout.width, laid.layout.height);
-		this.optionsStart = parsed.tree.options.start;
-		this.optionsHeight = parsed.tree.options.height;
+		this.optionsStart = plan.tree.options.start;
+		this.optionsHeight = plan.tree.options.height;
 		this.lod = null;
-
 		// O2: the picture warnings that need no file read go on the first badge.
-		this.textIssues = whole.issues;
-		this.resolvePictures(whole);
+		this.textIssues = plan.whole.issues;
+		this.resolvePictures(plan.whole);
+	}
 
-		const root = el.createDiv({ cls: 'dynasty-root', attr: { 'data-dynasty-people': String(g.people.length), 'data-dynasty-section': this.sectionNote, 'data-dynasty-orientation': orientation } });
+	/** Draws the planned tree: the layout, the DOM, the pan and zoom, and the timing of the render. */
+	private drawTree(el: HTMLElement, plan: TreePlan, c: DrawContext): void {
+		this.meId = plan.me;
+		this.successionDrawn = plan.succession;
+		this.finderDrawn = plan.finder;
+		this.foldPlan = plan.foldPlan;
+		// Spec §13.1: the names are kept per tree and mark (relation-cache.ts). Their time counts in the §7.7 time: it is in the layout part.
+		const rel = plan.relationsFor !== null ? relationsFor(plan.whole, plan.relationsFor, this.relationOptions) : null;
+		const result = this.layOutPlan(el, plan, rel, c);
+		if (!result) return;
+		const t2 = performance.now();
+		this.adoptDrawn(plan, result.laid);
+		const frame = this.buildFrame(el, plan, c.orientation);
+		this.buildTreeScene(frame, plan, result, rel);
+		this.buildTreeControls(frame, plan);
+		const t3 = performance.now();
+		const open = this.account(c.t0, plan.t1, t2, t3);
+		const timing: RenderTiming = {
+			path: this.sourcePath,
+			people: plan.g.people.length,
+			...(plan.sub ? { of: plan.whole.people.length } : {}),
+			...open.parts,
+			...(this.full ? { full: true } : {}),
+		};
+		this.timing = { t0: open.start, t: timing };
+		this.host.recordTiming(timing);
+	}
+
+	/** The root, the banner, the viewport and the empty svg of a tree. */
+	private buildFrame(el: HTMLElement, plan: TreePlan, orientation: Orientation): TreeFrame {
+		const { whole, finder, succession } = plan;
+		const root = el.createDiv({ cls: 'dynasty-root', attr: { 'data-dynasty-people': String(plan.g.people.length), 'data-dynasty-section': this.binding.sectionNote, 'data-dynasty-orientation': orientation } });
 		if (this.focusId !== null) root.setAttribute('data-dynasty-focus', this.focusId);
 		if (finder) root.setAttribute('data-dynasty-finder', !finder.line ? 'none' : finder.state.whole ? 'whole' : 'line');
 		if (succession) root.setAttribute('data-dynasty-succession', succession.titleId);
@@ -1746,7 +1410,7 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 		this.canvasEl = canvas;
 		this.svg = svg;
 		// The layout clamps the font size; the card text must use the size the layout used.
-		svg.style.setProperty('--dynasty-font-size', `${geo.fontPx}px`);
+		svg.style.setProperty('--dynasty-font-size', `${plan.geo.fontPx}px`);
 		// Obsidian's aria-label tooltips work only on HTML elements and fail on SVG ones. The CSS
 		// turns them off with --no-tooltip; this also covers versions without that switch.
 		svg.addEventListener('pointerover', (e) => e.stopPropagation());
@@ -1754,10 +1418,17 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 		// S5c: a card gets its content before the browser scrolls to it. `focus` does not bubble; the capture phase sees it first.
 		// The listener is on the HTML wrapper: Chromium makes an SVG element that has a focus listener a Tab stop of its own.
 		canvas.addEventListener('focus', (e) => this.guard(() => this.fillFocused(e.target)), true);
+		return { root, viewport, canvas, sceneEl };
+	}
+
+	/** The scene of the tree: the options, the cards, the tips and the live pictures. */
+	private buildTreeScene(frame: TreeFrame, plan: TreePlan, result: MeasuredResult, rel: TreeRelations | null): void {
+		const { root, viewport, sceneEl } = frame;
+		const { me, finder, succession, labels, sub } = plan;
 		const breaks = this.breakList();
 		const opts: SceneOptions = {
 			lazyCards: true,
-			fonts,
+			fonts: plan.fonts,
 			measure: measureText,
 			...(breaks.size ? { breaks } : {}),
 			link: (p) => this.cardLink(p),
@@ -1768,10 +1439,10 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 			...(succession ? { heirs: succession.heirs, ordinals: succession.ordinals } : {}),
 			...(labels ? { labels } : {}),
 			showDates: this.settings.showDates,
-			...(canFold ? { folds: { buttons: true, label: foldLabel, lazy: true, wire: (f: FoldRef) => this.wireFoldHit(f) } } : {}),
+			...(plan.canFold ? { folds: { buttons: true, label: foldLabel, lazy: true, wire: (f: FoldRef) => this.wireFoldHit(f) } } : {}),
 		};
-		this.scene = buildScene(sceneEl, g, laid, opts);
-		this.lastLayout = { geo, settings, sceneEl, opts };
+		this.scene = buildScene(sceneEl, plan.g, result.laid, opts);
+		this.lastLayout = { geo: plan.geo, settings: result.settings, sceneEl, opts };
 		this.markPositions();
 		this.wireScene(this.scene);
 		// D145: the tip of a card (relation text) with the setting "Show relation names on cards" off. The marked card has its "You" tab.
@@ -1797,6 +1468,12 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 			viewport.scrollTop = 0;
 			viewport.scrollLeft = 0;
 		});
+	}
+
+	/** The toolbar, the bars, the card presses, the pan and zoom and the observers of a tree. */
+	private buildTreeControls(frame: TreeFrame, plan: TreePlan): void {
+		const { root, viewport, canvas } = frame;
+		const { finder, succession, sub, focus, whole } = plan;
 		this.popover = new Popover(viewport);
 		this.buildToolbar(viewport);
 		if (finder) this.buildResultBar(viewport, canvas, finder, whole);
@@ -1805,11 +1482,23 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 		if (sub && focus !== null && !finder) this.buildFocusBar(viewport, canvas, whole.byId.get(focus)?.name || focus);
 		this.wireCardPresses(viewport);
 		this.updateEditUi();
+		this.panZoom = this.makePanZoom(frame, plan.geo);
+		this.fontProbe = root.createDiv({ cls: 'dynasty-font-probe' });
+		// Only the full-screen view reads the safe area (its toolbar can be at the bottom).
+		if (this.full) this.safeProbe = root.createDiv({ cls: 'dynasty-safe-probe' });
+		// D28: the hint labels stay in the tree, hidden until a first view counts children outside the box.
+		if (this.orientation === 'sideways') for (const dir of ['up', 'down']) viewport.createDiv({ cls: 'dynasty-hint-slot', attr: { 'data-dir': dir } });
+		this.observer = new ResizeObserver(() => this.guard(() => this.resized()));
+		this.observer.observe(viewport);
+		// A banner that grows (the steps open, a long sentence wraps) takes room from the drawing area below it without a change of the box.
+		if (viewport.hasClass('is-flow')) for (const bar of Array.from(viewport.querySelectorAll<HTMLElement>(':scope > .dynasty-toolbar, :scope > .dynasty-result'))) this.observer.observe(bar);
+	}
 
-		this.panZoom = new PanZoom({
-			viewport,
-			scene: sceneEl,
-			wrapper: canvas,
+	private makePanZoom(frame: TreeFrame, geo: Geometry): PanZoom {
+		return new PanZoom({
+			viewport: frame.viewport,
+			scene: frame.sceneEl,
+			wrapper: frame.canvas,
 			frameTop: () => this.frameTop(),
 			bounds: this.bounds,
 			fontPx: geo.fontPx,
@@ -1837,27 +1526,6 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 					}
 				: {}),
 		});
-		this.fontProbe = root.createDiv({ cls: 'dynasty-font-probe' });
-		// Only the full-screen view reads the safe area (its toolbar can be at the bottom).
-		if (this.full) this.safeProbe = root.createDiv({ cls: 'dynasty-safe-probe' });
-		// D28: the hint labels stay in the tree, hidden until a first view counts children outside the box.
-		if (orientation === 'sideways') for (const dir of ['up', 'down']) viewport.createDiv({ cls: 'dynasty-hint-slot', attr: { 'data-dir': dir } });
-		this.observer = new ResizeObserver(() => this.guard(() => this.resized()));
-		this.observer.observe(viewport);
-		// A banner that grows (the steps open, a long sentence wraps) takes room from the drawing area below it without a change of the box.
-		if (viewport.hasClass('is-flow')) for (const bar of Array.from(viewport.querySelectorAll<HTMLElement>(':scope > .dynasty-toolbar, :scope > .dynasty-result'))) this.observer.observe(bar);
-		const t3 = performance.now();
-		const open = this.account(t0, t1, t2, t3);
-		const timing: RenderTiming = {
-			path: this.sourcePath,
-			people: g.people.length,
-			...(sub ? { of: whole.people.length } : {}),
-			...open.parts,
-			...(this.full ? { full: true } : {}),
-		};
-		this.timing = { t0: open.start, t: timing };
-		this.host.recordTiming(timing);
-		if (sessionChanged) TreeView.redrawState(this.host, st, { except: this });
 	}
 
 	/**
@@ -1883,7 +1551,7 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 	/** The banner above a tree that has problems that stop editing (spec §8). */
 	private buildBanner(root: HTMLElement, blocking: readonly CodedIssue[]): void {
 		if (!blocking.length) return;
-		const banner = buildCallout(root, 'warning', UI.bannerTitle, 'dynasty-banner');
+		const banner = buildCallout(root, 'warning', UI.bannerTitle, 'dynasty-banner', setIcon);
 		banner.content.createDiv({ text: UI.bannerLead });
 		const list = banner.content.createEl('ul');
 		for (const i of blocking) list.createEl('li', { text: issueText(i) });
@@ -1901,13 +1569,13 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 		this.drawnKey = this.familyKey = null;
 		this.pendingTarget = null;
 		const kept = pruneFolds(whole, st.folds);
-		if (kept !== st.folds) st.folds = new Set(kept);
+		if (kept !== st.folds) setFolds(st, kept);
 		const me = validMe(whole, tree.options.me);
 		this.meId = me;
 		// A session choice that names nobody (the person was deleted) ends; a trail with no session position means nothing.
 		if (st.focus?.id != null && !whole.byId.has(st.focus.id)) st.focus = null;
 		if (!st.focus || st.focus.id === null) st.listBack = undefined;
-		const start = listStart({ session: st.focus?.id, pin: tree.options.focus, me, edited: st.lastEdited, g: whole });
+		const start = this.startOf({ session: st.focus?.id, pin: tree.options.focus, me, edited: st.lastEdited, g: whole });
 		const centre = start?.id ?? whole.people[0].id;
 		this.g = this.whole = whole;
 		this.focusId = centre;
@@ -1923,7 +1591,7 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 
 		const root = el.createDiv({
 			cls: ['dynasty-root', 'dynasty-list-root'],
-			attr: { 'data-dynasty-section': this.sectionNote, 'data-dynasty-orientation': 'list', 'data-dynasty-focus': centre, 'data-dynasty-list-from': start?.from ?? 'first', 'data-dynasty-cards-pending': '0', 'data-dynasty-lines-pending': '0' },
+			attr: { 'data-dynasty-section': this.binding.sectionNote, 'data-dynasty-orientation': 'list', 'data-dynasty-focus': centre, 'data-dynasty-list-from': start?.from ?? 'first', 'data-dynasty-cards-pending': '0', 'data-dynasty-lines-pending': '0' },
 		});
 		this.placeClasses(root);
 		const blocking = whole.issues.filter((i) => i.level === 'blocking');
@@ -1940,7 +1608,7 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 		const labels = needsLabels(whole) ? cardLabels(whole) : undefined;
 		const rel = me !== null && this.settings.showRelations ? relationsFor(whole, me, this.relationOptions) : null;
 		// 0.2.7 F.6: while the Show view is open, the list has the bar at its top, and each heir (each open branch) says its place in the place of the relation word.
-		const succession = this.successionFor(st, whole);
+		const succession = this.showViewFor(st, whole);
 		this.successionDrawn = succession;
 		const words = succession ? lineWords(succession) : null;
 		const ctl = new AbortController();
@@ -1962,6 +1630,7 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 			...(succession ? { bar: { sentence: succession.sentence, closeLabel: SUCCESSION_UI.barCloseLabel, onClose: () => this.guard(() => this.closeSuccession()) } } : {}),
 			...(labels ? { labels } : {}),
 			pictures: (slots, id) => this.listPictures(whole, slots, id, ctl.signal, token),
+			icon: setIcon,
 			onGo: (id) => this.guard(() => this.listMove(id)),
 			onEdit: (id, fromTap) => this.guard(() => this.activate(id, fromTap)),
 		});
@@ -2183,7 +1852,7 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 		this.scene = null;
 		this.svg = null;
 		this.blocked = false;
-		const root = el.createDiv({ cls: 'dynasty-root dynasty-empty-root', attr: { 'data-dynasty-cards-pending': '0', 'data-dynasty-people': '0', 'data-dynasty-section': this.sectionNote, 'data-dynasty-orientation': this.orientation } });
+		const root = el.createDiv({ cls: 'dynasty-root dynasty-empty-root', attr: { 'data-dynasty-cards-pending': '0', 'data-dynasty-people': '0', 'data-dynasty-section': this.binding.sectionNote, 'data-dynasty-orientation': this.orientation } });
 		this.placeClasses(root);
 		const box = root.createDiv({ cls: 'dynasty-empty' });
 		this.emptyEl = box;
@@ -2230,7 +1899,7 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 		const phoneFull = !!this.full && this.isPhone();
 		const root = el.createDiv({
 			cls: ['dynasty-root', 'dynasty-large-root'],
-			attr: { 'data-dynasty-large': bar.kind, 'data-dynasty-count': String(count), 'data-dynasty-cards-pending': '0', 'data-dynasty-lines-pending': '0', 'data-dynasty-section': this.sectionNote, 'data-dynasty-orientation': orientation },
+			attr: { 'data-dynasty-large': bar.kind, 'data-dynasty-count': String(count), 'data-dynasty-cards-pending': '0', 'data-dynasty-lines-pending': '0', 'data-dynasty-section': this.binding.sectionNote, 'data-dynasty-orientation': orientation },
 		});
 		this.placeClasses(root);
 		let parts: LargeBarParts;
@@ -2326,39 +1995,6 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 	}
 
 	/**
-	 * The focus person to draw, or null for the whole tree (priority order: session focus,
-	 * pin, the phone rule of D20, whole tree). Also updates the block state: it drops a session
-	 * focus that no longer applies and stores the D20 automatic focus.
-	 */
-	private updateFocus(tree: Tree, whole: FamilyGraph): string | null {
-		// D21: a full-screen view opened by a badge tap in a static embed shows that family, until the user chooses another focus there.
-		const own = this.full?.focus;
-		if (own && (own.id === null || whole.byId.has(own.id))) return own.id;
-		const st = this.ensureState();
-		// F5: only the first render of a full-screen view asks. The user chose Clear focus before, and the draw of the whole tree stopped: Expand opens the family, not the stop bar.
-		const stopped = !!this.full && !this.stopChecked && wasStopped(this.key, peopleCount(tree), this.source);
-		this.stopChecked = true;
-		// D234: the stored automatic focus follows the mark; a mark added, changed or removed since it was chosen chooses again (an edit still does not move it).
-		const mark = validMe(whole, tree.options.me) ?? null;
-		if (st.autoFocus !== null && (st.autoMark ?? null) !== mark) st.autoFocus = null;
-		const choice = chooseFocus({
-			session: st.focus,
-			pin: tree.options.focus,
-			phone: this.isPhone(),
-			auto: st.autoFocus,
-			has: (id) => whole.byId.has(id),
-			large: () => whole.people.length > PHONE_FOCUS_MIN_PEOPLE,
-			// Spec §5.5, D234: the person last edited, `options.start`, the marked person, the first root. So the full-screen view of a large tree starts on the family that the phone list shows. A mark that names nobody is no mark. Called only on a phone, so the computer is not changed.
-			start: () => startPerson(whole, [st.lastEdited, tree.options.start, mark].find((id) => id != null && whole.byId.has(id)) ?? undefined),
-			stopped,
-		});
-		if (choice.dropSession) st.focus = null;
-		st.autoFocus = choice.auto;
-		st.autoMark = mark;
-		return choice.id;
-	}
-
-	/**
 	 * Sets the session focus of this block (Focus, Focus here, a `+` badge; null: Clear focus)
 	 * and draws every view of the block again with it (spec §5.6). Nothing is written.
 	 */
@@ -2422,7 +2058,7 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 	syncFocus(own = false): void {
 		this.guard(() => {
 			if (this.unloaded) return;
-			if (!own && !this.full && FullScreenModal.isOpenFor(this.key)) {
+			if (!own && !this.full && this.host.isFullOpenFor(this.key)) {
 				this.focusStale = true;
 				return;
 			}
@@ -2869,14 +2505,13 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 		// Children drawn next to the person: a child placed with other parents is drawn elsewhere.
 		const kids = fam && g ? fam.children.filter((c) => (g.placementParents.get(c) ?? []).includes(id!)) : [];
 		// Far partners (D10) are drawn elsewhere and shown by a tag: not part of the group.
-		const near = (who: string, partners: string[]) => {
-			const far = laid.layout.farTags.get(who)?.spouses ?? [];
-			return partners.filter((p) => !far.includes(p));
-		};
+		const near = (who: string, partners: string[]) => partners.filter((p) => !(laid.layout.farTags.get(who)?.spouses ?? []).includes(p));
 		const top = Math.max(0, Math.min(this.insetTop, size.h - 1));
 		const bottom = Math.max(top + 1, size.h - this.insetBottom);
 		const me = id !== null ? (persons.get(id) ?? null) : null;
 		this.hintKids = boxesOf(persons, kids);
+		// D257: the "+ N" sign of a folded family of a child counts as part of the child's column.
+		const signs = signRights(laid.layout.folds, laid.layout.geometry.fontPx);
 		// V1: the column starts beside the left safe area, not under it.
 		const view = betweenSides(size, this.insetLeft, this.insetRight, (area) => sidewaysView(
 			area,
@@ -2884,7 +2519,7 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 			{
 				me,
 				partners: fam && id !== null ? boxesOf(persons, near(id, fam.partners)) : [],
-				children: g ? kids.flatMap((c) => boxesOf(persons, [c]).map((card) => ({ card, partners: boxesOf(persons, near(c, familyOf(g, c).partners)) }))) : [],
+				children: g ? kids.flatMap((c) => boxesOf(persons, [c]).map((card) => ({ card, partners: boxesOf(persons, near(c, familyOf(g, c).partners)), sign: signs.get(c) }))) : [],
 				parents: id !== null && g ? boxesOf(persons, g.placementParents.get(id) ?? []) : [],
 			},
 			top,
@@ -3456,6 +3091,7 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 		const sheet = EditSheet.create(this.host.app, {
 			handle: h,
 			personId: id,
+			dates: this.datesFor,
 			sourcePath: this.sourcePath,
 			// The sheet of a new person that Add child, Add parent or Add partner opens has this hook too, so the anchor stays the person of this sheet (D244).
 			beforeWrite: () => {
@@ -3494,6 +3130,7 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 			handle: h,
 			sourcePath: this.sourcePath,
 			beforeWrite: () => this.keepView(),
+			dates: this.datesFor,
 			newPerson: { kind: 'person' },
 			place: this.full ? 'full' : 'embed',
 			openNote: (open) => this.openNote(open),
@@ -3521,6 +3158,7 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 		const fromButton = !!this.viewport?.querySelector('.dynasty-titles-button');
 		const win = TitlesWindow.create(this.host.app, {
 			handle: h,
+			dates: this.datesFor,
 			sourcePath: this.sourcePath,
 			reduced: () => this.reduced(),
 			beforeWrite: () => this.keepView(),
@@ -3591,6 +3229,7 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 		const full = !!this.full;
 		const win = HousesWindow.create(this.host.app, {
 			handle: h,
+			dates: this.datesFor,
 			beforeWrite: () => this.keepView(),
 			onClosed: () => TreeView.refocusButton(this.host, st, full, '.dynasty-houses-button'),
 			sourcePath: this.sourcePath,
@@ -3652,7 +3291,7 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 			empty.parentElement?.toggleClass('dynasty-read-only', ro);
 			empty.querySelector<HTMLButtonElement>('.dynasty-add-first')?.toggle(!ro);
 			// A block whose place is only not known YET says nothing (D183).
-			const say = ro && (foreign || !this.placePending);
+			const say = ro && (foreign || !this.binding.placePending);
 			let label = empty.querySelector<HTMLElement>('.dynasty-read-only-label');
 			if (say && !label) label = empty.createDiv({ cls: 'dynasty-read-only-label', text: BLOCK_UI.readOnly });
 			else if (!say && label) label.remove();
@@ -3664,7 +3303,7 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 		const foreign = vp.isConnected && this.inForeignView();
 		const readOnly = this.readOnly || foreign;
 		// A block whose place is only not known YET shows no label and no chip (D183); the edit tools stay away.
-		const say = readOnly && (foreign || !this.placePending);
+		const say = readOnly && (foreign || !this.binding.placePending);
 		root.toggleClass('dynasty-read-only', readOnly);
 		let bar = vp.querySelector<HTMLElement>('.dynasty-toolbar');
 		if (!bar) {
@@ -3917,11 +3556,11 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 			sourcePath: this.sourcePath,
 			source: this.source,
 			handle: h,
-			peeked: this.handle ?? this.peeked,
+			peeked: this.handle ?? this.binding.peeked,
 			readOnly: this.readOnly || foreign || !h,
 			focusDue,
 		};
-		new FullScreenModal(this.host, from, target, this.containerEl, focus).open();
+		this.host.openFull(from, target, this.containerEl, focus);
 	}
 
 	/**
@@ -4063,7 +3702,7 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 	 * (D1) never moves then: a Tab in a phone sheet that has no focus yet can reach the tree below it.
 	 */
 	private modalAbove(): boolean {
-		if (pluginModalOpen() || FullScreenModal.openViews.size > 0) return true;
+		if (pluginModalOpen() || this.host.hasFullOpen()) return true;
 		return !!this.containerEl.doc?.body?.querySelector?.('.modal-container');
 	}
 
@@ -4290,7 +3929,7 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 		pop.open(
 			'problems',
 			(el) => {
-				const c = buildCallout(el, 'warning', problemsTitle(issues.length), 'dynasty-problems');
+				const c = buildCallout(el, 'warning', problemsTitle(issues.length), 'dynasty-problems', setIcon);
 				// In focus mode a problem can be about people who are not drawn: like Find, the button then shows all people (spec §6.10).
 				const shown = issues.map((i) => ({ issue: i, people: (i.ids ?? []).filter((id) => whole?.byId.has(id) && (this.g?.byId.has(id) || this.focusId !== null)) }));
 				if (shown.some((s) => s.people.length)) c.content.createDiv({ cls: 'dynasty-problems-hint', text: PROBLEMS_HINT });
@@ -4336,7 +3975,7 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 	 * own view, as for a focus change.
 	 */
 	static changeFolds(host: TreeHost, st: BlockState, next: ReadonlySet<FoldKey>, o: { anchor?: FoldAnchor | null; origin?: TreeView | null; full?: boolean; targets?: string[] } = {}): void {
-		st.folds = new Set(next);
+		setFolds(st, next);
 		const views = [...host.views].filter((v) => !v.unloaded && v.peekState() === st && (v.full || !v.coarse));
 		const kind = o.origin && !o.origin.unloaded ? !!o.origin.full : (o.full ?? false);
 		const same = views.filter((v) => !!v.full === kind);
@@ -4353,7 +3992,7 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 	private foldsChanged(anchor: FoldAnchor | null, targets: string[]): void {
 		if (this.unloaded) return;
 		// An embed under an open full-screen view of the block draws again when that closes (as for a focus change).
-		if (!this.full && FullScreenModal.isOpenFor(this.key)) {
+		if (!this.full && this.host.isFullOpenFor(this.key)) {
 			this.focusStale = true;
 			return;
 		}
@@ -4425,7 +4064,7 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 	private focusGraph(tree: Tree, focus: string): FamilyGraph | null {
 		const n = focusGenerationsFor(tree.options, this.settings.focusGenerations);
 		const sub = focusSubgraph(tree, focus, n);
-		return sub ? deriveFamilies(sub.tree) : null;
+		return sub ? deriveFamilies(sub.tree, { dates: this.whole?.dates.reader }) : null;
 	}
 
 	/**
@@ -4439,7 +4078,7 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 		if (!v || !whole || !foldHidden(whole, st.folds).has(id)) return;
 		const parsed = v.parse(v.source);
 		const drawn = (parsed.ok ? v.focusGraph(parsed.tree, id) : null) ?? whole;
-		st.folds = new Set(unfoldFor(drawn, whole, st.folds, [id]));
+		setFolds(st, unfoldFor(drawn, whole, st.folds, [id]));
 	}
 
 	/**
@@ -4452,7 +4091,7 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 		const v = TreeView.viewOf(host, st, full);
 		const parsed = v ? v.parse(body) : parseDynasty(body);
 		if (!parsed.ok) return;
-		const whole = deriveFamilies(parsed.tree);
+		const whole = deriveFamilies(parsed.tree, { dates: v?.whole?.dates.reader });
 		const known = ids.filter((id) => whole.byId.has(id));
 		if (!known.length) return;
 		// A static phone preview shows no fold, so a write there must not end the folds of the full-screen view.
@@ -4491,7 +4130,7 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 					return;
 				}
 				// The preview does not change: the fold is made in the block's state, and the full-screen view opens on the person.
-				st.folds = next;
+				setFolds(st, next);
 				void now()?.openFull(id);
 			},
 			show: (id) => {
@@ -4590,7 +4229,7 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 	private pictureFile(slot: PictureSlot): TFile | PictureProblem {
 		const info = this.pictureInfo;
 		const personal = slot.owner && 'person' in slot.owner ? this.whole?.byId.get(slot.owner.person)?.arms : undefined;
-		const link = slot.kind === 'arms' ? (personal ?? (slot.house !== undefined ? this.whole?.houses.get(slot.house)?.arms : undefined)) : this.whole?.byId.get(slot.person)?.portrait;
+		const link = slot.kind === 'arms' ? (personal ?? (slot.owner && 'house' in slot.owner ? this.whole?.houses.get(slot.owner.house)?.arms : undefined)) : this.whole?.byId.get(slot.person)?.portrait;
 		const r = link !== undefined ? info?.resolved.get(link) : undefined;
 		if (!r) return { ok: false, code: 'picture-not-image', file: link ?? '' };
 		return r.ok ? r.file : r;
@@ -4781,7 +4420,7 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 
 	/** True for a note's tree while a full-screen view of the same block covers it. */
 	private hiddenUnderFull(): boolean {
-		return !this.full && FullScreenModal.isOpenFor(this.key);
+		return !this.full && this.host.isFullOpenFor(this.key);
 	}
 
 	/**
@@ -4863,27 +4502,6 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 	}
 
 	// ---------- the relation finder (spec §13.2, D47, D48, D49) ----------
-
-	/**
-	 * The finder's result to draw, from the block state and the whole tree `whole`: computed again at
-	 * each render, so it follows every edit. A result whose person left the tree closes (spec §13.2).
-	 * The static touch preview never draws one (D1): the full-screen view shows it.
-	 */
-	private finderFor(st: BlockState, whole: FamilyGraph): FinderDrawn | null {
-		const f = st.finder;
-		if (!f) return null;
-		if (f.first === f.second || !whole.byId.has(f.first) || !whole.byId.has(f.second)) {
-			st.finder = null;
-			return null;
-		}
-		if (!this.full && this.coarse) return null;
-		const result = findRelation(whole, f.first, f.second, this.relationOptions);
-		const count = result.kind === 'named' ? result.relations.length : 1;
-		// An edit can leave fewer relations than the one that showed.
-		if (!(f.index >= 0 && f.index < count)) f.index = 0;
-		const line = result.kind === 'named' ? (result.relations[f.index]?.relation.line ?? null) : result.kind === 'chain' ? result.line : null;
-		return { state: f, result, line };
-	}
 
 	/**
 	 * The banner of the relation finder's result (spec §13.2, D48; 0.2.8 G.13): one row under the toolbar with the sentence, then the links
@@ -5005,22 +4623,11 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 
 	// ---------- the Show view of a line of succession (contract 0.2.7 F) ----------
 
-	/**
-	 * The Show view to draw, from the block state and the whole tree: computed again at each render, so it follows every edit (F.7). A
-	 * title that is gone, or a saved line that is not `kind: 'line'` any more, ends the view (F.1). The static touch preview never
-	 * draws the tree view (D1); the list on a phone draws the bar (F.6).
-	 */
-	private successionFor(st: BlockState, whole: FamilyGraph): SuccessionDrawn | null {
-		const s = st.succession;
-		if (!s) return null;
-		const set = this.host.settings ?? DEFAULT_SETTINGS;
-		const d = successionDrawn(whole, s.title, { limit: set.successionLength, oldAge: set.oldAge, youngDeathAge: set.youngDeathAge });
-		if (!d) {
-			st.succession = null;
-			return null;
-		}
-		if (!this.full && this.coarse && !this.isPhone()) return null;
-		return d;
+	/** The Show view the phone list draws (F.6): the same rule as for a tree, and a title that is gone ends the view. */
+	private showViewFor(st: BlockState, whole: FamilyGraph): SuccessionDrawn | null {
+		const { drawn, ended } = showViewOf(st, whole, this.settings, { full: !!this.full, coarse: this.coarse, phone: this.isPhone() });
+		if (ended) st.succession = null;
+		return drawn;
 	}
 
 	/** The people that the folds must show: the finder's line, or the ruler, the heirs and the open branches of the Show view (F.2, M.9). */
@@ -5051,7 +4658,7 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 			const card = scene.cards.get(id);
 			const p = g.byId.get(id);
 			if (!card || !p) continue;
-			const label = cardLabel(p, opts.me === id ? 'you' : opts.relations?.get(id)?.lower, opts.labels?.get(id), cardPosition(d, id));
+			const label = cardLabel(p, opts.me === id ? 'you' : opts.relations?.get(id)?.lower, opts.labels?.get(id), cardPosition(d, id), g.dates);
 			card.setAttribute('aria-label', card.hasClass('dynasty-signed') ? `${label}, ${SIGN_CARD_LABEL}` : label);
 		}
 	}
@@ -5204,6 +4811,9 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 				rows.push(item('route', FINDER_UI.relation, 'dynasty-more-relation', () => void this.startFinder(), FINDER_UI.relationLabel));
 				// Spec §13.8, O11: wherever the More list is, read-only views included.
 				if (this.laid) rows.push(item('image-down', SAVE_UI.more, 'dynasty-more-save', () => this.openSave(), SAVE_UI.moreLabel));
+				// Spec §14 rule 7: the Calendars window of every tree, and the calendar note of the tree where the block can be edited.
+				if (this.host.dates) rows.push(item('calendar-days', CALENDAR_UI.more, 'dynasty-more-calendars', () => this.openCalendarWindow(), CALENDAR_UI.moreLabel));
+				if (this.host.dates && this.canEditWindows()) rows.push(item('calendar-check', CALENDAR_UI.noteMore, 'dynasty-more-calendar-note', () => void this.chooseNote(), CALENDAR_UI.noteMoreLabel));
 				// D176 (2): the last item, where the block can be edited.
 				if (this.canShowText()) rows.push(item('code', BLOCK_UI.showText, 'dynasty-more-text-source', () => void this.showText(), BLOCK_UI.showTextLabel));
 				// Enter or Space on More moves the focus into the list (spec §5.2).
@@ -5213,6 +4823,18 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 			where.anchor,
 			where.opts,
 		);
+	}
+
+	/** More → Calendars (spec §14 rule 7): the window with the calendars of this tree's calendar notes. */
+	private openCalendarWindow(): void {
+		if (this.host.dates) void openCalendars(this.host.app, this.host.dates, { treePath: this.sourcePath, link: this.reading?.link, onClosed: () => this.refocusTool('.dynasty-more') });
+	}
+
+	/** More → Calendar note (spec §14 rule 7): the one calendar note of this tree, or every calendar note. */
+	private async chooseNote(): Promise<void> {
+		const h = await this.validHandle();
+		if (h && this.host.dates && !this.unloaded) await chooseCalendarNote(this.host.app, this.host.dates, h, this.sourcePath, this.reading?.link);
+		this.guard(() => this.refocusTool('.dynasty-more'));
 	}
 
 	/** Relation (spec §13.2): the first person, then the second (not the first); the marked person is offered first. */
@@ -5306,49 +4928,4 @@ export class TreeView extends MarkdownRenderChild implements HoverParent {
 		st.shown = null;
 		TreeView.redrawState(this.host, st, { target: ids, origin: this });
 	}
-}
-
-/** The drawn graph has a person with a portrait (O10): only then does "Show portraits on cards" change its layout. */
-function hasPortraits(g: FamilyGraph | null): boolean {
-	return !!g?.people.some((p) => !!p.portrait);
-}
-
-/** The drawn graph has arms that a card could show (a house with arms, or a person with personal arms): only then does "Arms on cards" change its layout. */
-function hasArms(g: FamilyGraph | null): boolean {
-	return !!g?.people.some((p) => !!p.arms || (p.house !== undefined && !!g.houses.get(p.house)?.arms));
-}
-
-/** Tells two picture owners apart (a house and a person can share an id). */
-function ownerKey(o: PictureOwner): string {
-	return o.kind === 'arms' ? `arms:${o.house.id}` : `${o.arms ? 'person-arms' : 'portrait'}:${o.person.id}`;
-}
-
-/** Some card shows a reign (spec §13.3): "Show dates on cards" then changes the title text lines. */
-function hasReign(labels: ReadonlyMap<string, CardLabel> | undefined): boolean {
-	for (const l of labels?.values() ?? []) if (l.reign !== undefined) return true;
-	return false;
-}
-
-/** F16: the accessible name and the tooltip of a fold control, from the parents' names. */
-function foldLabel(c: FoldControl, names: readonly string[]): string {
-	return c.folded ? FOLD_UI.showLabel(names, c.count) : FOLD_UI.hideLabel(names);
-}
-
-/** The finder's line as the scene marks it (D47); `fade` for "Show in the whole tree". */
-function lineMarks(line: RelationLine, fade: boolean): NonNullable<SceneOptions['line']> {
-	return { people: new Set(line.people), unions: new Set(line.unions), links: new Set(line.links.map((l) => `${l.parent}\u0000${l.child}`)), ...(fade ? { fade: true } : {}) };
-}
-
-/** The rectangle around `boxes`, with the tree's margin. */
-function around(boxes: readonly Rect[], margin = FIT_MARGIN): Rect {
-	const x0 = Math.min(...boxes.map((b) => b.x));
-	const y0 = Math.min(...boxes.map((b) => b.y));
-	const x1 = Math.max(...boxes.map((b) => b.x + b.w));
-	const y1 = Math.max(...boxes.map((b) => b.y + b.h));
-	return { x: x0 - margin, y: y0 - margin, w: x1 - x0 + 2 * margin, h: y1 - y0 + 2 * margin };
-}
-
-/** The drawn cards of `ids`, in the same order; people with no card are left out. */
-function boxesOf(persons: ReadonlyMap<string, PersonBox>, ids: Iterable<string>): PersonBox[] {
-	return [...ids].map((id) => persons.get(id)).filter((b): b is PersonBox => !!b);
 }

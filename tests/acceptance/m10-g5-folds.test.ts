@@ -9,7 +9,7 @@ import { FEl, clock, dispatch, fakeWin, flushFrames, installDom, resetDom, settl
 import { resetObsidian } from './fake-obsidian';
 import { block15, comments15 } from './m10-support';
 import DynastyTreePlugin from '../../src/obsidian/main';
-import { newBlockState } from '../../src/obsidian/block-state';
+import { newBlockState } from '../../src/view/block-state';
 import { desktop, embed, fakeApp, fakeHandle, fullViews } from './tree-view-fakes';
 
 /*
@@ -179,8 +179,8 @@ describe('the note closed and opened again has no folds (main.ts `endClosedSessi
 		const ended = newBlockState();
 		fold(kept);
 		fold(ended);
-		looseStates.set('Open.md #0', kept);
-		looseStates.set('Closed.md #0', ended);
+		looseStates.set('Open.md\u0000#0', kept);
+		looseStates.set('Closed.md\u0000#0', ended);
 		expect([...handlers.keys()].sort()).toEqual(expect.arrayContaining(['file-open', 'layout-change']));
 		handlers.get('layout-change')!();
 		expect(kept.folds.size).toBe(1);
@@ -196,7 +196,7 @@ describe('the note closed and opened again has no folds (main.ts `endClosedSessi
 		const handle = handleFor(source, 'A');
 		const first = await embed(source, { handle });
 		expect(cardCount(first.el)).toBe(96 - 75);
-		const { endSessionFocus } = await import('../../src/obsidian/block-state');
+		const { endSessionFocus } = await import('../../src/view/block-state');
 		endSessionFocus(handle.state as never);
 		resetDom();
 		const second = await embed(source, { handle });

@@ -4,10 +4,10 @@ vi.mock('obsidian', () => import('./acceptance/fake-obsidian'));
 vi.mock('@codemirror/language', () => ({ forceParsing: () => false, syntaxTree: () => ({ length: 0 }) }));
 vi.mock('@codemirror/view', () => ({ ViewPlugin: { fromClass: () => ({}) } }));
 
-import { carryState, endSessionFocus, newBlockState, type BlockState } from '../src/obsidian/block-state';
+import { carryState, endSessionFocus, newBlockState, type BlockState } from '../src/view/block-state';
 import { FullScreenModal } from '../src/obsidian/full-screen';
-import { clearRelationCache, relationsFor } from '../src/obsidian/relation-cache';
-import { DEFAULT_SETTINGS, type DynastySettings } from '../src/obsidian/settings';
+import { clearRelationCache, relationsFor } from '../src/view/relation-cache';
+import { DEFAULT_SETTINGS, type DynastySettings } from '../src/view/settings';
 import { TreeView } from '../src/obsidian/tree-view';
 import { PHONE_LIST_UI } from '../src/render/ui-text';
 import { FEl, clock, device, dispatch, fakeWin, flushFrames, installDom, resetDom, resizeAll, runTimers, settle } from './acceptance/fake-dom';

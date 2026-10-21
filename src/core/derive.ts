@@ -7,9 +7,10 @@
  * relation names (`relations.ts`) follow.
  */
 
+import { buildTreeDates, PLAIN_READER, type TreeDates } from './dates';
 import { codedIssue, type CodedIssue } from './messages';
 import { isPlacementType, parentKind, PLACEMENT_TYPES, type House, type ParentType, type Person, type Title, type Tree } from './types';
-import { push, validateTree, type ValidateOptions } from './validate';
+import { anchorIssues, push, validateTree, type ValidateOptions } from './validate';
 
 /** One partnership as it is drawn: a union listed in the block, or one inferred from shared children. */
 export interface FamilyUnion {
@@ -64,6 +65,8 @@ export interface FamilyGraph {
 	 * validation dropped any): what a delete removes and its confirmation counts (D57).
 	 */
 	writtenTitles: Title[];
+	/** Spec §14 rule 9: the dates view of this tree; `PLAIN_READER` reads it when no reader is given. A graph built from another one copies it. */
+	dates: TreeDates;
 	/** Parse issues, then validation issues, then those found here (spec §8). */
 	issues: CodedIssue[];
 }
@@ -155,7 +158,8 @@ export function deriveFamilies(tree: Tree, options: ValidateOptions = {}): Famil
 	for (const fu of unions) for (const partner of fu.partners) push(unionsOf, partner, fu.key);
 
 	const writtenUnions = tree.unions.map((u) => [...u.partners]);
-	return { people, byId, houses, placementParents, placementType, primaryUnion, unions, unionByKey, unionsOf, soloChildren, secondary, writtenUnions, titles: v.titles, writtenTitles: tree.titles ?? [], issues };
+	const dates = buildTreeDates(options.dates ?? PLAIN_READER, people, v.titles);
+	return { people, byId, houses, placementParents, placementType, primaryUnion, unions, unionByKey, unionsOf, soloChildren, secondary, writtenUnions, titles: v.titles, writtenTitles: tree.titles ?? [], dates, issues: [...issues, ...anchorIssues(v.titles, dates)] };
 }
 
 /** One parent link the tree draws: the parent's id and the link type (unknown types read as birth). */

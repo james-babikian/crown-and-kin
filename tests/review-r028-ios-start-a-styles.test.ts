@@ -14,7 +14,7 @@ import { fakeApp, fakeHandle, phone, type Host } from './acceptance/tree-view-fa
  * Review r028-ios-start, cause (a): the phone list draws before styles.css is applied.
  * Obsidian's loadPlugin does `await plugin.load(); await plugin.loadCSS();` (obsidian.asar app.js): the style sheet is read from disk AFTER onload and can
  * come late on a cold iPhone. The probe (`.dynasty-css-probe`) is the right signal, but both start gates give up after START_LIMIT_MS (2 s) whatever the probe says:
- * main.ts startReady (`performance.now() - startedAt >= START_LIMIT_MS`, counted from the construction of the plugin) and tree-view.ts waitingToStart
+ * main.ts startReady (`performance.now() - startedAt >= START_LIMIT_MS`, counted from the construction of the plugin) and block-binding.ts waitingToStart
  * (`performance.now() - startAt >= START_LIMIT_MS`, counted from the start of the view). Then the list is built with no style sheet.
  */
 

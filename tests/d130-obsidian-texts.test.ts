@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_RELATION_OPTIONS, relationsKey, type Relation, type RelationMaybe } from '../src/core/relations';
-import { clearRelationCache, relationStats, relationsFor } from '../src/obsidian/relation-cache';
-import { DEFAULT_SETTINGS, normaliseSettings, settingsChanges } from '../src/obsidian/settings';
+import { clearRelationCache, relationStats, relationsFor } from '../src/view/relation-cache';
+import { DEFAULT_SETTINGS, normaliseSettings, settingsChanges } from '../src/view/settings';
 import { MAYBE_TEXT, cardRelationText, relationSummary, spokenRelation } from '../src/render/tree-info';
 import { SETTINGS_UI } from '../src/render/ui-text';
 import { build } from './helpers';

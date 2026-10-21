@@ -58,6 +58,3 @@ export function randomLines(seed: number, shapes: Shapes): string {
 
 /** A list marker that opens a quote on its own line: the shape of the old fault F1 (and its fix). */
 export const MARKER_QUOTE = /^[ \t>]*(?:[-+*]|\d{1,9}[.)])[ \t]+>/m;
-
-/** A spaced thematic break ("- - -", "* * *", also after a marker): the shape of the old fault F4. */
-export const SPACED_BREAK = /^[ \t>]*(?:(?:[-+*]|\d{1,9}[.)])[ \t]+)?([-*_])(?:[ \t]*\1){2,}[ \t]*$/m;

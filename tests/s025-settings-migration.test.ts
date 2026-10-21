@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { endSessionFocus, focusKey, newBlockState } from '../src/obsidian/block-state';
-import * as focusMode from '../src/obsidian/focus-mode';
-import * as settings from '../src/obsidian/settings';
-import { DEFAULT_SETTINGS, normaliseSettings } from '../src/obsidian/settings';
+import { endSessionFocus, focusKey, newBlockState } from '../src/view/block-state';
+import * as focusMode from '../src/view/focus-mode';
+import * as settings from '../src/view/settings';
+import { DEFAULT_SETTINGS, normaliseSettings } from '../src/view/settings';
 
 /*
  * 0.2.5, WP-C2b (CONTRACT C.3.1 "Settings migration" and "What goes"): the settings of the phone preview of 0.2.4 are gone. There is no

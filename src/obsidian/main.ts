@@ -7,7 +7,7 @@
  * one picture store of all trees (spec §13.0 item 3) and tells it when a picture file changes.
  */
 
-import { Notice, Plugin, TFile, debounce, type TAbstractFile } from 'obsidian';
+import { Notice, Plugin, TFile, debounce, setIcon, type TAbstractFile } from 'obsidian';
 import { createParseCache } from '../core/parse-cache';
 import { INSERT_UI, RENAME_UI, TIMING_UI, UI, WRITE_TEXT } from '../render/ui-text';
 import { clearLayoutCache } from '../layout/index';
@@ -16,18 +16,22 @@ import { contrastChoices, onAccentChoice } from '../render/dom/theme-read';
 import { buildCallout } from '../render/dom/widgets';
 import { timingText, type RenderTiming } from '../render/tree-info';
 import { HandleRegistry } from './block-handle';
-import { endSessionFocus, type BlockState } from './block-state';
+import { endSessionFocus, type BlockState } from '../view/block-state';
 import { FullScreenModal } from './full-screen';
 import { insertTree } from './insert-tree';
-import { closePluginModals } from './plugin-modals';
+import { closePluginModals } from '../view/plugin-modals';
 import { tallBlockParser } from './live-preview';
-import { clearRelationCache } from './relation-cache';
+import { clearRelationCache } from '../view/relation-cache';
 import { createPictureStore, isPictureExtension } from './picture-store';
+import { bindViewerMotion } from './picture-viewer';
 import { LinkUpdater, RENAME_TIMING, extensionOf } from './rename-links';
-import { DEFAULT_SETTINGS, NO_EXTRAS, buildStoredData, clearInvalid, normaliseSettings, readPending, readStoredSettings, settingsChanges, type DynastySettings, type StoredExtras } from './settings';
+import { registerCalendars } from './calendar-feature';
+import { obsidianCalendarVault } from './calendar-vault';
+import { createCalendarIndex } from '../view/calendar-index';
+import { DEFAULT_SETTINGS, NO_EXTRAS, buildStoredData, clearInvalid, normaliseSettings, readPending, readStoredSettings, settingsChanges, type DynastySettings, type StoredExtras } from '../view/settings';
 import { DynastySettingTab, type SettingsHost } from './settings-tab';
 import { renameHeights } from './block-height';
-import { HOVER_SOURCE, START_LIMIT_MS, STYLES_LIMIT_MS, THEME_RECHECK_MS, TreeView, type OpenTime, type TreeHost } from './tree-view';
+import { HOVER_SOURCE, START_LIMIT_MS, STYLES_LIMIT_MS, THEME_RECHECK_MS, TreeView, type FullSource, type OpenTime, type TreeHost } from './tree-view';
 
 /** B16: vault events for picture files are grouped for this long, in ms, before the views refresh. */
 export const PICTURE_EVENT_MS = 250;
@@ -36,6 +40,8 @@ export const PICTURE_EVENT_MS = 250;
 export default class DynastyTreePlugin extends Plugin implements TreeHost, SettingsHost {
 	/** Spec §9; the defaults until the stored settings are read. */
 	override settings: DynastySettings = { ...DEFAULT_SETTINGS };
+	/** D256: the picture viewer reads "Reduce movement" from the settings above, whichever way they change. */
+	private readonly viewerMotion = bindViewerMotion(() => this.settings.reduceMotion);
 	readonly handles = new HandleRegistry(this.app);
 	/** Spec §6.9 (D6, D35): tree links follow a renamed note, if the setting is on. */
 	readonly links = new LinkUpdater(this.app, this.handles, () => this.settings.updateLinks, RENAME_TIMING, {
@@ -76,6 +82,8 @@ export default class DynastyTreePlugin extends Plugin implements TreeHost, Setti
 		ready: (el: HTMLElement) => this.startReady(el),
 		cache: () => this.cacheSeen || performance.now() - this.startedAt >= START_LIMIT_MS,
 	};
+	/** Spec §14: the calendar index (`TreeHost.dates`). It starts when the vault is ready and waits for the metadata cache by the same gate as the trees (D183). */
+	readonly dates = createCalendarIndex(obsidianCalendarVault(this.app, { seen: () => this.startedUp.cache(), limitMs: START_LIMIT_MS + 50 }));
 	private readonly startedAt = performance.now();
 	private settingsIn = false;
 	private cacheSeen = false;
@@ -105,7 +113,7 @@ export default class DynastyTreePlugin extends Plugin implements TreeHost, Setti
 				console.error('Crown and Kin: cannot show the tree', e);
 				try {
 					el.empty();
-					buildCallout(el, 'error', UI.errorTitle, 'dynasty-error').content.createDiv({ text: UI.internalError });
+					buildCallout(el, 'error', UI.errorTitle, 'dynasty-error', setIcon).content.createDiv({ text: UI.internalError });
 				} catch {
 					// The rest of the note still renders.
 				}
@@ -171,6 +179,33 @@ export default class DynastyTreePlugin extends Plugin implements TreeHost, Setti
 			}),
 		);
 		this.register(() => this.tellPictures.cancel?.());
+		this.addCommands();
+		registerCalendars(this, this.dates);
+		this.addSettingTab(new DynastySettingTab(this.app, this));
+		// The trees above are drawn with the defaults if they render first; they draw again if the stored settings differ.
+		const stored = await this.loadSettings();
+		this.settingsIn = true;
+		this.startUpDone();
+		// Spec §6.9: a link update that an earlier session did not complete (a phone closed the app) continues.
+		this.links.restore(readPending(stored));
+		// Only now: before, a rename would use the default "Update tree links" and store the default settings.
+		// Registered after the handler above, so the handles follow the rename first.
+		this.registerEvent(this.app.vault.on('rename', (file, oldPath) => this.links.renamed(file, oldPath)));
+		try {
+			this.app.workspace.onLayoutReady(() => {
+				this.paintOnAccent();
+				this.paintContrast();
+				this.links.resume();
+				// Obsidian sends `create` for every file while the vault loads: only later ones count.
+				this.registerEvent(this.app.vault.on('create', (file) => this.pictureChanged(file)));
+			});
+		} catch (e) {
+			console.error('Crown and Kin: cannot continue the link update of an earlier rename', e);
+		}
+	}
+
+	/** The commands of the plugin (spec §6.1 undo, §6.9, §7.7, §5.9). */
+	private addCommands(): void {
 		this.addCommand({
 			id: 'undo-last-tree-edit',
 			name: WRITE_TEXT.undoCommand,
@@ -201,27 +236,6 @@ export default class DynastyTreePlugin extends Plugin implements TreeHost, Setti
 				}
 			},
 		});
-		this.addSettingTab(new DynastySettingTab(this.app, this));
-		// The trees above are drawn with the defaults if they render first; they draw again if the stored settings differ.
-		const stored = await this.loadSettings();
-		this.settingsIn = true;
-		this.startUpDone();
-		// Spec §6.9: a link update that an earlier session did not complete (a phone closed the app) continues.
-		this.links.restore(readPending(stored));
-		// Only now: before, a rename would use the default "Update tree links" and store the default settings.
-		// Registered after the handler above, so the handles follow the rename first.
-		this.registerEvent(this.app.vault.on('rename', (file, oldPath) => this.links.renamed(file, oldPath)));
-		try {
-			this.app.workspace.onLayoutReady(() => {
-				this.paintOnAccent();
-				this.paintContrast();
-				this.links.resume();
-				// Obsidian sends `create` for every file while the vault loads: only later ones count.
-				this.registerEvent(this.app.vault.on('create', (file) => this.pictureChanged(file)));
-			});
-		} catch (e) {
-			console.error('Crown and Kin: cannot continue the link update of an earlier rename', e);
-		}
 	}
 
 	/**
@@ -556,5 +570,18 @@ export default class DynastyTreePlugin extends Plugin implements TreeHost, Setti
 		this.lastTiming = t;
 		this.timings.set(t.path, t);
 		if (!this.firstTimings.has(t.path)) this.firstTimings.set(t.path, t);
+	}
+
+	/** Opens the full-screen view of a block (TreeHost). */
+	openFull(from: FullSource, target: string | null, opener: HTMLElement, focus: string | null): void {
+		new FullScreenModal(this, from, target, opener, focus).open();
+	}
+
+	isFullOpenFor(key: string): boolean {
+		return FullScreenModal.isOpenFor(key);
+	}
+
+	hasFullOpen(): boolean {
+		return FullScreenModal.openViews.size > 0;
 	}
 }

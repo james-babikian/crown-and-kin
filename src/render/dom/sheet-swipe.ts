@@ -2,6 +2,7 @@
  * The swipe down that closes a phone sheet (spec §0 D220). A finger that starts on the grip or the title row, or anywhere on the sheet while its
  * list is scrolled to the top, pulls the sheet down with the finger. On release the sheet closes when the pull is long or fast enough, else it moves back.
  * Only touch pointers count: a mouse drag on a computer does nothing. The sheet moves through one custom property, so a move costs no layout.
+ * A sheet that closes stays off the screen until its owner has taken it away (D262): the reset comes with the function that takes the swipe away.
  */
 
 /** A pull of this many px closes the sheet, or of this share of its height, whichever is less. */
@@ -20,12 +21,26 @@ const HANDLES = '.dynasty-sheet-grip, .dynasty-sheet-head';
 const PULLED = 'is-pulled';
 const SETTLING = 'is-settling';
 
+/** True when a pull of `dy` px on a sheet `height` px high, released at `speed` px per ms, closes the sheet (D220). */
+export function swipeCloses(dy: number, height: number, speed: number): boolean {
+	return dy >= SWIPE_CLOSE_PX || (height > 0 && dy >= SWIPE_CLOSE_SHARE * height) || speed > SWIPE_FLICK;
+}
+
 /** What the swipe needs from its sheet. */
 export interface SwipeHooks {
 	/** Closes the sheet the way the Close button does (focus back to the opener). */
 	close: () => void;
 	/** True when movement is reduced (D126): the sheet then closes or snaps back at once. */
 	reduced: () => boolean;
+	/** False while the sheet must not start a swipe (the picture viewer, while its picture is zoomed). Default: always on. */
+	enabled?: () => boolean;
+}
+
+/** The speed of the last part of the move, in px per ms (0 for a finger that stood still). */
+function releaseSpeed(samples: readonly { t: number; y: number }[]): number {
+	const last = samples[samples.length - 1];
+	const first = samples.find((s) => last.t - s.t <= SPEED_WINDOW_MS) ?? last;
+	return last.t > first.t ? (last.y - first.y) / (last.t - first.t) : 0;
 }
 
 interface Track {
@@ -39,10 +54,15 @@ interface Track {
 	samples: { t: number; y: number }[];
 }
 
-/** Makes `sheet` close with a swipe down. Returns a function that takes the listeners away and stops a move that is still running. */
+/**
+ * Makes `sheet` close with a swipe down. Returns a function that takes the listeners away, stops a move that is still running and resets the sheet; the owner
+ * calls it when the sheet is gone (or in the same task as its removal), because a closed sheet keeps its pull until then.
+ */
 export function attachSheetSwipe(sheet: HTMLElement, hooks: SwipeHooks): () => void {
 	let track: Track | null = null;
 	let settle: number | null = null;
+	// From a closing release to the detach: the sheet takes no new swipe, and nothing brings it back up.
+	let closing = false;
 	// A touch that ended a swipe over a button must not press it.
 	let swallow = false;
 	let swallowTimer: number | null = null;
@@ -63,6 +83,7 @@ export function attachSheetSwipe(sheet: HTMLElement, hooks: SwipeHooks): () => v
 		if (settle !== null) win.clearTimeout(settle);
 		settle = null;
 		track = null;
+		closing = false;
 		sheet.removeClass(PULLED, SETTLING);
 		sheet.style.removeProperty('--dynasty-sheet-pull');
 	}
@@ -70,6 +91,8 @@ export function attachSheetSwipe(sheet: HTMLElement, hooks: SwipeHooks): () => v
 	/** Moves the sheet to `px` and runs `then` when it is there: at once when movement is reduced. */
 	function moveTo(px: number, then: () => void): void {
 		if (hooks.reduced()) {
+			// Also at once: a closing sheet is off the screen before its owner closes it, so a close animation of the owner has nothing to show.
+			setPull(px);
 			then();
 			return;
 		}
@@ -81,19 +104,15 @@ export function attachSheetSwipe(sheet: HTMLElement, hooks: SwipeHooks): () => v
 		}, SWIPE_SETTLE_MS);
 	}
 
-	const speed = (t: Track): number => {
-		const last = t.samples[t.samples.length - 1];
-		const first = t.samples.find((s) => last.t - s.t <= SPEED_WINDOW_MS) ?? last;
-		return last.t > first.t ? (last.y - first.y) / (last.t - first.t) : 0;
-	};
-
 	const down = (e: PointerEvent) => {
+		if (closing) return;
 		if (e.pointerType !== 'touch' || !e.isPrimary) {
 			// A second finger turns the swipe into something else (a pinch): drop it.
 			if (track && e.pointerType === 'touch') reset();
 			return;
 		}
 		if (settle !== null) reset();
+		if (hooks.enabled && !hooks.enabled()) return;
 		const target = e.target as Element | null;
 		const onHandle = !!target?.closest?.(HANDLES);
 		track = { id: e.pointerId, x0: e.clientX, y0: e.clientY, eligible: onHandle || sheet.scrollTop <= 0, engaged: false, dy: 0, samples: [{ t: performance.now(), y: e.clientY }] };
@@ -141,10 +160,12 @@ export function attachSheetSwipe(sheet: HTMLElement, hooks: SwipeHooks): () => v
 		if (swallowTimer !== null) win.clearTimeout(swallowTimer);
 		swallowTimer = win.setTimeout(() => (swallow = false), 400);
 		const h = sheet.offsetHeight || sheet.clientHeight || 0;
-		const far = t.dy >= SWIPE_CLOSE_PX || (h > 0 && t.dy >= SWIPE_CLOSE_SHARE * h);
-		if (!cancelled && (far || speed(t) > SWIPE_FLICK)) {
+		if (!cancelled && swipeCloses(t.dy, h, releaseSpeed(t.samples))) {
+			// D262: no reset before the close. Obsidian slides a phone modal out from the transform that it has; a sheet back at the top showed for one frame
+			// and slid out a second time. The settle class goes, because a transition that still runs would win over that slide.
+			closing = true;
 			moveTo(Math.max(h, t.dy), () => {
-				reset();
+				sheet.removeClass(SETTLING);
 				hooks.close();
 			});
 		} else moveTo(0, reset);

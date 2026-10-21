@@ -7,7 +7,7 @@ import { Notice } from 'obsidian';
 import { REMOVE, WRITE_TEXT } from '../render/ui-text';
 import { sameBody } from '../core/block-match';
 import type { Handle } from './block-handle';
-import { trackModal } from './plugin-modals';
+import { trackModal } from '../view/plugin-modals';
 
 const UNDO_NOTICE_MS = 10_000;
 

@@ -90,6 +90,7 @@ const FULL = [
 	'  me: aldric',
 	'  generations: 2',
 	'  height: 400',
+	'  calendar: "[[Calendars]]"',
 	'  format: 2',
 	'houses:',
 	'  - id: valmont',
@@ -290,7 +291,7 @@ describe('the generated files', () => {
 		const section = readmeSection();
 		for (const x of KEYS) expect(section).toContain(`| \`${x.key}\``);
 		const reserved = KEYS.filter((x) => x.reserved).length;
-		expect(KEYS).toHaveLength(65);
+		expect(KEYS).toHaveLength(66);
 		expect(reserved).toBe(3);
 		expect(formatDoc()).toContain(`has ${KEYS.length} keys, ${reserved} of them reserved`);
 		expect(readmeSection()).toContain(`the ${KEYS.length} keys of Format 1. Three of them are reserved`);

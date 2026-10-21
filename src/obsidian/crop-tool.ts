@@ -33,7 +33,7 @@ import { automaticCrop, clampCrop, isAutomaticCrop, moveCrop, readPortraitCrop, 
 import { CROP_UI } from '../render/ui-text';
 import { ignoreGhostClick, isPhoneWidth, phoneLayout } from './modal-layout';
 import type { PictureCopy, PictureStore } from './picture-store';
-import { trackModal } from './plugin-modals';
+import { trackModal } from '../view/plugin-modals';
 import { nameDialog } from './sheet-parts';
 
 /** What opens the crop tool. */
@@ -52,6 +52,20 @@ export type CropResult = { kind: 'save'; crop: CropFraction | null } | { kind: '
 
 /** The copy of the picture is at most this many px on the long side (spec §13.13). */
 export const CROP_COPY_PX = 2048;
+/**
+ * The side of the box for a large copy, in CSS px (spec §13.13). The store multiplies the box by the pixel ratio (at most 3), so the box is smaller by the
+ * same factor and the copy stays at `CROP_COPY_PX` px at most. The picture viewer asks for its copy the same way (D256).
+ */
+export function largeCopySide(win: Window): number {
+	let ratio = 1;
+	try {
+		const d = win.devicePixelRatio;
+		ratio = Math.min(Math.max(Number.isFinite(d) ? d : 1, 1), 3);
+	} catch {
+		ratio = 1;
+	}
+	return Math.max(1, Math.floor(CROP_COPY_PX / ratio));
+}
 /** The Zoom in button enlarges the shown size by this factor (C4). */
 export const ZOOM_IN_STEP = 1.25;
 /** The Zoom out button shrinks the shown size to 0.8 (C4). */
@@ -248,15 +262,7 @@ class CropModal extends Modal {
 	private async load(): Promise<void> {
 		const ctl = new AbortController();
 		this.abort = ctl;
-		// The store multiplies the box by the pixel ratio (at most 3), so the box is smaller by the same factor.
-		let ratio = 1;
-		try {
-			const d = this.hostWin().devicePixelRatio;
-			ratio = Math.min(Math.max(Number.isFinite(d) ? d : 1, 1), 3);
-		} catch {
-			ratio = 1;
-		}
-		const side = Math.max(1, Math.floor(CROP_COPY_PX / ratio));
+		const side = largeCopySide(this.hostWin());
 		try {
 			const r = await this.o.store.transient(this.o.file, { w: side, h: side, fit: 'meet' }, ctl.signal);
 			if (ctl.signal.aborted || this.settled) {

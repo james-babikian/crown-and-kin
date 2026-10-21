@@ -7,6 +7,7 @@
 import { deepFreeze } from '../core/deep-freeze';
 import type { FamilyGraph } from '../core/derive';
 import { computeGenerations } from '../core/generations';
+import { hash } from '../core/hash';
 import { foldControls, foldFamilies, hiddenPartners, pruneGraph, type FoldControl } from '../core/folds';
 import type { FoldInput } from './fold-spots';
 import { withRelationLine } from './geometry';
@@ -98,20 +99,6 @@ export function layoutKey(g: FamilyGraph, geo: Geometry, settings: LayoutSetting
 	];
 	// JSON writes Infinity, -Infinity and NaN all as null; a loose far rule must not share a key with another.
 	return hash(JSON.stringify(parts, (_, v) => (typeof v === 'number' && !Number.isFinite(v) ? `#${v}` : v)));
-}
-
-/** cyrb53: a fast 53-bit string hash. Collisions among 16 cached entries are negligible. */
-function hash(s: string): string {
-	let h1 = 0xdeadbeef;
-	let h2 = 0x41c6ce57;
-	for (let i = 0; i < s.length; i++) {
-		const c = s.charCodeAt(i);
-		h1 = Math.imul(h1 ^ c, 2654435761);
-		h2 = Math.imul(h2 ^ c, 1597334677);
-	}
-	h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
-	h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
-	return (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(36);
 }
 
 /**

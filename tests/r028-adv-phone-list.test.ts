@@ -6,13 +6,14 @@ import { deriveFamilies, type FamilyGraph } from '../src/core/derive';
 import { computeGenerations } from '../src/core/generations';
 import { parseDynasty } from '../src/core/parse';
 import { cardLabels, needsLabels } from '../src/core/titles';
-import { BACK_LIMIT, listData, listStart, listWord, popTrail, pushTrail, type ListWord } from '../src/obsidian/phone-list';
-import { relationsFor } from '../src/obsidian/relation-cache';
-import { lineWords, successionDrawn } from '../src/obsidian/succession-view';
+import type { ListWord } from '../src/render/dom/phone-list-dom';
+import { BACK_LIMIT, listData, listStart, listWord, popTrail, pushTrail } from '../src/view/phone-list';
+import { relationsFor } from '../src/view/relation-cache';
+import { lineWords, successionDrawn } from '../src/view/succession-view';
 import { buildPhoneList, type PhoneListSpec } from '../src/render/dom/phone-list-dom';
 import { PHONE_LIST_UI, SUCCESSION_UI } from '../src/render/ui-text';
 import { FEl, installDom, resetDom } from './acceptance/fake-dom';
-import { resetObsidian } from './acceptance/fake-obsidian';
+import { resetObsidian, setIcon } from './acceptance/fake-obsidian';
 import { genPeople, peopleYaml, pick, q, rng, type GenPerson } from './r028-advb-gen';
 import { accName } from './acceptance/accessible-name';
 
@@ -153,6 +154,7 @@ function render(t: { g: FamilyGraph }, f: Facts = {}): Built {
 		word: (id): ListWord | null => words?.get(id) ?? listWord(id, { me, showRelations, cards: rel?.cards }),
 		...(drawn ? { bar: { sentence: drawn.sentence, closeLabel: SUCCESSION_UI.barCloseLabel, onClose: () => void closed++ } } : {}),
 		...(labels ? { labels } : {}),
+		icon: setIcon as unknown as PhoneListSpec['icon'],
 		onGo: () => undefined,
 		onEdit: () => undefined,
 	};

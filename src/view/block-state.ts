@@ -57,6 +57,14 @@ export interface BlockState {
 	 */
 	folds: Set<FoldKey>;
 	/**
+	 * D257: the keys of `folds` that the plugin added when a focus view opened (the families the whole tree draws far away). They are folds like any
+	 * other, but Clear focus, Show whole tree and a change of the focus person take them out again and keep the owner's own folds. A key that leaves
+	 * `folds` leaves here too (`setFolds`). Optional so that `newBlockState()` stays as it is.
+	 */
+	autoFolds?: Set<FoldKey>;
+	/** D257: the focus (`focusKey`) for which `autoFolds` were chosen; the same focus does not choose again, so a fold the owner opened stays open. */
+	autoFor?: string | null;
+	/**
 	 * D144: the Back stack of the phone list, newest last, at most 20 entries (the oldest drops out). Session only: cleared
 	 * when the note closes. Optional so that `newBlockState()` stays as it is.
 	 */
@@ -107,6 +115,8 @@ export function endSessionFocus(st: BlockState): void {
 	st.finder = null;
 	st.succession = null;
 	st.folds.clear();
+	st.autoFolds = undefined;
+	st.autoFor = undefined;
 	st.listBack = undefined;
 	st.largeTapped = undefined;
 }
@@ -137,6 +147,11 @@ export function carryState(from: BlockState, to: BlockState): void {
 		to.succession = from.finder ? null : from.succession;
 	}
 	if (!to.folds.size) to.folds = new Set(from.folds);
+	// The memory of the automatic folds goes only where the new state holds none, so a focus that it has chosen for already is not chosen again.
+	if (to.autoFor === undefined && !to.autoFolds) {
+		to.autoFolds = from.autoFolds && new Set([...from.autoFolds].filter((k) => to.folds.has(k)));
+		to.autoFor = from.autoFor;
+	}
 	to.listBack ??= from.listBack;
 	to.largeTapped ??= from.largeTapped;
 }

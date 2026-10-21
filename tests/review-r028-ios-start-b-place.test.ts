@@ -13,9 +13,9 @@ import { fakeHandle, fakeHost, phone } from './acceptance/tree-view-fakes';
 /*
  * Review r028-ios-start, cause (b): "Read only" and "Open note" show for a block whose place is only not known YET (D183: never).
  *  b1: Obsidian answers getSectionInfo null at the first call (cold start) and a section later. The view asks once, in the constructor, and never again
- *      (tree-view.ts:532-534, readOnly = info === null). In a Reading view lateResolve cannot help (inEditorOf is false). After the 2 s limit the list
+ *      (block-binding.ts, readOnly = info === null). In a Reading view lateResolve cannot help (inEditorOf is false). After the 2 s limit the list
  *      is drawn read only, and it stays so.
- *  b2: the section is known, but the first `resolve` of the handle answers null (note not read yet). attach(null) (tree-view.ts:755-762) sets readOnly at
+ *  b2: the section is known, but the first `resolve` of the handle answers null (note not read yet). attach(null) (block-binding.ts) sets readOnly at
  *      once and shows the label and the chip; the retry 250 ms later (RESOLVE_RETRIES_MS) turns them off. That is the 0.5 s of "Read only" that the owner saw.
  */
 

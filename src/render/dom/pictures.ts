@@ -19,9 +19,7 @@ export interface PictureSlot {
 	/** The level of detail the slot shows at: Full arms and portraits, or Compact arms. */
 	lod: 'full' | 'compact';
 	person: string;
-	/** Arms: the house id (one small copy per house). Kept for a reader that knows only houses; a slot of personal arms may carry the person's house too. */
-	house?: string;
-	/** 0.2.8: arms only. The owner of the arms picture: the house or the person. Absent in a slot made before 0.2.8. */
+	/** Arms only: the owner of the arms picture, the house (one small copy per house) or the person (personal arms). A portrait slot has none. */
 	owner?: PictureOwner;
 	/** The picture's box in layout px, absolute. */
 	rect: Rect;

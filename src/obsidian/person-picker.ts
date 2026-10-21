@@ -23,11 +23,11 @@ import { cardLabel, dateLine } from '../render/tree-info';
 import { WINDOW_UI } from '../render/ui-text';
 import type { RelationOptions } from '../core/relations';
 import type { PictureStore } from './picture-store';
-import { relationsFor, validMe, type CardLookup, type CardRelation } from './relation-cache';
+import { relationsFor, validMe, type CardLookup, type CardRelation } from '../view/relation-cache';
 import { RowPictures, personLead } from './window-parts';
 import { FINDER_UI, FLOW } from '../render/ui-text';
 import { ignoreGhostClick, phoneLayout } from './modal-layout';
-import { trackModal } from './plugin-modals';
+import { trackModal } from '../view/plugin-modals';
 import { nameDialog } from './sheet-parts';
 
 /** What the picker may use for its rows: the picture store (portraits), the tree's note, the marked person and the relation options (the second text line). */
@@ -306,7 +306,7 @@ function definePicker() {
 				const label = this.labels.get(person.id);
 				const extra = label ? searchNames(label, person.name) : [];
 				// D122: the text of the sobriquet is matched too (without its marks).
-				const r = match(foldForMatch([person.name, person.sobriquet ?? '', person.title ?? '', dateLine(person) ?? '', ...extra].join(' ')));
+				const r = match(foldForMatch([person.name, person.sobriquet ?? '', person.title ?? '', dateLine(person, this.g.dates) ?? '', ...extra].join(' ')));
 				// "Aldric II" typed in full names one holder entry: that person comes before "Aldric III" (spec §13.5).
 				if (r) scored.push({ person, score: r.score, exact: extra.some((n) => foldForMatch(n) === lower) });
 			}
@@ -336,7 +336,7 @@ function definePicker() {
 			if (p.sobriquet !== undefined) name.createSpan({ cls: 'dynasty-picker-sob', text: ` ${quotedSobriquet(p.sobriquet)}` });
 			// "You: Ann" already says who is marked, so the second text line does not repeat "You".
 			// D218 rule 4: the relation word is italic, as on the cards and in the window rows; the rest of the text line is plain.
-			const rest = WINDOW_UI.findRowSub('', dateLine(p) ?? '', label?.title ?? p.title ?? '');
+			const rest = WINDOW_UI.findRowSub('', dateLine(p, this.g.dates) ?? '', label?.title ?? p.title ?? '');
 			let sub: HTMLElement | null = null;
 			const paintSub = () => {
 				sub?.remove();
@@ -355,7 +355,7 @@ function definePicker() {
 			// The visible lines hold "maybe full" and "·"; a screen reader gets the sentence the cards use. A hidden
 			// text, not aria-label: Obsidian shows an aria-label as a tooltip over the row.
 			text.setAttribute('aria-hidden', 'true');
-			const spoken = () => cardLabel(p, you ? 'you' : this.relationOf(p.id)?.lower, label);
+			const spoken = () => cardLabel(p, you ? 'you' : this.relationOf(p.id)?.lower, label, undefined, this.g.dates);
 			const sr = el.createSpan({ cls: 'dynasty-sr-only', text: spoken() });
 			// A row of a person whose word is not worked out yet gets it in place when its idle step has run.
 			const words = this.wordsOf();

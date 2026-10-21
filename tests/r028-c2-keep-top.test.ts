@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { keepTopCardWhole } from '../src/obsidian/focus-mode';
+import { keepTopCardWhole } from '../src/view/focus-mode';
 import type { View } from '../src/render/view-math';
 
 /*

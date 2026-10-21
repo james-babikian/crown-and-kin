@@ -8,7 +8,7 @@
 
 import { Modal, Notice, TFile, type EventRef } from 'obsidian';
 import { FULL_UI } from '../render/ui-text';
-import { isPhoneSideways } from './focus-mode';
+import { isPhoneSideways } from '../view/focus-mode';
 import { isPhoneWidth } from './modal-layout';
 import { nameDialog } from './sheet-parts';
 import { TreeView, type FullHost, type FullSource, type TreeHost } from './tree-view';

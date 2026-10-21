@@ -38,10 +38,10 @@ export interface SetPersonFields {
 	fields: Partial<Record<PersonField, FieldValue>> & { id?: string };
 }
 
-/** Sets or clears one tree option (`start`, `focus`, `me`, `generations` or `height`). `me` is the "This is me" mark (spec §13.1, D42). */
+/** Sets or clears one tree option (`start`, `focus`, `me`, `generations`, `height` or `calendar`). `me` is the "This is me" mark (spec §13.1, D42); `calendar` is the link to the calendar note of the tree (spec §14 rule 7). */
 export interface SetOption {
 	kind: 'set-option';
-	key: 'start' | 'focus' | 'me' | 'generations' | 'height';
+	key: 'start' | 'focus' | 'me' | 'generations' | 'height' | 'calendar';
 	/** `null` removes the key; removing the last key removes `options`. */
 	value: string | number | null;
 }
@@ -350,8 +350,8 @@ export interface SetTitleId {
 export type TitleOp = AddTitle | EditTitle | DeleteTitle | AddHolder | EditHolder | RemoveHolder | SetHolders | SetTitleId;
 
 /**
- * Link maintenance (§6.9, D6, §13.0 item 3). For each person `link`, person `portrait` and house
- * `arms` whose target (normalised with `NormaliseTarget` from `link-rewrite.ts`) is a key of `map`,
+ * Link maintenance (§6.9, D6, §13.0 item 3). For each person `link`, person `portrait`, house
+ * `arms` and the option `calendar` (spec §14 rule 7) whose target (normalised with `NormaliseTarget` from `link-rewrite.ts`) is a key of `map`,
  * write the new target `map[key]`, keeping `#heading`, `|alias`, a leading `!` and a trailing `.md`
  * if the old text had it. A value keeps its written style (quotes, the unquoted nested form) only
  * if that style can hold the new text; otherwise the value-quoting rule (spec §3) applies. Nothing

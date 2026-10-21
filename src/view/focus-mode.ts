@@ -4,6 +4,7 @@
  * Pure, so the priority rules run under vitest; the tree view supplies the facts.
  */
 
+import { foldMark } from '../layout/fold-spots';
 import type { Orientation, Rect, TreeLayout } from '../layout/model';
 import { COMPACT_NAME_EM } from '../render/dom/scene';
 import type { PhoneDirection } from './settings';
@@ -342,8 +343,8 @@ export interface SidewaysGroup {
 	/** The focus person, or the start person of a whole tree. */
 	me: Rect | null;
 	partners: Rect[];
-	/** The children drawn beside the person, each with their partners. */
-	children: { card: Rect; partners: Rect[] }[];
+	/** The children drawn beside the person, each with their partners. `sign` is the right edge (layout px) of the "+ N" sign of a folded family of the child (D257). */
+	children: { card: Rect; partners: Rect[]; sign?: number }[];
 	/** Placement parents: the left column when the person has no children. */
 	parents: Rect[];
 }
@@ -366,15 +367,7 @@ export function sidewaysView(size: Size, fontPx: number, g: SidewaysGroup, top: 
 		const px = Math.min(...g.parents.map((p) => p.x));
 		if ((me.x + me.w - px) * scale + 2 * FOCUS_SIDE_PAD <= size.w) left = px;
 	}
-	if (me && g.children.length) {
-		// V4: on a narrow phone (360 px) the children's column reaches past the right edge at 14 px names. The names go smaller, not under 11 px, so that the
-		// person's column and the nearest column of children show whole (a child a generation further right does not decide); a column that needs smaller
-		// names than that keeps 14 px, as before.
-		const near = Math.min(...g.children.map((c) => c.card.x));
-		const right = Math.max(...g.children.filter((c) => c.card.x <= near + 1).map((c) => c.card.x + c.card.w));
-		const fits = right > left ? (size.w - 2 * FOCUS_SIDE_PAD) / (right - left) : readable;
-		if (fits < readable && fits * f >= FIT_MIN_NAME_PX) scale = fits * (1 - 1e-9);
-	}
+	if (me && g.children.length) scale = columnScale(g.children, left, size.w, readable, f) ?? scale;
 	const pad = FOCUS_SIDE_PAD / scale;
 	const at = (x: number, freeTop: number): View => ({ scale, cx: x - pad + size.w / 2 / scale, cy: freeTop - top / scale + size.h / 2 / scale });
 	if (!me) return { view: at(fallback.x, fallback.y - START_TOP_GAP), tall: false };
@@ -393,6 +386,37 @@ export function sidewaysView(size: Size, fontPx: number, g: SidewaysGroup, top: 
 		if (me.y + me.h > t + free) t = me.y + me.h - free;
 	}
 	return { view: at(left, t), tall };
+}
+
+/**
+ * V4: on a narrow phone (360 px) the children's column reaches past the right edge at 14 px names. The names go smaller, not under 11 px, so that the
+ * person's column and the nearest column of children show whole (a child a generation further right does not decide); a column that needs smaller
+ * names than that keeps 14 px, as before. D257: the "+ N" sign of a folded family of a child counts as part of the column, so the sign is whole too; a sign that
+ * needs names under 11 px does not count, and the cards alone decide. Null when the names keep their size.
+ */
+function columnScale(children: SidewaysGroup['children'], left: number, width: number, readable: number, fontPx: number): number | null {
+	const near = Math.min(...children.map((c) => c.card.x));
+	const column = children.filter((c) => c.card.x <= near + 1);
+	const scaleFor = (rights: number[]): number | null => {
+		const right = Math.max(...rights);
+		const fits = right > left ? (width - 2 * FOCUS_SIDE_PAD) / (right - left) : readable;
+		return fits < readable && fits * fontPx >= FIT_MIN_NAME_PX ? fits * (1 - 1e-9) : null;
+	};
+	return scaleFor(column.map((c) => Math.max(c.card.x + c.card.w, c.sign ?? -Infinity))) ?? scaleFor(column.map((c) => c.card.x + c.card.w));
+}
+
+/**
+ * D257: for each person, the right edge (layout px) of the farthest "+ N" sign of a folded family that the person is a parent of: the sign belongs to the column
+ * of the person's card. Only a folded family has a sign; an open family has a round button that is no wider than the card.
+ */
+export function signRights(folds: TreeLayout['folds'], fontPx: number): Map<string, number> {
+	const out = new Map<string, number>();
+	for (const c of folds ?? []) {
+		if (!c.folded) continue;
+		const m = foldMark(c, c.spot, fontPx, false, true);
+		for (const p of c.parents) out.set(p, Math.max(out.get(p) ?? -Infinity, m.x2 + m.r));
+	}
+	return out;
 }
 
 /**

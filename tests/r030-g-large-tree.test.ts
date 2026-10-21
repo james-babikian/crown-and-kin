@@ -8,8 +8,8 @@ import * as derive from '../src/core/derive';
 import * as generations from '../src/core/generations';
 import { parseDynasty } from '../src/core/parse';
 import { FullScreenModal } from '../src/obsidian/full-screen';
-import { carryState, endSessionFocus, newBlockState } from '../src/obsidian/block-state';
-import * as largeTree from '../src/obsidian/large-tree';
+import { carryState, endSessionFocus, newBlockState } from '../src/view/block-state';
+import * as largeTree from '../src/view/large-tree';
 import {
 	FIRST_LIMIT,
 	PHONE_WHOLE_LIMIT,
@@ -24,7 +24,7 @@ import {
 	rememberStop,
 	wasStopped,
 	type BarFacts,
-} from '../src/obsidian/large-tree';
+} from '../src/view/large-tree';
 import { TreeView } from '../src/obsidian/tree-view';
 import { DEFAULT_FAR_RULE, LayoutStopped, NORMAL_GEOMETRY, clearLayoutCache, layoutTree } from '../src/layout/index';
 import { LARGE_UI, groupCount } from '../src/render/ui-text';

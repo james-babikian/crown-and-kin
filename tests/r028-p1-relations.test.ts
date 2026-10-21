@@ -6,6 +6,7 @@
 
 import { describe, expect, it } from 'vitest';
 import { deriveFamilies, type FamilyGraph } from '../src/core/derive';
+import { PLAIN_READER } from '../src/core/dates';
 import { parseDynasty } from '../src/core/parse';
 import { computeRelations, findRelation, type RelationOptions } from '../src/core/relations';
 import { CARD_SPOKEN_DEAD, CARD_SPOKEN_DEAD_DOUBT, MAYBE_TEXT, cardLabel, cardRelationText, dateLine, finderSentence, relationInfo, relationSummary, spokenRelation, stepSentences } from '../src/render/tree-info';
@@ -352,12 +353,12 @@ describe('I19: the dead sign in the date line and the screen-reader label', () =
 		[{ born: '1131', died: 'no' }, 'b. 1131'],
 		[{ born: '1131', died: 'c. 1190' }, '1131–c. 1190'],
 	])('dateLine %j is %s', (o, text) => {
-		expect(dateLine(person(o))).toBe(text);
+		expect(dateLine(person(o), PLAIN_READER)).toBe(text);
 	});
 
 	it('dateLine: no dates give no text line', () => {
-		expect(dateLine(person({}))).toBeUndefined();
-		expect(dateLine(person({ died: 'alive' }))).toBeUndefined();
+		expect(dateLine(person({}), PLAIN_READER)).toBeUndefined();
+		expect(dateLine(person({ died: 'alive' }), PLAIN_READER)).toBeUndefined();
 	});
 
 	it('cardLabel speaks the sign with words and never the character', () => {

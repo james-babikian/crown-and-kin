@@ -51,7 +51,7 @@ describe('options.me is read into TreeOptions.me', () => {
 
 describe('the me option in edits', () => {
 	it('sits between focus and generations, and is written as text', () => {
-		expect(OPTION_ORDER).toEqual(['start', 'focus', 'me', 'generations', 'height']);
+		expect(OPTION_ORDER).toEqual(['start', 'focus', 'me', 'generations', 'height', 'calendar']);
 		expect(TEXT_FIELDS.has('me')).toBe(true);
 		const r = applyOp('options:\n  focus: gwen\n  height: 400\n' + PEOPLE, { kind: 'set-option', key: 'me', value: 'gwen' });
 		expect(r).toMatchObject({ ok: true });

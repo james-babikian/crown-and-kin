@@ -4,7 +4,7 @@ import { cardLabels, type CardLabel } from '../src/core/titles';
 import { cardText, geometryFor, nameCountOf, tallExtra } from '../src/layout/geometry';
 import { DEFAULT_LAYOUT_SETTINGS, clearLayoutCache, layoutTree, pictureSets } from '../src/layout/index';
 import type { LaidOut, LayoutSettings } from '../src/layout/model';
-import { measuredLayout } from '../src/obsidian/measured-layout';
+import { measuredLayout } from '../src/view/measured-layout';
 import { parseBreakList } from '../src/render/break-words';
 import { BADGE_RADIUS_EM, buildScene, relationFont, type Scene, type SceneOptions } from '../src/render/dom/scene';
 import { tallCardsFor } from '../src/render/dom/tall-cards';

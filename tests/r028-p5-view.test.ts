@@ -6,7 +6,7 @@ vi.mock('@codemirror/view', () => ({ ViewPlugin: { fromClass: () => ({}) } }));
 
 import { forgetHeights, lastHeight, rememberHeight } from '../src/obsidian/block-height';
 import { FullScreenModal } from '../src/obsidian/full-screen';
-import { DEFAULT_SETTINGS } from '../src/obsidian/settings';
+import { DEFAULT_SETTINGS } from '../src/view/settings';
 import { START_LIMIT_MS, STYLES_LIMIT_MS, TreeView } from '../src/obsidian/tree-view';
 import { FEl, clock, dispatch, flushFrames, installDom, resetDom, resizeAll, runTimers, settle } from './acceptance/fake-dom';
 import { openModals, resetObsidian } from './acceptance/fake-obsidian';
