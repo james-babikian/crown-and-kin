@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { speedTest } from './support/speed-test';
 
 vi.mock('obsidian', () => import('./acceptance/fake-obsidian'));
 
@@ -409,7 +410,7 @@ describe('Rename, fix round after the M6 iPhone test (the decision notes "M6 iPh
 	describe('the wait for Obsidian\'s own link update', () => {
 		const slow: RenameTiming = { resolved: 400, quiet: 0, cap: 400 };
 
-		it('a tree note with no normal link to the old name is written at once', async () => {
+		speedTest('a tree note with no normal link to the old name is written at once', async () => {
 			const s = setup({ 'T.md': tree(person('a', '"[[Old]]"')), 'Old.md': '' }, true, { timing: slow });
 			s.caches.set('T.md', code);
 			const t0 = Date.now();
@@ -418,7 +419,7 @@ describe('Rename, fix round after the M6 iPhone test (the decision notes "M6 iPh
 			expect(bodyOf(s, 'T.md')).toContain('"[[New]]"');
 		});
 
-		it('a tree note that Obsidian can change (a normal link to the old name) waits for Obsidian', async () => {
+		speedTest('a tree note that Obsidian can change (a normal link to the old name) waits for Obsidian', async () => {
 			const s = setup({ 'T.md': `See [[Old]].\n\n${tree(person('a', '"[[Old]]"'))}`, 'Old.md': '' }, true, { timing: slow });
 			s.caches.set('T.md', { ...code, links: [{ link: 'Old' }] });
 			const t0 = Date.now();
@@ -427,7 +428,7 @@ describe('Rename, fix round after the M6 iPhone test (the decision notes "M6 iPh
 			expect(bodyOf(s, 'T.md')).toContain('"[[New]]"');
 		});
 
-		it('… and stops the wait when the note\'s cache no longer shows the old name', async () => {
+		speedTest('… and stops the wait when the note\'s cache no longer shows the old name', async () => {
 			const s = setup({ 'T.md': `See [[Old]].\n\n${tree(person('a', '"[[Old]]"'))}`, 'Old.md': '' }, true, { timing: slow });
 			s.caches.set('T.md', { ...code, links: [{ link: 'Old#Part' }] });
 			setTimeout(() => {

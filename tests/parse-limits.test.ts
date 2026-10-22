@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { speedTest } from './support/speed-test';
 import { applyOp } from '../src/core/yaml-edit';
 import { hardErrorText, LIMIT_DETAIL } from '../src/core/messages';
 import { ALIAS_MARKS_CAP, ALIAS_NODES_BASE, ALIAS_NODES_CEILING, ALIAS_NODES_PER_CHAR, parseBody, parseDynasty } from '../src/core/parse';
@@ -32,7 +33,7 @@ describe('F1: aliases that expand far beyond the text', () => {
 		expect(edit.ok).toBe(false);
 	});
 
-	it('a wide bomb stops fast, even with a long text', () => {
+	speedTest('a wide bomb stops fast, even with a long text', () => {
 		const text = `# ${'x'.repeat(170_000)}\na: &a [${rep(5000, 'x')}]\nb: &b [${rep(400, '*a')}]\nx: [${rep(400, '*b')}]\n${BASE}`;
 		const t0 = performance.now();
 		expect(parseBody(text).ok).toBe(false);
@@ -81,7 +82,7 @@ describe('F1: aliases that expand far beyond the text', () => {
 		expect(parseBody(make(6000)).ok).toBe(false);
 	});
 
-	it('1 000 people that share a map of 1 000 keys are allowed, and an edit of it stays fast', () => {
+	speedTest('1 000 people that share a map of 1 000 keys are allowed, and an edit of it stays fast', () => {
 		const shared = Array.from({ length: 1000 }, (_, i) => `k${i}: v${i}`).join(', ');
 		const people = Array.from({ length: 1000 }, (_, i) => `  - {id: p${i}, name: P${i}, extra: *b}`).join('\n');
 		const text = `base: &b {${shared}}\npeople:\n${people}\n`;
@@ -98,7 +99,7 @@ describe('F1: aliases that expand far beyond the text', () => {
 });
 
 describe('F2: a map with very many keys', () => {
-	it(`40 000 keys read and edit in about a second (at most ${KEYS_LIMIT} times the reference work)`, () => {
+	speedTest(`40 000 keys read and edit in about a second (at most ${KEYS_LIMIT} times the reference work)`, () => {
 		const keys = Array.from({ length: 40_000 }, (_, i) => `    k${i}: v${i}`).join('\n');
 		const text = `people:\n  - id: aldric\n    name: Aldric\n${keys}\n`;
 		const t = timedRatio(() => [parseDynasty(text), applyOp(text, { kind: 'set-person-fields', id: 'aldric', fields: { name: 'Edited' } })] as const, 3);
@@ -135,7 +136,7 @@ describe('F2: a map with very many keys', () => {
 		if (!r.ok) expect(r.error.detail).not.toBe(LIMIT_DETAIL.duplicateKey('a'));
 	});
 
-	it('10 000 repeated keys are still one error', () => {
+	speedTest('10 000 repeated keys are still one error', () => {
 		const t0 = performance.now();
 		expect(parseBody(Array(10_000).fill('people: []').join('\n') + '\n')).toMatchObject({ ok: false, error: { line: 2 } });
 		expect(performance.now() - t0).toBeLessThan(2000);
@@ -173,7 +174,7 @@ describe('the cap of alias uses (the package resolves aliases in quadratic time)
 		expect(parseBody(tiny(ALIAS_MARKS_CAP))).toEqual({ ok: false, error: { code: 'yaml-invalid', detail: LIMIT_DETAIL.tooLarge } });
 	}, 30_000);
 
-	it(`50 000 uses of a tiny anchor are refused at once (at most ${TINY_LIMIT} times the reference work), with the plain text, and no edit runs`, () => {
+	speedTest(`50 000 uses of a tiny anchor are refused at once (at most ${TINY_LIMIT} times the reference work), with the plain text, and no edit runs`, () => {
 		const text = tiny(50_000);
 		const t = timedRatio(() => [parseDynasty(text), applyOp(text, { kind: 'set-person-fields', id: 'aldric', fields: { name: 'Edited' } })] as const, 3);
 		console.log(`50 000 tiny anchor uses: ${t.ms.toFixed(0)} ms, reference ${t.refMs.toFixed(1)} ms, ratio ${t.ratio.toFixed(1)}`);
@@ -193,7 +194,7 @@ describe('the cap of alias uses (the package resolves aliases in quadratic time)
 		expect(parseBody(`a: [${anchors}]\n${BASE}`).ok).toBe(true);
 	});
 
-	it('a text just under the cap reads and edits in a few seconds', () => {
+	speedTest('a text just under the cap reads and edits in a few seconds', () => {
 		const people = Array.from({ length: 11_900 }, (_, i) => `  - {id: p${i}, name: P${i}, house: *h}`).join('\n');
 		const text = `houses:\n  - &h {id: h, name: H}\npeople:\n${people}\n`;
 		const t0 = performance.now();

@@ -1,5 +1,6 @@
 /* G2 review probes for src/layout/arms-outline.ts (D219). */
 import { describe, expect, it } from 'vitest';
+import { speedTest } from './support/speed-test';
 import { armsGap, traceOutline } from '../src/layout/arms-outline';
 
 function rnd(seed: number) {
@@ -28,7 +29,7 @@ describe('traceOutline probes', () => {
 			}
 		}
 	});
-	it('time: 128x128 noisy and checkerboard and big circle', () => {
+	speedTest('time: 128x128 noisy and checkerboard and big circle', () => {
 		const r = rnd(3);
 		const cases: [string, Uint8ClampedArray][] = [
 			['noise', px(128, 128, () => (r() < 0.5 ? 255 : 0))],

@@ -15,7 +15,7 @@ import { TFile } from 'obsidian';
 import { sameBody, smallestChange } from '../src/core/block-match';
 import { HandleRegistry } from '../src/obsidian/block-handle';
 import { findBlocks } from '../src/core/block-locate';
-import { loadSheet } from '../src/obsidian/edit-sheet';
+import { loadSheet } from '../src/view/sheet-draft';
 
 /** A vault with one note, no open editors: writes go through `vault.process`. */
 function fakeApp(path: string, initial: string) {

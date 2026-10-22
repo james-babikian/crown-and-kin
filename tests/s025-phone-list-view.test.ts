@@ -181,9 +181,9 @@ describe('the start chain (D144)', () => {
 		expect([centre(el), from(el)]).toEqual(['aldric', 'oldest']);
 	});
 
-	it('the person edited last, then the oldest', async () => {
+	it('the person saved last (B1: not the person of an in-place write), then the oldest', async () => {
 		const handle = noteHandle(PLAIN);
-		handle.state.lastEdited = 'kit';
+		handle.state.lastSaved = 'kit';
 		const { el } = await open(PLAIN, { handle });
 		expect([centre(el), from(el)]).toEqual(['kit', 'edited']);
 	});
@@ -191,7 +191,7 @@ describe('the start chain (D144)', () => {
 	it('the marked person comes before the edited one', async () => {
 		const src = tree('me: marta');
 		const handle = noteHandle(src);
-		handle.state.lastEdited = 'kit';
+		handle.state.lastSaved = 'kit';
 		const { el } = await open(src, { handle });
 		expect([centre(el), from(el)]).toEqual(['marta', 'me']);
 	});
@@ -230,7 +230,7 @@ describe('the start chain (D144)', () => {
 		const src = tree('me: marta');
 		const handle = noteHandle(src);
 		const { el } = await open(src, { handle });
-		handle.state.lastEdited = 'kit';
+		handle.state.lastSaved = 'kit';
 		handle.change(`${src}# edited\n`);
 		resizeAll();
 		flushFrames();

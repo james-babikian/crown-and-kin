@@ -10,7 +10,7 @@ import { newTitleId } from '../src/core/title-ops';
 import { applyOp } from '../src/core/yaml-edit';
 import { FullScreenModal } from '../src/obsidian/full-screen';
 import { closePluginModals } from '../src/view/plugin-modals';
-import { draftChanged, femaleNameOf, rebase, titleRows, windowOps, type TitleRow } from '../src/view/titles-draft';
+import { titlesDraftChanged, femaleNameOf, rebase, titleRows, windowOps, type TitleRow } from '../src/view/titles-draft';
 import { TitlesWindow } from '../src/obsidian/titles-window';
 import { TITLES_UI } from '../src/render/ui-text';
 import { FEl, clock, dispatch, fakeWin, installDom, resetDom, settle } from './acceptance/fake-dom';
@@ -80,7 +80,7 @@ describe('"Name for a woman" in the Titles window draft (D65)', () => {
 	it('a typed name: edit-title writes female-name right after name, one text line', () => {
 		const rows = rowsOf();
 		titleOf(rows, 'duke-of-valmont').femaleName = ' Duchess of Valmont ';
-		expect(draftChanged(rows)).toBe(true);
+		expect(titlesDraftChanged(rows)).toBe(true);
 		const o = ops(rows);
 		expect(o).toEqual([{ kind: 'edit-title', id: 'duke-of-valmont', femaleName: 'Duchess of Valmont' }]);
 		expect(bodyOf(applyOp(BODY_13, { kind: 'batch', ops: o }))).toBe(replaceOnce(BODY_13, DUKE, DUKE + FEMALE_LINE));
@@ -94,14 +94,14 @@ describe('"Name for a woman" in the Titles window draft (D65)', () => {
 		expect(bodyOf(applyOp(BODY_F, { kind: 'batch', ops: o }))).toBe(replaceOnce(BODY_F, FEMALE_LINE, ''));
 		const plain = rowsOf();
 		titleOf(plain, 'count-of-orsini').femaleName = '   ';
-		expect(draftChanged(plain)).toBe(false);
+		expect(titlesDraftChanged(plain)).toBe(false);
 		expect(ops(plain)).toEqual([]);
 	});
 
 	it('a changed name changes only its text line; the same text with spaces changes nothing', () => {
 		const rows = rowsOf(BODY_F);
 		titleOf(rows, 'duke-of-valmont').femaleName = 'Duchess of Valmont ';
-		expect(draftChanged(rows)).toBe(false);
+		expect(titlesDraftChanged(rows)).toBe(false);
 		titleOf(rows, 'duke-of-valmont').femaleName = 'Grand Duchess of Valmont';
 		const o = ops(rows, BODY_F);
 		expect(bodyOf(applyOp(BODY_F, { kind: 'batch', ops: o }))).toBe(replaceOnce(BODY_F, FEMALE_LINE, '    female-name: Grand Duchess of Valmont\n'));

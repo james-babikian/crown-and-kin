@@ -94,7 +94,7 @@ export function sideOf(z: number): number {
 }
 
 /** The factor of a wheel turn of `deltaY` (C4). */
-export function wheelFactor(deltaY: number): number {
+export function cropWheelFactor(deltaY: number): number {
 	return Math.exp(-(Number.isFinite(deltaY) ? deltaY : 0) * WHEEL_RATE);
 }
 
@@ -380,7 +380,7 @@ class CropModal extends Modal {
 			(e) => {
 				if (!this.pic) return;
 				e.preventDefault();
-				this.zoomAt(wheelFactor(e.deltaY), this.frameAt(e.clientX, e.clientY));
+				this.zoomAt(cropWheelFactor(e.deltaY), this.frameAt(e.clientX, e.clientY));
 			},
 			{ passive: false },
 		);

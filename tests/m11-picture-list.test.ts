@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
+import { speedTest } from './support/speed-test';
 import { PICKER_SEARCH_LIMIT, type PickerRow, type PickerState, type PictureFileLike, type PictureTree } from '../src/core/picture-list';
 import { isShown, pictureListModule, vf, type PictureListModule } from './acceptance/m11-support';
 
@@ -526,7 +527,7 @@ describe('P10: previewNear and previewOrder', () => {
 });
 
 describe('spec §13.14 Large vaults: 2 000 pictures in 100 folders', () => {
-	it('the tree and the first rows are made in under 300 ms', () => {
+	speedTest('the tree and the first rows are made in under 300 ms', () => {
 		const files: PictureFileLike[] = [];
 		for (let f = 0; f < 100; f++) for (let p = 0; p < 20; p++) files.push(vf(`Folder ${f}/Sub/picture ${p}.png`));
 		const t0 = performance.now();
@@ -538,7 +539,7 @@ describe('spec §13.14 Large vaults: 2 000 pictures in 100 folders', () => {
 		expect(ms).toBeLessThan(300);
 	});
 
-	it('one open folder of 2 000 pictures gives 2 001 rows and a search over them is fast', () => {
+	speedTest('one open folder of 2 000 pictures gives 2 001 rows and a search over them is fast', () => {
 		const files = Array.from({ length: 2000 }, (_, i) => vf(`Big/p${i}.png`));
 		const t = M.buildPictureTree(files, isShown);
 		const t0 = performance.now();

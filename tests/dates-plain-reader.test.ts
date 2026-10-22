@@ -1,26 +1,16 @@
 /*
  * Step 4.0 of WP-4: the corrections of the plain-year reader (spec §14 rule 8) and the plain readings that must not move.
  *
- * The corrections do not exist yet. Every test that needs one is `it.fails` while `RULE_8_BUILT` is false: it fails today
- * on purpose. At step 4.1b the builder sets `RULE_8_BUILT = true` (one line); then all of them run as ordinary tests.
- * The same table runs on `readPlain` as soon as it exists (step 4.1a, "readPlain with today's behaviour").
+ * The same table runs on `yearOf` and on `readPlain`.
  */
 
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { formatYear, yearOf } from '../src/core/succession-keys';
-import { lineOf, loadDatesApi, readPlain } from './dates-support';
-
-const api = await loadDatesApi();
-
-/** Set to true at step 4.1b, when `succession-keys.ts` has the corrections of §14 rule 8. */
-const RULE_8_BUILT = true;
-const r8 = RULE_8_BUILT ? it : it.fails;
+import { formatYear, readPlain, yearOf } from '../src/core/succession-keys';
+import { datesApi, lineOf } from './dates-support';
 
 type Reader = (text: string | undefined) => number | undefined;
-const readers: [string, Reader][] = [['yearOf', yearOf]];
-const plain = readPlain;
-if (plain) readers.push(['readPlain', (t) => plain(t).year]);
+const readers: [string, Reader][] = [['yearOf', yearOf], ['readPlain', (t) => readPlain(t).year]];
 
 describe.each(readers)('§14 r8 corrections on %s', (_name, read) => {
 	const table: [string, number][] = [
@@ -49,16 +39,16 @@ describe.each(readers)('§14 r8 corrections on %s', (_name, read) => {
 		['12 May ١٢٠٣', 1203],
 	];
 	for (const [text, want] of table) {
-		r8(`§14 r8: ${JSON.stringify(text)} reads internal year ${want}`, () => {
+		it(`§14 r8: ${JSON.stringify(text)} reads internal year ${want}`, () => {
 			expect(read(text)).toBe(want);
 		});
 	}
 
-	r8('§14 r8: BP (before present) after a number gives no year', () => {
+	it('§14 r8: BP (before present) after a number gives no year', () => {
 		for (const text of ['1500 BP', '1500 bp', 'c. 1500 BP']) expect(read(text), text).toBeUndefined();
 	});
 
-	r8('§14 r8: 0 beside -1 beside 1 BC are one year; AD 1 is one year after 1 BC', () => {
+	it('§14 r8: 0 beside -1 beside 1 BC are one year; AD 1 is one year after 1 BC', () => {
 		expect(read('0')).toBe(read('-1'));
 		expect(read('0')).toBe(read('1 BC'));
 		expect(read('1 AD')! - read('1 BC')!).toBe(1);
@@ -112,7 +102,7 @@ describe('§14 r8: formatYear shows an internal year y <= 0 as "(1 - y) BC"', ()
 		[-11999, '12000 BC'],
 	];
 	for (const [y, want] of table) {
-		r8(`§14 r8: formatYear(${y}) is "${want}"`, () => {
+		it(`§14 r8: formatYear(${y}) is "${want}"`, () => {
 			expect(formatYear(y)).toBe(want);
 		});
 	}
@@ -137,41 +127,34 @@ describe('§14 r8: no lookbehind in any pattern (iOS before 16.4)', () => {
 });
 
 describe('§14 r8: the flags of the plain reader (readPlain, PLAIN_READER)', () => {
-	const rp = readPlain;
-	if (!rp) it.todo('enable at 4.1a: readPlain flags dual and zero');
-	if (rp) {
-		r8('§14 r8: readPlain("1700/01") is year 1701 and a dual date', () => {
-			expect(rp('1700/01')).toMatchObject({ year: 1701, dual: true });
-			expect(rp('1799/00')).toMatchObject({ year: 1800, dual: true });
-		});
-		r8('§14 r8: readPlain("0") is internal year 0 and flags the zero', () => {
-			expect(rp('0')).toMatchObject({ year: 0, zero: true });
-		});
-		it('§14 r8: an ordinary year has no dual and no zero flag', () => {
-			expect(rp('1203')).toMatchObject({ year: 1203 });
-			expect(rp('1203')!.dual).toBeUndefined();
-			expect(rp('1203')!.zero).toBeUndefined();
-			expect(rp('long ago')!.year).toBeUndefined();
-			expect(rp(undefined)!.year).toBeUndefined();
-		});
-	}
-	if (!api) it.todo('enable at 4.1a: PLAIN_READER gives year-zero for a plain 0 and the dual flag');
-	if (api) {
-		r8('§14 r8: PLAIN_READER.read("0") is year 0 with the warning year-zero', () => {
-			const r = api.PLAIN_READER.read('0')!;
-			expect(r.year).toBe(0);
-			expect(r.warnings).toEqual(['year-zero']);
-		});
-		r8('§14 r8: PLAIN_READER.read("1799/00") is year 1800 and a dual date', () => {
-			const r = api.PLAIN_READER.read('1799/00')!;
-			expect(r.year).toBe(1800);
-			expect(r.dual).toBe(true);
-		});
-		it('§14 r8: a plain year has no warning', () => {
-			expect(api.PLAIN_READER.read('1203')!.warnings).toEqual([]);
-			expect(api.PLAIN_READER.read('200 BC')!.warnings).toEqual([]);
-		});
-	}
+	it('§14 r8: readPlain("1700/01") is year 1701 and a dual date', () => {
+		expect(readPlain('1700/01')).toMatchObject({ year: 1701, dual: true });
+		expect(readPlain('1799/00')).toMatchObject({ year: 1800, dual: true });
+	});
+	it('§14 r8: readPlain("0") is internal year 0 and flags the zero', () => {
+		expect(readPlain('0')).toMatchObject({ year: 0, zero: true });
+	});
+	it('§14 r8: an ordinary year has no dual and no zero flag', () => {
+		expect(readPlain('1203')).toMatchObject({ year: 1203 });
+		expect(readPlain('1203')!.dual).toBeUndefined();
+		expect(readPlain('1203')!.zero).toBeUndefined();
+		expect(readPlain('long ago')!.year).toBeUndefined();
+		expect(readPlain(undefined)!.year).toBeUndefined();
+	});
+	it('§14 r8: PLAIN_READER.read("0") is year 0 with the warning year-zero', () => {
+		const r = datesApi.PLAIN_READER.read('0')!;
+		expect(r.year).toBe(0);
+		expect(r.warnings).toEqual(['year-zero']);
+	});
+	it('§14 r8: PLAIN_READER.read("1799/00") is year 1800 and a dual date', () => {
+		const r = datesApi.PLAIN_READER.read('1799/00')!;
+		expect(r.year).toBe(1800);
+		expect(r.dual).toBe(true);
+	});
+	it('§14 r8: a plain year has no warning', () => {
+		expect(datesApi.PLAIN_READER.read('1203')!.warnings).toEqual([]);
+		expect(datesApi.PLAIN_READER.read('200 BC')!.warnings).toEqual([]);
+	});
 });
 
 // ---- What moves in the line (rule 8 "What moves") ----
@@ -190,7 +173,7 @@ titles:
 `;
 
 describe('§14 r8: what moves in the line of succession', () => {
-	r8('§14 r8: a written 0 and a written 1 BC are one year, so equal years fall back to the written order', () => {
+	it('§14 r8: a written 0 and a written 1 BC are one year, so equal years fall back to the written order', () => {
 		// Written order: Bea (0), Ada (1 BC). Today 1 BC is before 0, so Ada comes first.
 		expect(lineOf(TWO_SIBLINGS('0', '1 BC')).heirs).toEqual(['b', 'a']);
 		expect(lineOf(TWO_SIBLINGS('1 BC', '0')).heirs).toEqual(['b', 'a']);
@@ -214,11 +197,11 @@ titles:
       - {person: r}
 `;
 
-	r8('§14 r8: a person who died in year 0 is no longer alive in 1 BC', () => {
+	it('§14 r8: a person who died in year 0 is no longer alive in 1 BC', () => {
 		expect(lineOf(HEIR('0', '10 BC', '1 BC')).namedHeirs).toEqual([{ id: 'c', state: 'not-alive' }]);
 	});
 
-	r8('§14 r8: a person born in year 0 is born in 1 BC (same year), not "not born yet"', () => {
+	it('§14 r8: a person born in year 0 is born in 1 BC (same year), not "not born yet"', () => {
 		expect(lineOf(HEIR('50', '0', '1 BC')).namedHeirs).toEqual([{ id: 'c', state: 'first' }]);
 	});
 
@@ -235,7 +218,7 @@ titles:
       - {person: r, from: "200 BC"}
 `;
 
-	r8('§14 r8: a difference across the change of era is one year smaller (100 BC to AD 11 is 110 years, so no old-age note)', () => {
+	it('§14 r8: a difference across the change of era is one year smaller (100 BC to AD 11 is 110 years, so no old-age note)', () => {
 		expect(lineOf(OLD('11'), undefined, {}, 99, 110).old).toEqual([]);
 	});
 

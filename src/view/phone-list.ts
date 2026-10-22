@@ -55,14 +55,18 @@ export interface ListStartFacts {
 	pin: string | undefined;
 	/** The marked person, already checked against the tree (`validMe`), or null. */
 	me: string | null;
-	/** The person edited last (`st.lastEdited`), or null. */
-	edited: string | null;
+	/** The person of the last Save that closed a person window (`st.lastSaved`), or null. An in-place write does not count (B1). */
+	edited?: string | null;
+	/** An open person window wrote in place (`st.listHold`): the view keeps the start it had instead of choosing again. `listStart` does not read it. */
+	hold?: boolean;
+	/** The count `st.listKeep` of closed person windows that held the list; a view keeps its start once for each new count. `listStart` does not read it. */
+	keep?: number;
 	g: FamilyGraph;
 }
 
 /**
  * The person in the middle of the list when it is first drawn (D144): the session choice, the pin, the marked person,
- * the person edited last, the oldest person who has a child, the first root. A person who is not in the tree is skipped.
+ * the person saved last, the oldest person who has a child, the first root. A person who is not in the tree is skipped.
  * Null only for a tree with no people.
  */
 export function listStart(f: ListStartFacts): { id: string; from: ListFrom } | null {

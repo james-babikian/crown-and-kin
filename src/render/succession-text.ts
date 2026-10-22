@@ -3,11 +3,9 @@
  * the Show bar and the open-branch rows. It has this one home; `ui-text.ts` re-exports
  * `SUCCESSION_UI`. Simplified Technical English (ASD-STE100) and the project word list apply.
  */
+import { andList } from '../core/messages';
 import { DOUBTFUL_DIED, formatYear, type InheritIllegitimate, type InheritRule, type InheritThrough, type SuccessionRule } from '../core/succession-keys';
 import { PERSON_PLACEHOLDER } from './view-text';
-
-/** "A", "A and B", "A, B and C". */
-const andList = (xs: readonly string[]): string => (xs.length <= 1 ? (xs[0] ?? '') : `${xs.slice(0, -1).join(', ')} and ${xs[xs.length - 1]}`);
 
 /**
  * The year in a sentence of the line: the text that gives Y, as written (`SuccessionResult.yearText`, spec §14 rule 7), or null for "now".

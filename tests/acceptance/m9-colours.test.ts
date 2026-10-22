@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { speedTest } from '../support/speed-test';
 import { armsColoursOf, armsCopy64, comments14, deltaE, fixtureBytes } from './m9-support';
 
 /*
@@ -130,7 +131,7 @@ describe('armsColours: the decided method (spec §13.6; contract rule 10)', () =
 		expect(armsColours(new Uint8ClampedArray(rgba), 64, 64)).toEqual(first);
 	});
 
-	it('under 50 ms for a 64 × 64 copy (spec §13.6 target)', async () => {
+	speedTest('under 50 ms for a 64 × 64 copy (spec §13.6 target)', async () => {
 		const armsColours = await armsColoursOf();
 		const rgba = armsCopy64(fixtureBytes('pictures/valmont-arms.png'), 'image/png');
 		armsColours(rgba, 64, 64);

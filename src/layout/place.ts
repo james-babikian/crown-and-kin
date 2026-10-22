@@ -1,8 +1,8 @@
 /*
  * The placement stage (the architecture notes §4.2.2, stage S3). It gives every item of the plan an x: rows of rigid blocks, packed in order
  * (`packRows`), then rounds of "parents over children, children under parents" (pool-adjacent-violators per row, as the 0.3.0 sweeps:
- * `sweepRows`), then the compaction step of `compact.ts` run on the items (`compactStep`; passages are zero-height members of
- * their blocks, with a width), then `normalise`. The hang point of every family is a port or a bar dot, so the placement centres the children
+ * `sweepRows`), then the compaction step of `compact.ts` run on the items (`compactItems`; passages are zero-height members of
+ * their blocks, with a width), then `shiftToMargin`. The hang point of every family is a port or a bar dot, so the placement centres the children
  * under the point the route stage draws. The route stage works with ANY placement that keeps the order and the minimum gaps
  * (assumption A16); `placeItems` is one such placement, composed of the exported steps, and the tests compose others from them.
  * It writes `Item.x` and nothing else.
@@ -146,7 +146,7 @@ export function sweepRows(plan: Plan, geo: Geometry, rounds: number, shapes = sh
  * its own width; the gaps are centre distances; the dots are the hang points of the union families. Returns how many of the three
  * passes spent their whole walk budget (0 on every real tree). `snaps` limits part (c) to that many snaps, for the test of that part.
  */
-export function compactStep(plan: Plan, g: FamilyGraph, geo: Geometry, snaps = Infinity): number {
+export function compactItems(plan: Plan, g: FamilyGraph, geo: Geometry, snaps = Infinity): number {
 	const blocks = plan.blocks.map((b) => b.map((it) => it.id));
 	const withKids = plan.families.filter((f) => f.kids.length);
 	// A family of one parent alone hangs from the item that carries its hang point, so the step reads that item and the port's x.
@@ -161,7 +161,7 @@ export function compactStep(plan: Plan, g: FamilyGraph, geo: Geometry, snaps = I
 }
 
 /** Moves every item so that the leftmost one starts at `margin` (0 by default). */
-export function normalise(plan: Plan, margin = 0): void {
+export function shiftToMargin(plan: Plan, margin = 0): void {
 	let min = Infinity;
 	for (const it of plan.items.values()) min = Math.min(min, it.x);
 	if (!Number.isFinite(min)) return;
@@ -209,7 +209,7 @@ export function placeItems(plan: Plan, g: FamilyGraph, geo: Geometry, opts: Plac
 	packRows(plan, shapes);
 	if (sweeps >= 1) {
 		sweepRows(plan, geo, sweeps, shapes);
-		if (opts.compact !== false) compactStep(plan, g, geo);
+		if (opts.compact !== false) compactItems(plan, g, geo);
 	}
-	normalise(plan);
+	shiftToMargin(plan);
 }

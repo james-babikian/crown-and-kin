@@ -4,6 +4,8 @@
  * All lengths are CSS px. A "view" is the zoom and the move of the picture from the centre of the stage.
  */
 
+import { finite } from '../../core/portrait-crop';
+
 export { swipeCloses } from './sheet-swipe';
 
 /** The zoom stays between these limits (D256 item 5). */
@@ -44,10 +46,8 @@ export interface View {
 
 export const REST: View = { scale: 1, x: 0, y: 0 };
 
-const finite = (v: number, fallback: number) => (Number.isFinite(v) ? v : fallback);
-
 /** A zoom factor inside the limits. */
-export const clampScale = (s: number): number => Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, finite(s, ZOOM_MIN)));
+export const clampZoom = (s: number): number => Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, finite(s, ZOOM_MIN)));
 
 /**
  * The size of the whole picture on the stage: as large as the stage allows, never cut, with its own proportions. A raster picture grows to
@@ -66,7 +66,7 @@ export function panLimit(shown: Size, stage: Size, scale: number): Point {
 
 /** The view with its scale inside the limits and its move inside `panLimit`; at rest the move is 0. */
 export function clampView(v: View, shown: Size, stage: Size): View {
-	const scale = clampScale(v.scale);
+	const scale = clampZoom(v.scale);
 	if (scale <= ZOOM_MIN) return REST;
 	const lim = panLimit(shown, stage, scale);
 	return { scale, x: Math.min(lim.x, Math.max(-lim.x, finite(v.x, 0))), y: Math.min(lim.y, Math.max(-lim.y, finite(v.y, 0))) };
@@ -77,7 +77,7 @@ export function clampView(v: View, shown: Size, stage: Size): View {
  * the limits allow.
  */
 export function zoomAbout(v: View, factor: number, at: Point, shown: Size, stage: Size): View {
-	const scale = clampScale(v.scale * finite(factor, 1));
+	const scale = clampZoom(v.scale * finite(factor, 1));
 	const k = scale / v.scale;
 	return clampView({ scale, x: at.x - (at.x - v.x) * k, y: at.y - (at.y - v.y) * k }, shown, stage);
 }
@@ -86,7 +86,7 @@ export function zoomAbout(v: View, factor: number, at: Point, shown: Size, stage
  * The view of a pinch. `start` is the view when the second finger came down, `from` the two fingers then and `to` the two fingers now. The
  * view follows the distance ratio about the first midpoint, then the move of the midpoint. Working from the start gives no drift.
  */
-export function pinchView(start: View, from: { mid: Point; dist: number }, to: { mid: Point; dist: number }, shown: Size, stage: Size): View {
+export function pinchPicture(start: View, from: { mid: Point; dist: number }, to: { mid: Point; dist: number }, shown: Size, stage: Size): View {
 	if (!(from.dist > 0) || !(to.dist > 0)) return start;
 	const zoomed = zoomAbout(start, to.dist / from.dist, from.mid, shown, stage);
 	return clampView({ ...zoomed, x: zoomed.x + (to.mid.x - from.mid.x), y: zoomed.y + (to.mid.y - from.mid.y) }, shown, stage);
@@ -96,7 +96,7 @@ export function pinchView(start: View, from: { mid: Point; dist: number }, to: {
 export const settleView = (v: View): View => (v.scale < ZOOM_SNAP ? REST : v);
 
 /** A double tap at rest zooms to `DOUBLE_TAP_ZOOM` about the tap; a double tap on a zoomed picture goes back to rest. */
-export function doubleTapView(v: View, at: Point, shown: Size, stage: Size): View {
+export function doubleTapPicture(v: View, at: Point, shown: Size, stage: Size): View {
 	return v.scale > ZOOM_MIN ? REST : zoomAbout(v, DOUBLE_TAP_ZOOM, at, shown, stage);
 }
 
@@ -104,7 +104,7 @@ export function doubleTapView(v: View, at: Point, shown: Size, stage: Size): Vie
 export const panView = (v: View, dx: number, dy: number, shown: Size, stage: Size): View => (v.scale > ZOOM_MIN ? clampView({ ...v, x: v.x + dx, y: v.y + dy }, shown, stage) : v);
 
 /** True when a tap at `now` is the second of a double tap that began with `prev`. */
-export function isDoubleTap(prev: { t: number; x: number; y: number } | null, now: { t: number; x: number; y: number }): boolean {
+export function isPictureDoubleTap(prev: { t: number; x: number; y: number } | null, now: { t: number; x: number; y: number }): boolean {
 	return !!prev && now.t - prev.t <= DOUBLE_TAP_MS && Math.hypot(now.x - prev.x, now.y - prev.y) <= DOUBLE_TAP_PX;
 }
 

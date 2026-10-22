@@ -87,13 +87,13 @@ describe('the list of a phone note over a sequence of changes of the mark (spec 
 		expect(stands(el)).toEqual(['p6', 'me']);
 	});
 
-	it('with no mark the list follows the person edited last', async () => {
+	it('with no mark the list follows the person saved last (B1: not an in-place write)', async () => {
 		phone();
 		const a = line(7);
 		const handle = fakeHandle('n.md', a);
 		const { el } = await embed(a, { handle });
 		expect(stands(el)).toEqual(['p0', 'oldest']);
-		handle.state.lastEdited = 'p4';
+		handle.state.lastSaved = 'p4';
 		await change(handle, a.replace('name: P4', 'name: Four'));
 		expect(stands(el)).toEqual(['p4', 'edited']);
 	});

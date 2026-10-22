@@ -4,8 +4,6 @@
  *    (no calendar captures an existing plain date), and the trees keep their warnings and their lines;
  *  - `TreeDates` of every sample tree with no calendars equals `yearOf` on every text;
  *  - `TreeDates` is lazy, and `latestYear` and `unanchored` follow their contract (rule 5, `calendar-no-anchor`).
- *
- * Enable at 4.1a: skipped until `src/core/dates.ts` exists, then it runs by itself.
  */
 
 import { readdirSync, readFileSync } from 'node:fs';
@@ -18,17 +16,12 @@ import {
 	graphOf,
 	issueCodes,
 	LONG_COUNT,
-	loadDatesApi,
+	datesApi,
 	names,
 	REIGN_NAMES,
 	type CalendarDef,
 	type DateReaderT,
-	type DatesApi,
 } from './dates-support';
-
-const api = await loadDatesApi();
-
-if (!api) it.todo('enable at 4.1a: sample trees read the same with a full calendar set; TreeDates equals yearOf (needs src/core/dates.ts)');
 
 /** Every kin block of every sample note, with the file name. */
 function sampleBlocks(): { file: string; source: string }[] {
@@ -73,9 +66,8 @@ describe('the sample trees themselves (guard against an empty test)', () => {
 	});
 });
 
-describe.skipIf(!api)('§14 r11: sample trees with a full calendar set', () => {
-	const A = api as DatesApi;
-	// Built inside the tests: a skipped suite still runs its body, and `A` is null before step 4.1a.
+describe('§14 r11: sample trees with a full calendar set', () => {
+	const A = datesApi;
 	const readers: [string, () => DateReaderT][] = [
 		['PLAIN_READER', () => A.PLAIN_READER],
 		['a ready reader with no calendars', () => A.compileCalendars([], true)],
@@ -125,8 +117,8 @@ describe.skipIf(!api)('§14 r11: sample trees with a full calendar set', () => {
 	});
 });
 
-describe.skipIf(!api)('§14 r9, r11: TreeDates of every sample tree with no calendars equals yearOf', () => {
-	const A = api as DatesApi;
+describe('§14 r9, r11: TreeDates of every sample tree with no calendars equals yearOf', () => {
+	const A = datesApi;
 
 	for (const [label, make] of [
 		['PLAIN_READER', () => A.PLAIN_READER],
@@ -191,8 +183,8 @@ describe.skipIf(!api)('§14 r9, r11: TreeDates of every sample tree with no cale
 	});
 });
 
-describe.skipIf(!api)('§14 r9: TreeDates is lazy and memoised', () => {
-	const A = api as DatesApi;
+describe('§14 r9: TreeDates is lazy and memoised', () => {
+	const A = datesApi;
 	const SRC = `people:
   - {id: a, name: A, born: "1100", died: "1180"}
   - {id: b, name: B, born: "c. 1150", parents: [a]}
@@ -278,8 +270,8 @@ titles:
 	});
 });
 
-describe.skipIf(!api)('§14 r1, r5: calendar-no-anchor from the tree-level facts', () => {
-	const A = api as DatesApi;
+describe('§14 r1, r5: calendar-no-anchor from the tree-level facts', () => {
+	const A = datesApi;
 	const ERA_ONE: CalendarDef = { id: 'E#0#0', name: 'Dawn', note: 'E.md', formats: ['{era} {year}'], kind: { type: 'eras', eras: [{ name: 'Dawn', start: 1 }] } };
 	const dated = (people: string, cals: CalendarDef[], ready = true) => {
 		const g = graphOf(`people:\n${people}`);

@@ -1,4 +1,5 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { speedTest } from './support/speed-test';
 
 vi.mock('obsidian', () => import('./acceptance/fake-obsidian'));
 vi.mock('@codemirror/language', () => ({ forceParsing: () => false, syntaxTree: () => ({ length: 0 }) }));
@@ -202,7 +203,7 @@ describe('D97: the Remove row in the picker', () => {
 		expect(removeRow(m)!.hasClass('dynasty-picture-row')).toBe(true);
 	});
 
-	it('a list of 2 000 pictures opens in under 300 ms with the row', () => {
+	speedTest('a list of 2 000 pictures opens in under 300 ms with the row', () => {
 		const many = Array.from({ length: 2000 }, (_, i) => file(`Art/Folder ${i % 100}/picture ${i}.png`));
 		const t0 = performance.now();
 		const { m } = pick({ remove: PICTURES_UI.removeArms, files: many, current: many[5] });

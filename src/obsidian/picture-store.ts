@@ -262,8 +262,8 @@ function sourceSize(s: CanvasImageSource): { w: number; h: number } {
 	return { w: side(x.naturalWidth, x.width), h: side(x.naturalHeight, x.height) };
 }
 
-/** Loads an `Image` from a URL, within the step limit. */
-function loadImage(url: string): Promise<HTMLImageElement> {
+/** Loads an `Image` from a URL with no time limit of its own (`save-picture.ts` has a loader with a limit, so the two keep different names). */
+function loadImageUnlimited(url: string): Promise<HTMLImageElement> {
 	const img = new Image();
 	const p = new Promise<HTMLImageElement>((resolve, reject) => {
 		img.onload = () => resolve(img);
@@ -306,7 +306,7 @@ export function defaultIO(app: App): PictureIO {
 			const url = URL.createObjectURL(new Blob([bytes], { type: MIME.svg }));
 			let img: HTMLImageElement;
 			try {
-				img = await loadImage(url);
+				img = await loadImageUnlimited(url);
 			} catch (e) {
 				URL.revokeObjectURL(url);
 				throw e;

@@ -183,9 +183,9 @@ describe('F5: after a stopped draw, Expand opens the family', () => {
 		// The session no longer holds the choice of the whole tree.
 		expect(handle.state.focus).toBeNull();
 		// Clear focus brings the stop bar back, because the user asks for the whole tree again.
-		expect(root.querySelector('.dynasty-focus')?.getAttribute('aria-pressed')).toBe('true');
+		expect(root.querySelector('.dynasty-focus')?.hasClass('is-active')).toBe(true);
+		// D263 B2: one tap on Focus clears the focus.
 		await press(root.querySelector('.dynasty-focus'));
-		await press(root.querySelector('.dynasty-focus-clear'));
 		expect(root.querySelector('.dynasty-large-bar')?.getAttribute('data-dynasty-large')).toBe('slow');
 	});
 

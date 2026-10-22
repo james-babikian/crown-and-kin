@@ -203,15 +203,16 @@ describe('bad input never throws', () => {
 
 describe('the memo and the key (§14 rule 9)', () => {
 	const C = cycles('C', ['year {year} of cycle {cycle}']);
-	it('the same text gives the same object until the memo holds 5 000 texts, then it is cleared', () => {
-		expect(MEMO_CAP).toBe(5000);
+	it('the same text gives the same object until the memo holds 20 000 texts, then it is cleared', () => {
+		// Spec §14 rule 15: the cap went from 5 000 to 20 000 texts.
+		expect(MEMO_CAP).toBe(20000);
 		const reader = compileCalendars([C], true);
 		const first = reader.read('year 1 of cycle 1')!;
 		expect(reader.read('year 1 of cycle 1')).toBe(first);
 		for (let n = 2; n <= MEMO_CAP; n++) reader.read(`year ${n} of cycle 1`);
-		// 4 999 other texts: the first is still there.
+		// 19 999 other texts: the first is still there.
 		expect(reader.read('year 1 of cycle 1')).toBe(first);
-		reader.read('year 5001 of cycle 1');
+		reader.read(`year ${MEMO_CAP + 1} of cycle 1`);
 		expect(reader.read('year 1 of cycle 1')).not.toBe(first);
 		expect(reader.read('year 1 of cycle 1')).toEqual(first);
 	});
@@ -347,7 +348,7 @@ describe('TreeDates (§14 rule 9)', () => {
 	});
 	it('a reader that wraps another one still finds the unanchored calendars', () => {
 		const inner = compileCalendars([cycles('Cyc', ['year {year} of cycle {cycle}'])], true);
-		const wrapper = { ready: true, key: inner.key, problems: [], read: (t: string | undefined) => inner.read(t) };
+		const wrapper = { ready: true, key: inner.key, problems: [], hasLists: inner.hasLists, read: (t: string | undefined) => inner.read(t) };
 		const dates = buildTreeDates(wrapper, [person({ id: 'a', born: 'year 5 of cycle 3' }), person({ id: 'b', born: '1203' })], []);
 		expect(dates.unanchored()).toEqual(['Cyc']);
 	});

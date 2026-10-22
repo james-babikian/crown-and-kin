@@ -5,9 +5,12 @@
  * list and the windows. The style rules (`dynasty-joined`, `dynasty-jitem`, `dynasty-jmark`, `is-lead`) come with the first caller.
  */
 
-/** Keeps a reign "(r. 1160–1207)" on one text line: no-break spaces inside the brackets, and no break after the dash. */
+/**
+ * Keeps a reign "(r. 1160–1207)" on one text line: no-break spaces inside the brackets, and no break after the dash. The thin spaces around the dash of a range with names
+ * (D278) become narrow no-break spaces, which are as thin and which never break.
+ */
 export function nb(text: string): string {
-	return text.replace(/\(([^)]*)\)/g, (m) => m.replace(/ /g, ' ').replace(/–/g, '–⁠'));
+	return text.replace(/\(([^)]*)\)/g, (m) => m.replace(/ /g, ' ').replace(/\u2009/g, '\u202f').replace(/–/g, '–⁠'));
 }
 
 /** Where one item of a joined text line sits on screen. */
@@ -32,7 +35,7 @@ export function leadItems(boxes: readonly ItemBox[]): number[] {
 /** A part of a joined text line: a text or an element. Empty parts are left out. */
 export type JoinKid = Node | string | null | undefined | false;
 
-const observed = new WeakSet<HTMLElement>();
+let observed = new WeakSet<HTMLElement>();
 let observer: ResizeObserver | null | undefined;
 
 // Read every place first (all marks shown), then change. The hidden mark leaves a fixed line break, so an item that now
@@ -50,6 +53,13 @@ function fixJoined(box: HTMLElement): void {
 		items[i].addClass('is-lead');
 		box.insertBefore(box.createEl('br', { cls: 'dynasty-jbreak' }), items[i]);
 	}
+}
+
+/** Stops watching every joined box (the plugin calls it when it is turned off). */
+export function stopJoinedWatch(): void {
+	observer?.disconnect();
+	observer = undefined;
+	observed = new WeakSet();
 }
 
 function observe(box: HTMLElement): void {

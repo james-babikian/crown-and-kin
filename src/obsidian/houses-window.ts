@@ -20,6 +20,7 @@ import { Notice, type App } from 'obsidian';
 import { armsColours } from '../core/arms-colours';
 import { houseNoteName, housePage, houseTableNote, type HousePage } from '../core/house-page';
 import { nb } from '../render/text-join';
+import { shownYears, titleWithNames } from '../render/tree-info';
 import type { FamilyGraph } from '../core/derive';
 import { deriveDated, type DatesFor } from '../view/calendar-index';
 import type { Op } from '../core/edit';
@@ -450,17 +451,18 @@ export class HousesWindow extends ListEditWindow {
 		const rows = body.createDiv({ cls: ['dynasty-rows', 'dynasty-hp-rows'] });
 		const all = hp?.rows ?? [];
 		if (!all.length) rows.createDiv({ cls: ['dynasty-sheet-none', 'dynasty-hp-none'], text: HOUSE_PAGE_UI.none });
-		const generation = this.showGeneration();
+		// The page shows plain rows; the tap that shows the card (spec §13.12 H1) stays where the tree view gives a way to do it.
+		const generation = this.showGeneration(), show = this.o.people?.show;
 		for (const p of all.slice(0, PEOPLE_ROWS)) {
-			// The page shows plain rows; the tap that shows the card (spec §13.12 H1) stays where the tree view gives a way to do it.
-			const show = this.o.people?.show;
 			// A plain full-width row: no chevron, no hairline (people-rows). The tap stays (spec §13.12), as a soft tint under the pointer.
 			const row = buildRow(rows, { cls: 'dynasty-hp-row', attr: { 'data-person': p.id }, ...(show ? { tap: () => this.guard(() => this.leaveThen(() => show(p.id))), chevron: false } : {}) });
 			// The name in bold, then the title with its reign; the reign never breaks (G.2, G.10).
 			row.title.createEl('b', { cls: 'dynasty-hp-name', text: p.name });
-			if (p.title) row.title.createSpan({ cls: 'dynasty-sob', text: ` · ${nb(p.title)}` });
-			const years = WINDOW_UI.personRowYears(p.born, p.died);
-			row.sub.setText(generation ? WINDOW_UI.personRowSub(p.generation, p.born, p.died) : years);
+			// The reign shows the names of its years, as a card does; the table note keeps the text as written (spec §14 rule 15).
+			if (p.title) row.title.createSpan({ cls: 'dynasty-sob', text: ` · ${nb(titleWithNames(this.data.g, p.id, p.title))}` });
+			// A range with a name or a word has a thin space on each side of its dash, as on the card (D278).
+			const { born, died, range } = shownYears(p.born, p.died, this.data.g.dates);
+			row.sub.setText(generation ? WINDOW_UI.personRowSub(p.generation, born, died, range) : WINDOW_UI.personRowYears(born, died, range));
 		}
 		if (all.length > PEOPLE_ROWS) body.createDiv({ cls: ['dynasty-sheet-none', 'dynasty-hp-more'], text: WINDOW_UI.andMore(all.length - PEOPLE_ROWS) });
 		if (!all.length || !this.o.people || !hp) return;

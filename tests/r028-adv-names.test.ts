@@ -3,6 +3,7 @@
 // Seeds are fixed and printed on failure. R028_DEEP=1 runs more random names.
 import { Resvg } from '@resvg/resvg-js';
 import { beforeAll, describe, expect, it } from 'vitest';
+import { speedTest } from './support/speed-test';
 import { deriveFamilies, type FamilyGraph } from '../src/core/derive';
 import { foldForMatch } from '../src/core/fold';
 import { checkNewId, makeIdFromName, slugify, uniqueId } from '../src/core/id-gen';
@@ -299,7 +300,7 @@ describe('X2 (4): the time of name lines grows about linearly with the length (f
 	};
 
 	for (const [shape, make] of Object.entries(shapes)) {
-		it(`${shape}: 20 000 characters take less than 40 times as long as 2 000 (linear is 10, the square is 100)`, () => {
+		speedTest(`${shape}: 20 000 characters take less than 40 times as long as 2 000 (linear is 10, the square is 100)`, () => {
 			const ratios: string[] = [];
 			for (const [fn, call] of Object.entries(calls)) {
 				const small = make(2000);

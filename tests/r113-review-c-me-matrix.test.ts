@@ -108,7 +108,7 @@ describe('spec §13.18 rule 5: the first view against a model of the spec', () =
 			const src = line(c.size, ...opts);
 			if (c.place === 'preview' && c.device === 'phone') {
 				const handle = fakeHandle('n.md', src);
-				if (c.edited) handle.state.lastEdited = c.edited;
+				if (c.edited) handle.state.lastSaved = c.edited;
 				const root = (await embed(src, { handle })).el.querySelector('.dynasty-root')!;
 				const gotList = { id: root.getAttribute('data-dynasty-focus'), from: root.getAttribute('data-dynasty-list-from') };
 				const wantList = expectedList(c);

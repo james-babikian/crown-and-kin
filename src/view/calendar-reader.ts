@@ -4,7 +4,7 @@
  * read by the plain reader, which finds the year only at the start. The limit lives here, in the view layer, so `src/core/dates.ts` stays as it is.
  */
 
-import { PLAIN_READER, compileCalendars, type Calendar, type CalendarProblem, type DateReader } from '../core/dates';
+import { PLAIN_READER, compileCalendars, type Calendar, type CalendarProblem, type DateReader, type NameList } from '../core/dates';
 
 /** The longest text, in characters, that a calendar matcher reads. */
 export const MAX_DATE_TEXT = 500;
@@ -15,9 +15,10 @@ export function capReader(reader: DateReader): DateReader {
 		ready: reader.ready,
 		key: reader.key,
 		problems: reader.problems,
+		hasLists: reader.hasLists,
 		read: (text) => (typeof text === 'string' && text.length > MAX_DATE_TEXT ? PLAIN_READER.read(text) : reader.read(text)),
 	};
 }
 
-/** `compileCalendars` with the limit of `capReader`. */
-export const compileCapped = (calendars: Calendar[], ready: boolean, problems: CalendarProblem[] = []): DateReader => capReader(compileCalendars(calendars, ready, problems));
+/** `compileCalendars` with the limit of `capReader`; `plainLists` are the name lists of the plain years. */
+export const compileCapped = (calendars: Calendar[], ready: boolean, problems: CalendarProblem[] = [], plainLists: NameList[] = []): DateReader => capReader(compileCalendars(calendars, ready, problems, plainLists));

@@ -89,7 +89,7 @@ function parentEntries(p: Parsed, item: YAMLMap): { pair?: Pair; seq?: YAMLSeq; 
 const rawParents = (person: RawMap): Raw[] => (Array.isArray(person.parents) ? [...person.parents] : isEmpty(person.parents) ? [] : [person.parents]);
 
 /** A parent entry in the §4.2 write form. */
-function entryText(id: string, type: ParentKind): string {
+function parentEntryText(id: string, type: ParentKind): string {
 	return type === 'birth' ? flowText(id) : `{id: ${flowText(id)}, type: ${type}}`;
 }
 const entryRaw = (id: string, type: ParentKind): Raw => (type === 'birth' ? id : { id, type });
@@ -184,7 +184,7 @@ function addPerson(ctx: OpContext, op: AddPerson): EditResult {
 		if (key === 'id') continue;
 		if (key === 'parents') {
 			if (!parents.length) continue;
-			const text = `[${parents.map((r) => entryText(r.id, r.type)).join(', ')}]`;
+			const text = `[${parents.map((r) => parentEntryText(r.id, r.type)).join(', ')}]`;
 			person.parents = parents.map((r) => entryRaw(r.id, r.type));
 			block.push(`parents: ${text}`);
 			flowParts.push(`parents: ${text}`);
@@ -312,7 +312,7 @@ function unionToName(ctx: OpContext, index: number, placed: string[]): { id: str
 function appendParent(p: Parsed, item: YAMLMap, id: string, type: ParentKind): Patch | Refusal {
 	const src = p.src;
 	const layout = layoutOf(src);
-	const entry = entryText(id, type);
+	const entry = parentEntryText(id, type);
 	const { pair, seq, entries } = parentEntries(p, item);
 	if (seq) {
 		if (seq.flow) {

@@ -14,8 +14,25 @@ import type { SessionFocus } from './focus-mode';
 export interface BlockState {
 	/** The view to restore after a re-render; set once the user moved the view, and before each write. */
 	view: View | null;
-	/** The person most recently edited in this block: the start person (spec §5.5). */
+	/** The person most recently edited in this block: the start person (spec §5.5). Every write of the person window sets it, also an in-place one. */
 	lastEdited: string | null;
+	/**
+	 * 0.3.3 (B1): the person of the last Save that closed a person window. Only this moves the phone list (rung 4 of its start chain, D144); an in-place write
+	 * of an open window (a parent type, a removed parent, a moved sibling, an edited partnership) sets `lastEdited` but not this, so the list stays
+	 * where the reader left it. Optional so that `newBlockState()` stays as it is.
+	 */
+	lastSaved?: string | null;
+	/**
+	 * 0.3.3 (B1): an open person window wrote in place (a write that is not a Save), so the phone list behind it keeps the person it stands on, also when the
+	 * data would give it another start (the oldest person who has a child can change with a parent type). The window sets it and ends it when it closes or
+	 * saves. Optional so that `newBlockState()` stays as it is.
+	 */
+	listHold?: boolean;
+	/**
+	 * 0.3.3 (B1): how many person windows that held the list have closed. A list that has not read the latest count keeps the person it stands on at its
+	 * next draw, once: a draw can come after the window (a write that ended late, a change of the note), and the list must not move then. Optional like `listHold`.
+	 */
+	listKeep?: number;
 	/** A person to highlight and show once, in every view that renders before `until`. */
 	highlight: { id: string; until: number } | null;
 	/**
@@ -118,6 +135,7 @@ export function endSessionFocus(st: BlockState): void {
 	st.autoFolds = undefined;
 	st.autoFor = undefined;
 	st.listBack = undefined;
+	st.listHold = undefined;
 	st.largeTapped = undefined;
 }
 
@@ -134,6 +152,7 @@ export function carryState(from: BlockState, to: BlockState): void {
 	}
 	if (!Object.keys(to.views).length) to.views = { ...from.views };
 	to.lastEdited ??= from.lastEdited;
+	to.lastSaved ??= from.lastSaved;
 	to.highlight ??= from.highlight;
 	to.focus ??= from.focus;
 	if (to.autoFocus === null && from.autoFocus !== null) {

@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect } from 'vitest';
+import { speedTest } from './support/speed-test';
 import { computeRelations } from '../src/core/relations';
 import { build, fixture } from './helpers';
 
@@ -16,7 +17,7 @@ const MEDIAN_LIMIT = 20;
 const MAX_LIMIT = 60;
 
 describe('computeRelations timing (spec §13.1)', () => {
-	it(`fixture 7, every person marked: median under ${MEDIAN_LIMIT} ms, slowest under ${MAX_LIMIT} ms (warm)`, () => {
+	speedTest(`fixture 7, every person marked: median under ${MEDIAN_LIMIT} ms, slowest under ${MAX_LIMIT} ms (warm)`, () => {
 		const { g } = build(fixture('07'));
 		const ids = g.people.map((p) => p.id);
 		for (const me of ids) computeRelations(g, me);

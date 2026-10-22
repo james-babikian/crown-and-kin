@@ -1,5 +1,5 @@
 /*
- * Reads of the page that the tree view needs (moved out of `src/obsidian/tree-view.ts` in WP-4 step 4.3 to keep that file within its size ceiling):
+ * Reads of the page that the tree view needs (`tree-view-lifecycle.ts`, `tree-view-placement.ts`, `tree-view.ts`; moved out of `tree-view.ts` in WP-4 step 4.3 to keep that file within its size ceiling):
  * the fonts of a block through a probe element, and the safe-area insets from the view's probe element. They read computed styles only.
  */
 

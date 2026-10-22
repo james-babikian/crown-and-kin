@@ -7,7 +7,7 @@
  * `through-spouse` key of a holder.
  */
 
-import { PLAIN_READER, type DateReader, type ReadDate, type TreeDates } from './dates';
+import { nameMismatches, PLAIN_READER, type DateReader, type ReadDate, type TreeDates } from './dates';
 import { codedIssue, type CodedIssue, type IssueCode, type IssueParams } from './messages';
 import { readPortraitCrop } from './portrait-crop';
 import { DOUBTFUL_DIED, isDead, readInherit, readRule, resolveSpouse, type SpouseWorld } from './succession-keys';
@@ -316,7 +316,7 @@ export function validateTree(tree: Tree, options: ValidateOptions = {}): Validat
 
 	breakCycles(people, refs, byId, out);
 	const titles = validateTitles(tree.titles ?? [], people, byId, refs, unions, out, options.dates);
-	calendarProblems(options.dates, out);
+	calendarProblems(options.dates, out, people);
 
 	return { people, byId, houses, unions, refs, unionIds, titles, issues: out.issues };
 }
@@ -347,6 +347,13 @@ function validateTitles(written: readonly Title[], people: Person[], byId: Map<s
 			holders.push(h);
 		}
 		successionWarnings(t, byId, out, reader);
+		if (reader.hasLists) {
+			nameMismatchWarnings(reader, t.year, 'year', t.name, out);
+			for (const h of holders) {
+				nameMismatchWarnings(reader, h.from, 'reign', t.name, out);
+				nameMismatchWarnings(reader, h.to, 'reign', t.name, out);
+			}
+		}
 		if (reader.ready && needsYear(t)) {
 			titleDateWarnings(t, holders, reader, out);
 			needing.push({ t, holders });
@@ -431,11 +438,22 @@ const calendarsOf = (r: ReadDate): string[] => [...(r.calendar !== undefined ? [
 function warnDate(reader: DateReader, text: string | undefined, where: 'year' | 'reign' | 'born' | 'died', owner: Person | string, out: Collector, seen?: Set<string>) {
 	const r = text === undefined ? undefined : reader.read(text);
 	for (const w of r?.warnings ?? []) {
+		// The wrong name has its own path: it shows for every title, not only for a title that needs the year (spec §14 rule 14).
+		if (w === 'calendar-name-mismatch') continue;
 		const key = `${w}|${where}|${text}`;
 		if (seen?.has(key)) continue;
 		seen?.add(key);
 		const base: IssueParams = typeof owner === 'string' ? { where, value: text!, title: owner } : { where, value: text!, person: owner.name };
 		out.warn(w, w === 'fits-two-calendars' ? { ...base, calendars: calendarsOf(r!) } : base, typeof owner === 'string' ? undefined : [owner.id]);
+	}
+}
+
+/** Spec §14 rule 14: `calendar-name-mismatch` for one date text, once for each list with a wrong written name. */
+function nameMismatchWarnings(reader: DateReader, text: string | undefined, where: 'year' | 'reign' | 'born' | 'died', owner: Person | string, out: Collector) {
+	if (text === undefined) return;
+	for (const m of nameMismatches(reader.read(text))) {
+		const base: IssueParams = typeof owner === 'string' ? { where, value: text, title: owner } : { where, value: text, person: owner.name };
+		out.warn('calendar-name-mismatch', { ...base, list: m.list, expected: m.expected, written: m.written }, typeof owner === 'string' ? undefined : [owner.id]);
 	}
 }
 
@@ -463,12 +481,20 @@ function personDateWarnings(needing: readonly { t: Title; holders: readonly Hold
 	}
 }
 
-/** The problems of the calendar set (a missing or doubled calendar note) as tree warnings, once the calendars are ready (spec §14 rules 3 and 7). */
-function calendarProblems(reader: DateReader | undefined, out: Collector) {
+/**
+ * The problems of the calendar set (a missing or doubled calendar note) as tree warnings, once the calendars are ready (spec §14 rules 3 and 7).
+ * Spec §14 rule 14: a wrong written name shows for every person, and only a reader with lists reads the born and died dates for it.
+ */
+function calendarProblems(reader: DateReader | undefined, out: Collector, people: readonly Person[]) {
 	if (!reader?.ready) return;
 	for (const p of reader.problems) {
 		if (p.key === 'calendar-note-missing') out.warn(p.key, { note: p.note ?? '' });
-		else out.warn(p.key, { calendar: p.calendar ?? '', note: p.note ?? '', other: p.other ?? '' });
+		else out.warn(p.key, { calendar: p.calendar ?? '', note: p.note ?? '', other: p.other ?? '', ...(p.list !== undefined ? { list: p.list } : {}) });
+	}
+	if (!reader.hasLists) return;
+	for (const p of people) {
+		nameMismatchWarnings(reader, p.born, 'born', p, out);
+		nameMismatchWarnings(reader, p.died, 'died', p, out);
 	}
 }
 

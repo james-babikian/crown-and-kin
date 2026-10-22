@@ -99,7 +99,7 @@ const wholeIn = (v: unknown, r: { min: number; max: number }): v is number => ty
  * this version. Both `normaliseSettings` (invalid becomes the default) and `readStoredSettings` (invalid is
  * also kept as stored, spec §9) use it, so the two can never disagree on what is valid.
  */
-const bool = (v: unknown): boolean | undefined => (typeof v === 'boolean' ? v : undefined);
+const boolOf = (v: unknown): boolean | undefined => (typeof v === 'boolean' ? v : undefined);
 const choice = <T extends string>(list: readonly T[], v: unknown): T | undefined => list.find((x) => x === v);
 const whole =
 	(r: { min: number; max: number }) =>
@@ -113,13 +113,13 @@ const height = (v: unknown): number | undefined => {
 
 const READERS: { [K in keyof DynastySettings]: (v: unknown) => DynastySettings[K] | undefined } = {
 	embedHeightDesktop: height,
-	showDates: bool,
-	showRelations: bool,
-	oneParentUnknown: bool,
-	showPortraits: bool,
-	showHouseGeneration: bool,
+	showDates: boolOf,
+	showRelations: boolOf,
+	oneParentUnknown: boolOf,
+	showPortraits: boolOf,
+	showHouseGeneration: boolOf,
 	focusGenerations: whole(GENERATIONS),
-	updateLinks: bool,
+	updateLinks: boolOf,
 	// Too long is invalid, not cut: a newer version may allow more, and the raw text is then kept and written back unchanged.
 	breakWords: (v) => (typeof v === 'string' && v.length <= BREAK_WORDS_MAX ? v : undefined),
 	reduceMotion: (v) => choice(REDUCE_MOTIONS, v),
@@ -128,7 +128,7 @@ const READERS: { [K in keyof DynastySettings]: (v: unknown) => DynastySettings[K
 	oldAge: whole(OLD_AGE),
 	youngDeathAge: whole(YOUNG_DEATH_AGE),
 	armsOnCards: (v) => choice(ARMS_ON_CARDS, v),
-	warnManyParents: bool,
+	warnManyParents: boolOf,
 };
 
 const KNOWN_KEYS = Object.keys(DEFAULT_SETTINGS) as (keyof DynastySettings)[];

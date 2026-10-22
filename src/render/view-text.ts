@@ -72,15 +72,15 @@ export const FOCUS_UI = {
 	focus: 'Focus on a person in the tree',
 	pickerTitle: 'Focus on a person',
 	pickerPlaceholder: PERSON_PLACEHOLDER,
-	/** D132: the Focus button of the toolbar chooses a person, and clears the focus while one shows. */
+	/** D132, D263 B2: the Focus button of the toolbar opens the list (Choose a person) with no focus on, and clears the focus in one tap while one shows. */
 	choose: 'Choose a person',
 	chooseLabel: 'Choose a person: show only the family of the person that you choose',
 	clear: 'Clear focus',
 	clearLabel: 'Clear focus: show all people again',
 	/** D246 (F2): the sentence of the bar at the top of the tree while a focus shows. */
 	bar: (name: string) => `Focus on ${name}`,
-	/** The accessible name of the Focus button while a focus shows. */
-	focusOn: 'Focus is on. Choose a person to change it. Clear the focus to show all people.',
+	/** The accessible name and the tooltip of the Focus button while a focus shows: it says what a tap does (D263 B2). */
+	focusOn: 'Focus is on. Select this button to clear the focus and show all people.',
 	focusHere: 'Focus here',
 	focusHereLabel: (name: string) => `Focus here: show only the family of ${name}`,
 	pin: 'Pin focus here',

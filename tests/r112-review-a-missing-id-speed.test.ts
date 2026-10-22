@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect } from 'vitest';
+import { speedTest } from './support/speed-test';
 import { parseDynasty } from '../src/core/parse';
 
 // Review round, area A (core), 0.2.2. Finding 1: the "has no id" example of a person (D104,
@@ -9,7 +10,7 @@ import { parseDynasty } from '../src/core/parse';
 const noIds = (n: number) => 'people:\n' + Array.from({ length: n }, (_, i) => `  - name: Person ${i}`).join('\n') + '\n';
 
 describe('reading people with no id stays linear (spec §7.7, §8)', () => {
-	it('20 000 people with no id are read in under 3 s (main: about 0.2 s; 0.2.2 head: about 7 s)', () => {
+	speedTest('20 000 people with no id are read in under 3 s (main: about 0.2 s; 0.2.2 head: about 7 s)', () => {
 		parseDynasty(noIds(500)); // warm up
 		const body = noIds(20000);
 		const t0 = performance.now();
@@ -19,7 +20,7 @@ describe('reading people with no id stays linear (spec §7.7, §8)', () => {
 		expect(ms).toBeLessThan(3000);
 	}, 60000);
 
-	it('four times the people does not take sixteen times as long (linear, not quadratic)', () => {
+	speedTest('four times the people does not take sixteen times as long (linear, not quadratic)', () => {
 		const time = (n: number) => {
 			const body = noIds(n);
 			const t0 = performance.now();

@@ -18,6 +18,13 @@ export { SUCCESSION_UI };
 /** Texts that two or more windows show in the same words (D112 X10): one constant each. */
 const STALE_TEXT = 'The tree changed after you opened this window. The plugin did not save. Your changes are still in the window. Select Save again to save them.';
 const MAKE_NOTE_TEXT = 'Make a note with this table';
+/** The four texts of a Save that the plugin cannot do, the same in the Houses window and in the Notices about writes. */
+const SAVE_FAILED = {
+	missing: 'The plugin cannot find this tree in the note. It did not save your changes. Your changes are still in the window.',
+	invalid: 'The plugin cannot save. The tree text has an error. Your changes are still in the window.',
+	refused: 'The plugin cannot save this change safely. The note did not change. Your changes are still in the window.',
+	failed: 'The plugin cannot save your changes because of an error in the plugin. Your changes are still in the window.',
+} as const;
 
 /** The edit sheet (spec §6.3, §7.4). */
 export const SHEET = {
@@ -278,10 +285,7 @@ export const HOUSES = {
 	needName: 'Enter a name for each house.',
 	deleted: (houses: string[]) => (houses.length === 1 ? `The plugin deleted ${houses[0]}. You can undo this.` : `The plugin deleted ${houses.length} houses. You can undo this.`),
 	stale: STALE_TEXT,
-	missing: 'The plugin cannot find this tree in the note. It did not save your changes. Your changes are still in the window.',
-	invalid: 'The plugin cannot save. The tree text has an error. Your changes are still in the window.',
-	refused: 'The plugin cannot save this change safely. The note did not change. Your changes are still in the window.',
-	failed: 'The plugin cannot save your changes because of an error in the plugin. Your changes are still in the window.',
+	...SAVE_FAILED,
 } as const;
 
 /**
@@ -425,8 +429,8 @@ export const TITLES_UI = {
 		titles === 1 ? `The plugin also removes ${name} from the holders of 1 title.` : `The plugin also removes ${name} from the holders of ${titles} titles.`,
 } as const;
 
-function personRowYears(born: string, died: string): string {
-	return born && died ? `${born}–${died}` : born ? `b. ${born}` : died ? `d. ${died}` : '';
+function personRowYears(born: string, died: string, range?: string): string {
+	return born && died ? (range ?? `${born}–${died}`) : born ? `b. ${born}` : died ? `d. ${died}` : '';
 }
 
 /**
@@ -500,7 +504,7 @@ export const WINDOW_UI = {
 	// The People section of the house page (D202 (2), G.10).
 	/** The years of a person row: "1131–1161", "b. 1131" for a birth year alone, "d. 1161" for a death year alone. */
 	personRowYears,
-	personRowSub: (generation: number, born: string, died: string) => [`Generation ${generation}`, personRowYears(born, died)].filter(Boolean).join(' · '),
+	personRowSub: (generation: number, born: string, died: string, range?: string) => [`Generation ${generation}`, personRowYears(born, died, range)].filter(Boolean).join(' · '),
 	// The Find window (G.3).
 	findRowSub: (relation: string, years: string, title: string) => [relation, years, title].filter(Boolean).join(' · '),
 } as const;
@@ -672,13 +676,10 @@ export const WRITE_TEXT = {
 	stale: 'The tree changed after you opened it. The plugin did not save your changes. It loaded the tree again.',
 	/** F11: the one text of a stale Save in the edit sheet, the Houses window and the Titles window. The Notice and the red line in the window say the same words. */
 	staleWindow: STALE_TEXT,
-	missing: 'The plugin cannot find this tree in the note. It did not save your changes. Your changes are still in the window.',
+	...SAVE_FAILED,
 	personGone: 'This person is not in the tree now. The plugin cannot save your changes. You can copy your text from the window.',
 	personNotFound: 'This person is not in the tree now.',
 	blocked: 'The plugin cannot save. Editing is off for this tree.',
-	invalid: 'The plugin cannot save. The tree text has an error. Your changes are still in the window.',
-	refused: 'The plugin cannot save this change safely. The note did not change. Your changes are still in the window.',
-	failed: 'The plugin cannot save your changes because of an error in the plugin. Your changes are still in the window.',
 	heightFailed: 'The plugin cannot save the new height of the tree.',
 	undoCommand: 'Undo last tree edit',
 	undoDone: 'The plugin undid the last tree edit.',

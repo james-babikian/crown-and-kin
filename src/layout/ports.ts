@@ -57,7 +57,7 @@ export const pairOf = (fu: FamilyUnion): string => {
 };
 
 /** `pairOf` of the union with this key. */
-export const pairKey = (g: FamilyGraph, union: string): string => pairOf(g.unionByKey.get(union)!);
+export const unionPairKey = (g: FamilyGraph, union: string): string => pairOf(g.unionByKey.get(union)!);
 
 /** Whether two cards of one row are joined by a bar (side-by-side partners). */
 export const barred = (spec: Skeleton, g: FamilyGraph, a: Item, b: Item): boolean => (g.unionsOf.get(a.id) ?? []).some((k) => spec.couples.get(k)!.kind === 'bar' && g.unionByKey.get(k)!.partners.includes(b.id));
@@ -128,7 +128,7 @@ export function requestPorts(spec: Skeleton, g: FamilyGraph, geo: Geometry, side
 	const barPair = new Map<string, string>();
 	for (const fu of g.unions) {
 		if (couples.get(fu.key)!.kind !== 'bar') continue;
-		const pair = pairKey(g, fu.key);
+		const pair = unionPairKey(g, fu.key);
 		barPair.set(fu.key, pair);
 		const list = barSlots.get(pair);
 		if (list) list.push(fu.key);
@@ -206,7 +206,7 @@ export function hangRooms(spec: Skeleton, req: Requests, g: FamilyGraph, geo: Ge
 	const barPair = new Map<string, string>();
 	for (const c of spec.couples.values()) {
 		if (c.kind !== 'bar') continue;
-		const pair = pairKey(g, c.union);
+		const pair = unionPairKey(g, c.union);
 		barPair.set(c.union, pair);
 		barHalfOf.set(pair, Math.max(barHalfOf.get(pair) ?? 0, markHalf(familyOf.get(c.union)?.control, geo, !!side)));
 	}

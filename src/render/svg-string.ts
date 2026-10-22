@@ -33,8 +33,10 @@ import { cardNameLines, titleLines, type NameMeasure, type NameRun } from './nam
 import { fixedColour, fontOf, savedFrame, xmlText, type PictureMap, type SavedFrame, type SavedParts } from './saved-picture';
 import { DEAD_STRIP_OPACITY, DEFAULT_DARK, DEFAULT_LIGHT, FADED_OPACITY, HEIR_LOOK, ME_LOOK, ME_RING_INNER, ON_LINE_EXTRA, SAVED_CARD_RADIUS, STROKES, TAG_MARK, UNION_MARKS, stripColour, tagMarkSlot, unionMark, unionShape, type Palette, type UnionShape } from './styles';
 import { LEGEND_DEAD_DOUBT_LABEL, LEGEND_DEAD_LABEL, LEGEND_LABELS, SIGN_LEGEND_LABEL } from './legend-text';
-import { dateLine, farTagName, splitMaybe } from './tree-info';
-import { ribbonPath, truncate, truncateWithMaybe } from './view-math';
+import { fitNamed, pickReign } from './date-fit';
+import { dateLine, farTagName, shownReign } from './tree-info';
+import { fitRelationText } from './relation-fit';
+import { ribbonPath, truncate } from './view-math';
 import { ME_WORD } from './view-text';
 
 /** The fade of a part beside the finder's line, as an SVG attribute (D47). */
@@ -44,6 +46,8 @@ const esc = (s: string) => xmlText(s).replace(/&/g, '&amp;').replace(/</g, '&lt;
 
 /** Approximate advance of one character in em, for a sans-serif UI font. */
 function charEm(ch: string): number {
+	// The thin space around the dash of a date range with a name (D278).
+	if (ch === String.fromCharCode(0x2009)) return 0.2;
 	if ("iljt.,:;'|!()[] fr".includes(ch)) return 0.3;
 	if ('mwMW'.includes(ch)) return 0.82;
 	if (ch >= 'A' && ch <= 'Z') return 0.64;
@@ -215,7 +219,8 @@ export function renderSvg(g: FamilyGraph, layout: TreeLayout, edges: EdgeDrawing
 		const titleText = cl ? cl.title : p.title;
 		const reign = cl && opts.showDates !== false ? cl.reign : undefined;
 		// B.3.2: the scene passes the same lines, and the dates line counts even when "Show dates on cards" is off (the scene hides it by a class and keeps its room).
-		const shown: ShownLines = { title: !!(titleText || reign), dates: !!dateLine(p, g.dates) };
+		const dates = dateLine(p, g.dates, { names: 'none' });
+		const shown: ShownLines = { title: !!(titleText || reign), dates: !!dates };
 		// D177 (10): a card with no relation word, in a tree with relation words, centres its text in the whole card.
 		const t = textOf(count, box.tallTitle, shown, geo.relationLine === true && !!opts.relations && !opts.relations.get(p.id)?.text);
 		const tx = box.x + (t.anchorX ?? t.padX);
@@ -271,27 +276,24 @@ export function renderSvg(g: FamilyGraph, layout: TreeLayout, edges: EdgeDrawing
 		const smallMeasure = (s: string) => (measured ? measured(s, smallFont) : textWidth(s, t.smallSize));
 		if (cl && reign) {
 			// D61: two text lines only on a card the layout made taller for them; else one, cut with "…".
-			titles = titleLines(titleText, reign, t.textW, smallMeasure);
+			titles = titleLines(titleText, pickReign(titleText, shownReign(cl, g.dates, 'shown'), reign, t.textW, smallMeasure, t.title2Baseline !== undefined), t.textW, smallMeasure);
 			if (titles.length > 1 && t.title2Baseline === undefined) titles = [cutSmall([titleText, reign].filter(Boolean).join(' '), t.textW)];
 		} else if (titleText) titles = [cutSmall(titleText, t.textW)];
 		titles.forEach((line, i) => {
 			out.push(`<text x="${tx}" y="${box.y + (i ? t.title2Baseline! : t.titleBaseline)}"${anchor} font-size="${t.smallSize}" fill="${c.textMuted}">${esc(line)}</text>`);
 		});
-		const dates = dateLine(p, g.dates);
 		const datesY = hasTitle ? t.datesBaseline : t.titleBaseline;
 		const showYears = !!dates && !(saved && opts.showDates === false);
-		if (showYears) out.push(`<text x="${tx}" y="${box.y + datesY}"${anchor} font-size="${t.smallSize}" fill="${c.dates}">${esc(cutSmall(dates!, t.textW))}</text>`);
+		if (showYears) out.push(`<text x="${tx}" y="${box.y + datesY}"${anchor} font-size="${t.smallSize}" fill="${c.dates}">${esc(fitNamed(dateLine(p, g.dates)!, dates!, t.textW, smallMeasure, (s) => cutSmall(s, t.textW)))}</text>`);
 		const relation = opts.relations?.get(p.id)?.text;
 		const relY = relationY(t);
 		if (relation && relY !== undefined) {
 			const style = isMe ? `font-style="italic" font-weight="${esc(nameWeight)}"` : 'font-style="italic"';
 			// The word may use the width that the card gives it; every other line keeps its column. 0.2.8: the word is muted; "You" is in the text colour.
 			const relW = t.relationW ?? t.textW;
-			const { word, suffix } = splitMaybe(relation);
 			const relFont = relationFontOf(t.smallSize, fonts.text, isMe, fonts.bold);
-			const relText = suffix
-				? truncateWithMaybe(word, suffix, relW, (s) => (measured ? measured(s, relFont) : textWidth(s, t.smallSize, isMe)))
-				: measured ? cutWith(relation, relW, relFont) : fit(relation, relW, t.smallSize, isMe);
+			// D268: the short forms (R1 to R3) before a cut, by the measure of this picture; the saved picture has its own, the live view has its own.
+			const relText = fitRelationText(relation, relW, (s) => (measured ? measured(s, relFont) : textWidth(s, t.smallSize, isMe)));
 			out.push(`<text x="${tx}" y="${box.y + relY}"${anchor} font-size="${t.smallSize}" ${style} fill="${isMe ? c.text : c.textMuted}"${di(`relation:${p.id}`)}>${esc(relText)}</text>`);
 		}
 		// M9: the pictures. Arms with a problem show nothing; a portrait always has its frame (B1, B9).

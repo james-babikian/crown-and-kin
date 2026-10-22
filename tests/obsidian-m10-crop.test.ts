@@ -8,7 +8,7 @@ import { TFile as VaultFile } from 'obsidian';
 import type { Op } from '../src/core/edit';
 import { automaticCrop, type CropFraction } from '../src/core/portrait-crop';
 import { applyOp } from '../src/core/yaml-edit';
-import { CROP_COPY_PX, dragCrop, openCropTool, sideOf, sliderOf, toolSizes, wheelFactor } from '../src/obsidian/crop-tool';
+import { CROP_COPY_PX, dragCrop, openCropTool, sideOf, sliderOf, toolSizes, cropWheelFactor } from '../src/obsidian/crop-tool';
 import { EditSheet } from '../src/obsidian/edit-sheet';
 import type { CropResult } from '../src/obsidian/crop-tool';
 import { createPictureStore, type CopyBox, type PictureCopy, type PictureIO, type PictureStore } from '../src/obsidian/picture-store';
@@ -189,10 +189,10 @@ describe('C4: the tool\'s steps', () => {
 	});
 
 	it('the wheel factor is exp(-deltaY x 0.002)', () => {
-		expect(wheelFactor(0)).toBe(1);
-		expect(wheelFactor(-100)).toBeCloseTo(Math.exp(0.2), 12);
-		expect(wheelFactor(100)).toBeCloseTo(Math.exp(-0.2), 12);
-		expect(wheelFactor(Number.NaN)).toBe(1);
+		expect(cropWheelFactor(0)).toBe(1);
+		expect(cropWheelFactor(-100)).toBeCloseTo(Math.exp(0.2), 12);
+		expect(cropWheelFactor(100)).toBeCloseTo(Math.exp(-0.2), 12);
+		expect(cropWheelFactor(Number.NaN)).toBe(1);
 	});
 
 	it('a drag of (dx, dy) screen px moves the crop by (-dx, -dy) x side x short / frame picture px', () => {

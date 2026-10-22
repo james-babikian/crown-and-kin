@@ -24,6 +24,8 @@ body {
 	--dynasty-muted: var(--text-muted);
 	--dynasty-link: var(--text-accent);
 	--dynasty-error: var(--text-error);
+	/* The mark of a quiet warning (D278): the theme's warning colour. */
+	--dynasty-warn-mark: var(--text-warning);
 	/* The text on the accent: the theme's own pair. The theme reader replaces it at run time with black or white where the pair is under 4.5:1. */
 	--dynasty-on-accent: var(--text-on-accent);
 }
@@ -33,6 +35,8 @@ body {
 		--dynasty-edge: color-mix(in srgb, var(--text-normal) 55%, var(--modal-background));
 		--dynasty-btn-edge: var(--dynasty-edge);
 		--dynasty-error: color-mix(in srgb, var(--text-error) 85%, var(--text-normal));
+		/* A little toward the text colour, so the mark keeps 3:1 (non-text contrast) on a light window. */
+		--dynasty-warn-mark: color-mix(in srgb, var(--text-warning) 80%, var(--text-normal));
 		/* The accent, pulled toward the text colour so that a link reaches 4.5:1 (5.6:1 or more on the surfaces of the default light and dark themes). */
 		--dynasty-link: color-mix(in srgb, var(--text-accent) 70%, var(--text-normal));
 	}

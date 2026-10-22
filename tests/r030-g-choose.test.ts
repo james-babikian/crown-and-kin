@@ -211,10 +211,8 @@ describe('the phone: "Choose a person" on the bar above the phone top', () => {
 	}
 
 	async function clearFocus(root: FEl): Promise<void> {
+		// D263 B2: while a focus shows, one tap on Focus clears it.
 		click(root.querySelector('.dynasty-focus')!);
-		await settle();
-		const items = root.querySelectorAll('.dynasty-popover-focus .dynasty-popover-item');
-		click(items[items.length - 1]);
 		await settle();
 		resizeAll();
 		flushFrames();

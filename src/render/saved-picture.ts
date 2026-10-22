@@ -52,7 +52,8 @@ export function savedLegend(g: FamilyGraph, laid: LaidOut): SavedLegendContent {
 	let doubt = false;
 	for (const id of laid.layout.persons.keys()) {
 		const p = g.byId.get(id);
-		const text = p ? dateLine(p, g.dates) : undefined;
+		// Only the sign is looked for here, so no name of a year is added (spec §14 rule 15).
+		const text = p ? dateLine(p, g.dates, { names: 'none' }) : undefined;
 		if (!text?.includes('†')) continue;
 		if (text.includes('†?')) doubt = true;
 		else dead = true;

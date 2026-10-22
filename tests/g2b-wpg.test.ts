@@ -83,10 +83,8 @@ async function mount(source: string, o: { host?: Host; handle?: FakeHandle | nul
 
 
 async function clearFocusPhone(root: FEl): Promise<void> {
+	// D263 B2: one tap on Focus clears the focus.
 	click(root.querySelector('.dynasty-focus')!);
-	await settle();
-	const items = root.querySelectorAll('.dynasty-popover-focus .dynasty-popover-item');
-	click(items[items.length - 1]);
 	await settle();
 	resizeAll();
 	flushFrames();

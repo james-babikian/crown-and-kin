@@ -6,23 +6,17 @@
  * The numbers are worked out by hand from the rule, never taken from a run:
  *   cycle:  year Y of cycle C = S + (C - 1) * L + (Y - 1)        (The Long Count: S = 1, L = 60)
  *   era:    year Y of era E   = S(E) + (Y - 1)
- *
- * Enable at 4.1a: the whole file is skipped until `src/core/dates.ts` exists, then it runs by itself.
  */
 
-import { existsSync, readFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { yearOf } from '../src/core/succession-keys';
-import { ALDRIC, copyOf, FULL_SET, JAPAN, LONG_COUNT, loadDatesApi, namedBy, names, QING, REIGN_NAMES, type CalendarDef, type DatesApi } from './dates-support';
-
-const api = await loadDatesApi();
-
-if (!api) it.todo('enable at 4.1a: the case table of §14 rules 4 and 5 (needs src/core/dates.ts)');
+import { ALDRIC, copyOf, FULL_SET, JAPAN, LONG_COUNT, datesApi, namedBy, names, QING, REIGN_NAMES, type CalendarDef } from './dates-support';
 
 type Row = [text: string, year: number | undefined, warnings?: string[]];
 
-describe.skipIf(!api)('§14 r4, r5: matching and the year', () => {
-	const A = api as DatesApi;
+describe('§14 r4, r5: matching and the year', () => {
+	const A = datesApi;
 	const read = (cals: CalendarDef[], text: string) => A.compileCalendars(cals, true).read(text)!;
 
 	function table(title: string, cals: CalendarDef[], rows: Row[]) {
@@ -313,8 +307,8 @@ describe.skipIf(!api)('§14 r4, r5: matching and the year', () => {
 	});
 });
 
-describe.skipIf(!api)('§14 r9: the reader (ready, key, plain reader, memo)', () => {
-	const A = api as DatesApi;
+describe('§14 r9: the reader (ready, key, plain reader, memo)', () => {
+	const A = datesApi;
 
 	it('§14 r9: PLAIN_READER is ready, has key "plain" and no problems', () => {
 		expect(A.PLAIN_READER.ready).toBe(true);
@@ -393,7 +387,7 @@ describe.skipIf(!api)('§14 r9: the reader (ready, key, plain reader, memo)', ()
 	});
 });
 
-describe.skipIf(!api || !existsSync('src/core/dates.ts'))('§14 r8: no lookbehind in dates.ts (iOS before 16.4)', () => {
+describe('§14 r8: no lookbehind in dates.ts (iOS before 16.4)', () => {
 	it('dates.ts has no lookbehind', () => {
 		const src = readFileSync('src/core/dates.ts', 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
 		expect(src).not.toMatch(/\(\?<[=!]/);

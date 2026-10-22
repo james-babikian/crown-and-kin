@@ -106,6 +106,6 @@ class UnionEditModal extends SmallFormModal {
 }
 
 /** Opens the editor; it calls `save` on Save and stays open until a save succeeds or the user cancels. */
-export function editUnion(app: App, a: string, b: string, initial: UnionValues, save: UnionSave): void {
+export function openUnionEditor(app: App, a: string, b: string, initial: UnionValues, save: UnionSave): void {
 	new UnionEditModal(app, UNION_EDIT.of(a, b), initial, save).open();
 }

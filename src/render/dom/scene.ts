@@ -58,8 +58,9 @@ import { isColour } from '../colour-check';
 import { lineLook, type LineMarks, type LineState } from '../line-highlight';
 import { cardNameLines, titleLines, type NameMeasure, type NameRun } from '../name-lines';
 import { ME_RING_INNER, TAG_MARK, UNION_MARKS, tagMarkGap, tagMarkHalfWidth, tagMarkSlot, unionMark, unionShape, type UnionShape } from '../styles';
-import { SIGN_CARD_LABEL, cardLabel, dateLine, farTagLabel, farTagName, splitMaybe } from '../tree-info';
-import { HIT_EM, boxNearView, pathBox, ribbonPath, truncate, truncateWithMaybe } from '../view-math';
+import { fitCardText, pickReign } from '../date-fit';
+import { SIGN_CARD_LABEL, cardLabel, dateLine, farTagLabel, farTagName, shownReign } from '../tree-info';
+import { HIT_EM, boxNearView, pathBox, ribbonPath, truncate } from '../view-math';
 import { ME_WORD } from '../view-text';
 import { drawFold, type FoldRef } from './folds';
 
@@ -268,7 +269,7 @@ export const COMPACT_STEPS: readonly number[] = (() => {
  * The index in `COMPACT_STEPS` of the size of a Compact name: the first size whose width `widthAt(k)` fits in `maxW`, else the smallest. This is the result of a walk down from
  * the top size, but a canvas measure is the cost, and the width follows the size almost linearly, so the room gives a first guess that one or two measures confirm.
  */
-export function compactStep(widthAt: (k: number) => number, maxW: number): number {
+export function compactNameStep(widthAt: (k: number) => number, maxW: number): number {
 	const w0 = widthAt(0);
 	if (!(w0 > maxW)) return 0;
 	const last = COMPACT_STEPS.length - 1;
@@ -517,9 +518,9 @@ export function buildScene(parent: SVGGElement, g: FamilyGraph, laid: LaidOut, o
 			}
 		};
 	};
-	/** Sets `el` to `text` truncated to `maxW`, now and on every refit. */
-	const fitted = (el: SVGTextElement, text: string, maxW: number, font: string, maybe = '') => {
-		const run = () => el.setText(maybe ? truncateWithMaybe(text, maybe, maxW, (s) => opts.measure(s, font)) : fit(text, maxW, font));
+	/** Sets `el` to `text` truncated to `maxW`, now and on every refit. A relation text (B6, D268) tries the short forms first, by this renderer's own measure. */
+	const fitted = (el: SVGTextElement, text: string, maxW: number, font: string, relation = false, plain?: string) => {
+		const run = () => el.setText(fitCardText(text, plain, maxW, (s) => opts.measure(s, font), relation));
 		addFit(run);
 	};
 
@@ -531,7 +532,7 @@ export function buildScene(parent: SVGGElement, g: FamilyGraph, laid: LaidOut, o
 		/** True while the text carries a size of its own, so a name that fits again clears it and a name that always fits never touches the style. */
 		let sized = false;
 		const run = () => {
-			const k = compactStep((i) => opts.measure(text, textFont(COMPACT_STEPS[i]! * f, opts.fonts.bold)), maxW);
+			const k = compactNameStep((i) => opts.measure(text, textFont(COMPACT_STEPS[i]! * f, opts.fonts.bold)), maxW);
 			const em = COMPACT_STEPS[k]!;
 			// A name that fits at the top size is not cut, so there is nothing to measure again.
 			el.setText(k === 0 ? text : truncate(text, maxW, (s) => opts.measure(s, textFont(em * f, opts.fonts.bold))));
@@ -677,16 +678,17 @@ export function buildScene(parent: SVGGElement, g: FamilyGraph, laid: LaidOut, o
 	 * D61: the title text line from a card label, on the box's one or two text lines. A box the layout
 	 * did not make taller shows one text line, cut with "…", until the tree view lays it out again.
 	 */
-	const drawTitle = (fullEl: SVGGElement, box: PersonBox, ct: CardText, title: string | undefined, reign: string | undefined) => {
+	const drawTitle = (fullEl: SVGGElement, box: PersonBox, ct: CardText, title: string | undefined, plainReign: string | undefined, namedReign: string | undefined) => {
 		const x = box.x + (ct.anchorX ?? t.padX);
 		const first = fullEl.createSvg('text', { cls: 'dynasty-card-title', attr: { x, y: box.y + ct.titleBaseline } });
 		const second = box.tallTitle && ct.title2Baseline !== undefined ? fullEl.createSvg('text', { cls: 'dynasty-card-title', attr: { x, y: box.y + ct.title2Baseline } }) : undefined;
 		const run = () => {
-			const lines = titleLines(title, reign, t.textW, measureSmall);
+			// Spec §14 rule 15: a one-line room that cannot hold the names takes the plain reign, so a text that needs a cut is always the plain one.
+			const lines = titleLines(title, pickReign(title, namedReign, plainReign, t.textW, measureSmall, !!second), t.textW, measureSmall);
 			if (second) {
 				first.setText(lines[0] ?? '');
 				second.setText(lines[1] ?? '');
-			} else first.setText(lines.length > 1 ? fit([title, reign].filter(Boolean).join(' '), t.textW, smallFont) : (lines[0] ?? ''));
+			} else first.setText(lines.length > 1 ? fit([title, plainReign].filter(Boolean).join(' '), t.textW, smallFont) : (lines[0] ?? ''));
 		};
 		addFit(run);
 	};
@@ -762,7 +764,7 @@ export function buildScene(parent: SVGGElement, g: FamilyGraph, laid: LaidOut, o
 		// B.3.2: the lines that exist are centred in the body, so the text block needs to know which small lines the person has. The dates line counts even when "Show dates on cards" is off (the class hides it), as the saved picture centres it.
 		const titleText = cl ? cl.title : p.title;
 		const reign = cl && opts.showDates !== false ? cl.reign : undefined;
-		const shown: ShownLines = { title: !!(titleText || reign), dates: !!dateLine(p, g.dates) };
+		const shown: ShownLines = { title: !!(titleText || reign), dates: !!dateLine(p, g.dates, { names: 'none' }) };
 		// D177 (10): a card with no relation word, in a tree with relation words, centres its text in the whole card.
 		const ct = textOf(box, shown, geo.relationLine === true && !!opts.relations && !relation?.text);
 		const tx = box.x + (ct.anchorX ?? t.padX);
@@ -815,21 +817,21 @@ export function buildScene(parent: SVGGElement, g: FamilyGraph, laid: LaidOut, o
 		// D61: with a label, the title text line carries the reign, unless dates are off.
 		const hasTitle = !!titleText || !!reign;
 		if (cl) {
-			if (hasTitle) drawTitle(full, box, ct, titleText, reign);
+			if (hasTitle) drawTitle(full, box, ct, titleText, reign, shownReign(cl, g.dates, 'shown'));
 		} else if (p.title) {
 			fitted(full.createSvg('text', { cls: 'dynasty-card-title', attr: { x: tx, y: box.y + ct.titleBaseline } }), p.title, ct.textW, smallFont);
 		}
 		const dates = dateLine(p, g.dates);
 		const datesBaseline = hasTitle ? ct.datesBaseline : ct.titleBaseline;
 		if (dates) {
-			fitted(full.createSvg('text', { cls: 'dynasty-card-dates', attr: { x: tx, y: box.y + datesBaseline } }), dates, ct.textW, smallFont);
+			fitted(full.createSvg('text', { cls: 'dynasty-card-dates', attr: { x: tx, y: box.y + datesBaseline } }), dates, ct.textW, smallFont, false, dateLine(p, g.dates, { names: 'none' }));
 		}
 		const relY = relationY(ct);
 		if (relation?.text && relY !== undefined) {
 			// D40: a name too long for the card ends with "…"; the sheet shows it in full.
 			// D176 (5): a text with a maybe keeps " ?" when it is cut, so the word and the suffix are cut apart.
-			const { word, suffix } = splitMaybe(relation.text);
-			fitted(full.createSvg('text', { cls: 'dynasty-card-relation', attr: { x: tx, y: box.y + relY } }), word, ct.relationW ?? ct.textW, relationFont(t.smallSize, opts.fonts.text, isMe, opts.fonts.bold), suffix);
+			// D268: before it is cut, the text tries the short forms; only the drawn card does (the sheet, the label and the list keep the whole text).
+			fitted(full.createSvg('text', { cls: 'dynasty-card-relation', attr: { x: tx, y: box.y + relY } }), relation.text, ct.relationW ?? ct.textW, relationFont(t.smallSize, opts.fonts.text, isMe, opts.fonts.bold), true);
 		}
 		if (rp) {
 			// B.3.3, WP-B8: one set of elements for both levels. The Compact level shows the Full group with its text hidden (styles.css), so the medallion and

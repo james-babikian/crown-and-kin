@@ -3,6 +3,7 @@
 // unequal couples than before (r2). The tests use made-up trees (`tests/s025-rows-twin.ts`, `tests/s025-families.ts`).
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
+import { speedTest } from './support/speed-test';
 import type { FamilyGraph } from '../src/core/derive';
 import { pruneGraph } from '../src/core/folds';
 import { computeGenerations } from '../src/core/generations';
@@ -356,25 +357,25 @@ describe('r2: speed (each bound fails if the quadratic version returns)', () => 
 	/** The fastest of three calls: the quadratic version is far over the bound in each call, but a busy machine can slow one call. */
 	const fastest = (fn: () => void) => Math.min(time(fn), time(fn), time(fn));
 
-	it('sample 07 takes under 10 ms (median of 15)', () => {
+	speedTest('sample 07 takes under 10 ms (median of 15)', () => {
 		const { g } = build(fixture('07'));
 		expect(median(Array.from({ length: 15 }, () => time(() => computeGenerations(g))))).toBeLessThan(10);
 		expect(rowStats.guard).toBe(0);
 	});
 
-	it('two chains of 400 people each take under 100 ms', () => {
+	speedTest('two chains of 400 people each take under 100 ms', () => {
 		const { g } = build(chains(400));
 		expect(fastest(() => computeGenerations(g))).toBeLessThan(100);
 		expect(rowStats.guard).toBe(0);
 	});
 
-	it('a 400-person tree with a rumoured link on every person takes under 60 ms (median of 5)', () => {
+	speedTest('a 400-person tree with a rumoured link on every person takes under 60 ms (median of 5)', () => {
 		const { g } = build(rumourTree(400));
 		expect(median(Array.from({ length: 5 }, () => time(() => computeGenerations(g))))).toBeLessThan(60);
 		expect(rowStats.guard).toBe(0);
 	});
 
-	it('dense trees of 1,000 and 2,000 people stay quick, the step budget ends the 2,000 case, and the rows stay valid', () => {
+	speedTest('dense trees of 1,000 and 2,000 people stay quick, the step budget ends the 2,000 case, and the rows stay valid', () => {
 		for (const seed of [1, 2, 3]) {
 			const small = build(genTree(seed, 1000));
 			expect(fastest(() => computeGenerations(small.g)), `1000/${seed}`).toBeLessThan(150);

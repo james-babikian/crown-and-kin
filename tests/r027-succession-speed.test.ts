@@ -1,6 +1,7 @@
 // Contract 0.2.7 D.2 (WP2): the time of `successionLine`. It prints the times and checks the budgets with a factor of 10, so a loaded machine does not fail.
 // Budgets on the cloud machine: 5 ms for one title on sample trees 07 and 07b, 50 ms on a generated tree of 5 000 people.
 import { describe, expect, it } from 'vitest';
+import { speedTest } from './support/speed-test';
 import { deriveFamilies, type FamilyGraph } from '../src/core/derive';
 import { parseDynasty } from '../src/core/parse';
 import { successionLine, type SuccessionSpec } from '../src/core/succession';
@@ -83,7 +84,7 @@ describe('successionLine speed (D.2)', () => {
 		}
 	};
 
-	it('sample trees 07 and 07b: one title with a rule', () => {
+	speedTest('sample trees 07 and 07b: one title with a rule', () => {
 		const g07b = graphOf(fixture('07b'));
 		const first = g07b.titles[0];
 		// Sample tree 07 has the same people and no titles: it gets the holders of the first title of 07b.
@@ -95,7 +96,7 @@ describe('successionLine speed (D.2)', () => {
 		expect(successionLine(g07b, first, specOf({ rule: 'eldest-child' }), 5, 110).kind).toBe('line');
 	});
 
-	it('a generated house of 5 000 people', () => {
+	speedTest('a generated house of 5 000 people', () => {
 		const g = graphOf(bigHouse(5000, 100));
 		expect(g.people.length).toBeGreaterThanOrEqual(5000);
 		const title = g.titles[0];

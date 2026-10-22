@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { findBlocks } from '../src/core/block-locate';
 import { parseCalendarBlock } from '../src/core/calendar-block';
 import type { Calendar } from '../src/core/dates';
-import { checkDraft, draftChanged, draftOf, opsOf } from '../src/view/calendar-draft';
+import { checkDraft, calendarDraftChanged, draftOf, opsOf } from '../src/view/calendar-draft';
 import { writeCalendars } from '../src/view/calendar-write';
 
 const NOTE = 'Calendars.md';
@@ -24,7 +24,7 @@ describe('an era or cycle start that the note holds but the window cannot read',
 		const saved = readNote(ERA_NO_START);
 		const drafts = draftOf(saved, key);
 		const checked = checkDraft(drafts, NOTE, []);
-		expect(draftChanged(saved, drafts, checked)).toBe(false);
+		expect(calendarDraftChanged(saved, drafts, checked)).toBe(false);
 	});
 
 	it('does not rewrite the start of an era that the user did not touch, when another calendar is renamed', () => {
@@ -55,7 +55,7 @@ describe('text that the window normalises but the reader keeps', () => {
 	it('a format written with a trailing space does not make the window dirty when it opens', () => {
 		const saved = readNote(SPACED);
 		const drafts = draftOf(saved, key);
-		expect(draftChanged(saved, drafts, checkDraft(drafts, NOTE, []))).toBe(false);
+		expect(calendarDraftChanged(saved, drafts, checkDraft(drafts, NOTE, []))).toBe(false);
 	});
 
 	it('a format written with a trailing space is not rewritten when another calendar is renamed', () => {

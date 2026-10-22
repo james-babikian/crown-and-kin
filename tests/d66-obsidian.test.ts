@@ -10,7 +10,7 @@ import { newTitleId } from '../src/core/title-ops';
 import { applyOp } from '../src/core/yaml-edit';
 import { FullScreenModal } from '../src/obsidian/full-screen';
 import { closePluginModals } from '../src/view/plugin-modals';
-import { draftChanged, maleNameOf, rebase, titleRows, windowOps, type TitleRow } from '../src/view/titles-draft';
+import { titlesDraftChanged, maleNameOf, rebase, titleRows, windowOps, type TitleRow } from '../src/view/titles-draft';
 import { TitlesWindow } from '../src/obsidian/titles-window';
 import { TITLES_UI } from '../src/render/ui-text';
 import { FEl, clock, dispatch, fakeWin, installDom, resetDom, settle } from './acceptance/fake-dom';
@@ -84,7 +84,7 @@ describe('"Name for a man" in the Titles window draft (D66)', () => {
 	it('a typed name: edit-title writes male-name right after name and before female-name, one text line', () => {
 		const rows = rowsOf(BODY_F);
 		titleOf(rows, 'duke-of-valmont').maleName = ' Prince of Valmont ';
-		expect(draftChanged(rows)).toBe(true);
+		expect(titlesDraftChanged(rows)).toBe(true);
 		const o = ops(rows, BODY_F);
 		expect(o).toEqual([{ kind: 'edit-title', id: 'duke-of-valmont', maleName: 'Prince of Valmont' }]);
 		expect(bodyOf(applyOp(BODY_F, { kind: 'batch', ops: o }))).toBe(BODY_MF);
@@ -108,14 +108,14 @@ describe('"Name for a man" in the Titles window draft (D66)', () => {
 		expect(bodyOf(applyOp(BODY_MF, { kind: 'batch', ops: o }))).toBe(BODY_F);
 		const plain = rowsOf();
 		titleOf(plain, 'count-of-orsini').maleName = '   ';
-		expect(draftChanged(plain)).toBe(false);
+		expect(titlesDraftChanged(plain)).toBe(false);
 		expect(ops(plain)).toEqual([]);
 	});
 
 	it('the same text with spaces changes nothing', () => {
 		const rows = rowsOf(BODY_MF);
 		titleOf(rows, 'duke-of-valmont').maleName = 'Prince of Valmont ';
-		expect(draftChanged(rows)).toBe(false);
+		expect(titlesDraftChanged(rows)).toBe(false);
 	});
 
 	it('a new title: add-title with both names; an empty field writes none', () => {

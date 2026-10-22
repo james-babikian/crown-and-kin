@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { speedTest } from './support/speed-test';
 import { deriveFamilies } from '../src/core/derive';
 import { DEFAULT_FOCUS_GENERATIONS } from '../src/core/focus-subgraph';
 import { focusGenerations, focusGenerationsFor, focusSubgraph } from '../src/core/focus-subgraph';
@@ -259,7 +260,7 @@ describe('the rest of the shape', () => {
 		expect(tree.people[1]).toMatchObject({ name: 'F', parents: [{ id: 'a', type: 'birth' }] });
 	});
 
-	it('a wide tree: 20 000 children of one couple and 2 000 partners, with a huge n', () => {
+	speedTest('a wide tree: 20 000 children of one couple and 2 000 partners, with a huge n', () => {
 		const people: Person[] = [
 			{ id: 'a', name: 'A', parents: [], illegitimate: false, index: 0 },
 			{ id: 'b', name: 'B', parents: [], illegitimate: false, index: 1 },

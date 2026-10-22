@@ -16,8 +16,8 @@ import { openModals, resetObsidian } from './acceptance/fake-obsidian';
 import { desktop, embed, fakeHandle, fullViews, openFullScreen, phone, tabletDevice, type FakeHandle } from './acceptance/tree-view-fakes';
 
 /*
- * WP-C3 of 0.2.5 (D132, the 0.2.5 contract C.3.3): the Focus button. 0.2.8 (G.13): a press always opens the Focus menu:
- * Choose a person, Focus on you (only with a marked person), and (only while a focus shows) Clear focus. Clear
+ * WP-C3 of 0.2.5 (D132, the 0.2.5 contract C.3.3): the Focus button. 0.2.8 (G.13): with no focus a press opens the Focus menu:
+ * Choose a person and Focus on you (only with a marked person). 0.3.3 (D263 B2): while a focus shows, one press clears it. Clear
  * focus writes nothing; the Show all people button is gone.
  */
 
@@ -121,7 +121,7 @@ describe('the Focus button with no focus on', () => {
 		expect(b.getAttribute('aria-haspopup')).toBe('true');
 		expect(b.getAttribute('aria-expanded')).toBe('false');
 		expect(b.getAttribute('aria-label')).toBe(FOCUS_UI.focus);
-		expect(b.getAttribute('aria-pressed')).toBe('false');
+		expect(b.getAttribute('aria-pressed')).toBeNull();
 		await press(root, '.dynasty-focus');
 		expect(pickerOpen()).toBe(false);
 		expect(list(root)).not.toBeNull();
@@ -153,89 +153,30 @@ describe('the Focus button with no focus on', () => {
 	});
 });
 
-describe('the Focus button while a focus shows', () => {
-	it('has the menu attributes and the label "Focus is on"', async () => {
+describe('the Focus button while a focus shows (D263 B2)', () => {
+	it('has no menu attributes, is lit, and its name says that a tap clears the focus', async () => {
 		const { root } = await desk(PINNED);
 		const b = focusButton(root);
-		expect(b.getAttribute('aria-haspopup')).toBe('true');
-		expect(b.getAttribute('aria-expanded')).toBe('false');
+		expect(b.getAttribute('aria-haspopup')).toBeNull();
+		expect(b.getAttribute('aria-expanded')).toBeNull();
+		expect(b.getAttribute('aria-pressed')).toBeNull();
 		expect(b.getAttribute('aria-label')).toBe(FOCUS_UI.focusOn);
-		expect(b.getAttribute('aria-pressed')).toBe('true');
+		expect(FOCUS_UI.focusOn).toMatch(/clear the focus/);
 		expect(b.hasClass('is-active')).toBe(true);
 	});
 
-	it('a press opens a list with two items, and no picker', async () => {
+	it('one tap clears the focus and opens no list and no picker', async () => {
 		const { root } = await desk(PINNED);
 		await press(root, '.dynasty-focus');
+		expect(list(root)).toBeNull();
 		expect(pickerOpen()).toBe(false);
-		expect(list(root)).not.toBeNull();
-		expect(items(root).map((i) => i.querySelector('.dynasty-more-text')!.getText())).toEqual([FOCUS_UI.choose, FOCUS_UI.clear]);
-		expect(items(root).map((i) => i.getAttribute('aria-label'))).toEqual([FOCUS_UI.chooseLabel, FOCUS_UI.clearLabel]);
-		expect(focusButton(root).getAttribute('aria-expanded')).toBe('true');
-	});
-
-	it('a second press closes the list and aria-expanded follows', async () => {
-		const { root } = await desk(PINNED);
-		await press(root, '.dynasty-focus');
-		expect(list(root)).not.toBeNull();
-		await press(root, '.dynasty-focus');
-		expect(list(root)).toBeNull();
-		expect(focusButton(root).getAttribute('aria-expanded')).toBe('false');
-		expect(pickerOpen()).toBe(false);
-	});
-
-	it('Esc closes the list and gives the focus back to the Focus button', async () => {
-		const { root } = await desk(PINNED);
-		await press(root, '.dynasty-focus', 0);
-		expect(fakeDoc.activeElement).toBe(items(root)[0]);
-		dispatch(fakeDoc.activeElement!, 'keydown', { key: 'Escape' });
-		expect(list(root)).toBeNull();
-		expect(fakeDoc.activeElement).toBe(focusButton(root));
-		expect(focusButton(root).getAttribute('aria-expanded')).toBe('false');
-	});
-
-	it('a key press on the button puts the focus on the first item; a mouse press does not', async () => {
-		const { root } = await desk(PINNED);
-		await press(root, '.dynasty-focus', 0);
-		expect(fakeDoc.activeElement).toBe(items(root)[0]);
-		await press(root, '.dynasty-focus', 0);
-		new FEl('div').focus();
-		await press(root, '.dynasty-focus', 1);
-		expect(list(root)).not.toBeNull();
-		expect(fakeDoc.activeElement).not.toBe(items(root)[0]);
-	});
-
-	it('Choose a person closes the list and opens the picker; the choice moves the focus', async () => {
-		const { root } = await desk(PINNED);
-		await press(root, '.dynasty-focus');
-		await press(root, '.dynasty-popover-focus .dynasty-popover-item');
-		expect(list(root)).toBeNull();
-		expect(pickerOpen()).toBe(true);
-		await choose('p7');
-		expect(drawn(root)).toEqual(['p4', 'p5', 'p6', 'p7', 'p8']);
-	});
-
-	it('a picker closed with no choice (from the list) gives the focus back to the Focus button', async () => {
-		const { root } = await desk(PINNED);
-		await press(root, '.dynasty-focus', 0);
-		click(items(root)[0], 0);
-		await settle();
-		new FEl('div').focus();
-		picker().close();
-		runTimers(0);
-		await settle();
-		expect(fakeDoc.activeElement).toBe(focusButton(root));
-		expect(drawn(root)).toEqual(FAMILY);
+		expect(drawn(root)).toEqual(ALL);
 	});
 
 	it('Clear focus shows all people, builds the button again with its menu attributes and writes nothing', async () => {
 		const { root, handle } = await desk(PINNED);
 		expect(drawn(root)).toEqual(FAMILY);
 		await press(root, '.dynasty-focus');
-		click(items(root)[1]);
-		await settle();
-		resizeAll();
-		flushFrames();
 		expect(list(root)).toBeNull();
 		expect(drawn(root)).toEqual(ALL);
 		const b = focusButton(root);
@@ -251,20 +192,13 @@ describe('the Focus button while a focus shows', () => {
 	it('after Clear focus with a key, the keyboard focus is on the new Focus button', async () => {
 		const { root } = await desk(PINNED);
 		await press(root, '.dynasty-focus', 0);
-		click(items(root)[1], 0);
-		await settle();
-		resizeAll();
-		flushFrames();
 		expect(fakeDoc.activeElement).toBe(focusButton(root));
+		expect(list(root)).toBeNull();
 	});
 
 	it('after Clear focus the menu has one item again, and a choice shows that family; the pin stays in the note', async () => {
 		const { root, handle } = await desk(PINNED);
 		await press(root, '.dynasty-focus');
-		click(items(root)[1]);
-		await settle();
-		resizeAll();
-		flushFrames();
 		await press(root, '.dynasty-focus');
 		expect(items(root)).toHaveLength(1);
 		await press(root, '.dynasty-popover-focus .dynasty-popover-item');
@@ -275,18 +209,14 @@ describe('the Focus button while a focus shows', () => {
 		expect(handle.body).toBe(PINNED);
 	});
 
-	it('a focus that the session chose also opens the list, and Clear focus shows all people', async () => {
+	it('a focus that the session chose is cleared by one tap too', async () => {
 		const { root, handle } = await desk(LINE);
 		await press(root, '.dynasty-focus');
 		await press(root, '.dynasty-popover-focus .dynasty-popover-item');
 		await choose('p4');
 		expect(drawn(root)).toEqual(FAMILY);
 		await press(root, '.dynasty-focus');
-		expect(items(root)).toHaveLength(2);
-		click(items(root)[1]);
-		await settle();
-		resizeAll();
-		flushFrames();
+		expect(list(root)).toBeNull();
 		expect(drawn(root)).toEqual(ALL);
 		expect(handle.write).not.toHaveBeenCalled();
 	});
@@ -297,10 +227,6 @@ describe('what Clear focus resets', () => {
 		const { root, handle } = await desk(PINNED);
 		handle.state.finder = { first: 'p3', second: 'p5', index: 0, whole: false, steps: false };
 		await press(root, '.dynasty-focus');
-		click(items(root)[1]);
-		await settle();
-		resizeAll();
-		flushFrames();
 		expect(handle.state.finder).toBeNull();
 		expect(root.querySelector('.dynasty-result')).toBeNull();
 		expect(drawn(root)).toEqual(ALL);
@@ -310,10 +236,6 @@ describe('what Clear focus resets', () => {
 		const { root, handle } = await desk(PINNED);
 		handle.state.shown = { id: 'p6', place: 'embed' } as never;
 		await press(root, '.dynasty-focus');
-		click(items(root)[1]);
-		await settle();
-		resizeAll();
-		flushFrames();
 		expect(handle.state.shown).toBeNull();
 	});
 
@@ -324,11 +246,7 @@ describe('what Clear focus resets', () => {
 		expect(tools(root)).toContain('dynasty-focus');
 		expect(tools(root)).not.toContain('dynasty-show-all');
 		await press(root, '.dynasty-focus');
-		expect(items(root).map((i) => i.querySelector('.dynasty-more-text')!.getText())).toEqual([FOCUS_UI.choose, FOCUS_UI.clear]);
-		click(items(root)[1]);
-		await settle();
-		resizeAll();
-		flushFrames();
+		expect(list(root)).toBeNull();
 		expect(drawn(root)).toEqual(ALL);
 		expect(handle!.write).not.toHaveBeenCalled();
 		expect(fullViews()).toContain(modal);
@@ -351,10 +269,6 @@ describe('what Clear focus resets', () => {
 		const before = drawn(full);
 		expect(before).not.toEqual(ALL);
 		await press(full, '.dynasty-focus');
-		click(items(full)[1]);
-		await settle();
-		resizeAll();
-		flushFrames();
 		expect(drawn(full)).toEqual(ALL);
 		expect(handle.write).not.toHaveBeenCalled();
 	});

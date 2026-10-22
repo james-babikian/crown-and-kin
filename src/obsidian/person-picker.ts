@@ -306,7 +306,7 @@ function definePicker() {
 				const label = this.labels.get(person.id);
 				const extra = label ? searchNames(label, person.name) : [];
 				// D122: the text of the sobriquet is matched too (without its marks).
-				const r = match(foldForMatch([person.name, person.sobriquet ?? '', person.title ?? '', dateLine(person, this.g.dates) ?? '', ...extra].join(' ')));
+				const r = match(foldForMatch([person.name, person.sobriquet ?? '', person.title ?? '', dateLine(person, this.g.dates, { names: 'none' }) ?? '', ...extra].join(' ')));
 				// "Aldric II" typed in full names one holder entry: that person comes before "Aldric III" (spec §13.5).
 				if (r) scored.push({ person, score: r.score, exact: extra.some((n) => foldForMatch(n) === lower) });
 			}

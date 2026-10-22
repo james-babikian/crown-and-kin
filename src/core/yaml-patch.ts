@@ -706,7 +706,7 @@ function applyPatches(src: Source, patches: Patch[]): string | null {
 }
 
 /** `first` is the parse of `body` the op was checked with; the first step reuses it (a large tree parses in tens of ms). */
-export function run(body: string, steps: Step[], first: Parsed): string | Refusal {
+export function runSteps(body: string, steps: Step[], first: Parsed): string | Refusal {
 	let text = body;
 	for (const [n, step] of steps.entries()) {
 		const p = n === 0 ? first : parse(text);
@@ -821,7 +821,7 @@ export function personNode(p: Parsed, index: number): YAMLMap | Refusal {
 /** Runs the steps and accepts the new body only if it reads back as exactly the expected data. */
 export function finish(first: Parsed, steps: Step[], expected: RawMap, created: string[]): EditResult {
 	if (steps.length === 0) return { ok: true, body: first.src.text, created };
-	const out = run(first.src.text, steps, first);
+	const out = runSteps(first.src.text, steps, first);
 	if (isRefusal(out)) return out;
 	const check = parseBody(out);
 	// The new body is read with the curly pairs taken off structural values (D103), so the expected data is too.
@@ -853,7 +853,7 @@ export function recall(body: string): Raw | undefined {
 }
 
 /** Clears the data kept for `recall`; `applyOp` calls it at the end of every write. */
-export function forget(): void {
+export function forgetRecall(): void {
 	recent.length = 0;
 }
 

@@ -64,7 +64,7 @@ async function newOrExisting(host: FlowHost, what: string, exclude: Set<string>)
 }
 
 /** Add parent (spec §6.4): parent type, then new or existing person, then the write. */
-export async function addParent(host: FlowHost): Promise<void> {
+export async function addParentFlow(host: FlowHost): Promise<void> {
 	if (!host.ready()) return;
 	const p = host.person;
 	const type = await choose<ParentKind>(host.app, {

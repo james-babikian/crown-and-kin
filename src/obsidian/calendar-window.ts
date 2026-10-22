@@ -1,24 +1,30 @@
 /*
- * The Calendars window (spec §14 rules 1, 3, 6 and 7; D251). It shows the calendars of one calendar note of the tree, with Add (cycle calendar, era calendar),
- * Change and Remove, the name and folder of the note and "New calendar note", and a test line below each calendar. It is a draft in the way of the other windows
- * (D112): Save writes the changes in one step, Cancel writes nothing, and any other way to close with changes asks first. A refusal of `checkFormat` or
- * `checkCalendars` is shown in the window and the window does not save; a warning (the same format in another calendar note) is shown and the save goes ahead.
- * The draft is `view/calendar-draft.ts`, a card is `calendar-card.ts`, the file work is `calendar-note.ts`. The first save makes the note `Calendars` at the root of the vault.
+ * The Calendars window (spec §14 rules 1, 3, 6 and 7; D251, D273). It shows the calendars of one calendar note of the tree as folding sections, one for each calendar and
+ * one for the plain years, with Add (a menu of the two kinds), Remove, the name and folder of the note and "New calendar note", and one "Test a date" field under all
+ * sections. It is a draft in the way of the other windows (D112): Save writes the changes in one step, Cancel writes nothing, and any other way to close with changes asks
+ * first. A refusal of `checkFormat` or `checkCalendars` is shown in the window, opens the section that holds it, and the window does not save; a warning (the same format in
+ * another calendar note) is shown and the save goes ahead. The draft is `view/calendar-draft.ts`, a section body is `calendar-card.ts`, the file work is `calendar-note.ts`.
+ * The first save makes the note `Calendars` at the root of the vault.
  */
 
 import { Notice, type App } from 'obsidian';
 import { linkedNotePath } from '../core/note-make';
-import type { Calendar, DateReader } from '../core/dates';
-import { issueText } from '../core/messages';
+import type { Calendar, DateReader, NameList } from '../core/dates';
+import { issueText, type CodedIssue } from '../core/messages';
 import { CALENDAR_WINDOW_UI as T } from '../render/calendar-text';
-import { checkDraft, draftChanged, draftOf, newCalendar, newEra, opsOf, type CalendarDraft, type Checked } from '../view/calendar-draft';
+import { markedLine } from '../render/dom/marks';
+import { PLAIN_KEY, checkDraft, calendarDraftChanged, draftOf, emptyPlain, markerIssues, newCalendar, newEra, newListDraft, opsOf, type CalendarDraft, type Checked, type ListDraft, type PlainDraft } from '../view/calendar-draft';
 import type { CalendarIndex } from '../view/calendar-index';
-import { drawCalendar, type CardHost } from './calendar-card';
+import { listDraftsOf } from '../view/calendar-list-draft';
+import { calendarSummary, calendarTitle, listsSummary } from '../view/calendar-summary';
+import { drawCalendarBody, drawPlainBody } from './calendar-card';
 import { loadNote, makeCalendarNote, newNoteDefaults, saveNote, type LoadedNote } from './calendar-note';
+import { testField, type CardHost } from './calendar-parts';
 import { sheetField, showErrorLine, nameDialog } from './sheet-parts';
 import { SmallFormModal } from './small-form';
-import { textButton } from './window-parts';
+import { showMenu, textButton } from './window-parts';
 import { buildShell } from './window-shell';
+import { renderSections, type SectionSpec, type SectionsView } from './window-sections';
 
 /** What opens the window. */
 export interface CalendarsOptions {
@@ -38,17 +44,31 @@ const noteLabel = (path: string, all: readonly string[]): string => {
 	return all.filter((p) => p.replace(/^.*\//, '') === path.replace(/^.*\//, '')).length > 1 ? path.replace(/\.md$/i, '') : name;
 };
 
+/** The key of the section of a draft calendar, and of the plain years. */
+const sectionKey = (key: number): string => (key === PLAIN_KEY ? 'plain' : String(key));
+
+/** The issues of a calendar note that the window shows and goes on with: a name list that cannot be used (spec §14 rule 13). Any other issue stops the window. */
+export const isListIssue = (i: { code: string }): boolean => i.code === 'calendar-list-invalid';
+
 class CalendarsWindow extends SmallFormModal {
 	private note: LoadedNote | null;
 	private drafts: CalendarDraft[];
+	private plain: PlainDraft;
 	private counter = 0;
 	private checkedNow: Checked;
 	private readonly updates: (() => void)[] = [];
-	private cards: HTMLElement | null = null;
+	/** The place of the sections, the sections as drawn, and the key that keeps the open state of this window and note only. */
+	private sectionsEl: HTMLElement | null = null;
+	private view: SectionsView | null = null;
+	private token: object = {};
+	private introEl: HTMLElement | null = null;
+	private issuesEl: HTMLElement | null = null;
+	/** The two buttons of a window with no calendar. */
+	private emptyEl: HTMLElement | null = null;
+	private testUpdate: (() => void) | null = null;
 	private noteBox: HTMLElement | null = null;
-	/** The head: the note name and folder under the title, and the "New calendar note" link. */
+	/** The head: the text line under the title, with the note name, the folder and (at its end) the "New calendar note" link. */
 	private metaEl: HTMLElement | null = null;
-	private linksEl: HTMLElement | null = null;
 	/** The choice among the notes of the tree: it is off while the draft has a change, and says why. */
 	private noteSelect: HTMLSelectElement | null = null;
 	private noteHint: HTMLElement | null = null;
@@ -56,6 +76,8 @@ class CalendarsWindow extends SmallFormModal {
 	private newName: string;
 	private newFolder: string;
 	private readonly host: CardHost;
+	/** The user pressed Save and the window refused: empty fields show their refusal from then on. */
+	private attempted = false;
 
 	constructor(
 		app: App,
@@ -70,7 +92,8 @@ class CalendarsWindow extends SmallFormModal {
 		this.newName = start.name;
 		this.newFolder = start.folder;
 		this.drafts = draftOf(note?.calendars ?? [], () => this.counter++);
-		this.checkedNow = checkDraft(this.drafts, this.notePath(), this.outside());
+		this.plain = this.plainOf(note);
+		this.checkedNow = this.check();
 		this.host = this.makeHost();
 	}
 
@@ -89,33 +112,63 @@ class CalendarsWindow extends SmallFormModal {
 		return this.paths.filter((p) => p !== this.note?.path).flatMap((p) => this.index.calendarsOf(p));
 	}
 
+	/** The plain years of a note as a draft: the lists as read, and the block that holds them. */
+	private plainOf(note: LoadedNote | null): PlainDraft {
+		return note ? { block: note.plainBlock, saved: note.plain, lists: listDraftsOf(note.plain, undefined, () => this.counter++) } : emptyPlain();
+	}
+
+	/** The name lists of the plain years in the other calendar notes that the tree uses: "Test a date" reads with them. */
+	private outsidePlain(): NameList[] {
+		return this.paths.filter((p) => p !== this.note?.path).flatMap((p) => this.index.plainListsOf(p));
+	}
+
+	private check(): Checked {
+		return checkDraft(this.drafts, this.notePath(), this.outside(), this.plain, this.outsidePlain());
+	}
+
+	/** The lists of a calendar, or of the plain years (`PLAIN_KEY`). */
+	private listsOf(key: number): ListDraft[] {
+		return key === PLAIN_KEY ? this.plain.lists : (this.drafts.find((d) => d.key === key)?.lists ?? []);
+	}
+
 	private makeHost(): CardHost {
 		return {
 			checked: () => this.checkedNow,
 			changed: () => this.refresh(),
-			redraw: (focus) => this.draw(focus),
 			register: (update) => this.updates.push(update),
 			reader: (): DateReader => this.checkedNow.reader,
+			attempted: () => this.attempted,
 			removeCalendar: (key) => {
 				this.drafts = this.drafts.filter((d) => d.key !== key);
-				this.draw(`cal:add-cycles`);
+				this.draw({ focus: this.drafts.length ? 'cal:add' : 'cal:add-cycles' });
 			},
 			addEra: (key) => {
 				const d = this.drafts.find((x) => x.key === key);
 				if (!d) return;
 				const era = newEra(() => this.counter++);
 				d.eras.push(era);
-				this.draw(`cal:era-${era.key}-name`);
+				this.draw({ focus: `cal:era-${era.key}-name` });
 			},
 			removeEra: (key, era) => {
 				this.drafts.find((x) => x.key === key)?.eras.splice(era, 1);
-				this.draw(`cal:add-era:${key}`);
+				this.draw({ focus: `cal:add-era:${key}` });
+			},
+			addList: (key) => {
+				const l = newListDraft(() => this.counter++);
+				this.listsOf(key).push(l);
+				this.draw({ focus: `cal:list-${l.key}-name` });
+			},
+			removeList: (key, list) => {
+				const lists = this.listsOf(key);
+				const at = lists.findIndex((l) => l.key === list);
+				if (at >= 0) lists.splice(at, 1);
+				this.draw({ focus: `cal:add-list:${key}` });
 			},
 		};
 	}
 
 	protected dirty(): boolean {
-		return draftChanged(this.note?.calendars ?? [], this.drafts, this.checkedNow);
+		return calendarDraftChanged(this.note?.calendars ?? [], this.drafts, this.checkedNow, this.plain);
 	}
 
 	protected discardText(): string {
@@ -129,16 +182,28 @@ class CalendarsWindow extends SmallFormModal {
 		nameDialog(this.modalEl, shell.titleEl);
 		const body = shell.body;
 		this.drawHead(body);
-		body.createDiv({ cls: ['dynasty-sheet-hint', 'dynasty-cal-intro'], text: T.intro });
+		this.noteBox = body.createDiv({ cls: 'dynasty-cal-note' });
+		this.introEl = body.createDiv({ cls: ['dynasty-sheet-hint', 'dynasty-cal-intro'] });
+		this.issuesEl = body.createDiv({ cls: 'dynasty-cal-issues' });
 		this.errorEl = body.createDiv({ cls: 'dynasty-sheet-error', attr: { role: 'alert' } });
 		this.errorEl.hide();
-		this.noteBox = body.createDiv({ cls: 'dynasty-cal-note' });
-		this.cards = body.createDiv({ cls: 'dynasty-cal-cards' });
-		const add = body.createDiv({ cls: ['dynasty-actions', 'dynasty-cal-add'] });
-		textButton(add, ['dynasty-btn', 'dynasty-cal-add-cycles'], T.addCycles, () => this.add('cycles'), { icon: 'plus', focus: 'cal:add-cycles' });
-		textButton(add, ['dynasty-btn', 'dynasty-cal-add-eras'], T.addEras, () => this.add('eras'), { icon: 'plus', focus: 'cal:add-eras' });
+		this.emptyEl = body.createDiv({ cls: ['dynasty-actions', 'dynasty-cal-add'] });
+		textButton(this.emptyEl, ['dynasty-btn', 'dynasty-cal-add-cycles'], T.addCycles, () => this.add('cycles'), { icon: 'plus', focus: 'cal:add-cycles' });
+		textButton(this.emptyEl, ['dynasty-btn', 'dynasty-cal-add-eras'], T.addEras, () => this.add('eras'), { icon: 'plus', focus: 'cal:add-eras' });
+		this.sectionsEl = body.createDiv({ cls: 'dynasty-cal-sections' });
+		// One field under all sections: it reads with the calendars of the draft and the plain-year lists.
+		this.testUpdate = testField(body.createDiv({ cls: 'dynasty-cal-testbox' }), 'all', () => this.checkedNow.reader).update;
 		this.drawNote();
 		this.draw();
+		// The window opens with nothing selected: Obsidian puts the focus on the first link after this method, and Enter would start a new note (D278). Esc and Tab still work from the window.
+		this.modalEl.setAttribute('tabindex', '-1');
+		const clear = (): void => {
+			// Only a focus that nobody chose is taken away: on the page, or on the link; a field that the user entered keeps it.
+			const now = this.modalEl.doc.activeElement;
+			if (!now || now === this.modalEl.doc.body || now === this.metaEl?.querySelector('.dynasty-cal-new-note') || !this.modalEl.contains(now)) this.modalEl.focus({ preventScroll: true });
+		};
+		clear();
+		for (const ms of [0, 120]) (this.modalEl.win ?? window).setTimeout(clear, ms);
 	}
 
 	/** The head of the window, as in the person, Titles and Houses windows: the title, a text line with the note, and the link. A phone bar has the title already. */
@@ -147,52 +212,146 @@ class CalendarsWindow extends SmallFormModal {
 		const text = head.createDiv({ cls: 'dynasty-head-text' });
 		if (!this.modalEl.hasClass('is-phone')) text.createDiv({ cls: 'dynasty-head-name', text: T.title });
 		this.metaEl = text.createDiv({ cls: 'dynasty-head-meta' });
-		this.linksEl = text.createDiv({ cls: 'dynasty-cal-links' });
 	}
 
+	/** Adds a calendar: its section opens, and the focus goes to Name. */
 	private add(kind: 'cycles' | 'eras'): void {
 		const d = newCalendar(kind, () => this.counter++);
 		this.drafts.push(d);
-		this.draw(`cal:${d.key}-name`);
+		this.draw({ focus: `cal:${d.key}-name`, open: [sectionKey(d.key)] });
 	}
 
-	/** Works the draft out again and lets every part of the cards show it. */
+	/** Works the draft out again and lets every part of the sections show it. */
 	private refresh(): void {
 		this.errorEl?.hide();
-		this.checkedNow = checkDraft(this.drafts, this.notePath(), this.outside());
+		this.checkedNow = this.check();
 		for (const update of this.updates) update();
+		this.testUpdate?.();
+		this.paintSummaries();
+		this.paintIssues();
 		if (this.noteSelect) this.noteSelect.disabled = this.dirty();
 		this.noteHint?.toggle(!!this.noteSelect?.disabled);
 	}
 
-	/** Draws the cards again (a calendar or an era was added or removed); `focus` names the control that gets the focus. */
-	private draw(focus?: string): void {
-		const cards = this.cards;
-		if (!cards) return;
-		cards.empty();
+	/** The title and the summary line of every section follow the draft. */
+	private paintSummaries(): void {
+		const view = this.view;
+		if (!view) return;
+		for (const d of this.drafts) {
+			const key = sectionKey(d.key);
+			view.setSummary(key, calendarSummary(d));
+			const title = view.el(key)?.querySelector('.dynasty-section-title');
+			if (title && title.getText() !== calendarTitle(d)) title.setText(calendarTitle(d));
+			title?.toggleClass('is-empty', d.name.trim() === '');
+		}
+		view.setSummary('plain', listsSummary(this.plain.lists));
+	}
+
+	/** The sections of the window: one for each calendar, then "Plain years". `was` is how the sections stood before this draw (null: the first draw). */
+	private specs(was: ReadonlyMap<string, boolean> | null): SectionSpec[] {
+		// A window with exactly one calendar opens it; any other window opens none at the first draw.
+		const open = (key: string): boolean => (was ? (was.get(key) ?? false) : this.drafts.length === 1 && key !== 'plain');
+		const calendars = this.drafts.map((d): SectionSpec => ({ key: sectionKey(d.key), title: calendarTitle(d), summary: calendarSummary(d), open: open(sectionKey(d.key)), build: (b) => drawCalendarBody(b, this.host, d) }));
+		const plain: SectionSpec = { key: 'plain', title: T.plainTitle, summary: listsSummary(this.plain.lists), open: open('plain'), build: (b) => drawPlainBody(b, this.host, this.plain.lists) };
+		return [...calendars, plain];
+	}
+
+	/** How the sections stand now, by key; null when none were drawn. */
+	private openNow(): Map<string, boolean> | null {
+		const view = this.view;
+		if (!view) return null;
+		const keys = [...this.drafts.map((d) => sectionKey(d.key)), 'plain'];
+		return new Map(keys.map((k) => [k, view.isOpen(k)]));
+	}
+
+	/**
+	 * Draws the sections again (a calendar, an era or a list was added or removed, or another note was loaded). The scroll place and the open state stay; `open` names
+	 * sections that open (the one just added), and `focus` names the control that gets the focus.
+	 */
+	private draw(o: { focus?: string; open?: string[] } = {}): void {
+		const mount = this.sectionsEl;
+		if (!mount) return;
+		const was = this.openNow();
+		const scroll = this.shell?.body.scrollTop ?? 0;
+		mount.empty();
 		this.updates.length = 0;
-		this.checkedNow = checkDraft(this.drafts, this.notePath(), this.outside());
-		for (const d of this.drafts) drawCalendar(cards, this.host, d);
+		this.checkedNow = this.check();
+		this.paintTop();
+		const view = renderSections(mount, 'calendars', this.specs(was), () => this.shell?.checkOverflow(), this.token);
+		this.view = view;
+		this.addCalendarLink(view);
+		for (const key of o.open ?? []) view.open(key);
 		for (const update of this.updates) update();
-		if (focus) this.contentEl.querySelector<HTMLElement>(`[data-focus="${focus}"]`)?.focus();
+		this.testUpdate?.();
+		if (this.shell) this.shell.body.scrollTop = scroll;
+		this.shell?.checkOverflow();
+		if (o.focus) this.contentEl.querySelector<HTMLElement>(`[data-focus="${o.focus}"]`)?.focus();
+	}
+
+	/** The line under the head, the two buttons of a window with no calendar, and the lists that cannot be used. */
+	private paintTop(): void {
+		const none = this.drafts.length === 0;
+		this.introEl?.setText(none ? T.intro : T.introShort);
+		this.introEl?.toggleClass('is-long', none);
+		this.emptyEl?.toggle(none);
+		this.paintIssues();
+	}
+
+	/**
+	 * The notes about name lists that cannot be used. A list that the note holds with a bad shape stays as the note has it; a marker in a format that no list has is worked
+	 * out from the draft, so the note follows every change of a format or a marker.
+	 */
+	private paintIssues(): void {
+		const issues = this.issuesEl;
+		if (!issues) return;
+		issues.empty();
+		const fromNote = (this.note?.issues ?? []).filter((i) => isListIssue(i) && i.params?.why !== 'marker');
+		for (const issue of [...fromNote, ...markerIssues(this.drafts, this.notePath()).filter((i) => !this.isError(i))]) issues.createDiv({ cls: ['dynasty-sheet-hint', 'is-warning'], text: issueText(issue), attr: { 'data-issue': '' } });
+	}
+
+	/**
+	 * True when a note of the window about a marker is also an error of the last Save (the refusal of the format that holds the marker, shown open in its section): the grey
+	 * note at the top then hides, so the problem stands once (D278).
+	 */
+	private isError(issue: CodedIssue): boolean {
+		if (!this.attempted) return false;
+		const marker = `{${String(issue.params?.marker ?? '')}}`;
+		const name = String(issue.params?.calendar ?? '');
+		return this.checkedNow.refusals.some((r) => r.field === 'formats' && r.text.includes(marker) && this.drafts.some((d) => d.key === r.key && d.name.trim() === name));
+	}
+
+	/** "Add calendar" at the left of the row of "Open all": a link that opens a menu of the two kinds. */
+	private addCalendarLink(view: SectionsView): void {
+		const row = view.openAllRow;
+		if (!row) return;
+		const link = textButton(row, ['dynasty-link', 'dynasty-add-calendar'], T.addCalendar, () => this.addMenu(link), { icon: 'plus', focus: 'cal:add' });
+		link.setAttribute('aria-haspopup', 'menu');
+		row.prepend(link);
+	}
+
+	private addMenu(anchor: HTMLElement): void {
+		showMenu(anchor, [
+			{ label: T.kindCycles, icon: 'rotate-cw', run: () => this.add('cycles') },
+			{ label: T.kindEras, icon: 'list', run: () => this.add('eras') },
+		]);
 	}
 
 	// ---------- the note ----------
 
-	/** The head line with the note, the link "New calendar note", and the choice among the notes of the tree; a new note has a name and a folder to type. */
+	/** The text line under the title (the note, the folder, the link "New calendar note"), and the choice among the notes of the tree; a new note has a name and a folder to type. */
 	private drawNote(): void {
 		const box = this.noteBox;
 		if (!box) return;
 		box.empty();
 		this.metaEl?.empty();
-		this.linksEl?.empty();
 		this.noteSelect = null;
 		if (this.note === null) return void this.drawNewNote(box);
 		const path = this.note.path;
 		const folder = T.folder(path.includes('/') ? path.replace(/\/[^/]*$/, '') : '');
 		const several = this.paths.length > 1;
 		// With a choice of notes, the choice shows the name; the text line has the folder only.
-		this.metaEl?.setText(several ? folder : `${noteLabel(path, this.paths)} · ${folder}`);
+		const meta = this.metaEl;
+		if (meta) meta.createSpan({ cls: 'dynasty-cal-meta-text', text: `${several ? folder : `${noteLabel(path, this.paths)} · ${folder}`} · ` });
 		if (several) {
 			const { row, id } = sheetField(box, T.noteLabel, 'note', 'dynasty-cal');
 			const wrap = row.createDiv({ cls: 'dynasty-select' });
@@ -205,7 +364,8 @@ class CalendarsWindow extends SmallFormModal {
 			this.noteHint = row.createDiv({ cls: 'dynasty-sheet-hint', text: T.changesFirst });
 			this.noteHint.toggle(select.disabled);
 		}
-		if (this.linksEl) textButton(this.linksEl, ['dynasty-link', 'dynasty-cal-new-note'], T.newNote, () => this.newNote(), { focus: 'cal:new-note' });
+		// The link ends the text line (D278): the rarest action takes no text line of its own.
+		if (meta) textButton(meta, ['dynasty-link', 'dynasty-cal-new-note'], T.newNote, () => this.newNote(), { focus: 'cal:new-note' });
 	}
 
 	/** The fields of a note that the first save makes. */
@@ -238,23 +398,34 @@ class CalendarsWindow extends SmallFormModal {
 		this.newName = start.name;
 		this.newFolder = start.folder;
 		this.drafts = [];
+		this.plain = emptyPlain();
+		this.reset();
 		this.drawNote();
-		this.draw('cal:new-name');
+		this.draw({ focus: 'cal:new-name' });
 	}
 
 	/** Shows another calendar note of the tree (only while the draft has no change). */
 	private async switchTo(path: string, from: HTMLElement | null): Promise<void> {
 		if (this.dirty()) return showErrorLine(this.errorEl, T.changesFirst);
 		const loaded = await loadNote(this.app, path);
-		if (!loaded || loaded.issues.length) {
-			new Notice(loaded?.issues[0] ? issueText(loaded.issues[0]) : T.cannotOpenHere);
+		if (!loaded || loaded.issues.some((i) => !isListIssue(i))) {
+			new Notice(loaded?.issues.find((i) => !isListIssue(i)) ? issueText(loaded.issues.find((i) => !isListIssue(i))!) : T.cannotOpenHere);
 			if (from) (from as HTMLSelectElement).value = this.note?.path ?? path;
 			return;
 		}
 		this.note = loaded;
 		this.drafts = draftOf(loaded.calendars, () => this.counter++);
+		this.plain = this.plainOf(loaded);
+		this.reset();
 		this.drawNote();
 		this.draw();
+	}
+
+	/** A new note or another note: the sections start as at the first open, with no open state of the earlier note. */
+	private reset(): void {
+		this.view = null;
+		this.token = {};
+		this.attempted = false;
 	}
 
 	// ---------- Save ----------
@@ -264,9 +435,12 @@ class CalendarsWindow extends SmallFormModal {
 		this.refresh();
 		const checked = this.checkedNow;
 		if (checked.refusals.length) {
-			showErrorLine(this.errorEl, [T.refusalHead, ...checked.refusals.map((r) => this.refusalLine(r))].join(' '));
-			// The refusal stands next to its field in the card: the window shows the first one.
-			this.contentEl.querySelector<HTMLElement>('.dynasty-cal-card [data-refusal]')?.scrollIntoView?.({ block: 'nearest' });
+			this.attempted = true;
+			this.refresh();
+			this.showRefusals(checked.refusals);
+			// The sections that hold a refusal open, so the refusal stands in view next to its field; the window shows the first one.
+			for (const r of checked.refusals) if (r.key !== null) this.view?.open(sectionKey(r.key));
+			this.contentEl.querySelector<HTMLElement>('.dynasty-cal-sections [data-refusal]')?.scrollIntoView?.({ block: 'nearest' });
 			return;
 		}
 		if (!this.dirty() && this.note !== null) return this.finish();
@@ -285,12 +459,24 @@ class CalendarsWindow extends SmallFormModal {
 		}
 	}
 
-	/** A refusal for the line at the top of the window: it names its calendar, unless the sentence names it already. */
-	private refusalLine(r: { key: number | null; text: string }): string {
-		const d = this.drafts.find((x) => x.key === r.key);
-		if (!d) return r.text;
-		const name = d.name.trim();
-		return name !== '' && r.text.includes(`“${name}”`) ? r.text : T.refusalFor(name, r.text);
+	/**
+	 * The refusals at the top of the window (D278): one line that says how many errors to correct. Each error of a section stands once, under its field in that section, which
+	 * is open. An error of no section (the whole note) has no place below, so it stands here with its own head.
+	 */
+	private showRefusals(refusals: readonly { key: number | null; text: string }[]): void {
+		const el = this.errorEl;
+		if (!el) return;
+		el.empty();
+		const inSection = (r: { key: number | null }) => r.key !== null && (r.key === PLAIN_KEY || this.drafts.some((d) => d.key === r.key));
+		const placed = refusals.filter(inSection);
+		const loose = refusals.filter((r) => !inSection(r));
+		if (placed.length) markedLine(el, 'alert', T.refusalSummary(placed.length), 'dynasty-cal-refusal-sum').setAttribute('data-error-summary', '');
+		if (loose.length) {
+			el.createDiv({ text: T.refusalHead(loose.length) });
+			for (const r of loose) el.createDiv({ text: r.text, attr: { 'data-error-line': '' } });
+		}
+		el.show();
+		el.scrollIntoView?.({ block: 'nearest' });
 	}
 
 	/** Makes the note if it is new, writes the operations, tells the index; null when it went well, else the sentence for the window. */
@@ -307,12 +493,13 @@ class CalendarsWindow extends SmallFormModal {
 			if (!note) return T.cannotSave;
 			this.note = note;
 		}
-		const plan = opsOf(note.calendars, this.drafts, checked);
+		const plan = opsOf(note.calendars, this.drafts, checked, this.plain);
 		const out = plan.length ? await saveNote(this.app, note.path, note.bodies, plan) : { ok: true as const };
 		if (!out.ok) {
 			if (out.code === 'stale') return T.stale;
 			console.error('Crown and Kin: the calendar edit was refused', out.reason);
-			return T.cannotSave;
+			// The reason is a sentence of the core (a refused edit); an error of the file system has none.
+			return out.reason ? T.cannotSaveBecause(out.reason) : T.cannotSave;
 		}
 		await this.index.reload(note.path);
 		new Notice(made ? T.madeNote(made) : T.saved);
@@ -338,8 +525,10 @@ export async function openCalendars(app: App, index: CalendarIndex, o: Calendars
 		const paths = index.usedNotes(o.treePath, o.link);
 		const target = o.note && paths.includes(o.note) ? o.note : (paths[0] ?? null);
 		const note = target === null ? null : await loadNote(app, target);
-		if (target !== null && (!note || note.issues.length)) {
-			new Notice(note?.issues[0] ? issueText(note.issues[0]) : T.cannotOpen);
+		// A name list that cannot be used is shown in the window; any other problem of a block stops it (the plugin never writes over a block it cannot read).
+		const stop = note?.issues.find((i) => !isListIssue(i));
+		if (target !== null && (!note || stop)) {
+			new Notice(stop ? issueText(stop) : T.cannotOpen);
 			return;
 		}
 		new CalendarsWindow(app, index, o, paths, note).open();

@@ -6,7 +6,7 @@
  * come from `list-window.ts`; this file gives the rows, the page, the draft and the save pipeline. Like the Houses
  * window it is a draft: Save writes every change in one `batch` (one undo step), Cancel writes nothing, and any
  * other way to close with changes asks first. The window opens from the More list on the computer and in the
- * full-screen view, never from the static phone preview (`tree-view.ts`). The draft logic is in `titles-draft.ts`,
+ * full-screen view, never from the static phone preview (`tree-view-actions.ts`). The draft logic is in `titles-draft.ts`,
  * the holder form in `holder-form.ts`, and "Make a note with this table" in `table-note.ts`.
  */
 
@@ -36,7 +36,7 @@ import type { PictureStore } from './picture-store';
 import { RowPictures, buildRow, iconButton, personLead, showMenu, textButton } from './window-parts';
 import type { SectionSpec } from './window-sections';
 import { makeTableNote } from './table-note';
-import { draftChanged, emptyNames, holderText, personNameOf, rebase, savedListName, titleIdRow, titleRows, windowOps, withHolderIds, type HolderRow, type HolderValues, type TitleRow } from '../view/titles-draft';
+import { titlesDraftChanged, emptyNames, holderText, personNameOf, rebase, savedListName, titleIdRow, titleRows, windowOps, withHolderIds, type HolderRow, type HolderValues, type TitleRow } from '../view/titles-draft';
 
 /** The tree that the window edits, loaded from one block body. */
 export interface LoadedTitles {
@@ -121,7 +121,7 @@ export class TitlesWindow extends ListEditWindow {
 
 	/** True if the draft has an unsaved change. */
 	isDirty(): boolean {
-		return draftChanged(this.rows);
+		return titlesDraftChanged(this.rows);
 	}
 
 	protected discardText(): string {
@@ -182,7 +182,7 @@ protected labelOf(key: string): string {
 				id: t.id,
 				name: this.label(t),
 				summary: this.holdersSummary(t),
-				state: problems.has(t.key) ? 'check-id' : t.id === null ? 'new' : draftChanged([t]) ? 'changed' : '',
+				state: problems.has(t.key) ? 'check-id' : t.id === null ? 'new' : titlesDraftChanged([t]) ? 'changed' : '',
 				arms: this.armsOfRow(t),
 			}));
 	}
@@ -727,7 +727,7 @@ protected labelOf(key: string): string {
 			this.showError(TITLES_UI.needName);
 			return;
 		}
-		if (!draftChanged(this.rows)) {
+		if (!titlesDraftChanged(this.rows)) {
 			this.finish();
 			return;
 		}
@@ -743,7 +743,7 @@ protected labelOf(key: string): string {
 		}
 		const body = this.data.body;
 		// Ids from the names, each one unused also by the ids chosen before it in this Save (§6.8).
-		// `draftChanged` is true, so `windowOps` is never empty here.
+		// `titlesDraftChanged` is true, so `windowOps` is never empty here.
 		const ops = withHolderIds(
 			windowOps(this.rows, (name, taken) => newTitleId(body, name, taken)),
 			this.data.g,

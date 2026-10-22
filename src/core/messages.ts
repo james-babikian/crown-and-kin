@@ -9,7 +9,7 @@
 
 import { slugify } from './id-gen';
 import { quote } from './quote';
-import { REFUSAL_TEXT } from './refusal-text';
+import { LIST_REFUSAL_TEXT, REFUSAL_TEXT } from './refusal-text';
 import { INHERIT_ILLEGITIMATE, INHERIT_RULES, INHERIT_THROUGH, SUCCESSION_RULES } from './succession-keys';
 import { PARENT_LIMIT } from './parent-types';
 
@@ -122,6 +122,8 @@ export type WarningCode =
 	| 'calendar-year-past-end'
 	/** A date that fits two calendars with different years. */
 	| 'fits-two-calendars'
+	/** A name written in a date is not the name of the year in its name list (spec §14 rule 14); shown for every date of the tree. params: where, value, person | title, list, expected, written (full names) */
+	| 'calendar-name-mismatch'
 	/** A calendar with no example, used beside plain years or another calendar. params: calendar (name) */
 	| 'calendar-no-anchor'
 	/** The `calendar` option names a note that does not exist or holds no calendar. params: note (the link as written) */
@@ -133,6 +135,8 @@ export type WarningCode =
 	| 'calendar-block-invalid'
 	/** One calendar of the list cannot be used. params: note (path), index (1-based), why ('not-map' | 'no-name' | 'kind' | 'era') */
 	| 'calendar-entry-invalid'
+	/** One name list of a calendar, or of the plain years, cannot be used (spec §14 rule 13). params: note (path), calendar (name; absent for the plain years), index (1-based; 0 for a marker), why ('not-map' | 'names' | 'known' | 'size' | 'lists' | 'marker'), marker (for why 'marker': a format has this marker place and no list has it) */
+	| 'calendar-list-invalid'
 	// Holding a title through the spouse (0.2.8 contract A.2, D195). Only for a title with `succession` or `heir`; the key is then ignored.
 	/** The holder has no partner. params: person, title (name) */
 	| 'through-spouse-no-partner'
@@ -222,7 +226,7 @@ const cap = (x: string) => x.charAt(0).toUpperCase() + x.slice(1);
 const plural = (count: number, one: string, many: string) => `${count} ${count === 1 ? one : many}`;
 
 /** "A", "A and B", "A, B and C". */
-function andList(xs: string[]): string {
+export function andList(xs: readonly string[]): string {
 	if (xs.length <= 1) return xs[0] ?? '';
 	return `${xs.slice(0, -1).join(', ')} and ${xs[xs.length - 1]}`;
 }
@@ -501,17 +505,32 @@ const ISSUE_TEXT: { [C in IssueCode]: (p: P) => string } = {
 		const which = calendars.length > 1 ? `the calendars ${andList(calendars.map(quote))}` : 'two calendars';
 		return `${dateHead(p)} The date fits ${which} and gives a different year in each. As a result, the plugin uses no year for this date. Change the date, or change a calendar so that only one calendar fits it.`;
 	},
+	'calendar-name-mismatch': (p) =>
+		`${dateHead(p)} In the list ${quote(s(p, 'list', '?'))}, this year is ${s(p, 'expected', '?')}. The date says ${s(p, 'written', '?')}. The plugin keeps the year of the date. Correct the name in the date, or remove the name.`,
 	'calendar-no-anchor': (p) =>
 		`The calendar ${quote(s(p, 'calendar', '?'))} has no “Same year as” date that links it to plain years. So the plugin counts its Year 1 as plain year 1. The tree also has plain years or dates of another calendar. As a result, the order of dates and the ages can be wrong. In the Calendars window, add a “Same year as” date to the calendar.`,
 	'calendar-note-missing': (p) =>
 		`The tree uses the calendar note ${quote(s(p, 'note', '?'))}, but this note does not exist or has no calendar. As a result, the plugin reads no dates in your own calendars. Correct the link, or choose another calendar note with “Calendar note” in the More list.`,
 	'calendar-duplicate': (p) =>
-		`The notes ${quote(s(p, 'note', '?'))} and ${quote(s(p, 'other', '?'))} both have the calendar ${quote(s(p, 'calendar', '?'))} with the same cycle format or era name. A date that fits both can have no year. Change a format or an era name in one note.`,
+		// Two name lists for plain years with one name (the `list` parameter): the first note in order of path wins.
+		typeof p.list === 'string' && p.list !== ''
+			? `The notes ${quote(s(p, 'other', '?'))} and ${quote(s(p, 'note', '?'))} both have a name list ${quote(p.list)} for plain years. The plugin uses the list in ${quote(s(p, 'other', '?'))}. Give one of the two lists another name, or remove it.`
+			: `The notes ${quote(s(p, 'note', '?'))} and ${quote(s(p, 'other', '?'))} both have the calendar ${quote(s(p, 'calendar', '?'))} with the same cycle format or era name. A date that fits both can have no year. Change a format or an era name in one note.`,
 	'calendar-block-invalid': (p) =>
 		`The calendar block in the note ${quote(s(p, 'note', '?'))} has an error, so the plugin ignores it. The tree uses no calendar from this block. Edit the text of the block in the note. The block must have a list under “calendars:”.`,
 	'calendar-entry-invalid': (p) => {
 		const why = { 'not-map': 'it is not a group of keys, such as “name:”', 'no-name': 'it has no name', kind: 'its “kind:” is not “cycles” or “eras”', era: 'one of its eras has no name' }[s(p, 'why', 'kind')] ?? 'it has an error';
 		return `Calendar ${s(p, 'index', '?')} in the block of the note ${quote(s(p, 'note', '?'))} cannot be used, because ${why}. The plugin ignores it. Edit the text of the block in the note.`;
+	},
+
+	'calendar-list-invalid': (p) => {
+		const key = s(p, 'why', 'names');
+		const why = { 'not-map': 'it is not a group of keys, such as “name:”', names: 'it has no names, or a name is not text', known: 'its known year in the note is not a whole number', size: 'it has more than 60 names, or it is the fifth list or later (a calendar has at most 4 name lists)', lists: 'they are not a list. A list has one item on each text line, after a “-”' }[key] ?? 'it has an error';
+		const owner = typeof p.calendar === 'string' && p.calendar !== '' ? `the calendar ${quote(p.calendar)}` : 'the plain years';
+		// A format with a marker that no list has: the dates still read without the marker (spec §14 rule 13).
+		if (key === 'marker') return `A format of ${owner} in the note ${quote(s(p, 'note', '?'))} has the marker ${quote(`{${s(p, 'marker', '?')}}`)}, but no name list of the calendar has this marker. The plugin reads such dates without the name, and it does not check a name. Add a name list with this marker, or remove the marker from the format.`;
+		const what = key === 'lists' ? `The name lists of ${owner}` : `Name list ${s(p, 'index', '?')} of ${owner}`;
+		return `${what} in the note ${quote(s(p, 'note', '?'))} cannot be used. The reason is that ${why}. The plugin ignores ${key === 'lists' ? 'them' : 'it'}. Edit the text of the block in the note.`;
 	},
 
 	'through-spouse-no-partner': (p) =>
@@ -552,15 +571,21 @@ export const CALENDAR_REFUSAL_TEXT = {
 		other ? `The calendar ${quote(calendar)} and the calendar ${quote(other)} have the same format. A date in this format would fit both. Change one format.` : `The calendar ${quote(calendar)} has the same format two times. Change one format.`,
 	'calendar-era-duplicate': (calendar: string, other?: string) =>
 		other ? `The calendar ${quote(calendar)} and the calendar ${quote(other)} have the same era name. A date with this name would fit both. Change one era name.` : `The calendar ${quote(calendar)} has the same era name two times. Change one era name.`,
+	'calendar-name-twice': (calendar: string) => `Two calendars of this note have the name ${quote(calendar)}. Give each calendar its own name, so that the plugin can tell them apart.`,
 	// The two sentences that a refused edit also gives are written once, in `refusal-text.ts`.
 	'calendar-length': () => REFUSAL_TEXT.calendarLength,
 	'calendar-number': () => REFUSAL_TEXT.calendarNumber,
 } as const;
 
 /** The sentence for a refusal of `checkFormat` or `checkCalendars`; any other key gives a plain fallback (spec §8: never throw). */
-export function calendarRefusalText(refusal: { calendar: string; key: string; other?: string }): string {
-	const make = refusal ? (CALENDAR_REFUSAL_TEXT as Record<string, ((calendar: string, other?: string) => string) | undefined>)[refusal.key] : undefined;
-	return make ? make(refusal.calendar, refusal.other) : 'The calendar has an error. Correct the calendar.';
+export function calendarRefusalText(refusal: { calendar: string; key: string; other?: string; plain?: boolean; list?: number; listName?: string; detail?: string; marker?: string }): string {
+	// Only the keys of the tables count: a key such as "toString" is no sentence.
+	const own = (table: object): boolean => Object.prototype.hasOwnProperty.call(table, refusal.key);
+	const make = refusal && own(CALENDAR_REFUSAL_TEXT) ? (CALENDAR_REFUSAL_TEXT as Record<string, (calendar: string, other?: string) => string>)[refusal.key] : undefined;
+	if (make) return make(refusal.calendar, refusal.other);
+	// The name lists, their markers and the marker places in a format (spec §14 rule 16).
+	const listText = refusal && own(LIST_REFUSAL_TEXT) ? LIST_REFUSAL_TEXT[refusal.key] : undefined;
+	return listText ? listText(refusal) : 'The calendar has an error. Correct the calendar.';
 }
 
 /** Every issue code that has a message, for tests that read the whole table. */

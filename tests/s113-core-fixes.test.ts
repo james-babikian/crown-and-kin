@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { speedTest } from './support/speed-test';
 import { parseBody } from '../src/core/parse';
 import { linkText } from '../src/core/link-text';
 import { linkedNotePath } from '../src/core/note-make';
@@ -187,7 +188,7 @@ describe('A6: svg header scan', () => {
 			else expect([got.width, got.height], tag).toEqual([null, null]);
 		}
 	});
-	it('many attributes without a closing quote are read quickly', () => {
+	speedTest('many attributes without a closing quote are read quickly', () => {
 		const t = performance.now();
 		readPictureHeader(enc(`<svg ${'a=" '.repeat(12000)}`));
 		readPictureHeader(enc(`<svg ${"a='b=\"".repeat(10000)}`));
@@ -222,7 +223,7 @@ describe('A7: parentheses in link targets', () => {
 		expect(linkedNotePath('[x](Houses/Note%20(2).md)')).toEqual({ folder: 'Houses', name: 'Note (2)', path: 'Houses/Note (2).md' });
 		expect(linkedNotePath('[x](<Houses/Note (2)>)')).toEqual({ folder: 'Houses', name: 'Note (2)', path: 'Houses/Note (2).md' });
 	});
-	it('a long text of "[" and "(" is read in linear time', () => {
+	speedTest('a long text of "[" and "(" is read in linear time', () => {
 		const t = performance.now();
 		linkText(`[${'['.repeat(30000)}](${'('.repeat(30000)}`);
 		linkText(`[a](${'('.repeat(30000)}`);

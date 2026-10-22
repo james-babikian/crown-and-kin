@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect } from 'vitest';
+import { speedTest } from './support/speed-test';
 import { readPictureHeader } from '../src/core/pictures';
 
 // Proof of review s113-a: the attribute regex in `svgHeader` is quadratic on a long start tag with
@@ -14,10 +15,10 @@ function ms(f: () => void): number {
 }
 
 describe('svg header scan time', () => {
-	it('a 60 KB token inside <svg …> is read in under 400 ms', () => {
+	speedTest('a 60 KB token inside <svg …> is read in under 400 ms', () => {
 		expect(ms(() => readPictureHeader(enc(`<svg ${'a'.repeat(60000)}>`)))).toBeLessThan(400);
 	});
-	it('an attribute whose quote never closes (60 KB) is read in under 400 ms', () => {
+	speedTest('an attribute whose quote never closes (60 KB) is read in under 400 ms', () => {
 		expect(ms(() => readPictureHeader(enc(`<svg a = "${'x'.repeat(60000)}`)))).toBeLessThan(400);
 	});
 });

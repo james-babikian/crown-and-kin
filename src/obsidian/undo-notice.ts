@@ -12,6 +12,34 @@ import { trackModal } from '../view/plugin-modals';
 const UNDO_NOTICE_MS = 10_000;
 
 /**
+ * The one Undo rule (spec §6.1, §6.7), for the Notice and for the text line of the edit window: the handle undoes its last write only while the
+ * block is still what the action wrote (or what a link update after a rename made of it). `depth` is the undo depth right after the action; when
+ * it is given and another write stands above it, the body can look the same again (a pin set and removed), so the rule refuses too. A refusal
+ * shows its Notice and gives false; the undo gives true.
+ */
+export async function undoIfUnchanged(handle: Handle, written: string, depth: number | null = null): Promise<boolean> {
+	try {
+		// A link update after a rename (a maintenance write) does not count as a change of the tree.
+		const now = typeof handle.followed === 'function' ? handle.followed(written) : written;
+		const size = handle.undoSize;
+		if (!sameBody(handle.body, now) || (depth !== null && typeof size === 'number' && size !== depth)) {
+			new Notice(WRITE_TEXT.undoChanged);
+			return false;
+		}
+		const out = await handle.undo();
+		if (!out.ok) {
+			new Notice(out.code === 'missing' ? WRITE_TEXT.undoMissing : out.code === 'empty' ? WRITE_TEXT.undoEmpty : WRITE_TEXT.undoChanged);
+			return false;
+		}
+		return true;
+	} catch (err) {
+		console.error('Crown and Kin: cannot undo', err);
+		new Notice(WRITE_TEXT.undoChanged);
+		return false;
+	}
+}
+
+/**
  * The Notice after a destructive action (spec §6.1, §6.7): the text and an Undo button that uses
  * the plugin undo. Undo acts only while the block is still what this action wrote (or what a link
  * update after a rename made of it); otherwise it refuses, as the "Undo last tree edit" command does.
@@ -45,18 +73,10 @@ export function undoNotice(text: string, handle: Handle, written: string, onUndo
 		if (!live) return;
 		end();
 		void (async () => {
+			if (!(await undoIfUnchanged(handle, written))) return;
 			try {
-				// A link update after a rename (a maintenance write) does not count as a change of the tree.
-				const now = typeof handle.followed === 'function' ? handle.followed(written) : written;
-				if (!sameBody(handle.body, now)) {
-					new Notice(WRITE_TEXT.undoChanged);
-					return;
-				}
-				const out = await handle.undo();
-				if (out.ok) {
-					new Notice(doneText);
-					onUndone?.();
-				} else new Notice(out.code === 'missing' ? WRITE_TEXT.undoMissing : out.code === 'empty' ? WRITE_TEXT.undoEmpty : WRITE_TEXT.undoChanged);
+				new Notice(doneText);
+				onUndone?.();
 			} catch (err) {
 				console.error('Crown and Kin: cannot undo', err);
 				new Notice(WRITE_TEXT.undoChanged);

@@ -12,7 +12,7 @@ import { calendarBlockProcessor } from '../src/obsidian/calendar-block-view';
 import { CALENDAR_UI, CALENDAR_WINDOW_UI as T } from '../src/render/calendar-text';
 import { createCalendarIndex } from '../src/view/calendar-index';
 import { FEl, device, dispatch, fakeWin, installDom, resetDom } from './acceptance/fake-dom';
-import { notices, openModals, resetObsidian } from './acceptance/fake-obsidian';
+import { lastMenu, notices, openModals, resetObsidian } from './acceptance/fake-obsidian';
 import { cycleNote, eraNote, fakeVault as indexVault } from './support/calendar-vault';
 
 /*
@@ -116,6 +116,12 @@ const press = async (c: FEl, selector: string): Promise<void> => {
 	await settle();
 };
 const save = (c: FEl) => press(c, '.dynasty-sheet-save');
+/** "Add calendar" with the menu, as a user does when the window has a calendar already. */
+const addKind = async (c: FEl, kind: 'cycles' | 'eras'): Promise<void> => {
+	await press(c, '[data-focus="cal:add"]');
+	lastMenu()!.item(kind === 'cycles' ? T.kindCycles : T.kindEras)!.click();
+	await settle();
+};
 const errorText = (c: FEl) => c.querySelector('.dynasty-sheet-error')?.getText() ?? '';
 
 describe('the Calendars window', () => {
@@ -149,7 +155,7 @@ describe('the Calendars window', () => {
 	it('adds an era calendar with an era; the start comes from the Same year as form', async () => {
 		const o = await open({ 'Calendars.md': cycleNote() });
 		const c = o.win.contentEl;
-		await press(c, '.dynasty-cal-add-eras');
+		await addKind(c, 'eras');
 		type(c, '1-name', 'Houses');
 		type(c, '1-formats', '{era} {year}');
 		type(c, 'era-2-name', 'Aldric');
@@ -172,18 +178,18 @@ describe('the Calendars window', () => {
 	it('refuses a format that two calendars share, names the other calendar and writes nothing', async () => {
 		const o = await open({ 'Calendars.md': cycleNote() });
 		const c = o.win.contentEl;
-		await press(c, '.dynasty-cal-add-cycles');
+		await addKind(c, 'cycles');
 		type(c, '1-name', 'Copy');
 		type(c, '1-formats', '{year} year of the {cycle} cycle');
 		type(c, '1-length', '10');
 		const before = o.notes.get('Calendars.md');
 		await save(c);
 		expect(o.notes.get('Calendars.md')).toBe(before);
-		expect(errorText(c)).toContain('The plugin cannot save yet.');
-		expect(errorText(c)).toContain('“The Long Count”');
+		expect(errorText(c)).toBe('Correct the error in the open section.');
 		expect(openModals).toHaveLength(1);
-		// The refusal also stands under the calendar.
-		expect(c.querySelector('[data-calendar="1"] [data-refusal]')).not.toBeNull();
+		// The refusal stands once, under the calendar, and names the other calendar.
+		expect(c.querySelectorAll('[data-refusal]')).toHaveLength(1);
+		expect(c.querySelector('[data-calendar="1"] [data-refusal]')?.getText()).toContain('“The Long Count”');
 	});
 
 	it('refuses a bad format with the sentence of the rule, and a length below 1', async () => {
@@ -192,8 +198,10 @@ describe('the Calendars window', () => {
 		type(c, '0-formats', '{year} only');
 		type(c, '0-length', '0');
 		await save(c);
-		expect(errorText(c)).toContain('A cycle format needs {year} and {cycle}');
-		expect(errorText(c)).toContain('The length of a cycle or an era is a number of years.');
+		expect(errorText(c)).toBe('Correct the 2 errors in the open sections.');
+		const shown = c.querySelectorAll('.dynasty-cal-sections [data-refusal]').map((e) => e.getText()).join('|');
+		expect(shown).toContain('A cycle format needs {year} and {cycle}');
+		expect(shown).toContain('The length of a cycle or an era is a number of years.');
 	});
 
 	it('warns about the same format in another calendar note and saves anyway', async () => {
@@ -219,9 +227,9 @@ describe('the Calendars window', () => {
 	it('shows the test line for a date and updates it as the draft changes', async () => {
 		const o = await open({ 'Calendars.md': cycleNote('The Long Count', '{year} Year of the {cycle} Cycle', 100) });
 		const c = o.win.contentEl;
-		const line = () => c.querySelector('[data-calendar="0"] .dynasty-cal-test [data-readout]')?.getText();
+		const line = () => c.querySelector('.dynasty-cal-testbox [data-readout]')?.getText();
 		expect(line()).toBe('');
-		const input = c.querySelector('[data-focus="test:0"]')!;
+		const input = c.querySelector('[data-focus="test:all"]')!;
 		input.value = '10 Year of the 3 Cycle';
 		dispatch(input, 'input');
 		expect(line()).toBe('The Long Count: Cycle 3, Year 10 = year 229');
@@ -260,7 +268,7 @@ describe('the Calendars window', () => {
 		type(c, 'new-folder', 'Worlds');
 		await press(c, '.dynasty-cal-add-eras');
 		// The draft items are numbered on: the new note starts empty, so its first calendar is not number 0.
-		const k = Number(c.querySelector('.dynasty-cal-card')!.getAttribute('data-calendar'));
+		const k = Number(c.querySelector('[data-calendar]')!.getAttribute('data-calendar'));
 		type(c, `${k}-name`, 'Houses');
 		type(c, `${k}-formats`, '{era} {year}');
 		type(c, `era-${k + 1}-name`, 'Aldric');
@@ -398,13 +406,16 @@ describe('the look round of 0.3.2: the Calendars window and the block', () => {
 		const c = o.win.contentEl;
 		const head = c.querySelector('.dynasty-head')!;
 		expect(head.querySelector('.dynasty-head-name')!.getText()).toBe(T.title);
-		expect(head.querySelector('.dynasty-head-meta')!.getText()).toBe(`Calendars · ${T.folder('')}`);
+		// The link ends the text line (D278).
+		expect(head.querySelector('.dynasty-head-meta')!.getText()).toBe(`Calendars · ${T.folder('')} · ${T.newNote}`);
+		const metaKids = head.querySelector('.dynasty-head-meta')!.children;
+		expect(metaKids[metaKids.length - 1]?.hasClass('dynasty-cal-new-note')).toBe(true);
 		const link = head.querySelector('.dynasty-cal-new-note')!;
 		expect(link.hasClass('dynasty-link')).toBe(true);
 		expect(link.hasClass('dynasty-btn')).toBe(false);
 		expect(link.getText()).toBe(T.newNote);
 		const intro = c.querySelector('.dynasty-cal-intro')!;
-		expect(intro.getText()).toBe(T.intro);
+		expect(intro.getText()).toBe(T.introShort);
 		expect(intro.hasClass('dynasty-sheet-hint')).toBe(true);
 		expect(c.querySelector('.dynasty-choice-text')).toBeNull();
 	});
@@ -437,7 +448,7 @@ describe('the look round of 0.3.2: the Calendars window and the block', () => {
 		const o = await open({ 'Calendars.md': eraNote() });
 		const c = o.win.contentEl;
 		await press(c, '.dynasty-cal-add-era');
-		const card = c.querySelector('.dynasty-cal-card')!;
+		const card = c.querySelector('[data-calendar="0"]')!;
 		const heads = card.querySelectorAll('.dynasty-cal-subhead').filter((e) => e.getText() === T.erasLabel);
 		expect(heads).toHaveLength(1);
 		expect(card.querySelectorAll('.dynasty-cal-era')).toHaveLength(2);

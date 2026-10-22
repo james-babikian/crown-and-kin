@@ -235,7 +235,7 @@ describe('Find on an iPhone: the hidden names do not grow the scroll area of the
 			}
 		};
 		walk(new URL('../src/', import.meta.url));
-		expect(found.sort()).toEqual(['edit-sheet.ts', 'large-bar.ts', 'person-picker.ts', 'phone-list-dom.ts', 'picture-viewer.ts', 'window-shell.ts']);
+		expect(found.sort()).toEqual(['edit-sheet-family.ts', 'large-bar.ts', 'person-picker.ts', 'phone-list-dom.ts', 'picture-viewer.ts', 'window-shell.ts']);
 	});
 });
 

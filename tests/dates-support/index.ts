@@ -1,20 +1,14 @@
 /*
- * Shared helpers of the WP-4 acceptance tests (`tests/dates-*.test.ts`, step 4.0 of the dates work).
+ * Shared helpers of the WP-4 acceptance tests (`tests/dates-*.test.ts`).
  *
- * The tests are written from spec §14 and the dates seam in the architecture notes §5.7. `src/core/dates.ts` does
- * not exist at step 4.0, so this file (a) declares the shape of its API locally, from the frozen types of step 0, (b) loads the
- * module with a dynamic import only when the file exists, and (c) tells each test file which later step it belongs to
- * (the gates below). A gate turns on by itself when the code of that step lands, so nobody has to edit a test file;
- * a test that the gate lets in and that fails is a real failure of that step.
- *
- * When `dates.ts` exists, a builder may replace the local types by `import type` of the real ones.
+ * The tests are written from spec §14 and the dates seam in the architecture notes §5.7. This file declares the shape of the API of
+ * `src/core/dates.ts` locally, as the tests read it, and exports the real module under that shape as `datesApi`.
  */
 
-import { existsSync } from 'node:fs';
 import { deriveFamilies, type FamilyGraph } from '../../src/core/derive';
+import * as dates from '../../src/core/dates';
 import { parseDynasty } from '../../src/core/parse';
 import { specOf, successionLine, type SuccessionResult, type SuccessionSpec } from '../../src/core/succession';
-import * as keys from '../../src/core/succession-keys';
 import { cardLabel, dateLine } from '../../src/render/tree-info';
 import type { Person, Title, Tree } from '../../src/core/types';
 
@@ -30,7 +24,7 @@ export interface CalendarDef {
 }
 
 /** The architecture notes §5.7 `DateWarning`. */
-export type DateWarningKey = 'year-zero' | 'calendar-year-zero' | 'calendar-year-past-end' | 'fits-two-calendars';
+export type DateWarningKey = 'year-zero' | 'calendar-year-zero' | 'calendar-year-past-end' | 'fits-two-calendars' | 'calendar-name-mismatch';
 
 /** The architecture notes §5.7 `ReadDate`. */
 export interface ReadDateT {
@@ -85,60 +79,8 @@ export interface DatesApi {
 	exampleText(calendar: CalendarDef, internalYear: number): string | null;
 }
 
-/** Loads `src/core/dates.ts` when it exists; null at step 4.0. The variable DATES_IMPL (a file path) loads a scratch implementation instead, to try the tests. A broken file is not hidden: the import error shows. */
-export async function loadDatesApi(): Promise<DatesApi | null> {
-	if (!HAS_DATES) return null;
-	// A variable path keeps the transform and the type check from needing the file before it exists.
-	const path = process.env.DATES_IMPL ?? '../../src/core/dates';
-	return (await import(/* @vite-ignore */ path)) as DatesApi;
-}
-
-// ---------- The plain reader (the architecture notes §5.7) ----------
-
-/** The result of `readPlain` (the architecture notes §5.7). */
-export interface PlainRead {
-	year?: number;
-	approx?: true;
-	zero?: true;
-	dual?: true;
-}
-
-/** `readPlain` of `succession-keys.ts`; undefined until step 4.1a. */
-export const readPlain = (keys as unknown as Record<string, unknown>).readPlain as ((text: string | undefined) => PlainRead) | undefined;
-
-// ---------- The gates ----------
-
-/** Step 4.1a: `src/core/dates.ts` exists. */
-export const HAS_DATES = existsSync('src/core/dates.ts') || process.env.DATES_IMPL !== undefined;
-/** Step 4.1a: `readPlain` is exported. */
-export const HAS_READ_PLAIN = readPlain !== undefined;
-
-const PROBE = `people:
-  - {id: r, name: R, sex: m, born: 1000}
-  - {id: c, name: C, sex: m, born: 1020, parents: [r]}
-
-titles:
-  - id: t
-    name: T
-    succession: eldest-child
-    year: 1100
-    holders:
-      - {person: r, from: 1050}
-`;
-
-/** Step 4.2: the line reports `yearText` and `dateWarnings` (the architecture notes §5.7). Found by running the engine on a tiny tree. */
-export const HAS_LINE_DATES = (() => {
-	const parsed = parseDynasty(PROBE);
-	if (!parsed.ok) return false;
-	const g = deriveFamilies(parsed.tree);
-	const res = successionLine(g, g.titles[0], specOf(g.titles[0]), 5, 0) as unknown as Record<string, unknown>;
-	return 'yearText' in res && 'dateWarnings' in res;
-})();
-
-/** Step 4.2: `dateLine(p, dates)` takes the dates view as a required second parameter (the architecture notes §5.7). */
-export const HAS_DATELINE_DATES = dateLine.length >= 2;
-/** Step 4.2: `cardLabel(p, relation, label, inLine, dates)` takes the dates view as a required last parameter (the architecture notes §5.7). */
-export const HAS_CARDLABEL_DATES = cardLabel.length >= 5;
+/** `src/core/dates.ts` under the shape that the tests use. */
+export const datesApi = dates as unknown as DatesApi;
 
 // ---------- The calendars of the owner's doc (spec §14 rule 2 and the special-cases table) ----------
 

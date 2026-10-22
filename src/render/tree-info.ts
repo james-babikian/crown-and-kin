@@ -3,14 +3,14 @@
  * finder (M7, `RelationTexts`) show. Used by the tree view, the scene, the legend, and others. Every string here is plugin text, so it
  * obeys Simplified Technical English (ASD-STE100) and the project word list.
  */
-import { PLAIN_READER, type TreeDates } from '../core/dates';
+import { PLAIN_READER, type DateReader, type TreeDates } from '../core/dates';
 import type { FamilyGraph } from '../core/derive';
 import { linkText } from '../core/link-text';
 import { CURLY_APOSTROPHE } from '../core/quote';
 import { DOUBTFUL_DIED, isDead } from '../core/succession-keys';
 import type { FinderResult, Relation, RelationStep } from '../core/relations';
-import type { CardLabel } from '../core/titles';
-import type { Person } from '../core/types';
+import { cardLabels, entryReign, type CardLabel } from '../core/titles';
+import type { Holder, Person } from '../core/types';
 
 // The legend texts live in legend-text.ts (one home each); these names stay importable from here.
 export { LEGEND_HOUSES_LABEL, LEGEND_LABELS, LEGEND_LINES_LABEL, LEGEND_ORDER, SIGN_LEGEND_LABEL } from './legend-text';
@@ -92,7 +92,7 @@ export function startPerson(g: FamilyGraph, start: string | undefined): string |
  * Partners and placement children of `id`, each once, in union order: the cards the readable
  * default view tries to show next to the start person (spec §5.5, D13).
  */
-export function familyOf(g: FamilyGraph, id: string): { partners: string[]; children: string[] } {
+export function partnersAndChildren(g: FamilyGraph, id: string): { partners: string[]; children: string[] } {
 	const partners = new Set<string>();
 	const children = new Set<string>();
 	for (const key of g.unionsOf.get(id) ?? []) {
@@ -113,29 +113,125 @@ export const DEAD_SIGN_DOUBT = '†?';
 export const CARD_SPOKEN_DEAD = 'dead';
 export const CARD_SPOKEN_DEAD_DOUBT = 'dead, but the death text is not clear';
 
+/** What the date helpers need of the dates view: `read`, and (when known) `reader.hasLists`, so a tree with no name list pays nothing. */
+export type DatesRead = Pick<TreeDates, 'read'> & { readonly reader?: Pick<DateReader, 'hasLists'> };
+
+/** Which names a short date shows (spec §14 rule 15): the lists' own setting, full names, or none. */
+export type NamesForm = 'shown' | 'full' | 'none';
+
+/**
+ * The short date `text` with the name of its year (spec §14 rule 15, D273): only a whole date gets names, one space after the date, in list order.
+ * A list with a written name gets nothing (no doubling), also when the written name is wrong. `'shown'` follows the `show` of each list,
+ * `'full'` uses the full names of every list that is not `none`, `'none'` adds nothing (a search text, a test for a sign).
+ */
+export function shownDate(text: string, dates: DatesRead, form: NamesForm): string {
+	// A tree with no list never reads the born text here: this keeps the cost of 0.3.2.
+	if (form === 'none' || dates.reader?.hasLists === false) return text;
+	const r = dates.read(text);
+	if (!r?.whole || !r.names) return text;
+	const add: string[] = [];
+	for (const n of r.names) {
+		if (n.show === 'none' || n.written) continue;
+		add.push(form === 'full' || n.show === 'full' || n.short === undefined ? n.name : n.short);
+	}
+	return add.length ? `${text.trimEnd()} ${add.join(' ')}` : text;
+}
+
+/** The en dash of a date range, and the thin space (U+2009) that goes on each side of it when a date of the range has a name or an approximate word (D278). */
+const DASH = '\u2013';
+const THIN = '\u2009';
+
+/** A date that starts with the word of an approximate year ("c. 1131", "ca. 1131", "about 1131", "circa 1131"; spec §14 rule 4). */
+const APPROX_WORD = /^\s*(?:(?:c|ca)\.|about|circa)(?=[\s\d])/i;
+
+/** True when the date `raw` has a name of its year, written or added (`shown` is the same date with the names that the cards add), or starts with an approximate word. */
+function hasNameOrWord(raw: string, shown: string, dates: DatesRead): boolean {
+	if (APPROX_WORD.test(raw) || shown !== raw) return true;
+	return dates.reader?.hasLists !== false && dates.read(raw)?.names?.some((n) => n.written) === true;
+}
+
+/**
+ * The two dates of a range with the dash between them: "1131–1160". A date that has a name of its year or an approximate word ("22.13 Sa", "c. 1131") would touch the dash
+ * ("Sa–c."), so a thin space goes on each side of it. A plain range keeps the plain dash. `from` and `to` are the dates as written and as shown (with the names added).
+ */
+export function dateRange(from: { raw: string; shown: string }, to: { raw: string; shown: string }, dates: DatesRead): string {
+	const spaced = hasNameOrWord(from.raw, from.shown, dates) || hasNameOrWord(to.raw, to.shown, dates);
+	return spaced ? `${from.shown}${THIN}${DASH}${THIN}${to.shown}` : `${from.shown}${DASH}${to.shown}`;
+}
+
+/** The born and died dates of a person row with their names, and the range that joins them (undefined when a date is missing): the same text as on the card. */
+export function shownYears(born: string, died: string, dates: DatesRead): { born: string; died: string; range: string | undefined } {
+	const [b, d] = [born, died].map((x) => shownDate(x, dates, 'shown'));
+	return { born: b, died: d, range: born && died ? dateRange({ raw: born, shown: b }, { raw: died, shown: d }, dates) : undefined };
+}
+
+/** One holder entry as the reign text of a card has it ("22.13 Sa – 23.20 Ve", "from 1131", "until 1160"): the same as `entryReign` of the core, with the names of the dates (spec §14 rule 15) and `dateRange`. */
+export function entryReignText(entry: Holder, dates: DatesRead, form: NamesForm): string | undefined {
+	const shown = shownHolder(entry, dates, form);
+	if (entry.from !== undefined && entry.to !== undefined) return dateRange({ raw: entry.from, shown: shown.from! }, { raw: entry.to, shown: shown.to! }, dates);
+	return entryReign(shown);
+}
+
+/** The reign text of the entries, "(r. 1131–1140, from 1145)": the same as `reignText` of the core, with `entryReignText`. */
+export function reignOf(entries: readonly Holder[], dates: DatesRead, form: NamesForm): string | undefined {
+	const parts = entries.map((e) => entryReignText(e, dates, form)).filter((r): r is string => r !== undefined);
+	return parts.length ? `(r. ${parts.join(', ')})` : undefined;
+}
+
+/**
+ * The reign of a card label (`CardLabel.reign`, "(r. 22.30–23.20)") with the names of its dates (spec §14 rule 15). The label keeps the text as written;
+ * this builds the same text again from the entries, with `shownDate` for each date. Without a list it is the label's own text, except that a range with
+ * an approximate word ("c.") has the thin spaces around its dash (D278).
+ */
+export function shownReign(label: Pick<CardLabel, 'reign' | 'shown'> | undefined, dates: DatesRead, form: NamesForm): string | undefined {
+	if (!label?.reign || !label.shown) return label?.reign;
+	// No names and no approximate word in a range: the label's own text is the answer, and no card pays for building it again.
+	const names = form !== 'none' && dates.reader?.hasLists !== false;
+	const approx = label.shown.entries.some((e) => e.from !== undefined && e.to !== undefined && (APPROX_WORD.test(e.from) || APPROX_WORD.test(e.to)));
+	return names || approx ? (reignOf(label.shown.entries, dates, form) ?? label.reign) : label.reign;
+}
+
+/** The title of a card label with its reign, the reign with the names of its years (spec §14 rule 15); `written` when the tree has no list or the person has no label. */
+export function titleWithNames(g: FamilyGraph, id: string, written: string): string {
+	const label = written && g.dates.reader?.hasLists ? cardLabels(g).get(id) : undefined;
+	return label ? [label.title, shownReign(label, g.dates, 'shown')].filter((x) => x !== undefined && x !== '').join(' ') : written;
+}
+
+/** The title text of the head of the person window: with a reign, the reign shows the names of its years, as the card does (spec §14 rule 15); the label keeps the text as written. */
+export function headTitle(label: Pick<CardLabel, 'title' | 'reign' | 'shown'> | undefined, titleText: string, dates: DatesRead): string {
+	return label?.title && label.reign ? `${titleText} ${shownReign(label, dates, 'shown') ?? label.reign}` : titleText;
+}
+
+/** A holder entry (or the values of a holder form) with `from` and `until` as short dates with names (spec §14 rule 15); the text of a reign is built from it with `entryReign`. */
+export function shownHolder<T extends { from?: string; to?: string }>(entry: T, dates: DatesRead, form: NamesForm): T {
+	const date = (text: string | undefined) => (text === undefined ? undefined : shownDate(text, dates, form));
+	return { ...entry, ...(entry.from !== undefined ? { from: date(entry.from) } : {}), ...(entry.to !== undefined ? { to: date(entry.to) } : {}) };
+}
+
 /**
  * The two parts of a card's dates (I19): the text with the years, and the sign of a dead person with no death year.
  * A `died` that means alive (K.7: "no", "false") gives neither a death year nor the sign. A death text that fits a calendar of the
- * tree has a year, so it shows as written and not as the sign (spec §14 rule 7); `dates` reads it.
+ * tree has a year, so it shows as written and not as the sign (spec §14 rule 7); `dates` reads it. `names` says which names follow a whole date (rule 15).
  */
-function dateParts(p: Person, dates: Pick<TreeDates, 'read'>): { text?: string; sign?: string } {
+function dateParts(p: Person, dates: DatesRead, names: NamesForm = 'shown'): { text?: string; sign?: string } {
 	const dead = isDead(p);
 	const died = dead ? p.died : undefined;
 	const hasYear = died !== undefined && dates.read(died)?.year !== undefined;
 	const sign = dead && !hasYear ? (DOUBTFUL_DIED.includes(p.died!.trim().toLowerCase()) ? DEAD_SIGN_DOUBT : DEAD_SIGN) : undefined;
 	let text: string | undefined;
-	if (p.born && hasYear) text = `${p.born}–${died}`;
-	else if (p.born) text = `b. ${p.born}`;
-	else if (hasYear) text = `d. ${died}`;
+	if (p.born && hasYear) text = dateRange({ raw: p.born, shown: shownDate(p.born, dates, names) }, { raw: died!, shown: shownDate(died!, dates, names) }, dates);
+	else if (p.born) text = `b. ${shownDate(p.born, dates, names)}`;
+	else if (hasYear) text = `d. ${shownDate(died!, dates, names)}`;
 	return { ...(text !== undefined ? { text } : {}), ...(sign !== undefined ? { sign } : {}) };
 }
 
 /**
  * The dates text line of a card: "born–died", "b. born" or "d. died"; none without dates. A dead person with no death year
- * (I19) gets a sign after the birth text: "b. 1131 †", or "†" alone; "†?" if the `died` text is a doubt.
+ * (I19) gets a sign after the birth text: "b. 1131 †", or "†" alone; "†?" if the `died` text is a doubt. A whole date gets the name of its
+ * year after it (spec §14 rule 15); `opts.names` is `'none'` for the second try of the cut and for a test of a sign.
  */
-export function dateLine(p: Person, dates: Pick<TreeDates, 'read'>): string | undefined {
-	const { text, sign } = dateParts(p, dates);
+export function dateLine(p: Person, dates: DatesRead, opts: { names?: NamesForm } = {}): string | undefined {
+	const { text, sign } = dateParts(p, dates, opts.names);
 	if (text !== undefined && sign !== undefined) return `${text} ${sign}`;
 	return text ?? sign;
 }
@@ -149,11 +245,12 @@ export function dateLine(p: Person, dates: Pick<TreeDates, 'read'>): string | un
  * `dates` reads the death text like `dateLine` does. Every caller in `src` passes `g.dates`; it is optional so that the older
  * tests can leave it out (they read plain years).
  */
-export function cardLabel(p: Person, relation?: string, label?: CardLabel, inLine?: string, dates?: Pick<TreeDates, 'read'>): string {
+export function cardLabel(p: Person, relation?: string, label?: CardLabel, inLine?: string, dates?: DatesRead): string {
 	const name = label ? label.name : p.name;
-	const title = label ? [label.title, label.reign].filter((x) => x !== undefined && x !== '').join(' ') : p.title;
+	// The label says the full names of the years and never cuts them (spec §14 rule 15).
+	const title = label ? [label.title, shownReign(label, dates ?? PLAIN_READER, 'full')].filter((x) => x !== undefined && x !== '').join(' ') : p.title;
 	// The sign is a character, so the label says it with words (ruling 14).
-	const { text, sign } = dateParts(p, dates ?? PLAIN_READER);
+	const { text, sign } = dateParts(p, dates ?? PLAIN_READER, 'full');
 	const dead = sign === undefined ? undefined : sign === DEAD_SIGN_DOUBT ? CARD_SPOKEN_DEAD_DOUBT : CARD_SPOKEN_DEAD;
 	return [name, title, text, dead, relation, inLine].filter((x) => x !== undefined && x !== '').join(', ');
 }

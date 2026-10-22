@@ -18,7 +18,7 @@ vi.mock('../src/obsidian/choice-modal', () => ({ choose: async () => chosen.shif
 import { closePluginModals } from '../src/view/plugin-modals';
 import { openState, renderSections, resetOpenSections } from '../src/obsidian/window-sections';
 import { RowPictures, buildRow } from '../src/obsidian/window-parts';
-import { addChild, addParent, addPartner, type FlowHost } from '../src/obsidian/family-flows';
+import { addChild, addParentFlow, addPartner, type FlowHost } from '../src/obsidian/family-flows';
 import { TITLES_UI, WINDOW_UI } from '../src/render/ui-text';
 import { FEl, clock, device, dispatch, fakeWin, installDom, resetDom, settle } from './acceptance/fake-dom';
 import { openModals, resetObsidian } from './acceptance/fake-obsidian';
@@ -79,7 +79,7 @@ describe('the data that the windows give the person picker (G.3)', () => {
 			picker: () => ctx,
 		} as unknown as FlowHost;
 		chosen.push('birth', 'existing');
-		await addParent(host).catch(() => {});
+		await addParentFlow(host).catch(() => {});
 		chosen.push('existing');
 		await addChild(host).catch(() => {});
 		chosen.push('existing');

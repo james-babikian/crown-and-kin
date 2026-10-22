@@ -32,7 +32,7 @@ function applyToEditor(view: MarkdownView, c: { from: number; to: number; text: 
 }
 
 const keyString = (path: string, ordinal: number) => `${path}\u0000#${ordinal}`;
-const pause = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+export const pause = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
 /** F-VIEW-04: the longest `forBlock` waits for a write of the note to end (a slow disk or a sync lock), in ms. */
 export const FOR_BLOCK_WAIT_MS = 10_000;

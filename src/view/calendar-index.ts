@@ -9,7 +9,8 @@
 
 import { CALENDAR_LANGUAGE, findBlocks } from '../core/block-locate';
 import { parseCalendarBlock } from '../core/calendar-block';
-import { compileCalendars, findCrossNoteDuplicates, type Calendar, type CalendarProblem, type DateReader } from '../core/dates';
+import { fold } from '../core/date-text';
+import { compileCalendars, findCrossNoteDuplicates, type Calendar, type CalendarProblem, type DateReader, type NameList } from '../core/dates';
 import { deriveFamilies, type FamilyGraph } from '../core/derive';
 import type { CodedIssue } from '../core/messages';
 import type { Tree } from '../core/types';
@@ -65,8 +66,8 @@ export interface CalendarIndex extends DatesHost {
 	reload(path: string): Promise<void>;
 	/** The calendars of one note, in written order. */
 	calendarsOf(path: string): Calendar[];
-	/** The problems of the blocks of one note (a block that cannot be read). */
-	issuesOf(path: string): CodedIssue[];
+	/** The name lists of the plain years of one note, in written order (spec §14 rule 13). */
+	plainListsOf(path: string): NameList[];
 }
 
 /** The wait before the listeners hear of a change, in ms (a burst of events is one change). */
@@ -81,6 +82,10 @@ export interface IndexOptions {
 
 interface Entry {
 	calendars: Calendar[];
+	/** The name lists of the plain years (key `plain`, spec §14 rule 13); empty when the note has none. */
+	plain: NameList[];
+	/** The note has a `plain` key in a block: with no calendar it is still a calendar note (spec §14 rule 13). */
+	hasPlain: boolean;
 	issues: CodedIssue[];
 	/** The text of the entry for a quick "did it change" test. */
 	sig: string;
@@ -100,13 +105,20 @@ function entryOf(text: string, path: string): Entry | null {
 	const blocks = findBlocks(text, CALENDAR_LANGUAGE);
 	if (!blocks.length) return null;
 	const calendars: Calendar[] = [];
+	const plain: NameList[] = [];
 	const issues: CodedIssue[] = [];
+	let hasPlain = false;
 	blocks.forEach((b, i) => {
 		const read = parseCalendarBlock(b.body, path, i);
 		calendars.push(...read.calendars);
+		if (read.plain) {
+			hasPlain = true;
+			plain.push(...read.plain);
+		}
 		issues.push(...read.issues);
 	});
-	return { calendars, issues, sig: JSON.stringify([calendars, issues.length]) };
+	// The lists are in the signature (a list-only edit is a change); a note with no `plain` key keeps the signature of 0.3.2.
+	return { calendars, plain, hasPlain, issues, sig: JSON.stringify([calendars, issues.length, ...(hasPlain ? [plain] : [])]) };
 }
 
 /** The index behind `createCalendarIndex`. */
@@ -267,12 +279,30 @@ class Index implements CalendarIndex {
 		return path !== null && this.entries.has(path) ? [path] : [];
 	}
 
-	/** The calendars and the problems of the notes that a tree uses. */
-	private build(treePath: string, link: string | undefined): { calendars: Calendar[]; problems: CalendarProblem[] } {
-		const calendars = this.usedNotes(treePath, link).flatMap((p) => this.entries.get(p)!.calendars);
+	/**
+	 * The calendars, the plain-year lists and the problems of the notes that a tree uses. The plain-year lists come from every used note in index
+	 * order; of lists with the same folded name the first is kept, and a later one in another note gives `calendar-duplicate` (spec §14 rule 13).
+	 */
+	private build(treePath: string, link: string | undefined): { calendars: Calendar[]; plain: NameList[]; problems: CalendarProblem[] } {
+		const used = this.usedNotes(treePath, link);
+		const calendars = used.flatMap((p) => this.entries.get(p)!.calendars);
+		const plain: NameList[] = [];
+		const problems: CalendarProblem[] = [];
+		const firstNote = new Map<string, string>();
+		for (const path of used) {
+			for (const list of this.entries.get(path)!.plain) {
+				const key = fold(list.name);
+				const first = firstNote.get(key);
+				if (first === undefined) {
+					firstNote.set(key, path);
+					plain.push(list);
+				} else if (first !== path) problems.push({ key: 'calendar-duplicate', list: list.name, note: path, other: first });
+			}
+		}
 		const text = link?.trim();
-		if (text) return { calendars, problems: calendars.length ? [] : [{ key: 'calendar-note-missing', note: text }] };
-		return { calendars, problems: findCrossNoteDuplicates(calendars) };
+		// A note with only a `plain` key is a calendar note (spec §14 rule 13).
+		if (text) return { calendars, plain, problems: calendars.length || used.some((p) => this.entries.get(p)!.hasPlain) ? problems : [{ key: 'calendar-note-missing', note: text }] };
+		return { calendars, plain, problems: [...findCrossNoteDuplicates(calendars), ...problems] };
 	}
 
 	readerFor(treePath: string, calendarLink?: string): DateReader {
@@ -280,13 +310,13 @@ class Index implements CalendarIndex {
 		const cacheKey = `${calendarLink?.trim() ?? ''}\u0000${treePath}`;
 		const kept = this.readers.get(cacheKey);
 		if (kept?.version === this.version) return kept.reader;
-		const { calendars, problems } = this.build(treePath, calendarLink);
-		const sig = JSON.stringify([calendars, problems]);
+		const { calendars, plain, problems } = this.build(treePath, calendarLink);
+		const sig = JSON.stringify(plain.length ? [calendars, problems, plain] : [calendars, problems]);
 		if (kept?.sig === sig) {
 			kept.version = this.version;
 			return kept.reader;
 		}
-		const reader = compileCapped(calendars, true, problems);
+		const reader = compileCapped(calendars, true, problems, plain);
 		this.readers.set(cacheKey, { version: this.version, sig, reader });
 		return reader;
 	}
@@ -308,8 +338,8 @@ class Index implements CalendarIndex {
 		return this.entries.get(path)?.calendars ?? [];
 	}
 
-	issuesOf(path: string): CodedIssue[] {
-		return this.entries.get(path)?.issues ?? [];
+	plainListsOf(path: string): NameList[] {
+		return this.entries.get(path)?.plain ?? [];
 	}
 }
 

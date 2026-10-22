@@ -3,6 +3,7 @@
 // A speed rule here is always a ratio of two runs in one process, with a limit of about 10 times the linear growth (the I34 lesson). Known: ITEMS I11 (rumoured links cost) is not repeated.
 // Seeds are fixed. R028_DEEP=1 runs bigger inputs.
 import { describe, expect, it } from 'vitest';
+import { speedTest } from './support/speed-test';
 import { findBlocks, replaceBody } from '../src/core/block-locate';
 import { deriveFamilies } from '../src/core/derive';
 import { hardErrorText } from '../src/core/messages';
@@ -70,7 +71,7 @@ describe('X2 (8): a note of 1 MB around one block (spec §6.1, block-locate)', (
 		}
 	});
 
-	it('the time grows with the length of the note: 1 MB takes less than 40 times as long as 100 KB (linear is 10)', () => {
+	speedTest('the time grows with the length of the note: 1 MB takes less than 40 times as long as 100 KB (linear is 10)', () => {
 		const small = prose(900) + block + prose(900);
 		const big = prose(9000) + block + prose(9000);
 		const a = best(() => findBlocks(small), 5);
@@ -89,7 +90,7 @@ describe('X2 (8): a note of 1 MB around one block (spec §6.1, block-locate)', (
 		'a block inside 500 nested list items': Array.from({ length: 500 }, (_, i) => ' '.repeat(i * 2) + '- item').join('\n') + '\n' + ' '.repeat(1000) + '```kin\n' + ' '.repeat(1000) + 'people:\n' + ' '.repeat(1000) + '```\n',
 	};
 	for (const [label, text] of Object.entries(shapes)) {
-		it(`${label}: no throw, the right number of blocks, in less than 2 s`, () => {
+		speedTest(`${label}: no throw, the right number of blocks, in less than 2 s`, () => {
 			const t0 = performance.now();
 			const found = findBlocks(text);
 			if (found.length) replaceBody(text, found[0], BODY);
@@ -125,7 +126,7 @@ describe('X2 (8): a value of 100 000 characters (spec §3 exact text, §13.9 thr
 		if (edit.ok) expect(edit.body.length).toBe(src.length + 2);
 	});
 
-	it('the time grows with the length: 100 000 characters take less than 40 times as long as 10 000', () => {
+	speedTest('the time grows with the length: 100 000 characters take less than 40 times as long as 10 000', () => {
 		const run = (n: number) => () => {
 			const t = huge(n);
 			pipeline(`people:\n  - {id: a, name: ${q(t)}, sobriquet: ${q(t)}, title: ${q(t)}}\n`);
@@ -166,7 +167,7 @@ describe('X2 (8): thousands of unknown keys (spec §4: unknown keys are kept at 
 		}, 30000);
 	}
 
-	it('the parse time grows with the number of keys: 4 times the keys take less than 40 times as long (the YAML parser is not linear for one map, so the limit is about 10 times the growth)', () => {
+	speedTest('the parse time grows with the number of keys: 4 times the keys take less than 40 times as long (the YAML parser is not linear for one map, so the limit is about 10 times the growth)', () => {
 		const time = (n: number) => best(() => parseDynasty(placed['top level'](n)), 3);
 		const a = time(500);
 		const b = time(2000);
@@ -177,7 +178,7 @@ describe('X2 (8): thousands of unknown keys (spec §4: unknown keys are kept at 
 describe('X2 (8): 5 000 people (spec §7.7 gives times for 60 and 400 people; larger trees are version 0.3 work, so this is a ratio and a no-throw test)', () => {
 	const textOf = (n: number) => toText(genModel(3, { n, window: 40, unionP: 0.3, sex: 'mixed', houses: 4, dates: true }));
 
-	it('parse, derive, layout and SVG of 4 times as many people take less than 40 times as long, and every person has a card', () => {
+	speedTest('parse, derive, layout and SVG of 4 times as many people take less than 40 times as long, and every person has a card', () => {
 		const small = DEEP ? 1250 : 800;
 		const big = small * 4;
 		const a = pipeline(textOf(small));
@@ -201,7 +202,7 @@ describe('X2 (8): aliases (spec §3, parse.ts `maxAliasCount`)', () => {
 	};
 
 	for (const [levels, fan] of [[3, 9], [6, 9], [9, 9], [20, 9], [9, 30], [40, 40]]) {
-		it(`an alias bomb of ${levels} levels with ${fan} uses each (about ${Math.min(9 ** levels, 1e18).toExponential(0)} nodes) ends at once with the error box or a tree, not with a hang`, () => {
+		speedTest(`an alias bomb of ${levels} levels with ${fan} uses each (about ${Math.min(9 ** levels, 1e18).toExponential(0)} nodes) ends at once with the error box or a tree, not with a hang`, () => {
 			const t0 = performance.now();
 			const r = parseDynasty(laughs(levels, fan));
 			expect(performance.now() - t0).toBeLessThan(1500);
@@ -222,7 +223,7 @@ describe('X2 (8): aliases (spec §3, parse.ts `maxAliasCount`)', () => {
 		}
 	});
 
-	it('1 000 people share one anchored map of 1 000 keys: it parses, and the time stays small', () => {
+	speedTest('1 000 people share one anchored map of 1 000 keys: it parses, and the time stays small', () => {
 		const shared = Array.from({ length: 1000 }, (_, i) => `k${i}: v${i}`).join(', ');
 		const people = Array.from({ length: 1000 }, (_, i) => `  - {id: p${i}, name: P${i}, extra: *b}`).join('\n');
 		const t0 = performance.now();
@@ -252,7 +253,7 @@ describe('X2 (8): deep nesting (spec §8: nothing throws; a text the parser cann
 	};
 	for (const depth of depths) {
 		for (const [where, make] of Object.entries(places)) {
-			it(`${depth} nested lists ${where}: a tree or the error box, never a throw, in less than 3 s`, () => {
+			speedTest(`${depth} nested lists ${where}: a tree or the error box, never a throw, in less than 3 s`, () => {
 				const t0 = performance.now();
 				let r: ReturnType<typeof parseDynasty> | undefined;
 				expect(() => {
@@ -263,7 +264,7 @@ describe('X2 (8): deep nesting (spec §8: nothing throws; a text the parser cann
 				if (r && !r.ok) expect(hardErrorText(r.error).length).toBeGreaterThan(5);
 			});
 		}
-		it(`${depth} nested maps and ${Math.min(depth, 1500)} nested block lists: a tree or the error box`, () => {
+		speedTest(`${depth} nested maps and ${Math.min(depth, 1500)} nested block lists: a tree or the error box`, () => {
 			const maps = `extra: ${'{a: '.repeat(depth)}1${'}'.repeat(depth)}\n${BODY}`;
 			const lines = Array.from({ length: Math.min(depth, 1500) }, (_, i) => ' '.repeat(i) + '-').join('\n');
 			for (const text of [maps, `extra:\n${lines} x\n${BODY}`]) {
@@ -286,7 +287,7 @@ describe('X2 (8): one person with many links (spec §4.2: at most 2 of a type, t
 		return `people:\n  - {id: h, name: Hub}\n${people}\nunions:\n${ids.map((id) => `  - {partners: [h, ${id}]}`).join('\n')}\n`;
 	};
 	for (const kind of ['birth parents', 'rumoured parents', 'wards', 'partners'] as const) {
-		it(`${kind}: 40 and 400 on one person draw every card, the warning is there, and 10 times the people take less than 100 times as long (ITEMS I11 is measured elsewhere)`, () => {
+		speedTest(`${kind}: 40 and 400 on one person draw every card, the warning is there, and 10 times the people take less than 100 times as long (ITEMS I11 is measured elsewhere)`, () => {
 			const small = pipeline(many(kind, 40));
 			const big = pipeline(many(kind, 400));
 			expect(small.cards).toBe(kind === 'partners' ? 41 : kind === 'wards' ? 41 : 41);

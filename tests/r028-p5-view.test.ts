@@ -208,10 +208,13 @@ describe('the Focus menu (G.13)', () => {
 		expect(labels(marked.el)).toEqual(['Choose a person', 'Focus on you']);
 		await press(marked.el, '.dynasty-focus-me');
 		expect(marked.el.querySelector('.dynasty-root')!.getAttribute('data-dynasty-focus')).toBe('bo');
-		// With a focus the menu has Clear focus after a separator.
+		// D263 B2: with a focus on, the next tap clears it and opens no menu.
 		await press(marked.el, '.dynasty-focus');
-		expect(labels(marked.el)).toEqual(['Choose a person', 'Focus on you', 'Clear focus']);
-		expect(marked.el.querySelector('.dynasty-popover-focus .dynasty-menu-sep')).not.toBeNull();
+		expect(marked.el.querySelector('.dynasty-popover-focus')).toBeNull();
+		expect(marked.el.querySelector('.dynasty-root')!.getAttribute('data-dynasty-focus')).toBeNull();
+		// Both items are reachable again after the clear.
+		await press(marked.el, '.dynasty-focus');
+		expect(labels(marked.el)).toEqual(['Choose a person', 'Focus on you']);
 	});
 
 	it('on a phone the menus are sheets with a grip, and a tap on the cover closes them', async () => {

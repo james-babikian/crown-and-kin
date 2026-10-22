@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { speedTest } from './support/speed-test';
 import { foldForMatch, foldLetters } from '../src/core/fold';
 import { deriveFamilies } from '../src/core/derive';
 import { slugify } from '../src/core/id-gen';
@@ -138,7 +139,7 @@ describe('picture search folds both sides (D100)', () => {
 		expect(searchRows(tree, 'png', null, 3).rows).toHaveLength(4);
 	});
 
-	it('folds each path once: a search of 10 000 pictures, with accents, stays fast', () => {
+	speedTest('folds each path once: a search of 10 000 pictures, with accents, stays fast', () => {
 		const files = Array.from({ length: 10000 }, (_, i) => {
 			const name = `Retrato ${(i * 7919) % 10000} d’España ñ.png`;
 			return { path: `Carpeta ${i % 200}/${name}`, name, extension: 'png' };

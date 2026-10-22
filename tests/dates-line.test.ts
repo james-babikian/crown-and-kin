@@ -3,10 +3,6 @@
  * the family-history case table of the decision notes "Dates spec, genealogy check": M1 death date with no year, M2 no year 0,
  * S1 two equal calendars, S2 a range, S3 Year 0, S5 first match, S6 YEAR as written, S7 calendar-no-anchor, S8 Roman
  * numerals, plus Shōwa 64 and Heisei 1 and I19).
- *
- * Enable at 4.2: skipped until `successionLine` reports `yearText` and `dateWarnings` (the architecture notes §5.7) and `src/core/dates.ts`
- * exists. The card tests (I19) turn on when `dateLine` and `cardLabel` take the required dates parameter (the architecture notes §5.7).
- * The tests that use a plain `0` also need step 4.1b (they say so).
  */
 
 import { describe, expect, it } from 'vitest';
@@ -16,15 +12,12 @@ import {
 	copyOf,
 	dateLineWith,
 	graphOf,
-	HAS_CARDLABEL_DATES,
-	HAS_DATELINE_DATES,
-	HAS_LINE_DATES,
 	issueCodes,
 	JAPAN,
 	LONG_COUNT,
 	lineOf,
 	lineWithDates,
-	loadDatesApi,
+	datesApi,
 	notesOf,
 	person,
 	REIGN_NAMES,
@@ -32,13 +25,6 @@ import {
 	type CalendarDef,
 	type DatesApi,
 } from './dates-support';
-
-const api = await loadDatesApi();
-const LINE_ON = api !== null && HAS_LINE_DATES;
-const CARD_ON = api !== null && HAS_DATELINE_DATES;
-
-if (!LINE_ON) it.todo('enable at 4.2: dates in the line of succession (yearText, dateWarnings, died-no-year, not ready) and in the tree warning list');
-if (!CARD_ON) it.todo('enable at 4.2: I19, a calendar death date with no birth date shows as written (dateLine and cardLabel with dates)');
 
 /** A title tree: Rolf rules, Cade is his child. `extra` adds people and `title` the keys of the title. */
 function tree(opts: { people?: string; title?: string; holder?: string } = {}): string {
@@ -54,8 +40,8 @@ ${opts.title ?? '    year: "1109"\n'}    holders:
 `;
 }
 
-describe.skipIf(!LINE_ON)('§14 r5, r7: the year Y of the line and its text (family history S6)', () => {
-	const A = api as DatesApi;
+describe('§14 r5, r7: the year Y of the line and its text (family history S6)', () => {
+	const A = datesApi;
 	const aldric = () => A.compileCalendars([ALDRIC], true);
 
 	it('§14 r7: a title year in a calendar gives Y, and YEAR is the text as written', () => {
@@ -92,8 +78,8 @@ describe.skipIf(!LINE_ON)('§14 r5, r7: the year Y of the line and its text (fam
 	});
 });
 
-describe.skipIf(!LINE_ON)('§14 r4, r5: the line reads born, died and the reigns through the calendar', () => {
-	const A = api as DatesApi;
+describe('§14 r4, r5: the line reads born, died and the reigns through the calendar', () => {
+	const A = datesApi;
 	const SIBLINGS = tree({
 		people: '  - {id: c1, name: Cora, sex: f, born: "Aldric 30", parents: [r]}\n  - {id: c2, name: Cade, sex: m, born: "Aldric 10", parents: [r]}\n',
 		title: '',
@@ -147,8 +133,8 @@ describe.skipIf(!LINE_ON)('§14 r4, r5: the line reads born, died and the reigns
 	});
 });
 
-describe.skipIf(!LINE_ON)('§14 r1, r4: Shōwa 64 and Heisei 1 are one year (family history)', () => {
-	const A = api as DatesApi;
+describe('§14 r1, r4: Shōwa 64 and Heisei 1 are one year (family history)', () => {
+	const A = datesApi;
 	const src = (year: string) =>
 		tree({
 			people: `  - {id: x, name: Xan, sex: m, born: "Heisei 1"}
@@ -175,8 +161,8 @@ describe.skipIf(!LINE_ON)('§14 r1, r4: Shōwa 64 and Heisei 1 are one year (fam
 	});
 });
 
-describe.skipIf(!LINE_ON)('§14 r5: a death date with no year (family history M1)', () => {
-	const A = api as DatesApi;
+describe('§14 r5: a death date with no year (family history M1)', () => {
+	const A = datesApi;
 	const PEOPLE = `  - {id: c1, name: Cora, sex: f, born: 1060, died: "fell in the war", parents: [r]}
   - {id: c2, name: Cade, sex: m, born: 1070, parents: [r]}
 `;
@@ -261,8 +247,8 @@ describe.skipIf(!LINE_ON)('§14 r5: a death date with no year (family history M1
 	});
 });
 
-describe.skipIf(!LINE_ON)('§14 r5, r8: warnings of one date in the line (scope of §13.21 rule 9)', () => {
-	const A = api as DatesApi;
+describe('§14 r5, r8: warnings of one date in the line (scope of §13.21 rule 9)', () => {
+	const A = datesApi;
 	const reign = () => A.compileCalendars([REIGN_NAMES], true);
 	const find = (res: Record<string, unknown>, warning: string, what: string) => warningsOf(res).filter((w) => w.warning === warning && w.what === what);
 
@@ -338,8 +324,8 @@ describe.skipIf(!LINE_ON)('§14 r5, r8: warnings of one date in the line (scope 
 	});
 });
 
-describe.skipIf(!LINE_ON)('§14 r1, r5: calendar-no-anchor in the line (family history S7)', () => {
-	const A = api as DatesApi;
+describe('§14 r1, r5: calendar-no-anchor in the line (family history S7)', () => {
+	const A = datesApi;
 	const anchorWarnings = (res: Record<string, unknown>) => warningsOf(res).filter((w) => w.warning === 'calendar-no-anchor');
 	const cals = (cs: CalendarDef[], ready = true) => A.compileCalendars(cs, ready);
 	const withKid = (born: string, year: string) => tree({ people: `  - {id: c, name: Cade, sex: m, born: "${born}", parents: [r]}\n`, title: `    year: "${year}"\n` });
@@ -367,8 +353,8 @@ describe.skipIf(!LINE_ON)('§14 r1, r5: calendar-no-anchor in the line (family h
 	});
 });
 
-describe.skipIf(!LINE_ON)('§14 r5, r7: the tree warning list (where §13.21 rule 9 shows a note)', () => {
-	const A = api as DatesApi;
+describe('§14 r5, r7: the tree warning list (where §13.21 rule 9 shows a note)', () => {
+	const A = datesApi;
 	const codes = (src: string, reader: ReturnType<DatesApi['compileCalendars']>) => issueCodes(graphOf(src, reader));
 	const reign = (ready = true) => A.compileCalendars([REIGN_NAMES], ready);
 	const zero = tree({ people: '', title: '    year: "Qinglong Emperor 0"\n' });
@@ -433,8 +419,8 @@ describe.skipIf(!LINE_ON)('§14 r5, r7: the tree warning list (where §13.21 rul
 	});
 });
 
-describe.skipIf(!CARD_ON)('§14 r7, I19: a calendar death date with no birth date shows as written on the card', () => {
-	const A = api as DatesApi;
+describe('§14 r7, I19: a calendar death date with no birth date shows as written on the card', () => {
+	const A = datesApi;
 	const view = (cals: CalendarDef[], ready = true) => A.buildTreeDates(A.compileCalendars(cals, ready), [], []);
 	const plain = () => A.buildTreeDates(A.PLAIN_READER, [], []);
 	const p = (extra: { born?: string; died?: string }) => person({ id: 'a', name: 'Ada', ...extra });
@@ -472,8 +458,8 @@ describe.skipIf(!CARD_ON)('§14 r7, I19: a calendar death date with no birth dat
 	});
 });
 
-describe.skipIf(!(api !== null && HAS_CARDLABEL_DATES))('§14 r7, I19: the screen-reader label of the card says the same', () => {
-	const A = api as DatesApi;
+describe('§14 r7, I19: the screen-reader label of the card says the same', () => {
+	const A = datesApi;
 	const dead = person({ id: 'a', name: 'Ada', died: 'Year 5 of Cycle 3' });
 
 	it('§14 r7: a calendar death date is read as written; with no calendar the label says "dead"', () => {

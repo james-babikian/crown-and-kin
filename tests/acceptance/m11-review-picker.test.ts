@@ -1,4 +1,5 @@
 ﻿import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { speedTest } from '../support/speed-test';
 
 vi.mock('obsidian', () => import('./fake-obsidian'));
 vi.mock('@codemirror/language', () => ({ forceParsing: () => false, syntaxTree: () => ({ length: 0 }) }));
@@ -71,7 +72,7 @@ describe('A1: IME composition', () => {
 });
 
 describe('A2: search cost', () => {
-	it('a search over 10 000 pictures sorts in under 150 ms (it runs on every key)', () => {
+	speedTest('a search over 10 000 pictures sorts in under 150 ms (it runs on every key)', () => {
 		const files = Array.from({ length: 10000 }, (_, i) => {
 			const name = `Picture ${(i * 7919) % 10000} final.png`;
 			return { path: `Folder ${i % 200}/${name}`, name, extension: 'png' };

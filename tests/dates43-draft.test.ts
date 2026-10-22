@@ -5,7 +5,7 @@ import { editCalendarBlock, parseCalendarBlock } from '../src/core/calendar-bloc
 import { findBlocks } from '../src/core/block-locate';
 import { planWrite } from '../src/core/block-write';
 import type { Calendar } from '../src/core/dates';
-import { checkDraft, draftChanged, draftOf, formatsOf, newCalendar, newEra, opsOf, startReadback, testLine, wholeOf, type CalendarDraft } from '../src/view/calendar-draft';
+import { checkDraft, calendarDraftChanged, draftOf, formatsOf, newCalendar, newEra, opsOf, startReadback, testLine, wholeOf, type CalendarDraft } from '../src/view/calendar-draft';
 import { cycleNote, eraNote } from './support/calendar-vault';
 
 const NOTE = 'Calendars.md';
@@ -49,7 +49,7 @@ describe('the draft of a note', () => {
 		const drafts = draftOf(saved, key);
 		const checked = checkDraft(drafts, NOTE, []);
 		expect(checked.refusals).toEqual([]);
-		expect(draftChanged(saved, drafts, checked)).toBe(false);
+		expect(calendarDraftChanged(saved, drafts, checked)).toBe(false);
 		expect(opsOf(saved, drafts, checked)).toEqual([]);
 	});
 
@@ -209,9 +209,12 @@ describe('refusals and warnings', () => {
 	it('warns that a calendar with no example is read from year 1, beside another calendar', () => {
 		const other = readNote(eraNote('Reign names', 'Qinglong Emperor', 130));
 		const checked = checkDraft([cycle('Count', '{year} of {cycle}')], NOTE, other);
-		expect(checked.warnings.map((w) => w.text).join('|')).toContain('has no “Same year as” date');
+		// The window shows a short warning at Start (D278); the long sentence stays in the problem list of the tree, not in the warnings of the window.
+		expect(checked.noAnchor.size).toBe(1);
+		expect(checked.warnings).toEqual([]);
 		const alone = checkDraft([cycle('Count', '{year} of {cycle}')], NOTE, []);
 		expect(alone.warnings).toEqual([]);
+		expect(alone.noAnchor.size).toBe(0);
 	});
 
 	it('warns for a calendar with no format', () => {

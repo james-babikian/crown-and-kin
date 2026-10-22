@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { deriveFamilies } from '../src/core/derive';
 import { parseDynasty } from '../src/core/parse';
 import { STROKES } from '../src/render/styles';
-import { LEGEND_LABELS, LEGEND_ORDER, cardLabel, familyOf, farTagLabel, farTagName, linkTarget, startPerson, timingText } from '../src/render/tree-info';
+import { LEGEND_LABELS, LEGEND_ORDER, cardLabel, partnersAndChildren, farTagLabel, farTagName, linkTarget, startPerson, timingText } from '../src/render/tree-info';
 import { PROBLEMS_HINT, UI, problemsLabel, problemsTitle } from '../src/render/ui-text';
 
 function graph(yaml: string) {
@@ -56,14 +56,14 @@ describe('family of the start person (spec §5.5, D13)', () => {
 unions:
   - partners: [a, d]
 `);
-		const f = familyOf(g, 'a');
+		const f = partnersAndChildren(g, 'a');
 		expect(f.partners.sort()).toEqual(['b', 'd']);
 		expect(f.children.sort()).toEqual(['c', 'child', 'e', 'f']);
-		expect(familyOf(g, 'd')).toEqual({ partners: ['a'], children: ['e', 'f'] });
+		expect(partnersAndChildren(g, 'd')).toEqual({ partners: ['a'], children: ['e', 'f'] });
 	});
 
 	it('is empty for a person with no partner and no child', () => {
-		expect(familyOf(graph(TREE), 'c')).toEqual({ partners: [], children: [] });
+		expect(partnersAndChildren(graph(TREE), 'c')).toEqual({ partners: [], children: [] });
 	});
 });
 

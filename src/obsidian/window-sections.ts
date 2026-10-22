@@ -29,6 +29,8 @@ export interface SectionsView {
 	setSummary(key: string, text: string): void;
 	/** True when the section is open (only the tests read it). */
 	isOpen(key: string): boolean;
+	/** Opens a section (a refusal that stands in it, a calendar that was just added). The window keeps it open, as after a tap of the user. */
+	open(key: string): void;
 	/** The element of a section (for a focus that must find a control in it). */
 	el(key: string): HTMLElement | null;
 	/** The row of "Open all" (null when the window has one section): a window may add quiet links at its left (the person window: "Add portrait or arms", "Open linked note"). */
@@ -37,7 +39,7 @@ export interface SectionsView {
 
 /** Which sections are open, by kind of window, for this session. It is never written to a file. */
 const OPEN: Record<string, Record<string, boolean>> = {};
-/** The same, for new pages (a new person, title or house): it lives and dies with the window that drew the page. */
+/** The same, for a window that keeps its own state (a new page of a person, title or house; the Calendars window): it lives and dies with the window that drew the page. */
 const OWN = new WeakMap<object, Record<string, Record<string, boolean>>>();
 
 /** Forgets the open state (a test starts clean). */
@@ -61,6 +63,27 @@ function prefersReducedMotion(parent: HTMLElement): boolean {
 	}
 }
 
+/** One section as drawn: its spec and its parts. */
+interface Drawn {
+	spec: SectionSpec;
+	el: HTMLElement;
+	head: HTMLButtonElement;
+	sum: HTMLElement;
+}
+
+/** The elements of one section: the title row (a button), its body and the animated wrapper; the body is built at once, so a closed section has its fields. */
+function drawSection(parent: HTMLElement, spec: SectionSpec): Drawn {
+	const id = `dynasty-section-${++counter}`;
+	const el = parent.createEl('section', { cls: 'dynasty-section', attr: { 'data-section': spec.key } });
+	const head = el.createEl('button', { cls: 'dynasty-section-head', attr: { type: 'button', 'aria-controls': id, 'aria-expanded': 'false', 'data-focus': `section:${spec.key}` } });
+	head.createSpan({ cls: 'dynasty-section-title', text: spec.title });
+	const sum = head.createSpan({ cls: 'dynasty-section-sum', text: spec.summary });
+	setIcon(head.createSpan({ cls: 'dynasty-section-chevron', attr: { 'aria-hidden': 'true' } }), 'chevron-down');
+	const wrap = el.createDiv({ cls: 'dynasty-section-wrap', attr: { id } });
+	spec.build(wrap.createDiv({ cls: 'dynasty-section-inner' }).createDiv({ cls: 'dynasty-section-body' }));
+	return { spec, el, head, sum };
+}
+
 /** Draws the sections of one window page into `parent`. */
 export function renderSections(parent: HTMLElement, kind: string, specs: readonly SectionSpec[], onToggle?: () => void, own?: object): SectionsView {
 	// A new page does not read what the user did on saved pages: its first field could be hidden by a tap on another page.
@@ -70,12 +93,6 @@ export function renderSections(parent: HTMLElement, kind: string, specs: readonl
 	parent.addClass('has-sections');
 	// The same class as the tree view (D126): the style sheet has no media query for movement, so the section animation stops with this class.
 	parent.toggleClass('dynasty-reduce-motion', prefersReducedMotion(parent));
-	interface Drawn {
-		spec: SectionSpec;
-		el: HTMLElement;
-		head: HTMLButtonElement;
-		sum: HTMLElement;
-	}
 	const drawn: Drawn[] = [];
 	let allBtn: HTMLButtonElement | null = null;
 	let allRow: HTMLElement | null = null;
@@ -87,11 +104,15 @@ export function renderSections(parent: HTMLElement, kind: string, specs: readonl
 		allBtn.createSpan({ text: all ? WINDOW_UI.closeAll : WINDOW_UI.openAll });
 		allBtn.setAttribute('aria-label', all ? WINDOW_UI.closeAllLabel : WINDOW_UI.openAllLabel);
 	};
-	// `user`: a tap of the user; only that is stored.
+	// `user`: a tap of the user; only that is stored. A change of a section also paints the button of all and tells the window.
 	const setOpen = (d: Drawn, open: boolean, user = false) => {
 		d.el.toggleClass('is-open', open);
 		d.head.setAttribute('aria-expanded', String(open));
 		if (user) state[d.spec.key] = open;
+	};
+	const changed = () => {
+		paintAll();
+		onToggle?.();
 	};
 	if (specs.length > 1) {
 		const row = parent.createDiv({ cls: 'dynasty-openall' });
@@ -99,29 +120,18 @@ export function renderSections(parent: HTMLElement, kind: string, specs: readonl
 		allBtn = row.createEl('button', { cls: 'dynasty-openall-button', attr: { type: 'button', 'data-focus': 'open-all' } });
 	}
 	for (const spec of specs) {
-		const id = `dynasty-section-${++counter}`;
-		const el = parent.createEl('section', { cls: 'dynasty-section', attr: { 'data-section': spec.key } });
-		const head = el.createEl('button', { cls: 'dynasty-section-head', attr: { type: 'button', 'aria-controls': id, 'aria-expanded': 'false', 'data-focus': `section:${spec.key}` } });
-		head.createSpan({ cls: 'dynasty-section-title', text: spec.title });
-		const sum = head.createSpan({ cls: 'dynasty-section-sum', text: spec.summary });
-		setIcon(head.createSpan({ cls: 'dynasty-section-chevron', attr: { 'aria-hidden': 'true' } }), 'chevron-down');
-		const wrap = el.createDiv({ cls: 'dynasty-section-wrap', attr: { id } });
-		const inner = wrap.createDiv({ cls: 'dynasty-section-inner' });
-		spec.build(inner.createDiv({ cls: 'dynasty-section-body' }));
-		const d: Drawn = { spec, el, head, sum };
+		const d = drawSection(parent, spec);
 		drawn.push(d);
 		setOpen(d, state[spec.key] ?? spec.open);
-		head.addEventListener('click', () => {
-			setOpen(d, !el.hasClass('is-open'), true);
-			paintAll();
-			onToggle?.();
+		d.head.addEventListener('click', () => {
+			setOpen(d, !d.el.hasClass('is-open'), true);
+			changed();
 		});
 	}
 	allBtn?.addEventListener('click', () => {
 		const all = drawn.every((d) => d.el.hasClass('is-open'));
 		for (const d of drawn) setOpen(d, !all, true);
-		paintAll();
-		onToggle?.();
+		changed();
 	});
 	paintAll();
 	const find = (key: string) => drawn.find((d) => d.spec.key === key);
@@ -129,6 +139,12 @@ export function renderSections(parent: HTMLElement, kind: string, specs: readonl
 		setSummary(key, text) {
 			const d = find(key);
 			if (d && d.sum.getText() !== text) d.sum.setText(text);
+		},
+		open(key) {
+			const d = find(key);
+			if (!d || d.el.hasClass('is-open')) return;
+			setOpen(d, true, true);
+			changed();
 		},
 		isOpen: (key) => find(key)?.el.hasClass('is-open') ?? false,
 		el: (key) => find(key)?.el ?? null,

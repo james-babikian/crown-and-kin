@@ -22,7 +22,7 @@ import type { Tree } from './types';
 import { itemEnd } from './yaml-list';
 import {
 	addPair, addSection, appendItem, clone, doubleQuoted, findPair, finish, finishTogether, isBooleanField, isRefusal, itemBlock, layoutOf, OPTION_ORDER, PERSON_FIELDS, PERSON_ORDER, personNode,
-	personValue, forget, QUOTED_FIELDS, refuse, remember, removePair, renderScalar, sameValue, setPairValue, Source, sourceText, TEXT_FIELDS, topMap, type NewValue, type Parsed,
+	personValue, forgetRecall, QUOTED_FIELDS, refuse, remember, removePair, renderScalar, sameValue, setPairValue, Source, sourceText, TEXT_FIELDS, topMap, type NewValue, type Parsed,
 	type Step,
 } from './yaml-patch';
 import { REFUSAL_TEXT } from './refusal-text';
@@ -295,6 +295,6 @@ export const applyOp: ApplyOp = (body, op) => {
 		// never the raw error text.
 		return refuse('bad-value', 'The plugin cannot make this change. Edit the note text.');
 	} finally {
-		forget();
+		forgetRecall();
 	}
 };

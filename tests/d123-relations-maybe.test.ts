@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { speedTest } from './support/speed-test';
 import { deriveFamilies, type FamilyGraph } from '../src/core/derive';
 import { parseDynasty } from '../src/core/parse';
 import { computeRelations, findRelation, relationRunStats, type Relation, type RelationOptions } from '../src/core/relations';
@@ -429,7 +430,7 @@ describe('D123: timing with a rumoured link on every person (contract 2.3)', () 
 	// to the reference work of `speed-ref.ts`: 3.8 to 5.7 measured alone and under load (2026-10-16); 7.5 is just under
 	// 2 times the lowest, so computeRelations 2 times slower fails (checked: 9.0 to 9.8), and a busy machine does not.
 	const LIMIT = 7.5;
-	it(`at most ${LIMIT} times the reference work`, () => {
+	speedTest(`at most ${LIMIT} times the reference work`, () => {
 		const rumoured = dense('rumoured');
 		const birth = dense('birth');
 		expect(rumoured.people.length).toBe(400);

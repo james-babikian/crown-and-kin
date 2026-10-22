@@ -1,4 +1,5 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { speedTest } from '../support/speed-test';
 
 vi.mock('obsidian', () => import('./fake-obsidian'));
 vi.mock('@codemirror/language', () => ({ forceParsing: () => false, syntaxTree: () => ({ length: 0 }) }));
@@ -272,7 +273,7 @@ describe('rule 18: the note name', () => {
 });
 
 describe('performance (spec §13.12): the largest house of sample tree 7', () => {
-	it('opens in well under 200 ms, table text included', async () => {
+	speedTest('opens in well under 200 ms, table text included', async () => {
 		const { housePage, houseTableNote } = await housePageModule();
 		const g = graphOf(fixtureSource('07'));
 		const sizes = [...g.houses.keys()].map((id) => [id, g.people.filter((p) => p.house === id).length] as const);

@@ -1,7 +1,7 @@
 /*
  * Very large trees (spec §0 D159, D223, D226; §7.7). Pure rules, so a test can read them without a view: the three limits, the rule that
  * says when a block shows the low bar in place of the tree, the memory of a draw that took too long, and the time budget of a draw.
- * `tree-view.ts` counts the people right after the parse, asks `largeBar` once the focus is known, and draws the bar (`large-bar.ts`).
+ * `render-plan.ts` counts the people right after the parse and asks `largeBar` once the focus is known; `tree-view-list.ts` and `large-bar.ts` draw the bar.
  */
 
 import type { Tree } from '../core/types';

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { speedTest } from '../support/speed-test';
 import type { FamilyGraph } from '../../src/core/derive';
 import { focusSubgraph } from '../../src/core/focus-subgraph';
 import { deriveFamilies } from '../../src/core/derive';
@@ -882,7 +883,7 @@ describe('rule 11: the keys for the sheet (`personFolds`)', () => {
 });
 
 describe('performance (spec §13.10 acceptance; contract F17): sample tree 7', () => {
-	it('the count of every family, and the hidden set of every family, take well under a second', async () => {
+	speedTest('the count of every family, and the hidden set of every family, take well under a second', async () => {
 		const { foldFamilies, foldCount, foldHidden, foldControls } = await foldsModule();
 		const g = graphOf(fixtureSource('07'));
 		const families = foldFamilies(g);

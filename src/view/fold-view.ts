@@ -2,7 +2,7 @@
  * Pure helpers of the tree view for folds (spec §13.10): which folds count for a
  * draw, the people they hide and the layout settings that carry them, and the cut back of a fold's tap
  * area where it meets another tap area, and the automatic folds of a focus view (D257: `setFolds`, `autoFoldPatch`; the rule that chooses them is `start-folds.ts`).
- * No DOM here, so all of it runs under vitest. `tree-view.ts` calls these at each draw and at each settle.
+ * No DOM here, so all of it runs under vitest. `render-plan.ts` and the layers of the tree view (`tree-view-actions.ts`, `tree-view-scene.ts`, `tree-view-list.ts`) call these at each draw and at each settle.
  */
 
 import { foldFamilies, foldHidden, unfoldFor, type FoldKey, type FoldSet } from '../core/folds';

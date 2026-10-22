@@ -13,6 +13,7 @@ import type { SuccessionSpec } from '../core/succession';
 import { readInherit, readRule, type InheritIllegitimate, type InheritRule, type InheritThrough, type SuccessionRule } from '../core/succession-keys';
 import { sameList } from '../core/same-list';
 import { entryReign, rulerName } from '../core/titles';
+import { entryReignText } from '../render/tree-info';
 import type { Holder, Title } from '../core/types';
 import { draftId, idChanged, idOps, isIdOp, type IdRow } from './id-draft';
 import { idsForPeople } from './person-ids';
@@ -87,7 +88,8 @@ export function holderText(g: FamilyGraph | null, v: HolderValues): HolderText {
 	const base = plain || v.person || '';
 	const ruler = v.number !== undefined ? `${base} ${v.number}`.trim() : base;
 	const fullName = personName ?? v.name ?? v.person ?? '';
-	const reign = entryReign({ ...v, index: 0 });
+	// Spec §14 rule 15: the dates of a reign show the name of their year; the form (holder-form.ts) keeps the written text.
+	const reign = g ? entryReignText({ ...v, index: 0 }, g.dates, 'shown') : entryReign({ ...v, index: 0 });
 	const sobriquet = v.person !== undefined ? g?.byId.get(v.person)?.sobriquet : undefined;
 	return { ruler, ...(sobriquet !== undefined ? { sobriquet } : {}), ...(fullName && fullName !== base ? { full: fullName } : {}), ...(reign !== undefined ? { reign } : {}), inTree };
 }
@@ -407,7 +409,7 @@ export function draftTitle(g: FamilyGraph, t: TitleRow): Title | null {
 }
 
 /** True when Save has something to write. */
-export function draftChanged(rows: readonly TitleRow[]): boolean {
+export function titlesDraftChanged(rows: readonly TitleRow[]): boolean {
 	return rows.some((t) =>
 		t.id === null ? !t.deleted : t.deleted || idChanged(titleIdRow(t)) || nameChanged(t) || maleChanged(t) || femaleChanged(t) || holdersChanged(t) || successionChanges(t).length > 0,
 	);

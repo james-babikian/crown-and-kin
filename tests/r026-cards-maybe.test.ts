@@ -1,4 +1,4 @@
-// 0.2.6 WP3 (D176 5): a long relation word with a maybe is cut as "Half first cousin once re… ?". Short texts and texts with no maybe do
+// 0.2.6 WP3 (D176 5): a long relation word with a maybe is cut as "Half first cousin once re… ?". From 0.3.3 (D268) the cards first use the short forms ("Half 1st cousin 1× …"); `truncateWithMaybe` itself is unchanged. Short texts and texts with no maybe do
 // not change. The helper, the saved picture and the live scene.
 import { beforeAll, describe, expect, it } from 'vitest';
 import { cardLabels } from '../src/core/titles';
@@ -87,7 +87,7 @@ describe('D176 (5): the cards', () => {
 		const root = new FEl('g');
 		const scene = buildScene(root as unknown as SVGGElement, g, l, { fonts: FONTS, measure, link: () => null, labels, me: 'c', relations: relations(`${WORD}, maybe half`) });
 		const rel = all(root).filter((e) => e.hasClass('dynasty-card-relation')).map((e) => e.getText());
-		expect(rel.some((t) => /^Half first.*… \?$/.test(t)), rel.join('|')).toBe(true);
+		expect(rel.some((t) => /^Half 1st.*… \?$/.test(t)), rel.join('|')).toBe(true);
 		expect(rel).toContain('You');
 		void scene;
 	});

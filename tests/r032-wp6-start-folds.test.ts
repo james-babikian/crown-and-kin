@@ -5,7 +5,7 @@ import { focusSubgraph } from '../src/core/focus-subgraph';
 import { foldFamilies, foldHidden } from '../src/core/folds';
 import { parseDynasty } from '../src/core/parse';
 import type { LaidOut, Rect } from '../src/layout/model';
-import { familyOf } from '../src/render/tree-info';
+import { partnersAndChildren } from '../src/render/tree-info';
 import { approxMeasure } from '../src/render/svg-string';
 import { carryState, newBlockState, type BlockState } from '../src/view/block-state';
 import { autoFoldPatch, setFolds, stillAuto } from '../src/view/fold-view';
@@ -381,7 +381,7 @@ describe('the first view makes the names smaller until a "+ N" sign is whole', (
 		const today = first(false);
 		const built = first(true);
 		const P = laid.layout.persons;
-		const kids = familyOf(t.g, EDMUND).children.filter((c) => (t.g.placementParents.get(c) ?? []).includes(EDMUND) && P.has(c)).map((c) => P.get(c)! as Rect);
+		const kids = partnersAndChildren(t.g, EDMUND).children.filter((c) => (t.g.placementParents.get(c) ?? []).includes(EDMUND) && P.has(c)).map((c) => P.get(c)! as Rect);
 		expect(kids.length).toBe(2);
 		const out = (v: typeof built.view) => outsideBox(v, { w: 390, h: 844 }, kids, 91, 754);
 		expect(out(built.view)).toEqual({ up: 0, down: 0 });
@@ -403,7 +403,7 @@ function viewOf(g: FamilyGraph, laid: LaidOut, focus: string, withSigns: boolean
 	const P = laid.layout.persons;
 	const boxes = (ids: string[]) => ids.flatMap((i) => (P.get(i) ? [P.get(i)! as Rect] : []));
 	const near = (who: string, partners: string[]) => partners.filter((p) => !(laid.layout.farTags.get(who)?.spouses ?? []).includes(p));
-	const fam = familyOf(g, focus);
+	const fam = partnersAndChildren(g, focus);
 	const signs = signRights(laid.layout.folds, laid.layout.geometry.fontPx);
 	const kids = fam.children.filter((c) => (g.placementParents.get(c) ?? []).includes(focus) && P.has(c));
 	return sidewaysView(
@@ -412,7 +412,7 @@ function viewOf(g: FamilyGraph, laid: LaidOut, focus: string, withSigns: boolean
 		{
 			me: P.get(focus)! as Rect,
 			partners: boxes(near(focus, fam.partners)),
-			children: kids.flatMap((c) => boxes([c]).map((card) => ({ card, partners: boxes(near(c, familyOf(g, c).partners)), ...(withSigns ? { sign: signs.get(c) } : {}) }))),
+			children: kids.flatMap((c) => boxes([c]).map((card) => ({ card, partners: boxes(near(c, partnersAndChildren(g, c).partners)), ...(withSigns ? { sign: signs.get(c) } : {}) }))),
 			parents: boxes(g.placementParents.get(focus) ?? []),
 		},
 		91,

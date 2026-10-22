@@ -3,7 +3,7 @@
  * from the top size gives (D203), and a name that fits is measured once.
  */
 import { describe, expect, it } from 'vitest';
-import { COMPACT_NAME_EM, COMPACT_NAME_MIN_EM, COMPACT_STEPS, compactStep } from '../src/render/dom/scene';
+import { COMPACT_NAME_EM, COMPACT_NAME_MIN_EM, COMPACT_STEPS, compactNameStep } from '../src/render/dom/scene';
 
 /** The walk of 0.2.8 before the repair: from 1.5 em down in steps of 0.05 em to the first size that fits, else the smallest. */
 function walk(widthAt: (em: number) => number, maxW: number): { em: number; measures: number } {
@@ -33,7 +33,7 @@ describe('the sizes of a Compact name', () => {
 					const widthAt = (em: number) => c * em ** power;
 					const want = walk(widthAt, room);
 					let measures = 0;
-					const k = compactStep((i) => {
+					const k = compactNameStep((i) => {
 						measures++;
 						return widthAt(COMPACT_STEPS[i]!);
 					}, room);
@@ -52,7 +52,7 @@ describe('the sizes of a Compact name', () => {
 		for (let c = 10; c <= 400; c += 5.3) {
 			for (let room = 20; room <= 600; room += 11) {
 				const widthAt = (em: number) => Math.round(c * em);
-				expect(COMPACT_STEPS[compactStep((i) => widthAt(COMPACT_STEPS[i]!), room)]).toBe(walk(widthAt, room).em);
+				expect(COMPACT_STEPS[compactNameStep((i) => widthAt(COMPACT_STEPS[i]!), room)]).toBe(walk(widthAt, room).em);
 			}
 		}
 	});
@@ -60,13 +60,13 @@ describe('the sizes of a Compact name', () => {
 	it('measure a name that fits once, and a name with no room at all down to the smallest size', () => {
 		let n = 0;
 		expect(
-			compactStep(() => {
+			compactNameStep(() => {
 				n++;
 				return 50;
 			}, 80),
 		).toBe(0);
 		expect(n).toBe(1);
-		expect(compactStep((i) => 100 * COMPACT_STEPS[i]!, -5)).toBe(COMPACT_STEPS.length - 1);
-		expect(compactStep((i) => 100 * COMPACT_STEPS[i]!, 0)).toBe(COMPACT_STEPS.length - 1);
+		expect(compactNameStep((i) => 100 * COMPACT_STEPS[i]!, -5)).toBe(COMPACT_STEPS.length - 1);
+		expect(compactNameStep((i) => 100 * COMPACT_STEPS[i]!, 0)).toBe(COMPACT_STEPS.length - 1);
 	});
 });

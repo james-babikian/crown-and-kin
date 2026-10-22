@@ -142,7 +142,7 @@
  * Results are deep-frozen, like layout results, because the views share them.
  */
 
-import { deepFreeze } from './deep-freeze';
+import { deepFreeze, lockMap } from './deep-freeze';
 import { deriveFamilies, drawnParentMap, type DrawnParent, type FamilyGraph, type FamilyUnion } from './derive';
 import { CURLY_APOSTROPHE } from './quote';
 import { sameList } from './same-list';
@@ -2071,13 +2071,9 @@ function compareCands(x: Cand, y: Cand): number {
 	);
 }
 
-const readOnly = () => {
-	throw new TypeError('Relation results are read-only');
-};
-
 /** Blocks `set`, `delete` and `clear` too: `Object.freeze` does not stop them on a Map, and the views share the result. */
 function freezeMap<K, V>(map: Map<K, V>): ReadonlyMap<K, V> {
-	for (const method of ['set', 'delete', 'clear']) Object.defineProperty(map, method, { value: readOnly });
+	lockMap(map);
 	return Object.freeze(map);
 }
 

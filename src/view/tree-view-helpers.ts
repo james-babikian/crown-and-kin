@@ -1,5 +1,5 @@
 /*
- * Small pure helpers of the tree view (`src/obsidian/tree-view.ts`), moved out of it in WP-4 step 4.3 to keep that file within its size ceiling:
+ * Small pure helpers of the tree view (the layers `src/obsidian/tree-view*.ts`), moved out of `tree-view.ts` in WP-4 step 4.3 to keep that file within its size ceiling:
  * what the drawn graph holds (portraits, arms, reigns), the keys and labels of pictures and fold controls, the finder's line as the scene marks it, and the
  * rectangle around cards. None of them reads the page or Obsidian.
  */

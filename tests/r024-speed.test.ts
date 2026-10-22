@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { speedTest } from './support/speed-test';
 import { geometryFor } from '../src/layout/geometry';
 import { arrangeTree } from '../src/layout/pipeline';
 import type { LayoutSettings } from '../src/layout/model';
@@ -53,7 +54,7 @@ function manyDots(n: number): string {
 }
 
 describe('speed 1: the dots of one row cost about as much as the people (was the counter `unionWork`)', () => {
-	it('grows about linearly: 4 times the couples take less than 10 times as long', () => {
+	speedTest('grows about linearly: 4 times the couples take less than 10 times as long', () => {
 		const settings: LayoutSettings = { sweeps: 4, far: FAR };
 		const small = medianMs(manyDots(250), settings, 5);
 		const big = medianMs(manyDots(1000), settings, 5);
@@ -73,7 +74,7 @@ describe('speed 1: the dots of one row cost about as much as the people (was the
 });
 
 describe('speed 2: the "?" search looks only near its curve', () => {
-	it('a rumoured link on every person: 4 times the people take less than 10 times as long (was the counter `rumourWork`; the ratio test is review-r028-layout-speed)', () => {
+	speedTest('a rumoured link on every person: 4 times the people take less than 10 times as long (was the counter `rumourWork`; the ratio test is review-r028-layout-speed)', () => {
 		const settings: LayoutSettings = { sweeps: 4, far: FAR };
 		const small = medianMs(rumourTree(250), settings, 5);
 		const big = medianMs(rumourTree(1000), settings, 5);

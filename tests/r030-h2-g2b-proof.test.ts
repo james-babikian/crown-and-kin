@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { speedTest } from './support/speed-test';
 import { LIMIT_DETAIL } from '../src/core/messages';
 import { ALIAS_MARKS_CAP, parseBody } from '../src/core/parse';
 
@@ -11,7 +12,7 @@ import { ALIAS_MARKS_CAP, parseBody } from '../src/core/parse';
 const mk = (n: number, f: (i: number) => string) => Array.from({ length: n }, (_, i) => f(i)).join('\n');
 
 describe('G2b: alias cap', () => {
-	it('800 aliases inside one anchored list, used once, in a note of 4 000 people, are refused or read in under 4 s', () => {
+	speedTest('800 aliases inside one anchored list, used once, in a note of 4 000 people, are refused or read in under 4 s', () => {
 		const text = `x: &x v\na: &a [${Array(800).fill('*x').join(', ')}]\nb: *a\npeople:\n${mk(4000, (i) => `  - {id: q${i}, name: Q${i}, notes: [a, b, c]}`)}\n`;
 		const marks = 800 + 3;
 		expect(marks).toBeLessThan(ALIAS_MARKS_CAP);

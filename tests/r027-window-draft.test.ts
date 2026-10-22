@@ -12,7 +12,7 @@ import type { Op } from '../src/core/edit';
 import { parseBody, readTree } from '../src/core/parse';
 import { applyOp } from '../src/core/yaml-edit';
 import { closePluginModals } from '../src/view/plugin-modals';
-import { draftChanged, draftSpec, draftTitle, rebase, successionChanges, successionOf, titleRows, windowOps, withHolderIds, type SuccessionDraft, type TitleRow } from '../src/view/titles-draft';
+import { titlesDraftChanged, draftSpec, draftTitle, rebase, successionChanges, successionOf, titleRows, windowOps, withHolderIds, type SuccessionDraft, type TitleRow } from '../src/view/titles-draft';
 import { TITLES_UI } from '../src/render/ui-text';
 import { clock, device, fakeWin, installDom, resetDom } from './acceptance/fake-dom';
 import { openModals, resetObsidian } from './acceptance/fake-obsidian';
@@ -89,7 +89,7 @@ describe('the draft row', () => {
 	it('has no change and no op while nothing is touched, so a Save never touches a hand-written key', () => {
 		const { rows } = load(BODY);
 		expect(successionChanges(rows[0])).toEqual([]);
-		expect(draftChanged(rows)).toBe(false);
+		expect(titlesDraftChanged(rows)).toBe(false);
 		expect(windowOps(rows, newId)).toEqual([]);
 	});
 
@@ -123,11 +123,11 @@ describe('the draft row', () => {
 			const ops = windowOps(rows, newId);
 			if (!Object.keys(expected).length) {
 				expect(ops).toEqual([]);
-				expect(draftChanged(rows)).toBe(false);
+				expect(titlesDraftChanged(rows)).toBe(false);
 				return;
 			}
 			expect(ops).toEqual([{ kind: 'edit-title', id: 'crown', ...expected }]);
-			expect(draftChanged(rows)).toBe(true);
+			expect(titlesDraftChanged(rows)).toBe(true);
 		});
 	}
 
@@ -220,7 +220,7 @@ describe('rebase keeps the owner\'s succession edits when the tree changes under
 		const { rows } = load(BODY);
 		const [out] = rebase(rows, load(BODY.replace('year: 1120 # the year of the line', 'year: 1180')).rows);
 		expect(out.succ!.year).toBe('1180');
-		expect(draftChanged([out])).toBe(false);
+		expect(titlesDraftChanged([out])).toBe(false);
 	});
 });
 

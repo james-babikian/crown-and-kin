@@ -1,8 +1,8 @@
 /*
  * The pure parts of the Show view of a line of succession (contract 0.2.7 F, M.9): what the tree draws for a title (the ruler,
  * the heirs, the open branches, the ordinal texts, the bar sentence), the first view, and the words of the phone list. No DOM
- * and no state, so the tests run it on plain data. `tree-view.ts` keeps the state (`BlockState.succession`)
- * and calls these functions at each render.
+ * and no state, so the tests run it on plain data. `block-state.ts` keeps the state (`BlockState.succession`),
+ * and `render-plan.ts` and the layers of the tree view (`tree-view-*.ts`) call these functions at each render.
  */
 
 import type { FamilyGraph } from '../core/derive';
@@ -14,6 +14,7 @@ import type { ListWord } from '../render/dom/phone-list-dom';
 import { SUCCESSION_UI } from '../render/ui-text';
 import { FIT_MIN_NAME_PX, READABLE_NAME_PX, START_TOP_GAP, fitScale, fitView, type Size, type View } from '../render/view-math';
 import { finderFirstView, fittedNamePx } from './focus-mode';
+import { around } from './tree-view-helpers';
 
 /** The mark on the tab of an open branch (M.9). */
 export const BRANCH_MARK = '?';
@@ -99,17 +100,17 @@ export function successionFirstView(bounds: Rect, size: Size, fontPx: number, in
 	const fits = (box: Rect) => area.w > 0 && fittedNamePx(box, area, f) >= FIT_MIN_NAME_PX && !(fitScale(box, area) < minScale);
 	if (heirs.length > 0 && area.w > 0 && !fits(bounds)) {
 		// The caller's box has a margin round the cards; a shorter run gets the same margin.
-		const all = union([ruler, ...heirs]);
+		const all = around([ruler, ...heirs], 0);
 		const mx = Math.max(0, all.x - bounds.x);
 		const my = Math.max(0, all.y - bounds.y);
 		for (let k = heirs.length - 1; k >= 1; k--) {
-			const run = union([ruler, ...heirs.slice(0, k)]);
+			const run = around([ruler, ...heirs.slice(0, k)], 0);
 			const box = { x: run.x - mx, y: run.y - my, w: run.w + 2 * mx, h: run.h + 2 * my };
 			if (fits(box)) return fitView(box, size, insetTop);
 		}
 		// The ruler and the 1st heir do not fit together at readable names: the view starts at the ruler (spec §13.21 rule 35), leaned
 		// towards the 1st heir as far as the ruler stays whole. The user pans to the heirs.
-		const pair = union([ruler, heirs[0]]);
+		const pair = around([ruler, heirs[0]], 0);
 		const aim = { x: pair.x - mx, y: pair.y - my, w: pair.w + 2 * mx, h: pair.h + 2 * my };
 		return startAt(aim, size, insetTop, ruler, orientation, Math.max(minScale, READABLE_NAME_PX / f));
 	}
@@ -117,15 +118,6 @@ export function successionFirstView(bounds: Rect, size: Size, fontPx: number, in
 	const fit = finderFirstView(bounds, size, fontPx, insetTop, [ruler, ...heirs], orientation);
 	if (!(minScale > 0) || fit.scale >= minScale || !(size.w > 0)) return fit;
 	return startAt(bounds, size, insetTop, ruler, orientation, minScale);
-}
-
-/** The smallest box round `boxes`. */
-function union(boxes: readonly Rect[]): Rect {
-	const x0 = Math.min(...boxes.map((b) => b.x));
-	const y0 = Math.min(...boxes.map((b) => b.y));
-	const x1 = Math.max(...boxes.map((b) => b.x + b.w));
-	const y1 = Math.max(...boxes.map((b) => b.y + b.h));
-	return { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
 }
 
 /** A view at `scale` that puts the ruler at the start of the free area and keeps as much of the tree as the area holds (as `finderFirstView`). */

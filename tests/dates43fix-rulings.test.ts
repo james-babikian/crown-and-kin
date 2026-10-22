@@ -12,7 +12,7 @@ import { calendarBlockProcessor } from '../src/obsidian/calendar-block-view';
 import { openCalendars } from '../src/obsidian/calendar-window';
 import { CALENDAR_WINDOW_UI as T } from '../src/render/calendar-text';
 import { attachDateLine } from '../src/render/dom/date-line';
-import { checkDraft, draftChanged, draftOf, newCalendar, opsOf } from '../src/view/calendar-draft';
+import { checkDraft, calendarDraftChanged, draftOf, newCalendar, opsOf } from '../src/view/calendar-draft';
 import { createCalendarIndex, datesForTree } from '../src/view/calendar-index';
 import { MAX_DATE_TEXT, capReader } from '../src/view/calendar-reader';
 import { writeCalendars } from '../src/view/calendar-write';
@@ -48,7 +48,7 @@ describe('ruling 1: a length that the note holds as text', () => {
 		const drafts = draftOf(saved, key);
 		let checked = checkDraft(drafts, NOTE, []);
 		expect(checked.refusals).toEqual([]);
-		expect(draftChanged(saved, drafts, checked)).toBe(false);
+		expect(calendarDraftChanged(saved, drafts, checked)).toBe(false);
 		drafts[1].name = 'Two renamed';
 		checked = checkDraft(drafts, NOTE, []);
 		expect(checked.refusals).toEqual([]);
@@ -213,7 +213,7 @@ describe('polish: a refusal names its calendar and stands next to its field', ()
 		for (let i = 0; i < 12; i++) await tick();
 	};
 
-	it('shows the refusal under the field in error and names the calendar in the line at the top', async () => {
+	it('shows the refusal under the field in error, and one line at the top that counts it', async () => {
 		const notes = new Map([[NOTE, cycleNote()]]);
 		const file = (path: string) => Object.assign(new File(path, 'md'), { name: path, basename: path.replace(/\.md$/, ''), stat: { mtime: 1, ctime: 1, size: 1 } }) as VaultFile;
 		const app = {
@@ -241,8 +241,7 @@ describe('polish: a refusal names its calendar and stands next to its field', ()
 		dispatch(c.querySelector('.dynasty-sheet-save')!, 'click');
 		await settle();
 		const top = c.querySelector('.dynasty-sheet-error')?.getText() ?? '';
-		expect(top).toContain(T.refusalHead);
-		expect(top).toContain('“The Long Count”');
+		expect(top).toBe(T.refusalSummary(1));
 		const row = c.querySelector('[data-field="0-length"]')!;
 		expect(row.querySelector('.dynasty-cal-field-error [data-refusal]')?.getText()).toContain('The length of a cycle');
 		expect(length.getAttribute('aria-invalid')).toBe('true');

@@ -87,7 +87,8 @@ describe('the Calendars window refusals', () => {
 	});
 
 	it('the fallback is reachable by no key that the code gives', () => {
-		const source = readFileSync('src/core/dates.ts', 'utf8');
+		// The keys are written in the files of the date reader (the formats moved out of dates.ts in 0.3.3).
+		const source = ['dates', 'date-formats', 'name-lists'].map((f) => readFileSync(`src/core/${f}.ts`, 'utf8')).join('\n');
 		const keys = new Set([...source.matchAll(/'(calendar-(?:format|era|length|number)[a-z-]*)'/g)].map((m) => m[1]));
 		expect(keys.size).toBeGreaterThanOrEqual(7);
 		for (const key of keys) {

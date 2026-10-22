@@ -8,6 +8,7 @@ import { foldMark } from '../layout/fold-spots';
 import type { Orientation, Rect, TreeLayout } from '../layout/model';
 import { COMPACT_NAME_EM } from '../render/dom/scene';
 import type { PhoneDirection } from './settings';
+import { around } from './tree-view-helpers';
 import { FIT_MIN_NAME_PX, HIT_EM, MIN_HIT_PX, READABLE_NAME_PX, START_TOP_GAP, chooseLod, enlargeHit, fitScale, fitView, type Size, type View } from '../render/view-math';
 
 /**
@@ -162,7 +163,7 @@ export function focusView(bounds: Rect, size: Size, fontPx: number, focus: Rect 
 		let scale = readable;
 		let core = focus;
 		if (children.length && !childPlace(focus, children, area.w / readable, FOCUS_SIDE_PAD / readable).whole) {
-			const couple = partners.length ? around([focus, ...partners]) : null;
+			const couple = partners.length ? around([focus, ...partners], 0) : null;
 			const withCouple = couple ? smallerForChild(couple, children, area, readable, FIT_MIN_NAME_PX / f, lowAt(readable)) : readable;
 			if (couple && withCouple < readable) {
 				scale = withCouple;
@@ -215,13 +216,6 @@ export function familyFits(focus: Rect, parents: readonly Rect[], children: read
 	const up = mid - Math.min(...parents.map((p) => p.y));
 	const down = Math.min(...children.map((c) => c.y + c.h)) - mid;
 	return Math.max(up, down) * scale <= areaH / 2 + 1e-6;
-}
-
-/** The box around some cards. */
-function around(boxes: readonly Rect[]): Rect {
-	const x = Math.min(...boxes.map((b) => b.x));
-	const y = Math.min(...boxes.map((b) => b.y));
-	return { x, y, w: Math.max(...boxes.map((b) => b.x + b.w)) - x, h: Math.max(...boxes.map((b) => b.y + b.h)) - y };
 }
 
 /** The sideways move (layout px) from the focus card's centre that brings a child into sight (see focusView). */

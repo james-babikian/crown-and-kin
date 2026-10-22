@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { speedTest } from './support/speed-test';
 import { deriveFamilies, type FamilyGraph } from '../src/core/derive';
 import { parseDynasty } from '../src/core/parse';
 import { cardLabels, describeDeleteTitle, entryReign, holderTable, noteName, pickerSuffix, reignText, rulerName, searchNames } from '../src/core/titles';
@@ -151,7 +152,7 @@ describe('cardLabels (§13.3, §13.5, D56, D58, D61–D63)', () => {
 		}
 	});
 
-	it('fixture 7 takes well under 5 ms', () => {
+	speedTest('fixture 7 takes well under 5 ms', () => {
 		const g7 = graph(fixture('07'));
 		cardLabels(graph(fixture('01')));
 		const times: number[] = [];

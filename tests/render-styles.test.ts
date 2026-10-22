@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { cardText, geometryFor } from '../src/layout/geometry';
@@ -148,7 +148,9 @@ describe('styles.css text sizes match what the renderer measures', () => {
 	});
 
 	it('no text size is written into the SVG by the renderer', () => {
-		for (const f of ['src/render/dom/scene.ts', 'src/obsidian/tree-view.ts']) {
+		// The tree view is a chain of files since 0.3.3: every file of it counts.
+		const treeView = readdirSync(join(__dirname, '..', 'src/obsidian')).filter((n) => /^tree-view.*\.ts$/.test(n)).map((n) => `src/obsidian/${n}`);
+		for (const f of ['src/render/dom/scene.ts', ...treeView]) {
 			expect(readFileSync(join(__dirname, '..', f), 'utf8')).not.toMatch(/'font-size'/);
 		}
 	});

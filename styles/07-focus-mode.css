@@ -36,8 +36,20 @@
 }
 
 .dynasty-toolbar .dynasty-focus.is-active,
-.dynasty-toolbar .dynasty-focus.is-active .dynasty-tool-icon {
+.dynasty-toolbar .dynasty-focus.is-active .dynasty-tool-icon,
+.dynasty-toolbar .dynasty-focus.is-active:hover,
+.dynasty-toolbar .dynasty-focus.is-active:hover .dynasty-tool-icon {
 	color: var(--interactive-accent);
+}
+
+/* The hover rule of every tool (chunk 08, later in the file) clears the fill and the ring; the lit Focus button keeps its look under the pointer. */
+.dynasty-toolbar .dynasty-focus.is-active:hover {
+	background-color: var(--background-modifier-active-hover);
+	box-shadow: inset 0 0 0 1px var(--interactive-accent);
+}
+
+.dynasty-toolbar .dynasty-focus.is-active:hover::before {
+	background: transparent;
 }
 
 

@@ -47,7 +47,7 @@ const NUMBER = /^-?(\d+\.?\d*|\.\d+)$/;
 
 /** True when the picture size can be used. */
 const usable = (w: number, h: number) => Number.isFinite(w) && Number.isFinite(h) && w > 0 && h > 0;
-const finite = (v: number, fallback: number) => (Number.isFinite(v) ? v : fallback);
+export const finite = (v: number, fallback: number) => (Number.isFinite(v) ? v : fallback);
 
 /**
  * The text of a raw `portrait-crop` value: a scalar as text, a list or map as JSON text (numbers

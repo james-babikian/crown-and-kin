@@ -2,22 +2,16 @@
  * Step 4.0 of WP-4: the rules of the Calendars window that live in `src/core/dates.ts` (spec §14 rules 1, 3 and 6):
  * the format check, the refusals inside one note, the warning across notes, the entry form "same year as", the example
  * shown back, and the text of an internal year.
- *
- * Enable at 4.1a: skipped until `src/core/dates.ts` exists, then it runs by itself.
  */
 
 import { describe, expect, it } from 'vitest';
-import { ALDRIC, copyOf, JAPAN, LONG_COUNT, loadDatesApi, names, REIGN_NAMES, type CalendarDef, type DatesApi } from './dates-support';
-
-const api = await loadDatesApi();
-
-if (!api) it.todo('enable at 4.1a: formats, refusals, same-year-as, example text (needs src/core/dates.ts)');
+import { ALDRIC, copyOf, JAPAN, LONG_COUNT, datesApi, names, REIGN_NAMES, type CalendarDef } from './dates-support';
 
 const cycles = (id: string, name: string, formats: string[], length = 60, start = 1, note = 'Calendars.md'): CalendarDef => ({ id, name, note, formats, kind: { type: 'cycles', length, start } });
 const eras = (id: string, name: string, list: { name: string; start: number; length?: number }[], formats = ['{era} {year}'], note = 'Calendars.md'): CalendarDef => ({ id, name, note, formats, kind: { type: 'eras', eras: list } });
 
-describe.skipIf(!api)('§14 r3: the format check', () => {
-	const A = api as DatesApi;
+describe('§14 r3: the format check', () => {
+	const A = datesApi;
 
 	it('§14 r3: a cycle format with {year} and {cycle} once each is valid', () => {
 		expect(A.checkFormat('cycles', '{year} Year of the {cycle} Cycle')).toBeNull();
@@ -56,8 +50,8 @@ describe.skipIf(!api)('§14 r3: the format check', () => {
 	}
 });
 
-describe.skipIf(!api)('§14 r3: refusals inside the note that the window saves', () => {
-	const A = api as DatesApi;
+describe('§14 r3: refusals inside the note that the window saves', () => {
+	const A = datesApi;
 	const involved = (calendars: CalendarDef[]) => A.checkCalendars(calendars).flatMap((r) => [r.calendar, r.other]);
 
 	it('§14 r3: a valid set of calendars gives no refusal (eras of two calendars may share a format)', () => {
@@ -111,8 +105,8 @@ describe.skipIf(!api)('§14 r3: refusals inside the note that the window saves',
 	});
 });
 
-describe.skipIf(!api)('§14 r3: the same format or era name across calendar notes is a warning, not a refusal (D254 item 2)', () => {
-	const A = api as DatesApi;
+describe('§14 r3: the same format or era name across calendar notes is a warning, not a refusal (D254 item 2)', () => {
+	const A = datesApi;
 	const text = (p: unknown) => JSON.stringify(p);
 
 	it('§14 r3: the same cycle format in another note gives calendar-duplicate and names both notes', () => {
@@ -142,8 +136,8 @@ describe.skipIf(!api)('§14 r3: the same format or era name across calendar note
 	});
 });
 
-describe.skipIf(!api)('§14 r1: "same year as" gives the start S', () => {
-	const A = api as DatesApi;
+describe('§14 r1: "same year as" gives the start S', () => {
+	const A = datesApi;
 
 	it('§14 r1: era: Jianwen Emperor Year 1 is the same year as internal 141, so S = 141', () => {
 		expect(A.startFromSameYear({ year: 1 }, 141)).toBe(141);
@@ -173,8 +167,8 @@ describe.skipIf(!api)('§14 r1: "same year as" gives the start S', () => {
 	});
 });
 
-describe.skipIf(!api)('§14 r1: the example shown back (the internal year in the first format, digits)', () => {
-	const A = api as DatesApi;
+describe('§14 r1: the example shown back (the internal year in the first format, digits)', () => {
+	const A = datesApi;
 
 	it('§14 r1: The Long Count: internal 141 is "21 Year of the 3 Cycle" (first format, digits)', () => {
 		expect(A.exampleText(LONG_COUNT, 141)).toBe('21 Year of the 3 Cycle');
@@ -213,8 +207,8 @@ describe.skipIf(!api)('§14 r1: the example shown back (the internal year in the
 	});
 });
 
-describe.skipIf(!api)('§14 r6: the text of an internal year', () => {
-	const A = api as DatesApi;
+describe('§14 r6: the text of an internal year', () => {
+	const A = datesApi;
 	it('§14 r6: "year N", and "year −N" with the minus sign U+2212 for a year before 1 (D254 item 3)', () => {
 		expect(A.formatInternalYear(130)).toBe('year 130');
 		expect(A.formatInternalYear(1)).toBe('year 1');

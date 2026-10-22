@@ -15,7 +15,7 @@ import { pictureFormat } from '../core/pictures';
 import { applyOp } from '../core/yaml-edit';
 import { RENAME_UI, renamedKind, renamedText, type LinkReportText } from '../render/ui-text';
 import { VIEW_NOTICE } from '../render/view-text';
-import type { Handle } from './block-handle';
+import { pause, type Handle } from './block-handle';
 import type { PendingRename } from '../view/settings';
 
 /** What the updater needs from the handle registry (`HandleRegistry.forBlock`). */
@@ -94,7 +94,6 @@ interface Progress {
 	shown: Notice | null;
 }
 
-const pause = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 /** The basename as it is written, with its capitals: `nameForms` encodes it before it lowers the case, because "%C3%89" (É) is not "%C3%A9" (é). */
 const plainName = (path: string) => (path.split('/').pop() ?? path).replace(/\.md$/i, '');
 /** The last part of a path, without `.md`, lower case: the "old basename" of spec §6.9. A picture keeps its extension. */

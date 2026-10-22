@@ -1,7 +1,7 @@
 // R029 N01 (scratch proof): the knob of the crop zoom slider sits above the track because two shifts add up.
 // Obsidian's own rule `input[type=range]::-webkit-slider-thumb { position: relative; top: var(--slider-thumb-y) }` (-6px on the
 // computer, -9px under `body.is-mobile`) is still in force for the crop slider, and the plugin adds `margin-top: -9.5px` on top.
-// The engines (Chromium and WebKit alike, measured by an internal script) put the knob at the top of the track, so
+// The engines (Chromium and WebKit alike, measured by a probe that is in git history before 0.3.3, commit bf58098a: scripts/r029/slider-engines.mjs) put the knob at the top of the track, so
 // the knob needs exactly -9.5 px and the Obsidian shift must be cancelled (`top: 0`). This test fails while the rule keeps the margin
 // and does not cancel `top`.
 import { readFileSync } from 'node:fs';

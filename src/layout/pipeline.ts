@@ -16,7 +16,7 @@ import { turnBox, turnEdges, turnUnion } from './turn';
 import { farSpouses, routeTree, type Routed } from './draw';
 import type { Plan } from './plan-model';
 import { derive, farByDistance, markFar, nearAgain, planTree, walkSide, type PlanInput } from './plan';
-import { hangX, normalise, placeItems, startMargin } from './place';
+import { hangX, shiftToMargin, placeItems, startMargin } from './place';
 import { pairOf } from './ports';
 
 /** A placement: gives every item of the plan an x, keeping the order of every row and its minimum gaps. */
@@ -151,7 +151,7 @@ export function runStages(g: FamilyGraph, coreGen: Map<string, number>, plain: G
 		derives++;
 		check('plan');
 	}
-	normalise(plan, startMargin(plan, geo, side));
+	shiftToMargin(plan, startMargin(plan, geo, side));
 	const hangAtPlacement = new Map(plan.families.map((f) => [f.key, hangX(f.hang, geo)]));
 	// The ports again, now with the side of every leg and side link taken from the positions; the hang ports keep their places.
 	plan = derive(plan.spec, g, geo, side, (from, to) => (to.x + to.w / 2 - (from.x + from.w / 2) < -TIE ? 'left' : 'right'));

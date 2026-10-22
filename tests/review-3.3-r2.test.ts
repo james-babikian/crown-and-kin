@@ -13,12 +13,13 @@ vi.mock('obsidian', () => {
 });
 // The partnership editor: Save at once with a new start date.
 vi.mock('../src/obsidian/union-edit', () => ({
-	editUnion: (_app: unknown, _a: string, _b: string, v: { type: string; start: string; end: string }, save: (v: unknown) => Promise<unknown>) => void save({ ...v, start: '1130' }),
+	openUnionEditor: (_app: unknown, _a: string, _b: string, v: { type: string; start: string; end: string }, save: (v: unknown) => Promise<unknown>) => void save({ ...v, start: '1130' }),
 }));
 
 import type { Op } from '../src/core/edit';
 import { familyOf } from '../src/core/family-query';
-import { EditSheet, loadSheet } from '../src/obsidian/edit-sheet';
+import { EditSheet } from '../src/obsidian/edit-sheet';
+import { loadSheet } from '../src/view/sheet-draft';
 
 // Two partnerships of one couple with the same text: add-union gives no id to a childless union.
 const TWIN = ['people:', '  - id: a', '    name: A', '  - id: b', '    name: B', 'unions:', '  - partners: [a, b]', '  - partners: [a, b]', ''].join('\n');

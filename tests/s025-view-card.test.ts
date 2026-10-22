@@ -273,7 +273,7 @@ describe('the small tree of the relation finder (D47, D51)', () => {
 
 describe('Titles window gets the Reduce movement answer of the view', () => {
 	it('openTitles passes `reduced` (a window that moves only when the view may move)', async () => {
-		const src = await import('node:fs').then((fs) => fs.readFileSync(new URL('../src/obsidian/tree-view.ts', import.meta.url), 'utf8'));
+		const src = await import('node:fs').then((fs) => fs.readFileSync(new URL('../src/obsidian/tree-view-actions.ts', import.meta.url), 'utf8'));
 		const at = src.indexOf('TitlesWindow.create(');
 		expect(src.slice(at, at + 500)).toContain('reduced: () => this.reduced()');
 	});

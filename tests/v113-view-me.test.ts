@@ -113,7 +113,7 @@ describe('the list of a phone note stands on the marked person when nothing befo
 		phone();
 		const src = line(7, 'start: p5', 'me: p2');
 		const handle = fakeHandle('n.md', src);
-		handle.state.lastEdited = 'p1';
+		handle.state.lastSaved = 'p1';
 		const { el } = await embed(src, { handle });
 		expect(stands(el)).toEqual(['p2', 'me']);
 	});
@@ -122,7 +122,7 @@ describe('the list of a phone note stands on the marked person when nothing befo
 		phone();
 		const src = line(7);
 		const handle = fakeHandle('n.md', src);
-		handle.state.lastEdited = 'p1';
+		handle.state.lastSaved = 'p1';
 		const { el } = await embed(src, { handle });
 		expect(stands(el)).toEqual(['p1', 'edited']);
 	});

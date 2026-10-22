@@ -3,7 +3,8 @@
  * Timing proof: median of 5 runs each, ratio between two sizes in the same process (the I34 lesson).
  * WP-4b (the speed protocol, the architecture notes §6.4): `routeEdges` is gone, so the call is the whole `arrangeTree` (walk, plan, place, route); the ratio bound is as before.
  */
-import { describe, expect, it } from 'vitest';
+import { describe, expect } from 'vitest';
+import { speedTest } from './support/speed-test';
 import { cardForm, geometryFor } from '../src/layout/geometry';
 import { DEFAULT_LAYOUT_SETTINGS } from '../src/layout/layout';
 import { arrangeTree } from '../src/layout/pipeline';
@@ -25,7 +26,7 @@ function routeMs(source: string, runs: number): number {
 }
 
 describe('arrangeTree with a rumoured parent on every person', () => {
-	it('grows about linearly: 4 times the people take less than 10 times as long (rumoured lines: "?" search scans every line and card)', () => {
+	speedTest('grows about linearly: 4 times the people take less than 10 times as long (rumoured lines: "?" search scans every line and card)', () => {
 		const small = routeMs(rumourTree(250), 5);
 		const big = routeMs(rumourTree(1000), 5);
 		// Control in the same process: the same links as ward links need no "?" and grow with the people.

@@ -24,6 +24,7 @@ import { tallBlockParser } from './live-preview';
 import { clearRelationCache } from '../view/relation-cache';
 import { createPictureStore, isPictureExtension } from './picture-store';
 import { bindViewerMotion } from './picture-viewer';
+import { stopJoinedWatch } from '../render/text-join';
 import { LinkUpdater, RENAME_TIMING, extensionOf } from './rename-links';
 import { registerCalendars } from './calendar-feature';
 import { obsidianCalendarVault } from './calendar-vault';
@@ -429,6 +430,8 @@ export default class DynastyTreePlugin extends Plugin implements TreeHost, Setti
 	}
 
 	override onunload(): void {
+		stopJoinedWatch();
+		this.viewerMotion();
 		this.links.stop();
 		for (const t of this.redrawTimers) clearTimeout(t);
 		this.redrawTimers.clear();

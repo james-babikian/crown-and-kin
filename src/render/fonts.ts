@@ -1,5 +1,5 @@
 /**
- * Compares the note's fonts (spec §5.8) so `tree-view.ts` can tell whether a font change needs a
+ * Compares the note's fonts (spec §5.8) so the tree view (`tree-view-lifecycle.ts`, `tree-view-placement.ts`) can tell whether a font change needs a
  * new layout and measurement. When fonts did not change, the tree view does not redraw: it
  * rechecks tall cards and reads the theme; CSS does the rest. `FontState` is a plain snapshot that
  * the tree view builds from the page and keeps to diff the next one against.

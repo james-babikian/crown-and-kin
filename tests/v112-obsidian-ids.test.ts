@@ -22,7 +22,7 @@ import { FullScreenModal } from '../src/obsidian/full-screen';
 import { HousesWindow, houseOps, loadHouses, rowsOf } from '../src/obsidian/houses-window';
 import { danglingIds, idFromName, idOps, idProblemFor, idProblems, idRefusalText, type IdRow } from '../src/view/id-draft';
 import { closePluginModals } from '../src/view/plugin-modals';
-import { draftChanged, rebase, titleIdRow, titleRows, windowOps, withHolderIds } from '../src/view/titles-draft';
+import { titlesDraftChanged, rebase, titleIdRow, titleRows, windowOps, withHolderIds } from '../src/view/titles-draft';
 import { TitlesWindow } from '../src/obsidian/titles-window';
 import { HOUSES, ID_UI, REMOVE, SHEET, TITLES_UI, WRITE_TEXT } from '../src/render/ui-text';
 import { FEl, clock, dispatch, fakeDoc, fakeWin, installDom, resetDom, settle } from './acceptance/fake-dom';
@@ -951,19 +951,19 @@ describe('Titles window: the Id change (§13.17 rule 5, D109, D110)', () => {
 		expect(openModals.includes(win as never)).toBe(true);
 	});
 
-	it('closing with unsaved changes asks first when only an Id draft differs (draftChanged and windowOps)', () => {
+	it('closing with unsaved changes asks first when only an Id draft differs (titlesDraftChanged and windowOps)', () => {
 		const parsed = parseBody(TITLES_BODY);
 		if (!parsed.ok) throw new Error('parse');
 		const g = deriveFamilies(readTree(parsed.doc, parsed.data, TITLES_BODY));
 		let n = 0;
 		const rows = titleRows(g, () => `t${n++}`);
-		expect(draftChanged(rows)).toBe(false);
+		expect(titlesDraftChanged(rows)).toBe(false);
 		const baron = rows.find((t) => t.id === 'baron')!;
 		baron.idDraft = 'count';
-		expect(draftChanged(rows)).toBe(true);
+		expect(titlesDraftChanged(rows)).toBe(true);
 		expect(windowOps(rows, () => 'x')).toEqual([{ kind: 'set-title-id', id: 'baron', newId: 'count' }]);
 		baron.idDraft = 'baron ';
-		expect(draftChanged(rows)).toBe(false);
+		expect(titlesDraftChanged(rows)).toBe(false);
 		expect(windowOps(rows, () => 'x')).toEqual([]);
 	});
 

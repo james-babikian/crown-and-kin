@@ -4,15 +4,15 @@ import {
 	REST,
 	ZOOM_MAX,
 	ZOOM_SNAP,
-	clampScale,
+	clampZoom,
 	clampView,
-	doubleTapView,
+	doubleTapPicture,
 	fitSize,
-	isDoubleTap,
+	isPictureDoubleTap,
 	isTap,
 	panLimit,
 	panView,
-	pinchView,
+	pinchPicture,
 	settleView,
 	sideSwipe,
 	stepIndex,
@@ -53,9 +53,9 @@ describe('the zoom limits and the move (1x to 4x)', () => {
 	const shown = { w: 400, h: 600 };
 
 	it('keeps the zoom between 1 and 4 and ignores a number that is no number', () => {
-		expect(clampScale(0.2)).toBe(1);
-		expect(clampScale(9)).toBe(ZOOM_MAX);
-		expect(clampScale(NaN)).toBe(1);
+		expect(clampZoom(0.2)).toBe(1);
+		expect(clampZoom(9)).toBe(ZOOM_MAX);
+		expect(clampZoom(NaN)).toBe(1);
 		expect(ZOOM_MAX).toBe(4);
 	});
 
@@ -93,7 +93,7 @@ describe('the pinch and the double tap', () => {
 	const shown = { w: 400, h: 600 };
 
 	it('a pinch zooms by the ratio of the distances about the first midpoint, then follows the midpoint', () => {
-		const v = pinchView(REST, { mid: { x: 0, y: 0 }, dist: 100 }, { mid: { x: 10, y: 0 }, dist: 250 }, shown, STAGE);
+		const v = pinchPicture(REST, { mid: { x: 0, y: 0 }, dist: 100 }, { mid: { x: 10, y: 0 }, dist: 250 }, shown, STAGE);
 		expect(v.scale).toBe(2.5);
 		expect(v.x).toBe(10);
 		expect(v.y).toBe(0);
@@ -101,15 +101,15 @@ describe('the pinch and the double tap', () => {
 
 	it('a pinch from a view works from the start of the pinch, so it does not drift', () => {
 		const start = { scale: 2, x: 20, y: 0 };
-		const a = pinchView(start, { mid: { x: 0, y: 0 }, dist: 100 }, { mid: { x: 0, y: 0 }, dist: 150 }, shown, STAGE);
-		const b = pinchView(start, { mid: { x: 0, y: 0 }, dist: 100 }, { mid: { x: 0, y: 0 }, dist: 150 }, shown, STAGE);
+		const a = pinchPicture(start, { mid: { x: 0, y: 0 }, dist: 100 }, { mid: { x: 0, y: 0 }, dist: 150 }, shown, STAGE);
+		const b = pinchPicture(start, { mid: { x: 0, y: 0 }, dist: 100 }, { mid: { x: 0, y: 0 }, dist: 150 }, shown, STAGE);
 		expect(a).toEqual(b);
 		expect(a.scale).toBe(3);
 	});
 
 	it('a pinch with two fingers on the same spot changes nothing', () => {
 		const v = { scale: 2, x: 0, y: 0 };
-		expect(pinchView(v, { mid: { x: 0, y: 0 }, dist: 0 }, { mid: { x: 0, y: 0 }, dist: 80 }, shown, STAGE)).toBe(v);
+		expect(pinchPicture(v, { mid: { x: 0, y: 0 }, dist: 0 }, { mid: { x: 0, y: 0 }, dist: 80 }, shown, STAGE)).toBe(v);
 	});
 
 	it('a pinch back to nearly 1x ends the zoom; a larger zoom stays', () => {
@@ -119,16 +119,16 @@ describe('the pinch and the double tap', () => {
 	});
 
 	it('a double tap zooms in about the tap; a double tap on a zoomed picture ends the zoom', () => {
-		const zoomed = doubleTapView(REST, { x: 50, y: 50 }, shown, STAGE);
+		const zoomed = doubleTapPicture(REST, { x: 50, y: 50 }, shown, STAGE);
 		expect(zoomed.scale).toBe(DOUBLE_TAP_ZOOM);
-		expect(doubleTapView(zoomed, { x: 0, y: 0 }, shown, STAGE)).toEqual(REST);
+		expect(doubleTapPicture(zoomed, { x: 0, y: 0 }, shown, STAGE)).toEqual(REST);
 	});
 
 	it('two taps near each other in time and place are a double tap', () => {
-		expect(isDoubleTap({ t: 1000, x: 10, y: 10 }, { t: 1200, x: 20, y: 15 })).toBe(true);
-		expect(isDoubleTap({ t: 1000, x: 10, y: 10 }, { t: 1500, x: 10, y: 10 })).toBe(false);
-		expect(isDoubleTap({ t: 1000, x: 10, y: 10 }, { t: 1100, x: 200, y: 10 })).toBe(false);
-		expect(isDoubleTap(null, { t: 1000, x: 0, y: 0 })).toBe(false);
+		expect(isPictureDoubleTap({ t: 1000, x: 10, y: 10 }, { t: 1200, x: 20, y: 15 })).toBe(true);
+		expect(isPictureDoubleTap({ t: 1000, x: 10, y: 10 }, { t: 1500, x: 10, y: 10 })).toBe(false);
+		expect(isPictureDoubleTap({ t: 1000, x: 10, y: 10 }, { t: 1100, x: 200, y: 10 })).toBe(false);
+		expect(isPictureDoubleTap(null, { t: 1000, x: 0, y: 0 })).toBe(false);
 	});
 
 	it('a finger that moves more than 10 px is not a tap', () => {

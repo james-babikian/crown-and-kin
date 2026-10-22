@@ -1,7 +1,7 @@
 /*
  * Finds which cards need two or three text lines for their name (D29, D37, D81) or two for their title text line with
  * a reign (D61) instead of one truncated line.
- * `tree-view.ts` calls `tallCardsFor` and `tallTitlesFor` before layout, and passes their answers in as
+ * `view/measured-layout.ts` calls `tallCardsFor` and `tallTitlesFor` before layout, and passes their answers in as
  * `settings.tallCards` and `settings.tallTitles` so the layout makes exactly these cards taller; `sameTall` lets it
  * skip a re-layout when an answer has not changed. The name is broken with `cardNameLines` and the room that `nameRoom` gives,
  * the same call that `scene.ts` and `svg-string.ts` make to draw it. 0.2.6 (D179): no picture narrows a name (the classic card is gone),

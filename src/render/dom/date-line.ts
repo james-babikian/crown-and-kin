@@ -6,7 +6,18 @@
  */
 
 import type { DateReader } from '../../core/dates';
-import { dateReadout } from '../date-readout';
+import { dateReadoutParts, type ReadoutParts } from '../date-readout';
+import { markedLine } from './marks';
+
+/**
+ * Writes the two parts of a date line into `line`: the reading as grey text, and the warning about a wrong written name (when there is one) on a text line of its own, with
+ * a warning mark and the text colour (D278). The line is empty, and takes no room, when there is nothing to say.
+ */
+export function paintDateLine(line: HTMLElement, parts: ReadoutParts): void {
+	line.empty();
+	if (parts.reading !== '') line.createDiv({ cls: 'dynasty-date-reading', text: parts.reading });
+	if (parts.warning !== '') markedLine(line, 'warning', parts.warning, 'dynasty-date-warning').setAttribute('data-warning', '');
+}
 
 /**
  * Puts the grey line in `row`, below `input`, and keeps it up to date; returns the function that paints it again. `reader` gives the reader of the tree as it is
@@ -27,10 +38,10 @@ export function attachDateLine(
 	const paint = (): void => {
 		try {
 			const r = reader();
-			line.setText(dateReadout(input.value, r.read(input.value), r.ready));
+			paintDateLine(line, dateReadoutParts(input.value, r.read(input.value), r.ready));
 		} catch (e) {
 			console.error('Crown and Kin: cannot read the date', e);
-			line.setText('');
+			line.empty();
 		}
 	};
 	input.addEventListener('blur', paint);

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { speedTest } from './support/speed-test';
 import { buildPictureTree, comparePictureNames, searchRows } from '../src/core/picture-list';
 
 function make(n: number) {
@@ -27,7 +28,7 @@ describe('picture search (M11 fix round, A2)', () => {
 		expect(searchRows(tree, 'zzz', null, 9).rows).toHaveLength(1);
 	});
 
-	it('searches 30 000 pictures in under 150 ms', () => {
+	speedTest('searches 30 000 pictures in under 150 ms', () => {
 		const tree = make(30000);
 		const t = performance.now();
 		searchRows(tree, 'png', null);

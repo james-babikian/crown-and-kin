@@ -239,6 +239,8 @@ export function dateRows(dates: TreeDates, texts: readonly DateText[], also: rea
 		if (!r) continue;
 		reads.push(r);
 		for (const warning of r.warnings) {
+			// A wrong written name changes no year, so it is no row of the line of succession (spec §14 rule 14).
+			if (warning === 'calendar-name-mismatch') continue;
 			const key = `${warning}|${t.what}|${t.id ?? ''}|${t.entry ?? ''}|${t.text}`;
 			if (seen.has(key)) continue;
 			seen.add(key);

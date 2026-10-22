@@ -128,7 +128,7 @@ describe('every window that picks a person uses this one prompt', () => {
 			.filter((f) => f.endsWith('.ts') && f !== 'person-picker.ts')
 			.filter((f) => /pickPerson\(/.test(readFileSync(`${dir}/${f}`, 'utf8')))
 			.sort();
-		expect(callers).toEqual(['edit-sheet.ts', 'family-flows.ts', 'titles-window.ts', 'tree-view.ts']);
+		expect(callers).toEqual(['edit-sheet-actions.ts', 'family-flows.ts', 'titles-window.ts', 'tree-view-actions.ts', 'tree-view-finder.ts', 'tree-view-list.ts', 'tree-view-toolbar.ts']);
 	});
 });
 

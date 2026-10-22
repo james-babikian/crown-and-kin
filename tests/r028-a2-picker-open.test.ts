@@ -1,4 +1,5 @@
-import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeAll, beforeEach, describe, expect, vi } from 'vitest';
+import { speedTest } from './support/speed-test';
 
 vi.mock('obsidian', () => import('./acceptance/fake-obsidian'));
 vi.mock('@codemirror/language', () => ({ forceParsing: () => false, syntaxTree: () => ({ length: 0 }) }));
@@ -33,7 +34,7 @@ function vault(n: number, folders: number): VaultFile[] {
 }
 
 describe('the picture picker opens fast on a large vault', () => {
-	it('2 000 pictures in 100 folders: the call to the first rows takes under 100 ms of plugin work', async () => {
+	speedTest('2 000 pictures in 100 folders: the call to the first rows takes under 100 ms of plugin work', async () => {
 		const files = vault(2000, 100);
 		const { pickPicture } = await import('../src/obsidian/picture-picker');
 		const app = { vault: { getFiles: () => files, getAbstractFileByPath: () => null }, fileManager: { generateMarkdownLink: () => '' }, metadataCache: {}, loadLocalStorage: () => null, saveLocalStorage: () => {} };

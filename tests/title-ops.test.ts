@@ -5,7 +5,7 @@ import { describeDelete } from '../src/core/family-query';
 import { parseBody, parseDynasty } from '../src/core/parse';
 import { newTitleId } from '../src/core/title-ops';
 import { applyOp } from '../src/core/yaml-edit';
-import { forget, recall, remember } from '../src/core/yaml-patch';
+import { forgetRecall, recall, remember } from '../src/core/yaml-patch';
 
 // Spec §13.3–§13.5 and the M8 contract rules 6–8: the title ops, the written forms of holders,
 // `card-title` on a person, delete-person (D57) and the `card-title` cleanup. Golden texts: each
@@ -574,7 +574,7 @@ describe('card-title cleanup (rule 7), once per write', () => {
 		expect(code(SRC, { kind: 'remove-holder', holder: { title: 'duke', index: 99 } })).toBe('unknown-holder');
 		expect(recall(SRC)).toBeUndefined();
 		remember(SRC, parsed.data);
-		forget();
+		forgetRecall();
 		expect(recall(SRC)).toBeUndefined();
 	});
 

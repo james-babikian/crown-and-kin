@@ -19,7 +19,7 @@ import { freeName } from '../src/obsidian/table-note';
 import {
 	addFields,
 	changedFields,
-	draftChanged,
+	titlesDraftChanged,
 	emptyNames,
 	formResult,
 	formStart,
@@ -183,7 +183,7 @@ describe('the holder form (spec §13.5): the ruler name and the preview', () => 
 describe('the Titles window draft: Save is one batch (spec §13.4, §13.0 item 6)', () => {
 	it('an unchanged draft writes nothing', () => {
 		const rows = rowsOf();
-		expect(draftChanged(rows)).toBe(false);
+		expect(titlesDraftChanged(rows)).toBe(false);
 		expect(windowOps(rows, newId(BODY_13))).toEqual([]);
 	});
 
@@ -196,7 +196,7 @@ describe('the Titles window draft: Save is one batch (spec §13.4, §13.0 item 6
 		titleOf(rows, 'king-of-the-vale').name = 'High King of the Vale';
 		titleOf(rows, 'warden-of-the-marches').deleted = true;
 		rows.push({ key: 'nt', id: null, name: 'Lord of Harrowmere', baseName: null, maleName: '', baseMaleName: null, femaleName: '', baseFemaleName: null, deleted: false, holders: [], baseRows: [] });
-		expect(draftChanged(rows)).toBe(true);
+		expect(titlesDraftChanged(rows)).toBe(true);
 		const ops = windowOps(rows, newId(BODY_13));
 		expect(ops.map((o) => o.kind)).toEqual(['edit-title', 'set-holders', 'delete-title', 'add-title']);
 		// The same text as the WP 8.0 golden Save, except for the plural of the new title: the window no longer writes the list name (D201).
@@ -240,7 +240,7 @@ describe('the Titles window draft: Save is one batch (spec §13.4, §13.0 item 6
 		rows.push({ key: 'n', id: null, name: '  ', baseName: null, maleName: '', baseMaleName: null, femaleName: '', baseFemaleName: null, deleted: false, holders: [], baseRows: [] });
 		expect(emptyNames(rows).map((t) => t.key)).toEqual(['n']);
 		rows[rows.length - 1].deleted = true;
-		expect(draftChanged(rows)).toBe(false);
+		expect(titlesDraftChanged(rows)).toBe(false);
 		titleOf(rows, 'duke-of-valmont').name = '';
 		expect(emptyNames(rows).map((t) => t.id)).toEqual(['duke-of-valmont']);
 	});

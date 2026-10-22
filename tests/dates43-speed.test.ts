@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect } from 'vitest';
+import { speedTest } from './support/speed-test';
 import { compileCalendars, type Calendar } from '../src/core/dates';
 import { deriveFamilies } from '../src/core/derive';
 import { parseDynasty } from '../src/core/parse';
@@ -41,7 +42,7 @@ function listJob(reader: ReturnType<typeof compileCalendars>) {
 }
 
 describe('the phone list with 50 eras', () => {
-	it('reads every date of the largest sample tree in at most about four times the time of the plain reader', () => {
+	speedTest('reads every date of the largest sample tree in at most about four times the time of the plain reader', () => {
 		const plain = timedRatio(listJob(compileCalendars([], true)), 5);
 		const many = timedRatio(listJob(compileCalendars(manyEras(), true)), 5);
 		expect(many.out.people).toBe(plain.out.people);
@@ -50,7 +51,7 @@ describe('the phone list with 50 eras', () => {
 		expect(many.ratio, `plain ${plain.ms.toFixed(1)} ms, with 50 eras ${many.ms.toFixed(1)} ms, reference ${many.refMs.toFixed(1)} ms`).toBeLessThan(Math.max(plain.ratio * 4, 0.8));
 	});
 
-	it('the second read of the same tree comes from the memo and is not slower than the first', () => {
+	speedTest('the second read of the same tree comes from the memo and is not slower than the first', () => {
 		const reader = compileCalendars(manyEras(), true);
 		const job = listJob(reader);
 		const first = timedRatio(job, 1);

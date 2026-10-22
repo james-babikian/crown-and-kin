@@ -351,7 +351,7 @@ describe('I19: the dead sign in the date line and the screen-reader label', () =
 		[{ died: 'yes' }, '†'],
 		[{ died: '?' }, '†?'],
 		[{ born: '1131', died: 'no' }, 'b. 1131'],
-		[{ born: '1131', died: 'c. 1190' }, '1131–c. 1190'],
+		[{ born: '1131', died: 'c. 1190' }, '1131\u2009–\u2009c. 1190'],
 	])('dateLine %j is %s', (o, text) => {
 		expect(dateLine(person(o), PLAIN_READER)).toBe(text);
 	});

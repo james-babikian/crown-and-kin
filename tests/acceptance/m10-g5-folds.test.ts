@@ -146,12 +146,9 @@ describe('Clear focus keeps the folds (spec §13.10 "Focus mode")', () => {
 		(view as unknown as { focusOn(id: string | null): void }).focusOn('osric');
 		await run();
 		expect(folds(handle)).toEqual(new Set([key('B')]));
-		// D132: Focus opens a small list while a focus shows; Clear focus is its second item.
+		// D263 B2: while a focus shows, one tap on Focus clears it.
 		expect(el.querySelector('.dynasty-show-all')).toBeNull();
 		dispatch(el.querySelector('.dynasty-focus')!, 'click', { detail: 1 });
-		const clear = el.querySelectorAll('.dynasty-popover-focus .dynasty-popover-item')[1];
-		expect(clear).toBeDefined();
-		dispatch(clear, 'click', { detail: 1 });
 		await run();
 		expect(folds(handle)).toEqual(new Set([key('B')]));
 		expect(cardCount(el)).toBe(96 - 14);

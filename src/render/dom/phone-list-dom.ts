@@ -35,7 +35,7 @@ import { cardLabels, needsLabels, type CardLabel } from '../../core/titles';
 import type { ParentType } from '../../core/types';
 import { isColour } from '../colour-check';
 import { joined, nb } from '../text-join';
-import { dateLine } from '../tree-info';
+import { dateLine, shownReign } from '../tree-info';
 import { PHONE_LIST_UI } from '../ui-text';
 import type { IconFn } from './widgets';
 
@@ -253,7 +253,7 @@ export function buildPhoneList(parent: HTMLElement, spec: PhoneListSpec): PhoneL
 		];
 		if (parts.some(Boolean)) joined(text, 'dynasty-list-meta', parts, 'span');
 		if (large && title) {
-			const reign = spec.showDates ? label?.reign : undefined;
+			const reign = spec.showDates ? shownReign(label, g.dates, 'shown') : undefined;
 			text.createSpan({ cls: 'dynasty-list-title dynasty-hero-title', text: nb(reign ? `${title} ${reign}` : title) });
 		}
 		// D213: a place for a picture only when the person has one; no initials disc, no empty ring.

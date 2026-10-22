@@ -206,36 +206,63 @@ calendars:
     kind: cycles
     length: 60
     start: 1
-    formats: ["{year} Year of the {cycle} Cycle", "Year {year} of Cycle {cycle}"]
+    formats: ["{cycle}.{year} {planet}", "{year} Year of the {cycle} Cycle"]
+    lists:
+      - name: Planets
+        marker: planet
+        names:
+          - {name: Saturn, short: Sa}
+          - {name: Jupiter, short: Ju}
+          - {name: Mars, short: Ma}
+        known: {year: 1273, index: 0}
+        show: short
   - name: Reign names
     kind: eras
     formats: ["{year} Year of the {era}", "{era} {year}"]
     eras:
       - {name: Qinglong Emperor, start: 130, length: 11}
       - {name: Jianwen Emperor, start: 141}
+plain:
+  lists:
+    - name: Planets
+      names:
+        - {name: Saturn, short: Sa}
+        - {name: Jupiter, short: Ju}
+        - {name: Mars, short: Ma}
+      known: {year: 1273, index: 0}
+      show: short
 ```
 
 - A note can hold several blocks, and a block can hold several calendars. The plugin makes the note `Calendars` at the root of the vault the first time you save in the Calendars window.
 - The plugin counts every year on one scale of whole years (the plain years). A plain year 1210 is year 1210. The number `start` gives the plain year of Year 1 of a calendar. The window works it out from an example: "Year 21 of Cycle 3 is the same year as 1203". So a calendar never depends on another calendar.
 - A tree uses every calendar note of the vault. If the tree has the key `calendar` in `options`, it uses only that note. The item "Calendar note" in the More list writes this key.
 - A date that fits a format gets the year of the calendar. A date that fits no format is read as a plain year, as before. A date that fits two calendars with different years gets no year.
+- A name list gives each year a name that repeats. The plugin shows the name after a short date, for example "22.13 Sa". It never writes the name into your note. If a date holds a name that is wrong for its year, the plugin keeps the year of the date and gives a warning. A format can hold the marker of a list, for example `{planet}`. The part of the format with the marker is optional: the date still reads with no name.
 - The plugin never changes the text of a date. It reads the text to find a year, and it shows the date as you wrote it.
 - A plugin version before 0.3.2 shows the block as plain code. It reads a date in a calendar as a plain year: a date with no run of three or four digits has no year, and a date such as "Third Age 3019" gives the wrong year 3019, with no note. A device whose calendar note has not synced yet reads dates in the same way. If you delete the calendar note, such dates have no year until you add the calendars again.
+- A plugin version before 0.3.3 does not know name lists. It keeps the calendar and its other formats, and it ignores a format that holds a marker, with no warning. A calendar whose only format holds a marker reads no date there. Its Calendars window refuses to save the note until you remove the marker format. To let old devices read your dates, use formats with no marker, for example `{cycle}.{year}` (a marker format next to its own form with no marker is refused as the same format). The names still show in 0.3.3 with such formats, but a name written in such a date is not read or checked.
 
 | Level | Key | Meaning | Accepted forms | Written form |
 |---|---|---|---|---|
 | block | `calendars` | The list of calendars of this block. | A list of maps. Any other shape gives a warning and the plugin ignores the block. | A block list. |
+| block | `plain` | The name lists of the plain years, in a map with the key `lists`. A block with only this key is a calendar note. | A map. A list that the plugin cannot use gives a warning, and the plugin ignores it. | A block map. |
 | calendar | `name` | The name of the calendar. The grey line and the test line show it. | Text. A calendar with no name is not used. | Plain text, in double quotes if plain YAML would read it as another value. |
 | calendar | `kind` | The kind of the calendar. | `cycles` or `eras`, in any case. Any other word: the plugin ignores the calendar and gives a warning. | Plain text. |
 | calendar | `length` | Cycle calendar: the number of years in one cycle. | A whole number, 1 or more. | Plain number. |
 | calendar | `start` | Cycle calendar: the plugin year of Year 1 of Cycle 1. The Calendars window works this number out from "Same year as". With no number, the start is 1. | A whole number, also below 1. | Plain number. |
 | calendar | `formats` | The ways in which a date of this calendar is written. A cycle format needs `{year}` and `{cycle}` one time each. An era format needs `{year}` and `{era}` one time each. | A list of texts, or one text. Case and extra spaces do not matter. A format can be part of a longer text. | A flow list on one line, each format in double quotes. |
 | calendar | `eras` | Era calendar: the eras, each with its own start. | A list of maps. | A block list. Each era is a map on one line. |
+| calendar | `lists` | The name lists of this calendar, at most 4. A name list gives each year a name that repeats, for example a planet. A format can show the name with the marker of the list. | A list of maps. A list that the plugin cannot use gives a warning, and the plugin ignores it. | A block list of maps. |
 | era | `name` | The name of the era. The same name in two eras is not allowed. | Text. | Plain text. |
 | era | `start` | The plugin year of Year 1 of this era. | A whole number, also below 1. | Plain number. |
 | era | `length` | The number of years of the era. A date after the last year gives a warning. With no length, the era has no end. | A whole number, 1 or more. | Plain number. |
+| list | `name` | The name of the list. A list name can be the same in two calendars. The grey line shows it. | Text. A list with no name is not used. | Plain text. |
+| list | `marker` | The place name that a format uses for this list, for example `planet` for `{planet}`. It has 1 to 24 letters, digits or hyphens and starts with a letter. It is not `year`, `cycle` or `era`. The plain years have no marker. | Text. The plugin accepts curly brackets around it. | Plain text, with no curly brackets. |
+| list | `names` | The names, in order. Each name has an optional short form. The names repeat, one for each year. | A list of 1 to 60 maps with `name` and `short`, or a list of texts. A name and a short form have 1 to 40 characters. | A block list. Each name is a map on one line. |
+| list | `known` | One year with its name: the plugin year and the place of its name in `names`, counted from 0. | A map with `year` (a whole number) and `index` (a whole number below the number of names). | A map on one line. |
+| list | `show` | What a card shows after a date: the short form, the full name or nothing. | `short`, `full` or `none`. Any other value, or no value, is `short`. | Plain text. |
 
-Write order of a calendar: `name`, `kind`, `length`, `start`, `formats`, `eras`. Write order of an era: `name`, `start`, `length`.
+Write order of a calendar: `name`, `kind`, `length`, `start`, `formats`, `eras`, `lists`. Write order of an era: `name`, `start`, `length`. Write order of a name list: `name`, `marker`, `names`, `known`, `show`.
 
 ## Reserved keys
 

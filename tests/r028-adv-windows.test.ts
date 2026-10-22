@@ -13,7 +13,7 @@ import { applyOp } from '../src/core/yaml-edit';
 import { EditSheet } from '../src/obsidian/edit-sheet';
 import { houseOps, loadHouses, rowsOf } from '../src/obsidian/houses-window';
 import { closePluginModals } from '../src/view/plugin-modals';
-import { SUCCESSION_FIELDS, draftChanged, titleRows, windowOps, type SuccessionDraft } from '../src/view/titles-draft';
+import { SUCCESSION_FIELDS, titlesDraftChanged, titleRows, windowOps, type SuccessionDraft } from '../src/view/titles-draft';
 import { clock, dispatch, fakeWin, installDom, resetDom, settle, type FEl } from './acceptance/fake-dom';
 import { openModals, resetObsidian } from './acceptance/fake-obsidian';
 import { genPeople, peopleYaml, pick, rng, titleYaml } from './r028-advb-gen';
@@ -105,7 +105,7 @@ describe('X4 (7) the Titles window draft', () => {
 			const g = deriveFamilies(parsed.tree);
 			const rows = titleRows(g, key);
 			if (!rows.length) continue;
-			expect(draftChanged(rows), `seed ${seed}: the draft of an untouched window has a change\n${body}`).toBe(false);
+			expect(titlesDraftChanged(rows), `seed ${seed}: the draft of an untouched window has a change\n${body}`).toBe(false);
 			expect(windowOps(rows, newId), `seed ${seed}: ops of an untouched window\n${body}`).toEqual([]);
 			tried++;
 		}

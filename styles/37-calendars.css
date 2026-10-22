@@ -44,58 +44,64 @@
 	overflow-wrap: anywhere;
 }
 
-.dynasty-cal-links {
-	display: flex;
+/* "New calendar note" ends the text line under the title (D278): the rarest action takes no text line of its own, and the link wraps with the text on a phone. */
+.dynasty-sheet .dynasty-cal-top button.dynasty-cal-new-note {
+	display: inline-flex;
 	align-items: center;
+	vertical-align: baseline;
 	min-height: 30px;
-	margin-top: 6px;
-}
-
-/* The link takes the size of "Add portrait or arms" in the person window. */
-.dynasty-sheet .dynasty-cal-links button.dynasty-cal-new-note {
+	margin-block: -6px;
 	font-size: var(--dynasty-type-control);
 }
 
-.dynasty-cal-links:empty {
-	display: none;
+.dynasty-sheet.is-phone .dynasty-cal-top button.dynasty-cal-new-note {
+	min-height: 44px;
+	margin-block: -14px;
 }
 
-.dynasty-cal-top + .dynasty-cal-intro {
+/* The line under the head stands close under it, when the note box between them is empty. */
+.dynasty-cal-note:empty + .dynasty-cal-intro {
 	margin-top: -4px;
+}
+
+/* The window with no calendar shows the long explanation at the size of the window text (0.3.3 design, option A). */
+.dynasty-cal-intro.is-long {
+	color: var(--text-normal);
+	font-size: var(--dynasty-type-text);
+	line-height: 1.5;
+}
+
+/* The lists that cannot be used: quiet notes under the line, none when there is no problem. */
+.dynasty-cal-issues {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+}
+
+.dynasty-cal-issues:empty {
+	display: none;
 }
 
 .dynasty-cal-note:empty {
 	display: none;
 }
 
-/* The calendars are parts of the window, as Details and Family are in the person window: one thin line above each, and no frame. */
-.dynasty-cal-cards {
+/* The calendars are sections of the window (`window-sections.ts`), as Details and Family are in the person window: one thin line above each, and no frame. */
+.dynasty-cal-sections {
 	display: flex;
 	flex-direction: column;
-	gap: 0;
 }
 
-.dynasty-cal-card,
-.dynasty-cal-block {
-	display: flex;
-	flex-direction: column;
-	gap: 12px;
-}
-
-.dynasty-cal-card {
-	padding: 14px 0 26px;
-	border: 0;
-	border-top: 1px solid var(--background-modifier-border);
-	border-radius: 0;
-	background: none;
-}
-
-.dynasty-cal-card:last-child {
-	border-bottom: 1px solid var(--background-modifier-border);
+/* One "Test a date" field under all sections. */
+.dynasty-cal-testbox {
+	margin-top: 4px;
 }
 
 /* A calendar in a note keeps its frame: it stands among the text of the note. */
 .dynasty-cal-block {
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
 	padding: 14px;
 	border: 1px solid var(--background-modifier-border);
 	border-radius: var(--radius-m, 8px);
@@ -109,8 +115,10 @@
 	gap: 12px;
 }
 
-.dynasty-cal-kind {
-	font-size: var(--dynasty-type-heading);
+/* A section title of a calendar that has no name yet shows its kind, quiet. */
+.dynasty-section-title.is-empty {
+	color: var(--text-faint);
+	font-weight: var(--font-normal);
 }
 
 /* "Start" and "Eras": a sub-heading of the Small role, semibold, quiet grey (as `dynasty-succ-heading` in the Titles window). */
@@ -136,6 +144,33 @@
 	margin-block: -14px;
 }
 
+/* Every link of the window has the Control size, as "Add calendar" and "Open all" do (D278). */
+.dynasty-sheet button.dynasty-cal-remove,
+.dynasty-sheet button.dynasty-cal-add-link,
+.dynasty-sheet button.dynasty-cal-remove-cal {
+	font-size: var(--dynasty-type-control);
+}
+
+/* Remove of a name list stands at the right end of the first row of the list, on the line of the labels, as Remove of an era does. It is out of the flow, so the fields keep their places. */
+.dynasty-cal-list > .dynasty-grid {
+	position: relative;
+}
+
+.dynasty-sheet .dynasty-cal-list > .dynasty-grid > button.dynasty-cal-remove-list {
+	position: absolute;
+	top: -6px;
+	right: 0;
+}
+
+.dynasty-sheet.is-phone .dynasty-cal-list > .dynasty-grid > button.dynasty-cal-remove-list {
+	top: -14px;
+}
+
+/* A field for a number of two or three digits takes half the width of the row; its help and its refusals keep the whole width. */
+.dynasty-sheet-field.is-half > input.dynasty-sheet-input {
+	max-width: calc(50% - 8px);
+}
+
 /* A text button in a card has a touch area of 44 px on a screen that is touched (spec §7.5). */
 .dynasty-cal-remove {
 	min-height: 30px;
@@ -149,27 +184,42 @@
 }
 
 .dynasty-sheet.is-phone .dynasty-cal-remove,
+.dynasty-sheet.is-phone button.dynasty-cal-add-link,
+.dynasty-sheet.is-phone button.dynasty-cal-remove-cal,
 .dynasty-sheet.is-phone .dynasty-cal-new-note,
 .dynasty-sheet.is-phone .dynasty-cal-existing-note {
 	min-height: 44px;
 }
 
 .dynasty-cal-start,
-.dynasty-cal-era {
+.dynasty-cal-era,
+.dynasty-cal-list {
 	display: flex;
 	flex-direction: column;
 	gap: 8px;
 	padding-top: 4px;
 }
 
-.dynasty-cal-era {
+.dynasty-cal-era,
+.dynasty-cal-list {
 	padding: 0;
 }
 
-/* One thin line between two eras, none above the first. */
-.dynasty-cal-era + .dynasty-cal-era {
+.dynasty-cal-list {
+	gap: 14px;
+}
+
+/* One thin line between two eras or two name lists, none above the first. */
+.dynasty-cal-era + .dynasty-cal-era,
+.dynasty-cal-list + .dynasty-cal-list {
 	padding-top: 14px;
 	border-top: 1px solid var(--background-modifier-border);
+}
+
+/* The help text of a field (`is-on-focus`, styles/10) shows while the cursor is in its field. The start and the known year are groups of fields: their help shows while the cursor is in any of them. A calendar that was just added shows its help at once. */
+.dynasty-cal-start:focus-within > .dynasty-sheet-hint.is-on-focus,
+.dynasty-calendars .is-new .dynasty-sheet-hint.is-on-focus {
+	display: block;
 }
 
 /* Cycle, Year, "=" and "Same year as" in the order that the help text names them. The labels stand over the fields, so the fields stand on one line. */
@@ -184,6 +234,11 @@
 	grid-template-columns: 6.5em auto minmax(0, 1fr);
 }
 
+/* The known year of a name list: the date, "=", the name. */
+.dynasty-cal-start-row.is-known {
+	grid-template-columns: 8em auto minmax(0, 1fr);
+}
+
 .dynasty-cal-equals {
 	padding-bottom: 6px;
 	color: var(--dynasty-muted);
@@ -192,7 +247,8 @@
 
 /* A phone: Cycle and Year share one row, "Same year as" stands under them, and the "=" is not needed. */
 .dynasty-sheet.is-phone .dynasty-cal-start-row,
-.dynasty-sheet.is-phone .dynasty-cal-start-row.is-era {
+.dynasty-sheet.is-phone .dynasty-cal-start-row.is-era,
+.dynasty-sheet.is-phone .dynasty-cal-start-row.is-known {
 	grid-template-columns: 1fr 1fr;
 	gap: 12px;
 }
@@ -230,8 +286,9 @@
 	display: none;
 }
 
-.dynasty-cal-card input[aria-invalid='true'],
-.dynasty-cal-card textarea[aria-invalid='true'] {
+.dynasty-calendars input[aria-invalid='true'],
+.dynasty-calendars textarea[aria-invalid='true'],
+.dynasty-calendars select[aria-invalid='true'] {
 	border-color: var(--dynasty-error);
 }
 
@@ -239,13 +296,44 @@
 	justify-content: flex-start;
 }
 
-/* Add era is as wide as its text, at the left, as the other Add buttons are. */
-.dynasty-sheet button.dynasty-cal-add-era {
+/* "Add era" and "Add name list" are quiet links with a plus, at the left, after the last era or list; "Remove this calendar" is a quiet link at the end of the section. */
+.dynasty-sheet button.dynasty-cal-add-link,
+.dynasty-sheet button.dynasty-cal-remove-cal {
+	justify-self: start;
 	align-self: flex-start;
+	min-height: 30px;
+	min-width: 44px;
+}
+
+.dynasty-sheet button.dynasty-cal-add-link {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	margin-top: -2px;
+}
+
+.dynasty-cal-add-link .svg-icon {
+	width: 14px;
+	height: 14px;
+}
+
+.dynasty-sheet button.dynasty-cal-remove-cal {
+	margin-top: 12px;
+}
+
+/* "Add calendar" stands at the left of the row of "Open all", as "Add portrait or arms" does in the person window. */
+.dynasty-sheet .dynasty-openall button.dynasty-add-calendar {
+	margin-right: auto;
+	color: var(--dynasty-link);
+}
+
+.dynasty-openall button.dynasty-add-calendar .svg-icon {
+	width: 14px;
+	height: 14px;
 }
 
 /* A refusal that the window scrolls to (`block: 'nearest'`) keeps clear of the footer line. */
-.dynasty-cal-card [data-refusal] {
+.dynasty-cal-sections [data-refusal] {
 	scroll-margin-bottom: 24px;
 }
 
@@ -341,4 +429,43 @@
 	.dynasty-cal-view .dynasty-cal-edit {
 		min-height: 44px;
 	}
+
+	.dynasty-sheet button.dynasty-cal-add-link,
+	.dynasty-sheet button.dynasty-cal-remove-cal,
+	.dynasty-sheet button.dynasty-cal-remove {
+		min-height: 44px;
+		min-width: 44px;
+	}
+}
+
+/* The refusals at the top of the window: one red text line with a mark (D278); an error of no section stands under its own head, each on its own text line. */
+.dynasty-calendars .dynasty-sheet-error > [data-error-line] {
+	margin-top: 0.35em;
+}
+
+.dynasty-cal-refusal-sum {
+	font-size: var(--dynasty-type-text);
+	line-height: 1.4;
+}
+
+.dynasty-cal-refusal-sum .dynasty-mark {
+	width: 15px;
+	height: 15px;
+	margin-top: 1px;
+}
+
+/* A phone: the two buttons of the empty window take the full width, one under the other. */
+.dynasty-sheet.is-phone .dynasty-cal-add.dynasty-actions {
+	flex-direction: column;
+	align-items: stretch;
+}
+
+.dynasty-sheet.is-phone .dynasty-cal-add.dynasty-actions .dynasty-btn {
+	flex: 1 1 auto;
+	width: 100%;
+}
+
+/* The short warning at Start stands in the place of the help, in the text colour. */
+.dynasty-cal-readback.is-warning {
+	color: var(--text-normal);
 }

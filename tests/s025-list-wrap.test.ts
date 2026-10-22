@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 const css = readFileSync('styles.css', 'utf8');
-const view = readFileSync('src/obsidian/tree-view.ts', 'utf8');
+const view = readFileSync('src/obsidian/tree-view-list.ts', 'utf8');
 
 describe('phone list faults of WP-C6', () => {
 	it('the name button and the pencil button of a row reset white-space to normal', () => {

@@ -397,12 +397,10 @@ describe('the phone (G.2, R2 b)', () => {
 		return { ...o, root: o.root };
 	}
 
-	/** Focus, then Clear focus: the whole tree (D132). */
+	/** One tap on Focus clears the focus: the whole tree (D132, D263 B2). */
 	async function clearFocus(root: FEl): Promise<void> {
+		// D263 B2: while a focus shows, one tap on Focus clears it.
 		click(root.querySelector('.dynasty-focus')!);
-		await settle();
-		const items = root.querySelectorAll('.dynasty-popover-focus .dynasty-popover-item');
-		click(items[items.length - 1]);
 		await settle();
 		resizeAll();
 		flushFrames();

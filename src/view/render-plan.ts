@@ -186,12 +186,12 @@ export function planRender(inputs: RenderInputs): { plan: RenderPlan; stateChang
 	// D144: a tree in a note on a phone is a list. No fonts, no layout, no scene.
 	if (!inputs.full && inputs.coarse && inputs.phone) return none({ kind: 'list', ...derived });
 	const d = draftOf();
-	const plan = planTree(inputs, derived, d);
+	const plan = planTreePart(inputs, derived, d);
 	return { plan, stateChanges: changesOf(d) };
 }
 
 /** The tree part of the plan, once the block is known to draw something. */
-function planTree(inputs: RenderInputs, derived: Derived, d: Draft): RenderPlan {
+function planTreePart(inputs: RenderInputs, derived: Derived, d: Draft): RenderPlan {
 	const { tree, whole, count } = derived;
 	const fonts = inputs.fonts();
 	const f = focusStep(inputs, tree, whole, d);
@@ -222,12 +222,12 @@ function focusStep(inputs: RenderInputs, tree: Tree, whole: FamilyGraph, d: Draf
 	if (finder?.line && !finder.state.whole && target && whole.byId.has(target) && !finder.line.people.includes(target)) d.finderWhole = true;
 	const small = finder?.line && !(finder.state.whole || d.finderWhole) ? finder.line : null;
 	const n = focusGenerationsFor(tree.options, inputs.settings.focusGenerations);
-	const sub = familyOf(inputs, tree, whole, { focus, n, finder, succession }, d);
+	const sub = focusFamily(inputs, tree, whole, { focus, n, finder, succession }, d);
 	return { focus, n, sub, small, finder, succession };
 }
 
 /** The focus family to draw, or null. A person that this view must show but its family does not draw makes it show all people. */
-function familyOf(inputs: RenderInputs, tree: Tree, whole: FamilyGraph, f: Pick<FocusStep, 'focus' | 'n' | 'finder' | 'succession'>, d: Draft): FocusSubgraphResult | null {
+function focusFamily(inputs: RenderInputs, tree: Tree, whole: FamilyGraph, f: Pick<FocusStep, 'focus' | 'n' | 'finder' | 'succession'>, d: Draft): FocusSubgraphResult | null {
 	const st = inputs.state;
 	const target = inputs.full?.target;
 	let sub = f.focus !== null && !f.finder?.line && !f.succession ? focusSubgraph(tree, f.focus, f.n) : null;

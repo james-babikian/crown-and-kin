@@ -13,7 +13,8 @@ import type { FamilyGraph } from '../core/derive';
 import type { Op } from '../core/edit';
 import { newTitleId } from '../core/title-ops';
 import { quotedSobriquet } from '../core/sobriquet';
-import { cardLabels, entryReign, reignText, rulerName, titleNameFor, type Holding } from '../core/titles';
+import { cardLabels, entryReign, rulerName, titleNameFor, type Holding } from '../core/titles';
+import { entryReignText, reignOf, type DatesRead } from '../render/tree-info';
 import type { Holder, Person } from '../core/types';
 import { TITLES_UI, WINDOW_UI, WRITE_TEXT } from '../render/ui-text';
 import { choose } from './choice-modal';
@@ -48,10 +49,10 @@ const NEW_TITLE = '\u0000new-title';
  * of the person follows the ruler text in curly marks ("Gareth I “the Wise”, 1158–1163"); an entry with no
  * number has no ruler text, so it shows no sobriquet either.
  */
-export function entryText(entry: Holder, personName: string, sobriquet?: string): string {
+export function entryText(entry: Holder, personName: string, sobriquet?: string, dates?: DatesRead): string {
 	const ruler = entry.number !== undefined ? `${rulerName(entry, personName)} ${entry.number}` : undefined;
 	const named = ruler !== undefined && sobriquet !== undefined ? `${ruler} ${quotedSobriquet(sobriquet)}` : ruler;
-	const parts = [named, entryReign(entry)].filter((x): x is string => !!x);
+	const parts = [named, (dates ? entryReignText(entry, dates, 'shown') : entryReign(entry))].filter((x): x is string => !!x);
 	return parts.length ? parts.join(', ') : TITLES_UI.entryNone;
 }
 
@@ -72,7 +73,7 @@ export function titlesSummary(host: TitlesHost): string {
 	const holdings = cardLabels(g).get(person.id)?.holdings ?? [];
 	const first = holdings[0];
 	if (!first) return WINDOW_UI.noTitles;
-	const reign = reignText(first.entries)?.replace(/^\(|\)$/g, '');
+	const reign = reignOf(first.entries, g.dates, 'shown')?.replace(/^\(|\)$/g, '');
 	const parts = [titleNameFor(first.title, person), reign, holdings.length > 1 ? WINDOW_UI.andMore(holdings.length - 1) : undefined];
 	return parts.filter((x): x is string => !!x).join(' · ');
 }
@@ -99,7 +100,7 @@ function holdingRows(list: HTMLElement, host: TitlesHost, h: Holding, choice: bo
 	const shownName = titleNameFor(title, person);
 	const group = list.createDiv({ cls: ['dynasty-rows', 'dynasty-family-group', 'dynasty-title-holding'], attr: { 'data-title': title.id } });
 	h.entries.forEach((entry, i) => {
-		const text = entryText(entry, person.name, person.sobriquet);
+		const text = entryText(entry, person.name, person.sobriquet, host.data().g.dates);
 		const r = buildRow(group, {
 			cls: ['dynasty-family-row', 'dynasty-title-entry', ...(i === 0 ? ['dynasty-title-holding-head'] : [])],
 			attr: { 'data-index': String(entry.index) },
@@ -111,7 +112,7 @@ function holdingRows(list: HTMLElement, host: TitlesHost, h: Holding, choice: bo
 		if (choice && i === 0 && onCard === title.id) r.title.createSpan({ cls: ['dynasty-tag', 'dynasty-title-on-card'], text: TITLES_UI.onCard });
 		r.sub.addClass('dynasty-family-detail');
 		const ruler = entry.number !== undefined ? `${rulerName(entry, person.name)} ${entry.number}` : undefined;
-		const sub = [ruler, entryReign(entry)].filter((x): x is string => !!x).join(' · ');
+		const sub = [ruler, entryReignText(entry, host.data().g.dates, 'shown')].filter((x): x is string => !!x).join(' · ');
 		r.sub.setText(sub || TITLES_UI.entryNone);
 		if (host.readOnly) return;
 		const controls = r.actions();

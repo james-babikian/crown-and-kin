@@ -15,7 +15,7 @@ import { lineMetrics, relationExtra, sideTagDepth, sidewaysPartnerGap, tallExtra
 import { armsByRule, isFarCouple, type FarProbe } from './layout';
 import type { FarCoupleRule, Geometry, LayoutSettings } from './model';
 import { familyKeyOf, soloKey, type Couple, type CoupleSpec, type Family, type FamilySpec, type Hang, type Item, type Plan, type Port, type SideLink, type Skeleton } from './plan-model';
-import { barred, forkLegs, hangRooms, markHalf, nearOf, overflowHangs, packPorts, pairKey, requestPorts, unitEnd, type DirOf } from './ports';
+import { barred, forkLegs, hangRooms, markHalf, nearOf, overflowHangs, packPorts, unionPairKey, requestPorts, unitEnd, type DirOf } from './ports';
 import { consistentRows } from './row-blocks';
 
 /** What the plan stage needs beyond the graph: the rows, the order, the geometry of the working frame, the far rule and the settings. */
@@ -142,7 +142,7 @@ function passagesOf(s: Skeleton, g: FamilyGraph, near: number): void {
 	const lowerOf = (c: CoupleSpec) => (c.a.row < c.b.row ? c.b : c.a);
 	const hangAt = (c: CoupleSpec) => s.hangOrder.get(lowerOf(c).id)?.indexOf(c.union) ?? -1;
 	const twoRows = [...s.couples.values()].filter((c) => c.kind === 'dot' && c.a.row !== c.b.row);
-	const pairOf = (c: CoupleSpec) => pairKey(g, c.union);
+	const pairOf = (c: CoupleSpec) => unionPairKey(g, c.union);
 	const sideOfCouple = (c: CoupleSpec): 'left' | 'right' => {
 		const [upper, lower] = c.a.row < c.b.row ? [c.a, c.b] : [c.b, c.a];
 		const [left, right] = [unitEnd(s, g, lower, -1), unitEnd(s, g, lower, 1)];

@@ -34,7 +34,7 @@ import { sameList } from './same-list';
 import { INHERIT_ILLEGITIMATE, INHERIT_RULES, INHERIT_THROUGH, readIllegitimate, readInherit, readRule, readThrough, SUCCESSION_RULES } from './succession-keys';
 import { bool, isEmpty, isMap as isRawMap, list, str, unwrapCurly, type Raw, type RawMap } from './tolerate';
 import type { Tree } from './types';
-import { dashOf, itemEnd, itemStart, removeFromSection, removeItems, section } from './yaml-list';
+import { dashOf, emptyItems, itemEnd, itemStart, removeFromSection, removeItems, section } from './yaml-list';
 import {
 	addPair, addSection, appendItem, clone, commentsOf, findPair, finish, finishTogether, flowInsertAfter, insertAt, isRefusal, itemBlock, layoutOf, personNode, recall, refuse, removePair, renderScalar,
 	setPairValue, Source, topMap, type Layout, type NewValue, type Parsed, type Patch, type Refusal, type Step,
@@ -238,17 +238,8 @@ function newList(src: Source, at: HoldersAt, flows: string[], layout: Layout, ke
 
 /** Removes every item of a holder list and leaves `holders: []` (§13.4: the title stays). */
 function emptyList(src: Source, at: HoldersAt): Patch[] {
-	const layout = layoutOf(src);
-	if (at.scalar) return [setPairValue(src, at.title, at.pair!, { raw: '[]' }, layout)];
-	const seq = at.seq!;
-	if (!seq.items.length) return [];
-	if (seq.flow) {
-		// The whole list becomes `[]`: the holders go with their comments, and no trailing comma
-		// or line layout can leave text that reads back differently.
-		const span: [number, number] = [seq.range![0], src.nodeEnd(seq)];
-		return [{ start: span[0], end: span[1], text: '[]', allow: span }];
-	}
-	return [insertAt(src.colonEnd(at.pair!), ' []'), ...removeItems(src, seq, new Set(seq.items.map((_, i) => i)), true)];
+	if (at.scalar) return [setPairValue(src, at.title, at.pair!, { raw: '[]' }, layoutOf(src))];
+	return emptyItems(src, at.seq!, src.colonEnd(at.pair!));
 }
 
 /** One item of a final holder list: a written item (by its index before the op) or a new one (its flow text). */

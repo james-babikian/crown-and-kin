@@ -3,7 +3,7 @@
 // `scripts/layout-fable/placements.ts`. Used by the tests of A16 (packed rows, random and jittered placements give 0 hard faults) and by the round-off
 // tests (`jitteredPlacement`: +-1e-11 px must change nothing, I7).
 // `CARD_LINE_PLACE=packed` or `CARD_LINE_PLACE=random:<max px>` selects one for the scripts (`placementFromEnv`, read by an internal script).
-import { compactStep, normalise, packRows, shapesOf, sweepRows } from '../../src/layout/place';
+import { compactItems, shiftToMargin, packRows, shapesOf, sweepRows } from '../../src/layout/place';
 import type { Placement } from '../../src/layout/pipeline';
 
 export type { Placement };
@@ -11,7 +11,7 @@ export type { Placement };
 /** Packed rows only (no sweeps, no compaction). */
 export const packedPlacement: Placement = (plan) => {
 	packRows(plan);
-	normalise(plan);
+	shiftToMargin(plan);
 };
 
 /** A small deterministic random source (an LCG). */
@@ -34,7 +34,7 @@ export const randomPlacement =
 				shapes.setLeft(bi, x);
 			});
 		}
-		normalise(plan);
+		shiftToMargin(plan);
 	};
 
 /** The normal placement with a tiny move of each block's packed start (by the block's first item), for the noise tests (+-1e-11 px must change nothing). */
@@ -48,8 +48,8 @@ export const jitteredPlacement =
 			for (const it of b) it.x += dx;
 		}
 		sweepRows(plan, geo, sweeps, shapes);
-		compactStep(plan, g, geo);
-		normalise(plan);
+		compactItems(plan, g, geo);
+		shiftToMargin(plan);
 	};
 
 /** The placement the environment asks for (`CARD_LINE_PLACE`), or none (the normal placement). */

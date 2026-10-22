@@ -291,12 +291,6 @@
 	height: 16px;
 }
 
-.dynasty-menu-sep {
-	height: 1px;
-	margin: 4px -6px;
-	background: var(--background-modifier-border);
-}
-
 .dynasty-problems-list {
 	margin: var(--size-4-2) 0 0 0;
 	padding-left: var(--size-4-4);
@@ -357,10 +351,6 @@
 .dynasty-popover.is-sheet .dynasty-more-item .svg-icon {
 	width: 20px;
 	height: 20px;
-}
-
-.dynasty-popover.is-sheet .dynasty-menu-sep {
-	margin: 4px 0;
 }
 
 .dynasty-sheet-grip {

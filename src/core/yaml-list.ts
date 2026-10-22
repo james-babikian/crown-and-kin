@@ -140,6 +140,16 @@ function removeFlowRun(src: Source, seq: YAMLSeq, i: number, j: number): Patch[]
 
 const blankLine = (src: Source, start: number) => start < src.text.length && src.text.slice(start, src.lineEnd(start)).trim() === '' && lineAfter(src, start) !== null;
 
+/** Empties a list: `[]` in place of its items. The whole list becomes `[]`, so no trailing comma or line layout can leave text that reads back differently; the comments of the items go with them. */
+export function emptyItems(src: Source, seq: YAMLSeq, colonEnd: number): Patch[] {
+	if (!seq.items.length) return [];
+	if (seq.flow) {
+		const span: [number, number] = [seq.range![0], src.nodeEnd(seq)];
+		return [{ start: span[0], end: span[1], text: '[]', allow: span }];
+	}
+	return [insertAt(colonEnd, ' []'), ...removeItems(src, seq, new Set(seq.items.map((_, i) => i)), true)];
+}
+
 /**
  * Patches that remove some items of a list. The caller removes the whole key instead when no
  * item stays. Flow items take the separator after them (the last one takes the one before).

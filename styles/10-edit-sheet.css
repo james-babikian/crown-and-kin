@@ -247,6 +247,43 @@
 	font-weight: var(--font-semibold);
 }
 
+/*
+ * D267: the text line below Details after an action that writes at once (Add child, Add partner, Add parent, "This is me"), with its Undo button.
+ * It stands in the flow, not over the bar, so Cancel and Save stay free. The text wraps; the button keeps 44 px.
+ * The live region is in the window from the build on and is empty until the first text; it must not be hidden (a hidden region is not read), so empty it takes no space.
+ */
+.dynasty-sheet-change {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: var(--size-4-1) var(--size-4-3);
+	margin: var(--size-4-2) 0;
+	padding: var(--size-4-1) var(--size-4-3);
+	border-radius: var(--radius-m);
+	background: var(--background-secondary);
+	color: var(--text-normal);
+	font-size: var(--dynasty-type-text);
+	line-height: 1.4;
+}
+
+.dynasty-sheet-change:empty {
+	margin: 0;
+	padding: 0;
+	background: none;
+}
+
+.dynasty-sheet-change-text {
+	flex: 1 1 12em;
+	min-width: 0;
+	overflow-wrap: anywhere;
+}
+
+.dynasty-sheet .dynasty-sheet-change-undo {
+	flex: none;
+	min-height: 44px;
+	min-width: 64px;
+}
+
 /* The back link above the header of a second page (G.7); a phone has "‹ Name" in the bar instead. */
 .dynasty-back-row {
 	flex: none;
@@ -810,6 +847,48 @@ body.theme-dark .dynasty-house-dot {
 
 .dynasty-sheet-field:focus-within > .dynasty-sheet-hint.is-on-focus {
 	display: block;
+}
+
+/*
+ * A text line with a small mark (D278): the wrong name in the grey line of a date, the short warning at Start of a calendar, the red line after a Save with errors. The mark is
+ * plain SVG (`render/dom/marks.ts`) that draws with the colour of the text; the warning mark has its own colour, so it keeps 3:1 against the window in light and dark themes.
+ */
+.dynasty-marked {
+	display: flex;
+	align-items: flex-start;
+	gap: 6px;
+}
+
+.dynasty-marked > span {
+	min-width: 0;
+}
+
+.dynasty-mark {
+	flex: none;
+	width: 14px;
+	height: 14px;
+	margin-top: 1px;
+	fill: none;
+	stroke: currentColor;
+	stroke-width: 2;
+	stroke-linecap: round;
+	stroke-linejoin: round;
+}
+
+.dynasty-mark.is-warning {
+	color: var(--dynasty-warn-mark);
+}
+
+.dynasty-sheet.is-phone .dynasty-mark {
+	width: 15px;
+	height: 15px;
+	margin-top: 2px;
+}
+
+/* The wrong name in a date line: its own text line, the text colour; the reading of the date above it stays grey. */
+.dynasty-date-warning {
+	margin-top: 2px;
+	color: var(--text-normal);
 }
 
 /* An empty list in a window is a plain grey text line, not a dashed box. */
@@ -1446,6 +1525,15 @@ body.theme-dark .dynasty-house-dot {
 
 .dynasty-sheet.is-phone .dynasty-grid.is-stack {
 	grid-template-columns: 1fr;
+}
+
+/* A phone: the summary of a closed section may take two text lines, so a long summary is not cut after a few words (D278; the person window too). */
+.dynasty-sheet.is-phone .dynasty-section:not(.is-open) .dynasty-section-sum:not(:empty) {
+	display: -webkit-box;
+	-webkit-box-orient: vertical;
+	-webkit-line-clamp: 2;
+	white-space: normal;
+	overflow-wrap: anywhere;
 }
 
 /* At least 16 px, so iOS does not zoom the page when a field gets focus (spec §7.4). The Control role is 16 px here; the floor stays as a guard. */

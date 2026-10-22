@@ -5,7 +5,7 @@
  * `picture-gestures.ts`.
  */
 
-import { REST, doubleTapView, isDoubleTap, isTap, panView, pinchView, settleView, sideSwipe, type Point, type Size, type View } from './picture-gestures';
+import { REST, doubleTapPicture, isPictureDoubleTap, isTap, panView, pinchPicture, settleView, sideSwipe, type Point, type Size, type View } from './picture-gestures';
 
 /** What the touch code needs from the viewer. */
 export interface TouchHooks {
@@ -130,7 +130,7 @@ class StageTouch implements PictureTouch {
 		f.y = e.clientY;
 		if (this.fingers.size === 2 && this.pinch) {
 			const now = this.pair();
-			if (now) this.set(pinchView(this.pinch.start, this.pinch, now, s.shown, s.stage));
+			if (now) this.set(pinchPicture(this.pinch.start, this.pinch, now, s.shown, s.stage));
 		} else if (this.fingers.size === 1 && this.v.scale > 1) this.set(panView(this.v, dx, dy, s.shown, s.stage));
 	}
 
@@ -161,9 +161,9 @@ class StageTouch implements PictureTouch {
 		const t = performance.now();
 		if (isTap(dx, dy)) {
 			const now = { t, x: e.clientX, y: e.clientY };
-			if (isDoubleTap(this.lastTap, now)) {
+			if (isPictureDoubleTap(this.lastTap, now)) {
 				this.lastTap = null;
-				this.set(doubleTapView(this.v, this.centre(e.clientX, e.clientY), s.shown, s.stage));
+				this.set(doubleTapPicture(this.v, this.centre(e.clientX, e.clientY), s.shown, s.stage));
 			} else this.lastTap = now;
 		} else if (this.v.scale <= 1) {
 			const dir = sideSwipe(dx, dy, t - f.t0);

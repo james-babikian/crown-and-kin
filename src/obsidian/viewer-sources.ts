@@ -75,15 +75,15 @@ function showable(kit: ViewerKit, pics: ViewerPicture[]): ViewerPicture[] {
 	return store ? pics.filter((p) => store.resolve(p.link, kit.sourcePath ?? '').ok) : [];
 }
 
-/** The picture to start with: the arms when the arms mark was tapped, else the portrait; else the first that exists. */
-function startFor(anchor: HTMLElement | null, pics: ViewerPicture[]): number {
-	const kind = anchor?.hasClass('dynasty-arms-mark') ? 'arms' : 'portrait';
+/** The picture to start with: the arms when the arms mark was tapped (or `want` says arms), else the portrait; else the first that exists. */
+function startFor(anchor: HTMLElement | null, pics: ViewerPicture[], want?: ViewerPicture['kind']): number {
+	const kind = want ?? (anchor?.hasClass('dynasty-arms-mark') ? 'arms' : 'portrait');
 	return Math.max(0, pics.findIndex((p) => p.kind === kind));
 }
 
-function open(kit: ViewerKit, pics: ViewerPicture[], anchor: HTMLElement | null): void {
+function open(kit: ViewerKit, pics: ViewerPicture[], anchor: HTMLElement | null, want?: ViewerPicture['kind']): void {
 	if (!kit.pictures || pics.length === 0) return;
-	openPictureViewer({ app: kit.app, store: kit.pictures, sourcePath: kit.sourcePath ?? '', pictures: pics, start: startFor(anchor, pics), opener: anchor });
+	openPictureViewer({ app: kit.app, store: kit.pictures, sourcePath: kit.sourcePath ?? '', pictures: pics, start: startFor(anchor, pics, want), opener: anchor });
 }
 
 /** What a window asks for must not throw: a failure is logged and the window gets no viewer (spec §8). */
@@ -100,6 +100,18 @@ function safely<T>(fn: () => T, fallback: T): T {
 export function viewPerson(kit: PersonKit, anchor: HTMLElement): void {
 	const pics = safely(() => showable(kit, personPictures(kit)), []);
 	safely(() => open(kit, pics, anchor), undefined);
+}
+
+/**
+ * A tap on a card of a tree that cannot change the note (a tree shown from another note, a Canvas card, a hover preview; D269): the viewer opens at once with the
+ * pictures of the person as the card shows them. It reads the person from the tree, so it needs no block handle. A card with no picture that can show does nothing.
+ * `want` is the picture under the finger: the arms on the card start the viewer on the arms.
+ */
+export function viewCard(kit: ViewerKit & { g: FamilyGraph; person: Person }, anchor: HTMLElement | null, want?: ViewerPicture['kind']): void {
+	const p = kit.person;
+	const draft = { name: p.name, portrait: p.portrait ?? '', arms: p.arms ?? '', house: p.house ?? '', title: p.title ?? '', born: p.born ?? '', died: p.died ?? '' };
+	const pics = safely(() => showable(kit, personPictures({ ...kit, draft })), []);
+	safely(() => open(kit, pics, anchor, want), undefined);
 }
 
 /** The first items of the picture menu of a person window: "View portrait" or "View arms", and a line. None when nothing can show. */

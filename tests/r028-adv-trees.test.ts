@@ -2,6 +2,7 @@
 // The expected answers come from the spec: §8 (nothing throws), §4.3 and §5.1 (sibling order D2, cycles), §5.3 (no line behind a card), §13.1 (names).
 // Seeds are fixed and printed on failure. R028_DEEP=1 runs more seeds and bigger trees. Known faults (ITEMS I09, I10, I11, I16) are counted, never asserted.
 import { describe, expect, it } from 'vitest';
+import { speedTest } from './support/speed-test';
 import { Resvg } from '@resvg/resvg-js';
 import { deriveFamilies, type FamilyGraph } from '../src/core/derive';
 import { foldFamilies, foldHidden, pruneGraph } from '../src/core/folds';
@@ -751,7 +752,7 @@ describe('X1 (6, 2): folds on generated trees (spec §13.10 rule 3) and lines be
 });
 
 describe('X1: the time of the layout grows with the size of the tree (a ratio in one process; the limit is 10 times the linear growth)', () => {
-	it('the layout of 1 000 people takes less than 40 times the layout of 250', () => {
+	speedTest('the layout of 1 000 people takes less than 40 times the layout of 250', () => {
 		const best = (f: () => void, runs = 3) => {
 			let b = Infinity;
 			for (let i = 0; i < runs; i++) {

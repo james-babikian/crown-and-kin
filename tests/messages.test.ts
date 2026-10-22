@@ -70,6 +70,9 @@ const SAMPLES: Record<IssueCode, IssueParams> = {
 	'calendar-duplicate': { calendar: 'Reign names', note: 'Calendars 1.md', other: 'Calendars.md' },
 	'calendar-block-invalid': { note: 'Calendars.md' },
 	'calendar-entry-invalid': { note: 'Calendars.md', index: 2, why: 'no-name' },
+	// Spec §14 rules 13 and 14.
+	'calendar-name-mismatch': { where: 'born', person: 'Hugo Valmont', value: '22.13 Ju', list: 'Planets', expected: 'Saturn', written: 'Jupiter' },
+	'calendar-list-invalid': { note: 'Calendars.md', calendar: 'The Long Count', index: 2, why: 'names' },
 };
 
 /** Spec §13.3 gives this warning three short sentences, §13.6 the HEIC text four (checked by ste-editor). */
@@ -108,6 +111,8 @@ const MOST_SENTENCES: Partial<Record<IssueCode, number>> = {
 	'calendar-duplicate': 5,
 	'calendar-block-invalid': 4,
 	'calendar-entry-invalid': 3,
+	'calendar-name-mismatch': 5,
+	'calendar-list-invalid': 4,
 };
 
 /** Texts whose first sentence is a description of 21 to 25 words (STE allows 25 for a description; D205 words). */
@@ -488,7 +493,7 @@ describe('calendarRefusalText: the refusals of the Calendars window (spec §14 r
 		}
 		const cycles = (name: string, formats: string[], length = 5, start = 1) => ({ id: name, name, note: 'C.md', formats, kind: { type: 'cycles' as const, length, start } });
 		const eras = (name: string, ...names: string[]) => ({ id: name, name, note: 'C.md', formats: ['{era} {year}'], kind: { type: 'eras' as const, eras: names.map((n) => ({ name: n, start: 1 })) } });
-		for (const r of [...checkCalendars([cycles('A', ['{cycle} {year}']), cycles('B', ['{CYCLE} {year}'])]), ...checkCalendars([eras('A', 'Tang'), eras('B', 'tang')]), ...checkCalendars([eras('A', 'Tang', 'TANG')]), ...checkCalendars([cycles('A', ['{cycle} {year}'], 0, 1.5)])]) given.add(r.key);
+		for (const r of [...checkCalendars([cycles('A', ['{cycle} {year}']), cycles('B', ['{CYCLE} {year}'])]), ...checkCalendars([eras('A', 'Tang'), eras('B', 'tang')]), ...checkCalendars([eras('A', 'Tang', 'TANG')]), ...checkCalendars([cycles('A', ['{cycle} {year}']), cycles('A', ['{year} {cycle}'])]), ...checkCalendars([cycles('A', ['{cycle} {year}'], 0, 1.5)])]) given.add(r.key);
 		expect([...given].sort()).toEqual([...KEYS].sort());
 	});
 
