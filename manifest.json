@@ -1,8 +1,8 @@
 {
 	"id": "crown-and-kin",
 	"name": "Crown and Kin",
-	"version": "0.3.3",
-	"minAppVersion": "1.5.0",
+	"version": "0.4.0",
+	"minAppVersion": "1.11.0",
 	"description": "Show and edit the family tree of a fictional dynasty in a note.",
 	"author": "James Babikian",
 	"isDesktopOnly": false

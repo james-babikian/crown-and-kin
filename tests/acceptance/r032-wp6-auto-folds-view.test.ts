@@ -1,25 +1,18 @@
-import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-
-vi.mock('obsidian', () => import('./fake-obsidian'));
-vi.mock('@codemirror/language', () => ({ forceParsing: () => false, syntaxTree: () => ({ length: 0 }) }));
-vi.mock('@codemirror/view', () => ({ ViewPlugin: { fromClass: () => ({}) } }));
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { BlockState } from '../../src/view/block-state';
-import { FEl, dispatch, fakeWin, flushFrames, installDom, resetDom, resizeAll, settle } from './fake-dom';
+import { FEl, dispatch, flushFrames, resetDom, resizeAll, settle } from './fake-dom';
 import { resetObsidian } from './fake-obsidian';
 import { fixtureSource } from './load';
 import { openFullScreen, phone, phoneOnSide } from './tree-view-fakes';
+import { useFakeDom } from '../support/fake-dom-setup';
 
 /*
  * WP-6 (D257) on the tree view with the fake DOM: a focus view on a phone held upright starts with the far families folded ("+ N" signs); one tap on a sign
  * opens one family like a fold of the owner; Clear focus takes out the automatic folds and keeps the owner's own. The rule itself is in `r032-wp6-start-folds.test.ts`.
  */
 
-beforeAll(() => {
-	installDom();
-	(globalThis as Record<string, unknown>).window ??= fakeWin;
-	(globalThis as Record<string, unknown>).CSS = { supports: (_p: string, v: string) => /^#[0-9a-f]{6}$/i.test(v) };
-});
+useFakeDom({ window: true, css: true });
 
 beforeEach(() => {
 	resetDom();

@@ -1,8 +1,4 @@
-import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-
-vi.mock('obsidian', () => import('./fake-obsidian'));
-vi.mock('@codemirror/language', () => ({ forceParsing: () => false, syntaxTree: () => ({ length: 0 }) }));
-vi.mock('@codemirror/view', () => ({ ViewPlugin: { fromClass: () => ({}) } }));
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { Op } from '../../src/core/edit';
 import { applyOp } from '../../src/core/yaml-edit';
@@ -11,10 +7,11 @@ import { HousesWindow, firstFreeColour, houseOps, loadHouses, rowsOf } from '../
 import { HOUSE_PALETTE } from '../../src/render/styles';
 import { HOUSES, HOUSE_COLOUR_NAMES, REMOVE, SHEET, WRITE_TEXT } from '../../src/render/ui-text';
 import { TOOLBAR_UI } from '../../src/render/view-text';
-import { FEl, clock, dispatch, fakeDoc, fakeWin, installDom, resetDom, runTimers, settle } from './fake-dom';
+import { FEl, clock, dispatch, fakeDoc, resetDom, runTimers, settle } from './fake-dom';
 import { noticeList, notices, openModals, resetObsidian } from './fake-obsidian';
 import { embed, fakeHandle, openFullScreen, phone, type FakeHandle } from './tree-view-fakes';
-import { backButton, backToList, listRows, openPage, pageOf, rowOf } from '../lw-support';
+import { backButton, backToList, listRows, openPage, pageOf, rowOf } from '../support/lw-support';
+import { useFakeDom } from '../support/fake-dom-setup';
 
 const last = <T>(a: T[]): T | undefined => a[a.length - 1];
 
@@ -25,11 +22,7 @@ const last = <T>(a: T[]): T | undefined => a[a.length - 1];
  * text it writes.
  */
 
-beforeAll(() => {
-	installDom();
-	const g = globalThis as Record<string, unknown>;
-	g.window ??= fakeWin;
-});
+useFakeDom({ window: true });
 
 beforeEach(() => {
 	resetDom();

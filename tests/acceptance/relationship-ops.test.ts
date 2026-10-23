@@ -4,7 +4,7 @@ import type { ApplyOp, EditRefusal, EditResult, Op, ParentKind, UnionRef } from 
 import { parseDynasty } from '../../src/core/parse';
 import * as edit from '../../src/core/yaml-edit';
 import { golden, replaceOnce } from './golden';
-import { nextIdFor } from '../helpers';
+import { nextIdFor } from '../support/helpers';
 import { fixtureNote, fixtureSource, topLevelBlocks } from './load';
 
 // Spec §4.2 (parent-entry write form), §4.3 (primary union, sibling groups), §5.9 (Add first

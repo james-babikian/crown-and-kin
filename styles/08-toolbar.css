@@ -269,6 +269,14 @@
 	background: var(--background-modifier-hover);
 }
 
+/* A row of a list that has the keyboard focus shows the same ring as a toolbar button (G5 0.4, WCAG 2.4.7): the rule above takes the theme's button shadow away. */
+.dynasty-popover .dynasty-popover-item:focus-visible,
+.dynasty-popover .dynasty-problem-button:focus-visible {
+	outline: 2px solid var(--interactive-accent);
+	outline-offset: -2px;
+	box-shadow: inset 0 0 0 4px var(--text-normal);
+}
+
 /* A row of a menu: its icon in a column of its own, then its text, every row from the same left edge (D212, more-menu-align; a theme centres the text of a button). */
 .dynasty-popover .dynasty-popover-item.dynasty-more-item {
 	display: flex;

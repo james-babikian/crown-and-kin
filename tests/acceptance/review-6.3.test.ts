@@ -1,29 +1,22 @@
-import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-
-vi.mock('obsidian', () => import('./fake-obsidian'));
-vi.mock('@codemirror/language', () => ({ forceParsing: () => false, syntaxTree: () => ({ length: 0 }) }));
-vi.mock('@codemirror/view', () => ({ ViewPlugin: { fromClass: () => ({}) } }));
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { Op } from '../../src/core/edit';
 import { applyOp } from '../../src/core/yaml-edit';
 import { FullScreenModal } from '../../src/obsidian/full-screen';
 import { HousesWindow } from '../../src/obsidian/houses-window';
 import { SHEET } from '../../src/render/ui-text';
-import { FEl, clock, device, dispatch, fakeDoc, fakeWin, flushFrames, installDom, resetDom, resizeAll, settle } from './fake-dom';
+import { FEl, clock, device, dispatch, fakeDoc, flushFrames, resetDom, resizeAll, settle } from './fake-dom';
 import { openModals, resetObsidian } from './fake-obsidian';
 import { embed, fakeHandle, type FakeHandle } from './tree-view-fakes';
-import { openPage } from '../lw-support';
+import { openPage } from '../support/lw-support';
+import { useFakeDom } from '../support/fake-dom-setup';
 
 /*
  * Review of WP6.3 (code-reviewer): proof tests for the Houses window. Each test states the
  * behaviour the spec or the decision notes "M6 design gate" asks for.
  */
 
-beforeAll(() => {
-	installDom();
-	const g = globalThis as Record<string, unknown>;
-	g.window ??= fakeWin;
-});
+useFakeDom({ window: true });
 
 beforeEach(() => {
 	resetDom();

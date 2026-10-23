@@ -2,7 +2,7 @@
 
 This file is generated. Do not edit it by hand. Change `scripts/format/keys.ts` and run `npm run format-doc`.
 
-Format 1 is the form of the tree text in plugin version 0.3 and in every plugin version 1.x. Format 1 has 66 keys, 3 of them reserved. The plugin reads the other 63. The README has a short list of them.
+Format 1 is the form of the tree text in plugin version 0.3 and in every plugin version 1.x. Format 1 has 66 keys, 3 of them reserved. The plugin reads the other 63. The README has a short example of a tree.
 
 ## The rules of Format 1
 
@@ -55,7 +55,7 @@ A map under `options:`.
 | `me` | The person with the mark "This is me". The relation names start from this person. | A person ID. A number is read as text. A pair of curly quote marks around the ID is ignored. A list or a map gives a warning. If no person has this ID, the plugin shows a warning. | Plain text. "This is me" writes it. "Remove This is me" removes it. | 0.2 |
 | `generations` | How many generations up and down the tree shows in focus mode. | A whole number, 0 or more. Any other text is ignored. With no key, the setting of the plugin counts. | Typed by hand. No window of the plugin writes it. | 0.1 |
 | `height` | The height in pixels of the tree in a note, on a computer. | A whole number from 100 to 5000. Any other text or number is ignored and the usual height counts. A phone list does not use it. | A plain number. The resize handle of the tree writes it. | 0.1 |
-| `calendar` | The calendar note that this tree uses to read dates. With no key, the tree uses every calendar note. | A link to a note: [[x]], [Alias](x.md) or a plain path. A link in [[ ]] without quotes is accepted. A note that does not exist, or has no calendar, gives a warning and the tree reads dates with no calendar. | In double quotes. The item "Calendar note" in the More list writes it. "Every calendar note" removes it. The plugin keeps the link up to date when you rename the note. | 0.3.2 |
+| `calendar` | The calendar note that this tree uses to read dates. With no key, the tree reads plain years only (no calendar). | A link to a note: [[x]], [Alias](x.md) or a plain path. A link in [[ ]] without quotes is accepted. A note that does not exist, or has no calendar, gives a warning and the tree reads dates with no calendar. | In double quotes. The item "Calendar note" in the More list writes it. "No calendar" removes it. The Calendars window also writes it when you save calendars in a tree that has no key. The plugin keeps the link up to date when you rename the note. | 0.3.2 |
 | `format` (reserved) | Reserved for Format 2. The plugin ignores it today, keeps it and never writes it. | Any value. The plugin ignores it and keeps it. | Never written. A key that is in the note stays as it is. | 0.3 |
 
 Write order: `start`, `focus`, `me`, `generations`, `height`, `calendar`.
@@ -235,11 +235,12 @@ plain:
 
 - A note can hold several blocks, and a block can hold several calendars. The plugin makes the note `Calendars` at the root of the vault the first time you save in the Calendars window.
 - The plugin counts every year on one scale of whole years (the plain years). A plain year 1210 is year 1210. The number `start` gives the plain year of Year 1 of a calendar. The window works it out from an example: "Year 21 of Cycle 3 is the same year as 1203". So a calendar never depends on another calendar.
-- A tree uses every calendar note of the vault. If the tree has the key `calendar` in `options`, it uses only that note. The item "Calendar note" in the More list writes this key.
+- A tree uses a calendar note only when it has the key `calendar` in `options`. With no key, the tree reads plain years only. The item "Calendar note" in the More list writes the key, and the item "No calendar" removes it. The Calendars window writes the key when you save calendars from a tree that has no key. Before 0.4, a tree with no key used every calendar note.
 - A date that fits a format gets the year of the calendar. A date that fits no format is read as a plain year, as before. A date that fits two calendars with different years gets no year.
 - A name list gives each year a name that repeats. The plugin shows the name after a short date, for example "22.13 Sa". It never writes the name into your note. If a date holds a name that is wrong for its year, the plugin keeps the year of the date and gives a warning. A format can hold the marker of a list, for example `{planet}`. The part of the format with the marker is optional: the date still reads with no name.
 - The plugin never changes the text of a date. It reads the text to find a year, and it shows the date as you wrote it.
 - A plugin version before 0.3.2 shows the block as plain code. It reads a date in a calendar as a plain year: a date with no run of three or four digits has no year, and a date such as "Third Age 3019" gives the wrong year 3019, with no note. A device whose calendar note has not synced yet reads dates in the same way. If you delete the calendar note, such dates have no year until you add the calendars again.
+- A tree that has no key reads dates in a different way in 0.4 and in an older plugin version. An older version (0.3.3 or before) uses every calendar note for a tree with no key. Version 0.4 uses none. So the same tree can read a date in two ways on two devices that have different versions. A tree that has the key reads the same note in every version. To make the result the same, select the note for the tree with the item "Calendar note".
 - A plugin version before 0.3.3 does not know name lists. It keeps the calendar and its other formats, and it ignores a format that holds a marker, with no warning. A calendar whose only format holds a marker reads no date there. Its Calendars window refuses to save the note until you remove the marker format. To let old devices read your dates, use formats with no marker, for example `{cycle}.{year}` (a marker format next to its own form with no marker is refused as the same format). The names still show in 0.3.3 with such formats, but a name written in such a date is not read or checked.
 
 | Level | Key | Meaning | Accepted forms | Written form |

@@ -14,6 +14,7 @@ import { sameBody } from '../core/block-match';
 import { findBlocks } from '../core/block-locate';
 import { FULL_UI } from '../render/ui-text';
 import { carryState, type BlockState } from '../view/block-state';
+import { moveRelationBlock } from '../view/relation-cache';
 import type { Handle, HandleRegistry } from './block-handle';
 
 /** D183: the longest a tree waits for the styles, the settings and its block place on a cold start, in ms. */
@@ -320,6 +321,8 @@ export class BlockBinding {
 		this.peeked = peek && sameBody(peek.body, source) ? peek : null;
 		const oldKey = this.key;
 		this.key = blockKey(this.sourcePath, ordinal, source);
+		// The relation lookup of the block (relation-cache.ts) follows its key.
+		moveRelationBlock(oldKey, this.key);
 		// The view state that the session kept under the text key follows the block to its place key.
 		const loose = this.host.looseStates.get(oldKey);
 		if (loose && oldKey !== this.key && !this.host.looseStates.has(this.key)) {

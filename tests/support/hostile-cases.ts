@@ -1,5 +1,5 @@
 /*
- * Hostile tree texts for `tests/fuzz-hostile.test.ts` (0.3, WP-H, the release plan W4): alias bombs, very long values, blocks
+ * Hostile tree texts for `tests/core/fuzz-hostile.test.ts` (0.3, WP-H, the release plan W4): alias bombs, very long values, blocks
  * with very many keys and deeply nested flow collections. Each case is a note with one `kin` block. `runCase`
  * pushes the note through the plugin's read and write path (locate, parse, derive, layout, relations, one edit) and
  * reports what happened. The test runs it in a child process (`hostile-child.ts`), so a hang can be stopped and named.
@@ -22,8 +22,6 @@ export interface HostileCase {
 	body: string;
 	/** `error`: parse must give a hard error. `ok`: parse must succeed. `any`: either. */
 	expect: 'error' | 'ok' | 'any';
-	/** A known finding: the case does not end within the limit today. The test expects it to fail (`it.fails`), so a fix shows up. */
-	finding?: string;
 }
 
 /** A small valid tree around hostile parts: two people and a house, so layout, relations and an edit have something to do. */
@@ -102,7 +100,7 @@ function blockLadder(depth: number): string {
 
 export function buildCases(): HostileCase[] {
 	const cases: HostileCase[] = [];
-	const add = (name: string, body: string, expect: HostileCase['expect'], finding?: string) => cases.push(finding ? { name, body, expect, finding } : { name, body, expect });
+	const add = (name: string, body: string, expect: HostileCase['expect']) => cases.push({ name, body, expect });
 
 	// Alias bombs. The plugin raises the library's limit of 100 to the length of the text (parse.ts, `parseBody`), so the bomb
 	// must still stop on its own: the first group must be a hard error, the group after it must finish.

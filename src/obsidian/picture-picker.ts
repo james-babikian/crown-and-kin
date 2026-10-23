@@ -800,7 +800,7 @@ class PicturePicker extends Modal {
 		if (down || up) {
 			// Leave the Remove row: the model starts from "no cursor", so Down gives the first row and Up the last.
 			e.preventDefault();
-			this.state = pickerKey(this.rows, { ...this.state, cursor: null }, e.key as PickerKey).state;
+			this.state = pickerKey(this.rows, { ...this.state, cursor: null }, e.key).state;
 			this.mark();
 			this.keepRowInView();
 		}
@@ -872,7 +872,7 @@ class PicturePicker extends Modal {
 			if (this.closed) return;
 			const verdict = judgeHeader(readPictureHeader(new Uint8Array(bytes)), f.name);
 			if (!verdict.ok) {
-				new Notice(deviceNotice(verdict as PictureProblem));
+				new Notice(deviceNotice(verdict));
 				return;
 			}
 			const name = safePictureName(f.name, verdict.format);

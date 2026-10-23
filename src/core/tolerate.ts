@@ -149,6 +149,11 @@ export function isMap(v: Raw): v is RawMap {
 	return typeof v === 'object' && v !== null && !Array.isArray(v) && !(v instanceof Date);
 }
 
+/** True if `v` is a list. `Array.isArray` alone would type the result as `any[]`. */
+export function isRawList(v: Raw): v is Raw[] {
+	return Array.isArray(v);
+}
+
 /** Null, an empty string or an absent key: "nothing written". */
 export function isEmpty(v: Raw): boolean {
 	return v === undefined || v === null || (typeof v === 'string' && v.trim() === '');

@@ -349,6 +349,6 @@ export abstract class EditSheetActions extends EditSheetFamily {
 	/** The rows of the person picker: portraits, the marked person for the relation word, and the relation settings (G.3). */
 	protected pickerContext(): PickerContext {
 		const me = this.me();
-		return { ...(this.o.pictures ? { pictures: this.o.pictures } : {}), sourcePath: this.o.sourcePath, me, ...(this.o.relationOptions ? { relationOptions: this.o.relationOptions } : {}) };
+		return { ...(this.o.pictures ? { pictures: this.o.pictures } : {}), sourcePath: this.o.sourcePath, me, ...(this.o.relationOptions ? { relationOptions: this.o.relationOptions } : {}), ...(this.o.relationBlock ? { relationBlock: this.o.relationBlock } : {}) };
 	}
 }

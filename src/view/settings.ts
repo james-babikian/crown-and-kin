@@ -163,10 +163,15 @@ export interface StoredExtras {
 	version: number;
 	unknown: Readonly<Record<string, unknown>>;
 	invalid: Readonly<Record<string, unknown>>;
+	/**
+	 * The renames that wait, as `data.json` holds them (0.4, the index contract 3). A save writes them back until the
+	 * migration to the local storage has cleared them, so a save before the migration cannot wipe the list.
+	 */
+	pending: readonly PendingRename[];
 }
 
 /** No extras: a fresh install, and the state before the first load. */
-export const NO_EXTRAS: StoredExtras = { version: SETTINGS_VERSION, unknown: {}, invalid: {} };
+export const NO_EXTRAS: StoredExtras = { version: SETTINGS_VERSION, unknown: {}, invalid: {}, pending: [] };
 
 /** A stored version that is not a positive whole number counts as absent. */
 const readVersion = (v: unknown): number => (typeof v === 'number' && Number.isInteger(v) && v >= 1 ? v : SETTINGS_VERSION);
@@ -179,7 +184,7 @@ export function readStoredSettings(raw: unknown): { settings: DynastySettings; e
 	// `Object.fromEntries` makes own properties, so a stored key named `__proto__` stays plain data.
 	const unknown = Object.fromEntries(Object.entries(s).filter(([k]) => !known.has(k) && !skip.has(k)));
 	const invalid = Object.fromEntries(KNOWN_KEYS.filter((k) => k in s && READERS[k](s[k]) === undefined).map((k) => [k, s[k]]));
-	return { settings: normaliseSettings(raw), extras: { version: readVersion(s[VERSION_KEY]), unknown, invalid } };
+	return { settings: normaliseSettings(raw), extras: { version: readVersion(s[VERSION_KEY]), unknown, invalid, pending: readPending(s) } };
 }
 
 /** The extras after the user changed these settings: the kept raw value of a changed setting goes (spec §9). */
@@ -191,9 +196,11 @@ export function clearInvalid(extras: StoredExtras, changed: readonly string[]): 
 /**
  * The object for `Plugin.saveData`: the kept keys, the settings, the kept raw values, the version, and the
  * renames that wait (only while there are some, so the file keeps the shape of earlier versions). Pure.
+ * `pending` is the list of the updater; when it is empty the list that the file held (`extras.pending`) is written back.
  */
 export function buildStoredData(settings: DynastySettings, extras: StoredExtras, pending: readonly PendingRename[]): Record<string, unknown> {
-	return { ...extras.unknown, ...settings, ...extras.invalid, [VERSION_KEY]: extras.version, ...(pending.length ? { [PENDING_KEY]: pending } : {}) };
+	const list = pending.length ? pending : extras.pending;
+	return { ...extras.unknown, ...settings, ...extras.invalid, [VERSION_KEY]: extras.version, ...(list.length ? { [PENDING_KEY]: list } : {}) };
 }
 
 /** True when movement is reduced (D126). `prefers` is `matchMedia('(prefers-reduced-motion: reduce)').matches` on the view's own window. */

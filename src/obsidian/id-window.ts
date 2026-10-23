@@ -53,7 +53,6 @@ class IdWindow extends Modal {
 		this.cleanup.push(phoneLayout(this, undefined, false), ignoreGhostClick(this), trackModal(this, () => this.close()));
 		const el = this.contentEl;
 		// The window family (contract C): a bar on a phone, a footer on a computer; "Use this ID" is the main button.
-		let doUse: () => void = () => undefined; // eslint-disable-line prefer-const -- set after the shell exists
 		const shell = buildShell({
 			modalEl: this.modalEl,
 			contentEl: el,
@@ -61,7 +60,8 @@ class IdWindow extends Modal {
 			titled: true,
 			saveLabel: ID_UI.use,
 			onCancel: () => this.close(),
-			onSave: () => doUse(),
+			// The click handler stands on the Save button itself (below), so the shell has nothing more to do.
+			onSave: () => undefined,
 			buttons: { cancel: { cls: ['dynasty-id-cancel'], focus: 'id-cancel' }, save: { cls: ['dynasty-id-use'], focus: 'id-use' } },
 		});
 		this.shell = shell;

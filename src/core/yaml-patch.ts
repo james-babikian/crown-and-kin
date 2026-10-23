@@ -207,7 +207,7 @@ export class Source {
 	private lastLeaf(node: Node): unknown {
 		let n: unknown = node;
 		while ((isMap(n) || isSeq(n)) && !n.flow && n.items.length) {
-			const last = n.items[n.items.length - 1] as unknown;
+			const last = n.items[n.items.length - 1];
 			n = isPair(last) ? last.value : last;
 		}
 		return n;
@@ -313,7 +313,7 @@ const keyOf = (pair: Pair): string | undefined => (isScalar(pair.key) ? str(pair
 
 /** The pair of `map` with this key, or undefined. */
 export function findPair(map: YAMLMap, key: string): Pair | undefined {
-	return (map.items as Pair[]).find((p) => keyOf(p) === key);
+	return map.items.find((p) => keyOf(p) === key);
 }
 
 const rankIn = (order: string[], key: string | undefined) => (key === undefined ? -1 : order.indexOf(key));
@@ -335,7 +335,7 @@ export function layoutOf(src: Source): Layout {
 	if (!isMap(top) || top.flow) return layout;
 	let seqSeen = false;
 	let mapSeen = false;
-	for (const pair of top.items as Pair[]) {
+	for (const pair of top.items) {
 		const v = pair.value;
 		const keyCol = src.column((pair.key as Node).range![0]);
 		if (isSeq(v) && !v.flow && v.range && !seqSeen) {
@@ -343,7 +343,7 @@ export function layoutOf(src: Source): Layout {
 			layout.seqIndent = Math.max(0, src.column(v.range[0]) - keyCol);
 			const first = v.items[0];
 			if (isMap(first) && !first.flow && first.range && first.items.length) {
-				const k = (first.items[0] as Pair).key as Node;
+				const k = first.items[0].key as Node;
 				layout.itemIndent = Math.max(1, src.column(k.range![0]) - src.column(v.range[0]));
 			}
 		} else if (isMap(v) && !v.flow && v.range && !mapSeen) {
@@ -418,7 +418,7 @@ export function setPairValue(src: Source, map: YAMLMap, pair: Pair, value: NewVa
  * line between them.
  */
 export function addPair(src: Source, map: YAMLMap, key: string, value: NewValue, order: string[], layout: Layout): Patch {
-	const pairs = map.items as Pair[];
+	const pairs = map.items;
 	const rank = rankIn(order, key);
 	const nextIndex = pairs.findIndex((p) => rankIn(order, keyOf(p)) > rank);
 	const next = nextIndex >= 0 ? pairs[nextIndex] : undefined;
@@ -456,7 +456,7 @@ export function addPair(src: Source, map: YAMLMap, key: string, value: NewValue,
 
 /** Removes a pair and only its own lines. */
 export function removePair(src: Source, map: YAMLMap, pair: Pair): Patch {
-	const pairs = map.items as Pair[];
+	const pairs = map.items;
 	const i = pairs.indexOf(pair);
 	const keyStart = (pair.key as Node).range![0];
 	const text = src.text;
@@ -561,7 +561,7 @@ export function appendItem(src: Source, seq: YAMLSeq, block: string[], flow: str
 	// Items written as one-line flow maps get a new one-line item.
 	if (isMap(last) && last.flow) return insertAt(at, '\n' + ' '.repeat(dashCol) + '- ' + flow);
 	let itemCol = dashCol + 2;
-	if (isMap(last) && last.items.length) itemCol = src.column(((last.items[0] as Pair).key as Node).range![0]);
+	if (isMap(last) && last.items.length) itemCol = src.column((last.items[0].key as Node).range![0]);
 	const lines = block.map((l, n) => (n === 0 ? ' '.repeat(dashCol) + '-' + ' '.repeat(Math.max(1, itemCol - dashCol - 1)) + l : ' '.repeat(itemCol) + l));
 	return insertAt(at, lines.map((l) => '\n' + l).join(''));
 }
@@ -848,7 +848,7 @@ export function remember(body: string, data: Raw): void {
 }
 
 /** The raw data of `body` if it was parsed last, else undefined. Do not change it. */
-export function recall(body: string): Raw | undefined {
+export function recall(body: string): Raw {
 	return recent.find((r) => r.body === body)?.data;
 }
 

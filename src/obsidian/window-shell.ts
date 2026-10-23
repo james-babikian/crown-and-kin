@@ -22,12 +22,12 @@ export interface ShellOptions {
 	cancelLabel?: string;
 	/** The label of the right button; null: no Save button. */
 	saveLabel?: string | null;
-	onCancel(): void;
-	onSave?(): void;
+	onCancel: () => void;
+	onSave?: () => void;
 	/** More class names and the `data-focus` names of the two buttons, for a window whose tests and focus rules name them (the ID window). */
 	buttons?: { cancel?: { cls?: string[]; focus?: string }; save?: { cls?: string[]; focus?: string } };
 	/** A second action next to Save: "Save and add another child". It stands left in the footer, on a second row of the phone bar. */
-	extra?: { text: string; focus: string; run(): void };
+	extra?: { text: string; focus: string; run: () => void };
 }
 
 /** The parts of a drawn shell. */
@@ -107,7 +107,7 @@ export function buildShell(o: ShellOptions): Shell {
 		cleanup.push(() => body.removeEventListener('scroll', onScroll));
 	} else {
 		const win = modalEl.win ?? window;
-		const Observer = (win as Window & typeof globalThis).ResizeObserver;
+		const Observer = (win as unknown as { ResizeObserver?: typeof ResizeObserver }).ResizeObserver;
 		if (typeof Observer === 'function') {
 			const ro = new Observer(() => checkOverflow());
 			ro.observe(body);

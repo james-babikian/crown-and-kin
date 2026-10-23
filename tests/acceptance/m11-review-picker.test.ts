@@ -1,24 +1,18 @@
-﻿import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+﻿import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { speedTest } from '../support/speed-test';
-
-vi.mock('obsidian', () => import('./fake-obsidian'));
-vi.mock('@codemirror/language', () => ({ forceParsing: () => false, syntaxTree: () => ({ length: 0 }) }));
-vi.mock('@codemirror/view', () => ({ ViewPlugin: { fromClass: () => ({}) } }));
 
 import { TFile as VaultFile } from 'obsidian';
 import { readFileSync } from 'node:fs';
 import { buildPictureTree, pickerKey, pickerRows, searchRows } from '../../src/core/picture-list';
 import { cssRules, vf } from './m11-support';
-import { FEl, dispatch, fakeWin, installDom, resetDom, settle } from './fake-dom';
+import { FEl, dispatch, resetDom, settle } from './fake-dom';
 import { openModals, resetObsidian } from './fake-obsidian';
 import { pickerModule } from './m11-support';
+import { useFakeDom } from '../support/fake-dom-setup';
 
 /* Code review, M11 area A (picture list and house page). Run: npx vitest run tests/acceptance/m11-review-picker.test.ts */
 
-beforeAll(() => {
-	installDom();
-	(globalThis as Record<string, unknown>).window ??= fakeWin;
-});
+useFakeDom({ window: true });
 beforeEach(() => {
 	resetDom();
 	resetObsidian();

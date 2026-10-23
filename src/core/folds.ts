@@ -83,7 +83,7 @@ export interface PersonFolds {
 
 /** The key for one parent or a pair. Ids that are not distinct give the distinct ones. */
 export function foldKey(parents: readonly string[]): FoldKey {
-	const ids = [...new Set(Array.isArray(parents) ? parents : [])].sort();
+	const ids = [...new Set(Array.isArray(parents) ? (parents as readonly string[]) : [])].sort();
 	return ids.length === 2 ? pairKey(ids[0], ids[1]) : JSON.stringify(ids);
 }
 
@@ -244,7 +244,7 @@ export function foldsHiding(g: FamilyGraph, folds: FoldSet, id: string): FoldKey
 
 /** `folds` without the folds that hide any of `ids`, in the drawn graph and then in the whole graph (rule 9). */
 export function unfoldFor(drawn: FamilyGraph, whole: FamilyGraph, folds: FoldSet, ids: readonly string[]): Set<FoldKey> {
-	const targets = Array.isArray(ids) ? ids : [];
+	const targets = Array.isArray(ids) ? (ids as readonly string[]) : [];
 	const result = new Set<FoldKey>(folds);
 	for (const id of targets) for (const k of foldsHiding(drawn, folds, id)) result.delete(k);
 	// A safety net: the first step should leave no target hidden, but a target that is still hidden must not stay so.

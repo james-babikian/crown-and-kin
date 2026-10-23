@@ -1,5 +1,5 @@
 // 0.2.5 WP-B6: writes `tests/acceptance/s025-card-hashes.json`, the golden hashes of the Roundel and the sideways text card
-// (see `tests/s025-card-hashes.test.ts`). Run it only when a change of the card drawing is meant:
+// (see `tests/scripts/s025-card-hashes.test.ts`). Run it only when a change of the card drawing is meant:
 // `npx tsx scripts/s025-record-hashes.ts`, then look at the new pictures with `npm run spike` before you commit the file.
 import { writeFileSync } from 'node:fs';
 import { CARD_HASH_FILE, cardHash, cardHashKeys } from './s025-card-hash';

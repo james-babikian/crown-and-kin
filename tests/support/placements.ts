@@ -5,6 +5,7 @@
 // `CARD_LINE_PLACE=packed` or `CARD_LINE_PLACE=random:<max px>` selects one for the scripts (`placementFromEnv`, read by an internal script).
 import { compactItems, shiftToMargin, packRows, shapesOf, sweepRows } from '../../src/layout/place';
 import type { Placement } from '../../src/layout/pipeline';
+import { lcg31 as rng } from './rng';
 
 export type { Placement };
 
@@ -13,12 +14,6 @@ export const packedPlacement: Placement = (plan) => {
 	packRows(plan);
 	shiftToMargin(plan);
 };
-
-/** A small deterministic random source (an LCG). */
-function rng(seed: number): () => number {
-	let a = seed;
-	return () => ((a = (a * 1103515245 + 12345) % 2147483648) / 2147483648);
-}
 
 /** Packed rows with a random extra gap, up to `max` px, before each block; the order and the minimum gaps stay. */
 export const randomPlacement =

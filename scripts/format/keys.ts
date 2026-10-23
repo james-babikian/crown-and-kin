@@ -1,9 +1,9 @@
 /*
  * The one table behind "Format 1" (spec §4.4, the release plan Part 2 §3): every key of the tree text that the plugin
  * reads or keeps (3 are reserved: kept, never read), with its section, its meaning, the forms it accepts, the form it writes and the version that added it. `render.ts` turns
- * the table into `docs/format.md` and into the generated part of `README.md`, so the two files cannot drift from each other.
- * `tests/format-table.test.ts` checks the table against the code: the write-order lists, the keys that the reader asks for
- * and the words that the readers accept. Meanings are one plain sentence each; the README shows them to users.
+ * the table into `docs/format.md`, so the document cannot drift from the table. The README shows only a short example and
+ * links to the document. `tests/core/format-table.test.ts` checks the table against the code: the write-order lists, the keys
+ * that the reader asks for and the words that the readers accept. Meanings are one plain sentence each; users read them.
  */
 
 import { HOUSE_ORDER } from '../../src/core/house-ops';
@@ -91,7 +91,7 @@ export const KEYS: readonly FormatKey[] = [
 	k('options', 'me', '0.2', 'The person with the mark "This is me". The relation names start from this person.', `A person ID. ${ID_NOTE} A list or a map gives a warning. If no person has this ID, the plugin shows a warning.`, 'Plain text. "This is me" writes it. "Remove This is me" removes it.'),
 	k('options', 'generations', '0.1', 'How many generations up and down the tree shows in focus mode.', 'A whole number, 0 or more. Any other text is ignored. With no key, the setting of the plugin counts.', NOT_WRITTEN),
 	k('options', 'height', '0.1', 'The height in pixels of the tree in a note, on a computer.', 'A whole number from 100 to 5000. Any other text or number is ignored and the usual height counts. A phone list does not use it.', 'A plain number. The resize handle of the tree writes it.'),
-	k('options', 'calendar', '0.3.2', 'The calendar note that this tree uses to read dates. With no key, the tree uses every calendar note.', 'A link to a note: [[x]], [Alias](x.md) or a plain path. A link in [[ ]] without quotes is accepted. A note that does not exist, or has no calendar, gives a warning and the tree reads dates with no calendar.', 'In double quotes. The item "Calendar note" in the More list writes it. "Every calendar note" removes it. The plugin keeps the link up to date when you rename the note.'),
+	k('options', 'calendar', '0.3.2', 'The calendar note that this tree uses to read dates. With no key, the tree reads plain years only (no calendar).', 'A link to a note: [[x]], [Alias](x.md) or a plain path. A link in [[ ]] without quotes is accepted. A note that does not exist, or has no calendar, gives a warning and the tree reads dates with no calendar.', 'In double quotes. The item "Calendar note" in the More list writes it. "No calendar" removes it. The Calendars window also writes it when you save calendars in a tree that has no key. The plugin keeps the link up to date when you rename the note.'),
 	k('options', 'format', '0.3', 'Reserved for Format 2. The plugin ignores it today, keeps it and never writes it.', 'Any value. The plugin ignores it and keeps it.', 'Never written. A key that is in the note stays as it is.', { reserved: true, listed: false }),
 
 	// ---------- houses ----------

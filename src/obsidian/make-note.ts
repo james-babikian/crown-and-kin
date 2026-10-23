@@ -22,13 +22,14 @@
  * - The note opens after the sheet closed: a new tab on the computer, the same place on a phone.
  */
 
-import { TFile, type App, type TFolder } from 'obsidian';
+import { TFile, type App, type TAbstractFile, type TFolder } from 'obsidian';
 import { sameBody } from '../core/block-match';
 import { linkedNotePath, personNoteName } from '../core/note-make';
 import { NOTE_UI } from '../render/ui-text';
 import type { Handle, Written } from './block-handle';
 import { isPhoneWindow } from '../view/focus-mode';
 import { freeName, makeNote, namesIn } from './table-note';
+import { vaultPath } from './vault-path';
 
 /** Which button the sheet offers (N1): 'new' makes a note for the person; 'linked' makes the note that the link already names. */
 export type MakeNoteMode = 'new' | 'linked';
@@ -44,9 +45,9 @@ export interface MakePersonNoteInput {
 	sourcePath: string;
 	/** The body the sheet loaded, for the stale check (step 1). */
 	loadedBody: string;
-	/** pendingOps() !== null && fresh(): checked before ault.create and after each wait. */
+	/** pendingOps() !== null && fresh(): checked before vault.create and after each await. */
 	ready: () => boolean;
-	/** The sheet is still shown and not gone: checked after each wait. */
+	/** The sheet is still shown and not gone: checked after each await. */
 	alive: () => boolean;
 }
 
@@ -74,6 +75,11 @@ export interface MakePersonNoteExtra {
 	ask: (name: string, freeName: string) => Promise<SameNameAnswer>;
 	/** Writes `link` in the same write as the unsaved draft (one undo step); null if nothing was written. */
 	write: (link: string) => Promise<Written | null>;
+}
+
+/** A folder is the entry with `children`; the tests' fake folders are plain objects, so this is not `instanceof`. */
+function isFolder(entry: TAbstractFile): entry is TFolder {
+	return 'children' in entry;
 }
 
 /** The note of the tree as a file, or null. */
@@ -136,7 +142,7 @@ async function run(input: MakePersonNoteInput & Partial<MakePersonNoteExtra>): P
 	if (input.mode === 'linked') {
 		const lp = linkedNotePath(input.link);
 		if (!lp) return { kind: 'stopped' };
-		folderPath = lp.folder === '' ? undefined : lp.folder;
+		folderPath = lp.folder === '' ? undefined : vaultPath(lp.folder);
 		name = lp.name;
 		fileName = lp.path.slice(lp.path.lastIndexOf('/') + 1);
 	} else {
@@ -146,8 +152,8 @@ async function run(input: MakePersonNoteInput & Partial<MakePersonNoteExtra>): P
 	let folder: TFolder | null;
 	if (folderPath === undefined) folder = app.fileManager.getNewFileParent(sourcePath);
 	else {
-		const at = app.vault.getAbstractFileByPath(folderPath);
-		folder = at && 'children' in at ? (at as TFolder) : null;
+		const at = app.vault.getAbstractFileByPath(vaultPath(folderPath));
+		folder = at && isFolder(at) ? at : null;
 	}
 	const root = !!folder && folder.isRoot();
 	const dir = folder ? (root ? '' : folder.path) : (folderPath ?? '');

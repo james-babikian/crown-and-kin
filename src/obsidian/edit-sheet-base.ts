@@ -78,6 +78,10 @@ export interface SheetBase {
 	pictures?: PictureStore;
 	/** D174: the sibling setting of the plugin, so the sheet names the relation as the cards do. Absent: the defaults. */
 	relationOptions?: RelationOptions;
+	/** Runs after the window closed: the tree view gives the keyboard focus back to the control that opened it, which a write can have drawn again (G5 0.4). */
+	onClosed?: () => void;
+	/** The block of the tree view that opened the sheet (its view state key): the sheet asks for relation names for this block, so the block keeps one lookup (relation-cache.ts). */
+	relationBlock?: string;
 }
 
 /** A sheet for a person of the tree. */
@@ -285,7 +289,10 @@ export abstract class EditSheetBase extends Modal {
 			if (!this.shown || this.closing) return;
 			const active = this.modalEl.doc?.activeElement as HTMLElement | null | undefined;
 			const typing = !!active && this.contentEl.contains(active) && active.matches('input, textarea, select');
-			if (!typing) this.focusName();
+			// The first control is where Obsidian put the focus, not the user: in the window of a new partner it is "Type of partnership" above Name, and a
+			// name typed at once changed the type (G5 0.4).
+			const first = Array.from(this.contentEl.querySelectorAll<HTMLInputElement>('button, input, select, textarea')).find((c) => !c.disabled);
+			if (!typing || active === first) this.focusName();
 		});
 	}
 
@@ -318,6 +325,13 @@ export abstract class EditSheetBase extends Modal {
 		this.rowPictures = null;
 		this.head = null;
 		this.contentEl.empty();
+		// The window that started this one rebuilt itself after the write, so the control that had the focus there is gone (G5 0.4).
+		this.o.parentSheet?.childClosed();
+		try {
+			this.o.onClosed?.();
+		} catch (e) {
+			console.error('Crown and Kin: cannot give the focus back', e);
+		}
 	}
 
 	/** Esc, the X button, a press outside and Android back all come here (spec §6.3). */
@@ -507,6 +521,8 @@ export abstract class EditSheetBase extends Modal {
 	protected abstract me(): string | null;
 	protected abstract moveSibling(direction: 'earlier' | 'later'): Promise<void>;
 	protected abstract openNew(rel: NewRelation, name?: string): void;
+	/** A window for a new person that this one started has closed: the focus comes back to this window if it is on nothing now. */
+	abstract childClosed(): void;
 	/** D267: shows the text line with Undo for a write that just ended; `withFields`: the write also saved field changes of this window. */
 	protected abstract endHold(): void;
 	abstract announce(text: string, written: string, was: string, withFields: boolean): void;

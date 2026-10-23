@@ -17,7 +17,7 @@ import { rewriteLinks } from './link-rewrite';
 import { parseBody, readTree, referencedIds } from './parse';
 import { relationshipOp, removeStaleKeys } from './relationship-ops';
 import { cleanCardTitles, titleOp } from './title-ops';
-import { isEmpty, str, type Raw, type RawMap } from './tolerate';
+import { isEmpty, isRawList, str, type Raw, type RawMap } from './tolerate';
 import type { Tree } from './types';
 import { itemEnd } from './yaml-list';
 import {
@@ -149,7 +149,7 @@ function addHouse(first: Parsed, op: AddHouse, data: RawMap): EditResult {
 	if (color !== undefined) house.color = color;
 	const arms = typeof op.arms === 'string' && op.arms.trim() !== '' ? op.arms : undefined;
 	if (arms !== undefined) house.arms = arms;
-	expected.houses = [...(Array.isArray(expected.houses) ? expected.houses : []), house];
+	expected.houses = [...(isRawList(expected.houses) ? expected.houses : []), house];
 
 	const entries: [string, string, boolean][] = [
 		['id', id, true],

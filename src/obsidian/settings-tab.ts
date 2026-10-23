@@ -1,11 +1,14 @@
 /*
- * The settings page (spec §9, D33): the settings in groups under short headings. Obsidian 1.11 and
- * later draw a group with SettingGroup; older versions get a heading row above the group.
+ * The settings page (spec §9, D33): the settings in groups under short headings. The list of settings is in `settings-rows.ts`.
+ * Obsidian 1.13 and later calls `getSettingDefinitions()` (so its settings search finds each setting) and does not call `display()`
+ * when that list is not empty. Obsidian 1.11 and 1.12 know only `display()`, which draws the same groups with SettingGroup (the lowest
+ * version of the plugin is 1.11, D283). Both paths build each row with `buildRow`, so a row looks and acts the same in both.
  */
 
-import { Notice, PluginSettingTab, Setting, SettingGroup, debounce, type App, type Plugin } from 'obsidian';
-import { SETTINGS_UI } from '../render/ui-text';
-import { ARMS_ON_CARDS, BREAK_WORDS_MAX, GENERATIONS, OLD_AGE, PHONE_DIRECTIONS, REDUCE_MOTIONS, SUCCESSION_LENGTH, YOUNG_DEATH_AGE, parseDesktopHeight, parseWhole, type ArmsOnCards, type DynastySettings, type PhoneDirection, type ReduceMotion } from '../view/settings';
+import { Notice, PluginSettingTab, Setting, SettingGroup, debounce, type App, type Plugin, type SettingDefinitionItem } from 'obsidian';
+import { BREAK_WORDS_MAX, parseDesktopHeight, parseWhole } from '../view/settings';
+import { SETTING_GROUPS, patch, type AreaRow, type ButtonRow, type DropdownRow, type HeightRow, type NumberRow, type SettingRow, type ToggleRow } from './settings-rows';
+import type { DynastySettings } from '../view/settings';
 
 /** What the tab needs from the plugin. */
 export interface SettingsHost extends Plugin {
@@ -16,8 +19,6 @@ export interface SettingsHost extends Plugin {
 	clearCaches(): void;
 }
 
-type Group = (add: (build: (s: Setting) => void) => void) => void;
-
 /** Obsidian does not join a setting's name to its control; a screen reader needs the name on the control itself (P4). */
 function name(control: HTMLElement | null | undefined, label: string): void {
 	control?.setAttribute('aria-label', label);
@@ -26,251 +27,185 @@ function name(control: HTMLElement | null | undefined, label: string): void {
 /** The desktop height and the break list are stored this long after the last key press (or at once on blur; the height also on Enter). */
 const HEIGHT_TYPING_MS = 400;
 
-/** The text of each choice of "Tree direction on a phone held upright" (D150). */
-const DIRECTION_LABEL: Record<PhoneDirection, string> = { sideways: SETTINGS_UI.directionSideways, down: SETTINGS_UI.directionDown };
-/** The text of each choice of "Arms on cards" (D204). */
-const ARMS_LABEL: Record<ArmsOnCards, string> = { few: SETTINGS_UI.armsFew, all: SETTINGS_UI.armsAll };
-/** The text of each choice of "Reduce movement" (D126). */
-const REDUCE_LABEL: Record<ReduceMotion, string> = { system: SETTINGS_UI.reduceFollow, on: SETTINGS_UI.reduceOn, off: SETTINGS_UI.reduceOff };
+/** The class of each group. */
+const GROUP_CLASS = 'dynasty-setting-group';
+/** The class of the tab: the styles of the fields hang on it. */
+const TAB_CLASS = 'dynasty-settings';
 
-/** The plugin's settings page, built fresh each time it is shown. */
+/** The plugin's settings page. */
 export class DynastySettingTab extends PluginSettingTab {
-	/** Stores a desktop height that still waits for the typing to stop. */
-	private pending: (() => void) | null = null;
-	/** The same for the break list. */
-	private pendingBreaks: (() => void) | null = null;
-	/** The same for the number fields of the line of succession. */
-	private pendingNumbers: (() => void)[] = [];
+	/** What stores the typing that still waits for the typing to stop: one entry for each text field on the page. */
+	private readonly waiting = new Set<() => void>();
 
 	constructor(
 		app: App,
 		private readonly host: SettingsHost,
 	) {
 		super(app, host);
+		this.containerEl.addClass(TAB_CLASS);
 	}
 
+	/** Obsidian 1.13 and later: the groups and rows as data. Each row is drawn by `buildRow`, which reads the values when the row is drawn. */
+	override getSettingDefinitions(): SettingDefinitionItem[] {
+		return SETTING_GROUPS.map((g) => ({
+			type: 'group' as const,
+			heading: g.heading,
+			cls: GROUP_CLASS,
+			items: g.rows.map((row) => ({ name: row.name, desc: row.desc, render: (setting: Setting) => this.buildRow(row, setting) })),
+		}));
+	}
+
+	/** Obsidian 1.11 and 1.12 (and a fallback on later versions): the same groups, drawn with SettingGroup. */
 	override display(): void {
 		const el = this.containerEl;
 		el.empty();
-		el.addClass('dynasty-settings');
-		this.pendingNumbers = [];
-		const t = SETTINGS_UI;
-		const s = this.host.settings;
-		this.group(el, t.groups.view, (add) => {
-			add((row) => {
-				row.setName(t.heightDesktop).setDesc(t.heightDesktopDesc);
-				row.addText((text) => {
-					text.inputEl.addClass('dynasty-setting-height');
-					name(text.inputEl, t.heightDesktop);
-					text.inputEl.setAttribute('inputmode', 'numeric');
-					text.setValue(String(s.embedHeightDesktop));
-					// "1200" passes through "120": a value is stored only when the typing stops, not at each key press.
-					const store = () => {
-						const n = parseDesktopHeight(text.getValue());
-						if (n !== null) void this.host.changeSettings({ embedHeightDesktop: n });
-					};
-					const later = debounce(store, HEIGHT_TYPING_MS, true);
-					this.pending = () => later.run?.();
-					// A microtask first, so changes that come in one task count as one.
-					text.onChange(() => void Promise.resolve().then(() => later()));
-					const now = () => {
-						later.cancel?.();
-						store();
-						// A value out of range is not stored: the field shows the stored value again.
-						text.setValue(String(this.host.settings.embedHeightDesktop));
-					};
-					text.inputEl.addEventListener('blur', now);
-					text.inputEl.addEventListener('keydown', (e: KeyboardEvent) => {
-						if (e.key === 'Enter') now();
-					});
-				});
-			});
-			add((row) => {
-				row.setName(t.phoneDirection).setDesc(t.phoneDirectionDesc);
-				row.addDropdown((d) => {
-					name(d.selectEl, t.phoneDirection);
-					for (const v of PHONE_DIRECTIONS) d.addOption(v, DIRECTION_LABEL[v]);
-					d.setValue(s.phoneDirection);
-					d.onChange((v) => void this.host.changeSettings({ phoneDirection: PHONE_DIRECTIONS.find((x) => x === v) ?? 'sideways' }));
-				});
-			});
-			add((row) => {
-				row.setName(t.reduceMotion).setDesc(t.reduceMotionDesc);
-				row.addDropdown((d) => {
-					name(d.selectEl, t.reduceMotion);
-					for (const v of REDUCE_MOTIONS) d.addOption(v, REDUCE_LABEL[v]);
-					d.setValue(s.reduceMotion);
-					d.onChange((v) => void this.host.changeSettings({ reduceMotion: REDUCE_MOTIONS.find((x) => x === v) ?? 'system' }));
-				});
-			});
+		el.addClass(TAB_CLASS);
+		this.waiting.clear();
+		for (const g of SETTING_GROUPS) {
+			const group = new SettingGroup(el).setHeading(g.heading).addClass(GROUP_CLASS);
+			for (const row of g.rows) group.addSetting((setting) => void this.buildRow(row, setting));
+		}
+	}
+
+	override hide(): void {
+		for (const run of [...this.waiting]) run();
+		this.waiting.clear();
+		super.hide();
+	}
+
+	/**
+	 * One row. It returns a function that stores any typing that waits, for Obsidian 1.13 and later to call before it removes the row
+	 * (a search can draw the rows again); `display()` does not use it.
+	 */
+	private buildRow(row: SettingRow, setting: Setting): (() => void) | undefined {
+		setting.setName(row.name).setDesc(row.desc);
+		// The styles hang on the tab class. If the page is drawn into another element, the group of the row gets the class too.
+		this.containerEl.addClass(TAB_CLASS);
+		setting.settingEl.closest('.setting-group')?.addClass(TAB_CLASS);
+		switch (row.kind) {
+			case 'toggle':
+				this.toggleRow(row, setting);
+				return undefined;
+			case 'dropdown':
+				this.dropdownRow(row, setting);
+				return undefined;
+			case 'button':
+				this.buttonRow(row, setting);
+				return undefined;
+			case 'height':
+				return this.heightRow(row, setting);
+			case 'number':
+				return this.numberRow(row, setting);
+			case 'area':
+				return this.areaRow(row, setting);
+		}
+	}
+
+	private toggleRow(row: ToggleRow, setting: Setting): void {
+		setting.addToggle((tg) => {
+			name(tg.toggleEl, row.name);
+			name(tg.toggleEl.querySelector('input'), row.name);
+			tg.setValue(this.host.settings[row.key]);
+			tg.onChange((v) => void this.host.changeSettings(patch(row.key, v)));
 		});
-		this.group(el, t.groups.cards, (add) => {
-			// 0.2.8 contract A.4, D204: which cards show the arms of a house.
-			add((row) => {
-				row.setName(t.armsOnCards).setDesc(t.armsOnCardsDesc);
-				row.addDropdown((d) => {
-					name(d.selectEl, t.armsOnCards);
-					for (const v of ARMS_ON_CARDS) d.addOption(v, ARMS_LABEL[v]);
-					d.setValue(s.armsOnCards);
-					d.onChange((v) => void this.host.changeSettings({ armsOnCards: ARMS_ON_CARDS.find((x) => x === v) ?? 'few' }));
-				});
-			});
-			add((row) => {
-				row.setName(t.breakWords).setDesc(t.breakWordsDesc);
-				row.addTextArea((area) => {
-					area.inputEl.addClass('dynasty-setting-break-words');
-					area.inputEl.rows = 6;
-					name(area.inputEl, t.breakWords);
-					area.setValue(s.breakWords);
-					// D118: the list is stored when the typing stops or the field loses the focus, not at each key press (each store lays the trees out again).
-					const store = () => {
-						// A typed text over the limit is cut here: a stored text over the limit counts as not valid.
-						const text = area.getValue().slice(0, BREAK_WORDS_MAX);
-						if (text !== this.host.settings.breakWords) void this.host.changeSettings({ breakWords: text });
-					};
-					const later = debounce(store, HEIGHT_TYPING_MS, true);
-					this.pendingBreaks = () => {
-						later.cancel?.();
-						store();
-					};
-					area.onChange(() => void Promise.resolve().then(() => later()));
-					area.inputEl.addEventListener('blur', () => this.pendingBreaks?.());
-				});
-			});
-			add((row) => {
-				row.setName(t.dates).setDesc(t.datesDesc);
-				row.addToggle((tg) => {
-					name(tg.toggleEl, t.dates);
-					name(tg.toggleEl.querySelector('input'), t.dates);
-					tg.setValue(s.showDates);
-					tg.onChange((v) => void this.host.changeSettings({ showDates: v }));
-				});
-			});
-			add((row) => {
-				row.setName(t.relations).setDesc(t.relationsDesc);
-				row.addToggle((tg) => {
-					name(tg.toggleEl, t.relations);
-					name(tg.toggleEl.querySelector('input'), t.relations);
-					tg.setValue(s.showRelations);
-					tg.onChange((v) => void this.host.changeSettings({ showRelations: v }));
-				});
-			});
-			add((row) => {
-				row.setName(t.portraits).setDesc(t.portraitsDesc);
-				row.addToggle((tg) => {
-					name(tg.toggleEl, t.portraits);
-					name(tg.toggleEl.querySelector('input'), t.portraits);
-					tg.setValue(s.showPortraits);
-					tg.onChange((v) => void this.host.changeSettings({ showPortraits: v }));
-				});
-			});
+	}
+
+	private dropdownRow(row: DropdownRow, setting: Setting): void {
+		setting.addDropdown((d) => {
+			name(d.selectEl, row.name);
+			for (const [value, text] of row.options) d.addOption(value, text);
+			d.setValue(String(this.host.settings[row.key]));
+			d.onChange((v) => void this.host.changeSettings(row.change(v)));
 		});
-		// F10a, D246: the two settings about relations and warnings are not card settings.
-		this.group(el, t.groups.relations, (add) => {
-			add((row) => {
-				row.setName(t.oneParentUnknown).setDesc(t.oneParentUnknownDesc);
-				row.addToggle((tg) => {
-					name(tg.toggleEl, t.oneParentUnknown);
-					name(tg.toggleEl.querySelector('input'), t.oneParentUnknown);
-					tg.setValue(s.oneParentUnknown);
-					tg.onChange((v) => void this.host.changeSettings({ oneParentUnknown: v }));
-				});
-			});
-			// 0.2.8 contract A.5, D188 item 10: the warning about more than 2 parents of a type.
-			add((row) => {
-				row.setName(t.manyParents).setDesc(t.manyParentsDesc);
-				row.addToggle((tg) => {
-					name(tg.toggleEl, t.manyParents);
-					name(tg.toggleEl.querySelector('input'), t.manyParents);
-					tg.setValue(s.warnManyParents);
-					tg.onChange((v) => void this.host.changeSettings({ warnManyParents: v }));
-				});
-			});
-		});
-		// F10a: the three settings of the line of succession are not card settings.
-		this.group(el, t.groups.succession, (add) => {
-			add((row) => {
-				row.setName(t.successionLength).setDesc(t.successionLengthDesc);
-				this.numberField(row, 'dynasty-setting-succession-length', t.successionLength, () => this.host.settings.successionLength, SUCCESSION_LENGTH, (n) => void this.host.changeSettings({ successionLength: n }));
-			});
-			add((row) => {
-				row.setName(t.oldAge).setDesc(t.oldAgeDesc);
-				this.numberField(row, 'dynasty-setting-old-age', t.oldAge, () => this.host.settings.oldAge, OLD_AGE, (n) => void this.host.changeSettings({ oldAge: n }));
-			});
-			add((row) => {
-				row.setName(t.youngDeathAge).setDesc(t.youngDeathAgeDesc);
-				this.numberField(row, 'dynasty-setting-young-death-age', t.youngDeathAge, () => this.host.settings.youngDeathAge, YOUNG_DEATH_AGE, (n) => void this.host.changeSettings({ youngDeathAge: n }));
-			});
-		});
-		this.group(el, t.groups.housePage, (add) => {
-			add((row) => {
-				row.setName(t.houseGeneration).setDesc(t.houseGenerationDesc);
-				row.addToggle((tg) => {
-					name(tg.toggleEl, t.houseGeneration);
-					name(tg.toggleEl.querySelector('input'), t.houseGeneration);
-					tg.setValue(s.showHouseGeneration);
-					tg.onChange((v) => void this.host.changeSettings({ showHouseGeneration: v }));
-				});
-			});
-		});
-		this.group(el, t.groups.focus, (add) => {
-			add((row) => {
-				row.setName(t.generations).setDesc(t.generationsDesc);
-				row.addDropdown((d) => {
-					name(d.selectEl, t.generations);
-					for (let n = GENERATIONS.min; n <= GENERATIONS.max; n++) d.addOption(String(n), String(n));
-					d.setValue(String(s.focusGenerations));
-					d.onChange((v) => void this.host.changeSettings({ focusGenerations: Number(v) }));
-				});
-			});
-		});
-		this.group(el, t.groups.links, (add) => {
-			add((row) => {
-				row.setName(t.links).setDesc(t.linksDesc);
-				row.addToggle((tg) => {
-					name(tg.toggleEl, t.links);
-					name(tg.toggleEl.querySelector('input'), t.links);
-					tg.setValue(s.updateLinks);
-					tg.onChange((v) => void this.host.changeSettings({ updateLinks: v }));
-				});
-			});
-		});
-		this.group(el, t.groups.repair, (add) => {
-			add((row) => {
-				row.setName(t.cache).setDesc(t.cacheDesc);
-				row.addButton((b) => {
-					b.setButtonText(t.cacheButton);
-					b.onClick(() => {
-						this.host.clearCaches();
-						new Notice(t.cacheDone);
-					});
-				});
+	}
+
+	private buttonRow(row: ButtonRow, setting: Setting): void {
+		setting.addButton((b) => {
+			b.setButtonText(row.label);
+			b.onClick(() => {
+				this.host.clearCaches();
+				new Notice(row.notice);
 			});
 		});
 	}
 
-	override hide(): void {
-		this.pending?.();
-		this.pending = null;
-		this.pendingBreaks?.();
-		this.pendingBreaks = null;
-		for (const run of this.pendingNumbers.splice(0)) run();
-		super.hide();
+	/** Remembers what stores the waiting typing of a field. The returned function stores it once and forgets it. */
+	private track(run: () => void): () => void {
+		this.waiting.add(run);
+		return () => {
+			if (this.waiting.delete(run)) run();
+		};
+	}
+
+	private heightRow(row: HeightRow, setting: Setting): () => void {
+		let flushWaiting = () => {};
+		setting.addText((text) => {
+			text.inputEl.addClass('dynasty-setting-height');
+			name(text.inputEl, row.name);
+			text.inputEl.setAttribute('inputmode', 'numeric');
+			text.setValue(String(this.host.settings[row.key]));
+			// "1200" passes through "120": a value is stored only when the typing stops, not at each key press.
+			const store = () => {
+				const n = parseDesktopHeight(text.getValue());
+				if (n !== null) void this.host.changeSettings(patch(row.key, n));
+			};
+			const later = debounce(store, HEIGHT_TYPING_MS, true);
+			flushWaiting = () => later.run?.();
+			// A microtask first, so changes that come in one task count as one.
+			text.onChange(() => void Promise.resolve().then(() => later()));
+			const now = () => {
+				later.cancel?.();
+				store();
+				// A value out of range is not stored: the field shows the stored value again.
+				text.setValue(String(this.host.settings[row.key]));
+			};
+			text.inputEl.addEventListener('blur', now);
+			text.inputEl.addEventListener('keydown', (e: KeyboardEvent) => {
+				if (e.key === 'Enter') now();
+			});
+		});
+		return this.track(flushWaiting);
+	}
+
+	private areaRow(row: AreaRow, setting: Setting): () => void {
+		let flushWaiting = () => {};
+		setting.addTextArea((area) => {
+			area.inputEl.addClass('dynasty-setting-break-words');
+			area.inputEl.rows = 6;
+			name(area.inputEl, row.name);
+			area.setValue(this.host.settings[row.key]);
+			// D118: the list is stored when the typing stops or the field loses the focus, not at each key press (each store lays the trees out again).
+			const store = () => {
+				// A typed text over the limit is cut here: a stored text over the limit counts as not valid.
+				const text = area.getValue().slice(0, BREAK_WORDS_MAX);
+				if (text !== this.host.settings[row.key]) void this.host.changeSettings(patch(row.key, text));
+			};
+			const later = debounce(store, HEIGHT_TYPING_MS, true);
+			flushWaiting = () => {
+				later.cancel?.();
+				store();
+			};
+			area.onChange(() => void Promise.resolve().then(() => later()));
+			area.inputEl.addEventListener('blur', () => flushWaiting());
+		});
+		return this.track(flushWaiting);
 	}
 
 	/**
 	 * A text field for a whole number in a range. The number is stored when the typing stops or the field loses the focus;
 	 * a text out of range is not stored, and the field shows the stored number again.
 	 */
-	private numberField(row: Setting, cls: string, label: string, current: () => number, range: { min: number; max: number }, store: (n: number) => void): void {
-		row.addText((text) => {
-			text.inputEl.addClass(cls);
-			name(text.inputEl, label);
+	private numberRow(row: NumberRow, setting: Setting): () => void {
+		const current = () => this.host.settings[row.key];
+		let flushWaiting = () => {};
+		setting.addText((text) => {
+			text.inputEl.addClass(row.cls);
+			name(text.inputEl, row.name);
 			text.inputEl.setAttribute('inputmode', 'numeric');
 			text.setValue(String(current()));
 			const save = () => {
-				const n = parseWhole(text.getValue(), range);
-				if (n !== null && n !== current()) store(n);
+				const n = parseWhole(text.getValue(), row.range);
+				if (n !== null && n !== current()) void this.host.changeSettings(patch(row.key, n));
 			};
 			const later = debounce(save, HEIGHT_TYPING_MS, true);
 			const flush = () => {
@@ -278,27 +213,16 @@ export class DynastySettingTab extends PluginSettingTab {
 				save();
 				text.setValue(String(current()));
 			};
-			this.pendingNumbers.push(() => {
+			flushWaiting = () => {
 				later.cancel?.();
 				save();
-			});
+			};
 			text.onChange(() => void Promise.resolve().then(() => later()));
 			text.inputEl.addEventListener('blur', flush);
 			text.inputEl.addEventListener('keydown', (e: KeyboardEvent) => {
 				if (e.key === 'Enter') flush();
 			});
 		});
-	}
-
-	/** One group under a heading (D33). */
-	private group(el: HTMLElement, heading: string, fill: Group): void {
-		// SettingGroup is in Obsidian 1.11 and later; the manifest allows older versions.
-		if (typeof SettingGroup === 'function') {
-			const g = new SettingGroup(el).setHeading(heading).addClass('dynasty-setting-group');
-			fill((build) => g.addSetting(build));
-			return;
-		}
-		new Setting(el).setName(heading).setHeading().setClass('dynasty-setting-heading');
-		fill((build) => build(new Setting(el)));
+		return this.track(flushWaiting);
 	}
 }

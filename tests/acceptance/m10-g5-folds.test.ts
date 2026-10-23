@@ -1,16 +1,13 @@
-import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-
-vi.mock('obsidian', () => import('./fake-obsidian'));
-vi.mock('@codemirror/language', () => ({ forceParsing: () => false, syntaxTree: () => ({ length: 0 }) }));
-vi.mock('@codemirror/view', () => ({ ViewPlugin: { fromClass: () => ({}) } }));
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { TreeView } from '../../src/obsidian/tree-view';
-import { FEl, clock, dispatch, fakeWin, flushFrames, installDom, resetDom, settle } from './fake-dom';
+import { FEl, clock, dispatch, flushFrames, resetDom, settle } from './fake-dom';
 import { resetObsidian } from './fake-obsidian';
 import { block15, comments15 } from './m10-support';
 import DynastyTreePlugin from '../../src/obsidian/main';
 import { newBlockState } from '../../src/view/block-state';
 import { desktop, embed, fakeApp, fakeHandle, fullViews } from './tree-view-fakes';
+import { useFakeDom } from '../support/fake-dom-setup';
 
 /*
  * The M10 G5 spec review named these flows as not covered (the decision notes, "M10 G5 spec review"): spec §13.10
@@ -20,11 +17,7 @@ import { desktop, embed, fakeApp, fakeHandle, fullViews } from './tree-view-fake
  * the code of `src/`.
  */
 
-beforeAll(() => {
-	installDom();
-	(globalThis as Record<string, unknown>).window ??= fakeWin;
-	(globalThis as Record<string, unknown>).CSS = { supports: (_p: string, v: string) => /^#[0-9a-f]{6}$/i.test(v) };
-});
+useFakeDom({ window: true, css: true });
 
 beforeEach(() => {
 	resetDom();

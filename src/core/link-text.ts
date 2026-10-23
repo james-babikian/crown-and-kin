@@ -43,14 +43,3 @@ export function linkText(link: string): string {
 export function folderOf(path: string): string {
 	return path.split('/').slice(0, -1).join('/');
 }
-
-/** A path for `name` in `folder` that `taken` does not report, with " 1", " 2", … before the extension when the name is taken. */
-export function numberedFreePath(folder: string, name: string, taken: (path: string) => boolean): string {
-	const dot = name.lastIndexOf('.');
-	const stem = dot > 0 ? name.slice(0, dot) : name;
-	const ext = dot > 0 ? name.slice(dot) : '';
-	const at = (n: string) => (folder ? `${folder}/${n}` : n);
-	let path = at(name);
-	for (let i = 1; taken(path); i++) path = at(`${stem} ${i}${ext}`);
-	return path;
-}

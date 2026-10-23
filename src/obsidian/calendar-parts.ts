@@ -149,7 +149,7 @@ export const SHOW_OPTIONS = [
 export interface TestField {
 	input: HTMLInputElement;
 	/** Writes the line again from the field, with the reader that `reader()` gives now. */
-	update(): void;
+	update: () => void;
 }
 
 /**

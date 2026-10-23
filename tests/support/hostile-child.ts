@@ -1,5 +1,5 @@
 /*
- * Child process of `tests/fuzz-hostile.test.ts`: runs the hostile cases one after the other and writes one line to
+ * Child process of `tests/core/fuzz-hostile.test.ts`: runs the hostile cases one after the other and writes one line to
  * the parent before a case (`START <index>`) and one after it (`END <json>`). The parent stops the child if a case does
  * not end in time, and the START line names the case that hung. The writes are synchronous, so a line is out before the next case starts.
  */

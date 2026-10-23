@@ -16,6 +16,7 @@ import { applyOp } from '../core/yaml-edit';
 import { RENAME_UI, renamedKind, renamedText, type LinkReportText } from '../render/ui-text';
 import { VIEW_NOTICE } from '../render/view-text';
 import { pause, type Handle } from './block-handle';
+import { BLOCK_SECTIONS } from '../view/fence-index';
 import type { PendingRename } from '../view/settings';
 
 /** What the updater needs from the handle registry (`HandleRegistry.forBlock`). */
@@ -28,10 +29,17 @@ export interface BlockSource {
 
 /** What the plugin gives the updater besides the handles. */
 export interface LinkHooks {
-	/** Stores `pendingList()` in `data.json` (with the settings). */
-	save?(): Promise<void>;
+	/** Stores `pendingList()` in the pending store of this device (0.4; it may be sync). A throw is logged and does not stop the update. */
+	save?: () => Promise<void> | void;
 	/** Notes that show a tree now: the updater reads them first. */
 	known?(): Iterable<string>;
+	/**
+	 * The notes the fence index says hold a tree, with the notes it is not sure about. A set: the scan reads
+	 * only these, the notes of `known()` and the open trees. Null (the index is not complete, or there is
+	 * none): the scan of 0.3.3, which looks at the metadata cache of every note. The scan tests the text of
+	 * each note it reads, so a wrong flag costs a read and never a wrong write.
+	 */
+	kinNotes?(): ReadonlySet<string> | null;
 }
 
 /** How long the updater waits, in ms (tests make them short). */
@@ -221,8 +229,6 @@ function relativeTo(path: string, from: string): string {
 
 /** Most failure (and "not changed") Notices after one rename; the rest are counted in one more Notice. */
 const MAX_FAILURE_NOTICES = 3;
-/** Sections of the metadata cache that can hold a tree: a fence, or a callout, quote or list item around one. */
-const TREE_SECTIONS = new Set(['code', 'callout', 'blockquote', 'list']);
 /** The scan gives the interface a turn after this long (a read from Obsidian's text cache does not wait). */
 const SLICE_MS = 16;
 const KEPT_NOTICE_MS = 15_000;
@@ -277,8 +283,17 @@ export class LinkUpdater {
 
 	/** The renames that `data.json` keeps until they are handled. */
 	pendingList(): PendingRename[] {
-		const open = [...this.open].map((r) => ({ oldPath: r.oldPath, newPath: r.file.path, others: [...r.others].map((f) => f.path) }));
-		return [...this.stored.map((p) => ({ ...p, others: [...p.others] })), ...open];
+		return [...this.storedList(), ...this.openList()];
+	}
+
+	/** The renames that `resume()` has not queued yet (from the store or `data.json`). A late migration merges these, never the open ones. */
+	storedList(): PendingRename[] {
+		return this.stored.map((p) => ({ ...p, others: [...p.others] }));
+	}
+
+	/** The renames that are queued or running. */
+	openList(): PendingRename[] {
+		return [...this.open].map((r) => ({ oldPath: r.oldPath, newPath: r.file.path, others: [...r.others].map((f) => f.path) }));
 	}
 
 	/** At load: the renames that an earlier session did not complete. `resume()` starts them. */
@@ -367,7 +382,7 @@ export class LinkUpdater {
 				// Only notes then.
 			}
 			this.names = m;
-			setTimeout(() => (this.names = null), 0);
+			window.setTimeout(() => (this.names = null), 0);
 		}
 		const key = isPicturePath(oldPath) ? `\u0000${baseName(oldPath)}` : baseName(oldPath);
 		return new Set((this.names.get(key) ?? []).filter((f) => f !== file));
@@ -379,7 +394,7 @@ export class LinkUpdater {
 			// The wait starts at the rename: the metadata cache's events can come before the batch is complete.
 			const obsidian = this.obsidianDone();
 			const st: Progress = { found: false, scanned: false, shown: null };
-			const timer = setTimeout(() => {
+			const timer = window.setTimeout(() => {
 				try {
 					if (!this.halted() && (!st.scanned || st.found)) st.shown = new Notice(RENAME_UI.progressFor(kindOf(batch)), 0);
 				} catch (e) {
@@ -402,7 +417,7 @@ export class LinkUpdater {
 				if (report) report.state = 'failed';
 				if (!this.stopped && batch.length) new Notice(RENAME_UI.stopped(renamedText(batch.map((r) => ({ from: shownPath(r.oldPath), picture: isPicturePath(r.oldPath) })))), 0);
 			} finally {
-				clearTimeout(timer);
+				window.clearTimeout(timer);
 				obsidian.end();
 				st.shown?.hide();
 				if (report) report.ms = Date.now() - started;
@@ -425,26 +440,26 @@ export class LinkUpdater {
 		let end = () => {};
 		const done = new Promise<void>((resolve) => {
 			const refs: EventRef[] = [];
-			let quiet: ReturnType<typeof setTimeout> | null = null;
+			let quiet: number | null = null;
 			let ended = false;
 			end = () => {
 				if (ended) return;
 				ended = true;
-				clearTimeout(first);
-				clearTimeout(cap);
-				if (quiet) clearTimeout(quiet);
+				window.clearTimeout(first);
+				window.clearTimeout(cap);
+				if (quiet) window.clearTimeout(quiet);
 				for (const r of refs) mc.offref(r);
 				resolve();
 			};
 			const calm = () => {
-				if (quiet) clearTimeout(quiet);
-				quiet = setTimeout(end, this.timing.quiet);
+				if (quiet) window.clearTimeout(quiet);
+				quiet = window.setTimeout(end, this.timing.quiet);
 			};
-			const first = setTimeout(calm, this.timing.resolved);
-			const cap = setTimeout(end, this.timing.resolved + this.timing.cap);
+			const first = window.setTimeout(calm, this.timing.resolved);
+			const cap = window.setTimeout(end, this.timing.resolved + this.timing.cap);
 			try {
 				refs.push(mc.on('resolved', () => {
-					clearTimeout(first);
+					window.clearTimeout(first);
 					calm();
 				}));
 				refs.push(mc.on('changed', () => {
@@ -511,6 +526,16 @@ export class LinkUpdater {
 		} catch (e) {
 			console.error('Crown and Kin: cannot list the notes that show a tree', e);
 		}
+		const fence = this.fenceNotes();
+		if (fence) {
+			const shown: TFile[] = [];
+			const listed: TFile[] = [];
+			for (const f of files) {
+				if (known.has(f.path)) shown.push(f);
+				else if (fence.has(f.path)) listed.push(f);
+			}
+			return [...shown, ...listed];
+		}
 		const first: TFile[] = [];
 		const cached: TFile[] = [];
 		const unknown: TFile[] = [];
@@ -521,9 +546,19 @@ export class LinkUpdater {
 			}
 			const c = this.cacheOf(f);
 			if (!c) unknown.push(f);
-			else if (c.sections?.some((s) => TREE_SECTIONS.has(s.type))) cached.push(f);
+			else if (c.sections?.some((s) => BLOCK_SECTIONS.has(s.type))) cached.push(f);
 		}
 		return [...first, ...cached, ...unknown];
+	}
+
+	/** The set of the fence index, or null (no hook, not complete, or a throw): then the whole vault is a candidate, as in 0.3.3. */
+	private fenceNotes(): ReadonlySet<string> | null {
+		try {
+			return this.hooks.kinNotes?.() ?? null;
+		} catch (e) {
+			console.error('Crown and Kin: cannot read the fence index for the rename scan', e);
+			return null;
+		}
 	}
 
 	private async update(batch: Renamed[], obsidian: Promise<void>, st: Progress, report: LinkReportText): Promise<void> {

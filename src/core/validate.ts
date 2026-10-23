@@ -482,14 +482,13 @@ function personDateWarnings(needing: readonly { t: Title; holders: readonly Hold
 }
 
 /**
- * The problems of the calendar set (a missing or doubled calendar note) as tree warnings, once the calendars are ready (spec §14 rules 3 and 7).
+ * The problems of the calendar set (a missing calendar note) as tree warnings, once the calendars are ready (spec §14 rules 3 and 7).
  * Spec §14 rule 14: a wrong written name shows for every person, and only a reader with lists reads the born and died dates for it.
  */
 function calendarProblems(reader: DateReader | undefined, out: Collector, people: readonly Person[]) {
 	if (!reader?.ready) return;
 	for (const p of reader.problems) {
-		if (p.key === 'calendar-note-missing') out.warn(p.key, { note: p.note ?? '' });
-		else out.warn(p.key, { calendar: p.calendar ?? '', note: p.note ?? '', other: p.other ?? '', ...(p.list !== undefined ? { list: p.list } : {}) });
+		out.warn(p.key, { note: p.note ?? '' });
 	}
 	if (!reader.hasLists) return;
 	for (const p of people) {

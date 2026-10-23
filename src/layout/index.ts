@@ -98,7 +98,7 @@ export function layoutKey(g: FamilyGraph, geo: Geometry, settings: LayoutSetting
 		g.secondary.map((s) => [s.child, s.type, s.parents, s.unionKey ?? '']),
 	];
 	// JSON writes Infinity, -Infinity and NaN all as null; a loose far rule must not share a key with another.
-	return hash(JSON.stringify(parts, (_, v) => (typeof v === 'number' && !Number.isFinite(v) ? `#${v}` : v)));
+	return hash(JSON.stringify(parts, (_: string, v: unknown) => (typeof v === 'number' && !Number.isFinite(v) ? `#${v}` : v)));
 }
 
 /**

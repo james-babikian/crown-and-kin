@@ -17,13 +17,13 @@ const SAME_PX = 2;
 /** Heights by block key, newest last (a Map keeps the order of insertion). */
 const heights = new Map<string, number>();
 let loaded = false;
-let saveTimer: ReturnType<typeof setTimeout> | null = null;
+let saveTimer: number | null = null;
 
 function readStore(app: App): void {
 	if (loaded) return;
 	loaded = true;
 	try {
-		const raw: unknown = typeof app.loadLocalStorage === 'function' ? app.loadLocalStorage(STORE_KEY) : null;
+		const raw: unknown = app.loadLocalStorage(STORE_KEY);
 		if (!raw || typeof raw !== 'object') return;
 		for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
 			if (typeof v === 'number' && Number.isFinite(v) && v > 0 && !heights.has(k)) heights.set(k, v);
@@ -54,8 +54,8 @@ export function rememberHeight(app: App, key: string, px: number): void {
 
 /** One write for a burst of changes, and none while the view is still settling. */
 function scheduleSave(app: App): void {
-	if (saveTimer !== null || typeof app.saveLocalStorage !== 'function') return;
-	saveTimer = setTimeout(() => {
+	if (saveTimer !== null) return;
+	saveTimer = window.setTimeout(() => {
 		saveTimer = null;
 		try {
 			app.saveLocalStorage(STORE_KEY, Object.fromEntries(heights));
@@ -85,6 +85,6 @@ export function renameHeights(oldPath: string, newPath: string): void {
 export function forgetHeights(): void {
 	heights.clear();
 	loaded = false;
-	if (saveTimer !== null) clearTimeout(saveTimer);
+	if (saveTimer !== null) window.clearTimeout(saveTimer);
 	saveTimer = null;
 }

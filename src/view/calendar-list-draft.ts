@@ -146,8 +146,9 @@ export function nameLinesRefusal(l: ListDraft): string | null {
  */
 export function builtList(l: ListDraft, readYear: (text: string) => number | undefined, plain: boolean): { list: NameList; known: KnownInfo } {
 	const kept = listUntouched(l) ? l.saved : undefined;
-	// `as unknown`: the guard `isUsableList` would narrow the other branch to nothing.
-	if (kept && !isUsableList(kept as unknown, l.at ?? 0)) {
+	// The type `boolean` stops the guard `isUsableList` from narrowing `kept` to nothing in the branch below.
+	const usable: boolean = isUsableList(kept, l.at ?? 0);
+	if (kept && !usable) {
 		const k = kept.known;
 		const index = inNames(k.index, kept.names.length) ? k.index : -1;
 		return { list: kept, known: { ...(Number.isSafeInteger(k.year) ? { year: k.year } : {}), index, count: kept.names.length, ...(index >= 0 ? { name: kept.names[index].name } : {}) } };

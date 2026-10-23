@@ -1,14 +1,11 @@
-import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-
-vi.mock('obsidian', () => import('./fake-obsidian'));
-vi.mock('@codemirror/language', () => ({ forceParsing: () => false, syntaxTree: () => ({ length: 0 }) }));
-vi.mock('@codemirror/view', () => ({ ViewPlugin: { fromClass: () => ({}) } }));
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { TreeView } from '../../src/obsidian/tree-view';
-import { FEl, clock, fakeWin, flushFrames, installDom, resetDom, settle } from './fake-dom';
+import { FEl, clock, flushFrames, resetDom, settle } from './fake-dom';
 import { resetObsidian } from './fake-obsidian';
 import { block15, comments15 } from './m10-support';
 import { desktop, embed, fakeHandle, fullViews, tabletDevice } from './tree-view-fakes';
+import { useFakeDom } from '../support/fake-dom-setup';
 
 /*
  * Adopted from the M10 review B (`m10/review-b`): folds in the Obsidian views (spec §13.10, F11, F12).
@@ -17,11 +14,7 @@ import { desktop, embed, fakeHandle, fullViews, tabletDevice } from './tree-view
  * of that file make the finder and Find cases fail when both run in one file.
  */
 
-beforeAll(() => {
-	installDom();
-	(globalThis as Record<string, unknown>).window ??= fakeWin;
-	(globalThis as Record<string, unknown>).CSS = { supports: (_p: string, v: string) => /^#[0-9a-f]{6}$/i.test(v) };
-});
+useFakeDom({ window: true, css: true });
 
 beforeEach(() => {
 	resetDom();

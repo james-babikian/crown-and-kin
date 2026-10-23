@@ -52,6 +52,7 @@ import { measuredLayout, type MeasuredResult } from '../view/measured-layout';
 import { relationsFor, type TreeRelations } from '../view/relation-cache';
 import { planRender, type RenderInputs, type StateChanges, type TreePlan } from '../view/render-plan';
 import { foldLabel, lineMarks } from '../view/tree-view-helpers';
+import { BIG_TREE_CLASS, keepsStandingLayer } from './move-layer';
 import { TreeViewList } from './tree-view-list';
 import type { ViewHost } from './tree-view-base';
 export { HOVER_SOURCE, OPEN_GAP_MS, THEME_RECHECK_MS } from './tree-view-types';
@@ -242,7 +243,7 @@ export class TreeView extends TreeViewList {
 		this.finderDrawn = plan.finder;
 		this.foldPlan = plan.foldPlan;
 		// Spec §13.1: the names are kept per tree and mark (relation-cache.ts). Their time counts in the §7.7 time: it is in the layout part.
-		const rel = plan.relationsFor !== null ? relationsFor(plan.whole, plan.relationsFor, this.relationOptions) : null;
+		const rel = plan.relationsFor !== null ? relationsFor(plan.whole, plan.relationsFor, this.relationOptions, this.key) : null;
 		const result = this.layOutPlan(el, plan, rel, c);
 		if (!result) return;
 		const t2 = performance.now();
@@ -261,6 +262,12 @@ export class TreeView extends TreeViewList {
 		};
 		this.timing = { t0: open.start, t: timing };
 		this.host.recordTiming(timing);
+	}
+
+	/** D285: the canvas of a tree with very many cards keeps no standing layer (`move-layer.ts`); the style sheet reads the class. */
+	protected markBigTree(canvas: HTMLElement): void {
+		const big = !keepsStandingLayer(this.laid?.layout.persons.size ?? 0);
+		if (canvas.hasClass(BIG_TREE_CLASS) !== big) canvas.toggleClass(BIG_TREE_CLASS, big);
 	}
 
 	/** The root, the banner, the viewport and the empty svg of a tree. */
@@ -285,6 +292,7 @@ export class TreeView extends TreeViewList {
 		this.updateHeight();
 		// The HTML wrapper takes the CSS transform during a pinch (see PanZoom).
 		const canvas = viewport.createDiv({ cls: 'dynasty-canvas' });
+		this.markBigTree(canvas);
 		const svg = canvas.createSvg('svg', { cls: 'dynasty-svg', attr: { width: '100%', height: '100%' } });
 		// S7: the browser lays the tree out only when its first view is written (`firstDraw`); until then it takes no style or
 		// layout time. The wrapper hides, not the svg: the colour rule allows no inline `display`, and the svg is its only child.
@@ -391,7 +399,11 @@ export class TreeView extends TreeViewList {
 			// A D19 fill in a pinch out also takes the level of detail for its zoom: the smaller level has
 			// less text to lay out, so the fills are cheaper (measured: 83–133 ms instead of 133–167 ms at 4×).
 			onFill: (v) => {
-				if (this.applyLod(v)) this.placeFolds(v);
+				// D285: a new level changes the signs of every control, but the tap areas are placed only near the view.
+				if (this.applyLod(v)) {
+					this.refreshSignBoosts(v);
+					this.placeFolds(v, this.foldsDue(v));
+				}
 				this.fillFolds(v);
 				this.fillNear(v);
 			},
@@ -457,6 +469,7 @@ export class TreeView extends TreeViewList {
 		this.laid = laid;
 		this.bounds = treeBounds(laid.layout.width, laid.layout.height);
 		this.panZoom.setBounds(this.bounds);
+		if (this.canvasEl) this.markBigTree(this.canvasEl);
 		this.popover?.close();
 		this.tips?.hide();
 		this.live?.destroy();

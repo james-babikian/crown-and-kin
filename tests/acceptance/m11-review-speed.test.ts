@@ -1,34 +1,27 @@
-﻿import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-
-vi.mock('obsidian', () => import('./fake-obsidian'));
-vi.mock('@codemirror/language', () => ({ forceParsing: () => false, syntaxTree: () => ({ length: 0 }) }));
-vi.mock('@codemirror/view', () => ({ ViewPlugin: { fromClass: () => ({}) } }));
+﻿import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { parseDynasty } from '../../src/core/parse';
 import { createParseCache } from '../../src/core/parse-cache';
-import { FEl, clock, dispatch, fakeWin, flushFrames, installDom, resetDom, resizeAll, settle, wheel } from './fake-dom';
+import { FEl, clock, dispatch, flushFrames, resetDom, resizeAll, settle, wheel } from './fake-dom';
 import { resetObsidian } from './fake-obsidian';
 import { block15 } from './m10-support';
 import { desktop, embed, fakeHandle, fakeHost, fullViews } from './tree-view-fakes';
+import { useFakeDom } from '../support/fake-dom-setup';
 
 /* Review of M11 area B (speed work): each test states one defect; they wait for the B1, B2 fixes. Run: npx vitest run tests/acceptance/m11-review-speed.test.ts */
 
-beforeAll(() => {
-	installDom();
-	(globalThis as Record<string, unknown>).window ??= fakeWin;
-	(globalThis as Record<string, unknown>).CSS = { supports: (_p: string, v: string) => /^#[0-9a-f]{6}$/i.test(v) };
-});
+useFakeDom({ window: true, css: true });
 beforeEach(() => {
 	resetDom();
 	resetObsidian();
 	desktop();
 	// Idle time never comes in these tests, so only the near fill counts.
-	(globalThis as Record<string, unknown>).requestIdleCallback = () => 0;
+	(window as unknown as Record<string, unknown>).requestIdleCallback = () => 0;
 	vi.spyOn(performance, 'now').mockImplementation(() => clock.now);
 });
 afterEach(() => {
 	for (const m of fullViews()) (m as unknown as { close(): void }).close();
-	delete (globalThis as Record<string, unknown>).requestIdleCallback;
+	delete (window as unknown as Record<string, unknown>).requestIdleCallback;
 	vi.restoreAllMocks();
 });
 

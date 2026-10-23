@@ -70,14 +70,10 @@ export interface ReadDate {
 	// Reserved, never set in 0.3.2: month?, day?, qualifier?, yearTo?
 }
 
-/** A tree-level problem of the calendar set (spec section 14 rules 3 and 7). */
+/** A tree-level problem of the calendar set (spec section 14 rule 7): the note that the tree names does not exist or holds no calendar. `note` is the link as written. */
 export interface CalendarProblem {
-	key: 'calendar-note-missing' | 'calendar-duplicate';
-	calendar?: string;
+	key: 'calendar-note-missing';
 	note?: string;
-	other?: string;
-	/** `calendar-duplicate` for two name lists of plain years with one name: the name of the list (`calendar` is then empty). */
-	list?: string;
 }
 
 /** Reads date texts for one tree. */
@@ -404,7 +400,7 @@ export const MEMO_CAP = 20000;
  */
 function keyOf(calendars: readonly Calendar[], problems: readonly CalendarProblem[], plainLists: readonly NameList[]): string {
 	const cals = calendars.map((c) => JSON.stringify([c?.name, c?.formats, c?.kind, ...(Array.isArray(c?.lists) && c.lists.length ? [c.lists] : [])]) ?? '').sort();
-	const probs = problems.map((p) => JSON.stringify([p.key, p.calendar ?? '', p.note ?? '', p.other ?? ''])).sort();
+	const probs = problems.map((p) => JSON.stringify([p.key, p.note ?? ''])).sort();
 	return `k${hash(`${cals.join('\n')}\n--\n${probs.join('\n')}${plainLists.length ? `\n--\n${JSON.stringify(plainLists) ?? ''}` : ''}`)}`;
 }
 
@@ -636,19 +632,6 @@ export function checkCalendarsAt(calendars: Calendar[], plainLists: NameList[] =
 /** Refusals inside one note (rules 3 and 16): a bad format, a length below 1, a start that is not whole, the same cycle format (base form) or era name twice, the same calendar name twice, a bad name list. [] when valid. */
 export function checkCalendars(calendars: Calendar[], plainLists: NameList[] = []): CalendarRefusal[] {
 	return checkCalendarsAt(calendars, plainLists).map((x) => x.refusal);
-}
-
-/** The same cycle format or era name in another calendar note: a warning, not a refusal (spec section 14 rule 3). */
-export function findCrossNoteDuplicates(calendars: Calendar[]): CalendarProblem[] {
-	if (!Array.isArray(calendars)) return [];
-	const out: CalendarProblem[] = [];
-	calendars.forEach((c, i) => {
-		if (!c) return;
-		for (let j = 0; j < i; j++) {
-			if (calendars[j] && calendars[j].note !== c.note && clash(calendars[j], c)) out.push({ key: 'calendar-duplicate', calendar: c.name, note: c.note, other: calendars[j].note });
-		}
-	});
-	return out;
 }
 
 /** S from the entry form "same year as" (rule 1): cycles `other - (C-1)*L - (Y-1)`, eras `other - (Y-1)`. NaN when the input has no usable shape. */

@@ -1,5 +1,5 @@
 /*
- * The calendars of the plugin (spec §14), as `main.ts` registers them: the scan of the calendar notes when the vault is ready, the draw of the open
+ * The calendars of the plugin (spec §14), as `main.ts` registers them: the start of the calendar index when the vault is ready, the draw of the open
  * trees again when the index changes (only a tree whose reader key changed draws; the others do nothing), the `kin-calendar` block in a note and the
  * command that opens the Calendars window. `main.ts` owns the index (`TreeHost.dates`); this file only wires it to Obsidian.
  */
@@ -9,6 +9,7 @@ import { CALENDAR_UI } from '../render/calendar-text';
 import type { CalendarIndex } from '../view/calendar-index';
 import { calendarBlockProcessor } from './calendar-block-view';
 import { openCalendars } from './calendar-window';
+import { guardStart } from './start-guard';
 import type { TreeView } from './tree-view';
 
 /** What this file needs of the plugin: the open tree views. */
@@ -27,11 +28,29 @@ export function redrawForDates(views: Iterable<TreeView>, later: (fn: () => void
 	hidden.forEach((v, i) => later(() => v.datesChanged(), i));
 }
 
+/** The part of a tree view that `treesOfNote` reads. */
+type Placed = Pick<TreeView, 'notePath' | 'isFull' | 'stateKey' | 'offScreen'>;
+
+/**
+ * One view for each tree block of a note. In Reading view the hidden Live Preview editor draws the same block, so a block can have two views; they share the state key. The view
+ * on screen stands for the block. A block that is on screen nowhere (a closed fold) still counts, so a note with two trees stays "two trees".
+ */
+export function treesOfNote<V extends Placed>(views: Iterable<V>, path: string): V[] {
+	const blocks = new Map<string, V[]>();
+	for (const v of views) {
+		if (v.notePath !== path || v.isFull) continue;
+		const same = blocks.get(v.stateKey);
+		if (same) same.push(v);
+		else blocks.set(v.stateKey, [v]);
+	}
+	return [...blocks.values()].map((same) => same.find((v) => !v.offScreen) ?? same[0]);
+}
+
 /** Starts the index when the vault is ready, follows its changes and stops it when the plugin unloads. */
 export function registerCalendars(plugin: CalendarPlugin, index: CalendarIndex): void {
-	const timers = new Set<ReturnType<typeof setTimeout>>();
+	const timers = new Set<number>();
 	const later = (fn: () => void, turn: number) => {
-		const t = setTimeout(() => {
+		const t = window.setTimeout(() => {
 			timers.delete(t);
 			fn();
 		}, turn);
@@ -46,22 +65,23 @@ export function registerCalendars(plugin: CalendarPlugin, index: CalendarIndex):
 	});
 	plugin.register(() => {
 		off();
-		for (const t of timers) clearTimeout(t);
+		for (const t of timers) window.clearTimeout(t);
 		timers.clear();
 		index.dispose();
 	});
-	plugin.registerMarkdownCodeBlockProcessor('kin-calendar', calendarBlockProcessor(plugin.app, index));
-	// The command opens the window for the tree of the note that is open: its calendar note, if it names one.
+	guardStart('the calendar block', () => plugin.registerMarkdownCodeBlockProcessor('kin-calendar', calendarBlockProcessor(plugin.app, index)));
+	// The command opens the window for the tree of the note that is open. Only a note with exactly one tree lets the window write the key (D290): with two trees, which one is meant is not clear.
 	plugin.addCommand({
 		id: 'open-calendars',
 		name: CALENDAR_UI.command,
 		callback: () => {
 			const path = plugin.app.workspace.getActiveFile()?.path ?? '';
-			const view = [...plugin.views].find((v) => v.notePath === path && !v.isFull);
-			void openCalendars(plugin.app, index, { treePath: path, link: view?.calendarLink });
+			const here = treesOfNote(plugin.views, path);
+			const tree = here.length === 0 ? null : here.length === 1 ? here[0].calendarTree() : { ...here[0].calendarTree(), setLink: null };
+			void openCalendars(plugin.app, index, { tree });
 		},
 	});
-	// The vault list is complete only when the layout is ready. A host with no vault list or no metadata cache (a unit fake) has no calendar notes.
+	// The index only subscribes to the vault events when it starts (it reads no note). A host with no vault or no metadata cache (a unit fake) has no events.
 	const { vault, metadataCache } = plugin.app;
 	if (typeof vault?.getMarkdownFiles !== 'function' || typeof metadataCache?.on !== 'function') return;
 	plugin.app.workspace.onLayoutReady(() => void index.start());

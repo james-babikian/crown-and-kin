@@ -960,6 +960,13 @@ body.theme-dark .dynasty-house-dot {
 	transform: rotate(-45deg) translate(1px, -1px);
 }
 
+/* The keyboard ring of the window's buttons (G5 0.4, WCAG 2.4.7): the rule above takes the theme's own focus shadow away. */
+.dynasty-sheet .dynasty-check input[type='checkbox']:focus-visible {
+	outline: 2px solid var(--background-modifier-border-focus);
+	outline-offset: 1px;
+	box-shadow: 0 0 0 2px var(--interactive-accent);
+}
+
 .dynasty-sheet .dynasty-check input[type='checkbox']:disabled {
 	opacity: 0.5;
 	cursor: not-allowed;

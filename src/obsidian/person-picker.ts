@@ -37,6 +37,8 @@ export interface PickerContext {
 	/** The marked person: the second text line then starts with the relation word. Absent: the `you` of the picker, else no word. */
 	me?: string | null;
 	relationOptions?: RelationOptions;
+	/** The block of the tree view that asks (relation-cache.ts): the relation words come from the lookup of this block. */
+	relationBlock?: string;
 }
 
 /** What the picker resolved to: a person already in the tree, or a new one by the typed name. */
@@ -49,7 +51,13 @@ export const PICKER_PAGE = 200;
 /** The scroll position that adds the next page: this many heights of the list before its end, so the new rows exist before the reader sees them. */
 const NEAR_END = 2;
 
-/** Obsidian's row list inside `SuggestModal` (not in the public typings): the keyboard moves over `suggestions`, and `addSuggestion` adds one row at the end. */
+/**
+ * Obsidian's row list inside `SuggestModal` (not in the public typings): the keyboard moves over `suggestions`, and `addSuggestion` adds one row at the end.
+ * Why a private field: the public API has no way to add rows to a list that is already drawn, and drawing the whole list again for each page costs
+ * the reader's selected row and scroll position on a list of thousands of people. If a later Obsidian version removes or renames `chooser` (or
+ * its members), every use below checks for it first. The picker then draws the list again with one more page (`loadMore`), as it did before
+ * D237, and the keyboard and the search work as they do in any other picker; only the scroll position is less smooth.
+ */
 interface Chooser {
 	values: unknown[] | null;
 	suggestions: HTMLElement[];
@@ -72,7 +80,7 @@ const IDLE_MS = 300;
 
 /** Runs `fn` in idle time, or after `IDLE_MS` where the browser has no idle callback; gives a function that cancels it. */
 function whenIdle(fn: () => void): () => void {
-	const g = globalThis as unknown as { requestIdleCallback?: (f: () => void, o: { timeout: number }) => number; cancelIdleCallback?: (id: number) => void };
+	const g = window as unknown as { requestIdleCallback?: (f: () => void, o: { timeout: number }) => number; cancelIdleCallback?: (id: number) => void };
 	if (g.requestIdleCallback && g.cancelIdleCallback) {
 		const id = g.requestIdleCallback(fn, { timeout: IDLE_MS });
 		return () => g.cancelIdleCallback!(id);
@@ -147,7 +155,7 @@ function definePicker() {
 		}
 
 		override onOpen(): void {
-			super.onOpen();
+			void super.onOpen();
 			this.modalEl.addClass('dynasty-picker');
 			// A placeholder is not a name for a screen reader (P4).
 			this.inputEl.setAttribute('aria-label', FLOW.pickerSearchLabel);
@@ -224,7 +232,8 @@ function definePicker() {
 			// The rebuild selects the first row; the reader's row must stay selected (and in view), as with `addSuggestion`.
 			this.restoring = true;
 			try {
-				(this as unknown as { onInput(): void }).onInput();
+				// `onInput` is private too. If it is gone, the picker keeps the rows it has: the reader can still type to search.
+				(this as unknown as { onInput?(): void }).onInput?.();
 				list.scrollTop = top;
 				if (chooser && chooser.suggestions.length > 0) {
 					const at = Math.min(selected, chooser.suggestions.length - 1);
@@ -378,7 +387,7 @@ function definePicker() {
 			if (this.words === undefined) {
 				const me = this.ctx.me !== undefined ? this.ctx.me : this.you;
 				const valid = me ? validMe(this.g, me) : null;
-				this.words = valid ? relationsFor(this.g, valid, this.ctx.relationOptions).cards : null;
+				this.words = valid ? relationsFor(this.g, valid, this.ctx.relationOptions, this.ctx.relationBlock).cards : null;
 			}
 			return this.words;
 		}

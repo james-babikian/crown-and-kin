@@ -1,16 +1,13 @@
-import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-
-vi.mock('obsidian', () => import('./fake-obsidian'));
-vi.mock('@codemirror/language', () => ({ forceParsing: () => false, syntaxTree: () => ({ length: 0 }) }));
-vi.mock('@codemirror/view', () => ({ ViewPlugin: { fromClass: () => ({}) } }));
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { App, TFile } from 'obsidian';
 import { TFile as VaultFile } from 'obsidian';
 import type { MakePersonNoteInput } from '../../src/obsidian/make-note';
 import { makePersonNote } from '../../src/obsidian/make-note';
 import { linkTarget } from '../../src/render/tree-info';
-import { fakeWin, installDom, resetDom } from './fake-dom';
+import { resetDom } from './fake-dom';
 import { resetObsidian } from './fake-obsidian';
+import { useFakeDom } from '../support/fake-dom-setup';
 
 /*
  * The M10 G5 spec review named "clicking the new note's links" as not covered (spec §13.11, D86, D87). A
@@ -21,10 +18,7 @@ import { resetObsidian } from './fake-obsidian';
  * link back that it writes into the new note, must each resolve to the right note.
  */
 
-beforeAll(() => {
-	installDom();
-	(globalThis as Record<string, unknown>).window ??= fakeWin;
-});
+useFakeDom({ window: true });
 
 beforeEach(() => {
 	resetDom();

@@ -5,7 +5,7 @@ import { issueText, type CodedIssue } from '../../src/core/messages';
 import { findRelation, lineSubgraph } from '../../src/core/relations';
 import type { Holder, Title } from '../../src/core/types';
 import { fixtureSource } from './load';
-import { nextIdFor } from '../helpers';
+import { nextIdFor } from '../support/helpers';
 import { asWritten, BODY_13, graphOf, sample13, titleOf, titlesModule, treeOf, type ExpectedWarning, type TitledGraph, type TitledPerson } from './titles-support';
 
 /*

@@ -56,7 +56,7 @@ import type { BreakList } from '../break-words';
 import { legendRows, unionMarkClass, type LegendPart } from '../legend';
 import { isColour } from '../colour-check';
 import { lineLook, type LineMarks, type LineState } from '../line-highlight';
-import { cardNameLines, titleLines, type NameMeasure, type NameRun } from '../name-lines';
+import { cardNameLines, isolateLines, titleLines, type NameMeasure, type NameRun } from '../name-lines';
 import { ME_RING_INNER, TAG_MARK, UNION_MARKS, tagMarkGap, tagMarkHalfWidth, tagMarkSlot, unionMark, unionShape, type UnionShape } from '../styles';
 import { fitCardText, pickReign } from '../date-fit';
 import { SIGN_CARD_LABEL, cardLabel, dateLine, farTagLabel, farTagName, shownReign } from '../tree-info';
@@ -275,7 +275,7 @@ export function compactNameStep(widthAt: (k: number) => number, maxW: number): n
 	const last = COMPACT_STEPS.length - 1;
 	const want = (COMPACT_NAME_EM * maxW) / w0;
 	let k = 1;
-	while (k < last && COMPACT_STEPS[k]! > want + 1e-9) k++;
+	while (k < last && COMPACT_STEPS[k] > want + 1e-9) k++;
 	// `misfit` is the largest step that is known not to fit.
 	let misfit = 0;
 	while (k < last && widthAt(k) > maxW) misfit = k++;
@@ -350,10 +350,10 @@ function orderedLayer(parent: SVGElement): { reserve: () => number; put: (slot: 
 			let hi = done.length;
 			while (lo < hi) {
 				const mid = (lo + hi) >> 1;
-				if (done[mid]! < slot) lo = mid + 1;
+				if (done[mid] < slot) lo = mid + 1;
 				else hi = mid;
 			}
-			parent.insertBefore(el, lo < done.length ? els[done[lo]!]! : null);
+			parent.insertBefore(el, lo < done.length ? els[done[lo]]! : null);
 			done.splice(lo, 0, slot);
 			els[slot] = el;
 			return el;
@@ -532,8 +532,8 @@ export function buildScene(parent: SVGGElement, g: FamilyGraph, laid: LaidOut, o
 		/** True while the text carries a size of its own, so a name that fits again clears it and a name that always fits never touches the style. */
 		let sized = false;
 		const run = () => {
-			const k = compactNameStep((i) => opts.measure(text, textFont(COMPACT_STEPS[i]! * f, opts.fonts.bold)), maxW);
-			const em = COMPACT_STEPS[k]!;
+			const k = compactNameStep((i) => opts.measure(text, textFont(COMPACT_STEPS[i] * f, opts.fonts.bold)), maxW);
+			const em = COMPACT_STEPS[k];
 			// A name that fits at the top size is not cut, so there is nothing to measure again.
 			el.setText(k === 0 ? text : truncate(text, maxW, (s) => opts.measure(s, textFont(em * f, opts.fonts.bold))));
 			if (k === 0) {
@@ -803,7 +803,7 @@ export function buildScene(parent: SVGGElement, g: FamilyGraph, laid: LaidOut, o
 		}
 		const runNames = () => {
 			// A box the layout made taller for fewer text lines than the name needs shows at most that many until the tree view lays it out again.
-			const lines = cardNameLines(shownName, sob, room, nameMeasure, names.length as NameLineCount, opts.breaks);
+			const lines = isolateLines(cardNameLines(shownName, sob, room, nameMeasure, names.length as NameLineCount, opts.breaks));
 			names.forEach((el, i) => setRuns(el, lines[i] ?? []));
 		};
 		addFit(runNames);
@@ -1045,7 +1045,7 @@ export function buildScene(parent: SVGGElement, g: FamilyGraph, laid: LaidOut, o
 			lineChain = { cx, cy, items: order.map((o) => o.l), at: 0 };
 		}
 		let left = count;
-		while (left > 0 && lineChain.at < lineChain.items.length) left -= putLine(lineChain.items[lineChain.at++]!);
+		while (left > 0 && lineChain.at < lineChain.items.length) left -= putLine(lineChain.items[lineChain.at++]);
 	};
 	const fill: SceneFill = lazy
 		? {
@@ -1093,7 +1093,7 @@ export function buildScene(parent: SVGGElement, g: FamilyGraph, laid: LaidOut, o
 					let n = 0;
 					let cardsDone = 0;
 					while (chain.at < chain.items.length) {
-						const d = chain.items[chain.at]!;
+						const d = chain.items[chain.at];
 						if (!delayed.has(d)) {
 							chain.at++;
 							continue;

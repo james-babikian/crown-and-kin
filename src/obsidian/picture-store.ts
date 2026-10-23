@@ -456,8 +456,7 @@ export function createPictureStore(app: App, io: PictureIO = defaultIO(app)): Pi
 		if (saved) return saved;
 		saved = new Map();
 		try {
-			const load = (app as { loadLocalStorage?: (k: string) => unknown }).loadLocalStorage;
-			const raw = typeof load === 'function' ? load.call(app, HEADER_STORE_KEY) : null;
+			const raw: unknown = app.loadLocalStorage(HEADER_STORE_KEY);
 			const list = raw && typeof raw === 'object' && Array.isArray((raw as { e?: unknown }).e) ? (raw as { e: unknown[] }).e : [];
 			for (const x of list) {
 				if (!Array.isArray(x) || typeof x[0] !== 'string' || typeof x[1] !== 'string' || !x[2] || typeof x[2] !== 'object') continue;
@@ -472,9 +471,8 @@ export function createPictureStore(app: App, io: PictureIO = defaultIO(app)): Pi
 	function storeHeaders(): void {
 		saveTimer = null;
 		try {
-			const put = (app as { saveLocalStorage?: (k: string, v: unknown) => void }).saveLocalStorage;
-			if (typeof put !== 'function' || !saved) return;
-			put.call(app, HEADER_STORE_KEY, { v: 1, e: [...saved].map(([p, x]) => [p, x.sig, x.result]) });
+			if (!saved) return;
+			app.saveLocalStorage(HEADER_STORE_KEY, { v: 1, e: [...saved].map(([p, x]) => [p, x.sig, x.result]) });
 		} catch (e) {
 			console.error('Crown and Kin: cannot keep the picture checks', e);
 		}

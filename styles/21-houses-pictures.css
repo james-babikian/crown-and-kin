@@ -68,13 +68,21 @@
 	box-shadow: inset 0 0 0 1px var(--background-modifier-border);
 	color: var(--text-on-accent);
 	cursor: pointer;
+	/* No grey flash under the finger on a phone (owner's iPhone, 0.4): the tap highlight and the pressed style of a button do not paint over the colour. */
+	-webkit-tap-highlight-color: transparent;
+	transition: none;
+}
+
+.dynasty-sheet .dynasty-swatch:is(:hover, :active, :focus) {
+	background: var(--dynasty-house-color);
 }
 
 .dynasty-sheet .dynasty-swatch.is-selected {
 	box-shadow: inset 0 0 0 2px var(--modal-background, var(--background-primary)), inset 0 0 0 4px var(--text-normal);
 }
 
-.dynasty-sheet .dynasty-swatch.is-other {
+.dynasty-sheet .dynasty-swatch.is-other,
+.dynasty-sheet .dynasty-swatch.is-other:is(:hover, :active, :focus) {
 	background: conic-gradient(red, gold, green, dodgerblue, purple, red);
 }
 
@@ -94,21 +102,30 @@
 	filter: drop-shadow(0 0 1px var(--background-modifier-cover));
 }
 
-/* The system colour window is opened by the last swatch; its input stays in the page but takes no room. */
+/*
+ * The system colour window opens from the last swatch. Its input lies over the swatch, unseen, and takes a tap or a click itself: iOS opens the
+ * window only for a tap on the input, never from code (G5 0.4). The swatch below keeps the look and is the control for the keyboard.
+ * The selector outranks the 88 px colour field of the person window (10-edit-sheet.css), so the input has the size of the swatch and no tap beside it opens the window.
+ */
 .dynasty-house-other {
 	position: relative;
 	display: inline-flex;
 }
 
-.dynasty-sheet .dynasty-house-other-input {
+.modal.dynasty-sheet input[type='color'].dynasty-house-other-input {
 	position: absolute;
-	left: 0;
-	top: 0;
-	width: 28px;
-	height: 28px;
+	inset: 0;
+	z-index: 1;
+	width: 100%;
+	height: 100%;
 	min-height: 0;
+	margin: 0;
+	padding: 0;
+	border: 0;
+	border-radius: 50%;
 	opacity: 0;
-	pointer-events: none;
+	pointer-events: auto;
+	cursor: pointer;
 }
 
 .dynasty-sheet.is-phone .dynasty-swatch,

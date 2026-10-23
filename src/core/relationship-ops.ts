@@ -8,13 +8,13 @@
 import { isAlias, isMap, isScalar, isSeq, type Node, type Pair, type YAMLMap, type YAMLSeq } from 'yaml';
 import { deriveFamilies, type FamilyGraph } from './derive';
 import type {
-	AddParent, AddPerson, AddUnion, DeletePerson, EditResult, EditUnion, MoveSibling, ParentKind, PersonField, Placement, RemoveParent, RemoveUnion, SetParentType, UnionRef,
+	AddParent, AddPerson, AddUnion, DeletePerson, EditResult, EditUnion, MoveSibling, ParentKind, Placement, RemoveParent, RemoveUnion, SetParentType, UnionRef,
 } from './edit';
 import { descendantsOf, siblingGroup, writtenParents } from './family-query';
 import { newIdIn } from './id-gen';
 import { parseBody, readTree, textWithoutComments } from './parse';
 import { dropHolderPatches, dropHolders, dropIdPatches, dropIds } from './title-ops';
-import { isEmpty, isMap as isRawMap, list, str, unwrapCurly, type Raw, type RawMap } from './tolerate';
+import { isEmpty, isMap as isRawMap, isRawList, list, str, unwrapCurly, type Raw, type RawMap } from './tolerate';
 import { isParentType, isPlacementType, isUnionType, PARENT_LIMIT, parentKind, PLACEMENT_TYPES, type Tree } from './types';
 import { dashOf, flowComment, insertItem, itemEnd, itemStart, removeFromSection, removeItems, section, type Where } from './yaml-list';
 import {
@@ -86,7 +86,7 @@ function parentEntries(p: Parsed, item: YAMLMap): { pair?: Pair; seq?: YAMLSeq; 
 }
 
 /** The raw parents of a person as a list (a single id becomes a one-item list). */
-const rawParents = (person: RawMap): Raw[] => (Array.isArray(person.parents) ? [...person.parents] : isEmpty(person.parents) ? [] : [person.parents]);
+const rawParents = (person: RawMap): Raw[] => (isRawList(person.parents) ? [...person.parents] : isEmpty(person.parents) ? [] : [person.parents]);
 
 /** A parent entry in the §4.2 write form. */
 function parentEntryText(id: string, type: ParentKind): string {
@@ -146,7 +146,7 @@ function addPerson(ctx: OpContext, op: AddPerson): EditResult {
 	const values = new Map<string, string>();
 	for (const field of PERSON_FIELDS) {
 		if (!Object.prototype.hasOwnProperty.call(fields, field)) continue;
-		const v = personValue(field, fields[field as PersonField] ?? null);
+		const v = personValue(field, fields[field] ?? null);
 		if (isRefusal(v)) return v;
 		if (v.write !== null) values.set(field, v.write);
 	}
@@ -260,7 +260,7 @@ function addParent(ctx: OpContext, op: AddParent): EditResult {
 	// §6.4: two birth or two adoptive parents with no union between them get a marriage.
 	const other = same[0]?.id;
 	const auto = op.autoUnion !== false && (op.type === 'birth' || op.type === 'adoptive') && other !== undefined && !g.unions.some((u) => !u.implicit && u.partners.includes(other) && u.partners.includes(op.parent));
-	if (auto) expected.unions = [...(Array.isArray(expected.unions) ? expected.unions : []), { partners: [other, op.parent], type: 'marriage' }];
+	if (auto) expected.unions = [...(isRawList(expected.unions) ? expected.unions : []), { partners: [other, op.parent], type: 'marriage' }];
 	// A new parent can change the placement parents, so `union:` may no longer name their union.
 	let stale = staleKeys(ctx, expected, [childIndex]);
 
@@ -289,7 +289,7 @@ function addParent(ctx: OpContext, op: AddParent): EditResult {
 			}
 		}
 		if (!auto) return patches;
-		const union = insertUnion(p, [other!, op.parent], 'marriage');
+		const union = insertUnion(p, [other, op.parent], 'marriage');
 		return isRefusal(union) ? union : [...patches, union];
 	};
 	return done(finish(ctx.first, [step], expected, []), auto ? ['auto-union'] : []);
@@ -576,7 +576,7 @@ export function removeStaleKeys(before: string, after: string): EditResult {
 		for (const key of ['placement', 'union'] as const) {
 			if (was[key] === undefined || person[key] !== was[key] || now[key] !== undefined) continue;
 			stale.push({ index: person.index, key });
-			delete ((expected.people as RawMap[])[person.index] as RawMap)[key];
+			delete (expected.people as RawMap[])[person.index][key];
 		}
 	}
 	if (!stale.length) return unchanged;
@@ -622,7 +622,7 @@ function idTextOf(src: Source, node: Node): string {
 function plainEntry(src: Source, node: Node): boolean {
 	if (isScalar(node)) return true;
 	if (!isMap(node)) return false;
-	const keys = (node.items as Pair[]).every((pr) => ['id', 'type'].includes(str((pr.key as { value?: unknown })?.value) ?? ''));
+	const keys = node.items.every((pr) => ['id', 'type'].includes(str((pr.key as { value?: unknown })?.value) ?? ''));
 	return keys && commentsOf(src.text.slice(node.range![0], src.nodeEnd(node))).length === 0;
 }
 

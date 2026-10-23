@@ -135,6 +135,15 @@ body {
 	}
 }
 
+/*
+ * A tree with very many cards (D285, `src/obsidian/move-layer.ts`) keeps no layer, also not in a pinch: the browser's layer builder took most of every
+ * frame of a pan or pinch on a tree of thousands of people. The view sets the class on the canvas. The pinch still moves the wrapper by its transform.
+ */
+.dynasty-full .dynasty-canvas.dynasty-big-tree,
+.dynasty-canvas.dynasty-gesture.dynasty-big-tree {
+	will-change: auto;
+}
+
 .dynasty-banner {
 	margin: 0 0 var(--size-4-2) 0;
 }

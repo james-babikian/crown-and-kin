@@ -683,6 +683,12 @@ export const WRITE_TEXT = {
 	heightFailed: 'The plugin cannot save the new height of the tree.',
 	undoCommand: 'Undo last tree edit',
 	undoDone: 'The plugin undid the last tree edit.',
+	/** D284: the command names the note that it changed. */
+	undoDoneIn: (note: string) => `The plugin undid the last tree edit in ${quote(note)}.`,
+	/** D284: the question when the last tree edit is in a note that is not the active note. */
+	undoAskTitle: (note: string) => `Undo the last tree edit in ${quote(note)}?`,
+	/** The two sentences of the question: the first names the note in a line that everyone can see, also on a phone (the title can be cut). */
+	undoAskText: (note: string): string[] => [`The last tree edit is in the note ${quote(note)}, not in the active note.`, `If you select Undo, the plugin reverses that edit in ${quote(note)}.`],
 	undoEmpty: 'There is no tree edit to undo.',
 	undoChanged: 'The plugin cannot undo the last tree edit. The tree changed after the edit.',
 	undoMissing: 'The plugin cannot find the tree of the last edit.',

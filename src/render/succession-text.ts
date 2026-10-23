@@ -29,18 +29,18 @@ export const SUCCESSION_UI = {
 	rules: {
 		'eldest-child': 'Eldest child first (primogeniture)',
 		'youngest-child': 'Youngest child first (ultimogeniture)',
-		'siblings-first': 'Siblings before children (seniority)',
+		'siblings-first': 'Oldest generation first (lateral succession)',
 		'nearest-relative': 'Nearest relative first (proximity of blood)',
 		'born-in-reign': 'Born during the reign first (porphyrogeniture)',
 	} satisfies Record<SuccessionRule, string>,
 	inheritLabel: 'Who can inherit',
 	inherits: {
 		'men-only': 'Men only (agnatic)',
-		'men-first-in-house': 'Men first in the whole house (semi-Salic)',
+		'men-first-in-house': 'Men first in the whole dynasty (semi-Salic)',
 		'men-first': 'Men first (male preference)',
 		'no-preference': 'No preference (equal)',
 		'women-first': 'Women first (female preference)',
-		'women-first-in-house': 'Women first in the whole house (reverse semi-Salic)',
+		'women-first-in-house': 'Women first in the whole dynasty (reverse semi-Salic)',
 		'women-only': 'Women only (enatic)',
 	} satisfies Record<InheritRule, string>,
 	throughLabel: 'The right to inherit comes from',
@@ -54,11 +54,14 @@ export const SUCCESSION_UI = {
 	salic: 'This is the Salic law.',
 	salicReverse: 'This is the reverse of the Salic law.',
 	// F-DOCS-02: a man whose claim comes through a woman is in the first group only with "Anyone".
-	houseMen: 'All men of the male line of the house come before all women, whatever the generation or degree. A man whose claim comes through a woman is in this group only if “The right to inherit comes from” is “Anyone”.',
-	houseWomen: 'All women of the female line of the house come before all men, whatever the generation or degree. A woman whose claim comes through a man is in this group only if “The right to inherit comes from” is “Anyone”.',
-	siblingsHint: 'The oldest generation of the house comes first: aunts and uncles, then brothers, sisters and cousins, then children.',
+	houseMen: 'The dynasty is all the descendants of the founders. Every man of the male line of the dynasty comes before every woman. This is true even if a woman is of an older generation or is nearer to the ruler. A man whose claim comes through a woman is in this group only if “The right to inherit comes from” is “Anyone”.',
+	houseWomen: 'The dynasty is all the descendants of the founders. Every woman of the female line of the dynasty comes before every man. This is true even if a man is of an older generation or is nearer to the ruler. A woman whose claim comes through a man is in this group only if “The right to inherit comes from” is “Anyone”.',
+	// D292: the rule goes by generation. The order of the list is the order of the levels of spec §13.21 rule 16.
+	siblingsHint:
+		'The oldest generation comes first: great-uncles and great-aunts, then aunts and uncles, then brothers, sisters and cousins, then children, nephews and nieces. Age does not decide between generations. For example, an uncle of the ruler comes before a brother of the ruler, even if the uncle is younger.',
 	nearestHint: 'Nearness is the number of steps through the family. A child is 1, a brother or sister is 2, an aunt, uncle, niece or nephew is 3, a cousin is 4.',
-	matrilinealHint: 'With “Women (matrilineal)” and “Eldest child first”, the son of an elder sister comes before a brother of the ruler. If you want brothers first, choose “Siblings before children” or “Nearest relative first”.',
+	matrilinealHint:
+		'If “The right to inherit comes from” is “Women (matrilineal)” and the rule is “Eldest child first (primogeniture)”, the son of an elder sister comes before a brother of the ruler. If you want brothers first, choose “Oldest generation first (lateral succession)” or “Nearest relative first (proximity of blood)” as the rule.',
 	rulerNoSex: (ruler: string) => `${ruler} has no sex value, so no claim passes through ${ruler}.`,
 	yearLabel: 'Year',
 	yearHint: 'If you leave this empty, the line is for the end of the last reign. If the last reign has no end, the line is for now. A child born after this year is not in the line.',
@@ -68,14 +71,23 @@ export const SUCCESSION_UI = {
 		after: 'They inherit after all people who do not have the box “Illegitimate” ticked',
 		equal: 'They have the same right to inherit as the other children',
 	} satisfies Record<InheritIllegitimate, string>,
-	illHint: 'If you choose “Women only”, “Women first” or “Women first in the whole house”, only the mother’s side counts. If the box “Illegitimate” does not matter, choose the last option.',
+	// Shown only when a claim passes through women alone (inherit-through women, or not written with Women only). The last option is `ills.equal`.
+	illHint: 'Here a claim passes only through women, so only the mother’s side counts. If the box “Illegitimate” does not matter, choose “They have the same right to inherit as the other children”.',
+	// Women first in the whole dynasty with no written inherit-through: the first group is the women of the female line.
+	illHintFirstGroup: 'The first group, the women of the female line, has a claim only through the mother’s side. For everyone else the father’s side also counts, so the box “Illegitimate” matters there.',
 	adopted: 'Adopted children can inherit',
 	adoptedHint: 'Wards and rumoured children never inherit.',
 	body: 'Only descendants of the first holder can inherit',
 	bodyHint: (first: string) => `The first holder is ${first}. Only the descendants of ${first} are in the line. If the title goes to a new house, make a new title.`,
+	// D291: while the switch is off, the hint says what the switch would do; the next hint (`cadetHint`) shows only when it matters.
+	bodyHintOff: (first: string) => `The first holder is ${first}. If you turn on this switch, only the descendants of ${first} are in the line.`,
+	cadetHint: (name: string, first: string) =>
+		`${name} is in the line of succession, but ${name} is not a descendant of ${first}. If only the descendants of ${first} can inherit this title, turn on this switch. Then ${name} leaves the line.`,
 	// F-KIN-07: the first entry has a name only, so the first holder is the next entry that names a person in the tree.
 	bodyHintSkipped: (first: string, entry: string) =>
 		`The first holder in the tree is ${first}, so only the descendants of ${first} are in the line of succession. The first entry, ${entry}, is not a person in the tree. To use ${entry}, select a person in the tree as that holder. If the title goes to a new house, make a new title.`,
+	bodyHintSkippedOff: (first: string, entry: string) =>
+		`The first entry, ${entry}, is not a person in the tree, so the first holder in the tree is ${first}. If you turn on this switch, only the descendants of ${first} are in the line. To use ${entry}, select a person in the tree as that holder.`,
 	outsideBody: (ruler: string, first: string) =>
 		`${ruler} is not a descendant of ${first}, so nobody can inherit this title. Check the choices for adopted children and for children with the box “Illegitimate” ticked.`,
 	// Named heirs and excluded people (K.3).

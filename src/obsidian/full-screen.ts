@@ -12,6 +12,7 @@ import { isPhoneSideways } from '../view/focus-mode';
 import { isPhoneWidth } from './modal-layout';
 import { nameDialog } from './sheet-parts';
 import { TreeView, type FullHost, type FullSource, type TreeHost } from './tree-view';
+import { TreeViewBase, showsRing } from './tree-view-base';
 
 // Obsidian's sidebar swipe and pull-down gestures listen above the modal; these must not reach them (spec §7.2).
 const STOPPED = ['touchstart', 'touchmove', 'touchend', 'touchcancel', 'pointerdown', 'pointermove', 'pointerup', 'pointercancel'];
@@ -28,6 +29,8 @@ export class FullScreenModal extends Modal implements FullHost {
 	private after: (() => void) | null = null;
 	/** The note's scroll position when the view opened, restored on close (spec §7.1). */
 	private readonly scrolls: { el: HTMLElement; top: number; left: number }[] = [];
+	/** Expand had the keyboard focus when the view opened (and showed its ring or not): it gets the focus back on close, also when an edit drew the note's tree again (G5 0.4). */
+	private readonly expandBack: { visible: boolean } | null;
 
 	constructor(
 		private readonly host: TreeHost,
@@ -39,6 +42,8 @@ export class FullScreenModal extends Modal implements FullHost {
 	) {
 		super(host.app);
 		this.focus = focusId === null ? null : { id: focusId };
+		const active = opener.doc?.activeElement;
+		this.expandBack = active && opener.contains(active) && active.matches('.dynasty-expand') ? { visible: showsRing(active) } : null;
 		for (let el: HTMLElement | null = opener.parentElement; el; el = el.parentElement) {
 			if (el.scrollHeight > el.clientHeight || el.scrollWidth > el.clientWidth) this.scrolls.push({ el, top: el.scrollTop, left: el.scrollLeft });
 		}
@@ -209,8 +214,14 @@ export class FullScreenModal extends Modal implements FullHost {
 		restore();
 		const after = this.after;
 		this.after = null;
+		const back = this.expandBack;
 		(this.modalEl.win ?? window).requestAnimationFrame(() => {
 			restore();
+			try {
+				if (back) TreeViewBase.refocusAfterRedraw(this.host, (v) => v.stateKey === key && !v.isFull, (vp) => vp.querySelector<HTMLElement>('.dynasty-expand'), back.visible);
+			} catch (e) {
+				console.error('Crown and Kin: cannot give the focus back', e);
+			}
 			// Opened only now, so that the note's history entry keeps its scroll position.
 			try {
 				after?.();

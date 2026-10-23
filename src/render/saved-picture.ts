@@ -26,7 +26,7 @@ export interface SavedLegendContent {
 }
 
 /** B9, B1: a picture map: `arms:<houseId>` / `portrait:<personId>` → a data URI, 'missing' (dashed frame) or null (another problem). */
-export type PictureMap = ReadonlyMap<string, string | 'missing' | null>;
+export type PictureMap = ReadonlyMap<string, (string & {}) | 'missing' | null>;
 
 /** What only a saved picture has (P3–P5); `SvgOptions.saved`. */
 export interface SavedParts {
@@ -296,7 +296,7 @@ export function savedFrame(tree: { width: number; height: number }, legend: Save
 		// The two parts side by side when both fit in the tree's width; else the houses under the lines.
 		const beside = lines && legend.houses.length ? grid(legend.houses, houseCell, 2, content - lines.w - partGap) : undefined;
 		const side = !!beside && lines!.w + partGap + beside.w <= content;
-		const houses = legend.houses.length ? (side ? beside! : grid(legend.houses, houseCell, 2, content)) : undefined;
+		const houses = legend.houses.length ? (side ? beside : grid(legend.houses, houseCell, 2, content)) : undefined;
 		const housesX = side ? lines!.w + partGap : 0;
 		const housesY = !side && lines ? lines.h + gap : 0;
 		legendW = side ? housesX + houses!.w : Math.max(lines?.w ?? 0, houses?.w ?? 0);

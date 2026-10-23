@@ -145,8 +145,8 @@ function putAt(parent: HTMLElement, child: HTMLElement, at: number): void {
  * with its holder when it was the last one, and the large row loses `has-column` when no column is left. `restoreListPictures` undoes it.
  */
 export function failListPicture(slot: HTMLElement | undefined): void {
-	const holder = slot?.parentElement as HTMLElement | null | undefined;
-	const owner = holder?.parentElement as HTMLElement | null | undefined;
+	const holder = slot?.parentElement;
+	const owner = holder?.parentElement;
 	const row = slot?.closest<HTMLElement>('.dynasty-list-row');
 	if (!slot || !holder || !owner || !row) return;
 	const slotAt = indexIn(holder, slot);

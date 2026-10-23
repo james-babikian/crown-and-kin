@@ -5,7 +5,7 @@
  * `houses-window.ts`) use them; nothing here reads or writes a note.
  */
 
-import { Menu, setIcon, type TFile } from 'obsidian';
+import { Menu, setIcon } from 'obsidian';
 import { startCropOf } from './crop-tool';
 import type { PictureCopy, PictureStore } from './picture-store';
 
@@ -125,7 +125,7 @@ export class RowPictures {
 				entry.started = true;
 				this.unwatch(entry);
 				void store
-					.acquire(found.file as TFile, { w: o.px, h: o.px, fit: o.fit, ...(part && o.fit === 'portrait' ? { crop: part } : {}) }, entry.ctl.signal)
+					.acquire(found.file, { w: o.px, h: o.px, fit: o.fit, ...(part && o.fit === 'portrait' ? { crop: part } : {}) }, entry.ctl.signal)
 					.then((c) => {
 						if (!c || !('url' in c)) {
 							slot.addClass('is-failed');

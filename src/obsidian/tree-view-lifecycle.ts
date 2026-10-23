@@ -17,6 +17,7 @@ import type { Handle } from './block-handle';
 import { lastHeight, rememberHeight } from './block-height';
 import type { BlockState } from '../view/block-state';
 import { isPhoneDevice } from '../view/focus-mode';
+import { releaseRelations } from '../view/relation-cache';
 import { reducedMotion, type DynastySettings } from '../view/settings';
 import { hasArms, hasPortraits, hasReign } from '../view/tree-view-helpers';
 import { TreeViewBase } from './tree-view-base';
@@ -175,6 +176,10 @@ export abstract class TreeViewLifecycle extends TreeViewBase {
 		this.binding.clearTimers();
 		if (this.turnTimer) this.containerEl.win.clearTimeout(this.turnTimer);
 		this.host.views.delete(this);
+		// The calendar index may drop the keys that only this view held.
+		this.host.dates?.release?.(this);
+		// The block's relation lookup (relation-cache.ts) goes with its last view; the embed and its full-screen view share one.
+		if (![...this.host.views].some((v) => v.stateKey === this.key)) releaseRelations(this.key);
 		this.binding.release();
 		this.unsubPictures?.();
 		this.unsubPictures = null;

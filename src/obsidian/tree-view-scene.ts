@@ -36,7 +36,7 @@
 import { Keymap, getLinkpath } from 'obsidian';
 import type { Person } from '../core/types';
 import { FOLD_EM } from '../layout/fold-spots';
-import type { Rect } from '../layout/model';
+import type { LaidOut, Rect } from '../layout/model';
 import { visibleRect } from '../render/dom/pan-zoom';
 import { discPath, type CardLink, type Scene } from '../render/dom/scene';
 import { SIGN_CARD_LABEL, cardLabel, linkTarget } from '../render/tree-info';
@@ -51,6 +51,7 @@ import { TreeViewPlacement } from './tree-view-placement';
 import { viewCard } from './viewer-sources';
 import { TreeViewBase } from './tree-view-base';
 import { HIGHLIGHT_MS, HOVER_SOURCE } from './tree-view-types';
+import { hintSide } from './hint-place';
 import { later } from '../view/idle';
 
 /** The most cards attached in one idle chunk. */
@@ -64,8 +65,34 @@ const MIN_SIGN_TEXT_PX = 11;
 
 const MAX_SIGN_BOOST = 8;
 
+/** Writes the four numbers of a rectangle, each only when it changes: a write of the same value still restyles the element (D285). */
+function setRect(el: Element, r: Rect): void {
+	const x = String(r.x);
+	const y = String(r.y);
+	const w = String(r.w);
+	const h = String(r.h);
+	if (el.getAttribute('x') !== x) el.setAttribute('x', x);
+	if (el.getAttribute('y') !== y) el.setAttribute('y', y);
+	if (el.getAttribute('width') !== w) el.setAttribute('width', w);
+	if (el.getAttribute('height') !== h) el.setAttribute('height', h);
+}
+
+/** True when two lists of tap areas hold the same rectangles in the same order. */
+function sameRects(a: readonly Rect[], b: readonly Rect[]): boolean {
+	return a.length === b.length && a.every((r, i) => r.x === b[i].x && r.y === b[i].y && r.w === b[i].w && r.h === b[i].h);
+}
+
 /** The scene of a drawn tree: content on demand, the idle chain, the presses and keys, and the moves of the view to a card. */
 export abstract class TreeViewScene extends TreeViewPlacement {
+	/** The layout, scene and zoom that `tapAreas` and the tag and badge tap areas were placed for (`placeTapAreas`). */
+	private tapFor: { laid: LaidOut; scene: Scene; scale: number } | null = null;
+	/** Counts the new sets of `tapAreas`; a fold control placed for an older set is placed again when it is near the view. */
+	private tapEpoch = 0;
+	/** What each fold control was placed for: the level, the zoom and the set of cut-back areas. */
+	private readonly foldStamp = new WeakMap<FoldRef, string>();
+	/** The scene, level and zoom that the sizes of the Overview signs were last set for (`refreshSignBoosts`). */
+	private boostFor: { scene: Scene; lod: string | null; scale: number } | null = null;
+
 	/**
 	 * Starts the pulse of the cards in the frame after the one that writes the new view (D235): it must start after the card is drawn in its new place. The frame
 	 * of the pan and zoom is asked for first, and frames run in the order they were asked for. A new call or a redraw replaces the one that waits.
@@ -110,26 +137,34 @@ export abstract class TreeViewScene extends TreeViewPlacement {
 	}
 
 	/**
-	 * Gives the open controls near `view` their drawing and tap area (they start as empty shells: 600 extra
-	 * elements slowed the first view by 12 %). The rest follow in idle chunks, so a pan never meets an empty control.
+	 * The test for "near the view" of the fold controls: within one screen of the view's centre on each side. The fill and the placing of the tap areas use
+	 * the same window. Null when the view has no size yet.
 	 */
-	protected fillFolds(view: View): void {
-		const scene = this.scene;
+	protected foldWindow(view: View): ((f: FoldRef) => boolean) | null {
 		const vp = this.viewport;
-		if (!scene || !vp || view.scale <= 0) return;
+		if (!vp || view.scale <= 0) return null;
 		const area = this.panZoom?.size ?? { w: vp.clientWidth, h: vp.clientHeight };
 		const w = area.w / view.scale;
 		const h = area.h / view.scale;
-		let filled = false;
+		return (f) => Math.abs(f.control.spot.x - view.cx) <= w && Math.abs(f.control.spot.y - view.cy) <= h;
+	}
+
+	/**
+	 * Gives the open controls near `view` their drawing and tap area (they start as empty shells: 600 extra
+	 * elements slowed the first view by 12 %). The rest follow in idle chunks, so a pan never meets an empty control.
+	 * Only the controls that it fills get their tap area placed here (D285: a pass over all of them at each settle cost seconds on a very large tree).
+	 */
+	protected fillFolds(view: View): void {
+		const scene = this.scene;
+		const near = this.foldWindow(view);
+		if (!scene || !near) return;
+		const filled: FoldRef[] = [];
 		for (const f of scene.folds) {
-			if (f.filled) continue;
-			const { x, y } = f.control.spot;
-			if (Math.abs(x - view.cx) <= w && Math.abs(y - view.cy) <= h) {
-				f.fill();
-				filled = true;
-			}
+			if (f.filled || !near(f)) continue;
+			f.fill();
+			filled.push(f);
 		}
-		if (filled) this.placeFolds(view);
+		if (filled.length) this.placeFolds(view, filled);
 	}
 
 	/** Fold controls or card content still wait for the idle chain. A static phone preview has no idle fill of cards (S5g). */
@@ -168,15 +203,17 @@ export abstract class TreeViewScene extends TreeViewPlacement {
 					return;
 				}
 				// The M10 fold controls go first, and the two kinds never share one idle callback.
-				let n = 0;
+				const made: FoldRef[] = [];
 				for (const f of scene.folds) {
 					if (f.filled) continue;
 					f.fill();
-					if (++n >= 40 || idle.timeRemaining() < IDLE_STOP_MS) break;
+					made.push(f);
+					if (made.length >= 40 || idle.timeRemaining() < IDLE_STOP_MS) break;
 				}
 				const v = pz?.view;
-				if (n) {
-					if (v) this.placeFolds(v);
+				if (made.length) {
+					// D285: only the controls of this chunk are placed; a pass over all filled controls in every chunk was quadratic.
+					if (v) this.placeFolds(v, made);
 				} else if (scene.fill.pending > 0 || scene.fill.pendingLines > 0) {
 					const rect = v && pz ? visibleRect(v, pz.size) : null;
 					// No view yet: the first draw or the next settle starts the chain again.
@@ -245,28 +282,104 @@ export abstract class TreeViewScene extends TreeViewPlacement {
 	/**
 	 * F7: the tap areas of the fold controls at `view`'s zoom: 44 screen px, centred on the mark that shows at the
 	 * level (the Overview sign is larger), and cut back where they meet a far-couple tag or a `+` badge. A card wins
-	 * over a tap area by its place in the hit layer.
+	 * over a tap area by its place in the hit layer. `which` is the set of controls to place (all by default). Each placed control
+	 * keeps the zoom, the level and the cut-back areas it was placed for (`foldStamp`), so `foldsDue` can find the ones that need a new place.
 	 */
-	protected placeFolds(view: View): void {
+	protected placeFolds(view: View, which: Iterable<FoldRef> = this.scene?.folds ?? []): void {
 		const overview = this.lod === 'overview';
 		const fontPx = this.laid?.layout.geometry.fontPx ?? 0;
-		for (const f of this.scene?.folds ?? []) {
+		const stamp = `${this.lod}|${view.scale}|${this.tapEpoch}`;
+		for (const f of which) {
 			// An unfilled control has no tap area yet; `fillFolds` places it after it fills.
 			if (!f.filled || !f.hit) continue;
 			let visible = overview && f.markOverview ? f.markOverview : f.mark;
-			// The Overview sign keeps a readable size on screen: it grows about its spot (its left edge stays), like the hit areas.
-			const boost = overview && f.markOverview && fontPx > 0 && view.scale > 0 ? Math.min(MAX_SIGN_BOOST, Math.max(1, MIN_SIGN_TEXT_PX / (FOLD_EM.signTextOverview * fontPx * view.scale))) : 1;
+			const boost = this.signBoost(view, f, overview, fontPx);
 			const { x: sx, y: sy } = f.control.spot;
-			if (boost > 1) {
-				f.el.setAttribute('transform', `translate(${sx} ${sy}) scale(${boost}) translate(${-sx} ${-sy})`);
-				visible = { x: sx + (visible.x - sx) * boost, y: sy + (visible.y - sy) * boost, w: visible.w * boost, h: visible.h * boost };
-			} else f.el.removeAttribute('transform');
+			this.setSignBoost(f, boost);
+			if (boost > 1) visible = { x: sx + (visible.x - sx) * boost, y: sy + (visible.y - sy) * boost, w: visible.w * boost, h: visible.h * boost };
 			const r = cutBack(foldHit(visible, view.scale, fontPx), visible, this.tapAreas);
-			f.hit.setAttribute('x', String(r.x));
-			f.hit.setAttribute('y', String(r.y));
-			f.hit.setAttribute('width', String(r.w));
-			f.hit.setAttribute('height', String(r.h));
+			setRect(f.hit, r);
+			this.foldStamp.set(f, stamp);
 		}
+	}
+
+	/** The Overview sign keeps a readable size on screen: it grows about its spot (its left edge stays), like the hit areas. 1 for every other mark. */
+	private signBoost(view: View, f: FoldRef, overview: boolean, fontPx: number): number {
+		if (!(overview && f.markOverview && fontPx > 0 && view.scale > 0)) return 1;
+		return Math.min(MAX_SIGN_BOOST, Math.max(1, MIN_SIGN_TEXT_PX / (FOLD_EM.signTextOverview * fontPx * view.scale)));
+	}
+
+	private setSignBoost(f: FoldRef, boost: number): void {
+		if (boost > 1) {
+			const { x: sx, y: sy } = f.control.spot;
+			const value = `translate(${sx} ${sy}) scale(${boost}) translate(${-sx} ${-sy})`;
+			if (f.el.getAttribute('transform') !== value) f.el.setAttribute('transform', value);
+		} else if (f.el.getAttribute('transform') !== null) f.el.removeAttribute('transform');
+	}
+
+	/**
+	 * The size of the Overview signs follows the zoom, and they show on the screen at once, so it is kept right for every filled control when the zoom or the
+	 * level changes (the tap areas are placed only near the view, `foldsDue`). Nothing is written when neither changed since the last call.
+	 */
+	protected refreshSignBoosts(view: View): void {
+		const scene = this.scene;
+		if (!scene) return;
+		const last = this.boostFor;
+		if (last && last.scene === scene && last.lod === this.lod && last.scale === view.scale) return;
+		this.boostFor = { scene, lod: this.lod, scale: view.scale };
+		const overview = this.lod === 'overview';
+		const fontPx = this.laid?.layout.geometry.fontPx ?? 0;
+		for (const f of scene.folds) if (f.filled) this.setSignBoost(f, this.signBoost(view, f, overview, fontPx));
+	}
+
+	/** The filled controls near `view` whose tap area was not placed for the zoom, the level and the cut-back areas that now hold. */
+	protected foldsDue(view: View): FoldRef[] {
+		const near = this.foldWindow(view);
+		const scene = this.scene;
+		if (!near || !scene) return [];
+		const stamp = `${this.lod}|${view.scale}|${this.tapEpoch}`;
+		return scene.folds.filter((f) => f.filled && f.hit && this.foldStamp.get(f) !== stamp && near(f));
+	}
+
+	/**
+	 * Tag hit areas stay at least 44 screen px at low zoom (spec §7.5, the decision notes), and so do the `+` badges and their discs. They depend on the zoom, the layout
+	 * and the scene only, so a settle at the same zoom (a pan) writes nothing and keeps `tapAreas` (D285: it was about 5 000 attribute writes per settle on a very large tree).
+	 */
+	protected placeTapAreas(view: View, laid: LaidOut): void {
+		const scene = this.scene;
+		const last = this.tapFor;
+		const same = !!last && last.laid === laid && last.scene === scene && last.scale === view.scale;
+		// A badge is placed again at each settle: a new card corner radius (a theme change) puts its places back to the first ones (`setCornerRadius`). Only a focus family has badges.
+		if (same && !scene?.badges.length) return;
+		if (!same) this.tapFor = scene ? { laid, scene, scale: view.scale } : null;
+		// D31: in `down` the tap area hangs below its card. 0.3.1 fix3: in `sideways` it hangs from the card too, down to the next card at most;
+		// a strip over the bottom of its own card wins when the gap is shorter than 44 screen px (`tagHitSide`).
+		const down = laid.layout.orientation !== 'sideways';
+		const below = down ? null : tagNextTops(laid.layout);
+		const areas: Rect[] = [];
+		for (const t of scene?.tags ?? []) {
+			const card = laid.layout.persons.get(t.tag.person);
+			const side = below ? tagHitSide(t.tag.hit, card, below.get(t.tag.person) ?? Infinity, view.scale, laid.layout.geometry.fontPx) : null;
+			const r = side ? side.area : tagHitBelow(t.tag.hit, card, view.scale);
+			setRect(t.hit, r);
+			setRect(t.over, side?.over ?? { x: r.x, y: r.y, w: 0, h: 0 });
+			areas.push(r);
+		}
+		// The same for the `+` badges of focus mode (spec §7.5, contract 4.2): the square below the cards, capped (the layout's node gap in
+		// `sideways`, half the own card in `down`) and clipped at the tag tap areas of the other people; the disc above the cards.
+		for (const b of scene?.badges ?? []) {
+			const { square, disc } = this.badgeTapAt(laid, b.person, b.mark, view.scale);
+			setRect(b.hit, square);
+			const path = discPath(disc.cx, disc.cy, disc.r, disc.top);
+			if (b.disc.getAttribute('d') !== path) b.disc.setAttribute('d', path);
+			// A fold control's tap area gives way to the disc only; elsewhere in the square the fold control wins (contract 4.2 E1).
+			const top = Math.max(disc.top, disc.cy - disc.r);
+			areas.push({ x: disc.cx - disc.r, y: top, w: 2 * disc.r, h: disc.cy + disc.r - top });
+		}
+		// The fold controls are cut back against these areas. A badge moves with the card corner radius (a theme change, or the radius learnt after the first settle) with the same
+		// layout and zoom, so a changed area also makes the stamp of the folds old.
+		if (!same || !sameRects(this.tapAreas, areas)) this.tapEpoch++;
+		this.tapAreas = areas;
 	}
 
 	protected settled(view: View, byUser: boolean): void {
@@ -277,40 +390,11 @@ export abstract class TreeViewScene extends TreeViewPlacement {
 		this.tips?.shown();
 		this.applyLod(view);
 		this.showPictures(view);
-		// Tag hit areas stay at least 44 screen px at low zoom (spec §7.5, the decision notes).
-		const place = (hit: SVGRectElement, r: Rect) => {
-			hit.setAttribute('x', String(r.x));
-			hit.setAttribute('y', String(r.y));
-			hit.setAttribute('width', String(r.w));
-			hit.setAttribute('height', String(r.h));
-		};
-		// D31: in `down` the tap area hangs below its card. 0.3.1 fix3: in `sideways` it hangs from the card too, down to the next card at most;
-		// a strip over the bottom of its own card wins when the gap is shorter than 44 screen px (`tagHitSide`).
-		const down = laid.layout.orientation !== 'sideways';
-		const below = down ? null : tagNextTops(laid.layout);
-		const areas: Rect[] = [];
-		for (const t of this.scene?.tags ?? []) {
-			const card = laid.layout.persons.get(t.tag.person);
-			const side = below ? tagHitSide(t.tag.hit, card, below.get(t.tag.person) ?? Infinity, view.scale, laid.layout.geometry.fontPx) : null;
-			const r = side ? side.area : tagHitBelow(t.tag.hit, card, view.scale);
-			place(t.hit, r);
-			place(t.over, side?.over ?? { x: r.x, y: r.y, w: 0, h: 0 });
-			areas.push(r);
-		}
-		// The same for the `+` badges of focus mode (spec §7.5, contract 4.2): the square below the cards, capped (the layout's node gap in
-		// `sideways`, half the own card in `down`) and clipped at the tag tap areas of the other people; the disc above the cards.
-		for (const b of this.scene?.badges ?? []) {
-			const { square, disc } = this.badgeTapAt(laid, b.person, b.mark, view.scale);
-			place(b.hit, square);
-			b.disc.setAttribute('d', discPath(disc.cx, disc.cy, disc.r, disc.top));
-			// A fold control's tap area gives way to the disc only; elsewhere in the square the fold control wins (contract 4.2 E1).
-			const top = Math.max(disc.top, disc.cy - disc.r);
-			areas.push({ x: disc.cx - disc.r, y: top, w: 2 * disc.r, h: disc.cy + disc.r - top });
-		}
-		this.tapAreas = areas;
+		this.placeTapAreas(view, laid);
 		this.fillFolds(view);
 		this.fillNear(view);
-		this.placeFolds(view);
+		this.refreshSignBoosts(view);
+		this.placeFolds(view, this.foldsDue(view));
 		this.startIdleSoon();
 		if (byUser) {
 			this.storeView(view);
@@ -347,8 +431,36 @@ export abstract class TreeViewScene extends TreeViewPlacement {
 				el.toggleClass(`dynasty-hint-${dir}`, !!n);
 			}
 			if (el.getText() !== text) el.setText(text);
+			if (el.getAttribute('data-dynasty-hint-dropped') !== null) el.removeAttribute('data-dynasty-hint-dropped');
 		}
 		this.placeHints();
+		for (const dir of ['up', 'down'] as const) if (counts[dir]) this.clearOfCards(dir, view);
+	}
+
+	/**
+	 * G5 0.4: a hint never covers a card. With a theme's fonts the label is wider, and the first view can have a card in its corner: the label is measured as drawn
+	 * and moves to the left corner, or goes when both corners cover a card. The right corner, as before, wherever it covers nothing.
+	 */
+	protected clearOfCards(dir: 'up' | 'down', view: View): void {
+		const vp = this.viewport;
+		const pz = this.panZoom;
+		const laid = this.laid;
+		const el = vp?.querySelector<HTMLElement>(`:scope > .dynasty-hint-${dir}`);
+		if (!vp || !pz || !laid || !el) return;
+		el.removeClass('is-left');
+		const r = el.getBoundingClientRect();
+		// Not laid out (a hidden tab, a unit fake): nothing to measure.
+		if (!(r.width > 0 && r.height > 0)) return;
+		const box = vp.getBoundingClientRect();
+		const hint = { x: r.left - box.left - vp.clientLeft, y: r.top - box.top - vp.clientTop - this.frameTop(vp), w: r.width, h: r.height };
+		const side = hintSide(laid.layout.persons.values(), view, pz.size, hint);
+		if (side === 'left') el.addClass('is-left');
+		else if (side === null) {
+			// The text the hint would show stays on the slot for the harness (D28 counts the children; the drop is the reason there is no label).
+			el.setAttribute('data-dynasty-hint-dropped', el.getText());
+			el.removeClass('dynasty-hint', `dynasty-hint-${dir}`);
+			el.setText('');
+		}
 	}
 
 	/**

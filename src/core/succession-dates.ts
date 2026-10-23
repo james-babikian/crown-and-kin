@@ -150,9 +150,9 @@ export function yearNotes<N extends { kind: string; params: object }>(ready: boo
 /** Who is alive at Y, as the line reads it, and the people whose death text has no year (spec §14 rule 5). */
 export interface Life {
 	/** B.4: alive at Y (or not dead, with "now"). The answer is kept for each person. */
-	alive(p: Person): boolean;
+	alive: (p: Person) => boolean;
 	/** The birth year of a person, read once. */
-	born(p: Person): number | undefined;
+	born: (p: Person) => number | undefined;
 	/** True when the person is dead at Y only because the `died` text has text but no year. False with "now" and before the calendars are ready. */
 	noDeathYear(p: Person): boolean;
 	/** The walk reached the person, who is out of the line (the caller says: the person could stand in the line). Kept when `noDeathYear`. */

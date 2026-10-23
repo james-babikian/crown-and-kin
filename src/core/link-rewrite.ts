@@ -96,7 +96,7 @@ export const linkTargets: LinkTargets = (body) => {
  * The link text with its target replaced; null if the map has no entry for it, 'refused' if the
  * new target cannot be written in that form (a `|` or `]` would change what the link means).
  */
-function rewritten(v: string, map: Map<string, string>, read: typeof parseLink): string | null | 'refused' {
+function rewritten(v: string, map: Map<string, string>, read: typeof parseLink): string | null {
 	const parts = read(v);
 	if (!parts) return null;
 	let target = map.get(matchKey(parts.target));

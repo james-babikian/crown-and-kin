@@ -1,4 +1,4 @@
-import { beforeAll, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { DEFAULT_LAYOUT_SETTINGS, clearLayoutCache, layoutKey, layoutTree } from '../../src/layout/index';
 import { cardText, geometryFor, tallExtra } from '../../src/layout/geometry';
 import type { Geometry, LayoutSettings, PersonBox } from '../../src/layout/model';
@@ -6,8 +6,10 @@ import { buildScene, type Scene } from '../../src/render/dom/scene';
 import { tallCardsFor } from '../../src/render/dom/tall-cards';
 import { cardNameLines, nameLines, runsText, titleLines } from '../../src/render/name-lines';
 import { approxMeasure, renderSvg } from '../../src/render/svg-string';
-import { FEl, installDom } from './fake-dom';
+import { FEl } from './fake-dom';
 import { block15, comments15, graphOf } from './m10-support';
+import { rng } from '../support/rng';
+import { useFakeDom } from '../support/fake-dom-setup';
 
 /*
  * Spec §13.9 (D81, D82), §5.2, §13.7 "Text beside the portrait" and the M10 name-line rules L1-L5:
@@ -18,7 +20,7 @@ import { block15, comments15, graphOf } from './m10-support';
  * for WP 10.2a. The D37 cases and `titleLines` (D61) must not change.
  */
 
-beforeAll(installDom);
+useFakeDom();
 
 const three = nameLines;
 /** `tallCardsFor` (0.2.4 signature: no `sideways`, no `hidden`) reduced to the two lists these tests read. */
@@ -77,17 +79,6 @@ function reference(name: string, width: number, m: (s: string) => number, maxLin
 			rest = chars.slice(n).join('').trimStart();
 		}
 	}
-}
-
-/** A small deterministic random number generator (mulberry32). */
-function rng(seed: number) {
-	return () => {
-		seed |= 0;
-		seed = (seed + 0x6d2b79f5) | 0;
-		let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
-		t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-		return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-	};
 }
 
 describe('L1: `nameLines` with up to three text lines (D81, D82)', () => {
@@ -340,7 +331,7 @@ describe('L3: card heights, the box flags and the cache key', () => {
 		expect(box('d').h).toBe(GEO.cardH);
 		expect(box('a').h).toBe(GEO.cardH);
 		// One row for the three children: they share the top edge. (It is the last row, so it has no gap
-		// below it; the gap-under-the-tallest rule is tested in tests/layout-m10-name-lines.test.ts.)
+		// below it; the gap-under-the-tallest rule is tested in tests/render/layout-m10-name-lines.test.ts.)
 		expect(new Set(['b', 'c', 'd'].map((id) => box(id).y)).size).toBe(1);
 	});
 

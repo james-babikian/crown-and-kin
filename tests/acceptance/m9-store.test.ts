@@ -1,14 +1,13 @@
-import { beforeAll, describe, expect, it, vi } from 'vitest';
-
-vi.mock('obsidian', () => import('./fake-obsidian'));
+import { describe, expect, it } from 'vitest';
 
 import type { TFile as VaultFile } from 'obsidian';
 import type { createLivePictures } from '../../src/obsidian/live-pictures';
 import type { CopyBox, PictureCopy, PictureIO, PictureStore } from '../../src/obsidian/picture-store';
 import type { PictureSlot } from '../../src/render/dom/pictures';
-import { FEl, fakeWin, flushFrames, installDom, runTimers } from './fake-dom';
+import { FEl, flushFrames, runTimers } from './fake-dom';
 import { TFile } from './fake-obsidian';
 import { pngHead, jpegHead, isoFile } from './m9-support';
+import { useFakeDom } from '../support/fake-dom-setup';
 
 /*
  * The memory and queue checks of spec §13.6, §13.7 and §13.8 ("Memory (unit check)", "The large
@@ -19,11 +18,7 @@ import { pngHead, jpegHead, isoFile } from './m9-support';
  * tests wait for WP 9.3a and WP 9.3b.
  */
 
-beforeAll(() => {
-	installDom();
-	const g = globalThis as Record<string, unknown>;
-	g.window ??= fakeWin;
-});
+useFakeDom({ window: true });
 
 type Store = PictureStore;
 type CreateStore = (app: unknown, io?: PictureIO) => Store;

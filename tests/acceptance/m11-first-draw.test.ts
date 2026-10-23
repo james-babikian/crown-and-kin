@@ -1,10 +1,9 @@
-import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-
-vi.mock('obsidian', () => import('./fake-obsidian'));
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { PanZoom } from '../../src/render/dom/pan-zoom';
 import { treeBounds, type View } from '../../src/render/view-math';
-import { FEl, clock, dispatch, flushFrames, installDom, pointer, resetDom, runFrame, runTimers, wheel } from './fake-dom';
+import { FEl, clock, dispatch, flushFrames, pointer, resetDom, runFrame, runTimers, wheel } from './fake-dom';
+import { useFakeDom } from '../support/fake-dom-setup';
 
 /*
  * WP 11.0 (spec §13.15 rule 2; `PanZoom` header): the pan-zoom hook
@@ -14,7 +13,7 @@ import { FEl, clock, dispatch, flushFrames, installDom, pointer, resetDom, runFr
  * Run: npx vitest run tests/acceptance/m11-first-draw.test.ts
  */
 
-beforeAll(() => installDom());
+useFakeDom();
 beforeEach(() => {
 	resetDom();
 	vi.spyOn(performance, 'now').mockImplementation(() => clock.now);

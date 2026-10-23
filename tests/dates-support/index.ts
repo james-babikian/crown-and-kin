@@ -43,10 +43,8 @@ export interface ReadDateT {
 
 /** The architecture notes §5.7 `CalendarProblem`. */
 export interface CalendarProblemT {
-	key: 'calendar-note-missing' | 'calendar-duplicate';
-	calendar?: string;
+	key: 'calendar-note-missing';
 	note?: string;
-	other?: string;
 }
 
 /** The architecture notes §5.7 `DateReader`. */
@@ -74,7 +72,6 @@ export interface DatesApi {
 	formatInternalYear(y: number): string;
 	checkFormat(kind: 'cycles' | 'eras', format: string): string | null;
 	checkCalendars(calendars: CalendarDef[]): { calendar: string; key: string; other?: string }[];
-	findCrossNoteDuplicates(calendars: CalendarDef[]): CalendarProblemT[];
 	startFromSameYear(example: { cycle?: number; year: number }, otherInternalYear: number, length?: number): number;
 	exampleText(calendar: CalendarDef, internalYear: number): string | null;
 }

@@ -333,7 +333,7 @@ export function geometryProblems(layout: TreeLayout, geo: Geometry): string[] {
 	return bad;
 }
 
-// ---------- Lines (the random-tree properties of tests/random-trees.ts, for any path syntax) ----------
+// ---------- Lines (the random-tree properties of tests/support/random-trees.ts, for any path syntax) ----------
 
 type Seg = { x1: number; y1: number; x2: number; y2: number };
 

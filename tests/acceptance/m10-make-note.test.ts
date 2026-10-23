@@ -1,8 +1,4 @@
-import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-
-vi.mock('obsidian', () => import('./fake-obsidian'));
-vi.mock('@codemirror/language', () => ({ forceParsing: () => false, syntaxTree: () => ({ length: 0 }) }));
-vi.mock('@codemirror/view', () => ({ ViewPlugin: { fromClass: () => ({}) } }));
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { App, TFile } from 'obsidian';
 import type { Op } from '../../src/core/edit';
@@ -13,10 +9,11 @@ import type { makePersonNote, MakePersonNoteInput, openMadeNote } from '../../sr
 import type { makeNote } from '../../src/obsidian/table-note';
 import { NOTE_UI, REMOVE } from '../../src/render/ui-text';
 import { TFile as VaultFile } from 'obsidian';
-import { FEl, device, dispatch, fakeWin, installDom, resetDom } from './fake-dom';
+import { FEl, device, dispatch, resetDom } from './fake-dom';
 import { noticeList, notices, resetObsidian } from './fake-obsidian';
 import { fakeHandle, type FakeHandle } from './tree-view-fakes';
 import { loadModule, noteMakeModule } from './m10-support';
+import { useFakeDom } from '../support/fake-dom-setup';
 
 /*
  * Spec §13.11 (D60, D86, D87), §13.12 "Make a note with this table" (D55, D89) and the M10 rules
@@ -28,10 +25,7 @@ import { loadModule, noteMakeModule } from './m10-support';
  * and the undo Notice belong to the edit sheet, so those two are tested through the real sheet.
  */
 
-beforeAll(() => {
-	installDom();
-	(globalThis as Record<string, unknown>).window ??= fakeWin;
-});
+useFakeDom({ window: true });
 
 beforeEach(() => {
 	resetDom();
@@ -286,6 +280,21 @@ describe('N5: `makeNote(app, sourcePath, baseName, content, where)`', () => {
 		const root = fakeApp({ parent: 'Notes' });
 		const r2 = await makeNote(root.app, 'Trees/t.md', 'Aldric', 'x', { folder: '' });
 		expect(r2.ok && r2.file.path).toBe('Aldric.md');
+	});
+
+	it('where.folder: a folder as typed by a user (backslashes, doubled or end slashes, "/" for the root) is cleaned before it is used (0.4, normalizePath)', async () => {
+		const makeNote = await makeNoteOf();
+		const a = fakeApp({ parent: 'Notes', folders: ['People/Kings'] });
+		const r = await makeNote(a.app, 'Trees/t.md', 'Aldric', 'x', { folder: '/People\\Kings//' });
+		expect(r.ok && r.file.path).toBe('People/Kings/Aldric.md');
+		expect(a.createdFolders).toEqual([]);
+		const fresh = fakeApp({ parent: 'Notes' });
+		const r2 = await makeNote(fresh.app, 'Trees/t.md', 'Aldric', 'x', { folder: 'New\\Deep/' });
+		expect(r2.ok && r2.file.path).toBe('New/Deep/Aldric.md');
+		expect(fresh.createdFolders).toEqual(['New', 'New/Deep']);
+		const root = fakeApp({ parent: 'Notes' });
+		const r3 = await makeNote(root.app, 'Trees/t.md', 'Aldric', 'x', { folder: '/' });
+		expect(r3.ok && r3.file.path).toBe('Aldric.md');
 	});
 
 	it('where.exact: exactly this name, no free name looked for (an existing note makes it fail, not a "Name 1")', async () => {

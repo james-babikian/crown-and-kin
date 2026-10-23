@@ -1,16 +1,12 @@
-import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-
-vi.mock('obsidian', () => import('./fake-obsidian'));
-// main.ts pulls in the Live Preview extension; its CodeMirror parts are not needed here.
-vi.mock('@codemirror/language', () => ({ forceParsing: () => false, syntaxTree: () => ({ length: 0 }) }));
-vi.mock('@codemirror/view', () => ({ ViewPlugin: { fromClass: () => ({}) } }));
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { FullScreenModal } from '../../src/obsidian/full-screen';
 import { PanZoom } from '../../src/render/dom/pan-zoom';
 import { pinchView, transformFor, treeBounds, type View } from '../../src/render/view-math';
-import { FEl, clock, dispatch, flushFrames, installDom, pointer, resetDom, runFrame, runTimers, settle, wheel } from './fake-dom';
+import { FEl, clock, dispatch, flushFrames, pointer, resetDom, runFrame, runTimers, settle, wheel } from './fake-dom';
 import { events, notices, openModals, resetObsidian } from './fake-obsidian';
 import { FAR, desktop, embed, fakeHandle, isOpen, loadPlugin, openFullScreen, openSheetOn, phone, sheets, shown, tabletDevice, type FakeApp, type FakeHandle } from './tree-view-fakes';
+import { useFakeDom } from '../support/fake-dom-setup';
 
 /*
  * Adopted from the code reviews of WP4.1/4.2 (round 1: scratch/review-4.1-4.2, 28fd3d8; round 2:
@@ -19,7 +15,7 @@ import { FAR, desktop, embed, fakeHandle, isOpen, loadPlugin, openFullScreen, op
  * (fake-obsidian.ts) and the plugin-side fakes of tree-view-fakes.ts. Each test names the behaviour the spec requires.
  */
 
-beforeAll(() => installDom());
+useFakeDom();
 
 beforeEach(() => {
 	resetDom();

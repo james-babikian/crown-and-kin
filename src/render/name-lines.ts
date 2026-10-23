@@ -197,6 +197,282 @@ export function fitRuns(runs: readonly NameRun[], width: number, measure: NameMe
 /** The text of a name line from its pieces. */
 export const runsText = (runs: readonly NameRun[]) => runs.map((r) => r.text).join('');
 
+/** The bidi controls (Unicode UAX #9): the isolates (left to right, right to left, first strong), the end of an isolate, and the two direction marks. */
+const BIDI_LRI = '\u2066';
+const BIDI_RLI = '\u2067';
+const BIDI_FSI = '\u2068';
+const BIDI_PDI = '\u2069';
+const BIDI_LRM = '\u200e';
+const BIDI_RLM = '\u200f';
+
+/** A letter of a script that is written from right to left (Hebrew, Arabic, Syriac, Thaana and the others, with the presentation forms). */
+const RTL_LETTER = /[\u0590-\u08ff\ufb1d-\ufdff\ufe70-\ufeff\u{10800}-\u{10fff}\u{1e800}-\u{1efff}]/u;
+
+/**
+ * The release plan T10, fault RTL-1: whether a name needs the bidi isolate. An SVG text has the base direction of the page (left to right), so the closing curly mark of
+ * a sobriquet after an Arabic or Hebrew name would stand at the far right. The isolate gives the name its own direction and leaves `direction` and `text-anchor`
+ * alone, so the place of the line on the card does not change. A name with no right-to-left letter has none, and draws as before.
+ */
+const needsBidiIsolate = (text: string): boolean => RTL_LETTER.test(text);
+
+type Dir = 'L' | 'R';
+/** How a character counts here: a strong letter, a number, a combining mark (it goes with its letter), or neutral. */
+type BidiKind = Dir | 'num' | 'mark' | 'neutral';
+
+const bidiKind = (ch: string): BidiKind => {
+	if (/\p{M}/u.test(ch)) return 'mark';
+	if (/\p{N}/u.test(ch)) return 'num';
+	if (!/\p{L}/u.test(ch)) return 'neutral';
+	return RTL_LETTER.test(ch) ? 'R' : 'L';
+};
+
+/** The paired brackets of the bidi algorithm (BidiBrackets.txt), the ones a name can hold: opening to closing. */
+const BRACKET_CLOSE: Readonly<Record<string, string>> = {
+	'(': ')', '[': ']', '{': '}', '（': '）', '［': '］', '｛': '｝', '⟨': '⟩', '⟦': '⟧',
+	'〈': '〉', '《': '》', '「': '」', '『': '』', '【': '】', '〔': '〕', '〖': '〗', '〘': '〙', '〚': '〛',
+};
+const BRACKET_CLOSERS = new Set(Object.values(BRACKET_CLOSE));
+/** BD16: the bidi algorithm stops pairing brackets when 63 openings are open. */
+const BRACKET_DEPTH = 63;
+
+const openOf = (d: Dir) => (d === 'R' ? BIDI_RLI : BIDI_LRI);
+const markOf = (d: Dir | undefined) => (d === 'R' ? BIDI_RLM : d === 'L' ? BIDI_LRM : '');
+
+/** A split bracket pair that is not inside another: from its opening bracket to its closing one (code point indices) and its direction. */
+interface Phrase {
+	open: number;
+	close: number;
+	dir: Dir;
+}
+
+/** A wrapped name as one list of code points, so that brackets pair and directions resolve across the breaks. */
+interface WrappedName {
+	cps: { ch: string; line: number; kind: BidiKind }[];
+	/** The index of the first code point of each line, and the count at the end. */
+	lineStart: number[];
+	/** The direction of the whole name: its first strong letter. */
+	base: Dir;
+	phrases: Phrase[];
+	/** The phrase that holds each code point (its brackets included), -1 for none. */
+	phraseOf: number[];
+	/** Brackets of a split pair inside a phrase, with the direction the whole name gives them. */
+	forced: Map<number, Dir>;
+}
+
+/** The first strong letter in `[from, to)`. */
+function firstStrong(n: Pick<WrappedName, 'cps'>, from: number, to: number): Dir | undefined {
+	for (let i = from; i < to; i++) {
+		const k = n.cps[i].kind;
+		if (k === 'L' || k === 'R') return k;
+	}
+	return undefined;
+}
+
+/** The direction code point i has for a bracket pair (UAX #9 N0 after W2 and W7): a letter by its script; a digit as the letter before it, or right to left. */
+function pairDir(n: Pick<WrappedName, 'cps' | 'base'>, i: number): Dir | undefined {
+	const k = n.cps[i].kind;
+	if (k === 'L' || k === 'R') return k;
+	if (k !== 'num') return undefined;
+	if (/[\u0660-\u0669\u06f0-\u06f9]/u.test(n.cps[i].ch)) return 'R';
+	return firstStrongBefore(n, i) === 'L' ? 'L' : 'R';
+}
+
+/** The last strong letter before code point i, else the direction of the name (W7 looks back to the start). A name has at most three short lines, so the walk is short. */
+function firstStrongBefore(n: Pick<WrappedName, 'cps' | 'base'>, i: number): Dir {
+	for (let k = i - 1; k >= 0; k--) {
+		const d = n.cps[k].kind;
+		if (d === 'L' || d === 'R') return d;
+	}
+	return n.base;
+}
+
+/** BD16 bracket pairs over the whole name that a break splits, by their opening bracket. */
+function splitPairs(n: Pick<WrappedName, 'cps'>): [number, number][] {
+	const out: [number, number][] = [];
+	const stack: { at: number; close: string }[] = [];
+	for (let i = 0; i < n.cps.length; i++) {
+		const ch = n.cps[i].ch;
+		const close = BRACKET_CLOSE[ch];
+		if (close) {
+			if (stack.length === BRACKET_DEPTH) break;
+			stack.push({ at: i, close });
+		} else if (BRACKET_CLOSERS.has(ch)) {
+			for (let k = stack.length - 1; k >= 0; k--) {
+				if (stack[k].close !== ch) continue;
+				if (n.cps[stack[k].at].line !== n.cps[i].line) out.push([stack[k].at, i]);
+				stack.length = k;
+				break;
+			}
+		}
+	}
+	return out.sort((a, b) => a[0] - b[0]);
+}
+
+/**
+ * UAX #9 N0 for the pair `(o, c)` in the embedding direction `e`: `e` when the pair holds a letter or number of that direction; else, when it holds the other
+ * direction, that direction if the strong letter before the pair (from `from` on, else `e`) has it too; else undefined (the pair holds no strong letter).
+ */
+function bracketDir(n: WrappedName, o: number, c: number, e: Dir, from: number): Dir | undefined {
+	let opposite = false;
+	for (let i = o + 1; i < c; i++) {
+		const d = pairDir(n, i);
+		if (d === e) return e;
+		if (d) opposite = true;
+	}
+	if (!opposite) return undefined;
+	for (let i = o - 1; i >= from; i--) {
+		const d = n.forced.get(i) ?? pairDir(n, i);
+		if (d) return d;
+	}
+	return e;
+}
+
+/** The direction of a phrase: the name's when the phrase holds a letter or number of that direction, else that of the first it holds, else the name's. */
+function phraseDir(n: WrappedName, o: number, c: number): Dir {
+	let other: Dir | undefined;
+	for (let i = o + 1; i < c; i++) {
+		const d = pairDir(n, i);
+		if (d === n.base) return n.base;
+		other ??= d;
+	}
+	return other ?? n.base;
+}
+
+/**
+ * The phrases and forced brackets. An outermost split pair is a phrase, in the direction of the text round it when it holds a letter of that direction (then the
+ * isolate changes nothing on one line), else of the letters it holds. A split pair inside a phrase keeps the direction that the whole name gives its brackets (N0):
+ * a mark of that direction on both sides of each bracket acts as the resolved bracket does. A second isolate there would hide its letters from the phrase and change
+ * the one-line name.
+ */
+function findPhrases(n: WrappedName): void {
+	for (const [o, c] of splitPairs(n)) {
+		const ph = n.phraseOf[o];
+		if (ph < 0) {
+			n.phrases.push({ open: o, close: c, dir: phraseDir(n, o, c) });
+			n.phraseOf.fill(n.phrases.length - 1, o, c + 1);
+			continue;
+		}
+		const d = bracketDir(n, o, c, n.phrases[ph].dir, n.phrases[ph].open + 1);
+		if (d) {
+			n.forced.set(o, d);
+			n.forced.set(c, d);
+		}
+	}
+}
+
+const dirOf = (n: WrappedName, s: number): Dir => (s < 0 ? n.base : n.phrases[s].dir);
+/** The phrase that a break after code point i falls inside, or -1. */
+const phraseAcross = (n: WrappedName, i: number): number => (i >= 0 && n.phraseOf[i] >= 0 && n.phrases[n.phraseOf[i]].close !== i ? n.phraseOf[i] : -1);
+
+/**
+ * The strong letter next to an edge, walking from `from` by `step` in the scope `s` (-1 is the name, else a phrase; a phrase inside the name counts as neutral, as
+ * an isolate does). Reaching `limit` gives undefined (no answer on this line), leaving the scope gives its direction, and a number stops the rule. `neutral` says
+ * whether a neutral character lies between.
+ */
+function edgeWalk(n: WrappedName, from: number, step: 1 | -1, s: number, limit: number): { dir: Dir | undefined; neutral: boolean } {
+	let neutral = false;
+	for (let i = from; i !== limit; i += step) {
+		if (i < 0 || i >= n.cps.length) return { dir: dirOf(n, s), neutral };
+		if (n.phraseOf[i] !== s) {
+			if (s >= 0) return { dir: dirOf(n, s), neutral };
+			neutral = true;
+			continue;
+		}
+		const f = n.forced.get(i);
+		if (f) return { dir: f, neutral };
+		const k = n.cps[i].kind;
+		if (k === 'num') return { dir: undefined, neutral };
+		if (k === 'neutral') neutral = true;
+		else if (k !== 'mark') return { dir: k, neutral };
+	}
+	return { dir: undefined, neutral };
+}
+
+/**
+ * The direction marks at the edges of the lines, by line and scope (-1 the name, else a phrase). UAX #9 resolves a neutral run from the letters on both sides of
+ * it in the whole name; on its own line the far side is the edge of the line, which has the scope's direction. They differ only when both sides are letters of the
+ * other direction; then a mark at the edge gives the run the direction of the whole name. The name and a phrase open across the break are checked each, because
+ * the phrase is a neutral of the name.
+ */
+function edgeMarks(n: WrappedName): { lead: Map<number, Dir>[]; trail: Map<number, Dir>[] } {
+	const lines = n.lineStart.length - 1;
+	const lead = Array.from({ length: lines }, () => new Map<number, Dir>());
+	const trail = Array.from({ length: lines }, () => new Map<number, Dir>());
+	const same = (a: Dir | undefined, b: Dir | undefined, s: number) => (a && a === b && a !== dirOf(n, s) ? a : undefined);
+	for (let line = 0; line + 1 < lines; line++) {
+		const end = n.lineStart[line + 1] - 1;
+		const next = n.lineStart[line + 1];
+		if (end < n.lineStart[line] || next >= n.lineStart[line + 2]) continue;
+		const across = phraseAcross(n, end);
+		for (const s of across >= 0 ? [-1, across] : [-1]) {
+			const back = edgeWalk(n, end, -1, s, n.lineStart[line] - 1);
+			const t = back.neutral ? same(back.dir, edgeWalk(n, next, 1, s, -2).dir, s) : undefined;
+			if (t) trail[line].set(s, t);
+			const after = edgeWalk(n, next, 1, s, n.lineStart[line + 2]);
+			const l = after.neutral ? same(after.dir, edgeWalk(n, end, -1, s, -2).dir, s) : undefined;
+			if (l) lead[line + 1].set(s, l);
+		}
+	}
+	return { lead, trail };
+}
+
+/** One text line of a wrapped name with its controls: the isolate of the name, a phrase carried from the line before, the phrases, forced brackets and marks. */
+function drawLine(n: WrappedName, runs: readonly NameRun[], line: number, lead: Map<number, Dir>, trail: Map<number, Dir>): readonly NameRun[] {
+	if (n.lineStart[line] === n.lineStart[line + 1]) return runs;
+	let at = n.lineStart[line];
+	const carried = phraseAcross(n, at - 1);
+	const last = runs.length - 1;
+	return runs.map((r, ri) => {
+		let text = '';
+		if (ri === 0) {
+			text = openOf(n.base) + markOf(lead.get(-1));
+			if (carried >= 0) text += openOf(n.phrases[carried].dir) + markOf(lead.get(carried));
+		}
+		for (const ch of r.text) {
+			const ph = n.phraseOf[at];
+			if (ph >= 0 && n.phrases[ph].open === at) text += openOf(n.phrases[ph].dir);
+			const f = markOf(n.forced.get(at));
+			text += f + ch + f;
+			if (ph >= 0 && n.phrases[ph].close === at) text += BIDI_PDI;
+			at++;
+		}
+		if (ri === last) {
+			const open = phraseAcross(n, at - 1);
+			if (open >= 0) text += markOf(trail.get(open)) + BIDI_PDI;
+			text += markOf(trail.get(-1)) + BIDI_PDI;
+		}
+		return { ...r, text };
+	});
+}
+
+/**
+ * The text lines of a name with the bidi controls that make each line read as the same name on one line would, split at the break (the release plan T10, fault RTL-1, and
+ * the G5 fault 5 of 0.4). A name with no right-to-left letter comes back as the same list. A name on one text line is one first-strong isolate, as before. A wrapped
+ * name: every line is an isolate in the direction of the whole name (its first strong letter), not of its own first letter, so "II)" after an Arabic line stays in
+ * the order of the name; a bracket pair that the break splits is a phrase (`findPhrases`), so each line shows its piece of the one-line phrase with the same bracket
+ * glyph ("(Nur al-Din" then "II)"); and a neutral at the break gets a mark when the whole name gives it the other direction (`edgeMarks`: a hyphen added inside a
+ * Latin word in an Arabic name, for one). Both the live card and the saved picture draw the result, so they show the same text. The controls have no width, so the
+ * line breaks do not change.
+ */
+export function isolateLines(lines: readonly (readonly NameRun[])[]): readonly (readonly NameRun[])[] {
+	if (!lines.some((runs) => needsBidiIsolate(runsText(runs)))) return lines;
+	if (lines.length === 1) {
+		const last = lines[0].length - 1;
+		return [lines[0].map((r, i) => ({ ...r, text: (i === 0 ? BIDI_FSI : '') + r.text + (i === last ? BIDI_PDI : '') }))];
+	}
+	const n: WrappedName = { cps: [], lineStart: [], base: 'L', phrases: [], phraseOf: [], forced: new Map() };
+	lines.forEach((runs, line) => {
+		n.lineStart.push(n.cps.length);
+		for (const r of runs) for (const ch of r.text) n.cps.push({ ch, line, kind: bidiKind(ch) });
+	});
+	n.lineStart.push(n.cps.length);
+	n.base = firstStrong(n, 0, n.cps.length) ?? 'L';
+	n.phraseOf = new Array<number>(n.cps.length).fill(-1);
+	findPhrases(n);
+	const { lead, trail } = edgeMarks(n);
+	return lines.map((runs, line) => drawLine(n, runs, line, lead[line], trail[line]));
+}
+
 /**
  * The text lines of a card name (D117, D122, D125, D127): `maxLines` at most (default 3). The name breaks at spaces; a word
  * wider than a text line breaks with a hyphen (`breakToken`). The sobriquet follows the name as one token in curly marks that

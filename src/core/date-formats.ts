@@ -40,7 +40,7 @@ function scanFormat(kind: 'cycles' | 'eras', format: string, markers: ReadonlyMa
 		if (name === 'year' || name === own) {
 			if (seen.has(name)) return fail;
 			seen.add(name);
-			segs.push({ place: name as Place });
+			segs.push({ place: name });
 			continue;
 		}
 		const list = markers?.get(name);
@@ -158,7 +158,7 @@ export function groupFormat(segs: readonly Seg[]): { items: Item[]; base: string
 	});
 	// White space at the outer ends of what remains is trimmed (only a literal can hold it; a group that is absent leaves it).
 	const firstLit = items.findIndex((item) => !('group' in item));
-	if (firstLit >= 0 && 'lit' in items[firstLit]) items[firstLit] = { lit: (items[firstLit] as { lit: string }).lit.trimStart() };
+	if (firstLit >= 0 && 'lit' in items[firstLit]) items[firstLit] = { lit: items[firstLit].lit.trimStart() };
 	let lastLit = items.length - 1;
 	while (lastLit >= 0 && 'group' in items[lastLit]) lastLit--;
 	if (lastLit >= 0 && 'lit' in items[lastLit]) items[lastLit] = { lit: (items[lastLit] as { lit: string }).lit.trimEnd() };

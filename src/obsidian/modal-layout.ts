@@ -18,7 +18,7 @@ const MIN_VISIBLE = 200;
 /** Reads a CSS length in px (`301px`, `301`); anything else, a negative number or nothing is 0. */
 export function parseKeyboardHeight(raw: string | null | undefined): number {
 	const m = /^\s*(\d+(?:\.\d+)?)(?:px)?\s*$/.exec(raw ?? '');
-	return m ? parseFloat(m[1]!) : 0;
+	return m ? parseFloat(m[1]) : 0;
 }
 
 /**
@@ -99,7 +99,7 @@ export function phoneLayout(modal: Modal, onLayout?: () => void, holdAtClose = t
 			timers.add(id);
 		}
 	};
-	const Observer = (win as Window & typeof globalThis).MutationObserver;
+	const Observer = (win as unknown as { MutationObserver?: typeof MutationObserver }).MutationObserver;
 	const watcher = Observer ? new Observer(recheck) : null;
 	watcher?.observe(win.document.documentElement, { attributes: true, attributeFilter: ['style', 'class'] });
 	win.addEventListener('focusin', onFocusChange);
@@ -166,7 +166,7 @@ export function ignoreGhostClick(modal: Modal): () => void {
  * call counts: `delay` ms after the last step the field is brought into view. `reduced` (D126): when it is true the
  * scroll jumps at once even if the page asks for a smooth one.
  */
-export function settledReveal(modalEl: HTMLElement, contentEl: HTMLElement, reduced: () => boolean = () => false): { schedule(delay: number): void; cancel(): void } {
+export function settledReveal(modalEl: HTMLElement, contentEl: HTMLElement, reduced: () => boolean = () => false): { schedule: (delay: number) => void; cancel: () => void } {
 	let timer: number | null = null;
 	const win = modalEl.win ?? window;
 	const run = () => {
@@ -185,4 +185,32 @@ export function settledReveal(modalEl: HTMLElement, contentEl: HTMLElement, redu
 		},
 		cancel,
 	};
+}
+
+/** The controls of a window that Tab can reach, in their order: buttons and fields that are on, shown and not taken out of the Tab order. */
+function tabStops(root: HTMLElement): HTMLElement[] {
+	return Array.from(root.querySelectorAll<HTMLElement>('button, input, select, textarea, [tabindex]')).filter((el) => {
+		if ((el as HTMLButtonElement).disabled || el.getAttribute('tabindex') === '-1') return false;
+		// A hidden control (Obsidian's X in a sheet, a screen-reader-only text) has no box.
+		return typeof el.getClientRects !== 'function' || el.getClientRects().length > 0;
+	});
+}
+
+/**
+ * Tab and Shift+Tab stay inside a window and go round: from the last control to the first, and from the first back to the last (G5 0.4, WCAG 2.4.3).
+ * Without it, Shift+Tab on the first choice of a choice window left the focus where it was. Returns the function that removes the listener.
+ */
+export function holdTab(modalEl: HTMLElement): () => void {
+	const key = (e: KeyboardEvent) => {
+		if (e.key !== 'Tab' || e.ctrlKey || e.metaKey || e.altKey || e.isComposing) return;
+		const stops = tabStops(modalEl);
+		if (stops.length === 0) return;
+		const active = modalEl.doc?.activeElement ?? null;
+		const at = stops.indexOf(active as HTMLElement);
+		const to = e.shiftKey ? (at <= 0 ? stops.length - 1 : at - 1) : at < 0 || at === stops.length - 1 ? 0 : at + 1;
+		e.preventDefault();
+		stops[to].focus();
+	};
+	modalEl.addEventListener('keydown', key);
+	return () => modalEl.removeEventListener('keydown', key);
 }

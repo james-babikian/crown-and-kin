@@ -10,8 +10,9 @@ import type { App, TFile, TFolder } from 'obsidian';
 import { parseDynasty } from '../core/parse';
 import { holderTable, noteName } from '../core/titles';
 import { deriveDated, type DatesFor } from '../view/calendar-index';
+import { vaultPath } from './vault-path';
 
-/** Where a made note goes. The default is the folder that Obsidian picks for new notes next to sourcePath (D60); older is a vault folder path ('' = the vault root). */
+/** Where a made note goes. The default is the folder that Obsidian picks for new notes next to sourcePath (D60); folder is a vault folder path ('' = the vault root). */
 export interface NoteWhere {
 	folder?: string;
 	/** Use exactly this note name without ".md"; do not look for a free one. */
@@ -35,14 +36,14 @@ export function namesIn(folder: TFolder | null): Set<string> {
 
 /** The vault folder at `path`, if there is one. */
 function folderAt(app: App, path: string): TFolder | null {
-	const f = app.vault.getAbstractFileByPath(path) as (TFolder & { children?: unknown }) | null;
+	const f = app.vault.getAbstractFileByPath(vaultPath(path)) as (TFolder & { children?: unknown }) | null;
 	return f && Array.isArray(f.children) ? f : null;
 }
 
 /** Makes the folders of `path` one by one, so the parents exist first. */
 async function ensureFolder(app: App, path: string): Promise<TFolder | null> {
 	let made = '';
-	for (const part of path.split('/').filter((x) => x !== '')) {
+	for (const part of vaultPath(path).split('/').filter((x) => x !== '')) {
 		made = made ? `${made}/${part}` : part;
 		if (!folderAt(app, made)) await app.vault.createFolder(made);
 	}
@@ -60,7 +61,7 @@ export async function makeNote(app: App, sourcePath: string, baseName: string, c
 		if ([where.folder ?? '', baseName].some((p) => p.split(/[\\/]/).some((x) => x === '.' || x === '..'))) return { ok: false, why: 'failed' };
 		let folder: TFolder | null;
 		if (where.folder === undefined) folder = app.fileManager.getNewFileParent(sourcePath);
-		else if (where.folder === '') folder = app.vault.getRoot();
+		else if (vaultPath(where.folder) === '') folder = app.vault.getRoot();
 		else folder = folderAt(app, where.folder) ?? (await ensureFolder(app, where.folder));
 		if (!folder) return { ok: false, why: 'failed' };
 		const root = folder.isRoot();
@@ -69,6 +70,7 @@ export async function makeNote(app: App, sourcePath: string, baseName: string, c
 			const taken = namesIn(folder);
 			if (where.exact && taken.has(`${baseName}.md`.toLowerCase())) return { ok: false, why: 'failed' };
 			const name = where.exact ? baseName : freeName(baseName, taken);
+			// folder.path comes from Obsidian: it is already a vault path, and normalizePath could turn it into a folder that does not exist.
 			const path = root ? `${name}.md` : `${folder.path}/${name}.md`;
 			try {
 				const file: TFile = await app.vault.create(path, content);

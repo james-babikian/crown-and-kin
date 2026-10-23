@@ -163,7 +163,7 @@ export interface TreeOptions {
 	me?: string;
 	generations?: number;
 	height?: number;
-	/** Spec §14 rule 7: the calendar note this tree uses, a link as written (`[[Calendars of the Far Land]]`); absent = every calendar note. */
+	/** Spec §14 rule 7: the calendar note this tree uses, a link as written (`[[Calendars of the Far Land]]`); absent = no calendar, plain years only (D289). */
 	calendar?: string;
 }
 

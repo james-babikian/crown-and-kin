@@ -12,7 +12,7 @@
 import { Modal, Notice, type App, type TFile } from 'obsidian';
 import type { FamilyGraph } from '../core/derive';
 import type { FoldKey } from '../core/folds';
-import { folderOf, numberedFreePath } from '../core/link-text';
+import { folderOf } from '../core/link-text';
 import { portraitCropOf, type CropFraction } from '../core/portrait-crop';
 import type { CardLabel } from '../core/titles';
 import { PICTURE_EM, isRoundel, pictureSize, roundelPics } from '../layout/geometry';
@@ -192,7 +192,7 @@ export async function savePicture(app: App, store: PictureStore | undefined, src
 	}, PROGRESS_MS);
 	const stop = () => {
 		window.clearTimeout(timer);
-		(progress as Notice | null)?.hide();
+		progress?.hide();
 	};
 	let made: Made;
 	let file: TFile;
@@ -270,7 +270,7 @@ export async function makePicture(store: PictureStore | undefined, src: SaveSour
 		saved: { heading, legend, pictures, scale: sc.scale, ...(folds ? { folds: new Set(folds.folded) } : {}) },
 	});
 	const name = savedFileName(src.note, kind, src.focusName);
-	if (kind === 'svg') return { name, bytes: new TextEncoder().encode(svg).buffer as ArrayBuffer, type: 'image/svg+xml', small: sc.small };
+	if (kind === 'svg') return { name, bytes: new TextEncoder().encode(svg).buffer, type: 'image/svg+xml', small: sc.small };
 	const size = /<svg [^>]*?width="(\d+)" height="(\d+)"/.exec(svg);
 	const w = Number(size?.[1] ?? Math.ceil(extent.w * sc.scale));
 	const h = Number(size?.[2] ?? Math.ceil(extent.h * sc.scale));
@@ -286,7 +286,7 @@ export async function makePicture(store: PictureStore | undefined, src: SaveSour
  * and the legend's box.
  */
 async function picturesFor(store: PictureStore | undefined, src: SaveSource, laid: LaidOut, scale: number, legendArms: { w: number; h: number } | undefined): Promise<{ pictures: PictureMap; outlines: ReadonlyMap<string, ArmsOutline> }> {
-	const out = new Map<string, string | 'missing' | null>();
+	const out = new Map<string, (string & {}) | 'missing' | null>();
 	// D219: the outline of each arms picture, read while its copy was made; the picture draws the gap round the arms from it.
 	const outlines = new Map<string, ArmsOutline>();
 	if (!store) return { pictures: out, outlines };
@@ -371,11 +371,9 @@ function loadImage(url: string): Promise<HTMLImageElement> {
 	});
 }
 
-/** D70: a free path in Obsidian's attachment folder of the note; before Obsidian 1.5.7, the note's folder with " 1", " 2", …. The picture picker uses it too. */
+/** D70: a free path in Obsidian's attachment folder of the note. The picture picker uses it too. */
 export async function freePath(app: App, name: string, sourcePath: string): Promise<string> {
-	const fm = app.fileManager as { getAvailablePathForAttachment?: (n: string, s?: string) => Promise<string> };
-	if (typeof fm.getAvailablePathForAttachment === 'function') return fm.getAvailablePathForAttachment(name, sourcePath);
-	return numberedFreePath(folderOf(sourcePath), name, (p) => !!app.vault.getAbstractFileByPath(p));
+	return app.fileManager.getAvailablePathForAttachment(name, sourcePath);
 }
 
 /** The result Notice (spec §13.8): the file and its folder, the small-names texts, and Share where the device can share the file. It stays until the owner closes it. */

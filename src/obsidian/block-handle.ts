@@ -32,7 +32,7 @@ function applyToEditor(view: MarkdownView, c: { from: number; to: number; text: 
 }
 
 const keyString = (path: string, ordinal: number) => `${path}\u0000#${ordinal}`;
-export const pause = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+export const pause = (ms: number) => new Promise<void>((r) => window.setTimeout(r, ms));
 
 /** F-VIEW-04: the longest `forBlock` waits for a write of the note to end (a slow disk or a sync lock), in ms. */
 export const FOR_BLOCK_WAIT_MS = 10_000;
@@ -408,7 +408,7 @@ export class HandleRegistry {
 		// A view that just switched mode can lay out its editor after this call; the cursor goes in again once. The text can have changed by then, so the block is found again, and a closed leaf or a lost block is skipped.
 		if (switched) {
 			const leafNow = leaf;
-			setTimeout(() => {
+			window.setTimeout(() => {
 				try {
 					if (leafNow.view !== view || !mine(leafNow.view) || leafNow.view.editor !== editor) return;
 					const again = findBlocks(editor.getValue())[ordinal];

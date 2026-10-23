@@ -15,11 +15,11 @@ import { dateLine } from '../render/tree-info';
 import { SUCCESSION_UI as T, TITLES_UI } from '../render/ui-text';
 import { draftSpec, draftTitle, holderText, type SuccessionDraft, type TitleRow } from '../view/titles-draft';
 import { afterNotes, heirNotes, rulerLabelOf } from '../view/succession-notes';
+import { bodyHints, firstInfo, illegitimateHint } from './body-hint';
+import { setRowHints, switchRow } from './switch-row';
 import { RowPictures, buildRow, iconButton, personLead, textButton } from './window-parts';
 import type { PictureStore } from './picture-store';
 
-/** The inherit rules whose preferred sex is women (the hint of the illegitimate choice). */
-const WOMEN_RULES: readonly string[] = ['women-only', 'women-first', 'women-first-in-house'];
 /** The draft value for a written value that the plugin cannot read. */
 const UNKNOWN = '?';
 /** The year field recomputes the line this long after the last key press (E.2). */
@@ -63,6 +63,8 @@ export interface SectionHost {
 
 /** What the window does with a section it made. */
 export interface SuccessionView {
+	/** The Rules section opened or closed. The cadet hint is computed only while it is open (D282, G2 of part 4). */
+	rulesOpened(open: boolean): void;
 	/** Draws the two bodies again from the draft; `focus` names the control (`data-focus`) that gets the focus. */
 	draw(focus?: string): void;
 	/** The result of the line now (for tests and for the Show button). */
@@ -80,7 +82,7 @@ export interface SuccessionView {
 }
 
 /** The hints of the section for a draft (D.3, J.10, K.1). Pure, so a test can read them without a window. */
-export function successionHints(s: SuccessionDraft): { rule: string | null; inherit: string[]; through: string | null; illegitimate: boolean } {
+export function successionHints(s: SuccessionDraft): { rule: string | null; inherit: string[]; through: string | null; illegitimate: string | null } {
 	const rule = s.rule === '' || s.rule === '?' ? null : s.rule;
 	const inherit = s.inherit === '' || s.inherit === '?' ? 'no-preference' : s.inherit;
 	const through = s.through === '' || s.through === '?' ? '' : s.through;
@@ -94,7 +96,7 @@ export function successionHints(s: SuccessionDraft): { rule: string | null; inhe
 		rule: rule === 'siblings-first' ? T.siblingsHint : rule === 'nearest-relative' ? T.nearestHint : null,
 		inherit: out,
 		through: rule === 'eldest-child' && inherit === 'men-only' && through === 'women' ? T.matrilinealHint : null,
-		illegitimate: rule !== null && WOMEN_RULES.includes(inherit) && s.illegitimate !== 'equal',
+		illegitimate: rule === null || s.illegitimate === 'equal' ? null : illegitimateHint(inherit, through),
 	};
 }
 
@@ -106,21 +108,6 @@ export function rulesSummary(s: SuccessionDraft): string {
 	const rule = s.rule === '' ? T.ruleNone : s.rule === UNKNOWN ? T.unknownValue(null) : short(T.rules[s.rule]);
 	const inherit = s.rule === '' || s.rule === UNKNOWN ? '' : s.inherit === '' ? short(T.inherits['no-preference']) : s.inherit === UNKNOWN ? T.unknownValue(null) : short(T.inherits[s.inherit]);
 	return [rule, inherit].filter(Boolean).join(' · ');
-}
-
-/** A switch with its label and an optional hint: one row (`dynasty-rule`), the switch at the right. */
-function switchRow(box: HTMLElement, o: { key: string; label: string; hint: string; on: boolean; set: (v: boolean) => void }): HTMLElement {
-	const pair = box.createDiv({ cls: 'dynasty-succ-pair', attr: { 'data-succ': o.key } });
-	const row = pair.createEl('label', { cls: ['dynasty-succ-switch', 'dynasty-rule'] });
-	const text = row.createSpan({ cls: 'dynasty-rule-text' });
-	text.createSpan({ cls: 'dynasty-succ-switch-text', text: o.label });
-	// The hint stands in the text span, under its own label, as in the settings of Obsidian: it is then never nearer to the next switch.
-	const hint = o.hint ? text.createSpan({ cls: 'dynasty-sheet-hint', text: o.hint, attr: { id: `dynasty-succ-hint-${o.key}-${Math.random().toString(36).slice(2, 8)}` } }) : null;
-	const track = row.createDiv({ cls: o.on ? ['checkbox-container', 'is-enabled'] : ['checkbox-container'] });
-	const input = track.createEl('input', { attr: { type: 'checkbox', role: 'switch', 'aria-label': o.label, 'aria-describedby': hint?.getAttribute('id') ?? null, 'data-focus': `succ-${o.key}` } });
-	input.checked = o.on;
-	input.addEventListener('change', () => o.set(input.checked));
-	return pair;
 }
 
 /** The parts of the rules body that stay on the page between two choices. */
@@ -138,6 +125,33 @@ interface RulesUi {
 	grid: HTMLElement;
 }
 
+/** A hint under a choice; no text, no hint. */
+const hint = (box: HTMLElement, text: string | null, name: string): void => {
+	if (text) box.createDiv({ cls: ['dynasty-sheet-hint'], text, attr: { 'data-hint': name } });
+};
+
+/** Puts the hints of one name in a pair again (the choice itself stays). */
+function setHints(box: HTMLElement, name: string, texts: readonly string[]): void {
+	for (const c of Array.from(box.children)) if (c.getAttribute('data-hint') === name) c.remove();
+	for (const t of texts) hint(box, t, name);
+}
+
+/** A new pair in the grid, before `ref`. */
+function pairBefore(u: RulesUi, ref: HTMLElement): HTMLElement {
+	const pair = u.grid.createDiv({ cls: ['dynasty-succ-pair', 'is-wide'] });
+	u.grid.insertBefore(pair, ref);
+	return pair;
+}
+
+/** The one sentence for the live region: how many heirs the line has, or why it has none. */
+function summary(res: SuccessionResult | null): string {
+	if (!res || res.kind === 'no-rule') return '';
+	if (res.kind === 'bad-rule') return T.badRule;
+	if (res.kind === 'no-ruler') return T.noRuler(res.yearText);
+	if (res.kind === 'ruler-not-in-tree') return T.rulerNotInTree(res.yearText);
+	return res.heirs.length ? T.heirCount(res.heirs.length) : T.noHeir;
+}
+
 /** Makes the succession view of a saved title; the window puts `renderLine` and `renderRules` in its two sections. */
 export function successionSection(host: SectionHost): SuccessionView {
 	const s = () => host.row.succ!;
@@ -146,6 +160,8 @@ export function successionSection(host: SectionHost): SuccessionView {
 	let lineEl: HTMLElement | null = null;
 	let result: SuccessionResult | null = null;
 	let timer: number | null = null;
+	// True while the Rules section is open. The window tells it (`rulesOpened`).
+	let rulesOpen = false;
 	// The year that the line shows now (the year field redraws the line only when the draft year differs from it).
 	let shown = '';
 	// The parts of the rules body that a choice can add, remove or change; a choice updates these in place (r032).
@@ -228,17 +244,7 @@ export function successionSection(host: SectionHost): SuccessionView {
 		});
 	}
 
-	const hint = (box: HTMLElement, text: string | null, name: string) => {
-		if (text) box.createDiv({ cls: ['dynasty-sheet-hint'], text, attr: { 'data-hint': name } });
-	};
-
 	// ---------- the whole view ----------
-
-	/** Puts the hints of one name in a pair again (the choice itself stays). */
-	function setHints(box: HTMLElement, name: string, texts: readonly string[]): void {
-		for (const c of Array.from(box.children)) if (c.getAttribute('data-hint') === name) c.remove();
-		for (const t of texts) hint(box, t, name);
-	}
 
 	/**
 	 * What follows a choice in a dropdown. It changes only the parts that depend on the choice: the hints, the two choices that
@@ -275,17 +281,9 @@ export function successionSection(host: SectionHost): SuccessionView {
 			u.inheritPair = null;
 			u.throughPair = null;
 		}
-		setHints(u.illPair, 'illegitimate', hints.illegitimate ? [T.illHint] : []);
-		// The hint of the switch depends on the line, so its row is made again; it holds no dropdown.
-		u.bodyRow?.remove();
-		u.bodyRow = real ? bodyRow(u.switches) : null;
-	}
-
-	/** A new pair in the grid, before `ref`. */
-	function pairBefore(u: RulesUi, ref: HTMLElement): HTMLElement {
-		const pair = u.grid.createDiv({ cls: ['dynasty-succ-pair', 'is-wide'] });
-		u.grid.insertBefore(pair, ref);
-		return pair;
+		setHints(u.illPair, 'illegitimate', hints.illegitimate ? [hints.illegitimate] : []);
+		// The cadet hint depends on the line, so the hint spans of the switch row follow it.
+		patchBody(u);
 	}
 
 	// The four choices of the rules body. Each one reads the draft when it is made.
@@ -345,19 +343,33 @@ export function successionSection(host: SectionHost): SuccessionView {
 		});
 	}
 
-	/** The switch "body" with the hint that names the holder (L.2, F-KIN-07). */
+	/** The switch "body" with the hints that name the first holder and the cadet title (L.2, F-KIN-07, D291). */
 	function bodyRow(switches: HTMLElement): HTMLElement {
 		const d = s();
-		const first = firstHolder();
-		const skipped = result?.notes.find((n) => n.kind === 'body-skipped');
-		const bodyHint = skipped ? T.bodyHintSkipped(nameOf(String(skipped.params.first)), String(skipped.params.entry)) : first ? T.bodyHint(first) : '';
-		return switchRow(switches, { key: 'body', label: T.body, hint: bodyHint, on: d.body, set: (v) => change(() => void (d.body = v), 'succ-body') });
+		const { hint, extra } = bodyHints(host.g(), host.row, d, result, rulesOpen);
+		return switchRow(switches, { key: 'body', label: T.body, hint, extra, on: d.body, set: (v) => change(() => void (d.body = v), 'succ-body') });
+	}
+
+	/** The row of the switch stays; only its hint spans follow the line (a year commit or a choice must not replace the switch under a finger). */
+	function patchBody(u: RulesUi): void {
+		const real = s().rule !== '' && s().rule !== '?';
+		if (!real) {
+			u.bodyRow?.remove();
+			u.bodyRow = null;
+			return;
+		}
+		if (!u.bodyRow) {
+			u.bodyRow = bodyRow(u.switches);
+			return;
+		}
+		const { hint, extra } = bodyHints(host.g(), host.row, s(), result, rulesOpen);
+		setRowHints(u.bodyRow, 'body', { first: hint, cadet: extra });
 	}
 
 	function draw(focus?: string): void {
 		const mounted = rulesEl ?? lineEl;
 		const doc = mounted?.doc;
-		const had = focus ?? (doc?.activeElement && mounted?.contains(doc.activeElement as HTMLElement) ? (doc.activeElement as HTMLElement).getAttribute('data-focus') : null);
+		const had = focus ?? (doc?.activeElement && mounted?.contains(doc.activeElement) ? (doc.activeElement as HTMLElement).getAttribute('data-focus') : null);
 		stop();
 		// The line is computed first: the notes under the named heirs read it.
 		result = compute();
@@ -407,6 +419,8 @@ export function successionSection(host: SectionHost): SuccessionView {
 			if (shown === s().year) return;
 			shown = s().year;
 			drawLine(true);
+			// The cadet hint is for the year of the line.
+			if (ui && !s().body) patchBody(ui);
 		};
 		year.addEventListener('input', () =>
 			host.guard(() => {
@@ -434,7 +448,7 @@ export function successionSection(host: SectionHost): SuccessionView {
 		// Children marked as illegitimate.
 		const illPair = pair();
 		illChoice(illPair);
-		if (hints.illegitimate) hint(illPair, T.illHint, 'illegitimate');
+		hint(illPair, hints.illegitimate, 'illegitimate');
 
 		const switches = body.createDiv({ cls: 'dynasty-rows' });
 		switchRow(switches, { key: 'adopted', label: T.adopted, hint: T.adoptedHint, on: d.adopted, set: (v) => change(() => void (d.adopted = v), 'succ-adopted') });
@@ -443,25 +457,6 @@ export function successionSection(host: SectionHost): SuccessionView {
 
 		peopleList(body, 'heir');
 		peopleList(body, 'exclude');
-	}
-
-	/** The one sentence for the live region: how many heirs the line has, or why it has none. */
-	function summary(res: SuccessionResult | null): string {
-		if (!res || res.kind === 'no-rule') return '';
-		if (res.kind === 'bad-rule') return T.badRule;
-		if (res.kind === 'no-ruler') return T.noRuler(res.yearText);
-		if (res.kind === 'ruler-not-in-tree') return T.rulerNotInTree(res.yearText);
-		return res.heirs.length ? T.heirCount(res.heirs.length) : T.noHeir;
-	}
-
-	/** The first holder who is in the tree, in the draft, as the holder list names him (L.2). */
-	function firstHolder(): string | null {
-		const g = host.g();
-		for (const h of host.row.holders) {
-			const p = h.values.person;
-			if (p !== undefined && g.byId.has(p)) return holderText(g, h.values).ruler || nameOf(p);
-		}
-		return null;
 	}
 
 	/** The lead of a person row: the initials, and the portrait when the copy comes. */
@@ -636,7 +631,7 @@ export function successionSection(host: SectionHost): SuccessionView {
 		if (d.through !== '' && d.through !== '?' && ruler && g.byId.has(ruler) && !g.byId.get(ruler)?.sex) note(box, T.rulerNoSex(nameOf(ruler)), 'ruler-no-sex', true);
 		if (res.leftOutNoSex > 0) note(box, T.leftOutNoSex(res.leftOutNoSex), 'no-sex', true);
 		if (res.noBirthYear > 0) note(box, T.noBirthYear(res.noBirthYear), 'no-birth-year', true);
-		if (res.outsideBody) note(box, T.outsideBody(rulerLabel(ruler, res.year), firstHolder() ?? ''), 'outside-body', true);
+		if (res.outsideBody) note(box, T.outsideBody(rulerLabel(ruler, res.year), firstInfo(host.g(), host.row)?.name ?? ''), 'outside-body', true);
 		const list = box.createDiv({ cls: ['dynasty-rows', 'dynasty-succ-list'], attr: { role: 'list' } });
 		// M.2, M.3: a grey row stands before the heir at its `before` place (after that many heirs); the rows that remain stand after the last heir.
 		let nextBranch = 0;
@@ -719,6 +714,12 @@ export function successionSection(host: SectionHost): SuccessionView {
 	result = compute();
 	return {
 		draw,
+		rulesOpened(open) {
+			if (open === rulesOpen) return;
+			rulesOpen = open;
+			// A section that opens gets its cadet hint now; the one that closes keeps the page as it is.
+			if (open && ui) host.guard(() => patchBody(ui!));
+		},
 		result: () => result,
 		renderLine(parent) {
 			live = parent.createDiv({ cls: 'dynasty-succ-live', attr: { 'aria-live': 'polite', 'data-succ': 'summary' } });

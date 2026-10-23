@@ -34,13 +34,15 @@ export const CALENDAR_UI = {
 	noteMoreLabel: 'Calendar note: select the note with the calendars of this tree',
 	command: 'Open the Calendars window',
 	noteTitle: 'Calendar note',
-	noteText: 'Select the note with the calendars for this tree. If you select none, the tree uses every calendar note.',
-	everyNote: 'Every calendar note',
-	everyNoteDetail: 'The tree uses the calendars of all calendar notes.',
+	noteText: 'Select the note with the calendars for this tree.',
+	noCalendar: 'No calendar',
+	noCalendarDetail: 'The tree reads only plain years, such as 1205.',
 	inUse: 'In use',
-	noNotes: 'No calendar note exists yet. Select “Calendars” in the More list and save a calendar. The plugin then makes the note.',
+	/** Stands under the choice while the plugin still looks for calendar notes (the list can grow). */
+	stillLooking: 'The plugin still looks for calendar notes. More notes can appear in this list.',
+	noNotes: 'No calendar note exists yet. To make one, select “Calendars” in the More list and save a calendar. The plugin then makes the note, and this tree uses it.',
 	noteChosen: (name: string) => `This tree uses the calendar note “${name}”.`,
-	everyChosen: 'This tree uses every calendar note.',
+	noCalendarChosen: 'This tree uses no calendar. It reads plain years only.',
 	noteFailed: 'The plugin cannot change the tree text, so your choice is not saved.',
 } as const;
 
@@ -61,6 +63,11 @@ export const CALENDAR_WINDOW_UI = {
 	newNoteHint: 'The plugin makes this note when you save.',
 	noNoteMeta: 'No calendar note exists.',
 	noNoteHint: 'The plugin makes the note “Calendars” when you save.',
+	// The line before Save in a window that opened from a tree (D289, D290): it says what Save does to the tree.
+	treeNewNote: (name: string) => `This tree uses no calendar now. When you save, the plugin makes the note “${name}”. Then this tree uses it.`,
+	treeUsesNote: (name: string) => `This tree uses no calendar now. When you save, it uses the note “${name}”. This is also true when you change no calendar.`,
+	treeStillUses: (name: string) => `This tree still uses the note “${name}”, not the new note. To use the new note, save, and then select “Calendar note” in the More list.`,
+	treeReadOnly: 'The plugin cannot change this tree here. For example, the tree has an error, or it shows in another note or a Canvas. When you save, the plugin saves the calendars in the note, but this tree does not use the note. To make the tree use it, open the note of the tree and select “Calendar note” in the More list.',
 	changesFirst: 'Save or cancel your changes before you change the note.',
 	addCalendar: 'Add calendar',
 	addCycles: 'Add cycle calendar',
@@ -149,6 +156,11 @@ export const CALENDAR_WINDOW_UI = {
 	discardText: 'The plugin discards your changes to the calendars.',
 	saved: 'The plugin saved the calendars.',
 	madeNote: (name: string) => `The plugin made the note “${name}”.`,
+	// The end of the one Notice after a Save in a window that can set the key of the tree.
+	keyNow: (name: string) => `This tree now uses the note “${name}”.`,
+	keyNowMade: 'This tree now uses it.',
+	keyHas: 'This tree already uses a calendar note. The plugin did not change the tree.',
+	keyFailed: 'The plugin could not change this tree, so it does not use the note yet. To use the note, select “Calendar note” in the More list.',
 	cannotMake: 'The plugin cannot make the note. Check the name and the folder.',
 	// The draft stays in the window after each of these three (the window never closes on an error), so the texts say so.
 	stale: 'The plugin did not save the calendars, because the note moved or changed, for example by a sync. Your changes stay in this window until you close it. Open the window again to see the note as it is now.',

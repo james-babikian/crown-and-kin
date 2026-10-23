@@ -98,9 +98,19 @@
 	pointer-events: none;
 }
 
-/* The hint labels stay in the tree (no element is added after the draw); hidden while they count nobody. */
+/*
+ * The hint labels stay in the tree (no element is added after the draw); hidden while they count nobody. A hidden label stays in the layout as an empty,
+ * absolutely placed box and is hidden by `visibility`: to take it out with `display: none` and back made the browser lay out all the SVG text again
+ * (D285: 1 to 4 s at the first pan of a tree of thousands of people, on the phone profile).
+ */
 .dynasty-hint-slot:not(.dynasty-hint) {
-	display: none;
+	position: absolute;
+	visibility: hidden;
+	width: 0;
+	height: 0;
+	padding: 0;
+	border: 0;
+	overflow: hidden;
 }
 
 .dynasty-hint-up {
@@ -109,6 +119,12 @@
 
 .dynasty-hint-down {
 	bottom: var(--dynasty-hint-bottom, var(--size-4-1));
+}
+
+/* G5 0.4: a card in the right corner; the hint stands in the left corner, with the same gap to the edge. */
+.dynasty-hint.is-left {
+	right: auto;
+	left: var(--size-4-2);
 }
 
 @container (max-width: 420px) {

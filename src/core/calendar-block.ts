@@ -16,7 +16,7 @@ import { codedIssue, type CodedIssue } from './messages';
 import { inNames, MAX_LISTS, MAX_NAME_CHARS, MAX_NAMES, markerValid, normalizeMarker, type ListName, type NameList } from './name-lists';
 import { parseBody } from './parse';
 import { REFUSAL_TEXT } from './refusal-text';
-import { isEmpty, isMap as isRawMap, str, type Raw, type RawMap } from './tolerate';
+import { isEmpty, isMap as isRawMap, isRawList, str, type Raw, type RawMap } from './tolerate';
 import { emptyItems, insertItem, itemEnd, removeItems, section } from './yaml-list';
 import {
 	addPair, addSection, appendItem, clone, doubleQuoted, finishTogether, findPair, isRefusal, itemBlock, layoutOf, parse, refuse, removePair, renderScalar, setPairValue, topMap, type Layout, type NewValue, type Parsed, type Patch, type Source, type Step,
@@ -241,11 +241,11 @@ function cleanList(l: NameList, plain: boolean): { list: NameList } | { refusal:
 /** The lists of a new calendar as they will be written, or the refusal text. */
 function cleanLists(lists: unknown): { lists: NameList[] } | { refusal: string } {
 	if (lists === undefined) return { lists: [] };
-	if (!Array.isArray(lists)) return { refusal: REFUSAL_TEXT.listNames };
+	if (!isRawList(lists)) return { refusal: REFUSAL_TEXT.listNames };
 	if (lists.length > MAX_LISTS) return { refusal: REFUSAL_TEXT.listsTooMany };
 	const out: NameList[] = [];
 	for (const l of lists) {
-		const c = cleanList(l, false);
+		const c = cleanList(l as NameList, false);
 		if ('refusal' in c) return c;
 		out.push(c.list);
 	}
@@ -612,7 +612,7 @@ function editList(body: string, owner: ListOwner, index: number, fields: ListFie
 	if (!isRawMap(one)) return refuse('bad-value', REFUSAL_TEXT.unknownList);
 	if (!knownFits(fields, names, one)) return refuse('bad-value', REFUSAL_TEXT.listKnown);
 	const steps: Step[] = [];
-	const change = (key: string, data: Raw | null, value: (item: YAMLMap) => NewValue | null) => {
+	const change = (key: string, data: Raw, value: (item: YAMLMap) => NewValue | null) => {
 		if (data === null ? one[key] === undefined : canon(key === 'names' ? shorthand(one[key]) : one[key]) === canon(data)) return;
 		if (data === null) delete one[key];
 		else one[key] = data;

@@ -1,18 +1,15 @@
-import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { speedTest } from '../support/speed-test';
-
-vi.mock('obsidian', () => import('./fake-obsidian'));
-vi.mock('@codemirror/language', () => ({ forceParsing: () => false, syntaxTree: () => ({ length: 0 }) }));
-vi.mock('@codemirror/view', () => ({ ViewPlugin: { fromClass: () => ({}) } }));
 
 import { computeGenerations } from '../../src/core/generations';
 import { computeModelOrder } from '../../src/core/order';
 import { fixtureSource } from './load';
 import { HousesWindow } from '../../src/obsidian/houses-window';
-import { FEl, dispatch, fakeWin, installDom, resetDom } from './fake-dom';
+import { FEl, dispatch, resetDom } from './fake-dom';
 import { resetObsidian } from './fake-obsidian';
 import { graphOf, housePageModule, tableCellOf } from './m10-support';
 import { fakeHandle } from './tree-view-fakes';
+import { useFakeDom } from '../support/fake-dom-setup';
 
 /*
  * Spec §13.12 (D55, D88, D89), §13.11 "Note name" and the M10 core contract rules 13–18: the rows
@@ -291,10 +288,7 @@ describe('performance (spec §13.12): the largest house of sample tree 7', () =>
 
 /* Adopted from the M10 review C (`m10/review-c`, finding 4). Waits for the fix round (C2). */
 describe('review C: People in the Houses window (spec §13.12)', () => {
-	beforeAll(() => {
-		installDom();
-		(globalThis as Record<string, unknown>).window ??= fakeWin;
-	});
+	useFakeDom({ window: true });
 	beforeEach(() => {
 		resetDom();
 		resetObsidian();

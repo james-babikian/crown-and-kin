@@ -6,7 +6,7 @@ import type { Tree } from '../../src/core/types';
 import { drawnGeometry, geometryFor, tagTop } from '../../src/layout/geometry';
 import { clearLayoutCache, layoutKey, layoutTree } from '../../src/layout/index';
 import type { EdgeDrawing, Geometry, LaidOut, LayoutSettings, TreeLayout } from '../../src/layout/model';
-import { lineProblems, randomTree } from '../random-trees';
+import { lineProblems, randomTree } from '../support/random-trees';
 import { recordLayout } from './layout-record';
 import { allFixtures } from './load';
 import { DESCENT_KINDS, pathPoints } from './paths';

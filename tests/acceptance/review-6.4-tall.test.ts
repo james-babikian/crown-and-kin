@@ -1,9 +1,5 @@
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
-vi.mock('obsidian', () => import('./fake-obsidian'));
-vi.mock('@codemirror/language', () => ({ forceParsing: () => false, syntaxTree: () => ({ length: 0 }) }));
-vi.mock('@codemirror/view', () => ({ ViewPlugin: { fromClass: () => ({}) } }));
-
 import { geometryFor, tallExtra } from '../../src/layout/geometry';
 import { FullScreenModal } from '../../src/obsidian/full-screen';
 import { TreeView } from '../../src/obsidian/tree-view';

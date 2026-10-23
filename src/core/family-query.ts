@@ -20,7 +20,7 @@ export interface PartnerLink {
 	partner: string;
 	/** Null for an implicit union (co-parents with no union recorded). */
 	union: UnionRef | null;
-	type: UnionKind | string | null;
+	type: UnionKind | (string & {}) | null;
 	start?: string;
 	end?: string;
 }

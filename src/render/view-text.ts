@@ -15,6 +15,7 @@ export const PERSON_PLACEHOLDER = 'Type a name';
 export const UI = {
 	errorTitle: 'The plugin cannot show this tree',
 	internalError: 'The plugin cannot show this tree because of an error in the plugin. Close the note. Open it again.',
+	startFailed: 'Crown and Kin could not start one of its features. Some features, such as trees or calendars, may not work. Close Obsidian and open it again, because this can fix a short fault. If this message shows again, update Crown and Kin and Obsidian, or report the problem.',
 	bannerTitle: 'Editing is off',
 	bannerLead: 'Correct these problems. Then you can edit this tree:',
 	fit: 'Fit the tree in the view',

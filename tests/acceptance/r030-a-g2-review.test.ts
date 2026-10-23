@@ -1,20 +1,17 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-
-vi.mock('obsidian', () => import('./fake-obsidian'));
-vi.mock('@codemirror/language', () => ({ forceParsing: () => false, syntaxTree: () => ({ length: 0 }) }));
-vi.mock('@codemirror/view', () => ({ ViewPlugin: { fromClass: () => ({}) } }));
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { Rect } from '../../src/layout/model';
 import { FullScreenModal } from '../../src/obsidian/full-screen';
 import { DEFAULT_SETTINGS } from '../../src/view/settings';
 import type { TreeView } from '../../src/obsidian/tree-view';
 import type { View } from '../../src/render/view-math';
-import { FEl, clock, device, flushFrames, installDom, resetDom, resizeAll, runFrame, settle } from './fake-dom';
+import { FEl, clock, device, flushFrames, resetDom, resizeAll, runFrame, settle } from './fake-dom';
 import { resetObsidian } from './fake-obsidian';
 import { topLevelBlocks } from './load';
 import { fakeHandle, fakeHost, fullViews, phone } from './tree-view-fakes';
+import { useFakeDom } from '../support/fake-dom-setup';
 
 /*
  * 0.3 WP-A on the real TreeView, the PanZoom and the full-screen view on the fakes (D222, N02, N03):
@@ -24,7 +21,7 @@ import { fakeHandle, fakeHost, fullViews, phone } from './tree-view-fakes';
  * The numbers of "keeps its 0.2.8 first view" were recorded by running the same cases on the tag v0.2.8.
  */
 
-beforeAll(() => installDom());
+useFakeDom();
 /** n frames of the fake window. */
 function step(n = 1): void {
 	for (let i = 0; i < n; i++) {

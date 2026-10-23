@@ -1,0 +1,73 @@
+# Release files (0.4, D281 part 1). A pushed tag that is a bare version ("0.4.0", no "v") builds the three plugin files,
+# makes a signed build record for them and opens a DRAFT release. The owner reads the draft and presses "Publish release".
+# Obsidian's directory downloads main.js, manifest.json and styles.css from the release whose tag equals the manifest version.
+name: Release
+
+on:
+  push:
+    tags:
+      - '[0-9]+.[0-9]+.[0-9]+'
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write # a draft release
+      id-token: write # the signature of the build record
+      attestations: write # the build record
+    steps:
+      # actions/checkout v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+
+      # actions/setup-node v7.1.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version: 22
+          cache: npm
+
+      # The glob of the trigger is loose, so the exact rule is checked here before anything is built.
+      - name: Check that the tag equals the version
+        env:
+          TAG: ${{ github.ref_name }}
+        run: node scripts/release-check.mjs "$TAG"
+
+      - name: Install
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      # The minified copy is only for the release. styles.css in the repository stays readable. The script stops
+      # if a second CSS engine finds any difference in the styling.
+      - name: Collect the three release files
+        run: |
+          mkdir dist
+          cp main.js manifest.json dist/
+          node scripts/minify-styles.mjs styles.css dist/styles.css
+          ls -l dist
+
+      # actions/attest-build-provenance v4.2.2
+      # A private repository needs GitHub Enterprise Cloud for build records, so there the step may fail without stopping the release.
+      - name: Sign the build record
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8
+        continue-on-error: ${{ github.event.repository.private }}
+        with:
+          subject-path: |
+            dist/main.js
+            dist/manifest.json
+            dist/styles.css
+
+      - name: Create the draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          gh release create "$TAG" dist/main.js dist/manifest.json dist/styles.css \
+            --draft --verify-tag --title "$TAG" \
+            --notes "Crown and Kin $TAG. Install files: main.js, manifest.json, styles.css. Check a file with: gh attestation verify main.js --repo $GITHUB_REPOSITORY"

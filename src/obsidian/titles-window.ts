@@ -384,7 +384,7 @@ protected labelOf(key: string): string {
 			this.section = view;
 			specs.push(
 				{ key: 'line', title: WINDOW_UI.sectionLine, summary: view.lineSummary(), open: false, build: (body) => view.renderLine(body) },
-				{ key: 'rules', title: WINDOW_UI.sectionRules, summary: view.rulesSummary(), open: false, build: (body) => view.renderRules(body) },
+				{ key: 'rules', title: WINDOW_UI.sectionRules, summary: view.rulesSummary(), open: false, build: (body) => view.renderRules(body), onOpen: (open) => view.rulesOpened(open) },
 			);
 		}
 		specs.push(this.otherActionsSection(t.key, 'dynasty-title-delete', (name) => TITLES_UI.deleteLabel(name)));

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { deriveFamilies } from '../../src/core/derive';
 import { parseDynasty } from '../../src/core/parse';
 import { blockOf, branchLine, graphOf, titleIn, type BranchResult } from './r027-support';
+import { rng } from '../support/rng';
 
 /*
  * Version 0.2.7, open branches and wards (owner decision D191, spec section 0; the 0.2.7 contract M.1 item 4): a
@@ -236,18 +237,6 @@ describe('D191: childless-has-child does not count a ward as a child (M.6)', () 
 });
 
 // ---- property: a ward link never removes a row and never changes the heirs ----
-
-/** A small seeded random generator (mulberry32), so a failure can be repeated. */
-function rng(seed: number): () => number {
-	let a = seed >>> 0;
-	return () => {
-		a = (a + 0x6d2b79f5) >>> 0;
-		let t = a;
-		t = Math.imul(t ^ (t >>> 15), t | 1);
-		t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-		return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-	};
-}
 
 interface RandomPerson {
 	id: string;

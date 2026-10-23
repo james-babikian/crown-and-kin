@@ -29,7 +29,7 @@ import { FOLD_CHIP_EM, FRAME_STROKE_PX, RUMOUR_FONT_EM, TAB_TEXT_BASE_EM, TAB_TE
 import { legendRows, type LegendHouse, type LegendPart } from './legend';
 import { lineLook, type LineMarks, type LineState } from './line-highlight';
 import type { BreakList } from './break-words';
-import { cardNameLines, titleLines, type NameMeasure, type NameRun } from './name-lines';
+import { cardNameLines, isolateLines, titleLines, type NameMeasure, type NameRun } from './name-lines';
 import { fixedColour, fontOf, savedFrame, xmlText, type PictureMap, type SavedFrame, type SavedParts } from './saved-picture';
 import { DEAD_STRIP_OPACITY, DEFAULT_DARK, DEFAULT_LIGHT, FADED_OPACITY, HEIR_LOOK, ME_LOOK, ME_RING_INNER, ON_LINE_EXTRA, SAVED_CARD_RADIUS, STROKES, TAG_MARK, UNION_MARKS, stripColour, tagMarkSlot, unionMark, unionShape, type Palette, type UnionShape } from './styles';
 import { LEGEND_DEAD_DOUBT_LABEL, LEGEND_DEAD_LABEL, LEGEND_LABELS, SIGN_LEGEND_LABEL } from './legend-text';
@@ -262,7 +262,7 @@ export function renderSvg(g: FamilyGraph, layout: TreeLayout, edges: EdgeDrawing
 			const y0 = box.y + t.r1.plate.y + 0.5;
 			out.push(`<line x1="${box.x + span.x0}" y1="${y0}" x2="${box.x + span.x1}" y2="${y0}" stroke="${c.cardBorder}" stroke-width="1"${di(`foot:${p.id}`)}/>`);
 		}
-		names.forEach((runs: NameRun[], i) => {
+		isolateLines(names).forEach((runs: readonly NameRun[], i) => {
 			const y = box.y + [t.nameBaseline, t.name2Baseline!, t.name3Baseline!][i];
 			const inner = runs.map((r) => (r.sob ? `<tspan font-weight="400">${esc(r.text)}</tspan>` : esc(r.text))).join('');
 			out.push(`<text x="${tx}" y="${y}"${anchor} font-size="${t.nameSize}" font-weight="${esc(nameWeight)}" fill="${dead ? c.textMuted : c.text}">${inner}</text>`);
@@ -284,7 +284,7 @@ export function renderSvg(g: FamilyGraph, layout: TreeLayout, edges: EdgeDrawing
 		});
 		const datesY = hasTitle ? t.datesBaseline : t.titleBaseline;
 		const showYears = !!dates && !(saved && opts.showDates === false);
-		if (showYears) out.push(`<text x="${tx}" y="${box.y + datesY}"${anchor} font-size="${t.smallSize}" fill="${c.dates}">${esc(fitNamed(dateLine(p, g.dates)!, dates!, t.textW, smallMeasure, (s) => cutSmall(s, t.textW)))}</text>`);
+		if (showYears) out.push(`<text x="${tx}" y="${box.y + datesY}"${anchor} font-size="${t.smallSize}" fill="${c.dates}">${esc(fitNamed(dateLine(p, g.dates)!, dates, t.textW, smallMeasure, (s) => cutSmall(s, t.textW)))}</text>`);
 		const relation = opts.relations?.get(p.id)?.text;
 		const relY = relationY(t);
 		if (relation && relY !== undefined) {
@@ -471,7 +471,7 @@ function legendSvg(frame: SavedFrame, saved: SavedParts, c: Palette, fonts: Scen
 			const item = cell.item === 'sign' ? 'legend-sign' : cell.item === 'dead' || cell.item === 'dead-doubt' ? `legend-${cell.item}` : `legend-line:${cell.item}`;
 			out.push(`<g transform="translate(${cell.x} ${cell.y})" data-item="${item}">`);
 			out.push(`<g transform="translate(0 ${(L.rowH - L.sample.h) / 2}) scale(${L.sample.scale})">${row.parts.map((part) => partSvg(part, c, '#ffffff')).join('')}</g>`);
-			out.push(label(L.labelX, cell.item === 'sign' ? SIGN_LEGEND_LABEL : cell.item === 'dead' ? LEGEND_DEAD_LABEL : cell.item === 'dead-doubt' ? LEGEND_DEAD_DOUBT_LABEL : LEGEND_LABELS[cell.item as StrokeKind]));
+			out.push(label(L.labelX, cell.item === 'sign' ? SIGN_LEGEND_LABEL : cell.item === 'dead' ? LEGEND_DEAD_LABEL : cell.item === 'dead-doubt' ? LEGEND_DEAD_DOUBT_LABEL : LEGEND_LABELS[cell.item]));
 			out.push('</g>');
 		}
 	}

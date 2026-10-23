@@ -1,25 +1,22 @@
-import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-
-vi.mock('obsidian', () => import('./fake-obsidian'));
-vi.mock('@codemirror/language', () => ({ forceParsing: () => false, syntaxTree: () => ({ length: 0 }) }));
-vi.mock('@codemirror/view', () => ({ ViewPlugin: { fromClass: () => ({}) } }));
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { FullScreenModal } from '../../src/obsidian/full-screen';
 import { HousesWindow } from '../../src/obsidian/houses-window';
 import { clearRelationCache } from '../../src/view/relation-cache';
 import { DEFAULT_SETTINGS, type DynastySettings } from '../../src/view/settings';
 import { clearMeasureCache } from '../../src/render/dom/measure';
-import { FEl, clock, device, flushFrames, installDom, resetDom, runFrame, runTimers, settle, dispatch } from './fake-dom';
+import { FEl, clock, device, flushFrames, resetDom, runFrame, runTimers, settle, dispatch } from './fake-dom';
 import { resetObsidian } from './fake-obsidian';
 import { desktop, embed, fakeHandle, fakeHost, openFullScreen, phone, shown as sceneOf } from './tree-view-fakes';
+import { useFakeDom } from '../support/fake-dom-setup';
 
 /*
  * 0.2.4, the view of the phone preview (WP phone-A): "Reduce movement" (D126 1, contract 3.3) in the tree view, on the fake DOM. The pictures of
  * the settings tab are in windows-settings.test.ts. 0.2.5 (D144): the card style (D119) and the height button (D120) of the phone preview are gone
- * with the preview; a tree in a note on a phone is a list (tests/s025-phone-list-view.test.ts).
+ * with the preview; a tree in a note on a phone is a list (tests/obsidian/s025-phone-list-view.test.ts).
  */
 
-beforeAll(() => installDom());
+useFakeDom();
 beforeEach(() => {
 	resetDom();
 	resetObsidian();

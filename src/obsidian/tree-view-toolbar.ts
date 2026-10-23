@@ -623,12 +623,12 @@ export abstract class TreeViewToolbar extends TreeViewPictures {
 		);
 	}
 
-	/** More → Calendars (spec §14 rule 7): the window with the calendars of this tree's calendar notes. */
+	/** More → Calendars (spec §14 rule 7): the window with the calendars of the note that this tree names, or the first calendar note when it names none (D290). */
 	protected openCalendarWindow(): void {
-		if (this.host.dates) void openCalendars(this.host.app, this.host.dates, { treePath: this.sourcePath, link: this.reading?.link, onClosed: () => this.refocusTool('.dynasty-more') });
+		if (this.host.dates) void openCalendars(this.host.app, this.host.dates, { tree: this.calendarTree(), onClosed: () => this.refocusTool('.dynasty-more') });
 	}
 
-	/** More → Calendar note (spec §14 rule 7): the one calendar note of this tree, or every calendar note. */
+	/** More → Calendar note (spec §14 rule 7): the one calendar note of this tree, or no calendar. */
 	protected async chooseNote(): Promise<void> {
 		const h = await this.validHandle();
 		if (h && this.host.dates && !this.unloaded) await chooseCalendarNote(this.host.app, this.host.dates, h, this.sourcePath, this.reading?.link);

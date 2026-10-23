@@ -1,5 +1,5 @@
 // 0.2.5 WP-B6: the keys and the hash function of the golden pictures of the Roundel and the sideways text card. The test
-// `tests/s025-card-hashes.test.ts` and the recorder `scripts/s025-record-hashes.ts` both use it, so a key means one picture everywhere.
+// `tests/scripts/s025-card-hashes.test.ts` and the recorder `scripts/s025-record-hashes.ts` both use it, so a key means one picture everywhere.
 import { createHash } from 'node:crypto';
 import { allFixtures } from '../tests/acceptance/load';
 import { CARD_THEMES, CARD_VARIANTS, drawCard, type CardTheme, type CardVariant } from './s025-card-draw';

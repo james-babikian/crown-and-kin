@@ -11,13 +11,9 @@ import { events, openModals, type Plugin as FakePlugin } from './fake-obsidian';
 
 /*
  * The plugin side of the fakes: an app, a block handle, a host, and the ways a test opens a tree
- * (embedded in a note, full screen, the real plugin). A test file that imports this must mock
- * `obsidian` with fake-obsidian.ts, and `@codemirror/language` and `@codemirror/view` (main.ts
- * imports the Live Preview extension):
- *
- *   vi.mock('obsidian', () => import('./fake-obsidian'));
- *   vi.mock('@codemirror/language', () => ({ forceParsing: () => false, syntaxTree: () => ({ length: 0 }) }));
- *   vi.mock('@codemirror/view', () => ({ ViewPlugin: { fromClass: () => ({}) } }));
+ * (embedded in a note, full screen, the real plugin). `obsidian` is mocked with fake-obsidian.ts, and
+ * `@codemirror/language` and `@codemirror/view` with stubs (main.ts imports the Live Preview extension),
+ * for every test file by the setup file tests/support/common-mocks.ts.
  */
 
 /**

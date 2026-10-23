@@ -11,7 +11,8 @@ import { deriveFamilies, type FamilyGraph } from '../core/derive';
 import type { CodedIssue } from '../core/messages';
 import { foldHidden, personFolds, unfoldFor, type FoldControl, type FoldKey } from '../core/folds';
 import type { ParseCache } from '../core/parse-cache';
-import { parseDynasty } from '../core/parse';
+import { parseBody, parseDynasty } from '../core/parse';
+import { isEmpty, isMap } from '../core/tolerate';
 import type { RelationOptions } from '../core/relations';
 import type { CardLabel } from '../core/titles';
 import type { ParseResult, Tree } from '../core/types';
@@ -28,18 +29,29 @@ import type { Handle, HandleRegistry } from './block-handle';
 import { BlockBinding } from './block-binding';
 import { newBlockState, type BlockState } from '../view/block-state';
 import { datesForTree, type CalendarIndex, type DatesFor } from '../view/calendar-index';
+import type { CalendarTree, SetLinkResult } from './calendar-link';
 import type { SheetFolds } from './edit-sheet';
 import { setFolds, type FoldPlan } from '../view/fold-view';
 import type { LivePictures } from './live-pictures';
 import type { LargeBar } from '../view/large-tree';
 import type { MeasuredResult } from '../view/measured-layout';
 import { pushTrail, type ListFrom } from '../view/phone-list';
+import { pluginWindowOpen } from '../view/plugin-modals';
 import type { PickerContext } from './person-picker';
 import type { PictureCopy, PictureStore } from './picture-store';
 import type { FinderDrawn } from '../view/render-plan';
 import { DEFAULT_SETTINGS, type DynastySettings } from '../view/settings';
 import type { SuccessionDrawn } from '../view/succession-view';
 import { OPEN_GAP_MS, type OpenTime, type FullSource, type FullHost, type ViewPlace, type FoldAnchor, type Anchor, type KeepPlace, type PictureInfo } from './tree-view-types';
+
+/** Whether an element shows its keyboard focus ring now; an engine with no `:focus-visible` shows it on every focus. */
+export function showsRing(el: Element): boolean {
+	try {
+		return el.matches(':focus-visible');
+	} catch {
+		return true;
+	}
+}
 
 /** What a tree view needs from the plugin. `TreeHost` (in `tree-view.ts`) is this with the views typed as `TreeView`. */
 export interface ViewHost {
@@ -349,9 +361,38 @@ export abstract class TreeViewBase extends MarkdownRenderChild implements HoverP
 		return this.sourcePath;
 	}
 
-	/** The calendar note that the tree names in its `calendar` option, as written; undefined when it names none or has not drawn yet. */
-	get calendarLink(): string | undefined {
-		return this.reading?.link;
+	/**
+	 * What the Calendars window needs to know of this tree (D289, D290). `link` is the option `calendar` as written; undefined when the tree names none or has not drawn yet.
+	 * `setLink` is not null only for a tree with no key that has drawn and can be written: it has no problem that stops edits, and it is not read-only.
+	 */
+	calendarTree(): CalendarTree {
+		const link = this.reading?.link;
+		const named = !!link?.trim();
+		const writable = this.reading !== null && !named && !!this.handle && !this.hasCalendarKey(this.handle.body) && !this.readOnly && !this.blocked && this.errorBox === null && !this.inForeignView() && (!!this.full || !this.coarse);
+		return { treePath: this.sourcePath, link: named ? link : undefined, setLink: writable ? (value) => this.writeCalendarLink(value) : null };
+	}
+
+	/**
+	 * True when the text has a key `calendar` under `options` with any value that is not empty. The parser reads a link only from text, so a map or a list there reads as "no
+	 * link"; it is still the user's key, and Save never writes over it.
+	 */
+	private hasCalendarKey(body: string): boolean {
+		const read = parseBody(body);
+		if (!read.ok) return true;
+		const data = read.data;
+		const options = isMap(data) ? data.options : undefined;
+		return isMap(options) && !isEmpty(options.calendar);
+	}
+
+	/** Writes the option `calendar`. The body is read again now: a sync may have added a key since the window opened, and then nothing is written. */
+	private async writeCalendarLink(value: string): Promise<SetLinkResult> {
+		const h = this.handle;
+		if (!h) return 'failed';
+		const parsed = parseDynasty(h.body);
+		if (!parsed.ok) return 'failed';
+		if (parsed.tree.options.calendar?.trim() || this.hasCalendarKey(h.body)) return 'has-key';
+		const out = await h.write({ kind: 'set-option', key: 'calendar', value });
+		return out.ok ? 'ok' : 'failed';
 	}
 
 	/** The key of the block's view state, shared by the embed and the full-screen view. */
@@ -366,7 +407,7 @@ export abstract class TreeViewBase extends MarkdownRenderChild implements HoverP
 
 	/** G.1, G.3: what the person picker needs for portraits and relation words (Find, Focus, the finder). */
 	protected pickerContext(): PickerContext {
-		return { sourcePath: this.sourcePath, me: this.meId, relationOptions: this.relationOptions, ...(this.host.pictures ? { pictures: this.host.pictures } : {}) };
+		return { sourcePath: this.sourcePath, me: this.meId, relationOptions: this.relationOptions, relationBlock: this.key, ...(this.host.pictures ? { pictures: this.host.pictures } : {}) };
 	}
 
 	/** Spec §14: the date reader of a tree for the link it names as its calendar note; undefined without an index (a unit fake): plain years. */
@@ -553,6 +594,43 @@ export abstract class TreeViewBase extends MarkdownRenderChild implements HoverP
 		if (button && free && active !== button) button.focus();
 		const wait = [150, 600][step];
 		if (wait !== undefined) (doc.defaultView ?? window).setTimeout(() => TreeViewBase.refocusButton(host, st, full, sel, step + 1), wait);
+	}
+
+	/**
+	 * G5 0.4 (WCAG 2.4.3): a window of the tree closed, and Obsidian gave the focus back to the element that had it when the window opened. After a write the
+	 * redraw has replaced that element (a card, Expand), so the focus fell to the page. This puts it on the same place in the new drawing: `find` in the views that
+	 * `match` picks. Only while the focus is on no control and no window of the plugin is open (an Undo Notice does not count: it holds no focus); it looks again a little later, as the redraw can come after the close.
+	 */
+	static refocusAfterRedraw(host: ViewHost, match: (v: TreeViewBase) => boolean, find: (viewport: HTMLElement) => HTMLElement | null, focusVisible: boolean, step = 0): void {
+		let target: HTMLElement | null = null;
+		for (const v of host.views) {
+			if (v.unloaded || !v.viewport || !match(v)) continue;
+			const t = find(v.viewport);
+			if (t?.isConnected) target = t;
+		}
+		const doc = target?.doc ?? document;
+		const active = doc.activeElement;
+		const free = !active || active === doc.body || !active.isConnected;
+		// Obsidian's own restore passes `focusVisible` too: no ring after a mouse close of a window opened by a mouse.
+		if (target && free && !pluginWindowOpen()) target.focus({ preventScroll: true, focusVisible } as FocusOptions);
+		const wait = [150, 600][step];
+		if (wait !== undefined) (doc.defaultView ?? window).setTimeout(() => TreeViewBase.refocusAfterRedraw(host, match, find, focusVisible, step + 1), wait);
+	}
+
+	/**
+	 * The control of this view that has the keyboard focus now, if `is` accepts it, and whether it shows its focus ring: a window that opens now gives the focus
+	 * back there when it closes (G5 0.4). Null when the focus is elsewhere (a tap on a phone leaves it on the page).
+	 */
+	protected focusReturn(is: (el: Element) => boolean): { visible: boolean } | null {
+		const el = this.containerEl;
+		const active = el.doc?.activeElement;
+		if (!active || !el.contains(active) || !is(active)) return null;
+		return { visible: showsRing(active) };
+	}
+
+	/** True when this view shows the block state `st`, in the full-screen view (`full`) or in the note; for `refocusAfterRedraw`. */
+	static showsState(v: TreeViewBase, st: BlockState, full: boolean): boolean {
+		return !!v.full === full && v.peekState() === st;
 	}
 
 	/**

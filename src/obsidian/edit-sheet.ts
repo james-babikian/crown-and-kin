@@ -43,8 +43,23 @@ export class EditSheet extends EditSheetWrites {
 		return l.kind === 'ok' ? new EditSheet(app, o, l.data) : null;
 	}
 
+	/** The control of this window that had the focus when a window for a new person opened (Add child, Add partner), as a `data-focus` mark. */
+	private childMark: ReturnType<EditSheet['focusMark']> = null;
+
 	protected openNew(rel: NewRelation, name?: string): void {
-		const sheet = EditSheet.createNew(this.app, { handle: this.o.handle, sourcePath: this.o.sourcePath, beforeWrite: this.o.beforeWrite, openNote: this.o.openNote, newPerson: rel, initialName: name, parentSheet: this, place: this.o.place, pictures: this.o.pictures, folds: this.o.folds, relationOptions: this.o.relationOptions, dates: this.o.dates });
+		this.childMark = this.focusMark();
+		const sheet = EditSheet.createNew(this.app, { handle: this.o.handle, sourcePath: this.o.sourcePath, beforeWrite: this.o.beforeWrite, openNote: this.o.openNote, newPerson: rel, initialName: name, parentSheet: this, place: this.o.place, pictures: this.o.pictures, folds: this.o.folds, relationOptions: this.o.relationOptions, relationBlock: this.o.relationBlock, dates: this.o.dates });
 		sheet?.open();
+	}
+
+	childClosed(): void {
+		const mark = this.childMark;
+		this.childMark = null;
+		if (this.closing || !this.shown) return;
+		// Obsidian gives the focus back to the element that had it when the new window opened; after a Save this window was built again and that element is gone.
+		const doc = this.modalEl.doc ?? document;
+		const active = doc.activeElement;
+		if (active && active !== doc.body && active.isConnected) return;
+		this.restoreFocus(mark ?? 'sheet');
 	}
 }

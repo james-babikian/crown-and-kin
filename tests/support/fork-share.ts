@@ -1,4 +1,4 @@
-// The one rule of the fork (D228 idea 1, spec §5.1 step 5d, spec §10 "Version 0.3.1"): the two suite checks `lineProblems` (down: tests/random-trees.ts, sideways:
+// The one rule of the fork (D228 idea 1, spec §5.1 step 5d, spec §10 "Version 0.3.1"): the two suite checks `lineProblems` (down: tests/support/random-trees.ts, sideways:
 // tests/acceptance/sideways-checks.ts) report two families that share a stretch of line, and the fork shares a stretch by design. This file says
 // exactly which share is the fork, so both checks exempt that and nothing else. An internal test proves with mutants that no
 // other share is let through.

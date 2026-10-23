@@ -1,44 +1,34 @@
-// A fake vault for the calendar index tests (WP-4 step 4.3): notes in a map, events by hand, a metadata cache that is ready when the test says so.
+// A fake vault for the calendar index tests (WP-4 step 4.3; 0.4 WP-3a): notes in a map, events by hand, a metadata cache that is ready when the test says so.
+// Since D289 the vault has no list of notes and no section state: the host gives the list of calendar notes (`IndexOptions.notes`), and the event 'cache' brings the text.
 import type { CalendarVault } from '../../src/view/calendar-index';
 
 type Event = Parameters<CalendarVault['on']>[0];
 
 export interface FakeVault extends CalendarVault {
 	notes: Map<string, string>;
-	/** The state the fake cache gives a path; a path with no entry is 'unknown' until `cacheDone`, then it is worked out from the text. */
-	sections: Map<string, 'yes' | 'no' | 'unknown'>;
 	links: Map<string, string>;
 	reads: string[];
 	/** Settles `cacheReady()`. */
 	cacheDone(): void;
-	emit(event: Event, path: string, oldPath?: string): void;
-	/** Writes a note and sends the event. */
+	emit(event: Event, path: string, second?: string): void;
+	/** Writes a note and sends the events of Obsidian: `create` (a new note), then `cache` with the text. */
 	write(path: string, text: string): void;
 }
 
 export function fakeVault(initial: Record<string, string> = {}, cacheReady = true): FakeVault {
-	const handlers = new Map<Event, Set<(path: string, oldPath?: string) => void>>();
-	let cache = cacheReady;
+	const handlers = new Map<Event, Set<(path: string, second?: string) => void>>();
 	let open: () => void = () => undefined;
 	const gate = new Promise<void>((resolve) => (open = resolve));
 	if (cacheReady) open();
 	const v: FakeVault = {
 		notes: new Map(Object.entries(initial)),
-		sections: new Map(),
 		links: new Map(),
 		reads: [],
-		list: () => [...v.notes.keys()],
 		async read(path) {
 			v.reads.push(path);
 			const t = v.notes.get(path);
 			if (t === undefined) throw new Error('no such note');
 			return t;
-		},
-		sectionState(path) {
-			const set = v.sections.get(path);
-			if (set) return set;
-			if (!cache) return 'unknown';
-			return /^\s*(```|~~~)/m.test(v.notes.get(path) ?? '') ? 'yes' : 'no';
 		},
 		resolve: (link, from) => v.links.get(`${from}|${link}`) ?? v.links.get(link) ?? null,
 		on(event, cb) {
@@ -49,16 +39,16 @@ export function fakeVault(initial: Record<string, string> = {}, cacheReady = tru
 		},
 		cacheReady: () => gate,
 		cacheDone() {
-			cache = true;
 			open();
 		},
-		emit(event, path, oldPath) {
-			for (const cb of [...(handlers.get(event) ?? [])]) cb(path, oldPath);
+		emit(event, path, second) {
+			for (const cb of [...(handlers.get(event) ?? [])]) cb(path, second);
 		},
 		write(path, text) {
 			const had = v.notes.has(path);
 			v.notes.set(path, text);
-			v.emit(had ? 'modify' : 'create', path);
+			if (!had) v.emit('create', path);
+			v.emit('cache', path, text);
 		},
 	};
 	return v;

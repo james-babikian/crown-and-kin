@@ -219,9 +219,9 @@ function dateParts(p: Person, dates: DatesRead, names: NamesForm = 'shown'): { t
 	const hasYear = died !== undefined && dates.read(died)?.year !== undefined;
 	const sign = dead && !hasYear ? (DOUBTFUL_DIED.includes(p.died!.trim().toLowerCase()) ? DEAD_SIGN_DOUBT : DEAD_SIGN) : undefined;
 	let text: string | undefined;
-	if (p.born && hasYear) text = dateRange({ raw: p.born, shown: shownDate(p.born, dates, names) }, { raw: died!, shown: shownDate(died!, dates, names) }, dates);
+	if (p.born && hasYear) text = dateRange({ raw: p.born, shown: shownDate(p.born, dates, names) }, { raw: died, shown: shownDate(died, dates, names) }, dates);
 	else if (p.born) text = `b. ${shownDate(p.born, dates, names)}`;
-	else if (hasYear) text = `d. ${shownDate(died!, dates, names)}`;
+	else if (hasYear) text = `d. ${shownDate(died, dates, names)}`;
 	return { ...(text !== undefined ? { text } : {}), ...(sign !== undefined ? { sign } : {}) };
 }
 

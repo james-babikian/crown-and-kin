@@ -1,6 +1,6 @@
 // 0.3 (D231, WP-Q): the "M8" hashes of the sample trees were recorded again, once, because the added step of the placement moves cards.
 import { createHash } from 'node:crypto';
-import { beforeAll, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { deriveFamilies, type FamilyGraph } from '../../src/core/derive';
 import { focusSubgraph } from '../../src/core/focus-subgraph';
 import { computeRelations } from '../../src/core/relations';
@@ -13,9 +13,10 @@ import type { PictureMap, SavedParts } from '../../src/render/saved-picture';
 import { buildScene, type Scene } from '../../src/render/dom/scene';
 import { DEFAULT_DARK, DEFAULT_LIGHT } from '../../src/render/styles';
 import { renderSvg, type SvgOptions } from '../../src/render/svg-string';
-import { FEl, installDom } from './fake-dom';
+import { FEl } from './fake-dom';
 import { allFixtures } from './load';
 import { block14, graphOf, layoutPictures, savedModule, treeOf, type PictureHouse, type PictureSettings } from './m9-support';
+import { useFakeDom } from '../support/fake-dom-setup';
 
 /*
  * Spec §13.8 "Save the tree as a picture" (D70–D74) and the M9 obsidian contract P1–P6 with B3,
@@ -25,10 +26,7 @@ import { block14, graphOf, layoutPictures, savedModule, treeOf, type PictureHous
  * `renderSvg` draws exactly as in M8. These tests wait for WP 9.2.
  */
 
-beforeAll(() => {
-	installDom();
-	(globalThis as Record<string, unknown>).CSS = { supports: (_p: string, v: string) => /^#[0-9a-f]{6}$/i.test(v) };
-});
+useFakeDom({ css: true });
 
 const FONT = 'test';
 const FONTS = { text: 'serif', ui: 'sans', bold: '700' };
@@ -378,7 +376,8 @@ describe('P4: without `saved` (and without `pictures`), renderSvg draws exactly 
 		// Sample tree 16 (0.2.7): recorded from the 0.2.6 build.
 		'16': '2aea60397dc341f4',
 	};
-	for (const f of allFixtures()) {
+	// The sample trees 17 to 19 (version 0.4) did not exist in M8: they have no recorded value.
+	for (const f of allFixtures().filter((x) => x.id in M8_SVG)) {
 		it(`sample tree ${f.id}`, () => {
 			const g = graphOf(f.source);
 			const settings: LayoutSettings = { ...DEFAULT_LAYOUT_SETTINGS, relationLine: f.id === '14' || f.id === '07b' };

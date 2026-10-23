@@ -32,7 +32,7 @@ import { uniqueTitleId } from './id-gen';
 import { parseBody, textWithoutComments } from './parse';
 import { sameList } from './same-list';
 import { INHERIT_ILLEGITIMATE, INHERIT_RULES, INHERIT_THROUGH, readIllegitimate, readInherit, readRule, readThrough, SUCCESSION_RULES } from './succession-keys';
-import { bool, isEmpty, isMap as isRawMap, list, str, unwrapCurly, type Raw, type RawMap } from './tolerate';
+import { bool, isEmpty, isMap as isRawMap, isRawList, list, str, unwrapCurly, type Raw, type RawMap } from './tolerate';
 import type { Tree } from './types';
 import { dashOf, emptyItems, itemEnd, itemStart, removeFromSection, removeItems, section } from './yaml-list';
 import {
@@ -87,7 +87,7 @@ function titleIndex(data: RawMap, id: unknown): number | undefined {
 /** A title's holder items as written (`holders: aldric` is one); null when `holders` is a map. */
 function rawHolders(title: RawMap): Raw[] | null {
 	const v = title.holders;
-	if (Array.isArray(v)) return v;
+	if (isRawList(v)) return v;
 	if (isEmpty(v)) return [];
 	return isRawMap(v) ? null : [v];
 }
@@ -103,7 +103,7 @@ function whoOf(raw: Raw): { person?: string; name?: string } | null {
 function inTree(ctx: TitleContext, id: string): boolean {
 	const person = ctx.g.byId.get(id);
 	if (!person) return false;
-	const raw = (Array.isArray(ctx.data.people) ? ctx.data.people : [])[person.index];
+	const raw = (isRawList(ctx.data.people) ? ctx.data.people : [])[person.index];
 	return isRawMap(raw) && str(raw.id) === id;
 }
 
@@ -507,8 +507,8 @@ function titlesSection(p: Parsed, value: Extract<NewValue, { block: string[] }>)
 		return insertAt(end, `\n\n${lines}${after}`);
 	}
 	// Before `people` and the comment lines above it.
-	const i = (top.items as Pair[]).indexOf(next);
-	const at = src.withCommentsAbove(src.lineStart(keyStart), i > 0 ? src.pairLineEnd(top.items[i - 1] as Pair) : -1);
+	const i = top.items.indexOf(next);
+	const at = src.withCommentsAbove(src.lineStart(keyStart), i > 0 ? src.pairLineEnd(top.items[i - 1]) : -1);
 	const before = at > 0 && !blank(at - 1) ? '\n' : '';
 	return insertAt(at, `${before}${lines}\n\n`);
 }
@@ -676,7 +676,8 @@ function idListEdit(ctx: TitleContext, index: number, title: RawMap, key: 'heir'
 }
 
 /** An id as a flow list item: the text of the written item with this id if there is one, else the id written as a person id. */
-function idText(old: Raw | Node | null | undefined, id: string): string {
+/** `old` is a YAML node or a raw value (`Raw` is `unknown`, so it covers both). */
+function idText(old: Raw, id: string): string {
 	if (isSeq(old)) for (const it of old.items) if (isScalar(it) && str(unwrapCurly(it.value)) === id) return flowScalar('person', id, it);
 	if (isScalar(old) && str(unwrapCurly(old.value)) === id) return flowScalar('person', id, old);
 	return flowScalar('person', id);
@@ -767,7 +768,7 @@ function setHolders(ctx: TitleContext, op: SetHolders): EditResult {
 	for (const item of op.items as unknown[]) {
 		if (!item || typeof item !== 'object') return refuse('bad-value');
 		if ('add' in item) {
-			const added = newHolder(ctx, (item as { add: unknown }).add);
+			const added = newHolder(ctx, item.add);
 			if (isRefusal(added)) return added;
 			final.push(added);
 			continue;
@@ -930,7 +931,7 @@ export function dropIdPatches(p: Parsed, removals: IdRemoval[]): Patch[] | Refus
 // `card-title` cleanup (rule 7 above)
 
 /** The raw data of a body, or undefined if it does not parse. */
-function parsedData(body: string): Raw | undefined {
+function parsedData(body: string): Raw {
 	const p = parseBody(body);
 	return p.ok ? p.data : undefined;
 }
@@ -985,7 +986,7 @@ export function cleanCardTitles(before: string, after: string, beforeData?: Raw,
 		const title = str(raw['card-title']);
 		if (title === undefined || valid.get(id) !== title || holdsRaw(now, id, title)) return;
 		stale.push(k);
-		delete ((expected.people as RawMap[])[k] as RawMap)['card-title'];
+		delete (expected.people as RawMap[])[k]['card-title'];
 	});
 	if (!stale.length) return unchanged;
 	const b = parseBody(after);

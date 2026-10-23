@@ -8,7 +8,7 @@ import type { ParentRef, Person, Tree } from '../../src/core/types';
 import { layoutTree } from '../../src/layout/index';
 import { allFixtures, fixtureSource } from './load';
 import { FONT_FAMILY, geometry, SETTINGS } from './pipeline';
-import { randomTree } from '../random-trees';
+import { randomTree } from '../support/random-trees';
 
 // Spec §5.6 (focus mode: who is shown, + badges), §0 D2 (sibling order), D3 (focus mode for large
 // trees), D18 (the pin opens a focus tree), §8 (never throw), §9 (default 3 generations), and the

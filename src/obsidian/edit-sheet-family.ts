@@ -70,14 +70,14 @@ export abstract class EditSheetFamily extends EditSheetForm {
 	/** The relation word that a person row shows (D215), or undefined; the row's screen-reader name holds the same word. */
 	protected relationWord(id: string): { text: string } | undefined {
 		const me = this.me();
-		return me && (id === me || this.data.person.id === me) ? relationsFor(this.data.g, me, this.o.relationOptions).cards.get(id) : undefined;
+		return me && (id === me || this.data.person.id === me) ? relationsFor(this.data.g, me, this.o.relationOptions, this.o.relationBlock).cards.get(id) : undefined;
 	}
 
 	/** WP-K: the words of the parent rows and child rows come from one request. Only the window of the marked person shows them (D215). */
 	protected warmRelationWords(fam: FamilyView): void {
 		const me = this.me();
 		if (!me || this.data.person.id !== me) return;
-		relationsFor(this.data.g, me, this.o.relationOptions).cards.getMany([...fam.parents.map((l) => l.id), ...this.childrenOf().map((k) => k.id)]);
+		relationsFor(this.data.g, me, this.o.relationOptions, this.o.relationBlock).cards.getMany([...fam.parents.map((l) => l.id), ...this.childrenOf().map((k) => k.id)]);
 	}
 
 	/**
@@ -209,7 +209,7 @@ export abstract class EditSheetFamily extends EditSheetForm {
 		const me = this.me();
 		if (me === null) return null;
 		const p = this.data.person;
-		const v: RelationView = relationInfo(relationsFor(this.data.g, me, this.o.relationOptions).all.get(p.id), p.id === me);
+		const v: RelationView = relationInfo(relationsFor(this.data.g, me, this.o.relationOptions, this.o.relationBlock).all.get(p.id), p.id === me);
 		const finder = this.o.finder;
 		if (v.kind !== 'me' && finder && !this.gone) v.showLine = { label: ME_UI.showLine, aria: ME_UI.showLineLabel(p.name || p.id), run: () => this.leaveFor(() => finder.show(me, p.id)) };
 		return v;

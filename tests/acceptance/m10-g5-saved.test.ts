@@ -1,10 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { Resvg } from '@resvg/resvg-js';
-import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-
-vi.mock('obsidian', () => import('./fake-obsidian'));
-vi.mock('@codemirror/language', () => ({ forceParsing: () => false, syntaxTree: () => ({ length: 0 }) }));
-vi.mock('@codemirror/view', () => ({ ViewPlugin: { fromClass: () => ({}) } }));
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { TFile as VaultFile } from 'obsidian';
 import { deriveFamilies } from '../../src/core/derive';
@@ -15,10 +11,11 @@ import { makePicture, type SaveSource } from '../../src/obsidian/save-picture';
 import type { PictureStore } from '../../src/obsidian/picture-store';
 import { DEFAULT_LIGHT } from '../../src/render/styles';
 import { renderSvg } from '../../src/render/svg-string';
-import { fakeWin, installDom, resetDom } from './fake-dom';
+import { resetDom } from './fake-dom';
 import { resetObsidian } from './fake-obsidian';
 import { block15 } from './m10-support';
 import { fixtureNote, topLevelBlocks } from './load';
+import { useFakeDom } from '../support/fake-dom-setup';
 
 /*
  * The M10 G5 spec review named these as not covered (the decision notes, "M10 G5 spec review"): the saved
@@ -28,11 +25,7 @@ import { fixtureNote, topLevelBlocks } from './load';
  * the canvas and that its bytes are the file. A real canvas is a harness matter.
  */
 
-beforeAll(() => {
-	installDom();
-	(globalThis as Record<string, unknown>).window ??= fakeWin;
-	(globalThis as Record<string, unknown>).CSS = { supports: (_p: string, v: string) => /^#[0-9a-f]{6}$/i.test(v) };
-});
+useFakeDom({ window: true, css: true });
 
 beforeEach(() => {
 	resetDom();

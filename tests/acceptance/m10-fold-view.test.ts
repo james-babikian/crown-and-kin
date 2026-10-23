@@ -1,9 +1,5 @@
 import { readFileSync } from 'node:fs';
-import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-
-vi.mock('obsidian', () => import('./fake-obsidian'));
-vi.mock('@codemirror/language', () => ({ forceParsing: () => false, syntaxTree: () => ({ length: 0 }) }));
-vi.mock('@codemirror/view', () => ({ ViewPlugin: { fromClass: () => ({}) } }));
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { DEFAULT_LAYOUT_SETTINGS, clearLayoutCache, geometryFor, layoutTree } from '../../src/layout/index';
 import type { LaidOut, LayoutSettings } from '../../src/layout/model';
@@ -12,10 +8,11 @@ import { buildScene, type Scene, type SceneFolds, type SceneOptions } from '../.
 import type { SavedParts } from '../../src/render/saved-picture';
 import type { foldHit as FoldHitFn, keepSpot as KeepSpotFn } from '../../src/render/view-math';
 import { renderSvg, type SvgFolds, type SvgOptions } from '../../src/render/svg-string';
-import { FEl, dispatch, fakeWin, flushFrames, installDom, resetDom, settle } from './fake-dom';
+import { FEl, dispatch, flushFrames, resetDom, settle } from './fake-dom';
 import { resetObsidian } from './fake-obsidian';
 import { block15, comments15, graphOf, loadModule } from './m10-support';
 import { desktop, embed, fakeHandle, openFullScreen, openSheetOn, sheets, tabletDevice } from './tree-view-fakes';
+import { useFakeDom } from '../support/fake-dom-setup';
 
 /*
  * Spec §13.10 (D83–D85) and the M10 fold rules F6-F10, F14-F16: the fold controls in the
@@ -27,11 +24,7 @@ import { desktop, embed, fakeHandle, openFullScreen, openSheetOn, sheets, tablet
  * tree view, sheet). What cannot run here is listed at the end with the reason.
  */
 
-beforeAll(() => {
-	installDom();
-	(globalThis as Record<string, unknown>).window ??= fakeWin;
-	(globalThis as Record<string, unknown>).CSS = { supports: (_p: string, v: string) => /^#[0-9a-f]{6}$/i.test(v) };
-});
+useFakeDom({ window: true, css: true });
 
 beforeEach(() => {
 	resetDom();

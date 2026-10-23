@@ -6,7 +6,7 @@
 import { Modal, type App } from 'obsidian';
 import { FLOW } from '../render/ui-text';
 import { buildShell, type Shell } from './window-shell';
-import { ignoreGhostClick, phoneLayout } from './modal-layout';
+import { holdTab, ignoreGhostClick, phoneLayout } from './modal-layout';
 import { trackModal } from '../view/plugin-modals';
 import { nameDialog } from './sheet-parts';
 
@@ -51,7 +51,7 @@ class ChoiceModal<T> extends Modal {
 		m.addClass('dynasty-sheet');
 		m.addClass('dynasty-choice');
 		m.setAttribute('data-choice', this.spec.name);
-		this.cleanup.push(phoneLayout(this), ignoreGhostClick(this), trackModal(this, () => this.close()));
+		this.cleanup.push(phoneLayout(this), ignoreGhostClick(this), trackModal(this, () => this.close()), holdTab(m));
 		const el = this.contentEl;
 		// The window family (contract C): Cancel is the only button of the frame; the choices are the buttons of the body.
 		const shell = buildShell({ modalEl: this.modalEl, contentEl: el, title: this.spec.title, titled: true, cancelLabel: FLOW.cancel, saveLabel: null, onCancel: () => this.close() });

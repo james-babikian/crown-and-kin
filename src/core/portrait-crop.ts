@@ -83,7 +83,7 @@ const round4 = (n: number) => {
 
 /** The text to write: 4 decimals at most, no trailing zeros, single spaces. */
 export function formatPortraitCrop(crop: CropFraction): string {
-	return [crop?.left, crop?.top, crop?.side].map((n) => String(round4(n as number))).join(' ');
+	return [crop?.left, crop?.top, crop?.side].map((n) => String(round4(n))).join(' ');
 }
 
 /** True when two texts name the same part after rounding to 4 decimals; unreadable texts must match exactly. */

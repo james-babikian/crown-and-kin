@@ -2,7 +2,7 @@ import { FEl, fakeDoc, fakeWin } from './fake-dom';
 
 /*
  * The parts of the `obsidian` module that the tree view, the full-screen view and the edit sheet
- * use, on the fake DOM of fake-dom.ts. Use it with `vi.mock('obsidian', () => import('./fake-obsidian'))`.
+ * use, on the fake DOM of fake-dom.ts. It is the `obsidian` mock of every test file (the setup file tests/support/common-mocks.ts).
  * `events` records modal closes and link opens in order, so a test can check which came first.
  */
 
@@ -209,6 +209,13 @@ export class Plugin {
 	}
 	async onload(): Promise<void> {}
 	onunload(): void {}
+}
+
+/** Obsidian's `normalizePath`: one slash between parts, none at the ends ('/' for the root), no-break spaces as spaces, NFC. */
+export function normalizePath(path: string): string {
+	let p = path.replace(/[\\/]+/g, '/').replace(/(^\/+|\/+$)/g, '');
+	if (p === '') p = '/';
+	return p.replace(/[\u00A0\u202F]/g, ' ').normalize('NFC');
 }
 
 export const Keymap = { isModEvent: () => false };

@@ -1,24 +1,27 @@
 /*
- * The Calendars window (spec §14 rules 1, 3, 6 and 7; D251, D273). It shows the calendars of one calendar note of the tree as folding sections, one for each calendar and
+ * The Calendars window (spec §14 rules 1, 3, 6 and 7; D251, D273, D289, D290). It shows the calendars of one calendar note as folding sections, one for each calendar and
  * one for the plain years, with Add (a menu of the two kinds), Remove, the name and folder of the note and "New calendar note", and one "Test a date" field under all
  * sections. It is a draft in the way of the other windows (D112): Save writes the changes in one step, Cancel writes nothing, and any other way to close with changes asks
- * first. A refusal of `checkFormat` or `checkCalendars` is shown in the window, opens the section that holds it, and the window does not save; a warning (the same format in
- * another calendar note) is shown and the save goes ahead. The draft is `view/calendar-draft.ts`, a section body is `calendar-card.ts`, the file work is `calendar-note.ts`.
- * The first save makes the note `Calendars` at the root of the vault.
+ * first. A refusal of `checkFormat` or `checkCalendars` is shown in the window, opens the section that holds it, and the window does not save. A tree uses one calendar note, so
+ * the window shows one note at a time and reads no other note. Opened from a tree with no key, it shows the first calendar note by name and Save sets the key of the tree to the
+ * note shown, even with no change; a line before Save says so. The draft is `view/calendar-draft.ts`, a section body is `calendar-card.ts`, the file work is `calendar-note.ts` and the
+ * steps of Save are `calendar-window-save.ts`. A vault with no calendar note gets the note `Calendars` at the root of the vault at the first save with a calendar.
  */
 
-import { Notice, type App } from 'obsidian';
+import { Notice, setIcon, type App } from 'obsidian';
 import { linkedNotePath } from '../core/note-make';
-import type { Calendar, DateReader, NameList } from '../core/dates';
+import type { DateReader } from '../core/dates';
 import { issueText, type CodedIssue } from '../core/messages';
-import { CALENDAR_WINDOW_UI as T } from '../render/calendar-text';
+import { CALENDAR_UI, CALENDAR_WINDOW_UI as T } from '../render/calendar-text';
 import { markedLine } from '../render/dom/marks';
 import { PLAIN_KEY, checkDraft, calendarDraftChanged, draftOf, emptyPlain, markerIssues, newCalendar, newEra, newListDraft, opsOf, type CalendarDraft, type Checked, type ListDraft, type PlainDraft } from '../view/calendar-draft';
-import type { CalendarIndex } from '../view/calendar-index';
+import { byNameThenPath, type CalendarIndex } from '../view/calendar-index';
 import { listDraftsOf } from '../view/calendar-list-draft';
 import { calendarSummary, calendarTitle, listsSummary } from '../view/calendar-summary';
 import { drawCalendarBody, drawPlainBody } from './calendar-card';
-import { loadNote, makeCalendarNote, newNoteDefaults, saveNote, type LoadedNote } from './calendar-note';
+import type { CalendarTree } from './calendar-link';
+import { loadNote, newNoteDefaults, type LoadedNote } from './calendar-note';
+import { saveCalendars } from './calendar-window-save';
 import { testField, type CardHost } from './calendar-parts';
 import { sheetField, showErrorLine, nameDialog } from './sheet-parts';
 import { SmallFormModal } from './small-form';
@@ -26,13 +29,11 @@ import { showMenu, textButton } from './window-parts';
 import { buildShell } from './window-shell';
 import { renderSections, type SectionSpec, type SectionsView } from './window-sections';
 
-/** What opens the window. */
+export type { CalendarTree } from './calendar-link';
+
+/** What opens the window. `tree` is the tree it opens from (null: a note, the Edit button of a block, or a note with no tree); `note` opens on that calendar note. */
 export interface CalendarsOptions {
-	/** The note of the tree: a link in `options.calendar` is read from it. */
-	treePath: string;
-	/** The `calendar` option of the tree, as written; undefined: the tree uses every calendar note. */
-	link: string | undefined;
-	/** Open on this calendar note (the Edit button of a block). */
+	tree: CalendarTree | null;
 	note?: string;
 	/** Runs when the window has closed: the focus goes back to the control that opened it. */
 	onClosed?: () => void;
@@ -78,6 +79,9 @@ class CalendarsWindow extends SmallFormModal {
 	private readonly host: CardHost;
 	/** The user pressed Save and the window refused: empty fields show their refusal from then on. */
 	private attempted = false;
+	/** The line before Save: what Save does to the tree (D289, D290). It follows the name of a new note as typed. */
+	private lineEl: HTMLElement | null = null;
+	private lineKey = '';
 
 	constructor(
 		app: App,
@@ -85,6 +89,8 @@ class CalendarsWindow extends SmallFormModal {
 		private readonly o: CalendarsOptions,
 		private readonly paths: readonly string[],
 		note: LoadedNote | null,
+		/** The notes of the vault are not all known yet and none is listed: the window never says that the vault has no calendar note. */
+		private readonly uncertain: boolean,
 	) {
 		super(app);
 		this.note = note;
@@ -97,9 +103,30 @@ class CalendarsWindow extends SmallFormModal {
 		this.host = this.makeHost();
 	}
 
-	/** The name and folder of the note that a first save makes: the note that the tree names, else `Calendars` at the root of the vault. */
+	/** The tree that the window opened from, null when it opened from a note. */
+	private get tree(): CalendarTree | null {
+		return this.o.tree;
+	}
+
+	/** The tree names a calendar note (the key is set): Save never changes it. */
+	private get named(): boolean {
+		return !!this.tree?.link?.trim();
+	}
+
+	/** The note of the tree: where a new note is made near, and what a key is seen from. */
+	private get treePath(): string {
+		return this.tree?.treePath ?? this.o.note ?? this.app.workspace.getActiveFile()?.path ?? '';
+	}
+
+	/** The tree has no key and can take one: Save sets it to the note (D290). */
+	private get keyWriter(): CalendarTree['setLink'] {
+		return this.tree && !this.named ? this.tree.setLink : null;
+	}
+
+	/** The name and folder of the note that a first save makes: the note that the tree names if that note is missing, else `Calendars` at the root of the vault. */
 	private startOfNew(): { name: string; folder: string } {
-		const linked = this.o.link ? linkedNotePath(this.o.link) : null;
+		const link = this.tree?.link?.trim();
+		const linked = link && !this.paths.length ? linkedNotePath(link) : null;
 		return linked ? { name: linked.name, folder: linked.folder } : newNoteDefaults(this.app);
 	}
 
@@ -107,23 +134,13 @@ class CalendarsWindow extends SmallFormModal {
 		return this.note?.path ?? `${this.newFolder ? `${this.newFolder}/` : ''}${this.newName}.md`;
 	}
 
-	/** The calendars of the other calendar notes that the tree uses. */
-	private outside(): Calendar[] {
-		return this.paths.filter((p) => p !== this.note?.path).flatMap((p) => this.index.calendarsOf(p));
-	}
-
 	/** The plain years of a note as a draft: the lists as read, and the block that holds them. */
 	private plainOf(note: LoadedNote | null): PlainDraft {
 		return note ? { block: note.plainBlock, saved: note.plain, lists: listDraftsOf(note.plain, undefined, () => this.counter++) } : emptyPlain();
 	}
 
-	/** The name lists of the plain years in the other calendar notes that the tree uses: "Test a date" reads with them. */
-	private outsidePlain(): NameList[] {
-		return this.paths.filter((p) => p !== this.note?.path).flatMap((p) => this.index.plainListsOf(p));
-	}
-
 	private check(): Checked {
-		return checkDraft(this.drafts, this.notePath(), this.outside(), this.plain, this.outsidePlain());
+		return checkDraft(this.drafts, this.notePath(), this.plain);
 	}
 
 	/** The lists of a calendar, or of the plain years (`PLAIN_KEY`). */
@@ -231,6 +248,39 @@ class CalendarsWindow extends SmallFormModal {
 		this.paintIssues();
 		if (this.noteSelect) this.noteSelect.disabled = this.dirty();
 		this.noteHint?.toggle(!!this.noteSelect?.disabled);
+		this.paintLine();
+	}
+
+	/** The lines before Save: what Save does to the tree (D289, D290), and (while the notes of the vault are not all known) that the plugin still looks for calendar notes. */
+	private saveLines(): string[] {
+		const tree = this.tree;
+		const note = this.note;
+		const draftName = this.newName.trim() || newNoteDefaults(this.app).name;
+		const lines: string[] = [];
+		if (this.uncertain && note === null) lines.push(CALENDAR_UI.stillLooking);
+		if (tree && this.named) {
+			if (note === null) lines.push(this.paths.length ? T.treeStillUses(noteLabel(this.paths[0], this.paths)) : T.newNoteHint);
+		} else if (tree && !this.keyWriter) {
+			lines.push(T.treeReadOnly);
+		} else if (tree) {
+			if (note !== null) lines.push(T.treeUsesNote(noteLabel(note.path, this.paths)));
+			else lines.push(this.uncertain ? T.treeUsesNote(draftName) : T.treeNewNote(draftName));
+		} else if (note === null) {
+			lines.push(this.paths.length || this.uncertain ? T.newNoteHint : T.noNoteHint);
+		}
+		return lines;
+	}
+
+	/** Draws the lines before Save again when they changed (the name of a new note as typed is in one of them). */
+	private paintLine(): void {
+		const el = this.lineEl;
+		if (!el) return;
+		const lines = this.saveLines();
+		const key = JSON.stringify(lines);
+		if (this.lineKey === key) return;
+		this.lineKey = key;
+		el.empty();
+		for (const line of lines) el.createDiv({ text: line });
 	}
 
 	/** The title and the summary line of every section follow the draft. */
@@ -345,6 +395,8 @@ class CalendarsWindow extends SmallFormModal {
 		box.empty();
 		this.metaEl?.empty();
 		this.noteSelect = null;
+		this.lineEl = null;
+		this.lineKey = '';
 		if (this.note === null) return void this.drawNewNote(box);
 		const path = this.note.path;
 		const folder = T.folder(path.includes('/') ? path.replace(/\/[^/]*$/, '') : '');
@@ -356,6 +408,8 @@ class CalendarsWindow extends SmallFormModal {
 			const { row, id } = sheetField(box, T.noteLabel, 'note', 'dynasty-cal');
 			const wrap = row.createDiv({ cls: 'dynasty-select' });
 			const select = wrap.createEl('select', { cls: ['dropdown', 'dynasty-sheet-input', 'dynasty-input'], attr: { id, 'data-focus': 'cal:note' } });
+			// The wrapper hides the native arrow, so the choice needs our own chevron or it looks like a text field (G5 0.4).
+			setIcon(wrap.createSpan({ cls: 'dynasty-select-chevron', attr: { 'aria-hidden': 'true' } }), 'chevron-down');
 			for (const p of this.paths) select.createEl('option', { text: noteLabel(p, this.paths), attr: { value: p } });
 			select.value = path;
 			select.addEventListener('change', () => void this.switchTo(select.value, select));
@@ -364,14 +418,17 @@ class CalendarsWindow extends SmallFormModal {
 			this.noteHint = row.createDiv({ cls: 'dynasty-sheet-hint', text: T.changesFirst });
 			this.noteHint.toggle(select.disabled);
 		}
+		this.lineEl = box.createDiv({ cls: 'dynasty-sheet-hint' });
+		this.paintLine();
 		// The link ends the text line (D278): the rarest action takes no text line of its own.
 		if (meta) textButton(meta, ['dynasty-link', 'dynasty-cal-new-note'], T.newNote, () => this.newNote(), { focus: 'cal:new-note' });
 	}
 
 	/** The fields of a note that the first save makes. */
 	private drawNewNote(box: HTMLElement): void {
-		this.metaEl?.setText(this.paths.length ? T.newNote : T.noNoteMeta);
-		box.createDiv({ cls: 'dynasty-sheet-hint', text: this.paths.length ? T.newNoteHint : T.noNoteHint });
+		this.metaEl?.setText(this.paths.length || this.uncertain ? T.newNote : T.noNoteMeta);
+		this.lineEl = box.createDiv({ cls: 'dynasty-sheet-hint' });
+		this.paintLine();
 		const grid = box.createDiv({ cls: ['dynasty-grid', 'is-stack'] });
 		const text = (name: string, label: string, value: string, set: (v: string) => void) => {
 			const { row, id } = sheetField(grid, label, name, 'dynasty-cal');
@@ -443,7 +500,9 @@ class CalendarsWindow extends SmallFormModal {
 			this.contentEl.querySelector<HTMLElement>('.dynasty-cal-sections [data-refusal]')?.scrollIntoView?.({ block: 'nearest' });
 			return;
 		}
-		if (!this.dirty() && this.note !== null) return this.finish();
+		// A Save with no change still sets the key of a tree that has none (D290); a new note with no calendar makes nothing and sets no key, like Cancel.
+		const keyDue = this.keyWriter !== null && this.note !== null;
+		if (!this.dirty() && !keyDue) return this.finish();
 		this.saving = true;
 		this.modalEl.addClass('is-saving');
 		try {
@@ -479,30 +538,21 @@ class CalendarsWindow extends SmallFormModal {
 		el.scrollIntoView?.({ block: 'nearest' });
 	}
 
-	/** Makes the note if it is new, writes the operations, tells the index; null when it went well, else the sentence for the window. */
+	/** Makes the note if it is new, writes the operations, tells the index and sets the key; null when it went well, else the sentence for the window. */
 	private async save(checked: Checked): Promise<string | null> {
-		let note = this.note;
-		let made: string | null = null;
-		if (note === null) {
-			const folder = this.newFolder.trim().replace(/^\/+|\/+$/g, '');
-			const name = this.newName.trim() || newNoteDefaults(this.app).name;
-			const file = await makeCalendarNote(this.app, this.o.treePath, name, folder);
-			if (!file) return T.cannotMake;
-			made = file.name;
-			note = await loadNote(this.app, file.path);
-			if (!note) return T.cannotSave;
-			this.note = note;
-		}
-		const plan = opsOf(note.calendars, this.drafts, checked, this.plain);
-		const out = plan.length ? await saveNote(this.app, note.path, note.bodies, plan) : { ok: true as const };
-		if (!out.ok) {
-			if (out.code === 'stale') return T.stale;
-			console.error('Crown and Kin: the calendar edit was refused', out.reason);
-			// The reason is a sentence of the core (a refused edit); an error of the file system has none.
-			return out.reason ? T.cannotSaveBecause(out.reason) : T.cannotSave;
-		}
-		await this.index.reload(note.path);
-		new Notice(made ? T.madeNote(made) : T.saved);
+		const out = await saveCalendars({
+			app: this.app,
+			index: this.index,
+			treePath: this.treePath,
+			note: this.note,
+			name: this.newName.trim() || newNoteDefaults(this.app).name,
+			folder: this.newFolder.trim().replace(/^\/+|\/+$/g, ''),
+			planFor: (note) => opsOf(note.calendars, this.drafts, checked, this.plain),
+			setLink: this.keyWriter,
+			onNote: (note) => (this.note = note),
+		});
+		if (!out.ok) return out.message;
+		new Notice(out.notice);
 		return null;
 	}
 
@@ -516,14 +566,38 @@ class CalendarsWindow extends SmallFormModal {
 	}
 }
 
+/** How long the window waits for the notes index to find the calendar notes when it knows none, and how often it looks, in ms (D290). */
+const WAIT_NOTES_MS = 1000;
+const WAIT_STEP_MS = 100;
+
+/** Waits until the index lists a calendar note or says its list is complete, at most `WAIT_NOTES_MS`. */
+async function waitForNotes(index: CalendarIndex): Promise<void> {
+	for (let waited = 0; waited < WAIT_NOTES_MS && !index.notes().length && !index.notesComplete(); waited += WAIT_STEP_MS) await new Promise<void>((resolve) => window.setTimeout(resolve, WAIT_STEP_MS));
+}
+
 /**
- * Opens the Calendars window for a tree: on the calendar note that the tree names, else on the first calendar note, else on a new note. A note with a block
+ * The notes the window can show and the one it opens on (spec §14 rule 16, the table of the index contract 4.3). A tree that names a note shows that note only, or a new-note draft when it is
+ * missing. Any other opening shows the calendar notes of the index: the note asked for, else the first by name, else a new-note draft.
+ */
+async function notesFor(index: CalendarIndex, o: CalendarsOptions): Promise<{ paths: string[]; target: string | null; uncertain: boolean }> {
+	const link = o.tree?.link?.trim();
+	if (o.tree && link) {
+		const named = index.resolve(link, o.tree.treePath);
+		return { paths: named ? [named] : [], target: named, uncertain: false };
+	}
+	await waitForNotes(index);
+	const listed = index.notes();
+	const paths = o.note && !listed.includes(o.note) ? [...listed, o.note].sort(byNameThenPath) : listed;
+	return { paths, target: o.note && paths.includes(o.note) ? o.note : (paths[0] ?? null), uncertain: !paths.length && !index.notesComplete() };
+}
+
+/**
+ * Opens the Calendars window: on the calendar note that the tree names, else on the note asked for, else on the first calendar note by name, else on a new note. A note with a block
  * that cannot be read gives its message and no window (the plugin never writes over a block it cannot read).
  */
 export async function openCalendars(app: App, index: CalendarIndex, o: CalendarsOptions): Promise<void> {
 	try {
-		const paths = index.usedNotes(o.treePath, o.link);
-		const target = o.note && paths.includes(o.note) ? o.note : (paths[0] ?? null);
+		const { paths, target, uncertain } = await notesFor(index, o);
 		const note = target === null ? null : await loadNote(app, target);
 		// A name list that cannot be used is shown in the window; any other problem of a block stops it (the plugin never writes over a block it cannot read).
 		const stop = note?.issues.find((i) => !isListIssue(i));
@@ -531,7 +605,7 @@ export async function openCalendars(app: App, index: CalendarIndex, o: Calendars
 			new Notice(stop ? issueText(stop) : T.cannotOpen);
 			return;
 		}
-		new CalendarsWindow(app, index, o, paths, note).open();
+		new CalendarsWindow(app, index, o, paths, note, uncertain).open();
 	} catch (e) {
 		console.error('Crown and Kin: cannot open the calendars', e);
 		new Notice(T.cannotOpen);

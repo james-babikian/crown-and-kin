@@ -101,18 +101,18 @@ function removeFlowRun(src: Source, seq: YAMLSeq, i: number, j: number): Patch[]
 	const n = seq.items.length;
 	const own: [number, number] = [(seq.items[i] as Node).range![0], src.nodeEnd(seq.items[j] as Node)];
 	const runItems = Array.from({ length: j - i + 1 }, (_, k) => i + k);
-	const lines = runItems.map((k) => {
+	const lines = runItems.map((k): Patch | null => {
 		const s = src.lineStart((seq.items[k] as Node).range![0]);
 		const next = flowAlone(src, seq, k, k) ? lineAfter(src, src.nodeEnd(seq.items[k] as Node)) : null;
-		return next ? ({ start: s, end: next[0], text: '', allow: [s, next[0]] } as Patch) : null;
+		return next ? { start: s, end: next[0], text: '', allow: [s, next[0]] } : null;
 	});
 	if (lines.every((l) => l !== null) && (j + 1 < n || i > 0)) {
 		// Each item goes with its own line and end-of-line comment; full-line comments between them stay.
-		if (j + 1 < n) return lines as Patch[];
+		if (j + 1 < n) return lines;
 		// The last item: the item before it loses its comma.
 		const prevEnd = src.nodeEnd(seq.items[i - 1] as Node);
 		const comma = /^[ \t]*,/.exec(src.text.slice(prevEnd, src.lineEnd(prevEnd)));
-		if (comma) return [...(lines as Patch[]), { start: prevEnd, end: prevEnd + comma[0].length, text: '' }];
+		if (comma) return [...lines, { start: prevEnd, end: prevEnd + comma[0].length, text: '' }];
 	}
 	// Items that share lines: only comments on a single removed line may go with them.
 	const allow = src.text.slice(own[0], own[1]).includes('\n') ? undefined : own;
@@ -197,7 +197,7 @@ export type Where = { after: number } | { before: number } | null;
 /** Column of the first key of a block-map item in the list, or two past the dash. */
 function itemColumn(src: Source, seq: YAMLSeq, dashCol: number): number {
 	for (const it of seq.items) {
-		if (isMap(it) && !it.flow && it.items.length) return src.column(((it.items[0] as Pair).key as Node).range![0]);
+		if (isMap(it) && !it.flow && it.items.length) return src.column((it.items[0].key as Node).range![0]);
 	}
 	return dashCol + 2;
 }

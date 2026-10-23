@@ -1,12 +1,12 @@
-import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-
-vi.mock('obsidian', () => import('./fake-obsidian'));
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { GESTURE_CLASS, PanZoom } from '../../src/render/dom/pan-zoom';
 import { fitView, treeBounds, type View } from '../../src/render/view-math';
 import { fixtureSource } from './load';
 import { layOut } from './pipeline';
-import { FEl, clock, dispatch, flushFrames, installDom, pointer, resetDom, runFrame, runTimers, wheel } from './fake-dom';
+import { FEl, clock, dispatch, flushFrames, pointer, resetDom, runFrame, runTimers, wheel } from './fake-dom';
+import { rng } from '../support/rng';
+import { useFakeDom } from '../support/fake-dom-setup';
 
 /*
  * Full-screen pan and zoom with the gesture wrapper (spec §7.2 touch gestures, §7.6 pan/zoom
@@ -16,7 +16,7 @@ import { FEl, clock, dispatch, flushFrames, installDom, pointer, resetDom, runFr
  * transform, then the wrapper transform while the gesture class is on.
  */
 
-beforeAll(() => installDom());
+useFakeDom();
 beforeEach(() => {
 	resetDom();
 	vi.spyOn(performance, 'now').mockImplementation(() => clock.now);
@@ -25,17 +25,6 @@ afterEach(() => vi.restoreAllMocks());
 
 const BOUNDS = treeBounds(4000, 2000);
 const SIZE = { w: 800, h: 600 };
-
-function rng(seed: number): () => number {
-	let a = seed >>> 0;
-	return () => {
-		a = (a + 0x6d2b79f5) >>> 0;
-		let t = a;
-		t = Math.imul(t ^ (t >>> 15), t | 1);
-		t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-		return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-	};
-}
 
 function make(mode: 'full' | 'embed' = 'full') {
 	const vp = new FEl('div', { cls: 'dynasty-viewport' });

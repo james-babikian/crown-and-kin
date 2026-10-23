@@ -1,4 +1,4 @@
-import { beforeAll, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { deriveFamilies, type FamilyGraph } from '../../src/core/derive';
 import { focusSubgraph } from '../../src/core/focus-subgraph';
 import { cardForm, geometryFor } from '../../src/layout/geometry';
@@ -6,9 +6,10 @@ import { DEFAULT_LAYOUT_SETTINGS, clearLayoutCache, layoutKey, layoutTree } from
 import type { Geometry, LaidOut, LayoutSettings, Rect } from '../../src/layout/model';
 import type { PictureSlot, setPicture, setSlotProblem } from '../../src/render/dom/pictures';
 import { buildLegend, buildScene, type Scene, type SceneOptions } from '../../src/render/dom/scene';
-import { FEl, installDom } from './fake-dom';
+import { FEl } from './fake-dom';
 import { allFixtures } from './load';
 import { block14, graphOf, layoutPictures, livePictureSlotsOf, treeOf, type PictureBox, type PictureSettings } from './m9-support';
+import { useFakeDom } from '../support/fake-dom-setup';
 
 /*
  * Spec §13.6 "Cards" and "Card geometry", §13.7 "Portrait on the card" and "Text beside the
@@ -19,10 +20,7 @@ import { block14, graphOf, layoutPictures, livePictureSlotsOf, treeOf, type Pict
  * wait for WP 9.2.
  */
 
-beforeAll(() => {
-	installDom();
-	(globalThis as Record<string, unknown>).CSS = { supports: (_p: string, v: string) => /^#[0-9a-f]{6}$/i.test(v) };
-});
+useFakeDom({ css: true });
 
 const FONT = 'test';
 const FONTS = { text: 'serif', ui: 'sans', bold: '700' };
@@ -173,7 +171,8 @@ describe('L2 box flags and L3 the cache key (spec §13.6 "Card geometry", §13.7
 	};
 
 	it('with neither set, and with empty sets, the key equals the M8 key', () => {
-		for (const f of allFixtures()) {
+		// Only the sample trees that existed in M8 have a recorded key (the trees 17 to 19 of version 0.4 have none).
+		for (const f of allFixtures().filter((x) => x.id in M8_KEYS)) {
 			const g = graphOf(f.source);
 			const s: LayoutSettings = { ...DEFAULT_LAYOUT_SETTINGS, relationLine: f.id === '14' || f.id === '07b' };
 			expect(layoutKey(g, GEO, s, FONT), f.id).toBe(M8_KEYS[f.id]);

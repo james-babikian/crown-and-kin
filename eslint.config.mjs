@@ -13,7 +13,7 @@ const NO_OBSIDIAN_BELOW_SHELL = {
 	message: 'Only src/obsidian may import obsidian (MAINTAINERS.md, "The layers"). Pass what you need in as an argument.',
 };
 // The layer order is obsidian -> view -> render/dom -> render -> layout -> core: a layer never imports one to its right.
-// An internal test checks the same rule on every import, and also the cycles that lint cannot see.
+// tests/scan/import-graph.test.ts checks the same rule on every import, and also the cycles that lint cannot see.
 const UP = (layer, names) => ({
 	group: names.flatMap((n) => [n, `${n}/**`]),
 	message: `src/${layer} must not import a higher layer (MAINTAINERS.md, "The layers": obsidian -> view -> render/dom -> render -> layout -> core).`,
@@ -65,7 +65,11 @@ const SYNTAX_ELK = [
 		selector: "ImportExpression:not([source.type='Literal'])",
 		message: 'Use a plain string in import() so the elkjs ban (spec §3, D9) can be checked.',
 	},
-	{ selector: "CallExpression[callee.name='require']", message: 'Use import, not require, in plugin code.' },
+	// Two editor modules that Obsidian provides are loaded with `require` inside a `try` (live-preview.ts), so that a missing module turns off one feature and not the plugin.
+	{
+		selector: "CallExpression[callee.name='require']:not([arguments.0.value='@codemirror/language']):not([arguments.0.value='@codemirror/view'])",
+		message: 'Use import, not require, in plugin code.',
+	},
 ];
 
 const COLOUR_ATTR = '/^(fill|stroke|style|color|stop-color)$/';
@@ -132,7 +136,7 @@ const SYNTAX_DOM_COLOURS = [
 
 export default tseslint.config(
 	{
-		ignores: ['main.js', 'node_modules/**', 'out/**'],
+		ignores: ['main.js', 'node_modules/**', 'out/**', 'scripts/obsidian-lint/**'],
 	},
 	...tseslint.configs.recommended,
 	{

@@ -51,11 +51,14 @@ export function fakeApp(files: Record<string, string>) {
 	return { app, notes, created };
 }
 
+/** The notes of a map that hold a `kin-calendar` fence, sorted: what the fence index gives the calendar index (`IndexOptions.notes`). */
+export const calendarNotesOf = (notes: Map<string, string>): string[] => [...notes].filter(([, t]) => t.includes('```kin-calendar')).map(([p]) => p).sort();
+
 /** The index of the notes, started. */
 export async function indexOf(notes: Map<string, string>) {
 	const vault = indexVault({});
 	vault.notes = notes;
-	const index = createCalendarIndex(vault, { pause: async () => undefined });
+	const index = createCalendarIndex(vault, { notes: () => calendarNotesOf(notes) });
 	await index.start();
 	return index;
 }
@@ -68,10 +71,10 @@ export interface Opened {
 }
 
 /** Opens the Calendars window on a fake vault. */
-export async function openWindow(files: Record<string, string>, o: { link?: string } = {}): Promise<Opened> {
+export async function openWindow(files: Record<string, string>, o: { link?: string; tree?: boolean } = {}): Promise<Opened> {
 	const { app, notes, created } = fakeApp(files);
 	const index = await indexOf(notes);
-	await openCalendars(app as never, index, { treePath: 'tree.md', link: o.link });
+	await openCalendars(app as never, index, { tree: o.tree === false ? null : { treePath: 'tree.md', link: o.link, setLink: null } });
 	await settle();
 	const win = openModals[openModals.length - 1] as unknown as { contentEl: FEl; modalEl: FEl };
 	return { win, notes, created, index };

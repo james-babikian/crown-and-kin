@@ -1,8 +1,4 @@
-import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-
-vi.mock('obsidian', () => import('./fake-obsidian'));
-vi.mock('@codemirror/language', () => ({ forceParsing: () => false, syntaxTree: () => ({ length: 0 }) }));
-vi.mock('@codemirror/view', () => ({ ViewPlugin: { fromClass: () => ({}) } }));
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Text widths: the fakes have no canvas, so measure.ts uses 0.6 em per character; `wide` scales that,
 // as a web font that finished loading would.
@@ -16,9 +12,10 @@ import { geometryFor, tallExtra } from '../../src/layout/geometry';
 import { FullScreenModal } from '../../src/obsidian/full-screen';
 import { TreeView } from '../../src/obsidian/tree-view';
 import { HINT_UI } from '../../src/render/ui-text';
-import { FEl, clock, device, dispatch, flushFrames, installDom, pointer, resetDom, resizeAll, runTimers, settle } from './fake-dom';
+import { FEl, clock, device, dispatch, flushFrames, pointer, resetDom, resizeAll, runTimers, settle } from './fake-dom';
 import { resetObsidian } from './fake-obsidian';
 import { FAR, embed, fakeHandle, fakeHost, fullViews, tabletDevice, type Host } from './tree-view-fakes';
+import { useFakeDom } from '../support/fake-dom-setup';
 
 /*
  * WP6.4 on the fakes: the D28 hint, D29 name measure and tall cards in the full-screen view and the static preview of a tablet, and the D31 tag
@@ -29,7 +26,7 @@ import { FAR, embed, fakeHandle, fakeHost, fullViews, tabletDevice, type Host } 
 const DOWN = geometryFor(16);
 const TALL_H = DOWN.cardH + tallExtra(DOWN);
 
-beforeAll(() => installDom());
+useFakeDom();
 
 beforeEach(() => {
 	resetDom();

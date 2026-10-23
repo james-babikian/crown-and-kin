@@ -1,8 +1,4 @@
-import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-
-vi.mock('obsidian', () => import('./fake-obsidian'));
-vi.mock('@codemirror/language', () => ({ forceParsing: () => false, syntaxTree: () => ({ length: 0 }) }));
-vi.mock('@codemirror/view', () => ({ ViewPlugin: { fromClass: () => ({}) } }));
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { findBlocks } from '../../src/core/block-locate';
 import { focusSubgraph } from '../../src/core/focus-subgraph';
@@ -14,9 +10,10 @@ import { DEFAULT_SETTINGS } from '../../src/view/settings';
 import { Popover } from '../../src/render/dom/widgets';
 import { ADD_UI, INSERT_UI, RENAME_UI, SETTINGS_UI } from '../../src/render/ui-text';
 import { TreeView } from '../../src/obsidian/tree-view';
-import { FEl, clock, device, dispatch, dispatchWindow, fakeDoc, fakeWin, flushFrames, installDom, resetDom, resizeAll, settle } from './fake-dom';
+import { FEl, clock, device, dispatch, dispatchWindow, fakeDoc, flushFrames, resetDom, resizeAll, settle } from './fake-dom';
 import { notices, resetObsidian, settingGroups, settingRows, type DropdownComponent, type Plugin as FakePlugin, type TextAreaComponent, type TextComponent, type ToggleComponent } from './fake-obsidian';
 import { FAR, desktop, embed, fakeApp, fakeHandle, fullViews, openFullScreen, phone, phoneOnSide, type Host } from './tree-view-fakes';
+import { useFakeDom } from '../support/fake-dom-setup';
 
 const last = <T>(a: T[]): T | undefined => a[a.length - 1];
 
@@ -26,11 +23,7 @@ const last = <T>(a: T[]): T | undefined => a[a.length - 1];
  * Tab order, Esc on the legend and the partner list). The real plugin (main.ts) and TreeView run on the fakes.
  */
 
-beforeAll(() => {
-	installDom();
-	const g = globalThis as Record<string, unknown>;
-	g.window ??= fakeWin;
-});
+useFakeDom({ window: true });
 
 beforeEach(() => {
 	resetDom();
@@ -386,7 +379,8 @@ describe('dates and generations (spec §9)', () => {
 describe('link updates in data.json and the command "Show the last link update" (M6 iPhone fix round)', () => {
 	const entry = { oldPath: 'Old.md', newPath: 'New.md', others: [] };
 
-	it('stored pending renames do not change the settings; with the setting off they are dropped, and data.json keeps its old shape', async () => {
+	// 0.4 (the index contract 3, G2 part 3 item 2): the updater drops the entry; the file does not keep a copy of a list that the updater has handled.
+	it('stored pending renames do not change the settings; with the setting off the updater drops them, and a save does not write them back', async () => {
 		const { fake, plugin } = await loadPlugin({ ...DEFAULT_SETTINGS, updateLinks: false, pendingRenames: [entry] });
 		expect(plugin.settings).toEqual({ ...DEFAULT_SETTINGS, updateLinks: false });
 		await settle();

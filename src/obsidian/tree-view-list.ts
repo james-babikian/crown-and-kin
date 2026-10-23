@@ -125,7 +125,7 @@ export abstract class TreeViewList extends TreeViewFinder {
 		const t2 = performance.now();
 
 		const labels = needsLabels(whole) ? cardLabels(whole) : undefined;
-		const rel = me !== null && this.settings.showRelations ? relationsFor(whole, me, this.relationOptions) : null;
+		const rel = me !== null && this.settings.showRelations ? relationsFor(whole, me, this.relationOptions, this.key) : null;
 		// 0.2.7 F.6: while the Show view is open, the list has the bar at its top, and each heir (each open branch) says its place in the place of the relation word.
 		const succession = this.showViewFor(st, whole);
 		this.successionDrawn = succession;

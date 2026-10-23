@@ -435,7 +435,7 @@ const clearAnswers = new WeakMap<Geometry, Map<number, boolean>>();
  */
 function lastLineClearsSign(geo: Geometry, ring?: number): boolean {
 	let byRing = clearAnswers.get(geo);
-	if (!byRing) clearAnswers.set(geo, (byRing = new Map()));
+	if (!byRing) clearAnswers.set(geo, (byRing = new Map<number, boolean>()));
 	const key = ring ?? -1;
 	let answer = byRing.get(key);
 	if (answer === undefined) {

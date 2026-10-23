@@ -37,7 +37,7 @@ export function dateWarningText(row: DateWarningRow, g: FamilyGraph, nameOf: (id
  */
 export function afterNotes(res: SuccessionResult, g: FamilyGraph, under: ReadonlyMap<string, { n: SuccessionNote; text: string }[]>, nameOf: (id: string) => string, title: string): { text: string; kind: string }[] {
 	const rows = new Set([...res.heirs, ...res.openBranches.map((b) => b.id)]);
-	const strays = [...under].filter(([id]) => !rows.has(id)).flatMap(([, xs]) => xs.map((x) => ({ text: x.text, kind: x.n.kind as string })));
+	const strays = [...under].filter(([id]) => !rows.has(id)).flatMap(([, xs]) => xs.map((x) => ({ text: x.text, kind: x.n.kind })));
 	return [...strays, ...res.dateWarnings.map((w) => ({ text: dateWarningText(w, g, nameOf, title), kind: 'date-warning' }))];
 }
 

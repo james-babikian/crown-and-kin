@@ -21,6 +21,11 @@ import { TreeViewToolbar } from './tree-view-toolbar';
 import { TreeViewBase } from './tree-view-base';
 import type { FullSource, FoldAnchor } from './tree-view-types';
 
+/** The card of a person in a drawn view; ids are compared as text, so an id with quotes needs no escape. */
+function cardOf(viewport: HTMLElement, id: string): HTMLElement | null {
+	return Array.from(viewport.querySelectorAll<HTMLElement>('.dynasty-card')).find((c) => c.getAttribute('data-person') === id) ?? null;
+}
+
 /** The actions that open windows or change what the view shows: people, folds and focus. */
 export abstract class TreeViewActions extends TreeViewToolbar {
 	/**
@@ -51,9 +56,14 @@ export abstract class TreeViewActions extends TreeViewToolbar {
 		if (this.inForeignView()) return;
 		const h = await this.validHandle();
 		if (!h || this.readOnly) return;
+		const back = this.focusReturn((el) => el.matches('.dynasty-card') && el.getAttribute('data-person') === id);
+		const host = this.host;
+		const full = !!this.full;
 		const sheet = EditSheet.create(this.host.app, {
 			handle: h,
 			personId: id,
+			// The card that opened the window gets the focus back also when a write drew it again (G5 0.4).
+			...(back ? { onClosed: () => TreeViewBase.refocusAfterRedraw(host, (v) => TreeViewBase.showsState(v, h.state, full), (vp) => cardOf(vp, id), back.visible) } : {}),
 			dates: this.datesFor,
 			sourcePath: this.sourcePath,
 			// The sheet of a new person that Add child, Add parent or Add partner opens has this hook too, so the anchor stays the person of this sheet (D244).
@@ -76,6 +86,7 @@ export abstract class TreeViewActions extends TreeViewToolbar {
 			folds: this.sheetFolds(h),
 			pictures: this.host.pictures,
 			relationOptions: this.relationOptions,
+			relationBlock: this.key,
 		});
 		if (!sheet) {
 			new Notice(WRITE_TEXT.personNotFound);
@@ -89,16 +100,21 @@ export abstract class TreeViewActions extends TreeViewToolbar {
 		if (this.readOnly || this.inForeignView()) return;
 		const h = await this.validHandle();
 		if (!h || this.readOnly) return;
+		const back = this.focusReturn((el) => el.matches('.dynasty-add-person'));
+		const host = this.host;
+		const full = !!this.full;
 		const sheet = EditSheet.createNew(this.host.app, {
 			handle: h,
 			sourcePath: this.sourcePath,
 			beforeWrite: () => this.keepView(),
+			...(back ? { onClosed: () => TreeViewBase.refocusAfterRedraw(host, (v) => TreeViewBase.showsState(v, h.state, full), (vp) => vp.querySelector<HTMLElement>('.dynasty-add-person'), back.visible) } : {}),
 			dates: this.datesFor,
 			newPerson: { kind: 'person' },
 			place: this.full ? 'full' : 'embed',
 			openNote: (open) => this.openNote(open),
 			pictures: this.host.pictures,
 			relationOptions: this.relationOptions,
+			relationBlock: this.key,
 		});
 		if (!sheet) {
 			new Notice(WRITE_TEXT.invalid);

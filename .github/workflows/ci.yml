@@ -1,0 +1,92 @@
+# Automatic checks on every push and pull request (0.4, D281 part 2). They are the same as gate G1 on the
+# development computer: types, lint rules, build and the fast tests. The slow tests (`npm run test:perf`) do not run here.
+name: CI
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+# A new push to the same branch makes the older run useless.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      # actions/checkout v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          # Two tests read old releases from git tags; with the full history they run, with a shallow copy they skip.
+          fetch-depth: 0
+          persist-credentials: false
+
+      # actions/setup-node v7.1.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Types
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      # The build also joins styles.css from the chunks in styles/, which a test compares with the committed file.
+      - name: Build
+        run: npm run build
+
+      - name: Size of main.js by layer
+        run: npm run size -- --check
+
+      # Tests with a wall-clock limit (tag "timing") are left out: a shared runner is slower than the development computer and
+      # would fail them for no fault of the code. They run in `npm test` on the development computer and in `npm run test:perf`.
+      - name: Fast tests
+        run: npm test -- --tags-filter '!timing'
+
+  # The official Obsidian lint tool (eslint-plugin-obsidianmd, D281 part 1). It is a second job so that it runs next to the
+  # first one and a fault shows in its own line. The tool and its pinned helpers go into a folder OUTSIDE the checkout, so that
+  # they do not change `package.json` or the main lint. The rules and the three switched-off rules are in
+  # scripts/obsidian-lint/eslint.config.mjs; scripts/obsidian-lint/README.md has the same commands for a local run.
+  # Warnings (the four `keyCode === 229` sites) do not fail the job; any error does.
+  obsidian-lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      # actions/checkout v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+
+      # actions/setup-node v7.1.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version: 22
+          cache: npm
+
+      # The type-aware rules read the types of the project (obsidian, node), so the project needs its own packages too.
+      - name: Install the project
+        run: npm ci
+
+      - name: Install the Obsidian lint tool outside the checkout
+        working-directory: ${{ runner.temp }}
+        run: |
+          mkdir obsidian-lint
+          cd obsidian-lint
+          npm init -y
+          npm install --legacy-peer-deps --no-audit --no-fund eslint-plugin-obsidianmd@0.4.2 eslint@9.39.5 typescript-eslint@8.72.0 @eslint/js@9.39.5 @eslint/json@0.14.0 obsidian@1.12.3 typescript@5.9.3 jiti@2.7.0
+
+      - name: Lint src with the Obsidian rules
+        env:
+          OBSIDIAN_LINT_DIR: ${{ runner.temp }}/obsidian-lint
+        run: ${{ runner.temp }}/obsidian-lint/node_modules/.bin/eslint --config scripts/obsidian-lint/eslint.config.mjs src

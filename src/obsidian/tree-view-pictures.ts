@@ -307,7 +307,7 @@ export abstract class TreeViewPictures extends TreeViewScene {
 		// The saved picture shows the card form of the direction it is drawn in, whole cards (D148 2A, D150 5): the geometry is made again, with no flag of the view.
 		// The plate follows the mark, the finder's small tree and the setting, as at the draw; with no plate a marked person gets the "You" tab.
 		const small = this.finderDrawn?.line && !this.finderDrawn.state.whole;
-		const rel = this.meId !== null && !small && this.whole ? relationsFor(this.whole, this.meId, this.relationOptions) : null;
+		const rel = this.meId !== null && !small && this.whole ? relationsFor(this.whole, this.meId, this.relationOptions, this.key) : null;
 		const relationLine = rel !== null && this.settings.showRelations;
 		// Batched whenever there is a mark, so no card is worked out alone when the line is off.
 		if (rel) rel.cards.getMany(laid.layout.persons.keys());

@@ -7,9 +7,43 @@
  * until the user stops typing (WP-H2, P3), because it costs a few ms for each key press in a note of 1 MB.
  */
 
-import { forceParsing, syntaxTree } from '@codemirror/language';
-import { ViewPlugin, type EditorView, type ViewUpdate } from '@codemirror/view';
+/* global require -- Obsidian's module loader gives `require` to the bundle (see `languageModule`) */
+
+import type { Extension } from '@codemirror/state';
+import type { EditorView, ViewUpdate } from '@codemirror/view';
 import { findBlocks } from '../core/block-locate';
+
+/** The two functions of @codemirror/language that this file uses. */
+interface Language {
+	forceParsing: (view: EditorView, upto?: number, timeout?: number) => boolean;
+	syntaxTree: (state: EditorView['state']) => { length: number };
+}
+
+/** null: the module is missing or changed, so this feature stays off; undefined: not tried yet. */
+let language: Language | null | undefined;
+
+/**
+ * Obsidian provides @codemirror/language at run time, and a later Obsidian version may change it. It is loaded here, inside a
+ * `try`, and not with an import at the top of the file: a missing or changed module then turns off only this feature
+ * (the Live Preview help) and not the whole plugin. The tests give the module with `useLanguage`.
+ */
+function languageModule(): Language | null {
+	if (language !== undefined) return language;
+	try {
+		// eslint-disable-next-line @typescript-eslint/no-require-imports -- a top-level import would fail the load of the whole plugin
+		const m = require('@codemirror/language') as Partial<Language>;
+		language = typeof m.forceParsing === 'function' && typeof m.syntaxTree === 'function' ? (m as Language) : null;
+	} catch (e) {
+		console.error('Crown and Kin: Live Preview help is off, because the editor module is missing', e);
+		language = null;
+	}
+	return language;
+}
+
+/** For the tests: use this module instead of @codemirror/language (null: act as if it is missing). */
+export function useLanguage(m: Language | null): void {
+	language = m;
+}
 
 const PARSE_BUDGET_MS = 150;
 const MAX_TRIES = 40;
@@ -71,8 +105,9 @@ export class TallBlockParser {
 	}
 
 	private run(): void {
-		if (typeof forceParsing !== 'function' || typeof syntaxTree !== 'function') return;
-		const parsed = syntaxTree(this.view.state).length;
+		const lang = languageModule();
+		if (!lang) return;
+		const parsed = lang.syntaxTree(this.view.state).length;
 		// Short notes are parsed to the end at once; only long ones need the scan below.
 		if (parsed >= this.view.state.doc.length) return;
 		const { from, to } = this.view.viewport;
@@ -84,7 +119,7 @@ export class TallBlockParser {
 			this.tries = 0;
 			return;
 		}
-		if (forceParsing(this.view, need, PARSE_BUDGET_MS)) {
+		if (lang.forceParsing(this.view, need, PARSE_BUDGET_MS)) {
 			this.tries = 0;
 			return;
 		}
@@ -98,5 +133,19 @@ export class TallBlockParser {
 	}
 }
 
-/** The CodeMirror view plugin, registered by `main.ts`, that forces tall kin blocks to parse fully. */
-export const tallBlockParser = ViewPlugin.fromClass(TallBlockParser);
+/**
+ * The CodeMirror view plugin, registered by `main.ts`, that forces tall kin blocks to parse fully; null if the editor modules are
+ * missing or changed (the plugin then starts without it).
+ */
+export function tallBlockParser(): Extension | null {
+	// The editor module reads `document.documentElement` when it loads. A run with no page (the tests) has no editor to help.
+	if (typeof document === 'undefined' || !document.documentElement) return null;
+	try {
+		// eslint-disable-next-line @typescript-eslint/no-require-imports -- see `languageModule`
+		const view = require('@codemirror/view') as typeof import('@codemirror/view');
+		return view.ViewPlugin.fromClass(TallBlockParser);
+	} catch (e) {
+		console.error('Crown and Kin: Live Preview help is off, because the editor module is missing', e);
+		return null;
+	}
+}

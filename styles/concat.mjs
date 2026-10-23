@@ -1,5 +1,5 @@
 // Joins the numbered style chunks of this folder into the text of the plugin's styles.css.
-// The build (esbuild.config.mjs) and the drift test (tests/styles-drift.test.ts) both use it,
+// The build (esbuild.config.mjs) and the drift test (tests/styles/styles-drift.test.ts) both use it,
 // so the committed styles.css can never differ from what the build makes.
 import fs from 'node:fs';
 import path from 'node:path';

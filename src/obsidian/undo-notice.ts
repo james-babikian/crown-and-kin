@@ -49,7 +49,7 @@ export function undoNotice(text: string, handle: Handle, written: string, onUndo
 		f.createSpan({ cls: 'dynasty-undo-text', text });
 	});
 	const notice = new Notice(frag, UNDO_NOTICE_MS);
-	const el = notice.messageEl ?? notice.noticeEl;
+	const el = notice.messageEl;
 	el.addClass('dynasty-undo-notice');
 	const button = el.createEl('button', { cls: 'dynasty-undo-button', text: REMOVE.undo, attr: { type: 'button' } });
 	// Once the Notice is hidden (Undo, its time, a click, the plugin unload) the button does nothing.
@@ -64,9 +64,9 @@ export function undoNotice(text: string, handle: Handle, written: string, onUndo
 	// Obsidian hides a Notice at its time through `hide`, so this also ends it then.
 	notice.hide = end;
 	// Like a modal: the plugin unload hides it, so its Undo cannot write after that.
-	const forget = trackModal(notice, end);
+	const forget = trackModal(notice, end, true);
 	// If Obsidian ends the Notice another way, it must not count as an open window for ever.
-	setTimeout(forget, UNDO_NOTICE_MS + 1_000);
+	window.setTimeout(forget, UNDO_NOTICE_MS + 1_000);
 	button.addEventListener('click', (e) => {
 		// A click on a Notice closes it; the button acts first.
 		e.stopPropagation();

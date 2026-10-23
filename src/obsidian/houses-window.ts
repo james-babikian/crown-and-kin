@@ -27,7 +27,7 @@ import type { Op } from '../core/edit';
 import { describeHouseIdChange } from '../core/house-ops';
 import { parseBody, parseDynasty } from '../core/parse';
 import { HOUSE_PALETTE } from '../render/styles';
-import { HOUSES, HOUSE_COLOUR_NAMES, HOUSE_PAGE_UI, ID_UI, PICTURES_UI, WIN_LIST_UI, WINDOW_UI, WRITE_TEXT } from '../render/ui-text';
+import { HOUSES, HOUSE_PAGE_UI, ID_UI, PICTURES_UI, WIN_LIST_UI, WINDOW_UI, WRITE_TEXT } from '../render/ui-text';
 import type { Handle, HandleWriteOutcome } from './block-handle';
 import { danglingIds, draftId, idChanged, idFromName, idOps, idProblemFor, idProblems, reasonText, type IdRow } from '../view/id-draft';
 import { idNewNameNote, idNote, type IdRowView } from './id-field';
@@ -41,9 +41,9 @@ import { matchesAll } from '../view/list-search';
 import { currentPictureOf, pickPicture } from './picture-picker';
 import { ARMS_PIXELS, type PictureCopy, type PictureStore } from './picture-store';
 import { freshOrStale } from './sheet-parts';
+import { HEX, drawHousePalette, paintHouseColour } from './house-swatches';
 import { houseViewItems } from './viewer-sources';
 
-const HEX = /^#[0-9a-f]{6}$/i;
 /** D202 (2), G.10: the People section shows this many people, then "and N more". */
 const PEOPLE_ROWS = 8;
 
@@ -783,12 +783,7 @@ export class HousesWindow extends ListEditWindow {
 				attr: { type: 'button', 'aria-label': PICTURES_UI.armsColourLabel(i + 1), 'aria-pressed': String(chosen), 'data-colour': hex, 'data-focus': `arms-colour:${r.key}:${hex}` },
 			});
 			b.style.setProperty('--dynasty-house-color', hex);
-			b.addEventListener('click', () =>
-				this.guard(() => {
-					r.colour = hex;
-					this.build(`arms-colour:${r.key}:${hex}`);
-				}),
-			);
+			b.addEventListener('click', () => this.guard(() => this.pickColour(r, hex, b)));
 		});
 	}
 
@@ -802,48 +797,20 @@ export class HousesWindow extends ListEditWindow {
 		const box = body.createDiv({ cls: ['dynasty-house-palette', 'dynasty-sheet-field'], attr: { 'data-house': r.id ?? r.key } });
 		const titleId = `dynasty-house-palette-${r.key}-${this.keys}`;
 		box.createDiv({ cls: 'dynasty-sheet-label', text: WINDOW_UI.colour, attr: { id: titleId } });
-		const grid = box.createDiv({ cls: ['dynasty-swatches', 'dynasty-house-colours'], attr: { role: 'radiogroup', 'aria-label': HOUSES.paletteTitle(this.label(r)), 'aria-labelledby': titleId } });
-		let inPalette = false;
-		HOUSE_PALETTE.forEach((hex, i) => {
-			const chosen = lower(r.colour) === hex;
-			if (chosen) inPalette = true;
-			const b = grid.createEl('button', {
-				cls: chosen ? ['dynasty-swatch', 'dynasty-house-colour', 'is-selected'] : ['dynasty-swatch', 'dynasty-house-colour'],
-				attr: { type: 'button', role: 'radio', 'aria-label': HOUSE_COLOUR_NAMES[i], 'aria-pressed': String(chosen), 'aria-checked': String(chosen), 'data-colour': hex, 'data-focus': `colour:${r.key}:${hex}` },
-			});
-			b.style.setProperty('--dynasty-house-color', hex);
-			b.addEventListener('click', () =>
-				this.guard(() => {
-					r.colour = hex;
-					this.build(`colour:${r.key}:${hex}`);
-				}),
-			);
-		});
-		// "Other colour": the last swatch. A colour that is not in the palette shows in this swatch, which then has a ring.
-		const custom = !!r.colour && HEX.test(r.colour) && !inPalette;
-		const other = grid.createDiv({ cls: 'dynasty-house-other' });
-		const id = `${titleId}-other`;
-		const swatch = other.createEl('button', {
-			cls: custom ? ['dynasty-swatch', 'is-other', 'is-custom', 'is-selected'] : ['dynasty-swatch', 'is-other'],
-			attr: { type: 'button', role: 'radio', 'aria-label': HOUSES.otherColour, 'aria-checked': String(custom), 'aria-pressed': String(custom), 'data-focus': `other-swatch:${r.key}` },
-		});
-		if (custom) swatch.style.setProperty('--dynasty-house-color', r.colour!.toLowerCase());
-		const input = other.createEl('input', { cls: ['dynasty-sheet-colour', 'dynasty-house-other-input'], attr: { type: 'color', id, tabindex: '-1', 'aria-hidden': 'true', 'data-focus': `other:${r.key}` } });
-		input.value = r.colour && HEX.test(r.colour) ? r.colour.toLowerCase() : '#888888';
-		swatch.addEventListener('click', () => this.guard(() => (input.showPicker ? input.showPicker() : input.click())));
-		input.addEventListener('change', () =>
-			this.guard(() => {
-				if (!HEX.test(input.value)) return;
-				r.colour = input.value.toLowerCase();
-				this.build(`other-swatch:${r.key}`);
-			}),
-		);
+		drawHousePalette(box, { key: r.key, titleId, name: this.label(r), colour: r.colour, pick: (hex, used) => this.pickColour(r, hex, used), guard: (run) => this.guard(run) });
 		const arms = armsOf(r.arms);
 		if (arms) {
 			const group = box.createDiv({ cls: ['dynasty-swatches', 'dynasty-house-colours', 'dynasty-house-arms-colours'], attr: { role: 'group', 'aria-label': PICTURES_UI.coloursFromArms } });
 			this.armsGroup = { key: r.key, el: group };
 			this.fillArmsColours(group, r, arms);
 		}
+	}
+
+	/** A swatch was chosen: the draft takes the colour, and the swatches of the page show it in place, with no rebuild (G5 0.4). */
+	private pickColour(r: HouseRow, hex: string, used: HTMLElement): void {
+		r.colour = hex;
+		const box = this.contentEl.querySelector<HTMLElement>('.dynasty-house-palette');
+		if (box) paintHouseColour(box, r.colour, used);
 	}
 
 	// ---------- add and delete ----------

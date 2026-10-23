@@ -128,8 +128,6 @@ export type WarningCode =
 	| 'calendar-no-anchor'
 	/** The `calendar` option names a note that does not exist or holds no calendar. params: note (the link as written) */
 	| 'calendar-note-missing'
-	/** The same cycle format or era name in two calendar notes. params: calendar (name), note (path), other (path) */
-	| 'calendar-duplicate'
 	// The `kin-calendar` block (spec §14 rule 2). Found by `parseCalendarBlock`.
 	/** The block is not YAML, or is not a map with a list `calendars`. params: note (path) */
 	| 'calendar-block-invalid'
@@ -510,12 +508,7 @@ const ISSUE_TEXT: { [C in IssueCode]: (p: P) => string } = {
 	'calendar-no-anchor': (p) =>
 		`The calendar ${quote(s(p, 'calendar', '?'))} has no “Same year as” date that links it to plain years. So the plugin counts its Year 1 as plain year 1. The tree also has plain years or dates of another calendar. As a result, the order of dates and the ages can be wrong. In the Calendars window, add a “Same year as” date to the calendar.`,
 	'calendar-note-missing': (p) =>
-		`The tree uses the calendar note ${quote(s(p, 'note', '?'))}, but this note does not exist or has no calendar. As a result, the plugin reads no dates in your own calendars. Correct the link, or choose another calendar note with “Calendar note” in the More list.`,
-	'calendar-duplicate': (p) =>
-		// Two name lists for plain years with one name (the `list` parameter): the first note in order of path wins.
-		typeof p.list === 'string' && p.list !== ''
-			? `The notes ${quote(s(p, 'other', '?'))} and ${quote(s(p, 'note', '?'))} both have a name list ${quote(p.list)} for plain years. The plugin uses the list in ${quote(s(p, 'other', '?'))}. Give one of the two lists another name, or remove it.`
-			: `The notes ${quote(s(p, 'note', '?'))} and ${quote(s(p, 'other', '?'))} both have the calendar ${quote(s(p, 'calendar', '?'))} with the same cycle format or era name. A date that fits both can have no year. Change a format or an era name in one note.`,
+		`The tree uses the calendar note ${quote(s(p, 'note', '?'))}, but this note does not exist or has no calendar. As a result, the plugin reads no dates in your own calendars. Correct the link in the text of the tree. Or select “Calendar note” in the More list, and choose another note or “No calendar”.`,
 	'calendar-block-invalid': (p) =>
 		`The calendar block in the note ${quote(s(p, 'note', '?'))} has an error, so the plugin ignores it. The tree uses no calendar from this block. Edit the text of the block in the note. The block must have a list under “calendars:”.`,
 	'calendar-entry-invalid': (p) => {

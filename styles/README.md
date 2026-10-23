@@ -3,7 +3,7 @@
 `styles.css` in the project root is generated. It is the plain join of the files in this folder, in the order of their numbers, with nothing added between them (`styles/concat.mjs`).
 
 - `npm run build` and `npm run dev` write `styles.css` from the chunks (`esbuild.config.mjs`). The dev command also joins again when a chunk changes.
-- `tests/styles-drift.test.ts` fails if the committed `styles.css` is not the join of the chunks.
+- `tests/styles/styles-drift.test.ts` fails if the committed `styles.css` is not the join of the chunks.
 - A new rule goes into the chunk of the package that owns it. A new chunk takes the next free number, or a number between two chunks; the order of the chunks is the order of the cascade.
 - The base tokens (`--dynasty-` custom properties for edges, muted text, links and errors) are in `01-base.css`.
 

@@ -2,6 +2,7 @@
  * Small DOM pieces of the tree view: Obsidian-style callouts (spec §5.8: warning and error boxes
  * use Obsidian's own callout styles) and a popover that closes on Escape or a press outside it,
  * with a hook for what must happen when it closes (the legend lets go of its arms pictures). A phone sheet also closes with a swipe down (D220).
+ * The arrow keys move between the rows of a popover list, as in a menu.
  */
 
 import { attachSheetSwipe } from './sheet-swipe';
@@ -43,6 +44,22 @@ export interface PopoverOptions {
 export function fitLegend(el: HTMLElement): boolean {
 	if (el.scrollHeight <= el.clientHeight + 1) return false;
 	el.addClass('is-tight');
+	return true;
+}
+
+/**
+ * Arrow Up and Down (and Home, End) on a row of a popover list move the focus to the next row, as in a menu (G5 0.4, WCAG 2.1.1). The rows wrap round.
+ * Returns whether the key moved the focus; any other key, or a key with the focus outside the rows, is left alone.
+ */
+export function menuKey(el: HTMLElement, e: KeyboardEvent): boolean {
+	if (e.ctrlKey || e.metaKey || e.altKey || e.shiftKey || e.isComposing) return false;
+	if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp' && e.key !== 'Home' && e.key !== 'End') return false;
+	const rows = Array.from(el.querySelectorAll<HTMLElement>('.dynasty-popover-item')).filter((r) => !(r as HTMLButtonElement).disabled);
+	const at = rows.indexOf(el.doc.activeElement as HTMLElement);
+	if (at < 0 || rows.length === 0) return false;
+	const n = rows.length;
+	const to = e.key === 'Home' ? 0 : e.key === 'End' ? n - 1 : (at + (e.key === 'ArrowDown' ? 1 : -1) + n) % n;
+	rows[to].focus();
 	return true;
 }
 
@@ -101,7 +118,13 @@ export class Popover {
 		// full-screen view around the tree stays open.
 		const win = this.host.win ?? window;
 		const key = (e: KeyboardEvent) => {
-			if (e.key !== 'Escape') return;
+			if (e.key !== 'Escape') {
+				if (menuKey(el, e)) {
+					e.stopPropagation();
+					e.preventDefault();
+				}
+				return;
+			}
 			const active = doc.activeElement;
 			if (!(active && (el.contains(active) || this.host.contains(active)))) return;
 			e.stopPropagation();
@@ -156,7 +179,8 @@ export class Popover {
 		this.el = null;
 		this.cover?.remove();
 		this.cover = null;
-		const opener = this.opener as (Element & { focus?: () => void }) | null;
+		// An element with no focus method (some SVG parts) takes no focus.
+		const opener = this.opener as HTMLElement | null;
 		if (refocus) opener?.focus?.();
 		this.opener = null;
 	}

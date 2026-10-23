@@ -9,7 +9,7 @@ import { deriveDated, type DatesFor } from '../view/calendar-index';
 import type { Op, UnionRef } from '../core/edit';
 import { issueText } from '../core/messages';
 import { parseBody, readTree, referencedIds } from '../core/parse';
-import { isMap, type Raw } from '../core/tolerate';
+import { isMap } from '../core/tolerate';
 import { PLACEMENT_TYPES, type Person, type Tree } from '../core/types';
 import { familyOf, type FamilyView } from '../core/family-query';
 import { hasNoWrittenId, idsForPeople } from '../view/person-ids';
@@ -157,7 +157,7 @@ export function unwritten(l: Loaded, id: string): boolean {
 export function sameUnwritten(was: Loaded, id: string, now: Loaded): string | null {
 	const old = was.g.byId.get(id);
 	const listOf = (l: Loaded): unknown[] | null => {
-		const d = l.data as Raw;
+		const d = l.data;
 		return isMap(d) && Array.isArray(d.people) ? d.people : null;
 	};
 	const text = (v: unknown): string | null => {
@@ -182,7 +182,7 @@ export function sameUnwritten(was: Loaded, id: string, now: Loaded): string | nu
 
 /** Every person id and reference written in the block, and `more`: a new id must be none of them. */
 export function takenIds(l: Loaded, more: Iterable<string> = []): Set<string> {
-	const data = l.data as Raw;
+	const data = l.data;
 	return new Set([...(isMap(data) ? referencedIds(data) : []), ...more]);
 }
 
@@ -200,7 +200,7 @@ export type IdFields = Extract<Op, { kind: 'set-person-fields' }>['fields'] & { 
 /** The ops of one write that first gives each person of `ids` their id, then names them by it. */
 export function withIds(ops: Op[], ids: ReadonlyMap<string, string>): Op[] {
 	if (!ids.size) return ops;
-	const give = [...ids].map(([id, next]): Op => ({ kind: 'set-person-fields', id, fields: { id: next } as IdFields }));
+	const give = [...ids].map(([id, next]): Op => ({ kind: 'set-person-fields', id, fields: { id: next } }));
 	return [...give, ...mapIds(ops, (s) => ids.get(s) ?? s).map((op) => holderPersons(op, ids))];
 }
 

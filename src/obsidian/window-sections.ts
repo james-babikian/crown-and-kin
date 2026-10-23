@@ -21,6 +21,8 @@ export interface SectionSpec {
 	open: boolean;
 	/** Draws the fields and rows into the body. */
 	build(body: HTMLElement): void;
+	/** Called each time the section opens or closes, also once when the page is drawn (a section can use it to work only while it is open). */
+	onOpen?(open: boolean): void;
 }
 
 /** What a window does with the sections it drew. */
@@ -109,6 +111,7 @@ export function renderSections(parent: HTMLElement, kind: string, specs: readonl
 		d.el.toggleClass('is-open', open);
 		d.head.setAttribute('aria-expanded', String(open));
 		if (user) state[d.spec.key] = open;
+		d.spec.onOpen?.(open);
 	};
 	const changed = () => {
 		paintAll();

@@ -1,7 +1,7 @@
 /*
  * The text of the section "The calendar note" of `docs/format.md` (spec §14 rule 2): the `kin-calendar` block. The keys of this block are not keys of the tree text, so they
  * are not in the key table of `keys.ts`; `render.ts` puts these lines in the document. The keys of the block are listed here and checked against the code by
- * `tests/dates43-format-doc.test.ts`.
+ * `tests/core/dates43-format-doc.test.ts`.
  */
 
 /** The keys of the block, in the write order of `core/calendar-block.ts`. */
@@ -69,11 +69,12 @@ export function calendarDoc(): string[] {
 		'',
 		'- A note can hold several blocks, and a block can hold several calendars. The plugin makes the note `Calendars` at the root of the vault the first time you save in the Calendars window.',
 		'- The plugin counts every year on one scale of whole years (the plain years). A plain year 1210 is year 1210. The number `start` gives the plain year of Year 1 of a calendar. The window works it out from an example: "Year 21 of Cycle 3 is the same year as 1203". So a calendar never depends on another calendar.',
-		'- A tree uses every calendar note of the vault. If the tree has the key `calendar` in `options`, it uses only that note. The item "Calendar note" in the More list writes this key.',
+		'- A tree uses a calendar note only when it has the key `calendar` in `options`. With no key, the tree reads plain years only. The item "Calendar note" in the More list writes the key, and the item "No calendar" removes it. The Calendars window writes the key when you save calendars from a tree that has no key. Before 0.4, a tree with no key used every calendar note.',
 		'- A date that fits a format gets the year of the calendar. A date that fits no format is read as a plain year, as before. A date that fits two calendars with different years gets no year.',
 		'- A name list gives each year a name that repeats. The plugin shows the name after a short date, for example "22.13 Sa". It never writes the name into your note. If a date holds a name that is wrong for its year, the plugin keeps the year of the date and gives a warning. A format can hold the marker of a list, for example `{planet}`. The part of the format with the marker is optional: the date still reads with no name.',
 		'- The plugin never changes the text of a date. It reads the text to find a year, and it shows the date as you wrote it.',
 		'- A plugin version before 0.3.2 shows the block as plain code. It reads a date in a calendar as a plain year: a date with no run of three or four digits has no year, and a date such as "Third Age 3019" gives the wrong year 3019, with no note. A device whose calendar note has not synced yet reads dates in the same way. If you delete the calendar note, such dates have no year until you add the calendars again.',
+		'- A tree that has no key reads dates in a different way in 0.4 and in an older plugin version. An older version (0.3.3 or before) uses every calendar note for a tree with no key. Version 0.4 uses none. So the same tree can read a date in two ways on two devices that have different versions. A tree that has the key reads the same note in every version. To make the result the same, select the note for the tree with the item "Calendar note".',
 		'- A plugin version before 0.3.3 does not know name lists. It keeps the calendar and its other formats, and it ignores a format that holds a marker, with no warning. A calendar whose only format holds a marker reads no date there. Its Calendars window refuses to save the note until you remove the marker format. To let old devices read your dates, use formats with no marker, for example `{cycle}.{year}` (a marker format next to its own form with no marker is refused as the same format). The names still show in 0.3.3 with such formats, but a name written in such a date is not read or checked.',
 		'',
 		'| Level | Key | Meaning | Accepted forms | Written form |',

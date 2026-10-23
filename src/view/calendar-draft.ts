@@ -8,8 +8,8 @@
 import type { CalendarOp, EraFields, NewCalendar } from '../core/calendar-block';
 import { unknownMarkers, whole } from '../core/calendar-lists';
 import { fold } from '../core/date-text';
-import { PLAIN_READER, checkCalendarsAt, exampleText, findCrossNoteDuplicates, normalizeMarker, startFromSameYear, type Calendar, type CalendarRefusal, type DateReader, type NameList } from '../core/dates';
-import { calendarRefusalText, codedIssue, issueText, type CodedIssue } from '../core/messages';
+import { PLAIN_READER, checkCalendarsAt, exampleText, normalizeMarker, startFromSameYear, type Calendar, type CalendarRefusal, type DateReader, type NameList } from '../core/dates';
+import { calendarRefusalText, codedIssue, type CodedIssue } from '../core/messages';
 import { REFUSAL_TEXT } from '../core/refusal-text';
 import { CALENDAR_WINDOW_UI as T } from '../render/calendar-text';
 import { dateReadout, dateReadoutParts, type ReadoutParts } from '../render/date-readout';
@@ -165,7 +165,7 @@ function calendarOf(d: CalendarDraft, i: number, note: string, results: Readonly
 	};
 	// The lists hold only their markers here: a format with a marker place reads, and `withLists` builds the real lists after the starts are known.
 	const base = { id: `${note}#${d.at?.block ?? 0}#${d.at?.index ?? i}`, name: d.name.trim(), note, formats: formatsOf(d.formats, d.formatsWas), ...(d.lists.length ? { lists: markerLists(d.lists) } : {}) };
-	if (d.kind === 'cycles') return { ...base, kind: { type: 'cycles', length: lengthOf(d.length, d.lengthWas) ?? Number.NaN, start: value(`c${d.key}`, d.start.saved) } } as Calendar;
+	if (d.kind === 'cycles') return { ...base, kind: { type: 'cycles', length: lengthOf(d.length, d.lengthWas) ?? Number.NaN, start: value(`c${d.key}`, d.start.saved) } };
 	return {
 		...base,
 		kind: {
@@ -175,7 +175,7 @@ function calendarOf(d: CalendarDraft, i: number, note: string, results: Readonly
 				return { name: e.name.trim(), start: value(`e${e.key}`, e.start.saved), ...(typeof length === 'number' && (length || Number.isNaN(length)) ? { length } : {}) };
 			}),
 		},
-	} as Calendar;
+	};
 }
 
 /** What the window shows about a draft: the calendars as they come out, the starts, the refusals and the warnings. */
@@ -214,7 +214,7 @@ function sameTexts(d: CalendarDraft): { id: string; start: StartDraft; cycles: b
  * calendar will have when it is saved, so the calendars are worked out in the order of these references: a calendar goes after the calendars that read its
  * dates. A cycle of references (two calendars that start from each other) has no answer: each calendar in the cycle is refused.
  */
-function solveStarts(drafts: readonly CalendarDraft[], note: string, outside: readonly Calendar[]): Map<string, StartResult> {
+function solveStarts(drafts: readonly CalendarDraft[], note: string): Map<string, StartResult> {
 	const results = new Map<string, StartResult>();
 	const done = new Set<number>();
 	drafts.forEach((d, i) => {
@@ -229,7 +229,7 @@ function solveStarts(drafts: readonly CalendarDraft[], note: string, outside: re
 		const later: number[] = [];
 		for (const i of waiting) {
 			const d = drafts[i];
-			const reader = compileCapped([...outside, ...current.filter((_, k) => k !== i)], true);
+			const reader = compileCapped(current.filter((_, k) => k !== i), true);
 			// The calendars that read the dates of this one: it waits for those that are not worked out yet.
 			const needs = sameTexts(d).flatMap((t) => {
 				const r = t.start.same.trim() === '' ? undefined : reader.read(t.start.same);
@@ -344,13 +344,11 @@ function coreRefusals(drafts: readonly CalendarDraft[], calendars: readonly Cale
 }
 
 /**
- * Works out the starts and checks the draft of one note. `outside` are the calendars of the other calendar notes that the tree uses: a date in "Same year as"
- * may name them, and the same cycle format or era name in them is a warning (spec §14 rule 3). A date in "Same year as" is read with the other calendars of
- * this window as they will be saved (see `solveStarts`). `plain` holds the name lists of the plain years of this note; `outsidePlain` those of the other calendar notes that
- * the tree uses (the test line reads with them too; of two lists with one name the first is used).
+ * Works out the starts and checks the draft of one note. A date in "Same year as" may name only the other calendars of this window, as they will be saved (see
+ * `solveStarts`): a tree uses one calendar note (D289), so no other note adds calendars. `plain` holds the name lists of the plain years of this note.
  */
-export function checkDraft(drafts: readonly CalendarDraft[], note: string, outside: readonly Calendar[], plain: PlainDraft = emptyPlain(), outsidePlain: readonly NameList[] = []): Checked {
-	const results = solveStarts(drafts, note, outside);
+export function checkDraft(drafts: readonly CalendarDraft[], note: string, plain: PlainDraft = emptyPlain()): Checked {
+	const results = solveStarts(drafts, note);
 	const refusals: Checked['refusals'] = [];
 	const warnings: Checked['warnings'] = [];
 	for (const d of drafts) {
@@ -368,12 +366,8 @@ export function checkDraft(drafts: readonly CalendarDraft[], note: string, outsi
 	const made = withLists(drafts, asCalendars(drafts, note, results), plain);
 	const calendars = made.calendars;
 	refusals.push(...coreRefusals(drafts, calendars, made.plain, plain));
-	for (const p of findCrossNoteDuplicates([...outside, ...calendars]).filter((x) => x.note === note)) {
-		const at = drafts.findIndex((d) => d.name.trim() === p.calendar);
-		warnings.push({ key: at < 0 ? null : drafts[at].key, text: issueText(codedIssue('calendar-duplicate', 'warning', { calendar: p.calendar ?? '', note: p.note ?? '', other: p.other ?? '' })) });
-	}
 	// A calendar with no example, beside another calendar: its Year 1 counts as plain year 1 (spec §14 rule 1).
-	const used = outside.length + calendars.length > 1;
+	const used = calendars.length > 1;
 	const noAnchor = new Set<string>();
 	for (const d of drafts) {
 		const id = d.kind === 'cycles' ? `c${d.key}` : `e${d.eras[0]?.key}`;
@@ -382,9 +376,7 @@ export function checkDraft(drafts: readonly CalendarDraft[], note: string, outsi
 	}
 	// The same sentence can come from the draft and from `checkCalendars`.
 	const once = <T extends { key: number | null; text: string }>(list: T[]) => list.filter((x, i) => list.findIndex((y) => y.key === x.key && y.text === x.text) === i);
-	const heard = new Set<string>();
-	const readPlain = [...outsidePlain, ...made.plain].filter((l) => !heard.has(fold(l.name)) && !!heard.add(fold(l.name)));
-	const reader = compileCapped([...outside, ...calendars], true, [], readPlain);
+	const reader = compileCapped(calendars, true, [], made.plain);
 	return { calendars, byKey: new Map(drafts.map((d, i) => [d.key, calendars[i]])), starts: results, refusals: once(refusals), warnings: once(warnings), noAnchor, reader, plain: made.plain, knowns: made.knowns };
 }
 

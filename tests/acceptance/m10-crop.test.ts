@@ -1,9 +1,5 @@
 import { readFileSync } from 'node:fs';
-import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-
-vi.mock('obsidian', () => import('./fake-obsidian'));
-vi.mock('@codemirror/language', () => ({ forceParsing: () => false, syntaxTree: () => ({ length: 0 }) }));
-vi.mock('@codemirror/view', () => ({ ViewPlugin: { fromClass: () => ({}) } }));
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { deriveFamilies } from '../../src/core/derive';
 import type { EditResult, Op } from '../../src/core/edit';
@@ -13,9 +9,11 @@ import { applyOp } from '../../src/core/yaml-edit';
 import { topLevelBlocks, fixtureNote } from './load';
 import { replaceOnce } from './golden';
 import { TFile as VaultFile } from 'obsidian';
-import { fakeDoc, fakeWin, installDom, resetDom } from './fake-dom';
+import { fakeDoc, resetDom } from './fake-dom';
 import { openModals, resetObsidian } from './fake-obsidian';
 import { cropModule, graphOf, loadModule, treeOf } from './m10-support';
+import { rng } from '../support/rng';
+import { useFakeDom } from '../support/fake-dom-setup';
 
 /*
  * Spec §13.13 (D79, D90, D91), §13.0 items 1 and 10, §13.7 "Crop", and the M10 core contract rules
@@ -41,17 +39,6 @@ const bodyOf = (r: EditResult): string => {
 	return r.body;
 };
 const set = (body: string, id: string, fields: Record<string, string | boolean | null>) => apply(body, { kind: 'set-person-fields', id, fields });
-
-/** A small deterministic random number generator (mulberry32), so the property loops repeat. */
-function rng(seed: number) {
-	return () => {
-		seed |= 0;
-		seed = (seed + 0x6d2b79f5) | 0;
-		let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
-		t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-		return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-	};
-}
 
 describe('rules 19 and 20: reading the text of `portrait-crop`', () => {
 	it('three numbers with single spaces are ok', async () => {
@@ -566,10 +553,7 @@ describe('review A: a crop that the tool wrote still counts as the automatic par
 });
 
 describe('review C: the crop tool takes the keyboard focus (spec §13.13)', () => {
-	beforeAll(() => {
-		installDom();
-		(globalThis as Record<string, unknown>).window ??= fakeWin;
-	});
+	useFakeDom({ window: true });
 	beforeEach(() => {
 		resetDom();
 		resetObsidian();

@@ -1,0 +1,44 @@
+name: Feature request
+description: An idea for something new or a change to something that exists.
+title: "[Idea] "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for the idea. Crown and Kin is for the family trees of fictional dynasties. An idea that fits that purpose is easiest to accept.
+
+        **Privacy:** a request is public. Do not post private names or private notes.
+  - type: textarea
+    id: problem
+    attributes:
+      label: What do you want to do?
+      description: Describe the task you cannot do now, or do with too many steps. Describe the task before the solution.
+      placeholder: "I write a story with three houses and I want to ..."
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: What would help
+      description: How could the plugin do it? A sketch or a screenshot with notes is welcome.
+    validations:
+      required: false
+  - type: textarea
+    id: now
+    attributes:
+      label: What you do today
+      description: Is there a way around the problem now? How well does it work?
+    validations:
+      required: false
+  - type: dropdown
+    id: device
+    attributes:
+      label: Where do you need it?
+      options:
+        - Computer
+        - iPhone or iPad
+        - Android
+        - Everywhere
+    validations:
+      required: false

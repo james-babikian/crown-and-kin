@@ -292,7 +292,7 @@ export class PanZoom {
 				// so the wrapper keeps its layer.
 				this.o.scene.setAttribute('transform', transformFor(this.view, this.size));
 				this.drawn = { view: this.view, size: this.size, at: performance.now() };
-				w.style.setProperty('--dynasty-gesture-transform', 'matrix(1, 0, 0, 1, 0, 0)');
+				w.setCssProps({ '--dynasty-gesture-transform': 'matrix(1, 0, 0, 1, 0, 0)' });
 				this.filled = visibleRect(this.view, this.size);
 				this.o.onFill?.(this.view);
 				return;
@@ -319,7 +319,7 @@ export class PanZoom {
 		}
 		if (this.wrapped && w) {
 			w.removeClass(GESTURE_CLASS);
-			w.style.setProperty('--dynasty-gesture-transform', 'none');
+			w.setCssProps({ '--dynasty-gesture-transform': 'none' });
 		}
 		this.wrapped = false;
 		this.fillIfLeft();

@@ -1,0 +1,86 @@
+name: Bug report
+description: Something in Crown and Kin does not work, looks wrong, or is too slow.
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for the report. Please fill in each box. A short, exact report is the fastest to fix.
+
+        **Privacy:** a report is public. Do not post private names, private notes or paths from your computer.
+  - type: input
+    id: plugin-version
+    attributes:
+      label: Crown and Kin version
+      description: In Obsidian, open Settings, then Community plugins. The version is under the name Crown and Kin.
+      placeholder: "0.4.0"
+    validations:
+      required: true
+  - type: input
+    id: obsidian-version
+    attributes:
+      label: Obsidian version
+      description: In Obsidian, open Settings, then General. Look for "Current version".
+      placeholder: "1.13.7"
+    validations:
+      required: true
+  - type: dropdown
+    id: device
+    attributes:
+      label: Device
+      description: Where did the problem happen?
+      options:
+        - Windows
+        - macOS
+        - Linux
+        - iPhone
+        - iPad
+        - Android
+        - More than one device
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: Say what you did, step by step, and what you saw. A screenshot helps.
+      placeholder: "1. I opened a note with a tree.\n2. I selected a card.\n3. The person window showed ..."
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+      description: What should have happened instead?
+    validations:
+      required: true
+  - type: textarea
+    id: tree-text
+    attributes:
+      label: The smallest tree text that shows the problem
+      description: |
+        Copy the text of the `kin` code block. Cut it down to the fewest people that still show the problem.
+        **Replace private names with made-up names before you post.** If the problem needs no tree, leave this box empty.
+      render: yaml
+    validations:
+      required: false
+  - type: textarea
+    id: speed
+    attributes:
+      label: Startup time (only if the problem is about speed)
+      description: |
+        Open the command palette and run "Debug startup time". Copy the line for Crown and Kin.
+        Also say how many people the tree has and how many notes are in your vault, in round numbers.
+        If your Obsidian has no such command, write "not available".
+    validations:
+      required: false
+  - type: textarea
+    id: console
+    attributes:
+      label: Error in the console
+      description: |
+        If you can, open the developer console (Ctrl+Shift+I on Windows and Linux, Cmd+Option+I on macOS), repeat the problem, and copy the red error lines. On a phone or an iPad, skip this box.
+      render: text
+    validations:
+      required: false

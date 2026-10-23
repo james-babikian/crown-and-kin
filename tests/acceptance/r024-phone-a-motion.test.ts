@@ -1,12 +1,11 @@
-import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-
-vi.mock('obsidian', () => import('./fake-obsidian'));
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { GESTURE_CLASS, PanZoom } from '../../src/render/dom/pan-zoom';
 import { treeBounds, type View } from '../../src/render/view-math';
-import { FEl, clock, dispatch, fakeWin, flushFrames, installDom, pointer, resetDom, runFrame, runTimers } from './fake-dom';
+import { FEl, clock, dispatch, fakeWin, flushFrames, pointer, resetDom, runFrame, runTimers } from './fake-dom';
+import { useFakeDom } from '../support/fake-dom-setup';
 
 /*
  * 0.2.4, phone animation (D124 items 2 to 4, contract 7): the proofs of M5 (a change of the scale of the scene at each frame makes the browser shape
@@ -14,7 +13,7 @@ import { FEl, clock, dispatch, fakeWin, flushFrames, installDom, pointer, resetD
  * PanZoom runs on the fake DOM.
  */
 
-beforeAll(() => installDom());
+useFakeDom();
 beforeEach(() => {
 	resetDom();
 	vi.spyOn(performance, 'now').mockImplementation(() => clock.now);

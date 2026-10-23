@@ -123,7 +123,7 @@ export const isIdOp = (op: Op): boolean => op.kind === 'set-house-id' || op.kind
 
 /** The ids that people name (`house` or `card-title`) when no item has them: such an id is taken, so no new id can join the people by accident. */
 export function danglingIds(data: unknown, kind: IdKind): string[] {
-	if (!isMap(data as Raw)) return [];
+	if (!isMap(data)) return [];
 	const d = data as Record<string, Raw>;
 	const items = Array.isArray(d[kind === 'house' ? 'houses' : 'titles']) ? (d[kind === 'house' ? 'houses' : 'titles'] as Raw[]) : [];
 	const have = new Set<string>();

@@ -45,7 +45,7 @@ export function traceOutline(rgba: ArrayLike<number>, w: number, h: number): Arm
 	const lh = h + 2;
 	const field = new Uint8Array(lw * lh);
 	for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) field[(y + 1) * lw + x + 1] = rgba[(y * w + x) * 4 + 3]!;
-	const inside = (i: number, j: number) => field[j * lw + i]! >= THRESHOLD;
+	const inside = (i: number, j: number) => field[j * lw + i] >= THRESHOLD;
 
 	// An edge of the grid has the id 2 * (j * lw + i) for the edge from (i, j) to (i + 1, j) and the next number for the edge down to (i, j + 1).
 	const across = (i: number, j: number, down: boolean) => 2 * (j * lw + i) + (down ? 1 : 0);
@@ -68,11 +68,11 @@ export function traceOutline(rgba: ArrayLike<number>, w: number, h: number): Arm
 			const crossing = [tl !== tr, tr !== br, bl !== br, tl !== bl];
 			if (crossing.filter(Boolean).length === 2) {
 				const [a, b] = [top, right, bottom, left].filter((_, k) => crossing[k]);
-				join(a!, b!);
+				join(a, b);
 				continue;
 			}
 			// A saddle: the middle decides whether the two inside corners are joined.
-			const middle = (field[j * lw + i]! + field[j * lw + i + 1]! + field[(j + 1) * lw + i + 1]! + field[(j + 1) * lw + i]!) / 4 >= THRESHOLD;
+			const middle = (field[j * lw + i] + field[j * lw + i + 1] + field[(j + 1) * lw + i + 1] + field[(j + 1) * lw + i]) / 4 >= THRESHOLD;
 			if (tl !== middle) join(left, top);
 			if (tr !== middle) join(top, right);
 			if (br !== middle) join(right, bottom);
@@ -85,8 +85,8 @@ export function traceOutline(rgba: ArrayLike<number>, w: number, h: number): Arm
 		const at = id >> 1;
 		const i = at % lw;
 		const j = (at - i) / lw;
-		const a = field[at]!;
-		const b = field[down ? at + lw : at + 1]!;
+		const a = field[at];
+		const b = field[down ? at + lw : at + 1];
 		const t = (THRESHOLD - a) / (b - a);
 		// A cell of the grid is a pixel; its value belongs to its middle.
 		return down ? [i - 0.5, j - 0.5 + t] : [i - 0.5 + t, j - 0.5];
@@ -118,8 +118,8 @@ export function traceOutline(rgba: ArrayLike<number>, w: number, h: number): Arm
 function areaOf(ring: readonly [number, number][]): number {
 	let s = 0;
 	for (let k = 0; k < ring.length; k++) {
-		const [x0, y0] = ring[k]!;
-		const [x1, y1] = ring[(k + 1) % ring.length]!;
+		const [x0, y0] = ring[k];
+		const [x1, y1] = ring[(k + 1) % ring.length];
 		s += x0 * y1 - x1 * y0;
 	}
 	return s / 2;
@@ -127,11 +127,11 @@ function areaOf(ring: readonly [number, number][]): number {
 
 /** The distance of `p` from the segment `a`-`b`. */
 function farFrom(p: readonly number[], a: readonly number[], b: readonly number[]): number {
-	const dx = b[0]! - a[0]!;
-	const dy = b[1]! - a[1]!;
+	const dx = b[0] - a[0];
+	const dy = b[1] - a[1];
 	const len = dx * dx + dy * dy;
-	const t = len === 0 ? 0 : Math.max(0, Math.min(1, ((p[0]! - a[0]!) * dx + (p[1]! - a[1]!) * dy) / len));
-	return Math.hypot(p[0]! - (a[0]! + t * dx), p[1]! - (a[1]! + t * dy));
+	const t = len === 0 ? 0 : Math.max(0, Math.min(1, ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / len));
+	return Math.hypot(p[0] - (a[0] + t * dx), p[1] - (a[1] + t * dy));
 }
 
 /** Douglas-Peucker on a closed ring: it is split at the point that is farthest from the first, so no corner is lost at the seam. */
@@ -139,7 +139,7 @@ function simplify(ring: readonly [number, number][]): [number, number][] {
 	let far = 0;
 	let best = -1;
 	for (let k = 1; k < ring.length; k++) {
-		const d = Math.hypot(ring[k]![0] - ring[0]![0], ring[k]![1] - ring[0]![1]);
+		const d = Math.hypot(ring[k][0] - ring[0][0], ring[k][1] - ring[0][1]);
 		if (d > best) {
 			best = d;
 			far = k;
@@ -152,12 +152,12 @@ function simplify(ring: readonly [number, number][]): [number, number][] {
 	];
 	while (stack.length) {
 		const [lo, hi] = stack.pop()!;
-		const a = ring[lo]!;
-		const b = ring[hi % ring.length]!;
+		const a = ring[lo];
+		const b = ring[hi % ring.length];
 		let worst = -1;
 		let at = -1;
 		for (let k = lo + 1; k < hi; k++) {
-			const d = farFrom(ring[k]!, a, b);
+			const d = farFrom(ring[k], a, b);
 			if (d > worst) {
 				worst = d;
 				at = k;

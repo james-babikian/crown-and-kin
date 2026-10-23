@@ -5,7 +5,7 @@
  * the root down to the target, then bubble listeners from the target up. Time, animation frames,
  * timers and resize observers are fake: they move on only when a test says so.
  *
- * Used with `vi.mock('obsidian', () => import('./fake-obsidian'))`.
+ * The `obsidian` mock of every test file is fake-obsidian.ts (the setup file tests/support/common-mocks.ts).
  */
 
 export interface FakeEvent {
@@ -165,6 +165,18 @@ export async function settle(): Promise<void> {
 	for (let i = 0; i < 3; i++) await new Promise<void>((r) => setTimeout(r, 0));
 }
 
+/** Waits for `p` while the fake clock runs on: code that waits with `window.setTimeout` gets its timers from the fake window. */
+export async function untilDone<T>(p: Promise<T>): Promise<T> {
+	let done = false;
+	void p.then(() => (done = true), () => (done = true));
+	const end = Date.now() + 20_000;
+	while (!done && Date.now() < end) {
+		runTimers(100);
+		await settle();
+	}
+	return p;
+}
+
 const observers = new Set<FakeResizeObserver>();
 
 class FakeResizeObserver {
@@ -233,6 +245,10 @@ export class FEl {
 		removeProperty: (k: string) => void this.styleProps.delete(k),
 		getPropertyValue: (k: string) => this.styleProps.get(k) ?? '',
 	};
+	/** Obsidian's `setCssProps`: the same as `style.setProperty` for each pair. */
+	setCssProps(props: Record<string, string>): void {
+		for (const [k, v] of Object.entries(props)) this.style.setProperty(k, v);
+	}
 	text = '';
 	hidden = false;
 	isConnected = true;

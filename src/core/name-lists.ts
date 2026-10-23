@@ -270,7 +270,7 @@ export const oneLine = (text: string): string => text.replace(/\r\n|[\r\n]/g, ' 
  * A line break inside a name (only a hand-written note can have one) shows as a space; the window keeps the name as written until the user changes the field.
  */
 export function nameLinesText(names: readonly ListName[]): string {
-	return (Array.isArray(names) ? names : [])
+	return (Array.isArray(names) ? (names as readonly ListName[]) : [])
 		.map((n) => {
 			if (!n || typeof n.name !== 'string') return '';
 			const name = oneLine(n.name);

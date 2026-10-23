@@ -3,6 +3,7 @@ import { deriveFamilies, type FamilyGraph } from '../../src/core/derive';
 import { parseDynasty } from '../../src/core/parse';
 import { specOf, successionLine, type SuccessionResult, type SuccessionSpec } from '../../src/core/succession';
 import { INHERIT_RULES, INHERIT_THROUGH, SUCCESSION_RULES } from '../../src/core/succession-keys';
+import { rng } from '../support/rng';
 
 /*
  * Version 0.2.7, WP2: properties of `successionLine` on seeded random trees (with half-siblings, adoptions, wards,
@@ -20,17 +21,6 @@ import { INHERIT_RULES, INHERIT_THROUGH, SUCCESSION_RULES } from '../../src/core
  * These tests wait for WP 2 (`src/core/succession.ts`).
  * Run: npx vitest run tests/acceptance/r027-succession-fuzz.test.ts
  */
-
-function rng(seed: number) {
-	let a = seed >>> 0;
-	return () => {
-		a = (a + 0x6d2b79f5) >>> 0;
-		let t = a;
-		t = Math.imul(t ^ (t >>> 15), t | 1);
-		t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-		return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-	};
-}
 
 interface Made {
 	source: string;

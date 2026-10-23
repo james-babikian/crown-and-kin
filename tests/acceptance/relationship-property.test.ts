@@ -6,7 +6,7 @@ import { parseDynasty } from '../../src/core/parse';
 import type { Tree } from '../../src/core/types';
 import * as edit from '../../src/core/yaml-edit';
 import { fixtureNote, fixtureSource, topLevelBlocks } from './load';
-import { nextIdFor } from '../helpers';
+import { nextIdFor } from '../support/helpers';
 
 /*
  * Property (spec §8 "nothing may throw", §6.6 no cycles, §6.1 the stored body is always valid):

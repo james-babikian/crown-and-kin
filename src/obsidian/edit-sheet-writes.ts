@@ -4,7 +4,7 @@
  */
 
 import { Notice } from 'obsidian';
-import type { Op, ParentKind, UnionKind } from '../core/edit';
+import type { Op } from '../core/edit';
 import { nextPersonId } from '../core/id-gen';
 import { newHouseId } from '../core/yaml-edit';
 import { NEW_SHEET, REMOVE, SHEET, UNION_EDIT, WRITE_TEXT, deleteText, unionTypeText } from '../render/ui-text';
@@ -97,7 +97,7 @@ export abstract class EditSheetWrites extends EditSheetActions {
 				break;
 			case 'child': {
 				const parents = rel.other === null ? [rel.parent] : [rel.parent, rel.other];
-				ops.push({ kind: 'add-person', id, fields, parents: parents.map((p) => ({ id: p, type: 'birth' as ParentKind })), at: { kind: 'after-siblings', parents, ...(rel.union ? { union: rel.union } : {}) } });
+				ops.push({ kind: 'add-person', id, fields, parents: parents.map((p) => ({ id: p, type: 'birth' })), at: { kind: 'after-siblings', parents, ...(rel.union ? { union: rel.union } : {}) } });
 				break;
 			}
 			case 'partner':
@@ -460,7 +460,7 @@ export abstract class EditSheetWrites extends EditSheetActions {
 		const was = this.data.person.id;
 		this.showConfirm({
 			title: REMOVE.partnershipTitle,
-			text: [REMOVE.partnershipText(unionTypeText((link.type as UnionKind | null) ?? 'marriage'), a, b), REMOVE.canUndo],
+			text: [REMOVE.partnershipText(unionTypeText(link.type ?? 'marriage'), a, b), REMOVE.canUndo],
 			confirm: REMOVE.removeConfirm,
 			confirmCls: 'dynasty-confirm-remove-union',
 			keep: REMOVE.cancel,

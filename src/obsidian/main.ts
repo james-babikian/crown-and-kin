@@ -7,6 +7,8 @@
  * one picture store of all trees (spec §13.0 item 3) and tells it when a picture file changes.
  */
 
+/* global __DYNASTY_HARNESS__ -- a build-time switch, declared in harness-flag.d.ts */
+
 import { Notice, Plugin, TFile, debounce, setIcon, type TAbstractFile } from 'obsidian';
 import { createParseCache } from '../core/parse-cache';
 import { INSERT_UI, RENAME_UI, TIMING_UI, UI, WRITE_TEXT } from '../render/ui-text';
@@ -16,12 +18,14 @@ import { contrastChoices, onAccentChoice } from '../render/dom/theme-read';
 import { buildCallout } from '../render/dom/widgets';
 import { timingText, type RenderTiming } from '../render/tree-info';
 import { HandleRegistry } from './block-handle';
+import { undoLastEditCommand } from './undo-ask';
 import { endSessionFocus, type BlockState } from '../view/block-state';
 import { FullScreenModal } from './full-screen';
 import { insertTree } from './insert-tree';
 import { closePluginModals } from '../view/plugin-modals';
 import { tallBlockParser } from './live-preview';
-import { clearRelationCache } from '../view/relation-cache';
+import { beginStart, guardStart } from './start-guard';
+import { clearRelationCache, moveRelationBlocks } from '../view/relation-cache';
 import { createPictureStore, isPictureExtension } from './picture-store';
 import { bindViewerMotion } from './picture-viewer';
 import { stopJoinedWatch } from '../render/text-join';
@@ -29,7 +33,10 @@ import { LinkUpdater, RENAME_TIMING, extensionOf } from './rename-links';
 import { registerCalendars } from './calendar-feature';
 import { obsidianCalendarVault } from './calendar-vault';
 import { createCalendarIndex } from '../view/calendar-index';
-import { DEFAULT_SETTINGS, NO_EXTRAS, buildStoredData, clearInvalid, normaliseSettings, readPending, readStoredSettings, settingsChanges, type DynastySettings, type StoredExtras } from '../view/settings';
+import { createFenceIndex, type FenceIndex, type FenceStore } from '../view/fence-index';
+import { fenceOptionsForDevice, obsidianFenceStore, obsidianFenceVault, saveWhenLeaving } from './fence-vault';
+import { PendingKeeper } from './pending-keeper';
+import { DEFAULT_SETTINGS, NO_EXTRAS, buildStoredData, clearInvalid, normaliseSettings, readStoredSettings, settingsChanges, type DynastySettings, type StoredExtras } from '../view/settings';
 import { DynastySettingTab, type SettingsHost } from './settings-tab';
 import { renameHeights } from './block-height';
 import { HOVER_SOURCE, START_LIMIT_MS, STYLES_LIMIT_MS, THEME_RECHECK_MS, TreeView, type FullSource, type OpenTime, type TreeHost } from './tree-view';
@@ -46,16 +53,22 @@ export default class DynastyTreePlugin extends Plugin implements TreeHost, Setti
 	readonly handles = new HandleRegistry(this.app);
 	/** Spec §6.9 (D6, D35): tree links follow a renamed note, if the setting is on. */
 	readonly links = new LinkUpdater(this.app, this.handles, () => this.settings.updateLinks, RENAME_TIMING, {
-		save: () => this.store(),
+		save: () => this.savePending(),
 		known: () => [...this.views].map((v) => v.notePath),
+		// 0.4: the notes that hold a tree, from the fence index. Null until it is complete: the scan of 0.3.3 then looks at every note.
+		kinNotes: () => (this.fence.complete ? new Set([...this.fence.notes('kin'), ...this.fence.unsure()]) : null),
 	});
-	/** One `saveData` at a time: the settings and the pending renames share `data.json`. */
+	/** 0.4 (pre-mortem item 6): the renames that wait are kept in the local storage of this device, not in the synced `data.json`. */
+	private readonly pendingKeeper = new PendingKeeper(this.app);
+	/** One `saveData` at a time (the settings, and the renames that wait if the local storage fails, share `data.json`). */
 	private saving: Promise<void> = Promise.resolve();
 	/** W7: what the last load kept of `data.json` (version, unknown keys, invalid values); a save writes it back. */
 	private extras: StoredExtras = NO_EXTRAS;
 	/** The read at start failed: the settings in memory are defaults until the first save reads again. */
 	private startupReadFailed = false;
 	private recovery: Promise<void> | null = null;
+	/** The plugin is turned off: a callback that Obsidian runs late must start nothing. */
+	private off = false;
 	readonly looseStates = new Map<string, BlockState>();
 	readonly views = new Set<TreeView>();
 	/** Most recent render first; read by the timing command and the test harness. */
@@ -84,14 +97,31 @@ export default class DynastyTreePlugin extends Plugin implements TreeHost, Setti
 		cache: () => this.cacheSeen || performance.now() - this.startedAt >= START_LIMIT_MS,
 	};
 	/** Spec §14: the calendar index (`TreeHost.dates`). It starts when the vault is ready and waits for the metadata cache by the same gate as the trees (D183). */
-	readonly dates = createCalendarIndex(obsidianCalendarVault(this.app, { seen: () => this.startedUp.cache(), limitMs: START_LIMIT_MS + 50 }));
+	readonly dates = createCalendarIndex(obsidianCalendarVault(this.app, { seen: () => this.startedUp.cache(), limitMs: START_LIMIT_MS + 50 }), {
+		notes: () => this.fence.notes('cal'),
+		complete: () => this.fence.complete,
+	});
+	/**
+	 * 0.4 (D289): the one index of the notes that hold a `kin` or `kin-calendar` fence. It starts when the layout is ready. Its gate is `cacheSeen`, not the start
+	 * limit: a note with no block section is skipped only after the metadata cache has really finished.
+	 */
+	readonly fence: FenceIndex = createFenceIndex(
+		obsidianFenceVault(this.app, { seen: () => this.startedUp.cache(), done: () => this.cacheSeen || this.cacheWarm, limitMs: START_LIMIT_MS + 50 }),
+		this.fenceStore(),
+		fenceOptionsForDevice(),
+	);
 	private readonly startedAt = performance.now();
 	private settingsIn = false;
 	private cacheSeen = false;
+	/**
+	 * Set once at layout ready: every note already has an entry in the metadata cache. A plugin that loads after the cache resolved (turned on later, a reload) never sees
+	 * `resolved`, and must not take the cold pass at every such start. No read: one look at each file.
+	 */
+	private cacheWarm = false;
 	private cssSeen = false;
 	private cssProbe: HTMLElement | null = null;
 	/** The waiting redraws of trees that are off screen; they stop when the plugin unloads. */
-	private readonly redrawTimers = new Set<ReturnType<typeof setTimeout>>();
+	private readonly redrawTimers = new Set<number>();
 	/** O9, B16: picture files that changed, told to the store's listeners together after a short wait. */
 	private changedPictures = new Set<string>();
 	private readonly tellPictures = debounce(
@@ -104,23 +134,36 @@ export default class DynastyTreePlugin extends Plugin implements TreeHost, Setti
 		false,
 	);
 
-	override async onload(): Promise<void> {
-		this.registerHoverLinkSource(HOVER_SOURCE, { display: 'Crown and Kin', defaultMod: false });
-		this.registerMarkdownCodeBlockProcessor('kin', (source, el, ctx) => {
-			try {
-				ctx.addChild(new TreeView(this, el, source, { kind: 'embed', ctx }));
-			} catch (e) {
-				// Nothing may throw into Obsidian or blank the note (spec §8).
-				console.error('Crown and Kin: cannot show the tree', e);
+	/**
+	 * The `kin` code block and the Live Preview help. Obsidian refuses a second processor for the same name, and a later Obsidian can change the
+	 * editor modules; the rest of the plugin still starts then.
+	 */
+	private registerTreeBlock(): void {
+		const liveHelp = tallBlockParser();
+		if (liveHelp) this.registerEditorExtension(liveHelp);
+		guardStart('the tree block', () =>
+			this.registerMarkdownCodeBlockProcessor('kin', (source, el, ctx) => {
 				try {
-					el.empty();
-					buildCallout(el, 'error', UI.errorTitle, 'dynasty-error', setIcon).content.createDiv({ text: UI.internalError });
-				} catch {
-					// The rest of the note still renders.
+					ctx.addChild(new TreeView(this, el, source, { kind: 'embed', ctx }));
+				} catch (e) {
+					// Nothing may throw into Obsidian or blank the note (spec §8).
+					console.error('Crown and Kin: cannot show the tree', e);
+					try {
+						el.empty();
+						buildCallout(el, 'error', UI.errorTitle, 'dynasty-error', setIcon).content.createDiv({ text: UI.internalError });
+					} catch {
+						// The rest of the note still renders.
+					}
 				}
-			}
-		});
-		this.registerEditorExtension(tallBlockParser);
+			}),
+		);
+	}
+
+	override async onload(): Promise<void> {
+		beginStart();
+		this.pendingKeeper.load();
+		this.registerHoverLinkSource(HOVER_SOURCE, { display: 'Crown and Kin', defaultMod: false });
+		this.registerTreeBlock();
 		// D183: the metadata cache has finished once: a picture that it did not know is looked for again.
 		const mc = this.app.metadataCache;
 		if (typeof mc?.on === 'function') {
@@ -133,8 +176,8 @@ export default class DynastyTreePlugin extends Plugin implements TreeHost, Setti
 			);
 		}
 		// The limit passes: every tree that still waits draws as it is, and the pictures are counted.
-		const limit = setTimeout(() => this.startUpDone(), START_LIMIT_MS + 50);
-		this.register(() => clearTimeout(limit));
+		const limit = window.setTimeout(() => this.startUpDone(), START_LIMIT_MS + 50);
+		this.register(() => window.clearTimeout(limit));
 		this.register(() => this.cssProbe?.remove());
 		// The text colour set on the page body must not outlive the plugin (G.12).
 		this.register(() => document.body?.style.removeProperty('--dynasty-on-accent'));
@@ -188,20 +231,77 @@ export default class DynastyTreePlugin extends Plugin implements TreeHost, Setti
 		this.settingsIn = true;
 		this.startUpDone();
 		// Spec §6.9: a link update that an earlier session did not complete (a phone closed the app) continues.
-		this.links.restore(readPending(stored));
+		this.migratePending(stored, false);
 		// Only now: before, a rename would use the default "Update tree links" and store the default settings.
 		// Registered after the handler above, so the handles follow the rename first.
 		this.registerEvent(this.app.vault.on('rename', (file, oldPath) => this.links.renamed(file, oldPath)));
+		this.registerLayoutReady();
+	}
+
+	/** What waits for the layout: the colours, the link updates of an earlier session, the note index, and the `create` events of later files. */
+	private registerLayoutReady(): void {
 		try {
 			this.app.workspace.onLayoutReady(() => {
+				// Obsidian also runs this after the plugin was turned off; the unload has cleaned up already and never runs again.
+				if (this.off) return;
 				this.paintOnAccent();
 				this.paintContrast();
 				this.links.resume();
+				this.startNoteIndex();
 				// Obsidian sends `create` for every file while the vault loads: only later ones count.
 				this.registerEvent(this.app.vault.on('create', (file) => this.pictureChanged(file)));
 			});
 		} catch (e) {
 			console.error('Crown and Kin: cannot continue the link update of an earlier rename', e);
+		}
+	}
+
+	/** Starts the fence index and saves it when the page goes away. It never throws into the start of Obsidian (spec §8). */
+	private startNoteIndex(): void {
+		if (this.off) return;
+		// A host with no metadata cache (a unit fake) has no events to follow, as in `registerCalendars`.
+		if (typeof this.app.metadataCache?.on !== 'function') return;
+		try {
+			const cache = this.app.metadataCache;
+			this.cacheWarm = typeof cache.getFileCache === 'function' && this.app.vault.getMarkdownFiles().every((f) => !!cache.getFileCache(f));
+			this.register(saveWhenLeaving(this.fence));
+			void this.fence.start().catch((e: unknown) => console.error('Crown and Kin: the note index did not start', e));
+		} catch (e) {
+			console.error('Crown and Kin: cannot start the note index', e);
+		}
+	}
+
+	/** The saved copy of the fence index. It stops saving for the session when the local storage failed for the renames (one broken storage, one fallback). */
+	private fenceStore(): FenceStore {
+		const inner = obsidianFenceStore(this.app);
+		return {
+			load: () => inner.load(),
+			save: (value) => {
+				if (!this.pendingKeeper.fallback) inner.save(value);
+			},
+		};
+	}
+
+	/** The hook of the updater: the list goes to the local store; if that fails, to `data.json`, as in 0.3.3. */
+	private savePending(): Promise<void> | void {
+		if (!this.pendingKeeper.save(this.links.pendingList())) return this.store();
+	}
+
+	/**
+	 * Moves the list of `data.json` into the local store, once (the index contract 3). The store is saved first; only then does the plugin clear its copy of the list and write the file. `late`: the read
+	 * of the file failed at start and works now, so the updater gets the merged list and continues at once.
+	 */
+	private migratePending(raw: unknown, late: boolean): void {
+		try {
+			const r = this.pendingKeeper.settle(raw, late || !this.startupReadFailed, this.links.storedList(), this.links.openList(), late);
+			if (!r) return;
+			// The updater holds the list now. If the file kept a copy, the fallback would write a handled list back at each save.
+			this.extras = { ...this.extras, pending: [] };
+			this.links.restore(r.list);
+			if (late) this.links.resume();
+			else if (r.cleanFile) void this.store().catch((e: unknown) => console.error('Crown and Kin: cannot clean the settings file', e));
+		} catch (e) {
+			console.error('Crown and Kin: cannot move the renames that wait', e);
 		}
 	}
 
@@ -333,7 +433,8 @@ export default class DynastyTreePlugin extends Plugin implements TreeHost, Setti
 		const prev = this.settings;
 		const { settings, extras } = readStoredSettings(stored);
 		this.settings = settings;
-		this.extras = extras;
+		// A device whose flag is set ignores the list in the file; the next save drops the key.
+		this.extras = this.pendingKeeper.migrated ? { ...extras, pending: [] } : extras;
 		if (settingsChanges(prev, this.settings).length) this.redrawViews(prev);
 	}
 
@@ -355,19 +456,23 @@ export default class DynastyTreePlugin extends Plugin implements TreeHost, Setti
 		this.recovery ??= (async () => {
 			const r = await this.readData();
 			this.startupReadFailed = false;
-			if (r.ok) this.applyStored(r.data);
+			if (r.ok) {
+				this.applyStored(r.data);
+				this.migratePending(r.data, true);
+			}
 		})();
 		return this.recovery;
 	}
 
 	/**
 	 * Writes `data.json`: the settings, the version, the keys that this version does not know, and the renames
-	 * that wait for a link update (see `buildStoredData`).
+	 * that wait for a link update while they cannot live in the local store (see `buildStoredData`).
 	 */
 	private store(): Promise<void> {
 		const write = async () => {
 			await this.recoverStartupRead();
-			await this.saveData(buildStoredData(this.settings, this.extras, this.links.pendingList()));
+			// The list goes into the file only in the fallback; otherwise it lives in the local store (the index contract 3).
+			await this.saveData(buildStoredData(this.settings, this.extras, this.pendingKeeper.fallback ? this.links.pendingList() : []));
 		};
 		const next = this.saving.then(write, write);
 		this.saving = next.catch(() => undefined);
@@ -401,7 +506,7 @@ export default class DynastyTreePlugin extends Plugin implements TreeHost, Setti
 		const hidden = [...this.views].filter((v) => v.offScreen);
 		for (const v of [...this.views]) if (!hidden.includes(v)) v.onSettingsChange(prev);
 		hidden.forEach((v, i) => {
-			const t = setTimeout(() => {
+			const t = window.setTimeout(() => {
 				this.redrawTimers.delete(t);
 				v.onSettingsChange(prev);
 			}, i);
@@ -430,10 +535,16 @@ export default class DynastyTreePlugin extends Plugin implements TreeHost, Setti
 	}
 
 	override onunload(): void {
+		this.off = true;
 		stopJoinedWatch();
+		try {
+			this.fence.dispose();
+		} catch (e) {
+			console.error('Crown and Kin: cannot stop the note index', e);
+		}
 		this.viewerMotion();
 		this.links.stop();
-		for (const t of this.redrawTimers) clearTimeout(t);
+		for (const t of this.redrawTimers) window.clearTimeout(t);
 		this.redrawTimers.clear();
 		// Every blob URL of the pictures goes; the queue stops.
 		this.pictures.clear();
@@ -512,6 +623,8 @@ export default class DynastyTreePlugin extends Plugin implements TreeHost, Setti
 		try {
 			this.handles.renamed(oldPath, newPath);
 			renameHeights(oldPath, newPath);
+			// The relation lookups are kept by block key (note path and place): they follow the note, so no old key stays.
+			moveRelationBlocks(oldPath, newPath);
 			for (const v of this.views) v.renamed(oldPath, newPath);
 			const prefix = `${oldPath}\u0000`;
 			for (const [k, st] of [...this.looseStates]) {
@@ -542,19 +655,7 @@ export default class DynastyTreePlugin extends Plugin implements TreeHost, Setti
 
 	/** Plugin undo (spec §6.1, D8): the last tree edit in the active note, else the last one anywhere. */
 	private async undoLastEdit(): Promise<void> {
-		try {
-			const h = this.handles.undoTarget(this.app.workspace.getActiveFile()?.path ?? null);
-			if (!h) {
-				new Notice(WRITE_TEXT.undoEmpty);
-				return;
-			}
-			const out = await h.undo();
-			if (out.ok) new Notice(WRITE_TEXT.undoDone);
-			else new Notice(out.code === 'empty' ? WRITE_TEXT.undoEmpty : out.code === 'missing' ? WRITE_TEXT.undoMissing : WRITE_TEXT.undoChanged);
-		} catch (e) {
-			console.error('Crown and Kin: cannot undo', e);
-			new Notice(WRITE_TEXT.undoChanged);
-		}
+		await undoLastEditCommand(this.app, this.handles);
 	}
 
 	/**

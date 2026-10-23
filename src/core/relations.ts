@@ -94,6 +94,13 @@
  * paths: S_i are the parents of c_i of the type of c_i's link to X; R_i are the rumoured parents of c_i
  * that are not in S_i (none when the link is adoptive); A_i is S_i plus R_i. The setting
  * `oneParentUnknown` (on by default) says if a person who lists one parent has an unknown second parent.
+ * - D293, the legal parents. A child with one birth parent and one adoptive parent who share a union of the tree (a
+ *   step-parent or second-parent adoption) has two legal parents: for a birth or an adoptive link its S_i is the birth
+ *   and the adoptive parents together (`legalParents`), so it is complete and a sibling with the same two is full
+ *   ("Adoptive brother", or "Brother" if they share a birth parent: `orderCouple` puts that parent first, and the
+ *   link to the second parent can only make a word rumoured). A full adoption by unrelated parents, a child with two
+ *   birth parents, a child with more than one adoptive parent, and a sibling who has only one of the two stay as before.
+ *   Only the sure test uses the legal parents; the second test and its choices count the birth and rumoured parents.
  * - The sure test. A child is incomplete if its link is not adoptive, S_i has fewer than two people, and
  *   the setting is on or the child has a rumoured parent who is not also a birth parent. The pair is full only if S1 equals S2 and
  *   neither child is incomplete. A rumoured parent is never in the S_i of a birth link. The finder's
@@ -144,6 +151,7 @@
 
 import { deepFreeze, lockMap } from './deep-freeze';
 import { deriveFamilies, drawnParentMap, type DrawnParent, type FamilyGraph, type FamilyUnion } from './derive';
+import { legalParents, orderCouple } from './legal-parents';
 import { CURLY_APOSTROPHE } from './quote';
 import { sameList } from './same-list';
 import { ordinal } from './succession-keys';
@@ -593,7 +601,7 @@ class Kin {
 	private readonly belowMemo = new Map<number, Map<number, number>>();
 	/** `below` maps of the other people, by `v * n + t`; emptied for each new second person. */
 	private readonly belowScratch = new Map<number, Map<number, number>>();
-	/** `parentsOfType` results by `child * 4 + type`. */
+	/** `parentsOfType` results by `(child * 4 + type) * 2 + plain`. */
 	private readonly typedParents = new Map<number, { list: number[]; sig: string }>();
 	/** `counted` results by `child * 2 + (adoptive ? 1 : 0)`. */
 	private readonly countedMemo = new Map<number, Counted>();
@@ -722,14 +730,13 @@ class Kin {
 		return this.up[child].find((l) => l.p === parent)?.type ?? 'birth';
 	}
 
-	/** The parents of `child` whose link has `type`, in `drawnParents` order, and the same set as a sorted text (kept). */
-	parentsOfType(child: number, type: ParentType): { list: number[]; sig: string } {
-		const key = child * 4 + PARENT_TYPES.indexOf(type);
+	/** The parents of `child` whose link has `type`, in `drawnParents` order, and the same set as a sorted text (kept). A birth or adoptive link gives the legal parents of D293 when the child has them, unless `plain` (the second test counts birth and rumoured parents). */
+	parentsOfType(child: number, type: ParentType, plain = false): { list: number[]; sig: string } {
+		const key = (child * 4 + PARENT_TYPES.indexOf(type)) * 2 + (plain ? 1 : 0);
 		let out = this.typedParents.get(key);
 		if (!out) {
-			const list = [...new Set(this.drawn[child].filter((l) => l.type === type).map((l) => l.p))];
-			out = { list, sig: [...list].sort((i, j) => i - j).join(',') };
-			this.typedParents.set(key, out);
+			const list = (plain ? undefined : legalParents(this.drawn[child], type, (a, b) => this.sharesUnion(a, b))) ?? [...new Set(this.drawn[child].filter((l) => l.type === type).map((l) => l.p))];
+			this.typedParents.set(key, (out = { list, sig: [...list].sort((i, j) => i - j).join(',') }));
 		}
 		return out;
 	}
@@ -765,7 +772,7 @@ class Kin {
 		const key = child * 2 + (adoptive ? 1 : 0);
 		let out = this.countedMemo.get(key);
 		if (!out) {
-			const sure = this.parentsOfType(child, adoptive ? 'adoptive' : 'birth');
+			const sure = this.parentsOfType(child, adoptive ? 'adoptive' : 'birth', true);
 			const rumoured = adoptive ? [] : this.upAll[child].filter((l) => l.type === 'rumoured' && !sure.list.includes(l.p)).map((l) => l.p);
 			const text = (list: number[]) => [...list].sort((i, j) => i - j).join(',');
 			const allList = [...sure.list, ...rumoured];
@@ -1262,7 +1269,7 @@ class Kin {
 		const t1 = this.typeOf(c1, x);
 		const own = this.parentsOfType(c1, t1);
 		const half = this.isHalf(c1, t1, c2, this.typeOf(c2, x));
-		return half ? { half, couple: [x], key: `H:${x}:${a}:${b}` } : { half, couple: own.list, key: `F:${own.sig}:${a}:${b}` };
+		return half ? { half, couple: [x], key: `H:${x}:${a}:${b}` } : { half, couple: orderCouple(own.list, (v) => RANK[this.typeOf(c1, v)], (v) => RANK[this.typeOf(c2, v)]), key: `F:${own.sig}:${a}:${b}` };
 	}
 
 	/**
@@ -1400,14 +1407,15 @@ class Kin {
 	/** "rumoured" if a link of the line is rumoured, else "adoptive" if one is adoptive, else "birth". */
 	private wordOf(pathF: number[], pathP: number[], y: number): Blood['word'] {
 		let adoptive = false;
-		const check = (child: number, parent: number) => {
+		// The link to the second member of the couple can only make the word rumoured: with the legal parents of D293 it can be adoptive while the first member's links are birth, and the word stays "Brother".
+		const check = (child: number, parent: number, second = false) => {
 			const t = this.typeOf(child, parent);
-			if (t === 'adoptive') adoptive = true;
+			adoptive ||= t === 'adoptive' && !second;
 			return t === 'rumoured';
 		};
 		for (const path of [pathF, pathP]) {
 			for (let i = 0; i + 1 < path.length; i++) if (check(path[i], path[i + 1])) return 'rumoured';
-			if (y >= 0 && path.length >= 2 && check(path[path.length - 2], y)) return 'rumoured';
+			if (y >= 0 && path.length >= 2 && check(path[path.length - 2], y, true)) return 'rumoured';
 		}
 		return adoptive ? 'adoptive' : 'birth';
 	}
@@ -1776,7 +1784,7 @@ class Kin {
 	chain(f: number, t: number): Walk | undefined {
 		const n = this.ids.length;
 		const prev = new Int32Array(n).fill(-1);
-		const via: (Edge | undefined)[] = new Array(n);
+		const via = new Array<Edge | undefined>(n);
 		prev[f] = f;
 		const queue = [f];
 		for (let head = 0; head < queue.length && prev[t] < 0; head++) {

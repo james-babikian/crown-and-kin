@@ -11,8 +11,9 @@
  */
 
 import type { TreeDates } from './dates';
-import { drawnParentMap, partnerOf, type DrawnParent, type FamilyGraph } from './derive';
+import { drawnParentMap, type DrawnParent, type FamilyGraph } from './derive';
 import { isDead, readInherit, readRule, resolveSpouse, type InheritRule, type InheritThrough, type SpouseWorld, type SuccessionRule } from './succession-keys';
+import { firstHolderOf, spouseWorldOf } from './succession-first';
 import { bornNoYear, dateRows, deathNotes, findRuler, fitsTwoCalendars, lineYear, makeLife, missingBirthYears, personTexts, yearNotes, type DateText, type DateWarningRow, type Life, type NoYearRow, type YearReader } from './succession-dates';
 import type { Holder, Person, Title } from './types';
 
@@ -184,7 +185,7 @@ export function successionLine(g: FamilyGraph, title: Title, spec: SuccessionSpe
 	// The date texts the line reads: the title year and the holder texts. People are added below.
 	const texts: DateText[] = [...(spec.year !== undefined ? [{ text: spec.year, what: 'year' as const }] : []), ...found.reads];
 	if (rIdx < 0) return { ...empty('no-ruler', Y, yearFrom, yearText), noYear, dateWarnings: dateRows(dates, texts) };
-	const ruler = entries[rIdx].person !== undefined && g.byId.has(entries[rIdx].person!) ? entries[rIdx].person! : undefined;
+	const ruler = entries[rIdx].person !== undefined && g.byId.has(entries[rIdx].person) ? entries[rIdx].person : undefined;
 	if (ruler === undefined) return { ...empty('ruler-not-in-tree', Y, yearFrom, yearText), noYear, dateWarnings: dateRows(dates, texts) };
 	const X: string = ruler;
 
@@ -220,9 +221,9 @@ export function successionLine(g: FamilyGraph, title: Title, spec: SuccessionSpe
 
 	// The rule line.
 	const rule = spec.rule;
-	// L.2: the first holder is the first entry, in list order, whose person is in the tree; D195: its spouse if the entry has the key.
-	const firstIdx = spec.body ? entries.findIndex((e) => e.person !== undefined && g.byId.has(e.person)) : -1;
-	const firstHolder = firstIdx >= 0 ? spouseAt.get(firstIdx) ?? entries[firstIdx].person : undefined;
+	// L.2: the first holder, only read when the switch is on.
+	const bodyFirst = spec.body ? firstHolderOf(g, entries, spouseAt) : null;
+	const firstHolder = bodyFirst?.id;
 	// Who held the title (an open branch needs none of them), who the climb follows, and who is never in the line (S2, D195).
 	const hold = holdersOf(g, entries, rIdx, R, X, spouseAt, coRulers);
 	const engine = rule ? makeEngine(g, entries, spec, rule, R, Y, life, excluded, firstHolder, youngDeathAge, hold, spouseAt, yr) : undefined;
@@ -275,9 +276,9 @@ export function successionLine(g: FamilyGraph, title: Title, spec: SuccessionSpe
 	const notes: SuccessionNote[] = [];
 	if (spouseAt.has(rIdx)) notes.push({ kind: 'through-spouse', params: { holder: X, spouse: R } });
 	if (coRulers.length) notes.push({ kind: 'co-rulers-not-in-line', params: {} });
-	if (engine && firstHolder !== undefined && firstIdx > 0) {
+	if (engine && bodyFirst && bodyFirst.index > 0) {
 		const skipped = entries[0];
-		notes.push({ kind: 'body-skipped', params: { first: firstHolder, entry: skipped.name ?? skipped.person ?? '' } });
+		notes.push({ kind: 'body-skipped', params: { first: bodyFirst.id, entry: skipped.name ?? skipped.person ?? '' } });
 	}
 	if (engine) notes.push(...yearNotes(dates.ready, engine.notes(new Set(heirs))));
 	// Spec §14 rule 5: a death date with no year, for the people the line meets (the note names the text that gives Y).
@@ -306,20 +307,6 @@ export function successionLine(g: FamilyGraph, title: Title, spec: SuccessionSpe
 		notes,
 		dateWarnings: dateRows(dates, texts, life.texts()),
 		...(engine && firstHolder !== undefined ? { firstHolder } : {}),
-	};
-}
-
-/** The partners and the birth and adoptive parents of the family graph, in the form the partner choice reads (spec §13.21 rule 13a). */
-function spouseWorldOf(g: FamilyGraph): SpouseWorld {
-	const drawn = drawnParentMap(g);
-	return {
-		partners: (id) =>
-			(g.unionsOf.get(id) ?? []).map((key) => {
-				const fu = g.unionByKey.get(key)!;
-				return { id: partnerOf(fu, id), type: fu.type };
-			}),
-		claimParents: (id) => [...new Set((drawn.get(id) ?? []).filter((d) => d.type === 'birth' || d.type === 'adoptive').map((d) => d.id))],
-		exists: (id) => g.byId.has(id),
 	};
 }
 

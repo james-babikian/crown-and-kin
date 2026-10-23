@@ -4,7 +4,7 @@ import { parseDynasty } from '../../src/core/parse';
 import { deriveFamilies } from '../../src/core/derive';
 import * as edit from '../../src/core/yaml-edit';
 import { golden } from './golden';
-import { nextIdFor } from '../helpers';
+import { nextIdFor } from '../support/helpers';
 import { fixtureSource } from './load';
 import { layOut } from './pipeline';
 

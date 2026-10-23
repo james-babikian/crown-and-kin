@@ -4,12 +4,18 @@
  * elsewhere (a sync, another window) is never overwritten. The window does the file work: it gives this function the text that the note holds at the moment of the write.
  */
 
-import { CALENDAR_LANGUAGE } from '../core/block-locate';
+import { CALENDAR_LANGUAGE, findBlocks } from '../core/block-locate';
 import { planWrite } from '../core/block-write';
 import { editCalendarBlock, type CalendarOp } from '../core/calendar-block';
 
 /** The first text of a new calendar note: one block with no calendar. */
 export const NEW_NOTE_TEXT = '```kin-calendar\ncalendars: []\n```\n';
+
+/** `text` with one empty `kin-calendar` block after its last text line (a named note that holds no block yet gets its calendars there, D289). */
+export function appendBlock(text: string): string {
+	const gap = text === '' || text.endsWith('\n\n') ? '' : text.endsWith('\n') ? '\n' : '\n\n';
+	return `${text}${gap}${NEW_NOTE_TEXT}`;
+}
 
 /** The result of the write: the new note text, or why there is none. `stale`: a block is not the one that the window loaded. `reason` is a sentence of the core, for the user. */
 export type CalendarWrite = { ok: true; text: string } | { ok: false; code: 'stale' | 'rejected'; reason?: string };
@@ -20,10 +26,17 @@ export type CalendarWrite = { ok: true; text: string } | { ok: false; code: 'sta
  */
 export function writeCalendars(text: string, loaded: readonly string[], plan: readonly { block: number; ops: readonly CalendarOp[] }[]): CalendarWrite {
 	let out = text;
+	let bodies = loaded;
+	// A note that held no block when the window loaded it gets one now. A block that came meanwhile (a sync) makes the window stale instead.
+	if (!loaded.length && plan.length) {
+		if (findBlocks(text, CALENDAR_LANGUAGE).length) return { ok: false, code: 'stale' };
+		out = appendBlock(text);
+		bodies = findBlocks(out, CALENDAR_LANGUAGE).map((b) => b.body);
+	}
 	// The sentence of the core for a refused edit; another reason (an exception) is not a text for the user.
 	let said: string | undefined;
 	for (const { block, ops } of plan) {
-		const body = loaded[block];
+		const body = bodies[block];
 		const result = planWrite(
 			out,
 			block,

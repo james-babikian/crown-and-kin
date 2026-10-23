@@ -233,7 +233,7 @@ describe('isPan / PAN_THRESHOLD (spec §7.2 "8 px movement threshold")', () => {
 
 	it('a movement of exactly 8 px is still a tap, not a pan', () => {
 		// isPan uses a strict `>` against PAN_THRESHOLD in the existing code (see
-		// tests/render-view-math.test.ts, "treats a movement of 8 px or less as a tap"), so 8 px
+		// tests/render/render-view-math.test.ts, "treats a movement of 8 px or less as a tap"), so 8 px
 		// itself lands on the tap side of the boundary, and 8.1 px is the first value that pans.
 		expect(isPan(PAN_THRESHOLD, 0)).toBe(false);
 		expect(isPan(0, PAN_THRESHOLD)).toBe(false);

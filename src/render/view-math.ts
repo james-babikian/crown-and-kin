@@ -415,7 +415,7 @@ export function pathBox(d: string, pad = 0): Rect | null {
 		}
 		if (i === start) return null;
 		const v = Number(d.slice(start, i));
-		if (v !== v) return null;
+		if (Number.isNaN(v)) return null;
 		if (cmd === 72) {
 			if (minY === Infinity) return null;
 			if (v < minX) minX = v;

@@ -135,6 +135,15 @@ body {
 	}
 }
 
+/*
+ * A tree with very many cards (D285, `src/obsidian/move-layer.ts`) keeps no layer, also not in a pinch: the browser's layer builder took most of every
+ * frame of a pan or pinch on a tree of thousands of people. The view sets the class on the canvas. The pinch still moves the wrapper by its transform.
+ */
+.dynasty-full .dynasty-canvas.dynasty-big-tree,
+.dynasty-canvas.dynasty-gesture.dynasty-big-tree {
+	will-change: auto;
+}
+
 .dynasty-banner {
 	margin: 0 0 var(--size-4-2) 0;
 }
@@ -1098,6 +1107,14 @@ body.is-phone,
 	background: var(--background-modifier-hover);
 }
 
+/* A row of a list that has the keyboard focus shows the same ring as a toolbar button (G5 0.4, WCAG 2.4.7): the rule above takes the theme's button shadow away. */
+.dynasty-popover .dynasty-popover-item:focus-visible,
+.dynasty-popover .dynasty-problem-button:focus-visible {
+	outline: 2px solid var(--interactive-accent);
+	outline-offset: -2px;
+	box-shadow: inset 0 0 0 4px var(--text-normal);
+}
+
 /* A row of a menu: its icon in a column of its own, then its text, every row from the same left edge (D212, more-menu-align; a theme centres the text of a button). */
 .dynasty-popover .dynasty-popover-item.dynasty-more-item {
 	display: flex;
@@ -1410,9 +1427,19 @@ body.is-phone,
 	pointer-events: none;
 }
 
-/* The hint labels stay in the tree (no element is added after the draw); hidden while they count nobody. */
+/*
+ * The hint labels stay in the tree (no element is added after the draw); hidden while they count nobody. A hidden label stays in the layout as an empty,
+ * absolutely placed box and is hidden by `visibility`: to take it out with `display: none` and back made the browser lay out all the SVG text again
+ * (D285: 1 to 4 s at the first pan of a tree of thousands of people, on the phone profile).
+ */
 .dynasty-hint-slot:not(.dynasty-hint) {
-	display: none;
+	position: absolute;
+	visibility: hidden;
+	width: 0;
+	height: 0;
+	padding: 0;
+	border: 0;
+	overflow: hidden;
 }
 
 .dynasty-hint-up {
@@ -1421,6 +1448,12 @@ body.is-phone,
 
 .dynasty-hint-down {
 	bottom: var(--dynasty-hint-bottom, var(--size-4-1));
+}
+
+/* G5 0.4: a card in the right corner; the hint stands in the left corner, with the same gap to the edge. */
+.dynasty-hint.is-left {
+	right: auto;
+	left: var(--size-4-2);
 }
 
 @container (max-width: 420px) {
@@ -2427,6 +2460,13 @@ body.theme-dark .dynasty-house-dot {
 	transform: rotate(-45deg) translate(1px, -1px);
 }
 
+/* The keyboard ring of the window's buttons (G5 0.4, WCAG 2.4.7): the rule above takes the theme's own focus shadow away. */
+.dynasty-sheet .dynasty-check input[type='checkbox']:focus-visible {
+	outline: 2px solid var(--background-modifier-border-focus);
+	outline-offset: 1px;
+	box-shadow: 0 0 0 2px var(--interactive-accent);
+}
+
 .dynasty-sheet .dynasty-check input[type='checkbox']:disabled {
 	opacity: 0.5;
 	cursor: not-allowed;
@@ -3197,6 +3237,14 @@ body.theme-dark .dynasty-house-dot {
 
 .modal.dynasty-choice.is-phone {
 	width: 100vw;
+}
+
+/* G5 0.4: the title of a choice is its question, and the undo question names a note: on the phone bar it wraps and shows whole. */
+.dynasty-choice .dynasty-bar .dynasty-bar-title {
+	white-space: normal;
+	overflow-wrap: anywhere;
+	text-overflow: clip;
+	padding: 6px 0;
 }
 
 .dynasty-choice-text {
@@ -4575,13 +4623,21 @@ body.dynasty-fullscreen-open .popover.hover-popover {
 	box-shadow: inset 0 0 0 1px var(--background-modifier-border);
 	color: var(--text-on-accent);
 	cursor: pointer;
+	/* No grey flash under the finger on a phone (owner's iPhone, 0.4): the tap highlight and the pressed style of a button do not paint over the colour. */
+	-webkit-tap-highlight-color: transparent;
+	transition: none;
+}
+
+.dynasty-sheet .dynasty-swatch:is(:hover, :active, :focus) {
+	background: var(--dynasty-house-color);
 }
 
 .dynasty-sheet .dynasty-swatch.is-selected {
 	box-shadow: inset 0 0 0 2px var(--modal-background, var(--background-primary)), inset 0 0 0 4px var(--text-normal);
 }
 
-.dynasty-sheet .dynasty-swatch.is-other {
+.dynasty-sheet .dynasty-swatch.is-other,
+.dynasty-sheet .dynasty-swatch.is-other:is(:hover, :active, :focus) {
 	background: conic-gradient(red, gold, green, dodgerblue, purple, red);
 }
 
@@ -4601,21 +4657,30 @@ body.dynasty-fullscreen-open .popover.hover-popover {
 	filter: drop-shadow(0 0 1px var(--background-modifier-cover));
 }
 
-/* The system colour window is opened by the last swatch; its input stays in the page but takes no room. */
+/*
+ * The system colour window opens from the last swatch. Its input lies over the swatch, unseen, and takes a tap or a click itself: iOS opens the
+ * window only for a tap on the input, never from code (G5 0.4). The swatch below keeps the look and is the control for the keyboard.
+ * The selector outranks the 88 px colour field of the person window (10-edit-sheet.css), so the input has the size of the swatch and no tap beside it opens the window.
+ */
 .dynasty-house-other {
 	position: relative;
 	display: inline-flex;
 }
 
-.dynasty-sheet .dynasty-house-other-input {
+.modal.dynasty-sheet input[type='color'].dynasty-house-other-input {
 	position: absolute;
-	left: 0;
-	top: 0;
-	width: 28px;
-	height: 28px;
+	inset: 0;
+	z-index: 1;
+	width: 100%;
+	height: 100%;
 	min-height: 0;
+	margin: 0;
+	padding: 0;
+	border: 0;
+	border-radius: 50%;
 	opacity: 0;
-	pointer-events: none;
+	pointer-events: auto;
+	cursor: pointer;
 }
 
 .dynasty-sheet.is-phone .dynasty-swatch,

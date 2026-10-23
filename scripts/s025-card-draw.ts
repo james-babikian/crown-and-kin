@@ -1,6 +1,6 @@
 // 0.2.5 WP-B6: one function that draws a sample tree the way the saved picture does, with the Roundel (top to bottom) or the
 // sideways text card, the plate on or off, in the light or the dark palette. The spike pictures (an internal script) and the golden
-// hashes (`tests/s025-card-hashes.test.ts`, `scripts/s025-record-hashes.ts`) both call it, so a picture that a person looks at is
+// hashes (`tests/scripts/s025-card-hashes.test.ts`, `scripts/s025-record-hashes.ts`) both call it, so a picture that a person looks at is
 // exactly the picture that a hash protects. It uses the same steps as `makePicture` in `save-picture.ts`: card form, `measuredLayout`, `renderSvg`.
 import { deriveFamilies, type FamilyGraph } from '../src/core/derive';
 import { parseDynasty } from '../src/core/parse';
