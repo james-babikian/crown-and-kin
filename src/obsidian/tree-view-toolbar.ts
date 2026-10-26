@@ -143,7 +143,7 @@ export abstract class TreeViewToolbar extends TreeViewPictures {
 		const kind = this.barKind();
 		let add = bar.querySelector<HTMLElement>('.dynasty-add-person');
 		if (canAdd && !add) {
-			add = bar.createEl('button', { cls: ['clickable-icon', 'dynasty-tool', 'dynasty-add-person'], attr: { 'aria-label': this.listMode ? PHONE_LIST_UI.addPersonLabel : ADD_UI.addPerson, type: 'button' } });
+			add = bar.createEl('button', { cls: ['clickable-icon', 'dynasty-tool', 'dynasty-add-person'], attr: { 'aria-label': ADD_UI.addPerson, type: 'button' } });
 			setIcon(add.createSpan({ cls: 'dynasty-tool-icon' }), 'user-plus');
 			if (kind === 'desktop') {
 				add.addClass('dynasty-tool-main');

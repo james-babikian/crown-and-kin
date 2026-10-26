@@ -67,6 +67,12 @@ export abstract class EditSheetFamily extends EditSheetForm {
 		if (p?.sobriquet) title.createSpan({ cls: 'dynasty-sob', text: ` ${quotedSobriquet(p.sobriquet)}` });
 	}
 
+	/** The text of `rowName` as one string, for the spoken name of a row (WCAG 2.5.3: the visible text, in order). */
+	protected rowNameText(id: string): string {
+		const p = this.data.g.byId.get(id);
+		return `${p?.name || id}${p?.sobriquet ? ` ${quotedSobriquet(p.sobriquet)}` : ''}`;
+	}
+
 	/** The relation word that a person row shows (D215), or undefined; the row's screen-reader name holds the same word. */
 	protected relationWord(id: string): { text: string } | undefined {
 		const me = this.me();
@@ -89,9 +95,14 @@ export abstract class EditSheetFamily extends EditSheetForm {
 		const me = this.me();
 		const word = this.relationWord(id);
 		if (me && word) sub.createEl(id === me ? 'b' : 'i', { text: word.text });
-		const p = this.data.g.byId.get(id);
-		const dates = p ? dateLine(p, this.data.g.dates) : '';
+		const dates = this.rowDates(id);
 		if (dates) sub.appendText(`${word ? ' · ' : ''}${dates}`);
+	}
+
+	/** The years that a person row shows under the name; empty when the person has none. */
+	protected rowDates(id: string): string {
+		const p = this.data.g.byId.get(id);
+		return (p ? dateLine(p, this.data.g.dates) : '') || '';
 	}
 
 	protected personRowLead(row: HTMLElement, id: string): void {
@@ -119,16 +130,18 @@ export abstract class EditSheetFamily extends EditSheetForm {
 		const kids = this.childrenOf();
 		if (!kids.length) children.createDiv({ cls: ['dynasty-sheet-none', 'dynasty-family-empty'], text: WINDOW_UI.noChildren });
 		for (const kid of kids) {
-			const name = kid.name || kid.id;
 			const r = buildRow(children, {
 				tap: () => this.openPerson(kid.id),
-				label: WINDOW_UI.openPersonLabel(name, this.relationWord(kid.id)?.text),
+				label: WINDOW_UI.openPersonLabel(this.rowNameText(kid.id), this.relationWord(kid.id)?.text, this.rowDates(kid.id)),
 				cls: 'dynasty-family-row',
 				attr: { 'data-child': kid.id },
 				lead: (row) => this.personRowLead(row, kid.id),
 			});
 			r.title.addClass('dynasty-family-name');
 			this.rowName(r.title, kid.id);
+			// A space after the name: both lines are blocks, so it shows nothing, but a tool that reads the visible text (axe, WCAG 2.5.3) would
+			// join the name and the years into one word, and then no spoken name could hold that text in order.
+			r.title.appendText(' ');
 			this.rowSub(r.sub, kid.id);
 		}
 

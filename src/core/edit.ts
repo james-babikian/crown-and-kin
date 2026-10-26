@@ -140,12 +140,12 @@ export interface AddUnion {
 	end?: string;
 }
 
-/** Sets or clears the type, start or end of an existing union. */
+/** Sets or clears the type, start, end or ended-by of an existing union. */
 export interface EditUnion {
 	kind: 'edit-union';
 	union: UnionRef;
-	/** `null` removes the key (for `type`: back to the default, marriage). */
-	fields: Partial<Record<'type' | 'start' | 'end', string | null>>;
+	/** `null` removes the key (for `type`: back to the default, marriage). `ended-by` takes `divorce`, `annulment` or `death` (D306). */
+	fields: Partial<Record<'type' | 'start' | 'end' | 'ended-by', string | null>>;
 }
 
 /** Remove only the union item (D5, §6.7). Children keep both parents. */

@@ -6,25 +6,35 @@ import { computeRelations, type Relation, type RelationOptions } from '../../src
 import { cardRelationText } from '../../src/render/tree-info';
 
 export type Sex = 'm' | 'f' | '-';
-export interface Pp { id: string; sex: Sex; parents: string[] } // parents as "id" or "id:type"
+export interface Pp { id: string; sex: Sex; parents: string[]; born?: string } // parents as "id" or "id:type"
+/** 0.5 (1a): what a union has besides its type: why it ended, and the years the words compare. */
+export interface UnionYears { endedBy?: string; start?: string; end?: string }
 export class T {
 	people = new Map<string, Pp>();
-	unions: string[][] = [];
+	unions: { pair: string[]; type?: string; years?: UnionYears }[] = [];
 	add(id: string, sex: Sex, parents: string[] = []) {
 		this.people.set(id, { id, sex, parents });
 		return id;
 	}
-	union(a: string, b: string, type?: string) { this.unions.push(type ? [a, b, type] : [a, b]); }
+	union(a: string, b: string, type?: string, years?: UnionYears) { this.unions.push({ pair: [a, b], type, years }); }
 	graph(): FamilyGraph {
 		const out = ['people:'];
 		for (const p of this.people.values()) {
 			out.push(`  - id: ${p.id}`, `    name: ${p.id}`);
 			if (p.sex !== '-') out.push(`    sex: ${p.sex}`);
+			if (p.born) out.push(`    born: '${p.born}'`);
 			if (p.parents.length) out.push(`    parents: [${p.parents.map((s) => { const [i, t] = s.split(':'); return t ? `{id: ${i}, type: ${t}}` : i; }).join(', ')}]`);
 		}
 		if (this.unions.length) {
 			out.push('unions:');
-			for (const u of this.unions) out.push(u[2] ? `  - {partners: [${u[0]}, ${u[1]}], type: ${u[2]}}` : `  - partners: [${u[0]}, ${u[1]}]`);
+			for (const u of this.unions) {
+				const parts = [`partners: [${u.pair.join(', ')}]`];
+				if (u.type) parts.push(`type: ${u.type}`);
+				if (u.years?.start) parts.push(`start: '${u.years.start}'`);
+				if (u.years?.end) parts.push(`end: '${u.years.end}'`);
+				if (u.years?.endedBy) parts.push(`ended-by: ${u.years.endedBy}`);
+				out.push(`  - {${parts.join(', ')}}`);
+			}
 		}
 		const r = parseDynasty(out.join('\n') + '\n');
 		if (!r.ok) throw new Error(r.error.code + '\n' + out.join('\n'));
@@ -120,25 +130,31 @@ export function relationUniverse(N: number): string[] {
 		if (!blood(t, v, a, b, sx)) continue;
 		note(relsOf(t, 'ME', 'P'));
 	}
+	// The marriage of the rules below: open, divorced ("former", D307) or, with years, too short to hold a step word (D304: the possessive form).
+	const marriages: ({ endedBy?: string } & UnionYears | undefined)[] = [undefined, { endedBy: 'divorce' }, { start: '1100', end: '1110' }, { start: '1100', end: '1110', endedBy: 'divorce' }];
+	// The people whose life a step word reads: born after the marriage ended, so the years remove the step word (D304).
+	const late = (t: T, ids: string[]) => { for (const id of ids) if (t.people.has(id)) t.people.get(id)!.born = '1140'; };
 	// rule 1: P is the spouse of R, R a blood relative of ME
 	const v1: Variant[] = ['full', 'half', 'adopt', 'rum', 'double', 'rum-half'];
-	for (let a = 0; a <= N; a++) for (let b = 0; b <= N; b++) for (const v of v1) for (const sxR of ['m', 'f'] as Sex[]) for (const sxP of sexes) {
+	for (let a = 0; a <= N; a++) for (let b = 0; b <= N; b++) for (const v of v1) for (const sxR of ['m', 'f'] as Sex[]) for (const sxP of sexes) for (const years of marriages) {
 		const t = new T();
 		if (!blood(t, v, a, b, sxR, 'ME', 'R')) continue;
-		t.add('P', sxP); t.union('R', 'P');
+		t.add('P', sxP); t.union('R', 'P', undefined, years);
+		if (years?.end) late(t, ['ME', 'ME_1']);
 		note(relsOf(t, 'ME', 'P'));
 	}
 	// rule 2: P is a blood relative of ME's spouse S
-	for (let a = 0; a <= N; a++) for (let b = 0; b <= N; b++) for (const v of v1) for (const sxS of sexes) for (const sxP of sexes) {
+	for (let a = 0; a <= N; a++) for (let b = 0; b <= N; b++) for (const v of v1) for (const sxS of sexes) for (const sxP of sexes) for (const years of marriages) {
 		const t = new T();
 		if (!blood(t, v, a, b, sxP, 'S', 'P')) continue;
 		t.people.get('S')!.sex = sxS;
-		t.add('ME', '-'); t.union('ME', 'S');
+		t.add('ME', '-'); t.union('ME', 'S', undefined, years);
+		if (years?.end) late(t, ['P', 'P_1']);
 		note(relsOf(t, 'ME', 'P'));
 	}
 	// partners, wards, step-sibling, you
-	for (const sx of sexes) for (const type of ['marriage', 'betrothal', 'concubinage', 'affair', 'partnership', 'x']) {
-		const t = new T(); t.add('ME', '-'); t.add('P', sx); t.union('ME', 'P', type);
+	for (const sx of sexes) for (const type of ['marriage', 'betrothal', 'concubinage', 'affair', 'partnership', 'x']) for (const endedBy of [undefined, 'divorce']) {
+		const t = new T(); t.add('ME', '-'); t.add('P', sx); t.union('ME', 'P', type, endedBy ? { endedBy } : undefined);
 		note(relsOf(t, 'ME', 'P'));
 	}
 	for (const sx of sexes) {
@@ -148,8 +164,10 @@ export function relationUniverse(N: number): string[] {
 		note(relsOf(g1, 'ME', 'P'));
 		const g2 = new T(); g2.add('P', sx, ['ME:ward']); g2.add('ME', '-');
 		note(relsOf(g2, 'ME', 'P'));
-		const s = new T(); s.add('N', 'm'); s.add('Q', 'f'); s.union('N', 'Q'); s.add('ME', '-', ['N']); s.add('P', sx, ['Q']);
-		note(relsOf(s, 'ME', 'P'));
+		for (const endedBy of [undefined, 'divorce']) {
+			const s = new T(); s.add('N', 'm'); s.add('Q', 'f'); s.union('N', 'Q', undefined, endedBy ? { endedBy } : undefined); s.add('ME', '-', ['N']); s.add('P', sx, ['Q']);
+			note(relsOf(s, 'ME', 'P'));
+		}
 	}
 	rows.add('You');
 	return [...rows];

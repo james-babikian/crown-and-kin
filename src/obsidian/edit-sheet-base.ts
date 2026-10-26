@@ -18,7 +18,7 @@ import type { RelationOptions } from '../core/relations';
 import type { FlowHost, NewRelation } from './family-flows';
 import { ignoreGhostClick, phoneLayout } from './modal-layout';
 import type { PictureCopy, PictureStore } from './picture-store';
-import { showErrorLine } from './sheet-parts';
+import { revealFocused as revealInWindow, showErrorLine } from './sheet-parts';
 import type { RelationView } from './sheet-relation';
 import type { TitlesHost } from './sheet-titles';
 import type { Shell } from './window-shell';
@@ -408,12 +408,7 @@ export abstract class EditSheetBase extends Modal {
 	}
 
 	protected revealFocused(delay = 0): void {
-		const run = () => {
-			const a = this.modalEl.doc.activeElement as HTMLElement | null;
-			if (a && this.contentEl.contains(a) && a.matches('input, select, textarea')) a.scrollIntoView({ block: 'nearest' });
-		};
-		if (delay) (this.modalEl.win ?? window).setTimeout(run, delay);
-		else run();
+		revealInWindow(this.modalEl, this.contentEl, delay);
 	}
 
 	protected showError(text: string): void {

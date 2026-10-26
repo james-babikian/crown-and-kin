@@ -292,6 +292,16 @@ function bestHits(raw: Hit[]): Hit[] {
 const WINNER = new WeakMap<ReadDate, Compiled>();
 
 /**
+ * The calendar reads whose text is only the date: the match starts at the first character, ends at the last one (no second number of a
+ * range was skipped), and every matching calendar gives the same year. `exactYear` reads it. Not a part of the public shape of `ReadDate`:
+ * many tests compare a read with `toEqual`.
+ */
+const EXACT = new WeakSet<ReadDate>();
+
+/** True if the calendar read `r` is a whole date (see `EXACT`); false for every other read. */
+export const isExactCalendarRead = (r: ReadDate): boolean => EXACT.has(r);
+
+/**
  * The name written for a list in the hits of the calendars that matched (spec §14 rule 13): the first written name of any calendar that has a list of this
  * folded name, so no name is appended twice. A name written through the list of another calendar is found in the first list by its text; one
  * that the first list does not have is a wrong name.
@@ -355,6 +365,8 @@ function readCalendar(text: string, calendars: readonly Compiled[]): ReadDate | 
 			out.warnings = unionWarnings(all);
 			if (approxBefore(t, s)) out.approx = true;
 			WINNER.set(out, first.cal);
+			// `t` is folded and trimmed, so the first character of a whole date is at 0 and its end is the end of the text.
+			if (s === 0 && hits.some((h) => !h.range && h.end === t.length)) EXACT.add(out);
 			const named = calendarNames(hits, first.year);
 			if (named) {
 				out.names = named.names;

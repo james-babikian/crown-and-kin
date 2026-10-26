@@ -1547,6 +1547,8 @@ body.is-phone,
 	overflow-y: auto;
 	overflow-x: hidden;
 	overscroll-behavior: contain;
+	/* The Cancel and Save bar is not on top of the body (a computer: the foot under it; a phone: the bar above it), so the body's own edge is enough; the air keeps the hint of a field off that edge when the field is scrolled into view. */
+	scroll-padding-bottom: 12px;
 	padding: 22px 24px 12px;
 	display: flex;
 	flex-direction: column;
@@ -5718,7 +5720,7 @@ body.dynasty-fullscreen-open .popover.hover-popover {
  * --dynasty-house-color, which the code sets on the row.
  * 0.2.8 (D197 Q5 A, D198, D209, D210, D213, G.2, G.11): the bar is the same flat row as the toolbar of a
  * computer; the person at the top has a large row with no frame and no heading over it (the name at 21 px, the relation word in italic, the title text line;
- * at the right a column with a 56 px portrait and under it the 35 px arms); the other rows have a 3 px house strip, the name at 17 px and at the right a 36 px
+ * at the right a column with a 56 px portrait and under it the 35 px arms); every row has a 3 px house strip (the large row too, D302), the name at 17 px and at the right a 36 px
  * portrait; the order is the person, Parents, Partners, Children; a missing picture leaves no place holder. "You" is bold in the text colour.
  */
 
@@ -5972,6 +5974,15 @@ body.dynasty-fullscreen-open .popover.hover-popover {
 	padding-right: 0;
 }
 
+/* The large row: the strip and the text stand in one box, so the strip is as tall as the text and does not run down beside the portrait and the arms. */
+.dynasty-list-lead {
+	display: flex;
+	flex: 1 1 auto;
+	align-items: stretch;
+	gap: 12px;
+	min-width: 0;
+}
+
 /* The house strip of a row: 3 px, short, inset (the colour only through the custom property). */
 .dynasty-list-strip {
 	flex: none;
@@ -5980,6 +5991,14 @@ body.dynasty-fullscreen-open .popover.hover-popover {
 	margin: 6px 0;
 	border-radius: 2px;
 	background: var(--dynasty-house-color, var(--background-modifier-border-hover));
+}
+
+/*
+ * A born or died date of a row is an isolate for the text direction: an Arabic word before a number would otherwise turn the whole range round in this
+ * left-to-right list ("1170–1108"). The element also has dir="auto"; the dash between the two dates stays outside.
+ */
+.dynasty-list-date {
+	unicode-bidi: isolate;
 }
 
 /* G.11: as on the cards, a house colour is lighter in the dark theme (60 % of the colour with the text colour). */

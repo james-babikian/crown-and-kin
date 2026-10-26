@@ -63,7 +63,7 @@ describe('A: the texts of the Calendars window', () => {
 		expect(T.testHint).toBe('The plugin shows the date as a plain year, for example “year 1273”.');
 		expect(T.refusalHead(1)).toBe('Correct this error:');
 		expect(T.refusalHead(2)).toBe('Correct these errors:');
-		expect(T.markerPlaceholder).toBe('For example: {planet}');
+		expect(T.markerPlaceholder).toBe('For example: planet');
 		expect(T.namesPlaceholder).toBe('For example: Saturn, Sa');
 		expect(CALENDAR_BLOCK_UI.listMarker('Planets', 'planet')).toBe('Planets, marker {planet}');
 		expect(T.cannotSaveBecause('X.')).toBe('The plugin cannot save the calendars. X. Your changes stay in this window.');

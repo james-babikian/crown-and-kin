@@ -538,7 +538,7 @@ export abstract class TreeViewScene extends TreeViewPlacement {
 				e.preventDefault();
 				this.guard(() => this.activate(id, false, e));
 			});
-			card.addEventListener('focus', () => this.guard(() => this.keyFocus() && this.revealPerson(id)));
+			card.addEventListener('focus', () => this.guard(() => this.keyFocus() && this.revealPerson(id, TreeViewBase.takeRestoreMark(card))));
 		}
 		for (const t of scene.tags) {
 			const act = (e: Event) => {
@@ -719,10 +719,10 @@ export abstract class TreeViewScene extends TreeViewPlacement {
 		return !!this.containerEl.doc?.body?.querySelector?.('.modal-container');
 	}
 
-	protected revealPerson(id: string): void {
+	protected revealPerson(id: string, restored = false): void {
 		this.fillPerson(id);
 		const box = this.laid?.layout.persons.get(id);
-		if (box) this.reveal(box);
+		if (box) this.reveal(box, false, restored);
 	}
 
 	/** The card with its `+` badge: the badge sticks out above the card's top edge, and a card is only whole on the screen when its badge is (G3 F3). */
@@ -742,9 +742,10 @@ export abstract class TreeViewScene extends TreeViewPlacement {
 	/**
 	 * A card or tag that is off screen (after an edit, or when it gets the focus with Tab) is brought into view at once. `kept` is the edit after a kept
 	 * place (D244): then only the card counts and only the bars, so a card that is whole on the screen stays where it is, even with its badge under a bar
-	 * or its edge in a side safe area.
+	 * or its edge in a side safe area. `restored` is a focus that `refocusAfterRedraw` gave back after a write (a sheet closed): the edit may have panned to a
+	 * new card, so only a card wholly off screen pans.
 	 */
-	protected reveal(box: Rect, kept = false): void {
+	protected reveal(box: Rect, kept = false, restored = false): void {
 		const pz = this.panZoom;
 		const v = pz?.view;
 		if (!pz || !v || pz.busy) return;
@@ -759,8 +760,11 @@ export abstract class TreeViewScene extends TreeViewPlacement {
 		const worldRight = v.cx + (pz.size.w / 2 - right) / v.scale;
 		const worldTop = v.cy + (top - pz.size.h / 2) / v.scale;
 		const worldBottom = v.cy + (pz.size.h / 2 - bottom) / v.scale;
-		const seen = kept ? box : this.withBadge(box);
-		const inside = seen.x >= worldLeft && seen.x + seen.w <= worldRight && seen.y >= worldTop && seen.y + seen.h <= worldBottom;
+		// The card alone for a restore: a card hidden except for its `+` badge is not in view.
+		const seen = kept || restored ? box : this.withBadge(box);
+		const inside = restored
+			? seen.x < worldRight && seen.x + seen.w > worldLeft && seen.y < worldBottom && seen.y + seen.h > worldTop
+			: seen.x >= worldLeft && seen.x + seen.w <= worldRight && seen.y >= worldTop && seen.y + seen.h <= worldBottom;
 		if (inside) return;
 		pz.setView(this.centreFree({ scale: v.scale, cx: box.x + box.w / 2, cy: box.y + box.h / 2 }), { byUser: true });
 	}

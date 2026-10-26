@@ -155,8 +155,13 @@ function hasNameOrWord(raw: string, shown: string, dates: DatesRead): boolean {
  * ("Sa–c."), so a thin space goes on each side of it. A plain range keeps the plain dash. `from` and `to` are the dates as written and as shown (with the names added).
  */
 export function dateRange(from: { raw: string; shown: string }, to: { raw: string; shown: string }, dates: DatesRead): string {
+	return `${from.shown}${rangeDash(from, to, dates)}${to.shown}`;
+}
+
+/** The dash between the two dates of a range, with a thin space on each side when a date has a name or an approximate word (see `dateRange`). */
+function rangeDash(from: { raw: string; shown: string }, to: { raw: string; shown: string }, dates: DatesRead): string {
 	const spaced = hasNameOrWord(from.raw, from.shown, dates) || hasNameOrWord(to.raw, to.shown, dates);
-	return spaced ? `${from.shown}${THIN}${DASH}${THIN}${to.shown}` : `${from.shown}${DASH}${to.shown}`;
+	return spaced ? `${THIN}${DASH}${THIN}` : DASH;
 }
 
 /** The born and died dates of a person row with their names, and the range that joins them (undefined when a date is missing): the same text as on the card. */
@@ -213,16 +218,52 @@ export function shownHolder<T extends { from?: string; to?: string }>(entry: T, 
  * A `died` that means alive (K.7: "no", "false") gives neither a death year nor the sign. A death text that fits a calendar of the
  * tree has a year, so it shows as written and not as the sign (spec §14 rule 7); `dates` reads it. `names` says which names follow a whole date (rule 15).
  */
-function dateParts(p: Person, dates: DatesRead, names: NamesForm = 'shown'): { text?: string; sign?: string } {
+function dateParts(p: Person, dates: DatesRead, names: NamesForm = 'shown'): { text?: string; sign?: string; pieces?: DatePieces } {
 	const dead = isDead(p);
 	const died = dead ? p.died : undefined;
 	const hasYear = died !== undefined && dates.read(died)?.year !== undefined;
 	const sign = dead && !hasYear ? (DOUBTFUL_DIED.includes(p.died!.trim().toLowerCase()) ? DEAD_SIGN_DOUBT : DEAD_SIGN) : undefined;
-	let text: string | undefined;
-	if (p.born && hasYear) text = dateRange({ raw: p.born, shown: shownDate(p.born, dates, names) }, { raw: died, shown: shownDate(died, dates, names) }, dates);
-	else if (p.born) text = `b. ${shownDate(p.born, dates, names)}`;
-	else if (hasYear) text = `d. ${shownDate(died, dates, names)}`;
-	return { ...(text !== undefined ? { text } : {}), ...(sign !== undefined ? { sign } : {}) };
+	let pieces: DatePieces | undefined;
+	if (p.born && hasYear) {
+		const from = { raw: p.born, shown: shownDate(p.born, dates, names) };
+		const to = { raw: died, shown: shownDate(died, dates, names) };
+		pieces = { lead: '', born: from.shown, dash: rangeDash(from, to, dates), died: to.shown };
+	} else if (p.born) pieces = { lead: 'b. ', born: shownDate(p.born, dates, names), dash: '' };
+	else if (hasYear) pieces = { lead: 'd. ', dash: '', died: shownDate(died, dates, names) };
+	const text = pieces && `${pieces.lead}${pieces.born ?? ''}${pieces.dash}${pieces.died ?? ''}`;
+	return { ...(text !== undefined ? { text } : {}), ...(sign !== undefined ? { sign } : {}), ...(pieces ? { pieces } : {}) };
+}
+
+/** The parts of the dates text before they are joined: the lead ("b. ", "d. " or nothing), the born date, the dash of a range and the died date. */
+interface DatePieces {
+	lead: string;
+	born?: string;
+	dash: string;
+	died?: string;
+}
+
+/** One part of the dates text line: a date of its own (`date`), or plain text (the lead, the dash, the sign). */
+export interface DateSegment {
+	text: string;
+	/** Set on a born or died date, which the list isolates for the text direction (an Arabic word before a number would turn the range round). */
+	date?: 'born' | 'died';
+}
+
+/**
+ * The dates text line of `dateLine` in parts: the born date and the died date each in a part of their own, the lead, the dash and the sign between them. The
+ * parts joined are exactly the text of `dateLine`. The list uses this to isolate each date for the text direction; the card keeps the plain string.
+ */
+export function dateLineParts(p: Person, dates: DatesRead, opts: { names?: NamesForm } = {}): DateSegment[] | undefined {
+	const { sign, pieces } = dateParts(p, dates, opts.names);
+	const out: DateSegment[] = [];
+	if (pieces) {
+		if (pieces.lead) out.push({ text: pieces.lead });
+		if (pieces.born !== undefined) out.push({ text: pieces.born, date: 'born' });
+		if (pieces.dash) out.push({ text: pieces.dash });
+		if (pieces.died !== undefined) out.push({ text: pieces.died, date: 'died' });
+		if (sign !== undefined) out.push({ text: ` ${sign}` });
+	} else if (sign !== undefined) out.push({ text: sign });
+	return out.length ? out : undefined;
 }
 
 /**

@@ -12,7 +12,7 @@ import type { FoldControl } from '../core/folds';
 import { sideByWalk, type ModelOrder } from '../core/order';
 import { FOLD_BADGE_EM, type FoldInput } from './fold-spots';
 import { lineMetrics, relationExtra, sideTagDepth, sidewaysPartnerGap, tallExtra } from './geometry';
-import { armsByRule, isFarCouple, type FarProbe } from './layout';
+import { armsByRule, isFarByStructure, isFarCouple, type FarProbe } from './layout';
 import type { FarCoupleRule, Geometry, LayoutSettings } from './model';
 import { familyKeyOf, soloKey, type Couple, type CoupleSpec, type Family, type FamilySpec, type Hang, type Item, type Plan, type Port, type SideLink, type Skeleton } from './plan-model';
 import { barred, forkLegs, hangRooms, markHalf, nearOf, overflowHangs, packPorts, unionPairKey, requestPorts, unitEnd, type DirOf } from './ports';
@@ -228,6 +228,15 @@ export function buildSkeleton(input: PlanInput): Skeleton {
 		const kind: CoupleSpec['kind'] = adjacent(a, b) ? 'bar' : input.farKeys?.has(fu.key) || isFarCouple(probe(a), probe(b), a.block === b.block, false, far, geo.cardW) ? 'far' : 'dot';
 		s.couples.set(fu.key, { union: fu.key, a, b, kind, legs: [] });
 	}
+	// D303, far by structure: a second loop, because `unitEnd` reads every couple of a card (the bars are all set above). The kinds are collected
+	// first and set after, so that one couple's change cannot decide the test of the next.
+	const inside: string[] = [];
+	for (const c of s.couples.values()) {
+		if (c.kind !== 'dot') continue;
+		const lower = c.a.row < c.b.row ? c.b : c.a;
+		if (isFarByStructure(probe(c.a), probe(c.b), unitEnd(s, g, lower, -1) !== lower && unitEnd(s, g, lower, 1) !== lower, far)) inside.push(c.union);
+	}
+	for (const key of inside) s.couples.get(key)!.kind = 'far';
 	passagesOf(s, g, nearOf(geo));
 	// A same-row couple that is not side by side: the partner that is not the anchor gets a leg.
 	for (const c of s.couples.values()) {

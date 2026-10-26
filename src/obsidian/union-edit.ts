@@ -1,12 +1,12 @@
 /*
- * Edit of one partnership: type, start and end (spec §6.3 Partners, Edit). It looks like the
+ * Edit of one partnership: type, start, end and, for a marriage, "Ended by" (spec §6.3 Partners, Edit; D306, D310). It looks like the
  * edit sheet and has the same commit model: Save writes (through the sheet, with the sheet's
  * draft), and the editor stays open with the message if the write fails; Cancel discards; any
  * other way to close with changes asks "Discard changes?".
  */
 
 import { setIcon, type App } from 'obsidian';
-import { UNION_TYPES } from '../core/types';
+import { ENDED_BY, isUnionType, readEndedBy, UNION_TYPES } from '../core/types';
 import { SHEET, UNION_EDIT, UNION_TYPE_TEXT } from '../render/ui-text';
 import { buildShell } from './window-shell';
 import { nameDialog, sheetField } from './sheet-parts';
@@ -17,24 +17,42 @@ export interface UnionValues {
 	type: string;
 	start: string;
 	end: string;
+	/** The value of the "Ended by" choice: '' (not known), a known value, or the text as written in the note. */
+	endedBy: string;
 }
+
+/**
+ * The choice that shows a written `ended-by`: a known value or an alias (`divorced`, `annulled`) in any letter case is its value, so the
+ * choice shows "Divorce" and no extra raw choice; text with no meaning stays as written; none is ''. The note keeps its own text,
+ * because a pick that means the same value writes nothing (`edit-sheet-writes.ts`).
+ */
+export function endedByChoice(raw: string | undefined | null): string {
+	return readEndedBy(raw) ?? (raw ?? '').trim();
+}
+
+/** D310: "Ended by" shows for a marriage and for a type word of the tree's own (drawn as a marriage); not for a betrothal, a concubinage or an affair. */
+export const showsEndedBy = (type: string): boolean => type === 'marriage' || !isUnionType(type);
 
 /** Writes the values; resolves to null after a successful write, or to the message to show. */
 export type UnionSave = (v: UnionValues) => Promise<string | null>;
 
-const same = (a: UnionValues, b: UnionValues) => a.type === b.type && a.start.trim() === b.start.trim() && a.end.trim() === b.end.trim();
+const same = (a: UnionValues, b: UnionValues) => a.type === b.type && a.start.trim() === b.start.trim() && a.end.trim() === b.end.trim() && a.endedBy === b.endedBy;
 
 class UnionEditModal extends SmallFormModal {
 	private readonly values: UnionValues;
+	private readonly initial: UnionValues;
+	private endedRow: HTMLElement | null = null;
 
 	constructor(
 		app: App,
 		private readonly pair: string,
-		private readonly initial: UnionValues,
+		initial: UnionValues,
 		private readonly save: UnionSave,
 	) {
 		super(app);
-		this.values = { ...initial };
+		// A known value or an alias in another letter case is the known choice, so Save does not rewrite it (RULES §9 item 4).
+		this.initial = { ...initial, endedBy: endedByChoice(initial.endedBy) };
+		this.values = { ...this.initial };
 	}
 
 	override onOpen(): void {
@@ -57,7 +75,10 @@ class UnionEditModal extends SmallFormModal {
 		if (!types.includes(this.values.type)) types.push(this.values.type);
 		for (const v of types) sel.createEl('option', { text: UNION_TYPE_TEXT[v] ?? SHEET.sexOther(v), attr: { value: v } });
 		sel.value = this.values.type;
-		sel.addEventListener('change', () => (this.values.type = sel.value));
+		sel.addEventListener('change', () => {
+			this.values.type = sel.value;
+			this.endedRow?.toggle(showsEndedBy(this.values.type));
+		});
 		for (const key of ['start', 'end'] as const) {
 			const f = field(UNION_EDIT[key], `union-${key}`);
 			// Free text (fictional calendars): never a numeric keyboard (spec §7.4).
@@ -68,19 +89,42 @@ class UnionEditModal extends SmallFormModal {
 				this.errorEl?.hide();
 			});
 		}
+		this.endedByField(field);
 		sel.focus();
+	}
+
+	/** The "Ended by" choice. A hidden choice keeps what the note has: hiding never changes the value (D310). */
+	private endedByField(field: (label: string, name: string) => { row: HTMLElement; id: string }): void {
+		const e = field(UNION_EDIT.ended.label, 'union-ended-by');
+		this.endedRow = e.row;
+		const wrap = e.row.createDiv({ cls: 'dynasty-select' });
+		const sel = wrap.createEl('select', { cls: ['dropdown', 'dynasty-sheet-input', 'dynasty-input'], attr: { id: e.id, 'aria-describedby': `${e.id}-hint` } });
+		setIcon(wrap.createSpan({ cls: 'dynasty-select-chevron', attr: { 'aria-hidden': 'true' } }), 'chevron-down');
+		const choices: string[] = ['', ...ENDED_BY];
+		// A value that the window does not offer stays selectable, so Save never removes or changes it by itself.
+		if (!choices.includes(this.values.endedBy)) choices.push(this.values.endedBy);
+		for (const v of choices) sel.createEl('option', { text: v === '' ? UNION_EDIT.ended.none : (Object.prototype.hasOwnProperty.call(UNION_EDIT.ended.values, v) ? UNION_EDIT.ended.values[v] : v), attr: { value: v } });
+		sel.value = this.values.endedBy;
+		sel.addEventListener('change', () => (this.values.endedBy = sel.value));
+		e.row.createDiv({ cls: ['dynasty-sheet-hint', 'is-on-focus'], text: UNION_EDIT.ended.hint, attr: { id: `${e.id}-hint` } });
+		e.row.toggle(showsEndedBy(this.values.type));
+	}
+
+	/** What Save writes: the values, with the value of a hidden "Ended by" taken from the note. */
+	private current(): UnionValues {
+		return { ...this.values, endedBy: showsEndedBy(this.values.type) ? this.values.endedBy : this.initial.endedBy };
 	}
 
 	private async write(): Promise<void> {
 		if (this.saving) return;
-		if (same(this.values, this.initial)) {
+		if (same(this.current(), this.initial)) {
 			this.finish();
 			return;
 		}
 		this.saving = true;
 		this.modalEl.addClass('is-saving');
 		try {
-			const message = await this.save({ type: this.values.type, start: this.values.start.trim(), end: this.values.end.trim() });
+			const message = await this.save({ ...this.current(), start: this.values.start.trim(), end: this.values.end.trim() });
 			if (message === null) {
 				this.finish();
 				return;
@@ -96,7 +140,7 @@ class UnionEditModal extends SmallFormModal {
 	}
 
 	protected dirty(): boolean {
-		return !same(this.values, this.initial);
+		return !same(this.current(), this.initial);
 	}
 
 	protected discardText(): string {

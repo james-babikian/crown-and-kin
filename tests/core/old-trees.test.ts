@@ -14,7 +14,7 @@
  * The other direction (old code reads new trees, W8): 0.3 adds no key to the format, so every key of a new tree is a key
  * that 0.2.8 reads. That the plugin keeps a key it does not know at every level is tested in the existing unknown-key tests
  * (for example `acceptance/title-ops.test.ts`, `acceptance/houses-ops.test.ts`, `acceptance/me-option.test.ts` and `acceptance/r027-childless.test.ts`); the tests
- * below add the keys that Format 1 reserves.
+ * below add the keys that Format 1 reserves, and a union with the key `ended-by` of 0.5.
  */
 
 import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -168,6 +168,39 @@ describe('Format 1 reserved keys survive an edit', () => {
 		const b = applyOp(a.body, { kind: 'edit-title', id: 'duchy', name: 'Duchy of Valmont' });
 		if (!b.ok) throw new Error(b.code);
 		for (const text of ['format: 2', 'numbering: roman', 'count-with: duchy', 'something-new: kept']) expect(b.body).toContain(text);
+	});
+});
+
+describe('a union with ended-by (0.5, D306) survives the ops that an older version has', () => {
+	const body = [
+		'people:',
+		'  - id: aldric',
+		'    name: Aldric',
+		'  - id: isolde',
+		'    name: Isolde',
+		'unions:',
+		'  - partners: [aldric, isolde]   # kept',
+		'    start: 1129',
+		'    ended-by: divorce',
+		'    something-new: kept',
+		'',
+	].join('\n');
+	const ref = { index: 0, partners: ['aldric', 'isolde'] as [string, string] };
+
+	it('stays after an edit of a person, and of the start, the type and the end of the union', () => {
+		const ops = [
+			{ kind: 'set-person-fields', id: 'aldric', fields: { name: 'Aldric II' } },
+			{ kind: 'edit-union', union: ref, fields: { start: '1130' } },
+			{ kind: 'edit-union', union: ref, fields: { type: 'betrothal' } },
+			{ kind: 'edit-union', union: ref, fields: { end: '1140' } },
+		] as const;
+		let text = body;
+		for (const op of ops) {
+			const r = applyOp(text, op);
+			if (!r.ok) throw new Error(r.code);
+			text = r.body;
+		}
+		for (const line of ['ended-by: divorce', 'something-new: kept', '# kept']) expect(text).toContain(line);
 	});
 });
 

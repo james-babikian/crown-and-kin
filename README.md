@@ -106,7 +106,8 @@ A tree uses a calendar only if it names a calendar note. Open the tree. Select M
 
 - **Size.** A tree of more than 1,500 people shows a bar with "Draw the tree" first. The plugin draws a whole tree of up to 5,000 people (3,000 on a phone). For a larger tree, it shows the family of one person.
 - **Embeds and Canvas.** A tree shows inside another note, in a hover preview and on a Canvas card. You cannot edit it there. Open the note of the tree.
-- **Relation words ignore the years of a marriage.** A husband who divorced still shows as "Husband". Some relations by marriage have no name. More, then Relation, then shows the steps.
+- **Relation words and years.** Only an exact year, such as 1130, changes a relation word. A text such as "c. 1130" does not. A divorce gives "Former" only if you choose "Ended by" in the partnership window, or if the end year is before the death years of both partners and all three years are exact. A date in your own calendar counts only if the tree names a calendar note. Some relations by marriage have no name. Select More, then Relation, to see the steps.
+- **Saved picture.** If a CSS snippet loads the font of your notes, a saved picture uses a standard font. A long name can then be wider than its card.
 - **No drag.** You cannot drag a card to a new place. Change the order of brothers and sisters in the person window.
 - **No import or export.** The plugin reads no GEDCOM file and makes no PDF file. To print the tree, save it as a picture.
 - **Devices.** The author tested the plugin on Windows and on an iPhone. The author did not test it on Android.

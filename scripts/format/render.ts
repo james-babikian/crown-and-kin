@@ -83,6 +83,7 @@ export function formatDoc(): string {
 		'',
 		'- A newer version reads without error every tree that an older version wrote. The sample trees of the versions 0.1.0 and 0.2.0 are part of the tests.',
 		'- The meaning of an old word can change. Since version 0.2.8, the partnership types `engaged`, `mistress`, `lover`, `liaison` and `concubine` mean a known type. Before, the plugin drew them as a marriage.',
+		'- Since version 0.5, the partnership key `ended-by` says why a marriage ended. An older version keeps the key and ignores it.',
 		'- An older version keeps the keys that it does not know when it writes the note. It does not show them. Update the plugin on all your devices.',
 		'',
 	);

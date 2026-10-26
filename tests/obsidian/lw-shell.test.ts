@@ -1269,7 +1269,8 @@ describe('keyboard reveal on a phone (D.3.4, D114)', () => {
 		openPage(w.content, 't0');
 		const ta = field(w);
 		const scroll = vi.fn();
-		ta.scrollIntoView = scroll;
+		// The whole field scrolls, so its hint is in view too (R05 look repair 1).
+		(ta.closest('.dynasty-sheet-field') ?? ta).scrollIntoView = scroll;
 		ta.focus();
 		dispatch(ta, 'focusin');
 		expect(scroll).not.toHaveBeenCalled();
@@ -1283,7 +1284,8 @@ describe('keyboard reveal on a phone (D.3.4, D114)', () => {
 		openPage(w.content, 't0');
 		const ta = field(w);
 		const scroll = vi.fn();
-		ta.scrollIntoView = scroll;
+		// The whole field scrolls, so its hint is in view too (R05 look repair 1).
+		(ta.closest('.dynasty-sheet-field') ?? ta).scrollIntoView = scroll;
 		ta.focus();
 		dispatch(ta, 'focusin');
 		runTimers(400);

@@ -1,4 +1,4 @@
-// 0.3.3 B6 (D268): the short forms of the relation text on a drawn card. The rules R1 to R3, the proof over all 4 837 card texts of the case table
+// 0.3.3 B6 (D268): the short forms of the relation text on a drawn card. The rules R1 to R3, the proof over all 8 296 card texts of the case table
 // (no collision, never wider, reverse mapping, words that never change), the cut inside a word (S2), the drawn card (saved picture and live scene,
 // each with its own measure, also after a refit), and the proof that the sheet, the screen-reader label and the lists keep the whole text.
 import { readFileSync, readdirSync } from 'node:fs';
@@ -68,7 +68,7 @@ describe('the universe of card texts', () => {
 		const fresh = relationUniverse(4);
 		expect(fresh.length).toBeGreaterThan(900);
 		expect(fresh.filter((t) => !stored.has(t))).toEqual([]);
-		expect(TEXTS).toHaveLength(4837);
+		expect(TEXTS).toHaveLength(8296);
 	});
 
 	const SUFFIXES = [MAYBE_TEXT.cardFull, MAYBE_TEXT.cardHalf];
@@ -111,7 +111,7 @@ describe('the universe of card texts', () => {
 	});
 	it('the words that never change are kept as often as they were', () => {
 		const NEVER = [
-			'half', 'full', 'maybe', 'double', 'step', '-in-law', 'by marriage', 'adoptive', 'adopted', 'rumoured', 'removed', 'cousin', 'sibling',
+			'half', 'full', 'maybe', 'double', 'step', '-in-law', 'by marriage', 'adoptive', 'adopted', 'rumoured', 'former', 'removed', 'cousin', 'sibling',
 			'husband’s', 'wife’s', 'spouse’s', 'betrothed', 'concubinage', 'lover', 'co-parent', 'guardian', 'ward', 'grand',
 		];
 		const count = (s: string, w: string) => s.toLowerCase().split(w).length - 1;
@@ -160,7 +160,7 @@ describe('fitRelation at the width of a card', () => {
 				cut++;
 			}
 		}
-		expect({ whole, shortFits, cut }).toEqual({ whole: 842, shortFits: 167, cut: 3828 });
+		expect({ whole, shortFits, cut }).toEqual({ whole: 962, shortFits: 171, cut: 7163 });
 	});
 	it('a maybe is never lost: a cut text with a maybe ends with " ?", a fitting one keeps the words', () => {
 		for (const text of TEXTS) {
@@ -170,7 +170,7 @@ describe('fitRelation at the width of a card', () => {
 			expect(out.endsWith(suffix) || out.endsWith('… ?'), out).toBe(true);
 		}
 	});
-	it('S2: a cut never ends before a space or an apostrophe, and never leaves a complete, different relation (189 cases today, none now)', () => {
+	it('S2: a cut never ends before a space or an apostrophe, and never leaves a complete, different relation (214 cases today, none now)', () => {
 		let today = 0;
 		let now = 0;
 		for (const text of TEXTS) {
@@ -188,7 +188,7 @@ describe('fitRelation at the width of a card', () => {
 			if (!kept.endsWith('×')) expect(full.charAt(kept.length), `${text} -> ${out}`).not.toMatch(/[ '’]/);
 			if (visible(out) !== shortest(word) && valid.has(visible(out))) now++;
 		}
-		expect(today).toBe(189);
+		expect(today).toBe(214);
 		expect(now).toBe(0);
 	});
 	it('S2 on a few texts the case table names', () => {
@@ -203,6 +203,12 @@ describe('fitRelation at the width of a card', () => {
 		expect(cut('Second cousin once removed by marriage')).toBe('2nd cousin 1× removed b…');
 		expect(cut('Half first cousin, maybe full')).toBe('Half first cousin, maybe full');
 		expect(cut('Second cousin twice removed')).toBe('2nd cousin twice removed');
+		// 0.5 (1a): "former" is never shortened or dropped, and a cut never ends at the end of the word "former" (that would leave a complete, different relation).
+		expect(cut('Former sister-in-law')).toBe('Former sister-in-law');
+		expect(cut('Rumoured former stepmother')).toBe('Rumoured former stepmot…');
+		expect(cut('Rumoured father’s former wife')).toBe('Rumoured father’s forme…');
+		expect(cut('Former first cousin by marriage')).toBe('Former 1st cousin by marr…');
+		expect(cut('Rumoured former 3rd great-uncle by marriage')).toBe('Rumoured former 3rd great…');
 	});
 	it('S2 rule 1: a cut never ends in an apostrophe (100 texts at 166 px, 142 at 163 px, none now)', () => {
 		const count = (w: number) => {

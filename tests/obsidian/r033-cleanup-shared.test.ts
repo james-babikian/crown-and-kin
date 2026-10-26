@@ -58,7 +58,7 @@ describe('the bars of a tree view keep their DOM (steward T1)', () => {
 		expect(bars(el)).toMatchInlineSnapshot(`
 			"parent dynasty-viewport.is-flow, child 0 of 2
 			div.dynasty-toolbar [role=toolbar aria-label=Tools for this tree]
-			  button.clickable-icon.dynasty-tool.dynasty-add-person.dynasty-tool-main [aria-label=Add a person to the tree type=button]
+			  button.clickable-icon.dynasty-tool.dynasty-add-person.dynasty-tool-main [aria-label=Add person: add a person to the tree type=button]
 			    span.dynasty-tool-icon
 			    span.dynasty-tool-text "Add person"
 			  button.clickable-icon.dynasty-tool.dynasty-find [aria-label=Find a person in the tree type=button]
@@ -87,7 +87,7 @@ describe('the bars of a tree view keep their DOM (steward T1)', () => {
 		expect(bars(root)).toMatchInlineSnapshot(`
 			"parent dynasty-viewport, child 0 of 4
 			div.dynasty-toolbar [role=toolbar aria-label=Tools for this tree]
-			  button.clickable-icon.dynasty-tool.dynasty-add-person [aria-label=Add a person to the tree type=button]
+			  button.clickable-icon.dynasty-tool.dynasty-add-person [aria-label=Add person: add a person to the tree type=button]
 			    span.dynasty-tool-icon
 			  button.clickable-icon.dynasty-tool.dynasty-houses-button [aria-label=Houses: edit the houses of the tree type=button]
 			    span.dynasty-tool-icon
@@ -138,7 +138,7 @@ describe('the bars of a tree view keep their DOM (steward T1)', () => {
 		expect(bars(root)).toMatchInlineSnapshot(`
 			"parent dynasty-viewport, child 0 of 5
 			div.dynasty-toolbar [role=toolbar aria-label=Tools for this tree]
-			  button.clickable-icon.dynasty-tool.dynasty-add-person [aria-label=Add a person to the tree type=button]
+			  button.clickable-icon.dynasty-tool.dynasty-add-person [aria-label=Add person: add a person to the tree type=button]
 			    span.dynasty-tool-icon
 			  button.clickable-icon.dynasty-tool.dynasty-houses-button [aria-label=Houses: edit the houses of the tree type=button]
 			    span.dynasty-tool-icon
@@ -159,7 +159,7 @@ describe('the bars of a tree view keep their DOM (steward T1)', () => {
 		expect(bars(root)).toMatchInlineSnapshot(`
 			"parent dynasty-viewport, child 0 of 2
 			div.dynasty-toolbar [role=toolbar aria-label=Tools for this tree]
-			  button.clickable-icon.dynasty-tool.dynasty-add-person.dynasty-tool-main [aria-label=Add a person to the tree type=button]
+			  button.clickable-icon.dynasty-tool.dynasty-add-person.dynasty-tool-main [aria-label=Add person: add a person to the tree type=button]
 			    span.dynasty-tool-icon
 			    span.dynasty-tool-text "Add person"
 			  button.clickable-icon.dynasty-tool.dynasty-find [aria-label=Find a person in the tree type=button]

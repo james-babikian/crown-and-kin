@@ -12,7 +12,8 @@ vi.mock('obsidian', () => {
 	return { Notice, Modal, SuggestModal };
 });
 // The partnership editor: Save at once with a new start date.
-vi.mock('../../src/obsidian/union-edit', () => ({
+vi.mock('../../src/obsidian/union-edit', async (importActual) => ({
+	...(await importActual<typeof import('../../src/obsidian/union-edit')>()),
 	openUnionEditor: (_app: unknown, _a: string, _b: string, v: { type: string; start: string; end: string }, save: (v: unknown) => Promise<unknown>) => void save({ ...v, start: '1130' }),
 }));
 

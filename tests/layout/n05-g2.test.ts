@@ -24,8 +24,19 @@ describe('G2 finding 1 (D239 V1): the dot of partners on two rows stays on the h
 		});
 	}
 
-	it('random tree 204: the dot of p5 + p8 (rows 2 and 3) lies under the card of the lower partner', () => {
-		const found = dots(204).filter((d) => d.fu.partners.includes('p5') && d.fu.partners.includes('p8'));
+	// 0.5 (D303): p5 + p8 of random tree 204, the pair that this finding was written on, now stands inside a unit (the lower partner p8 has a partner on each
+	// side), so the couple is far by structure and has tags and no dot; the finding is kept on random tree 11, a crowded span with two cards between the partners.
+	it('random tree 204: p5 + p8 (rows 2 and 3) is far by structure, so no dot is drawn for it', () => {
+		expect(dots(204).filter((d) => d.fu.partners.includes('p5') && d.fu.partners.includes('p8'))).toEqual([]);
+		const { g } = build(randomTree(204));
+		clearLayoutCache();
+		const { layout } = layoutTree(g, geometryFor(16), { sweeps: 4, far: FAR }, 'x');
+		const key = g.unions.find((fu) => fu.partners.includes('p5') && fu.partners.includes('p8'))!.key;
+		expect(layout.unions.get(key)!.far).toBe(true);
+	});
+
+	it('random tree 11: the dot of p0 + p1 (rows 0 and 1, two cards of the lower row between them) lies under the card of the lower partner', () => {
+		const found = dots(11).filter((d) => d.fu.partners.includes('p0') && d.fu.partners.includes('p1'));
 		expect(found).toHaveLength(1);
 		const { u, lower } = found[0];
 		expect(u.x).toBeGreaterThanOrEqual(lower.x);

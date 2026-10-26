@@ -3,6 +3,7 @@ import type { Tree } from '../../src/core/types';
 import { tagTop } from '../../src/layout/geometry';
 import type { EdgeDrawing, EdgePath, FarCoupleRule, FarTag, Geometry, PersonBox, Rect, TreeLayout } from '../../src/layout/model';
 import { renderSvg } from '../../src/render/svg-string';
+import { isStructuralFar } from '../support/far-structure';
 import { isForkShare } from '../support/fork-share';
 import { specModel } from './spec-model';
 
@@ -126,7 +127,7 @@ export function rowGapProblems(layout: TreeLayout): string[] {
  * D10/D11 in sideways: the far distance keeps its length in px, `maxCardWidths` times the card
  * width of the `down` geometry (`geo.cardW`), now measured from card centre to card centre along
  * the column. More than `maxGenerations` apart is always far. Every far couple has a tag on each
- * partner that names the other.
+ * partner that names the other. D303: a couple far by structure (`isStructuralFar`) is far at any distance.
  */
 export function farRuleProblems(g: FamilyGraph, layout: TreeLayout, geo: Geometry, rule: FarCoupleRule): string[] {
 	const bad: string[] = [];
@@ -138,7 +139,7 @@ export function farRuleProblems(g: FamilyGraph, layout: TreeLayout, geo: Geometr
 		const gens = Math.abs(a.gen - b.gen);
 		const apart = Math.abs(cy(a) - cy(b));
 		if (gens > rule.maxGenerations && !u.far) bad.push(`${fu.partners}: ${gens} generations apart but not far`);
-		if (u.far && gens <= rule.maxGenerations && !(apart > limit)) bad.push(`${fu.partners}: far at ${apart} px apart (limit ${limit} px)`);
+		if (u.far && gens <= rule.maxGenerations && !(apart > limit) && !isStructuralFar(g, layout, fu.key, rule)) bad.push(`${fu.partners}: far at ${apart} px apart (limit ${limit} px)`);
 		if (u.far) {
 			for (const [me, other] of [
 				[a.id, b.id],

@@ -321,12 +321,14 @@ class Reader {
 				this.warn('entry-not-map', { section: 'unions', index: index + 1 });
 				return;
 			}
+			const endedBy = str(u['ended-by']);
 			unions.push({
 				id: str(u.id),
 				partners: list(u.partners).map(str).filter((s): s is string => s !== undefined),
 				type: readUnionType(u.type),
 				start: str(u.start),
 				end: str(u.end),
+				...(endedBy !== undefined ? { endedBy } : {}),
 				index,
 				text: this.itemText(['unions', index]),
 			});

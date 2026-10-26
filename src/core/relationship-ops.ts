@@ -15,7 +15,7 @@ import { newIdIn } from './id-gen';
 import { parseBody, readTree, textWithoutComments } from './parse';
 import { dropHolderPatches, dropHolders, dropIdPatches, dropIds } from './title-ops';
 import { isEmpty, isMap as isRawMap, isRawList, list, str, unwrapCurly, type Raw, type RawMap } from './tolerate';
-import { isParentType, isPlacementType, isUnionType, PARENT_LIMIT, parentKind, PLACEMENT_TYPES, type Tree } from './types';
+import { ENDED_BY, isParentType, isPlacementType, isUnionType, PARENT_LIMIT, parentKind, PLACEMENT_TYPES, readEndedBy, type Tree } from './types';
 import { dashOf, flowComment, insertItem, itemEnd, itemStart, removeFromSection, removeItems, section, type Where } from './yaml-list';
 import {
 	addPair, clone, commentsOf, doubleQuoted, findPair, finish, finishTogether, flowInsertAfter, insertAt, isBooleanField, isRefusal, layoutOf, PERSON_FIELDS, PERSON_ORDER, personNode, personValue,
@@ -33,7 +33,7 @@ export interface OpContext {
 	keepStale?: boolean;
 }
 
-export const UNION_ORDER = ['id', 'partners', 'type', 'start', 'end'];
+export const UNION_ORDER = ['id', 'partners', 'type', 'start', 'end', 'ended-by'];
 const flowText = (v: string) => renderScalar(v, null, { flow: true, text: true, indent: '' });
 
 function done(r: EditResult, effects: 'auto-union'[] = []): EditResult {
@@ -418,16 +418,19 @@ function editUnion(ctx: OpContext, op: EditUnion): EditResult {
 	const union = (expected.unions as RawMap[])[index];
 	const changes: FieldChange[] = [];
 	const fields = op.fields ?? {};
-	for (const key of ['type', 'start', 'end'] as const) {
+	for (const key of ['type', 'start', 'end', 'ended-by'] as const) {
 		const v = fields[key];
 		if (v === undefined) continue;
 		if (v !== null && typeof v !== 'string') return refuse('bad-value');
 		const write = v === null || v.trim() === '' ? null : v;
 		if (key === 'type' && write !== null && !isUnionType(write)) return refuse('bad-value', REFUSAL_TEXT.unknownUnionType);
-		if ((write === null && union[key] === undefined) || (write !== null && str(union[key]) === str(write))) continue;
+		// Only a current value is written; a value of another letter case or an alias that already means it stays as it is.
+		if (key === 'ended-by' && write !== null && !(ENDED_BY as readonly string[]).includes(write)) return refuse('bad-value', REFUSAL_TEXT.unknownEndedBy);
+		const same = key === 'ended-by' ? write !== null && readEndedBy(str(union[key])) === write : write !== null && str(union[key]) === str(write);
+		if ((write === null && union[key] === undefined) || same) continue;
 		if (write === null) delete union[key];
 		else union[key] = write;
-		changes.push({ key, write, text: key !== 'type' });
+		changes.push({ key, write, text: key !== 'type' && key !== 'ended-by' });
 	}
 	if (!changes.length) return { ok: true, body: ctx.first.src.text, created: [] };
 	const change = (c: FieldChange): Step => (p) => {

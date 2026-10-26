@@ -358,7 +358,7 @@ people:
   - {id: bo, name: Bo Valmont, born: 1130, parents: [ann]}
 `;
 
-	it('the person in the centre has a large row with no picture place and no initials disc (D213), the others a house strip', async () => {
+	it('the person in the centre has a large row with no picture place and no initials disc (D213); every row has a house strip, the large row too (D302)', async () => {
 		phone();
 		const { el } = await embed(SRC, { handle: fakeHandle('n.md', SRC) });
 		const hero = el.querySelectorAll('.dynasty-list-hero');
@@ -367,6 +367,7 @@ people:
 		expect(hero[0].querySelector('.dynasty-hero-col')).toBeNull();
 		expect(hero[0].querySelector('.dynasty-mono')).toBeNull();
 		expect(hero[0].querySelector('.dynasty-hero-title')!.getText()).toBe('Duchess');
+		expect(hero[0].querySelector('.dynasty-list-strip')).not.toBeNull();
 		const bo = el.querySelector('.dynasty-list-row[data-person="bo"]')!;
 		expect(bo.querySelector('.dynasty-list-strip')).not.toBeNull();
 		expect(bo.querySelector('.dynasty-list-pics')).toBeNull();

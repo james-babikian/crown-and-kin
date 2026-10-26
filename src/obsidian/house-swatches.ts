@@ -45,7 +45,7 @@ export function drawHousePalette(box: HTMLElement, o: PaletteSpec): void {
 		cls: custom ? ['dynasty-swatch', 'is-other', 'is-custom', 'is-selected'] : ['dynasty-swatch', 'is-other'],
 		attr: { type: 'button', role: 'radio', 'aria-label': HOUSES.otherColour, 'aria-checked': String(custom), 'aria-pressed': String(custom), 'data-focus': `other-swatch:${o.key}` },
 	});
-	if (custom) swatch.style.setProperty('--dynasty-house-color', now!);
+	if (custom) swatch.style.setProperty('--dynasty-house-color', now);
 	// The input lies over the swatch and takes a tap or a click itself (styles/21): iOS opens the colour window only for a tap on the input, never for
 	// `showPicker()` or `click()` from code (G5 0.4, owner's iPhone). It is not a Tab stop and not read; the swatch is the control for the keyboard and a screen reader.
 	const input = other.createEl('input', { cls: ['dynasty-sheet-colour', 'dynasty-house-other-input'], attr: { type: 'color', id: `${o.titleId}-other`, tabindex: '-1', 'aria-hidden': 'true', 'data-focus': `other:${o.key}` } });
@@ -85,7 +85,7 @@ export function paintHouseColour(box: HTMLElement, colour: string | null, used: 
 	if (swatch) {
 		mark(swatch, custom);
 		swatch.toggleClass('is-custom', custom);
-		if (custom) swatch.style.setProperty('--dynasty-house-color', now!);
+		if (custom) swatch.style.setProperty('--dynasty-house-color', now);
 		else swatch.style.removeProperty('--dynasty-house-color');
 	}
 	const input = box.querySelector<HTMLInputElement>('.dynasty-house-other-input');

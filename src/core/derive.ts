@@ -25,6 +25,8 @@ export interface FamilyUnion {
 	/** Listed unions only, for the edit sheet's spouse list (§6.3). */
 	start?: string;
 	end?: string;
+	/** D306: the raw trimmed text of `ended-by`; listed unions only. */
+	endedBy?: string;
 	/** Listed unions only: the source text a `UnionRef` carries. */
 	text?: string;
 	/** Children whose primary union this is, in sibling order. */
@@ -89,7 +91,7 @@ export function deriveFamilies(tree: Tree, options: ValidateOptions = {}): Famil
 	const listedByPair = new Map<string, FamilyUnion[]>();
 	for (const u of v.unions) {
 		const [a, b] = u.partners;
-		const fu: FamilyUnion = { key: `u${u.index}`, partners: [a, b], type: u.type, implicit: false, unionIndex: u.index, id: u.id, children: [] };
+		const fu: FamilyUnion = { key: `u${u.index}`, partners: [a, b], type: u.type, implicit: false, unionIndex: u.index, id: u.id, children: [], ...(u.endedBy !== undefined ? { endedBy: u.endedBy } : {}) };
 		if (u.start !== undefined) fu.start = u.start;
 		if (u.end !== undefined) fu.end = u.end;
 		if (u.text !== undefined) fu.text = u.text;

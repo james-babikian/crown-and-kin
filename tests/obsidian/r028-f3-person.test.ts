@@ -88,7 +88,7 @@ describe('D215: the Family rows name no relation outside the window of the marke
 
 	it('the screen-reader name of a child row holds no relation word', () => {
 		const row = open('b').querySelectorAll('.dynasty-family-row').find((r) => r.getAttribute('data-child') === 'c')!;
-		expect(row.getAttribute('aria-label')).toBe('Cid. Open this person.');
+		expect(row.getAttribute('aria-label')).toBe('Cid, b. 1160. Open this person.');
 	});
 });
 

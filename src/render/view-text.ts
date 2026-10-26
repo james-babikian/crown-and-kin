@@ -52,7 +52,8 @@ export const BLOCK_UI = {
 export const ADD_UI = {
 	addFirst: 'Add first person',
 	empty: 'This tree has no people.',
-	addPerson: 'Add a person to the tree',
+	// B-0001 (WCAG 2.5.3): the spoken name starts with the words on the button ("Add person" on the computer row).
+	addPerson: 'Add person: add a person to the tree',
 } as const;
 
 /** The full-screen view (spec §7.1), its toolbar buttons (spec §6.10) and Find. */
@@ -128,7 +129,7 @@ export const HINT_UI = {
 /** D144: the list that replaces the tree in a note on a phone (spec §5.5). */
 export const PHONE_LIST_UI = {
 	addPerson: 'Add person',
-	addPersonLabel: 'Add person: add a person to the tree',
+	addPersonLabel: ADD_UI.addPerson,
 	findLabel: 'Find: find a person in the tree to show the family of that person',
 	backLabel: (name: string) => `Back: show the family of ${name} again`,
 	expandLabel: 'Expand: show the tree in a full-screen view',

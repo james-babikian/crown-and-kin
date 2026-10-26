@@ -21,6 +21,7 @@ export const REFUSAL_TEXT = {
 	idNotText: 'The new ID must be a word or a number.',
 	unknownParentType: 'Unknown parent type.',
 	unknownUnionType: 'Unknown partnership type.',
+	unknownEndedBy: 'This is not a choice for “Ended by”. Use Divorce, Annulment or Death.',
 	alreadyParent: 'This person is already a parent of that type.',
 	notWritable: 'The change cannot be written. Edit the note text.',
 	commentWouldChange: 'The change cannot be written without a change to a comment. Edit the note text.',

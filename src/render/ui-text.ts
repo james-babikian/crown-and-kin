@@ -195,8 +195,8 @@ export const UNION_EDIT = {
 	title: 'Edit partnership',
 	of: (a: string, b: string) => `${a} and ${b}`,
 	type: 'Type of partnership',
-	start: 'Start',
-	end: 'End',
+	start: 'Start', end: 'End',
+	ended: { label: 'Ended by', none: 'Not known', values: { divorce: 'Divorce', annulment: 'Annulment', death: 'Death' } as Record<string, string>, hint: 'After a divorce or an annulment, relation names on cards start with “Former”, for example “Former husband”.' },
 	gone: 'This partnership is not in the tree now. The plugin cannot save your changes.',
 	discardText: 'You did not save the changes to this partnership.',
 	ambiguous: 'The tree changed, and the plugin cannot find the partnership that you selected. Select Cancel. Then select Edit on the partnership again.',
@@ -496,8 +496,8 @@ export const WINDOW_UI = {
 	pickPortraitHint: 'After you select a picture, select the part of it to show.',
 	pickArmsHint: 'The card shows the personal arms in the same place as the house arms.',
 	// Navigation inside a window (G.7).
-	/** The name of a person row. `word`: the relation word that the row shows under the name; the name holds the visible text in the same order (WCAG 2.5.3). */
-	openPersonLabel: (name: string, word?: string) => `${word ? `${name}, ${word}` : name}. Open this person.`,
+	/** The name of a person row. `word` and `dates`: what the row shows under the name; the name holds the visible text in the same order (WCAG 2.5.3). */
+	openPersonLabel: (name: string, word?: string, dates?: string) => `${[name, word, dates].filter(Boolean).join(', ')}. Open this person.`,
 	backToLabel: (name: string) => `Back to ${name}`,
 	listMetaTitles: (n: number) => (n === 1 ? '1 title' : `${n} titles`),
 	listMetaHouses: (n: number) => (n === 1 ? '1 house' : `${n} houses`),

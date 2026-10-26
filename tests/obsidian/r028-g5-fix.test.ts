@@ -93,21 +93,53 @@ describe('P3: a Family row names the relation word that it shows', () => {
 	it('the label is built from the name and the word', () => {
 		expect(WINDOW_UI.openPersonLabel('Gwen', 'Daughter')).toBe('Gwen, Daughter. Open this person.');
 		expect(WINDOW_UI.openPersonLabel('Gwen')).toBe('Gwen. Open this person.');
+		// B-0003 (D313): the years follow, as the row shows them.
+		expect(WINDOW_UI.openPersonLabel('Gwen', 'Daughter', 'b. 1131')).toBe('Gwen, Daughter, b. 1131. Open this person.');
+		expect(WINDOW_UI.openPersonLabel('Roderick Valmont', undefined, 'b. 1131')).toBe('Roderick Valmont, b. 1131. Open this person.');
 	});
 
-	it('the window of the marked person: the label holds the visible name and the visible word, in that order', () => {
+	it('the window of the marked person: the label holds the visible name, the visible word and the years, in that order', () => {
 		const row = childRow(openFor('a'), 'b');
 		const word = row.querySelector('.dynasty-row-sub')!.querySelector('i')!.getText();
 		expect(word.length).toBeGreaterThan(0);
 		const label = row.getAttribute('aria-label')!;
-		expect(label).toBe(`Bob, ${word}. Open this person.`);
+		expect(label).toBe(`Bob, ${word}, b. 1130. Open this person.`);
 		expect(label.indexOf('Bob')).toBeLessThan(label.indexOf(word));
+		expect(label.indexOf(word)).toBeLessThan(label.indexOf('b. 1130'));
 	});
 
-	it('the window of another person shows no word (D215), so the label keeps the name only', () => {
+	it('the window of another person shows no word (D215), so the label holds the name and the years', () => {
 		const row = childRow(openFor('b'), 'c');
 		expect(row.querySelector('.dynasty-row-sub')!.querySelector('i')).toBeNull();
-		expect(row.getAttribute('aria-label')).toBe('Cid. Open this person.');
+		expect(row.getAttribute('aria-label')).toBe('Cid, b. 1160. Open this person.');
+	});
+
+	it('B-0003: the label holds the whole visible text of the row, name first and the second text line after it', () => {
+		const row = childRow(openFor('b'), 'c');
+		// How axe reads the visible text of a button: the pieces joined with no separator, then punctuation dropped.
+		const curate = (t: string) => t.replace(/[^\p{L}\p{N}\s]+/gu, '').replace(/\s+/g, ' ').trim().toLowerCase();
+		const visible = row.querySelector('.dynasty-family-name')!.getText() + row.querySelector('.dynasty-row-sub')!.getText();
+		expect(visible).toBe('Cid b. 1160');
+		expect(curate(row.getAttribute('aria-label')!)).toContain(curate(visible));
+	});
+
+	it('B-0003: a child with no year keeps the label of before', () => {
+		const body = ['options:', '  me: a', 'people:', '  - {id: a, name: Ann}', '  - {id: b, name: Bob, parents: [a]}', ''].join('\n');
+		const sheet = EditSheet.create({} as never, { handle: fakeHandle('n.md', body) as never, personId: 'a', sourcePath: 'n.md' })!;
+		sheet.open();
+		const row = childRow((sheet as unknown as { contentEl: FEl }).contentEl, 'b');
+		const word = row.querySelector('.dynasty-row-sub')!.querySelector('i')!.getText();
+		expect(row.getAttribute('aria-label')).toBe(`Bob, ${word}. Open this person.`);
+	});
+
+	it('B-0003: a sobriquet is part of the visible name, so the label holds it too', () => {
+		const body = ['options:', '  me: a', 'people:', '  - {id: a, name: Ann, born: 1100}', '  - {id: b, name: Bob, sobriquet: the Bold, born: 1130, parents: [a]}', ''].join('\n');
+		const sheetA = EditSheet.create({} as never, { handle: fakeHandle('n.md', body) as never, personId: 'a', sourcePath: 'n.md' })!;
+		sheetA.open();
+		const row = childRow((sheetA as unknown as { contentEl: FEl }).contentEl, 'b');
+		const shown = row.querySelector('.dynasty-family-name')!.getText().trim();
+		expect(shown).toContain('the Bold');
+		expect(row.getAttribute('aria-label')!.startsWith(`${shown.split(/\s+/).join(' ')}, `)).toBe(true);
 	});
 });
 

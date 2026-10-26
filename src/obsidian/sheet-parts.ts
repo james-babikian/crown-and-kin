@@ -8,6 +8,7 @@ import { normBody } from '../core/block-match';
 import type { EditResult } from '../core/edit';
 import { isColour } from '../render/colour-check';
 import type { Handle, HandleWriteOutcome } from './block-handle';
+import { revealTarget } from './modal-layout';
 
 /** A value CSS can draw (a house colour can be any CSS colour, spec §4.1); `#rrggbb` where CSS cannot say. */
 export const drawableColour = isColour;
@@ -26,14 +27,14 @@ export function nameDialog(modalEl: HTMLElement, title: HTMLElement): HTMLElemen
 }
 
 /**
- * Scrolls the focused field of a window into the visible part, above the keyboard (C1). A browser does this only for
+ * Scrolls the focused field of a window, with its hint, into the visible part, above the keyboard (C1). A browser does this only for
  * its own scroller and only some of the time; the field sits inside `.dynasty-sheet-body`, which scrolls. `delay` waits
  * for the keyboard to finish opening.
  */
 export function revealFocused(modalEl: HTMLElement, contentEl: HTMLElement, delay = 0): void {
 	const run = () => {
 		const a = modalEl.doc.activeElement as HTMLElement | null;
-		if (a && contentEl.contains(a) && a.matches('input, select, textarea')) a.scrollIntoView({ block: 'nearest' });
+		if (a && contentEl.contains(a) && a.matches('input, select, textarea')) revealTarget(a, modalEl).scrollIntoView({ block: 'nearest' });
 	};
 	if (delay) (modalEl.win ?? window).setTimeout(run, delay);
 	else run();

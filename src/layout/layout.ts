@@ -59,6 +59,18 @@ export function isFarCouple(a: FarProbe, b: FarProbe, sameBlock: boolean, adjace
 }
 
 /**
+ * D303, the third class of far couple ("far by structure", next to far by distance and far by generations): a couple on two rows whose
+ * lower partner stands inside a unit (cards joined by bars on both sides, for example between two husbands) is far, whatever the distance.
+ * The leg of its upper partner would need a passage beside that unit, at the edge of the tree, and its last sideways run would cross every
+ * trunk between the passage and the dot. It reads only facts of the skeleton, so the couple never comes back to near, and it applies only
+ * when the rule can make a couple far at all: with `NEVER_FAR_RULE` (the relation finder's small tree, the saved picture of a line, the
+ * small-font sideways alternative) a couple is never far. `lowerInsideUnit` is the plan's own test (`unitEnd` on both sides of the lower partner).
+ */
+export function isFarByStructure(a: Pick<FarProbe, 'gen'>, b: Pick<FarProbe, 'gen'>, lowerInsideUnit: boolean, rule: FarCoupleRule): boolean {
+	return a.gen !== b.gen && lowerInsideUnit && (Number.isFinite(rule.maxCardWidths) || Number.isFinite(rule.maxGenerations));
+}
+
+/**
  * The people whose card shows arms: with the "Arms on cards" setting (D206, 0.2.8) the cards of `armsCardIds`, kept to the people who
  * have arms to show (a house in `settings.arms`, or their own arms in `settings.personalArms`); without it the 0.2.7 rule (every person
  * of a house with arms, plus personal arms). With folds the rule reads the whole graph, so folding a family never gives arms to a

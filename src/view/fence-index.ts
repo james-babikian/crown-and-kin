@@ -144,7 +144,7 @@ class Fence implements FenceIndex {
 
 	notes(kind: 'kin' | 'cal'): string[] {
 		const slot = kind === 'kin' ? 0 : 1;
-		if (this.passDone && this.lists[slot]) return this.lists[slot]!.slice();
+		if (this.passDone && this.lists[slot]) return this.lists[slot].slice();
 		const live = this.passDone ? null : new Set(this.vault.files().map((f) => f.path));
 		const out: string[] = [];
 		for (const [path, flag] of this.entries) if ((flag & BIT[kind]) !== 0 && (!live || live.has(path))) out.push(path);

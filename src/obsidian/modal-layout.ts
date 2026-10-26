@@ -160,6 +160,23 @@ export function ignoreGhostClick(modal: Modal): () => void {
 }
 
 /**
+ * What to bring into view when a control of a window gets the focus: the whole field (label, control and the hint that shows
+ * on focus), so the hint is not cut off at the foot of the scroll box. A field taller than the window would never fit with
+ * "nearest", so then the control itself is used.
+ */
+export function revealTarget(control: HTMLElement, modalEl?: HTMLElement): HTMLElement {
+	// The start of a calendar and the known year are groups: their one hint stands under the group, not under a field.
+	// A tick box's own label also carries `dynasty-sheet-field`; its hint stands under the outer box group, so that group comes first.
+	const field =
+		control.closest<HTMLElement>('.dynasty-cal-start') ?? control.closest<HTMLElement>('.dynasty-checks-field') ?? control.closest<HTMLElement>('.dynasty-sheet-field');
+	if (!field) return control;
+	// The box that scrolls is the body, which is shorter than the window by the title and the foot (more so with a phone keyboard).
+	const box = field.closest<HTMLElement>('.dynasty-sheet-body') ?? modalEl;
+	if (box && field.offsetHeight > box.clientHeight) return control;
+	return field;
+}
+
+/**
  * M1 to M3: scrolls the focused field of a window into view ONCE, after the keyboard has settled. The window follows the
  * keyboard step by step while it slides in (`phoneLayout` calls back at each step); a scroll at each step moves the list
  * by a row in a few frames, which looks like a stutter. Each call to `schedule` restarts one timer, so only the last
@@ -172,7 +189,7 @@ export function settledReveal(modalEl: HTMLElement, contentEl: HTMLElement, redu
 	const run = () => {
 		timer = null;
 		const a = modalEl.doc.activeElement as HTMLElement | null;
-		if (a && contentEl.contains(a) && a.matches('input, select, textarea')) a.scrollIntoView({ block: 'nearest', behavior: reduced() ? 'instant' : 'auto' });
+		if (a && contentEl.contains(a) && a.matches('input, select, textarea')) revealTarget(a, modalEl).scrollIntoView({ block: 'nearest', behavior: reduced() ? 'instant' : 'auto' });
 	};
 	const cancel = () => {
 		if (timer !== null) win.clearTimeout(timer);

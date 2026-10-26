@@ -73,7 +73,8 @@ describe('M2, M3: the Houses window scrolls once, after the keyboard has settled
 		expect(spy).not.toHaveBeenCalled();
 		runTimers(400);
 		expect(spy).toHaveBeenCalledTimes(1);
-		expect(spy.mock.contexts[0]).toBe(input);
+		// The whole field scrolls, so the hint that shows on focus is in view with the control (R05 look repair 1).
+		expect(spy.mock.contexts[0]).toBe(input.closest('.dynasty-sheet-field') ?? input);
 		expect(firstArg(spy)).toEqual({ block: 'nearest', behavior: 'auto' });
 		// Nothing more later.
 		runTimers(2000);

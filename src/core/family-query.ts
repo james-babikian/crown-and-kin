@@ -23,6 +23,8 @@ export interface PartnerLink {
 	type: UnionKind | (string & {}) | null;
 	start?: string;
 	end?: string;
+	/** D306: the raw trimmed text of `ended-by`. */
+	endedBy?: string;
 }
 
 /** Where a person sits among their siblings, for the sibling-order controls (§6.5). */
@@ -150,6 +152,7 @@ export const familyOf: FamilyOf = (g, id) => {
 		const link: PartnerLink = { partner, union, type: fu.type };
 		if (fu.start !== undefined) link.start = fu.start;
 		if (fu.end !== undefined) link.end = fu.end;
+		if (fu.endedBy !== undefined) link.endedBy = fu.endedBy;
 		partners.push(link);
 	}
 

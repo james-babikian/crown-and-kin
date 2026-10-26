@@ -6,6 +6,7 @@
 import { Notice } from 'obsidian';
 import type { Op } from '../core/edit';
 import { nextPersonId } from '../core/id-gen';
+import { readEndedBy } from '../core/types';
 import { newHouseId } from '../core/yaml-edit';
 import { NEW_SHEET, REMOVE, SHEET, UNION_EDIT, WRITE_TEXT, deleteText, unionTypeText } from '../render/ui-text';
 import { normBody } from '../core/block-match';
@@ -16,7 +17,7 @@ import { describeDelete, type ParentLink, type PartnerLink } from '../core/famil
 import { autoUnionNotice, unionOp } from './family-flows';
 import { afterPaint, freshOrStale, onWriteFailed } from './sheet-parts';
 import { undoIfUnchanged, undoNotice } from './undo-notice';
-import { openUnionEditor } from './union-edit';
+import { endedByChoice, openUnionEditor } from './union-edit';
 import { EditSheetActions } from './edit-sheet-actions';
 import { SLOW_SAVE_PEOPLE, type DraftWritten, type EditSheetBase } from './edit-sheet-base';
 import { NEW_HOUSE, loadSheet, findUnion, mapIds, opNames, unwritten, sameUnwritten, takenIds, idsFor, withIds, holderNames, type Draft } from '../view/sheet-draft';
@@ -429,7 +430,7 @@ export abstract class EditSheetWrites extends EditSheetActions {
 	protected editPartnership(link: PartnerLink): void {
 		const u = link.union;
 		if (!u || this.pendingOps() === null || !this.fresh()) return;
-		const values = (l: PartnerLink) => ({ type: l.type ?? 'marriage', start: l.start ?? '', end: l.end ?? '' });
+		const values = (l: PartnerLink) => ({ type: l.type ?? 'marriage', start: l.start ?? '', end: l.end ?? '', endedBy: endedByChoice(l.endedBy) });
 		openUnionEditor(this.app, this.data.person.name, this.name(link.partner), values(link), async (next) => {
 			// The sheet can have loaded new data since the editor opened: find the partnership again.
 			const rows = (this.data.fam?.partners ?? []).filter((l) => l.partner === link.partner && l.union);
@@ -441,11 +442,15 @@ export abstract class EditSheetWrites extends EditSheetActions {
 			const now = found ? rows.find((l) => l.union!.index === found.index) : undefined;
 			if (!now?.union) return UNION_EDIT.gone;
 			const current = values(now);
-			const fields: Partial<Record<'type' | 'start' | 'end', string | null>> = {};
+			const fields: Partial<Record<'type' | 'start' | 'end' | 'ended-by', string | null>> = {};
 			// Marriage is the default: choosing it removes the key (spec §4.1).
 			if (next.type !== current.type) fields.type = next.type === 'marriage' ? null : next.type;
 			if (next.start !== current.start) fields.start = next.start === '' ? null : next.start;
 			if (next.end !== current.end) fields.end = next.end === '' ? null : next.end;
+			// "Not known" removes the key; a text that the note had and the user kept is not written again (D306).
+			// A pick that means the value already written (the alias `divorced` and the choice Divorce) writes nothing: the note keeps its text.
+			const sameMeaning = next.endedBy !== '' && readEndedBy(next.endedBy) !== null && readEndedBy(next.endedBy) === readEndedBy(current.endedBy);
+			if (next.endedBy !== current.endedBy && !sameMeaning) fields['ended-by'] = next.endedBy === '' ? null : next.endedBy;
 			if (!Object.keys(fields).length) return null;
 			const out = await this.writeWithDraft([{ kind: 'edit-union', union: now.union, fields }]);
 			return out ? null : this.lastError || WRITE_TEXT.refused;

@@ -21,8 +21,8 @@ import { parseBody, parseDynasty, readTree, readUnionType, referencedIds } from 
 import { validateTree } from '../../src/core/validate';
 import { applyOp } from '../../src/core/yaml-edit';
 import { INHERIT_ILLEGITIMATE, INHERIT_RULES, INHERIT_THROUGH, SUCCESSION_RULES, readIllegitimate, readInherit, readRule, readThrough } from '../../src/core/succession-keys';
-import { PARENT_TYPES, PLACEMENT_TYPES, UNION_TYPES } from '../../src/core/types';
-import { KEYS, OLD_ILLEGITIMATE, OLD_INHERIT, OLD_RULES, OLD_THROUGH, OLD_UNION_TYPES, SECTIONS, VALUE_LISTS, keysOf, type SectionId } from '../../scripts/format/keys';
+import { ENDED_BY, PARENT_TYPES, PLACEMENT_TYPES, readEndedBy, UNION_TYPES } from '../../src/core/types';
+import { KEYS, OLD_ILLEGITIMATE, OLD_INHERIT, OLD_RULES, OLD_THROUGH, OLD_ENDED_BY, OLD_UNION_TYPES, SECTIONS, VALUE_LISTS, keysOf, type SectionId } from '../../scripts/format/keys';
 import { formatDoc } from '../../scripts/format/render';
 
 const ORDERS: Record<SectionId, readonly string[] | undefined> = {
@@ -150,6 +150,7 @@ const FULL = [
 	'    type: marriage',
 	'    start: 1129',
 	'    end: 1160',
+	'    ended-by: divorce',
 	'',
 ].join('\n');
 
@@ -252,6 +253,7 @@ describe('the values and the old names of the table', () => {
 		expect(by('people', 'placement')).toBe(PLACEMENT_TYPES);
 		expect(by('parents', 'type')).toBe(PARENT_TYPES);
 		expect(by('unions', 'type')).toBe(UNION_TYPES);
+		expect(by('unions', 'ended-by')).toBe(ENDED_BY);
 		for (const v of VALUE_LISTS) expect(keysOf(v.section).some((x) => x.key === v.key), `${v.section}.${v.key}`).toBe(true);
 	});
 
@@ -261,16 +263,19 @@ describe('the values and the old names of the table', () => {
 		for (const v of INHERIT_THROUGH) expect(readThrough(v.toUpperCase())).toBe(v);
 		for (const v of INHERIT_ILLEGITIMATE) expect(readIllegitimate(v.toUpperCase())).toBe(v);
 		for (const v of UNION_TYPES) expect(readUnionType(v.toUpperCase())).toBe(v);
+		for (const v of ENDED_BY) expect(readEndedBy(v.toUpperCase())).toBe(v);
 		for (const [old, now] of Object.entries(OLD_RULES)) expect(readRule(old), old).toBe(now);
 		for (const [old, now] of Object.entries(OLD_INHERIT)) expect(readInherit(old), old).toBe(now);
 		for (const [old, now] of Object.entries(OLD_THROUGH)) expect(readThrough(old), old).toBe(now);
 		for (const [old, now] of Object.entries(OLD_ILLEGITIMATE)) expect(readIllegitimate(old), old).toBe(now);
 		for (const [old, now] of Object.entries(OLD_UNION_TYPES)) expect(readUnionType(old), old).toBe(now);
+		for (const [old, now] of Object.entries(OLD_ENDED_BY)) expect(readEndedBy(old), old).toBe(now);
 	});
 
 	it('reads another word as itself or as nothing (a partnership type of its own, no rule)', () => {
 		expect(readUnionType('handfasting')).toBe('handfasting');
 		expect(readRule('salic')).toBeUndefined();
+		expect(readEndedBy('separation')).toBeNull();
 	});
 });
 
@@ -292,9 +297,20 @@ describe('the generated files', () => {
 		const doc = formatDoc();
 		for (const x of KEYS) expect(doc).toContain(`| \`${x.key}\``);
 		const reserved = KEYS.filter((x) => x.reserved).length;
-		expect(KEYS).toHaveLength(66);
+		expect(KEYS).toHaveLength(67);
 		expect(reserved).toBe(3);
 		expect(doc).toContain(`has ${KEYS.length} keys, ${reserved} of them reserved`);
+	});
+
+	it('says that the relation names read a year in born, died, start and end, and that ended-by is new in 0.5 (D306)', () => {
+		for (const [section, key] of [['people', 'born'], ['people', 'died'], ['unions', 'start'], ['unions', 'end']] as const) {
+			const x = keysOf(section).find((y) => y.key === key)!;
+			expect(x.accepts, `${section}.${key}`).not.toContain('never reads it as a date');
+			expect([x.meaning, x.accepts].join(' '), `${section}.${key}`).toContain('relation names');
+		}
+		const ended = keysOf('unions').find((y) => y.key === 'ended-by')!;
+		expect(ended.since).toBe('0.5');
+		expect(formatDoc()).toContain('Since version 0.5, the partnership key `ended-by`');
 	});
 
 	it('the README has the two sentences of the contract (E.5), as the clarity-editor checked them', () => {

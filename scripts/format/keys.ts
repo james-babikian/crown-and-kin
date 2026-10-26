@@ -10,7 +10,7 @@ import { HOUSE_ORDER } from '../../src/core/house-ops';
 import { UNION_ORDER } from '../../src/core/relationship-ops';
 import { HOLDER_ORDER, TITLE_ORDER } from '../../src/core/title-ops';
 import { INHERIT_ILLEGITIMATE, INHERIT_RULES, INHERIT_THROUGH, SUCCESSION_RULES } from '../../src/core/succession-keys';
-import { PARENT_TYPES, PLACEMENT_TYPES, UNION_TYPES } from '../../src/core/types';
+import { ENDED_BY, PARENT_TYPES, PLACEMENT_TYPES, UNION_TYPES } from '../../src/core/types';
 import { OPTION_ORDER, PERSON_ORDER, TOP_ORDER } from '../../src/core/yaml-patch';
 
 /** The parts of a tree text that have keys. `parents` is the map form of one parent entry. */
@@ -64,6 +64,8 @@ const BOOLEAN_FORMS = '"true" or "yes" in any case is on. Any other text, or no 
 const BOOLEAN_WRITTEN = '`true`. To turn it off, the plugin removes the key. A text that already means on stays as written.';
 const TEXT_WRITTEN = 'Plain text if plain YAML reads it back as the same text. If not, in double quotes. A value that you wrote in quotes keeps its quotes when the plugin changes it.';
 const FREE_TEXT = 'Free text. The plugin never reads it as a date.';
+// Relation names (D306, D304) read a year in born, died, start and end, but only when the text is one exact year or date.
+const YEAR_FORMS = 'Free text. The plugin reads a year in it. Relation names use the year only if the text is one exact year or date, for example 1135 or 12 May 1135. A text such as c. 1135 or before 1135 has no effect on them.';
 const RULE_WRITTEN = 'Plain text, one of the current names. The Titles window writes only the keys that you changed. A key that you wrote by hand stays as written.';
 const NOT_WRITTEN = 'Typed by hand. No window of the plugin writes it.';
 
@@ -136,8 +138,8 @@ export const KEYS: readonly FormatKey[] = [
 	k('people', 'card-title', '0.2', 'The ID of the title that the card shows, with its reign. It replaces a written `title`. It picks one title when the person holds several.', `A title ID. ${NO_CURLY_NOTE} If the person does not hold the title, the plugin shows a warning.`, 'Plain text. "Show on the card" writes it. The plugin removes it when the person loses the last holder entry of that title.'),
 	k('people', 'house', '0.1', 'The ID of the house of the person.', `A house ID. ${ID_NOTE} If no house has this ID, the plugin shows a warning.`, 'Plain text.'),
 	k('people', 'sex', '0.1', 'Write `m` for a man or `f` for a woman. It sets the look of the card, the order of partners, the relation names and the line of succession. A word such as `male` gives a warning.', 'Any text. Only `m` and `f` (lower case) mean a man and a woman. Any other text is a value of its own, with a neutral card. A spelling such as `male` or `Female` gives a warning, and the plugin does not read it as `m` or `f`.', 'Plain text.'),
-	k('people', 'born', '0.1', 'When the person was born. You can write any text. The line of succession and the phone list read a year in it.', FREE_TEXT, TEXT_WRITTEN),
-	k('people', 'died', '0.1', 'When the person died. You can write any text. The line of succession and the phone list read a year in it.', FREE_TEXT + ' The words false, no, alive, living and never mean that the person is alive. A doubtful word such as "?" or unknown counts as dead, with a warning.', TEXT_WRITTEN),
+	k('people', 'born', '0.1', 'When the person was born. You can write any text. The line of succession, the phone list and the relation names read a year in it.', YEAR_FORMS, TEXT_WRITTEN),
+	k('people', 'died', '0.1', 'When the person died. You can write any text. The line of succession, the phone list and the relation names read a year in it.', YEAR_FORMS + ' The words false, no, alive, living and never mean that the person is alive. A doubtful word such as "?" or unknown counts as dead, with a warning.', TEXT_WRITTEN),
 	k('people', 'parents', '0.1', 'The parents of the person. Write an ID, or write the keys `id` and `type` for a parent.', 'A list. One entry that is not in a list is accepted. A plain ID is a birth parent. At most 2 parents of one type, and 8 rumoured parents. More gives a warning. The setting "Warn about more than 2 parents of a type" turns off the warning for birth, adoptive and ward parents.', 'A flow list on one line. A block list that you typed keeps its form, and the plugin adds an entry to it. A birth parent is a plain ID. Any other type is a map: `{id: aldric, type: adoptive}`.'),
 	k('people', 'placement', '0.1', 'Which parents decide where the card stands: the birth parents, the adoptive parents or the ward parents.', '`birth`, `adoptive` or `ward`, in lower case. Another text gives a warning. A type that the person has no parents of gives a warning, and the plugin chooses itself.', 'Plain text.'),
 	k('people', 'illegitimate', '0.1', 'The person was born outside a marriage. Write `illegitimate: true`. The sign is on the line to the birth parents.', BOOLEAN_FORMS, BOOLEAN_WRITTEN),
@@ -157,8 +159,9 @@ export const KEYS: readonly FormatKey[] = [
 	k('unions', 'id', '0.1', 'The short name of the partnership. It is needed only when two partnerships have the same two partners, or when a person uses `union`.', `${ID_FORMS} If two partnerships have the same ID, the plugin shows the tree but does not let you edit it.`, 'Plain text. The plugin adds it only when it must name a partnership.'),
 	k('unions', 'partners', '0.1', 'The two people of the partnership.', 'A list of exactly 2 person IDs. One ID that is not in a list is read as a list of one ID. A partnership needs 2, so any other count, one ID too, gives a warning and the plugin skips the partnership. For three people, write one partnership for each pair.', 'A flow list on one line.'),
 	k('unions', 'type', '0.1', 'The kind of partnership: marriage, betrothal, concubinage or affair.', 'The four names, in any case. Also `engaged` (betrothal), `mistress`, `lover` and `liaison` (affair) and `concubine` (concubinage). No type is a marriage. Any other word is drawn as a marriage, with a warning only if it is close to a known type.', 'Plain text. The plugin writes `type` for every kind except a marriage. It writes `type: marriage` only for the partnership that it makes when you add a second parent.'),
-	k('unions', 'start', '0.1', 'When the partnership started.', FREE_TEXT, TEXT_WRITTEN),
-	k('unions', 'end', '0.1', 'When the partnership ended.', FREE_TEXT, TEXT_WRITTEN),
+	k('unions', 'start', '0.1', 'When the partnership started. You can write any text. The relation names read a year in it.', YEAR_FORMS, TEXT_WRITTEN),
+	k('unions', 'end', '0.1', 'When the partnership ended. You can write any text. The relation names read a year in it.', YEAR_FORMS, TEXT_WRITTEN),
+	k('unions', 'ended-by', '0.5', 'Why a marriage ended: divorce, annulment or death. After a divorce or an annulment, the relation names of the partner and the relatives by marriage have the word "former".', 'One of the values (see Values), in any case. Also `divorced` (divorce) and `annulled` (annulment). Any other text, a list or a map has no effect, and the plugin gives no warning. Only a marriage, or a partnership with its own type word, uses it. With the value `death`, the end year does not make the marriage "former".', 'Plain text, one of the three values. "Not known" removes the key. A text that you wrote by hand and that means the same value stays as written.'),
 ];
 
 /** The keys of one section, in table order. */
@@ -201,6 +204,7 @@ export const OLD_INHERIT: Readonly<Record<string, string>> = {
 export const OLD_THROUGH: Readonly<Record<string, string>> = { male: 'men', female: 'women', any: 'anyone' };
 export const OLD_ILLEGITIMATE: Readonly<Record<string, string>> = { true: 'after', yes: 'after', false: 'no' };
 export const OLD_UNION_TYPES: Readonly<Record<string, string>> = { engaged: 'betrothal', mistress: 'affair', lover: 'affair', liaison: 'affair', concubine: 'concubinage' };
+export const OLD_ENDED_BY: Readonly<Record<string, string>> = { divorced: 'divorce', annulled: 'annulment' };
 
 export const VALUE_LISTS: readonly ValueList[] = [
 	{ section: 'titles', key: 'succession', values: SUCCESSION_RULES, old: OLD_RULES },
@@ -210,6 +214,7 @@ export const VALUE_LISTS: readonly ValueList[] = [
 	{ section: 'people', key: 'placement', values: PLACEMENT_TYPES },
 	{ section: 'parents', key: 'type', values: PARENT_TYPES },
 	{ section: 'unions', key: 'type', values: UNION_TYPES, old: OLD_UNION_TYPES },
+	{ section: 'unions', key: 'ended-by', values: ENDED_BY, old: OLD_ENDED_BY },
 ];
 
 /** Hand-typed forms that the plugin reads without a warning (spec §8 "Tolerated silently", §13.4). Listed in `docs/format.md`. */
@@ -223,6 +228,7 @@ export const TOLERATED: readonly string[] = [
 	'`true` and `yes` in any case are on for `illegitimate`, `childless`, `inherit-adopted` and `heirs-of-body`.',
 	'The old names of the succession values (see Values) are read as the current value and stay as written.',
 	'A partnership type in any case, and the words `engaged`, `mistress`, `lover`, `liaison` and `concubine`, are read as a known type (see Values).',
+	'A value of `ended-by` in any case, and the words `divorced` and `annulled`, are read as a known value (see Values).',
 	'A parent type in any case (`Adoptive`) is read as the known type.',
 	'A `through-spouse` value in any case, and an ID after it with curly quote marks.',
 	'The words false, no, alive, living and never in `died` mean that the person is alive.',

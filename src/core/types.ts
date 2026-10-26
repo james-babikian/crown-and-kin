@@ -18,6 +18,23 @@ export type PlacementType = (typeof PLACEMENT_TYPES)[number];
 /** The partnership types a union can have (spec §4.1). */
 export const UNION_TYPES = ['marriage', 'betrothal', 'concubinage', 'affair'] as const;
 
+/** Why a partnership ended (spec §4.1, D306). `readEndedBy` reads the key. */
+export const ENDED_BY = ['divorce', 'annulment', 'death'] as const;
+/** One of `ENDED_BY`. */
+export type EndedBy = (typeof ENDED_BY)[number];
+
+/** Words read as a value of `ended-by`, besides the value itself (D306, RULES §9 item 3). */
+// A prototype-free table, so that a word such as "constructor" finds nothing (as UNION_WORDS in parse.ts).
+const ENDED_BY_ALIASES: Readonly<Record<string, EndedBy>> = Object.assign(Object.create(null) as Record<string, EndedBy>, { divorced: 'divorce', annulled: 'annulment' });
+
+/** Reads the raw text of `ended-by`: a known value or an alias in any case gives that value; anything else, or no text, gives null (no effect, no warning). */
+export function readEndedBy(raw: string | undefined | null): EndedBy | null {
+	if (typeof raw !== 'string') return null;
+	const word = raw.trim().toLowerCase();
+	if ((ENDED_BY as readonly string[]).includes(word)) return word as EndedBy;
+	return ENDED_BY_ALIASES[word] ?? null;
+}
+
 const isOneOf = <T extends string>(list: readonly T[], v: unknown): v is T => typeof v === 'string' && (list as readonly string[]).includes(v);
 
 /** True if `t` is a known parent type. */
@@ -79,6 +96,8 @@ export interface Union {
 	type: string;
 	start?: string;
 	end?: string;
+	/** D306: the raw trimmed text of `ended-by`; absent when not written, empty or not text. `readEndedBy` reads it. */
+	endedBy?: string;
 	index: number;
 	/** The item's source text without comments, whitespace runs as one space (`UnionRef.text`). */
 	text?: string;

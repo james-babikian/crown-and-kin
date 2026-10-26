@@ -18,7 +18,7 @@
  *   the portrait (56 px) and the arms under it (35 px; 56 px with no portrait); every other row has a 36 px portrait at the right and no arms. The caller
  *   loads small copies and puts each one in with `showListPicture(slot, url)`.
  * - 0.2.8 (D209, D210): the order is the person at the top (with a heading for a screen reader only), Parents, Partners, Children. A heading follows
- *   the count of its rows; "With <partner>" shows only when there is more than one group of children. The other rows have a 3 px house strip. A text line
+ *   the count of its rows; "With <partner>" shows only when there is more than one group of children. Every row has a 3 px house strip, the large row too (D302). A text line
  *   of items ("Adoptive father · 1102–1161") is a joined text line; its first item can be the kind of link (`spec.link`, D210).
  * - Test hooks (class names): `.dynasty-list-section[data-section]`, `.dynasty-list-head`, `.dynasty-list-sub`,
  *   `.dynasty-list-row[data-person]`, `.dynasty-list-me`, `.dynasty-has-house`, `.dynasty-list-go`, `.dynasty-list-edit`.
@@ -35,7 +35,7 @@ import { cardLabels, needsLabels, type CardLabel } from '../../core/titles';
 import type { ParentType } from '../../core/types';
 import { isColour } from '../colour-check';
 import { joined, nb } from '../text-join';
-import { dateLine, shownReign } from '../tree-info';
+import { dateLineParts, shownReign, type DateSegment } from '../tree-info';
 import { PHONE_LIST_UI } from '../ui-text';
 import type { IconFn } from './widgets';
 
@@ -114,6 +114,18 @@ export interface PhoneListResult {
 	/** The heading of the centre section, which takes the focus after a move. */
 	centre: HTMLElement;
 	list: HTMLElement;
+}
+
+/**
+ * The years of a row as one span. Each born and died date is an element of its own with `dir="auto"` and the isolate rule of the CSS, so that a date that starts
+ * with an Arabic word ("حوالي 1108") does not turn the range round in this left-to-right list. The dash stays outside the isolates, and the text is the same as
+ * `dateLine` gives (no control characters).
+ */
+function yearsSpan(segs: readonly DateSegment[]): HTMLElement {
+	const el = createSpan({ cls: 'dynasty-list-years' });
+	// The plain parts are spans too, so that the order of the parts is the order of the children (a text node would not be).
+	for (const seg of segs) el.createSpan(seg.date ? { cls: ['dynasty-list-date', `is-${seg.date}`], text: seg.text, attr: { dir: 'auto' } } : { cls: 'dynasty-list-dsep', text: seg.text });
+	return el;
 }
 
 /** True when the click came from a finger or a pen (a key press or a mouse is not a tap). */
@@ -229,9 +241,12 @@ export function buildPhoneList(parent: HTMLElement, spec: PhoneListSpec): PhoneL
 	const content = (into: HTMLElement, id: string, word: ListWord | null, link: ListWord | null, large: boolean) => {
 		const p = g.byId.get(id)!;
 		const label = labels?.get(id);
-		if (!large) into.createSpan({ cls: 'dynasty-list-strip', attr: { 'aria-hidden': 'true' } });
+		// D302: every row has the strip, the large row too (a person with no house gets the neutral colour from the CSS).
+		// The large row wraps strip and text in one box, so the strip is as tall as the text and not as the column of the portrait and the arms (R05 look repair 2).
+		const lead = large ? into.createSpan({ cls: 'dynasty-list-lead' }) : into;
+		lead.createSpan({ cls: 'dynasty-list-strip', attr: { 'aria-hidden': 'true' } });
 		// Spans, not divs: a button holds only inline content. The CSS makes them blocks.
-		const text = into.createSpan({ cls: 'dynasty-list-text' });
+		const text = lead.createSpan({ cls: 'dynasty-list-text' });
 		const name = text.createSpan({ cls: 'dynasty-list-name' });
 		name.appendText(nameOf(id));
 		const sob = label?.sobriquet ?? p.sobriquet;
@@ -240,7 +255,7 @@ export function buildPhoneList(parent: HTMLElement, spec: PhoneListSpec): PhoneL
 			name.appendText(' ');
 			name.createSpan({ cls: 'dynasty-list-sob', text: quote(sob) });
 		}
-		const years = spec.showDates ? dateLine(p, g.dates) : undefined;
+		const years = spec.showDates ? dateLineParts(p, g.dates) : undefined;
 		const title = label?.title ?? p.title;
 		// D210: in a list about You the kind of link takes the place of the relation word. A strong word ("You", a place in the line) stays.
 		const shown = link && aboutYou && id !== me && !word?.strong ? null : word;
@@ -248,7 +263,7 @@ export function buildPhoneList(parent: HTMLElement, spec: PhoneListSpec): PhoneL
 		const parts = [
 			link ? createSpan({ cls: 'dynasty-list-link', text: link.text }) : null,
 			shown ? createSpan({ cls: ['dynasty-list-word', ...(shown.strong ? ['is-strong'] : [])], text: shown.text }) : null,
-			years ? createSpan({ cls: 'dynasty-list-years', text: years }) : null,
+			years ? yearsSpan(years) : null,
 			!large && title ? createSpan({ cls: 'dynasty-list-title', text: title }) : null,
 		];
 		if (parts.some(Boolean)) joined(text, 'dynasty-list-meta', parts, 'span');

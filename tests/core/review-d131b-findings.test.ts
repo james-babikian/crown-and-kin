@@ -97,11 +97,11 @@ describe('review D131b finding 3: names by marriage do not depend on the order o
 	const p = '{id: p, name: P, sex: m, parents: [m, q]}';
 	const tree = (people: string[]) => graph(`people:\n${people.map((l) => `  - ${l}`).join('\n')}\nunions:\n  - {partners: [m, s]}\n`);
 	for (const on of [true, false]) {
-		// Older fault, PLAN ideas for later.
-		it.skip(`setting ${on ? 'on' : 'off'}: M then Q, or Q then M, give the same names for P`, () => {
+		// Repaired in 0.5 step 1(d): the tree without M's blood links restores the name in every order.
+		it(`setting ${on ? 'on' : 'off'}: M then Q, or Q then M, give the same names for P`, () => {
 			const first = computeRelations(tree([...head, m, q, p]), 'm', { oneParentUnknown: on }).get('p')!.map((r) => r.text);
 			const second = computeRelations(tree([...head, q, m, p]), 'm', { oneParentUnknown: on }).get('p')!.map((r) => r.text);
-			// f458add: ["Son", "Nephew"] against ["Son", "Nephew", "Wife’s half-nephew"].
+			// Before the repair: ["Son", "Nephew"] against ["Son", "Nephew", "Wife’s half-nephew"].
 			expect(first).toEqual(second);
 		});
 	}

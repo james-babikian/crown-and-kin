@@ -2,7 +2,7 @@
 
 This file is generated. Do not edit it by hand. Change `scripts/format/keys.ts` and run `npm run format-doc`.
 
-Format 1 is the form of the tree text in plugin version 0.3 and in every plugin version 1.x. Format 1 has 66 keys, 3 of them reserved. The plugin reads the other 63. The README has a short example of a tree.
+Format 1 is the form of the tree text in plugin version 0.3 and in every plugin version 1.x. Format 1 has 67 keys, 3 of them reserved. The plugin reads the other 64. The README has a short example of a tree.
 
 ## The rules of Format 1
 
@@ -128,8 +128,8 @@ A list of maps under `people:`. One item for each person. The order of the list 
 | `card-title` | The ID of the title that the card shows, with its reign. It replaces a written `title`. It picks one title when the person holds several. | A title ID. A number is read as text. Curly quote marks around the ID are not removed: they stay part of the ID. If the person does not hold the title, the plugin shows a warning. | Plain text. "Show on the card" writes it. The plugin removes it when the person loses the last holder entry of that title. | 0.2 |
 | `house` | The ID of the house of the person. | A house ID. A number is read as text. A pair of curly quote marks around the ID is ignored. If no house has this ID, the plugin shows a warning. | Plain text. | 0.1 |
 | `sex` | Write `m` for a man or `f` for a woman. It sets the look of the card, the order of partners, the relation names and the line of succession. A word such as `male` gives a warning. | Any text. Only `m` and `f` (lower case) mean a man and a woman. Any other text is a value of its own, with a neutral card. A spelling such as `male` or `Female` gives a warning, and the plugin does not read it as `m` or `f`. | Plain text. | 0.1 |
-| `born` | When the person was born. You can write any text. The line of succession and the phone list read a year in it. | Free text. The plugin never reads it as a date. | Plain text if plain YAML reads it back as the same text. If not, in double quotes. A value that you wrote in quotes keeps its quotes when the plugin changes it. | 0.1 |
-| `died` | When the person died. You can write any text. The line of succession and the phone list read a year in it. | Free text. The plugin never reads it as a date. The words false, no, alive, living and never mean that the person is alive. A doubtful word such as "?" or unknown counts as dead, with a warning. | Plain text if plain YAML reads it back as the same text. If not, in double quotes. A value that you wrote in quotes keeps its quotes when the plugin changes it. | 0.1 |
+| `born` | When the person was born. You can write any text. The line of succession, the phone list and the relation names read a year in it. | Free text. The plugin reads a year in it. Relation names use the year only if the text is one exact year or date, for example 1135 or 12 May 1135. A text such as c. 1135 or before 1135 has no effect on them. | Plain text if plain YAML reads it back as the same text. If not, in double quotes. A value that you wrote in quotes keeps its quotes when the plugin changes it. | 0.1 |
+| `died` | When the person died. You can write any text. The line of succession, the phone list and the relation names read a year in it. | Free text. The plugin reads a year in it. Relation names use the year only if the text is one exact year or date, for example 1135 or 12 May 1135. A text such as c. 1135 or before 1135 has no effect on them. The words false, no, alive, living and never mean that the person is alive. A doubtful word such as "?" or unknown counts as dead, with a warning. | Plain text if plain YAML reads it back as the same text. If not, in double quotes. A value that you wrote in quotes keeps its quotes when the plugin changes it. | 0.1 |
 | `parents` | The parents of the person. Write an ID, or write the keys `id` and `type` for a parent. | A list. One entry that is not in a list is accepted. A plain ID is a birth parent. At most 2 parents of one type, and 8 rumoured parents. More gives a warning. The setting "Warn about more than 2 parents of a type" turns off the warning for birth, adoptive and ward parents. | A flow list on one line. A block list that you typed keeps its form, and the plugin adds an entry to it. A birth parent is a plain ID. Any other type is a map: `{id: aldric, type: adoptive}`. | 0.1 |
 | `placement` | Which parents decide where the card stands: the birth parents, the adoptive parents or the ward parents. | `birth`, `adoptive` or `ward`, in lower case. Another text gives a warning. A type that the person has no parents of gives a warning, and the plugin chooses itself. | Plain text. | 0.1 |
 | `illegitimate` | The person was born outside a marriage. Write `illegitimate: true`. The sign is on the line to the birth parents. | "true" or "yes" in any case is on. Any other text, or no key, is off. | `true`. To turn it off, the plugin removes the key. A text that already means on stays as written. | 0.1 |
@@ -161,10 +161,11 @@ A list of maps under `unions:`. One item for each partnership.
 | `id` | The short name of the partnership. It is needed only when two partnerships have the same two partners, or when a person uses `union`. | Text. A number is read as text. A pair of curly quote marks around the ID is ignored. If two partnerships have the same ID, the plugin shows the tree but does not let you edit it. | Plain text. The plugin adds it only when it must name a partnership. | 0.1 |
 | `partners` | The two people of the partnership. | A list of exactly 2 person IDs. One ID that is not in a list is read as a list of one ID. A partnership needs 2, so any other count, one ID too, gives a warning and the plugin skips the partnership. For three people, write one partnership for each pair. | A flow list on one line. | 0.1 |
 | `type` | The kind of partnership: marriage, betrothal, concubinage or affair. | The four names, in any case. Also `engaged` (betrothal), `mistress`, `lover` and `liaison` (affair) and `concubine` (concubinage). No type is a marriage. Any other word is drawn as a marriage, with a warning only if it is close to a known type. | Plain text. The plugin writes `type` for every kind except a marriage. It writes `type: marriage` only for the partnership that it makes when you add a second parent. | 0.1 |
-| `start` | When the partnership started. | Free text. The plugin never reads it as a date. | Plain text if plain YAML reads it back as the same text. If not, in double quotes. A value that you wrote in quotes keeps its quotes when the plugin changes it. | 0.1 |
-| `end` | When the partnership ended. | Free text. The plugin never reads it as a date. | Plain text if plain YAML reads it back as the same text. If not, in double quotes. A value that you wrote in quotes keeps its quotes when the plugin changes it. | 0.1 |
+| `start` | When the partnership started. You can write any text. The relation names read a year in it. | Free text. The plugin reads a year in it. Relation names use the year only if the text is one exact year or date, for example 1135 or 12 May 1135. A text such as c. 1135 or before 1135 has no effect on them. | Plain text if plain YAML reads it back as the same text. If not, in double quotes. A value that you wrote in quotes keeps its quotes when the plugin changes it. | 0.1 |
+| `end` | When the partnership ended. You can write any text. The relation names read a year in it. | Free text. The plugin reads a year in it. Relation names use the year only if the text is one exact year or date, for example 1135 or 12 May 1135. A text such as c. 1135 or before 1135 has no effect on them. | Plain text if plain YAML reads it back as the same text. If not, in double quotes. A value that you wrote in quotes keeps its quotes when the plugin changes it. | 0.1 |
+| `ended-by` | Why a marriage ended: divorce, annulment or death. After a divorce or an annulment, the relation names of the partner and the relatives by marriage have the word "former". | One of the values (see Values), in any case. Also `divorced` (divorce) and `annulled` (annulment). Any other text, a list or a map has no effect, and the plugin gives no warning. Only a marriage, or a partnership with its own type word, uses it. With the value `death`, the end year does not make the marriage "former". | Plain text, one of the three values. "Not known" removes the key. A text that you wrote by hand and that means the same value stays as written. | 0.5 |
 
-Write order: `id`, `partners`, `type`, `start`, `end`.
+Write order: `id`, `partners`, `type`, `start`, `end`, `ended-by`.
 
 ## Values
 
@@ -179,6 +180,7 @@ Some keys take one of a fixed list of values. The plugin compares the values aft
 | people | `placement` | `birth`, `adoptive`, `ward` | None |
 | a parent entry | `type` | `birth`, `adoptive`, `ward`, `rumoured` | None |
 | unions | `type` | `marriage`, `betrothal`, `concubinage`, `affair` | `engaged` = `betrothal`, `mistress` = `affair`, `lover` = `affair`, `liaison` = `affair`, `concubine` = `concubinage` |
+| unions | `ended-by` | `divorce`, `annulment`, `death` | `divorced` = `divorce`, `annulled` = `annulment` |
 
 ## Forms that the plugin accepts without a warning
 
@@ -191,6 +193,7 @@ Some keys take one of a fixed list of values. The plugin compares the values aft
 - `true` and `yes` in any case are on for `illegitimate`, `childless`, `inherit-adopted` and `heirs-of-body`.
 - The old names of the succession values (see Values) are read as the current value and stay as written.
 - A partnership type in any case, and the words `engaged`, `mistress`, `lover`, `liaison` and `concubine`, are read as a known type (see Values).
+- A value of `ended-by` in any case, and the words `divorced` and `annulled`, are read as a known value (see Values).
 - A parent type in any case (`Adoptive`) is read as the known type.
 - A `through-spouse` value in any case, and an ID after it with curly quote marks.
 - The words false, no, alive, living and never in `died` mean that the person is alive.
@@ -277,4 +280,5 @@ The plugin keeps these keys and never reads them. It never writes them.
 
 - A newer version reads without error every tree that an older version wrote. The sample trees of the versions 0.1.0 and 0.2.0 are part of the tests.
 - The meaning of an old word can change. Since version 0.2.8, the partnership types `engaged`, `mistress`, `lover`, `liaison` and `concubine` mean a known type. Before, the plugin drew them as a marriage.
+- Since version 0.5, the partnership key `ended-by` says why a marriage ended. An older version keeps the key and ignores it.
 - An older version keeps the keys that it does not know when it writes the note. It does not show them. Update the plugin on all your devices.

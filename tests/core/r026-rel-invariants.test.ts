@@ -3,6 +3,7 @@ import { deriveFamilies, type FamilyGraph } from '../../src/core/derive';
 import { parseDynasty } from '../../src/core/parse';
 import { computeRelations, findRelation, type RelationOptions } from '../../src/core/relations';
 import { rng } from '../support/rng';
+import { graphOf, treeR, treeR2, treeX, wordsOf, type Tree } from './r05-marriage-years-trees';
 
 // D176: invariants of the rule on random trees with rumoured parents and double cousins. All names are made up.
 
@@ -111,5 +112,31 @@ describe('D176 invariants on random trees (3 seeds, both settings)', () => {
 				expect(some).toBeGreaterThan(0);
 			}, 120_000);
 		}
+	}
+});
+
+describe('0.5 step 1a-B: the words by marriage and the years never depend on the order (RULES §7: rows 6, 26, 27 and 50)', () => {
+	// Every pair of people reads the same in 40 shuffles of the people, of the unions and of each `parents` list, with both settings.
+	const trees: [string, Tree][] = [
+		['R (rows 6 and 26: one marriage ended, one open)', treeR()],
+		['R2 (row 27: both ended)', treeR2()],
+		['X (row 50: Ola and two brothers, rule D)', treeX()],
+	];
+	for (const [name, tree] of trees) {
+		it(name, () => {
+			const rand = rng(50_001);
+			const ids = tree.people.map((x) => x.id);
+			const read = (g: ReturnType<typeof graphOf>, on: boolean) => ids.flatMap((a) => ids.filter((b) => b !== a).map((b) => `${a}>${b} ${wordsOf(g, a, b, { oneParentUnknown: on })}`));
+			for (const on of [true, false]) {
+				const want = read(graphOf(tree), on);
+				// The words of the pairs of the rows must be there, so the comparison is not empty.
+				expect(want.filter((l) => /former|wife|husband|sister-in-law|brother-in-law|stepmother|father’s wife/i.test(l)).length).toBeGreaterThan(0);
+				for (let round = 0; round < 40; round++) {
+					const people = shuffled(tree.people, rand).map((x) => ({ ...x, parents: shuffled(x.parents ?? [], rand) }));
+					const unions = shuffled(tree.unions, rand);
+					expect(read(graphOf(tree, undefined, people, unions), on), `round ${round}, setting ${on}`).toEqual(want);
+				}
+			}
+		});
 	}
 });

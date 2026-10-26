@@ -44,6 +44,9 @@ import { DEFAULT_SETTINGS, type DynastySettings } from '../view/settings';
 import type { SuccessionDrawn } from '../view/succession-view';
 import { OPEN_GAP_MS, type OpenTime, type FullSource, type FullHost, type ViewPlace, type FoldAnchor, type Anchor, type KeepPlace, type PictureInfo } from './tree-view-types';
 
+/** Elements that `refocusAfterRedraw` focused and whose `focus` event has not come yet, each with the call that ends the mark. */
+const restoreMarks = new WeakMap<Element, () => void>();
+
 /** Whether an element shows its keyboard focus ring now; an engine with no `:focus-visible` shows it on every focus. */
 export function showsRing(el: Element): boolean {
 	try {
@@ -597,6 +600,32 @@ export abstract class TreeViewBase extends MarkdownRenderChild implements HoverP
 	}
 
 	/**
+	 * True once for the `focus` event of an element that `refocusAfterRedraw` marked: a restored focus is not a move of the user to a control, so it keeps the
+	 * place of the view. A mark and not a time window: Chromium holds the event while the page has no OS focus and sends it after the code returned.
+	 */
+	static takeRestoreMark(el: Element): boolean {
+		const clear = restoreMarks.get(el);
+		clear?.();
+		return !!clear;
+	}
+
+	/** Marks `el` for `takeRestoreMark`. The mark ends at the next input of the user or when `el` loses the focus, so a later Tab focus never uses it. */
+	private static markRestore(el: HTMLElement): void {
+		restoreMarks.get(el)?.();
+		const win = el.win;
+		const clear = () => {
+			restoreMarks.delete(el);
+			el.removeEventListener('blur', clear);
+			win.removeEventListener('pointerdown', clear, true);
+			win.removeEventListener('keydown', clear, true);
+		};
+		restoreMarks.set(el, clear);
+		el.addEventListener('blur', clear);
+		win.addEventListener('pointerdown', clear, true);
+		win.addEventListener('keydown', clear, true);
+	}
+
+	/**
 	 * G5 0.4 (WCAG 2.4.3): a window of the tree closed, and Obsidian gave the focus back to the element that had it when the window opened. After a write the
 	 * redraw has replaced that element (a card, Expand), so the focus fell to the page. This puts it on the same place in the new drawing: `find` in the views that
 	 * `match` picks. Only while the focus is on no control and no window of the plugin is open (an Undo Notice does not count: it holds no focus); it looks again a little later, as the redraw can come after the close.
@@ -612,7 +641,11 @@ export abstract class TreeViewBase extends MarkdownRenderChild implements HoverP
 		const active = doc.activeElement;
 		const free = !active || active === doc.body || !active.isConnected;
 		// Obsidian's own restore passes `focusVisible` too: no ring after a mouse close of a window opened by a mouse.
-		if (target && free && !pluginWindowOpen()) target.focus({ preventScroll: true, focusVisible } as FocusOptions);
+		if (target && free && !pluginWindowOpen()) {
+			// The focus listener of the card must not pan a card that is still partly in view (keep place, D245).
+			TreeViewBase.markRestore(target);
+			target.focus({ preventScroll: true, focusVisible } as FocusOptions);
+		}
 		const wait = [150, 600][step];
 		if (wait !== undefined) (doc.defaultView ?? window).setTimeout(() => TreeViewBase.refocusAfterRedraw(host, match, find, focusVisible, step + 1), wait);
 	}

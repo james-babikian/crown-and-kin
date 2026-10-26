@@ -13,6 +13,7 @@ export const PERF_FILES = [
 	'tests/acceptance/m11-review-speed.test.ts',
 	'tests/view/dates43-speed.test.ts',
 	'tests/layout/fuzz.test.ts',
+	'tests/core/r05-g2-fuzz-order.test.ts',
 	'tests/obsidian/g2-k-timing.test.ts',
 	'tests/obsidian/g2b-k-timing.test.ts',
 	'tests/view/names-render-speed.test.ts',
@@ -60,8 +61,8 @@ export default defineConfig({
 		// (16 test files at once, or another agent's run) is slow for seconds, and the limits are meant for a quiet moment. A real slowdown fails every time.
 		tags: [{ name: 'timing', retry: { count: 3, delay: 1500 } }],
 		projects: [
-			{ extends: true, test: { name: 'fast', include: ['tests/**/*.test.ts'], exclude: PERF_FILES } },
-			{ extends: true, test: { name: 'perf', include: PERF_FILES } },
+			{ extends: true, test: { name: 'fast', include: ['tests/**/*.test.ts'], exclude: [...PERF_FILES] } },
+			{ extends: true, test: { name: 'perf', include: [...PERF_FILES] } },
 		],
 	},
 });

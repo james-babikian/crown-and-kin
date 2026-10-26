@@ -2,6 +2,57 @@
 
 All notable changes for users. The newest version is first.
 
+## 0.5.0
+
+### Before you update: relation words and years
+
+- **Relation words now read years.** The plugin reads the years in `born`, `died`, `start` and `end`. If your tree has such years, some cards show a new word. The text of your notes does not change.
+- **Step words follow the years of the marriage.** If the marriage ended before the child was born, or began after the child died, the card says "Father's wife" in place of "Stepmother". A marriage ends at its end year or at the death of a partner. If the marriage and the life of the child overlap, the card says "Stepmother" as before.
+- **A divorce gives the word "Former".** A card says "Former husband", "Former wife", "Former stepmother" or "Former sister-in-law" when a marriage ended by a divorce or an annulment. The plugin knows this in two ways. You choose "Ended by" in the partnership window. Or the end year is before the death years of both partners.
+- **Only exact years count.** A year such as 1130 or "12 May 1130" counts. A text such as "c. 1130", "after 1130" or "1130s" does not. For such a text, the card keeps the old word.
+- **A date in your own calendar counts only if the tree names a calendar note.** See "Before you update: calendars" in version 0.4.0.
+- **Two devices with different versions show different words** until both have 0.5.0. An older version keeps the new key `ended-by` and ignores it.
+
+### Relation words
+
+- **The relation finder uses the same words.** The sentence and the steps say, for example, "Ola is Ned's former wife."
+- **A death never adds a word.** There is no "Late wife" and no "Widow". If the sister of your former wife died before the divorce, her card says "Sister-in-law", not "Former sister-in-law".
+- **Names by marriage no longer depend on the order of the people in the note.** A name such as "Wife's half-nephew" now shows in every order. The list "Also" can show more names than before. The first word of a card does not change.
+- **A name with an adoptive link no longer depends on the order.** If a person is related through a birth link and through an adoptive link at the same distance, the card gives the birth word.
+
+### Partnership window
+
+- **New choice "Ended by".** The choices are Not known, Divorce, Annulment and Death. The choice shows for a marriage and for a partnership with a type that you wrote yourself. It does not show for a betrothal, a concubinage or an affair. "Death" gives no "Former" word. The plugin writes the key `ended-by` in the tree text.
+
+### Phone list
+
+- **A colour bar at the top.** The person at the top of the list has the same house colour bar as the other rows. The bar also shows when the house has arms. A person with no house gets a grey bar. The name starts a little to the right, so a long name can wrap sooner.
+- **Dates with right-to-left words keep their order.** Before, a date such as "1108–1170" after an Arabic word could show as "1170–1108".
+
+### Tree
+
+- **Small tags in place of some long lines.** Take a couple on two rows, where the lower partner stands between two of her or his partners. The tree now shows a small tag with the partner's name under each of the two cards. Tap the tag to go to the partner. Before, a long line went around the tree and crossed other lines.
+
+### Repairs
+
+- **Settings stay safe during a sync.** A sync program can write the settings file of the plugin in two parts. Before, a setting change at that moment set all settings back to their default values. Now the plugin keeps your settings.
+- **Screen readers.** The spoken name of the button "Add person" now starts with "Add person", so voice control finds it. A child row in the person window now also says the year and the sobriquet, as the row shows them.
+
+### Calendars
+
+- **The hint of the Marker field is clearer.** The field now tells you to write one short word, for example "planet". Then you write the same word in curly brackets in a format. The field still accepts a word with curly brackets.
+
+### Known limits
+
+- A curved line for a rumoured link, or for a parent who is drawn elsewhere, can pass over a card. A better route for these lines comes later.
+- A lover at the end of a group of partners can still have a long line that crosses other lines.
+- A name tag with a long name can show only part of the name.
+- The cards and the person window do not yet keep the order of a date with right-to-left words.
+- A name by marriage that differs from another name only by "adoptive" or "rumoured" does not show. For example, "Wife's adoptive half-nephew" does not show.
+- A divorce gives the word "Former" only if you choose "Ended by", or if the end year is before the death years of both partners and all three years are exact. Otherwise no word changes.
+- If a child is born in the year after the father died, the card of the father's wife says "Father's wife", not "Stepmother". The plugin cannot know that the child was conceived before the death.
+- If a CSS snippet loads the font of your notes, a saved picture uses a standard font. A long name can then be wider than its card.
+
 ## 0.4.0
 
 ### Before you update: calendars

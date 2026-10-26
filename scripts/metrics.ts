@@ -1,5 +1,6 @@
 import type { FamilyGraph } from '../src/core/derive';
-import type { Rect, TreeLayout } from '../src/layout/model';
+import type { EdgeDrawing, Rect, TreeLayout } from '../src/layout/model';
+import { legCrossings } from './layout-legs';
 
 export interface LayoutMetrics {
 	people: number;
@@ -11,11 +12,18 @@ export interface LayoutMetrics {
 	siblingOrderViolations: number;
 	/** Crossings between parent→child drops of adjacent generations (a readability proxy). */
 	crossings: number;
+	/**
+	 * D303 (0.5): crossings that the legs of couples on two rows make with the lines of other families, straight lines and side-link curves both
+	 * (`legCrossings`, scripts/layout-legs.ts). `crossings` above does not count couple lines and its meaning does not change. Present only
+	 * when the drawn lines are given to `measureLayout`.
+	 */
+	legCrossings?: number;
 	width: number;
 	height: number;
 }
 
-export function measureLayout(g: FamilyGraph, layout: TreeLayout): LayoutMetrics {
+/** The metrics of a finished layout; pass its `edges` too to get `legCrossings`. */
+export function measureLayout(g: FamilyGraph, layout: TreeLayout, edges?: EdgeDrawing): LayoutMetrics {
 	const box = (id: string) => layout.persons.get(id)!;
 	// Positions along a generation: x in rows, y in sideways columns (D24).
 	const side = layout.orientation === 'sideways';
@@ -64,6 +72,7 @@ export function measureLayout(g: FamilyGraph, layout: TreeLayout): LayoutMetrics
 		couplesSameRow,
 		siblingOrderViolations,
 		crossings,
+		...(edges ? { legCrossings: legCrossings(g, layout, edges) } : {}),
 		width: Math.round(layout.width),
 		height: Math.round(layout.height),
 	};

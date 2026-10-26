@@ -418,10 +418,18 @@ export default class DynastyTreePlugin extends Plugin implements TreeHost, Setti
 		for (const v of [...this.views]) v.startUpDone();
 	}
 
-	/** Reads `data.json`. `ok` is false when the file cannot be read (a sync tool may be half way through a write): the caller decides what that means. */
+	/**
+	 * Reads `data.json`. `ok` is false when the file cannot be read (a sync tool may be half way through a write): the caller decides what that means.
+	 * Obsidian does not throw for a half file. It logs "failed to read JSON" and gives `undefined`; `null` means that there is no file.
+	 */
 	private async readData(): Promise<{ ok: true; data: unknown } | { ok: false }> {
 		try {
-			return { ok: true, data: await this.loadData() };
+			const data: unknown = await this.loadData();
+			if (data === undefined) {
+				console.error('Crown and Kin: cannot read the settings (the file is not complete)');
+				return { ok: false };
+			}
+			return { ok: true, data };
 		} catch (e) {
 			console.error('Crown and Kin: cannot read the settings', e);
 			return { ok: false };

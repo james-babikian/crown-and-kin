@@ -47,6 +47,8 @@
 	overflow-y: auto;
 	overflow-x: hidden;
 	overscroll-behavior: contain;
+	/* The Cancel and Save bar is not on top of the body (a computer: the foot under it; a phone: the bar above it), so the body's own edge is enough; the air keeps the hint of a field off that edge when the field is scrolled into view. */
+	scroll-padding-bottom: 12px;
 	padding: 22px 24px 12px;
 	display: flex;
 	flex-direction: column;
