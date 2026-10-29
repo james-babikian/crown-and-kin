@@ -1,5 +1,5 @@
 /*
- * What the years and the `ended-by` key say about a marriage (0.5 step 1a, D304 to D309; an internal study §A and §4).
+ * What the years and the `ended-by` key say about a marriage (D304 to D309).
  * `relations.ts` asks four things: is the marriage ENDED (a divorce or annulment, or an exact end year before both exact death years),
  * are its years APART from the life of one person (so a step word does not hold), is it FORMER for the person on the blood side of a
  * word (ENDED, and that person did not die before the exact end year: D309, rule F4), and what the exact years of a person are. A year
@@ -13,7 +13,7 @@ import { readEndedBy } from './types';
 
 /** The exact years of one marriage, worked out once. */
 interface UnionYears {
-	/** ENDED (RULES §A): the marriage ended by a divorce or an annulment, or (no `ended-by: death`) by an exact end year before both exact death years. */
+	/** ENDED: the marriage ended by a divorce or an annulment, or (no `ended-by: death`) by an exact end year before both exact death years. */
 	ended: boolean;
 	/** The exact year of `end`. */
 	end?: number;
@@ -23,6 +23,7 @@ interface UnionYears {
 	start?: number;
 }
 
+/** The exact years of the marriages of a tree, worked out when asked and kept for each person and union. */
 export class MarriageYears {
 	private readonly births = new Map<string, number | undefined>();
 	private readonly deaths = new Map<string, number | undefined>();
@@ -62,7 +63,7 @@ export class MarriageYears {
 		return out;
 	}
 
-	/** ENDED (RULES §A) for a marriage. */
+	/** ENDED for a marriage. */
 	ended(fu: FamilyUnion): boolean {
 		return this.of(fu).ended;
 	}
@@ -83,7 +84,7 @@ export class MarriageYears {
 	}
 
 	/**
-	 * The years' verdict on a word of a pair, from every marriage of the partners (RULES §2.1): `[step, former]`. `step` says if the step
+	 * The years' verdict on a word of a pair, from every marriage of the partners: `[step, former]`. `step` says if the step
 	 * word holds: the word kinds 'step' hold if some marriage may overlap the life of one person of `ks` (not APART). `former` says if
 	 * the name gets "former": a 'step' word and a 'named' word (an in-law or "by marriage" name) when every marriage that counts is FORMER
 	 * for the people of `blood`; a possessive form, and a step word that fails, when every marriage is ENDED (rule P).

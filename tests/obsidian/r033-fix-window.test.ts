@@ -95,13 +95,13 @@ describe('item 7: the Calendars window', () => {
 		typeInto(c, `${cal}-name`, 'The Far Count');
 		expect(body().getAttribute('aria-label')).toBe('The Far Count');
 		expect(c.querySelector('.dynasty-cal-remove-cal')!.getAttribute('aria-label')).toBe(T.removeCalendar('The Far Count'));
-		expect(T.removeCalendar('The Far Count')).toBe('Remove the calendar The Far Count');
+		expect(T.removeCalendar('The Far Count')).toBe('Remove this calendar: The Far Count');
 		const key = c.querySelector('.dynasty-cal-list')!.getAttribute('data-list')!;
 		typeInto(c, `list-${key}-name`, 'Moons');
-		expect(c.querySelector('.dynasty-cal-remove-list')!.getAttribute('aria-label')).toBe('Remove the name list Moons');
+		expect(c.querySelector('.dynasty-cal-remove-list')!.getAttribute('aria-label')).toBe('Remove this list: Moons');
 		typeInto(c, `${cal}-name`, '');
 		expect(body().getAttribute('aria-label')).toBe(T.kindCycles);
-		expect(c.querySelector('.dynasty-cal-remove-cal')!.getAttribute('aria-label')).toBe('Remove the calendar without a name');
+		expect(c.querySelector('.dynasty-cal-remove-cal')!.getAttribute('aria-label')).toBe('Remove this calendar: without a name');
 	});
 	it('the note about a marker that no list has follows every change of a format', async () => {
 		const o = await openWindow({ 'Calendars.md': NOTE });

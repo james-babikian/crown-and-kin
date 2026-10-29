@@ -111,29 +111,30 @@ describe('F10b: one word for the default', () => {
 	});
 });
 
-describe('F7: the computer edit window starts in Name', () => {
+describe('F7 (changed in 0.5.1): the edit window starts with no field focused', () => {
 	const nameInput = (modal: FEl) => modal.querySelector('[data-field="name"] input') as FEl;
 
-	it('a saved person: the focus is in Name, also when Obsidian moves it to the first control after the open', async () => {
+	it('a saved person: the window takes the focus back when Obsidian moves it to the first control after the open', async () => {
 		const { modal } = open();
 		// What Obsidian does on a computer: the focus goes to the first control of the window ("Add portrait or arms").
 		modal.querySelector('.dynasty-add-portrait')!.focus();
 		await settle();
-		expect(fakeDoc.activeElement).toBe(nameInput(modal));
+		runTimers(300);
+		expect(fakeDoc.activeElement).toBe(modal);
 	});
 
-	it('a saved person with the focus left on the page: still Name', async () => {
+	it('a saved person with the focus left on the page: the window has it, not Name', async () => {
 		const { modal } = open();
 		await settle();
-		expect(fakeDoc.activeElement).toBe(nameInput(modal));
+		expect(fakeDoc.activeElement).toBe(modal);
+		expect(fakeDoc.activeElement).not.toBe(nameInput(modal));
 	});
 
 	it('a touch screen: the focus is not put in Name, so the keyboard stays closed', async () => {
 		device.coarse = true;
 		const { modal } = open();
 		await settle();
-		expect(fakeDoc.activeElement).not.toBe(nameInput(modal));
-		expect(modal.contains(fakeDoc.activeElement)).toBe(true);
+		expect(fakeDoc.activeElement).toBe(modal);
 	});
 
 	it('a narrow window (a phone): the focus is not put in Name', async () => {
@@ -230,9 +231,16 @@ describe('F6: Save in a large tree shows at once that it saves', () => {
 describe('F7b: Enter in a single-line field ends the entry and never saves', () => {
 	const nameInput = (modal: FEl) => modal.querySelector('[data-field="name"] input') as FEl;
 
+	/** The user taps Name: a press in the window, then the focus. */
+	const tapName = async (modal: FEl) => {
+		await settle();
+		dispatch(modal, 'pointerdown');
+		nameInput(modal).focus();
+	};
+
 	it('Enter in Name: the field loses the focus, nothing is written, the window stays open', async () => {
 		const { h, modal } = open();
-		await settle();
+		await tapName(modal);
 		expect(fakeDoc.activeElement).toBe(nameInput(modal));
 		type(nameInput(modal), 'Brand');
 		const e = dispatch(nameInput(modal), 'keydown', { key: 'Enter', isComposing: false, keyCode: 13 });
@@ -246,7 +254,7 @@ describe('F7b: Enter in a single-line field ends the entry and never saves', () 
 
 	it('an input method that accepts its text with Enter (keyCode 229, isComposing) is left alone', async () => {
 		const { modal } = open();
-		await settle();
+		await tapName(modal);
 		const a = dispatch(nameInput(modal), 'keydown', { key: 'Enter', isComposing: true, keyCode: 229 });
 		const b = dispatch(nameInput(modal), 'keydown', { key: 'Enter', isComposing: false, keyCode: 229 });
 		expect(a.defaultPrevented).toBe(false);

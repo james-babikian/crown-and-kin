@@ -80,7 +80,7 @@ export function drawBudget(from: number, now: () => number = () => performance.n
 
 /**
  * Asks for the relation names of `ids` in groups, checking `shouldStop` after each group (spec §7.7); a group is one request, so no group is cut in the middle.
- * Without a check it is one request, as in 0.2.8. `ask` is the lookup's `getMany`.
+ * Without a check it is one request. `ask` is the lookup's `getMany`.
  */
 export function askInGroups(ask: (ids: string[]) => unknown, ids: Iterable<string>, shouldStop?: () => boolean): void {
 	if (!shouldStop) {

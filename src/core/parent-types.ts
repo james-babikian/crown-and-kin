@@ -9,7 +9,7 @@ export const PARENT_TYPES = ['birth', 'adoptive', 'ward', 'rumoured'] as const;
 export type ParentType = (typeof PARENT_TYPES)[number];
 
 /**
- * The most parents of each type that a person may have (0.2.8 contract B.3). Birth, adoptive and ward parents warn above 2;
+ * The most parents of each type that a person may have. Birth, adoptive and ward parents warn above 2;
  * a rumoured parent is a guess, so a person may have more of them. Read by the family query, the warning text and the relation rules.
  */
 export const PARENT_LIMIT: Record<ParentType, number> = { birth: 2, adoptive: 2, ward: 2, rumoured: 8 };

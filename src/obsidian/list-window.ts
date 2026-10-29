@@ -1,6 +1,6 @@
 /*
  * The shell of the Titles window and the Houses window as a searchable list with an edit page (spec §6.10,
- * §13.4, §13.16 rule 5; D134, D138; 0.2.8 contract C). It draws the frame of the window family (`window-shell.ts`: a footer
+ * §13.4, §13.16 rule 5; D134, D138). It draws the frame of the window family (`window-shell.ts`: a footer
  * with Cancel and Save on a computer, a bar on a phone), the header of the list (an icon, the name, the number of items), the
  * fixed search bar with the Add button, the list of rows, the edit page with its back link, the questions over the window and
  * the error line. It also owns the close rules (a question, then a page, then the discard question, then the window), the focus
@@ -11,12 +11,13 @@
 
 import { Modal, Notice, setIcon, type App } from 'obsidian';
 import type { EditResult, Op } from '../core/edit';
+import { holdLayoutOnPress } from '../render/dom/press-hold';
 import { HOUSES, ID_UI, REMOVE, SHEET, TITLES_UI, WIN_LIST_UI, WINDOW_UI, WRITE_TEXT } from '../render/ui-text';
 import type { Handle, HandleWriteOutcome } from './block-handle';
 import { idRefusalText, isIdOp } from '../view/id-draft';
 import { type IdRowView } from './id-field';
 import { queryWords } from '../view/list-search';
-import { phoneLayout, settledReveal } from './modal-layout';
+import { phoneLayout, settledReveal, startWithoutFocus } from './modal-layout';
 import type { PictureStore } from './picture-store';
 import { trackModal } from '../view/plugin-modals';
 import { drawableColour, nameDialog, onWriteFailed, showErrorLine } from './sheet-parts';
@@ -224,7 +225,7 @@ export abstract class ListEditWindow extends Modal {
 		void list;
 	}
 
-	/** True when the owner asks the system for less motion (D126): the scroll into view then jumps. */
+	/** True when the user asks the system for less motion (D126): the scroll into view then jumps. */
 	protected reduced(): boolean {
 		return false;
 	}
@@ -246,7 +247,7 @@ export abstract class ListEditWindow extends Modal {
 		this.modalEl.addClass('dynasty-sheet');
 		this.modalEl.addClass(this.modalClass);
 		this.modalEl.addClass('dynasty-lw');
-		// One scroll after the keyboard has settled, not one at each step of its slide (M1 to M3).
+		// One scroll after the keyboard has settled, not one at each step of its slide.
 		const settled = settledReveal(this.modalEl, this.contentEl, () => this.reduced());
 		this.cleanup.push(
 			phoneLayout(this, () => {
@@ -255,18 +256,17 @@ export abstract class ListEditWindow extends Modal {
 				this.growFields();
 				if (this.shell && this.modalEl.hasClass('is-phone') !== this.builtPhone) this.guard(() => this.build());
 			}),
-			trackModal(this, () => this.finish()),
+			trackModal(this, () => this.finish()), holdLayoutOnPress(this.modalEl),
 			settled.cancel,
 		);
-		// The keyboard can cover a field in the scrolling body: bring it into view when it gets the focus (C1).
+		// The keyboard can cover a field in the scrolling body: bring it into view when it gets the focus.
 		const reveal = () => settled.schedule(FOCUS_REVEAL_MS);
 		this.contentEl.addEventListener('focusin', reveal);
 		this.cleanup.push(() => this.contentEl.removeEventListener('focusin', reveal));
 		this.guard(() => this.opened());
 		this.guard(() => this.build());
-		// Keyboard users start at the top of the window; the search box must not take the focus (a phone keyboard would open).
-		this.modalEl.setAttribute('tabindex', '-1');
-		this.modalEl.focus({ preventScroll: true });
+		// No field takes the focus when the window opens (a phone keyboard would open).
+		this.cleanup.push(startWithoutFocus(this.modalEl));
 	}
 
 	override onClose(): void {
@@ -803,7 +803,7 @@ export abstract class ListEditWindow extends Modal {
 	}
 
 	/**
-	 * The one question before Save changes an id (C4): `lines` say what changes and how many people. Closing it is Cancel;
+	 * The one question before Save changes an id: `lines` say what changes and how many people. Closing it is Cancel;
 	 * the other button runs `go`.
 	 */
 	protected askIdChange(count: number, lines: string[], go: () => void): void {

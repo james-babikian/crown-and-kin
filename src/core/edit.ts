@@ -2,7 +2,7 @@
  * Edits of a block body through the `yaml` Document API (spec §3, §6.2). Pure: no `obsidian`
  * import. `yaml-edit.ts` implements `applyOp`.
  *
- * Formatting rules for a written value (see the decision notes):
+ * Formatting rules for a written value:
  * - Untouched nodes keep their comments, key order, quoting and flow style (§6.2).
  * - A changed value keeps its existing scalar style if that style can hold the new text;
  *   otherwise it is written plain if plain YAML reads it back as the same string, else in
@@ -131,7 +131,7 @@ export interface AddParent {
 	autoUnion?: boolean;
 }
 
-/** Add a union. If the pair already has one or more unions and the last-listed one has children, those children keep it: the op gives that union an `id` if it has none and sets `union:` on them (§4.3; the decision notes "Second union for a couple"). A union with no children gets no id. */
+/** Add a union. If the pair already has one or more unions and the last-listed one has children, those children keep it: the op gives that union an `id` if it has none and sets `union:` on them (§4.3). A union with no children gets no id. */
 export interface AddUnion {
 	kind: 'add-union';
 	partners: [string, string];
@@ -271,7 +271,7 @@ export interface AddTitle {
 
 /**
  * Rename a title or change its male name, female name, plural or succession keys; `null` (or empty text) removes the key.
- * The id changes only with `set-title-id` (§13.17). The succession fields (contract 0.2.7 A.3, K.3, K.4) must hold a canonical
+ * The id changes only with `set-title-id` (§13.17). The succession fields must hold a canonical
  * value, else `bad-value`; a person id in `heirs` or `exclude` that is not already written must name a person, else `unknown-person`.
  */
 export interface EditTitle {
@@ -288,7 +288,7 @@ export interface EditTitle {
 	inheritIllegitimate?: InheritIllegitimate;
 	/** `true` writes `true` unless the written text already reads as true; `false` removes the key. */
 	inheritAdopted?: boolean;
-	/** L.1: as `inheritAdopted`, for the key `heirs-of-body`; `null` removes the key like `false`. */
+	/** As `inheritAdopted`, for the key `heirs-of-body`; `null` removes the key like `false`. */
 	heirsOfBody?: boolean | null;
 	year?: string | null;
 	/** The named heirs in order; one id is written as a scalar, several as a flow list; `null` or `[]` removes the key. */
@@ -340,7 +340,7 @@ export interface SetHolders {
  * old id that no title has; `id-taken` for a title with `newId` or a person who writes
  * `card-title: <newId>`; `bad-value` as for `SetHouseId`.
  */
-export interface SetTitleId {
+interface SetTitleId {
 	kind: 'set-title-id';
 	id: string;
 	newId: string;

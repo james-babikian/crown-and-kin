@@ -4,7 +4,7 @@
  * `view/measured-layout.ts` calls `tallCardsFor` and `tallTitlesFor` before layout, and passes their answers in as
  * `settings.tallCards` and `settings.tallTitles` so the layout makes exactly these cards taller; `sameTall` lets it
  * skip a re-layout when an answer has not changed. The name is broken with `cardNameLines` and the room that `nameRoom` gives,
- * the same call that `scene.ts` and `svg-string.ts` make to draw it. 0.2.6 (D179): no picture narrows a name (the classic card is gone),
+ * the same call that `scene.ts` and `svg-string.ts` make to draw it. D179: no picture narrows a name (the classic card is gone),
  * so rule B (the lift) and the second name slot of D129 are gone too; the inner edge of the mark's border is passed to `nameRoom`
  * (the Roundel's room depends on it).
  */
@@ -17,8 +17,10 @@ import { cardText, nameRoom } from '../../layout/geometry';
 import { couldBeSigned } from '../../layout/illegitimate-sign';
 import type { Geometry, NameLineCount, NameRoom } from '../../layout/model';
 import type { BreakList } from '../break-words';
+import { marksForSvg } from '../date-bidi';
 import { cardNameLines, titleLines, type NameMeasure } from '../name-lines';
 import { ME_RING_INNER } from '../styles';
+import { reignShown } from '../tree-info';
 import type { Measure, SceneFonts } from '../scene-model';
 
 /** D29, D81: the people whose name needs two or three text lines (`tall`) and the ones that need three (`long`, a subset of `tall`), both sorted. */
@@ -39,8 +41,7 @@ export interface TallExtra {
  * D29, D37, D81: the people whose name needs two or three text lines on their card (`tall`) and those
  * that need three (`long`; a name that needs more is cut with "…" on the third), in every layout.
  * `geo` is the geometry the cards are drawn with (`drawnGeometry`); the width is the one `buildScene`
- * gives the name: the card's text width, less the D14 sign (`nameRoom`, spec §13.9). The name is measured in the note font's bold name font, the sobriquet in regular weight. With `labels`
- * (M8), the name measured is the card's name text line (`CardLabel.name`, "Roderick II", D58) and the sobriquet follows it (D122).
+ * gives the name: the card's text width, less the D14 sign (`nameRoom`, spec §13.9). The name is measured in the note font's bold name font, the sobriquet in regular weight. With `labels`, the name measured is the card's name text line (`CardLabel.name`, "Roderick II", D58) and the sobriquet follows it (D122).
  * People in `skip` (hidden by folds) are left out. The layout then makes exactly these
  * cards taller. Both lists are sorted, so equal sets compare equal. Pure but for `measure`.
  *
@@ -110,7 +111,8 @@ export function tallTitlesFor(g: FamilyGraph, labels: ReadonlyMap<string, CardLa
 	const out: string[] = [];
 	for (const p of g.people) {
 		const label = labels.get(p.id);
-		if (label?.reign && titleLines(label.title, label.reign, w, measure).length > 1) out.push(p.id);
+		// The reign as the card draws it (right-to-left dates isolated), so the decision measures the drawn text.
+		if (label?.reign && titleLines(label.title, marksForSvg(reignShown(label, label.reign, g.dates, 'none')), w, measure).length > 1) out.push(p.id);
 	}
 	return out.sort();
 }

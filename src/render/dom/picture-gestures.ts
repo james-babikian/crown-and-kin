@@ -10,6 +10,7 @@ export { swipeCloses } from './sheet-swipe';
 
 /** The zoom stays between these limits (D256 item 5). */
 export const ZOOM_MIN = 1;
+/** The largest zoom. */
 export const ZOOM_MAX = 4;
 /** A double tap on a picture at rest zooms to this factor. */
 export const DOUBLE_TAP_ZOOM = 2.5;
@@ -19,19 +20,24 @@ export const ZOOM_SNAP = 1.08;
 export const RASTER_GROWTH = 2;
 /** Two taps count as a double tap inside this time (ms) and this distance (px). */
 export const DOUBLE_TAP_MS = 320;
+/** The two taps of a double tap are this near (px). */
 export const DOUBLE_TAP_PX = 40;
 /** A finger that moves farther than this is not a tap. */
 export const TAP_SLOP_PX = 10;
 /** A sideways swipe needs this distance (px), or a flick of this speed (px per ms) over at least `FLICK_MIN_PX`. */
 export const SIDE_SWIPE_PX = 56;
+/** The speed of a flick that counts as a swipe (px per ms). */
 export const SIDE_FLICK = 0.45;
+/** The least distance of a flick (px). */
 export const FLICK_MIN_PX = 24;
 
+/** A width and a height in px. */
 export interface Size {
 	w: number;
 	h: number;
 }
 
+/** A point in px. */
 export interface Point {
 	x: number;
 	y: number;
@@ -44,6 +50,7 @@ export interface View {
 	y: number;
 }
 
+/** The picture at rest: no zoom and no move. */
 export const REST: View = { scale: 1, x: 0, y: 0 };
 
 /** A zoom factor inside the limits. */

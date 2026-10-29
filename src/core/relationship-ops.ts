@@ -24,7 +24,7 @@ import {
 import { REFUSAL_TEXT } from './refusal-text';
 
 /** The parsed body, its family graph, and other state a relationship op needs to run. */
-export interface OpContext {
+interface OpContext {
 	first: Parsed;
 	data: RawMap;
 	tree: Tree;
@@ -33,6 +33,7 @@ export interface OpContext {
 	keepStale?: boolean;
 }
 
+/** The key order of a union, for a key that is added. */
 export const UNION_ORDER = ['id', 'partners', 'type', 'start', 'end', 'ended-by'];
 const flowText = (v: string) => renderScalar(v, null, { flow: true, text: true, indent: '' });
 
@@ -165,7 +166,7 @@ function addPerson(ctx: OpContext, op: AddPerson): EditResult {
 	if (isRefusal(where)) return where;
 
 	const expected = clone(data) as RawMap;
-	// A child for a union that is not the pair's last-listed one names it (§4.3; the decision notes).
+	// A child for a union that is not the pair's last-listed one names it (§4.3).
 	const chosen = op.at?.kind === 'after-siblings' ? op.at.union : undefined;
 	// `placement` checked the ref against the union, so its partners are the union's partners.
 	const named = chosen === undefined ? undefined : unionToName(ctx, chosen.index, chosen.partners);
@@ -363,13 +364,13 @@ function addUnion(ctx: OpContext, op: AddUnion): EditResult {
 	if (!isEmpty(expected.unions) && !Array.isArray(expected.unions)) return refuse('bad-value', 'The unions section is not a list.');
 	const unions = Array.isArray(expected.unions) ? (expected.unions as RawMap[]) : [];
 
-	// The decision notes "Second union for a couple": the children of the pair's last-listed union keep it.
+	// The children of the pair's last-listed union keep it.
 	const listed = g.unions.filter((u) => !u.implicit && u.partners.includes(a) && u.partners.includes(b));
 	const last = listed[listed.length - 1];
 	let unionId: string | undefined;
 	let addId = false;
 	const keep: number[] = [];
-	// A union with no children needs no id (the decision notes "Relationship-op details").
+	// A union with no children needs no id.
 	if (last && last.unionIndex !== undefined && last.children.length) {
 		unionId = last.id;
 		if (unionId === undefined) {
@@ -441,8 +442,8 @@ function editUnion(ctx: OpContext, op: EditUnion): EditResult {
 }
 
 /**
- * Removes, in the expected data, the `union:` keys that name a union about to be removed
- * (the decision notes "Relationship-op details"). Returns the people (by index) whose key goes.
+ * Removes, in the expected data, the `union:` keys that name a union about to be removed.
+ * Returns the people (by index) whose key goes.
  */
 function dropUnionKeys(expected: RawMap, removed: Set<number>, skip?: number): number[] {
 	const unions = Array.isArray(expected.unions) ? (expected.unions as Raw[]) : [];
@@ -504,7 +505,7 @@ function placedFrom(raw: RawMap, byType: Map<string, string[]>): string[] {
 }
 
 /**
- * Keys a change to parent links leaves stale (the decision notes "Relationship-op details"): `placement`
+ * Keys a change to parent links leaves stale: `placement`
  * when the person no longer has a parent of that type, and `union` when it no longer names a union
  * of their placement parents. Only keys that were valid before the op go. `expected` is the data
  * after the op; the keys are removed from it here. `gone` is a person being deleted.
@@ -844,7 +845,7 @@ function deletePerson(ctx: OpContext, op: DeletePerson): EditResult {
 	if (options && clear.length && Object.keys(options).length === 0) delete expected.options;
 	// D57: the person's holder entries go in the same write; their titles stay.
 	const holders = dropHolders(expected, id);
-	// Contract 0.2.7 K.3: the person is no longer a named heir or an excluded person, in the same write.
+	// The person is no longer a named heir or an excluded person, in the same write.
 	const named = dropIds(expected, id);
 
 	const step: Step = (p) => {
@@ -884,7 +885,7 @@ function deletePerson(ctx: OpContext, op: DeletePerson): EditResult {
 }
 
 /** The ops this file implements: every `Op` except `batch` and the field, option, house and link-rewrite ops. */
-export type RelationshipOp = AddPerson | AddParent | AddUnion | EditUnion | RemoveUnion | SetParentType | RemoveParent | MoveSibling | DeletePerson;
+type RelationshipOp = AddPerson | AddParent | AddUnion | EditUnion | RemoveUnion | SetParentType | RemoveParent | MoveSibling | DeletePerson;
 
 /** Runs one relationship op by dispatching on its `kind`. */
 export function relationshipOp(ctx: OpContext, op: RelationshipOp): EditResult {

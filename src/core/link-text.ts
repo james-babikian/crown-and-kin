@@ -4,7 +4,7 @@
  * so every reader of a Markdown link treats a destination such as `Note%20(2).md` the same way.
  */
 
-/** True if every `)` in a Markdown destination closes an earlier `(` (contract A2: `Arms%20(old).png`). */
+/** True if every `)` in a Markdown destination closes an earlier `(` (for example `Arms%20(old).png`). */
 export function closesBalanced(dest: string): boolean {
 	let depth = 0;
 	for (const ch of dest) {

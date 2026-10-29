@@ -58,6 +58,7 @@ export interface ButtonRow extends RowText {
 	notice: string;
 }
 
+/** One row of the settings table. */
 export type SettingRow = ToggleRow | DropdownRow | HeightRow | NumberRow | AreaRow | ButtonRow;
 
 /** One group under a heading (D33). */
@@ -109,7 +110,7 @@ export const SETTING_GROUPS: readonly SettingGroupSpec[] = [
 	{
 		heading: t.groups.cards,
 		rows: [
-			// 0.2.8 contract A.4, D204: which cards show the arms of a house.
+			// Which cards show the arms of a house.
 			choice('armsOnCards', t.armsOnCards, t.armsOnCardsDesc, ARMS_ON_CARDS, { few: t.armsFew, all: t.armsAll }),
 			{ kind: 'area', key: 'breakWords', name: t.breakWords, desc: t.breakWordsDesc },
 			toggle('showDates', t.dates, t.datesDesc),

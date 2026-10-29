@@ -1,11 +1,11 @@
 /*
- * The nets of a gap between two rows and their lanes (the architecture notes §4.2.2, stage S4). A net is a horizontal piece (a couple line with
+ * The nets of a gap between two rows and their lanes (stage S4). A net is a horizontal piece (a couple line with
  * its dot, a hop of a passing line, a far dot of length 0, a sibling bar, a single parent's stem to a hang passage) with the verticals
  * that reach it from above and leave it downward, and zones: rectangles that hang on the net (a fold control's visible mark, which no
  * foreign line may cross, and its tap area, which no other tap area or tag may meet). Lane packing gives every net of a band the first
  * lane, in a crossing-aware order, where its line, its zones and the band's fixed zones (the controls of bar families and single
  * parents, the tags) are all clear. Every comparison of positions has the one tie rule `TIE`, and the order in which the nets are taken
- * is a total order that does not depend on the order they are given in (the architecture notes §4.2.7).
+ * is a total order that does not depend on the order they are given in.
  */
 import { TIE } from './geometry';
 

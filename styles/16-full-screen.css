@@ -134,7 +134,7 @@
 }
 
 /*
- * Phone layout (0.2.8, G.13): the bar sits at the bottom, flat, with a hairline above it and the safe area under it (spec §7.5): Add person, Houses,
+ * Phone layout: the bar sits at the bottom, flat, with a hairline above it and the safe area under it (spec §7.5): Add person, Houses,
  * Focus, Find, More, Close, spread over the width. Fit, Titles and the legend are in More.
  * D242: a phone held sideways has the same bar. `is-phone` is a window narrower than 600 px; `is-phone-side` is a phone (by its screen) whose window is
  * wider than high (`isPhoneSideways`). Every rule of the bar names both, so a rule cannot be added for one and forgotten for the other.
@@ -188,17 +188,45 @@
 	background-color: var(--background-primary);
 }
 
-/* The problem list (not a sheet) stands above the phone's bar. */
+/*
+ * A window under 600 px that has the wide set of buttons (an iPad in Slide Over or Split View: its screen is not a phone's; a narrow computer window too). Up to nine
+ * buttons of 44 px do not fit in 320 px, and the sticky Close covered More (and Titles). The bar wraps into a second row instead, so every button shows and no button lies over
+ * another; Close stays at the right end of the last row. The bars between the groups go: one could stand alone at the end of a row. `has-wide-set` is set in `orderBar`.
+ */
+.modal.dynasty-fullscreen.is-phone-side .dynasty-full .dynasty-toolbar.has-wide-set,
+.modal.dynasty-fullscreen.is-phone .dynasty-full .dynasty-toolbar.has-wide-set {
+	height: auto;
+	min-height: calc(52px + env(safe-area-inset-bottom));
+	flex-wrap: wrap;
+	align-content: flex-start;
+	justify-content: flex-start;
+	overflow: visible;
+}
+
+.modal.dynasty-fullscreen.is-phone-side .dynasty-full .dynasty-toolbar.has-wide-set .dynasty-close,
+.modal.dynasty-fullscreen.is-phone .dynasty-full .dynasty-toolbar.has-wide-set .dynasty-close {
+	position: relative;
+	right: auto;
+	margin-left: auto;
+	background-color: transparent;
+}
+
+.modal.dynasty-fullscreen.is-phone-side .dynasty-full .dynasty-toolbar.has-wide-set .dynasty-sep,
+.modal.dynasty-fullscreen.is-phone .dynasty-full .dynasty-toolbar.has-wide-set .dynasty-sep {
+	display: none;
+}
+
+/* The problem list (not a sheet) stands above the phone's bar. `--dynasty-bar-h` is the real height of the bar, set where the bar changes size (`watchBar`): one row or, in a narrow window, two. */
 .modal.dynasty-fullscreen.is-phone-side .dynasty-full .dynasty-popover:not(.is-anchored):not(.is-sheet),
 .modal.dynasty-fullscreen.is-phone .dynasty-full .dynasty-popover:not(.is-anchored):not(.is-sheet) {
 	top: auto;
 	left: max(var(--size-4-2), env(safe-area-inset-left));
 	right: max(var(--size-4-2), env(safe-area-inset-right));
-	bottom: calc(52px + env(safe-area-inset-bottom) + var(--size-4-2));
+	bottom: calc(var(--dynasty-bar-h, calc(52px + env(safe-area-inset-bottom))) + var(--size-4-2));
 	/* `max-content` (the base rule) made a long problem text wider than the screen and let the right edge go; auto fills the space between left and right. */
 	width: auto;
 	max-width: none;
-	max-height: calc(100% - 52px - env(safe-area-inset-bottom) - 4 * var(--size-4-2));
+	max-height: calc(100% - var(--dynasty-bar-h, calc(52px + env(safe-area-inset-bottom))) - 4 * var(--size-4-2));
 }
 
 /* The page preview of a linked name shows above the full-screen view, not behind it (spec §5.2).

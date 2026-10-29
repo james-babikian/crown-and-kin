@@ -1,16 +1,15 @@
 /*
- * The plugin's picture store (spec §13.0 item 3, §13.6, §13.7, §13.8; M9 contract O1, O3, O4 and
- * B10–B15). One store serves every tree. It finds the file of an `arms` or `portrait` link, checks
+ * The plugin's picture store (spec §13.0 item 3, §13.6, §13.7, §13.8). One store serves every tree. It finds the file of an `arms` or `portrait` link, checks
  * the file's first bytes (format and size) before any decode, decodes pictures one or two at a time,
  * makes one small copy at the size it shows, closes the full-size picture at once and keeps only the
  * encoded copies, in a least-recently-used list of 24 MB, shown through blob URLs. It also makes the
  * copies for a saved picture (one full-size picture at a time) and the 64 × 64 pixels for "Colours
  * from the arms". Nothing here throws: a picture that fails gives a picture problem, or null.
  *
- * The queue serves first what the owner waits for in a window (the edit sheet, the picker, the
+ * The queue serves first what the user waits for in a window (the edit sheet, the picker, the
  * colours, a saved picture), then the live pictures of the trees, then the background file check.
  * `alone` runs the saved PNG's canvas step with no decode beside it.
- * The picture picker's row previews (M11) use this store too: a preview is a small copy through `acquire`,
+ * The picture picker's row previews use this store too: a preview is a small copy through `acquire`,
  * so it may share a cached copy with the cards, and the picker releases every copy when it closes.
  *
  * Rules the code does not show at once:
@@ -27,17 +26,24 @@
  *   until the plugin unloads.
  *
  * The browser work (the vault read, the decode and the encode) goes through `PictureIO`, so the unit
- * checks can count what happens. `defaultIO` is the real one.
+ * checks can count what happens. `defaultIO` (in `picture-io.ts`) is the real one.
+ *
+ * D318: a copy that a caller asks for with `onDevice` is also kept on the device between starts (`picture-copies.ts`). A request
+ * looks in the memory list first, then in those copies, which takes no job slot, and only then makes the copy in the queue.
  */
 
 import type { App, TFile } from 'obsidian';
 import { copyPixels, fitMeet, judgeHeader, limitBox, type CopyPx, pictureFormat, pictureTarget, readPictureHeader, type PictureProblem, type SupportedFormat } from '../core/pictures';
 import { cropSquare, formatPortraitCrop, type CropFraction } from '../core/portrait-crop';
 import { outlineGrid, traceOutline, type ArmsOutline } from '../layout/arms-outline';
+import { defaultIO, linkOf, type DecodedPicture, type PictureIO } from './picture-io';
+import { NO_COPIES, deviceTicket, type CopyId, type DeviceTicket, type PictureCopies } from './picture-copies';
 
-// ---------- Types (M9 contract O1, O3, B15, C14) ----------
+export type { DecodedPicture, PictureIO };
 
-/** The box a copy is made for, in CSS px at scale 1 (O3); the caller multiplies it by the zoom step (B10). `portrait`: the round upper-centre square. */
+// ---------- Types ----------
+
+/** The box a copy is made for, in CSS px at scale 1; the caller multiplies it by the zoom step. `portrait`: the round upper-centre square. */
 export interface CopyBox {
 	w: number;
 	h: number;
@@ -49,6 +55,8 @@ export interface CopyBox {
 	 * pixels of its own and fills the box. The key does not hold this flag, so use it only with `transient`, which keeps no copy in the list.
 	 */
 	noEnlarge?: boolean;
+	/** D318: keep the drawn copy on the device between starts. Only the pictures that a tree shows set it; a picker list would fill the limited room. Not in the key. */
+	onDevice?: boolean;
 }
 
 /** A small copy in use; `release` lets the store forget it (it acts once). */
@@ -59,33 +67,8 @@ export interface PictureCopy {
 	release(): void;
 }
 
-/** A resolved picture link (O1): the file and the format its name says, or the problem. */
+/** A resolved picture link: the file and the format its name says, or the problem. */
 export type ResolvedPicture = { ok: true; file: TFile; format: SupportedFormat } | PictureProblem;
-
-/** A decoded picture: its size after the EXIF rotation, what a canvas can draw, and how to free it. */
-export interface DecodedPicture {
-	width: number;
-	height: number;
-	source: CanvasImageSource;
-	close(): void;
-}
-
-/**
- * The test seam of `createPictureStore` (O3, O4, C14): the vault read and the browser decode and
- * encode. `encode` and `rgba` must draw `source` before they return their promise, because the store
- * closes the full-size picture right after the call. `png` asks for PNG (a saved picture); otherwise
- * the IO may give WebP where the device can encode it.
- */
-export interface PictureIO {
-	read(file: TFile): Promise<ArrayBuffer>;
-	decode(bytes: ArrayBuffer, format: SupportedFormat): Promise<DecodedPicture>;
-	encode(source: CanvasImageSource, crop: { sx: number; sy: number; sw: number; sh: number }, out: { w: number; h: number }, round: boolean, png?: boolean): Promise<Blob>;
-	/** The pixels of `source` fitted into `w` × `h` (transparent around it), RGBA. */
-	rgba(source: CanvasImageSource, w: number, h: number): Promise<Uint8ClampedArray>;
-	/** True on a touch-first device (`pointer: coarse`): one decode at a time. */
-	coarse(): boolean;
-	dpr(): number;
-}
 
 /** The numbers of the memory checks (spec §13.6–§13.8 acceptance). */
 export interface PictureStats {
@@ -101,7 +84,7 @@ export interface PictureStats {
 	maxOpenBitmaps: number;
 }
 
-/** The plugin's picture store (O1, O3, O4, B11–B15). Never throws. */
+/** The plugin's picture store. Never throws. */
 export interface PictureStore {
 	/** O1: web address, missing file or file extension; synchronous. */
 	resolve(link: string, sourcePath: string): ResolvedPicture;
@@ -149,9 +132,11 @@ export const STORE_BYTES = 24_000_000;
 export const STEP_LIMIT_MS = 8000;
 /** A6: a file larger than this on disk is too large without a read (64 MB when the pointer is coarse). */
 export const NO_READ_BYTES = 256 * 1024 * 1024;
+/** The same limit when the pointer is coarse (a phone). */
 export const NO_READ_BYTES_COARSE = 64 * 1024 * 1024;
 /** B14: the header results kept across sessions, in the plugin's local storage. */
 export const HEADER_STORE_KEY = 'crown-and-kin-picture-headers';
+/** The most header results kept. */
 export const HEADER_STORE_MAX = 2000;
 /** O7: the size of the copy that "Colours from the arms" reads. */
 export const ARMS_PIXELS = 64;
@@ -168,8 +153,6 @@ const PRIORITY_CHECK = 2;
  * so this cap is a safety net: it is above the number of small copies that the byte limit of the list can hold.
  */
 const OUTLINE_KEPT = 2000;
-/** An SVG is drawn on a canvas at most this large on its longest side before its copy is made. */
-const SVG_RASTER_MAX = 2048;
 
 // ---------- Small helpers ----------
 
@@ -177,6 +160,7 @@ type HeaderResult = { ok: true; format: SupportedFormat } | PictureProblem;
 
 const sigOf = (f: TFile) => `${f.stat?.mtime ?? 0}:${f.stat?.size ?? 0}`;
 const notImage = (f: TFile): PictureProblem => ({ ok: false, code: 'picture-not-image', file: f.name });
+/** True if `x` is a picture problem and not a result. */
 export const isProblem = (x: unknown): x is PictureProblem => !!x && typeof x === 'object' && (x as { ok?: unknown }).ok === false;
 
 class StepTimeout extends Error {}
@@ -221,172 +205,6 @@ function base64(bytes: Uint8Array): string {
 	return btoa(s);
 }
 
-// ---------- The real browser IO ----------
-
-const MIME: Record<SupportedFormat, string> = { png: 'image/png', jpeg: 'image/jpeg', webp: 'image/webp', gif: 'image/gif', bmp: 'image/bmp', svg: 'image/svg+xml' };
-
-/** An iPhone frees canvas memory only when the canvas is made empty (B13, M9 iPhone check). */
-function emptyCanvas(c: HTMLCanvasElement): void {
-	c.width = 0;
-	c.height = 0;
-}
-
-function canvasOf(w: number, h: number): { c: HTMLCanvasElement; ctx: CanvasRenderingContext2D } {
-	const c = createEl('canvas');
-	c.width = Math.max(1, Math.round(w));
-	c.height = Math.max(1, Math.round(h));
-	const ctx = c.getContext('2d');
-	if (!ctx) {
-		emptyCanvas(c);
-		throw new Error('no canvas');
-	}
-	ctx.imageSmoothingEnabled = true;
-	ctx.imageSmoothingQuality = 'high';
-	return { c, ctx };
-}
-
-function blobOf(c: HTMLCanvasElement, type: string): Promise<Blob> {
-	return new Promise<Blob>((resolve, reject) => {
-		try {
-			c.toBlob((b) => (b ? resolve(b) : reject(new Error('the canvas gave no picture'))), type);
-		} catch (e) {
-			reject(e instanceof Error ? e : new Error(String(e)));
-		}
-	});
-}
-
-/** The drawn size of a canvas source. */
-function sourceSize(s: CanvasImageSource): { w: number; h: number } {
-	const x = s as { naturalWidth?: number; naturalHeight?: number; width?: unknown; height?: unknown };
-	const side = (natural: number | undefined, plain: unknown) => (typeof natural === 'number' && natural > 0 ? natural : typeof plain === 'number' ? plain : 0);
-	return { w: side(x.naturalWidth, x.width), h: side(x.naturalHeight, x.height) };
-}
-
-/** Loads an `Image` from a URL with no time limit of its own (`save-picture.ts` has a loader with a limit, so the two keep different names). */
-function loadImageUnlimited(url: string): Promise<HTMLImageElement> {
-	const img = new Image();
-	const p = new Promise<HTMLImageElement>((resolve, reject) => {
-		img.onload = () => resolve(img);
-		img.onerror = () => reject(new Error('the picture did not load'));
-	});
-	img.src = url;
-	return p;
-}
-
-/**
- * The browser IO: `vault.readBinary`, `createImageBitmap` (it applies the EXIF rotation, proven on
- * the owner's iPhone), an `Image` from a blob URL for SVG, and a canvas for each copy. WebP copies
- * only where the device encodes WebP (tested once, at the start; the owner's iPhone does not).
- */
-export function defaultIO(app: App): PictureIO {
-	let webp = false;
-	let probed = false;
-	// Once, at the first copy; until its answer, copies are PNG.
-	const probe = () => {
-		if (probed) return;
-		probed = true;
-		try {
-			const { c } = canvasOf(2, 2);
-			void blobOf(c, 'image/webp')
-				.then((b) => (webp = b.type === 'image/webp'))
-				.catch(() => undefined)
-				.finally(() => emptyCanvas(c));
-		} catch {
-			// No canvas: every copy fails later with its own problem.
-		}
-	};
-	return {
-		read: (file) => app.vault.readBinary(file),
-		async decode(bytes, format) {
-			if (format !== 'svg') {
-				const bmp = await createImageBitmap(new Blob([bytes], { type: MIME[format] }));
-				return { width: bmp.width, height: bmp.height, source: bmp, close: () => bmp.close() };
-			}
-			// An SVG is drawn once on a canvas of a known size, so the crop and the fit work in its pixels.
-			const url = URL.createObjectURL(new Blob([bytes], { type: MIME.svg }));
-			let img: HTMLImageElement;
-			try {
-				img = await loadImageUnlimited(url);
-			} catch (e) {
-				URL.revokeObjectURL(url);
-				throw e;
-			}
-			try {
-				const head = readPictureHeader(new Uint8Array(bytes));
-				const nat = sourceSize(img);
-				let w = head.width ?? nat.w;
-				let h = head.height ?? nat.h;
-				if (!(w > 0 && h > 0)) {
-					w = 512;
-					h = 512;
-				}
-				const k = Math.min(1, SVG_RASTER_MAX / Math.max(w, h));
-				const { c, ctx } = canvasOf(w * k, h * k);
-				try {
-					ctx.drawImage(img, 0, 0, c.width, c.height);
-				} catch (e) {
-					emptyCanvas(c);
-					throw e;
-				}
-				return { width: c.width, height: c.height, source: c, close: () => emptyCanvas(c) };
-			} finally {
-				URL.revokeObjectURL(url);
-				img.src = '';
-			}
-		},
-		encode(source, crop, out, round, png) {
-			probe();
-			let c: HTMLCanvasElement;
-			try {
-				const made = canvasOf(out.w, out.h);
-				c = made.c;
-				const ctx = made.ctx;
-				if (round) {
-					ctx.beginPath();
-					ctx.arc(c.width / 2, c.height / 2, Math.min(c.width, c.height) / 2, 0, Math.PI * 2);
-					ctx.closePath();
-					ctx.clip();
-				}
-				ctx.drawImage(source, crop.sx, crop.sy, crop.sw, crop.sh, 0, 0, c.width, c.height);
-			} catch (e) {
-				return Promise.reject(e instanceof Error ? e : new Error(String(e)));
-			}
-			const canvas = c;
-			return blobOf(canvas, !png && webp ? 'image/webp' : 'image/png').finally(() => emptyCanvas(canvas));
-		},
-		rgba(source, w, h) {
-			try {
-				const { c, ctx } = canvasOf(w, h);
-				try {
-					const s = sourceSize(source);
-					const f = fitMeet(s.w, s.h, w, h);
-					ctx.drawImage(source, f.x, f.y, f.w, f.h);
-					// An SVG with outside content can taint the canvas: then this throws and the colours are unknown.
-					return Promise.resolve(ctx.getImageData(0, 0, w, h).data);
-				} finally {
-					emptyCanvas(c);
-				}
-			} catch (e) {
-				return Promise.reject(e instanceof Error ? e : new Error(String(e)));
-			}
-		},
-		coarse: () => {
-			try {
-				return window.matchMedia('(pointer: coarse)').matches;
-			} catch {
-				return false;
-			}
-		},
-		dpr: () => {
-			try {
-				return typeof window.devicePixelRatio === 'number' ? window.devicePixelRatio : 1;
-			} catch {
-				return 1;
-			}
-		},
-	};
-}
-
 // ---------- The store ----------
 
 interface Entry {
@@ -424,10 +242,56 @@ interface Waiter {
 	gone: boolean;
 }
 
+/** D318: what names the copy on the device. The file's mtime and size are in `sig`, so a changed file never meets an old copy. */
+function deviceIdOf(box: CopyBox, file: TFile, px: CopyPx, fit: CopyBox['fit'], part: CropFraction | undefined, dpr: number): CopyId | null {
+	// A file with no mtime and size cannot tell a changed file from an old one: its copy is not kept.
+	if (box?.onDevice !== true || !file.stat) return null;
+	return { path: file.path, sig: sigOf(file), kind: fit === 'portrait' ? 'portrait' : 'arms', w: px.w, h: px.h, dpr, part: part ? formatPortraitCrop(part) : '' };
+}
+
+/** A list entry for a copy, from the device or just drawn. A device that cannot make a link gives null, so the request ends with no picture. */
+function entryOf(file: TFile, key: string, c: { blob: Blob; w: number; h: number }): Entry | null {
+	const url = linkOf(c.blob);
+	return url === null ? null : { key, path: file.path, url, bytes: c.blob.size, w: c.w, h: c.h, refs: 0, stale: false };
+}
+
+/** A second request for a copy that is being made waits for the same job. */
+function join(job: { waiters: Set<Waiter> }, signal?: AbortSignal): Promise<Given> {
+	return new Promise<Given>((resolve) => {
+		const w: Waiter = { resolve, signal, gone: false };
+		job.waiters.add(w);
+		signal?.addEventListener(
+			'abort',
+			() => {
+				if (w.gone) return;
+				w.gone = true;
+				job.waiters.delete(w);
+				resolve(null);
+			},
+			{ once: true },
+		);
+	});
+}
+
+/** A transient copy belongs to its one caller: its release revokes the URL. */
+function own(e: Entry): PictureCopy {
+	let done = false;
+	return {
+		url: e.url,
+		w: e.w,
+		h: e.h,
+		release() {
+			if (done) return;
+			done = true;
+			URL.revokeObjectURL(e.url);
+		},
+	};
+}
+
 /** Makes the plugin's picture store. `io` replaces the browser parts (unit checks). */
-export function createPictureStore(app: App, io: PictureIO = defaultIO(app)): PictureStore {
+export function createPictureStore(app: App, io: PictureIO = defaultIO(app), copies: PictureCopies = NO_COPIES): PictureStore {
 	const lru = new Map<string, Entry>();
-	/** Copies whose file changed while they were in use (B11). */
+	/** Copies whose file changed while they were in use. */
 	const staleInUse = new Set<Entry>();
 	const headers = new Map<string, { sig: string; result: HeaderResult }>();
 	const gens = new Map<string, number>();
@@ -450,7 +314,7 @@ export function createPictureStore(app: App, io: PictureIO = defaultIO(app)): Pi
 
 	const gen = (path: string) => gens.get(path) ?? 0;
 
-	// ---------- the header results kept across sessions (B14) ----------
+	// ---------- the header results kept across sessions ----------
 
 	function savedHeaders(): Map<string, { sig: string; result: HeaderResult }> {
 		if (saved) return saved;
@@ -524,14 +388,14 @@ export function createPictureStore(app: App, io: PictureIO = defaultIO(app)): Pi
 		return p;
 	}
 
-	/** The header verdict from bytes, remembered for the next check (B14). */
+	/** The header verdict from bytes, remembered for the next check. */
 	function judge(file: TFile, bytes: ArrayBuffer): HeaderResult {
 		const result = judgeHeader(readPictureHeader(new Uint8Array(bytes)), file.name);
 		remember(file, result, true);
 		return result;
 	}
 
-	// ---------- the queue (O4) ----------
+	// ---------- the queue ----------
 
 	function enqueue(t: Task): void {
 		// Lower priority numbers first; the same priority in the order of the requests.
@@ -619,7 +483,7 @@ export function createPictureStore(app: App, io: PictureIO = defaultIO(app)): Pi
 	}
 
 	/**
-	 * A failed step: `picture-not-image`. F-VIEW-02: only a real decode fault (`fault`: the engine could not decode the bytes) is remembered for the
+	 * A failed step: `picture-not-image`. Only a real decode fault (`fault`: the engine could not decode the bytes) is remembered for the
 	 * file as it is; a read error (a file that a sync has not finished), a timeout or a canvas error is not, so the next draw tries again.
 	 */
 	function failed(file: TFile, e: unknown, fault = false): PictureProblem {
@@ -629,7 +493,7 @@ export function createPictureStore(app: App, io: PictureIO = defaultIO(app)): Pi
 		return p;
 	}
 
-	/** The copy's pixels (O3, B10): box CSS px × min(max(dpr, 1), 3). `noEnlarge` counts only for a transient copy: the key of a kept copy lacks it. */
+	/** The copy's pixels: box CSS px × min(max(dpr, 1), 3). `noEnlarge` counts only for a transient copy: the key of a kept copy lacks it. */
 	const copyPx = (box: CopyBox, still = false): CopyPx => copyPixels(still ? box : { ...box, noEnlarge: false }, io.dpr());
 
 	/** The part is in the key only for a portrait with a crop, so every other key stays as it was. */
@@ -671,20 +535,23 @@ export function createPictureStore(app: App, io: PictureIO = defaultIO(app)): Pi
 
 	const outlineKey = (file: TFile) => `${file.path}\u0000${sigOf(file)}`;
 
+	/** Keeps the outline of a file as it is now; the one least recently read leaves when there are too many. */
+	function rememberOutline(key: string, o: ArmsOutline | null): void {
+		outlines.delete(key);
+		outlines.set(key, o);
+		while (outlines.size > OUTLINE_KEPT) outlines.delete(outlines.keys().next().value!);
+	}
+
+	const isTainted = (e: unknown) => !!e && typeof e === 'object' && (e as { name?: unknown }).name === 'SecurityError';
+
 	/**
 	 * Reads the shape of an arms picture while its full-size picture is still open (the same decode as the copy, so the outline costs one draw on a
 	 * 128-pixel canvas and no second decode). Gives null when the outline is known already.
 	 */
-	const isTainted = (e: unknown) => !!e && typeof e === 'object' && (e as { name?: unknown }).name === 'SecurityError';
-
 	function startOutline(file: TFile, picture: DecodedPicture): Promise<void> | null {
 		const key = outlineKey(file);
 		if (outlines.has(key)) return null;
-		const keepOutline = (o: ArmsOutline | null) => {
-			outlines.delete(key);
-			outlines.set(key, o);
-			while (outlines.size > OUTLINE_KEPT) outlines.delete(outlines.keys().next().value!);
-		};
+		const keepOutline = (o: ArmsOutline | null) => rememberOutline(key, o);
 		const grid = outlineGrid(picture.width, picture.height);
 		let pixels: Promise<Uint8ClampedArray>;
 		try {
@@ -712,7 +579,7 @@ export function createPictureStore(app: App, io: PictureIO = defaultIO(app)): Pi
 		);
 	}
 
-	// ---------- copies (O3) ----------
+	// ---------- copies ----------
 
 	function hold(e: Entry): PictureCopy {
 		e.refs++;
@@ -769,7 +636,7 @@ export function createPictureStore(app: App, io: PictureIO = defaultIO(app)): Pi
 			const fit: CopyBox['fit'] = box?.fit === 'portrait' ? 'portrait' : 'meet';
 			const px = copyPx(box, !keep);
 			const part = fit === 'portrait' ? box?.crop : undefined;
-				const key = keyOf(file, px, fit, part);
+			const key = keyOf(file, px, fit, part);
 			if (keep) {
 				const e = lru.get(key);
 				if (e) {
@@ -784,47 +651,15 @@ export function createPictureStore(app: App, io: PictureIO = defaultIO(app)): Pi
 				return Promise.resolve(known);
 			}
 			const job = keep ? jobs.get(key) : undefined;
-			return job ? join(job, signal) : startCopy(file, px, fit, key, signal, keep, part);
+			const onDevice = deviceTicket(copies, keep, deviceIdOf(box, file, px, fit, part, io.dpr()));
+			return job ? join(job, signal) : startCopy(file, px, fit, key, signal, keep, part, onDevice);
 		} catch (e) {
 			console.error('Crown and Kin: cannot make a copy of the picture', e);
 			return Promise.resolve(notImage(file));
 		}
 	}
 
-	/** A second request for a copy that is being made waits for the same job. */
-	function join(job: { waiters: Set<Waiter> }, signal?: AbortSignal): Promise<Given> {
-		return new Promise<Given>((resolve) => {
-			const w: Waiter = { resolve, signal, gone: false };
-			job.waiters.add(w);
-			signal?.addEventListener(
-				'abort',
-				() => {
-					if (w.gone) return;
-					w.gone = true;
-					job.waiters.delete(w);
-					resolve(null);
-				},
-				{ once: true },
-			);
-		});
-	}
-
-	/** A transient copy belongs to its one caller: its release revokes the URL. */
-	function own(e: Entry): PictureCopy {
-		let done = false;
-		return {
-			url: e.url,
-			w: e.w,
-			h: e.h,
-			release() {
-				if (done) return;
-				done = true;
-				URL.revokeObjectURL(e.url);
-			},
-		};
-	}
-
-	function startCopy(file: TFile, px: CopyPx, fit: CopyBox['fit'], key: string, signal: AbortSignal | undefined, keep: boolean, part?: CropFraction): Promise<Given> {
+	function startCopy(file: TFile, px: CopyPx, fit: CopyBox['fit'], key: string, signal: AbortSignal | undefined, keep: boolean, part: CropFraction | undefined, onDevice: DeviceTicket | null): Promise<Given> {
 		const job = { waiters: new Set<Waiter>() };
 		if (keep) jobs.set(key, job);
 		const result = join(job, signal);
@@ -856,7 +691,7 @@ export function createPictureStore(app: App, io: PictureIO = defaultIO(app)): Pi
 			}
 			if (entry && keep) evict();
 		};
-		enqueue({
+		const task: Task = {
 			priority: keep ? PRIORITY_LIVE : PRIORITY_NOW,
 			exclusive: false,
 			unwanted: () => !wanted() || gen(file.path) !== g,
@@ -878,9 +713,12 @@ export function createPictureStore(app: App, io: PictureIO = defaultIO(app)): Pi
 					finish(null);
 					return;
 				}
-				finish({ key, path: file.path, url: URL.createObjectURL(out.blob), bytes: out.blob.size, w: out.w, h: out.h, refs: 0, stale: false });
+				onDevice?.keep(out, outlines.get(outlineKey(file)));
+				finish(entryOf(file, key, out));
 			},
-		});
+		};
+		// A copy kept on the device needs no job slot; any other answer goes on to the queue.
+		void (onDevice ? onDevice.start(() => wanted() && gen(file.path) === g, (o) => rememberOutline(outlineKey(file), o), (c) => finish(entryOf(file, key, c)), () => enqueue(task)) : enqueue(task));
 		return result;
 	}
 
@@ -992,7 +830,7 @@ export function createPictureStore(app: App, io: PictureIO = defaultIO(app)): Pi
 						settled = true;
 						resolve(v);
 					};
-					// The owner waits for "Colours from the arms" in the Houses window.
+					// The user waits for "Colours from the arms" in the Houses window.
 					enqueue({
 						priority: PRIORITY_NOW,
 						exclusive: false,
@@ -1084,6 +922,7 @@ export function createPictureStore(app: App, io: PictureIO = defaultIO(app)): Pi
 			try {
 				gens.set(path, gen(path) + 1);
 				headers.delete(path);
+				copies.forget(path);
 				for (const k of [...outlines.keys()]) if (k.startsWith(`${path}\u0000`)) outlines.delete(k);
 				for (const e of [...lru.values()]) {
 					if (e.path !== path) continue;
@@ -1117,6 +956,7 @@ export function createPictureStore(app: App, io: PictureIO = defaultIO(app)): Pi
 
 		clear() {
 			closed = true;
+			void copies.flush();
 			for (const t of queue.splice(0)) t.drop();
 			for (const e of [...lru.values(), ...staleInUse]) drop(e);
 			lru.clear();
@@ -1138,12 +978,12 @@ export function createPictureStore(app: App, io: PictureIO = defaultIO(app)): Pi
 	return store;
 }
 
-/** True when the extension is one of a picture the plugin knows (shown or not): vault events for it refresh the pictures (O9). */
+/** True when the extension is one of a picture the plugin knows (shown or not): vault events for it refresh the pictures. */
 export function isPictureExtension(ext: string): boolean {
 	return pictureFormat(ext).kind !== 'other';
 }
 
-/** True when the plugin can show a file with this extension (the picker list, renames; O6, O8). */
+/** True when the plugin can show a file with this extension (the picker list, renames). */
 export function isShownPictureExtension(ext: string): boolean {
 	return pictureFormat(ext).kind === 'supported';
 }

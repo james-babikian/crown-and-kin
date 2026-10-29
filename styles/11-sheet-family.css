@@ -1,4 +1,4 @@
-/* ---------- Family and actions in the person window (spec §6.3, §7.4, §7.5; 0.2.8 contract C) ---------- */
+/* ---------- Family and actions in the person window (spec §6.3, §7.4, §7.5) ---------- */
 
 /* The three groups of the Family section stand under a small heading; each group is a list of rows. */
 .dynasty-family-group {

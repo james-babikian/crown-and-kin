@@ -38,7 +38,7 @@ export interface CropFraction {
 }
 
 /** What a written `portrait-crop` says. */
-export type CropRead = { kind: 'absent' } | { kind: 'bad' } | { kind: 'ok'; crop: CropFraction };
+type CropRead = { kind: 'absent' } | { kind: 'bad' } | { kind: 'ok'; crop: CropFraction };
 
 /** The smallest part: one tenth of the shorter side (spec §13.13 "Zoom limits"). */
 export const CROP_MIN_SIDE = 0.1;
@@ -47,6 +47,7 @@ const NUMBER = /^-?(\d+\.?\d*|\.\d+)$/;
 
 /** True when the picture size can be used. */
 const usable = (w: number, h: number) => Number.isFinite(w) && Number.isFinite(h) && w > 0 && h > 0;
+/** `v` if it is a finite number, else `fallback`. */
 export const finite = (v: number, fallback: number) => (Number.isFinite(v) ? v : fallback);
 
 /**

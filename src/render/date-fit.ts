@@ -3,9 +3,9 @@
  * the date with no names at all; only if that does not fit either is it cut with "…". The live scene and the saved picture each call these helpers with
  * their own measure, and the live scene calls them again at every refit. Pure but for `measure`.
  */
+import { truncateClosed, withoutBidiControls } from './bidi-controls';
 import { titleLines } from './name-lines';
 import { fitRelationText } from './relation-fit';
-import { truncate } from './view-math';
 
 /** The date text a card draws: `named` if it fits `maxW`, else `plain` cut by `cut` (the cut of the renderer). */
 export function fitNamed(named: string, plain: string, maxW: number, measure: (s: string) => number, cut: (s: string) => string): string {
@@ -18,11 +18,11 @@ export function fitNamed(named: string, plain: string, maxW: number, measure: (s
  */
 export function fitCardText(text: string, plain: string | undefined, maxW: number, measure: (s: string) => number, relation: boolean): string {
 	if (relation) return fitRelationText(text, maxW, measure);
-	return plain === undefined ? truncate(text, maxW, measure) : fitNamed(text, plain, maxW, measure, (s) => truncate(s, maxW, measure));
+	return plain === undefined ? truncateClosed(text, maxW, measure) : fitNamed(text, plain, maxW, measure, (s) => truncateClosed(s, maxW, measure));
 }
 
-/** A text without its white space, to tell a text that was kept whole from one that was cut or hyphenated. */
-const bare = (s: string) => s.replace(/\s/g, '');
+/** A text without its white space and its isolate controls, to tell a text that was kept whole from one that was cut or hyphenated. */
+const bare = (s: string) => withoutBidiControls(s).replace(/\s/g, '');
 
 /**
  * The reign a card's title text line uses: `named` (the reign with names) if the title and the reign still fit the one or two (`twoLines`) text lines

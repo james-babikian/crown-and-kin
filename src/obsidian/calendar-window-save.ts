@@ -12,10 +12,10 @@ import { linkTextFor, type SetLinkResult } from './calendar-link';
 import { loadNote, makeCalendarNote, saveNote, type LoadedNote } from './calendar-note';
 
 /** The operations for each block of a note. */
-export type SavePlan = readonly { block: number; ops: readonly CalendarOp[] }[];
+type SavePlan = readonly { block: number; ops: readonly CalendarOp[] }[];
 
 /** What a Save needs. */
-export interface SaveJob {
+interface SaveJob {
 	app: App;
 	index: CalendarIndex;
 	/** The note of the tree (or the note that was open): a new note is made near it, and the key is a link seen from it. */
@@ -34,7 +34,7 @@ export interface SaveJob {
 }
 
 /** The result of a Save: `notice` is the one Notice to show; `message` is the sentence for the window, which stays open. */
-export type SaveOutcome = { ok: true; notice: string } | { ok: false; message: string };
+type SaveOutcome = { ok: true; notice: string } | { ok: false; message: string };
 
 /** The end of the Notice, for the answer of `setLink`. */
 function keyText(result: SetLinkResult, made: boolean, name: string): string {

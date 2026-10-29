@@ -19,7 +19,7 @@ export interface SettingsHost extends Plugin {
 	clearCaches(): void;
 }
 
-/** Obsidian does not join a setting's name to its control; a screen reader needs the name on the control itself (P4). */
+/** Obsidian does not join a setting's name to its control; a screen reader needs the name on the control itself. */
 function name(control: HTMLElement | null | undefined, label: string): void {
 	control?.setAttribute('aria-label', label);
 }

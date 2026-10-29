@@ -27,7 +27,7 @@ export function nameDialog(modalEl: HTMLElement, title: HTMLElement): HTMLElemen
 }
 
 /**
- * Scrolls the focused field of a window, with its hint, into the visible part, above the keyboard (C1). A browser does this only for
+ * Scrolls the focused field of a window, with its hint, into the visible part, above the keyboard. A browser does this only for
  * its own scroller and only some of the time; the field sits inside `.dynasty-sheet-body`, which scrolls. `delay` waits
  * for the keyboard to finish opening.
  */

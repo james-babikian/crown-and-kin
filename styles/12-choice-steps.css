@@ -8,7 +8,7 @@
 	width: 100vw;
 }
 
-/* G5 0.4: the title of a choice is its question, and the undo question names a note: on the phone bar it wraps and shows whole. */
+/* The title of a choice is its question, and the undo question names a note: on the phone bar it wraps and shows whole. */
 .dynasty-choice .dynasty-bar .dynasty-bar-title {
 	white-space: normal;
 	overflow-wrap: anywhere;

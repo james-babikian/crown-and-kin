@@ -1,5 +1,5 @@
 /*
- * The two succession sections of the Titles window page (contract 0.2.7 sections D.3, E, J, K, L; 0.2.8 contract C, G.6, G.7): the
+ * The two succession sections of the Titles window page (E, J, K, L): the
  * section "Line of succession" (the line that the draft gives, the button Show, the quiet notes) and the section "Rules of
  * succession" (the rule, who can inherit, the year, the switches, the named heirs and the excluded people). Both are drawn from
  * the `succ` fields of the draft row of one saved title and never write to the note; the window's Save does (`titles-draft.ts`).
@@ -11,10 +11,11 @@ import { setIcon } from 'obsidian';
 import type { FamilyGraph } from '../core/derive';
 import { successionLine, type SuccessionNote, type SuccessionResult } from '../core/succession';
 import { INHERIT_ILLEGITIMATE, INHERIT_RULES, INHERIT_THROUGH, SUCCESSION_RULES, ordinal, type InheritIllegitimate } from '../core/succession-keys';
-import { dateLine } from '../render/tree-info';
+import { afterPress } from '../render/dom/press-hold';
+import { dateLineShown, isolateDate, withoutBidiControls } from '../render/tree-info';
 import { SUCCESSION_UI as T, TITLES_UI } from '../render/ui-text';
-import { draftSpec, draftTitle, holderText, type SuccessionDraft, type TitleRow } from '../view/titles-draft';
-import { afterNotes, heirNotes, rulerLabelOf } from '../view/succession-notes';
+import { draftSpec, draftTitle, holderLead, holderText, type SuccessionDraft, type TitleRow } from '../view/titles-draft';
+import { afterNotes, bornDateUnread, heirNotes, rulerLabelOf } from '../view/succession-notes';
 import { bodyHints, firstInfo, illegitimateHint } from './body-hint';
 import { setRowHints, switchRow } from './switch-row';
 import { RowPictures, buildRow, iconButton, personLead, textButton } from './window-parts';
@@ -22,7 +23,7 @@ import type { PictureStore } from './picture-store';
 
 /** The draft value for a written value that the plugin cannot read. */
 const UNKNOWN = '?';
-/** The year field recomputes the line this long after the last key press (E.2). */
+/** The year field recomputes the line this long after the last key press. */
 const YEAR_MS = 300;
 
 /** What the section needs from the window. */
@@ -35,7 +36,7 @@ export interface SectionHost {
 	limit(): number;
 	/** The age from which the line warns (the setting `oldAge`). */
 	oldAge(): number;
-	/** The age under which a death opens no branch (the setting `youngDeathAge`, M.7); 0 shows every open branch. */
+	/** The age under which a death opens no branch (the setting `youngDeathAge`); 0 shows every open branch. */
 	youngDeathAge(): number;
 	/** True while the window has the phone layout: a field that gets the focus back then does not scroll the page. */
 	phone(): boolean;
@@ -47,7 +48,7 @@ export interface SectionHost {
 	guard(fn: () => void): void;
 	/** A tap on a name of a list of people: the window shows the card in the tree. */
 	showCard(id: string): void;
-	/** G.7: a tap on a row of the line opens the person; the window gives the way to do so (absent: the card shows in the tree). */
+	/** A tap on a row of the line opens the person; the window gives the way to do so (absent: the card shows in the tree). */
 	openPerson?(id: string): void;
 	/** The Show button. */
 	show(): void;
@@ -63,7 +64,7 @@ export interface SectionHost {
 
 /** What the window does with a section it made. */
 export interface SuccessionView {
-	/** The Rules section opened or closed. The cadet hint is computed only while it is open (D282, G2 of part 4). */
+	/** The Rules section opened or closed. The cadet hint is computed only while it is open (D282). */
 	rulesOpened(open: boolean): void;
 	/** Draws the two bodies again from the draft; `focus` names the control (`data-focus`) that gets the focus. */
 	draw(focus?: string): void;
@@ -81,7 +82,7 @@ export interface SuccessionView {
 	dispose(): void;
 }
 
-/** The hints of the section for a draft (D.3, J.10, K.1). Pure, so a test can read them without a window. */
+/** The hints of the section for a draft. Pure, so a test can read them without a window. */
 export function successionHints(s: SuccessionDraft): { rule: string | null; inherit: string[]; through: string | null; illegitimate: string | null } {
 	const rule = s.rule === '' || s.rule === '?' ? null : s.rule;
 	const inherit = s.inherit === '' || s.inherit === '?' ? 'no-preference' : s.inherit;
@@ -103,7 +104,7 @@ export function successionHints(s: SuccessionDraft): { rule: string | null; inhe
 /** A name of a rule without the technical term in brackets: "Eldest child first (primogeniture)" reads "Eldest child first". */
 const short = (text: string): string => text.replace(/\s*\(.*\)$/, '');
 
-/** The summary of the rules for a draft (contract C): the rule and who can inherit, without the terms; "None" for no rule. */
+/** The summary of the rules for a draft: the rule and who can inherit, without the terms; "None" for no rule. */
 export function rulesSummary(s: SuccessionDraft): string {
 	const rule = s.rule === '' ? T.ruleNone : s.rule === UNKNOWN ? T.unknownValue(null) : short(T.rules[s.rule]);
 	const inherit = s.rule === '' || s.rule === UNKNOWN ? '' : s.inherit === '' ? short(T.inherits['no-preference']) : s.inherit === UNKNOWN ? T.unknownValue(null) : short(T.inherits[s.inherit]);
@@ -164,7 +165,7 @@ export function successionSection(host: SectionHost): SuccessionView {
 	let rulesOpen = false;
 	// The year that the line shows now (the year field redraws the line only when the draft year differs from it).
 	let shown = '';
-	// The parts of the rules body that a choice can add, remove or change; a choice updates these in place (r032).
+	// The parts of the rules body that a choice can add, remove or change; a choice updates these in place.
 	let ui: RulesUi | null = null;
 	// One short sentence that a screen reader says when the line changes. It stays outside the bodies, which draw again at each change.
 	let live: HTMLElement | null = null;
@@ -188,7 +189,7 @@ export function successionSection(host: SectionHost): SuccessionView {
 			draw(focus);
 		});
 	// A choice in a dropdown: the dropdown that the user used stays on the page, and the focus does not move. On a phone, a select
-	// that is destroyed and made again inside its own change event keeps its menu open, and a new select that gets the focus opens (r032).
+	// that is destroyed and made again inside its own change event keeps its menu open, and a new select that gets the focus opens.
 	const changeInPlace = (fn: () => void) =>
 		host.guard(() => {
 			fn();
@@ -196,7 +197,7 @@ export function successionSection(host: SectionHost): SuccessionView {
 			update();
 		});
 
-	/** The line for the draft, on the current graph (E.2). Null if the title is not in the tree. */
+	/** The line for the draft, on the current graph. Null if the title is not in the tree. */
 	function compute(): SuccessionResult | null {
 		try {
 			const title = draftTitle(host.g(), host.row);
@@ -296,7 +297,7 @@ export function successionSection(host: SectionHost): SuccessionView {
 			value: d.rule === UNKNOWN ? UNKNOWN : real ? d.rule : '',
 			unknown: badText('succession'),
 			options: [['', T.ruleNone], ...SUCCESSION_RULES.map((r): [string, string] => [r, T.rules[r]])],
-			// Choosing None removes the rule and the choice of who can inherit (E.3).
+			// Choosing None removes the rule and the choice of who can inherit.
 			pick: (v) =>
 				changeInPlace(() => {
 					d.rule = v as SuccessionDraft['rule'];
@@ -307,7 +308,7 @@ export function successionSection(host: SectionHost): SuccessionView {
 
 	function inheritChoice(box: HTMLElement): void {
 		const d = s();
-		// An unwritten key shows as "No preference" (E.3).
+		// An unwritten key shows as "No preference".
 		choice(box, {
 			key: 'inherit',
 			label: T.inheritLabel,
@@ -343,7 +344,7 @@ export function successionSection(host: SectionHost): SuccessionView {
 		});
 	}
 
-	/** The switch "body" with the hints that name the first holder and the cadet title (L.2, F-KIN-07, D291). */
+	/** The switch "body" with the hints that name the first holder and the cadet title (D291). */
 	function bodyRow(switches: HTMLElement): HTMLElement {
 		const d = s();
 		const { hint, extra } = bodyHints(host.g(), host.row, d, result, rulesOpen);
@@ -427,10 +428,11 @@ export function successionSection(host: SectionHost): SuccessionView {
 				s().year = year.value;
 				host.edited();
 				stop();
-				timer = host.win().setTimeout(() => host.guard(refresh), YEAR_MS);
+				// The same key as the blur: a press under way holds the new line back, so the buttons do not move before the click.
+				timer = host.win().setTimeout(() => afterPress(year, year, () => host.guard(refresh)), YEAR_MS);
 			}),
 		);
-		year.addEventListener('blur', () => host.guard(refresh));
+		year.addEventListener('blur', () => afterPress(year, year, () => host.guard(refresh)));
 		year.addEventListener('keydown', (e: KeyboardEvent) => {
 			if (e.key === 'Enter' && !e.isComposing && e.keyCode !== 229) {
 				e.preventDefault();
@@ -438,7 +440,7 @@ export function successionSection(host: SectionHost): SuccessionView {
 			}
 		});
 		hint(field, T.yearHint, 'year');
-		// The note has a year that the plugin cannot read: the field is empty, and this hint names the text until the owner types a year.
+		// The note has a year that the plugin cannot read: the field is empty, and this hint names the text until the user types a year.
 		if (d.yearBad !== undefined) {
 			const bad = field.createDiv({ cls: ['dynasty-sheet-hint'], text: T.yearBad(d.yearBad), attr: { 'data-hint': 'year-bad' } });
 			if (d.year.trim() !== '') bad.hide();
@@ -550,7 +552,7 @@ export function successionSection(host: SectionHost): SuccessionView {
 
 	// ---------- the line ----------
 
-	/** The text of a quiet note of the result (G.6), or null when the note has no text here. `body-skipped` is the hint of its switch. */
+	/** The text of a quiet note of the result, or null when the note has no text here. `body-skipped` is the hint of its switch. */
 	function noteText(n: SuccessionNote): string | null {
 		const p = n.params;
 		const name = (id: string | string[] | undefined) => nameOf(String(id ?? ''));
@@ -563,7 +565,7 @@ export function successionSection(host: SectionHost): SuccessionView {
 		return null;
 	}
 
-	/** The heir after whose row a note stands: the last person of the note in the line (G.6); null when no row of the line has it. */
+	/** The heir after whose row a note stands: the last person of the note in the line; null when no row of the line has it. */
 	function anchorOf(n: SuccessionNote, heirs: readonly string[]): string | null {
 		const p = n.params;
 		// A death date with no year: the note stands under the row of the person, if the line has one (`afterNotes` places the others).
@@ -612,7 +614,7 @@ export function successionSection(host: SectionHost): SuccessionView {
 		const ruler = res.ruler ?? '';
 		const head = box.createDiv({ cls: 'dynasty-line-head' });
 		head.createEl('b', { cls: 'dynasty-succ-heading', text: T.lineAfter(rulerLabel(ruler, res.year), y), attr: { role: 'heading', 'aria-level': '3' } });
-		// Show works for a line, also an empty one (E.4).
+		// Show works for a line, also an empty one.
 		textButton(head, ['dynasty-btn', 'dynasty-succ-show'], T.show, () => host.guard(() => host.show()), { icon: 'eye', label: T.showLabel, focus: 'succ-show' });
 		const note = (parent: HTMLElement, text: string, name: string, warn = false) => {
 			// A warning is a quiet roman text line in the text colour (D218 item 4), with no sign (quiet-warnings): the words carry the warning.
@@ -626,14 +628,14 @@ export function successionSection(host: SectionHost): SuccessionView {
 		for (const n of res.noYear) {
 			if (n.what !== 'reign') continue;
 			const entry = n.entry === undefined ? undefined : host.row.holders[n.entry];
-			note(box, T.noYearReign(entry ? holderText(g, entry.values).ruler : nameOf(n.id)), 'no-year-reign', true);
+			note(box, T.noYearReign(entry ? holderLead(holderText(g, entry.values), entry.values) : nameOf(n.id)), 'no-year-reign', true);
 		}
 		if (d.through !== '' && d.through !== '?' && ruler && g.byId.has(ruler) && !g.byId.get(ruler)?.sex) note(box, T.rulerNoSex(nameOf(ruler)), 'ruler-no-sex', true);
 		if (res.leftOutNoSex > 0) note(box, T.leftOutNoSex(res.leftOutNoSex), 'no-sex', true);
 		if (res.noBirthYear > 0) note(box, T.noBirthYear(res.noBirthYear), 'no-birth-year', true);
-		if (res.outsideBody) note(box, T.outsideBody(rulerLabel(ruler, res.year), firstInfo(host.g(), host.row)?.name ?? ''), 'outside-body', true);
+		if (res.outsideBody) note(box, T.outsideBody(rulerLabel(ruler, res.year), firstInfo(host.g(), host.row)?.lead ?? ''), 'outside-body', true);
 		const list = box.createDiv({ cls: ['dynasty-rows', 'dynasty-succ-list'], attr: { role: 'list' } });
-		// M.2, M.3: a grey row stands before the heir at its `before` place (after that many heirs); the rows that remain stand after the last heir.
+		// A grey row stands before the heir at its `before` place (after that many heirs); the rows that remain stand after the last heir.
 		let nextBranch = 0;
 		const branches = (upTo: number) => {
 			while (nextBranch < res.openBranches.length && res.openBranches[nextBranch].before <= upTo) {
@@ -662,13 +664,11 @@ export function successionSection(host: SectionHost): SuccessionView {
 			});
 			r.title.createSpan({ cls: 'dynasty-holder-label', text: nameOf(id) });
 			const p = g.byId.get(id);
-			const dates = p ? dateLine(p, g.dates) : '';
+			const dates = p ? dateLineShown(p, g.dates) : '';
 			if (dates) r.sub.setText(dates);
-			const sub = (text: string, kind: string, warn: boolean) => {
-				r.row.parentElement?.createDiv({ cls: warn ? ['dynasty-succ-subnote', 'is-warning'] : ['dynasty-succ-subnote'], attr: { 'data-note': kind }, text });
-			};
+			const sub = (text: string, kind: string, warn: boolean) => void r.row.parentElement?.createDiv({ cls: warn ? ['dynasty-succ-subnote', 'is-warning'] : ['dynasty-succ-subnote'], attr: { 'data-note': kind }, text });
 			if (res.old.includes(id)) sub(T.old(nameOf(id), host.oldAge(), y), 'old', true);
-			if (res.noYear.some((n) => n.id === id && n.what === 'born')) sub(T.noYearDate(nameOf(id)), 'no-year', true);
+			if (bornDateUnread(res, g, id)) sub(T.noYearDate(nameOf(id)), 'no-year', true);
 			for (const x of under.get(id) ?? []) note(list, x.text, x.n.kind);
 		});
 		branches(Infinity);
@@ -680,14 +680,14 @@ export function successionSection(host: SectionHost): SuccessionView {
 		if (recompute) refreshStates();
 	}
 
-	/** A grey row of the line (M.8): a person who died and has no children in the tree. The row taps like a name and uses no place. */
+	/** A grey row of the line: a person who died and has no children in the tree. The row taps like a name and uses no place. The spoken name has the same words with no isolate controls. */
 	function branchRow(list: HTMLElement, id: string): void {
 		const p = host.g().byId.get(id);
-		const text = T.branchRow(nameOf(id), p?.died ?? '');
+		const text = T.branchRow(nameOf(id), isolateDate(p?.died ?? ''));
 		const r = buildRow(list, {
 			ord: T.branchMark,
 			tap: () => host.guard(() => host.showCard(id)),
-			label: T.branchRowLabel(text),
+			label: T.branchRowLabel(withoutBidiControls(text)),
 			cls: ['dynasty-succ-branch', 'is-open-branch'],
 			attr: { role: 'listitem', 'data-person': id, 'data-branch': 'open', 'data-focus': `succ-branch:${id}` },
 			chevron: false,

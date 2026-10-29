@@ -18,7 +18,7 @@
 	width: min(560px, calc(100vw - 2 * var(--size-4-4)));
 }
 
-/* G.1, G.3: a row is the text, then the round portrait at the right when the person has one. No initials, no house ring, no empty circle (D213). */
+/* A row is the text, then the round portrait at the right when the person has one. No initials, no house ring, no empty circle (D213). */
 .dynasty-picker .dynasty-picker-row > .dynasty-picker-text {
 	flex: 1 1 auto;
 }
@@ -187,7 +187,7 @@
 }
 
 /*
- * 0.3 (spec §6.6), fix round: the pill and Cancel stand in row 1 of the prompt grid in every theme. Cupertino lifts the pill out of the flow (position absolute, at the bottom of the
+ * (spec §6.6) The pill and Cancel stand in row 1 of the prompt grid in every theme. Cupertino lifts the pill out of the flow (position absolute, at the bottom of the
  * prompt, like an iOS 26 search bar) while Cancel stays in the top row, 400 px above it. The doubled `.is-phone` makes the selector longer than any theme rule for these
  * two boxes; order, position, inset and alignment are set again here, so no theme can move one of them away from the other.
  */
@@ -381,7 +381,7 @@
 	border-radius: var(--radius-m);
 }
 
-/* On the highlighted row (keyboard cursor or pointer) the quiet texts take the text colour: the muted grey on the hover fill was 4.27–4.41:1 in Minimal and AnuPpuccin light (G3). */
+/* On the highlighted row (keyboard cursor or pointer) the quiet texts take the text colour: the muted grey on the hover fill was 4.27–4.41:1 in Minimal and AnuPpuccin light. */
 .modal.dynasty-picture-picker .dynasty-picture-row.is-cursor :is(.dynasty-picture-folder, .dynasty-picture-folder-name, .dynasty-picture-count, .dynasty-picture-chevron, .dynasty-picture-none, .dynasty-picture-name, .dynasty-picture-plus, .dynasty-picture-hint),
 .modal.dynasty-picture-picker .dynasty-picture-row:hover :is(.dynasty-picture-folder, .dynasty-picture-folder-name, .dynasty-picture-count, .dynasty-picture-chevron, .dynasty-picture-none, .dynasty-picture-name, .dynasty-picture-plus, .dynasty-picture-hint) {
 	color: var(--text-normal);

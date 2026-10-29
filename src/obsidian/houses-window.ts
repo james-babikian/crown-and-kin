@@ -1,5 +1,5 @@
 /*
- * The Houses window (spec §6.10, §13.16 rule 5, D32, D36, D134, D138; arms §13.6, D67–D69; 0.2.8 contract C, D202): the houses of one
+ * The Houses window (spec §6.10, §13.16 rule 5, D32, D36, D134, D138, arms §13.6, D67–D69, D202): the houses of one
  * tree as a searchable list with an edit page. The list shows the arms or a colour dot, the name and the
  * number of people of each house. A tap on a house opens its page in the same window: the header with the arms (a tap opens the
  * menu Select arms and Remove arms), the section Details (the name and the colour), the section People (the first eight people of
@@ -44,7 +44,7 @@ import { freshOrStale } from './sheet-parts';
 import { HEX, drawHousePalette, paintHouseColour } from './house-swatches';
 import { houseViewItems } from './viewer-sources';
 
-/** D202 (2), G.10: the People section shows this many people, then "and N more". */
+/** D202 (2): the People section shows this many people, then "and N more". */
 const PEOPLE_ROWS = 8;
 
 /** One house as the Houses window shows it: its id, name, colour and the people who have it. */
@@ -95,7 +95,7 @@ export function loadHouses(body: string, dates?: DatesFor): { kind: 'ok'; data: 
 	const seen = new Set<string>();
 	const houses: LoadedHouse[] = [];
 	for (const h of parsed.tree.houses) {
-		// The first house with an id is the one the tree uses (spec §8, the decision notes "Validation rules").
+		// The first house with an id is the one the tree uses (spec §8).
 		if (seen.has(h.id)) continue;
 		seen.add(h.id);
 		const people: string[] = [];
@@ -176,10 +176,10 @@ export interface HousesOptions {
 	sourcePath?: string;
 	/** Spec §14 rule 9: the date reader for the calendar link of the block; absent: plain years. */
 	dates?: DatesFor;
-	/** The plugin's picture store (M9 contract O3); without it the window shows no arms pictures. */
+	/** The plugin's picture store; without it the window shows no arms pictures. */
 	pictures?: PictureStore;
 	/**
-	 * Spec §13.12 (H1, H3): what the People section needs from the tree view. Without it a row does not open the card and
+	 * Spec §13.12: what the People section needs from the tree view. Without it a row does not open the card and
 	 * the section has no button for the note. `show` runs after this window has closed; `openNote` opens the note of the house page.
 	 */
 	people?: {
@@ -201,7 +201,7 @@ export class HousesWindow extends ListEditWindow {
 	private readonly copies = new Map<string, PictureCopy | 'problem' | 'loading'>();
 	/**
 	 * The copy request of each link that runs now. A link that is 'loading' with no request here got
-	 * null (its file changed during the copy) and waits for the store's change event (O3).
+	 * null (its file changed during the copy) and waits for the store's change event.
 	 */
 	private readonly asks = new Map<string, object>();
 	/** The arms boxes of the rows on the list now, by row key. */
@@ -323,7 +323,7 @@ export class HousesWindow extends ListEditWindow {
 				id: r.id,
 				name: this.label(r),
 				summary: HOUSES.count(this.peopleOf(r).length),
-				// A refused ID comes before "New": the owner must fix it before Save.
+				// A refused ID comes before "New": the user must fix it before Save.
 				state: problems.has(r.key) ? 'check-id' : r.id === null ? 'new' : houseOps([r]).length > 0 ? 'changed' : '',
 				colour: r.colour,
 				// Only arms that the plugin can find give the row a lead (D213); a house with no arms has none.
@@ -363,7 +363,7 @@ export class HousesWindow extends ListEditWindow {
 		this.showArms(box, view.arms ?? null);
 	}
 
-	// ---------- the edit page (spec §6.10, D.3.6) ----------
+	// ---------- the edit page (spec §6.10) ----------
 
 	protected pageHead(key: string): PageHead {
 		const r = this.rowByKey(key)!;
@@ -446,7 +446,7 @@ export class HousesWindow extends ListEditWindow {
 		this.addArmsLink(view.openAllRow, r);
 	}
 
-	/** The People section (D202 (2), G.10): the first eight people of the saved house, "and N more", and the button that makes a note with the table. */
+	/** The People section (D202 (2)): the first eight people of the saved house, "and N more", and the button that makes a note with the table. */
 	private peopleBody(body: HTMLElement, r: HouseRow, hp: HousePage | null): void {
 		const rows = body.createDiv({ cls: ['dynasty-rows', 'dynasty-hp-rows'] });
 		const all = hp?.rows ?? [];
@@ -456,7 +456,7 @@ export class HousesWindow extends ListEditWindow {
 		for (const p of all.slice(0, PEOPLE_ROWS)) {
 			// A plain full-width row: no chevron, no hairline (people-rows). The tap stays (spec §13.12), as a soft tint under the pointer.
 			const row = buildRow(rows, { cls: 'dynasty-hp-row', attr: { 'data-person': p.id }, ...(show ? { tap: () => this.guard(() => this.leaveThen(() => show(p.id))), chevron: false } : {}) });
-			// The name in bold, then the title with its reign; the reign never breaks (G.2, G.10).
+			// The name in bold, then the title with its reign; the reign never breaks.
 			row.title.createEl('b', { cls: 'dynasty-hp-name', text: p.name });
 			// The reign shows the names of its years, as a card does; the table note keeps the text as written (spec §14 rule 15).
 			if (p.title) row.title.createSpan({ cls: 'dynasty-sob', text: ` · ${nb(titleWithNames(this.data.g, p.id, p.title))}` });
@@ -563,7 +563,7 @@ export class HousesWindow extends ListEditWindow {
 
 	/**
 	 * The arms of the house at the right of the header of the page (about 56 px high). A tap opens the short menu (Select arms, Remove
-	 * arms); the box is at least 44 × 44 px (spec §7.5, B8). A house with no arms, or arms that cannot show, has no picture and no
+	 * arms); the box is at least 44 × 44 px (spec §7.5). A house with no arms, or arms that cannot show, has no picture and no
 	 * initials: the button is then hidden (`is-add`), and the link "Add arms" in the "Open all" row takes its place (D213, D216 item 1).
 	 */
 	private armsBox(parent: HTMLElement, r: HouseRow): void {
@@ -806,7 +806,7 @@ export class HousesWindow extends ListEditWindow {
 		}
 	}
 
-	/** A swatch was chosen: the draft takes the colour, and the swatches of the page show it in place, with no rebuild (G5 0.4). */
+	/** A swatch was chosen: the draft takes the colour, and the swatches of the page show it in place, with no rebuild. */
 	private pickColour(r: HouseRow, hex: string, used: HTMLElement): void {
 		r.colour = hex;
 		const box = this.contentEl.querySelector<HTMLElement>('.dynasty-house-palette');
@@ -892,9 +892,9 @@ export class HousesWindow extends ListEditWindow {
 	}
 
 	/**
-	 * Save. `asked` is the ID change that the owner just answered ("Change the ID?"): the answer runs Save again
+	 * Save. `asked` is the ID change that the user just answered ("Change the ID?"): the answer runs Save again
 	 * on the draft as it is then, so an edit made behind the question is written, and a different ID change
-	 * is asked again (C4).
+	 * is asked again.
 	 */
 	protected async save(asked: string | null = null): Promise<void> {
 		if (this.saving) return;

@@ -1,5 +1,7 @@
-/* The break list of the settings tab (D118): a wide field, and 16 px text on a touch screen like the other fields (P7). */
+/* The break list of the settings tab (D118): a wide field, and 16 px text on a touch screen like the other fields. */
 .dynasty-settings .dynasty-setting-break-words {
+	/* The box has several text lines: a pill radius of a theme must not cut the text. */
+	border-radius: min(var(--input-radius, 8px), 12px);
 	width: 18em;
 	max-width: 100%;
 	resize: vertical;

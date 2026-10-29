@@ -1,5 +1,5 @@
 /*
- * The date side of the line of succession (spec §14 rules 5 and 7; the architecture notes §5.7). `succession.ts`
+ * The date side of the line of succession (spec §14 rules 5 and 7). `succession.ts`
  * asks this file for the year Y of the line and the text that gives it, for the ruler (with the holder texts that have no year),
  * for who is alive at Y, and for the date warnings and the notes about a death date with no year. Every date text is read
  * through the reader of the tree (`TreeDates.read`), so a date in a calendar of the user counts like a plain year. Pure.
@@ -13,7 +13,7 @@ import type { Holder, Person } from './types';
 export type YearReader = (text: string | undefined) => number | undefined;
 
 /** True for a date text that has a warning of its own for having no year, so a note about the missing year would say the same twice. */
-export type TextTest = (text: string | undefined) => boolean;
+type TextTest = (text: string | undefined) => boolean;
 
 /** The test of a dates view for a text that fits two calendars (`fits-two-calendars` is its warning; spec §14 rule 5). */
 export const fitsTwoCalendars = (dates: TreeDates): TextTest => (text) => dates.read(text)?.warnings.includes('fits-two-calendars') === true;
@@ -45,11 +45,11 @@ export interface DateText {
 
 type YearFrom = 'field' | 'reign-end' | 'now';
 
-/** L.9: `to` texts that mean the reign is not over. */
+/** `to` texts that mean the reign is not over. */
 const OPEN_END: readonly string[] = ['present', 'now', 'current', 'ongoing', 'living', 'alive', 'reigning'];
 
 /**
- * B.2: the year Y of the line, where it comes from, and the text that gives it, as written (spec §14 rule 7: the sentences of the
+ * The year Y of the line, where it comes from, and the text that gives it, as written (spec §14 rule 7: the sentences of the
  * line name this text; the internal year shows only in the grey line and the test line). The text is null for "now".
  */
 export function lineYear(entries: readonly Holder[], fieldText: string | undefined, yr: YearReader): { Y: number | null; yearFrom: YearFrom; yearText: string | null } {
@@ -62,15 +62,15 @@ export function lineYear(entries: readonly Holder[], fieldText: string | undefin
 }
 
 /** The ruler search and what it read: `rIdx` is the entry of R (-1 for none), `noYear` the holder texts with no year, `reads` every holder text that was read. */
-export interface RulerFound {
+interface RulerFound {
 	rIdx: number;
 	noYear: NoYearRow[];
 	reads: DateText[];
 }
 
 /**
- * B.3: the ruler. An entry has started at Y when Y is now, its `from` year is <= Y, or it has no `from` year and no earlier
- * entry ends after Y. L.9: a holder text with no year is reported only when it could change R: the entries the scan reads up to
+ * The ruler. An entry has started at Y when Y is now, its `from` year is <= Y, or it has no `from` year and no earlier
+ * entry ends after Y. A holder text with no year is reported only when it could change R: the entries the scan reads up to
  * R's entry, and the last entry when the year of the line comes from it. A `to` that means "still ruling" is an open end.
  */
 export function findRuler(entries: readonly Holder[], Y: number | null, yearFrom: YearFrom, yr: YearReader, twoCalendars: TextTest = () => false): RulerFound {
@@ -125,7 +125,7 @@ function holderReads(entries: readonly Holder[], Y: number | null, yearFrom: Yea
 	return out;
 }
 
-/** J.2: the people among `shown` whose birth text has no year, except a text that fits two calendars. Nothing before the calendars are ready (rule 7). */
+/** The people among `shown` whose birth text has no year, except a text that fits two calendars. Nothing before the calendars are ready (rule 7). */
 export function bornNoYear(shown: readonly Person[], dates: TreeDates): NoYearRow[] {
 	if (!dates.ready) return [];
 	const twoCalendars = fitsTwoCalendars(dates);
@@ -149,7 +149,7 @@ export function yearNotes<N extends { kind: string; params: object }>(ready: boo
 
 /** Who is alive at Y, as the line reads it, and the people whose death text has no year (spec §14 rule 5). */
 export interface Life {
-	/** B.4: alive at Y (or not dead, with "now"). The answer is kept for each person. */
+	/** Alive at Y (or not dead, with "now"). The answer is kept for each person. */
 	alive: (p: Person) => boolean;
 	/** The birth year of a person, read once. */
 	born: (p: Person) => number | undefined;
@@ -274,7 +274,7 @@ export function personTexts(p: Person): DateText[] {
 }
 
 /** The note `died-no-year` (spec §14 rule 5), as `SuccessionNote` has it. */
-export interface DeathNote {
+interface DeathNote {
 	kind: 'died-no-year';
 	params: { person: string; year: string };
 }

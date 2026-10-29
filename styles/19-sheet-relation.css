@@ -1,5 +1,5 @@
 /*
- * The relation to the marked person (spec §13.1, D146; 0.2.8 contract C, D197 Q8 A): one text line in the header of the person window,
+ * The relation to the marked person (spec §13.1, D146, D197): one text line in the header of the person window,
  * "Your first cousin · 4 more · Show the line". Its rules are with the header in 10-edit-sheet.css (`dynasty-head-rel`, `dynasty-showline`,
  * `dynasty-more`, `dynasty-head-maybe`). The old box and strip of the first designs are gone.
  */

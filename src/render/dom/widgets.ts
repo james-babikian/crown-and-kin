@@ -26,7 +26,7 @@ export function buildCallout(parent: HTMLElement, type: 'warning' | 'error', tit
 	return { root, content };
 }
 
-/** How a popover is placed and shaped (0.2.8, G.13): near its opener on a computer, a sheet from the bottom on a phone. */
+/** How a popover is placed and shaped: near its opener on a computer, a sheet from the bottom on a phone. */
 export interface PopoverOptions {
 	/** A sheet from the bottom of the host with a grip, a dimmed cover and a tap outside that closes it (a phone). Needs no anchor. */
 	sheet?: boolean;
@@ -37,7 +37,7 @@ export interface PopoverOptions {
 }
 
 /**
- * 0.2.8 (G5b): makes the open legend as compact as it needs to be to show all its rows. A note embed is only 500 px high, and the rows alone are taller. When the
+ * Makes the open legend as compact as it needs to be to show all its rows. A note embed is only 500 px high, and the rows alone are taller. When the
  * content is taller than the box, the class `is-tight` (rows 22 px, no gaps, less padding) is added. Returns whether it was added. A box that is still too short
  * scrolls inside, as before.
  */
@@ -48,7 +48,7 @@ export function fitLegend(el: HTMLElement): boolean {
 }
 
 /**
- * Arrow Up and Down (and Home, End) on a row of a popover list move the focus to the next row, as in a menu (G5 0.4, WCAG 2.1.1). The rows wrap round.
+ * Arrow Up and Down (and Home, End) on a row of a popover list move the focus to the next row, as in a menu (WCAG 2.1.1). The rows wrap round.
  * Returns whether the key moved the focus; any other key, or a key with the focus outside the rows, is left alone.
  */
 export function menuKey(el: HTMLElement, e: KeyboardEvent): boolean {

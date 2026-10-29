@@ -27,7 +27,7 @@ export const NON_NOTE_EXTENSIONS: readonly string[] = [
 ];
 
 /** Where the linked note goes. `folder` '' = the D60 folder; `path` = folder + name + ".md" without a leading "/". */
-export interface LinkedNotePath {
+interface LinkedNotePath {
 	folder: string;
 	/** The note name without ".md". */
 	name: string;

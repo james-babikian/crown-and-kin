@@ -10,7 +10,7 @@
 }
 
 .dynasty-large-bar {
-	/* The hidden name of the bar is absolute; the bar is its box, so it never reaches a scroller around it (the iPhone Find fault, tests/r028-ios-find.test.ts). */
+	/* The hidden name of the bar is absolute; the bar is its box, so it never reaches a scroller around it (the iPhone Find fault). */
 	position: relative;
 	display: flex;
 	flex-wrap: wrap;

@@ -54,7 +54,7 @@ const LINK_FIELDS: Record<'houses' | 'people', readonly string[]> = { houses: ['
  * text order, without `[[`, `]]`, `#heading` and `|alias` (for example `folder/Old`, `Old.md` or
  * `arms.png`). Web addresses are listed too. Every written form counts: a quoted "[[Old]]", a plain
  * string, the unquoted [[Old]] that YAML reads as a nested flow sequence (spec §4.1 tolerate) and
- * an unquoted ![[x.png]] (contract A3). Returns [] when the body does not parse. Never throws.
+ * an unquoted ![[x.png]]. Returns [] when the body does not parse. Never throws.
  */
 export type LinkTargets = (body: string) => string[];
 
@@ -152,7 +152,7 @@ function linkPatch(p: Parsed, item: YAMLMap, key: string, map: Map<string, strin
 	const flow = !!item.flow;
 	if (isScalar(node)) {
 		if (typeof node.value !== 'string') return null;
-		// A value in curly quote marks (D103) is rewritten inside the marks, and the marks stay as the owner typed them.
+		// A value in curly quote marks (D103) is rewritten inside the marks, and the marks stay as the user typed them.
 		const curly = curlyParts(node.value);
 		const text = rewritten(curly ? curly.inner : node.value, map, parserFor(key));
 		if (text === 'refused') return text;

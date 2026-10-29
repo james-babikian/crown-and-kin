@@ -40,11 +40,13 @@ export interface FieldError {
 }
 
 /** What `field` can add to the plain labelled control. */
-export interface FieldOptions {
+interface FieldOptions {
 	/** The refusals of this field show right under it, and the control is marked invalid. */
 	error?: FieldError;
 	placeholder?: string;
 	hint?: string;
+	/** Parts of `hint` (example formats) that must stay on one text line: each shows in a no-wrap span. */
+	keepTogether?: readonly string[];
 	area?: boolean;
 	rows?: number;
 	numeric?: boolean;
@@ -60,7 +62,7 @@ export interface FieldOptions {
 }
 
 /** The refusals of one field, in red under it (as the ID window does); the control gets `aria-invalid` while there is one. */
-export function fieldErrors(row: HTMLElement, input: HTMLElement, host: CardHost, e: FieldError): void {
+function fieldErrors(row: HTMLElement, input: HTMLElement, host: CardHost, e: FieldError): void {
 	e.shown.add(e.field);
 	const id = `${input.id}-error`;
 	const box = row.createDiv({ cls: ['dynasty-sheet-error', 'dynasty-cal-field-error'], attr: { id, 'aria-live': 'polite' } });
@@ -93,6 +95,32 @@ function fieldRow(parent: HTMLElement, name: string, label: string, o: FieldOpti
 	return { row, id };
 }
 
+/**
+ * Puts `text` in a hint. Each of the `keep` parts that the text holds goes in its own span with `white-space: nowrap`, so an example format never breaks across text
+ * lines in the middle. The text content stays exactly `text`.
+ */
+export function hintText(el: HTMLElement, text: string, keep: readonly string[] = []): void {
+	let rest = text;
+	while (rest) {
+		let at = -1;
+		let part = '';
+		for (const k of keep) {
+			const i = k ? rest.indexOf(k) : -1;
+			if (i >= 0 && (at < 0 || i < at)) {
+				at = i;
+				part = k;
+			}
+		}
+		if (at < 0) {
+			el.appendText(rest);
+			return;
+		}
+		if (at > 0) el.appendText(rest.slice(0, at));
+		el.createSpan({ cls: 'dynasty-keep', text: part });
+		rest = rest.slice(at + part.length);
+	}
+}
+
 /** One labelled text field that writes into the draft as the user types. */
 export function field(parent: HTMLElement, host: CardHost, name: string, label: string, value: string, set: (v: string) => void, o: FieldOptions = {}): HTMLInputElement | HTMLTextAreaElement {
 	const { row, id } = fieldRow(parent, name, label, o);
@@ -105,7 +133,7 @@ export function field(parent: HTMLElement, host: CardHost, name: string, label: 
 	if (o.hint) {
 		const hintId = `${id}-hint`;
 		// The help shows while the cursor is in the field (`is-on-focus`, styles/10 and 37), and a screen reader reads it with the field.
-		row.createDiv({ cls: ['dynasty-sheet-hint', 'is-on-focus'], text: o.hint, attr: { id: hintId } });
+		hintText(row.createDiv({ cls: ['dynasty-sheet-hint', 'is-on-focus'], attr: { id: hintId } }), o.hint, o.keepTogether);
 		input.setAttribute('aria-describedby', hintId);
 	}
 	if (o.describedBy) input.setAttribute('aria-describedby', o.describedBy);
@@ -146,7 +174,7 @@ export const SHOW_OPTIONS = [
 ] as const;
 
 /** What `testField` gives back: the function that reads the field again (the calendars changed) and the input. */
-export interface TestField {
+interface TestField {
 	input: HTMLInputElement;
 	/** Writes the line again from the field, with the reader that `reader()` gives now. */
 	update: () => void;

@@ -1,8 +1,8 @@
 /*
- * The route stage, the drawing half (the architecture notes §4.2.2, stage S4). From the lanes and the y of every row (route.ts) it writes the
+ * The route stage, the drawing half (stage S4). From the lanes and the y of every row (route.ts) it writes the
  * boxes and union points (`TreeLayout`) and the paths and markers (`EdgeDrawing`): couple lines through their dots, trunks, bars and
- * drops, the stems of folded families to their signs, the side links as curves (as in 0.3.0), the "?" of a rumoured parent (the 0.3.0
- * search, rumour-spot.ts), the far tags, and the size of the picture. `routeTree` composes the steps of both halves. It reads the plan
+ * drops, the stems of folded families to their signs, the side links as curves, the "?" of a rumoured parent (the
+ * search of rumour-spot.ts), the far tags, and the size of the picture. `routeTree` composes the steps of both halves. It reads the plan
  * and the nets and writes no plan field.
  */
 import { partnerOf, type FamilyGraph, type FamilyUnion } from '../core/derive';
@@ -15,17 +15,17 @@ import { barNets, childPorts, foldZones, hangPoints, packLanes, passageLines, ro
 import { nearOf, pairOf } from './ports';
 import { RumourIndex, rumourSpot, segmentsOf, type Curve, type Seg } from './rumour-spot';
 
-/** em: how far right of the card middle a dotted side link lands on a Roundel card (B.3.3). */
+/** em: how far right of the card middle a dotted side link lands on a Roundel card. */
 const SIDE_LINK_EM = 3.4;
-/** px: how far right of the card middle a side link lands on a text card (as in 0.3.0). */
+/** px: how far right of the card middle a side link lands on a text card. */
 const SIDE_LINK_PX = 14;
 /** A drop this near the Roundel's axis ends at the medallion ring, not at the card's edge (half a stroke width). */
 const ON_AXIS = 0.5;
-/** The "?" disc: half an em in radius in the plugin, at least 8 px in the headless pictures; it keeps 2 px more from every card's edge (as in 0.3.0). */
+/** The "?" disc: half an em in radius in the plugin, at least 8 px in the headless pictures; it keeps 2 px more from every card's edge. */
 const RUMOUR_RADIUS_EM = 0.5;
 const RUMOUR_RADIUS_MIN_PX = 8;
 const RUMOUR_EDGE_PX = 2;
-/** Paths are written to a tenth of a px (as in 0.3.0), a stem to a thousandth so that it ends where its sign is. */
+/** Paths are written to a tenth of a px, a stem to a thousandth so that it ends where its sign is. */
 const PATH_ROUND = 10;
 const STEM_ROUND = 1000;
 const r1 = (n: number) => Math.round(n * PATH_ROUND) / PATH_ROUND;
@@ -52,7 +52,7 @@ export interface Routed {
 /**
  * Sideways (D24), in the turned frame: how far below the top of the row the bar of a couple meets the cards. The middle, unless a tag hangs from
  * the upper partner: its tap area is at least `MIN_HIT` wide and the zone of a short card (small fonts) is narrower, so the area reaches over the
- * middle and over the bar's dot. The bar then moves right, until the dot clears the area by `barClear` (0.3.0 `sideBars`); it stays on both cards.
+ * middle and over the bar's dot. The bar then moves right, until the dot clears the area by `barClear`; it stays on both cards.
  */
 export function barDepth(plan: Plan, c: Couple, geo: Geometry, side: Geometry | undefined): number {
 	const middle = Math.min(c.a.h, c.b.h) / 2;
@@ -67,7 +67,7 @@ export function barDepth(plan: Plan, c: Couple, geo: Geometry, side: Geometry | 
  * Sideways, in the turned frame: how far in from the card's edge the tag tap area of the next column starts. It is `tagInset`, but a card with
  * a partner stacked below keeps its tag in the left half (`sideTagZone`), and its area (at least `MIN_HIT` wide) then starts a little less far in.
  */
-export function nextTagIn(geo: Geometry): number {
+function nextTagIn(geo: Geometry): number {
 	const m = lineMetrics(geo);
 	return Math.min(m.tagInset, (m.tagInset + geo.cardH / 2 - barClear(geo)) / 2 - MIN_HIT / 2);
 }
@@ -253,7 +253,7 @@ export function drawFolds(plan: Plan, hp: HangPoints, nets: UpperNets, fixedSpot
 /**
  * The control y of a side link's curve that crosses gap `gap` from `sy` down to `ty`. The middle of the gap, as today; but where the curve's
  * middle (its flattest part) would lie within `near` of a sibling bar under it, the curve turns between the couple lines and the bars, so the
- * two do not run alongside each other (second fix round, item 5: random 2 down, a dotted side link along an adoptive bar for 40 px).
+ * two do not run alongside each other (random 2 down, a dotted side link along an adoptive bar for 40 px).
  */
 function turnY(gap: number, sx: number, sy: number, tx: number, ty: number, ys: RowYs, near: number, bands?: { upper: readonly (readonly Net[])[]; lower: readonly (readonly Net[])[] }): number {
 	const my = (sy + ty) / 2;
@@ -301,7 +301,7 @@ export function drawSideLinks(plan: Plan, g: FamilyGraph, persons: ReadonlyMap<s
 	return { paths, rumours };
 }
 
-/** Step 10e: the "?" of a rumoured parent, as in 0.3.0: where no other line and no dot is near it. */
+/** Step 10e: the "?" of a rumoured parent: where no other line and no dot is near it. */
 export function rumourMarkers(paths: readonly EdgePath[], markers: readonly EdgeMarker[], rumours: readonly Rumour[], persons: ReadonlyMap<string, PersonBox>, geo: Geometry, side: Geometry | undefined): EdgeMarker[] {
 	if (!rumours.length) return [];
 	const out: EdgeMarker[] = [];
@@ -391,7 +391,7 @@ export function routeTree({ plan, g, geo, side, tabbed, youTab, ordinalCards, fo
 	const rowGaps = rows.slice(1).map((_, r) => ({ top: ys.gapTop(r), bottom: ys.rowTop[r + 1] }));
 	// The picture holds every item, net, dot, tag and control (its largest mark and hit area, spec §13.10 F5b); the left margin for the controls is the placement's.
 	const extents = (folds.folds ?? []).map((c) => workExtent(c, c.spot, geo.fontPx, !!side));
-	// Only a line gets the half gap beyond it: a picture whose lines all stay between the cards ends at the last card's edge (as 0.3.0 did).
+	// Only a line gets the half gap beyond it: a picture whose lines all stay between the cards ends at the last card's edge.
 	const lineX = Math.max(0, ...nets.upper.flat().map((n) => n.hi), ...lower.flat().map((n) => n.hi));
 	const width = Math.max(0, lineX + geo.nodeGap / 2, ...[...persons.values()].map((p) => p.x + p.w), ...extents.map((b) => b.x + b.w));
 	// The gap below the last row has no next row to hold it: the picture holds every net there (the dots and stems of folded families) with its marks.

@@ -47,6 +47,8 @@ async function addHouse(reduced?: () => boolean) {
 	const win = HousesWindow.create({} as never, { handle: handle as never, ...(reduced ? { reduced } : {}) })!;
 	win.open();
 	const content = (win as unknown as { contentEl: FEl }).contentEl;
+	// The window has finished taking the focus (0 and 120 ms); a later focus is the user's.
+	runTimers(200);
 	await click(content.querySelector('.dynasty-house-add'));
 	const input = fakeDoc.activeElement!;
 	expect(input).not.toBeNull();

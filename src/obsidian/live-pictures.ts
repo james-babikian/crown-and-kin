@@ -1,6 +1,5 @@
 /*
- * The live pictures of one drawn tree (spec §13.0 item 3 "Live pictures", §13.6, §13.7; M9 contract
- * O5, B1, B10, B11, B15, B18). `buildScene` makes an empty slot for every arms and portrait place of
+ * The live pictures of one drawn tree (spec §13.0 item 3 "Live pictures", §13.6, §13.7). `buildScene` makes an empty slot for every arms and portrait place of
  * the drawn cards; this module decides which slots get an `<image>` now: only the slots of the shown
  * level of detail in or near the view, at most 150 (`livePictureSlots`). It asks the plugin's picture
  * store for a small copy of each, shows it with `setPicture`, and releases the copies of slots that
@@ -18,11 +17,11 @@ import { setArmsGap, setPicture, setSlotProblem, type PictureSlot, type SlotProb
 import { MAX_LIVE_PICTURES, livePictureSlots, type Lod } from '../render/view-math';
 import { isProblem, type CopyBox, type PictureCopy, type PictureStore } from './picture-store';
 
-/** The live pictures of one scene (O5, B15). */
+/** The live pictures of one scene. */
 export interface LivePictures {
 	/**
 	 * Shows the pictures of the slots in or near `view` (layout px) at level `lod`, with copies made
-	 * for zoom step `step` (1, 2 or 4, B10); releases the others.
+	 * for zoom step `step` (1, 2 or 4); releases the others.
 	 */
 	update(view: Rect, lod: Lod, step?: number): void;
 	/**
@@ -66,7 +65,7 @@ interface SlotState {
 export interface LiveOptions {
 	/** Spec §13.13: the selected part of a portrait slot's person (`portraitCropOf`); null or absent = the automatic part. */
 	cropOf?: (s: PictureSlot) => CropFraction | null;
-	/** Hears the number of slots that wait for a copy, after each change (the harness reads it, B15). */
+	/** Hears the number of slots that wait for a copy, after each change (the harness reads it). */
 	onPending?: (n: number) => void;
 }
 
@@ -103,7 +102,7 @@ export function createLivePictures(
 
 	const boxOf = (s: PictureSlot, step: number): CopyBox => {
 		const r = s.kind === 'arms' && compact ? compact : s.rect;
-		const box: CopyBox = { w: r.w * step, h: r.h * step, fit: s.kind === 'portrait' ? 'portrait' : 'meet' };
+		const box: CopyBox = { w: r.w * step, h: r.h * step, fit: s.kind === 'portrait' ? 'portrait' : 'meet', onDevice: true };
 		if (s.kind === 'portrait') {
 			let crop: CropFraction | null = null;
 			try {
@@ -276,7 +275,7 @@ export function createLivePictures(
 		}
 	};
 
-	// The frames of slots whose link already has a problem (a missing file: dashed, B1) show from the start.
+	// The frames of slots whose link already has a problem (a missing file: dashed) show from the start.
 	for (let i = 0; i < slots.length; i++) {
 		try {
 			const f = fileOf(slots[i]);

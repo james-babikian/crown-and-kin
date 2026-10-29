@@ -97,7 +97,7 @@
 	stroke-linejoin: round;
 }
 
-/* 0.2.1: inside a far-couple tag the hole of an open sign has the fill of the tag pill, not of the page. */
+/* Inside a far-couple tag the hole of an open sign has the fill of the tag pill, not of the page. */
 .dynasty-tag-mark.dynasty-union-ring,
 .dynasty-tag-mark.dynasty-union-open-triangle {
 	fill: var(--background-secondary);

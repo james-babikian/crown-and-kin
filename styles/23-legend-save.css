@@ -1,4 +1,4 @@
-/* The window "Save as a picture" (spec §13.8). The legend rows are in 08-toolbar.css; the live legend has no house rows (0.2.8 D196 item 3). */
+/* The window "Save as a picture" (spec §13.8). The legend rows are in 08-toolbar.css; the live legend has no house rows (D196 item 3). */
 
 /* Spec §13.8, D72: the window "Save as a picture", with PNG and SVG as a pair of choices. */
 .modal.dynasty-save-window {
@@ -38,7 +38,7 @@
 	box-shadow: inset 0 0 0 3px var(--background-primary);
 }
 
-/* The result Notice (spec §13.8): Share has a 44 × 44 px hit area (B8). */
+/* The result Notice (spec §13.8): Share has a 44 × 44 px hit area. */
 .dynasty-save-small {
 	margin-top: var(--size-4-1);
 }
@@ -52,7 +52,7 @@
 
 
 /*
- * The legend lines reach 3:1 on the window colour in every theme (G3: Cupertino light had ward 2.34, rumoured 2.35, its "?" 2.7 and the phone birth link 2.48).
+ * The legend lines reach 3:1 on the window colour in every theme (Cupertino light had ward 2.34, rumoured 2.35, its "?" 2.7 and the phone birth link 2.48).
  * The grey lines take the run-time line token (`--dynasty-edge`, see `paintContrast` in main.ts). The ward and the rumoured line keep a part of their hue, in a mix
  * that leans on the token. The mix sits in `@supports`, because var() hides `color-mix()` from the parser and an engine without it would draw no line.
  */

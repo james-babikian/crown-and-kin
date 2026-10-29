@@ -1,5 +1,5 @@
 /*
- * The Actions section of the edit sheet (0.3.3, WP-1 A1; spec §6.3, §13.11): focus, pin, the mark, folds, Make a note with its same-name question, the relation
+ * The Actions section of the edit sheet (spec §6.3, §13.11): focus, pin, the mark, folds, Make a note with its same-name question, the relation
  * finder, the id line, and the hosts that the Titles section and the add flows use. Fifth layer of the chain listed in `edit-sheet.ts`.
  */
 
@@ -111,7 +111,7 @@ export abstract class EditSheetActions extends EditSheetFamily {
 		}
 	}
 
-	/** The Notices and the next step for the result of the flow (N2 steps 6 and 7, N3). */
+	/** The Notices and the next step for the result of the flow (N2 steps 6 and 7). */
 	protected afterNote(out: MakePersonNoteOutcome, mode: MakeNoteMode, wanted: string, was: string): void {
 		const open = (file: TFile) => {
 			const go = () => openMadeNote(this.app, file);
@@ -346,7 +346,7 @@ export abstract class EditSheetActions extends EditSheetFamily {
 		};
 	}
 
-	/** The rows of the person picker: portraits, the marked person for the relation word, and the relation settings (G.3). */
+	/** The rows of the person picker: portraits, the marked person for the relation word, and the relation settings. */
 	protected pickerContext(): PickerContext {
 		const me = this.me();
 		return { ...(this.o.pictures ? { pictures: this.o.pictures } : {}), sourcePath: this.o.sourcePath, me, ...(this.o.relationOptions ? { relationOptions: this.o.relationOptions } : {}), ...(this.o.relationBlock ? { relationBlock: this.o.relationBlock } : {}) };

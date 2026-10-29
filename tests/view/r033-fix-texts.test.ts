@@ -49,7 +49,7 @@ describe('B: the sentences of the notes of the tree', () => {
 describe('A: the texts of the Calendars window', () => {
 	it('say what the clarity check asked for', () => {
 		expect(DATE_READOUT_UI.nameMismatch('Planets', 'Saturn', 'Jupiter')).toBe('In the list Planets, this year is Saturn. The date says Jupiter. The plugin uses the year of the date.');
-		expect(T.removeCalendar('')).toBe('Remove the calendar without a name');
+		expect(T.removeCalendar('')).toBe('Remove this calendar: without a name');
 		expect(T.summaryYears(1)).toBe('1 year in a cycle');
 		expect(T.summaryYears(60)).toBe('60 years in a cycle');
 		expect(T.summaryLists(['Planets'])).toBe('Name list: Planets');
@@ -63,7 +63,8 @@ describe('A: the texts of the Calendars window', () => {
 		expect(T.testHint).toBe('The plugin shows the date as a plain year, for example “year 1273”.');
 		expect(T.refusalHead(1)).toBe('Correct this error:');
 		expect(T.refusalHead(2)).toBe('Correct these errors:');
-		expect(T.markerPlaceholder).toBe('For example: planet');
+		// Owner, 0.5.1 retest 2c (D320): the example shows the word in its curly brackets, as the field holds it.
+		expect(T.markerPlaceholder).toBe('For example: {planet}');
 		expect(T.namesPlaceholder).toBe('For example: Saturn, Sa');
 		expect(CALENDAR_BLOCK_UI.listMarker('Planets', 'planet')).toBe('Planets, marker {planet}');
 		expect(T.cannotSaveBecause('X.')).toBe('The plugin cannot save the calendars. X. Your changes stay in this window.');

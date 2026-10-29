@@ -15,7 +15,7 @@ import { clone, findPair, finish, layoutOf, refuse, setPairValue, type Parsed, t
 import { REFUSAL_TEXT } from './refusal-text';
 
 /** Which kind of item an id change is for. */
-export interface IdChange {
+interface IdChange {
 	/** The list that holds the items. */
 	section: 'houses' | 'titles';
 	/** The key of a person that holds the id. */

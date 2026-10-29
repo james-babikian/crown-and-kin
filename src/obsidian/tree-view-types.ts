@@ -1,5 +1,5 @@
 /*
- * Types and constants that several layers of `TreeView` share (0.3.3, WP-1 A1): the places a view can be in, the open timing of spec §7.7, the anchor that a
+ * Types and constants that several layers of `TreeView` share: the places a view can be in, the open timing of spec §7.7, the anchor that a
  * redraw keeps, the picture facts of a tree, and the page-preview source. `tree-view.ts` exports the ones other files use.
  */
 
@@ -63,7 +63,7 @@ export interface FullHost {
 /** Where a view is: an embed in a note (with Obsidian's context), or the full-screen view. */
 export type ViewPlace = { kind: 'embed'; ctx: MarkdownPostProcessorContext } | { kind: 'full'; from: FullSource; host: FullHost };
 
-/** What stays in place when the folds change (F10): the control that was tapped ('spot'), or a person's card (the sheet actions). */
+/** What stays in place when the folds change: the control that was tapped ('spot'), or a person's card (the sheet actions). */
 export type FoldAnchor = { kind: 'spot'; key: FoldKey } | { kind: 'person'; id: string };
 
 /** Where the view was, relative to the card nearest its centre, in em: survives a font change. */
@@ -87,14 +87,14 @@ export interface KeepPlace {
 	until: number;
 }
 
-/** One arms or portrait link of the whole tree, and whose it is (M9 contract O2). */
+/** One arms or portrait link of the whole tree, and whose it is. */
 export interface PictureUse {
 	owner: PictureOwner;
 	link: string;
 }
 
 /**
- * The pictures of the whole tree as this view resolved them (spec §13.0 item 3 "Problems"; O1, O2):
+ * The pictures of the whole tree as this view resolved them (spec §13.0 item 3 "Problems"):
  * each link once, the warnings found at render, and the ones the background check of the files found.
  */
 export interface PictureInfo {
@@ -106,6 +106,7 @@ export interface PictureInfo {
 	found: Map<number, CodedIssue>;
 }
 
+/** How long the flash of a row or a card lasts, in ms. */
 export const HIGHLIGHT_MS = 2000;
 
 /** The page-preview source id for card names: `main.ts` registers it, and the tree view sends it with each hover-link event. */

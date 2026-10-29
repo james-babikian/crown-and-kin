@@ -10,7 +10,7 @@
 import { foldForId } from './fold';
 import { str, type Raw, type RawMap } from './tolerate';
 
-/** Characters an id may hold besides hyphens: lower-case or uncased letters, digits and marks of any writing system (I16). */
+/** Characters an id may hold besides hyphens: lower-case or uncased letters, digits and marks of any writing system. */
 const ID_REST = /[^\p{Ll}\p{Lm}\p{Lo}\p{N}\p{M}]+/gu;
 const ID_VALID = /^[\p{Ll}\p{Lm}\p{Lo}\p{N}\p{M}-]+$/u;
 const HAS_LETTER = /[\p{L}\p{N}]/u;
@@ -18,7 +18,7 @@ const HAS_LETTER = /[\p{L}\p{N}]/u;
 /** Turns a display name into a slug: "Aldric Valmont" → "aldric-valmont", "Þórr" → "thorr", "Иван" → "иван". */
 export function slugify(name: string): string {
 	// The id fold (the search fold, with the accent range only) lower-cases before the letter map and repeats until stable, so a capital ẞ or a letter such as Ǣ gives the same text as in search.
-	// Letters, digits and marks of other writing systems stay (I16). The fold has already taken the Latin accents off.
+	// Letters, digits and marks of other writing systems stay. The fold has already taken the Latin accents off.
 	const slug = foldForId(name)
 		.replace(ID_REST, '-')
 		// A mark with no letter before it (after a hyphen or at the start) has nothing to sit on.

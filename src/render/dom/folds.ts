@@ -5,7 +5,7 @@
  * (the CSS block is added with the tree view); this file writes geometry and text. The tree view wires the
  * clicks and keys, and sizes the tap area at each settle and change of level (`foldHit` in `view-math.ts`).
  *
- * Look and hit area (F6, F7; 0.2.8 C01, G.13):
+ * Look and hit area:
  * - Button: a small square chip `FOLD_CHIP_EM` (0.95 em) across, with rounded corners and a minus; the layout still reserves the 1.2 em circle.
  *   Sign: a chip 1.25 em high and (text width + 0.9 em) wide with 0.25 em corners, "+ N" at 0.8 em, weight 600, centred on the spot (D206). Full and Compact draw the
  *   same size in em. Overview draws the larger sign (`FOLD_EM.signHeightOverview`) in its own group,
@@ -76,7 +76,7 @@ export interface FoldDrawing {
  * Draws one control: an open one as a circle with a minus; a folded one as a pill with "+ N" (a Full
  * and Compact pill 1.25 em high, and a larger Overview pill 2 em high that share one text, which sits at the
  * same x; a class on the tree picks the pill and the text size). The pill is centred on the spot, on the line (D206); in a sideways
- * layout (`anchored`) the line runs along the sign, so the pill's left half-circle is centred on the spot. The `<title>` child gives the mouse-pointer tooltip (F16).
+ * layout (`anchored`) the line runs along the sign, so the pill's left half-circle is centred on the spot. The `<title>` child gives the mouse-pointer tooltip.
  * A lazy open button is only the group with its Tab stop and name; its five elements cost layout time at the
  * first view, so `fill` adds them later.
  */

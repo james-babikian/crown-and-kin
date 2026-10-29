@@ -1,5 +1,5 @@
 /*
- * The bottom layer of the edit sheet (0.3.3, WP-1 A1; split out of `edit-sheet.ts` with no change of behaviour). `EditSheet` is a chain of classes, one file for each
+ * The bottom layer of the edit sheet. `EditSheet` is a chain of classes, one file for each
  * part of the window, and the chain is listed in `edit-sheet.ts`. This first class holds the options of a sheet, the state of one window (every field), its
  * open and close, the test for unsaved changes, the list of fields that changed, and the messages and questions over the sheet. The draft logic that needs no
  * window is in `view/sheet-draft.ts`. The `abstract` methods at the end are implemented by the layers above.
@@ -10,13 +10,14 @@ import type { DatesFor } from '../view/calendar-index';
 import type { FieldValue, Op, PersonField } from '../core/edit';
 import type { PersonFolds } from '../core/folds';
 import { sameCropText } from '../core/portrait-crop';
+import { holdLayoutOnPress } from '../render/dom/press-hold';
 import { NEW_SHEET, SHEET, WRITE_TEXT } from '../render/ui-text';
 import type { Handle, Written } from './block-handle';
 import type { ViewKind } from '../view/block-state';
 import type { ParentLink, PartnerLink } from '../core/family-query';
 import type { RelationOptions } from '../core/relations';
 import type { FlowHost, NewRelation } from './family-flows';
-import { ignoreGhostClick, phoneLayout } from './modal-layout';
+import { ignoreGhostClick, phoneLayout, startWithoutFocus } from './modal-layout';
 import type { PictureCopy, PictureStore } from './picture-store';
 import { revealFocused as revealInWindow, showErrorLine } from './sheet-parts';
 import type { RelationView } from './sheet-relation';
@@ -27,7 +28,7 @@ import { RowPictures } from './window-parts';
 import { trackModal } from '../view/plugin-modals';
 import { TEXT_FIELDS, NEW_HOUSE, blankHouse, type Draft, type Loaded } from '../view/sheet-draft';
 
-/** What the tree view gives the sheet for Hide descendants, Show descendants and the unfold after a write (F12, F15). */
+/** What the tree view gives the sheet for Hide descendants, Show descendants and the unfold after a write. */
 export interface SheetFolds {
 	/** 'live': a view that folds. 'preview': the static touch preview, which never shows folds (D85). */
 	mode: 'live' | 'preview';
@@ -41,6 +42,7 @@ export interface SheetFolds {
 	written(ids: readonly string[]): void;
 }
 
+/** What opens an edit sheet: the handle, the path of the note and the optional parts. */
 export interface SheetBase {
 	handle: Handle;
 	/** The name typed in the picker before "Create a new person". */
@@ -74,11 +76,11 @@ export interface SheetBase {
 	place?: ViewKind;
 	/** Spec §14 rule 9: the date reader for the calendar link of the block; absent: plain years. */
 	dates?: DatesFor;
-	/** The plugin's picture store (M9 contract O3): the portrait picture and the picker's preview. */
+	/** The plugin's picture store: the portrait picture and the picker's preview. */
 	pictures?: PictureStore;
 	/** D174: the sibling setting of the plugin, so the sheet names the relation as the cards do. Absent: the defaults. */
 	relationOptions?: RelationOptions;
-	/** Runs after the window closed: the tree view gives the keyboard focus back to the control that opened it, which a write can have drawn again (G5 0.4). */
+	/** Runs after the window closed: the tree view gives the keyboard focus back to the control that opened it, which a write can have drawn again. */
 	onClosed?: () => void;
 	/** The block of the tree view that opened the sheet (its view state key): the sheet asks for relation names for this block, so the block keeps one lookup (relation-cache.ts). */
 	relationBlock?: string;
@@ -103,14 +105,15 @@ export type DraftWritten = Written & { withFields: boolean };
  * handle when the line was shown. The handle undoes its last write; if the depth is another one, a later write stands above the one the line names, and
  * the same body is not proof (a pin set and removed brings the body back).
  */
-export interface SheetChange {
+interface SheetChange {
 	text: string;
 	written: string | null;
 	was: string;
 	depth: number | null;
 }
 
-export interface ConfirmSpec {
+/** A question over the sheet: its title, its text, its buttons and what a confirm does. */
+interface ConfirmSpec {
 	title: string;
 	text: string[];
 	confirm: string;
@@ -119,10 +122,10 @@ export interface ConfirmSpec {
 	onConfirm: () => void;
 }
 
-/** A tree with this many people or more draws for a noticeable time after a write, so the sheet shows its sign first (F6). */
+/** A tree with this many people or more draws for a noticeable time after a write, so the sheet shows its sign first. */
 export const SLOW_SAVE_PEOPLE = 300;
 
-/** Contract C (Q6H A): the round portrait of the header is 64 px across. */
+/** The round portrait of the header is 64 px across. */
 export const SHEET_PORTRAIT_PX = 64;
 
 /** The state of one edit window and its messages. Never made by itself: `EditSheet` is the whole chain. */
@@ -135,12 +138,12 @@ export abstract class EditSheetBase extends Modal {
 	protected unionType: string = 'marriage';
 	protected saving = false;
 	protected closing = false;
-	/** `onClose` ran: a write that ends later must not draw the sheet again, which would start a portrait copy that nobody releases (C6). */
+	/** `onClose` ran: a write that ends later must not draw the sheet again, which would start a portrait copy that nobody releases. */
 	protected closed = false;
 	/** The person left the tree while the sheet was open: the sheet shows the draft but cannot save it. */
 	protected gone = false;
 	protected confirmEl: HTMLElement | null = null;
-	/** The control that had the focus when a question opened; the focus goes back to it when the question closes (C3). */
+	/** The control that had the focus when a question opened; the focus goes back to it when the question closes. */
 	protected confirmFrom: HTMLElement | null = null;
 	protected errorEl: HTMLElement | null = null;
 	protected statusEl: HTMLElement | null = null;
@@ -177,7 +180,7 @@ export abstract class EditSheetBase extends Modal {
 	/** Gives the hidden names of the parent type chips their ids. */
 	protected static chipCounter = 0;
 	/**
-	 * The parent link that each parent-type select shows now. A change of a parent type updates the page in place (r032: a native
+	 * The parent link that each parent-type select shows now. A change of a parent type updates the page in place (a native
 	 * select that is destroyed under the finger can keep its phone menu open), so the one listener of a select reads its link here.
 	 */
 	protected parentSelects = new WeakMap<HTMLElement, ParentLink>();
@@ -189,15 +192,15 @@ export abstract class EditSheetBase extends Modal {
 	protected sections: SectionsView | null = null;
 	/** The pictures of the rows and of the small arms marks of the header; released when the form is drawn again and when the window closes. */
 	protected rowPictures: RowPictures | null = null;
-	/** Contract C: the header draws the name, the detail line and the personal arms; these follow the draft. */
+	/** The header draws the name, the detail line and the personal arms; these follow the draft. */
 	protected head: { paint(): void; arms(): void } | null = null;
 	/** What the form showed last: a window that crosses 600 px (a turn, a resize) draws again, because the frame differs. */
 	protected builtPhone = false;
-	/** G.7: the people the user came from by a child row, the nearest last. */
+	/** The people the user came from by a child row, the nearest last. */
 	protected readonly trail: string[] = [];
 	/** What the relation line shows for this build (null: nothing). */
 	protected relView: RelationView | null = null;
-	/** Spec §13.11: the slot in the Actions list for Make a note, what it shows now, and the busy flag of the flow (N2). */
+	/** Spec §13.11: the slot in the Actions list for Make a note, what it shows now, and the busy flag of the flow. */
 	protected noteSlot: HTMLElement | null = null;
 	protected noteKey = '';
 	protected noteBusy = false;
@@ -245,7 +248,7 @@ export abstract class EditSheetBase extends Modal {
 		return this.data.g.byId.get(id)?.name || id;
 	}
 
-	/** Builds the form and gives the focus to the name field (a new person) or the modal itself. */
+	/** Builds the form; the window itself has the focus, no field. */
 	override onOpen(): void {
 		this.modalEl.addClass('dynasty-sheet');
 		if (this.isNew) this.modalEl.addClass('is-new');
@@ -257,43 +260,13 @@ export abstract class EditSheetBase extends Modal {
 				this.revealFocused();
 			}),
 		);
-		this.cleanup.push(trackModal(this, () => this.finish()));
+		this.cleanup.push(trackModal(this, () => this.finish()), holdLayoutOnPress(this.modalEl));
 		const store = this.o.pictures;
 		if (store) this.cleanup.push(store.onChange((paths) => this.portraitFilesChanged(paths)));
 		this.shown = true;
 		this.build();
-		if (this.isNew) this.focusNameAfterOpen();
-		else {
-			if (!this.modalEl.contains(this.modalEl.doc?.activeElement ?? null)) {
-				// On a phone the sheet can open with the focus left on the page, so a Tab key would reach the tree below it.
-				this.modalEl.setAttribute('tabindex', '-1');
-				this.modalEl.focus({ preventScroll: true });
-			}
-			// F7: a computer has a keyboard, so the window starts in Name, as for a new person. A phone would open its keyboard.
-			if (this.startsInName()) this.focusNameAfterOpen();
-		}
-	}
-
-	/** True if a saved person's window starts with the focus in Name: not a read-only window, not a phone, not a touch screen (spec §7: the pointer and the width decide, not `Platform`). */
-	protected startsInName(): boolean {
-		if (this.readOnly || this.gone || this.modalEl.hasClass('is-phone')) return false;
-		const win = this.modalEl.win ?? window;
-		return win.matchMedia?.('(pointer: coarse)')?.matches !== true;
-	}
-
-	protected focusNameAfterOpen(): void {
-		this.focusName();
-		// Why: after `onOpen` returns, Obsidian moves the focus to the first control of the window when the device has a
-		// physical keyboard (a computer). That control is "Open all" or "Add portrait or arms". A phone has no such step.
-		void Promise.resolve().then(() => {
-			if (!this.shown || this.closing) return;
-			const active = this.modalEl.doc?.activeElement as HTMLElement | null | undefined;
-			const typing = !!active && this.contentEl.contains(active) && active.matches('input, textarea, select');
-			// The first control is where Obsidian put the focus, not the user: in the window of a new partner it is "Type of partnership" above Name, and a
-			// name typed at once changed the type (G5 0.4).
-			const first = Array.from(this.contentEl.querySelectorAll<HTMLInputElement>('button, input, select, textarea')).find((c) => !c.disabled);
-			if (!typing || active === first) this.focusName();
-		});
+		// No window puts a cursor in a field when it opens: the user taps or tabs to the first field.
+		this.cleanup.push(startWithoutFocus(this.modalEl));
 	}
 
 	/** The one guard of every button, link and row of the window: nothing runs while a write runs, and a failing action never leaves an exception (spec §8). */
@@ -325,7 +298,7 @@ export abstract class EditSheetBase extends Modal {
 		this.rowPictures = null;
 		this.head = null;
 		this.contentEl.empty();
-		// The window that started this one rebuilt itself after the write, so the control that had the focus there is gone (G5 0.4).
+		// The window that started this one rebuilt itself after the write, so the control that had the focus there is gone.
 		this.o.parentSheet?.childClosed();
 		try {
 			this.o.onClosed?.();
@@ -385,7 +358,7 @@ export abstract class EditSheetBase extends Modal {
 		if (portrait !== this.base.portrait.trim()) out.portrait = portrait === '' ? null : portrait;
 		// Spec §13.13, D91: the part follows the picture. A changed part is written (or removed); a part that is kept while
 		// the link text changes to the same file is written again, so the core rule that a new picture drops its part keeps it.
-		// 0.2.8 contract A.1: Select personal arms and Remove personal arms are draft edits too.
+		// Select personal arms and Remove personal arms are draft edits too.
 		const arms = this.draft.arms.trim();
 		if (arms !== this.base.arms.trim()) out.arms = arms === '' ? null : arms;
 		const crop = this.draft.portraitCrop.trim();
@@ -403,6 +376,7 @@ export abstract class EditSheetBase extends Modal {
 
 	// ---------- messages ----------
 
+	/** Puts the cursor in the name field again; "Save and add another" uses it for the next person. */
 	protected focusName(): void {
 		this.contentEl.querySelector<HTMLInputElement>('[data-field="name"] input')?.focus();
 	}
@@ -462,7 +436,7 @@ export abstract class EditSheetBase extends Modal {
 		this.confirmFrom = active && this.contentEl.contains(active) ? active : null;
 	}
 
-	/** The focus must stay in the sheet when a question goes: the focused button goes with it (C3). */
+	/** The focus must stay in the sheet when a question goes: the focused button goes with it. */
 	protected focusBack(): void {
 		const from = this.confirmFrom;
 		this.confirmFrom = null;

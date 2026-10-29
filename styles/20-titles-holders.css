@@ -1,4 +1,4 @@
-/* ---------- Titles and holders (spec §13.3–§13.5; D54–D63; 0.2.8 contract C, G.6, G.7, D195, D201) ---------- */
+/* ---------- Titles and holders (spec §13.3–§13.5; D54–D63; D195, D201) ---------- */
 
 /*
  * Obsidian shows an aria-label as a floating label when the pointer rests on the element (the CSS switch `--no-tooltip` turns it off, and it
@@ -64,7 +64,7 @@
 	}
 }
 
-/* On a phone the tap area of the name grows to 44 px by an invisible extension, with no change of the look (F4). A row is at least 52 px high, so the extension stays inside its own row. */
+/* On a phone the tap area of the name grows to 44 px by an invisible extension, with no change of the look. A row is at least 52 px high, so the extension stays inside its own row. */
 .dynasty-sheet.is-phone button.dynasty-holder-name {
 	position: relative;
 }
@@ -181,7 +181,7 @@
 }
 
 /*
- * The succession sections of a title page (contract 0.2.7 E; 0.2.8 C, G.6). The choices are dropdowns on every device; on a phone each one
+ * The succession sections of a title page. The choices are dropdowns on every device; on a phone each one
  * opens the phone's own list (D208 item 3).
  */
 .dynasty-succ-pair {
@@ -265,7 +265,7 @@
 }
 
 /*
- * The quiet notes of the line stand apart (look round 0.3.2): 8 px between two notes, and 12 px above the first note after a row, so the notes do not look like a part of the last
+ * The quiet notes of the line stand apart: 8 px between two notes, and 12 px above the first note after a row, so the notes do not look like a part of the last
  * row. A note in the box has the 2 px gap of the box and 3 px each side. A note in the list has only a top margin; a note that starts the list has 10 px, with the 2 px of the box.
  */
 .dynasty-line-box > .dynasty-succ-note {
@@ -284,7 +284,7 @@
 	margin-top: 10px;
 }
 
-/* G.6, quiet-warnings; D218 item 4: a note of the line is a quiet grey roman text line at the Small size, with no sign; a warning is in the text colour. */
+/* D218 item 4: a note of the line is a quiet grey roman text line at the Small size, with no sign; a warning is in the text colour. */
 .dynasty-succ-note,
 .dynasty-succ-subnote {
 	display: block;
@@ -314,7 +314,7 @@
 	margin-left: 42px;
 }
 
-/* 8 px, as between two notes of the list (look round 0.3.2, G5: the branch hint stood 2 px under the last note). */
+/* 8 px, as between two notes of the list (the branch hint stood 2 px under the last note). */
 .dynasty-succ-branch-note {
 	margin-top: 8px;
 }

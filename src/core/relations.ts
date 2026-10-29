@@ -2,7 +2,7 @@
  * Relation names (spec §13.1) and the relation finder (spec §13.2; D40–D50). `computeRelations`
  * names every person's relation to the marked person ("This is me"); `findRelation` names the
  * relation of one person to another, or finds the shortest chain of links between them;
- * `relationLookup` gives the same names for the people a view asks for, each worked out once (WP-K);
+ * `relationLookup` gives the same names for the people a view asks for, each worked out once;
  * `lineSubgraph` builds the small tree that shows one relation (D47); `relationsKey` is the cache
  * key of the names. The names are English kinship words (exempt from the STE word rule, §13.0
  * item 5), all in the `WORDS` table below; `src/render/tree-info.ts` builds the sentences around them.
@@ -42,13 +42,13 @@
  *   children (`stepView`), so a child linked to S by a rumoured link only gives a rumoured name. So the
  *   name does not depend on the order of the people or of a person's parents. Known limits: (a) the
  *   cut tree gives names, not link words: a name that differs only in its link word (adoptive,
- *   rumoured) is not restored (design gate rule 4, case M2); (b) a rumoured cousin name by marriage,
+ *   rumoured) is not restored; (b) a rumoured cousin name by marriage,
  *   where a line of the name runs through M (a rumoured double cousin, or a rumoured cousin that the second
- *   test makes), can still change with the parent order (gate rule 7);
+ *   test makes), can still change with the parent order;
  *   (c) a child with three birth parents: the order inside S's parent list can decide a name such as
- *   "Sister-in-law" (the placement uses two of the three parents, F-KIN-05); (d) when M is a descendant
+ *   "Sister-in-law" (the placement uses two of the three parents); (d) when M is a descendant
  *   of S (a marriage to one's own parent or adoptive parent), a step-descendant name is not shown when
- *   the line through M is shorter than the line that avoids M (re-vet of 1d, case s60). A candidate keeps these
+ *   the line through M is shorter than the line that avoids M. A candidate keeps these
  *   other lines (`also`: one flat list, each line once, only its people) and the line of its maybe
  *   (`maybeFrom`) only until the names of its person are made; then `forget` drops them, so a result
  *   keeps only the one line that each name shows.
@@ -58,7 +58,7 @@
  *   visits the parents in `drawnParents` order, then the children in `g.people` order, then the
  *   partners in `unionsOf` order. The first chain found wins.
  *
- * Years (0.5, step 1a; D304 to D309; an internal study; `exact-year.ts`, `marriage-years.ts`). A year counts only if it is exact
+ * Years (D304 to D309, `exact-year.ts`, `marriage-years.ts`). A year counts only if it is exact
  * (`exactYear`), and every comparison is strict. The words of a pair read ALL the marriages of the pair (`marriagesOf`), never the last-listed one;
  * the line shows the last-listed marriage as before. (1) A step word (step-parent, step-grandparent, stepchild, step-grandchild, step-sibling) holds only
  * if some marriage may overlap the life of the child at the step link (not APART): K is M for a step-parent, every parent of M who is a child of R for
@@ -82,7 +82,7 @@
  * full or half result at X (full: one per couple) is one candidate (D50), so the names never depend
  * on the order of siblings; each takes the line with the best link type, as above.
  *
- * R1 (0.2.8, D200). The search keeps the shortest line to each ancestor, so a rumoured link could hide a longer sure line
+ * D200 R1. The search keeps the shortest line to each ancestor, so a rumoured link could hide a longer sure line
  * ("Great-grandfather" beside "Rumoured father"). When a rumoured link lies in the ancestry of either person and the sure
  * distances differ from the whole ones, `sureView` (the same tree with the rumoured links left out of `up` and `down`) gives
  * the candidates of the sure links; those whose key the whole tree did not give join the list, and "double" is decided
@@ -101,20 +101,20 @@
  * that the lines found so far do not settle and the couple test alone does not settle either, and only
  * if its key could be one of that group.
  *
- * Order (R3, 0.2.8). Names come best first by §13.1 "Which name wins", rules 1–4, with the keys of `compareCands`: each one
+ * Order. Names come best first by §13.1 "Which name wins", rules 1–4, with the keys of `compareCands`: each one
  * belongs to the name itself, so the order of the people in the note never decides a name. A name by marriage of a person
  * who also has a sure blood name comes after all other names; a rumoured blood name competes with the names by marriage
  * by distance and kind. A name by marriage whose blood leg is rumoured counts as rumoured and gets "Rumoured " in front
- * (R2; the possessive forms already say it, and an adoptive leg gets no word). Each distinct `lower` is listed once
+ * (the possessive forms already say it, and an adoptive leg gets no word). Each distinct `lower` is listed once
  * (the first in the order is kept). Distances: self 0, partner 1, guardian and ward 1, by marriage 1 + the blood
  * distance, step-sibling 3, blood a + b.
  *
- * Known limits (D200 R5, contract B.1): the partner names of a child with three birth or three adoptive parents use the two parents
- * used for placement (F-KIN-05; so the parent order of such a child can decide "Co-parent", and whether two adoptive parents share an
- * implicit union, which decides D293: "Adoptive sister" or "Adoptive half-sister", 1f case s274); a pair with a sure and a rumoured line of equal length can have different "Also" lists in
- * the two directions (F-KIN-09); rule 1 of the names by marriage skips a blood relative of M, rule 2 does not
- * (F-KIN-12); a rumoured link plus a person married to their own child can still make a name by marriage depend on
- * the order of the people (I10).
+ * Known limits (D200 R5): the partner names of a child with three birth or three adoptive parents use the two parents
+ * used for placement (so the parent order of such a child can decide "Co-parent", and whether two adoptive parents share an
+ * implicit union, which decides D293: "Adoptive sister" or "Adoptive half-sister"); a pair with a sure and a rumoured line of equal length can have different "Also" lists in
+ * the two directions; rule 1 of the names by marriage skips a blood relative of M, rule 2 does not;
+ * a rumoured link plus a person married to their own child can still make a name by marriage depend on
+ * the order of the people.
  *
  * Steps (the finder and "Show the steps"). There is one step per link, except that a step up to a
  * parent followed by a step down to another child of that parent is one sibling step ("brother",
@@ -160,16 +160,16 @@
  * that share a union of the tree and give the line a rumoured link (below c1 and c2, from c1 up to the
  * first, or from the second down to c2); else the first member with a rumoured link to c1 or c2,
  * alone, so the line has a "rumoured" sibling step. Siblings keep X alone, as their one sibling step
- * shows the rumoured link (D174 ruling 8). (2) A sure half candidate
- * gets `maybe` 'full' if R1 or R2 is not empty and a choice of one equals a choice of the other (any size; D176);
+ * shows the rumoured link (D174). (2) A sure half candidate
+ * gets `maybe` 'full' if either child has a rumoured parent and a choice of one equals a choice of the other (any size; D176);
  * with the setting on, also if two choices together have at most two people. The `some` flag (D176) says that
- * an equal choice leaves out a rumoured parent of either person, so one rumoured link is enough. R4 (0.2.8, I09): for this
+ * an equal choice leaves out a rumoured parent of either person, so one rumoured link is enough. D200 R4: for this
  * maybe a child with two sure parents and a rumoured parent has one more outcome, the two sure parents alone (the
  * rumour may be false), so Tom (Anna, rumoured Carl) and Sue (Carl, Anna, rumoured Dirk) read "Half-brother, maybe
  * full". The same outcomes serve the unlisted parent: Sue and Tom (Anna) read "maybe full" too. `choices` and so `secondHalf` do not change
  * (Eleanor and Fiona stay "Sister, maybe half"). The extra name takes the other outcome and its steps print it; a rumoured half line
- * of the same degree adds no second "Rumoured half-brother" beside "Rumoured brother" (D205 item 2). F-KIN-08: an 'unlisted' maybe says which of two sentences is true. (3) With the setting off, a parent who is not listed adds no maybe.
- * (4) A sure full candidate gets `maybe` 'half' if R1 and R2 differ; one rumoured parent is enough.
+ * of the same degree adds no second "Rumoured half-brother" beside "Rumoured brother" (D205 item 2). An 'unlisted' maybe says which of two sentences is true. (3) With the setting off, a parent who is not listed adds no maybe.
+ * (4) A sure full candidate gets `maybe` 'half' if the rumoured parents of the two children differ; one rumoured parent is enough.
  * (5) No maybe on a rumoured line, on a `double` name, or where the link of c1 or c2 to X is adoptive.
  * The `cause` of a maybe is 'rumoured' for rule 4 and for rule 2 with equal A1 and A2; else 'unlisted'
  * (rule 2 by the count of two, setting on). Only a rumoured cause adds the extra name ("Rumoured
@@ -197,10 +197,10 @@ import { isUnionType, PARENT_LIMIT, PARENT_TYPES, readEndedBy, type ParentType, 
 import { push } from './validate';
 
 /** The kinds of §13.1: which rule named the relation. */
-export type RelationKind = 'self' | 'blood' | 'partner' | 'guardian' | 'ward' | 'by-marriage' | 'step-sibling';
+type RelationKind = 'self' | 'blood' | 'partner' | 'guardian' | 'ward' | 'by-marriage' | 'step-sibling';
 
 /** One parent link that a line uses (a cycle-broken link, see the file header). */
-export interface RelationLink {
+interface RelationLink {
 	parent: string;
 	child: string;
 	type: ParentType;
@@ -238,9 +238,9 @@ export interface RelationMaybe {
 	lower: string;
 	/** D174: 'rumoured' if the second test settles it (the rumoured links make the sets equal, or any maybe half); 'unlisted' if the pair is full only when a parent who is not listed is the same person (setting on only). */
 	cause: 'rumoured' | 'unlisted';
-	/** D176: only with effect 'full' and cause 'rumoured'. True if the set of parents that makes the pair full leaves out a rumoured parent of either person: then not every rumoured link need be true ("If some of the rumoured links are true", D176 fix round). Absent if every rumoured link must be true. */
+	/** D176: only with effect 'full' and cause 'rumoured'. True if the set of parents that makes the pair full leaves out a rumoured parent of either person: then not every rumoured link need be true ("If some of the rumoured links are true", D176). Absent if every rumoured link must be true. */
 	some?: true;
-	/** F-KIN-08: only with cause 'unlisted'. 'same-person': both people list the same one parent, so the unlisted parent could be the same person. 'other-parent': one lists both parents and the other one, so the other's unlisted parent could be that second parent. Cousins and beyond always read 'same-person' (known limit). */
+	/** Only with cause 'unlisted'. 'same-person': both people list the same one parent, so the unlisted parent could be the same person. 'other-parent': one lists both parents and the other one, so the other's unlisted parent could be that second parent. Cousins and beyond always read 'same-person' (known limit). */
 	unlistedForm?: 'same-person' | 'other-parent';
 }
 
@@ -321,7 +321,7 @@ export type LineSubgraph = (g: FamilyGraph, line: RelationLine) => FamilyGraph;
  */
 export type RelationsKey = (g: FamilyGraph, me: string, options?: RelationOptions) => string;
 
-/** The most relations the finder cycles through (§13.2): no limit, as the owner decided (D53). A number caps the list. */
+/** The most relations the finder cycles through (§13.2): no limit (D53). A number caps the list. */
 export const FINDER_LIMIT: number = Infinity;
 
 /**
@@ -511,7 +511,7 @@ interface Blood {
 	cause?: RelationMaybe['cause'];
 	/** D176: set with `maybe`; true if the matching set leaves out a rumoured parent of either person (`RelationMaybe.some`). */
 	some?: true;
-	/** F-KIN-08: set with an 'unlisted' `maybe` (`RelationMaybe.unlistedForm`). */
+	/** Set with an 'unlisted' `maybe` (`RelationMaybe.unlistedForm`). */
 	form?: RelationMaybe['unlistedForm'];
 	/** The line of the pair of children that gave `maybe`, if it is not this candidate's own line (rule 6): the extra "Rumoured X" name takes it. */
 	maybeFrom?: BloodLine;
@@ -557,11 +557,11 @@ interface Cand {
 	direct: number;
 	half: number;
 	removal: number;
-	/** R3 key 8: the blood leg's a - b (larger = older generation first). 0 for the kinds that have no leg. */
+	/** D200 R3 key 8: the blood leg's a - b (larger = older generation first). 0 for the kinds that have no leg. */
 	elder: number;
-	/** R3 key 9, by marriage only: 0 step names (and step-sibling), 1 in-law names, 2 "by marriage", 3 the possessive forms. */
+	/** D200 R3 key 9, by marriage only: 0 step names (and step-sibling), 1 in-law names, 2 "by marriage", 3 the possessive forms. */
 	group: number;
-	/** Document index of the common ancestor, for the final tie-break (R3 key 11). */
+	/** Document index of the common ancestor, for the final tie-break (D200 R3 key 11). */
 	anc: number;
 	/** 1 for a name by marriage of a person who also has a blood name: it comes after every other name. */
 	after?: number;
@@ -569,7 +569,7 @@ interface Cand {
 	maybe?: RelationMaybe;
 	/** A rumoured blood name: its sibling steps take half or full from the second test (spec §13.2), as the name does. */
 	second?: boolean;
-	/** R4: the extra name of a maybe is the other outcome of the sure candidate; its sibling steps print that outcome (true: half), not what the second test says. */
+	/** D200 R4: the extra name of a maybe is the other outcome of the sure candidate; its sibling steps print that outcome (true: half), not what the second test says. */
 	stepHalf?: boolean;
 	/** Builds the line and the walk; only the names that are kept need them. */
 	make: () => { line: Line; walk: Walk };
@@ -579,7 +579,7 @@ interface Cand {
 interface Counted {
 	/** The sure parents of the type of the child's link (the half rule of §13.1). */
 	sure: string;
-	/** The same people as a list (R4: the sure set alone is an outcome of a child with two sure parents). */
+	/** The same people as a list (D200 R4: the sure set alone is an outcome of a child with two sure parents). */
 	sureList: number[];
 	/** The sure parents and every rumoured parent counted as a birth parent. */
 	all: string;
@@ -601,24 +601,24 @@ interface Counted {
 }
 
 /**
- * A name by marriage: its text, its group (R3 key 9) and, when it has "former" (D307), the same text without it (`base`; the order of
+ * A name by marriage: its text, its group (D200 R3 key 9) and, when it has "former" (D307), the same text without it (`base`; the order of
  * the names and rule D compare it, so "former" never changes a tie).
  */
 type Word = readonly [lower: string, group: number, base?: string];
 
-/** "former " goes before the whole name, after "rumoured " (RULES §1.3). */
+/** "former " goes before the whole name, after "rumoured " (D304 to D309). */
 const FORMER = `${WORDS.former} `;
 
-/** A name by marriage with its group (R3 key 9); a leg through a rumoured link puts "rumoured" in front (R2). */
+/** A name by marriage with its group (D200 R3 key 9); a leg through a rumoured link puts "rumoured" in front. */
 function named(c: Blood, word: string, group: number, former: boolean): Word {
 	const rumoured = c.word === 'rumoured' ? `${WORDS.rumoured} ` : '';
 	return former ? [`${rumoured}${FORMER}${word}`, group, `${rumoured}${word}`] : [`${rumoured}${word}`, group];
 }
 
-/** A possessive form: "former" describes the marriage, so it stands before the partner word (RULES §1.2). */
+/** A possessive form: "former" describes the marriage, so it stands before the partner word (D304 to D309). */
 const possessive = (text: (former: string) => string, former: boolean): Word => (former ? [text(FORMER), BY_POSSESSIVE, text('')] : [text(''), BY_POSSESSIVE]);
 
-/** R3 key 9, the groups of the names by marriage: step names (and step-sibling), in-law names, "by marriage" names, the possessive forms. */
+/** D200 R3 key 9, the groups of the names by marriage: step names (and step-sibling), in-law names, "by marriage" names, the possessive forms. */
 const BY_STEP = 0;
 const BY_IN_LAW = 1;
 const BY_MARRIAGE = 2;
@@ -627,7 +627,7 @@ const BY_POSSESSIVE = 3;
 /** The years and `ended-by` of the marriages of a graph (D304 to D309), made when a partner word or a name by marriage first needs them. A graph never changes, so each mark of it shares them. */
 const YEARS = new WeakMap<FamilyGraph, MarriageYears>();
 
-/** Supervisor ruling on rule 3: step-siblings come through birth and adoptive parents only. */
+/** Rule 3: step-siblings come through birth and adoptive parents only. */
 const isStepLink = (l: Up) => l.type === 'birth' || l.type === 'adoptive';
 const implicitKey = (a: string, b: string) => `i:${JSON.stringify(a < b ? [a, b] : [b, a])}`;
 const isMarriage = (u: FamilyUnion) => !u.implicit && (u.type === 'marriage' || !isUnionType(u.type));
@@ -674,7 +674,7 @@ class Kin {
 	/** `dagOf` results, kept like `belowMemo` and `belowScratch`. */
 	private readonly dagMemo = new Map<number, Dag>();
 	private readonly dagScratch = new Map<number, Dag>();
-	/** R1: the same tree seen with the sure links only, made the first time a pair needs it. */
+	/** D200 R1: the same tree seen with the sure links only, made the first time a pair needs it. */
 	private sure?: Kin;
 	/** Order repair: the tree seen without the blood links of one marked person (the key), made the first time a name by marriage needs it. */
 	private readonly cutViews = new Map<number, Kin>();
@@ -687,7 +687,7 @@ class Kin {
 		readonly g: FamilyGraph,
 		/** D174: the sibling rule switch; the half and full tests read it. */
 		readonly options: Readonly<RelationOptions> = DEFAULT_RELATION_OPTIONS,
-		/** R1: the whole-tree `Kin` that this one is the sure view of (see `sureView`). */
+		/** D200 R1: the whole-tree `Kin` that this one is the sure view of (see `sureView`). */
 		whole?: Kin,
 		/** Order repair: a person whose own up and down blood links this view leaves out (-1: none). Its marriages and its place in every parent set stay. */
 		readonly cut: number = -1,
@@ -866,7 +866,7 @@ class Kin {
 			const text = (list: number[]) => [...list].sort((i, j) => i - j).join(',');
 			const allList = [...sure.list, ...rumoured];
 			let choices: number[][] = [allList];
-			// With more rumoured parents than PARENT_LIMIT the sets would grow too fast, so the one set stays (the relation words can then miss a "maybe"; the warning of contract B.3 says so).
+			// With more rumoured parents than PARENT_LIMIT the sets would grow too fast, so the one set stays (the relation words can then miss a "maybe"; the `too-many-parents` warning says so).
 			if (!adoptive && sure.list.length < 2 && allList.length > 2 && rumoured.length <= PARENT_LIMIT.rumoured) {
 				const need = 2 - sure.list.length;
 				choices = [];
@@ -924,7 +924,7 @@ class Kin {
 	}
 
 	/**
-	 * R4: the sets that both children could have as outcomes: a set of one equal to a set of the other, where a child with two
+	 * D200 R4: the sets that both children could have as outcomes: a set of one equal to a set of the other, where a child with two
 	 * sure parents and a rumoured parent also has the two sure parents alone (the rumour may be false). Only the maybe of a half
 	 * pair reads this. `secondHalf` and rule 1 keep the `choices` (D174 item 4: Eleanor and Fiona stay "Sister, maybe half").
 	 */
@@ -1064,7 +1064,7 @@ class Kin {
 	/** The candidates of `blood` for the common ancestors `only` (all if absent). */
 	private bloodOf(f: number, p: number, aF: Map<number, number>, aP: Map<number, number>, only?: number[]): Blood[] {
 		const run = this.candidates(f, p, aF, aP, only);
-		// R1: the sure view may add candidates that a rumoured short line hid. All are merged for "double" together.
+		// D200 R1: the sure view may add candidates that a rumoured short line hid. All are merged for "double" together.
 		const sure = this.sureRun(f, p, aF, aP, run.list, only);
 		const list = sure ? [...run.list, ...sure.list] : run.list;
 		// Most pairs of people have fewer than two full cousin names, so nothing can be "double".
@@ -1100,7 +1100,7 @@ class Kin {
 	}
 
 	/**
-	 * R1: a rumoured link can make the shortest line to an ancestor shorter than every sure line, and the search keeps the
+	 * D200 R1: a rumoured link can make the shortest line to an ancestor shorter than every sure line, and the search keeps the
 	 * shortest, so the sure line would be lost ("Great-grandfather" beside "Rumoured father"). The sure view finds the
 	 * candidates of the sure links alone; the run holds those whose key `list` (the whole tree's candidates) does not have.
 	 * It exists only when a rumoured link lies in the ancestry of either person and the sure distances differ from the whole
@@ -1139,7 +1139,7 @@ class Kin {
 		return out.sort((i, j) => i - j);
 	}
 
-	/** The tree with the rumoured links left out (R1), made once. */
+	/** The tree with the rumoured links left out, made once. */
 	private sureView(): Kin {
 		return (this.sure ??= new Kin(this.g, this.options, this));
 	}
@@ -1171,7 +1171,7 @@ class Kin {
 
 	/**
 	 * The lines from `f` down to `p` (a = 0, key `D:0:b`): the shortest of this tree, and the shortest of the sure links if a rumoured
-	 * link made the whole one shorter (R1). `blood` gives the same two, with every other candidate that this one does not need.
+	 * link made the whole one shorter. `blood` gives the same two, with every other candidate that this one does not need.
 	 */
 	descent(f: number, p: number): Blood[] {
 		const aP = this.anc(p);
@@ -1492,7 +1492,7 @@ class Kin {
 				out.couple = setList;
 				// A half line passes `x` alone. A full line passes the couple of the second test (D175), the same at
 				// each of its members, so a couple with a rumoured parent stays one couple and never makes a "double".
-				// Siblings keep `x` alone: their one sibling step shows the rumoured link (D174 ruling 8), and they are never double.
+				// Siblings keep `x` alone: their one sibling step shows the rumoured link (D174), and they are never double.
 				const [nx, ny] = half || (out.a === 1 && out.b === 1) ? [x, -1] : this.ruleOneTop(pf, pp, x, c1, c2, setList);
 				if (nx !== lx || ny !== y) {
 					out.x = nx;
@@ -1537,7 +1537,7 @@ class Kin {
 		return [alone ? alone.p : x, -1];
 	}
 
-	/** True if `x` and `y` share a union of the tree, listed or implicit: then `coupleUnion` gives a key of the tree (contract "unknown union"). */
+	/** True if `x` and `y` share a union of the tree, listed or implicit: then `coupleUnion` gives a key of the tree. */
 	private sharesUnion(x: number, y: number): boolean {
 		let partners = this.unionPeople[x];
 		if (!partners) {
@@ -1569,7 +1569,7 @@ class Kin {
 				// One choice each (nearly always): the sets are equal or not, and equal sets hold every rumoured parent.
 				const single = s1.choices.length === 1 && s2.choices.length === 1;
 				if (single && s1.all === s2.all) return { maybe: 'full', cause: 'rumoured' };
-				// R4: a child with two sure parents may also have just those two, if the rumoured link is false.
+				// D200 R4: a child with two sure parents may also have just those two, if the rumoured link is false.
 				const equal = this.outcomeMatches(s1, s2);
 				if (equal.length) {
 					// D176: the sheet says "one of the links" if some matching set leaves out a rumoured parent of either person.
@@ -1784,7 +1784,7 @@ class Kin {
 
 		const blood = this.blood(m, p, aP);
 		// A rumoured half line of the same degree as a sure line whose "maybe full" the rumour causes adds no name: the "maybe" has made its
-		// "Rumoured" name already (R4-1). It reads no pair of children, since the lines kept for a key depend on the order of the people.
+		// "Rumoured" name already. It reads no pair of children, since the lines kept for a key depend on the order of the people.
 		const dupRumoured = (rc: Blood) => rc.word === 'rumoured' && blood.some((c) => c !== rc && c.word !== 'rumoured' && c.maybe === 'full' && c.cause === 'rumoured' && c.half && rc.half && c.a === rc.a && c.b === rc.b);
 		for (const c of blood) {
 			if (dupRumoured(c)) continue;
@@ -1838,7 +1838,7 @@ class Kin {
 			});
 		}
 
-		// A sure blood name of P puts the names by marriage after it (R3 key 2) and hides rule 1; a name through a rumoured link does neither (R1).
+		// A sure blood name of P puts the names by marriage after it (D200 R3 key 2) and hides rule 1; a name through a rumoured link does neither.
 		const sureBlood = blood.some((c) => c.word !== 'rumoured');
 		// By marriage, rule 1: P is married to a blood relative R of M, and P is not a sure blood relative.
 		if (!sureBlood) {
@@ -1864,7 +1864,7 @@ class Kin {
 		const step = this.stepSibling(m, p);
 		if (step) cands.push(step);
 
-		// Supervisor ruling, R3 key 2: a name by marriage (rules 1 and 2) never wins over a sure blood name.
+		// A name by marriage (rules 1 and 2) never wins over a sure blood name.
 		if (sureBlood) for (const c of cands) if (c.kind === 'by-marriage') c.after = 1;
 		cands.sort(compareCands);
 		const seen = new Map<string, Cand>();
@@ -1924,7 +1924,7 @@ class Kin {
 			const inStepCut = () => (stepCut ??= this.stepView(m, s, own, true).descent(s, p));
 			const list = !own.length || !ofS.some((c) => c.a === 0) ? ofS : ofS.flatMap((c) => (c.a !== 0 ? [c] : steps ? [] : (steps = this.down[s].some((k) => !own.includes(k) && aP.has(k)) ? this.stepView(m, s, own, false).descent(s, p) : [])));
 			const add = (c: Blood, via: BloodLine) => {
-				// The years read the stepchildren of S on a shortest line to P, never the one found first (RULES §2.1, order-fault gate rule 8).
+				// The years read the stepchildren of S on a shortest line to P, never the one found first.
 				const stepKids = c.a === 0 ? this.lineKids(s, p, aP, c.b, c.word !== 'rumoured').filter((k) => !own.includes(k)) : [];
 				cands.push(
 					this.marriageCand(this.rule2Word(c, sexP, sexS, ...this.ruleTwoYears(c, p, stepKids, marriages)), c, () => {
@@ -2009,7 +2009,7 @@ class Kin {
 			...(base !== undefined ? { base } : {}),
 			kind: 'by-marriage',
 			distance: 1 + c.a + c.b,
-			// R3 key 4: a name through a rumoured link counts as rumoured.
+			// D200 R3 key 4: a name through a rumoured link counts as rumoured.
 			cat: c.word === 'rumoured' ? 4 : 3,
 			direct: c.a === 0 || c.b === 0 ? 0 : 1,
 			half: c.half ? 1 : 0,
@@ -2024,7 +2024,7 @@ class Kin {
 	/**
 	 * The children of `s` on a shortest line down to P (`p`), who stands `b` generations below S (`aP` is `anc(P)`). For a confirmed name (`sure`)
 	 * only a child with a birth or adoptive link from S, and (b = 2) a birth or adoptive link to P, counts: a rumour never changes a confirmed
-	 * result (R1). A rumoured name keeps every link.
+	 * result. A rumoured name keeps every link.
 	 */
 	private lineKids(s: number, p: number, aP: Map<number, number>, b: number, sure: boolean): number[] {
 		const linked = (child: number, parent: number) => this.up[child].some((l) => l.p === parent && isStepLink(l));
@@ -2060,7 +2060,7 @@ class Kin {
 	}
 
 	/**
-	 * Rule 1 and the years (RULES §2.1): `[step, former]` for P, from all the marriages of R and P (`marriages`), read each time (`MarriageYears.verdict`).
+	 * Rule 1 and the years (D304 to D309): `[step, former]` for P, from all the marriages of R and P (`marriages`), read each time (`MarriageYears.verdict`).
 	 * `ks` is `ruleOneKs`. The person on the blood side of F4 is M.
 	 */
 	private ruleOneYears(c: Blood, m: number, marriages: FamilyUnion[], ks: number[]): [boolean, boolean] {
@@ -2085,8 +2085,8 @@ class Kin {
 	}
 
 	/**
-	 * Rule 2 and the years (RULES §2.1), as `ruleOneYears`: `marriages` are all the marriages of M and S, `stepKids` the stepchildren of S
-	 * on a shortest line to P (the years read the one that passes, never the one found first, order-fault gate rule 8). The person on the
+	 * Rule 2 and the years (D304 to D309), as `ruleOneYears`: `marriages` are all the marriages of M and S, `stepKids` the stepchildren of S
+	 * on a shortest line to P (the years read the one that passes, never the one found first). The person on the
 	 * blood side of F4 is P.
 	 */
 	private ruleTwoYears(c: Blood, p: number, stepKids: number[], marriages: FamilyUnion[]): [boolean, boolean] {
@@ -2096,8 +2096,8 @@ class Kin {
 	}
 
 	/**
-	 * Rule 1 names, by R's relation `c` to M; P has `sexP`, R has `sexR`. The second value is the group of R3 key 9. A leg through
-	 * a rumoured link puts "rumoured" in front (R2); the possessive form already says it in the name of the leg.
+	 * Rule 1 names, by R's relation `c` to M; P has `sexP`, R has `sexR`. The second value is the group of D200 R3 key 9. A leg through
+	 * a rumoured link puts "rumoured" in front; the possessive form already says it in the name of the leg.
 	 */
 	private rule1Word(c: Blood, sexR: Sex, sexP: Sex, step = true, former = false): Word {
 		const { a, b } = c;
@@ -2122,7 +2122,7 @@ class Kin {
 		return same.find(avoids);
 	}
 
-	/** Rule 2 names, by P's relation `c` to M's spouse S, with the group of R3 key 9 (see `rule1Word`). */
+	/** Rule 2 names, by P's relation `c` to M's spouse S, with the group of D200 R3 key 9 (see `rule1Word`). */
 	private rule2Word(c: Blood, sexP: Sex, sexS: Sex, step = true, former = false): Word {
 		const { a, b } = c;
 		if (b === 0 && a === 1) return named(c, WORDS.parentInLaw[sexP], BY_IN_LAW, former);
@@ -2138,7 +2138,7 @@ class Kin {
 		const mine = this.up[m].filter(isStepLink);
 		const theirs = this.up[p].filter(isStepLink);
 		if (mine.some((l) => theirs.some((t) => t.p === l.p))) return undefined;
-		// Every pair (N, Q) that has a marriage, and every marriage of it (RULES §2.1). Most people have none, so nothing is made before one is found.
+		// Every pair (N, Q) that has a marriage, and every marriage of it (D304 to D309). Most people have none, so nothing is made before one is found.
 		let pairs: { n: Up; q: number; link: Up; marriages: FamilyUnion[] }[] | undefined;
 		for (const n of mine) {
 			for (const q of this.spouses(n.p)) {
@@ -2215,7 +2215,7 @@ class Kin {
 				const sib = nodes[i + 2];
 				// The steps of a rumoured name follow its second test; a chain's step follows its own links.
 				const sure = this.isHalf(from, e.type, sib, after.type);
-					// R4: the extra name of a maybe prints the other outcome of the sure pair, whatever the second test says.
+					// D200 R4: the extra name of a maybe prints the other outcome of the sure pair, whatever the second test says.
 				const half = stepHalf ?? (second || e.type === 'rumoured' || after.type === 'rumoured' ? this.halfCounted(from, e.type, sib, after.type) : sure);
 				// A step that only the rumours make full (or half) says so, also over two birth links.
 				out.push({ person: this.ids[sib], of: this.ids[from], word: siblingStepWord(this.sex[sib], half, e.type, after.type, half !== sure) });
@@ -2282,12 +2282,12 @@ class Kin {
 	}
 }
 
-/** R4: a child with two sure parents and a rumoured parent may have just the two sure parents (the rumour may be false). */
+/** D200 R4: a child with two sure parents and a rumoured parent may have just the two sure parents (the rumour may be false). */
 function hasSureAlone(s: Counted): boolean {
 	return s.canLack && s.hasRumoured && s.sureList.length === 2;
 }
 
-/** R4: the parent sets that a child could have, as outcomes: its choices, and the sure set alone when `hasSureAlone`. Only the maybe of a half pair reads the sure set alone; `choices` itself is unchanged (D174 item 4). */
+/** D200 R4: the parent sets that a child could have, as outcomes: its choices, and the sure set alone when `hasSureAlone`. Only the maybe of a half pair reads the sure set alone; `choices` itself is unchanged (D174 item 4). */
 function outcomesOf(s: Counted): number[][] {
 	return hasSureAlone(s) ? [...s.choices, s.sureList] : s.choices;
 }
@@ -2311,7 +2311,7 @@ function better(d1: number, d2: number, b1: number, b2: number): boolean {
 const doubtRank = (maybe: 'full' | 'half', cause: RelationMaybe['cause'], some?: true, form?: RelationMaybe['unlistedForm']) => (((maybe === 'full' ? 0 : 2) + (cause === 'rumoured' ? 0 : 1)) * 2 + (some ? 0 : 1)) * 2 + (form === 'other-parent' ? 1 : 0);
 
 /**
- * F-KIN-08: which sentence tells the user what to check. Two siblings that both list the same single parent (or any pair
+ * Which sentence tells the user what to check. Two siblings that both list the same single parent (or any pair
  * above the sibling level, the known limit) read 'same-person'; if one lists both parents, the other's unlisted parent
  * is the question: 'other-parent'. The first kind wins when both are possible, so the answer never depends on the order.
  */
@@ -2460,7 +2460,7 @@ function walkLine(walk: Walk): Line {
 }
 
 /**
- * §13.1 "Which name wins" with the eleven keys of R3, every one a property of the name and none of the place in the note:
+ * §13.1 "Which name wins" with the eleven keys of D200 R3, every one a property of the name and none of the place in the note:
  * 1 partner names; 2 sure blood before by marriage (`after`); 3 smaller distance; 4 link kind (`cat`); 5 direct line;
  * 6 full before half; 7 smaller removal; 8 older generation first (larger `elder`); 9 by marriage: step, in-law, "by
  * marriage", possessive (`group`); 10 the name text by code unit (`<`, not `localeCompare`, so no locale decides);
@@ -2514,7 +2514,7 @@ export const computeRelations: ComputeRelations = (g, me, options = DEFAULT_RELA
 	return freezeMap(out);
 };
 
-/** The relations of the people that a view asks for, one answer per person (WP-K, spec §13.1 "Performance"). */
+/** The relations of the people that a view asks for, one answer per person (spec §13.1 "Performance"). */
 export interface RelationLookup {
 	/** The same value as `computeRelations(g, me, options).get(id)`: undefined for a person with no relation, for an unknown id, and for every id when `me` is not a person. */
 	get(id: string): readonly Relation[] | undefined;
@@ -2624,7 +2624,7 @@ export const lineSubgraph: LineSubgraph = (g, line) => {
 	const own = new Map<string, RelationLink[]>();
 	const has = (l: RelationLink) => (own.get(l.child) ?? []).some((k) => k.parent === l.parent && k.type === l.type);
 	for (const l of line.links) if (on.has(l.parent) && on.has(l.child) && !has(l)) push(own, l.child, l);
-	// Supervisor ruling: a full relation's couple keeps its shared trunk. A child on the line with a
+	// A full relation's couple keeps its shared trunk. A child on the line with a
 	// link to one partner of a couple of the line also keeps its drawn link of the same type to the other.
 	const drawn = drawnParentMap(g);
 	for (const key of line.unions) {
@@ -2713,6 +2713,6 @@ export const relationsKey: RelationsKey = (g, me, options = DEFAULT_RELATION_OPT
 	// The words read exact years (D304, D306): the key holds the date texts as written, not the years, so it needs no date read; an edit that keeps the year only makes a harmless new lookup.
 	const people = g.people.map((p) => [p.id, p.sex ?? null, g.primaryUnion.get(p.id) ?? null, (drawn.get(p.id) ?? []).map((d: DrawnParent) => [d.id, d.type]), p.born ?? null, p.died ?? null]);
 	const unions = g.unions.map((u) => [u.key, u.partners, u.type, u.start ?? null, u.end ?? null, readEndedBy(u.endedBy)]);
-	// A tree that names a calendar reads its years only when the reader is ready, so the words may change once (RULES §5.1).
+	// A tree that names a calendar reads its years only when the reader is ready, so the words may change once.
 	return JSON.stringify([me, people, unions, options.oneParentUnknown, g.dates.reader.ready, g.dates.reader.key]);
 };

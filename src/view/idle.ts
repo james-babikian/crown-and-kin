@@ -1,5 +1,5 @@
 /*
- * Runs a task in the next idle time (0.3.3, WP-1 A1; moved out of `tree-view.ts`). The fold and card chains of a drawn tree share it.
+ * Runs a task in the next idle time. The fold and card chains of a drawn tree share it.
  */
 
 /** Runs `fn` in the next idle time (a timer where the browser has no idle callback, as Safari); the fold and card chains share it. */

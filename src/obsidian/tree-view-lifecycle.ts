@@ -1,5 +1,5 @@
 /*
- * The life of a `TreeView` (0.3.3, WP-1 A1): the entry points Obsidian and the plugin call (`onload`, `onunload`, `retire`, a setting, the theme, the fonts, the
+ * The life of a `TreeView`: the entry points Obsidian and the plugin call (`onload`, `onunload`, `retire`, a setting, the theme, the fonts, the
  * start-up wait), the `guard` that keeps every error out of the note (spec §8), the teardown, and the kept height of the block. Second layer of the chain
  * listed in `tree-view.ts`.
  */
@@ -65,7 +65,7 @@ export abstract class TreeViewLifecycle extends TreeViewBase {
 				this.checkTurn();
 				return;
 			}
-			// 0.2.7 F.1: an open Show view draws again for the length of the line and the age for open branches (the age of the warning needs no redraw, K.10).
+			// An open Show view draws again for the length of the line and the age for open branches (the age of the warning needs no redraw).
 			if ((prev.successionLength !== now.successionLength || prev.youngDeathAge !== now.youngDeathAge) && (this.successionDrawn !== null || (this.listMode && !!this.peekState()?.succession))) {
 				if (!this.listMode) this.carry = this.keptAnchor();
 				this.render(this.fonts);
@@ -75,7 +75,7 @@ export abstract class TreeViewLifecycle extends TreeViewBase {
 			// a new direction or break list changes nothing in it.
 			if (this.listMode) {
 				const kinWords = prev.oneParentUnknown !== now.oneParentUnknown && this.meId !== null;
-				// 0.2.8: the list does not follow "Arms on cards" (D209 item 6: only the top row shows arms), so a change of it draws the list again
+				// The list does not follow "Arms on cards" (D209 item 6: only the top row shows arms), so a change of it draws the list again
 				// without need; the badge counts by "Warn about more than 2 parents of a type".
 				const arms = prev.armsOnCards !== now.armsOnCards;
 				if (prev.showDates !== now.showDates || prev.showRelations !== now.showRelations || prev.showPortraits !== now.showPortraits || kinWords || arms || prev.warnManyParents !== now.warnManyParents) this.render(this.fonts);
@@ -95,7 +95,7 @@ export abstract class TreeViewLifecycle extends TreeViewBase {
 			// so the view draws again; the new layout measures the new texts. A view with no mark and no finder shows none.
 			const kin = prev.oneParentUnknown !== now.oneParentUnknown && (this.finderDrawn !== null || this.meId !== null);
 			// D126 (1): "Reduce movement" is read when a movement starts, so a change needs no redraw.
-			// 0.2.8 (D206): "Arms on cards" gives or takes the arms room of a card, so the tree is laid out again; "Warn about more than 2 parents" changes the badge.
+			// D206: "Arms on cards" gives or takes the arms room of a card, so the tree is laid out again; "Warn about more than 2 parents" changes the badge.
 			const armsRoom = prev.armsOnCards !== now.armsOnCards && hasArms(this.g);
 			const warns = prev.warnManyParents !== now.warnManyParents;
 			if (!reigns && !portraits && !breaks && !plate && !kin && !armsRoom && !warns && (prev.focusGenerations === now.focusGenerations || this.focusId === null)) {
@@ -142,7 +142,7 @@ export abstract class TreeViewLifecycle extends TreeViewBase {
 			portrait.addEventListener('change', turned);
 			this.register(() => portrait.removeEventListener('change', turned));
 		}
-		// Esc closes the relation finder's result or the Show view of a line of succession and gives the focus back (spec §13.2, contract 0.2.7 F.1). The window hears
+		// Esc closes the relation finder's result or the Show view of a line of succession and gives the focus back (spec §13.2). The window hears
 		// it first, as for the popovers, so a full-screen view around the tree stays open.
 		this.registerDomEvent(
 			win,
@@ -171,7 +171,7 @@ export abstract class TreeViewLifecycle extends TreeViewBase {
 		this.unloaded = true;
 		// A view whose tree was seen ends its open: a later call is a new wait. A view that went before its tree was seen (also one
 		// that still waited for its start) keeps the open for the gap, because Obsidian often renders the block again at once and the
-		// next call continues that wait (spec §7.7); sweepOpens takes it out after the gap, so no idle time is added (0.3 second G2).
+		// next call continues that wait (spec §7.7); sweepOpens takes it out after the gap, so no idle time is added.
 		if (this.seenTree && this.opened && !this.openHeldElsewhere()) this.dropOpen();
 		this.binding.clearTimers();
 		if (this.turnTimer) this.containerEl.win.clearTimeout(this.turnTimer);
@@ -222,7 +222,7 @@ export abstract class TreeViewLifecycle extends TreeViewBase {
 		if (this.carry) this.carry.byUser = true;
 		this.keepPlace = this.placeToKeep(h.state) ?? this.keepPlace;
 		this.render(this.fonts);
-		// G2 note 8: the window counts from the end of the render. A large tree on a phone can take longer than the window to draw, and the first view comes after that.
+		// The window counts from the end of the render. A large tree on a phone can take longer than the window to draw, and the first view comes after that.
 		if (this.keepPlace) this.keepPlace.until = performance.now() + EDIT_PLACE_MS;
 	}
 

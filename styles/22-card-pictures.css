@@ -1,4 +1,4 @@
-/* ---------- M9: arms and portraits on the cards, the legend's houses, Save as a picture (spec §13.6–§13.8; D67, D74–D78) ---------- */
+/* ---------- Arms and portraits on the cards, the legend's houses, Save as a picture (spec §13.6–§13.8; D67, D74–D78) ---------- */
 
 /* A picture never takes a press: the card under it does (spec §7.2). */
 .dynasty-picture {
@@ -25,7 +25,7 @@
 	stroke: none;
 }
 
-/* G4: a deceased person's arms and portrait are muted like the house strip (the frame is not, as in the saved picture). */
+/* A deceased person's arms and portrait are muted like the house strip (the frame is not, as in the saved picture). */
 .dynasty-deceased .dynasty-picture {
 	opacity: 0.8;
 }

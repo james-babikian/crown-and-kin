@@ -1,5 +1,5 @@
 /*
- * The ports of every card (the port stage of `derive` in plan.ts; the architecture notes §4.2.2, stage S2). From the skeleton it requests the
+ * The ports of every card (the port stage of `derive` in plan.ts, stage S2). From the skeleton it requests the
  * ports each card needs (hang ports for the families anchored there, leg ports toward the hang points of partners, side ports), lets
  * legs of one person to one side share a port (D228: one line, then a fork, rule L3), decides whether a card's edge holds its ports
  * (`fits`; if not, the card's hang points move to passages beside it: `overflowHangs`), and packs the ports along the edge.
@@ -22,7 +22,7 @@ export const nearOf = (geo: Geometry): number => geo.unionSize / 2 + 2;
  */
 export const LEG_MIN = 4;
 
-/** How many leg steps the hang ports of one tagged card stand apart where the edge holds them: 24 px at 16 px text, so two stems read as two lines (WP-5f F1). */
+/** How many leg steps the hang ports of one tagged card stand apart where the edge holds them: 24 px at 16 px text, so two stems read as two lines. */
 const HANG_SPREAD = 2;
 
 /** Which side of `from` the line to `to` goes. */
@@ -44,7 +44,7 @@ export function markHalf(control: FoldControl | undefined, geo: Geometry, turned
  * stand at least the two halves apart, so their tap areas never meet and the lane packing never has to stack them (which would
  * make the gap taller by a tap area for each). Sideways the tap area's extent along the stack axis counts.
  */
-export function tapHalf(control: FoldControl, geo: Geometry, turned: boolean): number {
+function tapHalf(control: FoldControl, geo: Geometry, turned: boolean): number {
 	const r = turned ? foldExtent(control, { x: 0, y: 0 }, geo.fontPx, true) : foldExtent(control, { x: 0, y: 0 }, geo.fontPx);
 	return turned ? Math.max(-r.y, r.y + r.h) : Math.max(-r.x, r.x + r.w);
 }
@@ -77,7 +77,7 @@ export function unitEnd(spec: Skeleton, g: FamilyGraph, it: Item, dir: -1 | 1): 
 /**
  * The side a leg or side line takes from its card: toward its target; but a side link to a child in the same row leaves from the far
  * end, so that its curve (which loops back to the child's top edge) crosses the stack gap at an angle and not along it, where the
- * bar of a stacked couple lies and the "?" of a rumoured link would find no clear place (as 0.3.0 drew it).
+ * bar of a stacked couple lies and the "?" of a rumoured link would find no clear place.
  */
 export const lineSide = (dirOf: DirOf, from: Item, p: Pick<Port, 'kind' | 'target' | 'dir'>): 'left' | 'right' => {
 	if (!p.target) return p.dir === 'left' ? 'left' : 'right';
@@ -87,7 +87,7 @@ export const lineSide = (dirOf: DirOf, from: Item, p: Pick<Port, 'kind' | 'targe
 };
 
 /** The ports of one tree before the packing: by card, and what each family, leg and stem got. */
-export interface Requests {
+interface Requests {
 	byCard: Map<string, Port[]>;
 	hangs: Map<string, Hang>;
 	legPort: Map<LegSpec, Port>;
@@ -171,7 +171,7 @@ export function requestPorts(spec: Skeleton, g: FamilyGraph, geo: Geometry, side
 }
 
 /** What anchors the ports of a card, taken from facts that cannot change between the two port runs (see `packPorts`). */
-export interface HangRoom {
+interface HangRoom {
 	/** The number of leg and side lines of the card (before legs share a port): the group leaves room for all of them on either side. */
 	legs: number;
 	/** The corner the hang group of a tagged card takes: the side with fewer lines by the walk's guess. */
@@ -433,9 +433,9 @@ const holds = (room: number, gap: number): number => (room < gap - TIE ? 0 : 1 +
 
 /**
  * How far the first hang port of a group moves from `centre`: 0, unless the two stretches beside the group then hold fewer than the card's `total`
- * leg and side ports at `LEG_MIN` apart while another place holds them all (a short edge at small fonts: the architecture notes §4.2.6 class Q, the card
+ * leg and side ports at `LEG_MIN` apart while another place holds them all (a short edge at small fonts: the card
  * would be squeezed). The group then moves to the place nearest the centre that holds them, where one stretch ends at a whole number of
- * steps. This is the one exception to A4 (second fix round, item 7): the ports of such a card can differ between the two port runs (a fork
+ * steps. This is the one exception to A4: the ports of such a card can differ between the two port runs (a fork
  * by side), so its hang point can move after the placement; every other card keeps its group where the placement saw it.
  */
 function shiftToHold(centre: number, lo: number, hi: number, gapL: number, gapR: number, total: number): number {

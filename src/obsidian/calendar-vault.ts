@@ -10,7 +10,7 @@ import { parseLink } from '../core/picture-link';
 import type { CalendarVault } from '../view/calendar-index';
 
 /** What the adaptor needs of the start-up gate (`TreeHost.startedUp`, D183). */
-export interface CacheGate {
+interface CacheGate {
 	/** True once the metadata cache has finished, or the start limit has passed. */
 	seen(): boolean;
 	/** How long to wait for the cache at most, in ms. */

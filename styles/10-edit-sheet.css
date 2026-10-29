@@ -1,9 +1,9 @@
-/* ---------- The window family (0.2.8 contract C, G.13) ---------- */
+/* ---------- The window family ---------- */
 
 /*
  * One shell for every window of the plugin (src/obsidian/window-shell.ts). On a computer: Obsidian's own modal, 620 px wide and anchored
  * at the top, so a section that opens never moves the header; the footer has Cancel and Save, with a hairline only while the body
- * scrolls; there is no X in the corner (C04). On a phone: the window fills the visible area, with a bar of Cancel, the title and Save,
+ * scrolls; there is no X in the corner. On a phone: the window fills the visible area, with a bar of Cancel, the title and Save,
  * and the title fades in when the header has scrolled away. The colours are the tokens of 01-base.css.
  */
 
@@ -143,7 +143,7 @@
 }
 
 /*
- * G3 fix: the error text sits on a fill that the run-time pick of `--dynasty-error` checks (`--interactive-normal`, `--interactive-hover`). Obsidian
+ * The error text sits on a fill that the run-time pick of `--dynasty-error` checks (`--interactive-normal`, `--interactive-hover`). Obsidian
  * paints `button.mod-warning` red, and `.is-mobile button.mod-warning` with `--interactive-normal`; with the error colour on the red fill a button could not be read.
  */
 .dynasty-sheet button.mod-warning,
@@ -182,6 +182,16 @@
 .dynasty-icon-btn .svg-icon {
 	width: 17px;
 	height: 17px;
+	/* The icon is a flex item of its button; with a narrow content box it must keep its size and not shrink (otherwise the cross is 4 px wide). */
+	flex: none;
+}
+
+/*
+ * Obsidian's tablet rule `.is-tablet button:not(.clickable-icon)` (0,2,1) gives every button 20 px of padding at each side. In the 44 px box of an icon button the content
+ * box was 4 px wide and the cross of "Remove partnership" shrank to a dot. The class is repeated so the rule outranks it in any theme.
+ */
+.dynasty-sheet button.dynasty-icon-btn.dynasty-icon-btn {
+	padding: 0;
 }
 
 /* A visible focus ring in every theme: the accent outside, a ring in the text colour inside it. */
@@ -286,7 +296,7 @@
 	min-width: 64px;
 }
 
-/* The back link above the header of a second page (G.7); a phone has "‹ Name" in the bar instead. */
+/* The back link above the header of a second page; a phone has "‹ Name" in the bar instead. */
 .dynasty-back-row {
 	flex: none;
 }
@@ -425,7 +435,7 @@ body.theme-dark .dynasty-house-dot {
 
 /*
  * D218 rule 5: a link inside a sentence ("Show the line", "4 more") keeps one thin underline at rest, in a light tint of the link colour, the
- * same for both (the solid and the dotted underline of G.8 are gone). The plain colour comes first for engines without `color-mix()`.
+ * same for both (the solid and the dotted underline are gone). The plain colour comes first for engines without `color-mix()`.
  */
 .dynasty-head-rel .dynasty-showline,
 .dynasty-head-rel .dynasty-more {
@@ -541,7 +551,8 @@ body.theme-dark .dynasty-house-dot {
 	/* A phone row can hold three controls (a saved person with no portrait and a linked note): the last one moves to a second row. */
 	flex-wrap: wrap;
 	justify-content: flex-end;
-	margin: 0 0 4px;
+	/* The buttons have 6 px of padding for the hover box; the same negative margin puts their text on the left edge of the name above (the phone rule below does it with 8 px). */
+	margin: 0 -6px 4px;
 }
 
 /* Quiet controls (D218 rule 5): muted text with an icon, the same on a computer and on a phone. Control role, regular. */
@@ -573,7 +584,7 @@ body.theme-dark .dynasty-house-dot {
 }
 
 /*
- * G3 fix: the links of this row ("Add portrait or arms", "Add arms", "Open linked note") take the box and the size of "Open all". The general window link
+ * The links of this row ("Add portrait or arms", "Add arms", "Open linked note") take the box and the size of "Open all". The general window link
  * rule `.dynasty-sheet .dynasty-link` (0,2,0) outranks `.dynasty-openall button` (0,1,1), so it gave them the size of the window text, no padding and,
  * on a touch screen of any width, no 44 px height. This rule (0,3,1) comes after it. The phone rule below (same weight, later) sets the 44 px height.
  */
@@ -591,7 +602,7 @@ body.theme-dark .dynasty-house-dot {
 	color: var(--dynasty-link);
 }
 
-/* D218 item 9 (N23): "Open linked note" stands left of "Open all", a text link in the link colour. */
+/* D218 item 9: "Open linked note" stands left of "Open all", a text link in the link colour. */
 .dynasty-sheet .dynasty-openall button.dynasty-open-note {
 	color: var(--dynasty-link);
 }
@@ -800,6 +811,8 @@ body.theme-dark .dynasty-house-dot {
 	height: auto;
 	min-height: 72px;
 	padding: 7px 10px;
+	/* A theme with round fields (a pill radius) would cut into the text of a box with several text lines. */
+	border-radius: min(var(--input-radius, 8px), 12px);
 	line-height: 1.45;
 	resize: vertical;
 }
@@ -848,6 +861,11 @@ body.theme-dark .dynasty-house-dot {
 }
 
 .dynasty-sheet-field:focus-within > .dynasty-sheet-hint.is-on-focus {
+	display: block;
+}
+
+/* A press that starts in the window keeps the help text that is on screen until the click, so the buttons below do not move (`render/dom/press-hold.ts`). */
+.dynasty-sheet .dynasty-sheet-hint.is-on-focus.is-held {
 	display: block;
 }
 
@@ -900,7 +918,7 @@ body.theme-dark .dynasty-house-dot {
 	color: var(--dynasty-muted);
 }
 
-/* The tick boxes (I40): a square box of 18 px with a muted 1.5 px border; the mark is the text colour on the accent. */
+/* The tick boxes: a square box of 18 px with a muted 1.5 px border; the mark is the text colour on the accent. */
 .dynasty-checks {
 	display: flex;
 	flex-wrap: wrap;
@@ -962,7 +980,7 @@ body.theme-dark .dynasty-house-dot {
 	transform: rotate(-45deg) translate(1px, -1px);
 }
 
-/* The keyboard ring of the window's buttons (G5 0.4, WCAG 2.4.7): the rule above takes the theme's own focus shadow away. */
+/* The keyboard ring of the window's buttons (WCAG 2.4.7): the rule above takes the theme's own focus shadow away. */
 .dynasty-sheet .dynasty-check input[type='checkbox']:focus-visible {
 	outline: 2px solid var(--background-modifier-border-focus);
 	outline-offset: 1px;
@@ -1221,7 +1239,7 @@ body.theme-dark .dynasty-house-dot {
 	color: var(--dynasty-error);
 }
 
-/* G3 fix: a danger row is a row, not a button with a fill. `.is-mobile button.mod-warning` of Obsidian (0,2,1) gave "Delete person" a grey fill that the error colour was not checked on. */
+/* A danger row is a row, not a button with a fill. `.is-mobile button.mod-warning` of Obsidian (0,2,1) gave "Delete person" a grey fill that the error colour was not checked on. */
 .dynasty-sheet button.dynasty-row.is-tap.mod-warning {
 	background: none;
 }
@@ -1388,7 +1406,7 @@ body.theme-dark .dynasty-house-dot {
  * rule for `.modal`. The second background (in @supports) drops any transparency of the theme's colour. It must sit in the block: an engine
  * without relative colours would make the whole declaration invalid at computed-value time and leave the window transparent.
  */
-/* `!important`: Cupertino sets `body.mod-windows:not(.adaptive-mode-off) .modal { background-color: var(--modal-background) !important }` (G3, 2026-10-10). */
+/* `!important`: Cupertino sets `body.mod-windows:not(.adaptive-mode-off) .modal { background-color: var(--modal-background) !important }`. */
 .modal-container .modal.dynasty-sheet.dynasty-sheet {
 	background: var(--background-primary) !important;
 	backdrop-filter: none;
@@ -1473,6 +1491,16 @@ body.theme-dark .dynasty-house-dot {
 .dynasty-bar.is-scrolled .dynasty-bar-title,
 .dynasty-bar.is-titled .dynasty-bar-title {
 	opacity: 1;
+}
+
+/* The partnership window has the two names as its title (D316): a long pair wraps to three text lines at most, then ends with an ellipsis, so it never runs under Cancel or Save. */
+.dynasty-union-edit .dynasty-bar .dynasty-bar-title {
+	display: -webkit-box;
+	-webkit-box-orient: vertical;
+	-webkit-line-clamp: 3;
+	white-space: normal;
+	overflow-wrap: anywhere;
+	padding: 4px 0;
 }
 
 .dynasty-sheet .dynasty-bar button.dynasty-bar-extra {

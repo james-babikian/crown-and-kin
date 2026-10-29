@@ -8,7 +8,7 @@
  * own first row, "A holder who is not in the tree". The typed text and the text of each person are
  * folded with `foldForMatch` before they are compared (D100): case, accents and quote look-alikes do not matter.
  * D122: the sobriquet shows after the name in curly marks, and the search matches its text.
- * 0.2.8 contract G.3, G.1: a row is the name, a second text line "relation · years · title", and at the right the round portrait when the person
+ * A row is the name, a second text line "relation · years · title", and at the right the round portrait when the person
  * has one (D213: no initials, no house ring, no empty circle). On a phone the picker is a full-screen sheet; the field and Cancel share the top row (D212).
  * D237: the list builds at most `PICKER_PAGE` people at once; the next page is added to the same list when the reader scrolls near its end.
  */
@@ -19,7 +19,7 @@ import { foldForMatch } from '../core/fold';
 import { quotedSobriquet } from '../core/sobriquet';
 import { cardLabels, needsLabels, pickerSuffix, searchNames, type CardLabel } from '../core/titles';
 import type { Person } from '../core/types';
-import { cardLabel, dateLine } from '../render/tree-info';
+import { cardLabel, dateLine, dateLineShown } from '../render/tree-info';
 import { WINDOW_UI } from '../render/ui-text';
 import type { RelationOptions } from '../core/relations';
 import type { PictureStore } from './picture-store';
@@ -97,7 +97,7 @@ function definePicker() {
 		private readonly people: Person[];
 		/** Spec §13.5: the card labels, for the ruler names; empty for a tree with no titles. */
 		private readonly labels: ReadonlyMap<string, CardLabel>;
-		/** G.1: the portraits of the rows; released when the picker closes. */
+		/** The portraits of the rows; released when the picker closes. */
 		private readonly rowPictures: RowPictures;
 		/** The relation words to the marked person, or null for no word. */
 		private words: CardLookup | null | undefined;
@@ -157,9 +157,9 @@ function definePicker() {
 		override onOpen(): void {
 			void super.onOpen();
 			this.modalEl.addClass('dynasty-picker');
-			// A placeholder is not a name for a screen reader (P4).
+			// A placeholder is not a name for a screen reader.
 			this.inputEl.setAttribute('aria-label', FLOW.pickerSearchLabel);
-			// D101: no curly marks and no corrections in a name that the owner types.
+			// D101: no curly marks and no corrections in a name that the user types.
 			this.inputEl.setAttribute('spellcheck', 'false');
 			this.inputEl.setAttribute('autocapitalize', 'off');
 			this.inputEl.setAttribute('autocorrect', 'off');
@@ -253,7 +253,7 @@ function definePicker() {
 		}
 
 		/**
-		 * WP-K: the words of the first rows come from one request, and the words of the later rows are worked out in idle steps, so the first
+		 * The words of the first rows come from one request, and the words of the later rows are worked out in idle steps, so the first
 		 * picker on a large marked tree does not wait for the whole tree. A row draws without a word until then.
 		 * D237: only the rows that exist get words; `loadMore` queues the people of each new page.
 		 */
@@ -345,7 +345,7 @@ function definePicker() {
 			if (p.sobriquet !== undefined) name.createSpan({ cls: 'dynasty-picker-sob', text: ` ${quotedSobriquet(p.sobriquet)}` });
 			// "You: Ann" already says who is marked, so the second text line does not repeat "You".
 			// D218 rule 4: the relation word is italic, as on the cards and in the window rows; the rest of the text line is plain.
-			const rest = WINDOW_UI.findRowSub('', dateLine(p, this.g.dates) ?? '', label?.title ?? p.title ?? '');
+			const rest = WINDOW_UI.findRowSub('', dateLineShown(p, this.g.dates) ?? '', label?.title ?? p.title ?? '');
 			let sub: HTMLElement | null = null;
 			const paintSub = () => {
 				sub?.remove();

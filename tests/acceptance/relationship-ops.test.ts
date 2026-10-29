@@ -10,7 +10,7 @@ import { fixtureNote, fixtureSource, topLevelBlocks } from './load';
 // Spec §4.2 (parent-entry write form), §4.3 (primary union, sibling groups), §5.9 (Add first
 // person), §6.2 (insertion positions, minimal diff), §6.3 (drafts and relationship actions in one
 // write), §6.4 (add actions, automatic marriage), §6.5 (sibling moves), §6.6 (cycles), §6.7
-// (deletes, D5), §6.8 (ids), §10 "Unit tests cover: every op in core/ops". The decision notes "Second
+// (deletes, D5), §6.8 (ids), §10 "Unit tests cover: every op in core/ops". the decision notes "Second
 // union for a couple", "Automatic marriage", "How a changed value is written", "Formatting
 // details fixed by the WP2.1 tests". Contract: src/core/edit.ts (milestone 3 ops).
 //

@@ -221,9 +221,9 @@
 	transition: transform 200ms ease-out;
 }
 
-/* Look round 0.3.2 (D261): the screen behind the viewer. In a light theme the picture needs a darker screen to stand out; the colour is the text colour of the theme, so it fits each theme. A dark theme keeps the dark screen of Obsidian. */
+/* D261: the screen behind the viewer. In a light theme the picture needs a darker screen to stand out; the colour is the text colour of the theme, so it fits each theme. A dark theme keeps the dark screen of Obsidian. */
 .theme-light .modal-container.dynasty-viewer-container > .modal-bg {
-	/* Obsidian keeps its own opacity on the screen (about 0.85, G5 measure), so the half-dark screen of the preview comes from a colour at 60 %: 0.6 × 0.85 ≈ 0.5. */
+	/* Obsidian keeps its own opacity on the screen (about 0.85, measured), so the half-dark screen of the preview comes from a colour at 60 %: 0.6 × 0.85 ≈ 0.5. */
 	/* iOS before 16.2 has no color-mix(): it keeps the plain text colour (a darker screen), the rule of every color-mix() in the style sheet. */
 	background-color: var(--text-normal);
 	background-color: color-mix(in srgb, var(--text-normal) 60%, transparent);

@@ -9,6 +9,7 @@ export const CURLY_APOSTROPHE = '’';
 
 /** The opening and closing curly double quote marks. */
 export const CURLY_OPEN = '“';
+/** The closing curly double quote mark. */
 export const CURLY_CLOSE = '”';
 
 /** Puts curly double quote marks around `s`: `“s”`. */

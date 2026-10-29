@@ -33,7 +33,7 @@ export class RowGroups {
 	private readonly members: Map<string, string[]>;
 	private readonly kids = new Map<string, string[]>();
 	// Answers that depend on the grouping only, not on the rows: a merge or its undo is the only change of the grouping, and both empty them.
-	// The partner step asks them many times between two merges (WP-E2 P1).
+	// The partner step asks them many times between two merges.
 	private readonly childCache = new Map<string, Set<string>>();
 	private readonly parentCache = new Map<string, boolean>();
 	private readonly personParents = new Map<string, string[]>();
@@ -164,7 +164,7 @@ export function equalisePartners(groups: RowGroups, row: Map<string, number>): v
 	};
 	const unequalCount = () => g.unions.reduce((n, u) => n + (onOneRow(u) ? 0 : 1), 0);
 
-	// Work left for the whole step: a hostile tree keeps the rows of 0.2.4 for the unions not yet tried.
+	// Work left for the whole step: a hostile tree keeps the rows of the earlier steps for the unions not yet tried.
 	let stepWork = 200 * groups.size + 5000;
 
 	/** Finds the raised rows that bring two groups to one row, or nothing. It changes nothing either way. */

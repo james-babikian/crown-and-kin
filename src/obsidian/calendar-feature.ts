@@ -13,7 +13,7 @@ import { guardStart } from './start-guard';
 import type { TreeView } from './tree-view';
 
 /** What this file needs of the plugin: the open tree views. */
-export interface CalendarPlugin extends Plugin {
+interface CalendarPlugin extends Plugin {
 	readonly views: Set<TreeView>;
 }
 

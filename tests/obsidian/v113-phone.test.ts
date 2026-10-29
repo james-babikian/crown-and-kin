@@ -118,6 +118,8 @@ describe('C1: a field in the scrolling body is brought into view when it gets th
 	/** The call of scrollIntoView for a field after the focus, once the 300 ms of the keyboard have passed. */
 	function reveals(modal: FEl, field: FEl): number {
 		const spy = vi.spyOn(FEl.prototype, 'scrollIntoView');
+		// The window has finished taking the focus (0 and 120 ms); a later focus is the user's.
+		runTimers(200);
 		field.focus();
 		dispatch(field, 'focusin');
 		expect(modal.contains(fakeDoc.activeElement)).toBe(true);

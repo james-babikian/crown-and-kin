@@ -1,4 +1,4 @@
-// The frozen contract of the note index (an internal study/the index contract, 0.4 WP-3a), as the T0 tests see it: local copies of the types, and loaders that import a module by a path held in a
+// The frozen contract of the note index (an internal study, 0.4 WP-3a), as the T0 tests see it: local copies of the types, and loaders that import a module by a path held in a
 // variable. Both are there so that this file and the tests that use it compile and lint before the modules exist (T0 writes tests first; the build of each package comes later).
 // A builder who takes a package may replace a loader with a plain `import`; the types here must then agree with the real ones.
 import type { FenceStoreLike, FenceVaultLike } from './fake-fence-vault';

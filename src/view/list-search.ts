@@ -2,7 +2,7 @@
  * The search of the Titles window and the Houses window (spec §13.16 rule 5, D134). A query is split into words;
  * a row matches when every word is inside the text of the row. Both sides go through `foldForMatch` (D100: case,
  * accents, quote look-alikes). There is no fuzzy match and no ranking, so the list keeps the order of the tree
- * text and never jumps while the owner types. This file has no `obsidian` import, so tests run it alone.
+ * text and never jumps while the user types. This file has no `obsidian` import, so tests run it alone.
  */
 
 import { foldForMatch } from '../core/fold';

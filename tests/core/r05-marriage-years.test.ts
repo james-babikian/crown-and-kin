@@ -1,6 +1,6 @@
 /*
  * Version 0.5 step 1a-B, the words that follow the years and the word "former" (owner decisions D304 to D309; the rule is
- * An internal study, the case table is §7). Every row of the table is built from the sample trees of
+ * an internal study, the case table is §7). Every row of the table is built from the sample trees of
  * `r05-marriage-years-trees.ts` and read as a card text for the pair, in the order of the people in the note and in the reverse
  * order, with the setting "Assume an unknown second parent" on and off (it changes no row).
  */

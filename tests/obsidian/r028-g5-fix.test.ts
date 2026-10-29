@@ -164,8 +164,8 @@ describe('P5: the pencil icon of a small row does not pull a second margin', () 
 	});
 });
 
-describe('P6: nothing in the plugin moves the focus out of the Id field after it opens', () => {
-	it('the field keeps the focus through the frames and timers that follow the open', () => {
+describe('P6: the Id window opens with no field focused, and nothing in the plugin moves the focus into a field after it opens', () => {
+	it('the window keeps the focus through the frames and timers that follow the open', () => {
 		device.width = 390;
 		device.coarse = true;
 		let field: FEl | null = null;
@@ -180,7 +180,7 @@ describe('P6: nothing in the plugin moves the focus out of the Id field after it
 			closed: () => undefined,
 		});
 		field = fakeDoc.activeElement;
-		expect(field?.hasClass('dynasty-id-input')).toBe(true);
+		expect(field?.hasClass('dynasty-id-window')).toBe(true);
 		flushFrames();
 		runTimers();
 		expect(fakeDoc.activeElement).toBe(field);

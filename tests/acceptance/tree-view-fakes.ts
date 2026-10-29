@@ -134,6 +134,10 @@ export function fakeHandle(path: string, body: string) {
 		key: { path, ordinal: 0 },
 		body,
 		detached: false,
+		/** Writes of this handle that run now (block-handle.ts `writeRuns`). */
+		writeRuns: 0,
+		/** The block text that the running write puts in the file (block-handle.ts `pendingBody`). */
+		pendingBody: null as string | null,
 		canUndo: false,
 		state: newBlockState(),
 		onChanged: (fn: (body: string) => void) => {

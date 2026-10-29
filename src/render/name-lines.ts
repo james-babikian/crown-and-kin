@@ -1,6 +1,6 @@
 /**
  * Splits a long name onto up to three text lines instead of truncating it to one (D29, D37, D81),
- * and a title text line with a reign onto up to two (D61, spec §13.3). `cardNameLines` (0.2.4) breaks
+ * and a title text line with a reign onto up to two (D61, spec §13.3). `cardNameLines` breaks
  * a card name with its sobriquet: at spaces first, then at a hyphen with a syllable rule or the user's list
  * of break places (D117, D118), and cuts the sobriquet first (D122, D127). `render/dom/tall-cards.ts` calls
  * it to find the tall cards; `render/dom/scene.ts` and `render/svg-string.ts` call it to draw the text lines
@@ -9,6 +9,7 @@
  * starts at the short end, so the cost of a very long name does not grow with its square (finding L5).
  */
 import type { NameLineCount, NameRoom } from '../layout/model';
+import { BIDI_FSI, BIDI_LRI, BIDI_LRM, BIDI_PDI, BIDI_RLI, BIDI_RLM, carryIsolates, truncateClosed } from './bidi-controls';
 import { listKey, type BreakList } from './break-words';
 import { graphemes, truncate } from './view-math';
 
@@ -90,20 +91,21 @@ export type TitleLines = (title: string | undefined, reign: string | undefined, 
 
 /** D61: a title text line, with the reign after it, on one or two text lines; see `TitleLines`. */
 export const titleLines: TitleLines = (title, reign, width, measure) => {
-	// Without a reign the title is cut exactly as a 0.1 title text line is.
+	// Without a reign the title is cut exactly as a title text line is.
 	if (!reign?.trim()) return title ? [truncate(title, width, measure)] : [];
 	const tail = reign.trim();
 	const head = title?.trim() ?? '';
-	if (!head) return [truncate(tail, width, measure)];
+	if (!head) return [truncateClosed(tail, width, measure)];
 	const full = `${head} ${tail}`;
 	if (measure(full) <= width) return [full];
 	if (measure(head) <= width && measure(tail) <= width) return [head, tail];
 	// A reign too wide for line 2 alone must not start there: the last-space break keeps more of it on the card.
-	return nameLines(full, width, measure, 2);
+	// A break inside a right-to-left date closes its isolate on the first line and opens it again on the second.
+	return carryIsolates(nameLines(full, width, measure, 2));
 };
 
 // ---------------------------------------------------------------------------------------------
-// 0.2.4 (D117, D118, D122, D125, D127): the card name with a sobriquet.
+// D117, D118, D122, D125, D127: the card name with a sobriquet.
 
 /** A piece of a name text line: the name (bold) or the sobriquet (regular). */
 export interface NameRun {
@@ -197,23 +199,15 @@ export function fitRuns(runs: readonly NameRun[], width: number, measure: NameMe
 /** The text of a name line from its pieces. */
 export const runsText = (runs: readonly NameRun[]) => runs.map((r) => r.text).join('');
 
-/** The bidi controls (Unicode UAX #9): the isolates (left to right, right to left, first strong), the end of an isolate, and the two direction marks. */
-const BIDI_LRI = '\u2066';
-const BIDI_RLI = '\u2067';
-const BIDI_FSI = '\u2068';
-const BIDI_PDI = '\u2069';
-const BIDI_LRM = '\u200e';
-const BIDI_RLM = '\u200f';
-
 /** A letter of a script that is written from right to left (Hebrew, Arabic, Syriac, Thaana and the others, with the presentation forms). */
 const RTL_LETTER = /[\u0590-\u08ff\ufb1d-\ufdff\ufe70-\ufeff\u{10800}-\u{10fff}\u{1e800}-\u{1efff}]/u;
 
 /**
- * The release plan T10, fault RTL-1: whether a name needs the bidi isolate. An SVG text has the base direction of the page (left to right), so the closing curly mark of
+ * Whether a name needs the bidi isolate. An SVG text has the base direction of the page (left to right), so the closing curly mark of
  * a sobriquet after an Arabic or Hebrew name would stand at the far right. The isolate gives the name its own direction and leaves `direction` and `text-anchor`
  * alone, so the place of the line on the card does not change. A name with no right-to-left letter has none, and draws as before.
  */
-const needsBidiIsolate = (text: string): boolean => RTL_LETTER.test(text);
+export const needsBidiIsolate = (text: string): boolean => RTL_LETTER.test(text);
 
 type Dir = 'L' | 'R';
 /** How a character counts here: a strong letter, a number, a combining mark (it goes with its letter), or neutral. */
@@ -340,7 +334,7 @@ function phraseDir(n: WrappedName, o: number, c: number): Dir {
 
 /**
  * The phrases and forced brackets. An outermost split pair is a phrase, in the direction of the text round it when it holds a letter of that direction (then the
- * isolate changes nothing on one line), else of the letters it holds. A split pair inside a phrase keeps the direction that the whole name gives its brackets (N0):
+ * isolate changes nothing on one line), else of the letters it holds. A split pair inside a phrase keeps the direction that the whole name gives its brackets:
  * a mark of that direction on both sides of each bracket acts as the resolved bracket does. A second isolate there would hide its letters from the phrase and change
  * the one-line name.
  */
@@ -446,8 +440,7 @@ function drawLine(n: WrappedName, runs: readonly NameRun[], line: number, lead: 
 }
 
 /**
- * The text lines of a name with the bidi controls that make each line read as the same name on one line would, split at the break (the release plan T10, fault RTL-1, and
- * the G5 fault 5 of 0.4). A name with no right-to-left letter comes back as the same list. A name on one text line is one first-strong isolate, as before. A wrapped
+ * The text lines of a name with the bidi controls that make each line read as the same name on one line would, split at the break. A name with no right-to-left letter comes back as the same list. A name on one text line is one first-strong isolate, as before. A wrapped
  * name: every line is an isolate in the direction of the whole name (its first strong letter), not of its own first letter, so "II)" after an Arabic line stays in
  * the order of the name; a bracket pair that the break splits is a phrase (`findPhrases`), so each line shows its piece of the one-line phrase with the same bracket
  * glyph ("(Nur al-Din" then "II)"); and a neutral at the break gets a mark when the whole name gives it the other direction (`edgeMarks`: a hyphen added inside a
@@ -570,7 +563,7 @@ export function cardNameLines(name: string, sobriquet: string | undefined, room:
 	let rest: Tok[] = toks;
 	for (;;) {
 		const slot = lines.length + 1;
-		// F-LAYOUT-01: a name that stays on the first text line has the room `only`; the room `last` is for a final text line after the first.
+		// A name that stays on the first text line has the room `only`; the room `last` is for a final text line after the first.
 		const lastW = slot === 1 ? r.only : r.last;
 		if (grow(rest, lastW) === rest.length) {
 			lines.push(runsOf(rest));

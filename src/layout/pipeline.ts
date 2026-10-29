@@ -1,5 +1,5 @@
 /*
- * The whole card-and-line pipeline (the architecture notes §4.2.2): a graph, its generations, a geometry and the layout settings in; a
+ * The whole card-and-line pipeline: a graph, its generations, a geometry and the layout settings in; a
  * `LaidOut` (the cards and the lines) out. The stages: walk (core/order.ts), skeleton and plan (plan.ts), placement (place.ts; any
  * placement that keeps the order and the minimum gaps may stand in, assumption A16), the far-by-distance rounds, the ports again from
  * the positions, the route (route.ts, draw.ts). A sideways tree runs in the turned frame and is turned back at the end (D24).
@@ -26,7 +26,7 @@ export type Placement = (plan: Plan, g: FamilyGraph, geo: Geometry) => void;
 export type CheckSite = 'walk' | 'plan' | 'place' | 'route';
 
 /** The options of `arrangeTree`; both are for the tests and the time budget, the plugin passes at most `check`. */
-export interface ArrangeOptions {
+interface ArrangeOptions {
 	/** The placement stage; the default placement (`placeItems` with the settings' sweeps) when absent. The one injection point of the tests of A16. */
 	place?: Placement;
 	/** The time-budget hook: called after each stage, never inside one. It may throw `LayoutStopped`; nothing here catches it and no partial result is returned. */
@@ -44,7 +44,7 @@ export interface Stages extends LaidOut {
 	rounds: number;
 	/** The couples that were far by distance in a round and came back to near (the partners are within the limit again); sorted. They stay near (A15). */
 	cameBack: string[];
-	/** How often the route fell back to the clearest place: a passage line or a child slot with no place clear of every foreign vertical (the architecture notes §4.2.6). */
+	/** How often the route fell back to the clearest place: a passage line or a child slot with no place clear of every foreign vertical. */
 	fallbacks: number;
 }
 
@@ -104,8 +104,8 @@ function turnLayout(routed: Routed, plan: Plan, g: FamilyGraph, side: Geometry, 
  */
 export function runStages(g: FamilyGraph, coreGen: Map<string, number>, plain: Geometry, given0: LayoutSettings, fold?: FoldInput, opts: ArrangeOptions = {}): Stages {
 	const check = opts.check ?? (() => undefined);
-	// A tab belongs to a person of the drawn graph; any other id gives no tab and no `reach` (0.2.5, 0.2.7; the finder's small tree). The picture's
-	// reach is made from the settings, so they are cleaned first, as the 0.3.0 arranger did.
+	// A tab belongs to a person of the drawn graph; any other id gives no tab and no `reach` (the finder's small tree). The picture's
+	// reach is made from the settings, so they are cleaned first.
 	const youTab = given0.youTab !== undefined && g.byId.has(given0.youTab) ? given0.youTab : undefined;
 	const ordinalCards = [...new Set(given0.ordinalCards ?? [])].filter((id) => g.byId.has(id)).sort();
 	const settings: LayoutSettings = { ...given0, youTab, ...(given0.ordinalCards !== undefined ? { ordinalCards: ordinalCards.length ? ordinalCards : undefined } : {}) };

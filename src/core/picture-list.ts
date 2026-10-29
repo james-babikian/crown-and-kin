@@ -37,9 +37,9 @@
  *    row, then at most `limit` matches, each a picture row at depth 0 in the P4 order (file name, then
  *    folder path; the entries are ranked once in `buildPictureTree`, so a search only filters and stops
  *    after `limit` + 1), and `more` = there are more matches than `limit` (200). The row shows the folder
- *    under the name; a picture at the vault root shows the `topFolder` text there (V8).
+ *    under the name; a picture at the vault root shows the `topFolder` text there.
  *    `inUse` is set here too. The search ignores which folders are open. The search list has no folder
- *    row, so while the search field has a word the cursor is never on a folder row (P8).
+ *    row, so while the search field has a word the cursor is never on a folder row.
  * P8 Keyboard and taps (pure reducers). The search field keeps the DOM focus; the rows are reached with
  *    `aria-activedescendant`. The state is `PickerState`: one CURSOR (the row the keys act
  *    on; it can be on the device row, a folder row or a picture row), one SELECTED picture (the picture
@@ -52,7 +52,7 @@
  *      its folder closes (its row is then not shown, so its highlight is not visible, but **Select**
  *      still chooses it) and when the list switches.
  *    - `armed` is true when a second tap on the selected picture's row chooses it. It is false only
- *      at open for the current picture (P9), so a first tap on the current picture selects nothing new
+ *      at open for the current picture, so a first tap on the current picture selects nothing new
  *      and does not choose; it sets `armed`. Moving the cursor onto a picture, or a tap on another
  *      picture, selects it and sets `armed` true.
  *    - `pickerKey(rows, state, key)` returns the new state and one action:
@@ -68,7 +68,7 @@
  *      - Space: like Enter on a folder row only; elsewhere nothing and no `preventDefault`, because the
  *        key types a space in the search field.
  *      The folder actions (open, close, toggle by Space or Enter) need a folder row, which exists only
- *      while the search field has no word (P7). The caller calls `preventDefault` only when the reducer
+ *      while the search field has no word. The caller calls `preventDefault` only when the reducer
  *      returned an action other than 'none' or moved the cursor.
  *    - `pickerTap(rows, state, key)` (a tap on the row with this `rowKey`): a folder row gives
  *      'toggle', moves the cursor to it and keeps the selected picture; a picture row that is selected
@@ -81,9 +81,8 @@
  *    it) and chooses the selected picture even if its row is not shown. The keys are heard on the modal
  *    (capture), not only on the search field, so a touch device with a hardware keyboard works; a key on
  *    the Select or Cancel button is left alone.
- * P9 Current picture. The caller passes the current picture as a file (`current`, see V1 of the obsidian
- *    contract). At open: if it is a picture in the tree, `selected` = `cursor` = its row, its folders
- *    are open (P5), its row has the "In use" mark and `armed` is false (P8); else all folders are closed,
+ * P9 Current picture. The caller passes the current picture as a file (`current`). At open: if it is a picture in the tree, `selected` = `cursor` = its row, its folders
+ *    are open, its row has the "In use" mark and `armed` is false; else all folders are closed,
  *    nothing is selected, there is no cursor and `armed` is false. The mark stays on the current
  *    picture's row (in the folder view and in the search list) for as long as the picker is open,
  *    wherever the selection moves. The open folders last only while the picker is open (nothing is
@@ -106,22 +105,22 @@ export interface PictureFileLike {
 	extension: string;
 }
 
-/** One picture in the tree (P1). */
-export interface PictureEntry<F extends PictureFileLike = PictureFileLike> {
+/** One picture in the tree. */
+interface PictureEntry<F extends PictureFileLike = PictureFileLike> {
 	file: F;
 	/** The folder path, '' for the vault root. */
 	folder: string;
 }
 
-/** One folder that holds at least one shown picture (P2, P3). */
-export interface PictureFolder<F extends PictureFileLike = PictureFileLike> {
+/** One folder that holds at least one shown picture. */
+interface PictureFolder<F extends PictureFileLike = PictureFileLike> {
 	/** The path from the vault root, for example "Art/Arms". */
 	path: string;
 	/** The last segment, for example "Arms". */
 	name: string;
 	/** 1 for a top folder. */
 	depth: number;
-	/** The pictures in this folder and all its sub-folders (P3); at least 1. */
+	/** The pictures in this folder and all its sub-folders; at least 1. */
 	count: number;
 	/** Sub-folders in P4 order. */
 	folders: PictureFolder<F>[];
@@ -152,7 +151,7 @@ type ComparePictureNames = (a: string, b: string) => number;
 /** P5: the folder paths that are open at the start for the current picture's path (null: none). */
 type OpenSetFor = (tree: PictureTree, currentPath: string | null) => Set<string>;
 
-/** One row of the list (P6, P7). */
+/** One row of the list. */
 export type PickerRow<F extends PictureFileLike = PictureFileLike> =
 	| { kind: 'device' }
 	| { kind: 'folder'; folder: PictureFolder<F>; depth: number; open: boolean }
@@ -184,7 +183,7 @@ export interface PickerState {
 	cursor: PickerRowKey | null;
 	/** The path of the selected picture; null for none. **Select** chooses it. */
 	selected: string | null;
-	/** True when a tap or Enter on the selected picture's row chooses it (false only at open, P9). */
+	/** True when a tap or Enter on the selected picture's row chooses it (false only at open). */
 	armed: boolean;
 }
 
@@ -207,7 +206,7 @@ type PickerSwitch = (rows: readonly PickerRow[], state: PickerState) => PickerSt
 type ToggleFolder = (open: ReadonlySet<string>, path: string) => Set<string>;
 
 /** P10: a rectangle in client px (what `getBoundingClientRect` gives). */
-export interface ClientBand {
+interface ClientBand {
 	top: number;
 	bottom: number;
 }
@@ -336,7 +335,7 @@ export const pickerRows: PickerRows = <F extends PictureFileLike>(tree: PictureT
 export const searchRows: SearchRows = <F extends PictureFileLike>(tree: PictureTree<F>, query: string, current: string | null, limit: number = PICKER_SEARCH_LIMIT) => {
 	const words = foldForMatch(query).split(/\s+/).filter(Boolean);
 	const rows: PickerRow<F>[] = [{ kind: 'device' }];
-	// A query that folds to nothing (a lone accent mark) is still a search and finds nothing, as in 0.2.0. An empty query is the job of the caller.
+	// A query that folds to nothing (a lone accent mark) is still a search and finds nothing. An empty query is the job of the caller.
 	if (!words.length && query.trim() !== '') return { rows, more: false };
 	let more = false;
 	let taken = 0;
@@ -403,7 +402,7 @@ export const pickerTap: PickerTapStep = (rows, state, key) => {
 	const row = rows.find((r) => rowKey(r) === key);
 	if (!row) return { state, action: 'none' };
 	if (row.kind === 'device') return { state, action: 'device' };
-	// A tap on a folder row leaves `armed` alone (WP 11.0 ruling).
+	// A tap on a folder row leaves `armed` alone.
 	if (row.kind === 'folder') return { state: { ...state, cursor: key }, action: 'toggle' };
 	const path = row.entry.file.path;
 	if (state.selected === path && state.armed) return { state: { ...state, cursor: key }, action: 'choose' };

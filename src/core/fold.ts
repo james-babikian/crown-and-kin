@@ -28,11 +28,11 @@ export function foldLetters(s: string): string {
 }
 
 /** The combining marks that NFKD leaves behind: the accents of the Latin, Greek and Cyrillic scripts (the range of the fold of an id). */
-export const COMBINING_MARKS = /[\u0300-\u036f]/g;
+const COMBINING_MARKS = /[\u0300-\u036f]/g;
 
 /**
  * Every non-spacing mark (Unicode category Mn), for a search: Hebrew points, Arabic vowel signs and the like also go. Spacing marks (Mc) stay, because in the
- * Indic scripts they are part of the letter. An id keeps these marks (I16), so only a search uses this one.
+ * Indic scripts they are part of the letter. An id keeps these marks, so only a search uses this one.
  */
 const ALL_MARKS = /\p{Mn}/gu;
 
@@ -80,7 +80,7 @@ export function foldForMatch(s: string): string {
 	return foldAll(s, true);
 }
 
-/** The fold that `slugify` uses for an id: as `foldForMatch`, but only the accent range goes and the final sigma stays, so an id does not change (I16). */
+/** The fold that `slugify` uses for an id: as `foldForMatch`, but only the accent range goes and the final sigma stays, so an id does not change. */
 export function foldForId(s: string): string {
 	return foldAll(s, false);
 }

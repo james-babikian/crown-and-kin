@@ -5,8 +5,7 @@
  * draw. `TreeView` owns one `BlockBinding`. It holds the state of this work (the key, the path, the
  * section, the handle, the timers); the view reads it through small getters and calls the binding for
  * the rest. The binding draws nothing: what needs the view (a draw, the placeholder box, the edit
- * controls, a changed body) comes back through `BindingOwner`. Split out of `tree-view.ts` in 0.3.2
- * (WP-1d) with no change of behaviour or timing.
+ * controls, a changed body) comes back through `BindingOwner`.
  */
 
 import type { MarkdownPostProcessorContext, MarkdownSectionInformation } from 'obsidian';
@@ -35,7 +34,7 @@ const ASK_GAP_MS = 100;
 const RESOLVE_RETRIES_MS = [250, 1000];
 
 /** What the binding needs of the plugin host (`TreeHost` has all of it). */
-export interface BindingHost {
+interface BindingHost {
 	/** One handle per block (spec §6.1). */
 	handles: HandleRegistry;
 	/** View state of read-only blocks, which have no handle, keyed by note path and text. */
@@ -45,12 +44,12 @@ export interface BindingHost {
 }
 
 /** The full-screen modal, as far as the binding uses it. */
-export interface BindingFull {
+interface BindingFull {
 	close(notice: string | null): void;
 }
 
 /** What a full-screen view takes over from the embedded view that opened it. */
-export interface BindingSource {
+interface BindingSource {
 	key: string;
 	sourcePath: string;
 	handle: Handle | null;
@@ -59,10 +58,10 @@ export interface BindingSource {
 }
 
 /** Where the view is: an embed in a note, or the full-screen view. */
-export type BindingPlace = { kind: 'embed'; ctx: MarkdownPostProcessorContext } | { kind: 'full'; from: BindingSource; host: BindingFull };
+type BindingPlace = { kind: 'embed'; ctx: MarkdownPostProcessorContext } | { kind: 'full'; from: BindingSource; host: BindingFull };
 
 /** What the view gives back to its binding. */
-export interface BindingOwner {
+interface BindingOwner {
 	/** The text that the view rendered. */
 	source(): string;
 	unloaded(): boolean;
@@ -87,6 +86,23 @@ function shortHash(s: string): string {
 /** The view-state key of a block: its place when Obsidian told it, else the text. */
 function blockKey(path: string, ordinal: number | null, source: string): string {
 	return `${path}\u0000${ordinal !== null ? `#${ordinal}` : `text ${shortHash(source)}`}`;
+}
+
+/**
+ * The handle whose state a new view may use before `resolve` has checked the block: never written through.
+ * A handle whose body is not this block's text belongs to another block (the registry has not read a change of the note yet),
+ * so the view starts with a state of its own and takes the right handle's state in `attach`.
+ * While a write of this handle runs, the file is already new but the handle gets its new body only after the write ends,
+ * and Obsidian builds the view of the changed block in that gap. The handle is then the same block, so its state (session focus, folds,
+ * last saved person) goes to the new view. The view must show the text that the write puts in the file (`pendingBody`).
+ * A view of any other text, for example a block that moved there because of an outside change, never takes the state.
+ * Writes still need `validHandle` and its body check.
+ */
+function peekFor(handles: HandleRegistry, path: string, ordinal: number | null, source: string): Handle | null {
+	const peek = ordinal === null ? null : handles.peek(path, ordinal);
+	if (!peek) return null;
+	if (sameBody(peek.body, source)) return peek;
+	return peek.writeRuns > 0 && peek.pendingBody !== null && sameBody(source, peek.pendingBody) ? peek : null;
 }
 
 /** One view's hold on its block: handle, place, retries and the cold-start wait. */
@@ -164,11 +180,8 @@ export class BlockBinding {
 		this.placePending = info === null;
 		this.sectionNote = info ? `${info.lineStart}-${info.lineEnd}` : 'none';
 		const ordinal = info ? host.handles.quickOrdinal(info, source) : null;
-		// Only for the view state until `resolve` has checked the block: never written through.
-		// F-VIEW-03: a handle whose body is not this block's text belongs to another block (the registry has not read a change of the note yet),
-		// so the view starts with a state of its own and takes the right handle's state in `attach`.
-		const peek = ordinal === null ? null : host.handles.peek(ctx.sourcePath, ordinal);
-		this.peeked = peek && sameBody(peek.body, source) ? peek : null;
+		// Only for the view state until `resolve` has checked the block: never written through (see `peekFor`).
+		this.peeked = peekFor(host.handles, ctx.sourcePath, ordinal, source);
 		this.key = blockKey(ctx.sourcePath, ordinal, source);
 		this.ready = info ? host.handles.resolve(ctx.sourcePath, info, source).catch(() => null) : Promise.resolve(null);
 	}
@@ -273,7 +286,7 @@ export class BlockBinding {
 	lateResolve(ask = true): void {
 		if (ask) this.askSection();
 		if (this.info || this.full || this.lateTried || this.handle) return;
-		// I07: a call before the block is in the page, or before it is in the note's editor, says nothing yet; only a sure answer ends the tries.
+		// A call before the block is in the page, or before it is in the note's editor, says nothing yet; only a sure answer ends the tries.
 		if (!this.el.isConnected) return;
 		// A side view of another plugin is no editor and no reading view: nothing will ever make this block known, so there is no wait.
 		if (this.inForeignView() || !this.inNoteView()) {
@@ -317,8 +330,7 @@ export class BlockBinding {
 		this.info = info;
 		this.sectionNote = `${info.lineStart}-${info.lineEnd}`;
 		const ordinal = this.host.handles.quickOrdinal(info, source);
-		const peek = ordinal === null ? null : this.host.handles.peek(this.sourcePath, ordinal);
-		this.peeked = peek && sameBody(peek.body, source) ? peek : null;
+		this.peeked = peekFor(this.host.handles, this.sourcePath, ordinal, source);
 		const oldKey = this.key;
 		this.key = blockKey(this.sourcePath, ordinal, source);
 		// The relation lookup of the block (relation-cache.ts) follows its key.

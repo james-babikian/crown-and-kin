@@ -1,4 +1,4 @@
-/* ---------- Arms and the colour of a house, the pictures of the windows (spec §13.6, §13.7; D67–D69, D75; 0.2.8 contract C) ---------- */
+/* ---------- Arms and the colour of a house, the pictures of the windows (spec §13.6, §13.7; D67–D69, D75) ---------- */
 
 /* The arms of a house in the header of its page, at the right: the picture as it is (D75: no frame, edge or background). A tap opens the menu. The button has no box of its own (quiet-controls). */
 .dynasty-sheet button.dynasty-house-arms {
@@ -68,7 +68,7 @@
 	box-shadow: inset 0 0 0 1px var(--background-modifier-border);
 	color: var(--text-on-accent);
 	cursor: pointer;
-	/* No grey flash under the finger on a phone (owner's iPhone, 0.4): the tap highlight and the pressed style of a button do not paint over the colour. */
+	/* No grey flash under the finger on a phone: the tap highlight and the pressed style of a button do not paint over the colour. */
 	-webkit-tap-highlight-color: transparent;
 	transition: none;
 }
@@ -104,7 +104,7 @@
 
 /*
  * The system colour window opens from the last swatch. Its input lies over the swatch, unseen, and takes a tap or a click itself: iOS opens the
- * window only for a tap on the input, never from code (G5 0.4). The swatch below keeps the look and is the control for the keyboard.
+ * window only for a tap on the input, never from code. The swatch below keeps the look and is the control for the keyboard.
  * The selector outranks the 88 px colour field of the person window (10-edit-sheet.css), so the input has the size of the swatch and no tap beside it opens the window.
  */
 .dynasty-house-other {
@@ -171,7 +171,7 @@
 }
 
 /*
- * The People section of a house (D202, G.10; people-rows): plain full-width rows, the name in bold, the title after it, then the generation and the
+ * The People section of a house (D202; people-rows): plain full-width rows, the name in bold, the title after it, then the generation and the
  * years. No hairline and no chevron. The title stays on the name line (D218 item 11, answer B). The name is the Name role and the line under it the
  * Text role, both in the text font (D218 items 1 to 3). The selectors are long enough to win over the general row rules on a phone.
  */

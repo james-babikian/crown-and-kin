@@ -8,7 +8,7 @@
 import { closesBalanced } from './link-text';
 
 /** A link's text split around its target: `head + written target + tail` is the whole text. */
-export interface LinkParts {
+interface LinkParts {
 	head: string;
 	/** The target as Obsidian resolves it: trimmed, and percent-decoded in a Markdown link. */
 	target: string;
@@ -54,7 +54,7 @@ export function parseLink(v: string): LinkParts | null {
 }
 
 /**
- * `parseLink` for a picture value (`portrait`, `arms`; contract rule 4): a bare value may also start
+ * `parseLink` for a picture value (`portrait`, `arms`): a bare value may also start
  * with "!", which goes to the head, so `!Pictures/x.png` names `Pictures/x.png`. A bare `link` keeps
  * its "!", as the renderer opens it.
  */

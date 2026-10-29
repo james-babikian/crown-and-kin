@@ -13,12 +13,12 @@ import type { FarCoupleRule, Geometry, LayoutSettings, Rect } from './model';
 export const DEFAULT_FAR_RULE: Readonly<FarCoupleRule> = { maxCardWidths: 3, maxGenerations: 1 };
 /** Default layout settings: `down` orientation, 4 sweeps (then the compaction step of `compact.ts`), the D11 far-couple rule. Read-only: copy it to change it. */
 export const DEFAULT_LAYOUT_SETTINGS: Readonly<LayoutSettings> = { sweeps: 4, far: DEFAULT_FAR_RULE };
-/** M7: never far, so a couple is never split (the relation finder's small tree, D47). Read-only. */
+/** Never far, so a couple is never split (the relation finder's small tree, D47). Read-only. */
 export const NEVER_FAR_RULE: Readonly<FarCoupleRule> = { maxCardWidths: Infinity, maxGenerations: Infinity };
 
 /**
- * M9 (spec §13.6, §13.7): the picture sets that every caller puts into `LayoutSettings` (the tree
- * view, the saved picture, the spike and the tests). `arms`: the houses whose `arms` is written; `personalArms` (0.2.8):
+ * Spec §13.6, §13.7: the picture sets that every caller puts into `LayoutSettings` (the tree
+ * view, the saved picture, the spike and the tests). `arms`: the houses whose `arms` is written; `personalArms`:
  * the people whose own `arms` is written; `portraits`: the people whose `portrait` is written, or none with "Show portraits on cards" off.
  * Both sorted. "Written" is enough: a missing or failing picture still keeps its room, so loading
  * never changes a layout.
@@ -26,12 +26,12 @@ export const NEVER_FAR_RULE: Readonly<FarCoupleRule> = { maxCardWidths: Infinity
 export function pictureSets(g: FamilyGraph, showPortraits: boolean): { arms: string[]; portraits: string[]; personalArms?: string[] } {
 	const arms = [...g.houses.values()].filter((h) => !!h.arms).map((h) => h.id);
 	const portraits = showPortraits ? g.people.filter((p) => !!p.portrait).map((p) => p.id) : [];
-	// 0.2.8: the key is there only when a person has personal arms, so a tree without them gives the 0.2.7 shape.
+	// The key is there only when a person has personal arms, so a tree without them gives the plain shape.
 	const personal = [...new Set(g.people.filter((p) => !!p.arms).map((p) => p.id))].sort();
 	return { arms: [...new Set(arms)].sort(), portraits: [...new Set(portraits)].sort(), ...(personal.length ? { personalArms: personal } : {}) };
 }
 
-/** M9 (spec §13.6): the people whose card shows arms: their house is a house of `g` and in `arms`. */
+/** Spec §13.6: the people whose card shows arms: their house is a house of `g` and in `arms`. */
 export function armsCards(g: FamilyGraph, arms: readonly string[] | undefined): Set<string> {
 	const out = new Set<string>();
 	if (!arms?.length) return out;
@@ -71,8 +71,8 @@ export function isFarByStructure(a: Pick<FarProbe, 'gen'>, b: Pick<FarProbe, 'ge
 }
 
 /**
- * The people whose card shows arms: with the "Arms on cards" setting (D206, 0.2.8) the cards of `armsCardIds`, kept to the people who
- * have arms to show (a house in `settings.arms`, or their own arms in `settings.personalArms`); without it the 0.2.7 rule (every person
+ * The people whose card shows arms: with the "Arms on cards" setting (D206) the cards of `armsCardIds`, kept to the people who
+ * have arms to show (a house in `settings.arms`, or their own arms in `settings.personalArms`); without it the plain rule (every person
  * of a house with arms, plus personal arms). With folds the rule reads the whole graph, so folding a family never gives arms to a
  * person whose parent is hidden.
  */

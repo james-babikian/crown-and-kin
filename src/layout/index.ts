@@ -24,7 +24,7 @@ export const LAYOUT_CACHE_SIZE = 16;
 const cache = new Map<string, LaidOut>();
 
 /**
- * The generations of each graph object whose layout finished (WP-E2 P5): `measuredLayout` lays the same graph out a second time when the tall
+ * The generations of each graph object whose layout finished: `measuredLayout` lays the same graph out a second time when the tall
  * cards need the first layout, and the generations depend on the graph only. Keyed by the object, never by a text: a graph is not changed after
  * `deriveFamilies` makes it, and an entry lives only as long as its graph. The layout only reads the map.
  */
@@ -52,25 +52,25 @@ export function layoutKey(g: FamilyGraph, geo: Geometry, settings: LayoutSetting
 	const long = [...new Set(settings.longNames ?? [])].filter((id) => g.byId.has(id)).sort();
 	// D61: the same for two-line title text lines; none leaves the key as before.
 	const tallT = [...new Set(settings.tallTitles ?? [])].filter((id) => g.byId.has(id)).sort();
-	// 0.2.5: the "You" tab counts only for a person of this graph, as the layout sees it; the card form is in `geo`.
+	// The "You" tab counts only for a person of this graph, as the layout sees it; the card form is in `geo`.
 	const youTab = settings.youTab !== undefined && g.byId.has(settings.youTab) ? settings.youTab : undefined;
-	// 0.2.7 (F.4): the ordinal tabs are ids, once each and sorted, of people of this graph. An array, not a `Map` or `Set`: those serialise to `{}` and would drop out of the key.
+	// The ordinal tabs are ids, once each and sorted, of people of this graph. An array, not a `Map` or `Set`: those serialise to `{}` and would drop out of the key.
 	const ordinals = [...new Set(settings.ordinalCards ?? [])].filter((id) => g.byId.has(id)).sort();
 	// D40: only a relation line changes the key; without one the key is as before.
 	const rel = { ...(settings.relationLine ? { relationLine: true } : {}), ...(youTab !== undefined ? { youTab } : {}), ...(ordinals.length ? { ordinalCards: ordinals } : {}) };
 	// The crown and the reach come from the picture lists as given (`drawnGeometry` has no graph), so a list of ids that are not in this graph still moves the layout.
 	const drawn = withRelationLine(geo, { ...settings, youTab, ordinalCards: ordinals });
 	const heights = { ...(drawn.crown ? { crown: drawn.crown } : {}), ...(drawn.textTop ? { textTop: drawn.textTop } : {}), ...(drawn.reach ? { reach: drawn.reach } : {}) };
-	// 0.2.5: the text card shows no picture, so the picture lists never change a sideways text layout.
+	// The text card shows no picture, so the picture lists never change a sideways text layout.
 	const textCard = geo.form === 'text';
-	// M9 (L3): the picture sets, filtered, once each and sorted; none leaves the key as in M8.
+	// The picture sets, filtered, once each and sorted; none leaves the key as it is without them.
 	const arms = textCard ? [] : [...new Set(settings.arms ?? [])].filter((id) => g.houses.has(id)).sort();
-	// 0.2.8: the people with personal arms and the setting; absent leaves the key as before.
+	// The people with personal arms and the setting; absent leaves the key as before.
 	const personalArms = textCard ? [] : [...new Set(settings.personalArms ?? [])].filter((id) => g.byId.has(id)).sort();
 	const portraits = textCard ? [] : [...new Set(settings.portraits ?? [])].filter((id) => g.byId.has(id)).sort();
 	// D206: a holder shows the arms of the house; the titles are not part of the people list below, so the holders go in with the setting.
 	const holders = settings.armsOnCards === undefined ? [] : [...new Set(g.titles.flatMap((x) => x.holders.map((h) => h.person ?? '')))].filter(Boolean).sort();
-	// M10 (L3, F1): the people that folds hide, the folded families and the controls; empty or absent leaves the key as before.
+	// The people that folds hide, the folded families and the controls; empty or absent leaves the key as before.
 	const hidden = [...new Set(settings.foldHidden ?? [])].filter((id) => g.byId.has(id)).sort();
 	const folded = [...new Set(settings.foldedFamilies ?? [])].sort();
 	const tallParts = {
@@ -102,8 +102,8 @@ export function layoutKey(g: FamilyGraph, geo: Geometry, settings: LayoutSetting
 }
 
 /**
- * M10 (F1–F5): what the layout needs to know about folds, or undefined for a tree with no folds and no controls (then
- * nothing differs from M9). `pruned` is the graph to arrange, without the people that folds hide (rule 7).
+ * What the layout needs to know about folds, or undefined for a tree with no folds and no controls (then
+ * nothing differs from a tree with no folds). `pruned` is the graph to arrange, without the people that folds hide (rule 7).
  */
 function foldPlan(g: FamilyGraph, settings: LayoutSettings): { pruned: FamilyGraph; input: FoldInput } | undefined {
 	const hidden = new Set((settings.foldHidden ?? []).filter((id) => g.byId.has(id)));

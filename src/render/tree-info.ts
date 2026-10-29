@@ -1,6 +1,6 @@
 /*
  * Pure helpers that turn the model into what a card, the legend, the timing Notice and the relation
- * finder (M7, `RelationTexts`) show. Used by the tree view, the scene, the legend, and others. Every string here is plugin text, so it
+ * finder (`RelationTexts`) show. Used by the tree view, the scene, the legend, and others. Every string here is plugin text, so it
  * obeys Simplified Technical English (ASD-STE100) and the project word list.
  */
 import { PLAIN_READER, type DateReader, type TreeDates } from '../core/dates';
@@ -11,6 +11,10 @@ import { DOUBTFUL_DIED, isDead } from '../core/succession-keys';
 import type { FinderResult, Relation, RelationStep } from '../core/relations';
 import { cardLabels, entryReign, type CardLabel } from '../core/titles';
 import type { Holder, Person } from '../core/types';
+import { withoutBidiControls } from './bidi-controls';
+import { hasRtlDate, isolateDate, isolateDatesIn } from './date-bidi';
+
+export { isolateDate, withoutBidiControls };
 
 // The legend texts live in legend-text.ts (one home each); these names stay importable from here.
 export { LEGEND_HOUSES_LABEL, LEGEND_LABELS, LEGEND_LINES_LABEL, LEGEND_ORDER, SIGN_LEGEND_LABEL } from './legend-text';
@@ -40,9 +44,9 @@ export const MAYBE_TEXT = {
 	cardHalf: ', maybe half',
 	/** The sheet paragraph when a rumoured link is part of the doubt. */
 	sheet: (lower: string) => `If every rumoured link is true, this person is your ${lower}.`,
-	/** The sheet paragraph when only a parent who is not listed is the doubt (D174), form 'same-person': both people list the same one parent (F-KIN-08). */
+	/** The sheet paragraph when only a parent who is not listed is the doubt (D174), form 'same-person': both people list the same one parent. */
 	sheetUnlistedSame: (lower: string) => `If the parent that the note does not name is the same person for both, this person is your ${lower}.`,
-	/** The same, form 'other-parent': one person lists both parents and the other lists one of them (F-KIN-08). */
+	/** The same, form 'other-parent': one person lists both parents and the other lists one of them. */
 	sheetUnlistedOther: (lower: string) => `If this person${CURLY_APOSTROPHE}s other parent is also your parent, this person is your ${lower}.`,
 	/** D176 (4): the sheet paragraph when only some of the rumoured links can be true together (`maybe.some`). */
 	sheetSome: (lower: string) => `If some of the rumoured links are true, this person is your ${lower}.`,
@@ -52,7 +56,7 @@ export const MAYBE_TEXT = {
 	spokenSome: (lower: string) => `or ${lower} if some rumoured links are true`,
 } as const;
 
-/** The sheet paragraph for an 'unlisted' cause; the form says which of the two sentences is true (F-KIN-08). */
+/** The sheet paragraph for an 'unlisted' cause; the form says which of the two sentences is true. */
 const sheetUnlisted = (m: { lower: string; unlistedForm?: 'same-person' | 'other-parent' }) => (m.unlistedForm === 'other-parent' ? MAYBE_TEXT.sheetUnlistedOther(m.lower) : MAYBE_TEXT.sheetUnlistedSame(m.lower));
 
 /** The relation text of a card: "Half-brother, maybe full" or "Sister, maybe half" when the relation has a maybe; else `rel.text`. */
@@ -105,12 +109,14 @@ export function partnersAndChildren(g: FamilyGraph, id: string): { partners: str
 	return { partners: [...partners], children: [...children] };
 }
 
-/** I19: the sign of a dead person whose `died` holds no year ("yes", "true", a doubt such as "?"); '†?' for a doubt, '†' for any other text without a year. */
+/** The sign of a dead person whose `died` holds no year ("yes", "true", a doubt such as "?"); '†?' for a doubt, '†' for any other text without a year. */
 export const DEAD_SIGN = '†';
+/** The sign for a doubt about the death. */
 export const DEAD_SIGN_DOUBT = '†?';
 
 /** Screen-reader words for the two signs (the character itself is not read). */
 export const CARD_SPOKEN_DEAD = 'dead';
+/** What a screen reader says for the doubt sign. */
 export const CARD_SPOKEN_DEAD_DOUBT = 'dead, but the death text is not clear';
 
 /** What the date helpers need of the dates view: `read`, and (when known) `reader.hasLists`, so a tree with no name list pays nothing. */
@@ -125,7 +131,7 @@ export type NamesForm = 'shown' | 'full' | 'none';
  * `'full'` uses the full names of every list that is not `none`, `'none'` adds nothing (a search text, a test for a sign).
  */
 export function shownDate(text: string, dates: DatesRead, form: NamesForm): string {
-	// A tree with no list never reads the born text here: this keeps the cost of 0.3.2.
+	// A tree with no list never reads the born text here: this keeps the cost low.
 	if (form === 'none' || dates.reader?.hasLists === false) return text;
 	const r = dates.read(text);
 	if (!r?.whole || !r.names) return text;
@@ -164,10 +170,14 @@ function rangeDash(from: { raw: string; shown: string }, to: { raw: string; show
 	return spaced ? `${THIN}${DASH}${THIN}` : DASH;
 }
 
-/** The born and died dates of a person row with their names, and the range that joins them (undefined when a date is missing): the same text as on the card. */
+/**
+ * The born and died dates of a person row with their names, and the range that joins them (undefined when a date is missing): the same text as on the card, each
+ * date with a right-to-left letter in an isolate (`isolateDate`), so the range keeps the order in which it is written.
+ */
 export function shownYears(born: string, died: string, dates: DatesRead): { born: string; died: string; range: string | undefined } {
 	const [b, d] = [born, died].map((x) => shownDate(x, dates, 'shown'));
-	return { born: b, died: d, range: born && died ? dateRange({ raw: born, shown: b }, { raw: died, shown: d }, dates) : undefined };
+	const range = born && died ? `${isolateDate(b)}${rangeDash({ raw: born, shown: b }, { raw: died, shown: d }, dates)}${isolateDate(d)}` : undefined;
+	return { born: isolateDate(b), died: isolateDate(d), range };
 }
 
 /** One holder entry as the reign text of a card has it ("22.13 Sa – 23.20 Ve", "from 1131", "until 1160"): the same as `entryReign` of the core, with the names of the dates (spec §14 rule 15) and `dateRange`. */
@@ -196,15 +206,45 @@ export function shownReign(label: Pick<CardLabel, 'reign' | 'shown'> | undefined
 	return names || approx ? (reignOf(label.shown.entries, dates, form) ?? label.reign) : label.reign;
 }
 
+/** The date texts of the entries as `entryReignText` shows them, in the order they stand in the reign text (from, then to, entry by entry). */
+function reignDates(entries: readonly { from?: string; to?: string }[], dates: DatesRead, form: NamesForm): string[] {
+	return entries.flatMap((e) => {
+		const s = shownHolder(e, dates, form);
+		return [s.from, s.to].filter((d): d is string => d !== undefined);
+	});
+}
+
+/**
+ * The reign text `reign` of a card label for the eye: each date that holds a right-to-left letter is in a first-strong isolate (see `dateLineShown`). `form` is the
+ * form that built `reign`: 'none' for the label's own text (`CardLabel.reign`), 'shown' or 'full' for `shownReign`. A text with no right-to-left letter is returned as it is.
+ */
+export function reignShown(label: Pick<CardLabel, 'shown'> | undefined, reign: string | undefined, dates: DatesRead, form: NamesForm): string | undefined {
+	if (!reign || !label?.shown || !hasRtlDate(reign)) return reign;
+	return isolateDatesIn(reign, reignDates(label.shown.entries, dates, form));
+}
+
+/**
+ * A reign text that a window built from `entries` (`entryReignText`, `reignOf`, `holderText`), for the eye: each right-to-left date is isolated. `form` is the form of
+ * the names that built `text` (the windows use 'shown').
+ */
+export function isolateReign(text: string | undefined, entries: readonly { from?: string; to?: string }[], dates: DatesRead, form: NamesForm = 'shown'): string | undefined {
+	return text && hasRtlDate(text) ? isolateDatesIn(text, reignDates(entries, dates, form)) : text;
+}
+
+/** `shownReign` for the eye: the reign with the names of its years, each right-to-left date isolated (`reignShown`). */
+export function shownReignIsolated(label: Pick<CardLabel, 'reign' | 'shown'> | undefined, dates: DatesRead, form: NamesForm): string | undefined {
+	return reignShown(label, shownReign(label, dates, form), dates, form);
+}
+
 /** The title of a card label with its reign, the reign with the names of its years (spec §14 rule 15); `written` when the tree has no list or the person has no label. */
 export function titleWithNames(g: FamilyGraph, id: string, written: string): string {
 	const label = written && g.dates.reader?.hasLists ? cardLabels(g).get(id) : undefined;
-	return label ? [label.title, shownReign(label, g.dates, 'shown')].filter((x) => x !== undefined && x !== '').join(' ') : written;
+	return label ? [label.title, shownReignIsolated(label, g.dates, 'shown')].filter((x) => x !== undefined && x !== '').join(' ') : written;
 }
 
 /** The title text of the head of the person window: with a reign, the reign shows the names of its years, as the card does (spec §14 rule 15); the label keeps the text as written. */
 export function headTitle(label: Pick<CardLabel, 'title' | 'reign' | 'shown'> | undefined, titleText: string, dates: DatesRead): string {
-	return label?.title && label.reign ? `${titleText} ${shownReign(label, dates, 'shown') ?? label.reign}` : titleText;
+	return label?.title && label.reign ? `${titleText} ${shownReignIsolated(label, dates, 'shown') ?? label.reign}` : titleText;
 }
 
 /** A holder entry (or the values of a holder form) with `from` and `until` as short dates with names (spec §14 rule 15); the text of a reign is built from it with `entryReign`. */
@@ -214,8 +254,8 @@ export function shownHolder<T extends { from?: string; to?: string }>(entry: T, 
 }
 
 /**
- * The two parts of a card's dates (I19): the text with the years, and the sign of a dead person with no death year.
- * A `died` that means alive (K.7: "no", "false") gives neither a death year nor the sign. A death text that fits a calendar of the
+ * The two parts of a card's dates: the text with the years, and the sign of a dead person with no death year.
+ * A `died` that means alive ("no", "false") gives neither a death year nor the sign. A death text that fits a calendar of the
  * tree has a year, so it shows as written and not as the sign (spec §14 rule 7); `dates` reads it. `names` says which names follow a whole date (rule 15).
  */
 function dateParts(p: Person, dates: DatesRead, names: NamesForm = 'shown'): { text?: string; sign?: string; pieces?: DatePieces } {
@@ -268,7 +308,7 @@ export function dateLineParts(p: Person, dates: DatesRead, opts: { names?: Names
 
 /**
  * The dates text line of a card: "born–died", "b. born" or "d. died"; none without dates. A dead person with no death year
- * (I19) gets a sign after the birth text: "b. 1131 †", or "†" alone; "†?" if the `died` text is a doubt. A whole date gets the name of its
+ * gets a sign after the birth text: "b. 1131 †", or "†" alone; "†?" if the `died` text is a doubt. A whole date gets the name of its
  * year after it (spec §14 rule 15); `opts.names` is `'none'` for the second try of the cut and for a test of a sign.
  */
 export function dateLine(p: Person, dates: DatesRead, opts: { names?: NamesForm } = {}): string | undefined {
@@ -278,11 +318,22 @@ export function dateLine(p: Person, dates: DatesRead, opts: { names?: NamesForm 
 }
 
 /**
+ * `dateLine` for the eye: each born and died date that holds a right-to-left letter is in a first-strong isolate, so a range, "b. " and the sign keep the order in
+ * which they are written (same text as `dateLine` with the isolate controls added; a line with no right-to-left letter is the same string). The card, the saved
+ * picture, the person window and the pickers draw this; a screen-reader label and a search text keep `dateLine`.
+ */
+export function dateLineShown(p: Person, dates: DatesRead, opts: { names?: NamesForm } = {}): string | undefined {
+	const text = dateLine(p, dates, opts);
+	if (text === undefined || !hasRtlDate(text)) return text;
+	return dateLineParts(p, dates, opts)?.map((s) => (s.date ? isolateDate(s.text) : s.text)).join('') ?? text;
+}
+
+/**
  * What a screen reader says for a card: name, title and dates, then (spec §13.1) the relation to the
  * marked person in lower case ("half-sister"; "you" on the marked card). With the card's `label`
- * (M8, spec §13.3, §13.5) the name and title are the card's: "Roderick II, Duke of Valmont (r.
+ * (spec §13.3, §13.5) the name and title are the card's: "Roderick II, Duke of Valmont (r.
  * 1160–1190), 1140–1190". The reign stays also when "Show dates on cards" hides it, like the dates.
- * 0.2.7 (F.4): while the Show view of a line of succession is open, `inLine` ("2nd in line", "open branch") comes last.
+ * While the Show view of a line of succession is open, `inLine` ("2nd in line", "open branch") comes last.
  * `dates` reads the death text like `dateLine` does. Every caller in `src` passes `g.dates`; it is optional so that the older
  * tests can leave it out (they read plain years).
  */
@@ -290,7 +341,7 @@ export function cardLabel(p: Person, relation?: string, label?: CardLabel, inLin
 	const name = label ? label.name : p.name;
 	// The label says the full names of the years and never cuts them (spec §14 rule 15).
 	const title = label ? [label.title, shownReign(label, dates ?? PLAIN_READER, 'full')].filter((x) => x !== undefined && x !== '').join(' ') : p.title;
-	// The sign is a character, so the label says it with words (ruling 14).
+	// The sign is a character, so the label says it with words.
 	const { text, sign } = dateParts(p, dates ?? PLAIN_READER, 'full');
 	const dead = sign === undefined ? undefined : sign === DEAD_SIGN_DOUBT ? CARD_SPOKEN_DEAD_DOUBT : CARD_SPOKEN_DEAD;
 	return [name, title, text, dead, relation, inLine].filter((x) => x !== undefined && x !== '').join(', ');
@@ -397,7 +448,7 @@ export const RELINFO = {
 /** What the infobox and the strip show for one person. */
 export interface RelationInfo {
 	kind: 'relation' | 'me' | 'none';
-	/** 'Second cousin' (no full stop) for 'relation'; with a maybe it is the card text ('Half-sister, maybe full', F-KIN-08); 'This is you.' for 'me'; 'No relation to you in this tree.' for 'none'. */
+	/** 'Second cousin' (no full stop) for 'relation'; with a maybe it is the card text ('Half-sister, maybe full'); 'This is you.' for 'me'; 'No relation to you in this tree.' for 'none'. */
 	value: string;
 	/** `relationSummary().also` and `.maybe` (D123: only from the first relation). */
 	also?: string;
@@ -424,7 +475,7 @@ const ALSO_SHOWN = 3;
 export const relationSummary: RelationTexts['relationSummary'] = (rels: readonly Relation[] | undefined, isMe) => {
 	if (isMe) return { main: 'This is you.' };
 	if (!rels?.length) return { main: 'No relation to you in this tree.' };
-	// One source for the card, the header line of the window and the phone list (F-KIN-08).
+	// One source for the card, the header line of the window and the phone list.
 	const main = `${RELINFO.title}: ${cardRelationText(rels[0])}.`;
 	// The card shows the first relation only, so the sheet explains the maybe of that one only.
 	const m = rels[0].maybe;

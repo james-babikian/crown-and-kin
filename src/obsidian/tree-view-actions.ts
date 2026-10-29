@@ -1,5 +1,5 @@
 /*
- * What a tree view does for the user (0.3.3, WP-1 A1): opens the edit window of a person, of a new person, the Titles and Houses windows, expands to the
+ * What a tree view does for the user: opens the edit window of a person, of a new person, the Titles and Houses windows, expands to the
  * full-screen view, shows and centres people, and applies the folds (spec §13.10) and the focus. Seventh layer of the chain listed in `tree-view.ts`.
  */
 
@@ -52,7 +52,7 @@ export abstract class TreeViewActions extends TreeViewToolbar {
 	}
 
 	protected async openSheet(id: string, fromTap: boolean): Promise<void> {
-		// A read-only embed never opens the edit sheet, also when a window calls this directly (G.7).
+		// A read-only embed never opens the edit sheet, also when a window calls this directly.
 		if (this.inForeignView()) return;
 		const h = await this.validHandle();
 		if (!h || this.readOnly) return;
@@ -62,7 +62,7 @@ export abstract class TreeViewActions extends TreeViewToolbar {
 		const sheet = EditSheet.create(this.host.app, {
 			handle: h,
 			personId: id,
-			// The card that opened the window gets the focus back also when a write drew it again (G5 0.4).
+			// The card that opened the window gets the focus back also when a write drew it again.
 			...(back ? { onClosed: () => TreeViewBase.refocusAfterRedraw(host, (v) => TreeViewBase.showsState(v, h.state, full), (vp) => cardOf(vp, id), back.visible) } : {}),
 			dates: this.datesFor,
 			sourcePath: this.sourcePath,
@@ -148,7 +148,7 @@ export abstract class TreeViewActions extends TreeViewToolbar {
 			pictures: host.pictures,
 			me: () => this.meId,
 			relationOptions: () => this.relationOptions,
-			// Contract 0.2.7 E.4, K.10, M.7: Show opens the view of the line; the settings come from the host, because this view can be drawn again after a Save.
+			// Show opens the view of the line; the settings come from the host, because this view can be drawn again after a Save.
 			showLine: (title) => TreeViewBase.showSuccession(host, st, title, this.unloaded ? null : this),
 			succession: {
 				limit: () => (host.settings ?? DEFAULT_SETTINGS).successionLength,
@@ -287,7 +287,7 @@ export abstract class TreeViewActions extends TreeViewToolbar {
 
 	// ---------- folds (spec §13.10, D83–D85) ----------
 
-	/** A tap or key on a fold button or sign: the family folds or opens, and the control stays at the same screen place (F10). */
+	/** A tap or key on a fold button or sign: the family folds or opens, and the control stays at the same screen place. */
 	protected toggleFold(c: FoldControl): void {
 		const st = this.ensureState();
 		const next = new Set(st.folds);

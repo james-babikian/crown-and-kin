@@ -20,7 +20,7 @@ import { VIEWER_UI } from '../render/viewer-text';
 import { reducedMotion, type ReduceMotion } from '../view/settings';
 import { trackModal } from '../view/plugin-modals';
 import { largeCopySide } from './crop-tool';
-import { ignoreGhostClick, phoneLayout } from './modal-layout';
+import { ignoreGhostClick, phoneLayout, startWithoutFocus } from './modal-layout';
 import type { PictureCopy, PictureStore, ResolvedPicture } from './picture-store';
 
 /** One picture of the viewer and the texts that go with it. */
@@ -149,7 +149,7 @@ class PictureViewer extends Modal {
 		this.cleanup.push(() => m.removeEventListener('keydown', key));
 		this.slots.forEach((_, i) => this.loadThumb(i));
 		this.show(this.index);
-		m.focus({ preventScroll: true });
+		this.cleanup.push(startWithoutFocus(m));
 	}
 
 	override onClose(): void {

@@ -1,6 +1,6 @@
 /* roundel: card */
 
-/* The Roundel card (top-to-bottom, Normal size) and the text card (sideways): the 0.2.5 contract section B. The numbers of the plate repeat ROUNDEL_LOOK in render/styles.ts. */
+/* The Roundel card (top-to-bottom, Normal size) and the text card (sideways). The numbers of the plate repeat ROUNDEL_LOOK in render/styles.ts. */
 
 /*
  * The medallion and the arms of the Compact level are the ones of the Full group (one set of elements, WP-B8): at that level the Full group of a
@@ -54,7 +54,7 @@
 }
 
 /*
- * The small "You" tab on the top edge of the marked card, when the tree has no relation line (D153), and the ordinal tab of an heir (F.4). One look:
+ * The small "You" tab on the top edge of the marked card, when the tree has no relation line (D153), and the ordinal tab of an heir. One look:
  * the card colour inside a 1 px border in the text colour, 0.2 em corners (the rx attribute), the word 0.8 em semibold in the interface font. The base
  * under it is a card-colour pill with a wide edge, so the border and the line above the card do not show through. They take no press; the crown area holds them.
  */

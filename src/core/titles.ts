@@ -5,7 +5,7 @@
  * computed here from the family graph, so the views, the headless SVG, accessible names and
  * measuring all agree. The renderers get the labels from their callers (`SceneOptions.labels`).
  *
- * Rules of the M8 titles contract that the types do not show (rules 6–8 are in `title-ops.ts`):
+ * Rules for titles that the types do not show (rules 6–8 are in `title-ops.ts`):
  * 1. Reading (`parse.ts`): `titles` is read like `houses`; a title with no id gives `missing-id`
  *    and the first title with an id wins (`duplicate-title-id`). `holders: aldric` and a plain
  *    string item are `{person: <it>}`; numbers are read as text. There is no `missing-id` for holders.
@@ -14,10 +14,10 @@
  *    the person does not hold gives `card-title-not-held`, and the card ignores it.
  * 3. Subgraphs keep `titles` unchanged; the views show only the whole tree's issues.
  * 4. Card labels come only from `cardLabels(g)`. Renderers get them from their callers
- *    (`SceneOptions.labels`, `SvgOptions.labels`); absent labels mean the M7 drawing. Relation
+ *    (`SceneOptions.labels`, `SvgOptions.labels`); absent labels mean the drawing without labels. Relation
  *    names, finder sentences, far-couple tags and the problem list keep the full `Person.name`.
  * 5. Layout: a card in `tallTitles` is one small text line taller; the layout sets `tallName` and
- *    `tallTitle` on a box only when true, so trees without titles lay out as in M7.
+ *    `tallTitle` on a box only when true, so trees without titles lay out as before.
  */
 
 import type { FamilyGraph } from './derive';
@@ -29,7 +29,7 @@ export interface Holding {
 	entries: Holder[];
 }
 
-/** What a card shows for a person, beyond the 0.1 fields (spec §13.3, §13.5). */
+/** What a card shows for a person, beyond the basic fields (spec §13.3, §13.5). */
 export interface CardLabel {
 	/** Every title the person holds, in `titles` list order (the edit sheet lists these). */
 	holdings: Holding[];
@@ -236,7 +236,7 @@ export function holderTable(g: FamilyGraph, title: Title): string {
 
 /**
  * True when the drawn graph needs card labels: it has titles (spec §13.4) or a person has a sobriquet (D122).
- * A tree with neither draws with no labels, as in 0.2.3.
+ * A tree with neither draws with no labels.
  */
 export function needsLabels(g: FamilyGraph): boolean {
 	return (g.titles?.length ?? 0) > 0 || g.people.some((p) => p.sobriquet !== undefined);

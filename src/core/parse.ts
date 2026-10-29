@@ -3,7 +3,7 @@
  * any shape issues found while reading (spec §4, §8, §13.4). `parseDynasty` is the entry point;
  * `tree-view.ts` and `houses-window.ts` call it. `parseBody` is shared with the edit code in
  * `yaml-patch.ts`, so both work from the same parsed document. Depends on `tolerate.ts` for
- * lenient reads of raw YAML values, among them the curly quote marks around structural values (D103). From 0.2.8 it also
+ * lenient reads of raw YAML values, among them the curly quote marks around structural values (D103). It also
  * reads the person key `arms` and the holder key `through-spouse`.
  */
 
@@ -20,7 +20,7 @@ type Section = 'people' | 'houses' | 'unions' | 'titles';
 
 /** D205: common words that the plugin reads as a known partnership type, with no warning. */
 const UNION_WORDS: Readonly<Record<string, string>> = Object.assign(Object.create(null) as Record<string, string>, {
-	// The four known types in any case (genealogy re-vet of P2: "Concubinage" showed as a marriage).
+	// The four known types in any case ("Concubinage" must not draw as a marriage).
 	marriage: 'marriage',
 	betrothal: 'betrothal',
 	concubinage: 'concubinage',
@@ -55,7 +55,7 @@ function readParentType(v: Raw): string {
 const HOLDER_TEXT = ['as', 'number', 'from', 'to'] as const;
 
 /**
- * 0.2.8 contract A.2: the value of a holder's `through-spouse`. `true` or `yes` (any case) is `true`; `false` or `no` is off
+ * The value of a holder's `through-spouse`. `true` or `yes` (any case) is `true`; `false` or `no` is off
  * (absent); any other text is the id of the spouse, with a curly pair of quote marks taken off. A list or a map is absent.
  */
 export function readThroughSpouse(v: Raw): true | string | undefined {
@@ -187,7 +187,7 @@ class Reader {
 				if (throughSpouse !== undefined) fields.throughSpouse = throughSpouse;
 				out.push(this.holder(fields, i, text()));
 			} else if (str(h) !== undefined) out.push(this.holder({ person: str(h) }, i, text()));
-			// An empty item (`-` alone) is not a holder either (supervisor ruling).
+			// An empty item (`-` alone) is not a holder either.
 			else this.warn('entry-not-map', { section: 'holders', index: i + 1, title });
 		});
 		return out;
@@ -197,7 +197,7 @@ class Reader {
 	private holder(fields: Partial<Holder>, index: number, text: string | undefined): Holder {
 		const out: Holder = { index };
 		for (const key of ['person', 'name', ...HOLDER_TEXT] as const) if (fields[key] !== undefined) out[key] = fields[key];
-		// After `to`, as written (contract A.2); only when written.
+		// After `to`, as written; only when written.
 		if (fields.throughSpouse !== undefined) out.throughSpouse = fields.throughSpouse;
 		if (text !== undefined) out.text = text;
 		return out;
@@ -253,7 +253,7 @@ class Reader {
 			const sobriquet = normaliseSobriquet(str(p.sobriquet));
 			const portrait = linkValue(p.portrait, () => this.sourceText(['people', index, 'portrait']));
 			const portraitCrop = cropValue(p['portrait-crop']);
-			// A curly pair of quote marks is taken off here too, until `unwrapCurlyKeys` (P3) lists the person key `arms`.
+			// A curly pair of quote marks is taken off here too, until `unwrapCurlyKeys` lists the person key `arms`.
 			const arms = linkValue(typeof p.arms === 'string' ? unwrapCurly(p.arms) : p.arms, () => this.sourceText(['people', index, 'arms']));
 			let id = str(p.id);
 			if (!id) {
@@ -286,7 +286,7 @@ class Reader {
 				// Only when written, like `card-title` (spec §13.7).
 				...(portrait !== undefined ? { portrait } : {}),
 				...(portraitCrop !== undefined ? { portraitCrop } : {}),
-				// 0.2.8 contract A.1: personal arms, read like a portrait link.
+				// Personal arms, read like a portrait link.
 				...(arms !== undefined ? { arms } : {}),
 				notes: str(p.notes),
 				index,
@@ -337,13 +337,13 @@ class Reader {
 	}
 }
 
-/** A.1: the text of a list or map value as `badKeys` keeps it: `[a, b]`, `[a, …]` for an item that is not text, `{…}` for a map. */
+/** The text of a list or map value as `badKeys` keeps it: `[a, b]`, `[a, …]` for an item that is not text, `{…}` for a map. */
 function flowText(v: Raw): string {
 	if (Array.isArray(v)) return `[${v.map((x) => str(x) ?? '…').join(', ')}]`;
 	return '{…}';
 }
 
-/** K.3: the ids of `heir` or `exclude`: one id, or a list; an item that is not text is skipped and noted in `bad`. */
+/** The ids of `heir` or `exclude`: one id, or a list; an item that is not text is skipped and noted in `bad`. */
 function idList(v: Raw, key: 'heir' | 'exclude', bad: Partial<Record<BadKey, string>>): string[] | undefined {
 	if (isEmpty(v)) return undefined;
 	const items = Array.isArray(v) ? v : [v];
@@ -359,7 +359,7 @@ function idList(v: Raw, key: 'heir' | 'exclude', bad: Partial<Record<BadKey, str
 }
 
 /**
- * Contract 0.2.7 A, K.1, K.3: the succession keys of one title. Every field is present only when written, so a tree
+ * The succession keys of one title. Every field is present only when written, so a tree
  * without these keys reads exactly as before. A list or map value goes to `badKeys`, never into a field.
  */
 function successionKeys(t: RawMap): Partial<Title> {
@@ -438,7 +438,7 @@ export function referencedIds(data: RawMap): Set<string> {
 	for (const u of Array.isArray(data.unions) ? data.unions : []) if (isMap(u)) list(u.partners).forEach(add);
 	// Spec §13.4: a holder's `person` refers to a person, even one who does not exist yet.
 	for (const t of Array.isArray(data.titles) ? data.titles : []) {
-		// K.3: a named heir and an excluded person are references too, so a new person id never takes one.
+		// A named heir and an excluded person are references too, so a new person id never takes one.
 		if (isMap(t)) for (const key of ['heir', 'exclude']) for (const x of list(t[key])) if (!isMap(x)) add(x);
 		if (!isMap(t) || isMap(t.holders)) continue;
 		for (const h of list(t.holders)) {
@@ -466,7 +466,7 @@ function isStackOverflow(e: unknown): boolean {
 
 function yamlError(e: unknown): HardError {
 	const err = e as { message?: unknown; linePos?: { line: number }[] };
-	// A nesting so deep that the parser runs out of stack space (F3): say it in plain words, not in the engine's words.
+	// A nesting so deep that the parser runs out of stack space: say it in plain words, not in the engine's words.
 	const detail = isStackOverflow(e) ? LIMIT_DETAIL.tooDeep : typeof err?.message === 'string' ? cleanDetail(err.message) : String(e);
 	const line = err?.linePos?.[0]?.line;
 	return typeof line === 'number' ? { code: 'yaml-invalid', line, detail } : { code: 'yaml-invalid', detail };
@@ -480,7 +480,9 @@ function yamlError(e: unknown): HardError {
  * bounds that copy. It does not bound the whole edit: see `ALIAS_MARKS_CAP` for the other cost.
  */
 export const ALIAS_NODES_PER_CHAR = 50;
+/** The base that is added to the nodes for each character. */
 export const ALIAS_NODES_BASE = 10_000;
+/** The most nodes, whatever the length of the text. */
 export const ALIAS_NODES_CEILING = 5_000_000;
 /**
  * How many alias uses (`*name`) and anchors (`&name`) together a block may hold, when it has at least one alias. The `yaml`
@@ -493,7 +495,7 @@ export const ALIAS_NODES_CEILING = 5_000_000;
  */
 export const ALIAS_MARKS_CAP = 12_000;
 /**
- * The cap on the work of the aliases that sit inside an anchored list or map (G2b of WP-H2). When the anchored collection
+ * The cap on the work of the aliases that sit inside an anchored list or map. When the anchored collection
  * is used, the `yaml` package resolves each alias inside it with a visit of the whole document (`getAliasCount`, no cache),
  * so the work is (aliases inside anchored collections) x (nodes of the document), which `ALIAS_MARKS_CAP` does not see:
  * 800 such aliases in a note of 4 000 people read in 5 s. Measured at about 7 million steps a second on the development
@@ -522,7 +524,7 @@ interface DocumentScan {
  * One pass over the document with no recursion (a deep tree must not overflow the stack here either). It counts the
  * nodes as if every alias were written out, using the size counted once for the anchor (an alias is never followed),
  * and finds the first repeated key of a map. The `yaml` package finds repeated keys itself with a scan of the earlier
- * keys for each key, which is quadratic: 40 000 keys of one map took 5 s to read (F2). A set does it in linear time,
+ * keys for each key, which is quadratic: 40 000 keys of one map took 5 s to read. A set does it in linear time,
  * so `parseBody` turns the package's check off and uses this one.
  */
 function scanDocument(doc: Document): DocumentScan {
@@ -617,12 +619,12 @@ function lineOf(source: string, offset: number): number {
 }
 
 /** The result of `parseBody`: the parsed document and raw data on success, or a `HardError`. */
-export type ParsedBody = { ok: true; doc: Document; data: Raw } | { ok: false; error: HardError };
+type ParsedBody = { ok: true; doc: Document; data: Raw } | { ok: false; error: HardError };
 
 /**
  * The one YAML parse used for reading and for editing (`yaml-edit.ts`). The failsafe schema
  * keeps every scalar exactly as written (fictional dates, leading zeros, numeric-looking ids,
- * and free text such as `1e3` or `null`); see the decision notes. An unquoted `![[…]]` in a link key
+ * and free text such as `1e3` or `null`). An unquoted `![[…]]` in a link key
  * is not an error (`tolerateEmbeds`), so reading and editing agree on it.
  *
  * Never throws and never writes to the console: `logLevel: 'error'` keeps the yaml package's
@@ -630,7 +632,7 @@ export type ParsedBody = { ok: true; doc: Document; data: Raw } | { ok: false; e
  */
 export function parseBody(source: string): ParsedBody {
 	try {
-		// `uniqueKeys: false`: the package checks keys in quadratic time, so `scanDocument` does it (F2).
+		// `uniqueKeys: false`: the package checks keys in quadratic time, so `scanDocument` does it.
 		const doc = parseDocument(source, { schema: 'failsafe', logLevel: 'error', uniqueKeys: false });
 		tolerateEmbeds(doc, source);
 		const scan = scanDocument(doc);
@@ -648,7 +650,7 @@ export function parseBody(source: string): ParsedBody {
 		if (scan.nestedAliases * scan.written > NESTED_ALIAS_WORK_CAP) {
 			return { ok: false, error: { code: 'yaml-invalid', detail: LIMIT_DETAIL.tooLarge } };
 		}
-		// Aliases that write out far more than the text could hold (F1). The count in `toJS` below does not see a wide bomb.
+		// Aliases that write out far more than the text could hold. The count in `toJS` below does not see a wide bomb.
 		if (scan.expanded > Math.min(ALIAS_NODES_PER_CHAR * source.length + ALIAS_NODES_BASE, ALIAS_NODES_CEILING)) {
 			return { ok: false, error: { code: 'yaml-invalid', detail: LIMIT_DETAIL.tooLarge } };
 		}

@@ -1,6 +1,6 @@
 /*
  * The colour swatches of a house on the edit page of the Houses window (D32, spec §5.8): the 12 house colours as a radio group, then "Other colour",
- * which opens the system colour window. A choice changes the swatches in place (G5 0.4): the Houses window keeps the draft and calls `paintHouseColour`.
+ * which opens the system colour window. A choice changes the swatches in place: the Houses window keeps the draft and calls `paintHouseColour`.
  * The colours of the arms (D68) are drawn by the window, and this file marks them too.
  */
 
@@ -11,7 +11,7 @@ import { HOUSES, HOUSE_COLOUR_NAMES } from '../render/ui-text';
 export const HEX = /^#[0-9a-f]{6}$/i;
 
 /** What the palette of one house needs from the window. */
-export interface PaletteSpec {
+interface PaletteSpec {
 	/** The key of the house row: part of the `data-focus` names. */
 	key: string;
 	/** The id of the label "Colour" that names the group. */
@@ -47,12 +47,12 @@ export function drawHousePalette(box: HTMLElement, o: PaletteSpec): void {
 	});
 	if (custom) swatch.style.setProperty('--dynasty-house-color', now);
 	// The input lies over the swatch and takes a tap or a click itself (styles/21): iOS opens the colour window only for a tap on the input, never for
-	// `showPicker()` or `click()` from code (G5 0.4, owner's iPhone). It is not a Tab stop and not read; the swatch is the control for the keyboard and a screen reader.
+	// `showPicker()` or `click()` from code (seen on iOS Safari). It is not a Tab stop and not read; the swatch is the control for the keyboard and a screen reader.
 	const input = other.createEl('input', { cls: ['dynasty-sheet-colour', 'dynasty-house-other-input'], attr: { type: 'color', id: `${o.titleId}-other`, tabindex: '-1', 'aria-hidden': 'true', 'data-focus': `other:${o.key}` } });
 	input.value = o.colour && HEX.test(o.colour) ? now! : '#888888';
 	// Only a key press reaches the swatch now (Enter or Space on a computer); there the browser lets code open the colour window.
 	swatch.addEventListener('click', () => o.guard(() => (input.showPicker ? input.showPicker() : input.click())));
-	// The input keeps the focus: iOS closes its colour window at once, with no animation, when the focus moves while it is open (owner's iPhone, 0.4).
+	// The input keeps the focus: iOS closes its colour window at once, with no animation, when the focus moves while it is open (seen on iOS Safari).
 	input.addEventListener('change', () =>
 		o.guard(() => {
 			if (HEX.test(input.value)) o.pick(input.value.toLowerCase(), input);
@@ -67,7 +67,7 @@ function isCustom(colour: string | null): boolean {
 
 /**
  * Shows `colour` in the swatches of `box`, in place: the ring and the checked state move, and "Other colour" shows a colour that is not in the set.
- * A rebuild of the whole window for each tap drew a half-built frame on the iPhone, with the sections below over the colours (G5 0.4). The controls
+ * A rebuild of the whole window for each tap drew a half-built frame on the iPhone, with the sections below over the colours. The controls
  * stay; the focus goes to `used`, the swatch that was used (Safari gives a tapped button no focus). For "Other colour", `used` is the colour input,
  * which already has the focus: moving it would close the iPhone colour window.
  */

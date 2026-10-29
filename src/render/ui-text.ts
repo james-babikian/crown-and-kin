@@ -55,7 +55,7 @@ export const SHEET = {
 	born: 'Born',
 	died: 'Died',
 	illegitimate: 'Illegitimate',
-	// M.8: a person who died with no children; the line of succession then shows no open branch.
+	// A person who died with no children; the line of succession then shows no open branch.
 	childless: 'No children',
 	childlessHint: 'If the person had no children, tick this box. The line of succession then shows no open branch for the person.',
 	link: 'Linked note',
@@ -192,7 +192,8 @@ export const NEW_SHEET = {
 
 /** The partnership editor (spec §6.3 Partners, Edit). */
 export const UNION_EDIT = {
-	title: 'Edit partnership',
+	/** Heard by a screen reader before the two names, which are the visible title. */
+	purpose: 'Edit partnership',
 	of: (a: string, b: string) => `${a} and ${b}`,
 	type: 'Type of partnership',
 	start: 'Start', end: 'End',
@@ -209,7 +210,7 @@ export const REMOVE = {
 	removeConfirm: 'Remove partnership',
 	cancel: 'Cancel',
 	partnershipTitle: 'Remove partnership?',
-	// Only the first letter changes: a type that the owner wrote keeps its own capitals (C5).
+	// Only the first letter changes: a type that the user wrote keeps its own capitals.
 	partnershipText: (type: string, a: string, b: string) =>
 		`The plugin removes the ${type.charAt(0).toLowerCase()}${type.slice(1)} of ${a} and ${b}. If ${a} and ${b} have children, the children stay connected to both parents.`,
 	canUndo: 'You can undo this.',
@@ -371,8 +372,8 @@ export const TITLES_UI = {
 	addHolderLabel: (title: string) => `Add holder: add a holder to ${title}`,
 	pickerTitle: 'Select the holder',
 	pickerPlaceholder: PERSON_PLACEHOLDER,
-	/** The first row of the holder picker. */
-	notInTreeRow: 'A holder who is not in the tree',
+	/** The first row of the holder picker; it shows the typed name, so the user sees what the row will add. */
+	notInTreeRow: (typed: string) => (typed.trim() ? `A holder who is not in the tree: ${quote(typed.trim())}` : 'A holder who is not in the tree'),
 	needName: 'Enter a name for each title.',
 	discardText: 'You did not save the changes to the titles.',
 	cannotOpen: 'The plugin cannot show the titles. The tree text has an error.',
@@ -434,7 +435,7 @@ function personRowYears(born: string, died: string, range?: string): string {
 }
 
 /**
- * The window family of 0.2.8 (contract C, G.7, G.10; an internal study §5): the sections of the person window, the
+ * The window family: the sections of the person window, the
  * title page and the house page, their summaries, the header of the person window, and the new texts of the People section.
  * A section title that exists in another table (`FAMILY.heading`, `TITLES_UI.heading`, …) has the same words here.
  */
@@ -495,17 +496,17 @@ export const WINDOW_UI = {
 	pickArms: (name: string) => `Select personal arms for ${name}`,
 	pickPortraitHint: 'After you select a picture, select the part of it to show.',
 	pickArmsHint: 'The card shows the personal arms in the same place as the house arms.',
-	// Navigation inside a window (G.7).
+	// Navigation inside a window.
 	/** The name of a person row. `word` and `dates`: what the row shows under the name; the name holds the visible text in the same order (WCAG 2.5.3). */
 	openPersonLabel: (name: string, word?: string, dates?: string) => `${[name, word, dates].filter(Boolean).join(', ')}. Open this person.`,
 	backToLabel: (name: string) => `Back to ${name}`,
 	listMetaTitles: (n: number) => (n === 1 ? '1 title' : `${n} titles`),
 	listMetaHouses: (n: number) => (n === 1 ? '1 house' : `${n} houses`),
-	// The People section of the house page (D202 (2), G.10).
+	// The People section of the house page (D202 (2)).
 	/** The years of a person row: "1131–1161", "b. 1131" for a birth year alone, "d. 1161" for a death year alone. */
 	personRowYears,
 	personRowSub: (generation: number, born: string, died: string, range?: string) => [`Generation ${generation}`, personRowYears(born, died, range)].filter(Boolean).join(' · '),
-	// The Find window (G.3).
+	// The Find window.
 	findRowSub: (relation: string, years: string, title: string) => [relation, years, title].filter(Boolean).join(' · '),
 } as const;
 
@@ -528,19 +529,19 @@ export const SETTINGS_UI = {
 	relations: 'Show relation names on cards',
 	relationsDesc: `If this is on, each card shows how the person is related to you. A person in the tree must have the mark ${quote('This is me')}. If this is off, the cards are shorter. On a computer, a small label then shows the relation when you rest the pointer on a card. The list in a note on a phone follows this setting.`,
 	/** D150: the direction of the full-screen tree on a phone held upright. */
-	/** Contract 0.2.7 E.6, J.8: the line of succession. */
+	/** The line of succession. */
 	successionLength: 'Length of the line of succession',
 	successionLengthDesc: 'This is the number of people that the line of succession shows. Use a number from 1 to 20.',
 	oldAge: 'Warn about people older than',
 	oldAgeDesc: 'The plugin warns about a person in the line of succession who is older than this number of years and has no death year. Use a number from 0 to 1000. Use 0 to stop the warning.',
 	youngDeathAge: 'Age for open branches',
 	youngDeathAgeDesc: 'For a person who died younger than this age, the line of succession shows no open branch. The note must give the birth year and the death year. Use a number from 0 to 1000. Use 0 to show every open branch.',
-	/** 0.2.8 contract A.4, D204: which cards show the arms of a house. */
+	/** Which cards show the arms of a house. */
 	armsOnCards: 'Arms on cards',
 	armsFew: 'Founders, married-in people and holders',
 	armsAll: 'Every card',
 	armsOnCardsDesc: `${quote('Founders, married-in people and holders')} shows the arms of a house on two kinds of card. The first kind is a person with no parent in the same house, for example a founder or a person who married into the tree. The second kind is a person who is a holder of a title in the Titles window. ${quote('Every card')} shows the arms on each person with a house. A card always shows personal arms. The list in a note on a phone does not follow this setting. In that list, only the person at the top shows arms. Those arms are the personal arms of the person, or else the arms of the house.`,
-	/** 0.2.8 contract A.5, D188 item 10. */
+	/** D188 item 10. */
 	manyParents: 'Warn about more than 2 parents of a type',
 	manyParentsDesc: 'If this is on, the plugin warns when a person has more than 2 parents of one type. The types are birth, adoptive and ward. If this is off, the plugin gives no warning for these types. A person can have up to 8 rumoured parents. The plugin always warns about more than 8 rumoured parents.',
 	phoneDirection: 'Tree direction on a phone held upright',
@@ -551,7 +552,7 @@ export const SETTINGS_UI = {
 	oneParentUnknown: 'Assume an unknown second parent',
 	oneParentUnknownDesc:
 		'If this setting is on, a person with one listed parent has a second parent who is not known. Two people with the same listed parent show as half-siblings. If this setting is off, two people who list only the same parent show as full siblings. If a person lists fewer than two other parents, a rumoured parent shows that a parent is not known.',
-	/** Spec §13.7 (M9 contract O10). */
+	/** Spec §13.7. */
 	portraits: 'Show portraits on cards',
 	portraitsDesc: 'If this is on, the cards show the portraits of the people.',
 	/** D113 item 4. */
@@ -559,7 +560,7 @@ export const SETTINGS_UI = {
 	houseGenerationDesc: 'If this is on, the house page shows the generation of each person. If this is off, the house page does not show it. The note that you make from the house page always has the generation.',
 	generations: 'Generations in focus mode',
 	generationsDesc: 'This is the number of generations above and below the person in focus mode. The default is 3. A tree can have its own number.',
-	/** Spec §13.0 item 3 (M9 contract O8). */
+	/** Spec §13.0 item 3. */
 	links: 'Update tree links when you rename a note or a picture',
 	linksDesc: 'If you rename a note or a picture, the plugin changes the links to it in all trees. If this is off, the links do not change.',
 	cache: 'Arrange all trees again',
@@ -571,7 +572,7 @@ export const SETTINGS_UI = {
 /** The command Insert family tree (spec §5.9, D34). */
 export const INSERT_UI = {
 	command: 'Insert family tree',
-	/** The same sentence with straight marks: the plugin writes it into the owner's note, and it keeps that text plain ASCII (as in 0.2.0). */
+	/** The same sentence with straight marks: the plugin writes it into the user's note, and it keeps that text plain ASCII. */
 	noteHint: 'To add the first person, select "Add first person" in Reading view or Live Preview.',
 } as const;
 
@@ -699,8 +700,7 @@ export const WRITE_TEXT = {
 } as const;
 
 /**
- * Arms, portraits and the picture picker (spec §13.6, §13.7; D67–D69, D75–D78; M9 contract O6, O7,
- * B2, B8). "Colours from the arms" shows the exact colours of the arms (D68).
+ * Arms, portraits and the picture picker (spec §13.6, §13.7; D67–D69, D75–D78). "Colours from the arms" shows the exact colours of the arms (D68).
  */
 export const PICTURES_UI = {
 	// The Houses window (spec §13.6).
@@ -758,7 +758,7 @@ export function deviceNotice(problem: PictureProblem): string {
 }
 
 /**
- * Save as picture (spec §13.8, D70–D74; M9 contract O11, B8): the More item, the window with the
+ * Save as picture (spec §13.8, D70–D74): the More item, the window with the
  * kind of file, and the Notices of the save.
  */
 export const SAVE_UI = {
@@ -879,7 +879,7 @@ export function groupCount(n: number): string {
 }
 
 /**
- * The low bar of a very large tree (D159, D223, D226, D227; spec §7.7). The words are final (clarity-editor, 2026-10-13); all of them
+ * The low bar of a very large tree (D159, D223, D226, D227; spec §7.7). The words are final; all of them
  * are here, so one edit changes every surface. `n` is the people count, `m` the limit that applies.
  */
 export const LARGE_UI = {

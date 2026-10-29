@@ -4,7 +4,7 @@
  * D144: a tree in a note on a phone is a list of rows (src/render/dom/phone-list-dom.ts). The list has its natural
  * height and the note scrolls over it. Colours come only from theme variables; a house colour comes only through
  * --dynasty-house-color, which the code sets on the row.
- * 0.2.8 (D197 Q5 A, D198, D209, D210, D213, G.2, G.11): the bar is the same flat row as the toolbar of a
+ * D197, D198, D209, D210, D213: the bar is the same flat row as the toolbar of a
  * computer; the person at the top has a large row with no frame and no heading over it (the name at 21 px, the relation word in italic, the title text line;
  * at the right a column with a 56 px portrait and under it the 35 px arms); every row has a 3 px house strip (the large row too, D302), the name at 17 px and at the right a 36 px
  * portrait; the order is the person, Parents, Partners, Children; a missing picture leaves no place holder. "You" is bold in the text colour.
@@ -44,7 +44,7 @@
 }
 
 /*
- * The rows stand 8 px inside the block, so that the 2 px frame of the large row and of the marked row (which reaches the edge of the block, into the note's margin) is never cut by the block's own box; the content of every row starts at the same place (I38).
+ * The rows stand 8 px inside the block, so that the content of every row starts at the same place. The large row and the marked row reach the edge of the block and keep their outline inside their own box (see `dynasty-list-flash`).
  */
 .dynasty-list-section {
 	padding: 0 8px;
@@ -109,7 +109,7 @@
 
 /*
  * The large row and the marked row (D209 item 1): no frame; "You" in bold says who is marked (the 3 px frame of the marked card stays in the tree). The
- * transparent border keeps the content where the other rows' content is, and the outline of a saved row (below) has room.
+ * transparent border keeps the content where the other rows' content is, and carries the outline of a saved row (below).
  */
 .dynasty-list-hero {
 	margin: 4px -8px;
@@ -129,6 +129,15 @@
 	outline: 2px solid var(--interactive-accent);
 	outline-offset: 0;
 	border-radius: var(--radius-m);
+}
+
+/*
+ * The large row and the marked row reach the edge of the block (margin -8px). An outline outside their box is 2 px outside the block, and the block clips it, so only the
+ * top and the bottom showed (iPhone, 2026-10-29). Their transparent 2 px border is the room: the outline lies on it, inside the box.
+ */
+.dynasty-list-hero.dynasty-list-flash,
+.dynasty-list-me.dynasty-list-flash {
+	outline-offset: -2px;
 }
 
 .dynasty-list-hero {
@@ -183,7 +192,7 @@
 	outline-offset: -2px;
 }
 
-/* The name button fills the row; the pencil is a 44 px square at the right edge, with no divider before it (C03). */
+/* The name button fills the row; the pencil is a 44 px square at the right edge, with no divider before it. */
 .dynasty-list button.dynasty-list-go {
 	display: flex;
 	flex: 1 1 auto;
@@ -287,7 +296,7 @@
 	unicode-bidi: isolate;
 }
 
-/* G.11: as on the cards, a house colour is lighter in the dark theme (60 % of the colour with the text colour). */
+/* As on the cards, a house colour is lighter in the dark theme (60 % of the colour with the text colour). */
 .theme-dark .dynasty-list-row.dynasty-has-house .dynasty-list-strip {
 	background: var(--dynasty-house-color);
 	background: color-mix(in srgb, var(--dynasty-house-color) 60%, var(--text-normal));
@@ -363,7 +372,7 @@
 	line-height: 1.35;
 }
 
-/* A text line of items with "·" between them (G.2): a mark never starts a wrapped text line, and the mark is gone with its item's line break. */
+/* A text line of items with "·" between them: a mark never starts a wrapped text line, and the mark is gone with its item's line break. */
 .dynasty-list-text .dynasty-jitem {
 	display: inline-block;
 	max-width: 100%;
@@ -481,7 +490,7 @@ body .dynasty-list .dynasty-list-hero .dynasty-hero-col .dynasty-hero-arms > img
 	pointer-events: none;
 }
 
-/* G3 (2026-10-10): the list region is named with aria-label, which Obsidian shows as a tooltip wherever the pointer rests on the list. The list is a phone view with no hover, so its tooltips are off. */
+/* The list region is named with aria-label, which Obsidian shows as a tooltip wherever the pointer rests on the list. The list is a phone view with no hover, so its tooltips are off. */
 .dynasty-list {
 	--no-tooltip: true;
 }

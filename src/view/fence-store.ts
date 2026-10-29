@@ -1,5 +1,5 @@
 /*
- * The saved value of the fence index (0.4 WP-3a, the index contract 1.3). Pure code: the stamp of a note, the codec of the stamp list, and the check of a stored value.
+ * The saved value of the fence index. Pure code: the stamp of a note, the codec of the stamp list, and the check of a stored value.
  * `src/view/fence-index.ts` keeps the state and decides when to save; this file only turns state into a value and a value back into state, and never throws on bad input.
  */
 

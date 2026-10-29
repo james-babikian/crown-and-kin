@@ -23,6 +23,7 @@ import type { CalendarTree } from './calendar-link';
 import { loadNote, newNoteDefaults, type LoadedNote } from './calendar-note';
 import { saveCalendars } from './calendar-window-save';
 import { testField, type CardHost } from './calendar-parts';
+import { startWithoutFocus } from './modal-layout';
 import { sheetField, showErrorLine, nameDialog } from './sheet-parts';
 import { SmallFormModal } from './small-form';
 import { showMenu, textButton } from './window-parts';
@@ -32,7 +33,7 @@ import { renderSections, type SectionSpec, type SectionsView } from './window-se
 export type { CalendarTree } from './calendar-link';
 
 /** What opens the window. `tree` is the tree it opens from (null: a note, the Edit button of a block, or a note with no tree); `note` opens on that calendar note. */
-export interface CalendarsOptions {
+interface CalendarsOptions {
 	tree: CalendarTree | null;
 	note?: string;
 	/** Runs when the window has closed: the focus goes back to the control that opened it. */
@@ -49,7 +50,7 @@ const noteLabel = (path: string, all: readonly string[]): string => {
 const sectionKey = (key: number): string => (key === PLAIN_KEY ? 'plain' : String(key));
 
 /** The issues of a calendar note that the window shows and goes on with: a name list that cannot be used (spec §14 rule 13). Any other issue stops the window. */
-export const isListIssue = (i: { code: string }): boolean => i.code === 'calendar-list-invalid';
+const isListIssue = (i: { code: string }): boolean => i.code === 'calendar-list-invalid';
 
 class CalendarsWindow extends SmallFormModal {
 	private note: LoadedNote | null;
@@ -212,15 +213,8 @@ class CalendarsWindow extends SmallFormModal {
 		this.testUpdate = testField(body.createDiv({ cls: 'dynasty-cal-testbox' }), 'all', () => this.checkedNow.reader).update;
 		this.drawNote();
 		this.draw();
-		// The window opens with nothing selected: Obsidian puts the focus on the first link after this method, and Enter would start a new note (D278). Esc and Tab still work from the window.
-		this.modalEl.setAttribute('tabindex', '-1');
-		const clear = (): void => {
-			// Only a focus that nobody chose is taken away: on the page, or on the link; a field that the user entered keeps it.
-			const now = this.modalEl.doc.activeElement;
-			if (!now || now === this.modalEl.doc.body || now === this.metaEl?.querySelector('.dynasty-cal-new-note') || !this.modalEl.contains(now)) this.modalEl.focus({ preventScroll: true });
-		};
-		clear();
-		for (const ms of [0, 120]) (this.modalEl.win ?? window).setTimeout(clear, ms);
+		// Obsidian puts the focus on the first link after this method, and Enter would start a new note (D278).
+		this.cleanup.push(startWithoutFocus(this.modalEl));
 	}
 
 	/** The head of the window, as in the person, Titles and Houses windows: the title, a text line with the note, and the link. A phone bar has the title already. */
@@ -408,7 +402,7 @@ class CalendarsWindow extends SmallFormModal {
 			const { row, id } = sheetField(box, T.noteLabel, 'note', 'dynasty-cal');
 			const wrap = row.createDiv({ cls: 'dynasty-select' });
 			const select = wrap.createEl('select', { cls: ['dropdown', 'dynasty-sheet-input', 'dynasty-input'], attr: { id, 'data-focus': 'cal:note' } });
-			// The wrapper hides the native arrow, so the choice needs our own chevron or it looks like a text field (G5 0.4).
+			// The wrapper hides the native arrow, so the choice needs our own chevron or it looks like a text field.
 			setIcon(wrap.createSpan({ cls: 'dynasty-select-chevron', attr: { 'aria-hidden': 'true' } }), 'chevron-down');
 			for (const p of this.paths) select.createEl('option', { text: noteLabel(p, this.paths), attr: { value: p } });
 			select.value = path;
@@ -576,7 +570,7 @@ async function waitForNotes(index: CalendarIndex): Promise<void> {
 }
 
 /**
- * The notes the window can show and the one it opens on (spec §14 rule 16, the table of the index contract 4.3). A tree that names a note shows that note only, or a new-note draft when it is
+ * The notes the window can show and the one it opens on (spec §14 rule 16). A tree that names a note shows that note only, or a new-note draft when it is
  * missing. Any other opening shows the calendar notes of the index: the note asked for, else the first by name, else a new-note draft.
  */
 async function notesFor(index: CalendarIndex, o: CalendarsOptions): Promise<{ paths: string[]; target: string | null; uncertain: boolean }> {

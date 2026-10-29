@@ -33,7 +33,9 @@ function alnumBefore(t: string, e: number): boolean {
 	return alnumAt(t, isPair ? e - 2 : e - 1);
 }
 
+/** True if no letter or digit stands just before `s`, so a match that starts there is a whole word. */
 export const leftOk = (t: string, s: number) => !alnumBefore(t, s);
+/** True if no letter or digit stands at `e`, so a match that ends there is a whole word. */
 export const rightOk = (t: string, e: number) => e >= t.length || !alnumAt(t, e);
 
 /** The prefixes that make a date approximate (rule 4), as `approxBefore` reads them. */

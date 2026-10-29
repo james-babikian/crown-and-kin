@@ -8,7 +8,7 @@
  * (`render/dom/pan-zoom`), the toolbar, sheets and popovers on top of it. It never lets an error
  * escape into Obsidian or blank the note (spec §8): every entry point runs through `guard`.
  *
- * Since 0.3.3 (WP-1 A1) the class is a chain of layers, one file for each concern, from the bottom:
+ * The class is a chain of layers, one file for each concern, from the bottom:
  * - `tree-view-base.ts` `TreeViewBase`: the host contract, every field, the open timing, the block's memory and the cross-view calls (`focusState`,
  *   `redrawState`, `listGo`, `showFinder`, `changeFolds` ...). The layers above call members of each other; a call to a layer above is an `abstract` method here.
  * - `tree-view-lifecycle.ts`: load and unload, settings, theme, fonts, `guard`, the start-up wait and the kept height.
@@ -198,7 +198,7 @@ export class TreeView extends TreeViewList {
 		let result: MeasuredResult;
 		try {
 			result = this.layOut(plan.g, plan.geo, plan.laidBase, plan.fonts, plan.labels, plan.foldPlan.hidden, stop);
-			// WP-K: the names of the cards that are drawn, in one request (all cards of the whole tree, the people of a focus family); the scene reads each from the lookup.
+			// The names of the cards that are drawn, in one request (all cards of the whole tree, the people of a focus family); the scene reads each from the lookup.
 			// Spec §7.7 (time budget): the request of a whole tree is cut into groups, with the time check between them.
 			if (rel) askInGroups((ids) => rel.cards.getMany(ids), result.laid.layout.persons.keys(), stop);
 		} catch (e) {
@@ -368,7 +368,7 @@ export class TreeView extends TreeViewList {
 		this.buildToolbar(viewport);
 		if (finder) this.buildResultBar(viewport, canvas, finder, whole);
 		if (succession) this.buildSuccessionBar(viewport, canvas, succession);
-		// One bar at a time (G2 S3): both bars stand at the same place at the top, so a finder result that draws no line ("not related") would be covered by the focus bar and its Close could not be reached.
+		// One bar at a time: both bars stand at the same place at the top, so a finder result that draws no line ("not related") would be covered by the focus bar and its Close could not be reached.
 		if (sub && focus !== null && !finder) this.buildFocusBar(viewport, canvas, whole.byId.get(focus)?.name || focus);
 		this.wireCardPresses(viewport);
 		this.updateEditUi();

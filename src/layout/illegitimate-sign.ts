@@ -14,7 +14,7 @@ import type { EdgeDrawing } from './model';
  * style). Renderers draw the sign where `cardText(geo).sign` says.
  *
  * Only the line that ends at the child counts: a drop lists the child first and then exactly
- * its placement parents (the decision notes, "What EdgePath.people lists"). A trunk lists the parents
+ * its placement parents ("What EdgePath.people lists"). A trunk lists the parents
  * first, so an illegitimate parent of illegitimate children is not taken as shown by their
  * children's trunk.
  */

@@ -1,5 +1,5 @@
 /*
- * The relation to the marked person in the header of the person window (0.2.8 contract C, D197 Q8 A, G.8). It is one text line: "Your first cousin · 4 more · Show the
+ * The relation to the marked person in the header of the person window (D197 Q8 A). It is one text line: "Your first cousin · 4 more · Show the
  * line". "4 more" opens a second text line "Also: …". "Show the line" is a link in the same text line. The sentence of the
  * D123 "maybe" keeps its own quiet text line. The texts come from `RelationInfo` in `src/render/tree-info.ts`
  * (`cardRelationText` is the one source for the word, as on the card and in the phone list). This file only draws them.

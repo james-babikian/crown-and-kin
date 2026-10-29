@@ -1,5 +1,5 @@
 /*
- * The portrait and the personal arms of the edit sheet (0.3.3, WP-1 A1; spec §13.7, §13.13): the round picture in the header, its copy, the menu of the picture,
+ * The portrait and the personal arms of the edit sheet (spec §13.7, §13.13): the round picture in the header, its copy, the menu of the picture,
  * Select portrait, Select personal arms, Select the part, and the links "Add portrait" and "Open linked note". Second layer of the chain listed in `edit-sheet.ts`.
  */
 
@@ -64,7 +64,7 @@ export abstract class EditSheetPortrait extends EditSheetBase {
 
 	/**
 	 * Shows the portrait state in the round button of the header and the problem text under it. A copy that arrives comes here
-	 * only, so the rest of the header keeps its elements and the focus (O2).
+	 * only, so the rest of the header keeps its elements and the focus.
 	 */
 	protected paintPortrait(): void {
 		const frame = this.portraitFrame;
@@ -118,7 +118,7 @@ export abstract class EditSheetPortrait extends EditSheetBase {
 	}
 
 	/**
-	 * D218 item 9 (N23): "Open linked note", a text link left of "Open all", for a saved person that has a link. It stands in the row
+	 * D218 item 9: "Open linked note", a text link left of "Open all", for a saved person that has a link. It stands in the row
 	 * under the header, not in the closed Actions section, so a fresh window shows it. It closes the window and then opens the note.
 	 */
 	protected openNoteLink(row: HTMLElement | null): void {
@@ -260,7 +260,7 @@ export abstract class EditSheetPortrait extends EditSheetBase {
 		this.head?.paint();
 	}
 
-	/** Select personal arms (contract A.1, D198): the picture picker; the chosen link goes into the draft. */
+	/** Select personal arms (D198): the picture picker; the chosen link goes into the draft. */
 	protected async selectArms(): Promise<void> {
 		const name = this.shownName() || WINDOW_UI.thisPersonInSentence;
 		const current = currentPictureOf(this.o.pictures, this.draft.arms.trim(), this.o.sourcePath);

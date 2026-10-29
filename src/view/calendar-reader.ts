@@ -1,5 +1,5 @@
 /*
- * The date readers of the plugin, with a limit on the length of a date text (spec §14 rule 9, ruling 4.3 fix). A calendar matcher walks a text character by
+ * The date readers of the plugin, with a limit on the length of a date text (spec §14 rule 9). A calendar matcher walks a text character by
  * character, so a very long text (a note, a pasted page) in a date field would cost time for nothing. A text longer than `MAX_DATE_TEXT` is not a date: it is
  * read by the plain reader, which finds the year only at the start. The limit lives here, in the view layer, so `src/core/dates.ts` stays as it is.
  */

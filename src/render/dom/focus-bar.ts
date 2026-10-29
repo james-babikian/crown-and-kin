@@ -1,5 +1,5 @@
 /*
- * The bar of focus mode (D246, F2): while a focus shows, a row at the top of the tree says "Focus on <person>" and has the link "Clear focus" at the right.
+ * The bar of focus mode (D246): while a focus shows, a row at the top of the tree says "Focus on <person>" and has the link "Clear focus" at the right.
  * It has the look and the place of the relation finder's result bar (`.dynasty-result` in styles/18-more-list-finder-bar.css), so the tree view keeps the
  * tree clear of it with the code it has for that bar. The tree view decides when the bar shows and what a tap does; this file only builds the elements.
  */

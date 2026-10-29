@@ -10,11 +10,11 @@
  * plain-string holder becomes a flow map; `holders: aldric` becomes a flow list before any change;
  * the last holder removed leaves `holders: []`; the last title removed removes `titles`.
  *
- * Rules of the M8 titles contract (rules 1–5 are in `titles.ts`):
+ * Rules for titles (rules 1–5 are in `titles.ts`):
  * 6. Writes: values are quoted only when plain YAML would not read them back as the same text.
  *    Title keys go in the order `id`, `name`, `male-name`, `female-name`, `plural`, `numbering`,
  *    `count-with`, `succession`, `inherit`, `inherit-through`, `inherit-illegitimate`, `inherit-adopted`,
- *    `heirs-of-body`, `year`, `heir`, `exclude`, `holders` (contract 0.2.7 A.3, K.4);
+ *    `heirs-of-body`, `year`, `heir`, `exclude`, `holders`;
  *    `card-title` goes after `title`, else after `name`. A new `titles` section goes after `houses`,
  *    else before `people`, else at the end. Ops on a `holders` map are refused `bad-value`. Unknown
  *    keys stay. Title ops act on the first title with the id.
@@ -43,6 +43,7 @@ import { REFUSAL_TEXT } from './refusal-text';
 
 /** §13.0 key order of a title and of a holder. */
 export const TITLE_ORDER = ['id', 'name', 'male-name', 'female-name', 'plural', 'numbering', 'count-with', 'succession', 'inherit', 'inherit-through', 'inherit-illegitimate', 'inherit-adopted', 'heirs-of-body', 'year', 'heir', 'exclude', 'holders'];
+/** The key order of a holder entry. */
 export const HOLDER_ORDER = ['person', 'name', 'as', 'number', 'from', 'to', 'through-spouse'] as const;
 type HolderKey = (typeof HOLDER_ORDER)[number];
 type Changes = [HolderKey, string | null][];
@@ -53,7 +54,7 @@ const TEXT_KEYS = new Set(['id', 'person', 'number', 'from', 'to', 'through-spou
 const HOLDERS_MAP = 'The holders of this title are not a list. Edit the note text.';
 const NOT_A_LIST = 'This value is not a list. Edit the note text.';
 
-/** The refusal texts of the succession keys (STE; contract 0.2.7 A.3). */
+/** The refusal texts of the succession keys (STE). */
 const SUCCESSION_REFUSAL = {
 	rule: 'The succession rule is not a rule that the plugin knows.',
 	inherit: 'The rule for who can inherit is not a rule that the plugin knows.',
@@ -65,7 +66,7 @@ const SUCCESSION_REFUSAL = {
 } as const;
 
 /** The parsed body and graph a title op needs. */
-export interface TitleContext {
+interface TitleContext {
 	first: Parsed;
 	data: RawMap;
 	tree: Tree;
@@ -482,7 +483,7 @@ function addTitle(ctx: TitleContext, op: AddTitle): EditResult {
 
 /**
  * §13.0: a new `titles` section goes directly after `houses`; with no `houses`, directly before
- * `people`; else at the end. It has one blank line on each side (supervisor ruling).
+ * `people`; else at the end. It has one blank line on each side.
  */
 function titlesSection(p: Parsed, value: Extract<NewValue, { block: string[] }>): Patch | Refusal {
 	const top = topMap(p);
@@ -548,7 +549,7 @@ function editTitle(ctx: TitleContext, op: EditTitle): EditResult {
 	optional('female-name', op.femaleName);
 	optional('plural', op.plural);
 
-	// Contract 0.2.7 A.3, K.4: a rule is written as its canonical word; a written text that already reads as the same rule stays.
+	// A rule is written as its canonical word; a written text that already reads as the same rule stays.
 	const word = (key: string, v: string | null | undefined, canonical: readonly string[], read: (t: string | undefined) => string | undefined, message: string): Refusal | undefined => {
 		if (v === undefined) return undefined;
 		if (v === null || (typeof v === 'string' && v.trim() === '')) return void remove(key);
@@ -592,7 +593,7 @@ function editTitle(ctx: TitleContext, op: EditTitle): EditResult {
 	}
 	optional('year', op.year);
 
-	// The named heirs and the excluded people: lists of person ids (K.3).
+	// The named heirs and the excluded people: lists of person ids.
 	const lists: Step[] = [];
 	for (const [key, want] of [['heir', op.heirs], ['exclude', op.exclude]] as const) {
 		const planned = idListEdit(ctx, index, title, key, want);
@@ -612,7 +613,7 @@ function editTitle(ctx: TitleContext, op: EditTitle): EditResult {
 const writtenIds = (v: Raw): string[] => list(v).flatMap((x) => (isRawMap(x) || Array.isArray(x) ? [] : [str(x)].filter((y): y is string => y !== undefined)));
 
 /**
- * K.3: the step that makes the ids of `heir` or `exclude` equal `want` (undefined: no change), and the expected data. A list
+ * The step that makes the ids of `heir` or `exclude` equal `want` (undefined: no change), and the expected data. A list
  * equal to the written ids is no change. Ids already written need no check; a new id must be a person (`unknown-person`).
  * One id is written as a scalar and several as a flow list. A written list that holds comments is changed item by item, so
  * its comments stay (it stays a list).
@@ -690,7 +691,7 @@ function deleteTitle(ctx: TitleContext, op: DeleteTitle): EditResult {
 	const titles = expected.titles as Raw[];
 	titles.splice(index, 1);
 	if (titles.length === 0) delete expected.titles;
-	// Supervisor ruling: every `card-title` with this value goes, valid or not (rule 7 adds nothing here).
+	// Every `card-title` with this value goes, valid or not (rule 7 adds nothing here).
 	const people: number[] = [];
 	(Array.isArray(expected.people) ? expected.people : []).forEach((raw, k) => {
 		if (!isRawMap(raw) || str(raw['card-title']) !== op.id) return;
@@ -789,7 +790,7 @@ function setHolders(ctx: TitleContext, op: SetHolders): EditResult {
 }
 
 /**
- * Supervisor ruling: written items that the window does not show (dropped by validation, or not a
+ * Written items that the window does not show (dropped by validation, or not a
  * holder at all) are never removed by `set-holders`. Each stays after the listed item that
  * preceded it before the op, or first.
  */
@@ -872,7 +873,7 @@ export function dropHolderPatches(p: Parsed, removals: Map<number, Set<number>>)
 }
 
 /** One removal of a person id from the `heir` or `exclude` of a title: the whole key, or some items of its list. */
-export interface IdRemoval {
+interface IdRemoval {
 	title: number;
 	key: 'heir' | 'exclude';
 	/** The indices of the list items to remove; absent when the key goes whole. */
@@ -880,7 +881,7 @@ export interface IdRemoval {
 }
 
 /**
- * K.3: removes, in the expected data, `id` from the `heir` and `exclude` of every title with an id (also one that loses to
+ * Removes, in the expected data, `id` from the `heir` and `exclude` of every title with an id (also one that loses to
  * a duplicate id). A scalar that is the id removes the key; a list loses its items with the id and stays a list, also of
  * one; a list with no item left removes the key.
  */

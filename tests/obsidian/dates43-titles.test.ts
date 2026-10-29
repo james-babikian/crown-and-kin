@@ -63,7 +63,7 @@ describe('the Titles window with a calendar', () => {
 	it('names the year of the line as it is written, not as a number of the plugin', () => {
 		const o = openWin(body(), { dates });
 		const p = page(o, 'crown');
-		expect(p.querySelector('.dynasty-succ-heading')!.getText()).toBe('After Aldric in Qinglong Emperor 9');
+		expect(p.querySelector('.dynasty-succ-heading')!.getText()).toBe('After Aldric Valmont in Qinglong Emperor 9');
 		expect(lineRows(p)).toEqual(['1stBran Valmont']);
 	});
 

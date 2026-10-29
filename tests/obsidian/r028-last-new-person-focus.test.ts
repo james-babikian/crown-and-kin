@@ -1,16 +1,16 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { EditSheet } from '../../src/obsidian/edit-sheet';
-import { FEl, clock, device, fakeDoc, resetDom } from '../acceptance/fake-dom';
+import { FEl, clock, device, dispatch, fakeDoc, resetDom, runTimers } from '../acceptance/fake-dom';
 import { resetObsidian } from '../acceptance/fake-obsidian';
 import { stripNotDisabled, writingHandle } from '../support/s113-c-support';
 import { useFakeDom } from '../support/fake-dom-setup';
 
 /*
- * Last fix round of 0.2.8, flow review. On a computer, Obsidian moves the focus to the first control of a window right
- * after `onOpen` (a device with a physical keyboard). In a new-person window that control is "Open all", so typing went
- * nowhere. The window must give the focus back to the Name field after that step. F7 (0.3.1): an existing person's window
- * does the same on a computer; a touch screen or a phone keeps the focus where it is, so the keyboard stays closed.
+ * 0.5.1 repair (owner: "never put a cursor in a field"). On a computer, Obsidian moves the focus to the first control of a window
+ * right after `onOpen`. Every person window, new or saved, on every device, ends with no field focused: the window itself has the
+ * focus (its dialog element), so a screen reader reads the title and Tab goes to the first control. A field that the user chose
+ * (a press or a key in the window) keeps the focus.
  */
 
 useFakeDom({ window: true });
@@ -38,46 +38,60 @@ function openLikeObsidian(s: EditSheet): FEl {
 	return modal;
 }
 
-describe('the focus of a new-person window', () => {
-	it('is on the Name field after Obsidian moved it to "Open all"', async () => {
+describe('the focus of a person window', () => {
+	const settle = async (): Promise<void> => {
+		await Promise.resolve();
+		await Promise.resolve();
+		runTimers(300);
+	};
+
+	it('a new person: the window takes the focus back from "Open all" and no field has it', async () => {
 		const h = writingHandle(BODY);
 		const s = EditSheet.createNew({} as never, { handle: h as never, sourcePath: 'n.md', newPerson: { kind: 'person' } } as never)!;
 		const modal = openLikeObsidian(s);
-		expect(fakeDoc.activeElement).not.toBe(modal.querySelector('[data-field="name"] input'));
-		await Promise.resolve();
-		await Promise.resolve();
-		expect(fakeDoc.activeElement).toBe(modal.querySelector('[data-field="name"] input'));
+		await settle();
+		expect(fakeDoc.activeElement).toBe(modal);
+		expect(modal.getAttribute('tabindex')).toBe('-1');
 	});
 
-	it('does not take the focus from a field the user already chose', async () => {
+	it('does not take the focus from a field the user chose', async () => {
 		const h = writingHandle(BODY);
 		const s = EditSheet.createNew({} as never, { handle: h as never, sourcePath: 'n.md', newPerson: { kind: 'person' } } as never)!;
 		const modal = openLikeObsidian(s);
 		const other = modal.querySelector('[data-field="sobriquet"] input')!;
+		dispatch(modal, 'pointerdown');
 		other.focus();
-		await Promise.resolve();
-		await Promise.resolve();
+		await settle();
 		expect(fakeDoc.activeElement).toBe(other);
 	});
 
-	it('F7: an existing person on a computer starts in Name, too', async () => {
+	it('a saved person on a computer: no field has the focus either', async () => {
 		const h = writingHandle(BODY);
 		const s = EditSheet.create({} as never, { handle: h as never, personId: 'a', sourcePath: 'n.md' })!;
 		const modal = openLikeObsidian(s);
-		await Promise.resolve();
-		await Promise.resolve();
-		expect(fakeDoc.activeElement).toBe(modal.querySelector('[data-field="name"] input'));
+		await settle();
+		expect(fakeDoc.activeElement).toBe(modal);
 	});
 
-	it('an existing person on a touch screen keeps the focus where Obsidian put it', async () => {
+	it('a saved person on a touch screen: the window has the focus, no field', async () => {
 		device.coarse = true;
 		const h = writingHandle(BODY);
 		const s = EditSheet.create({} as never, { handle: h as never, personId: 'a', sourcePath: 'n.md' })!;
 		const modal = openLikeObsidian(s);
-		const first = fakeDoc.activeElement;
-		await Promise.resolve();
-		await Promise.resolve();
-		expect(fakeDoc.activeElement).toBe(first);
-		expect(fakeDoc.activeElement).not.toBe(modal.querySelector('[data-field="name"] input'));
+		await settle();
+		expect(fakeDoc.activeElement).toBe(modal);
+	});
+
+	it('after the window closed, a late timer does not take the focus again', async () => {
+		const h = writingHandle(BODY);
+		const s = EditSheet.create({} as never, { handle: h as never, personId: 'a', sourcePath: 'n.md' })!;
+		const modal = openLikeObsidian(s);
+		s.close();
+		const other = fakeDoc.body;
+		other.focus?.();
+		const before = fakeDoc.activeElement;
+		await settle();
+		expect(fakeDoc.activeElement).toBe(before);
+		expect(before).not.toBe(modal);
 	});
 });

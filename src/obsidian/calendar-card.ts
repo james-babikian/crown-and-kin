@@ -110,6 +110,9 @@ export function drawCalendarBody(body: HTMLElement, host: CardHost, d: CalendarD
 	drawLists(body, host, { key: d.key, plain: false, lists: d.lists, shown });
 	messages(body, host, d.key, shown);
 	const removeCal = textButton(body, ['dynasty-link', 'dynasty-cal-remove-cal'], T.removeThisCalendar, () => host.removeCalendar(d.key), { label: T.removeCalendar(d.name.trim()), focus: `cal:remove:${d.key}` });
+	const noteId = `dynasty-cal-${d.key}-remove-note`;
+	body.createDiv({ cls: ['dynasty-sheet-hint', 'dynasty-cal-remove-note'], text: T.removeNote, attr: { id: noteId } });
+	removeCal.setAttribute('aria-describedby', noteId);
 	// The names for a screen reader follow the name while the user types it.
 	host.register(() => {
 		body.setAttribute('aria-label', bodyLabel());

@@ -1,17 +1,17 @@
 /**
  * Draws a finished tree layout to a standalone SVG string, for the spike (`npm run spike`), test
- * snapshots and (M9, spec §13.8) the saved picture. This is the only place plugin code may bake
+ * snapshots and (spec §13.8) the saved picture. This is the only place plugin code may bake
  * colours into SVG attributes: it takes a fixed `Palette` (`styles.ts`) instead of the CSS variables
  * the DOM renderer uses, since a headless SVG and a saved file have no page theme to read from.
- * M9: `pictures` embeds arms and portraits as data URIs (the spike, B9); `saved` adds the white
- * ground, the heading, the legend and the parity ids of a saved picture (P3, P4), placed by
+ * `pictures` embeds arms and portraits as data URIs (the spike); `saved` adds the white
+ * ground, the heading, the legend and the parity ids of a saved picture, placed by
  * `savedFrame` in `saved-picture.ts`; `measure` and `fonts` break and cut the text with the font a
- * canvas really draws (P2). With none of them, the output is exactly the M8 drawing.
+ * canvas really draws. With none of them, the output is exactly the drawing with no options.
  * In a saved picture every drawn element has a `data-item` (`card:`, `line:`, `union:`, `rumour`,
  * `sign:`, `tag:`, `relation:`, `arms:`, `portrait:`, `frame:`, `heading`, `legend-line:`,
  * `legend-sign`, `legend-house:`, `legend-arms:`); the tests compare this list with the one they
  * derive from the DOM scene, so the file and the screen draw the same things.
- * 0.2.5 (CONTRACT B.3.11): the card form follows `Geometry.form`. The Roundel and the sideways text card are drawn from the same
+ * The card form follows `Geometry.form`. The Roundel and the sideways text card are drawn from the same
  * `cardText`, `roundelPics` and `youTabRect` as the live scene (`dom/scene.ts`), in the same element order, so the saved picture
  * has the plate, the medallion and the "You" tab that the screen has, at the Full level only. A text card has no picture at all.
  * The look numbers of the plate and the tab are `ROUNDEL_LOOK` (`styles.ts`); the colours are the palette's.
@@ -33,10 +33,12 @@ import { cardNameLines, isolateLines, titleLines, type NameMeasure, type NameRun
 import { fixedColour, fontOf, savedFrame, xmlText, type PictureMap, type SavedFrame, type SavedParts } from './saved-picture';
 import { DEAD_STRIP_OPACITY, DEFAULT_DARK, DEFAULT_LIGHT, FADED_OPACITY, HEIR_LOOK, ME_LOOK, ME_RING_INNER, ON_LINE_EXTRA, SAVED_CARD_RADIUS, STROKES, TAG_MARK, UNION_MARKS, stripColour, tagMarkSlot, unionMark, unionShape, type Palette, type UnionShape } from './styles';
 import { LEGEND_DEAD_DOUBT_LABEL, LEGEND_DEAD_LABEL, LEGEND_LABELS, SIGN_LEGEND_LABEL } from './legend-text';
+import { marksForSvg } from './date-bidi';
 import { fitNamed, pickReign } from './date-fit';
-import { dateLine, farTagName, shownReign } from './tree-info';
+import { dateLineShown, farTagName, reignShown, shownReignIsolated } from './tree-info';
 import { fitRelationText } from './relation-fit';
-import { ribbonPath, truncate } from './view-math';
+import { ribbonPath } from './view-math';
+import { closeIsolates, truncateClosed, withoutBidiControls } from './bidi-controls';
 import { ME_WORD } from './view-text';
 
 /** The fade of a part beside the finder's line, as an SVG attribute (D47). */
@@ -57,7 +59,8 @@ function charEm(ch: string): number {
 /** Approximate text width in px; resvg cannot measure, the DOM renderer measures real text. */
 export function textWidth(text: string, fontSize: number, bold = false): number {
 	let em = 0;
-	for (const ch of xmlText(text)) em += charEm(ch);
+	// The isolate controls draw nothing, so they have no width (the live card measures them the same way).
+	for (const ch of withoutBidiControls(xmlText(text))) em += charEm(ch);
 	return em * fontSize * (bold ? 1.06 : 1);
 }
 
@@ -71,14 +74,15 @@ export const approxMeasure: Measure = (text, font) => {
 function fit(text: string, px: number, fontSize: number, bold = false): string {
 	if (textWidth(text, fontSize, bold) <= px) return text;
 	const chars = [...text];
-	while (chars.length > 1 && textWidth(chars.join('') + '…', fontSize, bold) > px) chars.pop();
-	return chars.join('') + '…';
+	const cut = () => closeIsolates(chars.join('') + '…');
+	while (chars.length > 1 && textWidth(cut(), fontSize, bold) > px) chars.pop();
+	return cut();
 }
 
-/** G4: a deceased person's arms and portrait are muted like the house strip. */
+/** A deceased person's arms and portrait are muted like the house strip. */
 export const DEAD_PICTURE_OPACITY = 0.8;
 
-/** M10 (F14): how the headless picture draws the fold controls of `layout.folds`. */
+/** How the headless picture draws the fold controls of `layout.folds`. */
 export interface SvgFolds {
 	/** Draw the open "−" buttons too; false draws the "+ N" signs only. A saved picture never draws buttons (D71). */
 	buttons: boolean;
@@ -98,7 +102,7 @@ export interface SvgOptions {
 	me?: string;
 	/** D47: the relation finder's line, as `SceneOptions.line`. */
 	line?: LineMarks;
-	/** M8: the card labels of the drawn graph, as `SceneOptions.labels`; absent = the M7 drawing. */
+	/** The card labels of the drawn graph, as `SceneOptions.labels`; absent = no card labels. */
 	labels?: ReadonlyMap<string, CardLabel>;
 	/**
 	 * "Show dates on cards", as `SceneOptions.showDates`: `false` leaves the reign out of the title
@@ -115,15 +119,15 @@ export interface SvgOptions {
 	pictures?: PictureMap;
 	/** P3: draw a saved picture: white ground, heading, tree and legend, colours from `palette`, and parity ids. */
 	saved?: SavedParts;
-	/** M10: draw the fold controls of the layout (the spike). A saved picture draws its signs from `saved.folds` and no buttons. Absent = none. */
+	/** Draw the fold controls of the layout (the spike). A saved picture draws its signs from `saved.folds` and no buttons. Absent = none. */
 	folds?: SvgFolds;
 	/** D118: the user's break places for long names, as `SceneOptions.breaks`. */
 	breaks?: BreakList;
-	/** 0.2.7 (F.5): the heirs of the Show view, as `SceneOptions.heirs`; each gets the still outline (`HEIR_LOOK`) in the fixed colours. */
+	/** The heirs of the Show view, as `SceneOptions.heirs`; each gets the still outline (`HEIR_LOOK`) in the fixed colours. */
 	heirs?: Iterable<string>;
-	/** 0.2.7 (F.4, F.5): the ordinal texts, as `SceneOptions.ordinals`; the layout names the cards (`TreeLayout.ordinalCards`). */
+	/** The ordinal texts, as `SceneOptions.ordinals`; the layout names the cards (`TreeLayout.ordinalCards`). */
 	ordinals?: ReadonlyMap<string, string>;
-	/** 0.2.7 (F.5): with `saved`, the bar sentence of the Show view ("Line of succession: Duke of Valmont, 1210"), the second text line under the heading. Pass the same text to `savedExtent`. */
+	/** With `saved`, the bar sentence of the Show view ("Line of succession: Duke of Valmont, 1210"), the second text line under the heading. Pass the same text to `savedExtent`. */
 	barSentence?: string;
 }
 
@@ -143,7 +147,7 @@ export function renderSvg(g: FamilyGraph, layout: TreeLayout, edges: EdgeDrawing
 	const real = opts.measure;
 	const measured: Measure | undefined = real && opts.fonts ? (s, font) => real(xmlText(s), font) : saved ? approxMeasure : undefined;
 	const fonts: SceneFonts = opts.fonts ?? { text: family, ui: family, bold: '600' };
-	const cutWith = (text: string, px: number, font: string) => truncate(text, px, (s) => measured!(s, font));
+	const cutWith = (text: string, px: number, font: string) => truncateClosed(text, px, (s) => measured!(s, font));
 	/** P4: the parity id of an element of a saved picture; nothing otherwise. */
 	const di = (item: string) => (saved ? ` data-item="${esc(item)}"` : '');
 	const out: string[] = [];
@@ -209,17 +213,17 @@ export function renderSvg(g: FamilyGraph, layout: TreeLayout, edges: EdgeDrawing
 		const p = g.byId.get(box.id)!;
 		const house = p.house ? g.houses.get(p.house) : undefined;
 		const hex = house?.color && /^#[0-9a-f]{3}([0-9a-f]{3})?$/i.test(house.color) ? house.color : undefined;
-		// R2: a saved file has no page to resolve a `var()` or an unknown word, so it draws only fixed colours.
+		// A saved file has no page to resolve a `var()` or an unknown word, so it draws only fixed colours.
 		const accent = hex ? stripColour(hex, c, dark) : saved ? (fixedColour(house?.color) ?? c.noHouse) : (house?.color ?? c.noHouse);
 		const dead = isDead(p);
 		const count = nameCountOf(box);
-		// M8: the card's name and title text lines; without a label, the person's own (M7).
+		// The card's name and title text lines; without a label, the person's own.
 		const cl = opts.labels?.get(p.id);
 		const shownName = cl ? cl.name : p.name;
 		const titleText = cl ? cl.title : p.title;
-		const reign = cl && opts.showDates !== false ? cl.reign : undefined;
-		// B.3.2: the scene passes the same lines, and the dates line counts even when "Show dates on cards" is off (the scene hides it by a class and keeps its room).
-		const dates = dateLine(p, g.dates, { names: 'none' });
+		const reign = cl && opts.showDates !== false ? marksForSvg(reignShown(cl, cl.reign, g.dates, 'none')) : undefined;
+		// The scene passes the same lines, and the dates line counts even when "Show dates on cards" is off (the scene hides it by a class and keeps its room).
+		const dates = marksForSvg(dateLineShown(p, g.dates, { names: 'none' }), true);
 		const shown: ShownLines = { title: !!(titleText || reign), dates: !!dates };
 		// D177 (10): a card with no relation word, in a tree with relation words, centres its text in the whole card.
 		const t = textOf(count, box.tallTitle, shown, geo.relationLine === true && !!opts.relations && !opts.relations.get(p.id)?.text);
@@ -232,7 +236,7 @@ export function renderSvg(g: FamilyGraph, layout: TreeLayout, edges: EdgeDrawing
 		const hasArms = !!(box.arms && (p.arms || house));
 		// The Roundel's pictures stand on its top edge (`rp`); the text card has none.
 		const rp = roundel ? roundelPics(geo, { arms: hasArms, portrait: !!box.portrait }) : undefined;
-		// F.4: the ordinal tab replaces the "You" tab of the same card.
+		// The ordinal tab replaces the "You" tab of the same card.
 		const ordinal = ordinalIds.has(p.id) ? opts.ordinals?.get(p.id) : undefined;
 		const tab = layout.youTab === p.id && !ordinal ? youTabRect(geo, !!rp?.portrait, !!rp?.arms) : undefined;
 		const ordTab = ordinal ? ordinalTabRect(geo, !!rp?.portrait, !!rp?.arms, [...ordinal].length) : undefined;
@@ -244,7 +248,7 @@ export function renderSvg(g: FamilyGraph, layout: TreeLayout, edges: EdgeDrawing
 		const nameMeasure: NameMeasure = measured ? (s, sob) => measured(s, sob ? sobFont : nameFont) : (s, sob) => textWidth(s, t.nameSize, !sob);
 		const names = cardNameLines(shownName, cl?.sobriquet ?? p.sobriquet, nameRoom(geo, t, signed.has(p.id), ring), nameMeasure, count, opts.breaks);
 		out.push(`<g${di(`card:${p.id}`)}${fadeAttr(look.card(p.id))}>`);
-		// F.2, F.5 (0.2.8, I35 as changed by D212): the heir's outline is one accent border, 2 px wide; no second ring. The marked heir keeps the marked card's border
+		// D212: the heir's outline is one accent border, 2 px wide; no second ring. The marked heir keeps the marked card's border
 		// in the text colour (D153), and its ordinal tab shows that it is an heir.
 		const heir = heirIds.has(p.id);
 		// D41, D153: the marked card has one thicker border in the text colour; no theme accent colour is used.
@@ -252,7 +256,7 @@ export function renderSvg(g: FamilyGraph, layout: TreeLayout, edges: EdgeDrawing
 		// The heir's outline is the card's own border now, so its parity id sits on the card rect.
 		out.push(`<rect x="${box.x}" y="${box.y}" width="${box.w}" height="${box.h}" rx="${SAVED_CARD_RADIUS}" fill="${c.cardFill}" ${border}${heir ? di(`heir:${p.id}`) : ''}/>`);
 		const barFill = `fill="${esc(accent)}"${dead ? ` fill-opacity="${DEAD_STRIP_OPACITY}"` : ''}`;
-		// 0.2.8 (C, G.15): the house ribbon along the top edge (the left edge of a sideways card), with the card's own corners at a fixed radius; on the marked card it lies inside the thick border.
+		// The house ribbon along the top edge (the left edge of a sideways card), with the card's own corners at a fixed radius; on the marked card it lies inside the thick border.
 		const rib = ribbonWidth(geo);
 		const inset = isMe ? ME_RING_INNER : 0;
 		out.push(`<path d="${ribbonPath(box.x + inset, box.y + inset, roundel ? box.w - 2 * inset : rib, roundel ? rib : box.h - 2 * inset, rib, Math.max(0, SAVED_CARD_RADIUS - inset), roundel ? 'top' : 'left')}" ${barFill}/>`);
@@ -276,7 +280,7 @@ export function renderSvg(g: FamilyGraph, layout: TreeLayout, edges: EdgeDrawing
 		const smallMeasure = (s: string) => (measured ? measured(s, smallFont) : textWidth(s, t.smallSize));
 		if (cl && reign) {
 			// D61: two text lines only on a card the layout made taller for them; else one, cut with "…".
-			titles = titleLines(titleText, pickReign(titleText, shownReign(cl, g.dates, 'shown'), reign, t.textW, smallMeasure, t.title2Baseline !== undefined), t.textW, smallMeasure);
+			titles = titleLines(titleText, pickReign(titleText, marksForSvg(shownReignIsolated(cl, g.dates, 'shown')), reign, t.textW, smallMeasure, t.title2Baseline !== undefined), t.textW, smallMeasure);
 			if (titles.length > 1 && t.title2Baseline === undefined) titles = [cutSmall([titleText, reign].filter(Boolean).join(' '), t.textW)];
 		} else if (titleText) titles = [cutSmall(titleText, t.textW)];
 		titles.forEach((line, i) => {
@@ -284,22 +288,22 @@ export function renderSvg(g: FamilyGraph, layout: TreeLayout, edges: EdgeDrawing
 		});
 		const datesY = hasTitle ? t.datesBaseline : t.titleBaseline;
 		const showYears = !!dates && !(saved && opts.showDates === false);
-		if (showYears) out.push(`<text x="${tx}" y="${box.y + datesY}"${anchor} font-size="${t.smallSize}" fill="${c.dates}">${esc(fitNamed(dateLine(p, g.dates)!, dates, t.textW, smallMeasure, (s) => cutSmall(s, t.textW)))}</text>`);
+		if (showYears) out.push(`<text x="${tx}" y="${box.y + datesY}"${anchor} font-size="${t.smallSize}" fill="${c.dates}">${esc(fitNamed(marksForSvg(dateLineShown(p, g.dates), true)!, dates, t.textW, smallMeasure, (s) => cutSmall(s, t.textW)))}</text>`);
 		const relation = opts.relations?.get(p.id)?.text;
 		const relY = relationY(t);
 		if (relation && relY !== undefined) {
 			const style = isMe ? `font-style="italic" font-weight="${esc(nameWeight)}"` : 'font-style="italic"';
-			// The word may use the width that the card gives it; every other line keeps its column. 0.2.8: the word is muted; "You" is in the text colour.
+			// The word may use the width that the card gives it; every other line keeps its column. The word is muted; "You" is in the text colour.
 			const relW = t.relationW ?? t.textW;
 			const relFont = relationFontOf(t.smallSize, fonts.text, isMe, fonts.bold);
-			// D268: the short forms (R1 to R3) before a cut, by the measure of this picture; the saved picture has its own, the live view has its own.
+			// D268: the short forms of the relation text before a cut, by the measure of this picture; the saved picture has its own, the live view has its own.
 			const relText = fitRelationText(relation, relW, (s) => (measured ? measured(s, relFont) : textWidth(s, t.smallSize, isMe)));
 			out.push(`<text x="${tx}" y="${box.y + relY}"${anchor} font-size="${t.smallSize}" ${style} fill="${isMe ? c.text : c.textMuted}"${di(`relation:${p.id}`)}>${esc(relText)}</text>`);
 		}
-		// M9: the pictures. Arms with a problem show nothing; a portrait always has its frame (B1, B9).
+		// The pictures. Arms with a problem show nothing; a portrait always has its frame.
 		const muted = dead ? ` opacity="${DEAD_PICTURE_OPACITY}"` : '';
 		if (rp) {
-			// B.3.3: the arms and the medallion on the top edge, in the scene's order. The saved picture draws the Full level only, so each picture is made once.
+			// The arms and the medallion on the top edge, in the scene's order. The saved picture draws the Full level only, so each picture is made once.
 			if (rp.arms) {
 				// The personal arms of the person, else the arms of the house. The caller (`save-picture.ts`) names the personal ones `person-arms:<id>`.
 				const uri = p.arms ? pics?.get(`person-arms:${p.id}`) : pics?.get(`arms:${house!.id}`);
@@ -335,7 +339,7 @@ export function renderSvg(g: FamilyGraph, layout: TreeLayout, edges: EdgeDrawing
 		}
 		if (tab) {
 			// D148: the small "You" tab on the top edge of the person that `TreeLayout.youTab` names; the Full level only, so no other level hides it.
-			// 0.2.8: one look for both tabs: the card colour inside a 1 px border in the text colour, on a card-colour base with a wide edge, so the border
+			// One look for both tabs: the card colour inside a 1 px border in the text colour, on a card-colour base with a wide edge, so the border
 			// and the line above the card do not show through.
 			const spot = `x="${box.x + tab.x}" y="${box.y + tab.y}" width="${tab.w}" height="${tab.h}" rx="${tab.h / 2}"`;
 			out.push(`<rect ${spot} fill="${c.cardFill}" stroke="${c.cardFill}" stroke-width="${HEIR_LOOK.tabBase}"/>`);
@@ -343,7 +347,7 @@ export function renderSvg(g: FamilyGraph, layout: TreeLayout, edges: EdgeDrawing
 			out.push(`<text x="${box.x + tab.x + tab.w / 2}" y="${box.y + tab.y + tab.h / 2 + TAB_TEXT_BASE_EM * geo.fontPx}" font-size="${TAB_TEXT_EM * geo.fontPx}" font-weight="${esc(nameWeight)}" text-anchor="middle" fill="${c.text}">${ME_WORD}</text>`);
 		}
 		if (ordTab) {
-			// F.4: the ordinal tab, in the fixed colours and with the same look as the "You" tab; the text is bold, not italic.
+			// The ordinal tab, in the fixed colours and with the same look as the "You" tab; the text is bold, not italic.
 			const spot = `x="${box.x + ordTab.x}" y="${box.y + ordTab.y}" width="${ordTab.w}" height="${ordTab.h}" rx="${ORDINAL_EM.corner * geo.fontPx}"`;
 			out.push(`<rect ${spot} fill="${c.cardFill}" stroke="${c.cardFill}" stroke-width="${HEIR_LOOK.tabBase}"/>`);
 			out.push(`<rect ${spot} fill="${c.cardFill}" stroke="${c.text}" stroke-width="${HEIR_LOOK.tabBorder}"${di(`ordinal:${p.id}`)}/>`);
@@ -367,7 +371,7 @@ export function renderSvg(g: FamilyGraph, layout: TreeLayout, edges: EdgeDrawing
 			out.push(`<${m.tag} ${at} ${paint}${fadeAttr(state)}${di(`union:${shape}`)}/>`);
 		} else {
 			if (saved) out.push(`<g${di('rumour')}>`);
-			// F-LAYOUT-02: the size of the live marker, 0.5 em and 0.7 em of the note font (`scene.ts`), not a fixed 8 px and 11 px.
+			// The size of the live marker, 0.5 em and 0.7 em of the note font (`scene.ts`), not a fixed 8 px and 11 px.
 			const em = layout.geometry.fontPx;
 			const size = RUMOUR_FONT_EM * em;
 			out.push(`<circle cx="${mk.x}" cy="${mk.y}" r="${0.5 * em}" fill="${ground}" stroke="${c.rumoured}"${fadeAttr(state)}/>`);
@@ -376,7 +380,7 @@ export function renderSvg(g: FamilyGraph, layout: TreeLayout, edges: EdgeDrawing
 		}
 	});
 
-	// M10 (F14): the "+ N" signs of the folded families, and (not in a saved picture) the buttons of the open ones.
+	// The "+ N" signs of the folded families, and (not in a saved picture) the buttons of the open ones.
 	const foldMode: SvgFolds | undefined = saved ? (saved.folds ? { buttons: false } : undefined) : opts.folds;
 	if (foldMode) {
 		const em = geo.fontPx;
@@ -386,7 +390,7 @@ export function renderSvg(g: FamilyGraph, layout: TreeLayout, edges: EdgeDrawing
 			const { spot } = control;
 			if (!control.folded) {
 				if (!foldMode.buttons) continue;
-				// 0.2.8 (C01): a small square chip with rounded corners and a round-capped minus.
+				// A small square chip with rounded corners and a round-capped minus.
 				const side = FOLD_CHIP_EM * em;
 				const arm = 0.28 * em;
 				out.push(`<rect x="${spot.x - side / 2}" y="${spot.y - side / 2}" width="${side}" height="${side}" rx="${0.15 * em}" fill="${ground}" stroke="${c.textMuted}" stroke-width="1"/>`);
@@ -413,7 +417,7 @@ export function renderSvg(g: FamilyGraph, layout: TreeLayout, edges: EdgeDrawing
 	const tagFont = 0.75 * geo.fontPx;
 	const tagFontStr = fontOf('400', tagFont, fonts.ui);
 	const tagFamily = saved ? ` font-family="${esc(fonts.ui)}"` : '';
-	// 0.2.1: a far couple with no children has no union dot, so its tag carries the partnership sign.
+	// A far couple with no children has no union dot, so its tag carries the partnership sign.
 	const farSigns = farTagSigns(g, layout, edges);
 	for (const tag of layout.farTags.values()) {
 		const pad = tagH / 2;
@@ -433,7 +437,7 @@ export function renderSvg(g: FamilyGraph, layout: TreeLayout, edges: EdgeDrawing
 		const state = look.tag(tag);
 		const group = saved || state === 'faded';
 		if (group) out.push(`<g${di(`tag:${tag.person}`)}${fadeAttr(state)}>`);
-		// 0.2.8 (I36 C, then D212 tag-edge): the pill is a chip with the line colour as its edge, so it still reads as a tag without colour (3:1 on the page).
+		// D212: the pill is a chip with the line colour as its edge, so it still reads as a tag without colour (3:1 on the page).
 		const edge = state === 'on' ? `stroke="${c.accent}" stroke-width="2"` : `stroke="${c.line}" stroke-width="1"`;
 		out.push(`<rect x="${left}" y="${top}" width="${w}" height="${tagH}" rx="${tagH / 2}" fill="${c.cardFill}" ${edge}/>`);
 		out.push(`<text x="${left + pad}" y="${base}" font-size="${1.25 * tagFont}" font-family="Segoe UI Symbol, DejaVu Sans, sans-serif" fill="${c.textMuted}">⚭</text>`);
@@ -454,7 +458,7 @@ export function renderSvg(g: FamilyGraph, layout: TreeLayout, edges: EdgeDrawing
 	return out.join('\n');
 }
 
-/** The saved picture's legend (P3, D74): "Line styles" with the samples of the kinds drawn, then "Houses". */
+/** The saved picture's legend (D74): "Line styles" with the samples of the kinds drawn, then "Houses". */
 function legendSvg(frame: SavedFrame, saved: SavedParts, c: Palette, fonts: SceneFonts, dark: boolean): string[] {
 	const L = frame.legend!;
 	const out: string[] = [`<g transform="translate(${L.x} ${L.y})">`];

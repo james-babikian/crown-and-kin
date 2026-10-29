@@ -115,7 +115,7 @@ export function idNote(parent: HTMLElement, o: { key: string; item: string; id: 
  * The note of a new row (not saved yet) whose name gives an ID that a changed row has taken (owner
  * decision "3-both"). It is the same note as the one of the changed row, without "New ID" and the button:
  * the reason in red text in the same place, and the same red edge on the row. It is empty and hidden
- * until a reason comes, because the name can change while the owner types.
+ * until a reason comes, because the name can change while the user types.
  */
 export function idNewNameNote(parent: HTMLElement, o: { key: string; problem: string }): IdRowView {
 	const note = parent.createDiv({ cls: 'dynasty-id-new', attr: { 'data-id-new-name': o.key } });

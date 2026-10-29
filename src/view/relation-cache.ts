@@ -4,11 +4,11 @@
  * second parent" (D174), and shared until one of them changes: the key (`relationsKey`) holds all
  * three, so a change of the setting makes a new lookup. The lookup works out the names of the
  * people asked for, from the WHOLE tree (never a focus family), once each, with the same result as
- * the names of all people (WP-K). A view asks for the people it shows: the rows of the phone list,
+ * the names of all people. A view asks for the people it shows: the rows of the phone list,
  * the cards of a focus family, one person window. The view of the whole tree asks for all drawn cards.
  * Nothing here runs during a pan or zoom: only a render or a sheet asks.
  *
- * Memory (0.4 WP-3b). A lookup of a big tree is large (about 45 MB at 1 000 people asked, 240 MB at 3 000), and every edit that
+ * Memory. A lookup of a big tree is large (about 45 MB at 1 000 people asked, 240 MB at 3 000), and every edit that
  * changes a parent or a partnership makes a new key. So the cache is bounded in three ways. (1) One block keeps one lookup: a new
  * lookup for a block (its `block` key: the view state key of note path and block place, shared by the block and its full-screen
  * view) takes the older ones of that block out. (2) The lookups together stay under a size budget (`RELATION_BUDGET_BYTES`, an
@@ -59,7 +59,7 @@ export const RELATION_CACHE_SIZE = 8;
  */
 export const RELATION_BUDGET_BYTES = 100_000_000;
 
-// Fitted to the heap that a lookup of generated trees of 500 to 3 000 people keeps when every person is asked: 19, 45, 121 and 240 MB (0.4 WP-3b).
+// Fitted to the heap that a lookup of generated trees of 500 to 3 000 people keeps when every person is asked: 19, 45, 121 and 240 MB.
 const BYTES_PER_TREE_PERSON = 1000;
 const BYTES_PER_NAMED = 30_000;
 // The cost of each named person grows with the people named (more candidates share each search), so the total grows with the square.

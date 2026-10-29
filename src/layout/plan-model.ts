@@ -1,5 +1,5 @@
 /*
- * The concepts of the card-and-line system, as types (the architecture notes §4.2.2). Everything the system places or draws is one of these:
+ * The concepts of the card-and-line system, as types. Everything the system places or draws is one of these:
  * an item in a row (a card or a passage), a port on an item's edge, a family that hangs from a hang point, a couple with its legs,
  * and (in the route stage) verticals and nets in the gaps between rows. The plan, place and route stages share these types.
  * Two views of one tree: the `Skeleton` (what the graph and the order fix: items, couples, legs, families, without ports) and the
@@ -13,7 +13,7 @@ import type { PersonBox } from './model';
 export { soloKey };
 
 /** What a passage reserves room for: the line of a couple on two rows that passes this row, or the hang point of a family whose card's edge is full. */
-export type Carried = { kind: 'pass'; union: string } | { kind: 'hang'; family: string };
+type Carried = { kind: 'pass'; union: string } | { kind: 'hang'; family: string };
 
 /** An item of a row layer: a person's card, or a passage (a narrow place that a line of another row, or a hang point, takes). */
 export interface Item {
@@ -122,7 +122,7 @@ export interface Couple extends Omit<CoupleSpec, 'legs'> {
 }
 
 /** A side link (a parent that does not decide the child's place), before the ports. */
-export interface SideLinkSpec {
+interface SideLinkSpec {
 	child: string;
 	type: string;
 	parents: string[];

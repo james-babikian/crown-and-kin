@@ -1,5 +1,5 @@
 /*
- * Makes notes from the tree. `makeNote` (M10, N5) is the one place that makes a note: the folder, the
+ * Makes notes from the tree. `makeNote` is the one place that makes a note: the folder, the
  * first free name, the missing folders, and `vault.create`. "Make a note with this table" (spec
  * §13.4, D55, D60) uses it for the holder list of one title (`holderTable`), named by the title's
  * plural (`noteName`); the house page (§13.12) and "Make a note" for a person (§13.11) use it too.
@@ -51,7 +51,7 @@ async function ensureFolder(app: App, path: string): Promise<TFolder | null> {
 }
 
 /**
- * Makes a note with `content` (N5). The folder is `where.folder` ('' = the vault root) or the D60
+ * Makes a note with `content`. The folder is `where.folder` ('' = the vault root) or the D60
  * folder of `sourcePath`. The name is the first free one ("Name", "Name 1", …) unless `where.exact`.
  * It never throws.
  */

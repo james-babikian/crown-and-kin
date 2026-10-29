@@ -2,6 +2,50 @@
 
 All notable changes for users. The newest version is first.
 
+## 0.5.1
+
+### Repairs
+
+- **The phone list stays at the person after Save.** On an iPhone, after you saved a change in the person window, the list could go back to the first person of the tree. Now it stays at the person that you edited. The tree also keeps its folded branches.
+- **Close no longer covers buttons in a narrow iPad window.** In Split View or Slide Over, the buttons of the full-screen view now move to two rows. Close stays at the end.
+- **The × that removes a partnership in the person window is now easier to tap on an iPad.**
+- **Your first click no longer misses.** When you left a field, a grey line under a date field or the hint of the Marker field could appear or hide. This moved the buttons, so the first click or tap missed. Now the buttons stay in place until the click ends.
+- **The line of succession names the ruler as the holder list does.** For example, it says "After Konrad VI in 1464", not "After Konrad in 1464".
+
+### Pictures
+
+- **Arms and portraits show sooner when Obsidian starts.** The plugin now keeps a small copy of each picture on the device, in Obsidian's own storage, not in your vault. Copies are not synced, so each device keeps its own. From the second start, a picture that has a copy shows at the same time as the tree. If you change a picture file, the plugin makes a new copy.
+
+### Dates
+
+- **Dates with right-to-left words or digits keep their order in nearly every place.** This includes the cards, the saved picture, the person window, Find, the Houses and Titles windows and the line of succession. Before, a date such as "1108–1170" after an Arabic word could show as "1170–1108". One case remains. See Known limits.
+
+### Windows
+
+- **The partnership window shows the two names as its title**, on the computer and on the phone.
+- **The Titles window: the first row of the holder list shows the name that you typed.** For example, it shows `A holder who is not in the tree: “Isolde”`. If the person is in the tree, choose the row of the person.
+- **The Calendars window: a line under the link "Remove this calendar" says what changes** if you remove the calendar.
+- **The line of succession says when the plugin cannot read a year in a birth date.** It also says what to change.
+- **The hint of the Marker field is shorter.** It says: "Write one short word in curly brackets, for example {planet}."
+- **"Remove this list" stands at the end of each list of year names**, under its last field, so a tap on a field cannot remove the list.
+- **Windows open with no active field**, so the keyboard does not open by itself on a phone or an iPad. Find and the lists of people keep the cursor in their search field.
+
+### Install
+
+- **The README now shows how to install the plugin with BRAT.** BRAT is a community plugin that installs plugins from GitHub and keeps them up to date.
+
+### Known limits
+
+- A curved line for a rumoured link, or for a parent who is drawn elsewhere, can pass over a card. A better route for these lines comes later.
+- A lover at the end of a group of partners can still have a long line that crosses other lines.
+- A name tag with a long name can show only part of the name.
+- A date after an Arabic house name in the same text line can still show in the wrong order.
+- A name by marriage that differs from another name only by "adoptive" or "rumoured" does not show. For example, "Wife's adoptive half-nephew" does not show.
+- A divorce gives the word "Former" only if you choose "Ended by", or if the end year is before the death years of both partners and all three years are exact. Otherwise no word changes.
+- If a child is born in the year after the father died, the card of the father's wife says "Father's wife", not "Stepmother". The plugin cannot know that the child was conceived before the death.
+- If a CSS snippet loads the font of your notes, a saved picture uses a standard font. A long name can then be wider than its card.
+- If you replace a picture file with another file of the same size and the same time of the last change, the plugin can show the old picture until you change the file again.
+
 ## 0.5.0
 
 ### Before you update: relation words and years

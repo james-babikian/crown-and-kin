@@ -316,6 +316,7 @@ for (const c of ['dynasty-title-name', 'dynasty-title-male', 'dynasty-title-fema
 		expect(page.querySelector('.dynasty-id-open')).toBeNull();
 		typeIn(page, 'dynasty-title-name', 'Warden of the Reach');
 		expect(page.querySelector('.dynasty-title-delete')!.getAttribute('aria-label')).toBe(TITLES_UI.deleteLabel('Warden of the Reach'));
+		expect(page.querySelector('.dynasty-holder-add')!.getAttribute('aria-label')).toBe(TITLES_UI.addHolderLabel('Warden of the Reach'));
 		expect(o.content.querySelector('.dynasty-lw-back-name')!.getText()).toBe('Warden of the Reach');
 	});
 
@@ -405,7 +406,7 @@ describe('the holder rows of the page (D.3.9 c, D130 item 8)', () => {
 		for (const r of rules) expect(r[3]).not.toMatch(/display\s*:\s*(inline-)?(flex|grid)/);
 		expect(rules.some((r) => /overflow-wrap\s*:\s*anywhere/.test(r[3]!))).toBe(true);
 		// The rules sit in the holder block, not between the list-window markers.
-		const start = css.indexOf('/* ===== list windows (0.2.5, D134) =====');
+		const start = css.indexOf('/* ===== list windows (D134) =====');
 		const end = css.indexOf('/* ===== end list windows =====');
 		expect(start).toBeGreaterThan(0);
 		const inside = css.slice(start, end);
@@ -826,6 +827,8 @@ describe('the keyboard reveal (D.7 item 7)', () => {
 		openPage(o.content, 'duke-of-valmont');
 		const spy = scrolls();
 		spy.mockClear();
+		// The window has finished taking the focus (0 and 120 ms); a later focus is the user's.
+		runTimers(200);
 		const input = field(pageOf(o.content), 'dynasty-title-name');
 		input.focus();
 		dispatch(input, 'focusin');
@@ -843,6 +846,7 @@ describe('the keyboard reveal (D.7 item 7)', () => {
 		const spy = scrolls();
 		spy.mockClear();
 		reduced = true;
+		runTimers(200);
 		const input = field(pageOf(o.content), 'dynasty-title-name');
 		input.focus();
 		dispatch(input, 'focusin');

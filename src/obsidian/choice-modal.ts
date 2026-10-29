@@ -22,7 +22,7 @@ export interface Choice<T> {
 }
 
 /** What one choice step shows: its title, text, an optional list, and its choices. */
-export interface ChoiceSpec<T> {
+interface ChoiceSpec<T> {
 	title: string;
 	text?: string[];
 	/** Items shown as a list under the text (for example the partnerships a pair has now). */
@@ -53,7 +53,7 @@ class ChoiceModal<T> extends Modal {
 		m.setAttribute('data-choice', this.spec.name);
 		this.cleanup.push(phoneLayout(this), ignoreGhostClick(this), trackModal(this, () => this.close()), holdTab(m));
 		const el = this.contentEl;
-		// The window family (contract C): Cancel is the only button of the frame; the choices are the buttons of the body.
+		// The window family: Cancel is the only button of the frame; the choices are the buttons of the body.
 		const shell = buildShell({ modalEl: this.modalEl, contentEl: el, title: this.spec.title, titled: true, cancelLabel: FLOW.cancel, saveLabel: null, onCancel: () => this.close() });
 		this.shell = shell;
 		nameDialog(this.modalEl, shell.titleEl);

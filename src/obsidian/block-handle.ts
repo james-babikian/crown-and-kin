@@ -32,9 +32,10 @@ function applyToEditor(view: MarkdownView, c: { from: number; to: number; text: 
 }
 
 const keyString = (path: string, ordinal: number) => `${path}\u0000#${ordinal}`;
+/** A promise that is done after `ms` ms. */
 export const pause = (ms: number) => new Promise<void>((r) => window.setTimeout(r, ms));
 
-/** F-VIEW-04: the longest `forBlock` waits for a write of the note to end (a slow disk or a sync lock), in ms. */
+/** The longest `forBlock` waits for a write of the note to end (a slow disk or a sync lock), in ms. */
 export const FOR_BLOCK_WAIT_MS = 10_000;
 
 /** Most maintenance steps a handle remembers for `followed` (the delete Notice's Undo, spec §6.1). */
@@ -43,7 +44,7 @@ const MAINTAINED_MAX = 20;
 type Listener = (body: string) => void;
 
 /** Where a block is: the vault path of its note (re-keyed on rename) and its index among the note's `kin` blocks (`LocatedBlock.ordinal`). */
-export interface BlockKey {
+interface BlockKey {
 	path: string;
 	ordinal: number;
 }
@@ -59,7 +60,7 @@ export type Written = { ok: true; body: string; created: string[]; effects: 'aut
  * `maintenance`: a link update after a rename (spec §6.9): on neither,
  * and it does not become the target of "Undo last tree edit"; the undo entries are carried over it.
  */
-export type WriteKind = 'user' | 'maintenance';
+type WriteKind = 'user' | 'maintenance';
 
 /**
  * `stale`: the block changed since the handle last read or wrote it; the handle has re-read it and
@@ -71,7 +72,7 @@ export type HandleWriteOutcome =
 	| { ok: false; code: 'refused'; refusal: Extract<EditResult, { ok: false }> };
 
 /** The result of `Handle.undo`: the restored body, or why it did not undo. */
-export type UndoOutcome = { ok: true; body: string } | { ok: false; code: 'empty' | 'changed' | 'missing' };
+type UndoOutcome = { ok: true; body: string } | { ok: false; code: 'empty' | 'changed' | 'missing' };
 
 /** The one handle of a `kin` block (spec §6.1), shared by every view of that block. */
 export class Handle {
@@ -84,6 +85,10 @@ export class Handle {
 	 * and the body is not unique). It keeps its body and undo entries but refuses writes.
 	 */
 	detached = false;
+	/** Writes of this handle that run now: while one runs, the file is new and `body` is one step behind (see `BlockBinding.peekFor`). */
+	writeRuns = 0;
+	/** The block text that the running write is about to put in the file; null when no write runs or the write changes nothing. */
+	pendingBody: string | null = null;
 	readonly state: BlockState = newBlockState();
 	/** How the last write reached the note (read by the test harness, spec §12 question 1). */
 	lastWritePath: 'transaction' | 'process' | null = null;
@@ -257,6 +262,7 @@ export class Handle {
 		let unchanged = false;
 		// The count follows the handle: the note can be renamed while the write runs.
 		const done = this.reg.beginWrite(() => this.key.path);
+		this.writeRuns++;
 		try {
 			const view = this.reg.editorView(path);
 			if (view) {
@@ -265,6 +271,7 @@ export class Handle {
 				plan = this.plan(text, expected, edit);
 				unchanged = plan.ok && plan.newText === text;
 				if (plan.ok && !unchanged) {
+					this.pendingBody = plan.newBody;
 					applyToEditor(view, smallestChange(text, plan.newText), !maintenance);
 					this.lastWritePath = 'transaction';
 				}
@@ -273,12 +280,15 @@ export class Handle {
 					seen = text;
 					plan = this.plan(text, expected, edit);
 					unchanged = plan.ok && plan.newText === text;
+					this.pendingBody = plan.ok && !unchanged ? plan.newBody : null;
 					// Obsidian's `process` does not write the file when the function returns the same text.
 					return plan.ok && !unchanged ? plan.newText : text;
 				});
 				if (plan.ok && !unchanged) this.lastWritePath = 'process';
 			}
 		} finally {
+			this.writeRuns--;
+			this.pendingBody = null;
 			done();
 		}
 		if (!plan.ok) {
@@ -361,7 +371,7 @@ export class HandleRegistry {
 
 	/**
 	 * A Live Preview or source view of the note, for the editor-transaction write path: Ctrl/Cmd+Z works
-	 * only there. A note open only in Reading view is written with `vault.process` (the decision notes, spec
+	 * only there. A note open only in Reading view is written with `vault.process` (spec
 	 * §12 question 1).
 	 */
 	editorView(path: string): MarkdownView | null {
@@ -671,7 +681,7 @@ export class HandleRegistry {
 	 * For the link update after a rename (spec §6.9): the handle of block `ordinal` of a Markdown note, also of a
 	 * block no view has drawn or of a closed note. The note is read as `sync` reads it (never a read that
 	 * overlapped a write), every handle of the note finds its block again, and an existing handle of the
-	 * block is shared. Null if the note or the block is gone. F-VIEW-04: writes of the note can keep the reads from being
+	 * block is shared. Null if the note or the block is gone. Writes of the note can keep the reads from being
 	 * fresh for `FOR_BLOCK_WAIT_MS`; the block is not gone then, so `onBusy` runs (the caller tells the user) and the result is null.
 	 */
 	async forBlock(path: string, ordinal: number, onBusy?: () => void): Promise<Handle | null> {

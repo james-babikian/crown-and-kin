@@ -9,6 +9,7 @@ import { setIcon, type App } from 'obsidian';
 import { ENDED_BY, isUnionType, readEndedBy, UNION_TYPES } from '../core/types';
 import { SHEET, UNION_EDIT, UNION_TYPE_TEXT } from '../render/ui-text';
 import { buildShell } from './window-shell';
+import { startWithoutFocus } from './modal-layout';
 import { nameDialog, sheetField } from './sheet-parts';
 import { SmallFormModal } from './small-form';
 
@@ -50,7 +51,7 @@ class UnionEditModal extends SmallFormModal {
 		private readonly save: UnionSave,
 	) {
 		super(app);
-		// A known value or an alias in another letter case is the known choice, so Save does not rewrite it (RULES §9 item 4).
+		// A known value or an alias in another letter case is the known choice, so Save does not rewrite it.
 		this.initial = { ...initial, endedBy: endedByChoice(initial.endedBy) };
 		this.values = { ...this.initial };
 	}
@@ -58,11 +59,17 @@ class UnionEditModal extends SmallFormModal {
 	override onOpen(): void {
 		this.openFrame('dynasty-union-edit');
 		const el = this.contentEl;
-		const shell = buildShell({ modalEl: this.modalEl, contentEl: el, title: UNION_EDIT.title, titled: true, onCancel: () => this.finish(), onSave: () => void this.write() });
+		// The two names are the title on every device (D316): the bar of a phone shows them, and a computer window shows them as its first text line.
+		const shell = buildShell({ modalEl: this.modalEl, contentEl: el, title: this.pair, titled: true, onCancel: () => this.finish(), onSave: () => void this.write() });
 		this.shell = shell;
 		nameDialog(this.modalEl, shell.titleEl);
+		// The two names alone do not say what the window is for, so a hidden purpose text goes before them in the name of the dialog.
+		const titleId = shell.titleEl.getAttribute('id') ?? '';
+		const purposeId = `${titleId}-purpose`;
+		el.createSpan({ cls: 'dynasty-sr-only', text: UNION_EDIT.purpose, attr: { id: purposeId } });
+		this.modalEl.setAttribute('aria-labelledby', `${purposeId} ${titleId}`);
 		const body = shell.body;
-		body.createDiv({ cls: 'dynasty-choice-text', text: this.pair });
+		if (!shell.bar) body.createDiv({ cls: 'dynasty-choice-text', text: this.pair });
 		this.errorEl = body.createDiv({ cls: 'dynasty-sheet-error', attr: { role: 'alert' } });
 		this.errorEl.hide();
 		const field = (label: string, name: string) => sheetField(body, label, name, 'dynasty-union');
@@ -90,7 +97,8 @@ class UnionEditModal extends SmallFormModal {
 			});
 		}
 		this.endedByField(field);
-		sel.focus();
+		// A select that takes the focus in code opens its list by itself on an iPad.
+		this.cleanup.push(startWithoutFocus(this.modalEl));
 	}
 
 	/** The "Ended by" choice. A hidden choice keeps what the note has: hiding never changes the value (D310). */

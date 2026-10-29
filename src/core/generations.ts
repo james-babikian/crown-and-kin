@@ -24,7 +24,7 @@ import { loneRumouredRoots } from './rumoured-roots';
  * accepted only if the groups stay acyclic. A longest-path pass over that acyclic graph then
  * settles every row in one go, so there is no iteration to stop early.
  *
- * Then two steps of 0.2.5 (D140): the two partners of a partnership are put on one row where
+ * Then two steps (D140): the two partners of a partnership are put on one row where
  * this can be solved (`equalisePartners`), and a man who is only a rumoured parent sits in the
  * row of his child's lower placement parent.
  *

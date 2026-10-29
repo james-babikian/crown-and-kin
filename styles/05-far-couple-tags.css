@@ -7,7 +7,7 @@
 }
 
 /* The hit area is invisible but takes presses. It lies below the cards, so a card wins where they overlap,
-   except in the strip over the tag's own card (0.3.1 fix3), which is inside the tag and so above the cards. */
+   except in the strip over the tag's own card, which is inside the tag and so above the cards. */
 .dynasty-tag-hit,
 .dynasty-tag-over {
 	cursor: pointer;
@@ -16,7 +16,7 @@
 	pointer-events: all;
 }
 
-/* 0.2.8 (I36 C, D212 tag-edge): the pill is a chip: the secondary background and the line colour as its edge (3:1), so it reads as a tag also without colour. */
+/* D212 tag-edge: the pill is a chip: the secondary background and the line colour as its edge (3:1), so it reads as a tag also without colour. */
 .dynasty-tag-pill {
 	fill: var(--background-secondary);
 	stroke: var(--dynasty-edge, var(--text-muted));
@@ -43,7 +43,7 @@
 	stroke-width: 2;
 }
 
-/* Keyboard focus: a 2 px ring in the text colour outside the accent, as on the cards (WP6.5). */
+/* Keyboard focus: a 2 px ring in the text colour outside the accent, as on the cards. */
 .dynasty-tag-ring {
 	display: none;
 	fill: none;

@@ -1,5 +1,5 @@
 /*
- * The real vault behind the fence index (`src/view/fence-index.ts`, 0.4 WP-3a). It lists the Markdown notes with their stamp, reads from the cache of the vault, tells from the metadata cache
+ * The real vault behind the fence index (`src/view/fence-index.ts`). It lists the Markdown notes with their stamp, reads from the cache of the vault, tells from the metadata cache
  * whether a note has a section that can hold a block, and passes the vault events on (`cache` is the metadata cache event `changed`, with the text). The store is the local storage of the vault:
  * per vault and per device, never synced. `saveWhenLeaving` saves the index when the page hides or the app goes to the background. `cacheReady` follows the start-up gate of D183.
  */
@@ -12,7 +12,7 @@ import { later } from '../view/idle';
 export const FENCE_STORE_KEY = 'crown-and-kin-fence-index';
 
 /** What the adaptor needs of the start-up gate (`startedUp`, D183). */
-export interface FenceGate {
+interface FenceGate {
 	/** True once the metadata cache has finished, or the start limit has passed. */
 	seen(): boolean;
 	/** True only when the metadata cache has finished; the limit does not count. */
@@ -95,7 +95,7 @@ export function fenceOptionsForDevice(): FenceOptions {
 }
 
 /** The two event targets that tell that the page goes away; tests give small fakes. */
-export interface LeaveTargets {
+interface LeaveTargets {
 	win: Pick<Window, 'addEventListener' | 'removeEventListener'>;
 	doc: Pick<Document, 'addEventListener' | 'removeEventListener' | 'visibilityState'>;
 }

@@ -1,4 +1,4 @@
-/* D106: "ID: p12", the last line of the edit sheet of a person whose ID is written. Muted text, never below 4.5:1; the text can be selected and copied. A theme can set --font-ui-smaller to 9.6 px on a phone; the line is never smaller than 12 px (review 0.2.3). */
+/* D106: "ID: p12", the last line of the edit sheet of a person whose ID is written. Muted text, never below 4.5:1; the text can be selected and copied. A theme can set --font-ui-smaller to 9.6 px on a phone; the line is never smaller than 12 px. */
 .dynasty-sheet-id {
 	margin-top: 0;
 	color: var(--dynasty-muted);
@@ -132,7 +132,7 @@
 }
 
 /* phone-B: picker */
-/* Wave 2 only: new rules for `.dynasty-picker*` (person list height, `.dynasty-picker-sob`) go below this line. */
+/* New rules for `.dynasty-picker*` (person list height, `.dynasty-picker-sob`) go below this line. */
 /* D122: the sobriquet after a name in a person list and in a holder list: regular weight (the name is semibold). */
 .dynasty-picker-sob {
 	font-weight: var(--font-normal);

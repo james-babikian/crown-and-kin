@@ -2,9 +2,9 @@
  * Live Preview draws a code block only after the editor's Markdown parser has read the block's
  * closing fence, and the parser stops a little below the visible part of the note. A tall tree
  * (sample trees 6 and 7) therefore stayed as source text until the user scrolled to its end
- * (the decision notes). When a kin block is visible but not yet parsed to its end, this asks the
+ *. When a kin block is visible but not yet parsed to its end, this asks the
  * parser to read to the end of the block, and the block is drawn at once. The scan of the note for blocks waits
- * until the user stops typing (WP-H2, P3), because it costs a few ms for each key press in a note of 1 MB.
+ * until the user stops typing, because it costs a few ms for each key press in a note of 1 MB.
  */
 
 /* global require -- Obsidian's module loader gives `require` to the bundle (see `languageModule`) */

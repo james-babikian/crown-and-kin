@@ -29,14 +29,14 @@ export interface HardError {
 }
 
 /** Tree rendered, editing disabled, banner shown (spec §8). */
-export type BlockingCode =
+type BlockingCode =
 	/** params: id, name (of the first person with the id) */
 	| 'duplicate-person-id'
 	/** params: id */
 	| 'duplicate-union-id';
 
 /** Tree rendered, warning badge (spec §8, §4.1). */
-export type WarningCode =
+type WarningCode =
 	// Missing references.
 	/** params: person, ref */
 	| 'missing-parent'
@@ -91,7 +91,7 @@ export type WarningCode =
 	| 'picture-not-image'
 	/** A picture of more than 40 million pixels. params: owner, house or person, file; pixels (millions, rounded up) when known */
 	| 'picture-too-large'
-	// Succession keys on a title (contract 0.2.7 A.5, K.4). Found by `validate.ts`.
+	// Succession keys on a title. Found by `validate.ts`.
 	/** `succession` names no rule. params: title (name), value (as written, or the flow text of a list or map) */
 	| 'unknown-succession'
 	/** `inherit` names no rule. params: title (name), value */
@@ -110,7 +110,7 @@ export type WarningCode =
 	| 'sex-spelling'
 	/** A `died` that is a doubt, not a date; the plugin counts the person as dead. params: person (name), value */
 	| 'died-doubtful'
-	/** A dead person with `childless: true` who is the birth parent of another person (M.6). params: person (name), child (name) */
+	/** A dead person with `childless: true` who is the birth parent of another person. params: person (name), child (name) */
 	| 'childless-has-child'
 	// Dates and calendars (spec §14). Found by `validate.ts` and `derive.ts`, only for a title with a rule or a named heir (rule 5), and never before the calendars are ready (rule 7).
 	// params of the four date warnings: where ('year' | 'born' | 'died' | 'reign'), value (the date text), title (name) for 'year' and 'reign', person (name) for 'born' and 'died'; `fits-two-calendars` adds calendars (names).
@@ -135,7 +135,7 @@ export type WarningCode =
 	| 'calendar-entry-invalid'
 	/** One name list of a calendar, or of the plain years, cannot be used (spec §14 rule 13). params: note (path), calendar (name; absent for the plain years), index (1-based; 0 for a marker), why ('not-map' | 'names' | 'known' | 'size' | 'lists' | 'marker'), marker (for why 'marker': a format has this marker place and no list has it) */
 	| 'calendar-list-invalid'
-	// Holding a title through the spouse (0.2.8 contract A.2, D195). Only for a title with `succession` or `heir`; the key is then ignored.
+	// Holding a title through the spouse (D195). Only for a title with `succession` or `heir`; the key is then ignored.
 	/** The holder has no partner. params: person, title (name) */
 	| 'through-spouse-no-partner'
 	/** The holder has partners, but all are betrothals, concubines or affairs (D205). params: person, title (name) */
@@ -154,7 +154,7 @@ export type WarningCode =
 	/** A `portrait-crop` that is not three numbers, on a person with a `portrait`. params: person (name) */
 	| 'bad-portrait-crop'
 	// Unknown values: kept in the YAML, drawn with default styling.
-	/** Only a near-typo of a known type (0.2.8 I13); any other word is drawn as a marriage with no warning. params: union (label), partners (names), value, suggestion */
+	/** Only a near-typo of a known type; any other word is drawn as a marriage with no warning. params: union (label), partners (names), value, suggestion */
 	| 'unknown-union-type'
 	/** params: person, value */
 	| 'unknown-placement'
@@ -323,7 +323,7 @@ function sectionWrongShape(p: P): string {
  * that agree with it: "The arms of House Valmont use", "The portrait of Aldric Valmont uses".
  */
 function pictureOwner(p: P): { who: string; uses: string; is: string; other: string } {
-	// 0.2.8 contract A.1: the personal arms of a person.
+	// The personal arms of a person.
 	if (s(p, 'owner', '') === 'person-arms') return { who: `The personal arms of ${s(p, 'person', 'a person')}`, uses: 'use', is: 'are', other: 'select other arms' };
 	if (s(p, 'owner', '') === 'portrait' || (s(p, 'owner', '') === '' && s(p, 'person', '') !== '')) {
 		return { who: `The portrait of ${s(p, 'person', 'a person')}`, uses: 'uses', is: 'is', other: 'select another portrait' };
@@ -404,7 +404,7 @@ const ISSUE_TEXT: { [C in IssueCode]: (p: P) => string } = {
 		const what = partners.length
 			? `a partnership with ${plural(partners.length, 'person', 'people')}: ${andList(partners)}`
 			: `${byLabel(p)}, because it has ${plural(n(p, 'count'), 'person', 'people')}`;
-		// A partnership of 3 or more people gets an example of the right form (I12).
+		// A partnership of 3 or more people gets an example of the right form.
 		const example = n(p, 'count') >= 3 ? ' Write one partnership for each pair, for example “- partners: [aldric, isolde]”.' : '';
 		return `The tree does not show ${what}. Give each partnership exactly 2 people.${example}`;
 	},
@@ -593,15 +593,15 @@ export const issueText = (issue: CodedIssue): string => {
 const BLOCK_ERROR = 'The tree text has an error. Correct the text to show the tree.';
 
 /**
- * The "Details" of a hard error that the plugin finds itself (WP-H2), in plain words. They are the `detail` of a
+ * The "Details" of a hard error that the plugin finds itself, in plain words. They are the `detail` of a
  * `yaml-invalid` error, so the box shows them after "Details:".
  */
 export const LIMIT_DETAIL = {
-	/** The aliases (`*name`) expand to far more nodes than the text could hold (F1). */
+	/** The aliases (`*name`) expand to far more nodes than the text could hold. */
 	tooLarge: `The mark ${quote('*')} repeats text that you named with the mark ${quote('&')}. The tree text uses these marks so often that the plugin cannot read it. Replace some of the marks ${quote('*')} with the text that they repeat.`,
-	/** The text nests so deep that the parser runs out of room (F3). */
+	/** The text nests so deep that the parser runs out of room. */
 	tooDeep: 'The tree text goes too many levels deep. A level is a list or a section inside another list or section. Remove the extra levels.',
-	/** The same key twice in one section; the plugin checks this itself (F2). */
+	/** The same key twice in one section; the plugin checks this itself. */
 	duplicateKey: (key?: string): string => {
 		// The key is the user's own text; a long or odd one would not read well in a sentence.
 		const end = 'Delete one of the text lines, or change the name of the field.';
@@ -667,7 +667,7 @@ const HARD_ERROR_TEXT: { [C in HardErrorCode]: (e: HardError, source?: string) =
 
 /**
  * The sentence to show the user for a hard error (the tree cannot be drawn at all). With the block body (`source`) the text line that the box names
- * is a text line that the body has (F8).
+ * is a text line that the body has.
  */
 export const hardErrorText = (error: HardError, source?: string): string => {
 	const make = HARD_ERROR_TEXT[error.code] as ((e: HardError, source?: string) => string) | undefined;

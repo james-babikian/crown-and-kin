@@ -1,5 +1,5 @@
 /*
- * The switch rows of the Rules section of the Titles window (contract 0.2.7 L.2, 0.4 D291): a switch with its label and its hint
+ * The switch rows of the Rules section of the Titles window (D291): a switch with its label and its hint
  * spans, and the change of those spans in place. The section `succession-section.ts` uses them; they hold no state of their own.
  */
 

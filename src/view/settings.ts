@@ -5,14 +5,17 @@
 
 /** D150: the direction of the full-screen tree on a phone held upright. */
 export type PhoneDirection = 'sideways' | 'down';
+/** The values of `PhoneDirection`. */
 export const PHONE_DIRECTIONS: readonly PhoneDirection[] = ['sideways', 'down'];
 
 /** The choices of "Reduce movement" (D126). */
 export type ReduceMotion = 'system' | 'on' | 'off';
+/** The values of `ReduceMotion`. */
 export const REDUCE_MOTIONS: readonly ReduceMotion[] = ['system', 'on', 'off'];
 
-/** 0.2.8 contract A.4 (D204): which cards show the arms of their house. */
+/** D204: which cards show the arms of their house. */
 export type ArmsOnCards = 'few' | 'all';
+/** The values of `ArmsOnCards`. */
 export const ARMS_ON_CARDS: readonly ArmsOnCards[] = ['few', 'all'];
 
 /** The most characters of `breakWords` that this version accepts. A longer stored text is invalid. */
@@ -28,7 +31,7 @@ export interface DynastySettings {
 	showRelations: boolean;
 	/** D174 (spec §9, §13.1): a person with one listed birth parent has a second parent who is not known, so two such people are at most half-siblings. One setting for every tree in the vault. Default on. */
 	oneParentUnknown: boolean;
-	/** Spec §13.7 (M9 contract O10): portraits on cards. Off: no card shows a portrait or its room; a change lays the trees out again. */
+	/** Spec §13.7: portraits on cards. Off: no card shows a portrait or its room; a change lays the trees out again. */
 	showPortraits: boolean;
 	/** Focus mode default generations (§5.6, §9), a whole number 0–10. Default 3; `options.generations` wins. */
 	focusGenerations: number;
@@ -42,15 +45,15 @@ export interface DynastySettings {
 	reduceMotion: ReduceMotion;
 	/** D150: the direction of the full-screen tree on a phone held upright. Default 'sideways' (D24 as before). */
 	phoneDirection: PhoneDirection;
-	/** Contract 0.2.7 E.6: the number of people in the line of succession, a whole number 1–20. Default 5. */
+	/** The number of people in the line of succession, a whole number 1–20. Default 5. */
 	successionLength: number;
-	/** Contract 0.2.7 J.8: the line warns about a person older than this many years with no death date, 0–1000; 0 gives no warning. Default 110. */
+	/** The line warns about a person older than this many years with no death date, 0–1000; 0 gives no warning. Default 110. */
 	oldAge: number;
-	/** Contract 0.2.7 M.7: a person who died younger than this age opens no branch in the line, 0–1000; 0 shows every open branch. Default 0. */
+	/** A person who died younger than this age opens no branch in the line, 0–1000; 0 shows every open branch. Default 0. */
 	youngDeathAge: number;
-	/** 0.2.8 contract A.4 (D204): `'few'` shows house arms on the first person of a house, a married-in spouse of another house and a holder; `'all'` shows them on every card. Default 'few'. */
+	/** D204: `'few'` shows house arms on the first person of a house, a married-in spouse of another house and a holder; `'all'` shows them on every card. Default 'few'. */
 	armsOnCards: ArmsOnCards;
-	/** 0.2.8 contract A.5 (D188 item 10): warn about more than 2 birth, adoptive or ward parents. Off stops the warning `too-many-parents` for those types. Default on. */
+	/** D188 item 10: warn about more than 2 birth, adoptive or ward parents. Off stops the warning `too-many-parents` for those types. Default on. */
 	warnManyParents: boolean;
 }
 
@@ -145,17 +148,17 @@ export const normaliseSettings = (raw: unknown): DynastySettings => {
 
 /** The key of the settings version in `data.json`. It is not a setting: it is not in `DynastySettings`, and `settingsChanges` never reports it. */
 export const VERSION_KEY = 'settingsVersion';
-/** The settings version that this release writes (W7). A higher stored version is kept as stored. */
+/** The settings version that this release writes. A higher stored version is kept as stored. */
 export const SETTINGS_VERSION = 1;
 
 /**
  * Every key that an earlier release stored as a setting and this release does not (from the git history of
- * this file, 0.1.0 to 0.2.8). A load drops them and a save does not write them again (spec §9, D144, D179).
+ * this file). A load drops them and a save does not write them again (spec §9, D144, D179).
  */
 export const REMOVED_KEYS: readonly string[] = ['cardSize', 'embedHeightPhone', 'phoneCardStyle'];
 
 /**
- * What a load keeps of `data.json` besides the settings, so that a save does not lose it (W7): the version,
+ * What a load keeps of `data.json` besides the settings, so that a save does not lose it: the version,
  * the keys that no release knows, and the raw value of a known key that is not valid here (for example a
  * choice that a newer version added). The settings in memory hold the default for such a key.
  */
@@ -164,7 +167,7 @@ export interface StoredExtras {
 	unknown: Readonly<Record<string, unknown>>;
 	invalid: Readonly<Record<string, unknown>>;
 	/**
-	 * The renames that wait, as `data.json` holds them (0.4, the index contract 3). A save writes them back until the
+	 * The renames that wait, as `data.json` holds them. A save writes them back until the
 	 * migration to the local storage has cleared them, so a save before the migration cannot wipe the list.
 	 */
 	pending: readonly PendingRename[];

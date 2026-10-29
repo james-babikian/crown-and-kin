@@ -1,8 +1,7 @@
 /*
  * The cadet-title hint of the Titles window (owner decision D291, spec §13.21 rule 14). While the switch "Only descendants
  * of the first holder can inherit" is off, the hint names the first person in the line who is of an older line than the first
- * holder, that is, someone whom the switch would remove. It never changes the line. The rule was set by the genealogy gate
- * (the decision notes "0.4"): two runs of the line (switch off, switch on), then a test of seniority over claim links.
+ * holder, that is, someone whom the switch would remove. It never changes the line. The rule is two runs of the line (switch off, switch on), then a test of seniority over claim links.
  */
 
 import type { TreeDates } from './dates';
@@ -12,13 +11,13 @@ import { firstHolderOf } from './succession-first';
 import type { Person, Title } from './types';
 
 /** The person that the hint names, and the first holder that the person does not descend from. */
-export interface CadetHint {
+interface CadetHint {
 	person: string;
 	first: string;
 }
 
 /** What the hint may reuse or read besides the title. */
-export interface CadetHintOptions {
+interface CadetHintOptions {
 	/** Another view of the dates (the window's draft); absent: the graph's own. */
 	dates?: TreeDates;
 	/** The line that the caller already has for this same title and spec (switch off). It is used only if it is complete (`more` is false). */

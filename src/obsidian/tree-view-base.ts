@@ -1,5 +1,5 @@
 /*
- * The bottom layer of `TreeView` (0.3.3, WP-1 A1; split out of `tree-view.ts` with no change of behaviour). `TreeView` is a chain of classes,
+ * The bottom layer of `TreeView`. `TreeView` is a chain of classes,
  * one file for each concern, and the chain is listed in `tree-view.ts`. This first class holds what every layer shares: the host contract, the
  * state of one view (every field), the open timing of spec §7.7, the access to the block's memory, and the cross-view calls (the static methods
  * that draw every view of one block again after a focus, folds, finder or Show view change). The state stays in one object on purpose: the layers
@@ -76,14 +76,14 @@ export interface ViewHost {
 	hasFullOpen(): boolean;
 	/** Spec §9: read on every render; `onSettingsChange` follows a change. */
 	readonly settings: DynastySettings;
-	/** M9 contract O3: the plugin's one picture store (absent in hosts without pictures, for example the unit fakes). */
+	/** The plugin's one picture store (absent in hosts without pictures, for example the unit fakes). */
 	readonly pictures?: PictureStore;
 	/** Spec §14 rule 9: the calendar index. A tree gets its date reader from it; absent in a host with no calendars (the unit fakes): plain years. */
 	readonly dates?: CalendarIndex;
-	/** M11: the parse that the read paths share; a host without one (a unit fake) parses each time. */
+	/** The parse that the read paths share; a host without one (a unit fake) parses each time. */
 	readonly parseCache?: ParseCache;
 	/**
-	 * 0.2.8 contract B.5 (D183): set only by the plugin. On a cold start a tree draws a box of its last known height until `ready(el)` (the
+	 * D183: set only by the plugin. On a cold start a tree draws a box of its last known height until `ready(el)` (the
 	 * plugin styles and the stored settings are in) and until the place of its block is known, for at most `START_LIMIT_MS`. `cache()` is false until the
 	 * metadata cache has finished once (or the limit has passed), so no warning about a missing picture counts before it is true.
 	 * Absent in a host that has no cold start (the unit fakes): the tree draws at once.
@@ -159,26 +159,26 @@ export abstract class TreeViewBase extends MarkdownRenderChild implements HoverP
 	/** D28: the children of the first view's person, and whether the hint still counts them (until the user moves the view). */
 	protected hintKids: PersonBox[] = [];
 	protected hintOn = false;
-	/** The frame that starts the pulse after a view change (0.3, D235), or 0. */
+	/** The frame that starts the pulse after a view change (D235), or 0. */
 	protected pulseFrame = 0;
 	/** The session focus changed while a full-screen view of this block was open: draw again when it closes. */
 	protected focusStale = false;
 	/** F5: the focus rules have run once in this view; only the first run looks at a stopped draw. */
 	protected stopChecked = false;
-	/** The block's folds changed while this view had no size (the other mode of the note): it draws again when it shows (M10 F10). */
+	/** The block's folds changed while this view had no size (the other mode of the note): it draws again when it shows. */
 	protected foldsStale = false;
-	/** The last press on a fold control came from the keyboard (I37): the redraw puts the keyboard focus back on the new control only then. */
+	/** The last press on a fold control came from the keyboard: the redraw puts the keyboard focus back on the new control only then. */
 	protected foldByKey = false;
 	protected laid: LaidOut | null = null;
-	/** M10 (F1): the folds this draw applied, so the settle, the sheet and the saved picture use the same people. */
+	/** The folds this draw applied, so the settle, the sheet and the saved picture use the same people. */
 	protected foldPlan: FoldPlan | null = null;
 	/** The scene whose fold controls and card content are being filled in idle time (one chain for both), so a redraw does not start a second chain. */
 	protected idleScene: Scene | null = null;
-	/** The tap areas of the tags and `+` badges at the last settle: a fold's tap area is cut back where it meets them (F7). */
+	/** The tap areas of the tags and `+` badges at the last settle: a fold's tap area is cut back where it meets them. */
 	protected tapAreas: Rect[] = [];
 	protected scene: Scene | null = null;
 	protected svg: SVGSVGElement | null = null;
-	/** The wrapper of the svg: hidden until the first view (S7). */
+	/** The wrapper of the svg: hidden until the first view. */
 	protected canvasEl: HTMLElement | null = null;
 	protected viewport: HTMLElement | null = null;
 	/** The "Add first person" box of a block with no people (spec §5.9); null when a tree is drawn. */
@@ -234,7 +234,7 @@ export abstract class TreeViewBase extends MarkdownRenderChild implements HoverP
 	protected meId: string | null = null;
 	/** The relation finder's result that this view draws (spec §13.2), or null. */
 	protected finderDrawn: FinderDrawn | null = null;
-	/** The Show view of a line of succession that this view draws (contract 0.2.7 F), or null. Only one of the two temporary views shows at a time. */
+	/** The Show view of a line of succession that this view draws, or null. Only one of the two temporary views shows at a time. */
 	protected successionDrawn: SuccessionDrawn | null = null;
 	/**
 	 * After the next first view, the keyboard focus goes here: the result's sentence, or a button by its
@@ -246,9 +246,9 @@ export abstract class TreeViewBase extends MarkdownRenderChild implements HoverP
 	protected finderAlt: (MeasuredResult & { geo: Geometry }) | null = null;
 	/** The problems of the whole tree's text (spec §8); the picture warnings come on top (`allIssues`). */
 	protected textIssues: CodedIssue[] = [];
-	/** M9: the pictures of the whole tree, resolved at render (O1, O2); null with no picture store. */
+	/** The pictures of the whole tree, resolved at render; null with no picture store. */
 	protected pictureInfo: PictureInfo | null = null;
-	/** M9: the live pictures of the drawn scene (O5). */
+	/** The live pictures of the drawn scene. */
 	protected live: LivePictures | null = null;
 	/** The first view was ready for use: the live pictures may load (spec §13.0 item 3 "Pictures never delay the first view"). */
 	protected picturesOn = false;
@@ -408,7 +408,7 @@ export abstract class TreeViewBase extends MarkdownRenderChild implements HoverP
 		return this.host.settings ?? DEFAULT_SETTINGS;
 	}
 
-	/** G.1, G.3: what the person picker needs for portraits and relation words (Find, Focus, the finder). */
+	/** What the person picker needs for portraits and relation words (Find, Focus, the finder). */
 	protected pickerContext(): PickerContext {
 		return { sourcePath: this.sourcePath, me: this.meId, relationOptions: this.relationOptions, relationBlock: this.key, ...(this.host.pictures ? { pictures: this.host.pictures } : {}) };
 	}
@@ -514,7 +514,7 @@ export abstract class TreeViewBase extends MarkdownRenderChild implements HoverP
 		st.focus = { id };
 		// Any other change of the family starts a new Back trail of the phone list (D144).
 		st.listBack = undefined;
-		// A choice of the user replaces a pending "show the saved person", the finder's result (spec §13.2) and the Show view of a line of succession (contract 0.2.7 F.1).
+		// A choice of the user replaces a pending "show the saved person", the finder's result (spec §13.2) and the Show view of a line of succession.
 		st.shown = null;
 		st.finder = null;
 		st.succession = null;
@@ -571,7 +571,7 @@ export abstract class TreeViewBase extends MarkdownRenderChild implements HoverP
 		v?.guard(() => v.showFound(id));
 	}
 
-	/** G.7: a row of the line of succession opens that person's window; the view that opened the Titles window may be drawn again by now. */
+	/** A row of the line of succession opens that person's window; the view that opened the Titles window may be drawn again by now. */
 	protected static openPersonOf(host: ViewHost, st: BlockState, full: boolean, id: string, own: TreeViewBase | null): void {
 		const same = [...host.views].filter((x) => !x.unloaded && !x.inForeignView() && !!x.full === full && x.peekState() === st);
 		const v = own ?? same.find((x) => !!x.panZoom?.view) ?? same[0];
@@ -626,7 +626,7 @@ export abstract class TreeViewBase extends MarkdownRenderChild implements HoverP
 	}
 
 	/**
-	 * G5 0.4 (WCAG 2.4.3): a window of the tree closed, and Obsidian gave the focus back to the element that had it when the window opened. After a write the
+	 * WCAG 2.4.3: a window of the tree closed, and Obsidian gave the focus back to the element that had it when the window opened. After a write the
 	 * redraw has replaced that element (a card, Expand), so the focus fell to the page. This puts it on the same place in the new drawing: `find` in the views that
 	 * `match` picks. Only while the focus is on no control and no window of the plugin is open (an Undo Notice does not count: it holds no focus); it looks again a little later, as the redraw can come after the close.
 	 */
@@ -652,7 +652,7 @@ export abstract class TreeViewBase extends MarkdownRenderChild implements HoverP
 
 	/**
 	 * The control of this view that has the keyboard focus now, if `is` accepts it, and whether it shows its focus ring: a window that opens now gives the focus
-	 * back there when it closes (G5 0.4). Null when the focus is elsewhere (a tap on a phone leaves it on the page).
+	 * back there when it closes. Null when the focus is elsewhere (a tap on a phone leaves it on the page).
 	 */
 	protected focusReturn(is: (el: Element) => boolean): { visible: boolean } | null {
 		const el = this.containerEl;
@@ -765,12 +765,12 @@ export abstract class TreeViewBase extends MarkdownRenderChild implements HoverP
 	}
 
 	/**
-	 * Show (Titles window, contract E.4): opens the view of the line of `title` in every view of the block that can draw it. It writes
+	 * Show (Titles window): opens the view of the line of `title` in every view of the block that can draw it. It writes
 	 * nothing. If only a phone list or a static preview shows the block, the full-screen view opens with it, as for the finder.
 	 */
 	static showSuccession(host: ViewHost, st: BlockState, title: string, origin: TreeViewBase | null): void {
 		st.succession = { title };
-		// One temporary view at a time (F.1).
+		// One temporary view at a time.
 		st.finder = null;
 		const views = [...host.views].filter((v) => !v.unloaded && v.peekState() === st);
 		const shows = views.filter((v) => v.full || !v.coarse);
@@ -798,7 +798,7 @@ export abstract class TreeViewBase extends MarkdownRenderChild implements HoverP
 		}
 	}
 
-	/** Every view of the block that can show the Show view or its bar draws again (F.2: this includes the phone list; never the static tablet preview, D1). */
+	/** Every view of the block that can show the Show view or its bar draws again (this includes the phone list; never the static tablet preview, D1). */
 	protected static successionRedraw(host: ViewHost, st: BlockState): void {
 		for (const v of [...host.views]) {
 			if (v.unloaded || v.peekState() !== st || (!v.full && v.coarse && !v.isPhone())) continue;
@@ -815,7 +815,7 @@ export abstract class TreeViewBase extends MarkdownRenderChild implements HoverP
 	 */
 	static showFinder(host: ViewHost, st: BlockState, first: string, second: string, origin: TreeViewBase | null): void {
 		st.finder = { first, second, index: 0, whole: false, steps: false };
-		// One temporary view at a time (contract 0.2.7 F.1). The finder skips the phone list, so a list under a Show view that ends here draws again.
+		// One temporary view at a time. The finder skips the phone list, so a list under a Show view that ends here draws again.
 		const hadShow = st.succession !== null;
 		st.succession = null;
 		if (hadShow) TreeViewBase.listRedraw(host, st);

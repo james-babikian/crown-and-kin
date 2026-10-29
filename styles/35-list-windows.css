@@ -1,4 +1,4 @@
-/* ===== list windows (0.2.5, D134) ===== */
+/* ===== list windows (D134) ===== */
 
 /* The window is as tall as its content, up to the screen (the base rule has the maximum), and anchored at the top: a short list is a small window, and a page that opens does not move the top edge (list-window-height). */
 .modal.dynasty-sheet.dynasty-lw:not(.is-phone) {
@@ -315,6 +315,8 @@ body.theme-dark .dynasty-lw .dynasty-lw-dot {
 /* A name field grows and shrinks with its text (growField in list-window.ts writes the height). */
 .dynasty-lw textarea.dynasty-lw-field {
 	box-sizing: border-box;
+	/* A name of several text lines must not be cut by the pill radius of a theme. */
+	border-radius: min(var(--input-radius, 8px), 12px);
 	width: 100%;
 	height: var(--dynasty-lw-field-height, auto);
 	min-height: var(--input-height);

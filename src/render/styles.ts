@@ -203,9 +203,9 @@ export const UNION_MARKS: Record<UnionShape, { size: number; stroke?: number }> 
 };
 
 /**
- * 0.2.1: the partnership sign inside a far-couple tag. `unit` is the sign's size unit as a fraction of the
+ * The partnership sign inside a far-couple tag. `unit` is the sign's size unit as a fraction of the
  * tag's text size (it replaces the union size of a near couple's sign, so the sign fits the pill); `slot` is
- * the room of the dot only, in text sizes, with a small gap on each side (0.2.2: `tagMarkSlot` gives the room of
+ * the room of the dot only, in text sizes, with a small gap on each side (`tagMarkSlot` gives the room of
  * each shape, wider for the ring, the diamond and the triangle). The shapes and outline widths are those of
  * `UNION_MARKS`.
  */
@@ -217,13 +217,13 @@ function shapeHalfWidth(shape: UnionShape, s: number): number {
 	return (shape === 'open-triangle' ? 0.95 * s : s) + (stroke ?? 0) / 2;
 }
 
-/** 0.2.2 (D108): half the drawn width of the sign of `shape` in a far-couple tag of text size `font` px, outline included. */
+/** D108: half the drawn width of the sign of `shape` in a far-couple tag of text size `font` px, outline included. */
 export function tagMarkHalfWidth(shape: UnionShape, font: number): number {
 	return shapeHalfWidth(shape, UNION_MARKS[shape].size * TAG_MARK.unit * font);
 }
 
 /**
- * 0.2.2 (D108): the clear gap G between the right edge of the partnership sign and the start of the name in a
+ * D108: the clear gap G between the right edge of the partnership sign and the start of the name in a
  * far-couple tag, for text size `font` px. It is the gap that the dot always had (the dot sits in the middle of the
  * 1.1 text-size slot), and every shape gets the same one: the shapes differ in width, so a fixed centred slot
  * left the ring and the open triangle 1 to 2 px from the first letter.
@@ -233,8 +233,8 @@ export function tagMarkGap(font: number): number {
 }
 
 /**
- * 0.2.2 (D108): the room a sign of `shape` takes in a far-couple tag, in px: the gap G on each side of the shape.
- * The sign sits in the middle of this room. For the dot it is `TAG_MARK.slot` text sizes, as in 0.2.1; wider shapes
+ * D108: the room a sign of `shape` takes in a far-couple tag, in px: the gap G on each side of the shape.
+ * The sign sits in the middle of this room. For the dot it is `TAG_MARK.slot` text sizes; wider shapes
  * take more room, so the gap before the name is the same and the shape never touches the marriage sign.
  */
 export function tagMarkSlot(shape: UnionShape, font: number): number {
@@ -259,16 +259,16 @@ export const ON_LINE_EXTRA = 1.5;
 export const FADED_OPACITY = 0.25;
 /**
  * D41, D153: the marked card has one border in the text colour, `border` px wide (`.dynasty-card-me .dynasty-card-bg`). It is the same stroke
- * in the live scene and the saved picture; no theme accent colour is used, so the mark never clashes with a house colour. 0.2.8 (D212, you-border): 2 px, not 3.
+ * in the live scene and the saved picture; no theme accent colour is used, so the mark never clashes with a house colour. D212: 2 px, not 3.
  */
 export const ME_LOOK = { border: 2 } as const;
 /**
- * 0.2.8 (contract C, G.15): the corner radius of a card in a saved picture, which has no theme to read it from. It is the default theme's `--radius-m`; the live tree reads
+ * The corner radius of a card in a saved picture, which has no theme to read it from. It is the default theme's `--radius-m`; the live tree reads
  * the radius of the theme at run time (`readCornerRadius`). The ribbon of a saved picture uses it.
  */
 export const SAVED_CARD_RADIUS = 8;
 /**
- * 0.2.7 (F.2, F.4, F.5); 0.2.8 (I35, D212 heir-outline): how the heir's outline and the tabs look in the saved picture, which has no page CSS. `border` is the width of the heir's
+ * D212: how the heir's outline and the tabs look in the saved picture, which has no page CSS. `border` is the width of the heir's
  * one accent border (`non-scaling` on screen; there is no second ring); `tabBorder` is the 1 px border of the "You" tab and of the ordinal tab, and `tabBase` the wide
  * card-colour edge round them (the base under them).
  */

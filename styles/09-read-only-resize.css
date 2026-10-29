@@ -25,7 +25,7 @@
 }
 
 /*
- * 0.2.8 (contract C): the tree box of a note has no frame of its own. The toolbar row has its hairline below, and the box a hairline at its foot.
+ * The tree box of a note has no frame of its own. The toolbar row has its hairline below, and the box a hairline at its foot.
  * A rule with a higher specificity than the base rule of the viewport.
  */
 .dynasty-root .dynasty-viewport {
@@ -121,7 +121,7 @@
 	bottom: var(--dynasty-hint-bottom, var(--size-4-1));
 }
 
-/* G5 0.4: a card in the right corner; the hint stands in the left corner, with the same gap to the edge. */
+/* A card in the right corner; the hint stands in the left corner, with the same gap to the edge. */
 .dynasty-hint.is-left {
 	right: auto;
 	left: var(--size-4-2);

@@ -1,7 +1,7 @@
 /*
  * The name lists of one owner in the Calendars window (spec §14 rule 16): a calendar, or the plain years. Each list is a group of fields: the name of the
- * list with "Remove" at the right end of its first row, the marker (not for the plain years), the names in order as text lines, the known year (a date and the name of that year,
- * with a line that reads them back), and the choice "Show on cards". "Add name list" stands after the last list. The fields write into the draft as the user types.
+ * list, the marker (not for the plain years), the names in order as text lines, the known year (a date and the name of that year,
+ * with a line that reads them back), and the choice "Show on cards", then the link "Remove this list". "Add name list" stands after the last list. The fields write into the draft as the user types.
  */
 
 import { MAX_LISTS } from '../core/dates';
@@ -11,7 +11,7 @@ import { field, selectField, SHOW_OPTIONS, type CardHost, type FieldError } from
 import { textButton } from './window-parts';
 
 /** What the list editor needs to know about its owner. */
-export interface ListsOwner {
+interface ListsOwner {
 	/** The draft key of the calendar, or `PLAIN_KEY`. */
 	key: number;
 	plain: boolean;
@@ -49,16 +49,16 @@ function listForm(parent: HTMLElement, host: CardHost, o: ListsOwner, l: ListDra
 	const top = box.createDiv({ cls: ['dynasty-grid', 'is-stack'] });
 	// The plain years have no marker, so the name takes the whole row.
 	field(top, host, `list-${l.key}-name`, T.listName, l.name, (v) => (l.name = v), { error: at('name'), wide: o.plain, placeholder: T.listNamePlaceholder });
-	if (!o.plain) field(top, host, `list-${l.key}-marker`, T.markerLabel, l.marker, (v) => (l.marker = v), { placeholder: T.markerPlaceholder, hint: T.markerHint, error: at('marker') });
-	// After the fields, so the Tab key reaches Remove last; the style sheet puts it at the right end of the first row, on the line of the labels (as Remove of an era).
-	const remove = textButton(top, ['dynasty-link', 'dynasty-cal-remove', 'dynasty-cal-remove-list'], T.remove, () => host.removeList(o.key, l.key), { label: T.removeList(l.name.trim()), focus: `cal:list-remove:${l.key}` });
-	host.register(() => remove.setAttribute('aria-label', T.removeList(l.name.trim())));
+	if (!o.plain) field(top, host, `list-${l.key}-marker`, T.markerLabel, l.marker, (v) => (l.marker = v), { placeholder: T.markerPlaceholder, hint: T.markerHint, keepTogether: T.markerHintKeep, error: at('marker') });
 	// The field is one text line higher than its names (a list of seven shows all seven and one free text line), and not lower than 3 text lines or higher than 10.
 	const rows = Math.min(10, Math.max(3, l.names.split('\n').length + 1));
 	field(box, host, `list-${l.key}-names`, T.namesLabel, l.names, (v) => (l.names = v), { area: true, rows, wide: true, placeholder: T.namesPlaceholder, hint: T.namesHint, error: at('names') });
 	knownPart(box, host, o, l, at);
 	const bottom = box.createDiv({ cls: ['dynasty-grid', 'is-stack'] });
 	selectField(bottom, host, `list-${l.key}-show`, T.showLabel, l.show, SHOW_OPTIONS, (v) => (l.show = v as ListDraft['show']), T.showHint);
+	// At the end of the list, under its last field, away from the fields that a finger taps (a tap on Marker once removed the list).
+	const remove = textButton(box, ['dynasty-link', 'dynasty-cal-remove-list'], T.removeThisList, () => host.removeList(o.key, l.key), { label: T.removeList(l.name.trim()), focus: `cal:list-remove:${l.key}` });
+	host.register(() => remove.setAttribute('aria-label', T.removeList(l.name.trim())));
 }
 
 /** The name lists of an owner and the link "Add name list". */

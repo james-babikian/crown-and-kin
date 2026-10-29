@@ -3,9 +3,7 @@
  * written `arms` or `portrait` link points to, which file formats the plugin can show, the format
  * and size read from a file's first bytes, the 40 million pixel rule, the portrait crop, the arms
  * fit, and the four picture warnings. Nothing here reads the vault or decodes a picture: the
- * Obsidian side (`picture-store.ts`) does that and asks these functions what to do. The rule
- * numbers in the comments are those of the M9 core contract (rules 4–9 and 12, amendments A1, A2,
- * A4, A6), which was folded into this file and its neighbours when M9 ended.
+ * Obsidian side (`picture-store.ts`) does that and asks these functions what to do.
  *
  * Rules the code here does not show:
  * - The bytes decide in the end: a JPEG named .png shows; a HEIC named .jpg is not a picture.
@@ -22,7 +20,7 @@ import type { House, Person } from './types';
 // ---------- Links (rules 4, 5) ----------
 
 /** A picture link read from `arms` or `portrait`: a web address, or a path in the vault. */
-export type PictureTarget =
+type PictureTarget =
 	| { kind: 'web' }
 	| {
 			kind: 'vault';
@@ -62,7 +60,7 @@ export function pictureTarget(value: string | undefined): PictureTarget | null {
 export type SupportedFormat = 'png' | 'jpeg' | 'webp' | 'gif' | 'bmp' | 'svg';
 
 /** What an extension says about a file (rule 6). `name` is the format's name in the warning text. */
-export type FormatVerdict = { kind: 'supported'; format: SupportedFormat } | { kind: 'unsupported'; name: string } | { kind: 'other' };
+type FormatVerdict = { kind: 'supported'; format: SupportedFormat } | { kind: 'unsupported'; name: string } | { kind: 'other' };
 
 const SUPPORTED: Record<string, SupportedFormat> = { png: 'png', jpg: 'jpeg', jpeg: 'jpeg', webp: 'webp', gif: 'gif', bmp: 'bmp', svg: 'svg' };
 
@@ -367,7 +365,7 @@ function startTag(text: string, from: number): string {
 export const MAX_PICTURE_PIXELS = 40_000_000;
 
 /**
- * One picture problem, with the text params beyond the owner (rule 12). `file` is the path as
+ * One picture problem, with the text params besides `owner` (rule 12). `file` is the path as
  * written for `missing-picture`, else the file name. `pixels` (millions, rounded up) is absent
  * when the file was too large to read at all (A6).
  */
@@ -439,7 +437,7 @@ export interface CopyPx {
 }
 
 /**
- * The pixels of a copy (O3, B10): the box in CSS px times min(max(dpr, 1), 3). `noEnlarge` is carried only when it is set, so a copy
+ * The pixels of a copy: the box in CSS px times min(max(dpr, 1), 3). `noEnlarge` is carried only when it is set, so a copy
  * without it has the same size record as before.
  */
 export function copyPixels(box: { w: number; h: number; noEnlarge?: boolean }, dpr: number): CopyPx {
@@ -456,11 +454,10 @@ export function limitBox(picture: { width: number; height: number }, px: CopyPx,
 // ---------- Warnings (rule 12, A1) ----------
 
 /** The four picture warning codes (spec §13.6, §13.7). */
-export const PICTURE_CODES = ['missing-picture', 'picture-web', 'picture-not-image', 'picture-too-large'] as const;
+const PICTURE_CODES = ['missing-picture', 'picture-web', 'picture-not-image', 'picture-too-large'] as const;
 
 /**
- * Whose picture a problem is about. `arms: true` on a portrait owner means the personal arms of that person (0.2.8 contract
- * A.1); it is a flag, not a third kind, so callers that tell a house from a person keep compiling until they adopt it.
+ * Whose picture a problem is about. `arms: true` on a portrait owner means the personal arms of that person; it is a flag, not a third kind, so callers that tell a house from a person keep compiling until they adopt it.
  */
 export type PictureOwner = { kind: 'arms'; house: Pick<House, 'id' | 'name'> } | { kind: 'portrait'; person: Pick<Person, 'id' | 'name'>; arms?: true };
 

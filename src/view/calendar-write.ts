@@ -1,7 +1,7 @@
 /*
  * The write of the Calendars window (spec §14 rule 2), with no Obsidian: it turns the edit operations of `calendar-draft.ts` into the new text of a calendar note.
  * Each block is written with `planWrite` (language `kin-calendar`), which checks that the block still holds the text the window loaded, so a change made
- * elsewhere (a sync, another window) is never overwritten. The window does the file work: it gives this function the text that the note holds at the moment of the write.
+ * elsewhere (a sync, another window) is never overwritten. The window does the file work: it gives the write the text that the note holds at the moment of the write.
  */
 
 import { CALENDAR_LANGUAGE, findBlocks } from '../core/block-locate';

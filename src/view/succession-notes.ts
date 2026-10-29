@@ -7,17 +7,17 @@
 import type { FamilyGraph } from '../core/derive';
 import { codedIssue, issueText, type IssueParams } from '../core/messages';
 import type { SuccessionNote, SuccessionResult } from '../core/succession';
-import type { DateWarningRow } from '../core/succession-dates';
+import { bornNoYear, type DateWarningRow } from '../core/succession-dates';
 import { SUCCESSION_UI as T } from '../render/ui-text';
-import { holderText, type HolderRow } from './titles-draft';
+import { holderLead, holderText, type HolderRow } from './titles-draft';
 
-/** "Aldric II": the ruler text of the holder entry of `id` that the year reaches; else `name`. `year` is the internal year of the line (null for "now"). */
+/** "Aldric II": the name that the holder list shows in bold for the holder entry of `id` that the year reaches (the full name of an unnumbered entry); else `name`. `year` is the internal year of the line (null for "now"). */
 export function rulerLabelOf(g: FamilyGraph, holders: readonly HolderRow[], id: string, year: number | null, name: string): string {
 	let pick: string | null = null;
 	for (const h of holders) {
 		if (h.values.person !== id) continue;
 		const from = g.dates.read(h.values.from)?.year;
-		if (pick === null || year === null || from === undefined || from <= year) pick = holderText(g, h.values).ruler;
+		if (pick === null || year === null || from === undefined || from <= year) pick = holderLead(holderText(g, h.values), h.values);
 	}
 	return pick || name;
 }
@@ -42,7 +42,18 @@ export function afterNotes(res: SuccessionResult, g: FamilyGraph, under: Readonl
 }
 
 /**
- * The quiet notes under a named heir (G.6): why the heir is not used (not alive, not born yet, the ruler, excluded), a birth date with no year and, for a
+ * True when the plugin cannot read a year in the birth date of `id`, and the line used that date: the line read births (`noYear`), or the date broke the order of the note.
+ * The line with "now" reads no births, so without the second case a break of the order would show with no cause (spec §13.21 rule 9).
+ */
+export function bornDateUnread(res: SuccessionResult, g: FamilyGraph, id: string): boolean {
+	if (res.noYear.some((n) => n.id === id && n.what === 'born')) return true;
+	const person = g.byId.get(id);
+	const breaks = res.notes.some((n) => n.kind === 'order-contradiction' && Array.isArray(n.params.people) && n.params.people.includes(id));
+	return breaks && person !== undefined && bornNoYear([person], g.dates).length > 0;
+}
+
+/**
+ * The quiet notes under a named heir: why the heir is not used (not alive, not born yet, the ruler, excluded), a birth date with no year and, for a
  * death date with no year (spec §14 rule 5), the note that says how the line counts the heir. The sentences name the year as it is written.
  */
 export function heirNotes(res: SuccessionResult | null, id: string, nameOf: (id: string) => string): { text: string; note: string }[] {

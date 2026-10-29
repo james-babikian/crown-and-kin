@@ -85,14 +85,14 @@ export function idProblems(kind: IdKind, rows: readonly IdRow[], dangling: Itera
 		const why = checkNewId(draftId(r), takenFor(rows, r, names, fresh));
 		if (why !== null) out.set(r.key, why);
 	}
-	// The saved row is refused because a new row's name gives its id; the owner sees both rows with the same name, so both get a mark.
+	// The saved row is refused because a new row's name gives its id; the user sees both rows with the same name, so both get a mark.
 	const refused = new Set<string>();
 	for (const r of rows) if (out.get(r.key) === 'taken') refused.add(draftId(r));
 	for (const [key, id] of fresh) if (refused.has(id)) out.set(key, 'newName');
 	return out;
 }
 
-/** Why `value` would be refused as the id of `row` (the small ID window checks while the owner types); null when it is allowed. */
+/** Why `value` would be refused as the id of `row` (the small ID window checks while the user types); null when it is allowed. */
 export function idProblemFor(kind: IdKind, rows: readonly IdRow[], row: IdRow, value: string, dangling: Iterable<string>): IdReason | null {
 	const probe = rows.map((r) => (r.key === row.key ? { ...r, idDraft: value } : r));
 	return idProblems(kind, probe, dangling).get(row.key) ?? null;

@@ -1,5 +1,5 @@
 /*
- * Where the view looks (0.3.3, WP-1 A1): the height of the box, the direction (D24), a resize, the bars that the view keeps free, the anchor that a redraw
+ * Where the view looks: the height of the box, the direction (D24), a resize, the bars that the view keeps free, the anchor that a redraw
  * keeps, and the first view of a tree, of the finder's small tree and of the Show view (spec §5.5, §5.6, D18, D222). Third layer of the chain listed in
  * `tree-view.ts`.
  */
@@ -249,7 +249,7 @@ export abstract class TreeViewPlacement extends TreeViewLifecycle {
 
 	/**
 	 * D51, D203 item 2: the first view of the finder's small tree on an upright phone draws it top to bottom, in the free area below the
-	 * result bar and above the toolbar (before 0.2.8 the direction with the larger names won).
+	 * result bar and above the toolbar.
 	 * The other layout replaces the drawn one in place; the window's orientation stays the view's own,
 	 * so the D24 turn logic sees no turn.
 	 */
@@ -263,7 +263,7 @@ export abstract class TreeViewPlacement extends TreeViewLifecycle {
 		const top = Math.max(0, Math.min(this.insetTop, size.h - 1));
 		const area = { w: size.w, h: Math.max(1, size.h - top - Math.max(0, this.insetBottom)) };
 		const facts = (l: LaidOut) => ({ bounds: treeBounds(l.layout.width, l.layout.height), fontPx: l.layout.geometry.fontPx });
-		// 0.2.8 (D203 item 2): on a phone the line of the finder is always drawn top to bottom (the whole tree stays sideways); elsewhere the larger names decide.
+		// D203 item 2: on a phone the line of the finder is always drawn top to bottom (the whole tree stays sideways); elsewhere the larger names decide.
 		if (!this.isPhone() && finderOrientation(area, facts(now), facts(alt.laid)) !== alt.laid.layout.orientation) return;
 		last.settings = alt.settings;
 		// The geometry follows the direction too: a later layout of this tree (a font change) must not mix the text card with a top-to-bottom tree.
@@ -273,7 +273,7 @@ export abstract class TreeViewPlacement extends TreeViewLifecycle {
 		this.viewport?.parentElement?.setAttribute('data-dynasty-orientation', alt.laid.layout.orientation);
 	}
 
-	/** A view chosen for the area above the bottom toolbar and between the side safe areas (V1), shown in the whole viewport. */
+	/** A view chosen for the area above the bottom toolbar and between the side safe areas, shown in the whole viewport. */
 	protected aboveBottomBar(size: Size, make: (area: Size) => View): View {
 		const b = Math.max(0, Math.min(this.insetBottom, size.h - 1));
 		const inner = (area: Size) => betweenSides(area, this.insetLeft, this.insetRight, make);
@@ -282,7 +282,7 @@ export abstract class TreeViewPlacement extends TreeViewLifecycle {
 		return v.scale > 0 ? { scale: v.scale, cx: v.cx, cy: v.cy + b / 2 / v.scale } : v;
 	}
 
-	/** The bars and the side safe areas that the views chosen by the plugin keep free (D222, V1); none in a note. */
+	/** The bars and the side safe areas that the views chosen by the plugin keep free (D222); none in a note. */
 	protected freeArea(): FreeArea | undefined {
 		return this.full ? { top: this.insetTop, bottom: this.insetBottom, left: this.insetLeft, right: this.insetRight } : undefined;
 	}
@@ -313,7 +313,7 @@ export abstract class TreeViewPlacement extends TreeViewLifecycle {
 		// so the edited card moves as little as it can. Every other edit keeps the reveal of spec §5.5.
 		const sheet = TreeViewBase.sheetPerson.get(st);
 		if (sheet && performance.now() <= sheet.until && sheet.id !== hl.id) this.bringIn(box);
-		// D244 wins over G3 F3 and V1 here: the edited card keeps its place when the card is whole, even if its badge reaches under a bar or its edge into the notch.
+		// D244 wins over the bar and notch rules here: the edited card keeps its place when the card is whole, even if its badge reaches under a bar or its edge into the notch.
 		else this.reveal(box, true);
 		this.pulse([hl.id]);
 	}
@@ -343,7 +343,7 @@ export abstract class TreeViewPlacement extends TreeViewLifecycle {
 		const parentIds = this.g?.placementParents.get(id) ?? [];
 		const atTop = !parentIds.length;
 		const parents = boxesOf(persons, parentIds);
-		// The near partners count with the focus person when the names must go smaller to show a child (G3 F4); a far partner is drawn elsewhere (D10).
+		// The near partners count with the focus person when the names must go smaller to show a child; a far partner is drawn elsewhere (D10).
 		const far = laid.layout.farTags.get(id)?.spouses ?? [];
 		const partners = this.g ? boxesOf(persons, partnersAndChildren(this.g, id).partners.filter((p) => !far.includes(p))) : [];
 		const v = this.aboveBottomBar(size, (area) => focusView(this.bounds, area, laid.layout.geometry.fontPx, me, this.insetTop, children, atTop, parents, partners));
@@ -355,7 +355,7 @@ export abstract class TreeViewPlacement extends TreeViewLifecycle {
 		return clearToolbar(v, size, this.barBox, boxes, me, size.h - this.insetBottom);
 	}
 
-	/** Start person (spec §5.5, G.4): the person last edited in this block, else options.start, else the marked person ("You"), else the first root. */
+	/** Start person (spec §5.5): the person last edited in this block, else options.start, else the marked person ("You"), else the first root. */
 	protected startId(): string | null {
 		const g = this.g;
 		if (!g) return null;
@@ -410,7 +410,7 @@ export abstract class TreeViewPlacement extends TreeViewLifecycle {
 	}
 
 	/**
-	 * D222, D246 (F3): in the full-screen view only, the view that puts a small tree in the middle of the free area between the bars: at `scale` if it fits or only its
+	 * D222, D246: in the full-screen view only, the view that puts a small tree in the middle of the free area between the bars: at `scale` if it fits or only its
 	 * empty margin is cut, else smaller so that no card is cut (see `centredOpening`); else null. The insets are the cached values of `measureInsets`.
 	 */
 	protected centredSmall(size: Size, scale: number): View | null {
@@ -425,7 +425,7 @@ export abstract class TreeViewPlacement extends TreeViewLifecycle {
 		const startBox = start ? (persons.get(start) ?? null) : null;
 		const fam = start && this.g ? partnersAndChildren(this.g, start) : null;
 		const family = fam ? { partners: boxesOf(persons, fam.partners), children: boxesOf(persons, fam.children) } : null;
-		// 0.2.8 (G.4): the readable view of a note shows the row of the parents above the start person.
+		// The readable view of a note shows the row of the parents above the start person.
 		const parents = start && this.g ? boxesOf(persons, this.g.placementParents.get(start) ?? []) : [];
 		const plain = (area: Size) => defaultView(this.bounds, area, laid.layout.geometry.fontPx, startBox, this.insetTop, family);
 		const small = centre ? this.centredSmall(size, this.aboveBottomBar(size, plain).scale) : null;
@@ -468,7 +468,7 @@ export abstract class TreeViewPlacement extends TreeViewLifecycle {
 	}
 
 	protected storeView(view: View): void {
-		// The finder's tree and the Show view are not the family: after Close the family's own saved view comes back (spec §13.2, contract 0.2.7 F.2).
+		// The finder's tree and the Show view are not the family: after Close the family's own saved view comes back (spec §13.2).
 		if (this.finderDrawn?.line || this.successionDrawn) return;
 		const st = this.ensureState();
 		st.view = view;
@@ -515,7 +515,7 @@ export abstract class TreeViewPlacement extends TreeViewLifecycle {
 	}
 
 	/**
-	 * The first view of the Show view (F.2): the ruler and the heirs below the bar. The open branches are not fitted. On a phone it
+	 * The first view of the Show view: the ruler and the heirs below the bar. The open branches are not fitted. On a phone it
 	 * never goes below the scale `PHONE_MIN_SCALE`: it starts at the ruler (prototype finding 2).
 	 */
 	protected successionView(laid: LaidOut, size: Size, d: SuccessionDrawn): View {
@@ -530,8 +530,8 @@ export abstract class TreeViewPlacement extends TreeViewLifecycle {
 
 	/** D212 (bars-in-flow): a first view that the plugin chooses never leaves a card cut in two by the toolbar and the banner at the top (`keepTopCardWhole`). */
 	protected keepTopWhole(v: View, size: Size, laid: LaidOut, keys: readonly Rect[]): View {
-		// A `+` badge sticks out above its card: it is not cut by the bar (G3 F3), and it does not stand in the safe area above the bar either (V3).
-		// 0.3.1 fix3: in the full-screen view, where the bars lie over the tree, the badge's whole press square at this zoom keeps out of the band too,
+		// A `+` badge sticks out above its card: it is not cut by the bar, and it does not stand in the safe area above the bar either.
+		// In the full-screen view, where the bars lie over the tree, the badge's whole press square at this zoom keeps out of the band too,
 		// so no part of it is under the opaque focus bar. In a note the bars stand above the drawing area and the circle counts, as before.
 		const marks = (this.scene?.badges ?? []).map((b) => {
 			if (!this.full) return b.mark;
@@ -545,7 +545,7 @@ export abstract class TreeViewPlacement extends TreeViewLifecycle {
 	}
 
 	/**
-	 * The tap shape of the `+` badge of `person` (visible circle `mark`) at `scale` (spec §7.5, contract 4.2): the square is capped at the layout's node gap in
+	 * The tap shape of the `+` badge of `person` (visible circle `mark`) at `scale` (spec §7.5): the square is capped at the layout's node gap in
 	 * `sideways` and at half the own card in `down`, and clipped at the tag tap areas of the other people (`badgeTap`). One place for the settle and the first view.
 	 */
 	protected badgeTapAt(laid: LaidOut, person: string, mark: Rect, scale: number): ReturnType<typeof badgeTap> {

@@ -57,7 +57,7 @@ describe('the bars of a tree view keep their DOM (steward T1)', () => {
 		const { el } = await embed(BODY_16, { handle: fakeHandle('n.md', BODY_16) });
 		expect(bars(el)).toMatchInlineSnapshot(`
 			"parent dynasty-viewport.is-flow, child 0 of 2
-			div.dynasty-toolbar [role=toolbar aria-label=Tools for this tree]
+			div.dynasty-toolbar.has-wide-set [role=toolbar aria-label=Tools for this tree]
 			  button.clickable-icon.dynasty-tool.dynasty-add-person.dynasty-tool-main [aria-label=Add person: add a person to the tree type=button]
 			    span.dynasty-tool-icon
 			    span.dynasty-tool-text "Add person"
@@ -158,7 +158,7 @@ describe('the bars of a tree view keep their DOM (steward T1)', () => {
 		const { root } = await openFullScreen(flat(FIRST_LIMIT + 1), { host: fakeHost() });
 		expect(bars(root)).toMatchInlineSnapshot(`
 			"parent dynasty-viewport, child 0 of 2
-			div.dynasty-toolbar [role=toolbar aria-label=Tools for this tree]
+			div.dynasty-toolbar.has-wide-set [role=toolbar aria-label=Tools for this tree]
 			  button.clickable-icon.dynasty-tool.dynasty-add-person.dynasty-tool-main [aria-label=Add person: add a person to the tree type=button]
 			    span.dynasty-tool-icon
 			    span.dynasty-tool-text "Add person"

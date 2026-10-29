@@ -1,4 +1,4 @@
-/* ---------- M6 windows: settings, keyboard, Houses window (WP6.3; spec §5.2, §6.10, §9, D32) ---------- */
+/* ---------- Windows: settings, keyboard, Houses window (spec §5.2, §6.10, §9, D32) ---------- */
 
 /* Spec §9 "Show dates on cards" off: the dates hide, the card keeps its size. */
 .dynasty-no-dates .dynasty-card-dates {
@@ -6,7 +6,7 @@
 }
 
 /* A visible focus ring on every toolbar button (spec §5.2), inside the toolbar box, in any theme: the
-   accent at the edge, and inside it 2 px in the text colour, so it never depends on the accent alone (WP6.5). */
+   accent at the edge, and inside it 2 px in the text colour, so it never depends on the accent alone. */
 .dynasty-toolbar .dynasty-tool:focus-visible {
 	outline: 2px solid var(--interactive-accent);
 	outline-offset: -2px;
@@ -41,7 +41,7 @@
 }
 
 /* Obsidian gives a setting description `text-overflow: ellipsis`; iOS WebKit then puts "…" in the
-   middle of a wrapped description ("…w…" on the owner's iPhone, M6). Our descriptions always wrap and
+   middle of a wrapped description ("…w…" on an iPhone). Our descriptions always wrap and
    nothing of them is hidden, so no ellipsis is needed. */
 .dynasty-settings .setting-item-description {
 	text-overflow: clip;

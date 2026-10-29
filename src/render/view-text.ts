@@ -5,7 +5,7 @@
  * `ui-text.ts` re-exports every name. Simplified Technical English (ASD-STE100) and the project word list apply.
  */
 
-/** The word on the "You" tab of the marked person; the same word as the relation text of that person (B.3.4). */
+/** The word on the "You" tab of the marked person; the same word as the relation text of that person. */
 export const ME_WORD = 'You';
 
 /** The placeholder of every box that searches for a person. The windows and the line of succession use it too. */
@@ -79,7 +79,7 @@ export const FOCUS_UI = {
 	chooseLabel: 'Choose a person: show only the family of the person that you choose',
 	clear: 'Clear focus',
 	clearLabel: 'Clear focus: show all people again',
-	/** D246 (F2): the sentence of the bar at the top of the tree while a focus shows. */
+	/** D246: the sentence of the bar at the top of the tree while a focus shows. */
 	bar: (name: string) => `Focus on ${name}`,
 	/** The accessible name and the tooltip of the Focus button while a focus shows: it says what a tap does (D263 B2). */
 	focusOn: 'Focus is on. Select this button to clear the focus and show all people.',
@@ -183,7 +183,7 @@ export const LINK_WORDS = {
 	},
 } as const;
 
-/** Toolbar of the tree view (0.2.8 contract C, G.13): the name of the row, the Houses button and the Focus menu item for the marked person. */
+/** Toolbar of the tree view: the name of the row, the Houses button and the Focus menu item for the marked person. */
 export const TOOLBAR_UI = {
 	/** F13: Obsidian shows this name as a tooltip over the free points of the toolbar, so it says what the bar holds (it was only "Tree"). */
 	region: 'Tools for this tree',
@@ -193,7 +193,7 @@ export const TOOLBAR_UI = {
 
 /** Notices of the tree view and of the link update that follows a rename. */
 export const VIEW_NOTICE = {
-	/** F-VIEW-04: the update of the links in one note stopped because a write of the note took too long. */
+	/** The update of the links in one note stopped because a write of the note took too long. */
 	renameGaveUp: (note: string, old: string, next: string) =>
 		`After a rename, the plugin updates the links in the trees. In the note ${note}, this update took too long, and the plugin stopped it. If a tree in the note still has the link “${old}”, replace it with “${next}”.`,
 } as const;

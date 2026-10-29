@@ -9,7 +9,7 @@ import type { App } from 'obsidian';
 import type { FamilyGraph } from '../core/derive';
 import { cardLabels, needsLabels } from '../core/titles';
 import type { Person } from '../core/types';
-import { dateLine } from '../render/tree-info';
+import { dateLineShown } from '../render/tree-info';
 import { VIEWER_UI } from '../render/viewer-text';
 import { openPictureViewer, type ViewerPicture } from './picture-viewer';
 import type { PictureStore } from './picture-store';
@@ -45,7 +45,7 @@ export function personPictures(kit: PersonKit): ViewerPicture[] {
 	const portrait = d.portrait.trim();
 	if (portrait) {
 		const label = kit.person.id !== '' && needsLabels(kit.g) ? cardLabels(kit.g).get(kit.person.id) : undefined;
-		const dates = dateLine({ ...kit.person, born: d.born.trim() || undefined, died: d.died.trim() || undefined }, kit.g.dates) ?? '';
+		const dates = dateLineShown({ ...kit.person, born: d.born.trim() || undefined, died: d.died.trim() || undefined }, kit.g.dates) ?? '';
 		out.push({ kind: 'portrait', link: portrait, heading, line: VIEWER_UI.portraitLine([label?.title ?? d.title.trim(), dates]), label: VIEWER_UI.portraitOf(who), show: VIEWER_UI.showPortrait });
 	}
 	const own = d.arms.trim();
@@ -64,7 +64,7 @@ export function housePictures(kit: HouseKit): ViewerPicture[] {
 	const arms = kit.arms?.trim();
 	if (!arms) return [];
 	const name = kit.name.trim();
-	// The name above already says whose arms these are, so the text line is one word; the screen-reader label keeps the owner.
+	// The name above already says whose arms these are, so the text line is one word; the screen-reader label keeps the full name.
 	const label = name ? VIEWER_UI.armsOf(name) : VIEWER_UI.arms;
 	return [{ kind: 'arms', link: arms, heading: name || VIEWER_UI.arms, line: VIEWER_UI.arms, label, show: VIEWER_UI.showArms }];
 }

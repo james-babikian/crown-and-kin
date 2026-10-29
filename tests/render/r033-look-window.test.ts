@@ -130,13 +130,13 @@ describe('S3: the names box is one text line higher than its names', () => {
 	});
 });
 
-describe('S2: Remove of a list is in the first row of the list', () => {
-	it('stands in the grid of the first row, after the fields, and the style sheet puts it at the right end', async () => {
+describe('S2 (changed in 0.5.1): Remove of a list is at the end of the list', () => {
+	it('stands in the list itself, not in a grid, and the style sheet keeps it in the flow at the left', async () => {
 		const o = await openWindow({ 'Calendars.md': note(2) });
 		const remove = o.win.contentEl.querySelector('.dynasty-cal-list .dynasty-cal-remove-list')!;
-		expect(remove.parentElement!.hasClass('dynasty-grid')).toBe(true);
+		expect(remove.parentElement!.hasClass('dynasty-cal-list')).toBe(true);
 		const css = readFileSync('styles/37-calendars.css', 'utf8');
-		expect(css).toMatch(/button\.dynasty-cal-remove-list\s*\{[^}]*position:\s*absolute;[^}]*right:\s*0/);
+		expect(css).not.toMatch(/button\.dynasty-cal-remove-list\s*\{[^}]*position:\s*absolute/);
 	});
 });
 

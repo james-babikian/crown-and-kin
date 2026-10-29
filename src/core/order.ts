@@ -16,7 +16,7 @@ import { partnerOf, type FamilyGraph } from './derive';
 import { loneRumouredRoots } from './rumoured-roots';
 
 /** One entry of the left-to-right order: a person card, or a union's dot. */
-export type OrderItem = { kind: 'person'; id: string } | { kind: 'union'; key: string };
+type OrderItem = { kind: 'person'; id: string } | { kind: 'union'; key: string };
 
 /** The left-to-right order of people and unions the layout should try to keep. */
 export interface ModelOrder {
@@ -33,7 +33,7 @@ export interface ModelOrder {
 	 */
 	anchors: Map<string, string>;
 	/**
-	 * For each person, the keys of their families in the order of their hang points along the card (W3): union
+	 * For each person, the keys of their families in the order of their hang points along the card: union
 	 * keys, and `soloKey(id)` for the children of that person alone. The groups of children follow this order.
 	 */
 	familyOrder: Map<string, string[]>;
@@ -111,7 +111,7 @@ function blockRow(g: FamilyGraph, id: string, spouses: string[], others: Map<str
  * children in sibling order. `farGenerations` is the row distance of the far rule (D10): a partner
  * farther away has no line, so the family hangs from the person's own place.
  *
- * Exempt from the size rule of the architecture notes §4.2.7 (`tests/layout-size-rule.test.ts` holds its size): 122 code lines and 55 branches in 0.3.1 (0.3.0: 113 and 50). The walk is a
+ * Exempt from the size rule (an internal test holds its size): 122 code lines and 55 branches. The walk is a
  * stack machine whose tasks share the closures over its state; a split is a later clean-up.
  */
 export function computeModelOrder(g: FamilyGraph, gen: Map<string, number>, farGenerations: number = DEFAULT_FAR_GENERATIONS, whole: FamilyGraph = g): ModelOrder {

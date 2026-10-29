@@ -1,4 +1,4 @@
-/* ---------- The banner of the relation finder and of the Show view (spec §13.1, §13.2; D47–D49; 0.2.8 contract C and G.13) ---------- */
+/* ---------- The banner of the relation finder and of the Show view (spec §13.1, §13.2; D47–D49) ---------- */
 
 /*
  * One design for both (`dynasty-banner`): a row under the toolbar with the sentence at the left and the links at the right. Its own

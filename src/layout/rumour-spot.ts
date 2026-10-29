@@ -1,7 +1,7 @@
 /*
- * The "?" search of a rumoured line (the architecture notes §4.2): the search of the 0.3.0 router (E8/E9) as the card-and-line build uses it. The
+ * The "?" search of a rumoured line: the search of the router as the card-and-line build uses it. The
  * search order is the old one: the middle of the line, then along it, then the alternative pieces of the trunk, then the clearest point,
- * then any point off the cards. One change from 0.3.0: besides the cards, the "?" keeps clear of every box it is given, so a tag or a
+ * then any point off the cards. Besides the cards, the "?" keeps clear of every box it is given, so a tag or a
  * sign never sits under it. There are no counters and no module state; the last fallback reads the cards through the grid like the
  * others (it scanned every card).
  */
@@ -115,7 +115,7 @@ export function segmentsOf(d: string): Seg[] {
 /**
  * True if `p` is more than `r` and `TIE` from the box of the segment, so more than `r` and `TIE` from the segment: a cheap test before `distance`.
  * Every comparison of a distance with a size (10 px, 16 px, the card room) and with the best so far allows `TIE`, so that round-off of 1e-11 px
- * never turns a place clear or unclear (the architecture notes §4.2.4).
+ * never turns a place clear or unclear.
  */
 const beyond = (p: Spot, [x1, y1, x2, y2]: Seg, r: number) => p.x < Math.min(x1, x2) - r - TIE || p.x > Math.max(x1, x2) + r + TIE || p.y < Math.min(y1, y2) - r - TIE || p.y > Math.max(y1, y2) + r + TIE;
 
@@ -201,7 +201,7 @@ export class RumourIndex {
 }
 
 /** What the "?" must keep clear of besides lines and dots: every card by `room`, and where else it may sit. */
-export interface RumourRoom {
+interface RumourRoom {
 	room: number;
 	/** Straight pieces of the rumoured line's trunk the "?" may sit on when the line itself has no room; `own`: the segment ranges (trunk, line) it may touch. */
 	alt?: { segs: Seg[]; own: [number, number][] };

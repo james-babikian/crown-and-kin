@@ -1,7 +1,7 @@
 /*
- * The pure parts of the phone list (D144, contract C.3.1): who the list stands on when a note opens, what the list
+ * The pure parts of the phone list (D144): who the list stands on when a note opens, what the list
  * holds, which relation word a row shows and how the Back trail grows. No `obsidian` import and no DOM, so the tests
- * run it on plain data. `src/render/dom/phone-list-dom.ts` builds the DOM from `ListData`; the tree view (WP-C2b)
+ * run it on plain data. `src/render/dom/phone-list-dom.ts` builds the DOM from `ListData`; the tree view
  * calls these functions and keeps the state (`BlockState.focus`, `BlockState.listBack`).
  *
  * How the caller wires it:
@@ -55,7 +55,7 @@ export interface ListStartFacts {
 	pin: string | undefined;
 	/** The marked person, already checked against the tree (`validMe`), or null. */
 	me: string | null;
-	/** The person of the last Save that closed a person window (`st.lastSaved`), or null. An in-place write does not count (B1). */
+	/** The person of the last Save that closed a person window (`st.lastSaved`), or null. An in-place write does not count. */
 	edited?: string | null;
 	/** An open person window wrote in place (`st.listHold`): the view keeps the start it had instead of choosing again. `listStart` does not read it. */
 	hold?: boolean;
@@ -178,7 +178,7 @@ export function linkWord(g: FamilyGraph, data: ListData, row: ListRow): ListWord
 	return { text, lower: text.toLowerCase() };
 }
 
-/** The people the list shows, each once: the rows that carry a relation word are these (WP-K asks for their names in one request). */
+/** The people the list shows, each once: the rows that carry a relation word are these (their names are asked in one request). */
 export function listIds(data: ListData): string[] {
 	const ids = new Set<string>();
 	for (const r of [...data.parents, ...data.person, ...data.groups.flatMap((gr) => gr.rows)]) ids.add(r.id);
@@ -195,7 +195,7 @@ export interface ListWordFacts {
 }
 
 /**
- * The relation word of a row (C.3.1): the real word of the relation cache, so it names the relation to You. No mark, no
+ * The relation word of a row: the real word of the relation cache, so it names the relation to You. No mark, no
  * word. With the setting off, only the marked person's "You".
  */
 export function listWord(id: string, f: ListWordFacts): ListWord | null {

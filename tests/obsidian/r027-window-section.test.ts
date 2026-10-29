@@ -96,10 +96,10 @@ describe('placement', () => {
 
 describe('the line of sample tree 16 (the expected lines are in the comments of the fixture)', () => {
 	const cases: [string, string, string[], boolean][] = [
-		['duke-of-carrowmere', 'After Bertram now', ['Fenwick Carrow', 'Jasper Carrow', 'Cedric Carrow', 'Dunstan Carrow'], false],
-		['countess-of-harrowfen', 'After Matilda in 1215', ['Clara Harrow', 'Agnes Harrow', 'Dagmar Harrow', 'Sunniva Harrow', 'Tilde Harrow'], true],
-		['margrave-of-the-salt-coast', 'After Bram now', ['Dorian Saltmarsh', 'Leif Saltmarsh', 'Hale Saltmarsh', 'Finn Saltmarsh', 'Elowen Saltmarsh'], true],
-		['lord-of-wetherby', 'After Wystan now', ['Sam Wether', 'Cass Wether', 'Bertie Wether', 'Quill Penn', 'Ronan Penn'], false],
+		['duke-of-carrowmere', 'After Bertram Carrow now', ['Fenwick Carrow', 'Jasper Carrow', 'Cedric Carrow', 'Dunstan Carrow'], false],
+		['countess-of-harrowfen', 'After Matilda Harrow in 1215', ['Clara Harrow', 'Agnes Harrow', 'Dagmar Harrow', 'Sunniva Harrow', 'Tilde Harrow'], true],
+		['margrave-of-the-salt-coast', 'After Bram Saltmarsh now', ['Dorian Saltmarsh', 'Leif Saltmarsh', 'Hale Saltmarsh', 'Finn Saltmarsh', 'Elowen Saltmarsh'], true],
+		['lord-of-wetherby', 'After Wystan Wether now', ['Sam Wether', 'Cass Wether', 'Bertie Wether', 'Quill Penn', 'Ronan Penn'], false],
 	];
 	for (const [id, heading, names, more] of cases) {
 		it(`${id}: the heading, ${names.length} rows${more ? ', "and more people"' : ''} and Show`, () => {
@@ -207,7 +207,7 @@ describe('the messages', () => {
 	it('says "N holders rule in YEAR" when two entries rule at the same time', () => {
 		const o = openWin(mini('succession: eldest-child\nyear: 1120', '      - {person: rex, from: 1100}\n      - {person: elder, from: 1100}'));
 		const p = page(o, 'crown');
-		expect(notes(p, 'co-rulers')).toEqual([T.coRulers(2, 'Elder', 1120)]);
+		expect(notes(p, 'co-rulers')).toEqual([T.coRulers(2, 'Elder Ardent', 1120)]);
 	});
 
 	it('says a date has no year, for a person and for a reign', () => {
@@ -216,7 +216,8 @@ describe('the messages', () => {
 		const p = page(o, 'crown');
 		expect(notes(p, 'no-year')).toEqual([T.noYearDate('Vague Ardent')]);
 		const r = openWin(mini('succession: eldest-child\nyear: 1120', '      - {person: elder, from: spring}\n      - {person: rex, from: 1100}'));
-		expect(notes(page(r, 'crown'), 'no-year-reign')).toEqual([T.noYearReign('Elder')]);
+		// D319 item 2a: the note names the holder as the heading and the holder list do (the full name of an unnumbered entry).
+		expect(notes(page(r, 'crown'), 'no-year-reign')).toEqual([T.noYearReign('Elder Ardent')]);
 	});
 
 	it('says how many people the one-sex rule left out for lack of a sex value', () => {
@@ -240,7 +241,8 @@ describe('the messages', () => {
 		const people = '  - {id: lone, name: Lone Ardent, sex: m, born: 1080}';
 		const o = openWin(mini('succession: eldest-child\nheirs-of-body: true', '      - {person: rex, from: 1050}\n      - {person: lone, from: 1100}', people));
 		const p = page(o, 'crown');
-		expect(notes(p, 'outside-body')).toEqual([T.outsideBody('Lone', 'Rex')]);
+		// D319 item 2a: both names are the names of the holder list (the full name of an unnumbered entry), not the first word.
+		expect(notes(p, 'outside-body')).toEqual([T.outsideBody('Lone Ardent', 'Rex Ardent')]);
 		expect(p.querySelector('[data-msg="no-heir"]')).toBeNull();
 	});
 });
@@ -388,14 +390,14 @@ describe('the fields', () => {
 		expect(lineRows(p)).toHaveLength(3);
 		type(year, '1101');
 		// The draft has the text at once; the line waits.
-		expect(p.querySelector('.dynasty-succ-heading')!.getText()).toBe(T.lineAfter('Rex', null));
+		expect(p.querySelector('.dynasty-succ-heading')!.getText()).toBe(T.lineAfter('Rex Ardent', null));
 		runTimers(299);
-		expect(p.querySelector('.dynasty-succ-heading')!.getText()).toBe(T.lineAfter('Rex', null));
+		expect(p.querySelector('.dynasty-succ-heading')!.getText()).toBe(T.lineAfter('Rex Ardent', null));
 		runTimers(2);
-		expect(p.querySelector('.dynasty-succ-heading')!.getText()).toBe(T.lineAfter('Rex', 1101));
+		expect(p.querySelector('.dynasty-succ-heading')!.getText()).toBe(T.lineAfter('Rex Ardent', 1101));
 		type(year, '1103');
 		dispatch(year, 'blur');
-		expect(p.querySelector('.dynasty-succ-heading')!.getText()).toBe(T.lineAfter('Rex', 1103));
+		expect(p.querySelector('.dynasty-succ-heading')!.getText()).toBe(T.lineAfter('Rex Ardent', 1103));
 		expect(o.win.isDirty()).toBe(true);
 	});
 

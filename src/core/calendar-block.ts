@@ -329,7 +329,7 @@ function rawArray(raw: RawMap, key: string, text: string): Raw[] | ReturnType<ty
 	return Array.isArray(v) ? v : refuse('bad-value', text);
 }
 
-/** Cuts item `index` out of a sequence. The last item leaves `key: []`, so the block stays a calendar block and the owner keeps its place. */
+/** Cuts item `index` out of a sequence. The last item leaves `key: []`, so the block stays a calendar block and the calendar keeps its place. */
 function dropItem(q: Parsed, seq: YAMLSeq, pair: Pair, index: number): Patch[] {
 	if (seq.items.length === 1) return emptyItems(q.src, seq, q.src.colonEnd(pair));
 	return removeItems(q.src, seq, new Set([index]), true);

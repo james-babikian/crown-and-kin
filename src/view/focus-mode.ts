@@ -144,7 +144,7 @@ export const FOCUS_SIDE_PAD = 8;
  * parent in the drawn family, D23) the card sits near the top of the area instead, as in D13, so
  * the view is not half empty. The same happens in a low box (a phone on its side, D30) when the
  * centred view cannot show the `parents`, the focus card and a child whole (see `familyFits`).
- * G3 F4: when no child can show whole at 14 px names, the names go smaller, not under 11 px, so that a child shows whole beside the couple (the focus card and the
+ * When no child can show whole at 14 px names, the names go smaller, not under 11 px, so that a child shows whole beside the couple (the focus card and the
  * near `partners`), else beside the focus card (see `smallerForChild`).
  */
 export function focusView(bounds: Rect, size: Size, fontPx: number, focus: Rect | null, insetTop = 0, children: Rect[] = [], atTop = false, parents: Rect[] = [], partners: Rect[] = []): View {
@@ -157,7 +157,7 @@ export function focusView(bounds: Rect, size: Size, fontPx: number, focus: Rect 
 	else {
 		const readable = READABLE_NAME_PX / f;
 		const lowAt = (k: number) => atTop || !familyFits(focus, parents, children, k, area.h);
-		// G3 F4: when no child can show whole beside the focus card at 14 px names (a low area between two bars, children far apart), the names go smaller, but not under 11 px, as far
+		// When no child can show whole beside the focus card at 14 px names (a low area between two bars, children far apart), the names go smaller, but not under 11 px, as far
 		// as a child needs to show whole. First with the couple (the focus person and the near partners) whole beside the child; else with the focus card only, as D18 does at 14 px.
 		// If no child shows even then, the view is as before.
 		let scale = readable;
@@ -186,7 +186,7 @@ export function focusView(bounds: Rect, size: Size, fontPx: number, focus: Rect 
 }
 
 /**
- * G3 F4: the scale for the focus view of a family whose children cannot show whole beside the focus card at `readable` (14 px names). The largest scale not under `floor`
+ * The scale for the focus view of a family whose children cannot show whole beside the focus card at `readable` (14 px names). The largest scale not under `floor`
  * (11 px names) at which one child shows whole next to the whole focus card, inside the area's height (`low`: the card near the top as in D13, else centred). `readable` when a child
  * already shows whole at that scale, or when none can at the floor either.
  */
@@ -265,7 +265,7 @@ export interface BadgeTap {
 /** The half side of the tap square, before the clip. Low zoom: only the badge circle, so the cards keep the space. */
 function badgeHalf(r: number, scale: number, fontPx: number, capPx: number): number {
 	if (!(scale > 0) || scale * fontPx < FIT_MIN_NAME_PX) return r;
-	// 0.2.8 (G.13): the square is at least 3 em, as the fold controls' tap area; the cap never takes it off the visible badge.
+	// The square is at least 3 em, as the fold controls' tap area; the cap never takes it off the visible badge.
 	return Math.min(Math.max(MIN_HIT_PX / (2 * scale), (HIT_EM * fontPx) / 2, r), Math.max(capPx, r));
 }
 
@@ -283,7 +283,7 @@ function badgeReachUp(x0: number, x1: number, cardTop: number, half: number, avo
 }
 
 /**
- * The tap shape of a `+` badge in layout px at `scale` (spec §7.5, contract 4.2). `mark` is the visible circle: its centre is the
+ * The tap shape of a `+` badge in layout px at `scale` (spec §7.5). `mark` is the visible circle: its centre is the
  * top right corner of the card (D117). The square is at least 44 screen px while names are at least 11 px, with its right edge
  * at the badge's right edge and centred on the badge vertically. Its half side is capped at `capPx` (the layout's `nodeGap` in
  * `sideways`, half the card height in `down`) so it never reaches a neighbour or more than half its own card. Above the card top
@@ -344,7 +344,7 @@ export interface SidewaysGroup {
 }
 
 /**
- * First view in `sideways` (D24): names at 14 px, never a fit; smaller, not under 11 px, only when the children's column is cut at the right edge at 14 px (V4). The person's column
+ * First view in `sideways` (D24): names at 14 px, never a fit; smaller, not under 11 px, only when the children's column is cut at the right edge at 14 px. The person's column
  * sits at the left edge (8 screen px in) with the children's column beside it; with no children, the
  * parents' column goes at the left if the person still shows whole beside it. The group (the person,
  * partners, children and their partners; with no children, the parents) starts 24 layout px below
@@ -460,7 +460,7 @@ export interface SideTagTap {
 const nextTops = new WeakMap<TreeLayout, Map<string, number>>();
 
 /**
- * 0.3.1 fix3: for each far-couple tag of a sideways `layout`, the top of the next card below its card in the same column (the next id of
+ * For each far-couple tag of a sideways `layout`, the top of the next card below its card in the same column (the next id of
  * its row, as the layout's own tag hit area is limited); Infinity when there is none. Kept for each layout, as it does not change with zoom.
  */
 export function tagNextTops(layout: TreeLayout): Map<string, number> {
@@ -481,7 +481,7 @@ export function tagNextTops(layout: TreeLayout): Map<string, number> {
 }
 
 /**
- * 0.3.1 fix3: a sideways far-couple tag's press area at `scale`. It hangs from its card's bottom edge as in `down` (D31) and reaches
+ * A sideways far-couple tag's press area at `scale`. It hangs from its card's bottom edge as in `down` (D31) and reaches
  * down at most to `nextTop`, the top of the next card in the column (Infinity when there is none). When that gap holds less than
  * 44 screen px, the rest goes up over the bottom of the own card, and there the tag wins (`over`), as its pill already does where it
  * sits on that edge. While names are under 11 px (no first view goes there), or when the rest would take more than half the own card,
@@ -573,7 +573,7 @@ export function finderFirstView(bounds: Rect, size: Size, fontPx: number, insetT
 }
 
 /**
- * 0.2.8 (G.4): the readable first view of a note shows the start person with the row of their parents above. `view` is the view that
+ * The readable first view of a note shows the start person with the row of their parents above. `view` is the view that
  * `defaultView` chose for the free area below `insetTop`; with the person's card at the top of the area the parents are cut off. The view moves up, just enough that the
  * top of the parents' row (with the tree's own margin) is at the top of the area, but only when the start card is still whole at the foot of the area then. Never
  * moves down, and never changes the zoom: a view that already shows the parents, or that has no room for both, stays as it is.
@@ -601,13 +601,13 @@ function onScreen(view: View, size: Size, b: Rect): { left: number; right: numbe
 }
 
 /**
- * 0.2.8 (D212 `bars-in-flow`): every view that the plugin chooses keeps the top card whole. A card that the top edge of the drawing area, or the band over it
+ * D212: every view that the plugin chooses keeps the top card whole. A card that the top edge of the drawing area, or the band over it
  * (the toolbar and the banner of the full-screen view, `insetTop`; 0 in a note), cuts in two is made whole: the view moves down until the card is under the band, or, when that would push a `keys` card (the ruler, the line, the start person)
  * out at the foot, up until the card is out from under the band entirely. A card that lies wholly under the band, or wholly below it, is not touched. The view never
  * zooms. A view that no move can improve stays as it is, and a result never has more cut cards than the view it was given (a move that only swaps one cut card for another is dropped).
  * After the first move down, a further move stops as soon as it would cut a card that is whole at the foot (a staircase of cut cards would push the whole tree down).
  * `bottom` is the foot of the free area (the box height, or the top of a bottom toolbar).
- * `marks` (the `+` badges, V3) are stricter: a badge on the screen may not meet the band at all, as it would stand in the safe area or under a bar; a raise takes it above the screen.
+ * `marks` (the `+` badges) are stricter: a badge on the screen may not meet the band at all, as it would stand in the safe area or under a bar; a raise takes it above the screen.
  */
 export function keepTopCardWhole(view: View, size: Size, insetTop: number, bottom: number, boxes: Iterable<Rect>, keys: readonly Rect[], marks: Iterable<Rect> = []): View {
 	if (!(insetTop >= 0) || !(view.scale > 0) || !(size.w > 0)) return view;

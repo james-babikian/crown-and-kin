@@ -15,7 +15,7 @@ const DOUBLE_OPEN = new Set(['“', '„']);
 const INNER_DOUBLE = /["“”„]/;
 
 /**
- * The text of a sobriquet as the model holds it, or undefined when nothing is left (contract 1.1).
+ * The text of a sobriquet as the model holds it, or undefined when nothing is left.
  * Runs of white space become one space; one pair of double marks around the whole text is taken
  * off; marks inside the text stay as typed.
  */

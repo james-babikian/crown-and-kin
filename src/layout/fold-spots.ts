@@ -26,7 +26,7 @@ import type { FoldControl } from '../core/folds';
 import type { FoldSpot, PersonBox, PlacedFoldControl, Rect, UnionPoint } from './model';
 
 /**
- * The fold control sizes in em of the note font (F6). `render/dom/folds.ts` exports the same numbers
+ * The fold control sizes in em of the note font. `render/dom/folds.ts` exports the same numbers
  * under the same names; the layout needs them to place a control and to reserve its room.
  */
 export const FOLD_EM = {
@@ -55,7 +55,7 @@ export const FOLD_BADGE_EM = 0.55;
 export const FOLD_BADGE_GAP_EM = 0.25;
 
 /** The visible mark of a control as a capsule: the centres of its two end caps and the cap radius, in layout px. */
-export interface FoldMark {
+interface FoldMark {
 	x1: number;
 	y1: number;
 	x2: number;
@@ -65,7 +65,7 @@ export interface FoldMark {
 
 /**
  * The visible Full-level mark of `control` at `spot`: an open button is a circle (a capsule of length 0), a folded sign a pill. In a
- * `down` layout the pill is centred on the spot, on the line (0.2.8, D206). In a sideways layout the line runs along the sign and meets the middle of its near
+ * `down` layout the pill is centred on the spot, on the line (D206). In a sideways layout the line runs along the sign and meets the middle of its near
  * end, so the pill starts where the open chip starts (`FOLD_EM.chip` / 2 before the spot, D207) and grows to the right: along x in the real frame (`anchored`), along y in the turned frame (`turned`). The text width is not known here, so the sign
  * is as long as the layout reserves for it (0.6 em for each of its characters), the same bound the plan (`ports.ts`) uses for its reach.
  */
@@ -81,7 +81,7 @@ export function foldMark(control: FoldControl, spot: FoldSpot, em: number, turne
 	return { x1: spot.x - long / 2, y1: spot.y, x2: spot.x + long / 2, y2: spot.y, r };
 }
 
-/** What `arrangeTree` needs to know about folds (F2, F3, F5). */
+/** What `arrangeTree` needs to know about folds. */
 export interface FoldInput {
 	/** The graph before pruning: names of hidden partners and the union order of a tag come from it. */
 	full: FamilyGraph;
@@ -93,8 +93,8 @@ export interface FoldInput {
 	folded?: readonly FoldControl[];
 }
 
-/** What the spot rules may know beyond the cards (V2, V4). Every rect is in the frame of `persons`. */
-export interface SpotHints {
+/** What the spot rules may know beyond the cards. Every rect is in the frame of `persons`. */
+interface SpotHints {
 	/** The tap areas of the far-couple tags, by person (`down` frame only): no control's tap area may meet one. */
 	tags?: ReadonlyMap<string, Rect>;
 	/** Where a single parent's trunk leaves the card; a single parent's control sits there, not at the middle, which a tag or another line may hold. */
@@ -104,7 +104,7 @@ export interface SpotHints {
 }
 
 /** A placed control, and whether the rules moved it down from its first spot. */
-export interface SpotResult {
+interface SpotResult {
 	control: PlacedFoldControl;
 	pushed: boolean;
 }
@@ -140,7 +140,7 @@ export function placeFoldSpots(
 	const badges = [...persons.values()].map((b) => (hints.turned ? { x: b.x, y: b.y + b.h } : { x: b.x + b.w, y: b.y }));
 	const badgeNeed = (FOLD_BADGE_EM + FOLD_BADGE_GAP_EM) * em;
 	// A control moves only along its own stem, so its x never changes and only an obstacle whose x extent can meet its own can stop it. The
-	// columns give those obstacles in list order, so the first one a move meets is the one a test of every obstacle meets (WP-E2 P2).
+	// columns give those obstacles in list order, so the first one a move meets is the one a test of every obstacle meets.
 	const tagCols = new Columns();
 	tags.forEach((t, i) => tagCols.add(i, t.x, t.x + t.w));
 	const badgeCols = new Columns();
@@ -153,7 +153,7 @@ export function placeFoldSpots(
 		const { x } = start;
 		let { y } = start;
 		// The shape of the mark does not change while the control moves along its stem. In the turned frame the clearance measures the sign from the spot, as it did
-		// before D207 moved the drawn sign 0.15 em to the right (still 0.25 em clear of every badge, tests/s025-fold-badge.test.ts): so no spot, and no room the planner reserves, changes.
+		// before D207 moved the drawn sign 0.15 em to the right (still 0.25 em clear of every badge): so no spot, and no room the planner reserves, changes.
 		const shape = foldMark(c, { x: 0, y: 0 }, em, !!hints.turned);
 		const along = hints.turned ? shape.y2 - shape.y1 : shape.x2;
 		const before = hints.turned ? 0 : shape.x1;
@@ -203,7 +203,7 @@ export function placeFoldSpots(
 }
 
 /**
- * The first spot of a control (F5, V2, V4, L1), before any obstacle moves it; undefined when a parent is not in `persons`. See `placeFoldSpots`.
+ * The first spot of a control, before any obstacle moves it; undefined when a parent is not in `persons`. See `placeFoldSpots`.
  */
 function firstSpot(
 	c: FoldControl,

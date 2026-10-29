@@ -9,7 +9,7 @@ import { foldFamilies, foldHidden, unfoldFor, type FoldKey, type FoldSet } from 
 import type { FamilyGraph } from '../core/derive';
 import type { LayoutSettings, Rect } from '../layout/model';
 
-/** What one draw of a tree needs of the folds (F1). */
+/** What one draw of a tree needs of the folds. */
 export interface FoldPlan {
 	/** The folds that apply: the block's folds, less those that hide the finder's line people while a result shows. */
 	effective: FoldSet;
@@ -36,7 +36,7 @@ export function planFolds(g: FamilyGraph, whole: FamilyGraph, folds: FoldSet, ca
 	return { effective, hidden, hiddenList: [...hidden].sort(), foldedList };
 }
 
-/** `base` with the fold settings of `plan` (F1 step 4); `canFold` adds `foldControls`. Lists that are empty stay out, so a tree with no folds has the M9 key. */
+/** `base` with the fold settings of `plan`; `canFold` adds `foldControls`. Lists that are empty stay out, so a tree with no folds has the key of `base`. */
 export function withFolds(base: LayoutSettings, plan: FoldPlan, canFold: boolean): LayoutSettings {
 	const out: LayoutSettings = { ...base };
 	delete out.foldHidden;
@@ -54,7 +54,7 @@ interface FoldMemory {
 	autoFolds?: Set<FoldKey>;
 }
 
-/** The keys of `auto` that are still in `folds` (D257: a key that is not folded any more is the owner's open family, not an automatic fold). `auto` itself when all are. */
+/** The keys of `auto` that are still in `folds` (D257: a key that is not folded any more is the user's open family, not an automatic fold). `auto` itself when all are. */
 export function stillAuto(folds: FoldSet, auto: ReadonlySet<FoldKey> | undefined): Set<FoldKey> | undefined {
 	if (!auto || [...auto].every((k) => folds.has(k))) return auto as Set<FoldKey> | undefined;
 	return new Set([...auto].filter((k) => folds.has(k)));
@@ -62,7 +62,7 @@ export function stillAuto(folds: FoldSet, auto: ReadonlySet<FoldKey> | undefined
 
 /**
  * Sets the folds of a block and keeps its automatic folds (D257) to the keys that are still folded. Every change of `folds` by a tap, the edit sheet or a focus
- * on a hidden person goes through here, so an automatic fold that the owner opened is a normal fold at once, and one that the owner folds again is the owner's own.
+ * on a hidden person goes through here, so an automatic fold that the user opened is a normal fold at once, and one that the user folds again is the user's own.
  */
 export function setFolds(st: FoldMemory, next: FoldSet): void {
 	st.folds = new Set(next);
@@ -81,8 +81,8 @@ export interface AutoFoldPatch {
 
 /**
  * D257: the changes for `step`. A focus that is new (its key differs from `autoFor`) takes the automatic folds of the old focus out and puts its own `startKeys`
- * in, except the families that are folded already (the owner's own). The same focus changes nothing, so a family the owner opened stays open. The end of a focus view
- * takes its automatic folds out and keeps the owner's. `startKeys` runs only when a focus is new.
+ * in, except the families that are folded already (the user's own). The same focus changes nothing, so a family the user opened stays open. The end of a focus view
+ * takes its automatic folds out and keeps the user's. `startKeys` runs only when a focus is new.
  */
 export function autoFoldPatch(folds: FoldSet, auto: ReadonlySet<FoldKey> | undefined, autoFor: string | null | undefined, step: AutoFocus): AutoFoldPatch {
 	if (step.kind === 'keep' || (step.kind === 'enter' && autoFor === step.key)) return {};

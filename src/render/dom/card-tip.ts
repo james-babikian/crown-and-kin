@@ -1,5 +1,5 @@
 /*
- * The plugin's own tooltip for a card (D145, the 0.2.5 contract C.3.4). With "Show relation names on cards" off the card has
+ * The plugin's own tooltip for a card (D145). With "Show relation names on cards" off the card has
  * no relation word, so a small label under the card tells it when the pointer rests on the card or the card gets the
  * keyboard focus. Obsidian's own tooltips do not work on SVG elements, so this is a plain HTML element in the viewport.
  *

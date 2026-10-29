@@ -257,7 +257,7 @@ function solveStarts(drafts: readonly CalendarDraft[], note: string): Map<string
 function ownTexts(d: CalendarDraft, results: ReadonlyMap<string, StartResult>): { text: string; field: string }[] {
 	const out: { text: string; field: string }[] = [];
 	const add = (text: string, field: string) => out.push({ text, field });
-	// A number that the note holds as text stays as written until the user changes this calendar (ruling 4.3 fix).
+	// A number that the note holds as text stays as written until the user changes this calendar.
 	const kept = untouched(d);
 	const badLength = (n: number | undefined | null) => !kept && (n === null || (n !== undefined && n < 1));
 	if (d.name.trim() === '') add(REFUSAL_TEXT.calendarName, 'name');

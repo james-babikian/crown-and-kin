@@ -23,7 +23,7 @@ export function spouseWorldOf(g: FamilyGraph): SpouseWorld {
 }
 
 /**
- * The first holder (spec §13.21 rule 14, L.2): the first entry, in list order, whose person is in the tree; D195: its spouse if
+ * The first holder (spec §13.21 rule 14): the first entry, in list order, whose person is in the tree; D195: its spouse if
  * the entry has the key and the spouse can be chosen. It does not depend on the switch "only descendants", so the hint of the
  * Titles window can name the first holder while the switch is off. `spouseAt` is the spouses that the line already chose.
  */

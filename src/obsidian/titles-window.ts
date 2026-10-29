@@ -36,7 +36,7 @@ import type { PictureStore } from './picture-store';
 import { RowPictures, buildRow, iconButton, personLead, showMenu, textButton } from './window-parts';
 import type { SectionSpec } from './window-sections';
 import { makeTableNote } from './table-note';
-import { titlesDraftChanged, emptyNames, holderText, personNameOf, rebase, savedListName, titleIdRow, titleRows, windowOps, withHolderIds, type HolderRow, type HolderValues, type TitleRow } from '../view/titles-draft';
+import { titlesDraftChanged, emptyNames, holderLead, holderText, keepsRulerText, personNameOf, rebase, savedListName, titleIdRow, titleRows, windowOps, withHolderIds, type HolderRow, type HolderValues, type TitleRow } from '../view/titles-draft';
 
 /** The tree that the window edits, loaded from one block body. */
 export interface LoadedTitles {
@@ -70,23 +70,23 @@ export interface TitlesOptions {
 	onClosed?: () => void;
 	/** Shows a person's card in the tree the way Find does (spec §13.4); the window has closed. */
 	show?: (id: string) => void;
-	/** True when the owner asks the system for less motion (D126): a field is then scrolled into view at once. Default: false. */
+	/** True when the user asks the system for less motion (D126): a field is then scrolled into view at once. Default: false. */
 	reduced?: () => boolean;
-	/** Contract 0.2.7 E.4: shows the line of succession of a title in the tree; the window has closed. */
+	/** Shows the line of succession of a title in the tree; the window has closed. */
 	showLine?: (titleId: string) => void;
-	/** G.7: opens the edit window of a person (a tap on a row of the line of succession); absent: the card shows in the tree. */
+	/** Opens the edit window of a person (a tap on a row of the line of succession); absent: the card shows in the tree. */
 	openPerson?: (id: string) => void;
 	/** The plugin's picture store: portraits and arms in the rows and in the person picker; absent: initials and a crown. */
 	pictures?: PictureStore;
-	/** The marked person, for the relation word in the person picker's rows (G.3); absent: no word. */
+	/** The marked person, for the relation word in the person picker's rows; absent: no word. */
 	me?: () => string | null;
 	/** The relation settings for those words; absent: the defaults. */
 	relationOptions?: () => RelationOptions;
-	/** Contract 0.2.7 K.10, M.7: the length of the line, the age of the warning and the age for open branches (the settings). Defaults: 5, 110 and 0. */
+	/** The length of the line, the age of the warning and the age for open branches (the settings). Defaults: 5, 110 and 0. */
 	succession?: { limit: () => number; oldAge: () => number; youngDeathAge?: () => number };
 }
 
-/** The settings of the line when the caller gives none (K.10). */
+/** The settings of the line when the caller gives none. */
 const DEFAULT_LIMIT = 5;
 const DEFAULT_OLD_AGE = 110;
 
@@ -369,7 +369,8 @@ protected labelOf(key: string): string {
 				if (!t.holders.length) list.createDiv({ cls: ['dynasty-holder-none', 'dynasty-sheet-none'], text: TITLES_UI.noHolders });
 				t.holders.forEach((h, i) => this.holderRow(list, t, h, i));
 				const buttons = body.createDiv({ cls: ['dynasty-actions', 'dynasty-holder-panel-buttons'] });
-				textButton(buttons, ['dynasty-btn', 'dynasty-holder-add'], TITLES_UI.addHolder, () => this.guard(() => void this.addHolder(t)), { icon: 'plus', label: TITLES_UI.addHolderLabel(this.label(t)), focus: `add-holder:${t.key}` });
+				const add = textButton(buttons, ['dynasty-btn', 'dynasty-holder-add'], TITLES_UI.addHolder, () => this.guard(() => void this.addHolder(t)), { icon: 'plus', label: TITLES_UI.addHolderLabel(this.label(t)), focus: `add-holder:${t.key}` });
+				this.pageViews.push({ setItem: (name) => add.setAttribute('aria-label', TITLES_UI.addHolderLabel(name)), setProblem: () => undefined });
 				// The saved list only: a title that is not saved yet has none (spec §13.4).
 				if (t.id !== null) {
 					const id = t.id;
@@ -392,7 +393,7 @@ protected labelOf(key: string): string {
 		if (t.id === null || !t.succ) page.createDiv({ cls: ['dynasty-sheet-hint'], text: SUCCESSION_UI.newTitle, attr: { 'data-hint': 'new-title' } });
 	}
 
-	// ---------- the succession sections (contract 0.2.7 E; 0.2.8 C) ----------
+	// ---------- the succession sections ----------
 
 	/** The view of the line and the rules for the draft of a saved title. */
 	private successionView(t: TitleRow): SuccessionView {
@@ -431,7 +432,7 @@ protected labelOf(key: string): string {
 		}
 	}
 
-	/** What the person picker needs for its rows (G.3): portraits, the marked person and the relation settings. */
+	/** What the person picker needs for its rows: portraits, the marked person and the relation settings. */
 	private pickerPictures(): PickerContext {
 		const me = this.o.me?.();
 		return {
@@ -442,7 +443,7 @@ protected labelOf(key: string): string {
 		};
 	}
 
-	/** Show (E.4): with no changes the window closes and the tree shows the line; with changes it asks first. */
+	/** Show: with no changes the window closes and the tree shows the line; with changes it asks first. */
 	private showLine(t: TitleRow): void {
 		if (!this.isDirty()) {
 			const id = t.id;
@@ -471,8 +472,7 @@ protected labelOf(key: string): string {
 	private holderRow(list: HTMLElement, t: TitleRow, h: HolderRow, i: number): void {
 		const text = holderText(this.data.g, h.values);
 		// Only a holder with a number or a written ruler name keeps that name in bold; the full name leads every other row (holder-rows).
-		const keepsRuler = h.values.number !== undefined || (h.values.as ?? '').trim() !== '';
-		const lead = !keepsRuler && text.full ? text.full : text.ruler;
+		const lead = holderLead(text, h.values);
 		const rowAttr: Record<string, string> = { 'data-holder': h.key };
 		if (h.values.person !== undefined) rowAttr['data-person'] = h.values.person;
 		const r = buildRow(list, {
@@ -498,9 +498,9 @@ protected labelOf(key: string): string {
 			if (text.sobriquet !== undefined) label.createSpan({ cls: 'dynasty-picker-sob', text: ` ${quotedSobriquet(text.sobriquet)}` });
 			name.addEventListener('click', () => this.guard(() => this.showCard(person)));
 		} else r.title.createSpan({ cls: 'dynasty-holder-name', text: lead });
-		const sub = [keepsRuler ? text.full : undefined, text.reign, text.inTree ? undefined : TITLES_UI.notInTree].filter((x): x is string => !!x);
+		const sub = [keepsRulerText(h.values) ? text.full : undefined, text.reign, text.inTree ? undefined : TITLES_UI.notInTree].filter((x): x is string => !!x);
 		r.sub.setText(sub.join(' · '));
-		if (keepsRuler && text.full) r.sub.addClass('dynasty-holder-full');
+		if (keepsRulerText(h.values) && text.full) r.sub.addClass('dynasty-holder-full');
 		const move = (dir: -1 | 1) => {
 			const to = i + dir;
 			if (to < 0 || to >= t.holders.length) return;
@@ -623,7 +623,7 @@ protected labelOf(key: string): string {
 		this.busy = true;
 		let picked: Awaited<ReturnType<typeof pickPerson>> = null;
 		try {
-			picked = await pickPerson(this.app, this.data.g, new Set(), TITLES_UI.pickerPlaceholder, TITLES_UI.pickerTitle, true, null, () => TITLES_UI.notInTreeRow, this.pickerPictures());
+			picked = await pickPerson(this.app, this.data.g, new Set(), TITLES_UI.pickerPlaceholder, TITLES_UI.pickerTitle, true, null, TITLES_UI.notInTreeRow, this.pickerPictures());
 		} finally {
 			this.busy = false;
 		}
@@ -675,7 +675,7 @@ protected labelOf(key: string): string {
 		else go();
 	}
 
-	/** A tap on an heir (G.7): the window closes and the person opens; with changes it asks first, as for a holder name. */
+	/** A tap on an heir: the window closes and the person opens; with changes it asks first, as for a holder name. */
 	private openPerson(id: string): void {
 		const go = () => {
 			this.finish();
@@ -715,8 +715,8 @@ protected labelOf(key: string): string {
 	}
 
 	/**
-	 * Save. `asked` is the ID change that the owner just answered: the answer runs Save again on the draft as it is then (C4).
-	 * `show` is the row key of the title that "Save and show" opens in the tree after a successful write (E.4).
+	 * Save. `asked` is the ID change that the user just answered: the answer runs Save again on the draft as it is then.
+	 * `show` is the row key of the title that "Save and show" opens in the tree after a successful write.
 	 */
 	protected async save(asked: string | null = null, show: string | null = null): Promise<void> {
 		if (this.saving || this.busy) return;
@@ -813,7 +813,7 @@ protected labelOf(key: string): string {
 		this.showError(TITLES_UI.stale);
 	}
 
-	/** Shows the block's new titles, with the owner's changes on top (`rebase`). An open page stays when its title is still there. */
+	/** Shows the block's new titles, with the user's changes on top (`rebase`). An open page stays when its title is still there. */
 	private reload(body: string): void {
 		const l = loadTitles(body, this.o.dates);
 		if (l.kind !== 'ok') {

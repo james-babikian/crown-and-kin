@@ -1,6 +1,6 @@
 /*
  * The layout of a drawn tree with its text measured first (D29, D37, D61) and its picture sets
- * (spec §13.6, §13.7; M9 contract L1–L4). The tree view lays out every tree it draws with this, and
+ * (spec §13.6, §13.7). The tree view lays out every tree it draws with this, and
  * "Save as picture" (`save-picture.ts`) lays the saved picture out again with the same steps, so the
  * cards on screen and in the file follow one rule. Pure but for `measure` and the layout cache.
  *
@@ -22,16 +22,16 @@ import { tallCardsFor, tallTitlesFor, titleMeasure } from '../render/dom/tall-ca
 export interface MeasuredOptions {
 	fonts: SceneFonts;
 	measure: Measure;
-	/** M8: the card labels of the drawn graph. */
+	/** The card labels of the drawn graph. */
 	labels?: ReadonlyMap<string, CardLabel>;
 	/** "Show dates on cards": off leaves the reign out of the title text line (D61). */
 	showDates: boolean;
-	/** "Show portraits on cards" (O10). */
+	/** "Show portraits on cards". */
 	showPortraits: boolean;
-	/** "Arms on cards" (0.2.8, D206): which cards show arms. Absent: the 0.2.7 rule (every card of a house with arms). */
+	/** "Arms on cards" (D206): which cards show arms. Absent: the plain rule (every card of a house with arms). */
 	armsOnCards?: 'few' | 'all';
 	/**
-	 * M10 (F1): the people that folds hide. They are left out of the tall-card and tall-title answers, so hidden people never change
+	 * The people that folds hide. They are left out of the tall-card and tall-title answers, so hidden people never change
 	 * the settings or the cache key. Absent = the `foldHidden` of `base`.
 	 */
 	foldHidden?: ReadonlySet<string>;
@@ -48,10 +48,10 @@ export interface MeasuredResult {
 }
 
 /**
- * Lays `g` out (L4): 1. the picture sets from the graph and the setting; 2. the drawn geometry;
+ * Lays `g` out: 1. the picture sets from the graph and the setting; 2. the drawn geometry;
  * 3. the title text lines that need two text lines; 4. the names that need two or three text lines; 5. the layout. Only when the D14 sign changes a name's text line count does the
  * layout run twice (the sign comes from the lines of a layout with no tall cards). Pictures and their
- * loading never feed back into these steps. M10 (F1): the fold settings of `base` (`foldHidden`, `foldedFamilies`,
+ * loading never feed back into these steps. The fold settings of `base` (`foldHidden`, `foldedFamilies`,
  * `foldControls`) go into the layout as they are (`o.foldHidden` fills `foldHidden` when `base` has none), and the
  * people that folds hide are skipped in steps 3 and 4.
  * 0.3 (spec §7.7, time budget): `shouldStop` is checked between the steps and inside `layoutTree` between its phases; a true answer throws `LayoutStopped`.
@@ -72,16 +72,16 @@ export function measuredLayout(g: FamilyGraph, geo: Geometry, base: LayoutSettin
 	delete plain.foldHidden;
 	delete plain.foldedFamilies;
 	delete plain.foldControls;
-	// M10: empty lists stay out, so a tree with no folds has the M9 cache key.
+	// Empty lists stay out, so a tree with no folds has the cache key of `base`.
 	const skip = o.foldHidden ?? new Set(base.foldHidden);
 	const hiddenList = [...new Set(base.foldHidden?.length ? base.foldHidden : (o.foldHidden ?? []))].sort();
 	if (hiddenList.length) plain.foldHidden = hiddenList;
 	if (base.foldedFamilies?.length) plain.foldedFamilies = [...new Set(base.foldedFamilies)].sort();
 	if (base.foldControls) plain.foldControls = true;
-	// L1: empty lists stay out, so a tree with no pictures has the M8 cache key.
+	// Empty lists stay out, so a tree with no pictures has the cache key of `base`.
 	if (sets.arms.length) plain.arms = sets.arms;
 	if (sets.portraits.length) plain.portraits = sets.portraits;
-	// 0.2.8: the people with personal arms always show them; the setting decides the house arms (D206).
+	// The people with personal arms always show them; the setting decides the house arms (D206).
 	if (sets.personalArms?.length) plain.personalArms = sets.personalArms;
 	if (o.armsOnCards !== undefined) plain.armsOnCards = o.armsOnCards;
 	const drawn = drawnGeometry(geo, plain);

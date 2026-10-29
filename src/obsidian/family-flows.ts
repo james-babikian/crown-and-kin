@@ -121,7 +121,7 @@ export async function addChild(host: FlowHost): Promise<void> {
 	}
 	const exclude = pickerExclusions(host.g, p.id, 'add-child');
 	if (other) for (const id of pickerExclusions(host.g, other, 'add-child')) exclude.add(id);
-	// People who have this person as a birth parent are this person's children already (the decision notes "Union references").
+	// People who have this person as a birth parent are this person's children already.
 	for (const q of host.g.people) if (q.parents.some((l) => l.id === p.id && l.type === 'birth')) exclude.add(q.id);
 	const how = await newOrExisting(host, 'child', exclude);
 	if (!how) return;
@@ -162,7 +162,7 @@ export async function addChild(host: FlowHost): Promise<void> {
 		new Notice(FLOW.alreadyChild(child.name, host.name(p.id)));
 		return;
 	}
-	// Only the Add parent action adds an automatic marriage (the decision notes). The op that completes
+	// Only the Add parent action adds an automatic marriage. The op that completes
 	// the pair carries the chosen partnership, so the child sits under it (§4.3).
 	const ops: Op[] = add.map((id, i) => ({ kind: 'add-parent', child: child.id, parent: id, type, autoUnion: false, ...(union && i === add.length - 1 ? { union } : {}) }));
 	await host.commit(ops, child.id);
@@ -206,7 +206,7 @@ export async function addPartner(host: FlowHost): Promise<void> {
 }
 
 /** Asks which kind of partnership `a` and `b` have; null after Cancel. */
-export function chooseUnionType(app: App, a: string, b: string): Promise<UnionKind | null> {
+function chooseUnionType(app: App, a: string, b: string): Promise<UnionKind | null> {
 	return choose<UnionKind>(app, {
 		name: 'union-type',
 		title: FLOW.unionTypeTitle,

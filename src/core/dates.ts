@@ -1,11 +1,11 @@
 /*
- * Dates in the user's calendars (spec section 14, the architecture notes §5.7). This file reads a date text as an
+ * Dates in the user's calendars (spec section 14). This file reads a date text as an
  * internal year: first with the formats of the calendars that the tree uses (cycle calendars and era calendars), then, when no
  * format fits, with the plain-year reader of `succession-keys.ts`. It also builds the dates view of one tree (`TreeDates`) and
  * holds the checks of the Calendars window (formats, refusals, "same year as", the example). It is pure: it imports only the
  * other files of the date reader (`date-text.ts`, `date-numbers.ts`, `date-formats.ts`, `name-lists.ts`), `succession-keys.ts`, `hash.ts` and types of
  * `types.ts`, so the engine, the validator and the drawing code can all use it.
- * Since 0.3.3 a calendar and the plain years can also have name lists (`name-lists.ts`): the name of a year (a planet, an animal) that repeats,
+ * A calendar and the plain years can also have name lists (`name-lists.ts`): the name of a year (a planet, an animal) that repeats,
  * shown after a short date. A format can hold the marker of a list as an optional group (spec §14 rules 13 and 14).
  * No regular expression here uses a lookbehind: iOS before 16.4 cannot parse one.
  */
@@ -67,7 +67,7 @@ export interface ReadDate {
 	/** The text is only the date (and an approximate prefix, and for a plain year the names): a name can follow it (spec §14 rule 14). Set with `names`. */
 	whole?: true;
 	warnings: DateWarning[];
-	// Reserved, never set in 0.3.2: month?, day?, qualifier?, yearTo?
+	// Reserved, never set: month?, day?, qualifier?, yearTo?
 }
 
 /** A tree-level problem of the calendar set (spec section 14 rule 7): the note that the tree names does not exist or holds no calendar. `note` is the link as written. */
@@ -232,7 +232,7 @@ function matchAt(t: string, s: number, cal: Compiled, hits: Hit[]): void {
 		let endAt = 0;
 		let ranged = false;
 		const written: (Written | undefined)[] = grouped ? [] : NO_WRITTEN;
-		// A format without a group never needs the walk, so its closure is not made (the hot path of 0.3.2 is not slower).
+		// A format without a group never needs the walk, so its closure is not made (this keeps the hot path fast).
 		const walk = grouped ? groupWalker(t, cal, written) : undefined;
 		const go = (i: number, p: number): boolean => {
 			if (i === items.length) {
@@ -256,7 +256,7 @@ function matchAt(t: string, s: number, cal: Compiled, hits: Hit[]): void {
 				if (item.place === 'year') value = c.value;
 				else cycle = c.value;
 				if (go(i + 1, c.end)) return true;
-				// A range in a year-first format reads its first date: the second number is skipped (owner, 2026-10-19).
+				// A range in a year-first format reads its first date: the second number is skipped.
 				if (p !== s) continue;
 				for (const d of rangeEnds(t, c.end)) {
 					ranged = true;
@@ -408,7 +408,7 @@ export const MEMO_CAP = 20000;
 
 /**
  * The key of a ready reader with calendars, plain-year lists or problems: the hash of the sorted content, so scan order and note paths do not
- * matter. Every field of every list is in it (spec §14 rule 15); a calendar with no list hashes as in 0.3.2.
+ * matter. Every field of every list is in it (spec §14 rule 15); a calendar with no list hashes as it did before lists existed.
  */
 function keyOf(calendars: readonly Calendar[], problems: readonly CalendarProblem[], plainLists: readonly NameList[]): string {
 	const cals = calendars.map((c) => JSON.stringify([c?.name, c?.formats, c?.kind, ...(Array.isArray(c?.lists) && c.lists.length ? [c.lists] : [])]) ?? '').sort();

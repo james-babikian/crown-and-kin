@@ -3,7 +3,7 @@
  * the tree, so styles.css colours both alike. A partnership is a line between two card ends with
  * its union sign (D26, D38: none for no recorded partnership); a child line is a family's bar with two drops; a parent drawn elsewhere
  * is a curve. Pure: the DOM renderer and the headless pictures both build from this.
- * M9 (spec §13.6 "Legend", §13.8): the houses part (`legendHouses`, `LegendHouse`) as pure data; the
+ * Spec §13.6 "Legend", §13.8: the houses part (`legendHouses`, `LegendHouse`) as pure data; the
  * DOM legend (`buildLegend` in `dom/scene.ts`) and the saved picture (`svg-string.ts`) draw it.
  */
 import type { FamilyGraph } from '../core/derive';
@@ -28,7 +28,7 @@ export interface LegendPart {
 	children?: LegendPart[];
 }
 
-/** The legend row kinds that are not line kinds: the D14 card sign, and (0.2.8, I19) the two dead signs of a date text. */
+/** The legend row kinds that are not line kinds: the D14 card sign, and the two dead signs of a date text. */
 export type LegendExtraKind = 'sign' | 'dead' | 'dead-doubt';
 
 /** One row of the legend: a line kind (or the D14 sign, or a dead sign) with its label and sample drawing. */
@@ -55,7 +55,7 @@ const PARTNER_KINDS: readonly StrokeKind[] = ['marriage', 'betrothal', 'concubin
 const CURVE_KINDS: readonly StrokeKind[] = ['birth-link', 'rumoured'];
 
 const line = (kind: StrokeKind, d: string): LegendPart => ({ tag: 'path', cls: ['dynasty-line', `dynasty-line-${kind}`], attr: { d } });
-// 0.2.8: the card ends are 8 px wide.
+// The card ends are 8 px wide.
 const stub = (x: number): LegendPart => ({ tag: 'rect', cls: ['dynasty-legend-card'], attr: { x, y: 3, width: 8, height: 16, rx: 2 } });
 
 /** The class of a union sign's shape, as the tree's markers use it. */
@@ -93,7 +93,7 @@ function sample(kind: StrokeKind): LegendPart[] {
 /** The sample of a dead sign: the date text with the sign, in the size of a date on a card. */
 const deadSample = (text: string): LegendPart[] => [{ tag: 'text', cls: ['dynasty-legend-dagger'], attr: { x: LEGEND_DEAD_SAMPLE_W / 2, y: 15.5, 'text-anchor': 'middle' }, text }];
 
-/** Every legend row, in legend order, then the D14 card sign on the corner of a card, then the two dead signs (I19). */
+/** Every legend row, in legend order, then the D14 card sign on the corner of a card, then the two dead signs. */
 export function legendRows(): LegendRow[] {
 	const rows: LegendRow[] = LEGEND_ORDER.map((kind) => ({ kind, label: LEGEND_LABELS[kind], w: LEGEND_SAMPLE_W, h: LEGEND_SAMPLE_H, parts: sample(kind) }));
 	rows.push({
@@ -112,7 +112,7 @@ export function legendRows(): LegendRow[] {
 	return rows;
 }
 
-/** One house row of a legend (S4, P3): colour strip, arms and name. */
+/** One house row of a legend: colour strip, arms and name. */
 export interface LegendHouse {
 	id: string;
 	name: string;

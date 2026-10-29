@@ -1,5 +1,5 @@
 /*
- * The writes of the edit sheet (0.3.3, WP-1 A1; spec §6.1, §6.3): the draft as an operation, the write through the handle, Save, the relationship writes, and the reload
+ * The writes of the edit sheet (spec §6.1, §6.3): the draft as an operation, the write through the handle, Save, the relationship writes, and the reload
  * after a write. Sixth layer of the chain listed in `edit-sheet.ts`.
  */
 
@@ -112,7 +112,7 @@ export abstract class EditSheetWrites extends EditSheetActions {
 	 * One write through the handle, with the stale check first (spec §6.1). `highlight` is the
 	 * person the tree shows and highlights after the write (spec §5.5). Failures are reported in a
 	 * Notice and in the sheet, and the draft stays. `saves`: the write is a Save that closes the window (or a Save and add another);
-	 * only that moves the phone list to the person (B1). An in-place write does not.
+	 * only that moves the phone list to the person. An in-place write does not.
 	 */
 	protected async write(ops: Op[], highlight: string | null, saves = false): Promise<Written | null> {
 		if (this.saving || this.readOnly || !ops.length) return null;
@@ -236,12 +236,12 @@ export abstract class EditSheetWrites extends EditSheetActions {
 		const pending = this.pendingOps();
 		if (pending === null) return null;
 		const all = [...pending, ...ops];
-		// The refusal `limit` says which type is full: the text differs for a rumoured parent (contract B.3).
+		// The refusal `limit` says which type is full: the text differs for a rumoured parent.
 		this.limitType = ops.map((op) => (op.kind === 'add-parent' ? op.type : op.kind === 'set-parent-type' ? op.to : undefined)).find((t) => t !== undefined);
 		const ids = idsFor(this.data, [this.data.person.id, ...opNames(all), ...holderNames(all)]);
 		const out = await this.write(withIds(all, ids), highlight === null ? null : (ids.get(highlight) ?? highlight));
 		if (!out) return null;
-		// 'in-place' is for a control that the user is using now (r032). A write that carries field changes needs the full form again.
+		// 'in-place' is for a control that the user is using now. A write that carries field changes needs the full form again.
 		if (show === 'in-place' && pending.length === 0) this.showParentTypes(out.body, ids);
 		else this.afterWrite(out.body, ids);
 		return { ...out, withFields: pending.length > 0 };
@@ -510,7 +510,7 @@ export abstract class EditSheetWrites extends EditSheetActions {
 	 */
 	reload(body: string, id = this.data.person.id): void {
 		let target = id;
-		// A person with no written id is named `~N`, which follows the place in the list: find them again (C2).
+		// A person with no written id is named `~N`, which follows the place in the list: find them again.
 		if (!this.isNew && unwritten(this.data, id)) {
 			const now = loadSheet(body, null, this.o.dates);
 			if (now.kind === 'ok') {

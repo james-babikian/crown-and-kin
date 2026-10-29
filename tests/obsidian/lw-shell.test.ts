@@ -1271,6 +1271,7 @@ describe('keyboard reveal on a phone (D.3.4, D114)', () => {
 		const scroll = vi.fn();
 		// The whole field scrolls, so its hint is in view too (R05 look repair 1).
 		(ta.closest('.dynasty-sheet-field') ?? ta).scrollIntoView = scroll;
+		runTimers(200);
 		ta.focus();
 		dispatch(ta, 'focusin');
 		expect(scroll).not.toHaveBeenCalled();
@@ -1286,6 +1287,7 @@ describe('keyboard reveal on a phone (D.3.4, D114)', () => {
 		const scroll = vi.fn();
 		// The whole field scrolls, so its hint is in view too (R05 look repair 1).
 		(ta.closest('.dynasty-sheet-field') ?? ta).scrollIntoView = scroll;
+		runTimers(200);
 		ta.focus();
 		dispatch(ta, 'focusin');
 		runTimers(400);
@@ -1304,7 +1306,7 @@ describe('keyboard reveal on a phone (D.3.4, D114)', () => {
 });
 
 describe('the style block (D.2, D.3.9)', () => {
-	const START = '/* ===== list windows (0.2.5, D134) ===== */';
+	const START = '/* ===== list windows (D134) ===== */';
 	const END = '/* ===== end list windows ===== */';
 	const block = css.slice(css.indexOf(START) + START.length, css.indexOf(END));
 

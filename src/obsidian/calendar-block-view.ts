@@ -18,6 +18,11 @@ import { textButton } from './window-parts';
 /** The events that the block keeps from the editor, as the tree view does (spec §7.2): in Live Preview a click would else switch the block to its source text. */
 const STOPPED_EVENTS = ['pointerdown', 'mousedown', 'mouseup', 'click', 'dblclick', 'auxclick', 'touchstart', 'touchend'];
 
+/** Reads the note again, then runs `open`. A note that was deleted a moment ago cannot be read: the click does nothing and no error escapes (spec §8). */
+export function reloadThen(index: Pick<CalendarIndex, 'reload'>, path: string, open: () => void): void {
+	void index.reload(path).then(open).catch((e: unknown) => console.error('Crown and Kin: cannot open the calendar window', e));
+}
+
 /** One row of a table: a label and the text beside it (`lines` more than one stand under each other). */
 function row(table: HTMLElement, label: string, lines: readonly string[]): void {
 	const tr = table.createEl('tr');
@@ -106,7 +111,7 @@ class CalendarBlock extends MarkdownRenderChild {
 		for (const issue of issues) el.createDiv({ cls: 'dynasty-cal-block-error', text: issueText(issue) });
 		// A date that a calendar of this block reads: the test line uses the calendars of the block as they are written, with the plain-year name lists.
 		const reader = compileCapped(calendars, true, [], plain ?? []);
-		const edit = () => void this.index.reload(path).then(() => openCalendars(this.app, this.index, { tree: null, note: path }));
+		const edit = () => reloadThen(this.index, path, () => void openCalendars(this.app, this.index, { tree: null, note: path }));
 		for (const c of calendars) drawCalendar(el, c, edit, reader);
 		if (anyUsable(plain)) {
 			const box = el.createDiv({ cls: 'dynasty-cal-block', attr: { role: 'group', 'aria-label': T.plainYears } });

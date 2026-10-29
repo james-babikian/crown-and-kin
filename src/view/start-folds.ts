@@ -72,7 +72,7 @@ function farInWhole(facts: WholeFacts, [a, b]: readonly string[]): boolean {
 /**
  * The families of the focus graph `g` of `focus` that start folded. A family folds when it has two parents and neither is the focus person, exactly one parent is
  * a cut partner, the whole tree draws the couple far apart, and the fold does not hide the focus person (so the family of an ancestor never folds).
- * Two folds of one view never remove the same person (WP-6 fix round): the larger fold comes first, and a fold whose people another one removes already is left out,
+ * Two folds of one view never remove the same person: the larger fold comes first, and a fold whose people another one removes already is left out,
  * so the signs of one view add up to the people the folds remove. `getFacts` runs only when a candidate exists, so a view with no cut partner costs no walk of the
  * whole tree. The list is in the order of `foldFamilies`.
  */

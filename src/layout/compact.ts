@@ -1,6 +1,6 @@
 /**
  * The compaction step of the placement (spec §5.1 step 4, D231), with two changes made for the card-and-line build. Part (c) moves the whole piece of an only child (the child's
- * block with everything that hangs below it), so a snap never moves a child away from its own children (the 0.3 fault of D238 "an only child moved away from its own children").
+ * block with everything that hangs below it), so a snap never moves a child away from its own children (the fault of D238 "an only child moved away from its own children").
  * The cards are read and moved through the small type `Placed`, so the plan's own items are given to it with no copy.
  *
  * What the step does: after the centring sweeps it closes the empty space between sibling groups. Three parts, each with a fixed amount
@@ -41,7 +41,7 @@ const TRAIN_MAX = 6;
  * `snaps` limits part (c) to that many snaps: the test of part (c) (`layout-snap`) runs the step again with one more snap each time and
  * reads the move of a single snap from the difference.
  */
-export type CompactStep = (gaps: number[][], dots: ReadonlyMap<string, number>, snaps?: number) => number;
+type CompactStep = (gaps: number[][], dots: ReadonlyMap<string, number>, snaps?: number) => number;
 
 /** An integer array of `n` places, all `fill`. */
 const ints = (n: number, fill = 0): Int32Array => new Int32Array(n).fill(fill);
@@ -49,8 +49,8 @@ const ints = (n: number, fill = 0): Int32Array => new Int32Array(n).fill(fill);
 /**
  * Reads the structure of the placed rows once and returns the step; see the file header. `blocks` are the partners placed together,
  * `rowBlocks` the blocks of each row in order, `families` the children of each family.
- * Exempt from the size rule of the architecture notes §4.2.7 (`tests/layout-size-rule.test.ts` holds its size): 374 code lines and 119 branches in 0.3.1 (0.3.0: 287 and 85; part (c)
- * and the push train grew it). Its parts (a), (b) and (c) share closures over typed arrays that one pass fills, and a split costs the hot path; a split waits for WP-E2.
+ * Exempt from the size rule (an internal test holds its size): 374 code lines and 119 branches (part (c)
+ * and the push train grew it). Its parts (a), (b) and (c) share closures over typed arrays that one pass fills, and a split costs the hot path; a split is a later clean-up.
  */
 export function compactor(g: FamilyGraph, anchors: ReadonlyMap<string, string>, persons: ReadonlyMap<string, Placed>, blocks: string[][], rowBlocks: number[][], families: string[][], dropInset?: number): CompactStep {
 	const nB = blocks.length;

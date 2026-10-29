@@ -1,5 +1,5 @@
 /*
- * The collapsible sections of the window family (0.2.8 contract C, G.13). A section has a title, a one-line summary that shows while it is closed, and a
+ * The collapsible sections of the window family. A section has a title, a one-line summary that shows while it is closed, and a
  * chevron; the whole title row is the button. "Open all" and "Close all" stand right-aligned above the first section and are
  * hidden when a window has one section. Which sections the user opened or closed is kept for each kind of window while Obsidian
  * runs, so a window that draws again (after a write) keeps them as the user left them. Only the user's own taps are kept: the

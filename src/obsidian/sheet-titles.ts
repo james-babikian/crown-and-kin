@@ -14,7 +14,7 @@ import type { Op } from '../core/edit';
 import { newTitleId } from '../core/title-ops';
 import { quotedSobriquet } from '../core/sobriquet';
 import { cardLabels, entryReign, rulerName, titleNameFor, type Holding } from '../core/titles';
-import { entryReignText, reignOf, type DatesRead } from '../render/tree-info';
+import { entryReignText, isolateReign, reignOf, type DatesRead } from '../render/tree-info';
 import type { Holder, Person } from '../core/types';
 import { TITLES_UI, WINDOW_UI, WRITE_TEXT } from '../render/ui-text';
 import { choose } from './choice-modal';
@@ -67,13 +67,13 @@ export function titleOnCard(g: FamilyGraph, person: Person): string | undefined 
 	return person.title === undefined ? label.shown.title.id : undefined;
 }
 
-/** The line under the title of the closed Titles section: the first title with its reign, and how many more (contract C). */
+/** The line under the title of the closed Titles section: the first title with its reign, and how many more. */
 export function titlesSummary(host: TitlesHost): string {
 	const { g, person } = host.data();
 	const holdings = cardLabels(g).get(person.id)?.holdings ?? [];
 	const first = holdings[0];
 	if (!first) return WINDOW_UI.noTitles;
-	const reign = reignOf(first.entries, g.dates, 'shown')?.replace(/^\(|\)$/g, '');
+	const reign = isolateReign(reignOf(first.entries, g.dates, 'shown'), first.entries, g.dates)?.replace(/^\(|\)$/g, '');
 	const parts = [titleNameFor(first.title, person), reign, holdings.length > 1 ? WINDOW_UI.andMore(holdings.length - 1) : undefined];
 	return parts.filter((x): x is string => !!x).join(' · ');
 }
@@ -112,7 +112,7 @@ function holdingRows(list: HTMLElement, host: TitlesHost, h: Holding, choice: bo
 		if (choice && i === 0 && onCard === title.id) r.title.createSpan({ cls: ['dynasty-tag', 'dynasty-title-on-card'], text: TITLES_UI.onCard });
 		r.sub.addClass('dynasty-family-detail');
 		const ruler = entry.number !== undefined ? `${rulerName(entry, person.name)} ${entry.number}` : undefined;
-		const sub = [ruler, entryReignText(entry, host.data().g.dates, 'shown')].filter((x): x is string => !!x).join(' · ');
+		const sub = [ruler, isolateReign(entryReignText(entry, host.data().g.dates, 'shown'), [entry], host.data().g.dates)].filter((x): x is string => !!x).join(' · ');
 		r.sub.setText(sub || TITLES_UI.entryNone);
 		if (host.readOnly) return;
 		const controls = r.actions();

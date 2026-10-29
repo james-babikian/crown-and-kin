@@ -26,6 +26,7 @@ import { closePluginModals } from '../view/plugin-modals';
 import { tallBlockParser } from './live-preview';
 import { beginStart, guardStart } from './start-guard';
 import { clearRelationCache, moveRelationBlocks } from '../view/relation-cache';
+import { deviceCopies } from './picture-copies-idb';
 import { createPictureStore, isPictureExtension } from './picture-store';
 import { bindViewerMotion } from './picture-viewer';
 import { stopJoinedWatch } from '../render/text-join';
@@ -55,10 +56,10 @@ export default class DynastyTreePlugin extends Plugin implements TreeHost, Setti
 	readonly links = new LinkUpdater(this.app, this.handles, () => this.settings.updateLinks, RENAME_TIMING, {
 		save: () => this.savePending(),
 		known: () => [...this.views].map((v) => v.notePath),
-		// 0.4: the notes that hold a tree, from the fence index. Null until it is complete: the scan of 0.3.3 then looks at every note.
+		// The notes that hold a tree, from the fence index. Null until it is complete: the full scan then looks at every note.
 		kinNotes: () => (this.fence.complete ? new Set([...this.fence.notes('kin'), ...this.fence.unsure()]) : null),
 	});
-	/** 0.4 (pre-mortem item 6): the renames that wait are kept in the local storage of this device, not in the synced `data.json`. */
+	/** The renames that wait are kept in the local storage of this device, not in the synced `data.json`. */
 	private readonly pendingKeeper = new PendingKeeper(this.app);
 	/** One `saveData` at a time (the settings, and the renames that wait if the local storage fails, share `data.json`). */
 	private saving: Promise<void> = Promise.resolve();
@@ -80,15 +81,15 @@ export default class DynastyTreePlugin extends Plugin implements TreeHost, Setti
 	readonly opens = new Map<string, OpenTime>();
 	/** Number of tree renders in this session; the harness checks that a tree settles. */
 	renderCount = 0;
-	/** M9 contract O3: one picture store for all trees (`TreeHost.pictures`). */
-	readonly pictures = createPictureStore(this.app);
+	/** One picture store for all trees (`TreeHost.pictures`). */
+	readonly pictures = createPictureStore(this.app, undefined, deviceCopies(this.app));
 	/**
-	 * M11: the one parse cache of the tree views. The harness build freezes the cached trees, so that a
+	 * The one parse cache of the tree views. The harness build freezes the cached trees, so that a
 	 * reader which changes one (layout, relations, fold planning) throws in the harness and not in a note.
 	 */
 	readonly parseCache = createParseCache({ freeze: typeof __DYNASTY_HARNESS__ !== 'undefined' && __DYNASTY_HARNESS__ === true });
 	/**
-	 * 0.2.8 contract B.5 (D183): the cold start. A tree draws a box of its last known height until the plugin styles (a probe element with the
+	 * D183: the cold start. A tree draws a box of its last known height until the plugin styles (a probe element with the
 	 * variable `--dynasty-css-ready` of the style sheet), the stored settings and its block place are in, and it counts no missing picture until the
 	 * metadata cache has finished once. The settings and the cache end at the latest `START_LIMIT_MS` after the plugin starts, the styles at `STYLES_LIMIT_MS`.
 	 */
@@ -179,7 +180,7 @@ export default class DynastyTreePlugin extends Plugin implements TreeHost, Setti
 		const limit = window.setTimeout(() => this.startUpDone(), START_LIMIT_MS + 50);
 		this.register(() => window.clearTimeout(limit));
 		this.register(() => this.cssProbe?.remove());
-		// The text colour set on the page body must not outlive the plugin (G.12).
+		// The text colour set on the page body must not outlive the plugin.
 		this.register(() => document.body?.style.removeProperty('--dynasty-on-accent'));
 		// The same for the run-time grey, link, edge and error colours (D212, contrast-tokens).
 		this.register(() => this.clearContrast());
@@ -282,13 +283,13 @@ export default class DynastyTreePlugin extends Plugin implements TreeHost, Setti
 		};
 	}
 
-	/** The hook of the updater: the list goes to the local store; if that fails, to `data.json`, as in 0.3.3. */
+	/** The hook of the updater: the list goes to the local store; if that fails, to `data.json`. */
 	private savePending(): Promise<void> | void {
 		if (!this.pendingKeeper.save(this.links.pendingList())) return this.store();
 	}
 
 	/**
-	 * Moves the list of `data.json` into the local store, once (the index contract 3). The store is saved first; only then does the plugin clear its copy of the list and write the file. `late`: the read
+	 * Moves the list of `data.json` into the local store, once. The store is saved first; only then does the plugin clear its copy of the list and write the file. `late`: the read
 	 * of the file failed at start and works now, so the updater gets the merged list and continues at once.
 	 */
 	private migratePending(raw: unknown, late: boolean): void {
@@ -340,7 +341,7 @@ export default class DynastyTreePlugin extends Plugin implements TreeHost, Setti
 	}
 
 	/**
-	 * I40 (0.2.8, contract G.12): the text on the accent (`--dynasty-on-accent`, on the page body, so the windows have it too) is black or white by
+	 * The text on the accent (`--dynasty-on-accent`, on the page body, so the windows have it too) is black or white by
 	 * measured contrast where the theme's own pair is under 4.5:1; else the base token of the style sheet (the theme's pair) stays.
 	 */
 	private paintOnAccent(): void {
@@ -436,7 +437,7 @@ export default class DynastyTreePlugin extends Plugin implements TreeHost, Setti
 		}
 	}
 
-	/** Applies stored data: the settings, and the extras that a save writes back (W7). */
+	/** Applies stored data: the settings, and the extras that a save writes back. */
 	private applyStored(stored: unknown): void {
 		const prev = this.settings;
 		const { settings, extras } = readStoredSettings(stored);
@@ -479,7 +480,7 @@ export default class DynastyTreePlugin extends Plugin implements TreeHost, Setti
 	private store(): Promise<void> {
 		const write = async () => {
 			await this.recoverStartupRead();
-			// The list goes into the file only in the fallback; otherwise it lives in the local store (the index contract 3).
+			// The list goes into the file only in the fallback; otherwise it lives in the local store.
 			await this.saveData(buildStoredData(this.settings, this.extras, this.pendingKeeper.fallback ? this.links.pendingList() : []));
 		};
 		const next = this.saving.then(write, write);
@@ -508,7 +509,7 @@ export default class DynastyTreePlugin extends Plugin implements TreeHost, Setti
 
 	/**
 	 * A setting changed: every tree draws again (spec §9). Each draw is a whole layout, so trees that nobody sees (another tab,
-	 * a closed fold) wait one timer turn each, behind the trees on screen (G3 wave 2: the open tree took 3 s with many trees open).
+	 * a closed fold) wait one timer turn each, behind the trees on screen.
 	 */
 	private redrawViews(prev: DynastySettings): void {
 		const hidden = [...this.views].filter((v) => v.offScreen);

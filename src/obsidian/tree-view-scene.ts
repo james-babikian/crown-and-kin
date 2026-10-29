@@ -1,8 +1,8 @@
 /*
- * The drawn scene (0.3.3, WP-1 A1): the cards, tags, fold controls and badges of the scene after it is built. It fills their content on demand, wires the
+ * The drawn scene: the cards, tags, fold controls and badges of the scene after it is built. It fills their content on demand, wires the
  * presses and keys, and moves and highlights the view to a card. Fourth layer of the chain listed in `tree-view.ts`.
  *
- * Card content on demand (M11, spec §13.15; the scene builds shells, see `render/dom/scene.ts`):
+ * Card content on demand (spec §13.15, the scene builds shells, see `render/dom/scene.ts`):
  * - S5 When the tree fills. `fillNear` runs at the first draw, at each settle and pinch fill, during a
  *   wheel or trackpad zoom (through `onFill`, only when the view leaves the last filled rectangle) and
  *   in a new scene. The cases below use `fillPerson` and the idle chain uses `fillChunk`. A drag pan
@@ -15,21 +15,21 @@
  *      (Chromium makes an SVG element with a focus listener a Tab stop).
  *   d. Before a highlight, e. before a reveal, f. before the sheet opens by keyboard or code: fill the
  *      person first.
- *   (0.2.1, rule 4: the lines and partnership signs follow the same calls; `fillNear`, `fillPerson`, `fillChunk` and
+ *   (spec §13.15 rule 4: the lines and partnership signs follow the same calls; `fillNear`, `fillPerson`, `fillChunk` and
  *   `fillAll` build them too, and `pendingLines` keeps the idle chain running until they are built.)
  *   g. Idle: after the first view the rest is attached in idle chunks (`later`, at most
  *      `IDLE_CARDS_PER_CHUNK` cards, stop at `IDLE_STOP_MS`), nearest to the view first, one chain for
  *      each scene. A chunk that finds the view busy asks again; it never drops the chain. Folds go
  *      first and the two kinds never share an idle callback. The static phone preview starts no chain.
  *   i. A new scene (`redraw`) fills near in the same task, stops the old chain and starts its own.
- * - S6 The live pictures work on slots of attached cards; the fold controls keep their M10 rule.
+ * - S6 The live pictures work on slots of attached cards; the fold controls keep their own rule.
  * - S7 Hide until the first view. The `.dynasty-canvas` wrapper of the svg is `hidden` until the first
  *   transform is written (the browser then lays out the tree once). `showTree()` is idempotent and never
  *   throws. It runs after `fillNear` in `firstDraw`, in the `guard` catch, in a `finally` of `resized`, and
  *   before any code that reads layout (`highlight`). The error box and the empty tree are built shown.
  * - S8 One `TreeHost.parseCache` serves the read paths (`parse`); see `core/parse-cache.ts`.
  * - S10 Accessibility does not change: every shell keeps its Tab stop, name, role and order.
- * - The root attributes `data-dynasty-cards-pending` (`CARDS_PENDING_ATTR`; the lint rule wants a plain string here) and `data-dynasty-lines-pending` (`LINES_PENDING_ATTR`, 0.2.1) and the event `FILL_ALL_EVENT` (both in `render/dom/scene.ts`)
+ * - The root attributes `data-dynasty-cards-pending` (`CARDS_PENDING_ATTR`; the lint rule wants a plain string here) and `data-dynasty-lines-pending` (`LINES_PENDING_ATTR`) and the event `FILL_ALL_EVENT` (both in `render/dom/scene.ts`)
  *   are the harness hooks: the harness fills everything, then reads card content.
  */
 
@@ -119,7 +119,7 @@ export abstract class TreeViewScene extends TreeViewPlacement {
 		return (e: Event) => {
 			e.preventDefault();
 			e.stopPropagation();
-			// I37: only a key press gets its fold control back with the keyboard focus after the redraw; a tap or a click leaves no focus ring on it.
+			// Only a key press gets its fold control back with the keyboard focus after the redraw; a tap or a click leaves no focus ring on it.
 			this.foldByKey = e.type === 'keydown' || (e as MouseEvent).detail === 0;
 			this.guard(() => this.toggleFold(f.control));
 		};
@@ -167,7 +167,7 @@ export abstract class TreeViewScene extends TreeViewPlacement {
 		if (filled.length) this.placeFolds(view, filled);
 	}
 
-	/** Fold controls or card content still wait for the idle chain. A static phone preview has no idle fill of cards (S5g). */
+	/** Fold controls or card content still wait for the idle chain. A static phone preview has no idle fill of cards. */
 	protected idleWork(scene: Scene): boolean {
 		return scene.folds.some((f) => !f.filled) || ((!!this.full || !this.coarse) && (scene.fill.pending > 0 || scene.fill.pendingLines > 0));
 	}
@@ -202,7 +202,7 @@ export abstract class TreeViewScene extends TreeViewPlacement {
 					later(step);
 					return;
 				}
-				// The M10 fold controls go first, and the two kinds never share one idle callback.
+				// The fold controls go first, and the two kinds never share one idle callback.
 				const made: FoldRef[] = [];
 				for (const f of scene.folds) {
 					if (f.filled) continue;
@@ -232,7 +232,7 @@ export abstract class TreeViewScene extends TreeViewPlacement {
 		later(step);
 	}
 
-	/** The delayed card content near `view` (S3, S5a, S5b). A view with no size has no near part: the first draw or settle fills it. */
+	/** The delayed card content near `view`. A view with no size has no near part: the first draw or settle fills it. */
 	protected fillNear(view: View): void {
 		this.learnRadius();
 		const pz = this.panZoom;
@@ -342,7 +342,7 @@ export abstract class TreeViewScene extends TreeViewPlacement {
 	}
 
 	/**
-	 * Tag hit areas stay at least 44 screen px at low zoom (spec §7.5, the decision notes), and so do the `+` badges and their discs. They depend on the zoom, the layout
+	 * Tag hit areas stay at least 44 screen px at low zoom (spec §7.5), and so do the `+` badges and their discs. They depend on the zoom, the layout
 	 * and the scene only, so a settle at the same zoom (a pan) writes nothing and keeps `tapAreas` (D285: it was about 5 000 attribute writes per settle on a very large tree).
 	 */
 	protected placeTapAreas(view: View, laid: LaidOut): void {
@@ -352,7 +352,7 @@ export abstract class TreeViewScene extends TreeViewPlacement {
 		// A badge is placed again at each settle: a new card corner radius (a theme change) puts its places back to the first ones (`setCornerRadius`). Only a focus family has badges.
 		if (same && !scene?.badges.length) return;
 		if (!same) this.tapFor = scene ? { laid, scene, scale: view.scale } : null;
-		// D31: in `down` the tap area hangs below its card. 0.3.1 fix3: in `sideways` it hangs from the card too, down to the next card at most;
+		// D31: in `down` the tap area hangs below its card. In `sideways` it hangs from the card too, down to the next card at most;
 		// a strip over the bottom of its own card wins when the gap is shorter than 44 screen px (`tagHitSide`).
 		const down = laid.layout.orientation !== 'sideways';
 		const below = down ? null : tagNextTops(laid.layout);
@@ -365,14 +365,14 @@ export abstract class TreeViewScene extends TreeViewPlacement {
 			setRect(t.over, side?.over ?? { x: r.x, y: r.y, w: 0, h: 0 });
 			areas.push(r);
 		}
-		// The same for the `+` badges of focus mode (spec §7.5, contract 4.2): the square below the cards, capped (the layout's node gap in
+		// The same for the `+` badges of focus mode (spec §7.5): the square below the cards, capped (the layout's node gap in
 		// `sideways`, half the own card in `down`) and clipped at the tag tap areas of the other people; the disc above the cards.
 		for (const b of scene?.badges ?? []) {
 			const { square, disc } = this.badgeTapAt(laid, b.person, b.mark, view.scale);
 			setRect(b.hit, square);
 			const path = discPath(disc.cx, disc.cy, disc.r, disc.top);
 			if (b.disc.getAttribute('d') !== path) b.disc.setAttribute('d', path);
-			// A fold control's tap area gives way to the disc only; elsewhere in the square the fold control wins (contract 4.2 E1).
+			// A fold control's tap area gives way to the disc only; elsewhere in the square the fold control wins.
 			const top = Math.max(disc.top, disc.cy - disc.r);
 			areas.push({ x: disc.cx - disc.r, y: top, w: 2 * disc.r, h: disc.cy + disc.r - top });
 		}
@@ -416,7 +416,7 @@ export abstract class TreeViewScene extends TreeViewPlacement {
 		let counts = { up: 0, down: 0 };
 		if (this.hintOn && pz && this.laid?.layout.orientation === 'sideways') {
 			const size = pz.size;
-			// 0.2.8: the toolbar is a band over the full width, so the free area starts below it.
+			// The toolbar is a band over the full width, so the free area starts below it.
 			const top = Math.max(0, this.insetTop);
 			counts = outsideBox(view, size, this.hintKids, top, size.h - this.insetBottom);
 		}
@@ -438,7 +438,7 @@ export abstract class TreeViewScene extends TreeViewPlacement {
 	}
 
 	/**
-	 * G5 0.4: a hint never covers a card. With a theme's fonts the label is wider, and the first view can have a card in its corner: the label is measured as drawn
+	 * A hint never covers a card. With a theme's fonts the label is wider, and the first view can have a card in its corner: the label is measured as drawn
 	 * and moves to the left corner, or goes when both corners cover a card. The right corner, as before, wherever it covers nothing.
 	 */
 	protected clearOfCards(dir: 'up' | 'down', view: View): void {
@@ -472,7 +472,7 @@ export abstract class TreeViewScene extends TreeViewPlacement {
 		const up = vp?.querySelector<HTMLElement>(':scope > .dynasty-hint-up') ?? null;
 		const down = vp?.querySelector<HTMLElement>(':scope > .dynasty-hint-down') ?? null;
 		if (!vp || (!up && !down)) return;
-		// 0.2.8: the toolbar is a band over the full width, so the hint at the top stands below the bands that the view keeps free.
+		// The toolbar is a band over the full width, so the hint at the top stands below the bands that the view keeps free.
 		up?.style.setProperty('--dynasty-hint-top', `${this.frameTop(vp) + Math.max(0, this.insetTop) + 4}px`);
 		down?.style.setProperty('--dynasty-hint-bottom', `${this.insetBottom + 4}px`);
 	}
@@ -556,7 +556,7 @@ export abstract class TreeViewScene extends TreeViewPlacement {
 				if (e.key === 'Enter' || e.key === ' ') act(e);
 			});
 		}
-		// M10 (F6, F7, F16): the fold buttons and "+ N" signs. Both the visible group and the tap area toggle; Enter and Space too.
+		// The fold buttons and "+ N" signs. Both the visible group and the tap area toggle; Enter and Space too.
 		for (const f of scene.folds) {
 			const act = this.foldAct(f);
 			f.el.addEventListener('click', act);
@@ -725,7 +725,7 @@ export abstract class TreeViewScene extends TreeViewPlacement {
 		if (box) this.reveal(box, false, restored);
 	}
 
-	/** The card with its `+` badge: the badge sticks out above the card's top edge, and a card is only whole on the screen when its badge is (G3 F3). */
+	/** The card with its `+` badge: the badge sticks out above the card's top edge, and a card is only whole on the screen when its badge is. */
 	protected withBadge(box: Rect): Rect {
 		let out = box;
 		for (const { mark } of this.scene?.badges ?? []) {
@@ -779,7 +779,7 @@ export abstract class TreeViewScene extends TreeViewPlacement {
 			this.fillPerson(id);
 			const card = this.scene?.cards.get(id);
 			if (!card) continue;
-			// M7: the same card again restarts its pulse. The class goes now and comes back in the next frame; a read of the layout (`getBoundingClientRect`) to flush the style would force a layout of the whole tree.
+			// The same card again restarts its pulse. The class goes now and comes back in the next frame; a read of the layout (`getBoundingClientRect`) to flush the style would force a layout of the whole tree.
 			if (card.hasClass('dynasty-highlight')) {
 				card.removeClass('dynasty-highlight');
 				win.requestAnimationFrame(() => {
@@ -802,7 +802,7 @@ export abstract class TreeViewScene extends TreeViewPlacement {
 		}
 	}
 
-	/** The cards of heirs and branches say their place in the screen-reader label (F.4). The scene's own text has none: it does not know the line. */
+	/** The cards of heirs and branches say their place in the screen-reader label. The scene's own text has none: it does not know the line. */
 	protected markPositions(): void {
 		const d = this.successionDrawn;
 		const scene = this.scene;

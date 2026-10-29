@@ -1,5 +1,5 @@
 /*
- * Name lists (version 0.3.3; spec section 14 rules 13 to 16): a list gives each year a name that repeats ("Saturn", "Jupiter", ...), with an optional
+ * Name lists (spec section 14 rules 13 to 16): a list gives each year a name that repeats ("Saturn", "Jupiter", ...), with an optional
  * short form, one known year and a marker that a format can hold. This file has the types, the name of an internal year (rule 13), the markers (rule 14), the
  * compiled lists that `dates.ts` matches names with (rule 14), the test for a whole plain-year text (rule 14), the text field of names (rule 16) and the refusals of the
  * Calendars window for a list (rule 16). Pure: it imports only the text helpers and the refusal sentences, so `dates.ts`, `date-formats.ts` and
@@ -38,7 +38,9 @@ export interface YearName {
 
 /** The most name lists of one calendar (and of the plain years), the most names in one list, and the most characters in a name or a short form. */
 export const MAX_LISTS = 4;
+/** The most names in one list. */
 export const MAX_NAMES = 60;
+/** The most characters in a name or a short form. */
 export const MAX_NAME_CHARS = 40;
 /** The most characters in the name of a list (the name shows in a title, a summary line and a sentence). */
 export const MAX_LIST_NAME_CHARS = 60;
@@ -127,7 +129,7 @@ export interface Written {
 
 /** A list ready for matching: its usable names and short forms, folded. */
 export interface CompiledList {
-	/** The position in the written lists of the owner. */
+	/** The position of its owner in the written lists. */
 	pos: number;
 	list: NameList;
 	/** The folded name of the list: lists of one folded name are used once (spec §14 rule 13). */

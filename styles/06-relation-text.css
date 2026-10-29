@@ -1,4 +1,4 @@
-/* ---------- You and your family (M7: spec §13.1, §13.2) ---------- */
+/* ---------- You and your family (spec §13.1, §13.2) ---------- */
 
 /* D40: the relation to the marked person, one small text line after the card's other text lines: italic and muted. */
 .dynasty-card-relation {
@@ -97,7 +97,7 @@
 }
 
 
-/* 0.2.8 (I19): the sample of the dead signs in the legend: the date text with the sign, in the note font. */
+/* The sample of the dead signs in the legend: the date text with the sign, in the note font. */
 .dynasty-legend-dagger {
 	font-family: var(--font-text);
 	font-size: 12px;

@@ -349,6 +349,8 @@ describe('P8, V4: the keyboard', () => {
 	it('Up and Down move through the visible rows and wrap; the search field keeps the focus (aria-activedescendant)', async () => {
 		const { m } = await pick();
 		const s = search(m);
+		// The window opens with no field focused; the user taps the search field.
+		s.focus();
 		expect(key(s, 'ArrowDown').defaultPrevented).toBe(true);
 		expect(activeLabel(m)).toBe('device');
 		key(s, 'ArrowDown');
@@ -518,34 +520,29 @@ describe('V3: the scroll rule (defect fix)', () => {
 	});
 });
 
-describe('D95, V4: the keyboard focus', () => {
-	it('on the computer the search field has the focus at open, and takes it back when Obsidian moves it', async () => {
+describe('the keyboard focus (D320: a search list; the computer focuses the field, a touch-first device no field)', () => {
+	it('computer: the search field has the focus at open and takes it back from Obsidian until the user acts', async () => {
 		device.coarse = false;
 		const { m } = await pick();
 		expect(fakeDoc.activeElement).toBe(search(m));
 		m.contentEl.querySelector('.dynasty-sheet-cancel')!.focus();
 		runTimers(300);
+		await settle();
 		expect(fakeDoc.activeElement).toBe(search(m));
 	});
 
-	it('on a touch-first device the search field never gets the focus: not at open, not by a later timer', async () => {
-		device.coarse = true;
-		const { m } = await pick();
-		const focus = vi.spyOn(search(m), 'focus');
-		expect(fakeDoc.activeElement).not.toBe(search(m));
-		m.contentEl.querySelector('.dynasty-sheet-cancel')!.focus();
-		runTimers(1000);
-		await settle();
-		expect(fakeDoc.activeElement).not.toBe(search(m));
-		expect(focus).not.toHaveBeenCalled();
-	});
-
-	it('on a touch-first device the search field is never focused during open (a spy set before open sees no call)', async () => {
+	it('touch-first: the window itself has the focus, the search field never gets it, not at open and not by a later timer', async () => {
 		device.coarse = true;
 		const spy = vi.spyOn(FEl.prototype, 'focus');
 		const { m } = await pick();
-		runTimers(1000);
+		expect(fakeDoc.activeElement).toBe(m.modalEl);
+		// Obsidian moves the focus to the first control after `onOpen`: the window takes it back, as long as the user did nothing.
+		m.contentEl.querySelector('.dynasty-sheet-cancel')!.focus();
+		runTimers(300);
+		await settle();
+		expect(fakeDoc.activeElement).toBe(m.modalEl);
 		expect(spy.mock.contexts.some((c) => c === search(m))).toBe(false);
+		spy.mockRestore();
 	});
 
 	it('isTouchFirst reads the coarse pointer of the given window; a missing or throwing matchMedia is false', async () => {

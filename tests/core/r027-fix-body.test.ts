@@ -1,5 +1,5 @@
 // Contract 0.2.7 section L (D189): the switch `heirs-of-body`. Reading, writing, the engine (cases L01 to L11 of
-// An internal study) and the result fields `firstHolder` and `outsideBody`.
+// an internal study) and the result fields `firstHolder` and `outsideBody`.
 import { describe, expect, it } from 'vitest';
 import { deriveFamilies } from '../../src/core/derive';
 import type { EditResult, Op } from '../../src/core/edit';

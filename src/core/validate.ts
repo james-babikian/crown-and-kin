@@ -2,7 +2,7 @@
  * Checks the references and values of a parsed `Tree` and returns only the parts that are safe to
  * draw, together with every problem found (spec §8, §4.1). `derive.ts` calls `validateTree` before
  * building the family graph; anything that needs the derived families (for example a `union` that
- * does not name a union of the person's own parents) is checked there instead. From 0.2.8 it also checks the parent limits
+ * does not name a union of the person's own parents) is checked there instead. It also checks the parent limits
  * (`PARENT_LIMIT`, with the setting that stops the warning for 2 parents of a type), the near-typos of type words, and the
  * `through-spouse` key of a holder.
  */
@@ -15,7 +15,7 @@ import { isParentType, isPlacementType, isUnionType, PARENT_LIMIT, parentKind, P
 
 /** What the caller can switch in validation. Absent fields mean the default. */
 export interface ValidateOptions {
-	/** The setting "Warn about more than 2 parents of a type" (0.2.8 A.5). Off stops `too-many-parents` for birth, adoptive and ward parents; the limit for rumoured parents stays. Default: on. */
+	/** The setting "Warn about more than 2 parents of a type". Off stops `too-many-parents` for birth, adoptive and ward parents; the limit for rumoured parents stays. Default: on. */
 	warnManyParents?: boolean;
 	/** Spec §14: the date reader of the tree (calendars). Absent: plain years. Validation reads the dates of a title with a rule or a named heir through it and turns its problems into issues; `deriveFamilies` puts it in `FamilyGraph.dates`. */
 	dates?: DateReader;
@@ -83,7 +83,7 @@ export function cleanParents(
 	return out;
 }
 
-/** J.4: the lower case texts of `sex` that mean a man or a woman but are not `m` or `f` (`M` and `F` are caught as not equal to `m` and `f`). */
+/** The lower case texts of `sex` that mean a man or a woman but are not `m` or `f` (`M` and `F` are caught as not equal to `m` and `f`). */
 const SEX_SPELLINGS: ReadonlySet<string> = new Set(['m', 'f', 'male', 'man', 'female', 'woman', 'm.', 'f.']);
 
 /** The Levenshtein distance of two short words. */
@@ -97,7 +97,7 @@ function editDistance(a: string, b: string): number {
 	return prev[b.length];
 }
 
-/** I13: the known word within edit distance 2 of `value` (case ignored, the nearest first), or undefined. */
+/** The known word within edit distance 2 of `value` (case ignored, the nearest first), or undefined. */
 function nearWord(value: string, words: readonly string[]): string | undefined {
 	const v = value.trim().toLowerCase();
 	// A long text is a sentence, not a typo; the length test also keeps the cost small.
@@ -263,7 +263,7 @@ export function validateTree(tree: Tree, options: ValidateOptions = {}): Validat
 
 		const byType = new Map<string, number>();
 		for (const r of valid) byType.set(r.type, (byType.get(r.type) ?? 0) + 1);
-		// B.3, A.5: the limit of each type; the setting stops the warning for birth, adoptive and ward parents only.
+		// The limit of each type; the setting stops the warning for birth, adoptive and ward parents only.
 		for (const [type, count] of byType) {
 			const limit = PARENT_LIMIT[type as ParentType];
 			if (count > limit && (type === 'rumoured' || options.warnManyParents !== false)) out.warn('too-many-parents', { ...who, type, count, limit }, [p.id]);
@@ -274,12 +274,12 @@ export function validateTree(tree: Tree, options: ValidateOptions = {}): Validat
 		}
 		// A crop with no portrait does nothing and gives no warning (spec §13.13).
 		if (p.portrait !== undefined && readPortraitCrop(p.portraitCrop).kind === 'bad') out.warn('bad-portrait-crop', who, [p.id]);
-		// J.4, J.7: a spelling of a value the plugin reads, and a doubt where a date should be. The values keep their meaning.
+		// A spelling of a value the plugin reads, and a doubt where a date should be. The values keep their meaning.
 		if (p.sex !== undefined && p.sex !== 'm' && p.sex !== 'f' && SEX_SPELLINGS.has(p.sex.toLowerCase())) out.warn('sex-spelling', { ...who, value: p.sex }, [p.id]);
 		if (p.died !== undefined && DOUBTFUL_DIED.includes(p.died.trim().toLowerCase())) out.warn('died-doubtful', { ...who, value: p.died }, [p.id]);
 	}
 
-	// M.6: `childless: true` on a dead person who has a birth child. The first child in written order is named.
+	// `childless: true` on a dead person who has a birth child. The first child in written order is named.
 	const birthChild = new Map<string, Person>();
 	for (const p of people) {
 		for (const r of refs.get(p.id)!) if (r.type === 'birth' && !birthChild.has(r.id)) birthChild.set(r.id, p);
@@ -306,7 +306,7 @@ export function validateTree(tree: Tree, options: ValidateOptions = {}): Validat
 		const absent = u.partners.filter((x) => !byId.has(x));
 		for (const ref of absent) out.warn('missing-partner', { ...label, ref, absent }, known);
 		if (absent.length) continue;
-		// I13: any word is a partnership type and is drawn as a marriage; only a near-typo of a known type warns.
+		// Any word is a partnership type and is drawn as a marriage; only a near-typo of a known type warns.
 		if (!isUnionType(u.type)) {
 			const suggestion = nearWord(u.type, UNION_TYPES);
 			if (suggestion) out.warn('unknown-union-type', { ...label, value: u.type, suggestion }, known);
@@ -373,7 +373,7 @@ function validateTitles(written: readonly Title[], people: Person[], byId: Map<s
 	return titles;
 }
 
-/** Contract 0.2.7 A.5, K.3, K.4: the warnings about the succession keys of one title (the first title with its id). */
+/** The warnings about the succession keys of one title (the first title with its id). */
 function successionWarnings(t: Title, byId: Map<string, Person>, out: Collector, reader: DateReader) {
 	const bad = t.badKeys ?? {};
 	const at = (code: IssueCode, value: string, key: 'value' | 'ref' = 'value') => out.warn(code, { title: t.name, [key]: value });
@@ -385,7 +385,7 @@ function successionWarnings(t: Title, byId: Map<string, Person>, out: Collector,
 	if (bad['inherit-illegitimate'] !== undefined) at('unknown-inherit-illegitimate', bad['inherit-illegitimate']);
 	// Before the calendars are ready a calendar date reads as plain text and has no year, which is not the user's fault (spec §14 rule 7).
 	const year = bad.year ?? (reader.ready && t.year !== undefined && reader.read(t.year)?.year === undefined ? t.year : undefined);
-	// A date that fits two calendars has its own warning, so it gets no second one (ruling 4.2 fix 2).
+	// A date that fits two calendars has its own warning, so it gets no second one.
 	if (year !== undefined && needsYear(t) && !reader.read(year)?.warnings.includes('fits-two-calendars')) at('year-unreadable', year);
 	const missing = (ids: readonly string[] | undefined, text: string | undefined, code: IssueCode) => {
 		for (const id of new Set((ids ?? []).filter((x) => !byId.has(x)))) at(code, id, 'ref');
@@ -469,7 +469,7 @@ function titleDateWarnings(t: Title, holders: readonly Holder[], reader: DateRea
 
 /**
  * Spec §14 rule 5: the warnings of the `born` and `died` of every person that a line can read, for all titles that need the year
- * together (ruling 4.2 fix 1): the holders and the named heirs, their ancestors and all descendants of those ancestors. This is done
+ * together: the holders and the named heirs, their ancestors and all descendants of those ancestors. This is done
  * once for the tree, so a date gives one warning, not one for each title.
  */
 function personDateWarnings(needing: readonly { t: Title; holders: readonly Holder[] }[], people: readonly Person[], byId: Map<string, Person>, refs: Map<string, ParentRef[]>, reader: DateReader, out: Collector) {
@@ -545,7 +545,7 @@ function spouseWorld(people: Person[], byId: Map<string, Person>, refs: Map<stri
 	return { partners: (id) => partners.get(id) ?? [], claimParents: (id) => claimParents.get(id) ?? [], exists: (id) => byId.has(id) };
 }
 
-/** 0.2.8 contract A.2, D195: the warnings about the `through-spouse` keys of one title. Each warns once for a person and a value; the key is then ignored. */
+/** The warnings about the `through-spouse` keys of one title. Each warns once for a person and a value; the key is then ignored. */
 function throughSpouseWarnings(t: Title, holders: readonly Holder[], byId: Map<string, Person>, world: SpouseWorld, out: Collector) {
 	const inTree = holders.flatMap((h) => (h.person !== undefined && byId.has(h.person) ? [h.person] : []));
 	const seen = new Set<string>();

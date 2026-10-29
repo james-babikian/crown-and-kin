@@ -31,7 +31,7 @@ import { isPhoneWindow } from '../view/focus-mode';
 import { freeName, makeNote, namesIn } from './table-note';
 import { vaultPath } from './vault-path';
 
-/** Which button the sheet offers (N1): 'new' makes a note for the person; 'linked' makes the note that the link already names. */
+/** Which button the sheet offers: 'new' makes a note for the person; 'linked' makes the note that the link already names. */
 export type MakeNoteMode = 'new' | 'linked';
 
 /** What the sheet gives makePersonNote. */

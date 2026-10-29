@@ -1,5 +1,5 @@
 /*
- * Small pure helpers of the tree view (the layers `src/obsidian/tree-view*.ts`), moved out of `tree-view.ts` in WP-4 step 4.3 to keep that file within its size ceiling:
+ * Small pure helpers of the tree view (the layers `src/obsidian/tree-view*.ts`):
  * what the drawn graph holds (portraits, arms, reigns), the keys and labels of pictures and fold controls, the finder's line as the scene marks it, and the
  * rectangle around cards. None of them reads the page or Obsidian.
  */
@@ -14,7 +14,7 @@ import type { SceneOptions } from '../render/dom/scene';
 import { FOLD_UI } from '../render/ui-text';
 import { FIT_MARGIN } from '../render/view-math';
 
-/** The drawn graph has a person with a portrait (O10): only then does "Show portraits on cards" change its layout. */
+/** The drawn graph has a person with a portrait: only then does "Show portraits on cards" change its layout. */
 export function hasPortraits(g: FamilyGraph | null): boolean {
 	return !!g?.people.some((p) => !!p.portrait);
 }

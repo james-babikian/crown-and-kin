@@ -1,5 +1,5 @@
 /*
- * The calendar readers (spec §14 rules 7 and 9, the architecture notes §5.7; D289, D290). A tree reads a calendar only when `options.calendar` names a calendar note. This file gives each
+ * The calendar readers (spec §14 rules 7 and 9, D289, D290). A tree reads a calendar only when `options.calendar` names a calendar note. This file gives each
  * tree its date reader (`readerFor`) and keeps the calendars of the notes that trees name. A tree with no key gets the plain reader at once: no scan, no read, no wait. A key is
  * "requested": the first call starts one load of the note it names and answers the one "pending" reader (plain years, no warning) until the load ends; then the listeners hear of
  * it after a short wait, once for a burst of events. Which notes hold a `kin-calendar` fence is not known here: the host gives that list (`IndexOptions.notes`, from the fence
@@ -147,7 +147,7 @@ function entryOf(text: string, path: string): Entry | null {
 		}
 		issues.push(...read.issues);
 	});
-	// The lists are in the signature (a list-only edit is a change); a note with no `plain` key keeps the signature of 0.3.2.
+	// The lists are in the signature (a list-only edit is a change); a note with no `plain` key keeps the signature it has without lists.
 	return { calendars, plain, hasPlain, issues, text, sig: JSON.stringify([calendars, issues.length, ...(hasPlain ? [plain] : [])]) };
 }
 
@@ -163,7 +163,7 @@ class Index implements CalendarIndex {
 	private readonly targets = new Map<string, Set<string>>();
 	/** Notes that a window reloaded: they stay loaded until the next burst, so the window and the key it writes see them. */
 	private readonly pinned = new Set<string>();
-	/** The newest event or read of each path: an older read that finishes later is dropped (M2). */
+	/** The newest event or read of each path: an older read that finishes later is dropped. */
 	private readonly latest = new Map<string, number>();
 	/** The loads under way, so that two keys that name one note cost one read. */
 	private readonly loading = new Map<string, Promise<void>>();
@@ -434,7 +434,7 @@ class Index implements CalendarIndex {
 	private build(st: KeyState): { calendars: Calendar[]; plain: NameList[]; problems: CalendarProblem[] } {
 		const entry = st.path === null ? undefined : this.entries.get(st.path);
 		const calendars = entry?.calendars ?? [];
-		// A note with only a `plain` key is a calendar note (spec §14 rule 13); a note with neither is "missing", as in 0.3.3.
+		// A note with only a `plain` key is a calendar note (spec §14 rule 13); a note with neither is "missing".
 		const missing = !entry || !(calendars.length || entry.hasPlain);
 		// Of two lists with one folded name the first is kept (the window refuses such a pair on Save, but a note can be edited by hand).
 		const heard = new Set<string>();

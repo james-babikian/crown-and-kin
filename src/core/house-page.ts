@@ -28,7 +28,7 @@ import { cardLabels, noteName, tableCell } from './titles';
 import type { House } from './types';
 
 /** One row of the house page and of its table note. */
-export interface HousePageRow {
+interface HousePageRow {
 	id: string;
 	/** D88: 1 = the oldest generation with a member of the house. */
 	generation: number;
@@ -74,7 +74,7 @@ export function housePage(g: FamilyGraph, houseId: string): HousePage | null {
 			name: withSobriquet(label?.numbered ? label.name : p.name, p.sobriquet),
 			title: [label?.title, label?.reign].filter((x) => x !== undefined && x !== '').join(' '),
 			born: p.born ?? '',
-			// K.7: an alive word (`died: no`) is not a date, so the cell stays empty.
+			// An alive word (`died: no`) is not a date, so the cell stays empty.
 			died: isDead(p) ? p.died ?? '' : '',
 		};
 	});

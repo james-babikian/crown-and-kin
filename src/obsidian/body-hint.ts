@@ -10,25 +10,28 @@ import type { SuccessionResult } from '../core/succession';
 import { firstHolderOf } from '../core/succession-first';
 import { cadetHint } from '../core/succession-hint';
 import { SUCCESSION_UI as T } from '../render/ui-text';
-import { draftSpec, draftTitle, holderText, type SuccessionDraft, type TitleRow } from '../view/titles-draft';
+import { draftSpec, draftTitle, holderLead, holderText, type SuccessionDraft, type TitleRow } from '../view/titles-draft';
 
 const nameIn = (g: FamilyGraph, id: string) => g.byId.get(id)?.name ?? id;
 
 /**
  * The first holder for the hints. Its name is the name in the holder list; with the key `through-spouse` on the first entry the
  * first holder is the spouse (rule 14), so then the person's own name. `skipped` is the text of the first entry when that entry is
- * not a person in the tree (F-KIN-07). The engine's own helper decides who the first holder is, also while the switch is off.
+ * not a person in the tree. The engine's own helper decides who the first holder is, also while the switch is off.
  */
-export function firstInfo(g: FamilyGraph, row: TitleRow): { name: string; skipped: string | null } | null {
+export function firstInfo(g: FamilyGraph, row: TitleRow): { name: string; lead: string; skipped: string | null } | null {
 	const entry = row.holders.find((h) => h.values.person !== undefined && g.byId.has(h.values.person));
 	if (!entry) return null;
 	const id = entry.values.person!;
-	const text = holderText(g, entry.values).ruler || nameIn(g, id);
+	const holder = holderText(g, entry.values);
+	const text = holder.ruler || nameIn(g, id);
+	// `lead` is the name of the holder list (D319 item 2a); the hints keep `name`, the first word, which the cadet tests pin.
+	const lead = holderLead(holder, entry.values) || nameIn(g, id);
 	const title = draftTitle(g, row);
 	const core = title ? firstHolderOf(g, title.holders) : null;
-	if (!title || !core) return { name: text, skipped: null };
-	if (core.index > 0) return { name: nameIn(g, core.id), skipped: title.holders[0].name ?? title.holders[0].person ?? '' };
-	return { name: core.id === id ? text : nameIn(g, core.id), skipped: null };
+	if (!title || !core) return { name: text, lead, skipped: null };
+	if (core.index > 0) return { name: nameIn(g, core.id), lead: nameIn(g, core.id), skipped: title.holders[0].name ?? title.holders[0].person ?? '' };
+	return { name: core.id === id ? text : nameIn(g, core.id), lead: core.id === id ? lead : nameIn(g, core.id), skipped: null };
 }
 
 /** The cadet hint (D291), or ''. It runs the line two more times, so the caller reuses its own line when that line is complete. */

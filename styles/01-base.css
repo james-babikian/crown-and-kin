@@ -8,13 +8,13 @@
  * (iOS before 16.2) drop the second declaration and keep the first.
  */
 
-/* ---------- Tokens (0.2.8 contract C, G.12) ---------- */
+/* ---------- Tokens ---------- */
 
 /*
  * Static colours of the new look, from measured tokens. They sit on `body`, because
  * the windows are not inside a tree root. Each is a mix of Obsidian's own roles, so the theme still decides.
  * Targets: text 4.5:1 and a control edge 3:1 on the window and card surfaces of the default theme, light and dark
- * (visual-qa checks the other themes in G3). Nothing uses them yet; the packages P4 to P6 do.
+ * (the other themes are checked by hand).
  * A custom property takes any text, so the two-declaration rule above does not work here: the plain role
  * is the value first, and `@supports` replaces it where `color-mix()` works.
  */
@@ -102,7 +102,7 @@ body {
 }
 
 /*
- * During a pinch the wrapper scales the picture it already has (WP5.3, spec §7.6): its own layer, so
+ * During a pinch the wrapper scales the picture it already has (spec §7.6): its own layer, so
  * the browser moves the drawn picture and does not lay out or draw the cards again. The wrapper is
  * HTML: a transform on the <svg> itself makes the browser lay out every SVG text again. The value is
  * not inherited, so a new one restyles only the wrapper, not the 400 cards in it.
@@ -126,7 +126,7 @@ body {
 /*
  * In the full-screen view on a device with a touch screen, the wrapper keeps its layer all the
  * time: to make the layer when a pinch starts, and to remove it after, made the
- * browser lay out every SVG text again (a 350 ms and a 630 ms frame on a slow phone, WP5.3). A
+ * browser lay out every SVG text again (a 350 ms and a 630 ms frame on a slow phone). A
  * mouse-only computer does not pinch, and keeps the sharper text of a page without extra layers.
  */
 @media (any-pointer: coarse) {
@@ -165,7 +165,7 @@ body {
 }
 
 
-/* ---------- Shared parts of the window family (0.2.8 contract C, G.2, G.8) ---------- */
+/* ---------- Shared parts of the window family ---------- */
 
 /*
  * A text for a screen reader only: it takes no room. It is absolute, so its box stands at its place in the text and counts for the scroll area of its
@@ -193,7 +193,7 @@ body {
 }
 
 /*
- * Joined text lines (src/render/text-join.ts, G.2). The "·" belongs to the item after it. When an item starts a wrapped text line,
+ * Joined text lines (src/render/text-join.ts). The "·" belongs to the item after it. When an item starts a wrapped text line,
  * the script hides its "·" (`is-lead`) and puts a line break before it, so a text line never starts or ends with "·".
  */
 .dynasty-joined {
@@ -215,7 +215,7 @@ body {
 	display: none;
 }
 
-/* Links in a window (G.8, D218 rule 5): the link colour of the tokens, regular weight, no underline at rest. */
+/* Links in a window (D218 rule 5): the link colour of the tokens, regular weight, no underline at rest. */
 .dynasty-link {
 	display: inline-flex;
 	align-items: center;

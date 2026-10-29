@@ -1,5 +1,5 @@
 /*
- * The plan stage (the architecture notes §4.2.2, stage S2). `buildSkeleton` takes the graph, the rows and the order and builds the layered
+ * The plan stage (stage S2). `buildSkeleton` takes the graph, the rows and the order and builds the layered
  * items (cards and passages) in their blocks, the couples (bar, dot or far) with their legs, the families and the side links: nothing
  * here depends on a position. `derive` adds what follows from the skeleton: the ports of every card (ports.ts), the hang point of
  * every family and couple, the slot width of every passage and the minimum gaps of every row. It runs after every change of the
@@ -56,7 +56,7 @@ export const walkSide = (s: Skeleton): DirOf => (from, to) => sideByWalk(from, t
 /** The card items in the blocks of the order, with their sizes and flags, and the blocks of each row (D2: sibling blocks in document order). */
 function cardItems(input: PlanInput, gen: Map<string, number>, personBlocks: string[][]): Pick<Skeleton, 'items' | 'blocks' | 'rowBlocks'> {
 	const { g, geo, side, settings, fold } = input;
-	// Card sizes: as in 0.3.0 (D29, D37, D61, D81). Sideways a tall card is longer along the stack axis (wider in the turned frame).
+	// Card sizes (D29, D37, D61, D81). Sideways a tall card is longer along the stack axis (wider in the turned frame).
 	const has = (id: string) => g.byId.has(id);
 	const long = new Set((settings.longNames ?? []).filter(has));
 	const tall = new Set([...(settings.tallCards ?? []).filter(has), ...long]);
@@ -67,7 +67,7 @@ function cardItems(input: PlanInput, gen: Map<string, number>, personBlocks: str
 	const extra = tall.size > 0 || tallT.size > 0;
 	const cw = (id: string) => (side && extra ? geo.cardW + more(id) : geo.cardW);
 	const ch = (id: string) => (!side && extra ? geo.cardH + more(id) : geo.cardH);
-	const noPictures = geo.form === 'text'; // as 0.3.0: pictures follow the card form, not the direction (supervisor ruling at the switch, the decision notes "0.3.1")
+	const noPictures = geo.form === 'text'; // Pictures follow the card form, not the direction
 	const withArms = noPictures ? new Set<string>() : armsByRule(g, settings, fold);
 	const withPortrait = noPictures ? new Set<string>() : new Set(settings.portraits ?? []);
 	const flags = (id: string): Item['flags'] => ({
@@ -218,7 +218,7 @@ export function buildSkeleton(input: PlanInput): Skeleton {
 	const s: Skeleton = { rows: [], blocks, rowBlocks, items, blockIndex: new Map(blocks.map((_, i) => [i, i])), anchors: new Map(), tagged: new Set(fold?.partners.keys() ?? []), hangOrder: order.familyOrder, families: [], couples: new Map(), sideLinks: [], hangPassages: new Map() };
 	reindex(s);
 	// Couples: side by side means consecutive in the row's order of cards, whatever the blocks (a married pair of two sibling blocks is
-	// as side by side as a pair placed together: the 0.3.0 rule, and the `beside` of compact.ts). A far couple by generations (D11) has
+	// as side by side as a pair placed together: the rule, and the `beside` of compact.ts). A far couple by generations (D11) has
 	// no line; one by distance is marked after the placement (`farByDistance`). Nothing is placed yet (every x is 0), so here only the
 	// generation half of `isFarCouple` can hold.
 	const adjacent = (a: Item, b: Item) => a.row === b.row && Math.abs(a.at - b.at) === 1;

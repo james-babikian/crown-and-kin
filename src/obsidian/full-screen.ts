@@ -29,7 +29,7 @@ export class FullScreenModal extends Modal implements FullHost {
 	private after: (() => void) | null = null;
 	/** The note's scroll position when the view opened, restored on close (spec §7.1). */
 	private readonly scrolls: { el: HTMLElement; top: number; left: number }[] = [];
-	/** Expand had the keyboard focus when the view opened (and showed its ring or not): it gets the focus back on close, also when an edit drew the note's tree again (G5 0.4). */
+	/** Expand had the keyboard focus when the view opened (and showed its ring or not): it gets the focus back on close, also when an edit drew the note's tree again. */
 	private readonly expandBack: { visible: boolean } | null;
 
 	constructor(

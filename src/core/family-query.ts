@@ -28,7 +28,7 @@ export interface PartnerLink {
 }
 
 /** Where a person sits among their siblings, for the sibling-order controls (§6.5). */
-export interface SiblingPosition {
+interface SiblingPosition {
 	/** Siblings in the same group (same primary union, or same single parent), in `people` order, including the person. */
 	group: string[];
 	index: number;
@@ -46,7 +46,7 @@ export interface FamilyView {
 	siblings: SiblingPosition | null;
 	/** Placement-eligible parent types the person has (for "Shown under", §6.3). */
 	placementTypes: ParentKind[];
-	/** Parent types already at their limit, `PARENT_LIMIT`: 2 birth, adoptive or ward parents, 8 rumoured ones (disabled in Add parent, §6.4; contract B.3). */
+	/** Parent types already at their limit, `PARENT_LIMIT`: 2 birth, adoptive or ward parents, 8 rumoured ones (disabled in Add parent, §6.4). */
 	fullTypes: ParentKind[];
 	/** Choices for "other parent" in Add child: partners in union order, then implicit co-parents (§6.4). "No other parent" is added by the UI. */
 	otherParentChoices: string[];
@@ -81,7 +81,7 @@ export interface DeleteSummary {
 	 * (`titles`; a title with a duplicate id counts on its own). Set only when the tree has titles.
 	 */
 	holders?: { titles: number; entries: number };
-	/** Contract 0.2.7 K.3: the titles that name the person as an heir. Absent when 0. */
+	/** The titles that name the person as an heir. Absent when 0. */
 	heirs?: number;
 	/** The titles that list the person as an excluded person. Absent when 0. */
 	excluded?: number;

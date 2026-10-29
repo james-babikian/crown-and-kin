@@ -1,5 +1,5 @@
 /*
- * The renames that wait for a link update, kept per device (0.4, pre-mortem item 6). They used to live in
+ * The renames that wait for a link update, kept per device. They used to live in
  * `data.json`, which a sync tool copies to every device, so one device could run the update of another.
  * Now they live in the local storage of the vault (never synced). Until `migrated` is true the list also
  * stays in `data.json`, so an older device or a failed read cannot lose it. This file only reads, checks

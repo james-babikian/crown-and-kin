@@ -55,7 +55,7 @@ export type FoldKey = string;
 export type FoldSet = ReadonlySet<FoldKey>;
 
 /** One family that can fold: the children of one set of parents. */
-export interface FoldFamily {
+interface FoldFamily {
 	key: FoldKey;
 	/** One or two parent ids; a pair in the partner order of the family's union. */
 	parents: readonly string[];

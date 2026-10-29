@@ -1,5 +1,5 @@
 /*
- * Where the D28 first-view hint ("↓ 9 more children") may stand (G5 0.4). The label sits in a corner of the tree box at the right; with a theme's
+ * Where the D28 first-view hint ("↓ 9 more children") may stand. The label sits in a corner of the tree box at the right; with a theme's
  * fonts it can be wider or the first view can put a card there, and then the label covered the card. The tree view measures the label as it is
  * drawn and asks here for a side that covers no card: the right as before, else the left, else none (the view then shows no hint, and the slot keeps
  * the text in `data-dynasty-hint-dropped` for the harness).

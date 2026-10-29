@@ -1,5 +1,5 @@
 /*
- * The picture slots of the drawn tree (spec §13.6, §13.7, M9): the places `buildScene` makes for
+ * The picture slots of the drawn tree (spec §13.6, §13.7): the places `buildScene` makes for
  * arms and portraits, and the two calls that fill them. `buildScene` makes the empty slots (and the
  * portrait frames) but never an `<image>`; the tree view's live pictures (`src/obsidian`) decide
  * which slots to fill (`livePictureSlots` in `view-math.ts`) and call `setPicture` with a small
@@ -10,10 +10,10 @@
 import { armsGap, type ArmsOutline } from '../../layout/arms-outline';
 import type { Rect } from '../../layout/model';
 
-/** 0.2.8 (I05, D204): whose arms a slot shows: the arms of a house, or the personal arms of a person. */
+/** D204: whose arms a slot shows: the arms of a house, or the personal arms of a person. */
 export type PictureOwner = { house: string } | { person: string };
 
-/** One place for a picture on a card (S1). */
+/** One place for a picture on a card. */
 export interface PictureSlot {
 	kind: 'arms' | 'portrait';
 	/** The level of detail the slot shows at: Full arms and portraits, or Compact arms. */

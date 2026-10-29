@@ -172,7 +172,7 @@ function simplify(ring: readonly [number, number][]): [number, number][] {
 }
 
 /** What a card draws for the gap: the path in layout px, and the stroke width that grows the shape by the gap. */
-export interface ArmsGap {
+interface ArmsGap {
 	d: string;
 	strokeWidth: number;
 }

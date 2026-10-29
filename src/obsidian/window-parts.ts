@@ -1,5 +1,5 @@
 /*
- * Small parts of the window family (0.2.8 contract C, G.1, G.7, G.8): one row anatomy (title and detail, then the picture at the right, then the actions),
+ * Small parts of the window family: one row anatomy (title and detail, then the picture at the right, then the actions),
  * the round lead of a person (a portrait, and nothing when the person has none: D213), the short menu that Obsidian draws (a popover on a
  * computer, a sheet from the bottom on a phone), and the pictures of the rows. The windows (`edit-sheet.ts`, `titles-window.ts`,
  * `houses-window.ts`) use them; nothing here reads or writes a note.
@@ -212,7 +212,7 @@ export interface LeadPerson {
 }
 
 /**
- * The round lead of a person row (G.1): the portrait when the person has one that the store can find, else nothing and null (D213: no
+ * The round lead of a person row: the portrait when the person has one that the store can find, else nothing and null (D213: no
  * initials and no empty ring). The slot is made at once and the picture fills it when the copy comes. `px` is the size in CSS px.
  */
 export function personLead(parent: HTMLElement, p: LeadPerson, pictures: RowPictures | undefined, px = 32): HTMLElement | null {

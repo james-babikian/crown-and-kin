@@ -1,5 +1,5 @@
 /*
- * Joined text lines (0.2.8 contract G.2).
+ * Joined text lines.
  * A text line of items with "·" between them never starts a wrapped text line with "·", and a reign such as
  * "(r. 1160–1207)" never breaks. `nb` and `leadItems` are pure; `joined` builds the elements. Shared by the phone
  * list and the windows. The style rules (`dynasty-joined`, `dynasty-jitem`, `dynasty-jmark`, `is-lead`) come with the first caller.

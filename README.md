@@ -9,22 +9,38 @@ Crown and Kin is a plugin for Obsidian. It draws the family tree of a noble hous
 
 ## Install
 
-You need Obsidian 1.11 or newer. The plugin is not in the Obsidian list of community plugins yet. Install it from the release files on GitHub.
+You need Obsidian 1.11 or newer. The plugin is not in the Obsidian list of community plugins yet. Install it with BRAT (the easier way, because BRAT also updates it) or by hand. The plugin is a beta and it changes the tree text in your notes, so make a copy of your vault before you try it.
+
+### With BRAT
+
+BRAT is a community plugin that installs and updates plugins from GitHub. It needs Obsidian 1.11.4 or newer.
+
+1. In Obsidian, open Settings, then Community plugins. If Obsidian shows "Restricted mode", select "Exit Restricted mode" (Obsidian 1.14) or "Turn on community plugins" (Obsidian 1.11).
+2. Select Browse. Find "BRAT", select Install, then select Enable.
+3. Open Settings, then BRAT (on the left, under Community plugins). Beside "Beta plugin list", select + ("Add beta plugin").
+4. In the field for the repository (the page of the plugin on GitHub), type `james-babikian/crown-and-kin`. Leave the list of versions as it is.
+5. Select "Add plugin".
+6. Open Settings, then Community plugins. If the switch of Crown and Kin is off, turn it on.
+
+### By hand
 
 1. Open the newest release on the Releases page of this repository.
-2. Under "Assets", download the three files `main.js`, `manifest.json` and `styles.css`. Do not download the "Source code" files.
+2. Under "Assets", download the three files `main.js`, `manifest.json` and `styles.css`. Do not download the "Source code" files: they are not the plugin.
 3. Open the folder of your vault on your computer.
-4. Show the hidden folders. On Windows, open View, then Show, then Hidden items. On a Mac, press Cmd+Shift+. in Finder.
-5. Open the folder `.obsidian`, then `plugins`. If there is no folder `plugins`, make one. Make a folder `crown-and-kin` there. Put the three files in it.
-6. In Obsidian, open Settings, then Community plugins. If Obsidian shows "Restricted mode", select "Exit Restricted mode" (Obsidian 1.14) or "Turn on community plugins" (Obsidian 1.11).
-7. Select Reload plugins (the button with two arrows).
-8. Turn on the switch of Crown and Kin.
+4. Show the hidden folders, because the computer hides the folder `.obsidian`. On Windows, open View, then Show, then Hidden items. On a Mac, press Cmd+Shift+. in Finder.
+5. Open the folder `.obsidian`, then `plugins`. If there is no folder `plugins`, make one.
+6. In `plugins`, make a folder with the exact name `crown-and-kin`. Put the three files in it.
+7. In Obsidian, open Settings, then Community plugins. If Obsidian shows "Restricted mode", select "Exit Restricted mode" (Obsidian 1.14) or "Turn on community plugins" (Obsidian 1.11).
+8. Select Reload plugins (the button with two arrows).
+9. Turn on the switch of Crown and Kin.
+
+To update a plugin that you installed by hand, replace the three files with the files of the newest release. Then close Obsidian and open it again. Do not delete the file `data.json` in the same folder: it holds your settings.
+
+### Trust window and phones
 
 If Obsidian shows the window "Do you trust the author of this vault?", select "Trust author and enable plugins". The button "Browse vault in Restricted Mode" keeps the plugins off. Obsidian shows this window when it first opens a vault that holds plugin files.
 
-To update the plugin, replace the three files with the files of the newest release. Then close Obsidian and open it again. Keep the file `data.json`: it holds your settings.
-
-**On a phone,** install the plugin on your computer first. Then let your sync copy the vault to the phone. Obsidian Sync copies plugins only if "Installed community plugins" is on in its settings. Then, on the phone, open Settings, then Community plugins, and turn on Crown and Kin.
+**On a phone,** install the plugin on your computer first, with BRAT or by hand. Let your sync copy the vault to the phone. Obsidian Sync copies plugins only if "Installed community plugins" is on in its settings. On the phone, open Settings, then Community plugins, and turn on Crown and Kin.
 
 ## Your first tree
 
@@ -110,7 +126,7 @@ A tree uses a calendar only if it names a calendar note. Open the tree. Select M
 - **Saved picture.** If a CSS snippet loads the font of your notes, a saved picture uses a standard font. A long name can then be wider than its card.
 - **No drag.** You cannot drag a card to a new place. Change the order of brothers and sisters in the person window.
 - **No import or export.** The plugin reads no GEDCOM file and makes no PDF file. To print the tree, save it as a picture.
-- **Devices.** The author tested the plugin on Windows and on an iPhone. The author did not test it on Android.
+- **Devices.** The author tested the plugin on Windows, on an iPhone and on an iPad. The author did not test it on a Mac, on Linux or on Android. It may work there, but the author cannot promise it.
 - **Obsidian Publish** shows the tree text, not the tree. The links inside a tree do not show in backlinks or in the graph view.
 
 ## Privacy

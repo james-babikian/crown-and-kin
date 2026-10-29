@@ -17,19 +17,19 @@ export interface BlockState {
 	/** The person most recently edited in this block: the start person (spec §5.5). Every write of the person window sets it, also an in-place one. */
 	lastEdited: string | null;
 	/**
-	 * 0.3.3 (B1): the person of the last Save that closed a person window. Only this moves the phone list (rung 4 of its start chain, D144); an in-place write
+	 * The person of the last Save that closed a person window. Only this moves the phone list (rung 4 of its start chain, D144); an in-place write
 	 * of an open window (a parent type, a removed parent, a moved sibling, an edited partnership) sets `lastEdited` but not this, so the list stays
 	 * where the reader left it. Optional so that `newBlockState()` stays as it is.
 	 */
 	lastSaved?: string | null;
 	/**
-	 * 0.3.3 (B1): an open person window wrote in place (a write that is not a Save), so the phone list behind it keeps the person it stands on, also when the
+	 * An open person window wrote in place (a write that is not a Save), so the phone list behind it keeps the person it stands on, also when the
 	 * data would give it another start (the oldest person who has a child can change with a parent type). The window sets it and ends it when it closes or
 	 * saves. Optional so that `newBlockState()` stays as it is.
 	 */
 	listHold?: boolean;
 	/**
-	 * 0.3.3 (B1): how many person windows that held the list have closed. A list that has not read the latest count keeps the person it stands on at its
+	 * How many person windows that held the list have closed. A list that has not read the latest count keeps the person it stands on at its
 	 * next draw, once: a draw can come after the window (a write that ended late, a change of the note), and the list must not move then. Optional like `listHold`.
 	 */
 	listKeep?: number;
@@ -63,7 +63,7 @@ export interface BlockState {
 	 */
 	finder: FinderState | null;
 	/**
-	 * The Show view of a line of succession (contract 0.2.7 F.1): the title that the tree shows the line of, until Close, Esc, a focus
+	 * The Show view of a line of succession: the title that the tree shows the line of, until Close, Esc, a focus
 	 * choice or the note closes. It is a temporary view like the finder's result, and only one of the two shows at a time. It writes nothing.
 	 */
 	succession: SuccessionState | null;
@@ -75,11 +75,11 @@ export interface BlockState {
 	folds: Set<FoldKey>;
 	/**
 	 * D257: the keys of `folds` that the plugin added when a focus view opened (the families the whole tree draws far away). They are folds like any
-	 * other, but Clear focus, Show whole tree and a change of the focus person take them out again and keep the owner's own folds. A key that leaves
+	 * other, but Clear focus, Show whole tree and a change of the focus person take them out again and keep the user's own folds. A key that leaves
 	 * `folds` leaves here too (`setFolds`). Optional so that `newBlockState()` stays as it is.
 	 */
 	autoFolds?: Set<FoldKey>;
-	/** D257: the focus (`focusKey`) for which `autoFolds` were chosen; the same focus does not choose again, so a fold the owner opened stays open. */
+	/** D257: the focus (`focusKey`) for which `autoFolds` were chosen; the same focus does not choose again, so a fold the user opened stays open. */
 	autoFor?: string | null;
 	/**
 	 * D144: the Back stack of the phone list, newest last, at most 20 entries (the oldest drops out). Session only: cleared
@@ -106,7 +106,7 @@ export interface FinderState {
 	steps: boolean;
 }
 
-/** What the Show view of the line of succession shows (contract 0.2.7 F.1): the id of the title. */
+/** What the Show view of the line of succession shows: the id of the title. */
 export interface SuccessionState {
 	title: string;
 }
@@ -160,7 +160,7 @@ export function carryState(from: BlockState, to: BlockState): void {
 		to.autoMark = from.autoMark;
 	}
 	to.shown ??= from.shown;
-	// One temporary view at a time (F.1): the one that `to` holds wins, and then `from` gives neither.
+	// One temporary view at a time: the one that `to` holds wins, and then `from` gives neither.
 	if (!to.finder && !to.succession) {
 		to.finder = from.finder;
 		to.succession = from.finder ? null : from.succession;

@@ -5,6 +5,7 @@
  */
 
 import { Modal } from 'obsidian';
+import { holdLayoutOnPress } from '../render/dom/press-hold';
 import { SHEET } from '../render/ui-text';
 import { ignoreGhostClick, phoneLayout } from './modal-layout';
 import { trackModal } from '../view/plugin-modals';
@@ -29,8 +30,8 @@ export abstract class SmallFormModal extends Modal {
 	protected openFrame(cls: string): void {
 		this.modalEl.addClass('dynasty-sheet');
 		this.modalEl.addClass(cls);
-		this.cleanup.push(phoneLayout(this, () => revealFocused(this.modalEl, this.contentEl)), ignoreGhostClick(this), trackModal(this, () => this.finish()));
-		// The keyboard can cover a field in the scrolling body: bring it into view when it gets the focus (C1).
+		this.cleanup.push(phoneLayout(this, () => revealFocused(this.modalEl, this.contentEl)), ignoreGhostClick(this), trackModal(this, () => this.finish()), holdLayoutOnPress(this.modalEl));
+		// The keyboard can cover a field in the scrolling body: bring it into view when it gets the focus.
 		const reveal = () => revealFocused(this.modalEl, this.contentEl, 300);
 		this.contentEl.addEventListener('focusin', reveal);
 		this.cleanup.push(() => this.contentEl.removeEventListener('focusin', reveal));

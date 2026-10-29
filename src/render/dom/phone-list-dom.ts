@@ -1,7 +1,7 @@
 /*
- * The DOM of the phone list (D144, contract C.3.1): the family of one person as a list of rows that a thumb can
+ * The DOM of the phone list (D144): the family of one person as a list of rows that a thumb can
  * tap. `src/view/phone-list.ts` works out WHAT the list holds (`ListData`, from the pure `listData`); this file
- * only builds it. The tree view (WP-C2b) calls `buildPhoneList` into the viewport, after the toolbar, and keeps the
+ * only builds it. The tree view calls `buildPhoneList` into the viewport, after the toolbar, and keeps the
  * result. Nothing in here reads the settings or the note: the caller passes in what it needs and the two actions.
  *
  * How the caller wires it:
@@ -17,7 +17,7 @@
  *   a whole row and has no empty disc. `spec.pictures(slots, id)` runs for each row with the places it made. The centre row has a column at the right with
  *   the portrait (56 px) and the arms under it (35 px; 56 px with no portrait); every other row has a 36 px portrait at the right and no arms. The caller
  *   loads small copies and puts each one in with `showListPicture(slot, url)`.
- * - 0.2.8 (D209, D210): the order is the person at the top (with a heading for a screen reader only), Parents, Partners, Children. A heading follows
+ * - D209, D210: the order is the person at the top (with a heading for a screen reader only), Parents, Partners, Children. A heading follows
  *   the count of its rows; "With <partner>" shows only when there is more than one group of children. Every row has a 3 px house strip, the large row too (D302). A text line
  *   of items ("Adoptive father · 1102–1161") is a joined text line; its first item can be the kind of link (`spec.link`, D210).
  * - Test hooks (class names): `.dynasty-list-section[data-section]`, `.dynasty-list-head`, `.dynasty-list-sub`,
@@ -35,7 +35,7 @@ import { cardLabels, needsLabels, type CardLabel } from '../../core/titles';
 import type { ParentType } from '../../core/types';
 import { isColour } from '../colour-check';
 import { joined, nb } from '../text-join';
-import { dateLineParts, shownReign, type DateSegment } from '../tree-info';
+import { dateLineParts, shownReignIsolated, type DateSegment } from '../tree-info';
 import { PHONE_LIST_UI } from '../ui-text';
 import type { IconFn } from './widgets';
 
@@ -104,7 +104,7 @@ export interface PhoneListSpec {
 	icon: IconFn;
 	onGo(id: string): void;
 	onEdit(id: string, fromTap: boolean): void;
-	/** 0.2.7 F.6: while the Show view of a line of succession is open, the bar at the top of the list: the sentence and an icon-only Close (D182). */
+	/** While the Show view of a line of succession is open, the bar at the top of the list: the sentence and an icon-only Close (D182). */
 	bar?: { sentence: string; closeLabel: string; onClose(): void };
 }
 
@@ -259,7 +259,7 @@ export function buildPhoneList(parent: HTMLElement, spec: PhoneListSpec): PhoneL
 		const title = label?.title ?? p.title;
 		// D210: in a list about You the kind of link takes the place of the relation word. A strong word ("You", a place in the line) stays.
 		const shown = link && aboutYou && id !== me && !word?.strong ? null : word;
-		// The title is a text line of its own in the large row (with its reign, G.2: the reign never breaks), and a part of the joined text line elsewhere.
+		// The title is a text line of its own in the large row (with its reign: the reign never breaks), and a part of the joined text line elsewhere.
 		const parts = [
 			link ? createSpan({ cls: 'dynasty-list-link', text: link.text }) : null,
 			shown ? createSpan({ cls: ['dynasty-list-word', ...(shown.strong ? ['is-strong'] : [])], text: shown.text }) : null,
@@ -268,7 +268,7 @@ export function buildPhoneList(parent: HTMLElement, spec: PhoneListSpec): PhoneL
 		];
 		if (parts.some(Boolean)) joined(text, 'dynasty-list-meta', parts, 'span');
 		if (large && title) {
-			const reign = spec.showDates ? shownReign(label, g.dates, 'shown') : undefined;
+			const reign = spec.showDates ? shownReignIsolated(label, g.dates, 'shown') : undefined;
 			text.createSpan({ cls: 'dynasty-list-title dynasty-hero-title', text: nb(reign ? `${title} ${reign}` : title) });
 		}
 		// D213: a place for a picture only when the person has one; no initials disc, no empty ring.

@@ -72,10 +72,10 @@ export function smallestChange(a: string, b: string): { from: number; to: number
 }
 
 /** Where a handle's block is after the note changed. */
-export type Relocation = { kind: 'keep' | 'moved'; ordinal: number } | { kind: 'detached' };
+type Relocation = { kind: 'keep' | 'moved'; ordinal: number } | { kind: 'detached' };
 
 /**
- * Finds a handle's block again in the note's new blocks (the decision notes "Handles when blocks move"):
+ * Finds a handle's block again in the note's new blocks:
  * - the number of blocks did not change: the block at the ordinal still has `expectedBody` → keep;
  *   else exactly one other block has it → that block (blocks were swapped); else keep the ordinal
  *   (the block was edited in place, an ordinary stale case);

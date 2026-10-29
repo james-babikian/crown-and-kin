@@ -1,5 +1,5 @@
 /*
- * The pure parts of the Show view of a line of succession (contract 0.2.7 F, M.9): what the tree draws for a title (the ruler,
+ * The pure parts of the Show view of a line of succession: what the tree draws for a title (the ruler,
  * the heirs, the open branches, the ordinal texts, the bar sentence), the first view, and the words of the phone list. No DOM
  * and no state, so the tests run it on plain data. `block-state.ts` keeps the state (`BlockState.succession`),
  * and `render-plan.ts` and the layers of the tree view (`tree-view-*.ts`) call these functions at each render.
@@ -16,7 +16,7 @@ import { FIT_MIN_NAME_PX, READABLE_NAME_PX, START_TOP_GAP, fitScale, fitView, ty
 import { finderFirstView, fittedNamePx } from './focus-mode';
 import { around } from './tree-view-helpers';
 
-/** The mark on the tab of an open branch (M.9). */
+/** The mark on the tab of an open branch. */
 export const BRANCH_MARK = '?';
 /** On a phone the first view never shows the names smaller than this scale (prototype finding 2: a plain fit gave names of about 8 px). */
 export const PHONE_MIN_SCALE = 0.75;
@@ -38,7 +38,7 @@ export interface SuccessionDrawn {
 	sentence: string;
 }
 
-/** The settings the line reads (K.10, M.7). */
+/** The settings the line reads. */
 export interface LineSettings {
 	limit: number;
 	oldAge: number;
@@ -46,8 +46,8 @@ export interface LineSettings {
 }
 
 /**
- * The Show view for title `titleId`, computed again from the whole tree `whole` at each render (F.7). Null when the title is gone or its
- * saved line is not `kind: 'line'` (no rule, no ruler, a rule with an error): the caller then ends the view (F.1).
+ * The Show view for title `titleId`, computed again from the whole tree `whole` at each render. Null when the title is gone or its
+ * saved line is not `kind: 'line'` (no rule, no ruler, a rule with an error): the caller then ends the view.
  */
 export function successionDrawn(whole: FamilyGraph, titleId: string, s: LineSettings): SuccessionDrawn | null {
 	const title: Title | undefined = whole.titles.find((t) => t.id === titleId);
@@ -64,10 +64,10 @@ export function successionDrawn(whole: FamilyGraph, titleId: string, s: LineSett
 	return { titleId, result, ruler: result.ruler, heirs, branches, ordinals, sentence };
 }
 
-/** The people the view must show: R, the heirs and the branches (F.2, M.9). They open the folds that hide them. */
+/** The people the view must show: R, the heirs and the branches. They open the folds that hide them. */
 export const linePeople = (d: SuccessionDrawn): string[] => [d.ruler, ...d.heirs, ...d.branches];
 
-/** What a card's screen-reader label adds while the view is open: ", 2nd in line" or ", open branch" (F.4). Undefined for any other card. */
+/** What a card's screen-reader label adds while the view is open: ", 2nd in line" or ", open branch". Undefined for any other card. */
 export function cardPosition(d: SuccessionDrawn | null, id: string): string | undefined {
 	if (!d) return undefined;
 	const mark = d.ordinals.get(id);
@@ -75,7 +75,7 @@ export function cardPosition(d: SuccessionDrawn | null, id: string): string | un
 	return mark === BRANCH_MARK ? SUCCESSION_UI.openBranchCard : SUCCESSION_UI.inLine(mark);
 }
 
-/** The relation words of the phone list while the view is open (F.6): "2nd in line" for an heir, "Open branch" for a branch. */
+/** The relation words of the phone list while the view is open: "2nd in line" for an heir, "Open branch" for a branch. */
 export function lineWords(d: SuccessionDrawn): Map<string, ListWord> {
 	const out = new Map<string, ListWord>();
 	for (const [id, mark] of d.ordinals) {
@@ -87,11 +87,11 @@ export function lineWords(d: SuccessionDrawn): Map<string, ListWord> {
 }
 
 /**
- * The first view of the Show view (F.2): the ruler and the heirs fitted into the free area below `insetTop` (the bar), as
+ * The first view of the Show view: the ruler and the heirs fitted into the free area below `insetTop` (the bar), as
  * `finderFirstView` does it. `bounds` is the box around the ruler and the heirs; the open branches are not in it, so a far branch
  * cannot shrink the view. When the whole line would need names under 11 px, the view fits the ruler and the longest run of heirs
  * (1st, 2nd, ...) that fits with names of 11 px or more. Only when the ruler and the 1st heir do not fit together, the view starts at the
- * ruler at the readable zoom, whole and on screen (G5 fix; spec §13.21 rule 35). On a phone (`minScale` > 0) no fit goes below `minScale`.
+ * ruler at the readable zoom, whole and on screen (spec §13.21 rule 35). On a phone (`minScale` > 0) no fit goes below `minScale`.
  */
 export function successionFirstView(bounds: Rect, size: Size, fontPx: number, insetTop: number, ruler: Rect, heirs: readonly Rect[], orientation: Orientation, minScale = 0): View {
 	const top = Math.max(0, Math.min(insetTop, size.h - 1));

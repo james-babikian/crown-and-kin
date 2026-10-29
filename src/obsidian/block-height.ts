@@ -1,5 +1,5 @@
 /*
- * The last known height of each block (0.2.8 contract B.5, D183). On a cold start the tree of a note draws before the plugin styles
+ * The last known height of each block (D183). On a cold start the tree of a note draws before the plugin styles
  * are applied. The view then shows an empty box of this height, so the note does not jump when the real tree comes. The heights
  * are kept for the session, and in the vault's local storage (never synced, never in the note) so that the next start knows them too.
  * Nothing here throws: a storage that fails only means that the default height is used.

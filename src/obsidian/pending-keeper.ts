@@ -1,6 +1,6 @@
 /*
- * The keeper of the renames that wait for a link update, on this device (0.4, the index contract 3). It sits between `main.ts` and the pending store: it loads the store at start, moves the list
- * of `data.json` into the store once (the migration), writes the store at each change of the list, and, if the local storage fails, switches to the fallback of 0.3.3 (the list goes to
+ * The keeper of the renames that wait for a link update, on this device. It sits between `main.ts` and the pending store: it loads the store at start, moves the list
+ * of `data.json` into the store once (the migration), writes the store at each change of the list, and, if the local storage fails, switches to the fallback (the list goes to
  * `data.json` again). `main.ts` decides when each step runs and owns `data.json`; this file owns the rules of the store.
  */
 

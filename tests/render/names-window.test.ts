@@ -195,15 +195,16 @@ describe('Add and Remove keep the place and the open state', () => {
 		expect(isOpen(c, sections(c)[0])).toBe(true);
 	});
 
-	it('Remove this calendar stands last in the section, removes the calendar and keeps the other sections as they stood', async () => {
+	it('Remove this calendar stands at the end of the section, with its quiet line under it, removes the calendar and keeps the other sections as they stood', async () => {
 		const o = await open2();
 		const c = o.win.contentEl;
 		const [first, second] = sections(c);
 		dispatch(c.querySelector(`[data-section="${second}"] .dynasty-section-head`)!, 'click');
 		const body = c.querySelector(`[data-section="${first}"] .dynasty-section-body`)!;
-		const last = body.children[body.children.length - 1];
+		const last = body.children[body.children.length - 2];
 		expect(last.getText()).toBe(T.removeThisCalendar);
 		expect(last.hasClass('dynasty-link')).toBe(true);
+		expect(body.children[body.children.length - 1].getText()).toBe(T.removeNote);
 		await press(c, `[data-focus="cal:remove:${first}"]`);
 		expect(sections(c)).toEqual([second, 'plain']);
 		expect(isOpen(c, second)).toBe(true);
@@ -211,18 +212,33 @@ describe('Add and Remove keep the place and the open state', () => {
 		expect(o.index.calendarsOf('Calendars.md').map((k) => k.name)).toEqual(['Reign names']);
 	});
 
-	it('Remove of a list stands in the first row of the list (the style sheet puts it at the right end) and removes only that list', async () => {
+	it('"Remove this list" is the last child of its list, under the last field, and removes only that list', async () => {
 		const o = await openWindow({ 'Calendars.md': LISTED });
 		const c = o.win.contentEl;
 		const remove = c.querySelector('.dynasty-cal-list .dynasty-cal-remove-list')!;
-		expect(remove.getText()).toBe(T.remove);
-		// After the fields, so the Tab key reaches it last; the name of the list is the first field of the row.
-		const siblings = remove.parentElement!.children;
-		expect(siblings[siblings.length - 1]).toBe(remove);
-		expect(remove.parentElement?.children[0].querySelector('label')?.getText()).toBe(T.listName);
+		expect(remove.getText()).toBe(T.removeThisList);
+		expect(T.removeThisList).toBe('Remove this list');
+		// The name of the link begins with its visible words (WCAG 2.5.3).
+		expect(remove.getAttribute('aria-label')!.startsWith(T.removeThisList)).toBe(true);
+		const list = remove.parentElement!;
+		expect(list.hasClass('dynasty-cal-list')).toBe(true);
+		expect(list.children[list.children.length - 1]).toBe(remove);
+		// Not in the grid of the name and the marker.
+		expect(list.children[0].querySelector('.dynasty-cal-remove-list')).toBeNull();
 		dispatch(remove, 'click');
 		expect(c.querySelectorAll('.dynasty-cal-list')).toHaveLength(1);
 		expect(summaryOf(c, sections(c)[0])).toContain(T.summaryNoLists);
+	});
+});
+
+describe('the grids of a name list', () => {
+	it('no grid holds Remove; the link stands after the grid of "Show on cards"', async () => {
+		const o = await openWindow({ 'Calendars.md': LISTED });
+		const l = o.win.contentEl.querySelector('.dynasty-cal-list')!;
+		const grids = l.children.filter((e) => e.hasClass('dynasty-grid'));
+		expect(grids).toHaveLength(2);
+		for (const g of grids) expect(g.querySelector('.dynasty-cal-remove-list')).toBeNull();
+		expect(l.children.indexOf(l.querySelector('.dynasty-cal-remove-list')!)).toBeGreaterThan(l.children.indexOf(grids[1]));
 	});
 });
 

@@ -21,7 +21,7 @@ export const OPTION_ORDER = ['start', 'focus', 'me', 'generations', 'height', 'c
 /** §4.1 and §13.0 order of the top-level sections. */
 export const TOP_ORDER = ['options', 'houses', 'titles', 'people', 'unions'];
 
-/** The person fields that hold a yes or no: `illegitimate` and `childless` (M.5). */
+/** The person fields that hold a yes or no: `illegitimate` and `childless`. */
 export const isBooleanField = (field: string): boolean => field === 'illegitimate' || field === 'childless';
 
 /**
@@ -48,7 +48,7 @@ export const refuse = (code: EditRefusal, detail?: string): Refusal => (detail ?
 // Scalar rendering
 
 /** How a scalar is being written: in flow or block style, whether it is a text field, and the indentation for a block scalar. */
-export interface ScalarContext {
+interface ScalarContext {
 	flow: boolean;
 	text: boolean;
 	/** Indentation for the lines of a block scalar. */
@@ -636,7 +636,7 @@ export const isRefusal = (v: unknown): v is Refusal => typeof v === 'object' && 
 export type Step = (p: Parsed) => Patch | Patch[] | null | Refusal;
 
 /** The detail text used when two patches computed in one step would overlap. */
-export const OVERLAP = 'Patches overlap.';
+const OVERLAP = 'Patches overlap.';
 const LEXER_ONLY = new Set(['\x02', '\x18', '\x1f']);
 
 /** Every comment of a body, with its offset. Comment-like text in scalars is not a comment. */
@@ -706,7 +706,7 @@ function applyPatches(src: Source, patches: Patch[]): string | null {
 }
 
 /** `first` is the parse of `body` the op was checked with; the first step reuses it (a large tree parses in tens of ms). */
-export function runSteps(body: string, steps: Step[], first: Parsed): string | Refusal {
+function runSteps(body: string, steps: Step[], first: Parsed): string | Refusal {
 	let text = body;
 	for (const [n, step] of steps.entries()) {
 		const p = n === 0 ? first : parse(text);

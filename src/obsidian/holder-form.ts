@@ -1,7 +1,7 @@
 /*
  * The holder form (spec §13.5): Number (placeholder "II"), Ruler name (empty unless the entry has a
  * written ruler name; the default shows as a placeholder, and a hint under the field says so, I15), From and Until, the tick box
- * "Holds the title through the spouse" (D195, contract A.2; off and with a hint when the holder is not a person in the tree),
+ * "Holds the title through the spouse" (D195, off and with a hint when the holder is not a person in the tree),
  * and a live preview ("Ser Gareth Orsini shows as: Gareth I").
  * For a holder who is not in the tree it also asks for the name; for "New title…" in the edit sheet it
  * also asks for the title's name. It looks like the edit sheet and has its commit model: Save hands the
@@ -12,12 +12,13 @@
 import type { App } from 'obsidian';
 import { TITLES_UI } from '../render/ui-text';
 import { buildShell } from './window-shell';
+import { startWithoutFocus } from './modal-layout';
 import { nameDialog, sheetField, showErrorLine } from './sheet-parts';
 import { SmallFormModal } from './small-form';
 import { formResult, formStart, previewParts, rulerHint, type HolderFormFields, type HolderValues } from '../view/titles-draft';
 
 /** What the holder form shows and where its values go. */
-export interface HolderFormSpec {
+interface HolderFormSpec {
 	/** "Edit holder" or "New holder". */
 	heading: string;
 	/** A line under the heading: the title, and the person when there is one. */
@@ -67,22 +68,19 @@ class HolderFormModal extends SmallFormModal {
 		body.createDiv({ cls: ['dynasty-choice-text', 'dynasty-holder-context'], text: this.spec.context });
 		this.errorEl = body.createDiv({ cls: 'dynasty-sheet-error', attr: { role: 'alert' } });
 		this.errorEl.hide();
-		let first: HTMLInputElement | null = null;
 		if (this.titleName !== undefined) {
-			first = this.input(body, TITLES_UI.titleName, 'title-name', this.titleName, (v) => (this.titleName = v), { placeholder: TITLES_UI.namePlaceholder });
+			this.input(body, TITLES_UI.titleName, 'title-name', this.titleName, (v) => (this.titleName = v), { placeholder: TITLES_UI.namePlaceholder });
 		}
 		let ruler: HTMLInputElement | null = null;
 		if (this.fields.name !== undefined) {
-			const name = this.input(body, TITLES_UI.holderName, 'holder-name', this.fields.name, (v) => {
+			this.input(body, TITLES_UI.holderName, 'holder-name', this.fields.name, (v) => {
 				this.fields.name = v;
 				// The empty ruler field shows the holder's name as its hint (§13.5, D131); typed text is never replaced.
 				ruler?.setAttribute('placeholder', rulerHint(undefined, v));
 			});
-			first ??= name;
 		}
 		const row = body.createDiv({ cls: 'dynasty-holder-form-row' });
-		const number = this.input(row, TITLES_UI.number, 'number', this.fields.number, (v) => (this.fields.number = v), { placeholder: TITLES_UI.numberPlaceholder });
-		first ??= number;
+		this.input(row, TITLES_UI.number, 'number', this.fields.number, (v) => (this.fields.number = v), { placeholder: TITLES_UI.numberPlaceholder });
 		ruler = this.input(row, TITLES_UI.ruler, 'ruler', this.fields.ruler, (v) => (this.fields.ruler = v), {
 			placeholder: rulerHint(this.spec.personName, this.fields.name),
 			hint: TITLES_UI.rulerHint,
@@ -94,7 +92,7 @@ class HolderFormModal extends SmallFormModal {
 		this.tickBox(body);
 		this.previewEl = body.createDiv({ cls: 'dynasty-holder-preview', attr: { 'aria-live': 'polite' } });
 		this.updatePreview();
-		first?.focus();
+		this.cleanup.push(startWithoutFocus(this.modalEl));
 	}
 
 	/** The tick box "Holds the title through the spouse" (D195): off with its hint when the holder is not a person in the tree. */
@@ -121,7 +119,7 @@ class HolderFormModal extends SmallFormModal {
 		const { row, id } = sheetField(parent, label, name, 'dynasty-holder');
 		// Plain attribute names (no spread), so the colour rule of eslint.config.mjs can check them; null writes no attribute.
 		const extra = { placeholder: o.placeholder ?? null };
-		// D196 item 1: no capital and no correction in a name that the owner types.
+		// D196 item 1: no capital and no correction in a name that the user types.
 		const input = row.createEl('input', {
 			cls: ['dynasty-sheet-input', 'dynasty-input'],
 			attr: { id, type: 'text', autocomplete: 'off', autocorrect: 'off', spellcheck: 'false', autocapitalize: 'off', placeholder: extra.placeholder },
@@ -194,7 +192,7 @@ class HolderFormModal extends SmallFormModal {
 	}
 }
 
-/** Opens the holder form; it calls `spec.save` on Save and stays open until a save succeeds or the owner cancels. */
+/** Opens the holder form; it calls `spec.save` on Save and stays open until a save succeeds or the user cancels. */
 export function holderForm(app: App, spec: HolderFormSpec): void {
 	new HolderFormModal(app, spec).open();
 }

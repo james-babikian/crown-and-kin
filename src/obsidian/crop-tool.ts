@@ -1,6 +1,6 @@
 /*
  * The portrait crop tool (spec §13.13, D79, D90, D91). A window that shows the
- * whole picture under a round frame of fixed size. The owner moves and zooms the picture; the part
+ * whole picture under a round frame of fixed size. The user moves and zooms the picture; the part
  * inside the frame is what the card shows. Save gives the part as fractions of the picture, or null
  * for the automatic part; Cancel, Escape and a press outside give nothing.
  *
@@ -13,7 +13,7 @@
  * Behaviour (C1 to C8):
  * - Save gives a clamped `CropFraction`, or `null` when it is the automatic part. Cancel, Escape and a
  *   press outside give `cancel` and ask nothing.
- * - 0.2.8 contract G.9, D196 item 4: the tool has a dark surface in both themes. The title is at the top, the picture is under a
+ * - D196 item 4: the tool has a dark surface in both themes. The title is at the top, the picture is under a
  *   circle in the middle, then the instruction text, the slider with its zoom icons, and the buttons: Cancel and Reset at the left, Save at
  *   the right. The edit sheet opens it at once after a new portrait; if the user closes it, the part that the plugin chose by itself stays.
  * - On a phone-width screen (`isPhoneWidth`) the tool fills the visible area with its buttons in a bottom bar of 44 px
@@ -37,7 +37,7 @@ import { trackModal } from '../view/plugin-modals';
 import { nameDialog } from './sheet-parts';
 
 /** What opens the crop tool. */
-export interface CropToolOptions {
+interface CropToolOptions {
 	app: App;
 	file: TFile;
 	store: PictureStore;
@@ -66,18 +66,18 @@ export function largeCopySide(win: Window): number {
 	}
 	return Math.max(1, Math.floor(CROP_COPY_PX / ratio));
 }
-/** The Zoom in button enlarges the shown size by this factor (C4). */
-export const ZOOM_IN_STEP = 1.25;
-/** The Zoom out button shrinks the shown size to 0.8 (C4). */
-export const ZOOM_OUT_STEP = 0.8;
-/** The + and - keys zoom by this factor (C4). */
-export const KEY_ZOOM_STEP = 1.1;
-/** The wheel zooms by exp(-deltaY x this) (C4). */
-export const WHEEL_RATE = 0.002;
-/** An arrow key moves the picture by this part of the frame; Shift moves it by the larger part (C4). */
-export const KEY_MOVE = 0.02;
-/** An arrow key with Shift moves the picture by this part of the frame (C4). */
-export const KEY_MOVE_SHIFT = 0.1;
+/** The Zoom in button enlarges the shown size by this factor. */
+const ZOOM_IN_STEP = 1.25;
+/** The Zoom out button shrinks the shown size to 0.8. */
+const ZOOM_OUT_STEP = 0.8;
+/** The + and - keys zoom by this factor. */
+const KEY_ZOOM_STEP = 1.1;
+/** The wheel zooms by exp(-deltaY x this). */
+const WHEEL_RATE = 0.002;
+/** An arrow key moves the picture by this part of the frame; Shift moves it by the larger part. */
+const KEY_MOVE = 0.02;
+/** An arrow key with Shift moves the picture by this part of the frame. */
+const KEY_MOVE_SHIFT = 0.1;
 /** The area around the frame is this many times the frame across, so the part outside the frame shows darker. */
 const AREA_RATIO = 1.4;
 
@@ -87,19 +87,19 @@ export function sliderOf(side: number): number {
 	return Math.min(1, Math.max(0, -Math.log10(s)));
 }
 
-/** The side that slider position `z` means (C4). */
+/** The side that slider position `z` means. */
 export function sideOf(z: number): number {
 	const v = Math.min(1, Math.max(0, Number.isFinite(z) ? z : 0));
 	return Math.pow(10, -v);
 }
 
-/** The factor of a wheel turn of `deltaY` (C4). */
+/** The factor of a wheel turn of `deltaY`. */
 export function cropWheelFactor(deltaY: number): number {
 	return Math.exp(-(Number.isFinite(deltaY) ? deltaY : 0) * WHEEL_RATE);
 }
 
 /**
- * The crop after a drag of (dx, dy) screen px in a frame `frame` px across (C4): the picture follows
+ * The crop after a drag of (dx, dy) screen px in a frame `frame` px across: the picture follows
  * the pointer, so the part moves the other way. `w` and `h` are the picture sizes.
  */
 export function dragCrop(crop: CropFraction, dx: number, dy: number, frame: number, w: number, h: number): CropFraction {
@@ -374,7 +374,7 @@ class CropModal extends Modal {
 		};
 		a.addEventListener('pointerup', up);
 		a.addEventListener('pointercancel', up);
-		// Not passive: the wheel must not scroll the window (C4).
+		// Not passive: the wheel must not scroll the window.
 		a.addEventListener(
 			'wheel',
 			(e) => {

@@ -1,5 +1,5 @@
 /*
- * The route stage, the geometry half (the architecture notes §4.2.2, stage S4). From the placed items and the ports it builds the nets of every
+ * The route stage, the geometry half (stage S4). From the placed items and the ports it builds the nets of every
  * gap (couple lines, hops of passing lines, far dots, stems to hang passages, sibling bars), gives them lanes with a crossing-aware
  * order (lanes.ts), sizes the gaps and sets y. It runs once: the drawing (draw.ts) comes from the same nets that sized the gaps. Every
  * x it uses is an item x or a port x; the only choices it makes are the line of a passage inside its slot and the slot of a child port,
@@ -7,7 +7,7 @@
  * the only plan field it writes is `Item.line`.
  * Folds (spec §13.10): a fold control is a mark on a family's stem. A control of a couple's dot hangs below the dot's net as zones of
  * that net (`foldZones`); a control of a bar family or a single parent stands at a fixed place in the gap (a fixed zone), its spot from
- * one placement of those controls on rows set far apart (`placeFoldSpots`, the 0.3.0 rules: badges and tags of the same row push it).
+ * one placement of those controls on rows set far apart (`placeFoldSpots`: badges and tags of the same row push it).
  * The lane packing keeps every line out of the marks and every tap area off the others and off the tags, and the gap grows to hold the
  * marks above the sibling bars: so the spots are final when the lanes are, and nothing is placed twice.
  */
@@ -43,16 +43,16 @@ export interface RouteInput {
 	fold?: FoldInput;
 }
 
-/** The clear space a mark keeps below itself (a quarter em, as the 0.3.0 room rule). With the bar band below it (`barDrop`, at least 1.05 em) this keeps a mark farther from the next row's badge circles than D137 asks (0.8 em), so no control is ever pushed by one. */
+/** The clear space a mark keeps below itself (a quarter em). With the bar band below it (`barDrop`, at least 1.05 em) this keeps a mark farther from the next row's badge circles than D137 asks (0.8 em), so no control is ever pushed by one. */
 export const MARK_CLEAR_EM = 0.25;
 /** A mark's zone is its drawn extent and this much more on every side (the stroke and the dot's 2 px of `near`). */
 const MARK_PAD_PX = 2;
 /**
- * Rows this far apart see only the obstacles of their own gap (the 0.3.0 flat placement of the fold controls). The limit: a double has a
+ * Rows this far apart see only the obstacles of their own gap (the flat placement of the fold controls). The limit: a double has a
  * resolution of about `TIE` from y = 4.3e9, that is from row 4 300 at this step; the chain test `layout-flat-step` reaches 4 000 rows.
  */
 const FLAT_STEP = 1e6;
-/** The child-port slot tables of the Roundel, in em from the axis (spec §5.2, B.3.3): the axis, two places left of it, one right of it beyond the arms (0.2.8: the arms stand 0.3 em further out). A tabbed card (a "You" or ordinal tab) keeps the left places for the tab. */
+/** The child-port slot tables of the Roundel, in em from the axis (spec §5.2): the axis, two places left of it, one right of it beyond the arms (the arms stand 0.3 em further out). A tabbed card (a "You" or ordinal tab) keeps the left places for the tab. */
 const ROUNDEL_SLOTS_EM: readonly number[] = [0, -1.75, -2.5, 3.4];
 const ROUNDEL_SLOTS_TABBED_EM: readonly number[] = [0, 3.4];
 /** The child-port slots of a plain card, in leg steps from the middle: the middle, two places left, two right (sideways: one right, and only inside the tag insets). */
@@ -177,7 +177,7 @@ function slotPlaces(it: Item, own: number | undefined, near: number, blocked: re
 
 /**
  * A choice of a place by the rule "the first clear one, else the one with the most clearance". `clear` is false when the second
- * branch was taken: the caller reports that as a fallback hit (the architecture notes §4.2.6).
+ * branch was taken: the caller reports that as a fallback hit.
  */
 interface Choice {
 	x: number;
@@ -188,7 +188,7 @@ interface Choice {
  * The first place clear of every vertical of the gap above (the reach of each included). If none is: among the places clear of the
  * `firm` verticals (the hang trunks, whose reach holds a dot or a fold mark that no line may touch) the one with the most clearance
  * from all of them, the leg ports and the lines of the passages as well (a place that is clear of the trunks only could end a hair
- * from a leg port: the architecture notes §4.2.6 class P); if no place is clear of the trunks, the one with the most clearance from all. A tie keeps the
+ * from a leg port); if no place is clear of the trunks, the one with the most clearance from all. A tie keeps the
  * earlier place.
  */
 function clearestPlace(places: readonly number[], from: readonly Vert[], firm: readonly Vert[] = from): Choice {
@@ -344,7 +344,7 @@ export function childPorts(plan: Plan, hp: HangPoints, through: Vert[][], geo: G
 	const m = lineMetrics(geo);
 	const trunksIn: Vert[][] = Array.from({ length: plan.rows.length }, () => []);
 	for (const f of plan.families) if (f.kids.length) trunksIn[stemGap(plan, f)].push({ x: hp.x.get(f.key)!, half: near });
-	// A line that leaves a card for a dot ends in the gap; a drop on its x would read as its continuation (second fix round, item 6: x5).
+	// A line that leaves a card for a dot ends in the gap; a drop on its x would read as its continuation.
 	const legsIn: { x: number; key: string }[][] = plan.rows.map((row) => row.flatMap((it) => (plan.exits.get(it.id) ?? []).filter((p) => p.kind !== 'hang').map((p) => ({ x: portX(p), key: p.key }))));
 	const dropX = new Map<string, number>();
 	for (const f of plan.families) {
@@ -406,7 +406,7 @@ export function controlZones(c: FoldControl, x: number, dy: number, geo: Geometr
 }
 
 /** Step 6: the fold controls as zones. */
-export interface FoldZones {
+interface FoldZones {
 	/** The fixed zones of each gap: the controls of bar families and single parents, and the tag tap areas (down). */
 	fixed: Zone[][];
 	/** The spot of every fixed control: its x and its distance below the top of its gap. */
@@ -464,7 +464,7 @@ function flatSpotInput(plan: Plan, hp: HangPoints, geo: Geometry, side: Geometry
 }
 
 /**
- * The controls of bar families and of single parents whose trunk leaves the card are placed once with the 0.3.0 rules on rows set far
+ * The controls of bar families and of single parents whose trunk leaves the card are placed once with the same rules on rows set far
  * apart (so only the tags and badges of their own row and each other can push them) and become fixed zones of their gap; the
  * controls of dot couples, and of single parents whose hang point is on a passage (their stem net is the horizontal the trunk hangs
  * from), become zones of that net, `FOLD_EM.afterMarker` below it (the spot rule for a dot; the lane packing keeps that spot clear,

@@ -358,7 +358,7 @@ describe('Houses window: the Id change (§13.17 rule 5, D109, D110)', () => {
 		expect(idOpen(content)!.getAttribute('aria-label')).toBe('Change ID: change the ID of Crown');
 	});
 
-	it('the small window has the title, the hint, the Id field with the id of the draft, "Make ID from the name", the buttons, and the focus is in the field', async () => {
+	it('the small window has the title, the hint, the Id field with the id of the draft, "Make ID from the name", the buttons, and the window has the focus, no field', async () => {
 		const { content, modal } = await openHouses();
 		const w = await openIdOf(gotoPage(content, 'thorne'));
 		expect(w.hasClass('dynasty-sheet')).toBe(true);
@@ -369,7 +369,7 @@ describe('Houses window: the Id change (§13.17 rule 5, D109, D110)', () => {
 		expect(w.querySelector('.dynasty-id-make')!.getText()).toBe('Make ID from the name');
 		expect([w.querySelector('.dynasty-sheet-cancel')!, useOf(w)].map((b) => b.getText())).toEqual(['Cancel', 'Use this ID']);
 		expect(problemOf(w)).toBe('');
-		expect(fakeDoc.activeElement).toBe(fieldOf(w));
+		expect(fakeDoc.activeElement).toBe(w);
 		// The small window is a modal over the Houses window, which does not change.
 		expect(modal.querySelector('.dynasty-id-window')).toBeNull();
 		expect(openModals).toHaveLength(2);
@@ -755,7 +755,7 @@ describe('Titles window: the Id change (§13.17 rule 5, D109, D110)', () => {
 		expect(fieldOf(w).value).toBe('duke');
 		expect(fieldOf(w).getAttribute('aria-label')).toBe('ID of Duke');
 		expect([w.querySelector('.dynasty-sheet-cancel')!, useOf(w)].map((b) => b.getText())).toEqual(['Cancel', 'Use this ID']);
-		expect(fakeDoc.activeElement).toBe(fieldOf(w));
+		expect(fakeDoc.activeElement).toBe(w);
 		type(fieldOf(w), 'king');
 		await click(useOf(w));
 		expect(openModals).toHaveLength(1);

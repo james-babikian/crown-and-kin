@@ -1,5 +1,5 @@
 /*
- * The decisions of one render of a `kin` block, with no DOM and no Obsidian (architecture review F1 part b, 0.3.2). `planRender` takes
+ * The decisions of one render of a `kin` block, with no DOM and no Obsidian (architecture review F1 part b). `planRender` takes
  * the parse result and the facts of the view and the block (settings, device, session memory) and returns what to draw (`RenderPlan`)
  * and what the view must change in its session memory (`StateChanges`). It changes none of its inputs, so a test runs it on plain
  * data and a second call with the same inputs gives an equal result. `TreeView.render` applies the changes, then builds the DOM
@@ -60,7 +60,7 @@ export interface RenderInputs {
 	orientation: Orientation;
 	/** A person that a flow asked this view to show (Find outside the focus family). */
 	pendingTarget: readonly string[] | null;
-	/** The focus rules have run once in this view (F5). */
+	/** The focus rules have run once in this view. */
 	stopChecked: boolean;
 	/** A draw of this block text with this many people took too long before (spec §7.7). */
 	stopped(count: number): boolean;
@@ -177,9 +177,9 @@ export function planRender(inputs: RenderInputs): { plan: RenderPlan; stateChang
 	const none = (plan: RenderPlan) => ({ plan, stateChanges: changesOf(draftOf()) });
 	const { parsed } = inputs;
 	if (!parsed.ok) return none(inputs.full ? { kind: 'invalid-full' } : { kind: 'error', error: parsed.error });
-	// 0.3 (spec §7.7, size limits): the people are counted right after the parse, before the derive, the relations and the layout.
+	// Spec §7.7 (size limits): the people are counted right after the parse, before the derive, the relations and the layout.
 	const count = peopleCount(parsed.tree);
-	// A.5: "Warn about more than 2 parents of a type". The derive is not cached (`parse-cache.ts`), so the setting needs no cache key.
+	// "Warn about more than 2 parents of a type". The derive is not cached (`parse-cache.ts`), so the setting needs no cache key.
 	const whole = deriveFamilies(parsed.tree, { warnManyParents: inputs.settings.warnManyParents, ...(inputs.dates ? { dates: inputs.dates } : {}) });
 	const derived: Derived = { tree: parsed.tree, count, whole, t1: inputs.clock() };
 	if (!whole.people.length && !whole.issues.some((i) => i.level === 'blocking')) return none({ kind: 'empty', ...derived });
@@ -200,14 +200,14 @@ function planTreePart(inputs: RenderInputs, derived: Derived, d: Draft): RenderP
 	return layoutPlan(inputs, derived, f, fonts, d);
 }
 
-/** Folds that no family has any more end with the parse (F9); the rest of the block's folds stay. */
+/** Folds that no family has any more end with the parse; the rest of the block's folds stay. */
 function pruneBlockFolds(whole: FamilyGraph, st: BlockState, d: Draft): void {
 	const kept = pruneFolds(whole, st.folds);
 	if (kept !== st.folds) d.block.folds = new Set(kept);
 }
 
 /**
- * The focus, the finder's result, the Show view and the focus family (spec §5.6, §13.2, contract 0.2.7 F.1). The result of the finder and the Show view
+ * The focus, the finder's result, the Show view and the focus family (spec §5.6, §13.2). The result of the finder and the Show view
  * are computed again from the new text at each render; with a line they replace the focus family (the search uses the whole tree).
  */
 function focusStep(inputs: RenderInputs, tree: Tree, whole: FamilyGraph, d: Draft): FocusStep {
@@ -320,9 +320,9 @@ export interface ShowDevice {
 }
 
 /**
- * The Show view to draw, from the block state and the whole tree: computed again at each render, so it follows every edit (F.7). A title that is gone,
- * or a saved line that is not `kind: 'line'` any more, ends the view (F.1): `ended` is then true and the caller clears `succession` in the block state.
- * The static touch preview never draws the tree view (D1); the list on a phone draws the bar (F.6).
+ * The Show view to draw, from the block state and the whole tree: computed again at each render, so it follows every edit. A title that is gone,
+ * or a saved line that is not `kind: 'line'` any more, ends the view: `ended` is then true and the caller clears `succession` in the block state.
+ * The static touch preview never draws the tree view (D1); the list on a phone draws the bar.
  */
 export function showViewOf(st: BlockState, whole: FamilyGraph, set: DynastySettings, device: ShowDevice): { drawn: SuccessionDrawn | null; ended: boolean } {
 	const s = st.succession;
@@ -361,15 +361,15 @@ function markedSettings(s: LayoutSettings, relationLine: boolean, me: string | n
 	return me !== null ? { ...s, youTab: me } : s;
 }
 
-/** The ids only, never the texts (a cached layout would keep a stale text): the heirs and the open branches get a tab above their cards (0.2.7 F.4). */
+/** The ids only, never the texts (a cached layout would keep a stale text): the heirs and the open branches get a tab above their cards. */
 function shapedSettings(s: LayoutSettings, relationLine: boolean, me: string | null, succession: SuccessionDrawn | null): LayoutSettings {
 	const marked = markedSettings(s, relationLine, me);
 	return succession ? { ...marked, ordinalCards: [...succession.ordinals.keys()] } : marked;
 }
 
-/** The folds of the drawn graph. A person that a flow asked for (a tag or a problem in the preview, Find outside the focus family) is shown (F11). */
+/** The folds of the drawn graph. A person that a flow asked for (a tag or a problem in the preview, Find outside the focus family) is shown. */
 function foldsFor(inputs: RenderInputs, whole: FamilyGraph, g: FamilyGraph, f: FocusStep, d: Draft): { foldPlan: FoldPlan; canFold: boolean } {
-	// M10 (F1, F8): the computer and the full-screen view apply the folds; the static phone preview never does.
+	// The computer and the full-screen view apply the folds; the static phone preview never does.
 	const canFold = !!inputs.full || !inputs.coarse;
 	let folds: FoldSet = d.block.folds ?? inputs.state.folds;
 	const lineIds = f.succession ? linePeople(f.succession) : (f.finder?.line?.people ?? null);
@@ -455,7 +455,7 @@ function layoutPlan(inputs: RenderInputs, derived: Derived, f: FocusStep, fonts:
 		relationsFor,
 		canFold,
 		foldPlan,
-		// Spec §13.3, §13.5: the card labels of the drawn graph. A tree with no titles draws as in M7 (no labels).
+		// Spec §13.3, §13.5: the card labels of the drawn graph. A tree with no titles draws with no labels.
 		labels: needsLabels(g) ? cardLabels(g) : undefined,
 		laidBase: shape(small ? { ...sideways, far: NEVER_FAR_RULE } : sideways),
 		alt,

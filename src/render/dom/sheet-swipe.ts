@@ -7,6 +7,7 @@
 
 /** A pull of this many px closes the sheet, or of this share of its height, whichever is less. */
 export const SWIPE_CLOSE_PX = 100;
+/** The share of the height of the sheet that a pull must reach to close it. */
 export const SWIPE_CLOSE_SHARE = 0.3;
 /** A flick faster than this (px per ms) closes the sheet, however short the pull. */
 export const SWIPE_FLICK = 0.5;
@@ -55,7 +56,7 @@ interface Track {
 }
 
 /**
- * Makes `sheet` close with a swipe down. Returns a function that takes the listeners away, stops a move that is still running and resets the sheet; the owner
+ * Makes `sheet` close with a swipe down. Returns a function that takes the listeners away, stops a move that is still running and resets the sheet; the code that made the sheet
  * calls it when the sheet is gone (or in the same task as its removal), because a closed sheet keeps its pull until then.
  */
 export function attachSheetSwipe(sheet: HTMLElement, hooks: SwipeHooks): () => void {
@@ -91,7 +92,7 @@ export function attachSheetSwipe(sheet: HTMLElement, hooks: SwipeHooks): () => v
 	/** Moves the sheet to `px` and runs `then` when it is there: at once when movement is reduced. */
 	function moveTo(px: number, then: () => void): void {
 		if (hooks.reduced()) {
-			// Also at once: a closing sheet is off the screen before its owner closes it, so a close animation of the owner has nothing to show.
+			// Also at once: a closing sheet is off the screen before the code that made it closes it, so a close animation has nothing to show.
 			setPull(px);
 			then();
 			return;

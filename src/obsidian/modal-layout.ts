@@ -43,7 +43,7 @@ function readKeyboard(win: Window): number {
  * Keeps the `is-phone` class and the visible-area size up to date; returns the clean-up. The keyboard counts
  * from two sources: a smaller viewport, and Obsidian's `--keyboard-height` (the iPhone does not shrink the viewport).
  *
- * Close slide (P1): Obsidian slides a closing window down by its own height, read when `close()` starts, and removes
+ * Close slide: Obsidian slides a closing window down by its own height, read when `close()` starts, and removes
  * it at the end. If the keyboard goes down during the slide, the window grows with the visible area and the slide
  * no longer takes it off the screen: the lower half pops away at the end. So `close()` first stops the window from
  * following the visible area and makes its box as tall as the tallest visible area seen. The extra room is padding at
@@ -177,7 +177,7 @@ export function revealTarget(control: HTMLElement, modalEl?: HTMLElement): HTMLE
 }
 
 /**
- * M1 to M3: scrolls the focused field of a window into view ONCE, after the keyboard has settled. The window follows the
+ * Scrolls the focused field of a window into view ONCE, after the keyboard has settled. The window follows the
  * keyboard step by step while it slides in (`phoneLayout` calls back at each step); a scroll at each step moves the list
  * by a row in a few frames, which looks like a stutter. Each call to `schedule` restarts one timer, so only the last
  * call counts: `delay` ms after the last step the field is brought into view. `reduced` (D126): when it is true the
@@ -214,7 +214,7 @@ function tabStops(root: HTMLElement): HTMLElement[] {
 }
 
 /**
- * Tab and Shift+Tab stay inside a window and go round: from the last control to the first, and from the first back to the last (G5 0.4, WCAG 2.4.3).
+ * Tab and Shift+Tab stay inside a window and go round: from the last control to the first, and from the first back to the last (WCAG 2.4.3).
  * Without it, Shift+Tab on the first choice of a choice window left the focus where it was. Returns the function that removes the listener.
  */
 export function holdTab(modalEl: HTMLElement): () => void {
@@ -230,4 +230,27 @@ export function holdTab(modalEl: HTMLElement): () => void {
 	};
 	modalEl.addEventListener('keydown', key);
 	return () => modalEl.removeEventListener('keydown', key);
+}
+
+/**
+ * A window opens with no field focused (owner rule: never a cursor in a field at open). The dialog itself takes the focus, so a screen reader reads its title
+ * and Tab goes to the first control. Obsidian moves the focus to the first control after `onOpen` returns, so the focus is taken
+ * back at once and again after 0 and 120 ms, until the user presses a key or a pointer in the window. Returns the function
+ * that stops it: the window calls it when it closes (a closing phone window stays in the page for its slide, and must not take the focus from the button that opened it).
+ */
+export function startWithoutFocus(modalEl: HTMLElement): () => void {
+	modalEl.setAttribute('tabindex', '-1');
+	let done = false;
+	const stop = (): void => {
+		done = true;
+	};
+	modalEl.addEventListener('pointerdown', stop, true);
+	modalEl.addEventListener('keydown', stop, true);
+	const take = (): void => {
+		if (done || !modalEl.isConnected) return;
+		if (modalEl.doc?.activeElement !== modalEl) modalEl.focus({ preventScroll: true });
+	};
+	take();
+	for (const ms of [0, 120]) (modalEl.win ?? window).setTimeout(take, ms);
+	return stop;
 }

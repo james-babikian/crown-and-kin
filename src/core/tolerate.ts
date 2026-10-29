@@ -28,10 +28,10 @@ export function blankPlainNulls(doc: Document): void {
 }
 
 /** The keys whose value is a link: a person's `link` and `portrait`, a house's `arms` (spec §13.0 item 3). */
-export const LINK_KEYS: ReadonlySet<string> = new Set(['link', 'portrait', 'arms']);
+const LINK_KEYS: ReadonlySet<string> = new Set(['link', 'portrait', 'arms']);
 
 /**
- * Contract A3: a pasted embed written without quotes, `portrait: ![[x.png]]`. YAML reads the `!`
+ * A pasted embed written without quotes, `portrait: ![[x.png]]`. YAML reads the `!`
  * as a tag glued to the list after it, which is an error. In a link key the value is read like the
  * quoted text "![[x.png]]" instead: the node becomes that text and the error goes. The same
  * glued `!` anywhere else stays an error. Call it before looking at `doc.errors`.
@@ -138,7 +138,7 @@ export function unwrapCurlyKeys(data: Raw): void {
 	});
 	each(data.titles, (t) => {
 		unwrapRefs(t, 'holders', 'person');
-		// Contract 0.2.7 K.3: the ids of a named heir and of excluded people, one id or a list.
+		// The ids of a named heir and of excluded people, one id or a list.
 		unwrapRefs(t, 'heir', undefined);
 		unwrapRefs(t, 'exclude', undefined);
 	});

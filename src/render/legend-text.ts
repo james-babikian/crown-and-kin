@@ -25,18 +25,20 @@ export const LEGEND_LABELS: Record<StrokeKind, string> = {
 /** Legend label for the card sign (spec D14): illegitimacy that no dashed line shows. */
 export const SIGN_LEGEND_LABEL = 'Illegitimate child (no dashed line)';
 
-/** 0.2.8 (I19, an internal note 4.1): the legend row for a dead person with no death year: a sample of the date text and its words. */
+/** The legend row for a dead person with no death year: a sample of the date text and its words. */
 export const LEGEND_DEAD_SAMPLE = 'b. 1131 †';
+/** The words of the legend row for a dead person with no death year. */
 export const LEGEND_DEAD_LABEL = 'Dead. The year of death is not known.';
 
-/** 0.2.8 (I19, ruling 14): the legend row for a person counted as dead whose text for the death is not clear. */
+/** The legend row for a person counted as dead whose text for the death is not clear. */
 export const LEGEND_DEAD_DOUBT_SAMPLE = 'b. 1131 †?';
+/** The words of the legend row for a person counted as dead whose death text is not clear. */
 export const LEGEND_DEAD_DOUBT_LABEL = 'The plugin counts this person as dead, but the death entry in the note is not clear.';
 
-/** M9 (spec §13.6 "Legend", §13.8): the heading of the legend's houses part, on screen and in a saved picture. */
+/** Spec §13.6 "Legend", §13.8: the heading of the legend's houses part, on screen and in a saved picture. */
 export const LEGEND_HOUSES_LABEL = 'Houses';
 
-/** M9 (spec §13.8, D74): the heading of the line styles part of a saved picture's legend. */
+/** Spec §13.8, D74: the heading of the line styles part of a saved picture's legend. */
 export const LEGEND_LINES_LABEL = 'Line styles';
 
 /** Legend order: partnerships, then children, then other parents. */

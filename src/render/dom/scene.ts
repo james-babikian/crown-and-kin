@@ -2,33 +2,33 @@
  * Builds the tree's SVG content with Obsidian's createSvg. Colours and fonts come only from the
  * dynasty- classes in styles.css; the one value written per card is --dynasty-house-color.
  * Each card carries all three levels of detail (spec §5.4); a class on the <svg> picks one, so a
- * level change is a class change, never a rebuild. M7: the relation text, the marked card (D40, D41)
- * and the relation finder's line (D47, from `line-highlight.ts`) are classes too. M8: with card
+ * level change is a class change, never a rebuild. The relation text, the marked card (D40, D41)
+ * and the relation finder's line (D47, from `line-highlight.ts`) are classes too. With card
  * labels (`SceneOptions.labels`), the name and title text lines come from them (spec §13.3, §13.5).
- * M9: a card whose box has `arms` or `portrait` gets empty picture slots (`Scene.pictures`, filled
+ * A card whose box has `arms` or `portrait` gets empty picture slots (`Scene.pictures`, filled
  * by the tree view through `dom/pictures.ts`); its name makes room for the arms, and its small text
  * lines beside the portrait are narrower (spec §13.6, §13.7, D76–D78). The legend gains the houses.
- * M10: with `SceneOptions.folds`, the fold controls of the layout (`dom/folds.ts`): each in the Tab order after the
+ * With `SceneOptions.folds`, the fold controls of the layout (`dom/folds.ts`): each in the Tab order after the
  * card of the later of its parents, its tap area in the hit layer below the cards.
- * M11 (spec §13.15 rule 1): with `SceneOptions.lazyCards` (only the tree view sets it; the headless
+ * Spec §13.15 rule 1: with `SceneOptions.lazyCards` (only the tree view sets it; the headless
  * `renderSvg`, the tests, the spike and Save as a picture stay eager and complete) each card, far-couple
  * tag and focus badge is a shell plus its content:
  * - S1 Shell and content. A card shell is the `<g class="dynasty-card ...">` with `tabindex`, `role`,
  *   `aria-label`, `data-person`, every class and the `--dynasty-house-color` style, plus its
  *   `rect.dynasty-card-bg` (the size and hit area). Its content is every other child (strip,
- *   full, compact levels). 0.2.5 (WP-B8): the focus ring is not part of that content; only `fillPerson` and `fillAll`
+ *   full, compact levels). The focus ring is not part of that content; only `fillPerson` and `fillAll`
  *   make it, because it shows only for the keyboard focus and the highlight and both fill the person first.
  *   A tag shell has its attributes and hit rect, its content the three pill groups.
  *   A badge shell has its attributes and hit rect, its content the circle and the plus path. Fold controls
- *   keep the M10 rule (`FoldRef.fill`). A shell never moves, so the Tab order, the names and the roles
+ *   keep their own rule (`FoldRef.fill`). A shell never moves, so the Tab order, the names and the roles
  *   exist from the build on.
  * - S2 Built detached, attached later. The content is created in a detached holder, `fitted`, the
  *   `fitters`, `links` and `PictureSlot`s are registered as in an eager scene, and the holder's children
  *   move into the shell at fill. After a fill the shell has exactly the eager children in the eager
- *   order, so an eager and a filled lazy scene serialise byte for byte the same. 0.2.8 (speed repair): the text of a card and of a far-couple tag is cut
+ *   order, so an eager and a filled lazy scene serialise byte for byte the same. The text of a card and of a far-couple tag is cut
  *   to fit (the `fitters`) at fill, not at build, because nobody sees it before; a refit runs the fits that have run.
  * - S3 Near the view. `boxNearView` (`view-math.ts`) decides which items a fill attaches.
- * - S3b 0.2.1 (spec §13.15 rule 4): lines and partnership signs are delayed too. A lazy scene does not make
+ * - Spec §13.15 rule 4: lines and partnership signs are delayed too. A lazy scene does not make
  *   their elements at build time; it keeps each one's box (`pathBox`) and builds the element at fill, into its
  *   layer at its place (`orderedLayer`), so the layer after `fillAll` is the eager layer byte for byte. They have
  *   no tap area, so a missing one never costs a tap. `SceneFill.pendingLines` counts them; they are not in
@@ -36,10 +36,10 @@
  * - S4 `Scene.fill` (`SceneFill`) is the fill API; an eager scene has one that does nothing. The
  *   tree view decides when to call it (see `obsidian/tree-view.ts`). `Scene.cards`, `tags`, `badges`,
  *   `links`, `pictures` and `folds` contain every item from the build on.
- * 0.2.5 (CONTRACT section B): a card has one of two forms (`Geometry.form`). The Roundel (a tree from top to bottom) has its text
+ * A card has one of two forms (`Geometry.form`). The Roundel (a tree from top to bottom) has its text
  * centred on an axis, a round medallion and the arms on its top edge (a Full and a Compact slot for each picture), a footer plate for
  * the relation word, and a tap area over the part that sticks out above the card. The text card (sideways) has its text at the left, no
- * pictures at all (`Scene.pictures` stays empty, so nothing is fetched) and the same plate. 0.2.6 (D179): the classic card and the card size are gone. The "You" tab belongs to the card whose id
+ * pictures at all (`Scene.pictures` stays empty, so nothing is fetched) and the same plate. D179: the classic card and the card size are gone. The "You" tab belongs to the card whose id
  * is `TreeLayout.youTab`, whatever the form; nothing else decides it. The scene writes no `data-relation` and draws no tooltip:
  * the tooltip belongs to the tree view.
  */
@@ -58,8 +58,9 @@ import { isColour } from '../colour-check';
 import { lineLook, type LineMarks, type LineState } from '../line-highlight';
 import { cardNameLines, isolateLines, titleLines, type NameMeasure, type NameRun } from '../name-lines';
 import { ME_RING_INNER, TAG_MARK, UNION_MARKS, tagMarkGap, tagMarkHalfWidth, tagMarkSlot, unionMark, unionShape, type UnionShape } from '../styles';
+import { marksForSvg } from '../date-bidi';
 import { fitCardText, pickReign } from '../date-fit';
-import { SIGN_CARD_LABEL, cardLabel, dateLine, farTagLabel, farTagName, shownReign } from '../tree-info';
+import { SIGN_CARD_LABEL, cardLabel, dateLine, dateLineShown, farTagLabel, farTagName, reignShown, shownReignIsolated } from '../tree-info';
 import { HIT_EM, boxNearView, pathBox, ribbonPath, truncate } from '../view-math';
 import { ME_WORD } from '../view-text';
 import { drawFold, type FoldRef } from './folds';
@@ -83,7 +84,7 @@ export interface SceneOptions {
 	link: (p: Person) => CardLink | null;
 	/** Focus mode (spec §5.6): people with relatives who are not shown, and how many; each card gets a `+` badge. */
 	badges?: { hidden: ReadonlyMap<string, number>; label: (p: Person, hidden: number) => string };
-	/** D40 (spec §13.1): the relation text of each card ("Half-sister"; "You" for the marked person), drawn on the relation line in class `dynasty-card-relation`, and named in the card's screen-reader label. The setting "Show relation names on cards" off: pass it and set class `dynasty-no-relations` on the tree (like `dynasty-no-dates`), so the text hides but the label keeps the relation (M7 ruling). */
+	/** D40 (spec §13.1): the relation text of each card ("Half-sister"; "You" for the marked person), drawn on the relation line in class `dynasty-card-relation`, and named in the card's screen-reader label. The setting "Show relation names on cards" off: pass it and set class `dynasty-no-relations` on the tree (like `dynasty-no-dates`), so the text hides but the label keeps the relation. */
 	relations?: { get(id: string): { text: string; lower: string } | undefined };
 	/** D41: the marked person; the card gets class `dynasty-card-me` (one thicker border in the text colour, no accent, D153). */
 	me?: string;
@@ -96,10 +97,10 @@ export interface SceneOptions {
 	 */
 	line?: LineMarks;
 	/**
-	 * M8 (spec §13.3, §13.5; D56, D58, D61–D63): the card labels of the drawn graph (`cardLabels(g)`).
+	 * Spec §13.3, §13.5; D56, D58, D61–D63: the card labels of the drawn graph (`cardLabels(g)`).
 	 * A card with a label shows `name` on its name text line (Full and Compact) and `title` with the
 	 * reign on its title text line, on two text lines when the box has `tallTitle`; the accessible
-	 * name uses them too. Absent: every card is drawn as in M7.
+	 * name uses them too. Absent: every card is drawn with no label.
 	 */
 	labels?: ReadonlyMap<string, CardLabel>;
 	/**
@@ -108,12 +109,12 @@ export interface SceneOptions {
 	 */
 	showDates?: boolean;
 	/**
-	 * M10 (spec §13.10, F8, F14, F16): draw the fold controls of `laid.layout.folds`. Absent = none (the static phone preview, and
-	 * every tree before M10).
+	 * Spec §13.10: draw the fold controls of `laid.layout.folds`. Absent = none (the static phone preview, and
+	 * a tree that has no folds).
 	 */
 	folds?: SceneFolds;
 	/**
-	 * M11 (spec §13.15 rule 1): build each card, tag and badge as a shell (its attributes, classes, bg rect
+	 * Spec §13.15 rule 1: build each card, tag and badge as a shell (its attributes, classes, bg rect
 	 * or hit rect) and keep the rest of its content in a detached holder until `Scene.fill` attaches it. Only the tree view sets it;
 	 * the headless renderer, the tests and the saved picture stay eager and complete.
 	 */
@@ -121,12 +122,12 @@ export interface SceneOptions {
 	/** D118: the user's break places for long names (`parseBreakList`); `tallCardsFor` and the saved picture read the same list. */
 	breaks?: BreakList;
 	/**
-	 * 0.2.7 (F.2): the heirs of the Show view of a line of succession (ids). Each such card gets the class `dynasty-heir` when it is made (cards are
+	 * The heirs of the Show view of a line of succession (ids). Each such card gets the class `dynasty-heir` when it is made (cards are
 	 * lazy, so a class added later would miss the cards not built yet). The look is in styles.css.
 	 */
 	heirs?: Iterable<string>;
 	/**
-	 * 0.2.7 (F.4): the ordinal text of each heir ("2nd"), by person id. A card gets the ordinal tab only if its id is also in `TreeLayout.ordinalCards`
+	 * The ordinal text of each heir ("2nd"), by person id. A card gets the ordinal tab only if its id is also in `TreeLayout.ordinalCards`
 	 * (the layout made room for it); the tab replaces the "You" tab of the same card. The texts are never part of the layout.
 	 */
 	ordinals?: ReadonlyMap<string, string>;
@@ -136,12 +137,12 @@ export interface SceneOptions {
 export const FILL_ALL_EVENT = 'dynasty-fill-all';
 /** The root attribute with `SceneFill.pending` ('0' on an empty root; the harness helper counts a missing attribute as 0). */
 export const CARDS_PENDING_ATTR = 'data-dynasty-cards-pending';
-/** 0.2.1: the root attribute with `SceneFill.pendingLines` (lines and partnership signs that are not built yet). */
+/** The root attribute with `SceneFill.pendingLines` (lines and partnership signs that are not built yet). */
 export const LINES_PENDING_ATTR = 'data-dynasty-lines-pending';
 
 /**
- * M11 (S4): attaches the delayed content of a lazy scene. Every call is safe to repeat; each returns how many cards, tags and
- * badges it attached. 0.2.1 (S3b): the same calls build the lines and partnership signs that wait, but those are counted by
+ * Attaches the delayed content of a lazy scene. Every call is safe to repeat; each returns how many cards, tags and
+ * badges it attached. The same calls build the lines and partnership signs that wait, but those are counted by
  * `pendingLines` and never in a return value.
  */
 export interface SceneFill {
@@ -162,11 +163,11 @@ export interface SceneFill {
 	readonly pendingLines: number;
 }
 
-/** M10: how the scene draws the fold controls. */
+/** How the scene draws the fold controls. */
 export interface SceneFolds {
 	/** Draw the open buttons too; false draws the "+ N" signs only (a saved picture, D71). */
 	buttons: boolean;
-	/** The accessible name and the tooltip of a control (F16), from `ui-text.ts`; `names` are the parents' `Person.name`, in order. */
+	/** The accessible name and the tooltip of a control, from `ui-text.ts`; `names` are the parents' `Person.name`, in order. */
 	label: (c: PlacedFoldControl, names: readonly string[]) => string;
 	/** True: open buttons are made as empty shells (see `FoldDrawing.lazy`). Only the tree view sets it; the headless scene and the saved picture stay eager. */
 	lazy?: boolean;
@@ -181,7 +182,7 @@ export interface TagRef {
 	/** The invisible tap area. It lies below the cards (see buildScene), so it is not inside `el`. */
 	hit: SVGRectElement;
 	/**
-	 * 0.3.1 fix3: the invisible strip of the tap area that lies over the bottom of the tag's own card, inside `el` and so above the cards:
+	 * The invisible strip of the tap area that lies over the bottom of the tag's own card, inside `el` and so above the cards:
 	 * the tag wins a press there. Empty (no size) until the tree view places it at a settled zoom (`tagHitSide`).
 	 */
 	over: SVGRectElement;
@@ -224,11 +225,11 @@ export interface Scene {
 	/** Name elements that are links, with their link text. */
 	links: Map<SVGTextElement, string>;
 	/**
-	 * M9 (S1): the empty picture slots, in card order and, within a card, Full arms, portrait, then
+	 * The empty picture slots, in card order and, within a card, Full arms, portrait, then
 	 * Compact arms. `buildScene` makes no `<image>`; `setPicture` fills a slot.
 	 */
 	pictures: PictureSlot[];
-	/** M10: the fold controls, in drawing order; empty without `SceneOptions.folds`. */
+	/** The fold controls, in drawing order; empty without `SceneOptions.folds`. */
 	folds: FoldRef[];
 	/**
 	 * Truncates every text again with the current measurements, in place: for a web font that
@@ -250,7 +251,7 @@ export interface Scene {
 	 * class did. The `dynasty-lod-overview` rule still hides a group that is in the document.
 	 */
 	setDetail: (on: boolean) => void;
-	/** M11 (S4): the fill API; an eager scene has one that does nothing. */
+	/** The fill API; an eager scene has one that does nothing. */
 	fill: SceneFill;
 }
 
@@ -289,7 +290,7 @@ export const TAG_FONT_EM = 0.75;
 export const TAG_COMPACT_FONT_EM = COMPACT_NAME_EM;
 /** Height of the Compact and Overview tag pill, in em. It grows up into the card, below the Compact name. */
 export const TAG_COMPACT_PILL_EM = 2;
-/** Radius of the focus-mode `+` badge, in em. 0.2.8 (I01): its centre lies on the arc of the card's rounded top right corner, the middle of that arc. */
+/** Radius of the focus-mode `+` badge, in em. Its centre lies on the arc of the card's rounded top right corner, the middle of that arc. */
 export const BADGE_RADIUS_EM = 0.55;
 // All font sizes are set in styles.css from --dynasty-font-size (spec §5.8: nothing that styles
 // text is written into SVG attributes); these constants are what the measurement assumes.
@@ -305,7 +306,7 @@ export const lodClass = (lod: string) => `dynasty-lod-${lod}`;
 export function signAt(t: CardText, scale: number, baseline: number, rightX: number): CardText['sign'] {
 	const s = t.sign;
 	const size = (s.x1 - s.x2) * scale;
-	// The sign is 1.125 em of the note font; the Compact name is `scale` times the note font (not the Full name size, 0.85 em), so the sign sits as in 0.2.3.
+	// The sign is 1.125 em of the note font; the Compact name is `scale` times the note font (not the Full name size, 0.85 em).
 	const top = baseline - 0.35 * ((s.x1 - s.x2) / 1.125) * scale - size / 2;
 	return { x1: rightX, y1: top, x2: rightX - size, y2: top + size, width: s.width * scale, dash: [s.dash[0] * scale, s.dash[1] * scale] };
 }
@@ -392,7 +393,8 @@ export function buildScene(parent: SVGGElement, g: FamilyGraph, laid: LaidOut, o
 	const f = geo.fontPx;
 	const roundel = isRoundel(geo);
 	const textFont = (size: number, weight = '400') => `${weight} ${size}px ${opts.fonts.text}`;
-	const fit = (text: string, maxW: number, font: string) => truncate(text, maxW, (s) => opts.measure(s, font));
+	// The cut of fitCardText closes an isolate that the cut leaves open.
+	const fit = (text: string, maxW: number, font: string) => fitCardText(text, undefined, maxW, (s) => opts.measure(s, font), false);
 	const fitters: (() => void)[] = [];
 	const lazy = opts.lazyCards === true;
 	/** A lazy item that has not got its content yet: where it lies, its person, and the step that attaches it. */
@@ -470,7 +472,7 @@ export function buildScene(parent: SVGGElement, g: FamilyGraph, laid: LaidOut, o
 		else byPerson.set(person, [d]);
 	};
 	let cardsLeft = 0;
-	/** 0.2.1 (S3b): a line or sign that is not built yet: where it lies and the step that builds it into its layer. */
+	/** A line or sign that is not built yet: where it lies and the step that builds it into its layer. */
 	interface LateLine {
 		box: Rect;
 		put: () => void;
@@ -518,7 +520,7 @@ export function buildScene(parent: SVGGElement, g: FamilyGraph, laid: LaidOut, o
 			}
 		};
 	};
-	/** Sets `el` to `text` truncated to `maxW`, now and on every refit. A relation text (B6, D268) tries the short forms first, by this renderer's own measure. */
+	/** Sets `el` to `text` truncated to `maxW`, now and on every refit. A relation text (D268) tries the short forms first, by this renderer's own measure. */
 	const fitted = (el: SVGTextElement, text: string, maxW: number, font: string, relation = false, plain?: string) => {
 		const run = () => el.setText(fitCardText(text, plain, maxW, (s) => opts.measure(s, font), relation));
 		addFit(run);
@@ -604,7 +606,7 @@ export function buildScene(parent: SVGGElement, g: FamilyGraph, laid: LaidOut, o
 
 	// The tags' enlarged tap areas lie below the cards: at a low zoom a 44 px area can cover a whole
 	// small card, and a press on a card must open its sheet (spec §7.2). The visible pills stay on top.
-	// 0.2.4: the badge squares lie under all of these, so a tag or a fold control wins where it meets one (contract 4.2 E1).
+	// The badge squares lie under all of these, so a tag or a fold control wins where it meets one.
 	const badgeHitsEl = parent.createSvg('g', { cls: 'dynasty-badge-hits' });
 	const hitsEl = parent.createSvg('g', { cls: 'dynasty-tag-hits' });
 	// The tap areas of the open fold buttons share one group, so the Overview level hides them with one rule. It moves to the end of the layer after the tags are made (below).
@@ -613,7 +615,7 @@ export function buildScene(parent: SVGGElement, g: FamilyGraph, laid: LaidOut, o
 	const cardsEl = parent.createSvg('g', { cls: 'dynasty-cards' });
 	const cards = new Map<string, SVGGElement>();
 	const badges: BadgeRef[] = [];
-	// M10: a control is drawn right after the card (and badge) of the later of its parents, so the Tab key reaches it next.
+	// A control is drawn right after the card (and badge) of the later of its parents, so the Tab key reaches it next.
 	const folds: FoldRef[] = [];
 	const foldsAfter = new Map<string, PlacedFoldControl[]>();
 	if (opts.folds) {
@@ -640,9 +642,9 @@ export function buildScene(parent: SVGGElement, g: FamilyGraph, laid: LaidOut, o
 	const links = new Map<SVGTextElement, string>();
 	const nameFont = textFont(t.nameSize, opts.fonts.bold);
 	const smallFont = textFont(t.smallSize);
-	// The Compact name is 1.5 em of the note font, not of the Full name size (0.85 em): Compact looks as in 0.2.3.
+	// The Compact name is 1.5 em of the note font, not of the Full name size (0.85 em).
 	const compactSize = COMPACT_NAME_EM * f;
-	// 0.2.8: the sideways card's Compact name starts 0.6 em after the ribbon and ends 0.6 em before the edge.
+	// The sideways card's Compact name starts 0.6 em after the ribbon and ends 0.6 em before the edge.
 	const compactW = geo.cardW - ribbonWidth(geo) - 1.2 * f;
 	const signed = illegitimateSigns(g, edges);
 	// D29, D61: a tall card has two Full name or title text lines; its Compact name stays one line, centred.
@@ -660,7 +662,7 @@ export function buildScene(parent: SVGGElement, g: FamilyGraph, laid: LaidOut, o
 		return ct;
 	};
 	const measureSmall = (s: string) => opts.measure(s, smallFont);
-	// The Roundel's Compact name is centred in the body below the crown (B.3.7); every other card has no crown.
+	// The Roundel's Compact name is centred in the body below the crown; every other card has no crown.
 	const compactBaseline = (h: number, crown = 0) => crown + (h - crown) / 2 + 0.35 * compactSize;
 	const compactSign = (h: number) => signAt(t, COMPACT_NAME_EM, compactBaseline(h), t.sign.x1);
 	const baseCompactSign = compactSign(geo.cardH);
@@ -701,7 +703,7 @@ export function buildScene(parent: SVGGElement, g: FamilyGraph, laid: LaidOut, o
 		const house = p.house ? g.houses.get(p.house) : undefined;
 		const isMe = opts.me !== undefined && p.id === opts.me;
 		const relation = opts.relations?.get(p.id);
-		// M8: the card's name and title text lines; without a label, the person's own (M7).
+		// The card's name and title text lines; without a label, the person's own.
 		const cl = opts.labels?.get(p.id);
 		const shownName = cl ? cl.name : p.name;
 		// §13.1: the label names the relation, also when a class hides the text on the card.
@@ -727,21 +729,21 @@ export function buildScene(parent: SVGGElement, g: FamilyGraph, laid: LaidOut, o
 		const ringNow = !lazy;
 		if (ringNow) card.createSvg('rect', ringInfo);
 		const bg = card.createSvg('rect', { cls: 'dynasty-card-bg', attr: { x: box.x, y: box.y, width: box.w, height: box.h } });
-		// B.3.3: the Roundel's medallion and arms stand on the top edge; the text card has none (it never reads the picture flags).
-		// 0.2.8 (I05, D204): a card shows the arms of its person (A.1) or else of its house.
+		// The Roundel's medallion and arms stand on the top edge; the text card has none (it never reads the picture flags).
+		// D204: a card shows the arms of its person or else of its house.
 		const hasArms = !!(box.arms && (p.arms || house));
 		const rp = roundel ? roundelPics(geo, { arms: hasArms, portrait: !!box.portrait }) : undefined;
-		// F.4: the ordinal tab replaces the "You" tab of the same card.
+		// The ordinal tab replaces the "You" tab of the same card.
 		const ordinal = ordinalIds.has(p.id) ? opts.ordinals?.get(p.id) : undefined;
 		const hasTab = layout.youTab === p.id && !ordinal;
-		// B.3.6: a press on the part that sticks out above the card (the halo, the arms, the tab) opens the sheet and never pans; it is in the shell, so a card that is not filled yet has it.
+		// A press on the part that sticks out above the card (the halo, the arms, the tab) opens the sheet and never pans; it is in the shell, so a card that is not filled yet has it.
 		const above: number[] = [];
 		if (rp?.portrait) above.push(rp.cx - rp.haloR, rp.cx + rp.haloR);
 		if (rp?.arms) above.push(rp.arms.x, rp.arms.x + rp.arms.w);
 		const tab = hasTab ? youTabRect(geo, !!rp?.portrait, !!rp?.arms) : undefined;
 		if (tab) above.push(tab.x, tab.x + tab.w);
 		const ordTab = ordinal ? ordinalTabRect(geo, !!rp?.portrait, !!rp?.arms, [...ordinal].length) : undefined;
-		// F.4: the ordinal tab has no tap target of its own; a press on it is a press on the card, through the same crown area as the "You" tab.
+		// The ordinal tab has no tap target of its own; a press on it is a press on the card, through the same crown area as the "You" tab.
 		if (ordTab) above.push(ordTab.x, ordTab.x + ordTab.w);
 		if (above.length && geo.reach) {
 			const x0 = Math.min(...above);
@@ -752,7 +754,7 @@ export function buildScene(parent: SVGGElement, g: FamilyGraph, laid: LaidOut, o
 		const body = lazy ? createSvg('g', { cls: 'dynasty-card-body' }) : card.createSvg('g', { cls: 'dynasty-card-body' });
 		const bodyRef: BodyRef = { person: p.id, card, body, made: !lazy, in: !lazy, waiting: false };
 		bodies.push(bodyRef);
-		// 0.2.8 (contract C, G.15): the house ribbon is a path with the card's own rounded corners; on the marked card it lies inside the thick border. The radius comes
+		// The house ribbon is a path with the card's own rounded corners; on the marked card it lies inside the thick border. The radius comes
 		// from the theme at run time (`readCornerRadius`), so the path is made again when it becomes known (`setCornerRadius`).
 		const rib = ribbonWidth(geo);
 		const inset = isMe ? ME_RING_INNER : 0;
@@ -761,9 +763,9 @@ export function buildScene(parent: SVGGElement, g: FamilyGraph, laid: LaidOut, o
 		bars.push((r) => ribbon.setAttribute('d', ribbonD(r)));
 
 		const tall = !!(box.tallName || box.tallTitle);
-		// B.3.2: the lines that exist are centred in the body, so the text block needs to know which small lines the person has. The dates line counts even when "Show dates on cards" is off (the class hides it), as the saved picture centres it.
+		// The lines that exist are centred in the body, so the text block needs to know which small lines the person has. The dates line counts even when "Show dates on cards" is off (the class hides it), as the saved picture centres it.
 		const titleText = cl ? cl.title : p.title;
-		const reign = cl && opts.showDates !== false ? cl.reign : undefined;
+		const reign = cl && opts.showDates !== false ? marksForSvg(reignShown(cl, cl.reign, g.dates, 'none')) : undefined;
 		const shown: ShownLines = { title: !!(titleText || reign), dates: !!dateLine(p, g.dates, { names: 'none' }) };
 		// D177 (10): a card with no relation word, in a tree with relation words, centres its text in the whole card.
 		const ct = textOf(box, shown, geo.relationLine === true && !!opts.relations && !relation?.text);
@@ -773,7 +775,7 @@ export function buildScene(parent: SVGGElement, g: FamilyGraph, laid: LaidOut, o
 		const sob = cl?.sobriquet ?? p.sobriquet;
 		const full = body.createSvg('g', { cls: 'dynasty-card-full' });
 		if (ct.r1?.plate && relation?.text) {
-			// 0.2.8: the foot is a hairline over the relation word (there is no footer plate). A person with no relation word has no hairline
+			// The foot is a hairline over the relation word (there is no footer plate). A person with no relation word has no hairline
 			// (the card keeps its height, so a row keeps one height).
 			const span = footSpan(geo, box.w, isMe ? ME_RING_INNER : 1);
 			const y0 = box.y + ct.r1.plate.y + 0.5;
@@ -794,7 +796,7 @@ export function buildScene(parent: SVGGElement, g: FamilyGraph, laid: LaidOut, o
 		// D96: on the marked card the sign keeps clear of the mark's inner ring.
 		const markRing = isMe ? ME_RING_INNER : undefined;
 		const count = nameCountOf(box);
-		// The Roundel's room depends on the marked ring (B.3.2).
+		// The Roundel's room depends on the marked ring.
 		const room = nameRoom(geo, ct, sign, markRing);
 		const names = [name];
 		if (count > 1 && ct.name2Baseline !== undefined) {
@@ -817,15 +819,13 @@ export function buildScene(parent: SVGGElement, g: FamilyGraph, laid: LaidOut, o
 		// D61: with a label, the title text line carries the reign, unless dates are off.
 		const hasTitle = !!titleText || !!reign;
 		if (cl) {
-			if (hasTitle) drawTitle(full, box, ct, titleText, reign, shownReign(cl, g.dates, 'shown'));
+			if (hasTitle) drawTitle(full, box, ct, titleText, reign, marksForSvg(shownReignIsolated(cl, g.dates, 'shown')));
 		} else if (p.title) {
 			fitted(full.createSvg('text', { cls: 'dynasty-card-title', attr: { x: tx, y: box.y + ct.titleBaseline } }), p.title, ct.textW, smallFont);
 		}
-		const dates = dateLine(p, g.dates);
+		const dates = marksForSvg(dateLineShown(p, g.dates), true);
 		const datesBaseline = hasTitle ? ct.datesBaseline : ct.titleBaseline;
-		if (dates) {
-			fitted(full.createSvg('text', { cls: 'dynasty-card-dates', attr: { x: tx, y: box.y + datesBaseline } }), dates, ct.textW, smallFont, false, dateLine(p, g.dates, { names: 'none' }));
-		}
+		if (dates) fitted(full.createSvg('text', { cls: 'dynasty-card-dates', attr: { x: tx, y: box.y + datesBaseline } }), dates, ct.textW, smallFont, false, marksForSvg(dateLineShown(p, g.dates, { names: 'none' }), true));
 		const relY = relationY(ct);
 		if (relation?.text && relY !== undefined) {
 			// D40: a name too long for the card ends with "…"; the sheet shows it in full.
@@ -834,7 +834,7 @@ export function buildScene(parent: SVGGElement, g: FamilyGraph, laid: LaidOut, o
 			fitted(full.createSvg('text', { cls: 'dynasty-card-relation', attr: { x: tx, y: box.y + relY } }), relation.text, ct.relationW ?? ct.textW, relationFont(t.smallSize, opts.fonts.text, isMe, opts.fonts.bold), true);
 		}
 		if (rp) {
-			// B.3.3, WP-B8: one set of elements for both levels. The Compact level shows the Full group with its text hidden (styles.css), so the medallion and
+			// One set of elements for both levels. The Compact level shows the Full group with its text hidden (styles.css), so the medallion and
 			// the arms are the same elements at both levels, at the same places; the live pictures choose slots by level, so each picture has a Compact slot
 			// that shares the element and the frame with its Full slot. The arms go first.
 			const full2: PictureSlot[] = [];
@@ -868,7 +868,7 @@ export function buildScene(parent: SVGGElement, g: FamilyGraph, laid: LaidOut, o
 			tabEl.createSvg('text', { cls: 'dynasty-r1-tab-text', attr: { x: box.x + tab.x + tab.w / 2, y: box.y + tab.y + tab.h / 2 + TAB_TEXT_BASE_EM * f } }).setText(ME_WORD);
 		}
 		if (ordTab) {
-			// F.4: the ordinal tab, at the Full level only like the "You" tab. A card-colour base keeps the border and the line above the card from showing through.
+			// The ordinal tab, at the Full level only like the "You" tab. A card-colour base keeps the border and the line above the card from showing through.
 			const tabEl = full.createSvg('g', { cls: 'dynasty-ordinal-tab-group', attr: { 'aria-hidden': 'true' } });
 			const rect = { x: box.x + ordTab.x, y: box.y + ordTab.y, width: ordTab.w, height: ordTab.h, rx: ORDINAL_EM.corner * f };
 			tabEl.createSvg('rect', { cls: 'dynasty-ordinal-tab-base', attr: rect });
@@ -880,7 +880,7 @@ export function buildScene(parent: SVGGElement, g: FamilyGraph, laid: LaidOut, o
 			cls: 'dynasty-card-compact',
 			attr: roundel ? { x: box.x + (ct.anchorX ?? t.padX), y: box.y + compactBaseline(box.h, ct.r1?.crown ?? 0) } : { x: box.x + rib + 0.6 * f, y: box.y + compactBaseline(box.h) },
 		});
-		// B.3.7: the Roundel's Compact sign is the Full one; its text is centred, so the name stops short of the sign only where the two can meet.
+		// The Roundel's Compact sign is the Full one; its text is centred, so the name stops short of the sign only where the two can meet.
 		const cs = sign ? (roundel ? ct.sign : tall ? compactSign(box.h) : baseCompactSign) : undefined;
 		const shownCs = cs && markRing !== undefined ? signBelowRing(cs, markRing) : cs;
 		// The Compact name's capitals are 0.7 em of its size above its baseline; a name under the sign (no crown, the sign level with line 1) takes the narrow room.
@@ -913,14 +913,14 @@ export function buildScene(parent: SVGGElement, g: FamilyGraph, laid: LaidOut, o
 		if (n && opts.badges) {
 			const r = BADGE_RADIUS_EM * f;
 			const arm = 0.5 * r;
-			// 0.2.8 (I01): an outline disc whose centre lies on the middle of the arc of the card's rounded top right corner, so the disc sits in the corner
+			// An outline disc whose centre lies on the middle of the arc of the card's rounded top right corner, so the disc sits in the corner
 			// and does not stick out of it. The corner radius comes from the theme at run time, so the places are set again when it becomes known (`setCornerRadius`).
 			const mark = { x: 0, y: 0, w: 2 * r, h: 2 * r };
 			const el = cardsEl.createSvg('g', {
 				cls: 'dynasty-focus-badge',
 				attr: { tabindex: 0, role: 'button', 'aria-label': opts.badges.label(p, n), 'data-person': p.id, 'data-hidden': n },
 			});
-			// The square is below the cards, so the own card wins over it; the disc is the one part of the badge that wins over its card. Its first size is 3 em (G.13); the tree view sizes it again at each settled zoom.
+			// The square is below the cards, so the own card wins over it; the disc is the one part of the badge that wins over its card. Its first size is 3 em; the tree view sizes it again at each settled zoom.
 			const hitSide = HIT_EM * f;
 			const hit = badgeHitsEl.createSvg('rect', { cls: 'dynasty-focus-badge-hit', attr: { x: 0, y: 0, width: hitSide, height: hitSide, 'data-badge': p.id } });
 			const disc = el.createSvg('path', { cls: 'dynasty-focus-badge-disc' });
@@ -958,7 +958,7 @@ export function buildScene(parent: SVGGElement, g: FamilyGraph, laid: LaidOut, o
 	const small = tagFont(TAG_FONT_EM);
 	const large = tagFont(TAG_COMPACT_FONT_EM);
 	const bigH = TAG_COMPACT_PILL_EM * f;
-	// 0.2.1: a far couple with no children has no union dot, so its tag carries the partnership sign.
+	// A far couple with no children has no union dot, so its tag carries the partnership sign.
 	const farSigns = farTagSigns(g, layout, edges);
 	for (const tag of layout.farTags.values()) {
 		const prefix = '⚭ ';
@@ -982,7 +982,7 @@ export function buildScene(parent: SVGGElement, g: FamilyGraph, laid: LaidOut, o
 			const ring = part.createSvg('rect', { cls: 'dynasty-tag-ring', attr: { y: bottom - h, height: h, rx: h / 2 } });
 			const rect = part.createSvg('rect', { cls: 'dynasty-tag-pill', attr: { y: bottom - h, height: h, rx: h / 2 } });
 			const textEl = part.createSvg('text', { cls: 'dynasty-tag-text', attr: { x: tag.x, y: bottom - h / 2 + 0.35 * fontEm * f, 'text-anchor': 'middle' } });
-			// 0.2.1: the partnership sign sits between the ⚭ and the name. The text stays one text element; en spaces leave
+			// The partnership sign sits between the ⚭ and the name. The text stays one text element; en spaces leave
 			// the room, and the sign is drawn on that room, found with the same measure as the text.
 			const markPx = fontEm * f;
 			const markAt = (cx: number) => unionMark(shape!, cx, bottom - h / 2, UNION_MARKS[shape!].size * TAG_MARK.unit * markPx);
@@ -1166,7 +1166,7 @@ function addPart(parent: SVGElement, part: LegendPart): void {
 }
 
 /**
- * Fills the legend popover (D25): one row per line kind, the D14 sign and the two dead signs, each sample drawn like the tree. 0.2.8 (D196 item 3, contract A.1): the
+ * Fills the legend popover (D25): one row per line kind, the D14 sign and the two dead signs, each sample drawn like the tree. D196 item 3: the
  * live legend shows the line styles only; the houses are in the Houses window, and the saved picture keeps its own house legend (`svg-string.ts`).
  */
 export function buildLegend(list: HTMLElement): void {

@@ -1,5 +1,5 @@
 /*
- * The shell of the window family (0.2.8 contract C, G.13). Every plugin window draws its frame through `buildShell`: on a computer one scrolling body and a footer with
+ * The shell of the window family. Every plugin window draws its frame through `buildShell`: on a computer one scrolling body and a footer with
  * Cancel and Save (a hairline over the footer only while the body scrolls); on a phone a bar with Cancel, the title and
  * Save, where the title fades in when the header has scrolled away. A second page puts "‹ Name" in place of Cancel on a
  * phone and a back link above the header on a computer. The shell makes the frame only; the windows keep their own

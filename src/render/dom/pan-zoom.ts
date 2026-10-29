@@ -19,7 +19,7 @@
  * Full screen ('full'): every pointer pans with one finger or the mouse, two fingers pinch, a
  * double-tap on empty background zooms 2×, a plain wheel pans and Ctrl/Cmd+wheel zooms.
  *
- * M11 (spec §13.15): the tree view attaches card content that is near the view. `onFirstDraw` runs once,
+ * Spec §13.15: the tree view attaches card content that is near the view. `onFirstDraw` runs once,
  * right after the first write of the scene transform, in the same task (`onSettle` cannot do this: it runs
  * before that write). `onFill` also runs during a wheel or trackpad zoom, but only when
  * the visible rectangle leaves the last filled one and at most once for each frame. A drag pan never
@@ -60,7 +60,7 @@ export interface PanZoomOptions {
 	guard: (fn: () => void) => void;
 	/**
 	 * D222: the bars of the full-screen view, in screen px (cached values, never a read of the page on a pointer move). A drag or wheel pan of a tree that is smaller
-	 * than the free area between them keeps the whole tree inside that area. Absent: the 0.2.8 limits.
+	 * than the free area between them keeps the whole tree inside that area. Absent: the limits of the whole viewport.
 	 */
 	freeArea?: () => FreeArea;
 	/** Once at the start of each drag (a press that can begin a pan), never on a move: the caller refreshes the cached `freeArea` here. */
@@ -178,12 +178,12 @@ export class PanZoom {
 	private drawn: { view: View; size: Size; at: number } | null = null;
 	/** A D19 fill that waits for its time while the fingers do not move. */
 	private fillTimer = 0;
-	/** The frame that runs the settle of a pan, after its pointer-up handler (M11). */
+	/** The frame that runs the settle of a pan, after its pointer-up handler. */
 	private settleFrame = 0;
 	/** The wrapper transform is on (a pinch runs). */
 	private wrapped = false;
 	private firstDrawn = false;
-	/** M11 (B1): the rectangle of the last fill or settle, and whether a wheel zoom runs. A plain pan never fills. */
+	/** The rectangle of the last fill or settle, and whether a wheel zoom runs. A plain pan never fills. */
 	private filled: Rect | null = null;
 	private wheelZoom = false;
 	private readonly off: (() => void)[] = [];
@@ -462,7 +462,7 @@ export class PanZoom {
 	}
 
 	/**
-	 * M11: the work at the end of a pan (level of detail, fills, saving the view) runs in the next frame, not in the pointer-up
+	 * The work at the end of a pan (level of detail, fills, saving the view) runs in the next frame, not in the pointer-up
 	 * handler, so the handler returns at once and the browser can paint. The settle reads the view of that frame.
 	 */
 	private settleSoon(): void {

@@ -110,7 +110,7 @@ export function srgb(css: string): number[] | null {
 export const TEXT_CONTRAST = 4.5;
 
 /**
- * The text colour on the accent, 0.2.8 (I40, contract G.12): `null` keeps the theme's own pair (`--text-on-accent` on `--interactive-accent`) when it reaches 4.5:1;
+ * The text colour on the accent: `null` keeps the theme's own pair (`--text-on-accent` on `--interactive-accent`) when it reaches 4.5:1;
  * otherwise black or white, whichever has the larger contrast on the accent.
  */
 export function onAccentFrom(accent: readonly number[], onAccent: readonly number[] | null): '#000000' | '#ffffff' | null {
@@ -134,7 +134,7 @@ export function onAccentChoice(el: Element, parse: (css: string) => number[] | n
 export const EDGE_CONTRAST = MARK_CONTRAST;
 
 /**
- * The run-time colours of the plugin's grey text, link, control edge and error text (0.2.8, D212 `contrast-tokens`). Each starts from the static
+ * The run-time colours of the plugin's grey text, link, control edge and error text (D212 `contrast-tokens`). Each starts from the static
  * token of `01-base.css` (read from the page; else the plain theme role in `role`) and keeps it when it already reaches `min` on every surface in `on`.
  * Otherwise it is pulled toward `--text-normal` in 5 % steps until it does.
  */
@@ -142,7 +142,7 @@ export const CONTRAST_TOKENS = [
 	{ token: '--dynasty-muted', role: '--text-muted', min: TEXT_CONTRAST, on: ['--background-primary', '--background-primary-alt', '--background-secondary', '--modal-background'] },
 	{ token: '--dynasty-link', role: '--text-accent', min: TEXT_CONTRAST, on: ['--background-primary', '--background-secondary', '--modal-background'] },
 	{ token: '--dynasty-edge', role: '--text-muted', min: EDGE_CONTRAST, on: ['--background-primary', '--background-primary-alt', '--modal-background'] },
-	// Also the button fills: a phone paints `button.mod-warning` with --interactive-normal, and error text sits on it (G3: 3.4 to 4.0 on "Delete person").
+	// Also the button fills: a phone paints `button.mod-warning` with --interactive-normal, and error text sits on it (contrast 3.4 to 4.0 on "Delete person").
 	{ token: '--dynasty-error', role: '--text-error', min: TEXT_CONTRAST, on: ['--background-primary', '--background-primary-alt', '--background-secondary', '--modal-background', '--interactive-normal', '--interactive-hover'] },
 ] as const;
 

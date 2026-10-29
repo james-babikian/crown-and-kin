@@ -1,6 +1,6 @@
 /*
- * The bar of the Show view on the tree is the banner of the finder (`.dynasty-result` in 18-more-list-finder-bar.css; 0.2.8 G.13, I37 B: one row, with an X of 44 px
- * on a phone). This chunk has the same bar at the top of the phone list (F.6, D182): the sentence, and an icon-only Close with a 44 × 44 px target.
+ * The bar of the Show view on the tree is the banner of the finder (`.dynasty-result` in 18-more-list-finder-bar.css; one row, with an X of 44 px
+ * on a phone). This chunk has the same bar at the top of the phone list (D182): the sentence, and an icon-only Close with a 44 × 44 px target.
  * `dynasty-list-showbar`: a row of 48 px with the secondary background and a hairline below. In the flow of the list, not on a tree.
  */
 .dynasty-list-succession {

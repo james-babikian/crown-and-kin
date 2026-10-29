@@ -21,7 +21,7 @@ export type Orientation = 'down' | 'sideways';
  * `TreeLayout.geometry` in `sideways`: `cardW`/`cardH` are the drawn card size (renderers draw
  * cards with it); `fontPx`, `unionSize` and `tagH` are as passed in; `coupleGap` is the vertical
  * gap between stacked partners, `nodeGap` the vertical gap between unrelated neighbours in a
- * column, `rowGap` the minimum horizontal gap between columns. The gap sizes in the decision notes are
+ * column, `rowGap` the minimum horizontal gap between columns. The gap sizes are
  * minimums. The D11 far distance is measured card centre to card centre along the column, against
  * 3 × the `down` card width. A far tag's 44 px hit area must not cover another card (a larger gap
  * below a tagged card, or a hit area that takes more of its own card, are both acceptable).
@@ -51,22 +51,22 @@ export interface Geometry {
 	/** Height of a far-couple tag drawn at a card's bottom edge (its hit area is larger). */
 	tagH: number;
 	/**
-	 * D40 (M7): set by the layout from `LayoutSettings.relationLine`, in every layout;
+	 * D40: set by the layout from `LayoutSettings.relationLine`, in every layout;
 	 * `cardH` then already includes one small text line (`relationExtra(geo)` = round(line height ×
 	 * 0.85 × fontPx)), so `cardText`, `tagTop` and the lines need no other change. `drawnGeometry` and
 	 * `arrangeTree` apply it before anything else. `cardText` then centres three small lines.
 	 */
 	relationLine?: boolean;
-	/** 0.2.5 (D143, D150): the card form. 'roundel' = the top-to-bottom card with a medallion; 'text' = the sideways text card. Absent = a plain geometry (tests): the numbers of the text card. Set by `cardForm` only, never by `withRelationLine`. */
+	/** D143, D150: the card form. 'roundel' = the top-to-bottom card with a medallion; 'text' = the sideways text card. Absent = a plain geometry (tests): the numbers of the text card. Set by `cardForm` only, never by `withRelationLine`. */
 	form?: 'roundel' | 'text';
-	/** 0.2.5: the empty space above every card of a Roundel tree that has a picture, in px. Set only when more than 0, so old keys stay. */
+	/** The empty space above every card of a Roundel tree that has a picture, in px. Set only when more than 0, so old keys stay. */
 	crown?: number;
 	/**
-	 * 0.2.8 (D212 card-text-centre): the px below a Roundel card's top edge where the room for its text starts, when the tree has portraits: the lower edge of the
+	 * D212: the px below a Roundel card's top edge where the room for its text starts, when the tree has portraits: the lower edge of the
 	 * medallion's halo, which reaches further down than the crown. Absent: the crown (or, with no crown, the colour ribbon). Set only when more than 0.
 	 */
 	textTop?: number;
-	/** 0.2.5: the px at the start of the first row (down) or the first stack position (sideways) for what sticks out above a card (medallion, "You" tab). Set only when more than 0. */
+	/** The px at the start of the first row (down) or the first stack position (sideways) for what sticks out above a card (medallion, "You" tab). Set only when more than 0. */
 	reach?: number;
 }
 
@@ -132,7 +132,7 @@ export interface FarTag {
 	zoneW?: number;
 }
 
-/** Thresholds for D11, tuned with the owner. */
+/** Thresholds for D11. */
 export interface FarCoupleRule {
 	/** Different blocks and more than this many card widths apart horizontally. Spec default 3. */
 	maxCardWidths: number;
@@ -140,13 +140,13 @@ export interface FarCoupleRule {
 	maxGenerations: number;
 }
 
-/** M10 (F5): a point in layout px; the centre of a fold control. */
+/** A point in layout px; the centre of a fold control. */
 export interface FoldSpot {
 	x: number;
 	y: number;
 }
 
-/** M10 (F5): a fold control of the core with its place in the layout. */
+/** A fold control of the core with its place in the layout. */
 export type PlacedFoldControl = FoldControl & { spot: FoldSpot };
 
 /** A finished arrangement of one tree: every card and union point placed, ready to route lines through. */
@@ -169,14 +169,14 @@ export interface TreeLayout {
 	height: number;
 	geometry: Geometry;
 	/**
-	 * M10 (spec §13.10, F5): the fold controls with the centre of each, set only when
+	 * Spec §13.10: the fold controls with the centre of each, set only when
 	 * `LayoutSettings.foldControls` is true (absent, not empty, otherwise). `width` and `height` include
-	 * every control's largest mark and its 44 px hit area (F5b).
+	 * every control's largest mark and its 44 px hit area.
 	 */
 	folds?: PlacedFoldControl[];
-	/** 0.2.5 (D148): a copy of `LayoutSettings.youTab`, set by `layoutTree` only when that id is a person of the drawn graph. The scene and the saved picture read the tab from here. */
+	/** D148: a copy of `LayoutSettings.youTab`, set by `layoutTree` only when that id is a person of the drawn graph. The scene and the saved picture read the tab from here. */
 	youTab?: string;
-	/** 0.2.7 (F.4): a copy of `LayoutSettings.ordinalCards` that are people of the drawn graph, sorted; absent when none. The scene and the saved picture read the ordinal tabs from here. */
+	/** A copy of `LayoutSettings.ordinalCards` that are people of the drawn graph, sorted; absent when none. The scene and the saved picture read the ordinal tabs from here. */
 	ordinalCards?: readonly string[];
 }
 
@@ -200,11 +200,11 @@ export interface EdgePath {
 	kind: StrokeKind;
 	/** People this line connects; lets the renderer highlight a person's lines. */
 	people: string[];
-	/** M7: the union of a bar (a shared bar: the pair's last-listed union), a leg, a trunk or a drop. */
+	/** The union of a bar (a shared bar: the pair's last-listed union), a leg, a trunk or a drop. */
 	union?: string;
-	/** M7: a trunk and its drops: the family's parents; a side link: the link's parents. */
+	/** A trunk and its drops: the family's parents; a side link: the link's parents. */
 	parents?: string[];
-	/** M7: a drop or a side link: the child. */
+	/** A drop or a side link: the child. */
 	child?: string;
 }
 
@@ -215,7 +215,7 @@ export interface EdgeMarker {
 	kind: 'union' | 'implicit-union' | 'rumour';
 	/** D26, D38: for `kind: 'union'`, the partnership type as written (a missing `type` gives `marriage`). Renderers draw the dot's shape from it: marriage dot, betrothal ring, concubinage diamond, affair open triangle; an unknown value is drawn as the marriage dot. `implicit-union` markers draw no sign. Far-couple dots use the same shapes. */
 	unionType?: string;
-	/** M7: `union` and `implicit-union` markers: the union key. */
+	/** `union` and `implicit-union` markers: the union key. */
 	union?: string;
 }
 
@@ -262,7 +262,7 @@ export interface LayoutSettings {
 	 * "Show relation names on cards" off keeps the height (like "Show dates on cards"), so this is
 	 * true whenever the tree has a valid mark. Part of the cache key. The layout applies it to
 	 * `Geometry` (`Geometry.relationLine`, `cardH` += `relationExtra`). The line-only small tree of
-	 * the relation finder is laid out without it. `NEVER_FAR_RULE` (`layout.ts`, M7) =
+	 * the relation finder is laid out without it. `NEVER_FAR_RULE` (`layout.ts`) =
 	 * `{ maxCardWidths: Infinity, maxGenerations: Infinity }` never splits a couple.
 	 */
 	relationLine?: boolean;
@@ -274,13 +274,13 @@ export interface LayoutSettings {
 	 */
 	arms?: readonly string[];
 	/**
-	 * 0.2.8 (D204): the ids of the people whose personal `arms` is written, sorted (`pictureSets`). Their cards always show the personal arms, whatever
+	 * D204: the ids of the people whose personal `arms` is written, sorted (`pictureSets`). Their cards always show the personal arms, whatever
 	 * `armsOnCards` says, so each of them also makes the crown (the room above the card). Part of the cache key when not empty.
 	 */
 	personalArms?: readonly string[];
 	/**
-	 * 0.2.8 (D206, contract A.4, G.16): the setting "Arms on cards". Present: a card has `PersonBox.arms` when `armsCardIds` (`core/arms-rule.ts`) names it and its
-	 * house (`arms`) or its own `personalArms` has arms. Absent: the 0.2.7 rule, every person of a
+	 * D206: the setting "Arms on cards". Present: a card has `PersonBox.arms` when `armsCardIds` (`core/arms-rule.ts`) names it and its
+	 * house (`arms`) or its own `personalArms` has arms. Absent: the plain rule, every person of a
 	 * house in `arms`, plus every person in `personalArms`. Part of the cache key when present.
 	 */
 	armsOnCards?: 'few' | 'all';
@@ -291,18 +291,18 @@ export interface LayoutSettings {
 	 */
 	portraits?: readonly string[];
 	/**
-	 * Spec §13.10 (F1, F2): the people that the folds hide, sorted. The layout takes the generations
+	 * Spec §13.10: the people that the folds hide, sorted. The layout takes the generations
 	 * from the whole graph and arranges the graph without these people. Part of the cache key when not empty.
 	 */
 	foldHidden?: readonly string[];
-	/** Spec §13.10 (F4): the effective fold keys, sorted. The layout keeps a folded family's dot, stem lane and room for its "+ N" sign. Part of the cache key when not empty. */
+	/** Spec §13.10: the effective fold keys, sorted. The layout keeps a folded family's dot, stem lane and room for its "+ N" sign. Part of the cache key when not empty. */
 	foldedFamilies?: readonly FoldKey[];
-	/** Spec §13.10 (F5): the view can fold, so the layout computes `TreeLayout.folds`. Absent in a static preview. Part of the cache key when true. */
+	/** Spec §13.10: the view can fold, so the layout computes `TreeLayout.folds`. Absent in a static preview. Part of the cache key when true. */
 	foldControls?: true;
-	/** 0.2.5 (D148): the id of the person who gets the "You" tab. Set whenever the tree has a mark and `relationLine` is false (also in the small tree of the relation finder). Part of the cache key. */
+	/** D148: the id of the person who gets the "You" tab. Set whenever the tree has a mark and `relationLine` is false (also in the small tree of the relation finder). Part of the cache key. */
 	youTab?: string;
 	/**
-	 * 0.2.7 (F.4): the ids of the people who get an ordinal tab (the heirs of the Show view). Ids only, never texts: a text in a cached layout would
+	 * The ids of the people who get an ordinal tab (the heirs of the Show view). Ids only, never texts: a text in a cached layout would
 	 * go stale (the texts are `SceneOptions.ordinals`). Each such card has the reach of a tab above it and keeps the drop places of the
 	 * "You" tab clear. Part of the cache key when not empty (sorted, only people of the graph); omitted when empty.
 	 */

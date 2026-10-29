@@ -8,13 +8,13 @@
  * (iOS before 16.2) drop the second declaration and keep the first.
  */
 
-/* ---------- Tokens (0.2.8 contract C, G.12) ---------- */
+/* ---------- Tokens ---------- */
 
 /*
  * Static colours of the new look, from measured tokens. They sit on `body`, because
  * the windows are not inside a tree root. Each is a mix of Obsidian's own roles, so the theme still decides.
  * Targets: text 4.5:1 and a control edge 3:1 on the window and card surfaces of the default theme, light and dark
- * (visual-qa checks the other themes in G3). Nothing uses them yet; the packages P4 to P6 do.
+ * (the other themes are checked by hand).
  * A custom property takes any text, so the two-declaration rule above does not work here: the plain role
  * is the value first, and `@supports` replaces it where `color-mix()` works.
  */
@@ -102,7 +102,7 @@ body {
 }
 
 /*
- * During a pinch the wrapper scales the picture it already has (WP5.3, spec §7.6): its own layer, so
+ * During a pinch the wrapper scales the picture it already has (spec §7.6): its own layer, so
  * the browser moves the drawn picture and does not lay out or draw the cards again. The wrapper is
  * HTML: a transform on the <svg> itself makes the browser lay out every SVG text again. The value is
  * not inherited, so a new one restyles only the wrapper, not the 400 cards in it.
@@ -126,7 +126,7 @@ body {
 /*
  * In the full-screen view on a device with a touch screen, the wrapper keeps its layer all the
  * time: to make the layer when a pinch starts, and to remove it after, made the
- * browser lay out every SVG text again (a 350 ms and a 630 ms frame on a slow phone, WP5.3). A
+ * browser lay out every SVG text again (a 350 ms and a 630 ms frame on a slow phone). A
  * mouse-only computer does not pinch, and keeps the sharper text of a page without extra layers.
  */
 @media (any-pointer: coarse) {
@@ -165,7 +165,7 @@ body {
 }
 
 
-/* ---------- Shared parts of the window family (0.2.8 contract C, G.2, G.8) ---------- */
+/* ---------- Shared parts of the window family ---------- */
 
 /*
  * A text for a screen reader only: it takes no room. It is absolute, so its box stands at its place in the text and counts for the scroll area of its
@@ -193,7 +193,7 @@ body {
 }
 
 /*
- * Joined text lines (src/render/text-join.ts, G.2). The "·" belongs to the item after it. When an item starts a wrapped text line,
+ * Joined text lines (src/render/text-join.ts). The "·" belongs to the item after it. When an item starts a wrapped text line,
  * the script hides its "·" (`is-lead`) and puts a line break before it, so a text line never starts or ends with "·".
  */
 .dynasty-joined {
@@ -215,7 +215,7 @@ body {
 	display: none;
 }
 
-/* Links in a window (G.8, D218 rule 5): the link colour of the tokens, regular weight, no underline at rest. */
+/* Links in a window (D218 rule 5): the link colour of the tokens, regular weight, no underline at rest. */
 .dynasty-link {
 	display: inline-flex;
 	align-items: center;
@@ -278,7 +278,7 @@ body.is-phone,
 }
 
 /*
- * 0.2.8 (contract C, I17): the card corner is the theme's `--radius-m`, at most 1.5 em so that a large radius never rounds a small card into a pill. The
+ * The card corner is the theme's `--radius-m`, at most 1.5 em so that a large radius never rounds a small card into a pill. The
  * ribbon path (`ribbonPath`, `render/view-math.ts`) uses the number that the scene reads back from this rule (`readCornerRadius`).
  */
 .dynasty-card-bg {
@@ -339,7 +339,7 @@ body.is-phone,
 	fill: var(--dynasty-muted, var(--text-muted));
 }
 
-/* D27: a house colour is lighter in the dark theme (0.2.8: 60 % of the colour), so a dark house still shows on a dark card. */
+/* D27: a house colour is lighter in the dark theme (60 % of the colour), so a dark house still shows on a dark card. */
 .theme-dark .dynasty-has-house .dynasty-card-ribbon {
 	fill: var(--dynasty-house-color);
 	fill: color-mix(in srgb, var(--dynasty-house-color) 60%, var(--text-normal));
@@ -367,7 +367,7 @@ body.is-phone,
 /*
  * Keyboard focus and the find/focus highlight: the accent ring on the card's edge, and outside it a
  * 2 px ring in the text colour. A theme's accent can be pale (2:1 on the note); the text colour is
- * always strong, so the ring never depends on the accent alone (WP6.5). The outer ring is a wider
+ * always strong, so the ring never depends on the accent alone. The outer ring is a wider
  * stroke of a rect under the card: the card covers its inner half, the accent covers 1 px more.
  */
 .dynasty-card-ring {
@@ -390,10 +390,10 @@ body.is-phone,
 }
 
 /*
- * The highlight pulse (M7, M8). Only the outer ring pulses, and only its opacity: a change of stroke-width makes the browser measure the
+ * The highlight pulse. Only the outer ring pulses, and only its opacity: a change of stroke-width makes the browser measure the
  * shape again at each step. It is `stroke-opacity`, not `opacity`: the browser does not move an `opacity` animation of an SVG shape to its own
  * layer in a way that suits a tree whose view moves at the same time (Find); it laid out the layers of all cards again at each move frame
- * (harness step "r024 anim"). The accent border has a fixed width; the ring stays 2 px outside it.
+ * (measured). The accent border has a fixed width; the ring stays 2 px outside it.
  * `.dynasty-reduce-motion` (D126) stops the pulse: the ring then stays as a still outline.
  */
 .dynasty-card.dynasty-highlight .dynasty-card-ring {
@@ -586,7 +586,7 @@ body.is-phone,
 	stroke-linejoin: round;
 }
 
-/* 0.2.1: inside a far-couple tag the hole of an open sign has the fill of the tag pill, not of the page. */
+/* Inside a far-couple tag the hole of an open sign has the fill of the tag pill, not of the page. */
 .dynasty-tag-mark.dynasty-union-ring,
 .dynasty-tag-mark.dynasty-union-open-triangle {
 	fill: var(--background-secondary);
@@ -614,7 +614,7 @@ body.is-phone,
 }
 
 /* The hit area is invisible but takes presses. It lies below the cards, so a card wins where they overlap,
-   except in the strip over the tag's own card (0.3.1 fix3), which is inside the tag and so above the cards. */
+   except in the strip over the tag's own card, which is inside the tag and so above the cards. */
 .dynasty-tag-hit,
 .dynasty-tag-over {
 	cursor: pointer;
@@ -623,7 +623,7 @@ body.is-phone,
 	pointer-events: all;
 }
 
-/* 0.2.8 (I36 C, D212 tag-edge): the pill is a chip: the secondary background and the line colour as its edge (3:1), so it reads as a tag also without colour. */
+/* D212 tag-edge: the pill is a chip: the secondary background and the line colour as its edge (3:1), so it reads as a tag also without colour. */
 .dynasty-tag-pill {
 	fill: var(--background-secondary);
 	stroke: var(--dynasty-edge, var(--text-muted));
@@ -650,7 +650,7 @@ body.is-phone,
 	stroke-width: 2;
 }
 
-/* Keyboard focus: a 2 px ring in the text colour outside the accent, as on the cards (WP6.5). */
+/* Keyboard focus: a 2 px ring in the text colour outside the accent, as on the cards. */
 .dynasty-tag-ring {
 	display: none;
 	fill: none;
@@ -663,7 +663,7 @@ body.is-phone,
 	stroke-width: 6;
 }
 
-/* ---------- You and your family (M7: spec §13.1, §13.2) ---------- */
+/* ---------- You and your family (spec §13.1, §13.2) ---------- */
 
 /* D40: the relation to the marked person, one small text line after the card's other text lines: italic and muted. */
 .dynasty-card-relation {
@@ -762,7 +762,7 @@ body.is-phone,
 }
 
 
-/* 0.2.8 (I19): the sample of the dead signs in the legend: the date text with the sign, in the note font. */
+/* The sample of the dead signs in the legend: the date text with the sign, in the note font. */
 .dynasty-legend-dagger {
 	font-family: var(--font-text);
 	font-size: 12px;
@@ -836,7 +836,7 @@ body.is-phone,
 .dynasty-focus-bar-text {
 	overflow-wrap: anywhere;
 }
-/* ---------- Toolbar and menus (0.2.8, contract C and G.13) ---------- */
+/* ---------- Toolbar and menus ---------- */
 
 /*
  * One flat row at the top of the tree (D197 Q3 B): on a computer Add person with its word, Find, Focus, Fit | Houses, Titles | More … Expand;
@@ -1026,7 +1026,7 @@ body.is-phone,
 }
 
 /*
- * 0.2.8 (G5b): in a short tree box (a note embed of 500 px) the 15 rows are taller than the box, and the end of the list was cut with no sign. `fitLegend` adds
+ * In a short tree box (a note embed of 500 px) the 15 rows are taller than the box, and the end of the list was cut with no sign. `fitLegend` adds
  * `is-tight` when the rows do not fit: the rows are as high as their sample (22 px) and the gaps and the padding are smaller, so the whole list shows.
  * A box that is still too short for that scrolls inside.
  */
@@ -1051,9 +1051,9 @@ body.is-phone,
 .dynasty-popover-problems {
 	/*
 	 * Left, right and bottom stay flush so the callout's own border sits at the popover's edge.
-	 * The top keeps clearance: Minimal's outlined callouts (owner's theme) draw the title row on
+	 * The top keeps clearance: Minimal's outlined callouts draw the title row on
 	 * and above the callout's top border (a −24px offset in Minimal's theme.css); without room
-	 * above the callout, the popover's `overflow: auto` cuts the title off (0.1.1 iPhone test).
+	 * above the callout, the popover's `overflow: auto` cuts the title off.
 	 */
 	padding: var(--size-4-6) 0 0 0;
 }
@@ -1107,7 +1107,7 @@ body.is-phone,
 	background: var(--background-modifier-hover);
 }
 
-/* A row of a list that has the keyboard focus shows the same ring as a toolbar button (G5 0.4, WCAG 2.4.7): the rule above takes the theme's button shadow away. */
+/* A row of a list that has the keyboard focus shows the same ring as a toolbar button (WCAG 2.4.7): the rule above takes the theme's button shadow away. */
 .dynasty-popover .dynasty-popover-item:focus-visible,
 .dynasty-popover .dynasty-problem-button:focus-visible {
 	outline: 2px solid var(--interactive-accent);
@@ -1354,7 +1354,7 @@ body.is-phone,
 }
 
 /*
- * 0.2.8 (contract C): the tree box of a note has no frame of its own. The toolbar row has its hairline below, and the box a hairline at its foot.
+ * The tree box of a note has no frame of its own. The toolbar row has its hairline below, and the box a hairline at its foot.
  * A rule with a higher specificity than the base rule of the viewport.
  */
 .dynasty-root .dynasty-viewport {
@@ -1450,7 +1450,7 @@ body.is-phone,
 	bottom: var(--dynasty-hint-bottom, var(--size-4-1));
 }
 
-/* G5 0.4: a card in the right corner; the hint stands in the left corner, with the same gap to the edge. */
+/* A card in the right corner; the hint stands in the left corner, with the same gap to the edge. */
 .dynasty-hint.is-left {
 	right: auto;
 	left: var(--size-4-2);
@@ -1498,12 +1498,12 @@ body.is-phone,
 	user-select: none;
 }
 
-/* ---------- The window family (0.2.8 contract C, G.13) ---------- */
+/* ---------- The window family ---------- */
 
 /*
  * One shell for every window of the plugin (src/obsidian/window-shell.ts). On a computer: Obsidian's own modal, 620 px wide and anchored
  * at the top, so a section that opens never moves the header; the footer has Cancel and Save, with a hairline only while the body
- * scrolls; there is no X in the corner (C04). On a phone: the window fills the visible area, with a bar of Cancel, the title and Save,
+ * scrolls; there is no X in the corner. On a phone: the window fills the visible area, with a bar of Cancel, the title and Save,
  * and the title fades in when the header has scrolled away. The colours are the tokens of 01-base.css.
  */
 
@@ -1643,7 +1643,7 @@ body.is-phone,
 }
 
 /*
- * G3 fix: the error text sits on a fill that the run-time pick of `--dynasty-error` checks (`--interactive-normal`, `--interactive-hover`). Obsidian
+ * The error text sits on a fill that the run-time pick of `--dynasty-error` checks (`--interactive-normal`, `--interactive-hover`). Obsidian
  * paints `button.mod-warning` red, and `.is-mobile button.mod-warning` with `--interactive-normal`; with the error colour on the red fill a button could not be read.
  */
 .dynasty-sheet button.mod-warning,
@@ -1682,6 +1682,16 @@ body.is-phone,
 .dynasty-icon-btn .svg-icon {
 	width: 17px;
 	height: 17px;
+	/* The icon is a flex item of its button; with a narrow content box it must keep its size and not shrink (otherwise the cross is 4 px wide). */
+	flex: none;
+}
+
+/*
+ * Obsidian's tablet rule `.is-tablet button:not(.clickable-icon)` (0,2,1) gives every button 20 px of padding at each side. In the 44 px box of an icon button the content
+ * box was 4 px wide and the cross of "Remove partnership" shrank to a dot. The class is repeated so the rule outranks it in any theme.
+ */
+.dynasty-sheet button.dynasty-icon-btn.dynasty-icon-btn {
+	padding: 0;
 }
 
 /* A visible focus ring in every theme: the accent outside, a ring in the text colour inside it. */
@@ -1786,7 +1796,7 @@ body.is-phone,
 	min-width: 64px;
 }
 
-/* The back link above the header of a second page (G.7); a phone has "‹ Name" in the bar instead. */
+/* The back link above the header of a second page; a phone has "‹ Name" in the bar instead. */
 .dynasty-back-row {
 	flex: none;
 }
@@ -1925,7 +1935,7 @@ body.theme-dark .dynasty-house-dot {
 
 /*
  * D218 rule 5: a link inside a sentence ("Show the line", "4 more") keeps one thin underline at rest, in a light tint of the link colour, the
- * same for both (the solid and the dotted underline of G.8 are gone). The plain colour comes first for engines without `color-mix()`.
+ * same for both (the solid and the dotted underline are gone). The plain colour comes first for engines without `color-mix()`.
  */
 .dynasty-head-rel .dynasty-showline,
 .dynasty-head-rel .dynasty-more {
@@ -2041,7 +2051,8 @@ body.theme-dark .dynasty-house-dot {
 	/* A phone row can hold three controls (a saved person with no portrait and a linked note): the last one moves to a second row. */
 	flex-wrap: wrap;
 	justify-content: flex-end;
-	margin: 0 0 4px;
+	/* The buttons have 6 px of padding for the hover box; the same negative margin puts their text on the left edge of the name above (the phone rule below does it with 8 px). */
+	margin: 0 -6px 4px;
 }
 
 /* Quiet controls (D218 rule 5): muted text with an icon, the same on a computer and on a phone. Control role, regular. */
@@ -2073,7 +2084,7 @@ body.theme-dark .dynasty-house-dot {
 }
 
 /*
- * G3 fix: the links of this row ("Add portrait or arms", "Add arms", "Open linked note") take the box and the size of "Open all". The general window link
+ * The links of this row ("Add portrait or arms", "Add arms", "Open linked note") take the box and the size of "Open all". The general window link
  * rule `.dynasty-sheet .dynasty-link` (0,2,0) outranks `.dynasty-openall button` (0,1,1), so it gave them the size of the window text, no padding and,
  * on a touch screen of any width, no 44 px height. This rule (0,3,1) comes after it. The phone rule below (same weight, later) sets the 44 px height.
  */
@@ -2091,7 +2102,7 @@ body.theme-dark .dynasty-house-dot {
 	color: var(--dynasty-link);
 }
 
-/* D218 item 9 (N23): "Open linked note" stands left of "Open all", a text link in the link colour. */
+/* D218 item 9: "Open linked note" stands left of "Open all", a text link in the link colour. */
 .dynasty-sheet .dynasty-openall button.dynasty-open-note {
 	color: var(--dynasty-link);
 }
@@ -2300,6 +2311,8 @@ body.theme-dark .dynasty-house-dot {
 	height: auto;
 	min-height: 72px;
 	padding: 7px 10px;
+	/* A theme with round fields (a pill radius) would cut into the text of a box with several text lines. */
+	border-radius: min(var(--input-radius, 8px), 12px);
 	line-height: 1.45;
 	resize: vertical;
 }
@@ -2348,6 +2361,11 @@ body.theme-dark .dynasty-house-dot {
 }
 
 .dynasty-sheet-field:focus-within > .dynasty-sheet-hint.is-on-focus {
+	display: block;
+}
+
+/* A press that starts in the window keeps the help text that is on screen until the click, so the buttons below do not move (`render/dom/press-hold.ts`). */
+.dynasty-sheet .dynasty-sheet-hint.is-on-focus.is-held {
 	display: block;
 }
 
@@ -2400,7 +2418,7 @@ body.theme-dark .dynasty-house-dot {
 	color: var(--dynasty-muted);
 }
 
-/* The tick boxes (I40): a square box of 18 px with a muted 1.5 px border; the mark is the text colour on the accent. */
+/* The tick boxes: a square box of 18 px with a muted 1.5 px border; the mark is the text colour on the accent. */
 .dynasty-checks {
 	display: flex;
 	flex-wrap: wrap;
@@ -2462,7 +2480,7 @@ body.theme-dark .dynasty-house-dot {
 	transform: rotate(-45deg) translate(1px, -1px);
 }
 
-/* The keyboard ring of the window's buttons (G5 0.4, WCAG 2.4.7): the rule above takes the theme's own focus shadow away. */
+/* The keyboard ring of the window's buttons (WCAG 2.4.7): the rule above takes the theme's own focus shadow away. */
 .dynasty-sheet .dynasty-check input[type='checkbox']:focus-visible {
 	outline: 2px solid var(--background-modifier-border-focus);
 	outline-offset: 1px;
@@ -2721,7 +2739,7 @@ body.theme-dark .dynasty-house-dot {
 	color: var(--dynasty-error);
 }
 
-/* G3 fix: a danger row is a row, not a button with a fill. `.is-mobile button.mod-warning` of Obsidian (0,2,1) gave "Delete person" a grey fill that the error colour was not checked on. */
+/* A danger row is a row, not a button with a fill. `.is-mobile button.mod-warning` of Obsidian (0,2,1) gave "Delete person" a grey fill that the error colour was not checked on. */
 .dynasty-sheet button.dynasty-row.is-tap.mod-warning {
 	background: none;
 }
@@ -2888,7 +2906,7 @@ body.theme-dark .dynasty-house-dot {
  * rule for `.modal`. The second background (in @supports) drops any transparency of the theme's colour. It must sit in the block: an engine
  * without relative colours would make the whole declaration invalid at computed-value time and leave the window transparent.
  */
-/* `!important`: Cupertino sets `body.mod-windows:not(.adaptive-mode-off) .modal { background-color: var(--modal-background) !important }` (G3, 2026-10-10). */
+/* `!important`: Cupertino sets `body.mod-windows:not(.adaptive-mode-off) .modal { background-color: var(--modal-background) !important }`. */
 .modal-container .modal.dynasty-sheet.dynasty-sheet {
 	background: var(--background-primary) !important;
 	backdrop-filter: none;
@@ -2973,6 +2991,16 @@ body.theme-dark .dynasty-house-dot {
 .dynasty-bar.is-scrolled .dynasty-bar-title,
 .dynasty-bar.is-titled .dynasty-bar-title {
 	opacity: 1;
+}
+
+/* The partnership window has the two names as its title (D316): a long pair wraps to three text lines at most, then ends with an ellipsis, so it never runs under Cancel or Save. */
+.dynasty-union-edit .dynasty-bar .dynasty-bar-title {
+	display: -webkit-box;
+	-webkit-box-orient: vertical;
+	-webkit-line-clamp: 3;
+	white-space: normal;
+	overflow-wrap: anywhere;
+	padding: 4px 0;
 }
 
 .dynasty-sheet .dynasty-bar button.dynasty-bar-extra {
@@ -3175,7 +3203,7 @@ body.theme-dark .dynasty-house-dot {
 		min-width: 44px;
 	}
 }
-/* ---------- Family and actions in the person window (spec §6.3, §7.4, §7.5; 0.2.8 contract C) ---------- */
+/* ---------- Family and actions in the person window (spec §6.3, §7.4, §7.5) ---------- */
 
 /* The three groups of the Family section stand under a small heading; each group is a list of rows. */
 .dynasty-family-group {
@@ -3241,7 +3269,7 @@ body.theme-dark .dynasty-house-dot {
 	width: 100vw;
 }
 
-/* G5 0.4: the title of a choice is its question, and the undo question names a note: on the phone bar it wraps and shows whole. */
+/* The title of a choice is its question, and the undo question names a note: on the phone bar it wraps and shows whole. */
 .dynasty-choice .dynasty-bar .dynasty-bar-title {
 	white-space: normal;
 	overflow-wrap: anywhere;
@@ -3321,7 +3349,7 @@ body.theme-dark .dynasty-house-dot {
 	width: min(560px, calc(100vw - 2 * var(--size-4-4)));
 }
 
-/* G.1, G.3: a row is the text, then the round portrait at the right when the person has one. No initials, no house ring, no empty circle (D213). */
+/* A row is the text, then the round portrait at the right when the person has one. No initials, no house ring, no empty circle (D213). */
 .dynasty-picker .dynasty-picker-row > .dynasty-picker-text {
 	flex: 1 1 auto;
 }
@@ -3490,7 +3518,7 @@ body.theme-dark .dynasty-house-dot {
 }
 
 /*
- * 0.3 (spec §6.6), fix round: the pill and Cancel stand in row 1 of the prompt grid in every theme. Cupertino lifts the pill out of the flow (position absolute, at the bottom of the
+ * (spec §6.6) The pill and Cancel stand in row 1 of the prompt grid in every theme. Cupertino lifts the pill out of the flow (position absolute, at the bottom of the
  * prompt, like an iOS 26 search bar) while Cancel stays in the top row, 400 px above it. The doubled `.is-phone` makes the selector longer than any theme rule for these
  * two boxes; order, position, inset and alignment are set again here, so no theme can move one of them away from the other.
  */
@@ -3684,7 +3712,7 @@ body.theme-dark .dynasty-house-dot {
 	border-radius: var(--radius-m);
 }
 
-/* On the highlighted row (keyboard cursor or pointer) the quiet texts take the text colour: the muted grey on the hover fill was 4.27–4.41:1 in Minimal and AnuPpuccin light (G3). */
+/* On the highlighted row (keyboard cursor or pointer) the quiet texts take the text colour: the muted grey on the hover fill was 4.27–4.41:1 in Minimal and AnuPpuccin light. */
 .modal.dynasty-picture-picker .dynasty-picture-row.is-cursor :is(.dynasty-picture-folder, .dynasty-picture-folder-name, .dynasty-picture-count, .dynasty-picture-chevron, .dynasty-picture-none, .dynasty-picture-name, .dynasty-picture-plus, .dynasty-picture-hint),
 .modal.dynasty-picture-picker .dynasty-picture-row:hover :is(.dynasty-picture-folder, .dynasty-picture-folder-name, .dynasty-picture-count, .dynasty-picture-chevron, .dynasty-picture-none, .dynasty-picture-name, .dynasty-picture-plus, .dynasty-picture-hint) {
 	color: var(--text-normal);
@@ -3925,7 +3953,7 @@ body.theme-dark .dynasty-house-dot {
 }
 
 /*
- * Phone layout (0.2.8, G.13): the bar sits at the bottom, flat, with a hairline above it and the safe area under it (spec §7.5): Add person, Houses,
+ * Phone layout: the bar sits at the bottom, flat, with a hairline above it and the safe area under it (spec §7.5): Add person, Houses,
  * Focus, Find, More, Close, spread over the width. Fit, Titles and the legend are in More.
  * D242: a phone held sideways has the same bar. `is-phone` is a window narrower than 600 px; `is-phone-side` is a phone (by its screen) whose window is
  * wider than high (`isPhoneSideways`). Every rule of the bar names both, so a rule cannot be added for one and forgotten for the other.
@@ -3979,17 +4007,45 @@ body.theme-dark .dynasty-house-dot {
 	background-color: var(--background-primary);
 }
 
-/* The problem list (not a sheet) stands above the phone's bar. */
+/*
+ * A window under 600 px that has the wide set of buttons (an iPad in Slide Over or Split View: its screen is not a phone's; a narrow computer window too). Up to nine
+ * buttons of 44 px do not fit in 320 px, and the sticky Close covered More (and Titles). The bar wraps into a second row instead, so every button shows and no button lies over
+ * another; Close stays at the right end of the last row. The bars between the groups go: one could stand alone at the end of a row. `has-wide-set` is set in `orderBar`.
+ */
+.modal.dynasty-fullscreen.is-phone-side .dynasty-full .dynasty-toolbar.has-wide-set,
+.modal.dynasty-fullscreen.is-phone .dynasty-full .dynasty-toolbar.has-wide-set {
+	height: auto;
+	min-height: calc(52px + env(safe-area-inset-bottom));
+	flex-wrap: wrap;
+	align-content: flex-start;
+	justify-content: flex-start;
+	overflow: visible;
+}
+
+.modal.dynasty-fullscreen.is-phone-side .dynasty-full .dynasty-toolbar.has-wide-set .dynasty-close,
+.modal.dynasty-fullscreen.is-phone .dynasty-full .dynasty-toolbar.has-wide-set .dynasty-close {
+	position: relative;
+	right: auto;
+	margin-left: auto;
+	background-color: transparent;
+}
+
+.modal.dynasty-fullscreen.is-phone-side .dynasty-full .dynasty-toolbar.has-wide-set .dynasty-sep,
+.modal.dynasty-fullscreen.is-phone .dynasty-full .dynasty-toolbar.has-wide-set .dynasty-sep {
+	display: none;
+}
+
+/* The problem list (not a sheet) stands above the phone's bar. `--dynasty-bar-h` is the real height of the bar, set where the bar changes size (`watchBar`): one row or, in a narrow window, two. */
 .modal.dynasty-fullscreen.is-phone-side .dynasty-full .dynasty-popover:not(.is-anchored):not(.is-sheet),
 .modal.dynasty-fullscreen.is-phone .dynasty-full .dynasty-popover:not(.is-anchored):not(.is-sheet) {
 	top: auto;
 	left: max(var(--size-4-2), env(safe-area-inset-left));
 	right: max(var(--size-4-2), env(safe-area-inset-right));
-	bottom: calc(52px + env(safe-area-inset-bottom) + var(--size-4-2));
+	bottom: calc(var(--dynasty-bar-h, calc(52px + env(safe-area-inset-bottom))) + var(--size-4-2));
 	/* `max-content` (the base rule) made a long problem text wider than the screen and let the right edge go; auto fills the space between left and right. */
 	width: auto;
 	max-width: none;
-	max-height: calc(100% - 52px - env(safe-area-inset-bottom) - 4 * var(--size-4-2));
+	max-height: calc(100% - var(--dynasty-bar-h, calc(52px + env(safe-area-inset-bottom))) - 4 * var(--size-4-2));
 }
 
 /* The page preview of a linked name shows above the full-screen view, not behind it (spec §5.2).
@@ -4008,7 +4064,7 @@ body.dynasty-fullscreen-open .popover.hover-popover {
 	padding-right: env(safe-area-inset-right, 0px);
 }
 
-/* ---------- M6 windows: settings, keyboard, Houses window (WP6.3; spec §5.2, §6.10, §9, D32) ---------- */
+/* ---------- Windows: settings, keyboard, Houses window (spec §5.2, §6.10, §9, D32) ---------- */
 
 /* Spec §9 "Show dates on cards" off: the dates hide, the card keeps its size. */
 .dynasty-no-dates .dynasty-card-dates {
@@ -4016,7 +4072,7 @@ body.dynasty-fullscreen-open .popover.hover-popover {
 }
 
 /* A visible focus ring on every toolbar button (spec §5.2), inside the toolbar box, in any theme: the
-   accent at the edge, and inside it 2 px in the text colour, so it never depends on the accent alone (WP6.5). */
+   accent at the edge, and inside it 2 px in the text colour, so it never depends on the accent alone. */
 .dynasty-toolbar .dynasty-tool:focus-visible {
 	outline: 2px solid var(--interactive-accent);
 	outline-offset: -2px;
@@ -4051,7 +4107,7 @@ body.dynasty-fullscreen-open .popover.hover-popover {
 }
 
 /* Obsidian gives a setting description `text-overflow: ellipsis`; iOS WebKit then puts "…" in the
-   middle of a wrapped description ("…w…" on the owner's iPhone, M6). Our descriptions always wrap and
+   middle of a wrapped description ("…w…" on an iPhone). Our descriptions always wrap and
    nothing of them is hidden, so no ellipsis is needed. */
 .dynasty-settings .setting-item-description {
 	text-overflow: clip;
@@ -4060,7 +4116,7 @@ body.dynasty-fullscreen-open .popover.hover-popover {
 .dynasty-sheet-confirm .dynasty-choice-options {
 	margin-top: var(--size-4-3);
 }
-/* ---------- The banner of the relation finder and of the Show view (spec §13.1, §13.2; D47–D49; 0.2.8 contract C and G.13) ---------- */
+/* ---------- The banner of the relation finder and of the Show view (spec §13.1, §13.2; D47–D49) ---------- */
 
 /*
  * One design for both (`dynasty-banner`): a row under the toolbar with the sentence at the left and the links at the right. Its own
@@ -4213,7 +4269,7 @@ body.dynasty-fullscreen-open .popover.hover-popover {
 	outline: none;
 }
 /*
- * The relation to the marked person (spec §13.1, D146; 0.2.8 contract C, D197 Q8 A): one text line in the header of the person window,
+ * The relation to the marked person (spec §13.1, D146, D197): one text line in the header of the person window,
  * "Your first cousin · 4 more · Show the line". Its rules are with the header in 10-edit-sheet.css (`dynasty-head-rel`, `dynasty-showline`,
  * `dynasty-more`, `dynasty-head-maybe`). The old box and strip of the first designs are gone.
  */
@@ -4223,7 +4279,7 @@ body.dynasty-fullscreen-open .popover.hover-popover {
 .dynasty-relation-maybe {
 	margin-top: 2px;
 }
-/* ---------- Titles and holders (spec §13.3–§13.5; D54–D63; 0.2.8 contract C, G.6, G.7, D195, D201) ---------- */
+/* ---------- Titles and holders (spec §13.3–§13.5; D54–D63; D195, D201) ---------- */
 
 /*
  * Obsidian shows an aria-label as a floating label when the pointer rests on the element (the CSS switch `--no-tooltip` turns it off, and it
@@ -4289,7 +4345,7 @@ body.dynasty-fullscreen-open .popover.hover-popover {
 	}
 }
 
-/* On a phone the tap area of the name grows to 44 px by an invisible extension, with no change of the look (F4). A row is at least 52 px high, so the extension stays inside its own row. */
+/* On a phone the tap area of the name grows to 44 px by an invisible extension, with no change of the look. A row is at least 52 px high, so the extension stays inside its own row. */
 .dynasty-sheet.is-phone button.dynasty-holder-name {
 	position: relative;
 }
@@ -4406,7 +4462,7 @@ body.dynasty-fullscreen-open .popover.hover-popover {
 }
 
 /*
- * The succession sections of a title page (contract 0.2.7 E; 0.2.8 C, G.6). The choices are dropdowns on every device; on a phone each one
+ * The succession sections of a title page. The choices are dropdowns on every device; on a phone each one
  * opens the phone's own list (D208 item 3).
  */
 .dynasty-succ-pair {
@@ -4490,7 +4546,7 @@ body.dynasty-fullscreen-open .popover.hover-popover {
 }
 
 /*
- * The quiet notes of the line stand apart (look round 0.3.2): 8 px between two notes, and 12 px above the first note after a row, so the notes do not look like a part of the last
+ * The quiet notes of the line stand apart: 8 px between two notes, and 12 px above the first note after a row, so the notes do not look like a part of the last
  * row. A note in the box has the 2 px gap of the box and 3 px each side. A note in the list has only a top margin; a note that starts the list has 10 px, with the 2 px of the box.
  */
 .dynasty-line-box > .dynasty-succ-note {
@@ -4509,7 +4565,7 @@ body.dynasty-fullscreen-open .popover.hover-popover {
 	margin-top: 10px;
 }
 
-/* G.6, quiet-warnings; D218 item 4: a note of the line is a quiet grey roman text line at the Small size, with no sign; a warning is in the text colour. */
+/* D218 item 4: a note of the line is a quiet grey roman text line at the Small size, with no sign; a warning is in the text colour. */
 .dynasty-succ-note,
 .dynasty-succ-subnote {
 	display: block;
@@ -4539,7 +4595,7 @@ body.dynasty-fullscreen-open .popover.hover-popover {
 	margin-left: 42px;
 }
 
-/* 8 px, as between two notes of the list (look round 0.3.2, G5: the branch hint stood 2 px under the last note). */
+/* 8 px, as between two notes of the list (the branch hint stood 2 px under the last note). */
 .dynasty-succ-branch-note {
 	margin-top: 8px;
 }
@@ -4555,7 +4611,7 @@ body.dynasty-fullscreen-open .popover.hover-popover {
 	font-weight: var(--font-semibold);
 	line-height: 1.25;
 }
-/* ---------- Arms and the colour of a house, the pictures of the windows (spec §13.6, §13.7; D67–D69, D75; 0.2.8 contract C) ---------- */
+/* ---------- Arms and the colour of a house, the pictures of the windows (spec §13.6, §13.7; D67–D69, D75) ---------- */
 
 /* The arms of a house in the header of its page, at the right: the picture as it is (D75: no frame, edge or background). A tap opens the menu. The button has no box of its own (quiet-controls). */
 .dynasty-sheet button.dynasty-house-arms {
@@ -4625,7 +4681,7 @@ body.dynasty-fullscreen-open .popover.hover-popover {
 	box-shadow: inset 0 0 0 1px var(--background-modifier-border);
 	color: var(--text-on-accent);
 	cursor: pointer;
-	/* No grey flash under the finger on a phone (owner's iPhone, 0.4): the tap highlight and the pressed style of a button do not paint over the colour. */
+	/* No grey flash under the finger on a phone: the tap highlight and the pressed style of a button do not paint over the colour. */
 	-webkit-tap-highlight-color: transparent;
 	transition: none;
 }
@@ -4661,7 +4717,7 @@ body.dynasty-fullscreen-open .popover.hover-popover {
 
 /*
  * The system colour window opens from the last swatch. Its input lies over the swatch, unseen, and takes a tap or a click itself: iOS opens the
- * window only for a tap on the input, never from code (G5 0.4). The swatch below keeps the look and is the control for the keyboard.
+ * window only for a tap on the input, never from code. The swatch below keeps the look and is the control for the keyboard.
  * The selector outranks the 88 px colour field of the person window (10-edit-sheet.css), so the input has the size of the swatch and no tap beside it opens the window.
  */
 .dynasty-house-other {
@@ -4728,7 +4784,7 @@ body.dynasty-fullscreen-open .popover.hover-popover {
 }
 
 /*
- * The People section of a house (D202, G.10; people-rows): plain full-width rows, the name in bold, the title after it, then the generation and the
+ * The People section of a house (D202; people-rows): plain full-width rows, the name in bold, the title after it, then the generation and the
  * years. No hairline and no chevron. The title stays on the name line (D218 item 11, answer B). The name is the Name role and the line under it the
  * Text role, both in the text font (D218 items 1 to 3). The selectors are long enough to win over the general row rules on a phone.
  */
@@ -4932,7 +4988,7 @@ body.dynasty-fullscreen-open .popover.hover-popover {
 	color: var(--text-muted);
 }
 
-/* ---------- M9: arms and portraits on the cards, the legend's houses, Save as a picture (spec §13.6–§13.8; D67, D74–D78) ---------- */
+/* ---------- Arms and portraits on the cards, the legend's houses, Save as a picture (spec §13.6–§13.8; D67, D74–D78) ---------- */
 
 /* A picture never takes a press: the card under it does (spec §7.2). */
 .dynasty-picture {
@@ -4959,12 +5015,12 @@ body.dynasty-fullscreen-open .popover.hover-popover {
 	stroke: none;
 }
 
-/* G4: a deceased person's arms and portrait are muted like the house strip (the frame is not, as in the saved picture). */
+/* A deceased person's arms and portrait are muted like the house strip (the frame is not, as in the saved picture). */
 .dynasty-deceased .dynasty-picture {
 	opacity: 0.8;
 }
 
-/* The window "Save as a picture" (spec §13.8). The legend rows are in 08-toolbar.css; the live legend has no house rows (0.2.8 D196 item 3). */
+/* The window "Save as a picture" (spec §13.8). The legend rows are in 08-toolbar.css; the live legend has no house rows (D196 item 3). */
 
 /* Spec §13.8, D72: the window "Save as a picture", with PNG and SVG as a pair of choices. */
 .modal.dynasty-save-window {
@@ -5004,7 +5060,7 @@ body.dynasty-fullscreen-open .popover.hover-popover {
 	box-shadow: inset 0 0 0 3px var(--background-primary);
 }
 
-/* The result Notice (spec §13.8): Share has a 44 × 44 px hit area (B8). */
+/* The result Notice (spec §13.8): Share has a 44 × 44 px hit area. */
 .dynasty-save-small {
 	margin-top: var(--size-4-1);
 }
@@ -5018,7 +5074,7 @@ body.dynasty-fullscreen-open .popover.hover-popover {
 
 
 /*
- * The legend lines reach 3:1 on the window colour in every theme (G3: Cupertino light had ward 2.34, rumoured 2.35, its "?" 2.7 and the phone birth link 2.48).
+ * The legend lines reach 3:1 on the window colour in every theme (Cupertino light had ward 2.34, rumoured 2.35, its "?" 2.7 and the phone birth link 2.48).
  * The grey lines take the run-time line token (`--dynasty-edge`, see `paintContrast` in main.ts). The ward and the rumoured line keep a part of their hue, in a mix
  * that leans on the token. The mix sits in `@supports`, because var() hides `color-mix()` from the parser and an engine without it would draw no line.
  */
@@ -5073,7 +5129,7 @@ body.dynasty-fullscreen-open .popover.hover-popover {
 		fill: color-mix(in srgb, var(--dynasty-edge) 75%, var(--color-red));
 	}
 }
-/* ---------- The portrait crop tool (spec §13.13, D79, D90; 0.2.8 contract G.9, D196 item 4) ---------- */
+/* ---------- The portrait crop tool (spec §13.13, D79, D90, D196 item 4) ---------- */
 
 /*
  * The picture is not part of the theme, so the tool has a dark surface in both themes: the title at the top, the picture under a round
@@ -5217,7 +5273,7 @@ body.dynasty-fullscreen-open .popover.hover-popover {
 	color: gainsboro;
 }
 
-/* Cupertino sizes icon svgs on the phone; the zoom icons shrank to dots (G3, 2026-10-10). */
+/* Cupertino sizes icon svgs on the phone; the zoom icons shrank to dots. */
 .dynasty-crop .dynasty-crop-zoom .dynasty-icon-btn svg {
 	width: 18px;
 	height: 18px;
@@ -5304,7 +5360,7 @@ body.dynasty-fullscreen-open .popover.hover-popover {
 	margin-top: auto;
 	padding-bottom: env(safe-area-inset-bottom);
 }
-/* ---------- Make a note (spec §13.11) and the house page notes (spec §13.12), M10 ---------- */
+/* ---------- Make a note (spec §13.11) and the house page notes (spec §13.12) ---------- */
 
 /* The same-name question has three buttons: on a wide window they sit in a row, on a phone one under the other. */
 .dynasty-sheet-confirm-actions .dynasty-note-ask-link,
@@ -5326,7 +5382,7 @@ body.dynasty-fullscreen-open .popover.hover-popover {
 	flex: none;
 	margin-bottom: var(--size-4-3);
 }
-/* ---------- Fold a branch (M10: spec §13.10, D83–D85) ---------- */
+/* ---------- Fold a branch (spec §13.10, D83–D85) ---------- */
 
 /* The open button ("−") and the folded sign ("+ N"). The tooltip is the <title> child; Obsidian's aria-label tooltip fails on SVG. */
 .dynasty-fold {
@@ -5336,7 +5392,7 @@ body.dynasty-fullscreen-open .popover.hover-popover {
 	font-family: var(--font-interface);
 }
 
-/* The tap area is invisible and lies below the cards, so a card wins where they meet (F7). */
+/* The tap area is invisible and lies below the cards, so a card wins where they meet. */
 .dynasty-fold-hit {
 	cursor: pointer;
 	fill: none;
@@ -5344,7 +5400,7 @@ body.dynasty-fullscreen-open .popover.hover-popover {
 	pointer-events: all;
 }
 
-/* 0.2.8 (C01): a small square chip; the "−" is a round-capped line in the text colour. */
+/* A small square chip; the "−" is a round-capped line in the text colour. */
 .dynasty-fold-button,
 .dynasty-fold-pill,
 .dynasty-fold-pill-big {
@@ -5392,7 +5448,7 @@ body.dynasty-fullscreen-open .popover.hover-popover {
 	stroke-width: 3;
 }
 
-/* Levels of detail: Full and Compact draw the same size in em; Overview draws only signs, in the larger pill (F6). */
+/* Levels of detail: Full and Compact draw the same size in em; Overview draws only signs, in the larger pill. */
 .dynasty-fold-pill-big {
 	display: none;
 }
@@ -5422,7 +5478,7 @@ body.dynasty-fullscreen-open .popover.hover-popover {
 
 
 /*
- * 0.2.8 (I01, C01): the `+` badge of focus mode is an outline disc: the card colour inside a ring in the text colour, with the plus in the text
+ * The `+` badge of focus mode is an outline disc: the card colour inside a ring in the text colour, with the plus in the text
  * colour.
  */
 .dynasty-focus-badge-mark {
@@ -5434,7 +5490,7 @@ body.dynasty-fullscreen-open .popover.hover-popover {
 .dynasty-focus-badge-plus {
 	stroke: var(--text-normal);
 }
-/* D106: "ID: p12", the last line of the edit sheet of a person whose ID is written. Muted text, never below 4.5:1; the text can be selected and copied. A theme can set --font-ui-smaller to 9.6 px on a phone; the line is never smaller than 12 px (review 0.2.3). */
+/* D106: "ID: p12", the last line of the edit sheet of a person whose ID is written. Muted text, never below 4.5:1; the text can be selected and copied. A theme can set --font-ui-smaller to 9.6 px on a phone; the line is never smaller than 12 px. */
 .dynasty-sheet-id {
 	margin-top: 0;
 	color: var(--dynasty-muted);
@@ -5568,14 +5624,14 @@ body.dynasty-fullscreen-open .popover.hover-popover {
 }
 
 /* phone-B: picker */
-/* Wave 2 only: new rules for `.dynasty-picker*` (person list height, `.dynasty-picker-sob`) go below this line. */
+/* New rules for `.dynasty-picker*` (person list height, `.dynasty-picker-sob`) go below this line. */
 /* D122: the sobriquet after a name in a person list and in a holder list: regular weight (the name is semibold). */
 .dynasty-picker-sob {
 	font-weight: var(--font-normal);
 }
 
 /* phone-A: view */
-/* Wave 2 only: new rules for the tree view (height button, reduced movement) go below this line. */
+/* New rules for the tree view (height button, reduced movement) go below this line. */
 
 /* D126 (1): reduced movement. The view sets the class on the tree root before it starts a highlight; the highlight then stays as a still outline. */
 .dynasty-reduce-motion .dynasty-card.dynasty-highlight .dynasty-card-ring {
@@ -5600,8 +5656,10 @@ body.dynasty-fullscreen-open .popover.hover-popover {
 	display: block;
 	width: 100%;
 }
-/* The break list of the settings tab (D118): a wide field, and 16 px text on a touch screen like the other fields (P7). */
+/* The break list of the settings tab (D118): a wide field, and 16 px text on a touch screen like the other fields. */
 .dynasty-settings .dynasty-setting-break-words {
+	/* The box has several text lines: a pill radius of a theme must not cut the text. */
+	border-radius: min(var(--input-radius, 8px), 12px);
 	width: 18em;
 	max-width: 100%;
 	resize: vertical;
@@ -5616,7 +5674,7 @@ body.dynasty-fullscreen-open .popover.hover-popover {
 
 /* roundel: card */
 
-/* The Roundel card (top-to-bottom, Normal size) and the text card (sideways): the 0.2.5 contract section B. The numbers of the plate repeat ROUNDEL_LOOK in render/styles.ts. */
+/* The Roundel card (top-to-bottom, Normal size) and the text card (sideways). The numbers of the plate repeat ROUNDEL_LOOK in render/styles.ts. */
 
 /*
  * The medallion and the arms of the Compact level are the ones of the Full group (one set of elements, WP-B8): at that level the Full group of a
@@ -5670,7 +5728,7 @@ body.dynasty-fullscreen-open .popover.hover-popover {
 }
 
 /*
- * The small "You" tab on the top edge of the marked card, when the tree has no relation line (D153), and the ordinal tab of an heir (F.4). One look:
+ * The small "You" tab on the top edge of the marked card, when the tree has no relation line (D153), and the ordinal tab of an heir. One look:
  * the card colour inside a 1 px border in the text colour, 0.2 em corners (the rx attribute), the word 0.8 em semibold in the interface font. The base
  * under it is a card-colour pill with a wide edge, so the border and the line above the card do not show through. They take no press; the crown area holds them.
  */
@@ -5718,7 +5776,7 @@ body.dynasty-fullscreen-open .popover.hover-popover {
  * D144: a tree in a note on a phone is a list of rows (src/render/dom/phone-list-dom.ts). The list has its natural
  * height and the note scrolls over it. Colours come only from theme variables; a house colour comes only through
  * --dynasty-house-color, which the code sets on the row.
- * 0.2.8 (D197 Q5 A, D198, D209, D210, D213, G.2, G.11): the bar is the same flat row as the toolbar of a
+ * D197, D198, D209, D210, D213: the bar is the same flat row as the toolbar of a
  * computer; the person at the top has a large row with no frame and no heading over it (the name at 21 px, the relation word in italic, the title text line;
  * at the right a column with a 56 px portrait and under it the 35 px arms); every row has a 3 px house strip (the large row too, D302), the name at 17 px and at the right a 36 px
  * portrait; the order is the person, Parents, Partners, Children; a missing picture leaves no place holder. "You" is bold in the text colour.
@@ -5758,7 +5816,7 @@ body.dynasty-fullscreen-open .popover.hover-popover {
 }
 
 /*
- * The rows stand 8 px inside the block, so that the 2 px frame of the large row and of the marked row (which reaches the edge of the block, into the note's margin) is never cut by the block's own box; the content of every row starts at the same place (I38).
+ * The rows stand 8 px inside the block, so that the content of every row starts at the same place. The large row and the marked row reach the edge of the block and keep their outline inside their own box (see `dynasty-list-flash`).
  */
 .dynasty-list-section {
 	padding: 0 8px;
@@ -5823,7 +5881,7 @@ body.dynasty-fullscreen-open .popover.hover-popover {
 
 /*
  * The large row and the marked row (D209 item 1): no frame; "You" in bold says who is marked (the 3 px frame of the marked card stays in the tree). The
- * transparent border keeps the content where the other rows' content is, and the outline of a saved row (below) has room.
+ * transparent border keeps the content where the other rows' content is, and carries the outline of a saved row (below).
  */
 .dynasty-list-hero {
 	margin: 4px -8px;
@@ -5843,6 +5901,15 @@ body.dynasty-fullscreen-open .popover.hover-popover {
 	outline: 2px solid var(--interactive-accent);
 	outline-offset: 0;
 	border-radius: var(--radius-m);
+}
+
+/*
+ * The large row and the marked row reach the edge of the block (margin -8px). An outline outside their box is 2 px outside the block, and the block clips it, so only the
+ * top and the bottom showed (iPhone, 2026-10-29). Their transparent 2 px border is the room: the outline lies on it, inside the box.
+ */
+.dynasty-list-hero.dynasty-list-flash,
+.dynasty-list-me.dynasty-list-flash {
+	outline-offset: -2px;
 }
 
 .dynasty-list-hero {
@@ -5897,7 +5964,7 @@ body.dynasty-fullscreen-open .popover.hover-popover {
 	outline-offset: -2px;
 }
 
-/* The name button fills the row; the pencil is a 44 px square at the right edge, with no divider before it (C03). */
+/* The name button fills the row; the pencil is a 44 px square at the right edge, with no divider before it. */
 .dynasty-list button.dynasty-list-go {
 	display: flex;
 	flex: 1 1 auto;
@@ -6001,7 +6068,7 @@ body.dynasty-fullscreen-open .popover.hover-popover {
 	unicode-bidi: isolate;
 }
 
-/* G.11: as on the cards, a house colour is lighter in the dark theme (60 % of the colour with the text colour). */
+/* As on the cards, a house colour is lighter in the dark theme (60 % of the colour with the text colour). */
 .theme-dark .dynasty-list-row.dynasty-has-house .dynasty-list-strip {
 	background: var(--dynasty-house-color);
 	background: color-mix(in srgb, var(--dynasty-house-color) 60%, var(--text-normal));
@@ -6077,7 +6144,7 @@ body.dynasty-fullscreen-open .popover.hover-popover {
 	line-height: 1.35;
 }
 
-/* A text line of items with "·" between them (G.2): a mark never starts a wrapped text line, and the mark is gone with its item's line break. */
+/* A text line of items with "·" between them: a mark never starts a wrapped text line, and the mark is gone with its item's line break. */
 .dynasty-list-text .dynasty-jitem {
 	display: inline-block;
 	max-width: 100%;
@@ -6195,7 +6262,7 @@ body .dynasty-list .dynasty-list-hero .dynasty-hero-col .dynasty-hero-arms > img
 	pointer-events: none;
 }
 
-/* G3 (2026-10-10): the list region is named with aria-label, which Obsidian shows as a tooltip wherever the pointer rests on the list. The list is a phone view with no hover, so its tooltips are off. */
+/* The list region is named with aria-label, which Obsidian shows as a tooltip wherever the pointer rests on the list. The list is a phone view with no hover, so its tooltips are off. */
 .dynasty-list {
 	--no-tooltip: true;
 }
@@ -6245,10 +6312,10 @@ body .dynasty-list .dynasty-list-hero .dynasty-hero-col .dynasty-hero-arms > img
 
 
 
-/* ---------- Version 0.2.7: the Show view of a line of succession (contract F, M.9); 0.2.8: the outline of the heir (I35) ---------- */
+/* ---------- The Show view of a line of succession and the outline of the heir ---------- */
 
 /*
- * An heir's card has one still outline: an accent border 2 px wide (D212, heir-outline; 0.2.8 first had a second hairline ring 4 px outside it). It keeps its width on
+ * An heir's card has one still outline: an accent border 2 px wide (D212, heir-outline). It keeps its width on
  * screen at every zoom (`non-scaling-stroke`), so a line of 20 heirs shows 20 clear outlines at a low zoom too. The ordinal tab on top says which heir it is.
  * The highlight pulse is never used on an heir. The marked heir keeps the border of the marked card, in the text colour (D153), at the same 2 px.
  */
@@ -6272,8 +6339,8 @@ body .dynasty-list .dynasty-list-hero .dynasty-hero-col .dynasty-hero-arms > img
 }
 
 /*
- * The bar of the Show view on the tree is the banner of the finder (`.dynasty-result` in 18-more-list-finder-bar.css; 0.2.8 G.13, I37 B: one row, with an X of 44 px
- * on a phone). This chunk has the same bar at the top of the phone list (F.6, D182): the sentence, and an icon-only Close with a 44 × 44 px target.
+ * The bar of the Show view on the tree is the banner of the finder (`.dynasty-result` in 18-more-list-finder-bar.css; one row, with an X of 44 px
+ * on a phone). This chunk has the same bar at the top of the phone list (D182): the sentence, and an icon-only Close with a 44 × 44 px target.
  * `dynasty-list-showbar`: a row of 48 px with the secondary background and a hairline below. In the flow of the list, not on a tree.
  */
 .dynasty-list-succession {
@@ -6323,7 +6390,7 @@ body .dynasty-list .dynasty-list-hero .dynasty-hero-col .dynasty-hero-arms > img
 		background: rgb(from var(--background-secondary) r g b);
 	}
 }
-/* ===== list windows (0.2.5, D134) ===== */
+/* ===== list windows (D134) ===== */
 
 /* The window is as tall as its content, up to the screen (the base rule has the maximum), and anchored at the top: a short list is a small window, and a page that opens does not move the top edge (list-window-height). */
 .modal.dynasty-sheet.dynasty-lw:not(.is-phone) {
@@ -6640,6 +6707,8 @@ body.theme-dark .dynasty-lw .dynasty-lw-dot {
 /* A name field grows and shrinks with its text (growField in list-window.ts writes the height). */
 .dynasty-lw textarea.dynasty-lw-field {
 	box-sizing: border-box;
+	/* A name of several text lines must not be cut by the pill radius of a theme. */
+	border-radius: min(var(--input-radius, 8px), 12px);
 	width: 100%;
 	height: var(--dynasty-lw-field-height, auto);
 	min-height: var(--input-height);
@@ -6685,7 +6754,7 @@ body.theme-dark .dynasty-lw .dynasty-lw-dot {
 }
 
 .dynasty-large-bar {
-	/* The hidden name of the bar is absolute; the bar is its box, so it never reaches a scroller around it (the iPhone Find fault, tests/r028-ios-find.test.ts). */
+	/* The hidden name of the bar is absolute; the bar is its box, so it never reaches a scroller around it (the iPhone Find fault). */
 	position: relative;
 	display: flex;
 	flex-wrap: wrap;
@@ -6792,7 +6861,7 @@ body.theme-dark .dynasty-lw .dynasty-lw-dot {
 	padding-top: max(var(--size-4-4), env(safe-area-inset-top));
 	padding-bottom: calc(52px + env(safe-area-inset-bottom) + var(--size-4-4));
 }
-/* ===== calendars (0.3.2, spec §14, D251) ===== */
+/* ===== calendars (spec §14, D251) ===== */
 
 /* The grey line under Born and Died and the test line: the hint style of the window (`dynasty-sheet-hint`). It takes no room when it is empty, and a long text wraps under its own field. */
 .dynasty-date-line:empty {
@@ -6858,7 +6927,7 @@ body.theme-dark .dynasty-lw .dynasty-lw-dot {
 	margin-top: -4px;
 }
 
-/* The window with no calendar shows the long explanation at the size of the window text (0.3.3 design, option A). */
+/* The window with no calendar shows the long explanation at the size of the window text. */
 .dynasty-cal-intro.is-long {
 	color: var(--text-normal);
 	font-size: var(--dynasty-type-text);
@@ -6941,23 +7010,9 @@ body.theme-dark .dynasty-lw .dynasty-lw-dot {
 /* Every link of the window has the Control size, as "Add calendar" and "Open all" do (D278). */
 .dynasty-sheet button.dynasty-cal-remove,
 .dynasty-sheet button.dynasty-cal-add-link,
+.dynasty-sheet button.dynasty-cal-remove-list,
 .dynasty-sheet button.dynasty-cal-remove-cal {
 	font-size: var(--dynasty-type-control);
-}
-
-/* Remove of a name list stands at the right end of the first row of the list, on the line of the labels, as Remove of an era does. It is out of the flow, so the fields keep their places. */
-.dynasty-cal-list > .dynasty-grid {
-	position: relative;
-}
-
-.dynasty-sheet .dynasty-cal-list > .dynasty-grid > button.dynasty-cal-remove-list {
-	position: absolute;
-	top: -6px;
-	right: 0;
-}
-
-.dynasty-sheet.is-phone .dynasty-cal-list > .dynasty-grid > button.dynasty-cal-remove-list {
-	top: -14px;
 }
 
 /* A field for a number of two or three digits takes half the width of the row; its help and its refusals keep the whole width. */
@@ -6979,6 +7034,7 @@ body.theme-dark .dynasty-lw .dynasty-lw-dot {
 
 .dynasty-sheet.is-phone .dynasty-cal-remove,
 .dynasty-sheet.is-phone button.dynasty-cal-add-link,
+.dynasty-sheet.is-phone button.dynasty-cal-remove-list,
 .dynasty-sheet.is-phone button.dynasty-cal-remove-cal,
 .dynasty-sheet.is-phone .dynasty-cal-new-note,
 .dynasty-sheet.is-phone .dynasty-cal-existing-note {
@@ -7092,6 +7148,7 @@ body.theme-dark .dynasty-lw .dynasty-lw-dot {
 
 /* "Add era" and "Add name list" are quiet links with a plus, at the left, after the last era or list; "Remove this calendar" is a quiet link at the end of the section. */
 .dynasty-sheet button.dynasty-cal-add-link,
+.dynasty-sheet button.dynasty-cal-remove-list,
 .dynasty-sheet button.dynasty-cal-remove-cal {
 	justify-self: start;
 	align-self: flex-start;
@@ -7113,6 +7170,11 @@ body.theme-dark .dynasty-lw .dynasty-lw-dot {
 
 .dynasty-sheet button.dynasty-cal-remove-cal {
 	margin-top: 12px;
+}
+
+/* The list is a column with an 8 px gap already; the link needs a little more room under the last field, no large empty space. */
+.dynasty-sheet button.dynasty-cal-remove-list {
+	margin-top: 4px;
 }
 
 /* "Add calendar" stands at the left of the row of "Open all", as "Add portrait or arms" does in the person window. */
@@ -7225,6 +7287,7 @@ body.theme-dark .dynasty-lw .dynasty-lw-dot {
 	}
 
 	.dynasty-sheet button.dynasty-cal-add-link,
+	.dynasty-sheet button.dynasty-cal-remove-list,
 	.dynasty-sheet button.dynasty-cal-remove-cal,
 	.dynasty-sheet button.dynasty-cal-remove {
 		min-height: 44px;
@@ -7262,6 +7325,11 @@ body.theme-dark .dynasty-lw .dynasty-lw-dot {
 /* The short warning at Start stands in the place of the help, in the text colour. */
 .dynasty-cal-readback.is-warning {
 	color: var(--text-normal);
+}
+
+/* An example format in a hint never breaks across text lines in the middle (the Marker hint). */
+.dynasty-calendars .dynasty-keep {
+	white-space: nowrap;
 }
 /* ---------- The picture viewer (spec §0 D256; src/obsidian/picture-viewer.ts) ---------- */
 
@@ -7486,9 +7554,9 @@ body.theme-dark .dynasty-lw .dynasty-lw-dot {
 	transition: transform 200ms ease-out;
 }
 
-/* Look round 0.3.2 (D261): the screen behind the viewer. In a light theme the picture needs a darker screen to stand out; the colour is the text colour of the theme, so it fits each theme. A dark theme keeps the dark screen of Obsidian. */
+/* D261: the screen behind the viewer. In a light theme the picture needs a darker screen to stand out; the colour is the text colour of the theme, so it fits each theme. A dark theme keeps the dark screen of Obsidian. */
 .theme-light .modal-container.dynasty-viewer-container > .modal-bg {
-	/* Obsidian keeps its own opacity on the screen (about 0.85, G5 measure), so the half-dark screen of the preview comes from a colour at 60 %: 0.6 × 0.85 ≈ 0.5. */
+	/* Obsidian keeps its own opacity on the screen (about 0.85, measured), so the half-dark screen of the preview comes from a colour at 60 %: 0.6 × 0.85 ≈ 0.5. */
 	/* iOS before 16.2 has no color-mix(): it keeps the plain text colour (a darker screen), the rule of every color-mix() in the style sheet. */
 	background-color: var(--text-normal);
 	background-color: color-mix(in srgb, var(--text-normal) 60%, transparent);

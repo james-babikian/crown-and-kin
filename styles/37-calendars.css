@@ -1,4 +1,4 @@
-/* ===== calendars (0.3.2, spec §14, D251) ===== */
+/* ===== calendars (spec §14, D251) ===== */
 
 /* The grey line under Born and Died and the test line: the hint style of the window (`dynasty-sheet-hint`). It takes no room when it is empty, and a long text wraps under its own field. */
 .dynasty-date-line:empty {
@@ -64,7 +64,7 @@
 	margin-top: -4px;
 }
 
-/* The window with no calendar shows the long explanation at the size of the window text (0.3.3 design, option A). */
+/* The window with no calendar shows the long explanation at the size of the window text. */
 .dynasty-cal-intro.is-long {
 	color: var(--text-normal);
 	font-size: var(--dynasty-type-text);
@@ -147,23 +147,9 @@
 /* Every link of the window has the Control size, as "Add calendar" and "Open all" do (D278). */
 .dynasty-sheet button.dynasty-cal-remove,
 .dynasty-sheet button.dynasty-cal-add-link,
+.dynasty-sheet button.dynasty-cal-remove-list,
 .dynasty-sheet button.dynasty-cal-remove-cal {
 	font-size: var(--dynasty-type-control);
-}
-
-/* Remove of a name list stands at the right end of the first row of the list, on the line of the labels, as Remove of an era does. It is out of the flow, so the fields keep their places. */
-.dynasty-cal-list > .dynasty-grid {
-	position: relative;
-}
-
-.dynasty-sheet .dynasty-cal-list > .dynasty-grid > button.dynasty-cal-remove-list {
-	position: absolute;
-	top: -6px;
-	right: 0;
-}
-
-.dynasty-sheet.is-phone .dynasty-cal-list > .dynasty-grid > button.dynasty-cal-remove-list {
-	top: -14px;
 }
 
 /* A field for a number of two or three digits takes half the width of the row; its help and its refusals keep the whole width. */
@@ -185,6 +171,7 @@
 
 .dynasty-sheet.is-phone .dynasty-cal-remove,
 .dynasty-sheet.is-phone button.dynasty-cal-add-link,
+.dynasty-sheet.is-phone button.dynasty-cal-remove-list,
 .dynasty-sheet.is-phone button.dynasty-cal-remove-cal,
 .dynasty-sheet.is-phone .dynasty-cal-new-note,
 .dynasty-sheet.is-phone .dynasty-cal-existing-note {
@@ -298,6 +285,7 @@
 
 /* "Add era" and "Add name list" are quiet links with a plus, at the left, after the last era or list; "Remove this calendar" is a quiet link at the end of the section. */
 .dynasty-sheet button.dynasty-cal-add-link,
+.dynasty-sheet button.dynasty-cal-remove-list,
 .dynasty-sheet button.dynasty-cal-remove-cal {
 	justify-self: start;
 	align-self: flex-start;
@@ -319,6 +307,11 @@
 
 .dynasty-sheet button.dynasty-cal-remove-cal {
 	margin-top: 12px;
+}
+
+/* The list is a column with an 8 px gap already; the link needs a little more room under the last field, no large empty space. */
+.dynasty-sheet button.dynasty-cal-remove-list {
+	margin-top: 4px;
 }
 
 /* "Add calendar" stands at the left of the row of "Open all", as "Add portrait or arms" does in the person window. */
@@ -431,6 +424,7 @@
 	}
 
 	.dynasty-sheet button.dynasty-cal-add-link,
+	.dynasty-sheet button.dynasty-cal-remove-list,
 	.dynasty-sheet button.dynasty-cal-remove-cal,
 	.dynasty-sheet button.dynasty-cal-remove {
 		min-height: 44px;
@@ -468,4 +462,9 @@
 /* The short warning at Start stands in the place of the help, in the text colour. */
 .dynasty-cal-readback.is-warning {
 	color: var(--text-normal);
+}
+
+/* An example format in a hint never breaks across text lines in the middle (the Marker hint). */
+.dynasty-calendars .dynasty-keep {
+	white-space: nowrap;
 }

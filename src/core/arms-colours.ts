@@ -1,9 +1,8 @@
 /*
- * "Colours from the arms" (spec §13.6, D68; contract rule 10 and A5): the main colours of a coat
+ * "Colours from the arms" (spec §13.6, D68): the main colours of a coat
  * of arms, for the colour choice of the Houses window. The Obsidian side draws the arms into a
  * 64 × 64 px copy (fitted with `fitMeet`, transparent around them) and gives its RGBA pixels here.
- * The method is the one the owner saw in the M9 preview (`scripts/m9-preview/colours.ts` on the
- * branch `v1.1/m9-preview`): pixels in OKLab, seeds from a coarse histogram, k-means, small groups
+ * The method: pixels in OKLab, seeds from a coarse histogram, k-means, small groups
  * dropped, near groups merged. The colours come out exactly as the groups' means, with no change
  * for contrast. Pure and deterministic.
  */
@@ -11,9 +10,9 @@
 type Lab = [number, number, number];
 
 /** Groups closer than this (ΔE in OKLab) look nearly the same and are merged. */
-export const MERGE_DE = 0.05;
+const MERGE_DE = 0.05;
 /** Groups with less than this share of the counted pixels are dropped. */
-export const MIN_SHARE = 0.05;
+const MIN_SHARE = 0.05;
 /** At most this many colours. */
 const MAX_GROUPS = 5;
 const ROUNDS = 25;

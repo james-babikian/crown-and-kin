@@ -1,5 +1,5 @@
 /*
- * The views that are not a tree (0.3.3, WP-1 A1): the phone list (D144), its bar and its picture copies, the box of an empty block (spec §5.9) and the low bar of
+ * The views that are not a tree: the phone list (D144), its bar and its picture copies, the box of an empty block (spec §5.9) and the low bar of
  * a very large tree (spec §7.7). Ninth layer of the chain listed in `tree-view.ts`.
  */
 
@@ -37,11 +37,11 @@ const LIST_FOCUS = '.dynasty-list-section[data-section="person"] .dynasty-list-h
  * D144, D209: the small picture copies of a list row, in CSS px (about twice the size on the screen, for a sharp copy): the arms of the large row are
  * 35 px high under a portrait and 56 px high alone; the portrait is 36 px in a row and 56 px in the large row.
  */
-const LIST_ARMS_BOX: CopyBox = { w: 96, h: 120, fit: 'meet' };
+const LIST_ARMS_BOX: CopyBox = { w: 96, h: 120, fit: 'meet', onDevice: true };
 
-const LIST_PORTRAIT_BOX: CopyBox = { w: 96, h: 96, fit: 'portrait' };
+const LIST_PORTRAIT_BOX: CopyBox = { w: 96, h: 96, fit: 'portrait', onDevice: true };
 
-const HERO_PORTRAIT_BOX: CopyBox = { w: 128, h: 128, fit: 'portrait' };
+const HERO_PORTRAIT_BOX: CopyBox = { w: 128, h: 128, fit: 'portrait', onDevice: true };
 
 /** The person a save just changed in a phone list and the time the row flash ends; kept per block, so a second build keeps the flash. */
 const savedFlashes = new WeakMap<BlockState, { id: string; until: number }>();
@@ -77,7 +77,7 @@ export abstract class TreeViewList extends TreeViewFinder {
 	}
 
 	/**
-	 * D144, contract C.3.1: a tree in a note on a phone is a list of the family of one person. The start chain picks
+	 * D144: a tree in a note on a phone is a list of the family of one person. The start chain picks
 	 * the person (`listStart`); a tap on a name, Find and Back move it through the block state, so the full-screen
 	 * view that Expand opens stands on the same person. Nothing is laid out or drawn as a tree, and nothing is written.
 	 */
@@ -126,7 +126,7 @@ export abstract class TreeViewList extends TreeViewFinder {
 
 		const labels = needsLabels(whole) ? cardLabels(whole) : undefined;
 		const rel = me !== null && this.settings.showRelations ? relationsFor(whole, me, this.relationOptions, this.key) : null;
-		// 0.2.7 F.6: while the Show view is open, the list has the bar at its top, and each heir (each open branch) says its place in the place of the relation word.
+		// While the Show view is open, the list has the bar at its top, and each heir (each open branch) says its place in the place of the relation word.
 		const succession = this.showViewFor(st, whole);
 		this.successionDrawn = succession;
 		const words = succession ? lineWords(succession) : null;
@@ -135,7 +135,7 @@ export abstract class TreeViewList extends TreeViewFinder {
 		const token = this.pictureToken;
 		this.listCentre = centre;
 		const data = listData(whole, centre);
-		// WP-K: the words of the rows that show, in one request.
+		// The words of the rows that show, in one request.
 		rel?.cards.getMany(listIds(data));
 		const result = buildPhoneList(viewport, {
 			g: whole,
@@ -183,11 +183,11 @@ export abstract class TreeViewList extends TreeViewFinder {
 		this.host.recordTiming(timing);
 		this.markInteractive();
 		this.keepHeight();
-		// F-VIEW-01: the list checks its picture files too, so a file that is too large or not a picture shows on the badge.
+		// The list checks its picture files too, so a file that is too large or not a picture shows on the badge.
 		this.startPictures();
 	}
 
-	/** The bar above the list (D144, 0.2.8 G.13): the same flat row as the computer's toolbar: Add person and the tree text (made by `updateEditUi`) at the left, then Find, Back after a move, the problem badge and Expand. */
+	/** The bar above the list (D144): the same flat row as the computer's toolbar: Add person and the tree text (made by `updateEditUi`) at the left, then Find, Back after a move, the problem badge and Expand. */
 	protected buildListBar(viewport: HTMLElement, st: BlockState): void {
 		// D182: the phone bar shows icons only; the full text is in the aria-label.
 		const { bar, button } = toolbarIn(viewport);
@@ -244,7 +244,7 @@ export abstract class TreeViewList extends TreeViewFinder {
 	}
 
 	/**
-	 * The small picture copies of one row (0.2.8): the portrait when "Show portraits on cards" is on, and for the large row the arms (D209 rule A: the personal
+	 * The small picture copies of one row: the portrait when "Show portraits on cards" is on, and for the large row the arms (D209 rule A: the personal
 	 * arms first, else the arms of the house; the list does not follow "Arms on cards"). The row made a place for each picture it has. The portrait of the large row is 56 px, the others 36 px.
 	 */
 	protected listPictures(whole: FamilyGraph, slots: ListPictureSlots, id: string, signal: AbortSignal, token: number): void {
@@ -309,7 +309,7 @@ export abstract class TreeViewList extends TreeViewFinder {
 	/**
 	 * The first view is set: the next frame draws the cards, and the input is already wired. The frame
 	 * after that starts only when that one has been painted, so its start is the time to interactive
-	 * (spec §7.7). The owner reads it with the "Show render timing" command.
+	 * (spec §7.7). The user reads it with the "Show render timing" command.
 	 */
 	protected markInteractive(): void {
 		const m = this.timing;

@@ -36,7 +36,7 @@ export interface LinkHooks {
 	/**
 	 * The notes the fence index says hold a tree, with the notes it is not sure about. A set: the scan reads
 	 * only these, the notes of `known()` and the open trees. Null (the index is not complete, or there is
-	 * none): the scan of 0.3.3, which looks at the metadata cache of every note. The scan tests the text of
+	 * none): the full scan, which looks at the metadata cache of every note. The scan tests the text of
 	 * each note it reads, so a wrong flag costs a read and never a wrong write.
 	 */
 	kinNotes?(): ReadonlySet<string> | null;
@@ -81,7 +81,7 @@ interface Kept {
 	other: string;
 }
 
-/** One tree after its update: links changed and kept, a failure, no more trees in the note (`gone`), a note that stayed busy (`busy`, F-VIEW-04), or no link to a renamed note (null). */
+/** One tree after its update: links changed and kept, a failure, no more trees in the note (`gone`), a note that stayed busy (`busy`), or no link to a renamed note (null). */
 type TreeResult = { changed: number; kept: Kept[] } | { failed: Failure } | 'gone' | 'busy' | null;
 
 /** What the scan of the notes found, for the Notices at the end. */
@@ -89,7 +89,7 @@ interface ScanResult {
 	/** Trees with a changed link. */
 	trees: number;
 	failures: Failure[];
-	/** F-VIEW-04: the notes that stayed busy until the update gave up (a slow write or a sync lock); each one once. */
+	/** The notes that stayed busy until the update gave up (a slow write or a sync lock); each one once. */
 	gaveUp: Failure[];
 	/** The first kept link of each tree that has kept links and no changed link. */
 	kept: (Kept & { path: string })[];
@@ -365,7 +365,7 @@ export class LinkUpdater {
 			.catch((e) => console.error('Crown and Kin: cannot store the renames that wait for a link update', e));
 	}
 
-	/** The notes with the name of `oldPath` now, other than `file`; for a picture, the vault files with its extension (O8). */
+	/** The notes with the name of `oldPath` now, other than `file`; for a picture, the vault files with its extension. */
 	private sameName(oldPath: string, file: TFile): Set<TFile> {
 		if (!this.names) {
 			const m = new Map<string, TFile[]>();
@@ -551,7 +551,7 @@ export class LinkUpdater {
 		return [...first, ...cached, ...unknown];
 	}
 
-	/** The set of the fence index, or null (no hook, not complete, or a throw): then the whole vault is a candidate, as in 0.3.3. */
+	/** The set of the fence index, or null (no hook, not complete, or a throw): then the whole vault is a candidate. */
 	private fenceNotes(): ReadonlySet<string> | null {
 		try {
 			return this.hooks.kinNotes?.() ?? null;
@@ -630,7 +630,7 @@ export class LinkUpdater {
 					report.links += r.changed;
 					trees++;
 				}
-				// Also when other links of the same tree changed (owner, 2026-10-13): a kept link is never silent.
+				// Also when other links of the same tree changed: a kept link is never silent.
 				if (r.kept.length) kept.push({ ...r.kept[0], path });
 			}
 			// One note at a time, so a vault with many trees never holds up the interface (spec §6.9).

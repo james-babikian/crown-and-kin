@@ -92,14 +92,14 @@ function split(s: Sub, on: [number, number][]): { on: string[]; off: string[] } 
 }
 
 /**
- * The look of the finder's `line` on the drawn tree (see the file header). The rules (M7 design gate):
+ * The look of the finder's `line` on the drawn tree (see the file header). The rules:
  * a couple's bar is on if a union of the pair is in `unions`; a leg of union u from partner X if u is
  * in `unions` or a line link joins X to a child of u; a trunk if a line link joins one of its parents
  * to one of its children; a drop or side link if a line link is (parent, child); a union sign if its
  * union is in `unions` or one of its legs, its part of the bar, a trunk or a side link from it is on;
  * a far tag of X if X is on the line and a union of X with one of the tag's partners is in `unions`.
- * M7 fix round: a line link from the partner who is not a far couple's anchor turns on both tags and
- * the anchor's leg. Every leg of the 0.3 lines ends on its union sign, so a leg is on or off as a whole.
+ * A line link from the partner who is not a far couple's anchor turns on both tags and
+ * the anchor's leg. Every leg of the lines ends on its union sign, so a leg is on or off as a whole.
  * Each rumoured line with a `child` has one "?" marker, in path order (`layout/draw.ts`); the marker
  * follows its line.
  */

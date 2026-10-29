@@ -8,6 +8,7 @@
 import { fold, SPACE_CLASS } from './date-text';
 import { markersByName, markerValid, RESERVED_PLACES } from './name-lists';
 
+/** Where a name-list marker of a date format may stand: the year, the cycle or the era. */
 export type Place = 'year' | 'cycle' | 'era';
 /** A marker place holds the position of its list in `Calendar.lists`. */
 export type Seg = { lit: string } | { place: Place } | { marker: number };
@@ -15,7 +16,7 @@ export type Seg = { lit: string } | { place: Place } | { marker: number };
 export type Item = Seg | { group: Seg[] };
 
 /** The list position of a marker place that no list has: nothing is ever read there. */
-export const NO_LIST = -1;
+const NO_LIST = -1;
 
 /**
  * The segments of a folded format, or the message key of its fault: a missing or doubled place, a word that is no place, or a marker twice.

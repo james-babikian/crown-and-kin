@@ -1,5 +1,5 @@
 /*
- * The draft logic of the edit sheet that needs no window (0.3.3, WP-1 A1; moved out of `obsidian/edit-sheet.ts` with no change): loading the sheet's data from the
+ * The draft logic of the edit sheet that needs no window: loading the sheet's data from the
  * block text (`loadSheet`), the shape of the draft, the lookup of a partnership again in new data, and the helpers that give a person with no written id a first id
  * when a write names them (spec §6.3, §8).
  */
@@ -14,10 +14,13 @@ import { PLACEMENT_TYPES, type Person, type Tree } from '../core/types';
 import { familyOf, type FamilyView } from '../core/family-query';
 import { hasNoWrittenId, idsForPeople } from '../view/person-ids';
 
+/** The draft fields that hold free text; a change of one is written as that text. */
 export const TEXT_FIELDS = ['name', 'sobriquet', 'title', 'born', 'died', 'link', 'notes'] as const;
 
+/** The value of `Draft.house` that stands for a house made in this window. */
 export const NEW_HOUSE = '\u0000new';
 
+/** The fields of the person window as the user edits them, before a Save. */
 export interface Draft {
 	name: string;
 	/** D122: the model value, without the quote marks; the typed text is written as typed. */
@@ -28,19 +31,20 @@ export interface Draft {
 	born: string;
 	died: string;
 	illegitimate: boolean;
-	/** M.5: the person died with no children (`childless`); the line of succession then shows no open branch for the person. */
+	/** The person died with no children (`childless`); the line of succession then shows no open branch for the person. */
 	childless: boolean;
 	link: string;
 	/** Spec §13.7: the portrait link; '' = none. */
 	portrait: string;
 	/** Spec §13.13: the selected part of the portrait as written text; '' = none (the automatic part). */
 	portraitCrop: string;
-	/** 0.2.8 contract A.1: the personal arms link; '' = none. */
+	/** The personal arms link; '' = none. */
 	arms: string;
 	notes: string;
 	placement: string;
 }
 
+/** The data that the person window loads: the body, the tree, the person and the family. */
 export interface Loaded {
 	body: string;
 	/** The body as plain data, for the id of a new house. */
@@ -76,6 +80,7 @@ export function loadSheet(body: string, id: string | null, dates?: DatesFor): Sh
 	return { kind: 'ok', data: { body, data: parsed.data, tree, g, person, fam, blocking } };
 }
 
+/** The draft that starts from a loaded person. */
 export function draftOf(l: Loaded): Draft {
 	const p = l.person;
 	return {
@@ -149,7 +154,7 @@ export function unwritten(l: Loaded, id: string): boolean {
 }
 
 /**
- * The `~N` name of a person with no written id after the tree text changed (C2). `~N` follows the place
+ * The `~N` name of a person with no written id after the tree text changed. `~N` follows the place
  * in the list, so an edit above the person (sync, another pane) makes `~N` another person. The person is
  * found by their written fields, else by their name; null when no one matches, or more than one, so the
  * sheet never shows or saves to another person.
@@ -194,8 +199,6 @@ export function takenIds(l: Loaded, more: Iterable<string> = []): Set<string> {
 export function idsFor(l: Loaded, names: Iterable<string>): Map<string, string> {
 	return idsForPeople(l.g, l.data, names);
 }
-
-export type IdFields = Extract<Op, { kind: 'set-person-fields' }>['fields'] & { id?: string };
 
 /** The ops of one write that first gives each person of `ids` their id, then names them by it. */
 export function withIds(ops: Op[], ids: ReadonlyMap<string, string>): Op[] {

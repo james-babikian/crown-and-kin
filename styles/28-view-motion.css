@@ -1,5 +1,5 @@
 /* phone-A: view */
-/* Wave 2 only: new rules for the tree view (height button, reduced movement) go below this line. */
+/* New rules for the tree view (height button, reduced movement) go below this line. */
 
 /* D126 (1): reduced movement. The view sets the class on the tree root before it starts a highlight; the highlight then stays as a still outline. */
 .dynasty-reduce-motion .dynasty-card.dynasty-highlight .dynasty-card-ring {

@@ -8,7 +8,7 @@ import { rng } from '../support/rng';
  * Version 0.2.7, open branches and wards (owner decision D191, spec section 0; the 0.2.7 contract M.1 item 4): a
  * ward does not close an open branch, because a ward is not a descendant. Only a child by a birth, adoptive or
  * rumoured link (or a link of unknown type, read as birth) closes it. The cases M13z to M13i2 are in
- * An internal study ("Cases of D191"), written by hand by the genealogy-reviewer; no value
+ * an internal study ("Cases of D191"), written by hand by the genealogy-reviewer; no value
  * comes from the engine. A row `id@n` is a branch of the person `id` with n heirs before it. Also: the warning
  * `childless-has-child` does not count a ward, and a property test: a ward link on a branch person never
  * removes the row and never changes the heirs.

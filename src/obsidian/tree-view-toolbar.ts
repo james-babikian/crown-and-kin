@@ -1,5 +1,5 @@
 /*
- * The bars of a tree view (0.3.3, WP-1 A1): the toolbar of the computer and of the phone, the order of its parts, the menus (Focus, More, the legend, the problem
+ * The bars of a tree view: the toolbar of the computer and of the phone, the order of its parts, the menus (Focus, More, the legend, the problem
  * list), the edit controls that follow the block's state (`updateEditUi`), Find and the Focus picker, and the resize handle. Sixth layer of the chain listed in
  * `tree-view.ts`.
  */
@@ -20,7 +20,7 @@ import { openCalendars } from './calendar-window';
 import { chooseCalendarNote } from './calendar-note-choice';
 import { TreeViewPictures } from './tree-view-pictures';
 
-/** The order of the parts of each toolbar, by class (0.2.8, G.13); `orderBar` sorts the bar by it. */
+/** The order of the parts of each toolbar, by class; `orderBar` sorts the bar by it. */
 const BAR_ORDER = {
 	desktop: ['dynasty-read-only-label', 'dynasty-open-source', 'dynasty-add-person', 'dynasty-find', 'dynasty-focus', 'dynasty-fit', 'dynasty-sep-a', 'dynasty-houses-button', 'dynasty-titles-button', 'dynasty-sep-b', 'dynasty-more', 'dynasty-grow', 'dynasty-warning-badge', 'dynasty-expand', 'dynasty-close'],
 	phone: ['dynasty-read-only-label', 'dynasty-open-source', 'dynasty-add-person', 'dynasty-houses-button', 'dynasty-focus', 'dynasty-find', 'dynasty-more', 'dynasty-warning-badge', 'dynasty-close'],
@@ -45,8 +45,8 @@ export function toolbarIn(parent: HTMLElement, first = true): { bar: HTMLElement
 /** The toolbar and its menus, and the controls that depend on whether the block can be edited. */
 export abstract class TreeViewToolbar extends TreeViewPictures {
 	/**
-	 * D246 (F2): while a focus shows, the bar at the top of the tree says whose family it is and has the link Clear focus (one tap, on every device). The Focus button
-	 * does the same since D263 (B2). A static touch embed (D1) has no controls, so it has no bar. Clear focus is `focusOn(null)`: it writes nothing, a pin stays in the note.
+	 * D246: while a focus shows, the bar at the top of the tree says whose family it is and has the link Clear focus (one tap, on every device). The Focus button
+	 * does the same since D263. A static touch embed (D1) has no controls, so it has no bar. Clear focus is `focusOn(null)`: it writes nothing, a pin stays in the note.
 	 */
 	protected buildFocusBar(viewport: HTMLElement, before: HTMLElement, name: string): void {
 		if (!this.full && this.coarse) return;
@@ -138,7 +138,7 @@ export abstract class TreeViewToolbar extends TreeViewPictures {
 			label.remove();
 			label = null;
 		}
-		// Spec §6.10: "Add person" on embedded desktop and embedded touch views that can be edited. The computer row shows its word (0.2.8, G.13); the phone bars show the icon.
+		// Spec §6.10: "Add person" on embedded desktop and embedded touch views that can be edited. The computer row shows its word; the phone bars show the icon.
 		const canAdd = !noEdits && !!this.handle;
 		const kind = this.barKind();
 		let add = bar.querySelector<HTMLElement>('.dynasty-add-person');
@@ -176,7 +176,7 @@ export abstract class TreeViewToolbar extends TreeViewPictures {
 			houses.remove();
 			houses = null;
 		}
-		// Titles leave the More list on the computer (0.2.8, G.13): a button of their own next to Houses. On a phone they stay in More.
+		// Titles leave the More list on the computer: a button of their own next to Houses. On a phone they stay in More.
 		const canTitles = kind === 'desktop' && this.canEditWindows();
 		let titles = bar.querySelector<HTMLElement>('.dynasty-titles-button');
 		if (canTitles && !titles) {
@@ -338,7 +338,7 @@ export abstract class TreeViewToolbar extends TreeViewPictures {
 	}
 
 	/**
-	 * How the toolbar menus open (0.2.8, G.13): a sheet from the bottom of the phone's full-screen view, else a menu under the button that opened it.
+	 * How the toolbar menus open: a sheet from the bottom of the phone's full-screen view, else a menu under the button that opened it.
 	 */
 	protected menuPlace(opener: HTMLElement): { anchor?: DOMRect; opts: PopoverOptions } {
 		return this.barKind() === 'phone' ? { opts: { sheet: true, reduced: () => this.reduced() } } : { anchor: opener.getBoundingClientRect(), opts: { align: 'start' } };
@@ -395,19 +395,22 @@ export abstract class TreeViewToolbar extends TreeViewPictures {
 		pop.whenClosed(() => opener.setAttribute('aria-expanded', 'false'));
 	}
 
-	/** Which toolbar this view has (0.2.8, G.13): the row of the computer, the bar at the bottom of the phone's full-screen view, or the bar of the phone list. */
+	/** Which toolbar this view has: the row of the computer, the bar at the bottom of the phone's full-screen view, or the bar of the phone list. */
 	protected barKind(): 'desktop' | 'phone' | 'list' {
 		if (this.listMode) return 'list';
 		return this.full && this.isPhone() ? 'phone' : 'desktop';
 	}
 
 	/**
-	 * The order of the toolbar (0.2.8, G.13), by class: the computer row is Add person, Find, Focus, Fit | Houses, Titles | More … Expand (or Close); the phone's
+	 * The order of the toolbar, by class: the computer row is Add person, Find, Focus, Fit | Houses, Titles | More … Expand (or Close); the phone's
 	 * bottom bar is Add person, Houses, Focus, Find, More, Close; the list's bar is Add person, the tree text … Find, Back, Expand. The problem badge is
-	 * always next to the last button. A part that the view does not make is simply not in the bar. Only what is out of place moves: a move takes the keyboard focus from a button.
+	 * always next to the last button. A part that the view does not make is not in the bar. Only what is out of place moves: a move takes the keyboard focus from a button.
 	 */
 	protected orderBar(bar: HTMLElement): void {
-		const order = BAR_ORDER[this.barKind()];
+		const kind = this.barKind();
+		// The styles of a narrow window need to know that the buttons are the wide set (styles/16-full-screen.css).
+		bar.toggleClass('has-wide-set', kind === 'desktop');
+		const order = BAR_ORDER[kind];
 		const rank = (el: Element) => {
 			const i = order.findIndex((c) => (el as HTMLElement).hasClass(c));
 			return i < 0 ? order.length : i;
@@ -419,8 +422,30 @@ export abstract class TreeViewToolbar extends TreeViewPictures {
 		});
 	}
 
+	/**
+	 * The full-screen bar can change height with no resize of the window: the problem badge comes or goes, and a narrow bar then wraps into two rows or not. The inset that
+	 * views chosen by the plugin keep free and the room of the problem list follow the real height. A fixed width could not do this, as the width of the words depends on the font.
+	 */
+	protected watchBar(bar: HTMLElement, vp: HTMLElement): void {
+		if (!this.full || typeof ResizeObserver !== 'function') return;
+		const ro = new ResizeObserver(() =>
+			this.guard(() => {
+				if (!bar.isConnected || this.unloaded) {
+					ro.disconnect();
+					return;
+				}
+				const atBottom = bar.offsetTop > vp.clientHeight / 2;
+				if (atBottom) vp.style.setProperty('--dynasty-bar-h', `${bar.offsetHeight}px`);
+				else vp.style.removeProperty('--dynasty-bar-h');
+				this.measureInsets(vp);
+			}),
+		);
+		ro.observe(bar);
+	}
+
 	protected buildToolbar(viewport: HTMLElement): void {
 		const { bar, button } = toolbarIn(viewport);
+		this.watchBar(bar, viewport);
 		const kind = this.barKind();
 		// §6.10: Add person, Houses and Titles are added by updateEditUi once the block's handle is known. A static touch embed
 		// has no Find, Focus or More (D1): it shows what the block and the session choose.
@@ -557,7 +582,7 @@ export abstract class TreeViewToolbar extends TreeViewPictures {
 
 	/**
 	 * The problem badge shows the problems as they are now (spec §8): made, changed or removed in place.
-	 * A picture warning that the file check finds later changes only the badge (O2).
+	 * A picture warning that the file check finds later changes only the badge.
 	 */
 	protected updateBadge(bar: HTMLElement | null = this.viewport?.querySelector<HTMLElement>(':scope > .dynasty-toolbar') ?? null): void {
 		if (!bar) return;
@@ -584,7 +609,7 @@ export abstract class TreeViewToolbar extends TreeViewPictures {
 	}
 
 	/**
-	 * The More button (D49, 0.2.8 G.13): the menu of the toolbar. On a phone Fit and Titles come first (the phone's bar has neither button); then the line
+	 * The More button (D49): the menu of the toolbar. On a phone Fit and Titles come first (the phone's bar has neither button); then the line
 	 * styles (the legend), Relation (spec §13.2), Save as picture (spec §13.8) and, where the block can be edited, Show the tree text. Titles of the computer have a button of their own.
 	 */
 	protected toggleMore(opener: HTMLElement, keyboard: boolean): void {

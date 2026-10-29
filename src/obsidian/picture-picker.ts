@@ -1,6 +1,5 @@
 /*
- * The picture picker (spec §13.6 "Picture picker", D69; §13.14 picture list, D92 to D95; M9 contract O6
- * and B2). A window with a search bar and the vault's pictures that the plugin
+ * The picture picker (spec §13.6 "Picture picker", D69; §13.14 picture list, D92 to D95). A window with a search bar and the vault's pictures that the plugin
  * can show, as a folder view (the current picture's folders open, "In use" on its row) or, while the
  * search field has a word, as a flat list. Each picture row has a small preview from the picture store.
  * When the caller's draft has a picture (`PickPictureOptions.remove`), the list starts with a Remove row
@@ -25,11 +24,11 @@
  *   scroller when the keyboard opened, and the field left the view.
  * - Open. The list shows its top with the device row visible. Nothing calls `scrollIntoView` at open. The
  *   plugin sets `scrollTop = 0` at open, at `PICKER_TOP_MS` and on the first `visualViewport` resize, and
- *   stops as soon as the owner scrolls, presses a key, types or touches the window. Only Arrow keys and
+ *   stops as soon as the user scrolls, presses a key, types or touches the window. Only Arrow keys and
  *   typing keep the cursor row in view; a tap, a folder open or close and a preview load never scroll.
- * - Keyboard focus (D95). On a touch-first device (`isTouchFirst`: `(pointer: coarse)` in the picker's own
- *   window) the search field gets no focus at open and no timer focuses it later. Elsewhere the field gets
- *   the focus at open and refocus timers run until the owner presses a key or a pointer.
+ * - Keyboard focus (D320). On a touch-first device (`isTouchFirst`: `(pointer: coarse)` in the picker's own window) no field is
+ *   focused at open: the window itself has the focus. On a computer the search field gets the focus at open (this is a search
+ *   list), and refocus timers run until the user presses a key or a pointer.
  * - Rows. Each row is at least 44 px high, with `content-visibility: auto`, so a list of 2 000
  *   rows is cheap. Order: the device row, folders, then the root's pictures. A folder row has a chevron,
  *   the folder icon, the name and the count, indented for each depth by the CSS. `role="tree"` in
@@ -78,7 +77,7 @@ import { folderOf } from '../core/link-text';
 import { judgeHeader, readPictureHeader, type PictureProblem, type SupportedFormat } from '../core/pictures';
 import { PICKER_UI, PICTURES_UI, deviceNotice } from '../render/ui-text';
 import { NO_READ_BYTES, NO_READ_BYTES_COARSE, isShownPictureExtension, type CopyBox, type PictureCopy, type PictureStore } from './picture-store';
-import { phoneLayout } from './modal-layout';
+import { phoneLayout, startWithoutFocus } from './modal-layout';
 import { trackModal } from '../view/plugin-modals';
 import { freePath } from './save-picture';
 import { nameDialog } from './sheet-parts';
@@ -161,7 +160,7 @@ const REMOVE_KEY = 'remove';
 const NEAR_ROWS_MAX = 150;
 
 /**
- * O6: the written link of a vault file, as Obsidian makes it (the owner's link settings), with no
+ * O6: the written link of a vault file, as Obsidian makes it (the user's link settings), with no
  * leading "!" (spec §13.0 item 3).
  */
 export function pictureLink(app: App, file: TFile, sourcePath: string): string {
@@ -402,7 +401,7 @@ export function createRowPreviews(o: RowPreviewsOptions): RowPreviews {
 type PickerTreeRow = PickerRow<TFile>;
 
 const HANDLED_KEYS: readonly string[] = ['ArrowDown', 'ArrowUp', 'ArrowRight', 'ArrowLeft', 'Enter', ' '];
-/** What the owner does that ends the scroll reset. */
+/** What the user does that ends the scroll reset. */
 const OWNER_EVENTS = ['wheel', 'touchmove', 'pointerdown', 'keydown', 'input'] as const;
 
 class PicturePicker extends Modal {
@@ -426,7 +425,7 @@ class PicturePicker extends Modal {
 	private scroller: HTMLElement | null = null;
 	private previews: RowPreviews | null = null;
 	private shell: Shell | null = null;
-	/** The owner has scrolled, pressed a key, typed or touched: the plugin leaves the scroll alone. */
+	/** The user has scrolled, pressed a key, typed or touched: the plugin leaves the scroll alone. */
 	private acted = false;
 	/** A key or a pointer: the search field is not given the focus back. */
 	private touched = false;
@@ -463,7 +462,7 @@ class PicturePicker extends Modal {
 		this.cleanup.push(phoneLayout(this), trackModal(this, () => this.close()));
 		const el = this.contentEl;
 		el.empty();
-		// The window family (contract C): a bar on a phone, a footer on a computer; Select is the main button.
+		// The window family: a bar on a phone, a footer on a computer; Select is the main button.
 		const shell = buildShell({
 			modalEl: this.modalEl,
 			contentEl: el,
@@ -497,7 +496,7 @@ class PicturePicker extends Modal {
 		this.listEl = body.createDiv({ cls: 'dynasty-picture-list', attr: { id: 'dynasty-picture-list', 'aria-labelledby': heading.id } });
 		// The device's file choice (Photos or Files on an iPhone, D69); hidden, opened by the first row.
 		const input = body.createEl('input', { cls: 'dynasty-picture-file', attr: { type: 'file', accept: 'image/*', tabindex: '-1', 'aria-hidden': 'true' } });
-		// Hidden as in the M9 iPhone check, where a click from a button opened Photos and Files.
+		// Hidden, because on iOS a click from a button opened Photos and Files.
 		input.hide();
 		input.addEventListener('change', () => {
 			const f = input.files?.[0];
@@ -512,13 +511,10 @@ class PicturePicker extends Modal {
 		this.listen();
 		this.guard(() => this.render(false));
 		this.keepAtTop();
-		// A touch-first device never focuses the search field, so the keyboard stays closed. The focus goes to the window
-		// itself, so it is inside the dialog (a screen reader, the Tab key) and no keyboard opens.
-		if (!isTouchFirst(this.pickerWin)) this.focusSearch();
-		else {
-			this.modalEl.setAttribute('tabindex', '-1');
-			this.modalEl.focus({ preventScroll: true });
-		}
+		// A search list: a computer gives the field the focus (the keys and a screen reader work at once). A touch-first device
+		// opens with no field focused, so no keyboard covers the pictures.
+		if (isTouchFirst(this.pickerWin)) this.cleanup.push(startWithoutFocus(this.modalEl));
+		else this.focusSearch();
 		this.scheduleUpdate();
 	}
 
@@ -546,7 +542,16 @@ class PicturePicker extends Modal {
 		}
 	}
 
-	/** The listeners of the window: the owner's actions, the keys and the scroll. */
+	/** The search field takes the focus back from Obsidian until the user presses a key or a pointer. */
+	private focusSearch(): void {
+		const take = (): void => {
+			if (!this.touched) this.searchEl?.focus({ preventScroll: true });
+		};
+		take();
+		for (const ms of [0, 60, 200]) this.timers.push(this.pickerWin.setTimeout(take, ms));
+	}
+
+	/** The listeners of the window: the user's actions, the keys and the scroll. */
 	private listen(): void {
 		const modal = this.modalEl;
 		const scroller = this.scroller!;
@@ -575,19 +580,6 @@ class PicturePicker extends Modal {
 			};
 			vv.addEventListener('resize', once);
 			this.cleanup.push(() => vv.removeEventListener('resize', once));
-		}
-	}
-
-	/** The search field takes the focus back from Obsidian until the owner presses a key or a pointer. */
-	private focusSearch(): void {
-		this.searchEl?.focus({ preventScroll: true });
-		for (const ms of [0, 60, 200]) {
-			this.timers.push(
-				this.pickerWin.setTimeout(() => {
-					if (this.touched || !this.searchEl || this.modalEl.doc?.activeElement === this.searchEl) return;
-					this.searchEl.focus({ preventScroll: true });
-				}, ms),
-			);
 		}
 	}
 
@@ -719,18 +711,30 @@ class PicturePicker extends Modal {
 		if (cursor === REMOVE_KEY && this.removeEl) {
 			this.removeEl.addClass('is-cursor');
 			this.marked.push(this.removeEl);
-			this.searchEl?.setAttribute('aria-activedescendant', 'dynasty-picture-row-remove');
+			this.setActiveRow('dynasty-picture-row-remove');
 		} else if (cursorAt !== undefined) {
 			const el = this.els[cursorAt];
 			el.addClass('is-cursor');
 			// A picture row is "selected" for a screen reader when the keys act on it and it is the selected picture.
 			if (cursorAt === selectedAt) el.setAttribute('aria-selected', 'true');
 			this.marked.push(el);
-			this.searchEl?.setAttribute('aria-activedescendant', el.getAttribute('id') ?? '');
+			this.setActiveRow(el.getAttribute('id') ?? '');
 		} else {
-			this.searchEl?.removeAttribute('aria-activedescendant');
+			this.setActiveRow(null);
 		}
 		if (this.selectEl) this.selectEl.disabled = selected === null;
+	}
+
+	/**
+	 * Names the cursor row on the element that has the focus: the search field, or the window itself on a touch-first device.
+	 * A screen reader follows only the focused element.
+	 */
+	private setActiveRow(id: string | null): void {
+		const holder = this.modalEl.doc?.activeElement === this.modalEl ? this.modalEl : this.searchEl;
+		for (const el of [this.modalEl, this.searchEl]) {
+			if (el && el === holder && id !== null) el.setAttribute('aria-activedescendant', id);
+			else el?.removeAttribute('aria-activedescendant');
+		}
 	}
 
 	/** Only the Arrow keys and typing scroll the cursor row into view. */
@@ -848,7 +852,7 @@ class PicturePicker extends Modal {
 		this.close();
 	}
 
-	/** D97: the owner chose "Remove": the caller clears its draft value; nothing is written here. */
+	/** D97: the user chose "Remove": the caller clears its draft value; nothing is written here. */
 	private removeChosen(): void {
 		if (this.chosen || this.busy) return;
 		this.chosen = true;
@@ -856,7 +860,7 @@ class PicturePicker extends Modal {
 		this.close();
 	}
 
-	// ---------- Add a picture from this device (D69, B2) ----------
+	// ---------- Add a picture from this device (D69) ----------
 
 	private async fromDevice(f: File): Promise<void> {
 		if (this.busy || this.chosen) return;
@@ -891,7 +895,7 @@ class PicturePicker extends Modal {
 	}
 }
 
-/** O6: opens the picture picker; resolves to what the owner did (`choose`, `remove` or `cancel`). Never rejects. */
+/** O6: opens the picture picker; resolves to what the user did (`choose`, `remove` or `cancel`). Never rejects. */
 export function pickPicture(app: App, o: PickPictureOptions): Promise<PickResult> {
 	return new Promise((resolve) => {
 		let settled = false;

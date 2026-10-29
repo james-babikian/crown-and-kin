@@ -1,6 +1,6 @@
 /*
  * Pure viewport arithmetic for the DOM renderer: default view (spec §5.5), pan and zoom, level of
- * detail with hysteresis (§5.4), hit-area scaling (§7.5), text truncation and (M9) which picture
+ * detail with hysteresis (§5.4), hit-area scaling (§7.5), text truncation and which picture
  * slots a view fills (`livePictureSlots`). Used by the tree view, the scene and pan-zoom, and
  * others; no DOM here, so all of it runs under vitest.
  */
@@ -263,7 +263,7 @@ export function panFrom(start: View, dx: number, dy: number): View {
 
 /**
  * The bars of the full-screen view (D222): screen px at the top and at the bottom of the viewport that a card may not go under. `left` and `right` are the side safe
- * areas of a phone held sideways (the notch, 0.3.1 V1): the views that the plugin chooses keep a card out of them; the drag limit (`panLimits`) does not look at them.
+ * areas of a phone held sideways (the notch): the views that the plugin chooses keep a card out of them; the drag limit (`panLimits`) does not look at them.
  */
 export interface FreeArea {
 	top: number;
@@ -283,7 +283,7 @@ function insetsIn(free: FreeArea, size: Size): Required<FreeArea> {
 }
 
 /**
- * 0.3.1 (V1): a view that `make` chooses for the part of the viewport between the side safe areas, moved so that it shows there in the whole viewport.
+ * A view that `make` chooses for the part of the viewport between the side safe areas, moved so that it shows there in the whole viewport.
  * The scale stays; with no side inset this is `make(size)`.
  */
 export function betweenSides(size: Size, left: number, right: number, make: (area: Size) => View): View {
@@ -295,7 +295,7 @@ export function betweenSides(size: Size, left: number, right: number, make: (are
 }
 
 /**
- * 0.3.1 (F4): true when at least one of `boxes` meets the area that `view` shows in a viewport of `size` (with `free`, the viewport minus the bars). A saved view for
+ * True when at least one of `boxes` meets the area that `view` shows in a viewport of `size` (with `free`, the viewport minus the bars). A saved view for
  * which this is false shows a blank screen: after a pinch, or after the window changed its size. A view that is not a real view shows nothing, so it is false too.
  */
 export function cardShown(view: View, size: Size, boxes: Iterable<Rect>, free?: FreeArea): boolean {
@@ -341,14 +341,14 @@ export function clampTo(view: View, l: { x0: number; x1: number; y0: number; y1:
 	return { scale: view.scale, cx: Math.min(l.x1, Math.max(l.x0, view.cx)), cy: Math.min(l.y1, Math.max(l.y0, view.cy)) };
 }
 
-/** D246 (F3): the least space that a centred tree keeps between a card and the screen edge, in layout px (so `CENTRE_EDGE_MIN * scale` screen px). The rest of the 24 px margin may be cut. */
+/** D246: the least space that a centred tree keeps between a card and the screen edge, in layout px (so `CENTRE_EDGE_MIN * scale` screen px). The rest of the 24 px margin may be cut. */
 export const CENTRE_EDGE_MIN = 8;
 
-/** D246 (F3): the smallest name size, in screen px, at which a tree that does not fit is made smaller to be centred. */
+/** D246: the smallest name size, in screen px, at which a tree that does not fit is made smaller to be centred. */
 export const CENTRE_MIN_NAME_PX = 11;
 
 /**
- * D246 (F3, option C): the opening view of a small tree in the full-screen view. First as D222: the tree fits at `scale`, so it is centred there. Else, if only its
+ * D246 (option C): the opening view of a small tree in the full-screen view. First as D222: the tree fits at `scale`, so it is centred there. Else, if only its
  * empty margin would be cut (a card keeps at least CENTRE_EDGE_MIN px from each edge), it is centred at the same scale. Else it is made just small enough to fit
  * whole, if the names stay at CENTRE_MIN_NAME_PX or more. Otherwise null: the caller keeps its own view.
  */
@@ -359,20 +359,20 @@ export function centredOpening(bounds: Rect, size: Size, scale: number, free: Fr
 	// V1: the side safe areas (a phone held sideways) are not free area either, so the tree is centred between them.
 	const wide = size.w - left - right;
 	const at = (k: number): View => ({ scale: k, cx: bounds.x + bounds.w / 2 + (right - left) / 2 / k, cy: bounds.y + bounds.h / 2 + (bottom - top) / 2 / k });
-	// The margin is in layout px, so the part of it that may be cut is too: at a small scale (names 14 px on a large note font) it is fewer screen px (G2 S4).
+	// The margin is in layout px, so the part of it that may be cut is too: at a small scale (names 14 px on a large note font) it is fewer screen px.
 	const cut = 2 * (FIT_MARGIN - CENTRE_EDGE_MIN) * scale;
 	if (bounds.w * scale <= wide + cut + FIT_EPS && bounds.h * scale <= room + cut + FIT_EPS) return at(scale);
 	const fit = Math.min(scale, wide / bounds.w, room / bounds.h);
 	return fit > 0 && fit * fontPx >= CENTRE_MIN_NAME_PX - FIT_EPS ? at(fit) : null;
 }
 
-/** M11: true when `box` meets `view` grown by one view width left and right and one view height above and below (layout px). */
+/** True when `box` meets `view` grown by one view width left and right and one view height above and below (layout px). */
 export function boxNearView(box: Rect, view: Rect): boolean {
 	return box.x < view.x + 2 * view.w && box.x + box.w > view.x - view.w && box.y < view.y + 2 * view.h && box.y + box.h > view.y - view.h;
 }
 
 /**
- * 0.2.1: the box that holds an SVG path made of the absolute commands M, L, H, V, C, S, Q, T and Z, grown by `pad` on
+ * The box that holds an SVG path made of the absolute commands M, L, H, V, C, S, Q, T and Z, grown by `pad` on
  * every side. A curve lies inside the box of its control points, so the box never cuts a line short. Null when the path
  * has any other command (relative, arcs) or no point; the caller then treats the path as near every view.
  */
@@ -469,7 +469,7 @@ export function isPan(dx: number, dy: number): boolean {
 	return Math.hypot(dx, dy) > PAN_THRESHOLD;
 }
 
-/** 0.2.8 (G.13): the tap area of a fold control and of a `+` badge is at least this many em square. */
+/** The tap area of a fold control and of a `+` badge is at least this many em square. */
 export const HIT_EM = 3;
 
 /** Grows `hit` around its centre so that it is at least MIN_HIT_PX on screen at `scale`. */
@@ -482,10 +482,10 @@ export function enlargeHit(hit: Rect, scale: number, minScreen = MIN_HIT_PX): Re
 }
 
 /**
- * M10 (F7): the tap area of a fold control at zoom `scale`: at least 44 screen px each way (44 / scale layout px),
+ * The tap area of a fold control at zoom `scale`: at least 44 screen px each way (44 / scale layout px),
  * centred on the centre of the `visible` mark. A mark wider than that (a long "+ N" sign) keeps its own width.
  * Where it meets a card, a far-couple tag, a `+` badge or a D14 sign, the tree view cuts it back.
- * 0.2.8 (G.13): with `em` (the note font in px) the area is also at least 3 em each way, so it is large at the readable zoom and below it.
+ * With `em` (the note font in px) the area is also at least 3 em each way, so it is large at the readable zoom and below it.
  */
 export function foldHit(visible: Rect, scale: number, em = 0): Rect {
 	const min = Math.max(scale > 0 ? MIN_HIT_PX / scale : MIN_HIT_PX, HIT_EM * em);
@@ -496,7 +496,7 @@ export function foldHit(visible: Rect, scale: number, em = 0): Rect {
 	return { x: cx - w / 2, y: cy - h / 2, w, h };
 }
 
-/** M10 (F10): moves `view` so that the layout point `to` shows where the layout point `from` showed; the scale stays. */
+/** Moves `view` so that the layout point `to` shows where the layout point `from` showed; the scale stays. */
 export function keepSpot(view: View, from: { x: number; y: number }, to: { x: number; y: number }): View {
 	return { scale: view.scale, cx: view.cx + (to.x - from.x), cy: view.cy + (to.y - from.y) };
 }
@@ -509,7 +509,7 @@ export interface KeepPlaceArea {
 }
 
 /**
- * 0.3.1 (D244): the view after an edit, so that the card of person `id` shows where it showed before. The scale stays. Null when no shift
+ * D244: the view after an edit, so that the card of person `id` shows where it showed before. The scale stays. Null when no shift
  * applies: the person has no card before or after the edit (a delete, a card a fold hides). With `area` the shifted view is clamped like
  * a dragged view (D222), so the limits win over the exact place.
  */
@@ -523,7 +523,7 @@ export function keepPlaceShift(before: ReadonlyMap<string, Rect>, after: Readonl
 }
 
 /**
- * 0.3.1 (D245): the smallest pan that brings `box` wholly into the free area of the viewport (the viewport minus the bars). The scale stays. An axis in which the card is
+ * D245: the smallest pan that brings `box` wholly into the free area of the viewport (the viewport minus the bars). The scale stays. An axis in which the card is
  * larger than the free area centres the card there. The view is returned as it is when the card is already wholly inside.
  */
 export function bringInView(view: View, box: Rect, area: { size: Size; free?: FreeArea }): View {
@@ -681,7 +681,7 @@ export const isDoubleTap: IsDoubleTap = (t0, p0, t1, p1) => {
 /** Resize or orientation change (spec §7.5): see `ResizeView`. */
 export const resizeView: ResizeView = (view, _oldSize, _newSize, newLimits) => ({ scale: clampScale(view.scale, newLimits), cx: view.cx, cy: view.cy });
 
-/** Spec §13.0 item 3: at most this many picture elements in each view (B18). */
+/** Spec §13.0 item 3: at most this many picture elements in each view. */
 export const MAX_LIVE_PICTURES = 150;
 
 /**
@@ -732,7 +732,7 @@ export function truncateWithMaybe(word: string, suffix: string, maxW: number, me
 }
 
 /**
- * The path of a house ribbon (0.2.8, contract C, G.15): the strip along the top edge (`edge` 'top': a band `w` wide and `t` thick) or the left edge (`edge` 'left': a band
+ * The path of a house ribbon: the strip along the top edge (`edge` 'top': a band `w` wide and `t` thick) or the left edge (`edge` 'left': a band
  * `t` wide and `h` high) of a card with corners of radius `r`. The two corners at the strip's ends follow the card's own corners, so no strip sticks out of
  * the rounded card. A strip thinner than the radius ends in the arc of the corner circle (no part of it lies outside the card); a thicker one has the arc and a straight foot.
  * The radius is read from the theme at run time in the live tree (`readCornerRadius`) and fixed in a saved picture.

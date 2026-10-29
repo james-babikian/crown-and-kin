@@ -11,7 +11,7 @@ import { TreeViewBase } from '../../src/obsidian/tree-view-base';
 import { HOUSE_PALETTE } from '../../src/render/styles';
 import { menuKey } from '../../src/render/dom/widgets';
 import { closePluginModals } from '../../src/view/plugin-modals';
-import { FEl, clock, dispatch, fakeDoc, resetDom } from '../acceptance/fake-dom';
+import { FEl, clock, dispatch, fakeDoc, resetDom, runTimers } from '../acceptance/fake-dom';
 import { openModals, resetObsidian } from '../acceptance/fake-obsidian';
 import { cycleNote, eraNote } from '../support/calendar-vault';
 import { openWindow } from '../support/calendar-window-app';
@@ -193,8 +193,8 @@ describe('item 6: the choice window', () => {
 	});
 });
 
-describe('item 7: the window of a new partner starts in Name', () => {
-	it('Obsidian puts the focus on "Type of partnership", the first control; the window moves it to Name', async () => {
+describe('item 7 (changed in 0.5.1): the window of a new partner starts with no field focused', () => {
+	it('Obsidian puts the focus on "Type of partnership", the first control; the window takes it back, so the type list never opens by itself', async () => {
 		const h = writingHandle(BODY);
 		const s = EditSheet.createNew({} as never, { handle: h as never, sourcePath: 'n.md', newPerson: { kind: 'partner', partner: 'a' } } as never)!;
 		s.open();
@@ -203,7 +203,8 @@ describe('item 7: the window of a new partner starts in Name', () => {
 		type.focus();
 		await Promise.resolve();
 		await Promise.resolve();
-		expect(fakeDoc.activeElement).toBe(modal.querySelector('[data-field="name"] input'));
+		runTimers(300);
+		expect(fakeDoc.activeElement).toBe(modal);
 	});
 });
 

@@ -8,6 +8,7 @@
 import type { DateReader } from '../../core/dates';
 import { dateReadoutParts, type ReadoutParts } from '../date-readout';
 import { markedLine } from './marks';
+import { afterPress } from './press-hold';
 
 /**
  * Writes the two parts of a date line into `line`: the reading as grey text, and the warning about a wrong written name (when there is one) on a text line of its own, with
@@ -44,7 +45,8 @@ export function attachDateLine(
 			line.empty();
 		}
 	};
-	input.addEventListener('blur', paint);
+	// A press on a button below the field is under way when the blur comes: the line changes after the click, so the button does not move.
+	input.addEventListener('blur', () => afterPress(input, input, paint));
 	paint();
 	if (watch && release) {
 		// The sheet draws its fields again now and then: a line that left the page stops its own watch.

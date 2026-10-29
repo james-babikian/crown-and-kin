@@ -1,6 +1,6 @@
 /*
- * The temporary views of a tree view (0.3.3, WP-1 A1): the result bar of the relation finder (spec §13.2, D47–D49) and the bar of the Show view of a line of
- * succession (contract 0.2.7 F). Eighth layer of the chain listed in `tree-view.ts`.
+ * The temporary views of a tree view: the result bar of the relation finder (spec §13.2, D47–D49) and the bar of the Show view of a line of
+ * succession. Eighth layer of the chain listed in `tree-view.ts`.
  */
 
 import { setIcon } from 'obsidian';
@@ -22,7 +22,7 @@ export abstract class TreeViewFinder extends TreeViewActions {
 	// ---------- the relation finder (spec §13.2, D47, D48, D49) ----------
 
 	/**
-	 * The banner of the relation finder's result (spec §13.2, D48; 0.2.8 G.13): one row under the toolbar with the sentence, then the links
+	 * The banner of the relation finder's result (spec §13.2, D48): one row under the toolbar with the sentence, then the links
 	 * Show the steps, Other relation, Show in the whole tree (or back to the line only) and Close. On a phone Close is an X with a 44 px
 	 * tap area. The links wrap under the sentence when the row is narrow; the steps open as a list under them.
 	 */
@@ -112,7 +112,7 @@ export abstract class TreeViewFinder extends TreeViewActions {
 		pop.whenClosed(() => opener.setAttribute('aria-expanded', 'false'));
 	}
 
-	/** The Close of a banner: the word as a link on the computer, an X with a 44 px tap area on a phone (0.2.8 G.13, I37). */
+	/** The Close of a banner: the word as a link on the computer, an X with a 44 px tap area on a phone. */
 	protected closeLink(row: HTMLElement, cls: string, text: string, label: string, run: () => void): HTMLElement {
 		const icon = this.barKind() === 'phone';
 		const b = row.createEl('button', { cls: ['dynasty-result-button', cls, ...(icon ? ['clickable-icon', 'dynasty-bar-x'] : ['dynasty-link'])], attr: { type: 'button', 'aria-label': label } });
@@ -139,22 +139,22 @@ export abstract class TreeViewFinder extends TreeViewActions {
 		TreeViewBase.finderRedraw(this.host, st);
 	}
 
-	// ---------- the Show view of a line of succession (contract 0.2.7 F) ----------
+	// ---------- the Show view of a line of succession ----------
 
-	/** The Show view the phone list draws (F.6): the same rule as for a tree, and a title that is gone ends the view. */
+	/** The Show view the phone list draws: the same rule as for a tree, and a title that is gone ends the view. */
 	protected showViewFor(st: BlockState, whole: FamilyGraph): SuccessionDrawn | null {
 		const { drawn, ended } = showViewOf(st, whole, this.settings, { full: !!this.full, coarse: this.coarse, phone: this.isPhone() });
 		if (ended) st.succession = null;
 		return drawn;
 	}
 
-	/** The people that the folds must show: the finder's line, or the ruler, the heirs and the open branches of the Show view (F.2, M.9). */
+	/** The people that the folds must show: the finder's line, or the ruler, the heirs and the open branches of the Show view. */
 	protected linePeopleNow(): string[] | null {
 		if (this.successionDrawn) return linePeople(this.successionDrawn);
 		return this.finderDrawn?.line?.people ?? null;
 	}
 
-	/** The banner of the Show view (F.3, 0.2.8 G.13): the sentence and Close in one row, with the look and the place of the finder's banner. */
+	/** The banner of the Show view: the sentence and Close in one row, with the look and the place of the finder's banner. */
 	protected buildSuccessionBar(viewport: HTMLElement, before: HTMLElement, d: SuccessionDrawn): void {
 		const id = `dynasty-result-${++resultIds}`;
 		const bar = viewport.createDiv({ cls: ['dynasty-result', 'dynasty-succession-bar', ...(this.barKind() === 'phone' ? ['dynasty-result-phone'] : [])], attr: { role: 'group', 'aria-labelledby': id } });

@@ -8,6 +8,7 @@
 
 import { formatInternalYear } from '../core/dates';
 import { andList } from '../core/messages';
+import { isolateDate } from './date-bidi';
 
 /** The grey line under Born and Died and the test line (spec §14 rule 6). */
 export const DATE_READOUT_UI = {
@@ -109,8 +110,11 @@ export const CALENDAR_WINDOW_UI = {
 	addEra: 'Add era',
 	noEras: 'This calendar has no era. Add an era.',
 	remove: 'Remove',
-	removeCalendar: (name: string) => `Remove the calendar ${name || 'without a name'}`,
+	// The name begins with the words of the visible link (WCAG 2.5.3).
+	removeCalendar: (name: string) => `Remove this calendar: ${name || 'without a name'}`,
 	removeThisCalendar: 'Remove this calendar',
+	/** A quiet line under the link: what changes in the tree when the calendar is gone. */
+	removeNote: 'If you remove this calendar, the plugin no longer reads dates in this calendar as years. Cards show these dates as written. The line of succession then uses plain years only.',
 	removeEra: (name: string) => `Remove the era ${name || 'without a name'}`,
 	// The summary line of a closed section (spec §14 rule 16).
 	summaryYears: (n: number) => (n === 1 ? '1 year in a cycle' : `${n} years in a cycle`),
@@ -127,17 +131,21 @@ export const CALENDAR_WINDOW_UI = {
 	noLists: 'No name list. A name list gives each year a name from a list that repeats, for example a planet.',
 	listName: 'Name of the list',
 	listNamePlaceholder: 'For example: Planets',
-	removeList: (name: string) => `Remove the name list ${name || 'without a name'}`,
+	// The name begins with the words of the visible link (WCAG 2.5.3).
+	removeThisList: 'Remove this list',
+	removeList: (name: string) => `Remove this list: ${name || 'without a name'}`,
 	markerLabel: 'Marker',
-	markerPlaceholder: 'For example: planet',
-	markerHint: 'Write one short word here, for example planet. The word stands for a name from this list. Then write the same word in curly brackets in a format of this calendar, for example {cycle}.{year} {planet}. The plugin then reads a date such as 22.13 Saturn.',
+	markerPlaceholder: 'For example: {planet}',
+	markerHint: 'Write one short word in curly brackets, for example {planet}.',
+	/** The one word in curly brackets in `markerHint`: the hint shows it on one text line, never broken inside. */
+	markerHintKeep: ['{planet}'] as readonly string[],
 	namesLabel: 'Names in order',
 	namesPlaceholder: 'For example: Saturn, Sa',
 	namesHint: 'Write one name on each text line. To add a short form for the cards, write it after a comma, for example Saturn, Sa. The names repeat in this order, one name for each year. If a name has its own comma, write a comma at the end of the text line. An example is Mary, Queen of Scots,',
 	knownLabel: 'Known year',
 	knownNameLabel: 'Name of that year',
 	knownHint: 'Write a date and the name of its year. The plugin then counts the names of all other years from this one. For example, if year 1273 is Saturn, year 1274 is the next name in the list.',
-	knownBack: (date: string, year: number, name: string, count: number) => `${date} = ${formatInternalYear(year)}. The name of this year is ${name}. ${T_REPEAT(count)}`,
+	knownBack: (date: string, year: number, name: string, count: number) => `${isolateDate(date)} = ${formatInternalYear(year)}. The name of this year is ${name}. ${T_REPEAT(count)}`,
 	/** The known year of the plain years: the date is a plain year, so the line has no "=". */
 	knownBackPlain: (year: number, name: string, count: number) => `The name of ${formatInternalYear(year)} is ${name}. ${T_REPEAT(count)}`,
 	knownDateBad: 'The plugin cannot read a year in this date. Write a date that this calendar can read.',

@@ -13,7 +13,7 @@ export { PARENT_LIMIT, PARENT_TYPES, type ParentType };
 /** Parent types that can decide where a card is drawn. Rumoured never can. */
 export const PLACEMENT_TYPES = ['birth', 'adoptive', 'ward'] as const;
 /** One of `PLACEMENT_TYPES`. */
-export type PlacementType = (typeof PLACEMENT_TYPES)[number];
+type PlacementType = (typeof PLACEMENT_TYPES)[number];
 
 /** The partnership types a union can have (spec §4.1). */
 export const UNION_TYPES = ['marriage', 'betrothal', 'concubinage', 'affair'] as const;
@@ -21,9 +21,9 @@ export const UNION_TYPES = ['marriage', 'betrothal', 'concubinage', 'affair'] as
 /** Why a partnership ended (spec §4.1, D306). `readEndedBy` reads the key. */
 export const ENDED_BY = ['divorce', 'annulment', 'death'] as const;
 /** One of `ENDED_BY`. */
-export type EndedBy = (typeof ENDED_BY)[number];
+type EndedBy = (typeof ENDED_BY)[number];
 
-/** Words read as a value of `ended-by`, besides the value itself (D306, RULES §9 item 3). */
+/** Words read as a value of `ended-by`, besides the value itself (D306). */
 // A prototype-free table, so that a word such as "constructor" finds nothing (as UNION_WORDS in parse.ts).
 const ENDED_BY_ALIASES: Readonly<Record<string, EndedBy>> = Object.assign(Object.create(null) as Record<string, EndedBy>, { divorced: 'divorce', annulled: 'annulment' });
 
@@ -74,13 +74,13 @@ export interface Person {
 	parents: ParentRef[];
 	placement?: string;
 	illegitimate: boolean;
-	/** M.5: the person died with no children; set only when true. Only a dead person's open branch reads it. */
+	/** The person died with no children; set only when true. Only a dead person's open branch reads it. */
 	childless?: true;
 	union?: string;
 	link?: string;
 	/** Spec §13.7: the portrait picture link, as written (flattened like `link`); absent when not written or empty. */
 	portrait?: string;
-	/** 0.2.8 contract A.1: the personal arms picture link, as written (flattened like `link`); absent when not written or empty. */
+	/** The personal arms picture link, as written (flattened like `link`); absent when not written or empty. */
 	arms?: string;
 	/** Spec §13.13, D79: the text of `portrait-crop` as written (a list or map as JSON text); absent when not written or empty. */
 	portraitCrop?: string;
@@ -124,7 +124,7 @@ export interface Holder {
 	number?: string;
 	from?: string;
 	to?: string;
-	/** 0.2.8 contract A.2, key `through-spouse`: `true` when the person holds the title through a spouse that the plugin finds, or the id of that spouse as written. Absent when not written or off. */
+	/** Key `through-spouse`: `true` when the person holds the title through a spouse that the plugin finds, or the id of that spouse as written. Absent when not written or off. */
 	throughSpouse?: true | string;
 	/** Position of the item in the written `holders` list, counting skipped items. */
 	index: number;
@@ -149,29 +149,29 @@ export interface Title {
 	index: number;
 	/** As read: the number of items in the written `holders` list, holders or not (the Delete title confirmation). */
 	items: number;
-	/** Contract 0.2.7 A: `succession` as written, trimmed; the rule is `readRule` of it. Present only when written. */
+	/** `succession` as written, trimmed; the rule is `readRule` of it. Present only when written. */
 	succession?: string;
 	/** `inherit` as written, trimmed; the rule is `readInherit` of it. Present only when written. */
 	inherit?: string;
-	/** K.1: `inherit-through`, set only for a usable value (old forms read as the current one). */
+	/** `inherit-through`, set only for a usable value (old forms read as the current one). */
 	inheritThrough?: InheritThrough;
 	/** `inherit-illegitimate`, set only for `after` or `equal` (`no` and an absent key are the same). */
 	inheritIllegitimate?: 'after' | 'equal';
 	/** `inherit-adopted`, set only when it reads as true. */
 	inheritAdopted?: true;
-	/** L.1: `heirs-of-body`, set only when it reads as true. */
+	/** `heirs-of-body`, set only when it reads as true. */
 	heirsOfBody?: true;
 	/** `year` as written; the year is `yearOf` of it. */
 	year?: string;
-	/** K.3: the ids of `heir` in written order (one id or a list). An empty list gives undefined. */
+	/** The ids of `heir` in written order (one id or a list). An empty list gives undefined. */
 	heirs?: string[];
-	/** K.3: the ids of `exclude` in written order. */
+	/** The ids of `exclude` in written order. */
 	exclude?: string[];
-	/** A.1: the flow text of a succession key whose value is a list or a map (or, for the last three, a text the plugin cannot use). */
+	/** The flow text of a succession key whose value is a list or a map (or, for the last three, a text the plugin cannot use). */
 	badKeys?: Partial<Record<BadKey, string>>;
 }
 
-/** The title keys that can hold a value the plugin cannot use (A.1, K.4). */
+/** The title keys that can hold a value the plugin cannot use. */
 export type BadKey = 'succession' | 'inherit' | 'inherit-through' | 'inherit-illegitimate' | 'year' | 'heir' | 'exclude';
 
 /** The `options` section of a block: the start person, the focus person, the generation and height limits, and the calendar note. */

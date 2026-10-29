@@ -1,11 +1,11 @@
 /**
- * The "Arms on cards" rule (0.2.8, D206, contract G.16): which cards show arms. One function, `armsCardIds`, serves the cards of the layout
+ * The "Arms on cards" rule (D206): which cards show arms. One function, `armsCardIds`, serves the cards of the layout
  * and the saved picture, so both show the same set. The phone list does not use it (D209 item 6: only its top row shows arms). The rule needs only the graph.
  */
 import { drawnParents, type FamilyGraph } from './derive';
 
-/** The two values of the setting "Arms on cards" (A.4): the few people of D206, or every card that has arms. */
-export type ArmsMode = 'few' | 'all';
+/** The two values of the setting "Arms on cards": the few people of D206, or every card that has arms. */
+type ArmsMode = 'few' | 'all';
 
 /**
  * The ids of the people whose card shows arms, house arms or personal arms. A person with personal arms is always in the set. With `'all'`,

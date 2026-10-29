@@ -1,4 +1,4 @@
-/* ---------- Fold a branch (M10: spec §13.10, D83–D85) ---------- */
+/* ---------- Fold a branch (spec §13.10, D83–D85) ---------- */
 
 /* The open button ("−") and the folded sign ("+ N"). The tooltip is the <title> child; Obsidian's aria-label tooltip fails on SVG. */
 .dynasty-fold {
@@ -8,7 +8,7 @@
 	font-family: var(--font-interface);
 }
 
-/* The tap area is invisible and lies below the cards, so a card wins where they meet (F7). */
+/* The tap area is invisible and lies below the cards, so a card wins where they meet. */
 .dynasty-fold-hit {
 	cursor: pointer;
 	fill: none;
@@ -16,7 +16,7 @@
 	pointer-events: all;
 }
 
-/* 0.2.8 (C01): a small square chip; the "−" is a round-capped line in the text colour. */
+/* A small square chip; the "−" is a round-capped line in the text colour. */
 .dynasty-fold-button,
 .dynasty-fold-pill,
 .dynasty-fold-pill-big {
@@ -64,7 +64,7 @@
 	stroke-width: 3;
 }
 
-/* Levels of detail: Full and Compact draw the same size in em; Overview draws only signs, in the larger pill (F6). */
+/* Levels of detail: Full and Compact draw the same size in em; Overview draws only signs, in the larger pill. */
 .dynasty-fold-pill-big {
 	display: none;
 }
@@ -94,7 +94,7 @@
 
 
 /*
- * 0.2.8 (I01, C01): the `+` badge of focus mode is an outline disc: the card colour inside a ring in the text colour, with the plus in the text
+ * The `+` badge of focus mode is an outline disc: the card colour inside a ring in the text colour, with the plus in the text
  * colour.
  */
 .dynasty-focus-badge-mark {

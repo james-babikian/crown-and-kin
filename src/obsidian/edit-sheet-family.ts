@@ -1,12 +1,12 @@
 /*
- * The Family section of the edit sheet and the small pieces of rows and buttons it shares (0.3.3, WP-1 A1; spec §6.3, G.7): parents, partners, children, the place
- * among the siblings, a move to another person, and the update in place after a change of a parent type (r032). Fourth layer of the chain listed in `edit-sheet.ts`.
+ * The Family section of the edit sheet and the small pieces of rows and buttons it shares (spec §6.3): parents, partners, children, the place
+ * among the siblings, a move to another person, and the update in place after a change of a parent type. Fourth layer of the chain listed in `edit-sheet.ts`.
  */
 
 import { setIcon } from 'obsidian';
 import type { ParentKind } from '../core/edit';
 import { PARENT_LIMIT, PARENT_TYPES } from '../core/types';
-import { dateLine, relationInfo } from '../render/tree-info';
+import { dateLine, dateLineShown, relationInfo } from '../render/tree-info';
 import { quotedSobriquet } from '../core/sobriquet';
 import { FAMILY, ME_UI, SHEET, WINDOW_UI, parentTypeText, partnerDetail } from '../render/ui-text';
 import type { FamilyView, ParentLink, PartnerLink } from '../core/family-query';
@@ -79,7 +79,7 @@ export abstract class EditSheetFamily extends EditSheetForm {
 		return me && (id === me || this.data.person.id === me) ? relationsFor(this.data.g, me, this.o.relationOptions, this.o.relationBlock).cards.get(id) : undefined;
 	}
 
-	/** WP-K: the words of the parent rows and child rows come from one request. Only the window of the marked person shows them (D215). */
+	/** The words of the parent rows and child rows come from one request. Only the window of the marked person shows them (D215). */
 	protected warmRelationWords(fam: FamilyView): void {
 		const me = this.me();
 		if (!me || this.data.person.id !== me) return;
@@ -99,10 +99,10 @@ export abstract class EditSheetFamily extends EditSheetForm {
 		if (dates) sub.appendText(`${word ? ' · ' : ''}${dates}`);
 	}
 
-	/** The years that a person row shows under the name; empty when the person has none. */
-	protected rowDates(id: string): string {
+	/** The years that a person row shows under the name; empty when the person has none. `spoken` gives the text for a screen reader, with no isolate controls. */
+	protected rowDates(id: string, spoken = false): string {
 		const p = this.data.g.byId.get(id);
-		return (p ? dateLine(p, this.data.g.dates) : '') || '';
+		return (p ? (spoken ? dateLine : dateLineShown)(p, this.data.g.dates) : '') || '';
 	}
 
 	protected personRowLead(row: HTMLElement, id: string): void {
@@ -110,7 +110,7 @@ export abstract class EditSheetFamily extends EditSheetForm {
 		personLead(row, { name: p?.name || id, ...(p?.portrait ? { portrait: p.portrait } : {}), ...(p?.portraitCrop ? { portraitCrop: p.portraitCrop } : {}) }, this.rowPictures ?? undefined);
 	}
 
-	/** The Family section: the three Add buttons, then Parents, Partners, Children and the place among the siblings (spec §6.3, G.7). */
+	/** The Family section: the three Add buttons, then Parents, Partners, Children and the place among the siblings (spec §6.3). */
 	protected familyBody(body: HTMLElement): void {
 		const fam = this.data.fam;
 		if (!fam) return;
@@ -125,14 +125,14 @@ export abstract class EditSheetFamily extends EditSheetForm {
 		if (!fam.partners.length) partners.createDiv({ cls: ['dynasty-sheet-none', 'dynasty-family-empty'], text: FAMILY.noPartners });
 		for (const link of fam.partners) this.partnerRow(partners, link);
 
-		// G.7: a child row opens that person in this window, with a way back.
+		// A child row opens that person in this window, with a way back.
 		const children = group('children', WINDOW_UI.children, { text: FAMILY.addChild, cls: 'dynasty-add-child', run: () => void addChild(this.flowHost()) });
 		const kids = this.childrenOf();
 		if (!kids.length) children.createDiv({ cls: ['dynasty-sheet-none', 'dynasty-family-empty'], text: WINDOW_UI.noChildren });
 		for (const kid of kids) {
 			const r = buildRow(children, {
 				tap: () => this.openPerson(kid.id),
-				label: WINDOW_UI.openPersonLabel(this.rowNameText(kid.id), this.relationWord(kid.id)?.text, this.rowDates(kid.id)),
+				label: WINDOW_UI.openPersonLabel(this.rowNameText(kid.id), this.relationWord(kid.id)?.text, this.rowDates(kid.id, true)),
 				cls: 'dynasty-family-row',
 				attr: { 'data-child': kid.id },
 				lead: (row) => this.personRowLead(row, kid.id),
@@ -172,7 +172,7 @@ export abstract class EditSheetFamily extends EditSheetForm {
 	}
 
 	/**
-	 * G.7: a child row opens that person in this window. With unsaved changes the window first asks "Discard changes?", because the
+	 * A child row opens that person in this window. With unsaved changes the window first asks "Discard changes?", because the
 	 * draft belongs to the person on screen. The way back names the person that the user came from.
 	 */
 	protected openPerson(id: string): void {
@@ -282,7 +282,7 @@ export abstract class EditSheetFamily extends EditSheetForm {
 	}
 
 	/**
-	 * r032: shows the result of a changed parent type without a build. The select that the user used stays in the page (a native select
+	 * Shows the result of a changed parent type without a build. The select that the user used stays in the page (a native select
 	 * that is taken out under the finger can keep its phone menu open), so only what depends on the types is set again: the rows of
 	 * the parents, the relation text line, the place among the siblings, the Titles section and the summaries. A page that differs from
 	 * what a build gives (the rows are not there, the person did not load) is built again.

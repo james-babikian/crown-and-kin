@@ -132,9 +132,11 @@ describe('D102: the structure', () => {
 });
 
 describe('D102: the scroller does not move when the field gets the focus', () => {
-	it('on the computer, with the focus at open, the scroller stays at 0', async () => {
+	it('on the computer, the field has the focus at open (D320); after a click in the field the scroller stays at 0', async () => {
 		const m = pick({ remove: 'Remove arms' });
 		expect(fakeDoc.activeElement).toBe(search(m));
+		dispatch(search(m), 'pointerdown');
+		search(m).focus();
 		iosScrollsHolderOfFocus(m);
 		runTimers(1000);
 		await settle();

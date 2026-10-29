@@ -1,5 +1,5 @@
 /*
- * The fence index (0.4 WP-3a, the index contract 1). It knows which notes of the vault hold a `kin` fence (a tree) and which hold a `kin-calendar` fence (a calendar), so that the plugin does not
+ * The fence index. It knows which notes of the vault hold a `kin` fence (a tree) and which hold a `kin-calendar` fence (a calendar), so that the plugin does not
  * scan the whole vault at each task. It is a hint, not a proof: callers that write still check the text. The state is kept per note with a stamp (modified time and size). A saved copy in the
  * local storage of the vault lets the next start skip every note that did not change; vault events keep the index up to date while Obsidian runs. Pure logic: the vault, the store and the
  * idle wait come in as arguments (`src/obsidian/fence-vault.ts` is the real adaptor).
@@ -96,7 +96,7 @@ class Fence implements FenceIndex {
 	private readonly o: Required<FenceOptions>;
 	private readonly entries = new Map<string, FenceFlag>();
 	private readonly stamps = new Map<string, number>();
-	/** Every event for a path raises its sequence number; a read that ends under another number is stale (gate finding M2). */
+	/** Every event for a path raises its sequence number; a read that ends under another number is stale. */
 	private readonly marks = new Map<string, { seq: number; kind: Mark }>();
 	/** Paths that a `cache` event told about before the check ended. */
 	private readonly seen = new Set<string>();
@@ -245,7 +245,7 @@ class Fence implements FenceIndex {
 			const was = this.stored.get(key);
 			if (counts.get(key) === 1 && was === stamp) this.stamps.set(f.path, stamp);
 			else {
-				// A stamp that differs: the note changed while the plugin did not run, and Obsidian may give the old cache entry (found by the G2 of part 3).
+				// A stamp that differs: the note changed while the plugin did not run, and Obsidian may give the old cache entry.
 				if (was !== undefined) this.doubted.add(f.path);
 				out.push({ f, s: this.seqOf(f.path) });
 			}
@@ -422,7 +422,7 @@ class Fence implements FenceIndex {
 			this.stamps.set(f.path, stamp);
 			return;
 		}
-		// The old path was not checked yet: the new path inherits the doubt (gate finding M1).
+		// The old path was not checked yet: the new path inherits the doubt.
 		this.toCheck.add(f.path);
 		this.arm(f);
 	}

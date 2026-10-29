@@ -1,5 +1,5 @@
 /*
- * Reads of the page that the tree view needs (`tree-view-lifecycle.ts`, `tree-view-placement.ts`, `tree-view.ts`; moved out of `tree-view.ts` in WP-4 step 4.3 to keep that file within its size ceiling):
+ * Reads of the page that the tree view needs (`tree-view-lifecycle.ts`, `tree-view-placement.ts`, `tree-view.ts`):
  * the fonts of a block through a probe element, and the safe-area insets from the view's probe element. They read computed styles only.
  */
 
@@ -22,6 +22,7 @@ export function readFonts(el: HTMLElement): FontState {
 	}
 }
 
+/** Reads the font state from a probe element that is already in the page. */
 export function fontsOf(probe: HTMLElement): FontState {
 	const cs = getComputedStyle(probe);
 	const v = (name: string) => cs.getPropertyValue(name).trim();
@@ -38,7 +39,7 @@ export function safeTop(probe: HTMLElement | null): number {
 	return probe?.isConnected ? (parsePx(getComputedStyle(probe).paddingTop) ?? 0) : 0;
 }
 
-/** `env(safe-area-inset-left)` and `-right` in px (the notch of a phone held sideways, 0.3.1 V1), read from the same probe element. */
+/** `env(safe-area-inset-left)` and `-right` in px (the notch of a phone held sideways), read from the same probe element. */
 export function safeSides(probe: HTMLElement | null): { left: number; right: number } {
 	if (!probe?.isConnected) return { left: 0, right: 0 };
 	const cs = getComputedStyle(probe);

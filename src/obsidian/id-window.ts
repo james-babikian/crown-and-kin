@@ -10,7 +10,7 @@ import { Modal, type App } from 'obsidian';
 import { ID_UI } from '../render/ui-text';
 import { reasonText, type IdKind, type IdReason } from '../view/id-draft';
 import { idField } from './id-field';
-import { ignoreGhostClick, phoneLayout } from './modal-layout';
+import { ignoreGhostClick, phoneLayout, startWithoutFocus } from './modal-layout';
 import { trackModal } from '../view/plugin-modals';
 import { nameDialog } from './sheet-parts';
 import { buildShell, type Shell } from './window-shell';
@@ -52,7 +52,7 @@ class IdWindow extends Modal {
 		this.modalEl.addClass('dynasty-id-window');
 		this.cleanup.push(phoneLayout(this, undefined, false), ignoreGhostClick(this), trackModal(this, () => this.close()));
 		const el = this.contentEl;
-		// The window family (contract C): a bar on a phone, a footer on a computer; "Use this ID" is the main button.
+		// The window family: a bar on a phone, a footer on a computer; "Use this ID" is the main button.
 		const shell = buildShell({
 			modalEl: this.modalEl,
 			contentEl: el,
@@ -98,8 +98,7 @@ class IdWindow extends Modal {
 			this.close();
 		});
 		refresh(s.value);
-		// The sheet is at the top of the screen, so the keyboard that this focus opens cannot cover the field.
-		view.input.focus();
+		this.cleanup.push(startWithoutFocus(this.modalEl));
 	}
 
 	override onClose(): void {

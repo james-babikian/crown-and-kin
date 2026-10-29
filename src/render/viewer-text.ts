@@ -5,6 +5,7 @@
 
 const PORTRAIT = 'Portrait';
 
+/** The texts of the picture viewer and of the picture menu, by name. */
 export const VIEWER_UI = {
 	/** The first item of the picture menu of a person, and of the arms menu of a house. */
 	viewPortrait: 'View portrait',

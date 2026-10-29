@@ -1,5 +1,5 @@
 /*
- * The pure parts of "Save as picture" (spec §13.8, D70–D74; M9 contract P1–P6, B4, B5): what the
+ * The pure parts of "Save as picture" (spec §13.8, D70–D74): what the
  * saved picture's legend lists (`savedLegend`), where its heading, tree and legend go
  * (`savedFrame`, `savedExtent`), the scale it is written at (`savedScale`) and its file name
  * (`savedFileName`). `svg-string.ts` draws the picture from `savedFrame`, so the extent that the save
@@ -16,38 +16,38 @@ import { LEGEND_DEAD_SAMPLE_W, LEGEND_SAMPLE_H, LEGEND_SAMPLE_W, legendHouses, t
 import { LEGEND_DEAD_DOUBT_LABEL, LEGEND_DEAD_LABEL, LEGEND_HOUSES_LABEL, LEGEND_LABELS, LEGEND_LINES_LABEL, LEGEND_ORDER, SIGN_LEGEND_LABEL } from './legend-text';
 import { dateLine } from './tree-info';
 
-/** What a saved picture's legend shows (P3): the line kinds drawn, the D14 sign when used, the houses of the drawn people. */
+/** What a saved picture's legend shows: the line kinds drawn, the D14 sign when used, the houses of the drawn people. */
 export interface SavedLegendContent {
 	kinds: readonly StrokeKind[];
 	sign: boolean;
 	houses: readonly LegendHouse[];
-	/** 0.2.8 (I19): the dead signs that a drawn date text carries ("†", "†?"), in legend order; absent when none is drawn. */
+	/** The dead signs that a drawn date text carries ("†", "†?"), in legend order; absent when none is drawn. */
 	dead?: readonly ('dead' | 'dead-doubt')[];
 }
 
 /** B9, B1: a picture map: `arms:<houseId>` / `portrait:<personId>` → a data URI, 'missing' (dashed frame) or null (another problem). */
 export type PictureMap = ReadonlyMap<string, (string & {}) | 'missing' | null>;
 
-/** What only a saved picture has (P3–P5); `SvgOptions.saved`. */
+/** What only a saved picture has; `SvgOptions.saved`. */
 export interface SavedParts {
 	/** The note's name, drawn at the top (D74). */
 	heading: string;
 	legend: SavedLegendContent;
 	/** The pictures to embed; a missing key is drawn like null. */
 	pictures: PictureMap;
-	/** Output px per layout px (P5, `savedScale`). */
+	/** Output px per layout px (`savedScale`). */
 	scale: number;
 	/**
-	 * M10 (F14, spec §13.10): the folds of the view that saves. Present = the picture draws the "+ N" signs of the folded
+	 * Spec §13.10: the folds of the view that saves. Present = the picture draws the "+ N" signs of the folded
 	 * families of `layout.folds` (never the "−" buttons, D71); the layout is made with the same hidden people as the view.
 	 */
 	folds?: FoldSet;
 }
 
-/** The legend content of a saved picture (P3): the kinds of `laid`'s lines in legend order, the D14 sign, the houses of the drawn people in list order. */
+/** The legend content of a saved picture: the kinds of `laid`'s lines in legend order, the D14 sign, the houses of the drawn people in list order. */
 export function savedLegend(g: FamilyGraph, laid: LaidOut): SavedLegendContent {
 	const used = new Set(laid.edges.paths.map((p) => p.kind));
-	// I19: the legend explains a dead sign only when a drawn card has one; "†?" is a text with a question mark after the sign.
+	// The legend explains a dead sign only when a drawn card has one; "†?" is a text with a question mark after the sign.
 	let dead = false;
 	let doubt = false;
 	for (const id of laid.layout.persons.keys()) {
@@ -67,15 +67,16 @@ export function savedLegend(g: FamilyGraph, laid: LaidOut): SavedLegendContent {
 	};
 }
 
-// R1: XML 1.0 forbids these characters; one of them in a name makes the whole saved SVG (and the
+// XML 1.0 forbids these characters; one of them in a name makes the whole saved SVG (and the
 // PNG made from it) fail to load.
 const NOT_XML = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\uFFFE\uFFFF]/g;
 
-/** R1: `s` without the characters XML forbids, as a saved picture writes and measures it. */
+/** `s` without the characters XML forbids, as a saved picture writes and measures it. */
 export const xmlText = (s: string) => s.replace(NOT_XML, '');
 
 /** The largest PNG a save makes (spec §13.8): pixels in all, and px on each side (the iPhone's limit for one image). */
 export const SAVED_PNG_MAX_PIXELS = 16_000_000;
+/** The most px on one side of a saved PNG. */
 export const SAVED_PNG_MAX_SIDE = 8192;
 /** Spec §13.8, D71: names at 14 CSS px. */
 export const SAVED_NAME_PX = 14;
@@ -140,7 +141,7 @@ const HSL = colourFunction('hsla?', HUE);
 const HEX = /^#(?:[0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/i;
 
 /**
- * R2: `value` when it is a fixed colour (hex, `rgb()`/`hsl()` with numeric arguments, or a CSS
+ * `value` when it is a fixed colour (hex, `rgb()`/`hsl()` with numeric arguments, or a CSS
  * named colour); else undefined. A saved file has no page, so a `var()` or a word that is not a
  * colour would draw black or nothing there; the saved picture draws the no-house colour instead.
  */
@@ -173,7 +174,7 @@ export interface SavedFrame {
 	w: number;
 	h: number;
 	heading: SavedText;
-	/** 0.2.7 (F.5): the bar sentence of the Show view, a second text line under the heading; absent when there is none. */
+	/** The bar sentence of the Show view, a second text line under the heading; absent when there is none. */
 	sentence?: SavedText;
 	/** The tree's top left corner. */
 	tree: { x: number; y: number };
@@ -196,7 +197,7 @@ export interface SavedFrame {
 	};
 }
 
-// Sizes in em of the note font. The preview the owner chose (q8e-A) set the heading at 26 px and
+// Sizes in em of the note font. The heading is at 26 px and
 // the legend in two parts side by side under the tree, line styles in up to 3 columns and houses in 2.
 const PAD_EM = 2;
 const GAP_EM = 1.25;
@@ -207,17 +208,17 @@ const ROW_EM = 2;
 const COL_GAP_EM = 1.75;
 const PART_GAP_EM = 3;
 
-/** The font string a saved text is measured with and written in (P2): `${weight} ${size}px ${family}`. */
+/** The font string a saved text is measured with and written in: `${weight} ${size}px ${family}`. */
 export const fontOf = (weight: string, size: number, family: string) => `${weight} ${size}px ${family}`;
 
 /**
  * P3, B4: the places of the heading, the tree and the legend of a saved picture of a `treeW` ×
  * `treeH` tree. Text is measured with `measure` in the interface font (heading and legend). A heading
  * wider than the tree makes the picture wider; with `scale`, it is cut with "…" only where the
- * picture would pass 8192 px. 0.2.7 (F.5): with `barSentence` the Show view's sentence is a second, smaller text line under the heading (cut the same way).
+ * picture would pass 8192 px. With `barSentence` the Show view's sentence is a second, smaller text line under the heading (cut the same way).
  */
 export function savedFrame(tree: { width: number; height: number }, legend: SavedLegendContent, heading: string, fontPx: number, rawMeasure: Measure, fonts: SceneFonts, scale?: number, cut?: (text: string, maxW: number, font: string) => string, barSentence?: string): SavedFrame {
-	// R1: measure the text as it is written, so `savedExtent` and `renderSvg` get the same size.
+	// Measure the text as it is written, so `savedExtent` and `renderSvg` get the same size.
 	const measure: Measure = (text, font) => rawMeasure(xmlText(text), font);
 	const f = fontPx;
 	const pad = PAD_EM * f;
@@ -236,7 +237,7 @@ export function savedFrame(tree: { width: number; height: number }, legend: Save
 	const treeW = Math.max(0, tree.width);
 	const treeH = Math.max(0, tree.height);
 	const headH = 1.25 * headSize;
-	// F.5: the sentence is 1 em, regular, 0.25 em under the heading's line box; the tree starts below it.
+	// The sentence is 1 em, regular, 0.25 em under the heading's line box; the tree starts below it.
 	let sentence: SavedText | undefined;
 	let sentW = 0;
 	let sentH = 0;

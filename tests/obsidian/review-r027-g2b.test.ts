@@ -75,6 +75,6 @@ describe('finding 2: the window computes the line with a year that the tree read
 		const g = deriveFamilies(r.tree);
 		const saved = successionLine(g, g.titles[0], specOf(g.titles[0]), 5, 110);
 		expect(saved.year).toBeNull();
-		expect(lineTexts(p)[0], 'the window must show the line that Show will draw').toBe('After Rex now');
+		expect(lineTexts(p)[0], 'the window must show the line that Show will draw').toBe('After Rex Ardent now');
 	});
 });

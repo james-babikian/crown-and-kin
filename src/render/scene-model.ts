@@ -1,7 +1,7 @@
 /*
  * The headless part of the scene: the constants and the two types that both drawing paths share. `render/dom/scene.ts` and `render/dom/folds.ts`
  * build the SVG elements from them; `render/svg-string.ts` and `render/saved-picture.ts` build the same picture as text. They live here, with no
- * DOM and no Obsidian, so the string renderer never has to load the DOM scene module (the architecture notes §3: a lower layer never imports a higher one).
+ * DOM and no Obsidian, so the string renderer never has to load the DOM scene module.
  */
 
 import { FOLD_EM } from '../layout/fold-spots';
@@ -19,7 +19,7 @@ export interface SceneFonts {
 	bold: string;
 }
 
-/** The word on the "You" tab, in em of the note font (B.3.4). */
+/** The word on the "You" tab, in em of the note font. */
 export const TAB_TEXT_EM = 0.8;
 /** The baseline of the text of a tab, in em below the middle of the tab (0.3 em). */
 export const TAB_TEXT_BASE_EM = 0.3;

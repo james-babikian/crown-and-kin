@@ -1,7 +1,7 @@
 /*
- * The words and small readers of the succession keys on a title (contract 0.2.7, sections A, B.1, J.7, K.5): the rule
+ * The words and small readers of the succession keys on a title: the rule
  * names, the year reader and its formatter, the ordinal word, the "is this person dead" test and the partner choice of
- * "holds the title through the spouse" (0.2.8). It is a leaf: it imports nothing from
+ * "holds the title through the spouse". It is a leaf: it imports nothing from
  * the other core files, so `parse.ts`, `validate.ts`, `messages.ts`, the engine in `succession.ts` and the Titles
  * window can all use it without a cycle.
  */
@@ -16,7 +16,7 @@ export const INHERIT_RULES = ['men-only', 'men-first-in-house', 'men-first', 'no
 /** One of `INHERIT_RULES`. */
 export type InheritRule = (typeof INHERIT_RULES)[number];
 
-/** The values of `inherit-through`: through whom a claim passes (K.1). */
+/** The values of `inherit-through`: through whom a claim passes. */
 export const INHERIT_THROUGH = ['men', 'women', 'anyone'] as const;
 /** One of `INHERIT_THROUGH`. */
 export type InheritThrough = (typeof INHERIT_THROUGH)[number];
@@ -59,23 +59,23 @@ function readWord<T extends string>(list: readonly T[], old: Readonly<Record<str
 	return Object.prototype.hasOwnProperty.call(old, t) ? old[t] : undefined;
 }
 
-/** A.1: a written `succession` value as a rule (old names included), or undefined. */
+/** A written `succession` value as a rule (old names included), or undefined. */
 export function readRule(v: string | undefined): SuccessionRule | undefined {
 	return readWord(SUCCESSION_RULES, OLD_RULES, v);
 }
 
-/** A.1: a written `inherit` value as a rule (old names included), or undefined. */
+/** A written `inherit` value as a rule (old names included), or undefined. */
 export function readInherit(v: string | undefined): InheritRule | undefined {
 	return readWord(INHERIT_RULES, OLD_INHERIT, v);
 }
 
-/** K.1: a written `inherit-through` value (old forms `male`, `female`, `any` included), or undefined. */
+/** A written `inherit-through` value (old forms `male`, `female`, `any` included), or undefined. */
 export function readThrough(v: string | undefined): InheritThrough | undefined {
 	return readWord(INHERIT_THROUGH, OLD_THROUGH, v);
 }
 
 /**
- * A.1: a written `inherit-illegitimate` value. `no` and `false` are `no`; `after` and `equal` as written; every value
+ * A written `inherit-illegitimate` value. `no` and `false` are `no`; `after` and `equal` as written; every value
  * that the person key `illegitimate` reads as true (`true`, `yes`) is `after`. Any other text is undefined.
  */
 export function readIllegitimate(v: string | undefined): InheritIllegitimate | undefined {
@@ -97,7 +97,7 @@ const THREE_OR_FOUR = /(?:^|\D)(\d{3,4})(?!\d)/g;
 // "BP" (before present) right after a number: a count of years back from now, which has no place on the line (rule 8).
 const BP_AFTER = /^\s*B\.?\s*P\.?(?![A-Za-z0-9])/i;
 
-// S1 (0.2.8): a grouped number has groups of exactly 3 digits joined by a comma, a space, a no-break space (U+00A0, U+202F)
+// S1: a grouped number has groups of exactly 3 digits joined by a comma, a space, a no-break space (U+00A0, U+202F)
 // or a thin space (U+2009). A text that is wholly one, with an optional prefix and an optional era mark, is one number.
 const GROUPED = '\\d{1,3}(?:[,\\u00a0\\u202f\\u2009 ]\\d{3})+';
 const ERA = '(?:B\\.?\\s*C\\.?(?:\\s*E\\.?)?|A\\.?\\s*D\\.?|C\\.?\\s*E\\.?)';
@@ -138,7 +138,7 @@ function internal(n: number, bc: boolean): { year: number; zero?: true } | undef
 }
 
 /**
- * K.5: the year in a free text, as an internal year (rule 8). A whole number ("12", "-200"), a grouped number ("1,250"),
+ * The year in a free text, as an internal year (rule 8). A whole number ("12", "-200"), a grouped number ("1,250"),
  * a number with BC, BCE or AD, CE ("200 BC" and "BC 200" are -199), else the first run of three or four digits with no
  * digit beside it ("12 May 1203") that is not followed by BP. Undefined when there is none, and for a fragment of a grouped
  * number ("1.250", "1,2500", "1, 250"). It can return 0 and negative numbers, so callers test `!== undefined`. `text` has
@@ -176,7 +176,7 @@ const DUAL_LAST = 1800;
 const DUAL = /(?:^|\D)(\d{4})\/(\d{1,2})(?!\d)(?![/.-]\d)/;
 
 /** What the plain reader found: the year of `yearOf`, and flags for the cases that spec section 14 rule 8 treats in a special way. */
-export interface PlainRead {
+interface PlainRead {
 	year?: number;
 	/** The text starts with `c.`, `ca.`, `~`, `about` or `circa`; the year is the same. */
 	approx?: true;
@@ -220,12 +220,12 @@ export function readPlain(text: string | undefined): PlainRead {
 	return out;
 }
 
-/** K.5: the year in a free text, as `readPlain` reads it. */
+/** The year in a free text, as `readPlain` reads it. */
 export function yearOf(text: string | undefined): number | undefined {
 	return readPlain(text).year;
 }
 
-/** F-KIN-06: a year as the succession texts show it. An internal year of 0 or less shows as "(1 - y) BC" ("225 BC"), every other year as a plain number. */
+/** A year as the succession texts show it. An internal year of 0 or less shows as "(1 - y) BC" ("225 BC"), every other year as a plain number. */
 export function formatYear(n: number): string {
 	return n <= 0 ? `${1 - n} BC` : String(n);
 }
@@ -238,12 +238,12 @@ export function ordinal(n: number): string {
 	return `${n}${suffix}`;
 }
 
-/** J.7: a `died` text that means "not dead". */
+/** A `died` text that means "not dead". */
 const ALIVE_WORDS: readonly string[] = ['false', 'no', 'alive', 'living', 'never'];
-/** J.7: a `died` text that is a doubt, not a date; the plugin counts the person as dead and warns (`died-doubtful`). */
+/** A `died` text that is a doubt, not a date; the plugin counts the person as dead and warns (`died-doubtful`). */
 export const DOUBTFUL_DIED: readonly string[] = ['?', 'unknown', 'maybe', 'perhaps', 'possibly', 'uncertain'];
 
-/** J.7: false when `died` is absent or one of the words that mean alive; true for every other text. */
+/** False when `died` is absent or one of the words that mean alive; true for every other text. */
 export function isDead(person: { died?: string }): boolean {
 	const d = person.died;
 	if (typeof d !== 'string') return false;
@@ -251,7 +251,7 @@ export function isDead(person: { died?: string }): boolean {
 	return t !== '' && !ALIVE_WORDS.includes(t);
 }
 
-// ---------- Holding the title through the spouse (0.2.8 contract A.2, D195) ----------
+// ---------- Holding the title through the spouse (D195) ----------
 
 /** The facts the partner choice reads. `validate.ts` and `succession.ts` each build one, from the same rules (spec §13.21 rule 13a). */
 export interface SpouseWorld {
@@ -264,7 +264,7 @@ export interface SpouseWorld {
 }
 
 /** The result of the partner choice: the spouse S, or why the key is ignored. */
-export type SpouseResult =
+type SpouseResult =
 	| { ok: true; id: string }
 	| { ok: false; why: 'no-partner' | 'no-marriage' | 'self' }
 	| { ok: false; why: 'no-claim' | 'several-claims'; candidates: string[] }

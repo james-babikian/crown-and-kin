@@ -1,7 +1,7 @@
 /*
  * List items and their text spans, for the ops that add, move and remove list items.
  *
- * Lines a list item owns (the decision notes "Relationship-op details"): its own lines with their
+ * Lines a list item owns: its own lines with their
  * end-of-line comments, the full-line comments right below it indented deeper than its dash,
  * and the full-line comments directly above it at or left of its dash, up to the previous item or
  * a blank line. In a flow list, an end-of-line comment belongs to the item it follows. A move
@@ -169,7 +169,7 @@ export function removeItems(src: Source, seq: YAMLSeq, remove: Set<number>, abov
 		return patches;
 	}
 	for (const i of [...remove].sort((a, b) => a - b)) {
-		// The comments above a removed item stay (the decision notes "Relationship-op details").
+		// The comments above a removed item stay.
 		const start = above ? itemStart(src, seq, i) : ownStart(src, seq, i);
 		const end = itemEnd(src, seq, i);
 		const next = lineAfter(src, end);

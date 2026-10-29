@@ -10,7 +10,7 @@
  * does not keep, released when the sheet closes. Select the part (spec §13.13) opens the crop tool
  * (`crop-tool.ts`); the part is the draft field `portraitCrop`, and the round picture shows it.
  *
- * Since 0.3.3 (WP-1 A1) the class is a chain of layers, one file for each part of the window, from the bottom:
+ * The class is a chain of layers, one file for each part of the window, from the bottom:
  * - `edit-sheet-base.ts` `EditSheetBase`: the options, every field, open and close, unsaved changes, and the messages and questions. A call to a layer
  *   above is an `abstract` method there.
  * - `edit-sheet-portrait.ts`: the round portrait, the personal arms and the links under the header.

@@ -1,6 +1,6 @@
 /*
- * The placement stage (the architecture notes §4.2.2, stage S3). It gives every item of the plan an x: rows of rigid blocks, packed in order
- * (`packRows`), then rounds of "parents over children, children under parents" (pool-adjacent-violators per row, as the 0.3.0 sweeps:
+ * The placement stage (stage S3). It gives every item of the plan an x: rows of rigid blocks, packed in order
+ * (`packRows`), then rounds of "parents over children, children under parents" (pool-adjacent-violators per row:
  * `sweepRows`), then the compaction step of `compact.ts` run on the items (`compactItems`; passages are zero-height members of
  * their blocks, with a width), then `shiftToMargin`. The hang point of every family is a port or a bar dot, so the placement centres the children
  * under the point the route stage draws. The route stage works with ANY placement that keeps the order and the minimum gaps
@@ -16,7 +16,7 @@ import type { Geometry } from './model';
 import { placeInOrder } from './pava';
 import { portX, type Family, type Hang, type Plan } from './plan-model';
 
-/** Several signs on one bar are spread at most this many sign sizes apart where the gap allows, never less than one (as in 0.3.0). */
+/** Several signs on one bar are spread at most this many sign sizes apart where the gap allows, never less than one. */
 const BAR_SPREAD_MAX = 2;
 
 /** The x of a hang point for the current item positions. */
@@ -142,7 +142,7 @@ export function sweepRows(plan: Plan, geo: Geometry, rounds: number, shapes = sh
 }
 
 /**
- * The compaction step on the items (the architecture notes §4.2). `compactor` reads the items through `Placed`: a passage is a card of its block with
+ * The compaction step on the items. `compactor` reads the items through `Placed`: a passage is a card of its block with
  * its own width; the gaps are centre distances; the dots are the hang points of the union families. Returns how many of the three
  * passes spent their whole walk budget (0 on every real tree). `snaps` limits part (c) to that many snaps, for the test of that part.
  */
@@ -169,7 +169,7 @@ export function shiftToMargin(plan: Plan, margin = 0): void {
 }
 
 /**
- * Spec §13.10 (F5b): the room a fold control needs left of its stem, beyond the leftmost item: its largest mark and its hit area can
+ * Spec §13.10: the room a fold control needs left of its stem, beyond the leftmost item: its largest mark and its hit area can
  * reach left of the first card. The caller normalises the items to this margin, so nothing is shifted after the drawing. Above the
  * first row no control can reach: a control hangs below its parents' cards.
  */
@@ -189,7 +189,7 @@ export function foldMargin(plan: Plan, geo: Geometry, side: Geometry | undefined
 
 /**
  * The room the first card of a row needs before it along the row (the stack axis sideways): the fold controls' (`foldMargin`) and, sideways,
- * the `reach` for the tab above the first card of a stack (the 0.3.0 rule: "the first card of a stack starts `reach` in"). Down, the reach is
+ * the `reach` for the tab above the first card of a stack (the rule: "the first card of a stack starts `reach` in"). Down, the reach is
  * above the first row (the route stage), not before the first card.
  */
 export function startMargin(plan: Plan, geo: Geometry, side: Geometry | undefined): number {
@@ -197,7 +197,7 @@ export function startMargin(plan: Plan, geo: Geometry, side: Geometry | undefine
 }
 
 /** The configuration of the placement: the number of sweep rounds (`LayoutSettings.sweeps`; 0 keeps the packed rows, as today) and whether the compaction step runs (D231; on by default). */
-export interface PlaceOptions {
+interface PlaceOptions {
 	sweeps?: number;
 	compact?: boolean;
 }

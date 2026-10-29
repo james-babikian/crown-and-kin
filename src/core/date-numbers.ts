@@ -50,6 +50,7 @@ const ORDINAL_SUFFIX = ['st', 'nd', 'rd', 'th'];
 /** A digit run longer than this is no value (it could not be a safe whole number in a sum). */
 const MAX_DIGITS = 15;
 
+/** One way to read a number at a place in a text: where it ends and its value. */
 export interface Candidate {
 	end: number;
 	value: number;

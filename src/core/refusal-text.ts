@@ -6,6 +6,7 @@
 
 import { quote } from './quote';
 
+/** The `detail` sentences of refused edits, by name. */
 export const REFUSAL_TEXT = {
 	houseName: 'A house must have a name.',
 	armsLink: 'The arms must be a link.',
@@ -54,7 +55,7 @@ export const REFUSAL_TEXT = {
 } as const;
 
 /** What a refusal of a name list (spec §14 rule 16) knows: where it is, the list and the text that the refusal names. */
-export interface ListRefusalInfo {
+interface ListRefusalInfo {
 	calendar: string;
 	plain?: boolean;
 	list?: number;

@@ -1,7 +1,7 @@
-/* ---------- Version 0.2.7: the Show view of a line of succession (contract F, M.9); 0.2.8: the outline of the heir (I35) ---------- */
+/* ---------- The Show view of a line of succession and the outline of the heir ---------- */
 
 /*
- * An heir's card has one still outline: an accent border 2 px wide (D212, heir-outline; 0.2.8 first had a second hairline ring 4 px outside it). It keeps its width on
+ * An heir's card has one still outline: an accent border 2 px wide (D212, heir-outline). It keeps its width on
  * screen at every zoom (`non-scaling-stroke`), so a line of 20 heirs shows 20 clear outlines at a low zoom too. The ordinal tab on top says which heir it is.
  * The highlight pulse is never used on an heir. The marked heir keeps the border of the marked card, in the text colour (D153), at the same 2 px.
  */

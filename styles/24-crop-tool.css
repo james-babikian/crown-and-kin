@@ -1,4 +1,4 @@
-/* ---------- The portrait crop tool (spec §13.13, D79, D90; 0.2.8 contract G.9, D196 item 4) ---------- */
+/* ---------- The portrait crop tool (spec §13.13, D79, D90, D196 item 4) ---------- */
 
 /*
  * The picture is not part of the theme, so the tool has a dark surface in both themes: the title at the top, the picture under a round
@@ -142,7 +142,7 @@
 	color: gainsboro;
 }
 
-/* Cupertino sizes icon svgs on the phone; the zoom icons shrank to dots (G3, 2026-10-10). */
+/* Cupertino sizes icon svgs on the phone; the zoom icons shrank to dots. */
 .dynasty-crop .dynasty-crop-zoom .dynasty-icon-btn svg {
 	width: 18px;
 	height: 18px;

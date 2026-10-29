@@ -34,7 +34,7 @@ export interface FamilyUnion {
 }
 
 /** A parent link that is drawn but does not decide where the child sits. */
-export interface SecondaryEdge {
+interface SecondaryEdge {
 	child: string;
 	type: string;
 	parents: string[];

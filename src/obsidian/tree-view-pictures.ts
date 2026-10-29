@@ -1,5 +1,5 @@
 /*
- * The pictures of a tree view (0.3.3, WP-1 A1; spec §13.0 item 3, §13.6–§13.8; M9 contract O1–O5, O9–O11): resolving every arms and portrait link of the tree,
+ * The pictures of a tree view (spec §13.0 item 3, §13.6–§13.8): resolving every arms and portrait link of the tree,
  * the live pictures of the scene, the background check of the files, the problems they add to the badge, the pause under a full-screen view, and the data
  * of the saved picture. Fifth layer of the chain listed in `tree-view.ts`.
  */
@@ -22,22 +22,34 @@ import { TreeViewScene } from './tree-view-scene';
 import { TreeViewBase } from './tree-view-base';
 import type { PictureUse, PictureInfo } from './tree-view-types';
 
+/** True if some picture link was or is not found, or now leads to another file: only then can the list show something new. */
+function linksChanged(before: ReadonlyMap<string, ResolvedPicture>, after: ReadonlyMap<string, ResolvedPicture> | undefined): boolean {
+	if (!after) return true;
+	for (const [link, r] of after) {
+		const old = before.get(link);
+		if (!r.ok || !old || !old.ok || old.file.path !== r.file.path) return true;
+	}
+	return false;
+}
+
 /** Picture handling of a tree view: links, live pictures, the file check and the saved picture. */
 export abstract class TreeViewPictures extends TreeViewScene {
 	/** The pictures are resolved again (the metadata cache learned a file): the badge, the cards and the list rows follow. */
 	protected picturesLookAgain(): void {
 		const whole = this.whole;
 		if (!whole || !this.pictureInfo) return;
+		const before = this.pictureInfo.resolved;
 		this.resolvePictures(whole);
 		this.updateBadge();
 		this.live?.refresh([]);
-		this.refillList();
+		// The list rows only change when a link was or is missing (or points to another file). Asking again would take every picture out of its place for nothing.
+		if (linksChanged(before, this.pictureInfo?.resolved)) this.refillList();
 		if (this.picturesOn) this.checkPictures();
 	}
 
-	// ---------- pictures (spec §13.0 item 3, §13.6–§13.8; M9 contract O1–O5, O9–O11) ----------
+	// ---------- pictures (spec §13.0 item 3, §13.6–§13.8) ----------
 
-	/** The problems of the badge: the tree text's, then the picture warnings in tree order (O2). */
+	/** The problems of the badge: the tree text's, then the picture warnings in tree order. */
 	protected allIssues(): CodedIssue[] {
 		const info = this.pictureInfo;
 		if (!info) return this.textIssues;
@@ -70,7 +82,7 @@ export abstract class TreeViewPictures extends TreeViewScene {
 		for (const h of whole.houses.values()) if (h.arms) uses.push({ owner: { kind: 'arms', house: { id: h.id, name: h.name } }, link: h.arms });
 		for (const p of whole.people) {
 			if (p.portrait) uses.push({ owner: { kind: 'portrait', person: { id: p.id, name: p.name } }, link: p.portrait });
-			// 0.2.8 (I05, contract A.1): the personal arms of a person have the same warnings as the arms of a house.
+			// The personal arms of a person have the same warnings as the arms of a house.
 			if (p.arms) uses.push({ owner: { kind: 'portrait', person: { id: p.id, name: p.name }, arms: true }, link: p.arms });
 		}
 		const resolved = new Map<string, ResolvedPicture>();
@@ -88,7 +100,7 @@ export abstract class TreeViewPictures extends TreeViewScene {
 		this.pictureInfo = { uses, resolved, found };
 	}
 
-	/** The file of a picture slot, or the problem of its link (O1). */
+	/** The file of a picture slot, or the problem of its link. */
 	protected pictureFile(slot: PictureSlot): TFile | PictureProblem {
 		const info = this.pictureInfo;
 		const personal = slot.owner && 'person' in slot.owner ? this.whole?.byId.get(slot.owner.person)?.arms : undefined;
@@ -125,7 +137,7 @@ export abstract class TreeViewPictures extends TreeViewScene {
 	/**
 	 * Spec §13.0 item 3 "Pictures never delay the first view": the pictures start after the frame that
 	 * made the first view ready for use (`markInteractive` measures that frame), then one background
-	 * check of the files (O2).
+	 * check of the files.
 	 */
 	protected startPictures(): void {
 		if (this.picturesOn || !this.host.pictures || !this.pictureInfo) return;
@@ -276,8 +288,8 @@ export abstract class TreeViewPictures extends TreeViewScene {
 	}
 
 	/**
-	 * More → Save as picture (spec §13.8, O11): the window "Save as a picture", then the save of what
-	 * this view draws now (P1). The view stays in use while the picture is made.
+	 * More → Save as picture (spec §13.8): the window "Save as a picture", then the save of what
+	 * this view draws now. The view stays in use while the picture is made.
 	 */
 	protected openSave(): void {
 		const src = this.saveSource();
@@ -332,7 +344,7 @@ export abstract class TreeViewPictures extends TreeViewScene {
 			note: name.replace(/\.md$/i, ''),
 			...(focus !== undefined ? { focusName: focus } : {}),
 			...(this.foldPlan?.foldedList.length ? { folds: { hidden: this.foldPlan.hiddenList, folded: this.foldPlan.foldedList } } : {}),
-			// F.5: while the Show view is open, the saved picture has the tabs, the outlines and the bar sentence.
+			// While the Show view is open, the saved picture has the tabs, the outlines and the bar sentence.
 			...(this.successionDrawn ? { succession: { ordinalCards: [...this.successionDrawn.ordinals.keys()], heirs: this.successionDrawn.heirs, ordinals: this.successionDrawn.ordinals, sentence: this.successionDrawn.sentence } } : {}),
 		};
 	}

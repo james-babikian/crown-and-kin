@@ -1,5 +1,5 @@
 /*
- * The form of the edit sheet (0.3.3, WP-1 A1; spec §6.3): the build of the window, its sections and their summaries, the header, the choices of a new person,
+ * The form of the edit sheet (spec §6.3): the build of the window, its sections and their summaries, the header, the choices of a new person,
  * and the fields of Details and Notes. Third layer of the chain listed in `edit-sheet.ts`.
  */
 
@@ -8,7 +8,7 @@ import { readerOfTree } from '../view/calendar-index';
 import { attachDateLine } from '../render/dom/date-line';
 import type { UnionRef } from '../core/edit';
 import { UNION_TYPES, type Person } from '../core/types';
-import { dateLine, headTitle } from '../render/tree-info';
+import { dateLineShown, headTitle } from '../render/tree-info';
 import { quotedSobriquet } from '../core/sobriquet';
 import { joined, nb } from '../render/text-join';
 import { NEW_SHEET, REMOVE, SHEET, UI, UNION_TYPE_TEXT, WINDOW_UI, WRITE_TEXT, partnerDetail } from '../render/ui-text';
@@ -66,7 +66,7 @@ export abstract class EditSheetForm extends EditSheetPortrait {
 		const body = shell.body;
 		this.bodyEl = body;
 		body.addEventListener('focusin', () => this.revealFocused(300));
-		// G.7: a child row opened this person; the way back names the person before.
+		// A child row opened this person; the way back names the person before.
 		const before = this.trail[this.trail.length - 1];
 		if (before !== undefined) shell.setBack(this.name(before), WINDOW_UI.backToLabel(this.name(before)), () => this.goBackTo());
 		if (ro) {
@@ -144,7 +144,7 @@ export abstract class EditSheetForm extends EditSheetPortrait {
 		const d = this.draft;
 		const house = d.house === NEW_HOUSE ? this.newHouse.name.trim() : (this.data.g.houses?.get(d.house)?.name ?? '');
 		const sex = d.sex === 'm' ? SHEET.sexMale : d.sex === 'f' ? SHEET.sexFemale : '';
-		return this.sum([house || SHEET.noHouse, sex, dateLine({ ...this.data.person, born: d.born.trim() || undefined, died: d.died.trim() || undefined }, this.data.g.dates)]);
+		return this.sum([house || SHEET.noHouse, sex, dateLineShown({ ...this.data.person, born: d.born.trim() || undefined, died: d.died.trim() || undefined }, this.data.g.dates)]);
 	}
 
 	protected familySummary(): string {
@@ -172,7 +172,7 @@ export abstract class EditSheetForm extends EditSheetPortrait {
 		return id === '' ? [] : this.data.g.people.filter((q) => q.parents.some((l) => l.id === id));
 	}
 
-	// ---------- the header (contract C, Q6H A) ----------
+	// ---------- the header (Q6H A) ----------
 
 	/** The house of the draft: the written house, or the new house that the form asks for. */
 	protected draftHouse(): { name: string; colour: string | null; arms: string | null } | null {
@@ -236,7 +236,7 @@ export abstract class EditSheetForm extends EditSheetPortrait {
 			const label = this.cardLabel();
 			const titleText = label?.title ?? this.draft.title.trim();
 			if (titleText) parts.push(nb(headTitle(label, titleText, this.data.g.dates)));
-			const dates = dateLine({ ...this.data.person, born: this.draft.born.trim() || undefined, died: this.draft.died.trim() || undefined }, this.data.g.dates);
+			const dates = dateLineShown({ ...this.data.person, born: this.draft.born.trim() || undefined, died: this.draft.died.trim() || undefined }, this.data.g.dates);
 			if (dates) parts.push(dates);
 			if (this.isNew && this.rel) parts.push(this.newDetail());
 			if (parts.length) joined(metaHost, 'dynasty-head-meta', parts);
@@ -320,7 +320,7 @@ export abstract class EditSheetForm extends EditSheetPortrait {
 			const same = Array.from(this.contentEl.querySelectorAll<HTMLInputElement>(`[data-focus="${mark.key}"]`)).filter((c) => !c.disabled);
 			const target = same[Math.min(mark.index, same.length - 1)];
 			// Every control here was made by the build that just ran. A select that is new and gets the focus in code can open its phone
-			// menu again, so a touch screen leaves the focus on the sheet instead (r032). A select that the user used is not rebuilt (the
+			// menu again, so a touch screen leaves the focus on the sheet instead. A select that the user used is not rebuilt (the
 			// changes of a select update the page in place), so it never comes here and keeps the focus it has.
 			const touch = (this.modalEl.win ?? window).matchMedia?.('(pointer: coarse)')?.matches === true;
 			if (target && !(touch && target.matches('select'))) {
@@ -400,7 +400,7 @@ export abstract class EditSheetForm extends EditSheetPortrait {
 
 	/**
 	 * Checks that the new person can still join the tree as chosen, after the sheet loaded new data
-	 * (the decision notes "Union references"). The chosen partnership is found again
+	 *. The chosen partnership is found again
 	 * by its text; if it is gone, the user must choose again. A related person who is gone blocks
 	 * Save; the draft stays.
 	 */
@@ -448,7 +448,7 @@ export abstract class EditSheetForm extends EditSheetPortrait {
 			rel.union = couple[Number(sel.value)];
 			this.relNote = null;
 			this.relBlocked = false;
-			// r032: no build inside the change event of this select (a native select that is taken out under the finger can keep its
+			// No build inside the change event of this select (a native select that is taken out under the finger can keep its
 			// phone menu open). What the choice changes is only the note that asked for it and the empty choice; both go away here.
 			for (const el of Array.from(box.children)) if (el.hasClass('dynasty-sheet-relation-note')) el.remove();
 			for (const opt of Array.from(sel.querySelectorAll<HTMLOptionElement>('option'))) if (opt.getAttribute('value') === '') opt.remove();
@@ -496,7 +496,7 @@ export abstract class EditSheetForm extends EditSheetPortrait {
 		input.addEventListener('input', () => {
 			this.draft[key] = input.value;
 			this.clearError();
-			// The button and its label follow the draft name and link (N1).
+			// The button and its label follow the draft name and link.
 			if (key === 'link' || key === 'name') this.updateNoteButton();
 			this.fieldChanged(key);
 		});
@@ -592,7 +592,7 @@ export abstract class EditSheetForm extends EditSheetPortrait {
 		sel.addEventListener('change', () => (this.draft.placement = sel.value));
 	}
 
-	// ---------- the sections (contract C) ----------
+	// ---------- the sections ----------
 
 	/** Details: name, sobriquet, title text, house, sex, born, died, and the two tick boxes. */
 	protected detailsBody(body: HTMLElement): void {

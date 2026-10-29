@@ -1,11 +1,11 @@
 /*
- * "Save as picture" (spec §13.8, D70–D74; M9 contract O11, P1–P6, B4, B5, B8, B13). The tree view's
- * More list opens `SaveWindow`, where the owner selects PNG or SVG. `savePicture` then lays the drawn
- * tree out again with the card form of the view, the plate setting and the "You" tab (0.2.5, D148) at the Full level
+ * "Save as picture" (spec §13.8, D70–D74). The tree view's
+ * More list opens `SaveWindow`, where the user selects PNG or SVG. `savePicture` then lays the drawn
+ * tree out again with the card form of the view, the plate setting and the "You" tab (D148) at the Full level
  * (`measured-layout.ts`, with the canvas text measure), asks the picture store for each arms and portrait picture at the size of the file, one at
  * a time (`exportCopy`), draws one standalone SVG with fixed light colours (`renderSvg` with `saved`),
  * for a PNG draws that SVG on a canvas, and writes the file once into the attachment folder of the
- * tree's note. Notices tell the owner what happens. The tree text never changes, the view stays in use
+ * tree's note. Notices tell the user what happens. The tree text never changes, the view stays in use
  * while the picture is made, and nothing here throws.
  */
 
@@ -28,13 +28,13 @@ import { DEFAULT_LIGHT } from '../render/styles';
 import { renderSvg } from '../render/svg-string';
 import { SAVE_UI } from '../render/ui-text';
 import { measuredLayout } from '../view/measured-layout';
-import { ignoreGhostClick, phoneLayout } from './modal-layout';
+import { ignoreGhostClick, phoneLayout, startWithoutFocus } from './modal-layout';
 import type { PictureStore } from './picture-store';
 import { trackModal } from '../view/plugin-modals';
 import { nameDialog } from './sheet-parts';
 import { buildShell, type Shell } from './window-shell';
 
-/** What the tree view gives the save (P1): the drawn graph and the view's settings. */
+/** What the tree view gives the save: the drawn graph and the view's settings. */
 export interface SaveSource {
 	/** The drawn graph: the whole tree, the focus family, or the relation finder's small tree. */
 	g: FamilyGraph;
@@ -54,19 +54,19 @@ export interface SaveSource {
 	fonts: SceneFonts;
 	showDates: boolean;
 	showPortraits: boolean;
-	/** "Arms on cards" (0.2.8, D206): the saved picture follows the cards (supervisor default, open to veto). */
+	/** "Arms on cards" (D206): the saved picture follows the cards (open to veto). */
 	armsOnCards?: 'few' | 'all';
 	/** The user's break places for names (D118). */
 	breaks?: BreakList;
 	sourcePath: string;
 	/** The note's name without ".md" (the heading and the file name). */
 	note: string;
-	/** Focus mode only: the focus person's name (P6). */
+	/** Focus mode only: the focus person's name. */
 	focusName?: string;
-	/** M10 (F14): the view's folds, when a family is folded: the hidden people and the folded families, both sorted. */
+	/** The view's folds, when a family is folded: the hidden people and the folded families, both sorted. */
 	folds?: { hidden: readonly string[]; folded: readonly FoldKey[] };
 	/**
-	 * 0.2.7 F.5: the Show view of a line of succession is open. The picture has the ordinal tabs (`ordinalCards`, with the texts in `ordinals`), the
+	 * The Show view of a line of succession is open. The picture has the ordinal tabs (`ordinalCards`, with the texts in `ordinals`), the
 	 * outline of each heir and the bar sentence as a second text line under the heading, all in the fixed colours.
 	 */
 	succession?: { ordinalCards: readonly string[]; heirs: readonly string[]; ordinals: ReadonlyMap<string, string>; sentence: string };
@@ -98,7 +98,7 @@ export class SaveWindow extends Modal {
 		m.addClass('dynasty-sheet');
 		m.addClass('dynasty-save-window');
 		this.cleanup.push(phoneLayout(this), ignoreGhostClick(this), trackModal(this, () => this.close()));
-		// The window family (contract C): the frame comes from the shell, as for the other small windows.
+		// The window family: the frame comes from the shell, as for the other small windows.
 		const shell = buildShell({
 			modalEl: this.modalEl,
 			contentEl: this.contentEl,
@@ -113,7 +113,6 @@ export class SaveWindow extends Modal {
 		this.shell = shell;
 		nameDialog(this.modalEl, shell.titleEl);
 		const cancel = shell.cancel;
-		const save = shell.save;
 		const body = shell.body;
 		const group = body.createDiv({ cls: ['dynasty-choice-options', 'dynasty-save-kinds'], attr: { role: 'radiogroup', 'aria-label': SAVE_UI.kindLabel } });
 		const options: [SaveKind, string, string][] = [
@@ -151,7 +150,7 @@ export class SaveWindow extends Modal {
 			e.preventDefault();
 			this.chosen();
 		});
-		save?.focus();
+		this.cleanup.push(startWithoutFocus(this.modalEl));
 	}
 
 	private chosen(): void {
@@ -217,7 +216,7 @@ export async function savePicture(app: App, store: PictureStore | undefined, src
 	return file;
 }
 
-/** P1–P5: the file's name, bytes and type, and whether the names are small (B5). */
+/** P1–P5: the file's name, bytes and type, and whether the names are small. */
 export async function makePicture(store: PictureStore | undefined, src: SaveSource, kind: SaveKind): Promise<Made> {
 	const { g } = src;
 	const folds = src.folds?.folded.length ? src.folds : undefined;
@@ -281,7 +280,7 @@ export async function makePicture(store: PictureStore | undefined, src: SaveSour
 
 /**
  * P3, B1: the pictures of the drawn cards as data URIs at `scale` picture px per layout px, one at a
- * time (the store holds its queue alone for each, O4); 'missing' for a link to no file (the dashed
+ * time (the store holds its queue alone for each); 'missing' for a link to no file (the dashed
  * frame), null for another problem. The arms are made once per house at the larger of the card's box
  * and the legend's box.
  */
@@ -292,7 +291,7 @@ async function picturesFor(store: PictureStore | undefined, src: SaveSource, lai
 	if (!store) return { pictures: out, outlines };
 	const { g } = src;
 	const geo = laid.layout.geometry;
-	// The Roundel's medallion is 2 em across and its arms alone 2 em high (B.3.3): so the copies are made at that size.
+	// The Roundel's medallion is 2 em across and its arms alone 2 em high: so the copies are made at that size.
 	const round = isRoundel(geo) ? { portrait: roundelPics(geo, { arms: false, portrait: true }).portrait!, arms: roundelPics(geo, { arms: true, portrait: false }).arms! } : undefined;
 	const d = round ? round.portrait.w : pictureSize(geo);
 	const armsW = Math.max(round ? round.arms.w : PICTURE_EM.armsAspect * d, legendArms?.w ?? 0);
@@ -303,7 +302,7 @@ async function picturesFor(store: PictureStore | undefined, src: SaveSource, lai
 		const p = g.byId.get(box.id);
 		if (!p) continue;
 		const house = p.house !== undefined ? g.houses.get(p.house) : undefined;
-		// 0.2.8 (I05): the personal arms of a person, else the arms of the house; one copy per person and one per house.
+		// The personal arms of a person, else the arms of the house; one copy per person and one per house.
 		if (box.arms && p.arms) {
 			wanted.push({ key: `person-arms:${p.id}`, link: p.arms, w: armsW, h: armsH, fit: 'meet' });
 		} else if (box.arms && house?.arms && !houses.has(house.id)) {
@@ -331,8 +330,8 @@ async function picturesFor(store: PictureStore | undefined, src: SaveSource, lai
 
 /**
  * The PNG of `svg` at `w` × `h` px: the SVG is drawn on a canvas from a blob URL (its pictures are
- * data URIs, which the iPhone draws; M9 iPhone check). The caller holds the picture queue alone for
- * it, and the canvas is emptied after use (B13).
+ * data URIs, which the iPhone draws). The caller holds the picture queue alone for
+ * it, and the canvas is emptied after use.
  */
 async function pngOf(svg: string, w: number, h: number): Promise<ArrayBuffer> {
 	const url = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml' }));
@@ -376,7 +375,7 @@ export async function freePath(app: App, name: string, sourcePath: string): Prom
 	return app.fileManager.getAvailablePathForAttachment(name, sourcePath);
 }
 
-/** The result Notice (spec §13.8): the file and its folder, the small-names texts, and Share where the device can share the file. It stays until the owner closes it. */
+/** The result Notice (spec §13.8): the file and its folder, the small-names texts, and Share where the device can share the file. It stays until the user closes it. */
 function resultNotice(file: TFile, made: Made): void {
 	let share: File | null = null;
 	try {
