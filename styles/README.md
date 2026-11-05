@@ -5,10 +5,11 @@
 - `npm run build` and `npm run dev` write `styles.css` from the chunks (`esbuild.config.mjs`). The dev command also joins again when a chunk changes.
 - `tests/styles/styles-drift.test.ts` fails if the committed `styles.css` is not the join of the chunks.
 - A new rule goes into the chunk of the package that owns it. A new chunk takes the next free number, or a number between two chunks; the order of the chunks is the order of the cascade.
-- The base tokens (`--dynasty-` custom properties for edges, muted text, links and errors) are in `01-base.css`.
+- The design tokens (`--dynasty-` custom properties) are in `00-tokens.css`. The static colours (edges, muted text, links and errors) and the five text sizes are in `01-base.css`. An internal script, run by `npm run lint`, refuses a new colour, radius, font-size or spacing literal beyond the recorded baseline.
 
 | Chunk | Lines in the old `styles.css` |
 |---|---|
+| `00-tokens.css` | new in 0.5.2 |
 | `01-base.css` | 1–109 |
 | `02-cards.css` | 110–259 |
 | `03-detail-levels.css` | 260–305 |

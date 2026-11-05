@@ -99,7 +99,7 @@ const entryRaw = (id: string, type: ParentKind): Raw => (type === 'birth' ? id :
 function resolveUnion(ctx: OpContext, ref: UnionRef | undefined): number | Refusal {
 	if (!ref || typeof ref !== 'object' || !Number.isInteger(ref.index) || !Array.isArray(ref.partners) || ref.partners.length !== 2) return refuse('unknown-union');
 	const u = ctx.tree.unions.find((x) => x.index === ref.index);
-	if (!u || u.partners.length !== 2) return refuse('unknown-union');
+	if (u?.partners.length !== 2) return refuse('unknown-union');
 	const [a, b] = ref.partners;
 	const same = (u.partners[0] === a && u.partners[1] === b) || (u.partners[0] === b && u.partners[1] === a);
 	// The text tells apart two unions of one couple when an old index now points at the other.
@@ -303,7 +303,7 @@ function addParent(ctx: OpContext, op: AddParent): EditResult {
  */
 function unionToName(ctx: OpContext, index: number, placed: string[]): { id: string; addId: boolean } | undefined {
 	const fu = ctx.g.unionByKey.get(`u${index}`);
-	if (!fu || fu.unionIndex === undefined || placed.length !== 2 || !placed.every((id) => fu.partners.includes(id))) return undefined;
+	if (fu?.unionIndex === undefined || placed.length !== 2 || !placed.every((id) => fu.partners.includes(id))) return undefined;
 	const listed = ctx.g.unions.filter((u) => !u.implicit && u.partners.includes(fu.partners[0]) && u.partners.includes(fu.partners[1]));
 	if (listed[listed.length - 1] === fu) return undefined;
 	return fu.id !== undefined ? { id: fu.id, addId: false } : { id: newUnionId(ctx, fu.partners), addId: true };
@@ -371,7 +371,7 @@ function addUnion(ctx: OpContext, op: AddUnion): EditResult {
 	let addId = false;
 	const keep: number[] = [];
 	// A union with no children needs no id.
-	if (last && last.unionIndex !== undefined && last.children.length) {
+	if (last?.unionIndex !== undefined && last.children.length) {
 		unionId = last.id;
 		if (unionId === undefined) {
 			unionId = newUnionId(ctx, last.partners);
@@ -755,7 +755,7 @@ function moveSibling(ctx: OpContext, op: MoveSibling): EditResult {
 	const before = ownedComments(ctx.first);
 	const after = ownedComments(r.body);
 	const owner = (k: number) => (k === i ? j : k === j ? i : k);
-	const same = before && after && before.length === after.length && after.every((texts, k) => texts.join('\n') === before[owner(k)].join('\n'));
+	const same = after && before?.length === after.length && after.every((texts, k) => texts.join('\n') === before[owner(k)].join('\n'));
 	return same ? r : refuse('bad-value', REFUSAL_TEXT.commentWouldChange);
 }
 

@@ -14,6 +14,7 @@ import type { Op } from '../core/edit';
 import { newTitleId } from '../core/title-ops';
 import { quotedSobriquet } from '../core/sobriquet';
 import { cardLabels, entryReign, rulerName, titleNameFor, type Holding } from '../core/titles';
+import { isolateName } from '../render/name-bidi';
 import { entryReignText, isolateReign, reignOf, type DatesRead } from '../render/tree-info';
 import type { Holder, Person } from '../core/types';
 import { TITLES_UI, WINDOW_UI, WRITE_TEXT } from '../render/ui-text';
@@ -74,7 +75,7 @@ export function titlesSummary(host: TitlesHost): string {
 	const first = holdings[0];
 	if (!first) return WINDOW_UI.noTitles;
 	const reign = isolateReign(reignOf(first.entries, g.dates, 'shown'), first.entries, g.dates)?.replace(/^\(|\)$/g, '');
-	const parts = [titleNameFor(first.title, person), reign, holdings.length > 1 ? WINDOW_UI.andMore(holdings.length - 1) : undefined];
+	const parts = [isolateName(titleNameFor(first.title, person)), reign, holdings.length > 1 ? WINDOW_UI.andMore(holdings.length - 1) : undefined];
 	return parts.filter((x): x is string => !!x).join(' · ');
 }
 
@@ -107,11 +108,11 @@ function holdingRows(list: HTMLElement, host: TitlesHost, h: Holding, choice: bo
 		});
 		// The name of a title of the world: the name look of the Family rows (D218 rules 1 to 3).
 		r.title.addClass('dynasty-family-name');
-		r.title.createSpan({ cls: 'dynasty-title-holding-name', text: shownName });
+		r.title.createSpan({ cls: 'dynasty-title-holding-name', text: isolateName(shownName) });
 		// The tag belongs to the title, so the first row of it carries it.
 		if (choice && i === 0 && onCard === title.id) r.title.createSpan({ cls: ['dynasty-tag', 'dynasty-title-on-card'], text: TITLES_UI.onCard });
 		r.sub.addClass('dynasty-family-detail');
-		const ruler = entry.number !== undefined ? `${rulerName(entry, person.name)} ${entry.number}` : undefined;
+		const ruler = entry.number !== undefined ? `${isolateName(rulerName(entry, person.name))} ${entry.number}` : undefined;
 		const sub = [ruler, isolateReign(entryReignText(entry, host.data().g.dates, 'shown'), [entry], host.data().g.dates)].filter((x): x is string => !!x).join(' · ');
 		r.sub.setText(sub || TITLES_UI.entryNone);
 		if (host.readOnly) return;
@@ -144,7 +145,7 @@ function editEntry(host: TitlesHost, titleId: string, titleName: string, entry: 
 	const before = valuesOf(entry);
 	holderForm(host.app, {
 		heading: TITLES_UI.formEdit,
-		context: `${person.name}: ${titleName}`,
+		context: `${isolateName(person.name)}: ${isolateName(titleName)}`,
 		values: before,
 		personName: person.name,
 		save: async (v) => {
@@ -169,7 +170,7 @@ async function addTitle(host: TitlesHost): Promise<void> {
 	const picked = await choose(host.app, {
 		title: TITLES_UI.addTitle,
 		text: [TITLES_UI.addTitleText(person.name)],
-		choices: [...(g.titles ?? []).map((t) => ({ value: t.id, label: t.name })), { value: NEW_TITLE, label: TITLES_UI.newTitleChoice, detail: TITLES_UI.newTitleDetail }],
+		choices: [...g.titles.map((t) => ({ value: t.id, label: t.name })), { value: NEW_TITLE, label: TITLES_UI.newTitleChoice, detail: TITLES_UI.newTitleDetail }],
 		name: 'add-title',
 	});
 	if (picked === null) return;
@@ -177,7 +178,7 @@ async function addTitle(host: TitlesHost): Promise<void> {
 	const existing = isNew ? undefined : g.titles.find((t) => t.id === picked);
 	holderForm(host.app, {
 		heading: TITLES_UI.formNew,
-		context: existing ? `${person.name}: ${titleNameFor(existing, person)}` : person.name,
+		context: existing ? `${isolateName(person.name)}: ${isolateName(titleNameFor(existing, person))}` : isolateName(person.name),
 		values: { person: person.id },
 		personName: person.name,
 		...(isNew ? { titleName: host.draftTitle() } : {}),

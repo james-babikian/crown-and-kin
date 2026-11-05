@@ -208,7 +208,7 @@ describe('readable default view: start person at the top, children below (D13)',
 		expect(onScreen(v, start).left).toBeCloseTo(FAMILY_SIDE_PAD);
 	});
 
-	it('shows part of a child rather than a partner on the other side (sample tree 7 after WP3.4)', () => {
+	it('shows part of a child rather than a partner on the other side (sample tree 7)', () => {
 		const start = card(5000, 0);
 		const partner = card(5216, 0);
 		// Neither child fits whole next to the start card; the partner does, on the right.
@@ -363,7 +363,7 @@ describe('pan and zoom', () => {
 		expect(transformFor({ scale: 0.5, cx: 100, cy: 50 }, size)).toBe('translate(350 225) scale(0.5)');
 	});
 
-	it('keeps a small scale exact enough that no tree point moves by more than 0.01 px (WP5.3 review)', () => {
+	it('keeps a small scale exact enough that no tree point moves by more than 0.01 px', () => {
 		// Sample tree 7 at Fit on a phone: scale about 0.031, tree about 12,000 px wide.
 		const v = { scale: 0.0312345678901, cx: 6000, cy: 900 };
 		const m = /translate\(([-\d.e]+) ([-\d.e]+)\) scale\(([-\d.e]+)\)/.exec(transformFor(v, size))!;

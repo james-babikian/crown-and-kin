@@ -212,7 +212,7 @@ describe('the scan finds what it should (self-test)', () => {
 	});
 });
 
-describe('import graph of src/ (the architecture notes §3)', () => {
+describe('import graph of src/', () => {
 	const files = tsFiles('src');
 	const graph = buildGraph(new Map(files.map((f) => [f, read(f)] as const)));
 
@@ -233,8 +233,8 @@ describe('import graph of src/ (the architecture notes §3)', () => {
 		expect(cycles(graph)).toEqual([]);
 	});
 
-	it('dates.ts (WP-4) imports only the other files of the date reader, hash.ts, succession-keys.ts and the types of types.ts', () => {
-		// Names contract (0.3.3, WP-6): the size rule split the name lists, the formats, the number places and the text helpers out of dates.ts.
+	it('dates.ts imports only the other files of the date reader, hash.ts, succession-keys.ts and the types of types.ts', () => {
+		// Names contract: the size rule split the name lists, the formats, the number places and the text helpers out of dates.ts.
 		expect([...(graph.edges.get('src/core/dates.ts') ?? [])].sort()).toEqual([
 			'src/core/date-formats.ts', 'src/core/date-numbers.ts', 'src/core/date-text.ts', 'src/core/hash.ts', 'src/core/name-lists.ts', 'src/core/succession-keys.ts', 'src/core/types.ts',
 		]);

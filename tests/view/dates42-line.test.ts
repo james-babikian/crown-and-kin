@@ -84,7 +84,7 @@ describe('the year text of the line, as written (vet item 1; spec §14 rule 7)',
 	});
 });
 
-describe('the note died-no-year (spec §14 rule 5; the architecture notes §5.7)', () => {
+describe('the note died-no-year (spec §14 rule 5)', () => {
 	const DEAD = (id: string, extra = '') => `  - {id: ${id}, name: ${id.toUpperCase()}, sex: f, born: 1060, died: "fell in the war", parents: [r]${extra}}\n`;
 
 	it('its text names the person and the text that gives Y', () => {

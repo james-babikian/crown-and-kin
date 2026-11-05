@@ -10,7 +10,7 @@ import { fakeVault } from '../support/calendar-vault';
 import { useFakeDom } from '../support/fake-dom-setup';
 
 /*
- * Spec §14 rule 13 (WP-6 step 3): the `kin-calendar` block in a note shows its name lists as rows of the table, the plain years as a box of their own, and a note with only the key
+ * Spec §14 rule 13: the `kin-calendar` block in a note shows its name lists as rows of the table, the plain years as a box of their own, and a note with only the key
  * `plain` as a calendar note. The test line of the block reads with the plain-year lists.
  */
 

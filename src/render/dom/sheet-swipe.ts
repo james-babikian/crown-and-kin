@@ -28,7 +28,7 @@ export function swipeCloses(dy: number, height: number, speed: number): boolean 
 }
 
 /** What the swipe needs from its sheet. */
-export interface SwipeHooks {
+interface SwipeHooks {
 	/** Closes the sheet the way the Close button does (focus back to the opener). */
 	close: () => void;
 	/** True when movement is reduced (D126): the sheet then closes or snaps back at once. */
@@ -67,7 +67,7 @@ export function attachSheetSwipe(sheet: HTMLElement, hooks: SwipeHooks): () => v
 	// A touch that ended a swipe over a button must not press it.
 	let swallow = false;
 	let swallowTimer: number | null = null;
-	const win = sheet.win ?? window;
+	const win = sheet.win;
 
 	const guard = (fn: () => void) => {
 		try {
@@ -115,13 +115,13 @@ export function attachSheetSwipe(sheet: HTMLElement, hooks: SwipeHooks): () => v
 		if (settle !== null) reset();
 		if (hooks.enabled && !hooks.enabled()) return;
 		const target = e.target as Element | null;
-		const onHandle = !!target?.closest?.(HANDLES);
+		const onHandle = !!target?.closest(HANDLES);
 		track = { id: e.pointerId, x0: e.clientX, y0: e.clientY, eligible: onHandle || sheet.scrollTop <= 0, engaged: false, dy: 0, samples: [{ t: performance.now(), y: e.clientY }] };
 	};
 
 	const move = (e: PointerEvent) => {
 		const t = track;
-		if (!t || e.pointerId !== t.id) return;
+		if (t?.id !== e.pointerId) return;
 		const dy = e.clientY - t.y0;
 		const dx = e.clientX - t.x0;
 		t.samples.push({ t: performance.now(), y: e.clientY });
@@ -147,7 +147,7 @@ export function attachSheetSwipe(sheet: HTMLElement, hooks: SwipeHooks): () => v
 
 	const finish = (e: PointerEvent, cancelled: boolean) => {
 		const t = track;
-		if (!t || e.pointerId !== t.id) return;
+		if (t?.id !== e.pointerId) return;
 		track = null;
 		if (!t.engaged) return;
 		// The last sample is the release itself, so a finger that stopped before it lifted has no speed.

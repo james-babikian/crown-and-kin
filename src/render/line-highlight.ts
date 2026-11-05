@@ -25,7 +25,7 @@ export interface LineMarks {
 export type LineState = 'on' | 'faded' | undefined;
 
 /** One line to draw: a whole `EdgePath`, or a piece of one that was split. */
-export interface DrawnPath {
+interface DrawnPath {
 	d: string;
 	kind: StrokeKind;
 	state: LineState;
@@ -165,7 +165,7 @@ export function lineLook(g: FamilyGraph, layout: TreeLayout, edges: EdgeDrawing,
 			}
 			const subs = straight(p.d);
 			const spans: [number, number][] = [];
-			if (subs && subs.length === 1) {
+			if (subs?.length === 1) {
 				const s = subs[0];
 				const axis = axisOf(s);
 				const ends = [axis === 'x' ? s.x : s.y, s.to];

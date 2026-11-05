@@ -193,6 +193,14 @@ body {
 }
 
 /*
+ * A name that holds a right-to-left letter (src/render/dom/name-span.ts) is one isolate whose direction its first strong letter sets, as on the cards ("كريم Mansour"
+ * shows "Mansour" at the left). The span is inline, so the line breaks and the ellipsis of the block around it work as before, and the block keeps its direction.
+ */
+.dynasty-name-run {
+	unicode-bidi: isolate;
+}
+
+/*
  * Joined text lines (src/render/text-join.ts). The "·" belongs to the item after it. When an item starts a wrapped text line,
  * the script hides its "·" (`is-lead`) and puts a line break before it, so a text line never starts or ends with "·".
  */
@@ -206,9 +214,14 @@ body {
 	max-width: 100%;
 }
 
+/* The text puts a space after the mark, as it puts one before it, so the "·" has the same room on both sides. */
 .dynasty-jmark {
-	margin-right: 0.4em;
 	color: var(--dynasty-muted);
+}
+
+/* A margin on the mark would add to that space. This selector is more specific than the margin of the phone list. */
+.dynasty-joined .dynasty-jitem > .dynasty-jmark {
+	margin-right: 0;
 }
 
 .dynasty-jitem.is-lead > .dynasty-jmark {
@@ -263,4 +276,55 @@ body.is-phone,
 	--dynasty-type-control: 16px;
 	--dynasty-type-text: 15px;
 	--dynasty-type-small: 13px;
+}
+
+/* ---------- Shared roles ---------- */
+
+/*
+ * The title role of a window or a page (D218 rules 1 to 3): the Title size, semibold, a tight line. `is-name` is for the name of a person, a couple,
+ * a house or a title: the text font, so a name reads as a name. `is-tool` is for the plugin's own window titles ("Titles", "Calendars"): the interface font.
+ */
+.dynasty-title {
+	min-width: 0;
+	font-size: var(--dynasty-type-title);
+	font-weight: var(--dynasty-weight-semibold);
+	line-height: var(--dynasty-line-tight);
+	letter-spacing: 0;
+	overflow-wrap: anywhere;
+}
+
+.dynasty-title.is-name {
+	font-family: var(--dynasty-font-name);
+}
+
+.dynasty-title.is-tool {
+	font-family: var(--dynasty-font-tool);
+}
+
+/* The title in a phone bar stays on one text line and ends with an ellipsis, so the bar buttons never move. A window that needs more lines adds `is-wrapping` (the partnership window, D316). */
+.dynasty-bar-line:not(.is-wrapping) {
+	min-width: 0;
+	overflow: hidden;
+	text-align: center;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+/*
+ * A field with an error has the error colour as its edge, in every window. There is no ring outside the field and the focus recipe is not used,
+ * so an error never looks like focus. The line that says what is wrong stands under the field.
+ */
+.dynasty-sheet input[aria-invalid='true'],
+.dynasty-sheet textarea[aria-invalid='true'],
+.dynasty-sheet select[aria-invalid='true'],
+.dynasty-picker input[aria-invalid='true'] {
+	border: var(--dynasty-error-edge);
+}
+
+.dynasty-sheet input[aria-invalid='true']:focus,
+.dynasty-sheet textarea[aria-invalid='true']:focus,
+.dynasty-sheet select[aria-invalid='true']:focus,
+.dynasty-picker input[aria-invalid='true']:focus {
+	border-color: var(--dynasty-error);
+	box-shadow: var(--dynasty-error-focus-shadow);
 }

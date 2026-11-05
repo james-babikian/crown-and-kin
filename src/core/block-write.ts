@@ -28,14 +28,26 @@ export type PlanWrite = (
 	language?: string,
 ) => WritePlan;
 
+/**
+ * What a write changed, kept with its undo entry so the words after an Undo can say it (D330 UX-17). Core keeps the facts; the wording is in the text tables.
+ * `names` are the names that the words show, in the order of the words: a person's change `[person]`, an added child `[child, parents]` (parents already joined),
+ * an added parent `[parent, child]` (a third name: the other parent of the marriage that the write also added), an added partner `[partner, other]`,
+ * a deleted person and the two marks "This is me" `[person]`. `type` is the parent type of an added parent or child.
+ */
+export interface UndoLabel {
+	kind: 'change' | 'added-child' | 'added-parent' | 'added-partner' | 'deleted' | 'marked-me' | 'unmarked-me';
+	names: readonly string[];
+	type?: string;
+}
+
 /** Plugin undo (§6.1, D8): the last 20 bodies a handle replaced. */
 export interface UndoStack {
-	/** Record one write: the body before and the body the plugin wrote. Keeps at most 20. */
-	push(before: string, after: string): void;
+	/** Record one write: the body before and the body the plugin wrote, and what it changed when the writer said so. Keeps at most 20. */
+	push(before: string, after: string, label?: UndoLabel): void;
 	/** True if there is an entry and `currentBody` equals what the plugin last wrote. */
 	canUndo(currentBody: string): boolean;
-	/** On success returns the body to restore and drops the entry. */
-	undo(currentBody: string): { ok: true; body: string } | { ok: false; code: 'empty' | 'changed' };
+	/** On success returns the body to restore and the label of the entry, and drops the entry. */
+	undo(currentBody: string): { ok: true; body: string; label?: UndoLabel } | { ok: false; code: 'empty' | 'changed' };
 	readonly size: number;
 	/** Rewrites every entry: a link update after a rename (spec §6.9) changes them all. */
 	map(fn: (body: string) => string): void;
@@ -72,10 +84,10 @@ export const UNDO_LIMIT = 20;
 
 /** Creates an empty `UndoStack`. */
 export function createUndoStack(): UndoStack {
-	const entries: { before: string; after: string }[] = [];
+	const entries: { before: string; after: string; label?: UndoLabel }[] = [];
 	return {
-		push(before, after) {
-			entries.push({ before, after });
+		push(before, after, label) {
+			entries.push(label ? { before, after, label } : { before, after });
 			if (entries.length > UNDO_LIMIT) entries.splice(0, entries.length - UNDO_LIMIT);
 		},
 		canUndo(currentBody) {
@@ -87,7 +99,7 @@ export function createUndoStack(): UndoStack {
 			// Someone else changed the block since the plugin wrote it; undo would overwrite that.
 			if (top.after !== currentBody) return { ok: false, code: 'changed' };
 			entries.pop();
-			return { ok: true, body: top.before };
+			return top.label ? { ok: true, body: top.before, label: top.label } : { ok: true, body: top.before };
 		},
 		get size() {
 			return entries.length;

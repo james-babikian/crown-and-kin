@@ -1,5 +1,5 @@
-// Behaviour of the helpers that the 0.3.3 clean-up (WP-1 A4) merged into one place, and the two stops that the plugin calls when it is turned off.
-// Kept from the proofs of the code-steward (tests/r033-steward-proofs.test.ts, split in the after-pass): these have no other test.
+// Behaviour of the helpers that the 0.3.3 clean-up merged into one place, and the two stops that the plugin calls when it is turned off.
+// Kept from the proofs of the code check (tests/r033-steward-proofs.test.ts, split in the after-pass): these have no other test.
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { YAMLMap, YAMLSeq } from 'yaml';

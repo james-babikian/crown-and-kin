@@ -1,4 +1,4 @@
-// A fake app for the Calendars window tests (WP-6 step 3): notes in a map, `read`, `process`, `create`, the root folder, and an index that reads the same notes that the window writes.
+// A fake app for the Calendars window tests: notes in a map, `read`, `process`, `create`, the root folder, and an index that reads the same notes that the window writes.
 // The test file must mock the module `obsidian` with the fake of the acceptance folder before it imports this file.
 import { vi } from 'vitest';
 import { TFile as VaultFile } from 'obsidian';

@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { deriveFamilies, type FamilyGraph } from '../../src/core/derive';
-import type { EditResult, Op } from '../../src/core/edit';
+import type { Op } from '../../src/core/edit';
 import { parseDynasty } from '../../src/core/parse';
 import { cardLabels, describeDeleteTitle, holderTable, pickerSuffix, searchNames, titleNameFor } from '../../src/core/titles';
 import type { Title, Tree } from '../../src/core/types';
 import { applyOp } from '../../src/core/yaml-edit';
 import { fixture } from '../support/helpers';
+import { body } from '../support/edit-body';
 
 // Spec §13.3, §13.4 (D65): the title key `female-name`, the female form on the card title text
 // line for a holder with `sex: f`, and the add-title / edit-title writes of the key.
@@ -16,10 +17,6 @@ function tree(src: string): Tree {
 	return r.tree;
 }
 const graph = (src: string): FamilyGraph => deriveFamilies(tree(src));
-function body(r: EditResult): string {
-	if (!r.ok) throw new Error(`refused: ${r.code} ${r.detail ?? ''}`);
-	return r.body;
-}
 const edit = (src: string, op: Op) => body(applyOp(src, op));
 const code = (src: string, op: Op) => {
 	const r = applyOp(src, op);

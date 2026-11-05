@@ -74,3 +74,26 @@ export function truncateClosed(text: string, maxW: number, measure: (s: string) 
 	if (!text.includes(BIDI_FSI)) return truncate(text, maxW, measure);
 	return closeIsolates(truncate(text, maxW, (s) => measure(closeIsolates(s))));
 }
+
+/**
+ * `text` cut at each `sep` that stands outside every isolate. A separator inside a name isolate belongs to the name ("Banu Hashim · بنو هاشم" is one item), so each
+ * piece keeps its isolates paired. A text with no isolate is cut as `String.split` cuts it.
+ */
+export function splitOutsideIsolates(text: string, sep: string): string[] {
+	if (!text.includes(BIDI_FSI) && !text.includes(BIDI_LRI) && !text.includes(BIDI_RLI)) return text.split(sep);
+	const parts: string[] = [];
+	let depth = 0;
+	let from = 0;
+	for (let i = 0; i < text.length; i++) {
+		const ch = text[i];
+		if (isOpener(ch)) depth++;
+		else if (ch === BIDI_PDI && depth > 0) depth--;
+		else if (depth === 0 && text.startsWith(sep, i)) {
+			parts.push(text.slice(from, i));
+			i += sep.length - 1;
+			from = i + 1;
+		}
+	}
+	parts.push(text.slice(from));
+	return parts;
+}

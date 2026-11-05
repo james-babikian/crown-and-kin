@@ -13,7 +13,7 @@ import { relationsModule } from './relations-support';
  * The "This is me" mark (spec §13.1 "Tree text", D42): `options.me: <id>` as one line, in the key
  * order of §13.0 item 1 (`start, focus, me, generations, height`), with the same formatting rules as
  * the pin (tests/acceptance/pin.test.ts, §6.2). Written through the existing `SetOption` op with the
- * new key `me` (M7 contract). Delete person clears it like `start` and `focus` (§6.7). Two new
+ * new key `me`. Delete person clears it like `start` and `focus` (§6.7). Two new
  * warnings: `missing-me` and `me-not-id`, with the §13.1 texts.
  *
  * Every expected text is written here by hand. These tests fail until WP7.1.

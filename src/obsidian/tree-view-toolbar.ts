@@ -4,35 +4,80 @@
  * `tree-view.ts`.
  */
 
-import { Keymap, Notice, setIcon } from 'obsidian';
+import { Keymap, Notice, getIconIds, setIcon } from 'obsidian';
 import type { CodedIssue } from '../core/messages';
 import { issueText } from '../core/messages';
 import { buildFocusBar } from '../render/dom/focus-bar';
 import { buildLegend } from '../render/dom/scene';
 import { setListEditable } from '../render/dom/phone-list-dom';
+import { setNameText } from '../render/dom/name-marks';
 import { buildCallout, fitLegend, Popover, type PopoverOptions } from '../render/dom/widgets';
-import { ADD_UI, BLOCK_UI, FINDER_UI, FOCUS_UI, FULL_UI, PHONE_LIST_UI, PROBLEMS_HINT, SAVE_UI, SHEET, TITLES_UI, UI, WRITE_TEXT, problemsLabel, problemsTitle } from '../render/ui-text';
+import { ADD_UI, BLOCK_UI, FINDER_UI, FOCUS_UI, FULL_UI, PHONE_LIST_UI, SAVE_UI, SHEET, TITLES_UI, UI, WRITE_TEXT, problemsLabel } from '../render/ui-text';
 import { CALENDAR_UI } from '../render/calendar-text';
 import { TOOLBAR_UI } from '../render/view-text';
 import { pickPerson } from './person-picker';
 import { pluginModalOpen } from '../view/plugin-modals';
 import { openCalendars } from './calendar-window';
 import { chooseCalendarNote } from './calendar-note-choice';
+import { drawProblems, type ProblemTarget } from './problems-list';
 import { TreeViewPictures } from './tree-view-pictures';
 
 /** The order of the parts of each toolbar, by class; `orderBar` sorts the bar by it. */
 const BAR_ORDER = {
-	desktop: ['dynasty-read-only-label', 'dynasty-open-source', 'dynasty-add-person', 'dynasty-find', 'dynasty-focus', 'dynasty-fit', 'dynasty-sep-a', 'dynasty-houses-button', 'dynasty-titles-button', 'dynasty-sep-b', 'dynasty-more', 'dynasty-grow', 'dynasty-warning-badge', 'dynasty-expand', 'dynasty-close'],
-	phone: ['dynasty-read-only-label', 'dynasty-open-source', 'dynasty-add-person', 'dynasty-houses-button', 'dynasty-focus', 'dynasty-find', 'dynasty-more', 'dynasty-warning-badge', 'dynasty-close'],
-	list: ['dynasty-read-only-label', 'dynasty-open-source', 'dynasty-add-person', 'dynasty-show-text', 'dynasty-grow', 'dynasty-list-find', 'dynasty-list-back', 'dynasty-warning-badge', 'dynasty-expand'],
+	desktop: ['dynasty-sr-only', 'dynasty-read-only-label', 'dynasty-open-source', 'dynasty-add-person', 'dynasty-find', 'dynasty-focus', 'dynasty-fit', 'dynasty-sep-a', 'dynasty-houses-button', 'dynasty-titles-button', 'dynasty-sep-b', 'dynasty-more', 'dynasty-grow', 'dynasty-warning-badge', 'dynasty-expand', 'dynasty-close'],
+	phone: ['dynasty-sr-only', 'dynasty-read-only-label', 'dynasty-open-source', 'dynasty-add-person', 'dynasty-houses-button', 'dynasty-focus', 'dynasty-find', 'dynasty-more', 'dynasty-warning-badge', 'dynasty-close'],
+	list: ['dynasty-sr-only', 'dynasty-read-only-label', 'dynasty-open-source', 'dynasty-add-person', 'dynasty-show-text', 'dynasty-grow', 'dynasty-list-find', 'dynasty-list-back', 'dynasty-warning-badge', 'dynasty-expand'],
 } as const;
+
+/** O-27: a bar narrower than this has the phone set of buttons in one row (an iPad window in Slide Over or Split View; extends D52). */
+export const NARROW_BAR_PX = 400;
+
+/**
+ * How an icon is drawn in this Obsidian: the class and the shapes of its SVG. Two names that draw the same picture give the same text. An older Obsidian draws the new
+ * icon `fullscreen` with the paths of `maximize` (Expand), and then Fit and Expand would be one picture (K-05).
+ */
+function drawnLook(name: string): string {
+	const holder = createDiv();
+	setIcon(holder, name);
+	const svg = holder.querySelector('svg');
+	if (!svg) return '';
+	const shapes = Array.from(svg.children, (c) => `${c.tagName}:${c.getAttribute('d') ?? ''}${c.getAttribute('x') ?? ''}${c.getAttribute('width') ?? ''}`);
+	return `${svg.getAttribute('class') ?? ''}|${shapes.join(';')}`;
+}
+
+/** The icon of Expand, which Fit must not copy. */
+export const EXPAND_ICON = 'maximize';
+
+/**
+ * CH-14, K-05: the one icon of Fit, in the bar and in the More list of a phone. `lucide-fullscreen` (a frame with the picture in it) where this Obsidian has it and draws
+ * it differently from Expand; else `minimize`. `look` says how a name is drawn (a test passes its own).
+ */
+export function fitIcon(ids: readonly string[] = knownIcons(), look: (name: string) => string = drawnLook): string {
+	if (!ids.includes('lucide-fullscreen')) return 'minimize';
+	return look('lucide-fullscreen') !== look(EXPAND_ICON) ? 'lucide-fullscreen' : 'minimize';
+}
+
+/** The ids of the icons that this Obsidian has; none when it cannot say (an older version, a test double). */
+function knownIcons(): string[] {
+	try {
+		return typeof getIconIds === 'function' ? getIconIds() : [];
+	} catch {
+		return [];
+	}
+}
+
+/** Numbers the bars, for their `aria-labelledby`. */
+let barNames = 0;
 
 /**
  * A bar in `parent` with the role and label of a toolbar, and `button`, which adds an icon-only button to it. `first` puts the bar first in
  * `parent`, so Tab reaches the buttons before the cards and the list (spec §5.2); the bar of an empty tree stays where it is made.
  */
 export function toolbarIn(parent: HTMLElement, first = true): { bar: HTMLElement; button: (icon: string, label: string, cls: string) => HTMLButtonElement } {
-	const bar = parent.createDiv({ cls: 'dynasty-toolbar', attr: { role: 'toolbar', 'aria-label': TOOLBAR_UI.region } });
+	// CH-11: named by a hidden text, not an aria-label. Obsidian shows an aria-label as a tooltip on every free point of the bar, also between two buttons.
+	const id = `dynasty-bar-${++barNames}`;
+	const bar = parent.createDiv({ cls: 'dynasty-toolbar', attr: { role: 'toolbar', 'aria-labelledby': id } });
+	bar.createSpan({ cls: 'dynasty-sr-only', text: TOOLBAR_UI.region, attr: { id } });
 	if (first) parent.prepend(bar);
 	const button = (icon: string, label: string, cls: string) => {
 		const b = bar.createEl('button', { cls: ['clickable-icon', 'dynasty-tool', cls], attr: { 'aria-label': label, type: 'button' } });
@@ -70,7 +115,7 @@ export abstract class TreeViewToolbar extends TreeViewPictures {
 		const banner = buildCallout(root, 'warning', UI.bannerTitle, 'dynasty-banner', setIcon);
 		banner.content.createDiv({ text: UI.bannerLead });
 		const list = banner.content.createEl('ul');
-		for (const i of blocking) list.createEl('li', { text: issueText(i) });
+		for (const i of blocking) setNameText(list.createEl('li'), issueText(i));
 	}
 
 	/** The block can be edited in a window here: an editable view, not the static phone preview (D1, D36). */
@@ -189,7 +234,8 @@ export abstract class TreeViewToolbar extends TreeViewPictures {
 		}
 		bar.querySelector<HTMLElement>('.dynasty-sep-a')?.toggle(!!houses || !!titles);
 		this.orderBar(bar);
-		if (!bar.childElementCount) bar.remove();
+		// The hidden name of the bar is no part: a bar with only that is empty.
+		if (Array.from(bar.children).every((c) => c.hasClass('dynasty-sr-only'))) bar.remove();
 		// The toolbar can be wider now (Add person): the D28 hint stays left of it.
 		this.placeHints();
 		const resizable = !this.full && !readOnly && !this.coarse && !this.blocked && !!this.handle && !this.isPhone();
@@ -251,7 +297,7 @@ export abstract class TreeViewToolbar extends TreeViewPictures {
 			root.addClass('dynasty-resizing');
 		});
 		grip.addEventListener('pointermove', (e) => {
-			if (!drag || drag.pointer !== e.pointerId) return;
+			if (drag?.pointer !== e.pointerId) return;
 			const h = Math.round(Math.min(5000, Math.max(100, drag.h + e.clientY - drag.y)));
 			drag.moved ||= Math.abs(e.clientY - drag.y) >= 2;
 			this.dragHeight = h;
@@ -259,7 +305,7 @@ export abstract class TreeViewToolbar extends TreeViewPictures {
 		});
 		const end = (e: PointerEvent) => {
 			const d = drag;
-			if (!d || d.pointer !== e.pointerId) return;
+			if (d?.pointer !== e.pointerId) return;
 			drag = null;
 			root.removeClass('dynasty-resizing');
 			const h = this.dragHeight;
@@ -341,7 +387,23 @@ export abstract class TreeViewToolbar extends TreeViewPictures {
 	 * How the toolbar menus open: a sheet from the bottom of the phone's full-screen view, else a menu under the button that opened it.
 	 */
 	protected menuPlace(opener: HTMLElement): { anchor?: DOMRect; opts: PopoverOptions } {
-		return this.barKind() === 'phone' ? { opts: { sheet: true, reduced: () => this.reduced() } } : { anchor: opener.getBoundingClientRect(), opts: { align: 'start' } };
+		return this.listsAsSheet() ? { opts: { sheet: true, reduced: () => this.reduced() } } : { anchor: opener.getBoundingClientRect(), opts: { align: 'start' } };
+	}
+
+	/** K-06: the lists of a bar are a sheet from the bottom on the bar of the phone's full-screen view; the computer's bar and the bar of the phone list in a note open them next to the button. */
+	protected listsAsSheet(): boolean {
+		return this.barKind() === 'phone';
+	}
+
+	/** Scrolls the note so that the bar of the list stands just under the header of the note (made by the list layer, which knows the scroll area and the header). */
+	protected abstract bringBarUp(bar: HTMLElement): void;
+
+	/** The small pop-up under the bar of the phone list in a note (made by the list layer, which knows the bar and the scroll area). */
+	protected abstract openProblemsPopup(opener: HTMLElement, count: number, keyboard: boolean): void;
+
+	/** The triangle of the phone list in a note, when a finger is the pointer, opens a small pop-up under the bar, not a sheet from the bottom of a box that is taller than the screen. */
+	protected listsAsPanel(): boolean {
+		return this.barKind() === 'list' && this.coarse;
 	}
 
 	/** One row of a toolbar menu: its icon, its text and the accessible name; a key press gives the focus back to the opener, a picker or a new menu takes it itself. */
@@ -398,7 +460,25 @@ export abstract class TreeViewToolbar extends TreeViewPictures {
 	/** Which toolbar this view has: the row of the computer, the bar at the bottom of the phone's full-screen view, or the bar of the phone list. */
 	protected barKind(): 'desktop' | 'phone' | 'list' {
 		if (this.listMode) return 'list';
-		return this.full && this.isPhone() ? 'phone' : 'desktop';
+		return this.full && (this.isPhone() || this.barWidth() < NARROW_BAR_PX) ? 'phone' : 'desktop';
+	}
+
+	/** The width of the bar of the full-screen view: the view is as wide as its window (the modal is 100vw), also in a pop-out window. */
+	private barWidth(): number {
+		return this.containerEl.win.innerWidth;
+	}
+
+	/** O-27: the window of the full-screen view became narrower or wider than the limit: the bar is made again with the set of buttons that fits. */
+	barWidthChanged(): void {
+		this.guard(() => {
+			const vp = this.viewport;
+			const bar = vp?.querySelector<HTMLElement>(':scope > .dynasty-toolbar');
+			if (!vp || !bar || this.unloaded || this.listMode || !!bar.querySelector('.dynasty-fit') === (this.barKind() === 'desktop')) return;
+			this.popover?.close();
+			bar.remove();
+			this.buildToolbar(vp);
+			this.updateEditUi();
+		});
 	}
 
 	/**
@@ -462,7 +542,7 @@ export abstract class TreeViewToolbar extends TreeViewPictures {
 			}
 			focus.addEventListener('click', (e) => this.guard(() => this.toggleFocusList(focus, !e.detail)));
 			if (kind === 'desktop') {
-				const fit = button('minimize', UI.fit, 'dynasty-fit');
+				const fit = button(fitIcon(), UI.fit, 'dynasty-fit');
 				fit.addEventListener('click', () => this.guard(() => this.fit()));
 				// The two bars between the groups: the first goes while the block cannot be edited (no Houses, no Titles).
 				bar.createSpan({ cls: ['dynasty-sep', 'dynasty-sep-a'], attr: { 'aria-hidden': 'true' } });
@@ -548,36 +628,51 @@ export abstract class TreeViewToolbar extends TreeViewPictures {
 			pop.close();
 			return;
 		}
+		// The phone list in a note has a small pop-up under its bar: the long list needs more room than a note gives (made by the list layer).
+		if (this.listsAsPanel()) {
+			this.openProblemsPopup(opener, issues.length, keyboard);
+			return;
+		}
 		const whole = this.whole;
+		// CH-01: the full-screen view of a phone has the list as a sheet from the bottom, as the More list; a computer opens it under the badge, at its right edge, or above it where there is no room below.
+		const sheet = this.listsAsSheet();
 		pop.open(
 			'problems',
 			(el) => {
-				const c = buildCallout(el, 'warning', problemsTitle(issues.length), 'dynasty-problems', setIcon);
-				// In focus mode a problem can be about people who are not drawn: like Find, the button then shows all people (spec §6.10).
-				const shown = issues.map((i) => ({ issue: i, people: (i.ids ?? []).filter((id) => whole?.byId.has(id) && (this.g?.byId.has(id) || this.focusId !== null)) }));
-				if (shown.some((s) => s.people.length)) c.content.createDiv({ cls: 'dynasty-problems-hint', text: PROBLEMS_HINT });
-				const list = c.content.createEl('ul', { cls: 'dynasty-problems-list' });
-				for (const { issue, people } of shown) {
-					const li = list.createEl('li', { cls: issue.level === 'blocking' ? 'dynasty-problem is-blocking' : 'dynasty-problem' });
-					if (!people.length) {
-						li.setText(issueText(issue));
-						continue;
-					}
-					const b = li.createEl('button', { cls: 'dynasty-problem-button', text: issueText(issue) });
-					b.addEventListener('click', () => {
+				const first = drawProblems(el, {
+					issues,
+					whole,
+					// In focus mode a problem can be about people who are not drawn: like Find, the button then shows all people (spec §6.10).
+					peopleOf: (i) => (i.ids ?? []).filter((id) => whole?.byId.has(id) && (this.g?.byId.has(id) || this.focusId !== null)),
+					show: (people) => {
 						pop.close();
-						this.guard(() => {
-							// D1: the static touch preview never moves; like a tag tap (D17), the full-screen view opens on the person.
-							if (!this.full && this.coarse) void this.openFull(people[0]);
-							else this.showPeople(people);
-						});
-					});
-				}
+						// D1: the static touch preview never moves; like a tag tap (D17), the full-screen view opens on the person.
+						this.guard(() => (!this.full && this.coarse ? void this.openFull(people[0]) : this.showPeople(people)));
+					},
+					open: (target) => {
+						pop.close();
+						this.guard(() => void this.openProblemTarget(target));
+					},
+					close: () => pop.close(true),
+					icon: setIcon,
+					sheet,
+				});
 				// Enter or Space on the badge moves the focus into the list: its buttons come last in the Tab order (spec §5.2).
-				if (keyboard) el.querySelector<HTMLElement>('.dynasty-problem-button')?.focus();
+				if (keyboard) first?.focus();
 			},
 			opener,
+			sheet ? undefined : opener.getBoundingClientRect(),
+			sheet ? { sheet: true, reduced: () => this.reduced() } : { align: 'end' },
 		);
+	}
+
+	/** UX-20: the window where a problem is corrected: the person window, or the Houses window on the house page. */
+	protected async openProblemTarget(t: ProblemTarget): Promise<void> {
+		if (t.kind === 'person') return this.openSheet(t.id, false);
+		await this.openHouses();
+		// The Houses window has opened (or not: a read-only tree). Its rows carry the saved ID of the house.
+		const modal = this.containerEl.doc.querySelector('.modal.dynasty-houses');
+		Array.from(modal?.querySelectorAll<HTMLElement>('button[data-house]') ?? []).find((b) => b.getAttribute('data-house') === t.id)?.click();
 	}
 
 	/**
@@ -626,7 +721,7 @@ export abstract class TreeViewToolbar extends TreeViewPictures {
 				const item = (icon: string, text: string, cls: string, run: () => void, label?: string) => this.menuItem(pop, el, icon, text, cls, run, label);
 				const rows: HTMLElement[] = [];
 				if (this.barKind() === 'phone') {
-					rows.push(item('minimize', UI.fit, 'dynasty-more-fit', () => this.fit()));
+					rows.push(item(fitIcon(), UI.fit, 'dynasty-more-fit', () => this.fit()));
 					// Spec §13.4, D49: the Titles window, where the block can be edited.
 					if (this.canEditWindows()) rows.push(item('crown', TITLES_UI.more, 'dynasty-more-titles', () => void this.openTitles(), TITLES_UI.moreLabel));
 				}

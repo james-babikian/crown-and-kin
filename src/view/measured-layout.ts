@@ -19,7 +19,7 @@ import type { BreakList } from '../render/break-words';
 import { tallCardsFor, tallTitlesFor, titleMeasure } from '../render/dom/tall-cards';
 
 /** What `measuredLayout` needs beyond the graph, the geometry and the base settings. */
-export interface MeasuredOptions {
+interface MeasuredOptions {
 	fonts: SceneFonts;
 	measure: Measure;
 	/** The card labels of the drawn graph. */

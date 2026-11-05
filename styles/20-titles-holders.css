@@ -21,7 +21,7 @@
 }
 
 .dynasty-holder-none {
-	padding: 4px 0;
+	padding: var(--dynasty-space-1) 0;
 }
 
 /* The holder rows of a title page: the lead, the ruler text, a second text line, the menu "more". */
@@ -136,10 +136,19 @@
 }
 
 .dynasty-holder-panel > .dynasty-sub {
-	margin-bottom: -4px;
+	margin-bottom: calc(-1 * var(--dynasty-space-1));
 }
 
 .dynasty-sheet.is-phone .dynasty-sheet-body .dynasty-holder-move:disabled {
+	opacity: 0.35;
+}
+
+/* O-18: the actions of an existing holder stand as rows under the preview: the card, the order, Remove. */
+.modal.dynasty-holder-form .dynasty-holder-actions {
+	margin-top: var(--dynasty-space-3);
+}
+
+.modal.dynasty-holder-form .dynasty-holder-actions .dynasty-action-row:disabled {
 	opacity: 0.35;
 }
 
@@ -187,7 +196,7 @@
 .dynasty-succ-pair {
 	display: flex;
 	flex-direction: column;
-	gap: 4px;
+	gap: var(--dynasty-space-1);
 }
 
 /* A switch is a row with the label at the left and the switch at the right (`dynasty-rule`). */
@@ -195,7 +204,7 @@
 	display: grid;
 	grid-template-columns: minmax(0, 1fr) auto;
 	align-items: center;
-	gap: 4px 16px;
+	gap: var(--dynasty-space-1) var(--dynasty-space-4);
 	min-height: 44px;
 	padding-block: 6px;
 	cursor: pointer;
@@ -239,8 +248,8 @@
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
-	gap: 12px;
-	margin-bottom: 4px;
+	gap: var(--dynasty-space-3);
+	margin-bottom: var(--dynasty-space-1);
 }
 
 /* A sub-heading: the Small role, semibold, quiet grey (D218 items 2 and 3). */
@@ -273,11 +282,11 @@
 }
 
 .dynasty-succ-list > .dynasty-succ-note {
-	margin: 8px 0 0;
+	margin: var(--dynasty-space-2) 0 0;
 }
 
 .dynasty-succ-list > :not(.dynasty-succ-note) + .dynasty-succ-note {
-	margin-top: 12px;
+	margin-top: var(--dynasty-space-3);
 }
 
 .dynasty-succ-list > .dynasty-succ-note:first-child {
@@ -316,11 +325,11 @@
 
 /* 8 px, as between two notes of the list (the branch hint stood 2 px under the last note). */
 .dynasty-succ-branch-note {
-	margin-top: 8px;
+	margin-top: var(--dynasty-space-2);
 }
 
 .dynasty-succ-people .dynasty-actions {
-	margin-top: 4px;
+	margin-top: var(--dynasty-space-1);
 }
 
 /* The Titles section of the person window (spec §13.4): the name of a title is a name in a row. */

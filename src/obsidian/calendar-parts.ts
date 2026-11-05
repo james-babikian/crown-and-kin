@@ -10,7 +10,7 @@ import type { DateReader } from '../core/dates';
 import { CALENDAR_WINDOW_UI as T } from '../render/calendar-text';
 import { paintDateLine } from '../render/dom/date-line';
 import { testParts, type Checked } from '../view/calendar-draft';
-import { endEntryOnEnter, sheetField } from './sheet-parts';
+import { clearFieldError, endEntryOnEnter, fieldError, sheetField } from './sheet-parts';
 
 /** What a card needs of its window. */
 export interface CardHost {
@@ -49,30 +49,45 @@ interface FieldOptions {
 	keepTogether?: readonly string[];
 	area?: boolean;
 	rows?: number;
+	/** A number: the keyboard of a phone shows digits, and the field has the one width of a number field in this window (6.5 em, CAL-04). */
 	numeric?: boolean;
 	wide?: boolean;
-	/** The control takes half the width of the row (a number of two or three digits); its help and refusals keep the whole width. */
-	half?: boolean;
 	/** The refusals stand in this box (a row of fields shows them under the whole row), not under the field. */
 	errorIn?: HTMLElement;
+	/** UX-11: the hint of the field stands in this box (under a row of fields), and shows only while its own field has the focus. */
+	hintIn?: HTMLElement;
 	/** Fills the line of the label, at the right of it (the Remove link of an era or a name list). */
 	labelEnd?: (line: HTMLElement) => void;
 	/** An `aria-describedby` id of a hint that stands outside the field (the hint under the row of the start). */
 	describedBy?: string;
 }
 
-/** The refusals of one field, in red under it (as the ID window does); the control gets `aria-invalid` while there is one. */
-function fieldErrors(row: HTMLElement, input: HTMLElement, host: CardHost, e: FieldError): void {
-	e.shown.add(e.field);
-	const id = `${input.id}-error`;
-	const box = row.createDiv({ cls: ['dynasty-sheet-error', 'dynasty-cal-field-error'], attr: { id, 'aria-live': 'polite' } });
+/** The refusals of a field that is not in a row of fields, under it (CX-11: the shared helper; the field takes the error edge). */
+function fieldRefusals(input: HTMLElement, host: CardHost, e: FieldError): void {
 	host.register(() => {
-		box.empty();
 		// A field that is still empty shows no refusal before the first Save: a calendar or a list that was just added starts with no red text.
 		const quiet = !host.attempted() && (input as HTMLInputElement).value.trim() === '';
 		const mine = quiet ? [] : host.checked().refusals.filter((r) => r.key === e.key && r.field === e.field);
-		for (const r of mine) box.createDiv({ text: r.text, attr: { 'data-refusal': '' } });
-		box.toggle(mine.length > 0);
+		if (!mine.length) return clearFieldError(input);
+		const line = fieldError(input, mine.map((r) => r.text).join(' '), { focus: false });
+		line.addClass('dynasty-cal-field-error');
+		line.setAttribute('data-refusal', '');
+	});
+}
+
+/**
+ * The refusals of a field in a row of fields: they stand in `box` under the whole row, so a long refusal does not lift the other fields of the row. The control gets
+ * `aria-invalid` (the error edge of `styles/01-base.css`) while there is one.
+ */
+function rowRefusals(box: HTMLElement, input: HTMLElement, host: CardHost, e: FieldError): void {
+	const id = `${input.id}-error`;
+	const line = box.createDiv({ cls: ['dynasty-sheet-error', 'dynasty-field-error', 'dynasty-cal-field-error'], attr: { id, role: 'alert' } });
+	host.register(() => {
+		line.empty();
+		const quiet = !host.attempted() && (input as HTMLInputElement).value.trim() === '';
+		const mine = quiet ? [] : host.checked().refusals.filter((r) => r.key === e.key && r.field === e.field);
+		for (const r of mine) line.createDiv({ text: r.text, attr: { 'data-refusal': '' } });
+		line.toggle(mine.length > 0);
 		if (mine.length) input.setAttribute('aria-invalid', 'true');
 		else input.removeAttribute('aria-invalid');
 		const described = (input.getAttribute('aria-describedby') ?? '').split(' ').filter((x) => x && x !== id);
@@ -80,11 +95,18 @@ function fieldErrors(row: HTMLElement, input: HTMLElement, host: CardHost, e: Fi
 	});
 }
 
+/** The refusals of one field (CX-11): under the field, or in the box of its row. `shown` tells the card that the refusal has its place. */
+function fieldErrors(row: HTMLElement, input: HTMLElement, host: CardHost, e: FieldError, box?: HTMLElement): void {
+	e.shown.add(e.field);
+	if (box) rowRefusals(box, input, host, e);
+	else fieldRefusals(input, host, e);
+}
+
 /** The row of a field, with its label (and the link at the right end of the label, when `labelEnd` is given) and its hint. */
 function fieldRow(parent: HTMLElement, name: string, label: string, o: FieldOptions): { row: HTMLElement; id: string } {
 	const { row, id } = sheetField(parent, label, name, 'dynasty-cal');
 	if (o.wide) row.addClass('is-wide');
-	if (o.half) row.addClass('is-half');
+	if (o.numeric) row.addClass('is-number');
 	const labelEl = row.querySelector('label');
 	if (o.labelEnd && labelEl) {
 		const line = row.createDiv({ cls: 'dynasty-cal-labelrow' });
@@ -130,14 +152,21 @@ export function field(parent: HTMLElement, host: CardHost, name: string, label: 
 		? row.createEl('textarea', { cls: ['dynasty-sheet-input', 'dynasty-input'], attr: { id, rows: o.rows ?? 2, spellcheck: 'false', autocapitalize: 'off', placeholder: extra.placeholder, 'data-focus': `cal:${name}` } })
 		: row.createEl('input', { cls: ['dynasty-sheet-input', 'dynasty-input'], attr: { id, type: 'text', autocomplete: 'off', autocorrect: 'off', spellcheck: 'false', autocapitalize: 'off', inputmode: extra.inputmode, placeholder: extra.placeholder, 'data-focus': `cal:${name}` } });
 	input.value = value;
-	if (o.hint) {
+	if (o.hint && o.hintIn) {
+		// One hint for each field of a row, in the box under the row; it shows while its own field has the focus (UX-11).
+		const hintId = `${id}-hint`;
+		const hint = o.hintIn.createDiv({ cls: ['dynasty-sheet-hint', 'dynasty-cal-field-hint'], text: o.hint, attr: { id: hintId } });
+		input.addEventListener('focus', () => hint.addClass('is-shown'));
+		input.addEventListener('blur', () => hint.removeClass('is-shown'));
+		input.setAttribute('aria-describedby', hintId);
+	} else if (o.hint) {
 		const hintId = `${id}-hint`;
 		// The help shows while the cursor is in the field (`is-on-focus`, styles/10 and 37), and a screen reader reads it with the field.
 		hintText(row.createDiv({ cls: ['dynasty-sheet-hint', 'is-on-focus'], attr: { id: hintId } }), o.hint, o.keepTogether);
 		input.setAttribute('aria-describedby', hintId);
 	}
 	if (o.describedBy) input.setAttribute('aria-describedby', o.describedBy);
-	if (o.error) fieldErrors(o.errorIn ?? row, input, host, o.error);
+	if (o.error) fieldErrors(row, input, host, o.error, o.errorIn);
 	if (!o.area) endEntryOnEnter(input as HTMLInputElement);
 	input.addEventListener('input', () => {
 		set(input.value);
@@ -192,9 +221,8 @@ export function testField(parent: HTMLElement, name: string, reader: () => DateR
 		attr: { id, type: 'text', autocomplete: 'off', autocorrect: 'off', spellcheck: 'false', autocapitalize: 'off', placeholder: T.testPlaceholder, 'data-focus': `test:${name}` },
 	});
 	const line = row.createDiv({ cls: ['dynasty-sheet-hint', 'dynasty-date-line'], attr: { id: `${id}-readout`, 'aria-live': 'polite', 'data-readout': '' } });
-	// The second sentence of the old label is a help that shows while the cursor is in the field (D278).
-	row.createDiv({ cls: ['dynasty-sheet-hint', 'is-on-focus'], text: T.testHint, attr: { id: `${id}-hint` } });
-	input.setAttribute('aria-describedby', `${id}-readout ${id}-hint`);
+	// UX-11: the field has no hint of its own; the placeholder and the line say what it does.
+	input.setAttribute('aria-describedby', `${id}-readout`);
 	const update = (): void => {
 		try {
 			paintDateLine(line, testParts(reader(), input.value));

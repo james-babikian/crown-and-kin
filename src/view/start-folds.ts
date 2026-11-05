@@ -14,14 +14,14 @@ import type { Tree } from '../core/types';
 import { DEFAULT_FAR_RULE } from '../layout/index';
 
 /** What the rule needs of the whole tree: the rows, and the place of each person in the row of the whole-tree walk. */
-export interface WholeFacts {
+interface WholeFacts {
 	gen: ReadonlyMap<string, number>;
 	/** The number of cards before the person in his row, as the walk of the whole tree orders them (the far rule of D10 counts in cards). */
 	slot: ReadonlyMap<string, number>;
 }
 
 /** One family that starts folded: its key and the number of people its "+ N" sign shows. */
-export interface StartFold {
+interface StartFold {
 	key: FoldKey;
 	count: number;
 }

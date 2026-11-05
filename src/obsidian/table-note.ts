@@ -13,14 +13,14 @@ import { deriveDated, type DatesFor } from '../view/calendar-index';
 import { vaultPath } from './vault-path';
 
 /** Where a made note goes. The default is the folder that Obsidian picks for new notes next to sourcePath (D60); folder is a vault folder path ('' = the vault root). */
-export interface NoteWhere {
+interface NoteWhere {
 	folder?: string;
 	/** Use exactly this note name without ".md"; do not look for a free one. */
 	exact?: boolean;
 }
 
 /** The result of makeNote. */
-export type MakeNoteResult = { ok: true; file: TFile; name: string } | { ok: false; why: 'failed' };
+type MakeNoteResult = { ok: true; file: TFile; name: string } | { ok: false; why: 'failed' };
 
 /** The first free note name: `base`, else "base 1", "base 2", … (compared without case, as on Windows and macOS). */
 export function freeName(base: string, taken: ReadonlySet<string>): string {
@@ -88,7 +88,7 @@ export async function makeNote(app: App, sourcePath: string, baseName: string, c
 }
 
 /** The result of `makeTableNote`: the new note's name, or why there is none. */
-export type TableNoteResult = { ok: true; name: string; path: string } | { ok: false; why: 'gone' | 'failed' };
+type TableNoteResult = { ok: true; name: string; path: string } | { ok: false; why: 'gone' | 'failed' };
 
 /**
  * Makes the table note of title `id` from the block text `body` (the saved list, spec §13.4).

@@ -52,7 +52,7 @@
 .dynasty-swatches {
 	display: flex;
 	flex-wrap: wrap;
-	gap: 8px;
+	gap: var(--dynasty-space-2);
 }
 
 .dynasty-sheet .dynasty-swatch {
@@ -137,37 +137,26 @@
 }
 
 /*
- * One label "Colour", then one row of round colours, then the colours read from the arms (D68, D208 item 2, arms-colours). A thin divider
- * stands over them, and each carries a small dot as its mark. The group has no content while the picture is read, or when the plugin cannot
- * read it, and then it is not shown at all: no empty box.
+ * One label "Colour", then one row of round colours, then the label "From the arms" and the colours read from the arms (D68, D330 O-19).
+ * There is no line and no dot: the label says what the row is. The label and the group have no content while the picture is read, or when the plugin
+ * cannot read it, and then they are not shown at all: no empty box.
  */
 .dynasty-house-palette {
 	display: flex;
 	flex-direction: column;
-	gap: 8px;
+	gap: var(--dynasty-space-2);
 }
 
-.dynasty-house-arms-colours {
-	margin-top: 4px;
-	padding-top: 12px;
-	border-top: 1px solid var(--background-modifier-border);
+.dynasty-house-arms-label {
+	flex: 0 0 100%;
+	margin-top: var(--dynasty-space-1);
+	color: var(--dynasty-muted);
+	font-size: var(--dynasty-type-small);
 }
 
 .dynasty-house-arms-colours:empty,
 .dynasty-house-arms-colours.is-loading {
 	display: none;
-}
-
-.dynasty-sheet button.dynasty-house-arms-colour::after {
-	content: '';
-	position: absolute;
-	right: -2px;
-	bottom: -2px;
-	width: 10px;
-	height: 10px;
-	border-radius: 50%;
-	background: var(--text-normal);
-	box-shadow: 0 0 0 2px var(--modal-background, var(--background-primary));
 }
 
 /*
@@ -207,11 +196,12 @@
 /* The picture picker (spec §13.14, D92 to D95, D102): a search bar and the folder list. The bar never scrolls; the sheet body below it is the scroller, on the computer and on the phone. */
 .dynasty-picture-top {
 	flex: none;
-	background: var(--modal-background, var(--background-primary));
+	/* P3-08: no colour of its own, as the list windows (CX-15): the body is the plain page background, and the modal background is a grey on a dark phone. */
+	background: none;
 }
 
 .dynasty-picture-intro {
-	padding: 22px 24px 4px;
+	padding: 22px var(--dynasty-space-5) var(--dynasty-space-1);
 }
 
 .dynasty-picture-hint {
@@ -220,14 +210,14 @@
 }
 
 .dynasty-sheet.is-phone .dynasty-picture-intro {
-	padding: 8px max(16px, env(safe-area-inset-left)) 4px;
+	padding: var(--dynasty-space-2) max(var(--dynasty-space-4), env(safe-area-inset-left)) var(--dynasty-space-1);
 }
 
 .dynasty-picture-searchbar {
 	flex: none;
-	padding: var(--size-4-2) 24px;
+	padding: var(--size-4-2) var(--dynasty-space-5);
 	border-bottom: 1px solid var(--background-modifier-border);
-	background: var(--modal-background, var(--background-primary));
+	background: none;
 }
 
 .dynasty-sheet.is-phone .dynasty-picture-searchbar {
@@ -371,7 +361,7 @@
 	flex: none;
 	display: inline-flex;
 	align-items: center;
-	gap: 4px;
+	gap: var(--dynasty-space-1);
 	color: var(--text-muted);
 }
 

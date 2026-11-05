@@ -88,7 +88,7 @@ interface Opened {
 async function open(files: Record<string, string>, o: { link?: string; links?: Record<string, string> } = {}): Promise<Opened> {
 	const { app, notes, created } = fakeApp(files);
 	const index = await indexOf(notes, o.links);
-	// No link: the window opens as from a note (the Edit button, the command in a note with no tree), so it has no line about a tree; the cases of a tree with no key are in r04-calendar-window.
+	// No link: the window opens as from a note (the Edit button, the command in a note with no tree), so it has no line about a tree; the cases of a tree with no key are in calendar-window-openings.
 	await openCalendars(app as never, index, { tree: o.link === undefined ? null : { treePath: 'tree.md', link: o.link, setLink: null } });
 	await settle();
 	const win = openModals[openModals.length - 1] as unknown as { contentEl: FEl; modalEl: FEl };
@@ -157,7 +157,7 @@ describe('the Calendars window', () => {
 		type(c, 'era-2-name', 'Aldric');
 		type(c, 'era-2-same', '1500');
 		type(c, 'era-2-year', '4');
-		expect(c.querySelector('[data-readback="era-2"]')?.getText()).toContain('Start: year 1497');
+		expect(c.querySelector('[data-readback="era-2"]')?.getText()).toBe('Aldric 4 = year 1500');
 		await save(c);
 		const added = o.index.calendarsOf('Calendars.md').find((k) => k.name === 'Houses');
 		expect(added?.kind).toMatchObject({ type: 'eras', eras: [{ name: 'Aldric', start: 1497 }] });
@@ -385,7 +385,7 @@ describe('the kin-calendar block in a note', () => {
 	});
 });
 
-describe('the look round of 0.3.2: the Calendars window and the block', () => {
+describe('the look of the Calendars window and the block', () => {
 	const kids = (el: FEl) => el.children.map((c) => c.classes);
 
 	it('starts with a head: the title, a text line with the note and its folder, and "New calendar note" as a link', async () => {
@@ -458,25 +458,37 @@ describe('the look round of 0.3.2: the Calendars window and the block', () => {
 		expect(c.querySelectorAll('.dynasty-cal-era')).toHaveLength(1);
 	});
 
-	it('the start has a sub-heading, the readback, one row of Cycle, Year, "=" and Same year as, then the hint', async () => {
+	it('the start of a cycle calendar has a sub-heading, one row of Cycle, Year, "=" and Same year as, the reading line, then the hint of the field that has the focus', async () => {
 		const o = await open({ 'Calendars.md': cycleNote() });
 		const start = o.win.contentEl.querySelector('.dynasty-cal-start')!;
-		expect(kids(start).map((k) => [...k][0])).toEqual(['dynasty-cal-subhead', 'dynasty-sheet-hint', 'dynasty-cal-start-row', 'dynasty-sheet-hint', 'dynasty-sheet-error']);
+		expect(kids(start).map((k) => [...k][0])).toEqual(['dynasty-cal-subhead', 'dynasty-cal-start-row', 'dynasty-sheet-hint', 'dynasty-cal-under']);
 		expect(start.children[0].getText()).toBe(T.startLabel);
 		const row = start.querySelector('.dynasty-cal-start-row')!;
 		expect(row.children.map((e) => e.getAttribute('data-field') ?? e.getText())).toEqual(['0-cycle', '0-year', '=', '0-same']);
-		const hint = start.children[3];
-		expect(hint.getText()).toBe(T.exampleHintCycles);
-		// Every field of the row is described by the hint under the row.
-		for (const input of row.querySelectorAll('input')) expect(input.getAttribute('aria-describedby')).toBe(hint.getAttribute('id'));
+		// UX-11: one hint for each field, under the row; a field is described by its own hint.
+		const hints = start.querySelectorAll('.dynasty-cal-field-hint');
+		expect(hints.map((h) => h.getText())).toEqual([T.cycleHint, T.yearHintCycles, T.sameAsHint]);
+		const inputs = row.querySelectorAll('input');
+		inputs.forEach((input, i) => expect(input.getAttribute('aria-describedby')).toBe(hints[i].getAttribute('id')));
+		// The hint shows only while its own field has the focus.
+		expect(hints.every((h) => !h.hasClass('is-shown'))).toBe(true);
+		dispatch(inputs[1], 'focus');
+		expect(hints.map((h) => h.hasClass('is-shown'))).toEqual([false, true, false]);
+		dispatch(inputs[1], 'blur');
+		expect(hints.some((h) => h.hasClass('is-shown'))).toBe(false);
 	});
 
-	it('an era start has Year, "=" and Same year as; a refusal of the row stands under the hint, not in the row', async () => {
+	it('an era is a name row, then one row of Year, "=", Same year as and Length, and the reading line; a refusal of the row stands under the row, not in it (O-23)', async () => {
 		const o = await open({ 'Calendars.md': eraNote() });
 		const c = o.win.contentEl;
 		const start = c.querySelector('.dynasty-cal-era .dynasty-cal-start')!;
+		expect(start.querySelector('.dynasty-cal-subhead')).toBeNull();
 		const row = start.querySelector('.dynasty-cal-start-row')!;
-		expect(row.children.map((e) => e.getAttribute('data-field') ?? e.getText())).toEqual(['era-1-year', '=', 'era-1-same']);
+		expect(row.children.map((e) => e.getAttribute('data-field') ?? e.getText())).toEqual(['era-1-year', '=', 'era-1-same', 'era-1-length']);
+		expect(row.querySelector('[data-field="era-1-year"] input')!.getAttribute('placeholder')).toBe(T.yearPlaceholder);
+		expect(start.querySelectorAll('.dynasty-cal-field-hint').map((h) => h.getText())).toEqual([T.yearHintEras, T.sameAsHint, T.lengthHintEras]);
+		// One width for every number field.
+		for (const name of ['era-1-year', 'era-1-length']) expect(row.querySelector(`[data-field="${name}"]`)!.hasClass('is-number'), name).toBe(true);
 		type(c, 'era-1-same', 'no year in these words');
 		await save(c);
 		expect(row.querySelector('[data-refusal]')).toBeNull();

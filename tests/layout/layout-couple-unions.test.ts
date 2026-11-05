@@ -4,7 +4,7 @@ import { clearLayoutCache, layoutTree } from '../../src/layout/index';
 import type { LayoutSettings } from '../../src/layout/model';
 import { build } from '../support/helpers';
 
-// Review 0.1.1 C2: a couple with several unions side by side (the decision notes "Second union for a couple").
+// Review 0.1.1 C2: a couple with several unions side by side.
 
 const FAR = { maxCardWidths: 3, maxGenerations: 1 };
 const SRC = `people:

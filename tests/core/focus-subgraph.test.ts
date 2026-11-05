@@ -104,7 +104,7 @@ describe('placement parents of shown children, exactly as deriveFamilies places 
 		expect(r.r.tree.people[1].parents).toEqual([]);
 	});
 
-	it('a partner with only one placement parent inside is drawn as a root (contract 62e55a5)', () => {
+	it('a partner with only one placement parent inside is drawn as a root', () => {
 		// f marries w and w's mother d. w's father x is outside, so w keeps no parent link.
 		const yaml = 'people:\n  - {id: d, name: D}\n  - {id: x, name: X}\n  - {id: w, name: W, parents: [d, x]}\n  - {id: f, name: F}\nunions:\n  - partners: [f, w]\n  - partners: [f, d]\n';
 		const r = run(parse(yaml), 'f', 1);
@@ -161,7 +161,7 @@ unions:
 		expect(r.hidden).toEqual({});
 	});
 
-	it('a link dropped to break a cycle never counts, also when the relative is outside (contract d10284b)', () => {
+	it('a link dropped to break a cycle never counts, also when the relative is outside', () => {
 		// a → b → c → a. Validation drops c → a, so a's written parent c is not drawn.
 		const tree = parse('people:\n  - {id: a, name: A, parents: [c]}\n  - {id: b, name: B, parents: [a]}\n  - {id: c, name: C, parents: [b]}\n');
 		expect(run(tree, 'a', 0)).toMatchObject({ ids: ['a'], hidden: { a: 1 } });
@@ -170,7 +170,7 @@ unions:
 	});
 
 	it('a child who is in only as a partner and loses the parent line counts on the parent\'s card', () => {
-		// s is f's brother and is married to x, f's daughter by y. Focus f, n = 0 (review 5.1 round 2).
+		// s is f's brother and is married to x, f's daughter by y. Focus f, n = 0.
 		const tree = parse('people:\n  - {id: q, name: Q}\n  - {id: y, name: Y}\n  - {id: f, name: F, parents: [q]}\n  - {id: s, name: S, parents: [q]}\n  - {id: x, name: X, parents: [f, y]}\nunions:\n  - {partners: [s, x]}\n');
 		const r = run(tree, 'f', 0);
 		expect(r.ids).toEqual(['f', 's', 'x']);

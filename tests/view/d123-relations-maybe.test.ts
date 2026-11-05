@@ -44,7 +44,7 @@ const b = tree([...base, 'S f M']);
 const c = tree([...base, 'S f M R']);
 const d = tree([...base, 'Q m', 'S f M Q:rumoured']);
 
-describe('D123: cards and sheet words (contract 2.2 and 2.4)', () => {
+describe('D123: cards and sheet words', () => {
 	it('case a: the card of the half-brother says ", maybe full"; the maybe is full with the name Brother', () => {
 		const g = rels(a, 'G');
 		expect(g[0].text).toBe('Half-brother');
@@ -113,7 +113,7 @@ describe('D123: cards and sheet words (contract 2.2 and 2.4)', () => {
 	});
 });
 
-describe('D123: the oracle is not "every rumoured parent becomes birth" (gate proofs)', () => {
+describe('D123: the oracle is not "every rumoured parent becomes birth"', () => {
 	const caseB = ['M f', 'R m', 'F m', 'E m M R:rumoured', 'G m R M', 'A m F M', 'S f M'];
 	it('case b (D174): Half-sister, and with rumoured links as birth links also Half-sister; only the cause of the maybe tells them apart', () => {
 		const asBirth = tree(caseB.map((l) => l.replace(':rumoured', '')));
@@ -277,7 +277,7 @@ describe('D123: the second comparison runs only where a rumoured link lies in th
 	});
 });
 
-describe('D123 and D174: random trees against an independent brute force (spec ยง13.1 "Sure and maybe", both settings)', () => {
+describe('D123, D174: random trees against an independent brute force (spec ยง13.1 "Sure and maybe", both settings)', () => {
 	// Children C0..Cn of up to four parents. For every pair (me, p) and every common parent X, the sets S (birth parents), R (rumoured
 	// parents), A = S + R and the two tests are worked out here, with no use of the plugin's search (D174 rules, spec fix of 2026-10-06).
 	type Kid = { id: string; sex: string; parents: { id: string; type: 'birth' | 'rumoured' }[] };
@@ -306,7 +306,7 @@ describe('D123 and D174: random trees against an independent brute force (spec ย
 			return out;
 		};
 		// 0.2.8 R4: a child with two birth parents and a rumoured parent may also have just the two birth parents. This outcome
-		// counts for the maybe of a half pair, by rumour and (fix round, D205 item 2) by an unlisted parent; not for the second test (D174 item 4).
+		// counts for the maybe of a half pair, by rumour and (D205 item 2) by an unlisted parent; not for the second test (D174 item 4).
 		const outcomes = (k: Kid): string[][] => (S(k).length === 2 && R(k).length > 0 ? [...choices(k), S(k)] : choices(k));
 		// Second test: two equal choices, neither of fewer than two people where the setting is on.
 		const secondFull = choices(me).some((t1) => choices(p).some((t2) => key(t1) === key(t2) && !(on && t1.length < 2)));
@@ -393,7 +393,7 @@ describe('D123 and D174: random trees against an independent brute force (spec ย
 	}
 });
 
-describe('D123: timing with a rumoured link on every person (contract 2.3)', () => {
+describe('D123: timing with a rumoured link on every person', () => {
 	/** `gens` rows of `width` people; each person has a couple of the row above as parents, the second link of the type `second`. */
 	function dense(second: 'rumoured' | 'birth', gens = 10, width = 40): FamilyGraph {
 		const rand = rng(77);
@@ -443,6 +443,6 @@ describe('D123: timing with a rumoured link on every person (contract 2.3)', () 
 		}
 		console.log(`computeRelations, 400 people, rumoured on every person, last row marked: ${withRumour.toFixed(1)} ms; as birth: ${without.toFixed(1)} ms; ratio ${(withRumour / without).toFixed(2)}; ${perRef.toFixed(2)} times the reference work`);
 		expect(perRef).toBeLessThan(LIMIT);
-		// The old bound "at most 2.2 times the birth tree" had 7 to 10 % headroom on a quiet machine and failed under load (steward W1, 0.3.2); the reference ratio above keeps the speed guard.
+		// The old bound "at most 2.2 times the birth tree" had 7 to 10 % headroom on a quiet machine and failed under load (steward W1); the reference ratio above keeps the speed guard.
 	}, 60_000);
 });

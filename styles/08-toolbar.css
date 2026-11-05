@@ -91,9 +91,26 @@
 	color: var(--text-accent);
 }
 
+/*
+ * C1-09: the lit Focus button (a focus shows) is drawn on `::before`, the 30 px chip of every other button, with an accent ring, not as the whole 44 px box that touched the bar line.
+ * Chunk 07 gives the button itself a fill and a ring; this rule comes later and moves both to the chip, also under the pointer.
+ */
+.dynasty-toolbar .dynasty-focus.is-active,
+.dynasty-toolbar .dynasty-focus.is-active:hover {
+	background-color: transparent;
+	box-shadow: none;
+}
+
+.dynasty-toolbar .dynasty-focus.is-active::before,
+.dynasty-toolbar .dynasty-focus.is-active:hover::before {
+	box-sizing: border-box;
+	background: var(--background-modifier-active-hover);
+	border: var(--dynasty-width-hairline) solid var(--interactive-accent);
+}
+
 .dynasty-toolbar .dynasty-tool .svg-icon {
-	width: 17px;
-	height: 17px;
+	width: var(--dynasty-icon-bar);
+	height: var(--dynasty-icon-bar);
 }
 
 /* Add person has its word on the computer. */
@@ -132,7 +149,7 @@
 
 .dynasty-toolbar .dynasty-tool.dynasty-warning-badge {
 	width: auto;
-	padding: 0 8px;
+	padding: 0 var(--dynasty-space-2);
 }
 
 .dynasty-toolbar .dynasty-tool.dynasty-warning-badge::before {
@@ -166,6 +183,23 @@
 	-webkit-user-select: text;
 }
 
+/*
+ * CH-04: one inset at both ends of a bar. The first glyph (Add person) stands 8 px inside the ruled line (the bar's 2 px and the button's 6 px). The last button gets a negative
+ * right margin, so its glyph also ends 8 px inside; with a mouse only, so a finger keeps the whole 44 px of its target.
+ */
+@media (hover: hover) and (pointer: fine) {
+	.dynasty-toolbar > .dynasty-tool:last-child {
+		/* token-allow: the 44 px box of a tool and the 2 px padding of the bar are the sizes of this rule */
+		margin-right: calc(var(--dynasty-space-2) - 2px - (44px - var(--dynasty-icon-bar)) / 2);
+	}
+
+	/* K-13: the phone set (a narrow window, an iPad with a trackpad) spaces its icons evenly to the edge; its last button keeps its place. */
+	.modal.dynasty-fullscreen.is-phone .dynasty-toolbar > .dynasty-tool:last-child,
+	.modal.dynasty-fullscreen.is-phone-side .dynasty-toolbar > .dynasty-tool:last-child {
+		margin-right: 0;
+	}
+}
+
 /* The menus of the toolbar (More, Focus): `ob-menu`. */
 .dynasty-popover-more,
 .dynasty-popover-focus {
@@ -180,16 +214,21 @@
 	box-shadow: var(--shadow-l);
 }
 
-/* D212 (legend-width): 320 px wide and as tall as its rows, up to the height of the tree, so no label wraps and no scrollbar shows. */
+/*
+ * D212 (legend-width), D330 O-05, C1-02: 360 px wide (320 px made two labels wrap, 34 px more) and as tall as its content (two groups: 14 rows, 2 headings, 441 px at a 16 px
+ * font). The cap is only a guard for a tree box that is shorter than the legend: the box then scrolls. A note box of 500 px has room for 448 px, so the legend does not scroll
+ * there; `min()` keeps it inside a narrower box.
+ */
 .dynasty-popover.dynasty-popover-legend:not(.is-sheet) {
 	box-sizing: border-box;
-	width: 320px;
-	max-height: calc(100% - 52px);
+	/* token-allow: the width of the legend, the measure at which no label wraps */
+	width: min(360px, 100% - 8px);
+	max-height: min(calc(100% - 52px), var(--dynasty-pop-room, 100%));
 }
 
 /*
- * In a short tree box (a note embed of 500 px) the 15 rows are taller than the box, and the end of the list was cut with no sign. `fitLegend` adds
- * `is-tight` when the rows do not fit: the rows are as high as their sample (22 px) and the gaps and the padding are smaller, so the whole list shows.
+ * In a short tree box (a note embed of 500 px) the 14 rows and the two headings are taller than the box, and the end of the list was cut with no sign. `fitLegend` adds
+ * `is-tight` when the content does not fit: the rows are as high as their sample (22 px) and the gaps and the padding are smaller, so the whole list shows.
  * A box that is still too short for that scrolls inside.
  */
 .dynasty-popover-legend.is-tight {
@@ -198,7 +237,7 @@
 }
 
 .dynasty-popover-legend.is-tight .dynasty-popover-title {
-	margin-bottom: 4px;
+	margin-bottom: var(--dynasty-space-1);
 }
 
 .dynasty-popover-legend.is-tight .dynasty-legend {
@@ -210,25 +249,43 @@
 	min-height: 22px;
 }
 
+/*
+ * CH-02: the problem list is one box. The popover is the list: a title row (the triangle in the warning colour, the words in the text colour), the hint in muted text, and the rows with a hover
+ * and no bullet. A problem that blocks editing stays semibold.
+ */
 .dynasty-popover-problems {
-	/*
-	 * Left, right and bottom stay flush so the callout's own border sits at the popover's edge.
-	 * The top keeps clearance: Minimal's outlined callouts draw the title row on
-	 * and above the callout's top border (a −24px offset in Minimal's theme.css); without room
-	 * above the callout, the popover's `overflow: auto` cuts the title off.
-	 */
-	padding: var(--size-4-6) 0 0 0;
+	padding: var(--dynasty-space-3) var(--dynasty-space-4) var(--dynasty-space-2);
 }
 
-/* A popover that belongs to an element in the tree opens next to it. */
+.dynasty-problems-title {
+	display: flex;
+	align-items: center;
+	gap: var(--dynasty-space-2);
+	color: var(--text-normal);
+}
+
+.dynasty-problems-mark {
+	display: inline-flex;
+	color: var(--dynasty-warn-mark);
+}
+
+.dynasty-problems-mark .svg-icon {
+	width: var(--dynasty-icon-s);
+	height: var(--dynasty-icon-s);
+}
+
+.dynasty-problems-hint {
+	margin-bottom: var(--dynasty-space-2);
+	color: var(--dynasty-muted);
+	font-size: var(--dynasty-type-small);
+}
+
+/* A popover that belongs to an element in the tree opens next to it, below it or above it, and is no higher than the room on that side (`--dynasty-pop-room`, set by `Popover.place`; it scrolls inside). */
 .dynasty-popover.is-anchored {
 	top: var(--dynasty-pop-y);
 	left: var(--dynasty-pop-x);
 	right: auto;
-}
-
-.dynasty-popover-problems .callout {
-	margin: 0;
+	max-height: min(calc(100% - 44px - 4 * var(--dynasty-space-1)), var(--dynasty-pop-room, 100%));
 }
 
 /* D218 (rules 2 and 3): the title of a popover or a bar is a Heading, semibold. */
@@ -258,10 +315,23 @@
 	cursor: pointer;
 }
 
+/* CH-05: with a mouse the rows are as high as the rows of Obsidian's own menus (30 px); a finger keeps 44 px. A phone sheet has its own rule (48 px). */
+@media (hover: hover) and (pointer: fine) {
+	.dynasty-popover .dynasty-popover-item,
+	.dynasty-popover .dynasty-problem-button {
+		min-height: 30px;
+	}
+}
+
 /* A row of the problems list is a row, not a link (D218 item 5): no underline. */
 .dynasty-popover .dynasty-problem-button {
-	margin-left: calc(-1 * var(--size-4-2));
+	margin-left: calc(-1 * var(--dynasty-space-2));
 	text-decoration: none;
+}
+
+.dynasty-problem-text {
+	display: block;
+	padding: var(--dynasty-space-1) 0;
 }
 
 .dynasty-popover .dynasty-popover-item:hover,
@@ -272,9 +342,9 @@
 /* A row of a list that has the keyboard focus shows the same ring as a toolbar button (WCAG 2.4.7): the rule above takes the theme's button shadow away. */
 .dynasty-popover .dynasty-popover-item:focus-visible,
 .dynasty-popover .dynasty-problem-button:focus-visible {
-	outline: 2px solid var(--interactive-accent);
-	outline-offset: -2px;
-	box-shadow: inset 0 0 0 4px var(--text-normal);
+	outline: var(--dynasty-focus-outline);
+	outline-offset: var(--dynasty-focus-inset-offset);
+	box-shadow: var(--dynasty-focus-inset-shadow);
 }
 
 /* A row of a menu: its icon in a column of its own, then its text, every row from the same left edge (D212, more-menu-align; a theme centres the text of a button). */
@@ -295,17 +365,33 @@
 }
 
 .dynasty-more-item .svg-icon {
-	width: 16px;
-	height: 16px;
+	width: var(--dynasty-icon-s);
+	height: var(--dynasty-icon-s);
 }
 
 .dynasty-problems-list {
-	margin: var(--size-4-2) 0 0 0;
-	padding-left: var(--size-4-4);
+	margin: 0;
+	padding: 0;
+	list-style: none;
 }
 
-.dynasty-problem {
-	margin: 0 0 var(--size-4-1) 0;
+/* K-07: Obsidian gives a list item a left margin; the rows, their text and "Open" stand on the edge of the title and the hint. */
+.dynasty-popover .dynasty-problems-list > li.dynasty-problem {
+	margin: 0 0 var(--dynasty-space-1) 0;
+}
+
+/* UX-20: the second action of a problem row stands under its text, as a link. */
+.dynasty-popover .dynasty-problem-open {
+	display: flex;
+	min-height: 30px;
+	margin-left: 0;
+}
+
+/* A touch screen: "Open …" has the 44 px tap height of every other control (spec §7.5). */
+@media (pointer: coarse) {
+	.dynasty-popover .dynasty-problem-open {
+		min-height: 44px;
+	}
 }
 
 .dynasty-problem.is-blocking {
@@ -328,7 +414,8 @@
 	bottom: 0;
 	width: auto;
 	max-width: none;
-	max-height: calc(100% - 60px);
+	/* The cap is the modal rule below: a sheet only opens in the full-screen view. */
+	max-height: none;
 	box-sizing: border-box;
 	/* The sides keep clear of the notch of a phone held sideways (D242); the safe area is 0 on a phone held upright. */
 	padding: 6px max(12px, env(safe-area-inset-right, 0px)) calc(env(safe-area-inset-bottom, 0px) + 10px) max(12px, env(safe-area-inset-left, 0px));
@@ -342,8 +429,71 @@
 	font-size: var(--dynasty-type-control);
 }
 
+.modal .dynasty-popover.is-sheet {
+	max-height: calc(100% - 60px);
+}
+
+/* A sheet with more content below its foot shows a fade there (the code sets `has-more` and clears it at the end). It takes the colour of the box and no pointer. */
+.dynasty-popover.is-sheet.has-more::after {
+	content: '';
+	display: block;
+	position: sticky;
+	bottom: 0;
+	height: var(--dynasty-space-6);
+	margin-top: calc(-1 * var(--dynasty-space-6));
+	background: linear-gradient(to bottom, transparent, var(--background-primary));
+	pointer-events: none;
+}
+
+/*
+ * The small problem pop-up of the phone list in a note hangs under the bar, at the right edge of the list (`Popover.layPanel`): the popover look of the computer, no grip, no
+ * cover. The code sets its place (`--dynasty-pop-y`). It holds one text line and one button, so it needs no scroll and no cap.
+ */
+.dynasty-popover.is-panel {
+	display: flex;
+	flex-direction: column;
+	gap: var(--dynasty-space-3);
+	box-sizing: border-box;
+	top: var(--dynasty-pop-y);
+	left: auto;
+	right: 0;
+	/* token-allow: the measure of the pop-up, the width of a menu on a phone */
+	width: min(280px, 100%);
+	max-width: none;
+	max-height: none;
+	padding: var(--dynasty-space-3);
+	/* Opaque in every theme: the note shows round it, and a translucent theme window would let the list rows show through the text. */
+	background: var(--background-primary);
+	backdrop-filter: none;
+	-webkit-backdrop-filter: none;
+}
+
+.dynasty-problems-summary {
+	display: flex;
+	align-items: center;
+	gap: var(--dynasty-space-2);
+	color: var(--text-normal);
+	font-size: var(--dynasty-type-control);
+	font-weight: var(--font-semibold);
+}
+
+/* The one action of the pop-up: a plain button (the accent marks a main choice among several), the edge of every button, a pill on a phone, regular weight (D218 rule 3). */
+.dynasty-popover .dynasty-btn.dynasty-problems-full {
+	width: 100%;
+	min-height: 44px;
+	border: var(--dynasty-button-edge);
+	border-radius: var(--dynasty-radius-button-phone);
+	box-shadow: none;
+	font-size: var(--dynasty-type-control);
+	font-weight: var(--font-normal);
+}
+
 @supports (color: rgb( from red r g b)) {
 	.dynasty-popover.is-sheet {
+		background: rgb(from var(--background-primary) r g b);
+	}
+
+	.dynasty-popover.is-panel {
 		background: rgb(from var(--background-primary) r g b);
 	}
 }
@@ -356,15 +506,22 @@
 	border-radius: 10px;
 }
 
+/* K-09: the legend and the problem list stand 16 px from the sides, the title, the hint, the rows and the swatches on one edge; the notch of a phone held sideways still wins. */
+.dynasty-popover-legend.is-sheet,
+.dynasty-popover-problems.is-sheet {
+	padding-left: max(var(--dynasty-space-4), env(safe-area-inset-left, 0px));
+	padding-right: max(var(--dynasty-space-4), env(safe-area-inset-right, 0px));
+}
+
 .dynasty-popover.is-sheet .dynasty-more-item .svg-icon {
-	width: 20px;
-	height: 20px;
+	width: var(--dynasty-icon-m);
+	height: var(--dynasty-icon-m);
 }
 
 .dynasty-sheet-grip {
 	width: 36px;
 	height: 5px;
-	margin: 2px auto 8px;
+	margin: 2px auto var(--dynasty-space-2);
 	border-radius: 3px;
 	background: var(--background-modifier-border-hover);
 }
@@ -409,7 +566,7 @@
 	align-items: center;
 	justify-content: space-between;
 	min-height: 44px;
-	padding: 0 0 4px 4px;
+	padding: 0 0 var(--dynasty-space-1) 0;
 }
 
 .dynasty-sheet-head .dynasty-popover-title {
@@ -418,8 +575,9 @@
 
 /* "Close" is a link, so regular at the Control size (D218 items 3 and 5). */
 .dynasty-sheet-head .dynasty-sheet-close {
+	min-width: 44px;
 	min-height: 44px;
-	padding: 0 8px;
+	padding: 0 var(--dynasty-space-2);
 	font-size: var(--dynasty-type-control);
 	font-weight: var(--font-normal);
 }
@@ -429,7 +587,7 @@
 .dynasty-popover .dynasty-link {
 	display: inline-flex;
 	align-items: center;
-	gap: 4px;
+	gap: var(--dynasty-space-1);
 	padding: 0;
 	border: 0;
 	background: none;
@@ -464,7 +622,7 @@
 	display: grid;
 	grid-template-columns: 72px 1fr;
 	align-items: center;
-	gap: 12px;
+	gap: var(--dynasty-space-3);
 	min-height: 28px;
 	font-size: var(--dynasty-type-text);
 }

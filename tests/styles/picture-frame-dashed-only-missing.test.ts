@@ -1,0 +1,13 @@
+import { readFileSync } from 'node:fs';
+import { describe, expect, it } from 'vitest';
+
+/* M11 fix round (Obsidian): the style rules that the round changed. */
+const css = readFileSync('styles.css', 'utf8');
+const rule = (sel: string) => new RegExp(`${sel.replace(/[.]/g, '\\.')}\\s*\\{([^}]*)\\}`).exec(css)?.[1] ?? '';
+
+describe('picker preview frame', () => {
+	it('a picture that cannot show keeps a solid frame; only a missing file is dashed', () => {
+		expect(rule('.dynasty-picture-thumb.is-problem')).not.toMatch(/dashed/);
+		expect(rule('.dynasty-picture-thumb.is-missing')).toMatch(/border-style:\s*dashed/);
+	});
+});

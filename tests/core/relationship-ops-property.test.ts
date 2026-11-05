@@ -34,7 +34,7 @@ function graph(body: string): FamilyGraph | null {
 }
 
 const cycles = (g: FamilyGraph) => g.issues.filter((i) => i.code === 'cycle').length;
-/** Warnings a relationship op must not leave behind (the decision notes "Relationship-op details"). */
+/** Warnings a relationship op must not leave behind. */
 const staleCount = (g: FamilyGraph) => g.issues.filter((i) => ['placement-without-parents', 'union-not-of-parents', 'missing-union'].includes(i.code)).length;
 const blocked = (g: FamilyGraph) => g.issues.some((i) => i.level === 'blocking');
 

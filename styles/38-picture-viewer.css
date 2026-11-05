@@ -47,17 +47,17 @@
 
 .dynasty-viewer.is-phone .dynasty-sheet-grip {
 	grid-area: grip;
-	margin: max(8px, env(safe-area-inset-top)) auto 4px;
+	margin: max(var(--dynasty-space-2), env(safe-area-inset-top)) auto var(--dynasty-space-1);
 }
 
 .dynasty-viewer-head {
 	grid-area: head;
 	min-width: 0;
-	padding: 22px 24px 10px;
+	padding: 22px var(--dynasty-space-5) 10px;
 }
 
 .dynasty-viewer.is-phone .dynasty-viewer-head {
-	padding: 4px 8px 8px 16px;
+	padding: var(--dynasty-space-1) var(--dynasty-space-2) var(--dynasty-space-2) var(--dynasty-space-4);
 }
 
 .dynasty-viewer-name {
@@ -81,7 +81,7 @@
 	position: relative;
 	min-width: 0;
 	min-height: 0;
-	margin: 0 24px;
+	margin: 0 var(--dynasty-space-5);
 	overflow: hidden;
 	/* The picture takes every touch and pointer gesture itself: the browser must not scroll or zoom the page from it. */
 	touch-action: none;
@@ -126,7 +126,7 @@
 	display: flex;
 	align-items: center;
 	justify-content: center;
-	padding: 16px;
+	padding: var(--dynasty-space-4);
 	text-align: center;
 	font-size: var(--dynasty-type-text);
 	color: var(--dynasty-muted);
@@ -142,12 +142,12 @@
 	display: flex;
 	align-items: center;
 	gap: 10px;
-	padding: 14px 0 18px 24px;
+	padding: 14px 0 18px var(--dynasty-space-5);
 }
 
 .dynasty-viewer.is-phone .dynasty-viewer-thumbs {
 	justify-content: center;
-	padding: 10px 16px max(18px, env(safe-area-inset-bottom));
+	padding: 10px var(--dynasty-space-4) max(18px, env(safe-area-inset-bottom));
 }
 
 .dynasty-viewer.is-zoomed .dynasty-viewer-thumbs {
@@ -198,7 +198,14 @@
 	align-self: center;
 	min-width: 44px;
 	min-height: 44px;
-	margin: 14px 24px 18px 10px;
+	margin: 14px var(--dynasty-space-5) 18px 10px;
+}
+
+/* CH-07: with a mouse the button is as high as the buttons of the other windows (30 px); a finger keeps 44 px. */
+@media (hover: hover) and (pointer: fine) {
+	.dynasty-sheet button.dynasty-viewer-close {
+		min-height: var(--input-height);
+	}
 }
 
 .dynasty-sheet.dynasty-viewer.is-phone button.dynasty-viewer-close {

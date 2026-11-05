@@ -24,11 +24,13 @@ import { loadNote, newNoteDefaults, type LoadedNote } from './calendar-note';
 import { saveCalendars } from './calendar-window-save';
 import { testField, type CardHost } from './calendar-parts';
 import { startWithoutFocus } from './modal-layout';
-import { sheetField, showErrorLine, nameDialog } from './sheet-parts';
+import { sheetField, nameDialog } from './sheet-parts';
 import { SmallFormModal } from './small-form';
 import { showMenu, textButton } from './window-parts';
-import { buildShell } from './window-shell';
+import { buildShell, cancelLabelFor } from './window-shell';
 import { renderSections, type SectionSpec, type SectionsView } from './window-sections';
+import { guarded } from './start-guard';
+import { noticeText } from '../render/dom/name-marks';
 
 export type { CalendarTree } from './calendar-link';
 
@@ -64,6 +66,8 @@ class CalendarsWindow extends SmallFormModal {
 	private view: SectionsView | null = null;
 	private token: object = {};
 	private introEl: HTMLElement | null = null;
+	/** The head: an error about the whole window stands under it (CX-11). */
+	private headEl: HTMLElement | null = null;
 	private issuesEl: HTMLElement | null = null;
 	/** The two buttons of a window with no calendar. */
 	private emptyEl: HTMLElement | null = null;
@@ -195,7 +199,18 @@ class CalendarsWindow extends SmallFormModal {
 
 	override onOpen(): void {
 		this.openFrame('dynasty-calendars');
-		const shell = buildShell({ modalEl: this.modalEl, contentEl: this.contentEl, title: T.title, titled: true, saveLabel: T.save, onCancel: () => this.finish(), onSave: () => void this.write() });
+		const shell = buildShell({
+			modalEl: this.modalEl,
+			contentEl: this.contentEl,
+			title: T.title,
+			titled: true,
+			saveLabel: T.save,
+			cancelLabel: cancelLabelFor('edit'),
+			// O-14: Cancel asks the question that Esc asks when a typed change would be lost.
+			discard: { dirty: () => this.dirty(), ask: () => this.close() },
+			onCancel: () => this.finish(),
+			onSave: () => void this.write(),
+		});
 		this.shell = shell;
 		nameDialog(this.modalEl, shell.titleEl);
 		const body = shell.body;
@@ -203,8 +218,6 @@ class CalendarsWindow extends SmallFormModal {
 		this.noteBox = body.createDiv({ cls: 'dynasty-cal-note' });
 		this.introEl = body.createDiv({ cls: ['dynasty-sheet-hint', 'dynasty-cal-intro'] });
 		this.issuesEl = body.createDiv({ cls: 'dynasty-cal-issues' });
-		this.errorEl = body.createDiv({ cls: 'dynasty-sheet-error', attr: { role: 'alert' } });
-		this.errorEl.hide();
 		this.emptyEl = body.createDiv({ cls: ['dynasty-actions', 'dynasty-cal-add'] });
 		textButton(this.emptyEl, ['dynasty-btn', 'dynasty-cal-add-cycles'], T.addCycles, () => this.add('cycles'), { icon: 'plus', focus: 'cal:add-cycles' });
 		textButton(this.emptyEl, ['dynasty-btn', 'dynasty-cal-add-eras'], T.addEras, () => this.add('eras'), { icon: 'plus', focus: 'cal:add-eras' });
@@ -220,8 +233,10 @@ class CalendarsWindow extends SmallFormModal {
 	/** The head of the window, as in the person, Titles and Houses windows: the title, a text line with the note, and the link. A phone bar has the title already. */
 	private drawHead(body: HTMLElement): void {
 		const head = body.createDiv({ cls: ['dynasty-head', 'dynasty-cal-top'] });
+		this.headEl = head;
 		const text = head.createDiv({ cls: 'dynasty-head-text' });
-		if (!this.modalEl.hasClass('is-phone')) text.createDiv({ cls: 'dynasty-head-name', text: T.title });
+		// The title of the plugin's own window: the title role in the interface font (CX-01).
+		if (!this.modalEl.hasClass('is-phone')) text.createDiv({ cls: ['dynasty-head-name', 'dynasty-title', 'is-tool'], text: T.title });
 		this.metaEl = text.createDiv({ cls: 'dynasty-head-meta' });
 	}
 
@@ -234,7 +249,7 @@ class CalendarsWindow extends SmallFormModal {
 
 	/** Works the draft out again and lets every part of the sections show it. */
 	private refresh(): void {
-		this.errorEl?.hide();
+		this.shell?.clearWindowError();
 		this.checkedNow = this.check();
 		for (const update of this.updates) update();
 		this.testUpdate?.();
@@ -336,7 +351,6 @@ class CalendarsWindow extends SmallFormModal {
 	private paintTop(): void {
 		const none = this.drafts.length === 0;
 		this.introEl?.setText(none ? T.intro : T.introShort);
-		this.introEl?.toggleClass('is-long', none);
 		this.emptyEl?.toggle(none);
 		this.paintIssues();
 	}
@@ -397,7 +411,11 @@ class CalendarsWindow extends SmallFormModal {
 		const several = this.paths.length > 1;
 		// With a choice of notes, the choice shows the name; the text line has the folder only.
 		const meta = this.metaEl;
-		if (meta) meta.createSpan({ cls: 'dynasty-cal-meta-text', text: `${several ? folder : `${noteLabel(path, this.paths)} · ${folder}`} · ` });
+		// The dot before the link is its own span: a phone shows the link on a line of its own, and then a dot alone at the end of the text line would be wrong (CAL-15).
+		if (meta) {
+			meta.createSpan({ cls: 'dynasty-cal-meta-text', text: several ? folder : `${noteLabel(path, this.paths)} · ${folder}` });
+			meta.createSpan({ cls: 'dynasty-cal-meta-dot', text: ' · ', attr: { 'aria-hidden': 'true' } });
+		}
 		if (several) {
 			const { row, id } = sheetField(box, T.noteLabel, 'note', 'dynasty-cal');
 			const wrap = row.createDiv({ cls: 'dynasty-select' });
@@ -423,6 +441,8 @@ class CalendarsWindow extends SmallFormModal {
 		this.metaEl?.setText(this.paths.length || this.uncertain ? T.newNote : T.noNoteMeta);
 		this.lineEl = box.createDiv({ cls: 'dynasty-sheet-hint' });
 		this.paintLine();
+		// UX-11: the name and the folder of the note are one group under their own heading.
+		box.createDiv({ cls: 'dynasty-cal-subhead', text: T.noteGroup, attr: { role: 'heading', 'aria-level': '4' } });
 		const grid = box.createDiv({ cls: ['dynasty-grid', 'is-stack'] });
 		const text = (name: string, label: string, value: string, set: (v: string) => void) => {
 			const { row, id } = sheetField(grid, label, name, 'dynasty-cal');
@@ -441,7 +461,7 @@ class CalendarsWindow extends SmallFormModal {
 	/** "New calendar note": the draft starts empty and the save makes the note. */
 	private newNote(): void {
 		if (this.dirty()) {
-			showErrorLine(this.errorEl, T.changesFirst);
+			this.windowError(T.changesFirst);
 			return;
 		}
 		this.note = null;
@@ -457,10 +477,10 @@ class CalendarsWindow extends SmallFormModal {
 
 	/** Shows another calendar note of the tree (only while the draft has no change). */
 	private async switchTo(path: string, from: HTMLElement | null): Promise<void> {
-		if (this.dirty()) return showErrorLine(this.errorEl, T.changesFirst);
+		if (this.dirty()) return this.windowError(T.changesFirst);
 		const loaded = await loadNote(this.app, path);
 		if (!loaded || loaded.issues.some((i) => !isListIssue(i))) {
-			new Notice(loaded?.issues.find((i) => !isListIssue(i)) ? issueText(loaded.issues.find((i) => !isListIssue(i))!) : T.cannotOpenHere);
+			new Notice(noticeText(loaded?.issues.find((i) => !isListIssue(i)) ? issueText(loaded.issues.find((i) => !isListIssue(i))!) : T.cannotOpenHere));
 			if (from) (from as HTMLSelectElement).value = this.note?.path ?? path;
 			return;
 		}
@@ -491,7 +511,7 @@ class CalendarsWindow extends SmallFormModal {
 			this.showRefusals(checked.refusals);
 			// The sections that hold a refusal open, so the refusal stands in view next to its field; the window shows the first one.
 			for (const r of checked.refusals) if (r.key !== null) this.view?.open(sectionKey(r.key));
-			this.contentEl.querySelector<HTMLElement>('.dynasty-cal-sections [data-refusal]')?.scrollIntoView?.({ block: 'nearest' });
+			this.contentEl.querySelector<HTMLElement>('.dynasty-cal-sections [data-refusal]')?.scrollIntoView({ block: 'nearest' });
 			return;
 		}
 		// A Save with no change still sets the key of a tree that has none (D290); a new note with no calendar makes nothing and sets no key, like Cancel.
@@ -502,10 +522,10 @@ class CalendarsWindow extends SmallFormModal {
 		try {
 			const message = await this.save(checked);
 			if (message === null) this.finish();
-			else showErrorLine(this.errorEl, message);
+			else this.windowError(message);
 		} catch (e) {
 			console.error('Crown and Kin: cannot save the calendars', e);
-			showErrorLine(this.errorEl, T.cannotSave);
+			this.windowError(T.cannotSave);
 		} finally {
 			this.saving = false;
 			this.modalEl.removeClass('is-saving');
@@ -517,7 +537,7 @@ class CalendarsWindow extends SmallFormModal {
 	 * is open. An error of no section (the whole note) has no place below, so it stands here with its own head.
 	 */
 	private showRefusals(refusals: readonly { key: number | null; text: string }[]): void {
-		const el = this.errorEl;
+		const el = this.shell?.windowError('', this.headEl);
 		if (!el) return;
 		el.empty();
 		const inSection = (r: { key: number | null }) => r.key !== null && (r.key === PLAIN_KEY || this.drafts.some((d) => d.key === r.key));
@@ -529,7 +549,12 @@ class CalendarsWindow extends SmallFormModal {
 			for (const r of loose) el.createDiv({ text: r.text, attr: { 'data-error-line': '' } });
 		}
 		el.show();
-		el.scrollIntoView?.({ block: 'nearest' });
+		el.scrollIntoView({ block: 'nearest' });
+	}
+
+	/** An error about the whole window, under the head (CX-11). */
+	private windowError(text: string): void {
+		this.shell?.windowError(text, this.headEl);
 	}
 
 	/** Makes the note if it is new, writes the operations, tells the index and sets the key; null when it went well, else the sentence for the window. */
@@ -552,11 +577,7 @@ class CalendarsWindow extends SmallFormModal {
 
 	override onClose(): void {
 		super.onClose();
-		try {
-			this.o.onClosed?.();
-		} catch (e) {
-			console.error('Crown and Kin: cannot return the focus', e);
-		}
+		guarded('cannot return the focus', () => this.o.onClosed?.());
 	}
 }
 
@@ -596,7 +617,7 @@ export async function openCalendars(app: App, index: CalendarIndex, o: Calendars
 		// A name list that cannot be used is shown in the window; any other problem of a block stops it (the plugin never writes over a block it cannot read).
 		const stop = note?.issues.find((i) => !isListIssue(i));
 		if (target !== null && (!note || stop)) {
-			new Notice(stop ? issueText(stop) : T.cannotOpen);
+			new Notice(noticeText(stop ? issueText(stop) : T.cannotOpen));
 			return;
 		}
 		new CalendarsWindow(app, index, o, paths, note, uncertain).open();

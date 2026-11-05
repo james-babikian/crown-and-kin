@@ -13,6 +13,8 @@
  */
 
 import { Modal, type App } from 'obsidian';
+import { setNameText } from '../render/dom/name-marks';
+import { mediaMatches } from '../render/dom/page-reads';
 import { REST, fitSize, stepIndex, type Size, type View } from '../render/dom/picture-gestures';
 import { attachPictureTouch, type PictureTouch } from '../render/dom/picture-touch';
 import { attachSheetSwipe } from '../render/dom/sheet-swipe';
@@ -22,6 +24,7 @@ import { trackModal } from '../view/plugin-modals';
 import { largeCopySide } from './crop-tool';
 import { ignoreGhostClick, phoneLayout, startWithoutFocus } from './modal-layout';
 import type { PictureCopy, PictureStore, ResolvedPicture } from './picture-store';
+import { guarded } from './start-guard';
 
 /** One picture of the viewer and the texts that go with it. */
 export interface ViewerPicture {
@@ -39,7 +42,7 @@ export interface ViewerPicture {
 }
 
 /** What opens the viewer. */
-export interface ViewerOptions {
+interface ViewerOptions {
 	app: App;
 	store: PictureStore;
 	sourcePath: string;
@@ -103,20 +106,9 @@ class PictureViewer extends Modal {
 		this.index = Math.min(Math.max(0, o.start), Math.max(0, this.slots.length - 1));
 	}
 
-	/** Not `win`: Obsidian's `Modal` owns that name as a property, and a method of the same name would be hidden by it. */
-	private viewWindow(): Window {
-		return this.modalEl.win ?? window;
-	}
-
 	/** D126: movement is reduced by the setting or, with "Follow the device", by the device. */
 	private reduced(): boolean {
-		let prefers = false;
-		try {
-			prefers = this.viewWindow().matchMedia?.('(prefers-reduced-motion: reduce)')?.matches === true;
-		} catch {
-			prefers = false;
-		}
-		return reducedMotion(motion(), prefers);
+		return reducedMotion(motion(), mediaMatches(this.modalEl.win, '(prefers-reduced-motion: reduce)'));
 	}
 
 	override onOpen(): void {
@@ -224,8 +216,8 @@ class PictureViewer extends Modal {
 		this.index = i;
 		const s = this.slots[i];
 		if (!s) return;
-		this.nameEl.setText(s.pic.heading);
-		this.lineEl.setText(s.pic.line);
+		setNameText(this.nameEl, s.pic.heading);
+		setNameText(this.lineEl, s.pic.line);
 		this.labelEl.setText(s.pic.label);
 		this.img.setAttribute('alt', s.pic.label);
 		this.slots.forEach((x, k) => {
@@ -284,7 +276,7 @@ class PictureViewer extends Modal {
 		s.state = 'loading';
 		const ctl = new AbortController();
 		s.ctl = ctl;
-		const side = largeCopySide(this.viewWindow());
+		const side = largeCopySide(this.modalEl.win);
 		this.o.store
 			.transient(s.found.file, { w: side, h: side, fit: 'meet', noEnlarge: true }, ctl.signal)
 			.then((r) => {
@@ -330,15 +322,13 @@ class PictureViewer extends Modal {
 	}
 
 	private onKey(e: KeyboardEvent): void {
-		try {
+		guarded('the picture viewer key failed', () => {
 			if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
 				if (this.slots.length < 2) return;
 				e.preventDefault();
 				this.step(e.key === 'ArrowRight' ? 1 : -1);
 			} else if (e.key === 'Tab') this.holdFocus(e);
-		} catch (err) {
-			console.error('Crown and Kin: the picture viewer key failed', err);
-		}
+		});
 	}
 
 	/** Tab stays inside the window: from the last control to the first, and back. */
@@ -362,10 +352,8 @@ class PictureViewer extends Modal {
 
 /** Opens the viewer. It never throws: a failure is logged and the window that called stays as it is. */
 export function openPictureViewer(o: ViewerOptions): void {
-	try {
+	guarded('cannot open the picture viewer', () => {
 		if (o.pictures.length === 0) return;
 		new PictureViewer(o.app, o).open();
-	} catch (e) {
-		console.error('Crown and Kin: cannot open the picture viewer', e);
-	}
+	});
 }

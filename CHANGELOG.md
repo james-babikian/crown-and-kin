@@ -2,6 +2,96 @@
 
 All notable changes for users. The newest version is first.
 
+## 0.5.2
+
+### Repairs
+
+- **The top of the person window now stays still when you type.** Before, the name, the line under it with the house, the title and the years, the arms of the house and the portrait flickered with each key. Now only the part that you change shows again.
+- **In the window where you choose a portrait or arms, a folder inside a folder now stands further to the right.** Before, it stood at the same left edge as the folder around it. Now each level of folders moves right by the same distance.
+- **On a phone, the title of a window now stands level with Cancel and Save.** Before, the title stood a little higher.
+- **The phone list stays at the person that you chose.** Before, it could go back to the first person of the tree when Obsidian showed the note again, for example after you turned the phone.
+- **In the problem list, each "Open …" link is now large enough to tap with a finger.** Before, the link was hard to tap.
+- **On a computer, the fields in the person window now keep their width when a scroll bar shows.** Before, they became narrower.
+
+### Tree
+
+- **Each card has one clear edge, a little darker than before.** The thin line above the relation word is gone.
+- **The text on a card is now never smaller than 12 pixels.** If the text of your notes is smaller than that, the card text stays at 12 pixels and the card grows to fit it.
+- **The lines for wards and rumoured parents have clearer patterns.** The dots of a ward line have wider gaps. The dashes of a rumoured line are longer. The colours of the lines stay the same.
+- **The legend has the title "Legend" and two groups.** The groups are "Lines" and "Death labels". The two death labels are shorter, for example "Dead: the year of death is not known". The saved picture shows the same labels.
+- **A tree with one person now shows a hint** that says how to add a partner, a parent or a child.
+- **On a phone, with the tree direction "Sideways", the full-screen view now opens with 16 pixels between the first card and the edge of the screen.** Before, it left 8 pixels.
+- **With a mouse, the rows of the More list are now less tall.**
+- **The window "Save as picture" now shows its title and uses round option buttons.**
+
+### Phone
+
+- **The icons in the bars now have the same size as the icons of Obsidian.** On a computer, the icons do not change.
+- **Buttons now have fully round ends**, the same as the buttons of Obsidian on an iPhone. Text fields keep their small round corners.
+- **The rows of the phone list now reach the edges of the list.** The bar icons and the pencil icons stand in one column. When you select a row, the whole row gets a light colour.
+- **After you add a person from the bar, the list now stays where it is.** A message names the new person and says how to find the person.
+- **After you add a partner or a child to a person, the list now stays at that person.**
+- **On a phone, a tree in a note now shows its problems in a small pop-up.** For example, the pop-up says "This tree has 2 problems." It has one button, "Show in full screen", which opens the full-screen view with the problem list.
+
+### Windows
+
+- **An error message now shows under its field.** For example, "Enter a name." stands under the Name field. The top of the window no longer moves.
+- **If a window already saved a change, the left button now says "Close".** Before, it said "Cancel", but the change was already saved.
+- **If you typed a change, Cancel now asks "Discard changes?"**, the same as the Esc key.
+- **On a computer, Enter now moves the cursor to the next field.** Ctrl+Enter (Cmd+Enter on a Mac) saves. The Save button shows these keys.
+- **The partnership window now says "Kind", not "Type of partnership".** Start and End stand side by side.
+- **The partnership window shows what you changed.** After Save, a message with Undo names the two people. In the Family section of the person window, a partner row says, for example, "Marriage, 1126–1131, ended by divorce".
+- **A window that asks you to choose, for example the other parent of a new child, now shows plain options with no coloured fill.** As before, one tap takes you to the next step. On a computer, the window now shows its title.
+- **The ID window is easier to read.** The label stands above the field. "Make ID from the name" is a link. An error message shows under the field.
+- **In the Family section of the person window, each group now takes only the space that it needs.** Portraits line up inside a group.
+- **When you open a section of a window, the window now scrolls so that you can see the section.**
+- **The field "Title text on the card" is now "Title shown under the name".**
+- **Check boxes are now square**, so they do not look like option buttons.
+- **After you remove a parent or a partner, the result now shows inside the open window**, with Undo. The message no longer covers Cancel and Save.
+- **The crop tool is now called "Crop the portrait".** The name of the person stands under the title.
+- **Each Undo message now says what the plugin undid.** For example, "The plugin undid the deletion of Edric Valmont."
+
+### Titles, Houses and lists
+
+- **The Titles and Houses lists now have one left edge and no circle with an icon.** A tap on a row opens the title or the house.
+- **On a phone, the bar now says "Title" or "House".** The heading with the full name stays.
+- **A tap on a holder row now opens the details of the holder.** There you find "Show the card in the tree", Move up, Move down and Remove.
+- **On the page of a house, the colours from its arms now have the label "From the arms".**
+- **In a list of people, Enter now chooses the first match.** "Create a new person" is the last row if a person matches your text. It is the first row if no person matches.
+- **You can now use the Rules section of a new title** before you save the title.
+
+### Calendars
+
+- **The Calendars window now starts with one sentence** that says what a calendar does.
+- **An era now takes two rows, and a text line under them shows how the era reads.** For example, "Qinglong Emperor 1 = year 130". All number fields have the same width.
+- **The hints in the fields now give an example.** For example, "A cycle number of this calendar. For example: 3."
+- **The section "Plain years" now has one short text** that explains plain years and name lists.
+
+### Settings
+
+- **The help texts for "Arms on cards" and "Tree direction" are now shorter.**
+- **The choice "Founders and holders" now fits on a phone.**
+
+### Known limits
+
+- On a phone, the name of a parent with a portrait can break onto two text lines in the person window.
+- On a phone, the title of the ID window is cut. For example, "ID of House Valmont of the ce…".
+- After you remove a parent or a partner, the text in the window ends with "You can undo this." The Undo button stands next to it, so the text says the same thing twice.
+- In the phone list, the text of a row is now 8 pixels narrower than in 0.5.1. As a result, about 1 name in 500 needs one more text line.
+- If many holders match the name that you type, "A holder who is not in the tree" stands at the end of a long list.
+- The grey stripe of a person with no house looks almost the same as the card edge.
+- The iPad was not tested for this version.
+- On a phone, the relation view of two people can cut off a card at the edge of the screen.
+- A curved line for a rumoured link, or for a parent who is drawn elsewhere, can pass over a card. A better route for these lines comes later.
+- A lover at the end of a group of partners can still have a long line that crosses other lines.
+- A name tag with a long name can show only part of the name.
+- A date after an Arabic house name in the same text line can still show in the wrong order.
+- A name by marriage that differs from another name only by "adoptive" or "rumoured" does not show. For example, "Wife's adoptive half-nephew" does not show.
+- A divorce gives the word "Former" only in two cases. You choose "Ended by", or the end year is before the death years of both partners. In the second case, all three years must be exact. Otherwise no word changes.
+- If a child is born in the year after the father died, the card of the father's wife says "Father's wife", not "Stepmother". The plugin cannot know that the child was conceived before the death.
+- If a CSS snippet loads the font of your notes, a saved picture uses a standard font. A long name can then be wider than its card.
+- If you replace a picture file with another file of the same size and the same time of the last change, the plugin can show the old picture until you change the file again.
+
 ## 0.5.1
 
 ### Repairs

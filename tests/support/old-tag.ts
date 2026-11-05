@@ -1,5 +1,5 @@
 /*
- * The one bridge from the old block word to the new one (0.3.1, WP-R, D167). Until 0.3.0 a tree was a `dynasty` code block;
+ * The one bridge from the old block word to the new one (WP-R, D167). Until 0.3.0 a tree was a `dynasty` code block;
  * from 0.3.1 it is a `kin` block and the plugin does not read the old word. The frozen notes of old versions
  * (`tests/old-trees/**`) and the whole-note goldens recorded before the rename (`tests/golden/*.md`) are never edited, so
  * the tests that read them change the word in memory here: the fence word, and the word in inline code that names it.

@@ -244,7 +244,7 @@ describe('polish: a refusal names its calendar and stands next to its field', ()
 		const top = c.querySelector('.dynasty-sheet-error')?.getText() ?? '';
 		expect(top).toBe(T.refusalSummary(1));
 		const row = c.querySelector('[data-field="0-length"]')!;
-		expect(row.querySelector('.dynasty-cal-field-error [data-refusal]')?.getText()).toContain('The length of a cycle');
+		expect(row.querySelector('.dynasty-cal-field-error[data-refusal]')?.getText()).toContain('The length of a cycle');
 		expect(length.getAttribute('aria-invalid')).toBe('true');
 		// The first refusal of a card is scrolled into view.
 		expect(scrolled).toHaveBeenCalled();

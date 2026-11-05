@@ -1,8 +1,8 @@
-// A fake of the vault adaptor of the fence index (the index contract 1.2, 0.4 WP-3a, step T0), with the tools a test needs: events that the test fires, reads that can be held back or fail,
+// A fake of the vault adaptor of the fence index (step T0), with the tools a test needs: events that the test fires, reads that can be held back or fail,
 // the cache gates (`cacheReady` and `cacheDone` are two different things), `files()` with a stamp, a fake store, and a fake `localStorage` of the vault (Obsidian's
 // `app.loadLocalStorage` and `app.saveLocalStorage`). It is written from the contract. Nothing in `src` is imported: the types below copy the contract, so this file compiles before the build.
 
-/** One Markdown note as `files()` lists it (the index contract 1.2). */
+/** One Markdown note as `files` lists it. */
 export interface FenceFile {
 	path: string;
 	mtime: number;
@@ -260,7 +260,7 @@ export function fakeStore(initial?: unknown): FakeStore {
 
 // ---------- the stamp, written again from the contract (so a test does not use the code it tests) ----------
 
-/** FNV-1a, 32 bits, unsigned, over the UTF-16 code units of a string (the index contract 1.3). The tests use ASCII paths, where this is the same as over bytes. */
+/** FNV-1a, 32 bits, unsigned, over the UTF-16 code units of a string. The tests use ASCII paths, where this is the same as over bytes. */
 export function fnv1a32(text: string): number {
 	let h = 0x811c9dc5;
 	for (let i = 0; i < text.length; i++) {

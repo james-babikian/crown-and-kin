@@ -1,18 +1,22 @@
 /**
- * A small reference of the Unicode bidirectional algorithm (UAX #9, rules P2-P3, X1-X10 for isolates, W1-W7, N0-N2, I1-I2, L1, L2 and L4) for the tests of the
- * name text lines. It knows the character classes that names use (Latin, Greek, Hebrew, Arabic, digits, spaces, brackets and common punctuation) and the isolate
- * and mark controls; it has no embeddings or overrides, because the plugin writes none. It is written from the text of UAX #9, not from the plugin's code, so a
+ * A small reference of the Unicode bidirectional algorithm (UAX #9, rules P2-P3, X1-X10 for isolates and embeddings, W1-W7, N0-N2, I1-I2, L1, L2 and L4) for the
+ * tests of the name text lines. It knows the character classes that names use (Latin, Greek, Hebrew, Arabic, digits, spaces, brackets and common punctuation) and
+ * the isolate, embedding and mark controls (the embeddings are what an SVG name uses, because WebKit ignores isolates there); it has no overrides, because the
+ * plugin writes none. It is written from the text of UAX #9, not from the plugin's code, so a
  * test can compare what a browser shows with what the plugin means to show. `visualLines` resolves the levels over the whole text and reorders each line on its
  * own, which is what UAX #9 does for a paragraph that wraps.
  */
 
-type BidiClass = 'L' | 'R' | 'AL' | 'EN' | 'ES' | 'ET' | 'AN' | 'CS' | 'NSM' | 'WS' | 'ON' | 'LRI' | 'RLI' | 'FSI' | 'PDI';
+type BidiClass = 'L' | 'R' | 'AL' | 'EN' | 'ES' | 'ET' | 'AN' | 'CS' | 'NSM' | 'WS' | 'ON' | 'LRI' | 'RLI' | 'FSI' | 'PDI' | 'LRE' | 'RLE' | 'PDF';
 
-const CONTROLS = /[\u2066-\u2069\u200e\u200f\u061c]/gu;
+const CONTROLS = /[\u202a-\u202c\u2066-\u2069\u200e\u200f\u061c]/gu;
 
 /** The bidi class of one code point (UnicodeData.txt, for the ranges a name uses). */
 export function bidiClass(ch: string): BidiClass {
 	const cp = ch.codePointAt(0)!;
+	if (cp === 0x202a) return 'LRE';
+	if (cp === 0x202b) return 'RLE';
+	if (cp === 0x202c) return 'PDF';
 	if (cp === 0x2066) return 'LRI';
 	if (cp === 0x2067) return 'RLI';
 	if (cp === 0x2068) return 'FSI';
@@ -44,6 +48,8 @@ for (const [o, c] of Object.entries(OPEN_TO_CLOSE)) {
 	MIRROR[c] = o;
 }
 
+/** An embedding control: X9 removes it, so it takes no part in the rules after the levels are set. */
+const isEmbedControl = (t: BidiClass) => t === 'LRE' || t === 'RLE' || t === 'PDF';
 const isIsolateControl = (t: BidiClass) => t === 'LRI' || t === 'RLI' || t === 'FSI' || t === 'PDI';
 const isInitiator = (t: BidiClass) => t === 'LRI' || t === 'RLI' || t === 'FSI';
 const isNI = (t: BidiClass) => t === 'WS' || t === 'ON' || isIsolateControl(t);
@@ -88,11 +94,23 @@ export function resolve(text: string, para: 0 | 1 | 'auto' = 0): Resolved {
 	const levels = new Array<number>(n).fill(level0);
 	const stack: { level: number; isolate: boolean }[] = [{ level: level0, isolate: false }];
 	let overflow = 0;
+	let overflowEmbed = 0;
 	let valid = 0;
 	for (let i = 0; i < n; i++) {
 		const t = classes[i];
 		const top = stack[stack.length - 1];
-		if (isInitiator(t)) {
+		if (t === 'LRE' || t === 'RLE') {
+			levels[i] = top.level;
+			const next = t === 'RLE' ? (top.level + 1) | 1 : (top.level + 2) & ~1;
+			if (next <= 125 && overflow === 0 && overflowEmbed === 0) stack.push({ level: next, isolate: false });
+			else if (overflow === 0) overflowEmbed++;
+		} else if (t === 'PDF') {
+			if (overflow === 0) {
+				if (overflowEmbed > 0) overflowEmbed--;
+				else if (!stack[stack.length - 1].isolate && stack.length >= 2) stack.pop();
+			}
+			levels[i] = stack[stack.length - 1].level;
+		} else if (isInitiator(t)) {
 			levels[i] = top.level;
 			const rtl = t === 'RLI' || (t === 'FSI' && firstStrong(i + 1, match[i] < 0 ? n : match[i]) === 1);
 			const next = rtl ? (top.level + 1) | 1 : (top.level + 2) & ~1;
@@ -103,6 +121,7 @@ export function resolve(text: string, para: 0 | 1 | 'auto' = 0): Resolved {
 		} else if (t === 'PDI') {
 			if (overflow > 0) overflow--;
 			else if (valid > 0) {
+				overflowEmbed = 0;
 				while (!stack[stack.length - 1].isolate) stack.pop();
 				stack.pop();
 				valid--;
@@ -111,28 +130,28 @@ export function resolve(text: string, para: 0 | 1 | 'auto' = 0): Resolved {
 		} else levels[i] = top.level;
 	}
 
-	// X10: level runs, then isolating run sequences.
-	const runs: [number, number][] = [];
-	for (let i = 0; i < n; ) {
-		let j = i;
-		while (j + 1 < n && levels[j + 1] === levels[i]) j++;
-		runs.push([i, j]);
-		i = j + 1;
+	// X9 takes the embedding controls out; X10: level runs, then isolating run sequences, over the code points that stay.
+	const kept: number[] = [];
+	for (let i = 0; i < n; i++) if (!isEmbedControl(classes[i])) kept.push(i);
+	const runs: number[][] = [];
+	for (const i of kept) {
+		const run = runs[runs.length - 1];
+		if (run && levels[run[0]] === levels[i]) run.push(i);
+		else runs.push([i]);
 	}
 	const runOf = new Array<number>(n);
-	runs.forEach(([a, b], r) => {
-		for (let i = a; i <= b; i++) runOf[i] = r;
-	});
+	runs.forEach((run, r) => run.forEach((i) => (runOf[i] = r)));
 	const matchedPdi = new Set(match.filter((m) => m >= 0));
 	const sequences: number[][] = [];
-	for (const [a, b] of runs) {
-		if (matchedPdi.has(a)) continue;
+	for (const first of runs) {
+		if (matchedPdi.has(first[0])) continue;
 		const seq: number[] = [];
-		let [x, y] = [a, b];
+		let run = first;
 		for (;;) {
-			for (let i = x; i <= y; i++) seq.push(i);
+			seq.push(...run);
+			const y = run[run.length - 1];
 			if (!isInitiator(classes[y]) || match[y] < 0) break;
-			[x, y] = runs[runOf[match[y]]];
+			run = runs[runOf[match[y]]];
 		}
 		sequences.push(seq);
 	}
@@ -143,8 +162,10 @@ export function resolve(text: string, para: 0 | 1 | 'auto' = 0): Resolved {
 		const last = seq[seq.length - 1];
 		const level = levels[first];
 		const e: 'L' | 'R' = level % 2 ? 'R' : 'L';
-		const before = first > 0 ? levels[first - 1] : level0;
-		const after = last + 1 < n && !(isInitiator(classes[last]) && match[last] < 0) ? levels[last + 1] : level0;
+		const prev = kept[kept.indexOf(first) - 1];
+		const next = kept[kept.indexOf(last) + 1];
+		const before = prev !== undefined ? levels[prev] : level0;
+		const after = next !== undefined && !(isInitiator(classes[last]) && match[last] < 0) ? levels[next] : level0;
 		const sos: 'L' | 'R' = Math.max(level, before) % 2 ? 'R' : 'L';
 		const eos: 'L' | 'R' = Math.max(level, isInitiator(classes[last]) && match[last] < 0 ? level0 : after) % 2 ? 'R' : 'L';
 		const ts = seq.map((i) => types[i]);
@@ -254,7 +275,7 @@ export function resolve(text: string, para: 0 | 1 | 'auto' = 0): Resolved {
 /** L1, L2, L4 for the code points `from` to `to` (exclusive) of a resolved paragraph: the visual order, left to right, with the controls taken out. */
 function reorder(r: Resolved, from: number, to: number): string {
 	const idx: number[] = [];
-	for (let i = from; i < to; i++) idx.push(i);
+	for (let i = from; i < to; i++) if (!isEmbedControl(r.classes[i])) idx.push(i);
 	const lv = idx.map((i) => r.levels[i]);
 	// L1: white space and isolate controls at the end of the line go to the paragraph level.
 	for (let k = idx.length - 1; k >= 0 && (r.classes[idx[k]] === 'WS' || isIsolateControl(r.classes[idx[k]])); k--) lv[k] = r.para;

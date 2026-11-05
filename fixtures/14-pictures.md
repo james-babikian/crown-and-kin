@@ -10,7 +10,7 @@ Coats of arms and portraits of spec §13.6 and §13.7 (decisions D67–D78), and
 - Bastien is illegitimate with no parents listed, so his card has the D14 sign beside the arms.
 - The first block has a "This is me" mark (Roderick), so its cards have a relation text line; the second block has no mark (D77: the title and the dates are beside the portrait).
 
-The comments in the first block give the expected results (read by `tests/acceptance/m9-*.test.ts`):
+The comments in the first block give the expected results (read by the tests `picture-colour-list`, `arms-and-portrait-sets`, `arms-and-portrait-link-targets`, `picture-link-reading`, `saved-picture-with-pictures`, `picture-store-decoding` and `arms-and-portrait-values-in-text` in `tests/acceptance/`):
 
 - `# picture: <file> | format=…; width=…; height=…` — what the header reader finds in each file of `fixtures/pictures/` (`orientation=` when the JPEG has one).
 - `# colours: <file> | …` — the colours from the arms of the PNG arms, largest share first, computed with the decided method (§13.6) from a 64 × 64 px copy made with resvg (contract amendment A5). A test accepts each colour within ΔE (OKLab) 0.03.
@@ -282,7 +282,7 @@ unions:
     start: 1129
 ```
 
-The third block is for the portrait crop of spec §13.13 (decisions D79 and D91). It adds `portrait-crop` to the tall portrait photo (`roderick-tall.jpg`, 400 × 600 px) and to other portraits. It has no arms, so all cards are plain. The comments give the expected results (read by `tests/acceptance/m10-crop.test.ts`):
+The third block is for the portrait crop of spec §13.13 (decisions D79 and D91). It adds `portrait-crop` to the tall portrait photo (`roderick-tall.jpg`, 400 × 600 px) and to other portraits. It has no arms, so all cards are plain. The comments give the expected results (read by `tests/acceptance/portrait-crop-text.test.ts`):
 
 - `# crop: <id> | read=…; square=<sx>,<sy>,<size>; warning=<yes|no>` — what the value reads as (`ok`, `bad` or `absent`), the square in picture px that the card shows (`cropSquare` of the clamped part; for a bad value or a missing portrait, the automatic upper-centre square of §13.7), and whether `bad-portrait-crop` is expected.
 - Roderick has a good part: left 0.1, top 0.4, side 0.5 of the shorter side (200 px), so the square is (40, 240) and 200 px wide. Odette's square leaves the picture, so it is moved and made smaller until it fits: side 0.8 (320 px), left at most 1 − 320 / 400 = 0.2, top at most 1 − 320 / 600 = 0.4667. Piers' side is under 0.1, so it is read as 0.1 (40 px). Bertrand writes commas, Hilda a side of 0: both are bad, with a warning, and show the automatic part. Gunnar has a `portrait-crop` but no `portrait`: it does nothing and gives no warning.

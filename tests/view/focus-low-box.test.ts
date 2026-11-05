@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import type { Rect } from '../../src/layout/model';
 import { familyFits, focusView } from '../../src/view/focus-mode';
-import { START_TOP_GAP } from '../../src/render/view-math';
+import { READABLE_NAME_PX, START_TOP_GAP } from '../../src/render/view-math';
 
 /*
- * G5 fix round (the decision notes "M6 G5 … and the G5 fix round"): the D18 first view in a low box. On a
+ * G5 fix round: the D18 first view in a low box. On a
  * phone on its side the note box is 60 % of 390 px (D30), 234 px. If the parents, the focus person
  * and a child cannot all show below the toolbar band, the first view uses the D13 rule of a person
  * without parents: the person near the top below the band, the children below.
@@ -47,7 +47,7 @@ describe('familyFits', () => {
 describe('focusView in a low box (D18, D30, phone on its side)', () => {
 	it('844 × 234 below a 48 px toolbar band: the card near the top of the free area, the child below it, the parent not in the free area', () => {
 		const v = focusView(BOUNDS, LOW, 16, focus, BAND, [child], false, [parent]);
-		expect(v.scale * 16).toBeCloseTo(14, 6);
+		expect(v.scale * 16).toBeCloseTo(READABLE_NAME_PX, 6);
 		const s = on(v, LOW);
 		expect(s.y(focus.y)).toBeCloseTo(BAND + START_TOP_GAP * v.scale, 6);
 		expect(s.x(focus.x + focus.w / 2)).toBeCloseTo(LOW.w / 2, 6);

@@ -51,7 +51,7 @@ import { TreeViewPlacement } from './tree-view-placement';
 import { viewCard } from './viewer-sources';
 import { TreeViewBase } from './tree-view-base';
 import { HIGHLIGHT_MS, HOVER_SOURCE } from './tree-view-types';
-import { hintSide } from './hint-place';
+import { hintSide, showOnePersonHint } from './hint-place';
 import { later } from '../view/idle';
 
 /** The most cards attached in one idle chunk. */
@@ -277,6 +277,7 @@ export abstract class TreeViewScene extends TreeViewPlacement {
 		} finally {
 			this.showTree();
 		}
+		showOnePersonHint(this.viewport, { people: this.whole?.people.length, full: !!this.full, coarse: this.coarse });
 	}
 
 	/**
@@ -325,7 +326,7 @@ export abstract class TreeViewScene extends TreeViewPlacement {
 		const scene = this.scene;
 		if (!scene) return;
 		const last = this.boostFor;
-		if (last && last.scene === scene && last.lod === this.lod && last.scale === view.scale) return;
+		if (last?.scene === scene && last.lod === this.lod && last.scale === view.scale) return;
 		this.boostFor = { scene, lod: this.lod, scale: view.scale };
 		const overview = this.lod === 'overview';
 		const fontPx = this.laid?.layout.geometry.fontPx ?? 0;
@@ -498,7 +499,7 @@ export abstract class TreeViewScene extends TreeViewPlacement {
 
 	/** S5c: the element that got the focus is a card, tag or badge shell: it gets its content before the view moves to it. */
 	protected fillFocused(target: EventTarget | null): void {
-		const id = (target as Element | null)?.getAttribute?.('data-person');
+		const id = (target as Element | null)?.getAttribute('data-person');
 		if (id) this.fillPerson(id);
 	}
 
@@ -616,7 +617,7 @@ export abstract class TreeViewScene extends TreeViewPlacement {
 	 * or moves past the 8 px threshold at some point (full screen).
 	 */
 	protected wireCardPresses(viewport: HTMLElement): void {
-		const person = (t: EventTarget | null) => ((t as Element | null)?.closest?.('.dynasty-card') as Element | null)?.getAttribute('data-person') ?? null;
+		const person = (t: EventTarget | null) => ((t as Element | null)?.closest('.dynasty-card') as Element | null)?.getAttribute('data-person') ?? null;
 		viewport.addEventListener('pointerdown', (e) => {
 			// A second finger makes the press a pinch, never a tap (spec §7.2).
 			if (!e.isPrimary) this.tap = null;
@@ -627,12 +628,12 @@ export abstract class TreeViewScene extends TreeViewPlacement {
 		// Once the finger has moved past the threshold, the press is a pan, even if it comes back to its start (spec §7.2).
 		viewport.addEventListener('pointermove', (e) => {
 			const t = this.tap;
-			if (t && t.pointer === e.pointerId && isPan(e.clientX - t.x, e.clientY - t.y)) this.tap = null;
+			if (t?.pointer === e.pointerId && isPan(e.clientX - t.x, e.clientY - t.y)) this.tap = null;
 		});
 		viewport.addEventListener('pointerup', (e) => {
 			const t = this.tap;
 			this.tap = null;
-			if (!t || t.pointer !== e.pointerId || isPan(e.clientX - t.x, e.clientY - t.y)) return;
+			if (t?.pointer !== e.pointerId || isPan(e.clientX - t.x, e.clientY - t.y)) return;
 			this.lastTap = performance.now();
 			this.guard(() => this.activate(t.person, true, e));
 		});
@@ -682,7 +683,7 @@ export abstract class TreeViewScene extends TreeViewPlacement {
 
 	/** Did the press land on the arms of the card? The pictures take no pointer events, so the place of the press is compared with the place of the arms. */
 	protected pressedArms(card: Element | null, via: Event | null): boolean {
-		if ((via?.target as Element | null)?.closest?.('.dynasty-arms')) return true;
+		if ((via?.target as Element | null)?.closest('.dynasty-arms')) return true;
 		const m = via as MouseEvent | null;
 		const box = card?.querySelector('.dynasty-arms')?.getBoundingClientRect();
 		if (!m || !box || typeof m.clientX !== 'number' || box.width <= 0) return false;
@@ -716,7 +717,7 @@ export abstract class TreeViewScene extends TreeViewPlacement {
 	 */
 	protected modalAbove(): boolean {
 		if (pluginModalOpen() || this.host.hasFullOpen()) return true;
-		return !!this.containerEl.doc?.body?.querySelector?.('.modal-container');
+		return !!this.containerEl.doc.body.querySelector('.modal-container');
 	}
 
 	protected revealPerson(id: string, restored = false): void {

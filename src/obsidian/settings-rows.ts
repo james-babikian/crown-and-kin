@@ -62,7 +62,7 @@ export interface ButtonRow extends RowText {
 export type SettingRow = ToggleRow | DropdownRow | HeightRow | NumberRow | AreaRow | ButtonRow;
 
 /** One group under a heading (D33). */
-export interface SettingGroupSpec {
+interface SettingGroupSpec {
 	heading: string;
 	rows: readonly SettingRow[];
 }

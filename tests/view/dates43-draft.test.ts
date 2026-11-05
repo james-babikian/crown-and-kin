@@ -137,7 +137,7 @@ describe('Same year as', () => {
 		// year Y of cycle C is S + (C - 1) x L + (Y - 1): S = 1203 - 120 - 20.
 		expect(checked.calendars[0].kind).toMatchObject({ start: 1063 });
 		expect(checked.reader.read('21 Year of the 3 Cycle')?.year).toBe(1203);
-		expect(startReadback(checked.starts.get(`c${d.key}`), checked.calendars[0], null)).toBe('Start: year 1063. This is the plain year of Year 1 of this calendar. Example: 21 Year of the 3 Cycle = year 1203');
+		expect(startReadback(checked.starts.get(`c${d.key}`), checked.calendars[0], null)).toBe('21 Year of the 3 Cycle = year 1203');
 	});
 
 	it('reads a date in another calendar, and treats an empty example as year 1 of cycle 1', () => {
@@ -173,7 +173,7 @@ describe('Same year as', () => {
 		const saved = readNote(text);
 		const d = draftOf(saved, key);
 		const checked = checkDraft(d, NOTE);
-		expect(startReadback(checked.starts.get(`c${d[0].key}`), checked.calendars[0], 130)).toBe('The calendar starts at year 130. To change this, write a date in “Same year as”. Example: 1 Year of the 1 Cycle = year 130');
+		expect(startReadback(checked.starts.get(`c${d[0].key}`), checked.calendars[0], 130)).toBe('1 Year of the 1 Cycle = year 130');
 		expect(startReadback(checked.starts.get(`c${d[0].key}`), checked.calendars[0], null)).toBe('No “Same year as” date. The calendar starts at year 1. If you use other calendars or plain years, write a date in “Same year as”.');
 	});
 });

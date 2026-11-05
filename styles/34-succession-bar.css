@@ -9,12 +9,12 @@
 	z-index: 1;
 	display: flex;
 	align-items: center;
-	gap: 4px;
+	gap: var(--dynasty-space-1);
 	box-sizing: border-box;
 	min-height: 48px;
-	/* The bar reaches 8 px beyond the rows on both sides, and its text starts where the text of the rows starts. */
-	margin: 0 -8px;
-	padding: 0 0 0 16px;
+	/* The rows reach the edges of the block (no section padding), so the bar does too. Its text starts on the name edge of the rows (inset + stripe + gap), and the Close ends where the pencil of a row ends (the inset). */
+	margin: 0;
+	padding: 0 var(--dynasty-space-2) 0 calc(var(--dynasty-space-2) + var(--dynasty-width-house) + var(--dynasty-space-3));
 	background: var(--background-secondary);
 	border-bottom: 1px solid var(--background-modifier-border);
 	font-family: var(--font-interface);
@@ -25,7 +25,7 @@
 .dynasty-list-succession .dynasty-succession-text {
 	flex: 1 1 auto;
 	min-width: 0;
-	padding: 6px 0;
+	padding: var(--dynasty-list-pad) 0;
 	line-height: 1.35;
 }
 

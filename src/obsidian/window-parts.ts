@@ -2,12 +2,13 @@
  * Small parts of the window family: one row anatomy (title and detail, then the picture at the right, then the actions),
  * the round lead of a person (a portrait, and nothing when the person has none: D213), the short menu that Obsidian draws (a popover on a
  * computer, a sheet from the bottom on a phone), and the pictures of the rows. The windows (`edit-sheet.ts`, `titles-window.ts`,
- * `houses-window.ts`) use them; nothing here reads or writes a note.
+ * `houses-window.ts`) use them, and the question box that they draw over themselves; nothing here reads or writes a note.
  */
 
 import { Menu, setIcon } from 'obsidian';
 import { startCropOf } from './crop-tool';
 import type { PictureCopy, PictureStore } from './picture-store';
+import { uniqueId } from './sheet-parts';
 
 // ---------- the short menu ----------
 
@@ -50,13 +51,70 @@ export function showMenu(anchor: HTMLElement, items: MenuItems): Menu {
 	return menu;
 }
 
+// ---------- the question over a window ----------
+
+/** One button of a question box. `detail` makes it a choice with a second text line, drawn in the choice list above the actions. */
+export interface ConfirmBoxButton {
+	label: string;
+	detail?: string;
+	/** Passed to the element as given: the sites keep the form (a string or a list) that they draw today. */
+	cls: string | string[];
+	run(): void;
+}
+
+/**
+ * What a question box has. `labelled` is the id prefix of the title: with it the box names itself for a screen reader
+ * (`aria-labelledby`); without it the box has no name, as two of the windows draw it today. `scroll` puts the title and
+ * the text in their own scrolling part, above the buttons.
+ */
+export interface ConfirmBoxSpec {
+	title: string;
+	text?: readonly string[];
+	labelled?: string;
+	scroll?: boolean;
+	buttons: readonly ConfirmBoxButton[];
+}
+
+/** Draws a question box over `modalEl` and gives the first button the focus. The caller keeps the layer, to remove it later. */
+export function confirmBox(modalEl: HTMLElement, spec: ConfirmBoxSpec): { layer: HTMLElement; buttons: HTMLElement[] } {
+	const layer = modalEl.createDiv({ cls: 'dynasty-sheet-confirm', attr: { role: 'alertdialog', 'aria-modal': 'true' } });
+	const box = layer.createDiv({ cls: 'dynasty-sheet-confirm-box' });
+	const top = spec.scroll ? box.createDiv({ cls: 'dynasty-sheet-confirm-scroll' }) : box;
+	const titleEl = top.createDiv({ cls: 'dynasty-sheet-confirm-title', text: spec.title });
+	if (spec.labelled !== undefined) {
+		const id = uniqueId(spec.labelled);
+		titleEl.setAttribute('id', id);
+		layer.setAttribute('aria-labelledby', id);
+	}
+	for (const t of spec.text ?? []) top.createDiv({ cls: 'dynasty-sheet-confirm-text', text: t });
+	const choices = spec.buttons.some((b) => b.detail !== undefined) ? box.createDiv({ cls: 'dynasty-choice-options' }) : null;
+	const row = box.createDiv({ cls: 'dynasty-sheet-confirm-actions' });
+	const buttons = spec.buttons.map((b) => {
+		const choice = b.detail !== undefined && choices !== null;
+		const el = (choice ? choices : row).createEl('button', { cls: b.cls, text: choice ? undefined : b.label, attr: { type: 'button' } });
+		if (choice) {
+			el.createSpan({ cls: 'dynasty-choice-label', text: b.label });
+			el.createSpan({ cls: 'dynasty-choice-detail', text: b.detail });
+		}
+		el.addEventListener('click', () => b.run());
+		return el;
+	});
+	buttons[0]?.focus();
+	return { layer, buttons };
+}
+
 // ---------- the pictures of the rows ----------
 
 /** One picture of a row: its slot, the cancel switch of its request and the copy once it arrived. */
 interface RowEntry {
 	slot: HTMLElement;
+	/** What the picture is made from: the file and the size. The same signature on the same slot is the same picture. */
+	sig: string;
 	ctl: AbortController;
 	copy: PictureCopy | null;
+	/** The copy of the picture that the slot showed before; it goes back to the store when the new picture is drawn. */
+	carry: PictureCopy | null;
+	failed: boolean;
 	started: boolean;
 	start(): void;
 }
@@ -82,6 +140,8 @@ function scrollParent(el: HTMLElement): HTMLElement | null {
 export class RowPictures {
 	private readonly entries = new Set<RowEntry>();
 	private readonly bySlot = new Map<Element, RowEntry>();
+	/** Every entry by its slot (`bySlot` holds only those that wait for the watcher). */
+	private readonly bySlotAll = new Map<Element, RowEntry>();
 	private watcher: IntersectionObserver | null = null;
 	private watcherDoc: Document | null = null;
 	private closed = false;
@@ -103,49 +163,99 @@ export class RowPictures {
 		return this.store.resolve(text, this.sourcePath).ok;
 	}
 
-	/** Fills `slot` with the picture of `link` when the store can make one. A slot whose picture cannot be made gets `is-failed` and is not drawn. */
-	show(slot: HTMLElement, link: string | undefined, o: { px: number; fit: 'portrait' | 'meet'; crop?: string }): void {
+	/**
+	 * Fills `slot` with the picture of `link` when the store can make one. A slot whose picture cannot be made gets `is-failed` and is not drawn.
+	 * A slot that already shows (or waits for) the same picture keeps it and makes no new request. A slot that gets another picture keeps the
+	 * old one in view until the new one has arrived, so a slot that changes its picture is never empty. `now`: the slot is always in view (the
+	 * header of a window), so the request starts at once and does not wait for the watcher.
+	 */
+	show(slot: HTMLElement, link: string | undefined, o: { px: number; fit: 'portrait' | 'meet'; crop?: string; now?: boolean }): void {
 		const store = this.store;
 		const text = link?.trim();
 		if (!store || !text || this.closed) return;
 		const found = store.resolve(text, this.sourcePath);
-		if (!found.ok) return;
+		if (!found.ok) {
+			// The new link names no file: the slot must not keep the picture of the link before, whose copy goes back now.
+			this.clearSlot(slot);
+			return;
+		}
 		const part = o.crop ? startCropOf(o.crop) : null;
+		const sig = [found.file.path, o.px, o.fit, o.crop ?? ''].join('|');
+		const before = this.bySlotAll.get(slot);
+		if (before?.sig === sig && !before.failed) return;
+		let carry: PictureCopy | null = null;
+		if (before) {
+			carry = before.copy ?? before.carry;
+			before.carry = null;
+			before.copy = null;
+			this.drop(before);
+		}
 		if (this.entries.size >= this.sweepAt) {
 			this.sweep();
 			this.sweepAt = Math.max(64, this.entries.size * 2);
 		}
 		const entry: RowEntry = {
 			slot,
+			sig,
 			ctl: new AbortController(),
 			copy: null,
+			carry,
+			failed: false,
 			started: false,
 			start: () => {
 				if (entry.started || this.closed) return;
 				entry.started = true;
 				this.unwatch(entry);
+				slot.removeClass('is-failed');
 				void store
 					.acquire(found.file, { w: o.px, h: o.px, fit: o.fit, ...(part && o.fit === 'portrait' ? { crop: part } : {}) }, entry.ctl.signal)
-					.then((c) => {
-						if (!c || !('url' in c)) {
-							slot.addClass('is-failed');
-							return;
-						}
-						// The row left the page, or the window closed, while the picture was made.
-						if (this.closed || entry.ctl.signal.aborted || !this.entries.has(entry)) {
-							c.release();
-							return;
-						}
-						entry.copy = c;
-						slot.empty();
-						slot.addClass('has-picture');
-						slot.createEl('img', { attr: { src: c.url, alt: '' } });
-					})
+					.then((c) => this.arrived(entry, c))
 					.catch((e) => console.error('Crown and Kin: cannot show a picture in a row', e));
 			},
 		};
 		this.entries.add(entry);
-		if (!this.watch(entry)) entry.start();
+		this.bySlotAll.set(slot, entry);
+		if (o.now || !this.watch(entry)) entry.start();
+	}
+
+	/** The request of `entry` ended: the copy goes into its slot, or, when it could not be made, the slot is emptied. */
+	private arrived(entry: RowEntry, c: Awaited<ReturnType<PictureStore['acquire']>>): void {
+		const slot = entry.slot;
+		// The row left the page, the picture was replaced, or the window closed, while the picture was made.
+		if (this.closed || entry.ctl.signal.aborted || !this.entries.has(entry)) {
+			if (c && 'url' in c) c.release();
+			return;
+		}
+		if (!c || !('url' in c)) {
+			entry.failed = true;
+			entry.carry?.release();
+			entry.carry = null;
+			// The copy of the old picture is back in the store, so its picture must not stay in view.
+			slot.empty();
+			slot.removeClass('has-picture');
+			slot.addClass('is-failed');
+			return;
+		}
+		entry.copy = c;
+		slot.addClass('has-picture');
+		// The picture that stands in the slot gets the new source: the old picture stays in view until the new one has loaded.
+		const img = slot.querySelector('img');
+		if (img) img.setAttribute('src', c.url);
+		else {
+			slot.empty();
+			slot.createEl('img', { attr: { src: c.url, alt: '' } });
+		}
+		entry.carry?.release();
+		entry.carry = null;
+	}
+
+	/** Gives back the picture of `slot` (copy and request) and empties the slot. */
+	private clearSlot(slot: HTMLElement): void {
+		const before = this.bySlotAll.get(slot);
+		if (!before) return;
+		this.drop(before);
+		slot.empty();
+		slot.removeClass('has-picture', 'is-failed');
 	}
 
 	/** Watches the lead until it is near the visible part. False when the system cannot watch (the request then starts at once). */
@@ -182,12 +292,15 @@ export class RowPictures {
 		entry.ctl.abort();
 		entry.copy?.release();
 		entry.copy = null;
+		entry.carry?.release();
+		entry.carry = null;
 		this.entries.delete(entry);
+		if (this.bySlotAll.get(entry.slot) === entry) this.bySlotAll.delete(entry.slot);
 	}
 
 	/** Lets go of the pictures of rows that are not on the page any more. */
 	private sweep(): void {
-		for (const e of [...this.entries]) if (e.slot.isConnected === false) this.drop(e);
+		for (const e of [...this.entries]) if (!e.slot.isConnected) this.drop(e);
 	}
 
 	/** The rows inside `root` are drawn again: lets go of their pictures and cancels their requests. */

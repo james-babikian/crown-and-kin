@@ -145,7 +145,7 @@ describe('plugin text obeys the word list', () => {
 		expect(timingText({ path: 'Big.md', people: 1, parseMs: 0, layoutMs: 0, drawMs: 1, totalMs: 1, interactiveMs: 20, full: true })).toMatch(/^The last tree \(Big\.md, 1 person, full-screen\) was ready for use after 20 ms\./);
 	});
 
-	it('in focus mode the timing text names the family and the whole tree (the decision notes WP5.2 fix round 2)', () => {
+	it('in focus mode the timing text names the family and the whole tree', () => {
 		expect(timingText({ path: 'Big.md', people: 38, of: 389, parseMs: 0, layoutMs: 0, drawMs: 1, totalMs: 1, interactiveMs: 20, full: true })).toMatch(
 			/^The last tree \(Big\.md, the family, 38 of 389 people, full-screen\) was ready for use after 20 ms\./,
 		);

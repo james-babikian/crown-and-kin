@@ -9,7 +9,7 @@ import { timedRatio } from '../support/speed-ref';
 import { speedTest } from '../support/speed-test';
 
 /*
- * Names contract §5 "Speed" (WP-6 step 2, spec §7.7 gate, one case): the phone list of the largest sample tree with 50 eras, against the same calendars with two name lists. A tree
+ * Names contract §5 "Speed" (spec §7.7 gate, one case): the phone list of the largest sample tree with 50 eras, against the same calendars with two name lists. A tree
  * draws the list from its graph: the derive reads the dates of the titles once, and each row reads its own dates (and, with a list, the born date too) through the memo of
  * the reader. Every round reads cold. The time is a ratio to a fixed piece of work timed in the same run (tests/support/speed-ref.ts), so a busy machine does not fail it. The numbers go to the report.
  */

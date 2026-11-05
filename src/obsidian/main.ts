@@ -24,7 +24,7 @@ import { FullScreenModal } from './full-screen';
 import { insertTree } from './insert-tree';
 import { closePluginModals } from '../view/plugin-modals';
 import { tallBlockParser } from './live-preview';
-import { beginStart, guardStart } from './start-guard';
+import { beginStart, guarded, guardStart } from './start-guard';
 import { clearRelationCache, moveRelationBlocks } from '../view/relation-cache';
 import { deviceCopies } from './picture-copies-idb';
 import { createPictureStore, isPictureExtension } from './picture-store';
@@ -43,7 +43,7 @@ import { renameHeights } from './block-height';
 import { HOVER_SOURCE, START_LIMIT_MS, STYLES_LIMIT_MS, THEME_RECHECK_MS, TreeView, type FullSource, type OpenTime, type TreeHost } from './tree-view';
 
 /** B16: vault events for picture files are grouped for this long, in ms, before the views refresh. */
-export const PICTURE_EVENT_MS = 250;
+const PICTURE_EVENT_MS = 250;
 
 /** The Crown and Kin plugin: Obsidian loads one instance and calls `onload`/`onunload` on it. */
 export default class DynastyTreePlugin extends Plugin implements TreeHost, SettingsHost {
@@ -87,7 +87,7 @@ export default class DynastyTreePlugin extends Plugin implements TreeHost, Setti
 	 * The one parse cache of the tree views. The harness build freezes the cached trees, so that a
 	 * reader which changes one (layout, relations, fold planning) throws in the harness and not in a note.
 	 */
-	readonly parseCache = createParseCache({ freeze: typeof __DYNASTY_HARNESS__ !== 'undefined' && __DYNASTY_HARNESS__ === true });
+	readonly parseCache = createParseCache({ freeze: typeof __DYNASTY_HARNESS__ === 'boolean' && __DYNASTY_HARNESS__ });
 	/**
 	 * D183: the cold start. A tree draws a box of its last known height until the plugin styles (a probe element with the
 	 * variable `--dynasty-css-ready` of the style sheet), the stored settings and its block place are in, and it counts no missing picture until the
@@ -202,7 +202,7 @@ export default class DynastyTreePlugin extends Plugin implements TreeHost, Setti
 				recheck();
 			}),
 		);
-		this.register(() => recheck.cancel?.());
+		this.register(() => recheck.cancel());
 		this.watchWebFonts();
 		// The session focus lasts until the note closes (spec §5.6).
 		this.registerEvent(this.app.workspace.on('layout-change', () => this.endClosedSessions()));
@@ -223,7 +223,7 @@ export default class DynastyTreePlugin extends Plugin implements TreeHost, Setti
 				this.pictureChanged(file);
 			}),
 		);
-		this.register(() => this.tellPictures.cancel?.());
+		this.register(() => this.tellPictures.cancel());
 		this.addCommands();
 		registerCalendars(this, this.dates);
 		this.addSettingTab(new DynastySettingTab(this.app, this));
@@ -262,14 +262,12 @@ export default class DynastyTreePlugin extends Plugin implements TreeHost, Setti
 		if (this.off) return;
 		// A host with no metadata cache (a unit fake) has no events to follow, as in `registerCalendars`.
 		if (typeof this.app.metadataCache?.on !== 'function') return;
-		try {
+		guarded('cannot start the note index', () => {
 			const cache = this.app.metadataCache;
 			this.cacheWarm = typeof cache.getFileCache === 'function' && this.app.vault.getMarkdownFiles().every((f) => !!cache.getFileCache(f));
 			this.register(saveWhenLeaving(this.fence));
 			void this.fence.start().catch((e: unknown) => console.error('Crown and Kin: the note index did not start', e));
-		} catch (e) {
-			console.error('Crown and Kin: cannot start the note index', e);
-		}
+		});
 	}
 
 	/** The saved copy of the fence index. It stops saving for the session when the local storage failed for the renames (one broken storage, one fallback). */
@@ -293,7 +291,7 @@ export default class DynastyTreePlugin extends Plugin implements TreeHost, Setti
 	 * of the file failed at start and works now, so the updater gets the merged list and continues at once.
 	 */
 	private migratePending(raw: unknown, late: boolean): void {
-		try {
+		guarded('cannot move the renames that wait', () => {
 			const r = this.pendingKeeper.settle(raw, late || !this.startupReadFailed, this.links.storedList(), this.links.openList(), late);
 			if (!r) return;
 			// The updater holds the list now. If the file kept a copy, the fallback would write a handled list back at each save.
@@ -301,9 +299,7 @@ export default class DynastyTreePlugin extends Plugin implements TreeHost, Setti
 			this.links.restore(r.list);
 			if (late) this.links.resume();
 			else if (r.cleanFile) void this.store().catch((e: unknown) => console.error('Crown and Kin: cannot clean the settings file', e));
-		} catch (e) {
-			console.error('Crown and Kin: cannot move the renames that wait', e);
-		}
+		});
 	}
 
 	/** The commands of the plugin (spec §6.1 undo, §6.9, §7.7, §5.9). */
@@ -331,11 +327,7 @@ export default class DynastyTreePlugin extends Plugin implements TreeHost, Setti
 			id: 'insert-family-tree',
 			name: INSERT_UI.command,
 			editorCallback: (editor) => {
-				try {
-					insertTree(editor);
-				} catch (e) {
-					console.error('Crown and Kin: cannot insert a tree', e);
-				}
+				guarded('cannot insert a tree', () => insertTree(editor));
 			},
 		});
 	}
@@ -345,15 +337,13 @@ export default class DynastyTreePlugin extends Plugin implements TreeHost, Setti
 	 * measured contrast where the theme's own pair is under 4.5:1; else the base token of the style sheet (the theme's pair) stays.
 	 */
 	private paintOnAccent(): void {
-		try {
+		guarded('cannot read the colour of the text on the accent', () => {
 			const body = document.body;
 			if (!body?.isConnected) return;
 			const pick = onAccentChoice(body);
 			if (pick) body.style.setProperty('--dynasty-on-accent', pick);
 			else body.style.removeProperty('--dynasty-on-accent');
-		} catch (e) {
-			console.error('Crown and Kin: cannot read the colour of the text on the accent', e);
-		}
+		});
 	}
 
 	/** Takes the run-time contrast tokens off the page body, so the static values of the style sheet show (also when the plugin unloads). */
@@ -370,7 +360,7 @@ export default class DynastyTreePlugin extends Plugin implements TreeHost, Setti
 	 * reaches 4.5:1 and a line 3:1 on the page, card and window colours. A token that is strong enough already keeps the static value of the style sheet.
 	 */
 	private paintContrast(): void {
-		try {
+		guarded('cannot read the colours of the theme for the grey text', () => {
 			const body = document.body;
 			if (!body?.isConnected) return;
 			// The static value is the start, so the overrides must be off while it is read.
@@ -386,9 +376,7 @@ export default class DynastyTreePlugin extends Plugin implements TreeHost, Setti
 			if (link) body.style.setProperty('--dynasty-link', link);
 			if (edge) body.style.setProperty('--dynasty-edge', edge);
 			if (error) body.style.setProperty('--dynasty-error', error);
-		} catch (e) {
-			console.error('Crown and Kin: cannot read the colours of the theme for the grey text', e);
-		}
+		});
 	}
 
 	/**
@@ -406,7 +394,7 @@ export default class DynastyTreePlugin extends Plugin implements TreeHost, Setti
 	private stylesIn(el: HTMLElement): boolean {
 		if (this.cssSeen) return true;
 		try {
-			this.cssProbe ??= (el.doc ?? document).body.createDiv({ cls: 'dynasty-css-probe', attr: { 'aria-hidden': 'true' } });
+			this.cssProbe ??= el.doc.body.createDiv({ cls: 'dynasty-css-probe', attr: { 'aria-hidden': 'true' } });
 			if (getComputedStyle(this.cssProbe).getPropertyValue('--dynasty-css-ready').trim() === '1') this.cssSeen = true;
 		} catch {
 			// A page that cannot tell: the limit decides.
@@ -546,11 +534,7 @@ export default class DynastyTreePlugin extends Plugin implements TreeHost, Setti
 	override onunload(): void {
 		this.off = true;
 		stopJoinedWatch();
-		try {
-			this.fence.dispose();
-		} catch (e) {
-			console.error('Crown and Kin: cannot stop the note index', e);
-		}
+		guarded('cannot stop the note index', () => this.fence.dispose());
 		this.viewerMotion();
 		this.links.stop();
 		for (const t of this.redrawTimers) window.clearTimeout(t);
@@ -565,11 +549,7 @@ export default class DynastyTreePlugin extends Plugin implements TreeHost, Setti
 		// A tree in a note is a child of the note, not of the plugin: Obsidian does not unload it when the
 		// plugin goes. Unload it here (its listeners and observers go, and it refuses edits and writes).
 		for (const v of [...this.views]) {
-			try {
-				v.retire();
-			} catch (e) {
-				console.error('Crown and Kin: cannot close a tree view', e);
-			}
+			guarded('cannot close a tree view', () => v.retire());
 		}
 		this.views.clear();
 	}
@@ -593,12 +573,10 @@ export default class DynastyTreePlugin extends Plugin implements TreeHost, Setti
 			true,
 		);
 		const onDone = (e: Event) => {
-			try {
+			guarded('cannot handle a loaded font', () => {
 				for (const face of (e as FontFaceSetLoadEvent).fontfaces ?? []) loaded.push(face.family);
 				if (loaded.length) flush();
-			} catch (err) {
-				console.error('Crown and Kin: cannot handle a loaded font', err);
-			}
+			});
 		};
 		fonts.addEventListener('loadingdone', onDone);
 		this.register(() => fonts.removeEventListener('loadingdone', onDone));
@@ -611,7 +589,7 @@ export default class DynastyTreePlugin extends Plugin implements TreeHost, Setti
 	 * when Obsidian last saved it, so it would keep a closed note's session alive (D22).
 	 */
 	private endClosedSessions(): void {
-		try {
+		guarded('cannot end the focus of closed notes', () => {
 			const open = new Set<string>();
 			this.app.workspace.iterateAllLeaves((leaf) => {
 				const vs = leaf.getViewState();
@@ -622,14 +600,12 @@ export default class DynastyTreePlugin extends Plugin implements TreeHost, Setti
 			for (const v of this.views) if (v.containerEl.isConnected) open.add(v.notePath);
 			for (const h of this.handles.all()) if (!open.has(h.key.path)) endSessionFocus(h.state);
 			for (const [k, st] of this.looseStates) if (!open.has(k.slice(0, k.indexOf('\u0000')))) endSessionFocus(st);
-		} catch (e) {
-			console.error('Crown and Kin: cannot end the focus of closed notes', e);
-		}
+		});
 	}
 
 	/** A renamed note keeps its handles, its views' paths and the view state of its read-only blocks. */
 	private renamed(oldPath: string, newPath: string): void {
-		try {
+		guarded('cannot follow the renamed note', () => {
 			this.handles.renamed(oldPath, newPath);
 			renameHeights(oldPath, newPath);
 			// The relation lookups are kept by block key (note path and place): they follow the note, so no old key stays.
@@ -641,9 +617,7 @@ export default class DynastyTreePlugin extends Plugin implements TreeHost, Setti
 				this.looseStates.delete(k);
 				this.looseStates.set(newPath + k.slice(oldPath.length), st);
 			}
-		} catch (e) {
-			console.error('Crown and Kin: cannot follow the renamed note', e);
-		}
+		});
 	}
 
 	/**
@@ -652,14 +626,12 @@ export default class DynastyTreePlugin extends Plugin implements TreeHost, Setti
 	 * `PICTURE_EVENT_MS`, once for all the events of that time (a folder rename sends many).
 	 */
 	private pictureChanged(file: TAbstractFile, path = file.path): void {
-		try {
+		guarded('cannot follow the changed picture', () => {
 			if (!(file instanceof TFile) || !isPictureExtension(extensionOf(path))) return;
 			this.pictures.invalidate(path);
 			this.changedPictures.add(path);
 			this.tellPictures();
-		} catch (e) {
-			console.error('Crown and Kin: cannot follow the changed picture', e);
-		}
+		});
 	}
 
 	/** Plugin undo (spec §6.1, D8): the last tree edit in the active note, else the last one anywhere. */

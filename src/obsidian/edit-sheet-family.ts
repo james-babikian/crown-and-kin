@@ -6,9 +6,11 @@
 import { setIcon } from 'obsidian';
 import type { ParentKind } from '../core/edit';
 import { PARENT_LIMIT, PARENT_TYPES } from '../core/types';
+import { appendNameRun } from '../render/dom/name-span';
 import { dateLine, dateLineShown, relationInfo } from '../render/tree-info';
 import { quotedSobriquet } from '../core/sobriquet';
-import { FAMILY, ME_UI, SHEET, WINDOW_UI, parentTypeText, partnerDetail } from '../render/ui-text';
+import { FAMILY, ME_UI, SHEET, WINDOW_UI, parentTypeText } from '../render/ui-text';
+import { partnerLinkDetail } from './union-edit';
 import type { FamilyView, ParentLink, PartnerLink } from '../core/family-query';
 import { addChild, addParentFlow, addPartner } from './family-flows';
 import { relationsFor, validMe } from '../view/relation-cache';
@@ -63,8 +65,8 @@ export abstract class EditSheetFamily extends EditSheetForm {
 	/** The name of a person in a row: the name, then the sobriquet in curly marks. */
 	protected rowName(title: HTMLElement, id: string): void {
 		const p = this.data.g.byId.get(id);
-		title.appendText(p?.name || id);
-		if (p?.sobriquet) title.createSpan({ cls: 'dynasty-sob', text: ` ${quotedSobriquet(p.sobriquet)}` });
+		// D322: the name with its sobriquet is one run whose direction its first strong letter sets, as on the cards.
+		appendNameRun(title, p?.name || id, [p?.sobriquet ? { cls: 'dynasty-sob', text: ` ${quotedSobriquet(p.sobriquet)}` } : undefined]);
 	}
 
 	/** The text of `rowName` as one string, for the spoken name of a row (WCAG 2.5.3: the visible text, in order). */
@@ -166,6 +168,7 @@ export abstract class EditSheetFamily extends EditSheetForm {
 		r.title.setText(FAMILY.position(sib.index + 1, sib.group.length));
 		if (!this.readOnly) {
 			const actions = r.actions();
+			actions.addClass('dynasty-move-actions');
 			this.button(actions, FAMILY.moveEarlier, 'dynasty-move-earlier', () => void this.moveSibling('earlier')).disabled = !sib.canMoveEarlier;
 			this.button(actions, FAMILY.moveLater, 'dynasty-move-later', () => void this.moveSibling('later')).disabled = !sib.canMoveLater;
 		}
@@ -398,7 +401,8 @@ export abstract class EditSheetFamily extends EditSheetForm {
 		r.title.addClass('dynasty-family-name');
 		this.rowName(r.title, link.partner);
 		r.sub.addClass('dynasty-family-detail');
-		r.sub.setText(`⚭ ${partnerDetail(link.type, link.start, link.end)}`);
+		// D330 UX-03: a marriage that ended says so in its row ("Marriage, 1126–1131, ended by divorce").
+		r.sub.setText(`⚭ ${partnerLinkDetail(link)}`);
 		// The box of the end controls stands also when it is empty, so the pictures of the rows keep one vertical line.
 		const controls = r.actions();
 		controls.addClass('dynasty-family-controls');

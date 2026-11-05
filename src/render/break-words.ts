@@ -6,7 +6,7 @@
  */
 
 /** The break places of one listed word: indices over the NFC form of the word as typed (hyphen-less), and its NFC code-point length. */
-export interface BreakEntry {
+interface BreakEntry {
 	places: readonly number[];
 	length: number;
 }
@@ -15,7 +15,7 @@ export interface BreakEntry {
 export type BreakList = ReadonlyMap<string, BreakEntry>;
 
 /** The most entries one list keeps; later lines are ignored. */
-export const BREAK_LIST_MAX_ENTRIES = 2000;
+const BREAK_LIST_MAX_ENTRIES = 2000;
 
 /** The key of a word in a `BreakList`: NFC, then lower case, so the match ignores case and the way an accent was typed. */
 export const listKey = (word: string): string => word.normalize('NFC').toLowerCase();

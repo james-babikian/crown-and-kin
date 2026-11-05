@@ -37,7 +37,7 @@ export function cadetHint(g: FamilyGraph, title: Title, spec: SuccessionSpec, op
 	if (spec.body || spec.bad || !spec.rule) return null;
 	const first = firstHolderOf(g, title.holders);
 	if (!first) return null;
-	const reuse = opts.line !== undefined && opts.line.kind === 'line' && !opts.line.more ? opts.line : undefined;
+	const reuse = opts.line?.kind === 'line' && !opts.line.more ? opts.line : undefined;
 	const off = reuse ?? successionLine(g, title, spec, WHOLE_LINE, 0, 0, opts.dates ?? g.dates);
 	if (off.kind !== 'line' || off.heirs.length === 0) return null;
 	const on = successionLine(g, title, { ...spec, body: true }, WHOLE_LINE, 0, 0, opts.dates ?? g.dates);

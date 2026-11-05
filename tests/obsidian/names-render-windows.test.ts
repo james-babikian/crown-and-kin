@@ -1,4 +1,4 @@
-// Spec §14 rule 15, D272 (WP-6 step 2): the names of the years in the windows. The Houses window rows, the Find row and its search text, the picture viewer
+// Spec §14 rule 15, D272: the names of the years in the windows. The Houses window rows, the Find row and its search text, the picture viewer
 // line, the rows of the line of succession, the Titles window holder rows, the top of the person window; and the proof that the Born and Died fields and the
 // note stay as written after the window opens and after Save.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -27,8 +27,8 @@ import { FEl, clock, device, resetDom } from '../acceptance/fake-dom';
 import { openModals, resetObsidian } from '../acceptance/fake-obsidian';
 import { cycles, list } from '../dates-support/names';
 import { openPage } from '../support/lw-support';
-import { lineRows, openWin, page } from '../support/r027-window-support';
-import { click, stripNotDisabled, type, writingHandle } from '../support/s113-c-support';
+import { lineRows, openWin, page } from '../support/titles-window-support';
+import { click, stripNotDisabled, type, writingHandle } from '../support/windows-sheets-support';
 import { useFakeDom } from '../support/fake-dom-setup';
 
 useFakeDom({ window: true });

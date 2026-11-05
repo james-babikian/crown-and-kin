@@ -33,11 +33,13 @@ const PLAIN_VARS = {
 } as const;
 
 /** A colour role backed by a single Obsidian CSS variable. */
-export type PlainRole = keyof typeof PLAIN_VARS;
+type PlainRole = keyof typeof PLAIN_VARS;
 
 /** `color-mix(in srgb, <first> <percent>%, <second>)` of two plain roles. */
 export interface MixedRole {
 	mix: readonly [PlainRole, number, PlainRole];
+	/** The percent of the first colour in a dark theme, where it differs from the light one. */
+	dark?: number;
 }
 
 /**
@@ -50,6 +52,8 @@ const MIXED_VARS = {
 	lineSoft: { mix: ['textMuted', 55, 'textFaint'] },
 	/** The theme's green moved towards the text colour: darker on a light note, lighter on a dark one. */
 	adoptiveLine: { mix: ['adoptive', 70, 'text'] },
+	/** D330 O-01: the line round a card, 14 % of the text colour in the card colour (18 % in a dark theme); styles/00-tokens.css has the same numbers. */
+	cardEdge: { mix: ['text', 14, 'cardFill'], dark: 18 },
 } as const satisfies Record<string, MixedRole>;
 
 /** Every colour role, plain and mixed, keyed by name. */
@@ -73,9 +77,11 @@ export function mixHex(a: string, p: number, b: string): string {
 	return '#' + x.map((v, i) => Math.round(Math.min(255, Math.max(0, v * p + y[i] * (1 - p)))).toString(16).padStart(2, '0')).join('');
 }
 
-function withMixes(plain: Record<PlainRole, string>): Palette {
+function withMixes(plain: Record<PlainRole, string>, dark: boolean): Palette {
 	const out = { ...plain } as Palette;
-	for (const [role, { mix }] of Object.entries(MIXED_VARS) as [keyof typeof MIXED_VARS, MixedRole][]) out[role] = mixHex(plain[mix[0]], mix[1] / 100, plain[mix[2]]);
+	for (const [role, { mix, dark: darkPercent }] of Object.entries(MIXED_VARS) as [keyof typeof MIXED_VARS, MixedRole][]) {
+		out[role] = mixHex(plain[mix[0]], (dark && darkPercent !== undefined ? darkPercent : mix[1]) / 100, plain[mix[2]]);
+	}
 	return out;
 }
 
@@ -94,7 +100,7 @@ export const DEFAULT_LIGHT: Palette = withMixes({
 	ward: '#086ddd',
 	rumoured: '#e93147',
 	accent: '#8a5cf5',
-});
+}, false);
 
 /** Approximations of Obsidian's default dark theme, for headless pictures only. */
 export const DEFAULT_DARK: Palette = withMixes({
@@ -111,7 +117,7 @@ export const DEFAULT_DARK: Palette = withMixes({
 	ward: '#027aff',
 	rumoured: '#fb464c',
 	accent: '#7f6df2',
-});
+}, true);
 
 /** D32: the 12 house colours offered in the Houses window, in this order. Names are in `ui-text.ts`. */
 export const HOUSE_PALETTE = [
@@ -140,7 +146,7 @@ export function stripColour(house: string, p: Palette, dark: boolean): string {
 }
 
 /** How one `StrokeKind` is drawn: colour role, width, dash pattern and legend label. */
-export interface StrokeStyle {
+interface StrokeStyle {
 	role: ThemeRole;
 	width: number;
 	dash?: string;
@@ -156,8 +162,8 @@ export interface StrokeStyle {
  * note. D38: the ward line is bold square dots (butt caps), the adoptive line longer, thicker dashes.
  */
 export const STROKES: Record<StrokeKind, StrokeStyle> = {
-	marriage: { role: 'line', width: 2.5, label: LEGEND_LABELS.marriage },
-	betrothal: { role: 'line', width: 2.5, dash: '0.1 5', cap: 'round', label: LEGEND_LABELS.betrothal },
+	marriage: { role: 'line', width: 2, label: LEGEND_LABELS.marriage },
+	betrothal: { role: 'line', width: 2, dash: '0.1 5', cap: 'round', label: LEGEND_LABELS.betrothal },
 	concubinage: { role: 'lineSoft', width: 2, dash: '8 4', label: LEGEND_LABELS.concubinage },
 	affair: { role: 'lineSoft', width: 2, dash: '8 3 2 3', label: LEGEND_LABELS.affair },
 	implicit: { role: 'lineSoft', width: 1.25, label: LEGEND_LABELS.implicit },
@@ -165,8 +171,8 @@ export const STROKES: Record<StrokeKind, StrokeStyle> = {
 	illegitimate: { role: 'line', width: 1.5, dash: '5 4', label: LEGEND_LABELS.illegitimate },
 	'birth-link': { role: 'lineSoft', width: 1.5, dash: '0.1 3.5', cap: 'round', label: LEGEND_LABELS['birth-link'] },
 	adoptive: { role: 'adoptiveLine', width: 3, dash: '20 6', label: LEGEND_LABELS.adoptive },
-	ward: { role: 'ward', width: 3, dash: '3 5', label: LEGEND_LABELS.ward },
-	rumoured: { role: 'rumoured', width: 1.5, dash: '4 4', opacity: 0.85, label: LEGEND_LABELS.rumoured },
+	ward: { role: 'ward', width: 3, dash: '3 7', label: LEGEND_LABELS.ward },
+	rumoured: { role: 'rumoured', width: 1.5, dash: '10 4', opacity: 0.85, label: LEGEND_LABELS.rumoured },
 };
 
 /** D26, D38: the union point tells the kind of partnership. */
@@ -197,7 +203,7 @@ export function unionShape(kind: 'union' | 'implicit-union', unionType?: string)
  */
 export const UNION_MARKS: Record<UnionShape, { size: number; stroke?: number }> = {
 	dot: { size: 0.4 },
-	ring: { size: 0.6, stroke: 2.5 },
+	ring: { size: 0.6, stroke: 2 },
 	diamond: { size: 0.55 },
 	'open-triangle': { size: 0.65, stroke: 1.6 },
 };

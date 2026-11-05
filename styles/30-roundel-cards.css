@@ -14,7 +14,6 @@
 .dynasty-lod-compact .dynasty-card-r1 .dynasty-card-full > .dynasty-card-title,
 .dynasty-lod-compact .dynasty-card-r1 .dynasty-card-full > .dynasty-card-dates,
 .dynasty-lod-compact .dynasty-card-r1 .dynasty-card-full > .dynasty-card-relation,
-.dynasty-lod-compact .dynasty-card-r1 .dynasty-card-full > .dynasty-card-foot-line,
 .dynasty-lod-compact .dynasty-card-r1 .dynasty-card-full > .dynasty-sign,
 .dynasty-lod-compact .dynasty-card-r1 .dynasty-card-full > .dynasty-r1-tab-group,
 .dynasty-lod-compact .dynasty-card-r1 .dynasty-card-full > .dynasty-ordinal-tab-group {
@@ -44,13 +43,6 @@
 .dynasty-card-r1 .dynasty-card-relation,
 .dynasty-card-r1 .dynasty-card-compact {
 	text-anchor: middle;
-}
-
-/* The foot: a hairline over the relation word. It has no band behind it (there is no footer plate). It takes no press. */
-.dynasty-card-foot-line {
-	stroke: var(--background-modifier-border);
-	stroke-width: 1;
-	pointer-events: none;
 }
 
 /*

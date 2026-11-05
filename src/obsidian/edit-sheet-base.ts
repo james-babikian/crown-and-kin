@@ -12,21 +12,23 @@ import type { PersonFolds } from '../core/folds';
 import { sameCropText } from '../core/portrait-crop';
 import { holdLayoutOnPress } from '../render/dom/press-hold';
 import { NEW_SHEET, SHEET, WRITE_TEXT } from '../render/ui-text';
-import type { Handle, Written } from './block-handle';
+import type { Handle, LabelSource, Written } from './block-handle';
 import type { ViewKind } from '../view/block-state';
 import type { ParentLink, PartnerLink } from '../core/family-query';
 import type { RelationOptions } from '../core/relations';
 import type { FlowHost, NewRelation } from './family-flows';
 import { ignoreGhostClick, phoneLayout, startWithoutFocus } from './modal-layout';
 import type { PictureCopy, PictureStore } from './picture-store';
-import { revealFocused as revealInWindow, showErrorLine } from './sheet-parts';
+import { clearFieldError, fieldError, revealFocused as revealInWindow } from './sheet-parts';
 import type { RelationView } from './sheet-relation';
 import type { TitlesHost } from './sheet-titles';
 import type { Shell } from './window-shell';
 import type { SectionsView } from './window-sections';
-import { RowPictures } from './window-parts';
+import { RowPictures, confirmBox } from './window-parts';
 import { trackModal } from '../view/plugin-modals';
+import { guarded } from './start-guard';
 import { TEXT_FIELDS, NEW_HOUSE, blankHouse, type Draft, type Loaded } from '../view/sheet-draft';
+import { noticeText } from '../render/dom/name-marks';
 
 /** What the tree view gives the sheet for Hide descendants, Show descendants and the unfold after a write. */
 export interface SheetFolds {
@@ -95,6 +97,15 @@ export type NewSheetOptions = SheetBase & { newPerson: NewRelation; personId?: u
 /** How the sheet was opened: for a person already in the tree, or for a new one. */
 export type SheetOptions = PersonSheetOptions | NewSheetOptions;
 
+/**
+ * What a write says besides its ops. `label`: what it changed, for the words after an Undo (D330 UX-17). `keepList`: the phone list stays on the person of this
+ * window, not on the person that the write highlights (O-09b: Add partner and Add child); nothing sets it yet.
+ */
+export interface WriteExtra {
+	label?: LabelSource;
+	keepList?: boolean;
+}
+
 /** A write of a relationship action; `withFields`: it also saved field changes of the draft. */
 export type DraftWritten = Written & { withFields: boolean };
 
@@ -145,7 +156,6 @@ export abstract class EditSheetBase extends Modal {
 	protected confirmEl: HTMLElement | null = null;
 	/** The control that had the focus when a question opened; the focus goes back to it when the question closes. */
 	protected confirmFrom: HTMLElement | null = null;
-	protected errorEl: HTMLElement | null = null;
 	protected statusEl: HTMLElement | null = null;
 	protected bodyEl: HTMLElement | null = null;
 	/** The text line under the header for a problem with the portrait, and what the round portrait showed last (so a repaint that changes nothing leaves it alone). */
@@ -209,6 +219,8 @@ export abstract class EditSheetBase extends Modal {
 	protected changeEl: HTMLElement | null = null;
 	/** An Undo of the text line runs now: a second tap does nothing. */
 	protected changeBusy = false;
+	/** O-13: this window wrote something to the note (an Add action, a mark, a type change): the left button reads "Close", not "Cancel". */
+	protected wrote = false;
 	/** B1: this window wrote in place and set `listHold` on the block, so it ends the hold when it closes (and its last write has ended). */
 	protected holdsList = false;
 	/** Called when the same-name question goes away without a choice; it settles the question as Cancel. */
@@ -272,11 +284,7 @@ export abstract class EditSheetBase extends Modal {
 	/** The one guard of every button, link and row of the window: nothing runs while a write runs, and a failing action never leaves an exception (spec §8). */
 	protected press(run: () => void): void {
 		if (this.saving) return;
-		try {
-			run();
-		} catch (e) {
-			console.error('Crown and Kin: the sheet action failed', e);
-		}
+		guarded('the sheet action failed', run);
 	}
 
 	/** Runs the cleanup functions `onOpen` registered and empties the modal. */
@@ -300,11 +308,7 @@ export abstract class EditSheetBase extends Modal {
 		this.contentEl.empty();
 		// The window that started this one rebuilt itself after the write, so the control that had the focus there is gone.
 		this.o.parentSheet?.childClosed();
-		try {
-			this.o.onClosed?.();
-		} catch (e) {
-			console.error('Crown and Kin: cannot give the focus back', e);
-		}
+		guarded('cannot give the focus back', () => this.o.onClosed?.());
 	}
 
 	/** Esc, the X button, a press outside and Android back all come here (spec §6.3). */
@@ -385,13 +389,28 @@ export abstract class EditSheetBase extends Modal {
 		revealInWindow(this.modalEl, this.contentEl, delay);
 	}
 
-	protected showError(text: string): void {
+	/**
+	 * The one rule for an error (D330 W-02, CX-11): an error about one field stands under that field and the field takes the error edge; an error about
+	 * the whole window stands under the header. The header never moves. A window that the user is not using (the window under a new-person window) keeps the focus where it is.
+	 */
+	protected showError(text: string, field?: HTMLElement | null): void {
 		this.lastError = text;
-		showErrorLine(this.errorEl, text);
+		if (field) {
+			const active = this.modalEl.doc.activeElement;
+			fieldError(field, text, { focus: !active || active === this.modalEl.doc.body || this.modalEl.contains(active) });
+			return;
+		}
+		this.shell?.windowError(text);
+	}
+
+	/** The field of a form by its `data-field` name, or null (a closed or missing part). */
+	protected fieldInput(name: string): HTMLElement | null {
+		return this.contentEl.querySelector<HTMLElement>(`[data-field="${name}"] input`);
 	}
 
 	protected clearError(): void {
-		this.errorEl?.hide();
+		this.shell?.clearWindowError();
+		for (const f of Array.from(this.bodyEl?.querySelectorAll<HTMLElement>('[aria-invalid="true"]') ?? [])) clearFieldError(f);
 		if (this.status) {
 			this.status = '';
 			this.statusEl?.hide();
@@ -402,24 +421,23 @@ export abstract class EditSheetBase extends Modal {
 	protected showConfirm(c: ConfirmSpec): void {
 		this.hideConfirm();
 		this.rememberFocus();
-		const layer = this.modalEl.createDiv({ cls: 'dynasty-sheet-confirm', attr: { role: 'alertdialog', 'aria-modal': 'true' } });
-		this.confirmEl = layer;
-		const box = layer.createDiv({ cls: 'dynasty-sheet-confirm-box' });
-		const titleEl = box.createDiv({ cls: 'dynasty-sheet-confirm-title', text: c.title });
 		// The question has a name, like the questions of the Houses and Titles windows.
-		const titleId = `dynasty-sheet-confirm-${Math.random().toString(36).slice(2, 8)}`;
-		titleEl.setAttribute('id', titleId);
-		layer.setAttribute('aria-labelledby', titleId);
-		for (const t of c.text) box.createDiv({ cls: 'dynasty-sheet-confirm-text', text: t });
-		const row = box.createDiv({ cls: 'dynasty-sheet-confirm-actions' });
-		const keep = row.createEl('button', { cls: 'dynasty-sheet-keep', text: c.keep ?? SHEET.keepEditing, attr: { type: 'button' } });
-		const go = row.createEl('button', { cls: ['mod-warning', c.confirmCls], text: c.confirm, attr: { type: 'button' } });
-		keep.addEventListener('click', () => this.hideConfirm());
-		go.addEventListener('click', () => {
-			this.hideConfirm();
-			c.onConfirm();
-		});
-		keep.focus();
+		this.confirmEl = confirmBox(this.modalEl, {
+			title: c.title,
+			text: c.text,
+			labelled: 'dynasty-sheet-confirm',
+			buttons: [
+				{ label: c.keep ?? SHEET.keepEditing, cls: 'dynasty-sheet-keep', run: () => this.hideConfirm() },
+				{
+					label: c.confirm,
+					cls: ['mod-warning', c.confirmCls],
+					run: () => {
+						this.hideConfirm();
+						c.onConfirm();
+					},
+				},
+			],
+		}).layer;
 	}
 
 	protected hideConfirm(): void {
@@ -432,7 +450,7 @@ export abstract class EditSheetBase extends Modal {
 
 	/** Notes the control that has the focus now, so a question that closes with no choice can give it back. */
 	protected rememberFocus(): void {
-		const active = this.modalEl.doc?.activeElement as HTMLElement | null | undefined;
+		const active = this.modalEl.doc.activeElement as HTMLElement | null;
 		this.confirmFrom = active && this.contentEl.contains(active) ? active : null;
 	}
 
@@ -466,7 +484,7 @@ export abstract class EditSheetBase extends Modal {
 
 	/** The write did not happen: say so in a Notice and in the sheet, and keep the draft. */
 	protected refused(text: string): void {
-		new Notice(text);
+		new Notice(noticeText(text));
 		this.showError(text);
 	}
 
@@ -504,10 +522,11 @@ export abstract class EditSheetBase extends Modal {
 	protected abstract relationSig(): string;
 	abstract reload(body: string, id?: string): void;
 	protected abstract removeParent(link: ParentLink): Promise<void>;
-	protected abstract removedNotice(text: string, out: DraftWritten, was: string, undone?: string): void;
+	protected abstract removedNotice(text: string, out: DraftWritten, was: string): void;
+	protected abstract undoableNotice(text: string, out: DraftWritten, was: string, undone?: string): void;
 	protected abstract save(another?: boolean): Promise<void>;
 	protected abstract shownName(): string;
 	protected abstract titlesHost(): TitlesHost;
 	protected abstract updateNoteButton(): void;
-	protected abstract writeWithDraft(ops: Op[], highlight?: string | null, show?: 'build' | 'in-place'): Promise<DraftWritten | null>;
+	protected abstract writeWithDraft(ops: Op[], highlight?: string | null, show?: 'build' | 'in-place', extra?: WriteExtra): Promise<DraftWritten | null>;
 }

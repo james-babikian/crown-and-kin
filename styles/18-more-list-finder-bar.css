@@ -17,9 +17,9 @@
 	display: flex;
 	flex-wrap: wrap;
 	align-items: center;
-	gap: 0 8px;
+	gap: 0 var(--dynasty-space-2);
 	min-height: 44px;
-	padding: 0 4px 0 14px;
+	padding: 0 var(--dynasty-space-1) 0 14px;
 	background: var(--background-secondary);
 	border-bottom: 1px solid var(--background-modifier-border);
 	font-family: var(--font-interface);
@@ -40,7 +40,7 @@
 .dynasty-full .dynasty-result {
 	top: calc(max(0px, env(safe-area-inset-top)) + 44px);
 	padding-left: max(14px, env(safe-area-inset-left));
-	padding-right: max(4px, env(safe-area-inset-right));
+	padding-right: max(var(--dynasty-space-1), env(safe-area-inset-right));
 }
 
 /* Phone: the bar is at the bottom, so the banner is at the top, inside the safe area (spec §13.2). */
@@ -48,7 +48,7 @@
 .modal.dynasty-fullscreen.is-phone .dynasty-full .dynasty-result {
 	top: max(0px, env(safe-area-inset-top));
 	min-height: 52px;
-	padding: 4px max(0px, env(safe-area-inset-right)) 4px max(16px, env(safe-area-inset-left));
+	padding: var(--dynasty-space-1) max(0px, env(safe-area-inset-right)) var(--dynasty-space-1) max(var(--dynasty-space-4), env(safe-area-inset-left));
 }
 
 .dynasty-result-text {
@@ -81,7 +81,7 @@
 	min-height: 44px;
 	min-width: 44px;
 	height: auto;
-	padding: 0 8px;
+	padding: 0 var(--dynasty-space-2);
 	justify-content: center;
 	font-family: var(--font-interface);
 	font-size: var(--dynasty-type-control);

@@ -118,7 +118,7 @@ export function wasStopped(key: string, count: number, text: string): boolean {
 	return false;
 }
 
-/** Forgets every stopped draw (tests, and the plugin when it unloads). */
+/** Forgets every stopped draw (used by tests). */
 export function clearStops(): void {
 	stopped.clear();
 }

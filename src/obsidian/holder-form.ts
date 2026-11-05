@@ -10,12 +10,28 @@
  */
 
 import type { App } from 'obsidian';
-import { TITLES_UI } from '../render/ui-text';
-import { buildShell } from './window-shell';
+import { SHEET, TITLES_UI } from '../render/ui-text';
+import { buildShell, cancelLabelFor } from './window-shell';
 import { startWithoutFocus } from './modal-layout';
-import { nameDialog, sheetField, showErrorLine } from './sheet-parts';
+import { clearFieldError, fieldError, nameDialog, sheetField, uniqueId } from './sheet-parts';
+import { buildRow, confirmBox, iconLead } from './window-parts';
 import { SmallFormModal } from './small-form';
+import { guarded } from './start-guard';
 import { formResult, formStart, previewParts, rulerHint, type HolderFormFields, type HolderValues } from '../view/titles-draft';
+
+/**
+ * O-18: what an existing holder row used to keep in its three-dot menu. The form of an existing holder holds these four actions.
+ * The window runs `move` and `remove` on its draft; the form closes itself after each one.
+ */
+export interface HolderFormActions {
+	/** Show the card in the tree; absent for a holder who is not in the tree. */
+	show?: () => void;
+	/** Move the holder one place up (-1) or down (1); the form is closed after it. */
+	move: (dir: -1 | 1) => void;
+	canMoveUp: boolean;
+	canMoveDown: boolean;
+	remove: () => void;
+}
 
 /** What the holder form shows and where its values go. */
 interface HolderFormSpec {
@@ -29,6 +45,8 @@ interface HolderFormSpec {
 	personName?: string;
 	/** Ask for the name of a holder who is not in the tree. */
 	askName?: boolean;
+	/** The actions of an existing holder (O-18); absent for a new holder. */
+	actions?: HolderFormActions;
 	/** Ask for the name of a new title, with this text first; undefined: no title field. */
 	titleName?: string;
 	/**
@@ -42,6 +60,9 @@ interface HolderFormSpec {
 
 class HolderFormModal extends SmallFormModal {
 	private previewEl: HTMLElement | null = null;
+	private contextEl: HTMLElement | null = null;
+	private titleInput: HTMLInputElement | null = null;
+	private nameInput: HTMLInputElement | null = null;
 	private readonly start: HolderFormFields;
 	private readonly fields: HolderFormFields;
 	private readonly startTitle: string | undefined;
@@ -61,19 +82,27 @@ class HolderFormModal extends SmallFormModal {
 	override onOpen(): void {
 		this.openFrame('dynasty-holder-form');
 		const el = this.contentEl;
-		const shell = buildShell({ modalEl: this.modalEl, contentEl: el, title: this.spec.heading, titled: true, onCancel: () => this.finish(), onSave: () => void this.write() });
+		const shell = buildShell({
+			modalEl: this.modalEl,
+			contentEl: el,
+			title: this.spec.heading,
+			titled: true,
+			cancelLabel: cancelLabelFor('edit'),
+			// O-14: Cancel asks the question that Esc asks when a typed change would be lost.
+			discard: { dirty: () => this.dirty(), ask: () => this.close() },
+			onCancel: () => this.finish(),
+			onSave: () => void this.write(),
+		});
 		this.shell = shell;
 		nameDialog(this.modalEl, shell.titleEl);
 		const body = shell.body;
-		body.createDiv({ cls: ['dynasty-choice-text', 'dynasty-holder-context'], text: this.spec.context });
-		this.errorEl = body.createDiv({ cls: 'dynasty-sheet-error', attr: { role: 'alert' } });
-		this.errorEl.hide();
+		this.contextEl = body.createDiv({ cls: ['dynasty-choice-text', 'dynasty-holder-context'], text: this.spec.context });
 		if (this.titleName !== undefined) {
-			this.input(body, TITLES_UI.titleName, 'title-name', this.titleName, (v) => (this.titleName = v), { placeholder: TITLES_UI.namePlaceholder });
+			this.titleInput = this.input(body, TITLES_UI.titleName, 'title-name', this.titleName, (v) => (this.titleName = v), { placeholder: TITLES_UI.namePlaceholder });
 		}
 		let ruler: HTMLInputElement | null = null;
 		if (this.fields.name !== undefined) {
-			this.input(body, TITLES_UI.holderName, 'holder-name', this.fields.name, (v) => {
+			this.nameInput = this.input(body, TITLES_UI.holderName, 'holder-name', this.fields.name, (v) => {
 				this.fields.name = v;
 				// The empty ruler field shows the holder's name as its hint (§13.5, D131); typed text is never replaced.
 				ruler?.setAttribute('placeholder', rulerHint(undefined, v));
@@ -92,6 +121,7 @@ class HolderFormModal extends SmallFormModal {
 		this.tickBox(body);
 		this.previewEl = body.createDiv({ cls: 'dynasty-holder-preview', attr: { 'aria-live': 'polite' } });
 		this.updatePreview();
+		if (this.spec.actions) this.actionRows(body, this.spec.actions);
 		this.cleanup.push(startWithoutFocus(this.modalEl));
 	}
 
@@ -104,13 +134,13 @@ class HolderFormModal extends SmallFormModal {
 		box.checked = inTree && this.fields.throughSpouse === true;
 		box.disabled = !inTree;
 		row.createSpan({ cls: 'dynasty-sheet-label', text: TITLES_UI.holderTickLabel });
-		const hintId = `dynasty-holder-tick-hint-${Math.random().toString(36).slice(2, 8)}`;
+		const hintId = uniqueId('dynasty-holder-tick-hint');
 		// Under the box, always shown: a person who reads the label needs the meaning, and a name-only entry needs the reason.
 		field.createDiv({ cls: ['dynasty-sheet-hint'], text: inTree ? TITLES_UI.holderTickHint : TITLES_UI.holderTickDisabled, attr: { id: hintId } });
 		box.setAttribute('aria-describedby', hintId);
 		box.addEventListener('change', () => {
 			this.fields.throughSpouse = box.checked;
-			this.errorEl?.hide();
+			this.clearErrors();
 			this.updatePreview();
 		});
 	}
@@ -132,15 +162,67 @@ class HolderFormModal extends SmallFormModal {
 		input.value = value;
 		input.addEventListener('input', () => {
 			change(input.value);
-			this.errorEl?.hide();
+			this.clearErrors();
 			this.updatePreview();
 		});
 		return input;
 	}
 
+	/** UX-21: "X shows as: X" says nothing new when the two are equal, so the line goes then. */
 	private updatePreview(): void {
 		const p = previewParts(this.spec.personName, this.fields, this.spec.values);
-		this.previewEl?.setText(p.full ? TITLES_UI.preview(p.full, p.shown) : p.shown);
+		this.previewEl?.setText(p.full ? (p.full === p.shown ? '' : TITLES_UI.preview(p.full, p.shown)) : p.shown);
+		this.previewEl?.toggle(this.previewEl.getText() !== '');
+	}
+
+	/** Takes the errors of the two name fields and of the whole form away (CX-11). */
+	private clearErrors(): void {
+		if (this.titleInput) clearFieldError(this.titleInput);
+		if (this.nameInput) clearFieldError(this.nameInput);
+		this.shell?.clearWindowError();
+	}
+
+	/** O-18: Show the card, Move up, Move down and Remove, as rows at the end of the form. */
+	private actionRows(body: HTMLElement, a: HolderFormActions): void {
+		const rows = body.createDiv({ cls: ['dynasty-rows', 'dynasty-holder-actions'] });
+		const row = (icon: string, label: string, focus: string, run: () => void, o: { danger?: boolean; off?: boolean; late?: boolean } = {}): void => {
+			const r = buildRow(rows, {
+				tap: () => this.act(run, o.late === true),
+				cls: ['dynasty-action-row', `dynasty-holder-${focus}`, ...(o.danger ? ['is-danger', 'mod-warning'] : [])],
+				attr: { 'data-focus': focus },
+				chevron: false,
+				lead: (parent) => iconLead(parent, icon),
+			});
+			r.title.setText(label);
+			if (o.off) (r.row as HTMLButtonElement).disabled = true;
+		};
+		if (a.show) row('eye', TITLES_UI.showCardRow, 'show-card', a.show, { late: true });
+		row('arrow-up', TITLES_UI.moveEarlier, 'move-up', () => a.move(-1), { off: !a.canMoveUp });
+		row('arrow-down', TITLES_UI.moveLater, 'move-down', () => a.move(1), { off: !a.canMoveDown });
+		row('trash-2', TITLES_UI.remove, 'remove', a.remove, { danger: true });
+	}
+
+	/** Runs a holder action. A typed change in the form would be lost with it, so the form asks first, as for Esc. */
+	private act(run: () => void, late: boolean): void {
+		const go = () => {
+			// A change of the draft runs before the form closes, so the window draws the new draft. Showing the card runs after it: the window then closes or asks.
+			if (!late) run();
+			this.finish();
+			if (late) run();
+		};
+		if (!this.dirty()) {
+			go();
+			return;
+		}
+		const box = confirmBox(this.modalEl, {
+			title: SHEET.discardTitle,
+			text: [this.discardText()],
+			buttons: [
+				{ label: SHEET.keepEditing, cls: 'dynasty-sheet-keep', run: () => { box.layer.remove(); this.confirmEl = null; } },
+				{ label: SHEET.discard, cls: ['mod-warning', 'dynasty-sheet-discard'], run: go },
+			],
+		});
+		this.confirmEl = box.layer;
 	}
 
 	protected dirty(): boolean {
@@ -153,11 +235,11 @@ class HolderFormModal extends SmallFormModal {
 	private async write(): Promise<void> {
 		if (this.saving) return;
 		if (this.titleName !== undefined && this.titleName.trim() === '') {
-			showErrorLine(this.errorEl, TITLES_UI.needTitleName);
+			if (this.titleInput) fieldError(this.titleInput, TITLES_UI.needTitleName);
 			return;
 		}
 		if (this.fields.name !== undefined && this.fields.name.trim() === '') {
-			showErrorLine(this.errorEl, TITLES_UI.needHolderName);
+			if (this.nameInput) fieldError(this.nameInput, TITLES_UI.needHolderName);
 			return;
 		}
 		const values = formResult(this.spec.values, this.spec.personName, this.fields);
@@ -169,7 +251,7 @@ class HolderFormModal extends SmallFormModal {
 				this.finish();
 				return;
 			}
-			showErrorLine(this.errorEl, message);
+			this.shell?.windowError(message, this.contextEl);
 		} catch (e) {
 			console.error('Crown and Kin: cannot save the holder', e);
 		} finally {
@@ -184,11 +266,7 @@ class HolderFormModal extends SmallFormModal {
 
 	override onClose(): void {
 		super.onClose();
-		try {
-			this.spec.closed?.();
-		} catch (e) {
-			console.error('Crown and Kin: cannot return the focus', e);
-		}
+		guarded('cannot return the focus', () => this.spec.closed?.());
 	}
 }
 

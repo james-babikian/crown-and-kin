@@ -5,6 +5,7 @@
 
 import { setIcon } from 'obsidian';
 import type { FamilyGraph } from '../core/derive';
+import { setNameText } from '../render/dom/name-marks';
 import { finderSentence, stepSentences } from '../render/tree-info';
 import { FINDER_UI, SUCCESSION_UI } from '../render/ui-text';
 import type { BlockState, FinderState } from '../view/block-state';
@@ -34,11 +35,11 @@ export abstract class TreeViewFinder extends TreeViewActions {
 		const bar = viewport.createDiv({ cls: ['dynasty-result', ...(this.barKind() === 'phone' ? ['dynasty-result-phone'] : [])], attr: { role: 'group', 'aria-labelledby': id } });
 		// After the toolbar and before the cards in the Tab order (spec §5.2).
 		viewport.insertBefore(bar, before);
-		bar.createDiv({ cls: 'dynasty-result-text', text: finderSentence(whole, result, f.index), attr: { id, role: 'status', tabindex: -1 } });
+		setNameText(bar.createDiv({ cls: 'dynasty-result-text', attr: { id, role: 'status', tabindex: -1 } }), finderSentence(whole, result, f.index));
 		const steps = result.kind === 'named' ? (result.relations[f.index]?.steps ?? []) : result.kind === 'chain' ? result.steps : [];
 		const list = bar.createEl('ol', { cls: 'dynasty-result-steps' });
 		const sentences = stepSentences(whole, steps);
-		for (const t of sentences.shown) list.createEl('li', { text: t });
+		for (const t of sentences.shown) setNameText(list.createEl('li'), t);
 		if (sentences.more) list.createEl('li', { cls: 'dynasty-result-more-steps', text: FINDER_UI.moreSteps(sentences.more) });
 		list.toggle(f.steps);
 		const row = bar.createDiv({ cls: 'dynasty-result-buttons' });
@@ -160,7 +161,7 @@ export abstract class TreeViewFinder extends TreeViewActions {
 		const bar = viewport.createDiv({ cls: ['dynasty-result', 'dynasty-succession-bar', ...(this.barKind() === 'phone' ? ['dynasty-result-phone'] : [])], attr: { role: 'group', 'aria-labelledby': id } });
 		// After the toolbar and before the cards in the Tab order, like the finder's bar.
 		viewport.insertBefore(bar, before);
-		bar.createDiv({ cls: ['dynasty-result-text', 'dynasty-succession-text'], text: d.sentence, attr: { id, role: 'status', tabindex: -1 } });
+		setNameText(bar.createDiv({ cls: ['dynasty-result-text', 'dynasty-succession-text'], attr: { id, role: 'status', tabindex: -1 } }), d.sentence);
 		const row = bar.createDiv({ cls: 'dynasty-result-buttons' });
 		this.closeLink(row, 'dynasty-succession-close', SUCCESSION_UI.barClose, SUCCESSION_UI.barCloseLabel, () => this.closeSuccession());
 	}
@@ -179,12 +180,12 @@ export abstract class TreeViewFinder extends TreeViewActions {
 		if (!g || this.unloaded) return;
 		const st = this.ensureState();
 		const me = this.meId;
-		const a = await pickPerson(this.host.app, g, new Set(), FINDER_UI.placeholder, FINDER_UI.firstTitle, false, me, null, this.pickerContext());
+		const a = await pickPerson(this.host.app, g, new Set(), FINDER_UI.placeholder, FINDER_UI.firstTitle, false, me, null, { ...this.pickerContext(), titleOnPhone: true });
 		if (a?.kind !== 'person') {
 			this.guard(() => this.refocusTool('.dynasty-more'));
 			return;
 		}
-		const b = await pickPerson(this.host.app, g, new Set([a.id]), FINDER_UI.placeholder, FINDER_UI.secondTitle, false, me !== a.id ? me : null, null, this.pickerContext());
+		const b = await pickPerson(this.host.app, g, new Set([a.id]), FINDER_UI.placeholder, FINDER_UI.secondTitle, false, me !== a.id ? me : null, null, { ...this.pickerContext(), titleOnPhone: true });
 		if (b?.kind !== 'person') {
 			this.guard(() => this.refocusTool('.dynasty-more'));
 			return;

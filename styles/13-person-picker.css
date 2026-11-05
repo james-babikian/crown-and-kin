@@ -38,14 +38,15 @@
 	display: none;
 }
 
+/* L-03: the plus of the row "Create" is quiet: muted, regular, in a 20 px column as the chevron column of the picture list. */
 .dynasty-picker-swatch.is-new {
-	width: 32px;
+	width: 20px;
 	display: flex;
 	align-items: center;
 	justify-content: center;
 	background: transparent;
-	color: var(--interactive-accent);
-	font-weight: var(--font-semibold);
+	color: var(--dynasty-muted);
+	font-weight: var(--dynasty-weight-normal);
 	font-size: var(--dynasty-type-title);
 	border-radius: 0;
 }
@@ -53,6 +54,12 @@
 .dynasty-picker.is-phone .dynasty-picker-swatch {
 	width: 36px;
 	height: 36px;
+}
+
+/* P3-05: the quiet plus keeps its 20 px column on a phone; the 36 px of a portrait would push the Create text in by 16 px. */
+.dynasty-picker.is-phone .dynasty-picker-swatch.is-new {
+	width: 20px;
+	height: auto;
 }
 
 .dynasty-picker-text {
@@ -73,11 +80,13 @@
 	font-weight: var(--font-normal);
 }
 
-/* The first row, "Create a new person", is the plugin speaking, not a name: the interface font, the Control role. */
+/* The row "Create a new person" is the plugin speaking, not a name: the interface font, the Control role, in the text colour (L-03). */
 .dynasty-picker-new .dynasty-picker-name {
-	color: var(--interactive-accent);
+	color: var(--text-normal);
 	font-family: var(--font-interface);
 	font-size: var(--dynasty-type-control);
+	/* P3-06: "quiet" means regular; the base rule of a name is semibold. */
+	font-weight: var(--dynasty-weight-normal);
 }
 
 .dynasty-picker-sub {
@@ -102,8 +111,9 @@
 	flex: none;
 	display: flex;
 	align-items: center;
-	gap: var(--size-4-2);
-	padding: var(--size-4-3) var(--size-4-4) var(--size-4-1);
+	gap: var(--dynasty-space-2);
+	/* L-08: the title starts on the left edge of the typed text and the names (8 px in from the 16 px of the window). */
+	padding: var(--dynasty-space-3) var(--dynasty-space-4) var(--dynasty-space-1) calc(var(--dynasty-space-4) + var(--dynasty-space-2));
 }
 
 /* The title of the prompt: the Heading role, semibold. */
@@ -178,6 +188,38 @@
 }
 
 /*
+ * L-07: in the relation finder the title ("Select the first person") shows on a phone as one quiet line under the field, so the two steps do not look the same. The prompt grid gets a row for it.
+ * The selector has four classes, so it wins over the rules that hide the title and put the list in row 2.
+ */
+.prompt.dynasty-picker.is-phone.has-phone-title {
+	grid-template-rows: auto auto minmax(0, 1fr);
+}
+
+.dynasty-picker.is-phone.has-phone-title .dynasty-picker-head {
+	position: static;
+	grid-row: 2;
+	grid-column: 1 / -1;
+	width: auto;
+	height: auto;
+	margin: 0;
+	/* P3-04, F07: the hint starts on the edge of the names, 8 px in from the window padding, as the title of the other pickers (L-08). */
+	padding: var(--dynasty-space-2) max(var(--dynasty-space-4), env(safe-area-inset-right)) 0 calc(max(var(--dynasty-space-4), env(safe-area-inset-left)) + var(--dynasty-space-2));
+	overflow: visible;
+	clip-path: none;
+	white-space: normal;
+}
+
+.dynasty-picker.is-phone.has-phone-title .dynasty-sheet-title {
+	color: var(--dynasty-muted);
+	font-size: var(--dynasty-type-small);
+	font-weight: var(--dynasty-weight-normal);
+}
+
+.dynasty-picker.is-phone.has-phone-title .prompt-results {
+	grid-row: 3;
+}
+
+/*
  * Obsidian gives the pill 8 px of margin below. In a grid row that margin would put the middle of the row 4 px below the middle of the pill, and Cancel with it,
  * so the pill has no vertical margin, with a selector that a theme cannot beat, and the list takes the 8 px as padding (below). The sides keep Obsidian's inset.
  */
@@ -228,7 +270,7 @@
 	flex: 1 1 auto;
 	min-width: 0;
 	min-height: 44px;
-	padding: 0 4px 0 8px;
+	padding: 0 var(--dynasty-space-1) 0 var(--dynasty-space-2);
 	border: 0;
 	border-radius: 0;
 	background: transparent;
@@ -304,7 +346,7 @@
 .modal.dynasty-picture-picker .dynasty-picture-list {
 	display: grid;
 	grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
-	gap: 6px 8px;
+	gap: 6px var(--dynasty-space-2);
 }
 
 .modal.dynasty-picture-picker.is-phone .dynasty-picture-list {
@@ -317,7 +359,7 @@
 	justify-content: flex-start;
 	min-height: 0;
 	gap: 6px;
-	padding: 10px 4px 8px;
+	padding: 10px var(--dynasty-space-1) var(--dynasty-space-2);
 	text-align: center;
 	contain-intrinsic-size: auto 120px;
 }
@@ -336,7 +378,23 @@
 	contain-intrinsic-size: auto 44px;
 }
 
+/* P3-07: the action rows start on the edge of a folder row at depth 0 (8 px); the shorthand `padding` of the picker row above would give them 4 px. */
+.modal.dynasty-picture-picker .dynasty-picture-row.dynasty-picture-device,
+.modal.dynasty-picture-picker .dynasty-picture-row.dynasty-picture-remove {
+	padding-left: var(--dynasty-space-2);
+}
+
+/* P3-09: the empty sentence is the Text role, on the edge of the row texts (row padding, the 20 px icon column and the 6 px gap). */
+.modal.dynasty-picture-picker .dynasty-picture-none {
+	/* The icon column (20 px) and the gap (6 px) of a row, as one length. */
+	--dynasty-picture-lead: 26px;
+	padding-left: calc(var(--dynasty-space-2) + var(--dynasty-picture-lead));
+	font-size: var(--dynasty-type-text);
+}
+
+/* D325, L-01: a folder inside a folder steps in, 16 px for each depth (8 px at depth 0). The shorthand `padding` of the picker row above would reset the step, so it is written here again. */
 .modal.dynasty-picture-picker .dynasty-picture-row.dynasty-picture-folder-row {
+	padding-left: calc(var(--dynasty-space-2) + var(--dynasty-picker-depth, 0) * var(--dynasty-space-4));
 	margin-top: 10px;
 	border-bottom: 1px solid var(--background-modifier-border);
 	border-radius: 0;
@@ -402,12 +460,13 @@
 	font-size: var(--dynasty-type-small);
 }
 
+/* L-09: the icon column of the action rows is 20 px, as the chevron column of the folder rows, so the words stand on one edge. */
 .modal.dynasty-picture-picker .dynasty-picture-plus {
+	width: 20px;
 	font-size: var(--dynasty-type-title);
 }
 
-.modal.dynasty-picture-picker .dynasty-picture-folder,
-.modal.dynasty-picture-picker .dynasty-picture-none {
+.modal.dynasty-picture-picker .dynasty-picture-folder {
 	font-size: var(--dynasty-type-small);
 }
 

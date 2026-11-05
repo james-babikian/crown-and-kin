@@ -20,7 +20,7 @@
 	display: flex;
 	flex-wrap: wrap;
 	align-items: center;
-	gap: 0 var(--size-4-2);
+	gap: 0 var(--dynasty-space-2);
 	min-width: 0;
 	color: var(--text-normal);
 	font-size: var(--dynasty-type-text);
@@ -46,10 +46,10 @@
 	width: auto;
 	min-width: 44px;
 	min-height: 44px;
-	padding: 0 var(--size-4-3);
+	padding: 0 var(--dynasty-space-3);
 	background: var(--interactive-normal);
 	/* I39: the edge of a button reaches 3:1 on the window. */
-	border: 1px solid var(--dynasty-btn-edge);
+	border: var(--dynasty-button-edge);
 	box-shadow: none;
 	color: var(--text-normal);
 	font-size: var(--dynasty-type-control);
@@ -68,41 +68,59 @@
 	overflow-y: auto;
 }
 
+/*
+ * D330 O-11: the ID field is a field like the others: the label above it, then the field, the reason that the id is refused right under the field (the error edge of
+ * 01-base.css), the link "Make ID from the name", and the help under the link.
+ */
 .dynasty-id-row {
 	display: flex;
 	flex-direction: column;
 	align-items: stretch;
-	gap: var(--size-4-1);
+	gap: var(--dynasty-space-1);
 }
 
-.dynasty-id-field {
-	display: flex;
-	align-items: center;
-	gap: var(--size-4-3);
-	min-height: 44px;
-}
-
-.dynasty-sheet .dynasty-id-field .dynasty-sheet-input {
-	flex: 1 1 auto;
-	width: auto;
-	min-width: 6em;
-	min-height: 44px;
-}
-
+/* F04: the size and the ring of a link as "Add portrait or arms" has them: 6 px inside the ring, and the same space taken back at the start, so the letters stand on the edge of the field. */
 .dynasty-sheet .dynasty-id-row .dynasty-id-make {
-	width: 100%;
+	align-self: flex-start;
+	min-height: 22px;
+	/* token-allow: the ring of the link of the window, as .dynasty-add-portrait has it (6 px), and the same space taken back */
+	padding: 0 6px;
+	/* token-allow: the 6 px of the ring above */
+	margin-inline-start: -6px;
+	font-size: var(--dynasty-type-control);
+}
+
+.dynasty-id-row .dynasty-sheet-hint {
+	margin-top: var(--dynasty-space-1);
+}
+
+/*
+ * F01: on a touch screen the link keeps a tap box of 44 px, but its text stands at the top of the box and the extra 22 px are below it, so the box never
+ * reaches up into the field (it began 7 px inside the field before). The negative margin gives the extra height back to the space under the link, and
+ * `position: relative` keeps the box above the help text that it overlaps there. Box: top = top of the text, height 44, margin below = 22 - 44.
+ */
+@media (pointer: coarse) {
+	.dynasty-sheet .dynasty-id-row .dynasty-id-make {
+		display: flex;
+		align-items: flex-start;
+		position: relative;
+		min-height: 44px;
+		/* token-allow: the text line of the link (22 px); the tap box is 44 px high */
+		line-height: 22px;
+		/* token-allow: the text line (22 px) less the tap box (44 px): the extra height overlaps the space under the link */
+		margin-block: 0 -22px;
+	}
+}
+
+.dynasty-sheet.is-phone .dynasty-id-row .dynasty-id-make {
+	display: flex;
+	align-items: flex-start;
+	position: relative;
 	min-height: 44px;
-	border: 1px solid var(--dynasty-btn-edge);
-	box-shadow: none;
-}
-
-.dynasty-id-problem {
-	color: var(--dynasty-error);
-	font-size: var(--dynasty-type-text);
-}
-
-.dynasty-sheet .dynasty-id-input[aria-invalid='true'] {
-	border-color: var(--dynasty-error);
+	/* token-allow: the text line of the link (22 px); the tap box is 44 px high */
+	line-height: 22px;
+	/* token-allow: the text line (22 px) less the tap box (44 px): the extra height overlaps the space under the link */
+	margin-block: 0 -22px;
 }
 
 .dynasty-id-window .dynasty-id-use:disabled {
@@ -118,8 +136,8 @@
 .modal.dynasty-sheet.dynasty-id-window.is-phone {
 	height: auto;
 	max-height: var(--dynasty-sheet-height, 100%);
-	border-radius: 0 0 var(--radius-l) var(--radius-l);
-	border-bottom: 1px solid var(--background-modifier-border);
+	border-radius: 0 0 var(--dynasty-radius-window) var(--dynasty-radius-window);
+	border-bottom: var(--dynasty-hairline);
 	box-shadow: var(--shadow-l);
 	/* Obsidian slides a phone modal by its own height (a bottom sheet) with an inline transform and
 	   transition. This is a top sheet, so the slide shows as a jump. An inline style loses only to !important. */
@@ -128,7 +146,7 @@
 }
 
 .dynasty-id-window.is-phone .dynasty-sheet-body {
-	padding-bottom: var(--size-4-3);
+	padding-bottom: var(--dynasty-space-3);
 }
 
 /* phone-B: picker */

@@ -1,4 +1,4 @@
-// The judge of the third class of far couple (spec §5.3, D303, the architecture notes A15), read from a finished layout and not from the plan: a couple on two
+// The judge of the third class of far couple (spec §5.3, D303), read from a finished layout and not from the plan: a couple on two
 // rows whose lower partner stands inside a unit (the cards on both sides of it are joined to it by bars) is far by structure, whatever the distance. The
 // judges of D11 (`farProblems` in an internal script, `farRuleProblems` in the sideways checks, the stage tests) accept such a couple as far and expect it to be far.
 // It is written from the rule, not from `isFarByStructure` of src/layout/layout.ts, so that a mistake in the plan shows.

@@ -94,7 +94,7 @@ describe('planInsert', () => {
 		expect(containerPrefix('-      x').rest).toBe('  ');
 	});
 
-	it('a plain indented line is no container: the fence is not indented (the decision notes WP6.3 fix round)', () => {
+	it('a plain indented line is no container: the fence is not indented', () => {
 		expect(containerPrefix('   text')).toEqual({ first: '', rest: '' });
 		expect(containerPrefix('> ')).toEqual({ first: '> ', rest: '> ' });
 		expect(containerPrefix('>     text')).toEqual({ first: '> ', rest: '> ' });
@@ -162,7 +162,7 @@ describe('insertTree in an editor', () => {
 		expect(s.cursor).toEqual({ line: blocks[1].closeLine! + 1, ch: 1 });
 	});
 
-	it('in a code block that never closes: the tree goes above its opening fence (review 0.1.1 E)', () => {
+	it('in a code block that never closes: the tree goes above its opening fence', () => {
 		const s = run('Intro\n```js\nlet a = 1;', { line: 2, ch: 3 });
 		expect(s.text).toBe(['Intro', '```kin', HINT, '```', '', '```js', 'let a = 1;'].join('\n'));
 		const b = expectOneEmptyTree(s.text);
@@ -176,7 +176,7 @@ describe('insertTree in an editor', () => {
 		expect(s.cursor).toEqual({ line: 4, ch: 1 });
 	});
 
-	it('in the note properties: the tree goes after them, and they do not change (review 0.1.1 E)', () => {
+	it('in the note properties: the tree goes after them, and they do not change', () => {
 		for (const close of ['---', '...']) {
 			const s = run(`---\ntitle: Valmont\n${close}\nBody`, { line: 1, ch: 3 });
 			expect(s.text).toBe(['---', 'title: Valmont', close, '```kin', HINT, '```', '', 'Body'].join('\n'));

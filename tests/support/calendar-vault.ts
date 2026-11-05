@@ -1,4 +1,4 @@
-// A fake vault for the calendar index tests (WP-4 step 4.3; 0.4 WP-3a): notes in a map, events by hand, a metadata cache that is ready when the test says so.
+// A fake vault for the calendar index tests: notes in a map, events by hand, a metadata cache that is ready when the test says so.
 // Since D289 the vault has no list of notes and no section state: the host gives the list of calendar notes (`IndexOptions.notes`), and the event 'cache' brings the text.
 import type { CalendarVault } from '../../src/view/calendar-index';
 

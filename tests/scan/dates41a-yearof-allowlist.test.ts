@@ -8,7 +8,7 @@ import { codeOf, read, tsFiles } from '../support/scan';
 const STILL_READING: string[] = [];
 const HOME = ['src/core/succession-keys.ts', 'src/core/dates.ts'];
 
-describe('yearOf allow-list (the architecture notes §5.7)', () => {
+describe('yearOf allow-list', () => {
 	const users = tsFiles('src').filter((f) => /\byearOf\b/.test(codeOf(read(f))));
 
 	it('no file outside the allow-list names yearOf', () => {

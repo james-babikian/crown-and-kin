@@ -32,7 +32,7 @@ function isDateShape(text: string): boolean {
 
 function compute(text: string, reader: DateReader): number | undefined {
 	const r = reader.read(text);
-	if (!r || r.year === undefined || r.approx || r.dual || r.samePlace || r.warnings.length) return undefined;
+	if (r?.year === undefined || r.approx || r.dual || r.samePlace || r.warnings.length) return undefined;
 	if (r.source === 'calendar') return isExactCalendarRead(r) ? r.year : undefined;
 	// A plain year that the reader set `whole` is a bare year with names of the year list after it.
 	return r.source === 'plain' && (r.whole || isDateShape(text)) ? r.year : undefined;

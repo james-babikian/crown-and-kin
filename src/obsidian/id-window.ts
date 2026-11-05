@@ -16,7 +16,7 @@ import { nameDialog } from './sheet-parts';
 import { buildShell, type Shell } from './window-shell';
 
 /** What the Houses window or the Titles window gives the small window. */
-export interface IdWindowSpec {
+interface IdWindowSpec {
 	kind: IdKind;
 	/** The name of the house or title, for the title and the accessible names. */
 	item: string;
@@ -57,6 +57,8 @@ class IdWindow extends Modal {
 			modalEl: this.modalEl,
 			contentEl: el,
 			title: ID_UI.windowTitle(s.item),
+			// A computer window shows its title, as the other plugin windows do (D330 O-11, O-32); the phone bar shows it as before.
+			titleRole: 'tool',
 			titled: true,
 			saveLabel: ID_UI.use,
 			onCancel: () => this.close(),
@@ -66,8 +68,9 @@ class IdWindow extends Modal {
 		});
 		this.shell = shell;
 		nameDialog(this.modalEl, shell.titleEl);
+		// CX-18: the phone bar shows the title on one text line with an ellipsis.
+		if (shell.bar) shell.titleEl.addClass('dynasty-bar-line');
 		const body = shell.body;
-		body.createDiv({ cls: ['dynasty-sheet-hint'], text: ID_UI.hint(s.kind) });
 		let use: HTMLButtonElement | null = shell.save;
 		const refresh = (value: string) => {
 			const why = s.check(value);
@@ -79,6 +82,7 @@ class IdWindow extends Modal {
 			item: s.item,
 			value: s.value,
 			problem: '',
+			hint: ID_UI.hint(s.kind),
 			onInput: refresh,
 			onMake: () => {
 				const made = s.make();

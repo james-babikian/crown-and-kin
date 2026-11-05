@@ -7,7 +7,7 @@ import { createPictureStore, type CopyBox, type PictureCopy, type PictureIO } fr
 import { ARMS_GAP_CLASS, type PictureSlot } from '../../src/render/dom/pictures';
 import { FEl, resetDom } from '../acceptance/fake-dom';
 import { resetObsidian } from '../acceptance/fake-obsidian';
-import { pngHead } from '../acceptance/m9-support';
+import { pngHead } from '../acceptance/picture-sample-support';
 import { useFakeDom } from '../support/fake-dom-setup';
 
 /*

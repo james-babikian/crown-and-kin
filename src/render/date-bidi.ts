@@ -61,7 +61,7 @@ const ISOLATE_ENDS = new RegExp(`[${BIDI_FSI}${BIDI_PDI}]+`, 'g');
 export function marksForSvg(text: string, wholeLine?: boolean): string;
 export function marksForSvg(text: string | undefined, wholeLine?: boolean): string | undefined;
 export function marksForSvg(text: string | undefined, wholeLine = false): string | undefined {
-	if (text === undefined || !text.includes(BIDI_FSI)) return text;
+	if (!text?.includes(BIDI_FSI)) return text;
 	let out = text.replace(ISOLATE_ENDS, BIDI_LRM);
 	if (wholeLine) out = (out.startsWith(BIDI_LRM) ? '' : BIDI_LRM) + out + (out.endsWith(BIDI_LRM) ? '' : BIDI_LRM);
 	return out;

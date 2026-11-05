@@ -78,7 +78,7 @@ describe('the key table and the write-order lists of the code', () => {
 		}
 	});
 
-	it('reserves exactly options.format, numbering and count-with (E.2)', () => {
+	it('reserves exactly options.format, numbering and count-with', () => {
 		expect(KEYS.filter((x) => x.reserved).map((x) => `${x.section}.${x.key}`)).toEqual(['options.format', 'titles.numbering', 'titles.count-with']);
 	});
 });
@@ -313,7 +313,7 @@ describe('the generated files', () => {
 		expect(formatDoc()).toContain('Since version 0.5, the partnership key `ended-by`');
 	});
 
-	it('the README has the two sentences of the contract (E.5), as the clarity-editor checked them', () => {
+	it('the README has the two sentences of the contract', () => {
 		expect(readme).toContain('Keep an empty text line or a heading above a tree. If a tree is the first thing in a note, Live Preview opens the note with the cursor in the tree. Then you see the text of the tree, not the tree. To see the tree, move the cursor out of the tree.');
 		expect(readme).toContain('If you use the same vault on two devices, wait until the sync is complete before you edit a tree on the other device. If you do not wait, the other device changes an old copy of the note, and the sync can lose one of the two edits.');
 	});
@@ -329,7 +329,7 @@ describe('the generated files', () => {
 	});
 });
 
-describe('what the table says about hand-typed forms (fix round of G2)', () => {
+describe('what the table says about hand-typed forms', () => {
 	const read = (text: string) => {
 		const r = parseDynasty(text);
 		if (!r.ok) throw new Error('does not parse');

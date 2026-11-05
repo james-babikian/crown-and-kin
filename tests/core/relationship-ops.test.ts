@@ -1,18 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import { deriveFamilies } from '../../src/core/derive';
-import type { EditResult, Op } from '../../src/core/edit';
+import type { Op } from '../../src/core/edit';
 import { parseDynasty, textWithoutComments } from '../../src/core/parse';
 import { familyOf } from '../../src/core/family-query';
 import { applyOp } from '../../src/core/yaml-edit';
 import { nextIdFor } from '../support/helpers';
+import { body } from '../support/edit-body';
 
 // Unit tests for the relationship ops (spec §6.2–§6.8) on YAML the golden files do not cover:
 // flow-map people, flow lists, comments between items, CRLF, aliases, single-string parents.
 
-function body(r: EditResult): string {
-	if (!r.ok) throw new Error(`refused: ${r.code} ${r.detail ?? ''}`);
-	return r.body;
-}
 const edit = (src: string, op: Op) => body(applyOp(src, op));
 const code = (src: string, op: Op) => {
 	const r = applyOp(src, op);
@@ -171,7 +168,7 @@ describe('unions', () => {
 		expect(code(KIDS, { kind: 'edit-union', union: ref, fields: { type: 'handfast' } })).toBe('bad-value');
 	});
 
-	describe('refs carry the union text (the decision notes "Union references after WP3.3 review")', () => {
+	describe('refs carry the union text', () => {
 		const THREE = PAIR + '  - id: c\n    name: C\nunions:\n  - partners: [a, b]\n    start: 1100\n  - partners: [a, b]   # second\n    start: 1110\n  - partners: [a, b]\n    start: 1120\n';
 		const refs = () => familyOf(deriveFamilies(tree(THREE)), 'a')!.partners.map((l) => l.union!);
 
@@ -247,7 +244,7 @@ describe('parent links', () => {
 	});
 });
 
-describe('keys left stale by an op (the decision notes "Relationship-op details")', () => {
+describe('keys left stale by an op', () => {
 	const ADOPTED = PAIR + '  - id: c\n    name: C\n    parents: [a, {id: b, type: adoptive}]\n    placement: adoptive\n    notes: n\n';
 
 	it('placement goes with the last parent of its type, through remove-parent, set-parent-type and delete-person', () => {
@@ -367,7 +364,7 @@ describe('delete-person', () => {
 	});
 });
 
-describe('comment ownership (review round 1)', () => {
+describe('comment ownership', () => {
 	it('a deeper comment below an item is its own: removed with it, carried by a move; a comment at the dash column stays for the next item', () => {
 		const src = 'people:\n  - id: p\n  - id: a\n    parents: [p]\n    # about a\n  # about b\n  - id: b\n    parents: [p]\n';
 		expect(edit(src, { kind: 'delete-person', id: 'a' })).toBe('people:\n  - id: p\n  # about b\n  - id: b\n    parents: [p]\n');

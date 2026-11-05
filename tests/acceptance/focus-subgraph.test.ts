@@ -12,10 +12,10 @@ import { randomTree } from '../support/random-trees';
 
 // Spec §5.6 (focus mode: who is shown, + badges), §0 D2 (sibling order), D3 (focus mode for large
 // trees), D18 (the pin opens a focus tree), §8 (never throw), §9 (default 3 generations), and the
-// M5 contract in src/core/focus.ts (the decision notes "M5 contract").
+// M5 contract in src/core/focus.ts.
 //
 // Every expected family and every hidden count below is worked out by hand from the contract
-// (4a896b9, d10284b):
+// :
 // - core = the focus person, their siblings (other children of any of their parents, any type),
 //   ancestors up to n parent steps and descendants down to n parent steps (any parent type);
 // - add the partners of every core person in a listed union of any type (one step);
@@ -505,7 +505,7 @@ const implicitPairs = (tree: Tree) =>
 		.map((u) => [...u.partners].sort().join('+'))
 		.sort();
 
-describe('implicit co-parents come in only through a shown child (contract 618ddb7)', () => {
+describe('implicit co-parents come in only through a shown child', () => {
 	it('the tree has the implicit unions the tests rely on', () => {
 		expect(implicitPairs(IMPLICIT)).toEqual(['cp+cpo', 'cp+f', 'gm+gp', 'gp+gw2', 'k+ko']);
 	});
@@ -625,7 +625,7 @@ describe('implicit co-parents come in only through a shown child (contract 618dd
 });
 
 // ---------------------------------------------------------------------------------------------
-// Adopted from the WP5.1 code review (scratch/review-5.1, e89bacd), adjusted to contract 618ddb7.
+// Adopted from the WP5.1 code review, adjusted to contract 618ddb7.
 
 /** Placement parents that `deriveFamilies` gives each shown person, on the subgraph and on the whole tree. */
 function placements(tree: Tree, r: FocusSubgraphResult, who: string[]) {
@@ -637,7 +637,7 @@ function placements(tree: Tree, r: FocusSubgraphResult, who: string[]) {
 	};
 }
 
-describe('one parent-link rule: placed exactly as in the whole tree, or a root (contract 4a896b9)', () => {
+describe('one parent-link rule: placed exactly as in the whole tree, or a root', () => {
 	it('a partner whose father is shown and whose mother is not is a root, not drawn under the father alone', () => {
 		const tree = parse(`people:
   - {id: gf, name: GF, sex: m}
@@ -692,7 +692,7 @@ unions:
 	});
 });
 
-describe('review 5.1: a shown child is drawn where the whole tree draws it (contract 618ddb7)', () => {
+describe('a shown child is drawn where the whole tree draws it', () => {
 	it('f and q have k, k and r have m; focus f, n = 1: r is not in (m is out), and hidden counts r for k', () => {
 		const tree = parse(`people:
   - {id: f, name: F}
@@ -878,7 +878,7 @@ describe('never throws: cycles, dangling ids, malformed entries (§8)', () => {
 		expect(ids(r)).toEqual(['a', 'b', 'f']);
 		expect(parentsIn(r, 'f')).toEqual(['a']);
 		expect([...parentsIn(r, 'a'), ...parentsIn(r, 'b')]).toHaveLength(1);
-		// The dropped link never counts in hidden, although a and b are both inside (d10284b).
+		// The dropped link never counts in hidden, although a and b are both inside.
 		expect(hidden(r)).toEqual({});
 		expect(ids(run(tree, 'a', 1))).toEqual(['a', 'b', 'f']);
 		for (const n of [0, 1, 2, 3, 100]) for (const id of ['a', 'b', 'f']) expect(() => subgraph(tree, id, n)).not.toThrow();
@@ -1117,7 +1117,7 @@ describe('the model on every other tree, every focus person, n = 0 to 3', () => 
 });
 
 describe('fixture 7: every person as the focus (§5.6, §7.7, §8)', () => {
-	// Adopted from the G5 audit of M5 (scratch/g5-m5, 6fbb13e).
+	// Adopted from the G5 audit of M5.
 	it('a focus family is laid out separately and cached (§5.6, §7.7): the same family again is the cached result, another family a new layout', () => {
 		const lay = (id: string) => layoutTree(deriveFamilies(focusSubgraph(F7, id, 3)!.tree), geometry(), SETTINGS, FONT_FAMILY);
 		const a = lay('thea-valmont');
@@ -1202,7 +1202,7 @@ function placementProblems(tree: Tree): string[] {
 	return problems;
 }
 
-describe('every shown person with a parent shown is placed as in the whole tree (contract 4a896b9)', () => {
+describe('every shown person with a parent shown is placed as in the whole tree', () => {
 	const trees: [string, Tree][] = [
 		...allFixtures().map((f): [string, Tree] => [`sample tree ${f.id}`, parse(f.source)]),
 		['sample tree 07 without unions', F7_IMPLICIT],
@@ -1238,7 +1238,7 @@ describe('every shown person with a parent shown is placed as in the whole tree 
 });
 
 // ---------------------------------------------------------------------------------------------
-// Adopted from the WP5.1 review, round 2 (scratch/review-5.1-r2, de28dcc), as standing properties,
+// Adopted from the WP5.1 review, round 2, as standing properties,
 // with the exact results of contract 4a896b9 added to the named cases.
 
 /** People drawn under a placement couple (or one parent) that differs from the whole tree's. */
@@ -1280,7 +1280,7 @@ function withCycle(tree: Tree): Tree {
 	return { ...tree, people };
 }
 
-describe('review 5.1 round 2: nobody is placed differently from the whole tree (contract 4a896b9)', () => {
+describe('nobody is placed differently from the whole tree', () => {
 	it('a core person whose parent comes in only through the placement pass is a root, not under one parent of a couple', () => {
 		// f and s are children of q and r. d is their half-brother (q and w) and s is his guardian
 		// (ward). Focus f, n = 0: d has a parent (s) in the family, so the pass brings q and w.
@@ -1405,7 +1405,7 @@ unions:
 	}, 120_000);
 });
 
-describe('random trees: the exact rule and the placement property (contract 4a896b9)', () => {
+describe('random trees: the exact rule and the placement property', () => {
 	it('100 random trees with and without a parent cycle, n = 0 to 3: the exact family, parent links and hidden counts of the model', () => {
 		const out: string[] = [];
 		RANDOM.slice(0, 100).forEach((plain, i) => {

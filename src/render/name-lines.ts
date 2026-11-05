@@ -8,6 +8,7 @@
  * `nameLines` and `titleLines` stay for title text lines. Every search here is a binary search that
  * starts at the short end, so the cost of a very long name does not grow with its square (finding L5).
  */
+import { RTL_LETTER, needsBidiIsolate } from '../core/name-bidi';
 import type { NameLineCount, NameRoom } from '../layout/model';
 import { BIDI_FSI, BIDI_LRI, BIDI_LRM, BIDI_PDI, BIDI_RLI, BIDI_RLM, carryIsolates, truncateClosed } from './bidi-controls';
 import { listKey, type BreakList } from './break-words';
@@ -87,7 +88,7 @@ export const nameLines: NameLines = (name, width, measure, maxLines = 3) => {
  * too wide. A reign with no
  * title: the reign alone, on one text line. No title and no reign: no text line.
  */
-export type TitleLines = (title: string | undefined, reign: string | undefined, width: number, measure: (s: string) => number) => string[];
+type TitleLines = (title: string | undefined, reign: string | undefined, width: number, measure: (s: string) => number) => string[];
 
 /** D61: a title text line, with the reign after it, on one or two text lines; see `TitleLines`. */
 export const titleLines: TitleLines = (title, reign, width, measure) => {
@@ -145,7 +146,7 @@ export function syllableBreaks(word: string): number[] {
 export function breakPlaces(part: string, user?: BreakList): number[] {
 	const nfc = part.normalize('NFC');
 	const entry = user?.get(listKey(nfc));
-	if (entry && entry.length === Array.from(nfc).length) return [...entry.places];
+	if (entry?.length === Array.from(nfc).length) return [...entry.places];
 	return syllableBreaks(nfc);
 }
 
@@ -187,7 +188,7 @@ export function fitRuns(runs: readonly NameRun[], width: number, measure: NameMe
 		while (body.length && body[body.length - 1].ch === ' ') body.pop();
 		for (const c of [...body, { ch: '…', sob: body.length ? body[body.length - 1].sob : false }]) {
 			const last = out[out.length - 1];
-			if (last && last.sob === c.sob) last.text += c.ch;
+			if (last?.sob === c.sob) last.text += c.ch;
 			else out.push({ text: c.ch, sob: c.sob });
 		}
 		return out;
@@ -199,15 +200,12 @@ export function fitRuns(runs: readonly NameRun[], width: number, measure: NameMe
 /** The text of a name line from its pieces. */
 export const runsText = (runs: readonly NameRun[]) => runs.map((r) => r.text).join('');
 
-/** A letter of a script that is written from right to left (Hebrew, Arabic, Syriac, Thaana and the others, with the presentation forms). */
-const RTL_LETTER = /[\u0590-\u08ff\ufb1d-\ufdff\ufe70-\ufeff\u{10800}-\u{10fff}\u{1e800}-\u{1efff}]/u;
-
 /**
  * Whether a name needs the bidi isolate. An SVG text has the base direction of the page (left to right), so the closing curly mark of
  * a sobriquet after an Arabic or Hebrew name would stand at the far right. The isolate gives the name its own direction and leaves `direction` and `text-anchor`
  * alone, so the place of the line on the card does not change. A name with no right-to-left letter has none, and draws as before.
  */
-export const needsBidiIsolate = (text: string): boolean => RTL_LETTER.test(text);
+export { needsBidiIsolate };
 
 type Dir = 'L' | 'R';
 /** How a character counts here: a strong letter, a number, a combining mark (it goes with its letter), or neutral. */
@@ -466,6 +464,126 @@ export function isolateLines(lines: readonly (readonly NameRun[])[]): readonly (
 	return lines.map((runs, line) => drawLine(n, runs, line, lead[line], trail[line]));
 }
 
+/** Left-to-right embedding, right-to-left embedding and pop directional formatting: the controls that WebKit honours in an SVG text. */
+const EMBED_LRE = String.fromCharCode(0x202a);
+const EMBED_RLE = String.fromCharCode(0x202b);
+const EMBED_PDF = String.fromCharCode(0x202c);
+
+/** The direction that an FSI at `at` in `text` takes: the first strong letter after it, skipping the isolates inside (UAX #9, P2). Left to right when there is none. */
+function fsiDirection(text: readonly string[], at: number): Dir {
+	let depth = 0;
+	for (let i = at + 1; i < text.length; i++) {
+		const ch = text[i];
+		if (ch === BIDI_LRI || ch === BIDI_RLI || ch === BIDI_FSI) depth++;
+		else if (ch === BIDI_PDI) {
+			if (depth === 0) break;
+			depth--;
+		} else if (depth === 0) {
+			const k = bidiKind(ch);
+			if (k === 'L' || k === 'R') return k;
+		}
+	}
+	return 'L';
+}
+
+/** An Arabic-Indic digit (class AN), which counts as right to left for the neutrals next to it. */
+const isArabicNumber = (ch: string) => {
+	const cp = ch.codePointAt(0)!;
+	return (cp >= 0x660 && cp <= 0x669) || cp === 0x66b || cp === 0x66c;
+};
+
+/** The direction of one character for the neutrals next to it: a letter or a direction mark; 'number' for a digit (it takes the direction of the letter before it, UAX #9 W7); undefined for a neutral. */
+function strongAt(ch: string): Dir | 'number' | undefined {
+	if (ch === BIDI_LRM) return 'L';
+	if (ch === BIDI_RLM) return 'R';
+	const k = bidiKind(ch);
+	if (k === 'num') return isArabicNumber(ch) ? 'R' : 'number';
+	return k === 'L' || k === 'R' ? k : undefined;
+}
+
+/**
+ * One text line of an isolate name as the same text with embeddings: what each code point becomes. An isolate round a phrase is a neutral character of the
+ * name for UAX #9, and the neutrals next to it take their direction from the letters round the phrase (X before, Y after: that direction when both are the same,
+ * else the direction of the name). An embedding is a text of its own, so the neutrals next to it would see the phrase instead; a mark of the direction that the
+ * isolate gives them, on both sides of the phrase, keeps them as they are. The embedding of the whole name needs none, as nothing stands round it.
+ */
+function embeddedLine(chars: readonly string[]): string[] {
+	const out = chars.map((ch) => (ch === BIDI_LRI ? EMBED_LRE : ch === BIDI_RLI ? EMBED_RLE : ch === BIDI_PDI ? EMBED_PDF : ch));
+	// The code points that belong to the name itself (depth 1), and the phrases (depth 2) as pairs of their ends.
+	const scope: number[] = [];
+	const phrases: [number, number][] = [];
+	const open: number[] = [];
+	let base: Dir = 'L';
+	chars.forEach((ch, i) => {
+		const opener = ch === BIDI_LRI || ch === BIDI_RLI || ch === BIDI_FSI;
+		if (opener && open.length === 0) base = ch === BIDI_RLI ? 'R' : ch === BIDI_FSI ? fsiDirection(chars, i) : 'L';
+		if (ch === BIDI_FSI) out[i] = fsiDirection(chars, i) === 'R' ? EMBED_RLE : EMBED_LRE;
+		if (ch === BIDI_PDI && open.length > 0) {
+			const from = open.pop()!;
+			if (open.length === 1) phrases.push([from, i]);
+		}
+		if (opener) open.push(i);
+		if (open.length === 1 || (open.length === 2 && opener)) scope.push(i);
+	});
+	for (const [a, b] of phrases) {
+		// The letter before position `k` of the scope, or the direction of the name at its start.
+		const letterBefore = (k: number): Dir => {
+			for (let j = k - 1; j >= 0; j--) {
+				const s = strongAt(chars[scope[j]]);
+				if (s === 'L' || s === 'R') return s;
+			}
+			return base;
+		};
+		const side = (from: number, step: 1 | -1): Dir => {
+			for (let k = scope.indexOf(from) + step; k >= 0 && k < scope.length; k += step) {
+				const s = strongAt(chars[scope[k]]);
+				if (s === 'number') return letterBefore(k) === 'L' ? 'L' : 'R';
+				if (s) return s;
+			}
+			return base;
+		};
+		const x = side(a, -1);
+		const y = side(b, 1);
+		const mark = markOf(x === y ? x : base);
+		out[a] = mark + out[a];
+		out[b] = out[b] + mark;
+	}
+	return out;
+}
+
+/** Whether `text` holds an isolate control (a mark pair of a text table, or characters that a name from a note holds). */
+const hasIsolateMark = (text: string): boolean => /[\u2066-\u2069]/.test(text);
+
+/**
+ * A plain string for an SVG text: each isolate in it becomes the embedding of the same direction, as in `svgNameLines`, because WebKit ignores an isolate in an SVG
+ * text. A sentence of a text table that names a person (the bar sentence of a saved picture) goes through here. A text with no isolate control comes back as it is.
+ */
+export function svgText(text: string): string {
+	return hasIsolateMark(text) ? embeddedLine(Array.from(text)).join('') : text;
+}
+
+/**
+ * The text lines of a card name for an SVG text (spec §0 D322): `isolateLines` with each isolate turned into the embedding of the same direction (FSI by its first
+ * strong letter), as WebKit, the engine of iPhone and iPad, ignores an isolate in an SVG text and so shows a name that starts right to left and holds Latin letters
+ * in the other order. Both engines honour an embedding there. The embedding of the whole name gives the order the isolate gives, as the text has nothing round it;
+ * the phrases of a wrapped name get marks at their ends (`embeddedLine`). The controls have no width, so the width and the breaks stay as they are. A name with no
+ * right-to-left letter comes back as the same list. HTML texts keep `isolateLines`. The tests prove the order with a reference of UAX #9 and in WebKit.
+ */
+export function svgNameLines(lines: readonly (readonly NameRun[])[]): readonly (readonly NameRun[])[] {
+	const isolated = isolateLines(lines);
+	// A name that holds a first-strong isolate of its own (the note wrote U+2068) is turned too, as WebKit ignores that mark in an SVG text. Other controls of a left-to-right name stay as written.
+	if (isolated === lines && !lines.some((runs) => runsText(runs).includes(BIDI_FSI))) return lines;
+	return isolated.map((runs) => {
+		const out = embeddedLine(Array.from(runsText(runs)));
+		let at = 0;
+		return runs.map((r) => {
+			let text = '';
+			for (let i = 0; i < Array.from(r.text).length; i++) text += out[at++];
+			return { ...r, text };
+		});
+	});
+}
+
 /**
  * The text lines of a card name (D117, D122, D125, D127): `maxLines` at most (default 3). The name breaks at spaces; a word
  * wider than a text line breaks with a hyphen (`breakToken`). The sobriquet follows the name as one token in curly marks that
@@ -488,7 +606,7 @@ export function cardNameLines(name: string, sobriquet: string | undefined, room:
 		const runs: NameRun[] = [];
 		for (const t of line) {
 			const last = runs[runs.length - 1];
-			if (last && last.sob === t.sob) last.text += ` ${t.text}`;
+			if (last?.sob === t.sob) last.text += ` ${t.text}`;
 			else {
 				// The space between a bold part and a regular part belongs to the bold part.
 				if (last) last.text += ' ';

@@ -10,7 +10,7 @@ import { arrangeTree } from '../../src/layout/pipeline';
 import type { EdgeDrawing, EdgePath, FarCoupleRule, Rect, TreeLayout } from '../../src/layout/model';
 import { build, fixture } from '../support/helpers';
 
-// Review round 1 of WP1.3 (R1–R9, visual items 3.1, 4.1, 4.4) and the line invariants it asked for.
+// Review round 1 of WP1.3 (visual items 3.1, 4.1, 4.4) and the line invariants it asked for.
 
 const FIXTURES = ['01', '02', '03', '04', '05', '06', '07', '08', '10', '11'];
 const OPTIONS: [string, FarCoupleRule][] = [
@@ -161,8 +161,8 @@ describe('line invariants over every fixture and the three far-couple options', 
 	}
 });
 
-describe('review 1.3', () => {
-	it('R1: a near couple one generation apart in a one-column tree does not throw, and its leg misses every card', () => {
+describe('near couples and the legs of double-cousin couples', () => {
+	it('a near couple one generation apart in a one-column tree does not throw, and its leg misses every card', () => {
 		const src = 'people:\n  - {id: a, name: A}\n  - {id: b, name: B, parents: [a]}\nunions:\n  - partners: [a, b]\n';
 		const { layout, edges } = lay(src);
 		const a = layout.persons.get('a')!;
@@ -177,7 +177,7 @@ describe('review 1.3', () => {
 		for (const p of edges.paths) for (const s of segments(p.d)) expect(Math.max(s.x1, s.x2)).toBeLessThanOrEqual(layout.width);
 	});
 
-	it('R2: double-cousin couples: no leg runs through the other couple\'s dot, and no two legs lie on each other', () => {
+	it('double-cousin couples: no leg runs through the other couple\'s dot, and no two legs lie on each other', () => {
 		const src = `
 people:
   - {id: x1, name: X1}
@@ -197,13 +197,13 @@ people:
 		expect(overlaps(edges, (p) => COUPLE.has(p.kind))).toEqual([]);
 	});
 
-	it('R2: with a loose rule, fixture 7 still has no dot on a foreign line and no overlapping couple lines', () => {
+	it('with a loose rule, fixture 7 still has no dot on a foreign line and no overlapping couple lines', () => {
 		const { g, layout, edges } = lay(fixture('07'), { maxCardWidths: 8, maxGenerations: 1 });
 		expect(dotsOnForeignLines(g, layout, edges)).toEqual([]);
 		expect(overlaps(edges, (p) => COUPLE.has(p.kind))).toEqual([]);
 	});
 
-	it('R3: the cache misses when a child changes from birth to adoptive parents', () => {
+	it('the cache misses when a child changes from birth to adoptive parents', () => {
 		clearLayoutCache();
 		const birth = 'people:\n  - {id: a, name: A}\n  - {id: b, name: B}\n  - {id: c, name: C, parents: [a, b]}\n';
 		const adopt = 'people:\n  - {id: a, name: A}\n  - {id: b, name: B}\n  - {id: c, name: C, parents: [{id: a, type: adoptive}, {id: b, type: adoptive}]}\n';
@@ -214,7 +214,7 @@ people:
 		expect(cached.edges.paths.map((p) => p.kind)).toEqual(fresh.edges.paths.map((p) => p.kind));
 	});
 
-	it('R4: results are read-only, and a caller cannot change later results', () => {
+	it('results are read-only, and a caller cannot change later results', () => {
 		clearLayoutCache();
 		const src = 'people:\n  - {id: a, name: A}\n  - {id: b, name: B}\n  - {id: c, name: C, parents: [a, b]}\n';
 		const first = layoutTree(graph(src), NORMAL_GEOMETRY, DEFAULT_LAYOUT_SETTINGS, 'Inter');
@@ -228,7 +228,7 @@ people:
 		expect(layoutTree(graph(src), NORMAL_GEOMETRY, DEFAULT_LAYOUT_SETTINGS, 'Inter').layout.persons.get('c')!.x).toBe(x);
 	});
 
-	it('R5: a leg never shares a segment with a line leaving the same card', () => {
+	it('a leg never shares a segment with a line leaving the same card', () => {
 		// A has a child C by A alone and a childless union with their other child B.
 		const src = 'people:\n  - {id: a, name: A}\n  - {id: b, name: B, parents: [a]}\n  - {id: c, name: C, parents: [a]}\nunions:\n  - partners: [a, b]\n';
 		const { edges } = lay(src);
@@ -236,7 +236,7 @@ people:
 		expect(overlaps(edges)).toEqual([]);
 	});
 
-	it('R6: a far tag does not sit on a line that leaves the same card', () => {
+	it('a far tag does not sit on a line that leaves the same card', () => {
 		// P has a far wife W (three generations down) and a child C by P alone.
 		const src = `
 people:
@@ -253,7 +253,7 @@ unions:
 		expect(overlaps(edges)).toEqual([]);
 	});
 
-	it('N1: a couple trunk does not run on into a half-sibling drop', () => {
+	it('a couple trunk does not run on into a half-sibling drop', () => {
 		// P0 and P1 have P2; each also has a child alone (P5 by P0, P3 by P1). Seed 247 of the review fuzz.
 		const src = 'people:\n  - {id: p0, name: P0}\n  - {id: p1, name: P1}\n  - {id: p2, name: P2, parents: [p0, p1]}\n  - {id: p3, name: P3, parents: [p1]}\n  - {id: p4, name: P4}\n  - {id: p5, name: P5, parents: [p0]}\n';
 		const { g, layout, edges } = lay(src);
@@ -265,7 +265,7 @@ unions:
 		expect(dotsOnForeignLines(g, layout, edges)).toEqual([]);
 	});
 
-	it('N2: a far couple line does not start inside the tag of its own card', () => {
+	it('a far couple line does not start inside the tag of its own card', () => {
 		const src = `
 people:
   - {id: f, name: F}
@@ -290,7 +290,7 @@ people:
 		expect(linesThroughTags(layout, edges)).toEqual([]);
 	});
 
-	it('N3: more than 8 overlapping couple runs in one gap each get a lane', () => {
+	it('more than 8 overlapping couple runs in one gap each get a lane', () => {
 		const ppl = ['people:', '  - {id: x1, name: X1}', '  - {id: x2, name: X2}', '  - {id: y1, name: Y1}', '  - {id: y2, name: Y2}'];
 		for (let i = 0; i < 9; i++) ppl.push(`  - {id: p${i}, name: P${i}, parents: [x1, x2]}`);
 		for (let i = 0; i < 9; i++) ppl.push(`  - {id: q${i}, name: Q${i}, parents: [y1, y2]}`);
@@ -303,7 +303,7 @@ people:
 		expect(overlaps(edges)).toEqual([]);
 	});
 
-	it('R9: a loose far rule does not share a cache key with another', () => {
+	it('a loose far rule does not share a cache key with another', () => {
 		const g = graph(fixture('01'));
 		const key = (v: number) => layoutKey(g, NORMAL_GEOMETRY, { sweeps: 4, far: { maxCardWidths: v, maxGenerations: 1 } }, 'Inter');
 		expect(new Set([key(Infinity), key(-Infinity), key(NaN), key(0)]).size).toBe(4);

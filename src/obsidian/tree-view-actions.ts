@@ -8,6 +8,8 @@ import { deriveFamilies, type FamilyGraph } from '../core/derive';
 import { focusGenerationsFor, focusSubgraph } from '../core/focus-subgraph';
 import { unfoldFor, type FoldControl } from '../core/folds';
 import type { Tree } from '../core/types';
+import { setNameText } from '../render/dom/name-marks';
+import { isolateName } from '../render/name-bidi';
 import { FOCUS_UI, UI, WRITE_TEXT } from '../render/ui-text';
 import { keepSpot } from '../render/view-math';
 import type { Handle } from './block-handle';
@@ -219,7 +221,8 @@ export abstract class TreeViewActions extends TreeViewToolbar {
 			(el) => {
 				el.createDiv({ cls: 'dynasty-popover-title', text: UI.spouseListTitle });
 				for (const id of spouses) {
-					const b = el.createEl('button', { cls: 'dynasty-popover-item', text: g.byId.get(id)?.name ?? id });
+					const b = el.createEl('button', { cls: 'dynasty-popover-item' });
+					setNameText(b, isolateName(g.byId.get(id)?.name ?? id));
 					b.addEventListener('click', () => {
 						this.popover?.close();
 						this.guard(() => this.jumpTo(id));
@@ -245,7 +248,7 @@ export abstract class TreeViewActions extends TreeViewToolbar {
 	}
 
 	/** Expand (spec §6.10, §7.1): the same block, handle and view state in a full-screen modal. */
-	protected async openFull(target: string | null, focus: string | null = null, focusDue: string | null = null): Promise<void> {
+	protected async openFull(target: string | null, focus: string | null = null, focusDue: string | null = null, problemsDue = false): Promise<void> {
 		if (this.unloaded || this.full || this.opening) return;
 		const foreign = this.inForeignView();
 		// A second press while the handle is checked must not open a second modal.
@@ -265,6 +268,7 @@ export abstract class TreeViewActions extends TreeViewToolbar {
 			peeked: this.handle ?? this.binding.peeked,
 			readOnly: this.readOnly || foreign || !h,
 			focusDue,
+			problemsDue,
 		};
 		this.host.openFull(from, target, this.containerEl, focus);
 	}
@@ -327,8 +331,8 @@ export abstract class TreeViewActions extends TreeViewToolbar {
 		const keep = control?.spot ?? null;
 		const near = anchor?.kind === 'person' ? this.anchorOn(anchor.id) : control ? this.anchorOn(control.parents[0]) : null;
 		const fallback = near ?? this.keptAnchor();
-		const active = this.containerEl.doc?.activeElement as Element | null | undefined;
-		const focused = this.foldByKey ? (active?.closest?.('.dynasty-fold')?.getAttribute('data-fold') ?? null) : null;
+		const active = this.containerEl.doc.activeElement as Element | null;
+		const focused = this.foldByKey ? (active?.closest('.dynasty-fold')?.getAttribute('data-fold') ?? null) : null;
 		this.foldByKey = false;
 		const plan = planFolds(g, whole, this.ensureState().folds, true, this.linePeopleNow());
 		this.foldPlan = plan;

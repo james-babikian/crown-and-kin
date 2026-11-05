@@ -1,4 +1,4 @@
-// Names contract §5 (WP-6 step 1): no list captures an existing date. Every date text of every sample tree reads the same year with a full
+// Names contract §5: no list captures an existing date. Every date text of every sample tree reads the same year with a full
 // set of calendars and name lists loaded as it does with the calendars alone.
 import { readdirSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';

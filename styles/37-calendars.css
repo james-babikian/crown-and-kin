@@ -14,13 +14,13 @@
 .dynasty-calendars .dynasty-sheet-body {
 	display: flex;
 	flex-direction: column;
-	gap: 14px;
+	gap: var(--dynasty-space-3);
 }
 
 .dynasty-cal-note {
 	display: flex;
 	flex-direction: column;
-	gap: 8px;
+	gap: var(--dynasty-space-2);
 	align-items: flex-start;
 }
 
@@ -31,7 +31,7 @@
 
 /* The fields of a note that does not exist yet stand the normal distance (12 px, as in a card) under the hint above them. */
 .dynasty-cal-note > .dynasty-grid {
-	margin-top: 4px;
+	margin-top: var(--dynasty-space-1);
 }
 
 /* The head is the one of the other windows (`dynasty-head`); the link "New calendar note" stands under the text line, and the intro stands close under it. */
@@ -61,14 +61,7 @@
 
 /* The line under the head stands close under it, when the note box between them is empty. */
 .dynasty-cal-note:empty + .dynasty-cal-intro {
-	margin-top: -4px;
-}
-
-/* The window with no calendar shows the long explanation at the size of the window text. */
-.dynasty-cal-intro.is-long {
-	color: var(--text-normal);
-	font-size: var(--dynasty-type-text);
-	line-height: 1.5;
+	margin-top: calc(-1 * var(--dynasty-space-1));
 }
 
 /* The lists that cannot be used: quiet notes under the line, none when there is no problem. */
@@ -94,14 +87,14 @@
 
 /* One "Test a date" field under all sections. */
 .dynasty-cal-testbox {
-	margin-top: 4px;
+	margin-top: var(--dynasty-space-1);
 }
 
 /* A calendar in a note keeps its frame: it stands among the text of the note. */
 .dynasty-cal-block {
 	display: flex;
 	flex-direction: column;
-	gap: 12px;
+	gap: var(--dynasty-space-3);
 	padding: 14px;
 	border: 1px solid var(--background-modifier-border);
 	border-radius: var(--radius-m, 8px);
@@ -112,7 +105,7 @@
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
-	gap: 12px;
+	gap: var(--dynasty-space-3);
 }
 
 /* A section title of a calendar that has no name yet shows its kind, quiet. */
@@ -133,15 +126,22 @@
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
-	gap: 12px;
+	gap: var(--dynasty-space-3);
 }
 
 .dynasty-cal-labelrow .dynasty-cal-remove {
 	margin-block: -6px;
 }
 
+/* K-02: the 44 px tap area of Remove grows upward only, and the text stays on the label line. A box that grew downward would lie over the Era name field under it, and the field would win the tap. */
+.dynasty-sheet.is-phone .dynasty-cal-labelrow {
+	align-items: flex-end;
+}
+
 .dynasty-sheet.is-phone .dynasty-cal-labelrow .dynasty-cal-remove {
-	margin-block: -14px;
+	display: inline-flex;
+	align-items: flex-end;
+	margin-block: -27px 0;
 }
 
 /* Every link of the window has the Control size, as "Add calendar" and "Open all" do (D278). */
@@ -152,16 +152,17 @@
 	font-size: var(--dynasty-type-control);
 }
 
-/* A field for a number of two or three digits takes half the width of the row; its help and its refusals keep the whole width. */
-.dynasty-sheet-field.is-half > input.dynasty-sheet-input {
-	max-width: calc(50% - 8px);
+/* CAL-04: one width for a number field in this window (Cycle, Year, Length): 6.5 em. The help and the refusals of a field keep the whole width of the row. */
+.dynasty-calendars .dynasty-sheet-field.is-number > input.dynasty-sheet-input {
+	width: 6.5em;
+	max-width: 100%;
 }
 
 /* A text button in a card has a touch area of 44 px on a screen that is touched (spec §7.5). */
 .dynasty-cal-remove {
 	min-height: 30px;
 	min-width: 44px;
-	padding: 0 8px;
+	padding: 0 var(--dynasty-space-2);
 	border: 0;
 	background: none;
 	box-shadow: none;
@@ -183,8 +184,8 @@
 .dynasty-cal-list {
 	display: flex;
 	flex-direction: column;
-	gap: 8px;
-	padding-top: 4px;
+	gap: var(--dynasty-space-2);
+	padding-top: var(--dynasty-space-1);
 }
 
 .dynasty-cal-era,
@@ -209,16 +210,43 @@
 	display: block;
 }
 
-/* Cycle, Year, "=" and "Same year as" in the order that the help text names them. The labels stand over the fields, so the fields stand on one line. */
+/* Cycle, Year, "=" and "Same year as" in the order that the reading line shows them. The labels stand over the fields, so the fields stand on one line. */
 .dynasty-cal-start-row {
 	display: grid;
-	grid-template-columns: 6.5em 6.5em auto minmax(0, 1fr);
-	gap: 0 10px;
+	/* K-01: the two number columns are as wide as their fields (`max-content`), so "=" has the same gap at both sides. */
+	grid-template-columns: max-content max-content auto minmax(0, 1fr);
+	gap: 0 var(--dynasty-space-3);
 	align-items: end;
 }
 
+/* O-23: an era has Year, "=", "Same year as" and Length on its second row. */
 .dynasty-cal-start-row.is-era {
-	grid-template-columns: 6.5em auto minmax(0, 1fr);
+	/* K-01: the last column is as wide as the Length field, so the field ends on the right edge of the window text. */
+	grid-template-columns: max-content auto minmax(0, 1fr) max-content;
+}
+
+/* The reading line stands under the row; the hint of the field that has the focus and the refusals stand under it. A line with no text takes no room. */
+.dynasty-cal-readback:empty {
+	display: none;
+}
+
+.dynasty-cal-under {
+	display: flex;
+	flex-direction: column;
+	gap: var(--dynasty-space-1);
+}
+
+.dynasty-cal-under:empty {
+	display: none;
+}
+
+/* UX-11: one hint for each field of a row; it shows only while its own field has the focus (`is-shown`, set by the field). */
+.dynasty-cal-field-hint {
+	display: none;
+}
+
+.dynasty-cal-field-hint.is-shown {
+	display: block;
 }
 
 /* The known year of a name list: the date, "=", the name. */
@@ -232,16 +260,21 @@
 	font-size: var(--dynasty-type-heading);
 }
 
-/* A phone: Cycle and Year share one row, "Same year as" stands under them, and the "=" is not needed. */
+/* A phone: Cycle and Year (an era: Year and Length) share one row, "Same year as" stands under them, and the "=" is not needed. */
 .dynasty-sheet.is-phone .dynasty-cal-start-row,
 .dynasty-sheet.is-phone .dynasty-cal-start-row.is-era,
 .dynasty-sheet.is-phone .dynasty-cal-start-row.is-known {
 	grid-template-columns: 1fr 1fr;
-	gap: 12px;
+	gap: var(--dynasty-space-3);
 }
 
 .dynasty-sheet.is-phone .dynasty-cal-start-row > .is-wide {
 	grid-column: 1 / -1;
+}
+
+/* In an era the Length stands in the DOM after "Same year as"; on a phone it takes the place beside Year. */
+.dynasty-sheet.is-phone .dynasty-cal-start-row.is-era > .is-wide {
+	order: 1;
 }
 
 .dynasty-sheet.is-phone .dynasty-cal-equals {
@@ -251,7 +284,7 @@
 .dynasty-cal-messages {
 	display: flex;
 	flex-direction: column;
-	gap: 4px;
+	gap: var(--dynasty-space-1);
 }
 
 .dynasty-cal-messages:empty {
@@ -263,12 +296,7 @@
 	color: var(--text-normal);
 }
 
-/* A refusal stands under its field, in red, and the field has a red edge (as in the ID window). */
-.dynasty-cal-field-error {
-	font-size: var(--dynasty-type-text);
-	font-weight: var(--font-normal);
-}
-
+/* A refusal stands under its field, in red, and the field has a red edge (as in the ID window). Its size and weight (Small, semibold) come from `.dynasty-sheet-error` and `.dynasty-field-error` (K-04). */
 .dynasty-cal-field-error:empty {
 	display: none;
 }
@@ -296,7 +324,7 @@
 .dynasty-sheet button.dynasty-cal-add-link {
 	display: inline-flex;
 	align-items: center;
-	gap: 4px;
+	gap: var(--dynasty-space-1);
 	margin-top: -2px;
 }
 
@@ -306,12 +334,12 @@
 }
 
 .dynasty-sheet button.dynasty-cal-remove-cal {
-	margin-top: 12px;
+	margin-top: var(--dynasty-space-3);
 }
 
 /* The list is a column with an 8 px gap already; the link needs a little more room under the last field, no large empty space. */
 .dynasty-sheet button.dynasty-cal-remove-list {
-	margin-top: 4px;
+	margin-top: var(--dynasty-space-1);
 }
 
 /* "Add calendar" stands at the left of the row of "Open all", as "Add portrait or arms" does in the person window. */
@@ -335,7 +363,7 @@
 .dynasty-cal-view {
 	display: flex;
 	flex-direction: column;
-	gap: 12px;
+	gap: var(--dynasty-space-3);
 }
 
 /* The table of a block takes no margin of the note: the gaps in the block are the 12 px of the box, the same above every table. The second selector outranks the table rule of the reading view. */
@@ -354,7 +382,7 @@
 
 .dynasty-cal-table th,
 .dynasty-cal-table td {
-	padding: 4px 8px 4px 0;
+	padding: var(--dynasty-space-1) var(--dynasty-space-2) var(--dynasty-space-1) 0;
 	border: 0;
 	text-align: left;
 	vertical-align: top;
@@ -459,7 +487,35 @@
 	width: 100%;
 }
 
-/* The short warning at Start stands in the place of the help, in the text colour. */
+/* CAL-15: on a phone the link "New calendar note" is a line of its own, so the dot before it goes. */
+.dynasty-sheet.is-phone .dynasty-cal-meta-dot {
+	display: none;
+}
+
+/* CAL-16: a placeholder that is longer than its field ends with an ellipsis, in the window and in the block. */
+.dynasty-calendars input.dynasty-sheet-input,
+.dynasty-cal-view input.dynasty-sheet-input,
+.dynasty-calendars input.dynasty-sheet-input::placeholder,
+.dynasty-cal-view input.dynasty-sheet-input::placeholder {
+	text-overflow: ellipsis;
+}
+
+/* CAL-16: in a narrow block the kind stands under the name, with no dot. The container is the block's own box, not the window. */
+.dynasty-cal-view {
+	container-type: inline-size;
+}
+
+@container (max-width: 400px) {
+	.dynasty-cal-block-dot {
+		display: none;
+	}
+
+	.dynasty-cal-block-kind {
+		display: block;
+	}
+}
+
+/* The short warning at Start stands in the place of the reading line, in the text colour. */
 .dynasty-cal-readback.is-warning {
 	color: var(--text-normal);
 }

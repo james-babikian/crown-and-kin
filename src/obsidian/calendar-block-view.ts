@@ -14,6 +14,7 @@ import { compileCapped } from '../view/calendar-reader';
 import { testField } from './calendar-parts';
 import { openCalendars } from './calendar-window';
 import { textButton } from './window-parts';
+import { guarded } from './start-guard';
 
 /** The events that the block keeps from the editor, as the tree view does (spec §7.2): in Live Preview a click would else switch the block to its source text. */
 const STOPPED_EVENTS = ['pointerdown', 'mousedown', 'mouseup', 'click', 'dblclick', 'auxclick', 'touchstart', 'touchend'];
@@ -64,7 +65,9 @@ function drawCalendar(parent: HTMLElement, c: Calendar, edit: () => void, reader
 	const title = head.createDiv({ cls: 'dynasty-cal-block-title' });
 	title.createEl('b', { text: c.name });
 	const kind = c.kind.type === 'cycles' ? W.kindCycles : W.kindEras;
-	title.createSpan({ cls: 'dynasty-cal-block-kind', text: c.name ? ` · ${kind}` : kind });
+	// The dot is its own span: in a narrow block the kind stands under the name and the dot goes (CAL-16).
+	if (c.name) title.createSpan({ cls: 'dynasty-cal-block-dot', text: ' · ', attr: { 'aria-hidden': 'true' } });
+	title.createSpan({ cls: 'dynasty-cal-block-kind', text: kind });
 	textButton(head, ['dynasty-btn', 'dynasty-cal-edit'], T.edit, edit, { label: T.editLabel(c.name) });
 	const table = box.createEl('table', { cls: 'dynasty-cal-table' });
 	row(table, T.formats, c.formats.length ? c.formats : [T.noFormats]);
@@ -129,10 +132,6 @@ class CalendarBlock extends MarkdownRenderChild {
 /** The code block processor of `kin-calendar`. Nothing may throw into Obsidian (spec §8). */
 export function calendarBlockProcessor(app: App, index: CalendarIndex): (source: string, el: HTMLElement, ctx: MarkdownPostProcessorContext) => void {
 	return (source, el, ctx) => {
-		try {
-			ctx.addChild(new CalendarBlock(app, index, el, source, ctx));
-		} catch (e) {
-			console.error('Crown and Kin: cannot show the calendar block', e);
-		}
+		guarded('cannot show the calendar block', () => ctx.addChild(new CalendarBlock(app, index, el, source, ctx)));
 	};
 }

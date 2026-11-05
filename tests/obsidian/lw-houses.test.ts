@@ -11,16 +11,16 @@ import { closePluginModals } from '../../src/view/plugin-modals';
 import type { PictureCopy, PictureStore } from '../../src/obsidian/picture-store';
 import { HOUSE_PALETTE } from '../../src/render/styles';
 import { VIEWER_UI } from '../../src/render/viewer-text';
-import { HOUSES, HOUSE_PAGE_UI, ID_UI, PICTURES_UI, WIN_LIST_UI, WINDOW_UI } from '../../src/render/ui-text';
+import { HOUSES, HOUSE_PAGE_UI, ID_UI, PICTURES_UI, SHEET, WIN_LIST_UI, WINDOW_UI } from '../../src/render/ui-text';
 import { FEl, clock, dispatch, fakeDoc, resetDom, runTimers, settle } from '../acceptance/fake-dom';
 import { lastMenu, noticeList, notices, openModals, resetObsidian } from '../acceptance/fake-obsidian';
 import { fakeApp } from '../acceptance/tree-view-fakes';
 import { backButton, backToList, listRows, openPage, pageOf, press, rowNames, rowOf, rowTexts, searchBox, searchFor } from '../support/lw-support';
-import { click, stripNotDisabled, type, writingHandle, type Writing } from '../support/s113-c-support';
+import { click, stripNotDisabled, type, writingHandle, type Writing } from '../support/windows-sheets-support';
 import { useFakeDom } from '../support/fake-dom-setup';
 
 /*
- * The Houses window as a searchable list with an edit page (the 0.2.5 contract D.3, D134, D138). The real window runs on
+ * The Houses window as a searchable list with an edit page (D134, D138). The real window runs on
  * the fakes. The window stays a draft: one Save writes every house in one write, Cancel writes nothing, closing with
  * changes asks first. Names in this file are made up.
  */
@@ -179,6 +179,8 @@ describe('open: a list of the houses (D134)', () => {
 	it('shows one line for a tree with no houses', () => {
 		const { content } = open({ body: 'people:\n  - id: a\n    name: A\n' });
 		expect(content.querySelectorAll('li.dynasty-lw-none').map((e) => e.getText())).toEqual([HOUSES.none]);
+		// P3-10: no count line over the one sentence.
+		expect(content.querySelector('.dynasty-lw-meta-count')).toBeNull();
 	});
 
 	it('gives a Notice and no window when the tree text has an error', () => {
@@ -187,7 +189,7 @@ describe('open: a list of the houses (D134)', () => {
 	});
 });
 
-describe('search (D.3.3)', () => {
+describe('search', () => {
 	it('finds a house by words of its name in any order, and counts the matches', () => {
 		const { content } = open();
 		searchFor(content, 'ORSINI house');
@@ -253,7 +255,7 @@ describe('search (D.3.3)', () => {
 	});
 });
 
-describe('the edit page (D.3.6, D.3.7)', () => {
+describe('the edit page', () => {
 	it('opens on a tap, with the focus on Back, the Back bar and a region named for the house', () => {
 		const { content } = open();
 		const page = openPage(content, 'orsini');
@@ -263,7 +265,7 @@ describe('the edit page (D.3.6, D.3.7)', () => {
 		expect(page.getAttribute('aria-label')).toBe(WIN_LIST_UI.editPage('House Orsini'));
 		expect(content.querySelector('.dynasty-lw-back-name')!.getText()).toBe('House Orsini');
 		expect(content.querySelector('.dynasty-lw-bar')).toBeNull();
-		// The way back is a link above the header (G.7).
+		// The way back is a link above the header.
 		expect(content.querySelector('.dynasty-back')!.getText()).toBe(HOUSES.title);
 		expect(field(content).value).toBe('House Orsini');
 		expect(field(content).getAttribute('data-focus')).toBe('name:h1');
@@ -423,7 +425,7 @@ describe('the edit page (D.3.6, D.3.7)', () => {
 	});
 });
 
-describe('the draft: edit, Save, Cancel and close (D.3.8)', () => {
+describe('the draft: edit, Save, Cancel and close', () => {
 	it('shows a change in the list at once with the tag Changed, and the Back bar follows the name', () => {
 		const { content } = open();
 		openPage(content, 'thorne');
@@ -460,11 +462,15 @@ describe('the draft: edit, Save, Cancel and close (D.3.8)', () => {
 		expect(openModals).toHaveLength(0);
 	});
 
-	it('Cancel writes nothing and closes at once, also with changes', async () => {
-		const { content, handle } = open();
+	it('Cancel writes nothing; with changes it asks "Discard changes?" first, as Esc does (O-14)', async () => {
+		const { content, handle, win } = open();
 		openPage(content, 'thorne');
 		type(field(content), 'House Changed');
 		await click(content.querySelector('button[data-focus="cancel"]'));
+		expect(openModals).toHaveLength(1);
+		const question = (win as unknown as { modalEl: FEl }).modalEl.querySelector('.dynasty-sheet-confirm')!;
+		expect(question.getText()).toContain(SHEET.discardTitle);
+		await click(question.querySelector('.dynasty-sheet-discard'));
 		expect(handle.write).not.toHaveBeenCalled();
 		expect(openModals).toHaveLength(0);
 	});
@@ -658,7 +664,7 @@ describe('arms in the draft (spec §13.6)', () => {
 	});
 });
 
-describe('Add (D.3.4)', () => {
+describe('Add', () => {
 	it('clears the query, opens the page of the new house with the focus on its name, and the row shows New', async () => {
 		const { content } = open();
 		searchFor(content, 'orsini');
@@ -679,11 +685,14 @@ describe('Add (D.3.4)', () => {
 		await save(content);
 		expect(handle.write).not.toHaveBeenCalled();
 		expect(pageOf(content).getAttribute('data-house')).toBe('h12');
-		const error = content.querySelector('.dynasty-sheet-error')!;
+		// CX-11: an error about one field stands under that field, and the field takes the error edge.
+		const error = field(content).parentElement!.querySelector('.dynasty-field-error')!;
 		expect(error.getText()).toBe(HOUSES.needName);
+		expect(field(content).getAttribute('aria-invalid')).toBe('true');
 		expect(active()).toBe('name:h12');
 		type(field(content), 'House Fresh');
-		expect(content.querySelector('.dynasty-sheet-error')!.getText()).toBe('');
+		expect(content.querySelector('.dynasty-field-error')).toBeNull();
+		expect(field(content).getAttribute('aria-invalid')).toBeNull();
 	});
 
 	it('Save refuses an old house whose name is empty, on the page of that house', async () => {
@@ -698,7 +707,7 @@ describe('Add (D.3.4)', () => {
 	});
 });
 
-describe('Delete (D32, D113, D.3.7)', () => {
+describe('Delete (D32, D113)', () => {
 	it('removes a new house at once, with no question, shows the list and puts the focus on Add when it was last', async () => {
 		const { content, modal } = open();
 		await click(content.querySelector('button[data-focus="add"]'));
@@ -781,7 +790,7 @@ describe('Delete (D32, D113, D.3.7)', () => {
 	});
 });
 
-describe('Change ID (D109, D110, D.3.7)', () => {
+describe('Change ID (D109, D110)', () => {
 	it('opens the small window once, "Use this ID" puts the new ID into the draft, and the page shows the note', async () => {
 		const { content } = open();
 		openPage(content, 'valmont');
@@ -885,7 +894,7 @@ describe('Change ID (D109, D110, D.3.7)', () => {
 		expect(active()).toBe('id-open:h3');
 		expect(pageOf(content).querySelector('.dynasty-id-new-problem')!.getText()).not.toBe('');
 		expect(pageOf(content).hasClass('has-id-problem')).toBe(true);
-		expect(content.querySelector('.dynasty-sheet-error')!.getText()).toBe('');
+		expect(content.querySelector('.dynasty-sheet-error')).toBeNull();
 	});
 });
 
@@ -929,7 +938,7 @@ describe('stale write and reload (spec §6.1)', () => {
 	});
 });
 
-describe('the People section (D202, G.10; replaces the house page window)', () => {
+describe('the People section (D202, replaces the house page window)', () => {
 	function peopleApp() {
 		return {
 			fileManager: { getNewFileParent: () => ({ path: '/', name: '', isRoot: () => true, children: [] }), generateMarkdownLink: () => '' },

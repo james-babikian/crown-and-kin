@@ -56,9 +56,9 @@ describe('the golden files start from sample tree 13 as stored', () => {
 	});
 });
 
-describe('add-title (§13.4 Titles window, contract rule 6)', () => {
+describe('add-title (§13.4 Titles window)', () => {
 	it('goes at the end of titles, as a block map in the order id, name, plural; the caller chooses the id', () => {
-		// Decision (supervisor ruling): a new title has no `holders` key until it gets a holder.
+		// Decision: a new title has no `holders` key until it gets a holder.
 		expectGolden(apply({ kind: 'add-title', id: 'lord-of-harrowmere', name: 'Lord of Harrowmere', plural: 'Lords of Harrowmere' }), '13-add-title.yaml', ['lord-of-harrowmere']);
 	});
 
@@ -85,7 +85,7 @@ describe('add-title (§13.4 Titles window, contract rule 6)', () => {
 
 	describe('a new titles section (§13.0 item 1)', () => {
 		const add: AnyOp = { kind: 'add-title', id: 'duke-of-valmont', name: 'Duke of Valmont' };
-		// Decision: as for every new section (M2, M3), one blank line separates it from its neighbours.
+		// Decision: as for every new section, one blank line separates it from its neighbours.
 		it('directly after houses', () => {
 			const body = 'houses:\n  - id: valmont\n    name: House Valmont\n\npeople:\n  - id: aldric\n    name: Aldric Valmont';
 			expect(bodyOf(apply(add, body))).toBe(
@@ -140,7 +140,7 @@ describe('delete-title (§13.4, §13.3 cleanup)', () => {
 		expect(titleOf(graphOf(body), 'count-of-orsini').name).toBe('Count of the Salt Coast');
 	});
 
-	it('removes every card-title whose value is the title id, also one that was not valid (Isolde; spec §13.4, supervisor ruling)', () => {
+	it('removes every card-title whose value is the title id, also one that was not valid (Isolde; spec §13.4)', () => {
 		const body = bodyOf(apply({ kind: 'delete-title', id: 'duke-of-valmont' }));
 		const duke = BODY_13.slice(BODY_13.indexOf('  - id: duke-of-valmont\n'), BODY_13.indexOf('  - id: count-of-orsini\n'));
 		expect(duke.endsWith('      - {person: edmund, from: 1210, to: 1228}\n')).toBe(true);
@@ -184,7 +184,7 @@ describe('add-holder (§13.4 sheet: Add title; a new holder is the newest ruler)
 		expect(refusal(apply({ kind: 'add-holder', title: 'duke-of-valmont', fields: { from: '1300' } }))).toBe('bad-value');
 	});
 
-	it('holders: aldric (one string) first becomes a flow list (contract rule 6)', () => {
+	it('holders: aldric (one string) first becomes a flow list', () => {
 		const body = 'titles:\n  - id: duke\n    name: Duke\n    holders: aldric\npeople:\n  - id: aldric\n    name: Aldric Valmont\n  - id: roderick\n    name: Roderick Valmont';
 		expect(bodyOf(apply({ kind: 'add-holder', title: 'duke', fields: { person: 'roderick', from: '1150' } }, body))).toBe(
 			replaceOnce(body, '    holders: aldric\n', '    holders: [aldric, {person: roderick, from: 1150}]\n'),
@@ -192,7 +192,7 @@ describe('add-holder (§13.4 sheet: Add title; a new holder is the newest ruler)
 	});
 
 	it('a title with no holders key gets a holders list', () => {
-		// Decision (supervisor ruling): a block list under `holders:`, after the other title keys.
+		// Decision: a block list under `holders:`, after the other title keys.
 		const body = 'titles:\n  - id: duke\n    name: Duke\npeople:\n  - id: aldric\n    name: Aldric Valmont';
 		expect(bodyOf(apply({ kind: 'add-holder', title: 'duke', fields: { person: 'aldric' } }, body))).toBe(
 			'titles:\n  - id: duke\n    name: Duke\n    holders:\n      - {person: aldric}\npeople:\n  - id: aldric\n    name: Aldric Valmont',
@@ -232,7 +232,7 @@ describe('edit-holder (§13.4 sheet Edit, §13.5 number, §13.3 reign)', () => {
 		);
 	});
 
-	it('an edited plain-string holder becomes a flow map (contract rule 6)', () => {
+	it('an edited plain-string holder becomes a flow map', () => {
 		expect(bodyOf(apply({ kind: 'edit-holder', holder: ref('count-of-orsini', 6), fields: { from: '1160' } }))).toBe(
 			replaceOnce(BODY_13, '      - luca\n', '      - {person: luca, from: 1160}\n'),
 		);
@@ -242,7 +242,7 @@ describe('edit-holder (§13.4 sheet Edit, §13.5 number, §13.3 reign)', () => {
 		);
 	});
 
-	it('a changed person: the old holder loses the title, so their card-title goes in the same write (contract rule 7)', () => {
+	it('a changed person: the old holder loses the title, so their card-title goes in the same write', () => {
 		expect(bodyOf(apply({ kind: 'edit-holder', holder: ref('king-of-the-vale', 0), fields: { person: 'edmund' } }))).toBe(
 			replaceOnce(replaceOnce(BODY_13, YA_KING, '      - {person: edmund, number: III, from: 1180, to: 1210}\n'), YA_CARD, '    name: Aldric Valmont\n'),
 		);
@@ -288,7 +288,7 @@ describe('remove-holder (§13.4 sheet Remove, §13.3 cleanup)', () => {
 	});
 });
 
-describe('set-holders (§13.4 Titles window: the final list of one title, contract rule 8)', () => {
+describe('set-holders (§13.4 Titles window: the final list of one title)', () => {
 	const r = (i: number) => ref('duke-of-valmont', i);
 
 	it('reorder, edit, add and remove in one op: items move whole with their comments; only changed values are written', () => {
@@ -300,7 +300,7 @@ describe('set-holders (§13.4 Titles window: the final list of one title, contra
 		expectGolden(apply(op), '13-set-holders.yaml');
 	});
 
-	it('items that are not shown holders stay in place, after the listed item that preceded them (supervisor ruling)', () => {
+	it('items that are not shown holders stay in place, after the listed item that preceded them', () => {
 		const c = (i: number) => ref('count-of-orsini', i);
 		const count = (t: string) => t.slice(t.indexOf('  - id: count-of-orsini\n'), t.indexOf('  - id: king-of-the-vale\n'));
 		// Shown holders 0–6; items 7 (beatrice, nobody) and 8 (no person, no name) follow item 6 (luca).
@@ -343,10 +343,10 @@ describe('set-holders (§13.4 Titles window: the final list of one title, contra
 		expect(bodyOf(apply({ kind: 'set-holders', title: 'duke-of-valmont', items }))).toBe(BODY_13);
 	});
 
-	it('a list without the younger Aldric: his card-title goes too (contract rule 7)', () => {
+	it('a list without the younger Aldric: his card-title goes too', () => {
 		const k = (i: number) => ref('king-of-the-vale', i);
 		const body = bodyOf(apply({ kind: 'set-holders', title: 'king-of-the-vale', items: [{ ref: k(1) }, { ref: k(2) }] }));
-		// The item that is not a holder is not in the window's list, but it is never removed (supervisor ruling).
+		// The item that is not a holder is not in the window's list, but it is never removed.
 		expect(body).toBe(replaceOnce(replaceOnce(BODY_13, YA_KING, ''), YA_CARD, '    name: Aldric Valmont\n'));
 	});
 
@@ -379,7 +379,7 @@ describe('Titles window Save: one batch, one write (§13.4 acceptance, §13.0 it
 	});
 });
 
-describe('card-title cleanup once per write, after all ops of a batch (contract rule 7)', () => {
+describe('card-title cleanup once per write, after all ops of a batch', () => {
 	it('removed and added again in one batch: the card-title stays', () => {
 		const body = bodyOf(
 			apply(batch({ kind: 'remove-holder', holder: ref('king-of-the-vale', 0) }, { kind: 'add-holder', title: 'king-of-the-vale', fields: { person: 'young-aldric', number: 'III', from: '1180', to: '1210' } })),

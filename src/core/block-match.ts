@@ -93,14 +93,14 @@ export function relocate(bodies: readonly string[], previousCount: number, ordin
 		if (b === expectedBody) same.push(i);
 	});
 	// A list of another length does not describe the handle's ordinal, so it cannot tell a copy.
-	const before = previous && previous.length === previousCount ? previous : null;
+	const before = previous?.length === previousCount ? previous : null;
 	if (bodies.length === previousCount) {
 		if (ordinal >= bodies.length) return { kind: 'detached' };
 		if (bodies[ordinal] === expectedBody) return { kind: 'keep', ordinal };
 		return same.length === 1 && before?.[same[0]] !== expectedBody ? { kind: 'moved', ordinal: same[0] } : { kind: 'keep', ordinal };
 	}
 	if (same.length !== 1) return { kind: 'detached' };
-	if (before && before.some((b, i) => i !== ordinal && b === expectedBody)) return { kind: 'detached' };
+	if (before?.some((b, i) => i !== ordinal && b === expectedBody)) return { kind: 'detached' };
 	return { kind: same[0] === ordinal ? 'keep' : 'moved', ordinal: same[0] };
 }
 

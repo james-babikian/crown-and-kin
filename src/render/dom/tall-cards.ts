@@ -24,13 +24,13 @@ import { reignShown } from '../tree-info';
 import type { Measure, SceneFonts } from '../scene-model';
 
 /** D29, D81: the people whose name needs two or three text lines (`tall`) and the ones that need three (`long`, a subset of `tall`), both sorted. */
-export interface TallNames {
+interface TallNames {
 	tall: string[];
 	long: string[];
 }
 
 /** What `tallCardsFor` reads besides the graph and the geometry. */
-export interface TallExtra {
+interface TallExtra {
 	/** The user's break places (D118). */
 	breaks?: BreakList;
 	/** The marked person (D41): the card has a border (D153) whose inner edge the D14 sign keeps clear of. */

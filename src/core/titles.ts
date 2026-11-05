@@ -109,7 +109,7 @@ export function cardLabels(g: FamilyGraph): ReadonlyMap<string, CardLabel> {
 	const known = labelsOf.get(g);
 	if (known) return known;
 	const holdings = new Map<string, Holding[]>();
-	for (const title of g.titles ?? []) {
+	for (const title of g.titles) {
 		const mine = new Map<string, Holder[]>();
 		for (const h of title.holders) {
 			// A holder whose `person` names nobody is not in the tree (rule 2 above).
@@ -239,5 +239,5 @@ export function holderTable(g: FamilyGraph, title: Title): string {
  * A tree with neither draws with no labels.
  */
 export function needsLabels(g: FamilyGraph): boolean {
-	return (g.titles?.length ?? 0) > 0 || g.people.some((p) => p.sobriquet !== undefined);
+	return g.titles.length > 0 || g.people.some((p) => p.sobriquet !== undefined);
 }

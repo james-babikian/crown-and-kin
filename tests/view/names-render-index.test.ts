@@ -1,4 +1,4 @@
-// Spec §14 rules 13 and 15 (WP-6 step 2), as 0.4 WP-3a changes it (D289, D270 item 3): the calendar index with name lists. The plain-year lists of the one note that a tree names,
+// Spec §14 rules 13 and 15, as 0.4 WP-3a changes it (D289, D270 item 3): the calendar index with name lists. The plain-year lists of the one note that a tree names,
 // a plain-only note as a calendar note, and the lists in the signature of an entry and of a reader. A tree used the lists of every note, the first of a folded name kept and
 // `calendar-duplicate` for a later one: a tree now names one note, so those cases are gone; the lists of other notes are never used.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';

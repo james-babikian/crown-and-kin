@@ -145,7 +145,7 @@ describe('fixture 8 (parent types): spec §10, §4.3, §5.3', () => {
 		// §5.1 step 4: children are centred under their parents' union dot.
 		expect(Math.abs(centre(tomas) - layout.unions.get(adoptive.key)!.x)).toBeLessThan(tomas.w);
 		// The drop that places him comes from the adoptive couple, in the adoptive style
-		// (the decision notes "Lines to children placed under adoptive or ward parents").
+		// .
 		expect(edges.paths.some((p) => p.kind === 'adoptive' && connects(p, 'tomas', 'aldric', 'isolde'))).toBe(true);
 		expect(edges.paths.some((p) => p.kind === 'descent' && connects(p, 'tomas') && (p.people.includes('marek') || p.people.includes('anna')))).toBe(false);
 	});

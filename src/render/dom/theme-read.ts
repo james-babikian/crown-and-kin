@@ -70,7 +70,7 @@ export function contrastRatio(a: readonly number[], b: readonly number[]): numbe
 }
 
 /** WCAG 2 1.4.11: a graphical object needs 3:1 against the colour next to it. */
-export const MARK_CONTRAST = 3;
+const MARK_CONTRAST = 3;
 
 let paint: CanvasRenderingContext2D | null | undefined;
 
@@ -107,7 +107,7 @@ export function srgb(css: string): number[] | null {
 }
 
 /** The least contrast of text on the accent (WCAG 2 level AA, normal text). */
-export const TEXT_CONTRAST = 4.5;
+const TEXT_CONTRAST = 4.5;
 
 /**
  * The text colour on the accent: `null` keeps the theme's own pair (`--text-on-accent` on `--interactive-accent`) when it reaches 4.5:1;
@@ -131,7 +131,7 @@ export function onAccentChoice(el: Element, parse: (css: string) => number[] | n
 }
 
 /** The least contrast of a line or a control edge against the colour next to it (WCAG 2.1 1.4.11). */
-export const EDGE_CONTRAST = MARK_CONTRAST;
+const EDGE_CONTRAST = MARK_CONTRAST;
 
 /**
  * The run-time colours of the plugin's grey text, link, control edge and error text (D212 `contrast-tokens`). Each starts from the static

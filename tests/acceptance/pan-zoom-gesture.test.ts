@@ -11,7 +11,7 @@ import { useFakeDom } from '../support/fake-dom-setup';
 /*
  * Full-screen pan and zoom with the gesture wrapper (spec §7.2 touch gestures, §7.6 pan/zoom
  * rendering, D19: during a two-finger zoom the tree moves as one picture and fills empty space
- * about 4 times per second). Adopted from the WP5.3 review (scratch/review-5.3, 7861544).
+ * about 4 times per second). Adopted from the WP5.3 review (7861544).
  * The real PanZoom runs on the fake DOM; what the screen shows is read from the DOM: the scene
  * transform, then the wrapper transform while the gesture class is on.
  */

@@ -3,7 +3,9 @@
  * spans, and the change of those spans in place. The section `succession-section.ts` uses them; they hold no state of their own.
  */
 
-const hintId = (key: string, tail: string): string => `dynasty-succ-hint-${key}${tail}-${Math.random().toString(36).slice(2, 8)}`;
+import { uniqueId } from './sheet-parts';
+
+const hintId = (key: string, tail: string): string => uniqueId(`dynasty-succ-hint-${key}${tail}`);
 
 /**
  * The hint spans of a switch row change in place: a span is made, changed or removed, and `aria-describedby` follows. The row and

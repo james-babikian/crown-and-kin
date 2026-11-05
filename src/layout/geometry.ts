@@ -19,6 +19,16 @@ import type { Geometry, GeometryFor, LayoutSettings, NameLineCount, NameRoom, Or
 /** Obsidian's default note font size; the card geometry (180×64 cards) was tuned at this size. */
 const BASE_FONT_PX = 16;
 
+/** The text size of every card text line in em of the note font (D117: one size for all card text). */
+const NAME_EM = 0.85;
+
+/**
+ * D330 (O-02), px: card text is never smaller than this, the smallest text of the rest of the plugin (D218 rule 2). The whole
+ * card is in em of the note font, so a note font under `CARD_TEXT_MIN_PX / NAME_EM` is raised to it: the card grows with its text.
+ * At 16 px nothing changes (0.85 × 16 = 13.6).
+ */
+export const CARD_TEXT_MIN_PX = 12;
+
 // Sizes in em of the note font (spec §5.8: geometry follows the font).
 // D117: all text is 0.85 em, so 3 lines at 1.2 line height take 3.06 em; 3.8 em keeps the padding unchanged.
 const CARD_W_EM = 11.25;
@@ -100,8 +110,14 @@ export function lineMetrics(geo: Geometry): LineMetrics {
 	};
 }
 
+/**
+ * The note font size a geometry is made for: 8 to 48 px, and never so small that the card text (0.85 em) is under `CARD_TEXT_MIN_PX`.
+ * The floor lies above 8, so it is the lower limit in effect. `fontPx` of the geometry is this value, so the layout, the scene and
+ * the saved picture (`--dynasty-font-size`) all follow it.
+ */
 function sanitize(fontPx: number): number {
-	return Number.isFinite(fontPx) && fontPx > 0 ? Math.min(Math.max(fontPx, 8), 48) : BASE_FONT_PX;
+	const floor = Math.max(8, CARD_TEXT_MIN_PX / NAME_EM);
+	return Number.isFinite(fontPx) && fontPx > 0 ? Math.min(Math.max(fontPx, floor), 48) : BASE_FONT_PX;
 }
 
 /** Builds the `down` geometry for a note font size: see `GeometryFor`. */
@@ -218,13 +234,6 @@ export const RIBBON = { em: 0.3, minPx: 3, footGapEm: 0.35 } as const;
 /** The thickness of the house ribbon in px: 0.3 em, never under 3 px. */
 export const ribbonWidth = (geo: Geometry): number => Math.max(RIBBON.minPx, Math.round(RIBBON.em * geo.fontPx));
 
-/** The ends of the foot hairline across a card of width `w`, card-relative; `inset` is how far a top-to-bottom hairline stays inside the edge (the marked card's border). */
-export function footSpan(geo: Geometry, w: number, inset = 1): { x0: number; x1: number } {
-	if (isRoundel(geo)) return { x0: inset, x1: w - inset };
-	const gap = Math.round(RIBBON.footGapEm * geo.fontPx);
-	return { x0: ribbonWidth(geo) + gap, x1: w - gap };
-}
-
 /** em: the room that a relation word keeps from the colour bar and from the plate's right end, so a cut word never touches them. */
 export const WORD_CLEAR_EM = 0.125;
 
@@ -282,9 +291,6 @@ export function turnedGeometry(side: Geometry): Geometry {
  * `cardText(geo, 2)` and `cardText(geo, 3)` place its text. A card with a two-line title text line (D61) is `relationExtra` taller.
  */
 export const tallExtra = relationExtra;
-
-/** The name text size in em of the note font (D117: one size for all card text). */
-const NAME_EM = 0.85;
 
 /** Where card text goes, so every renderer lays out the Full level of detail the same way. */
 export interface CardText {

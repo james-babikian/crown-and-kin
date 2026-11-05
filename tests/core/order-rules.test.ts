@@ -1,5 +1,5 @@
 /*
- * Tests for `src/core/order.ts`, the walk of the card-and-line build (the decision notes "0.3.1" WP-1): the three
+ * Tests for `src/core/order.ts`, the walk of the card-and-line build: the three
  * changed rules W1 to W3, `familyOrder`, `farGenerations`, ids that contain `|` or `:`, and D2 (the order
  * in which the user wrote the children never changes). Where the new walk differs from the walk of 0.3.0 and where it must
  * not, the tests state the answers of 0.3.0 as fixed values: the frozen copy of the old `order.ts` was deleted in 0.4
@@ -47,7 +47,7 @@ const TWO_ROWS = `people:
   - {id: kid, name: Kid, parents: [uncle, niece]}
 `;
 
-describe('W1: a couple on two rows is anchored to the lower partner', () => {
+describe('a couple on two rows is anchored to the lower partner', () => {
 	it('puts the dot and the children with the lower partner', () => {
 		const { g, gen, order } = walk(TWO_ROWS);
 		expect(gen.get('uncle')).toBe(1);
@@ -98,7 +98,7 @@ people:
 	});
 });
 
-describe('W2: partners in one block but not side by side', () => {
+describe('partners in one block but not side by side', () => {
 	// The blood person has three married-in spouses: the block is [s1, id, s2, s3] and s3 stands two cards along.
 	const THREE_SPOUSES = `people:
   - {id: gp, name: GP}
@@ -138,7 +138,7 @@ unions:
 	});
 });
 
-describe('W3: the families of a person follow the order of their hang points', () => {
+describe('the families of a person follow the order of their hang points', () => {
 	const THREE_SPOUSES_OF_ONE = `people:
   - {id: gp, name: GP}
   - {id: id, name: Id, parents: [gp], sex: m}
@@ -272,7 +272,7 @@ unions:
 	});
 });
 
-describe('ids with | and : (control flow never reads text)', () => {
+describe('ids with | and: (control flow never reads text)', () => {
 	// Ids that look like parts of a key: `a|b` is the join of two ids in a union key, `solo:x` is the key of the family of x alone.
 	const ODD = `people:
   - {id: "a|b", name: AB}

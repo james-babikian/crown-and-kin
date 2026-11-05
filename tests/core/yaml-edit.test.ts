@@ -1,15 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import type { EditResult, Op, SetPersonFields } from '../../src/core/edit';
+import type { Op, SetPersonFields } from '../../src/core/edit';
 import { parseDynasty } from '../../src/core/parse';
 import { applyOp, newHouseId } from '../../src/core/yaml-edit';
 import { finishTogether, isRefusal, parse, type Step } from '../../src/core/yaml-patch';
+import { body } from '../support/edit-body';
 
 const person = (id: string, fields: SetPersonFields['fields']): Op => ({ kind: 'set-person-fields', id, fields });
-
-function body(r: EditResult): string {
-	if (!r.ok) throw new Error(`refused: ${r.code} ${r.detail ?? ''}`);
-	return r.body;
-}
 
 const edit = (src: string, op: Op) => body(applyOp(src, op));
 const nameOf = (src: string, id: string) => {
@@ -121,18 +117,18 @@ describe('adding and removing keys', () => {
 		);
 	});
 
-	it('an empty string removes an optional key, like null (supervisor decision)', () => {
+	it('an empty string removes an optional key, like null', () => {
 		const src = 'people:\n  - id: a\n    name: A\n    title: T\n    sex: f\n';
 		expect(edit(src, person('a', { title: '' }))).toBe('people:\n  - id: a\n    name: A\n    sex: f\n');
 		expect(edit(src, person('a', { sex: '   ' }))).toBe('people:\n  - id: a\n    name: A\n    title: T\n');
 	});
 
-	it('a full-line comment above a removed key stays (supervisor decision)', () => {
+	it('a full-line comment above a removed key stays', () => {
 		const src = 'people:\n  - id: a\n    name: A\n    # the title is disputed\n    title: T # end\n    sex: f\n';
 		expect(edit(src, person('a', { title: null }))).toBe('people:\n  - id: a\n    name: A\n    # the title is disputed\n    sex: f\n');
 	});
 
-	it('a new first key goes above the full-line comments of the old first key (WP5.1 fix)', () => {
+	it('a new first key goes above the full-line comments of the old first key', () => {
 		const opt = (src: string) => edit(src, { kind: 'set-option', key: 'focus', value: 'a' });
 		expect(opt('options:\n  # size\n  height: 1\n')).toBe('options:\n  focus: a\n  # size\n  height: 1\n');
 		expect(opt('options:\n  # one\n  # two\n  height: 1\n')).toBe('options:\n  focus: a\n  # one\n  # two\n  height: 1\n');
@@ -272,7 +268,7 @@ describe('set-option', () => {
 
 	it('an empty body gets an options section', () => {
 		expect(edit('', { kind: 'set-option', key: 'start', value: 'a' })).toBe('options:\n  start: a');
-		// A final line break stays last (M6 supervisor decision, from the D34 acceptance tests).
+		// A final line break stays last (from the D34 acceptance tests).
 		expect(edit('# only a comment\n', { kind: 'set-option', key: 'start', value: 'a' })).toBe('# only a comment\noptions:\n  start: a\n');
 		expect(edit('# only a comment', { kind: 'set-option', key: 'start', value: 'a' })).toBe('# only a comment\noptions:\n  start: a');
 	});
@@ -340,8 +336,8 @@ describe('batch', () => {
 	});
 });
 
-describe('review 2.2 fixes', () => {
-	it('F1: a value with a fence line is never written as block-scalar lines that Markdown reads as a fence', () => {
+describe('repairs of the yaml edit helpers', () => {
+	it('a value with a fence line is never written as block-scalar lines that Markdown reads as a fence', () => {
 		const src = 'people:\n- id: a\n  name: A\n  notes: |\n   old\n';
 		expect(edit(src, person('a', { notes: 'see:\n```\nend' }))).toBe('people:\n- id: a\n  name: A\n  notes: "see:\\n```\\nend"\n');
 		// With 4 or more spaces the line is indented code inside the fence, so the literal can stay.
@@ -349,33 +345,33 @@ describe('review 2.2 fixes', () => {
 		expect(edit(deep, person('a', { notes: 'see:\n~~~\nend' }))).toBe('people:\n  - id: a\n    name: A\n    notes: |-\n      see:\n      ~~~\n      end\n');
 	});
 
-	it('F2: removing the dash-line key keeps the comment above the next key', () => {
+	it('removing the dash-line key keeps the comment above the next key', () => {
 		const src = 'people:\n  - title: T\n    # about the name\n    name: A\n    id: a\n';
 		expect(edit(src, person('a', { title: null }))).toBe('people:\n  - # about the name\n    name: A\n    id: a\n');
 	});
 
-	it('F2: removing a key from a multi-line flow map keeps comments on other keys', () => {
+	it('removing a key from a multi-line flow map keeps comments on other keys', () => {
 		expect(edit('people:\n  - {id: a, # first\n     title: T, name: A}\n', person('a', { title: null }))).toBe('people:\n  - {id: a, # first\n     name: A}\n');
 		const last = edit('people:\n  - {id: a, name: A, # c\n     title: T}\n', person('a', { title: null }));
 		expect(last).toContain('# c');
 		expect(nameOf(last, 'a')?.title).toBeUndefined();
 	});
 
-	it('F2: a comment after the removed pair and its comma stays', () => {
+	it('a comment after the removed pair and its comma stays', () => {
 		expect(edit('people:\n  - {id: a, title: T, # kept\n     name: A}\n', person('a', { title: null }))).toBe('people:\n  - {id: a, # kept\n     name: A}\n');
 	});
 
-	it('F2: the comment guard refuses a change that would drop a comment', () => {
+	it('the comment guard refuses a change that would drop a comment', () => {
 		const src = 'people:\n  - id: a\n    name:\n      - A # a comment inside the old value\n';
 		expect(applyOp(src, person('a', { name: 'B' }))).toMatchObject({ ok: false, code: 'bad-value' });
 	});
 
-	it('F2: the removed key takes the comments on its own lines', () => {
+	it('the removed key takes the comments on its own lines', () => {
 		const src = 'people:\n  - id: a\n    name: A\n    # above\n    notes: |  # header\n      x\n    sex: f # end\n';
 		expect(edit(src, person('a', { notes: null, sex: null }))).toBe('people:\n  - id: a\n    name: A\n    # above\n');
 	});
 
-	it('F3: a block-scalar line starting with # is text, not a comment above the next key', () => {
+	it('a block-scalar line starting with # is text, not a comment above the next key', () => {
 		const src = 'people:\n  - id: a\n    name: A\n    bio: |\n      Born in the north.\n      #valmont\n    born: 1100\n';
 		expect(edit(src, person('a', { title: 'T' }))).toBe('people:\n  - id: a\n    name: A\n    bio: |\n      Born in the north.\n      #valmont\n    title: T\n    born: 1100\n');
 	});

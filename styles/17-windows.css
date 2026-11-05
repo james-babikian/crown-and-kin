@@ -8,9 +8,9 @@
 /* A visible focus ring on every toolbar button (spec §5.2), inside the toolbar box, in any theme: the
    accent at the edge, and inside it 2 px in the text colour, so it never depends on the accent alone. */
 .dynasty-toolbar .dynasty-tool:focus-visible {
-	outline: 2px solid var(--interactive-accent);
-	outline-offset: -2px;
-	box-shadow: inset 0 0 0 4px var(--text-normal);
+	outline: var(--dynasty-focus-outline);
+	outline-offset: var(--dynasty-focus-inset-offset);
+	box-shadow: var(--dynasty-focus-inset-shadow);
 }
 
 .dynasty-settings .dynasty-setting-height {

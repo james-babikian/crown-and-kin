@@ -12,7 +12,7 @@
 import { Modal, Notice, setIcon, type App } from 'obsidian';
 import type { EditResult, Op } from '../core/edit';
 import { holdLayoutOnPress } from '../render/dom/press-hold';
-import { HOUSES, ID_UI, REMOVE, SHEET, TITLES_UI, WIN_LIST_UI, WINDOW_UI, WRITE_TEXT } from '../render/ui-text';
+import { HOUSES, ID_UI, REMOVE, SHEET, TITLES_UI, WIN_LIST_UI, WINDOW_UI, WRITE_TEXT, isolateName } from '../render/ui-text';
 import type { Handle, HandleWriteOutcome } from './block-handle';
 import { idRefusalText, isIdOp } from '../view/id-draft';
 import { type IdRowView } from './id-field';
@@ -20,11 +20,13 @@ import { queryWords } from '../view/list-search';
 import { phoneLayout, settledReveal, startWithoutFocus } from './modal-layout';
 import type { PictureStore } from './picture-store';
 import { trackModal } from '../view/plugin-modals';
-import { drawableColour, nameDialog, onWriteFailed, showErrorLine } from './sheet-parts';
+import { ListErrors } from './list-errors';
+import { drawableColour, nameDialog, noticeText, onWriteFailed } from './sheet-parts';
 import { undoNotice } from './undo-notice';
 import { renderSections, type SectionSpec, type SectionsView } from './window-sections';
-import { buildRow, iconLead, textButton } from './window-parts';
+import { buildRow, confirmBox, iconLead, textButton } from './window-parts';
 import { buildShell, type Shell } from './window-shell';
+import { guarded } from './start-guard';
 
 /**
  * The link of an arms picture when the picture store can find its file, else null. A row or a header has a picture lead only when
@@ -63,7 +65,7 @@ export interface ListRowView {
 }
 
 /** One button of a question over the window. `detail` makes it a choice with a second text line. */
-export interface ConfirmButton {
+interface ConfirmButton {
 	label: string;
 	detail?: string;
 	cls: string;
@@ -71,7 +73,7 @@ export interface ConfirmButton {
 }
 
 /** What a text field of an edit page needs. */
-export interface TextFieldOptions {
+interface TextFieldOptions {
 	/** The old class of the field (for example `dynasty-title-name`): it goes on the label around the text area. */
 	cls: string;
 	label: string;
@@ -104,7 +106,7 @@ const KINDS = {
 		count: WIN_LIST_UI.matchTitles,
 		noResult: WIN_LIST_UI.noResultTitles,
 		name: 'Titles',
-		icon: 'crown',
+		barWord: WIN_LIST_UI.barTitle,
 		meta: WINDOW_UI.listMetaTitles,
 		idKind: 'title',
 	},
@@ -119,7 +121,7 @@ const KINDS = {
 		count: WIN_LIST_UI.matchHouses,
 		noResult: WIN_LIST_UI.noResultHouses,
 		name: 'Houses',
-		icon: 'castle',
+		barWord: WIN_LIST_UI.barHouse,
 		meta: WINDOW_UI.listMetaHouses,
 		idKind: 'house',
 	},
@@ -151,8 +153,12 @@ export abstract class ListEditWindow extends Modal {
 	protected busy = false;
 	/** True while the small ID window is open, so a second "Change ID" opens no second window. */
 	protected idWindowOpen = false;
-	protected error = '';
-	protected errorEl: HTMLElement | null = null;
+	/** The errors of the window: the one about the whole window and the one about a field (CX-11). */
+	private readonly errors = new ListErrors({ shell: () => this.shell, root: () => this.contentEl });
+	/** The text of the error about the whole window; empty when there is none. */
+	protected get error(): string {
+		return this.errors.text;
+	}
 	protected confirmEl: HTMLElement | null = null;
 	protected confirmFrom: string | null = null;
 	protected readonly cleanup: (() => void)[] = [];
@@ -207,6 +213,10 @@ export abstract class ListEditWindow extends Modal {
 	protected abstract discardText(): string;
 	/** Runs last in `onClose`: the window lets go of what it holds and hands the focus back. */
 	protected abstract released(): void;
+	/** The error line after a stale write (spec §6.1): the draft is kept and the note has new data. */
+	protected abstract readonly staleText: string;
+	/** Shows the block's new data in the window, with the user's changes kept on top. */
+	protected abstract reload(body: string): void;
 
 	// ---------- hooks with a default ----------
 
@@ -271,7 +281,7 @@ export abstract class ListEditWindow extends Modal {
 
 	override onClose(): void {
 		// The focused control goes with the window: let go of it first, so the focus can go back to the button that opened it.
-		const active = this.modalEl.doc?.activeElement as HTMLElement | null | undefined;
+		const active = this.modalEl.doc.activeElement as HTMLElement | null;
 		if (active && this.modalEl.contains(active)) active.blur();
 		for (const c of this.cleanup.splice(0)) c();
 		this.shell?.dispose();
@@ -320,7 +330,7 @@ export abstract class ListEditWindow extends Modal {
 		const el = this.contentEl;
 		const sameView = this.drawn === this.page;
 		// A control that had the focus keeps it, so the focus never leaves the window; the control of another view is gone.
-		const active = this.modalEl.doc?.activeElement as HTMLElement | null | undefined;
+		const active = this.modalEl.doc.activeElement as HTMLElement | null;
 		const had = sameView && active && el.contains(active) ? active.getAttribute('data-focus') : null;
 		focus ??= had;
 		const top = sameView ? (el.querySelector<HTMLElement>('.dynasty-sheet-body')?.scrollTop ?? 0) : this.page === null ? this.listTop : 0;
@@ -341,11 +351,14 @@ export abstract class ListEditWindow extends Modal {
 		const shell = buildShell({
 			modalEl: this.modalEl,
 			contentEl: el,
-			title: onList ? k.title : this.labelOf(this.page!),
+			// O-17: the bar of a phone says what the page is ("Title", "House"); the heading with the full name stays in the body.
+			title: onList ? k.title : this.builtPhone ? k.barWord : this.labelOf(this.page!),
 			titled: true,
 			// The list has nothing to save, so its only button is Close. With changes in the draft (a page made them) it keeps Cancel and Save.
 			...(onList && !this.isDirty() ? { cancelLabel: SHEET.close, saveLabel: null } : {}),
 			onCancel: () => this.finish(),
+			// O-14: Cancel asks the question that Esc asks when the draft has a change.
+			discard: { dirty: () => this.isDirty(), ask: () => this.askDiscard(() => this.finish()) },
 			onSave: () =>
 				this.guard(() => {
 					this.save().catch((e) => console.error(`Crown and Kin: the ${k.name} window could not save`, e));
@@ -356,15 +369,14 @@ export abstract class ListEditWindow extends Modal {
 		if (onList) this.listTopBar(el, shell);
 		else shell.setBack(k.title, k.back, () => this.guard(() => this.goBack()));
 		const body = shell.body;
-		this.errorEl = body.createDiv({ cls: 'dynasty-sheet-error', attr: { role: 'alert' } });
-		this.errorEl.setText(this.error);
-		this.errorEl.toggle(this.error !== '');
 		if (onList) {
 			this.countEl = body.createDiv({ cls: 'dynasty-lw-count', attr: { role: 'status', 'aria-live': 'polite' } });
 			this.listEl = body.createEl('ul', { cls: 'dynasty-lw-list', attr: { role: 'list' } });
 			this.listEl.addEventListener('keydown', (e) => this.onListKey(e));
 			this.renderList();
 		} else this.drawPage(body, this.page!);
+		// An error stays over a new draw (CX-11): the window's under the header, a field's under its field.
+		this.errors.reapply(false);
 		body.scrollTop = top;
 		this.drawn = this.page;
 		if (focus) this.focusFirst([focus]);
@@ -375,18 +387,18 @@ export abstract class ListEditWindow extends Modal {
 		const k = KINDS[this.kind];
 		const top = createDiv({ cls: 'dynasty-lw-top' });
 		el.insertBefore(top, shell.body);
-		const count = k.meta(this.rowViews().length);
-		// On a phone the bar already says "Titles": the list starts with the search box, and its placeholder has the count.
+		const count = this.rowViews().length ? k.meta(this.rowViews().length) : '';
+		// CX-01, L-02: no icon tile. The title and the count stand on the left edge of the search box and the rows.
+		// On a phone the bar says the name of the list: the count stands on its own quiet line above the search box (UX-22), so the placeholder is the same in every state.
 		const phone = this.modalEl.hasClass('is-phone');
 		if (!phone) {
 			const head = top.createDiv({ cls: ['dynasty-head', 'dynasty-lw-head'] });
-			const lead = head.createSpan({ cls: ['dynasty-row-lead', 'is-icon', 'is-list-icon'], attr: { 'aria-hidden': 'true' } });
-			setIcon(lead, k.icon);
 			const text = head.createDiv({ cls: 'dynasty-head-text' });
-			text.createDiv({ cls: 'dynasty-head-name', text: k.title });
-			text.createDiv({ cls: ['dynasty-head-meta', 'dynasty-lw-meta-count'], text: count });
-		}
-		this.searchBar(top, phone ? WINDOW_UI.searchWithCount(count) : k.search);
+			text.createDiv({ cls: ['dynasty-head-name', 'dynasty-title', 'is-tool'], text: k.title });
+			// P3-10: an empty list says it once, in the row sentence; "0 titles" would say it twice.
+			if (count) text.createDiv({ cls: ['dynasty-head-meta', 'dynasty-lw-meta-count'], text: count });
+		} else if (count) top.createDiv({ cls: ['dynasty-head-meta', 'dynasty-lw-meta-count', 'is-phone-count'], text: count });
+		this.searchBar(top, k.search);
 	}
 
 	/** The fixed bar of the list: the search box and, beside it, the Add button. */
@@ -454,10 +466,12 @@ export abstract class ListEditWindow extends Modal {
 		const h = this.pageHead(key);
 		const head = page.createDiv({ cls: ['dynasty-head', 'dynasty-lw-pagehead'] });
 		const text = head.createDiv({ cls: 'dynasty-head-text' });
-		this.headNameEl = text.createDiv({ cls: ['dynasty-head-name', 'dynasty-lw-back-name'], text: h.name, attr: { role: 'heading', 'aria-level': '2' } });
+		this.headNameEl = text.createDiv({ cls: ['dynasty-head-name', 'dynasty-title', 'is-name', 'dynasty-lw-back-name'], text: isolateName(h.name), attr: { role: 'heading', 'aria-level': '2' } });
 		if (h.meta) text.createDiv({ cls: ['dynasty-head-meta', 'dynasty-lw-pagemeta'], text: h.meta });
 		// The picture stands at the right of the name, as in the person window (D209, D213).
 		h.lead?.(head);
+		// The bar of a phone has only the word, so the dialog takes its name from the heading with the full name.
+		if (this.builtPhone) nameDialog(this.modalEl, this.headNameEl);
 		this.renderPage(page, key);
 	}
 
@@ -512,7 +526,7 @@ export abstract class ListEditWindow extends Modal {
 					}
 				: {}),
 		});
-		r.title.createSpan({ cls: 'dynasty-lw-row-name', text: v.name });
+		r.title.createSpan({ cls: 'dynasty-lw-row-name', text: isolateName(v.name) });
 		if (v.state) r.title.createSpan({ cls: ['dynasty-lw-state', `is-${v.state}`], text: STATE_TEXT[v.state] });
 		r.sub.addClass('dynasty-lw-row-sum');
 		// D214: the house colour is a small dot before the count. It reaches the dot only through this property (spec §5.8).
@@ -582,7 +596,7 @@ export abstract class ListEditWindow extends Modal {
 	private add(): void {
 		const key = this.addItem();
 		this.query = '';
-		this.error = '';
+		this.clearError();
 		this.shownKeys = this.rowViews().map((v) => v.key);
 		this.openPage(key, `name:${key}`);
 		this.listTop = 0;
@@ -591,8 +605,9 @@ export abstract class ListEditWindow extends Modal {
 	/** The name of the item changed: the heading of the page, the bar title, the label of the page and the names of its buttons follow. */
 	protected updateBackName(key: string): void {
 		const name = this.labelOf(key);
-		this.headNameEl?.setText(name);
-		this.shell?.setTitle(name, true);
+		this.headNameEl?.setText(isolateName(name));
+		// A phone bar keeps its word (O-17); the dialog name is the heading.
+		if (!this.modalEl.hasClass('is-phone')) this.shell?.setTitle(isolateName(name), true);
 		this.pageEl?.setAttribute('aria-label', WIN_LIST_UI.editPage(name));
 		this.idView?.setItem(name);
 		const label = typeof this.deleteLabel === 'function' ? this.deleteLabel(name) : this.deleteLabel;
@@ -723,31 +738,16 @@ export abstract class ListEditWindow extends Modal {
 	protected showConfirm(title: string, text: string[], from: string | null, buttons: ConfirmButton[]): void {
 		this.hideConfirm(false);
 		// Without a named control, the focus goes back to the one that had it, else to Save (it must stay in the window).
-		const active = this.modalEl.doc?.activeElement as HTMLElement | null | undefined;
+		const active = this.modalEl.doc.activeElement as HTMLElement | null;
 		this.confirmFrom = from ?? (active && this.contentEl.contains(active) ? active.getAttribute('data-focus') : null) ?? 'save';
-		const layer = this.modalEl.createDiv({ cls: 'dynasty-sheet-confirm', attr: { role: 'alertdialog', 'aria-modal': 'true' } });
-		this.confirmEl = layer;
-		const box = layer.createDiv({ cls: 'dynasty-sheet-confirm-box' });
 		// Title and text scroll if the screen is too low; the buttons below never scroll (D113 item 1).
-		const scroll = box.createDiv({ cls: 'dynasty-sheet-confirm-scroll' });
-		const titleEl = scroll.createDiv({ cls: 'dynasty-sheet-confirm-title', text: title });
-		const titleId = `dynasty-${this.kind}-confirm-${Math.random().toString(36).slice(2, 8)}`;
-		titleEl.setAttribute('id', titleId);
-		layer.setAttribute('aria-labelledby', titleId);
-		for (const t of text) scroll.createDiv({ cls: 'dynasty-sheet-confirm-text', text: t });
-		const choices = buttons.some((b) => b.detail !== undefined) ? box.createDiv({ cls: 'dynasty-choice-options' }) : null;
-		const row = box.createDiv({ cls: 'dynasty-sheet-confirm-actions' });
-		let first: HTMLElement | null = null;
-		for (const b of buttons) {
-			const el = (b.detail !== undefined && choices ? choices : row).createEl('button', { cls: b.cls.split(' '), attr: { type: 'button' } });
-			if (b.detail !== undefined) {
-				el.createSpan({ cls: 'dynasty-choice-label', text: b.label });
-				el.createSpan({ cls: 'dynasty-choice-detail', text: b.detail });
-			} else el.setText(b.label);
-			el.addEventListener('click', () => this.guard(b.run));
-			first ??= el;
-		}
-		first?.focus();
+		this.confirmEl = confirmBox(this.modalEl, {
+			title,
+			text,
+			labelled: `dynasty-${this.kind}-confirm`,
+			scroll: true,
+			buttons: buttons.map((b) => ({ label: b.label, detail: b.detail, cls: b.cls.split(' '), run: () => this.guard(b.run) })),
+		}).layer;
 	}
 
 	protected hideConfirm(refocus = true): void {
@@ -775,23 +775,23 @@ export abstract class ListEditWindow extends Modal {
 
 	// ---------- error line, focus, guard ----------
 
-	/** Shows `text` in the error line of the window (and keeps it for the next draw). */
+	/** Shows `text` as an error about the whole window, under the header (CX-11), and keeps it for the next draw. */
 	protected showError(text: string): void {
-		this.error = text;
-		showErrorLine(this.errorEl, text);
+		this.errors.show(text);
+	}
+
+	/** Shows `text` as an error about the field named `focus` (its `data-focus`), under that field, and keeps it for the next draw. */
+	protected showFieldError(focus: string, text: string): void {
+		this.errors.showField(focus, text);
 	}
 
 	protected clearError(): void {
-		if (!this.error) return;
-		this.error = '';
-		// The text goes too: a hidden line must not keep an old message that a screen reader or a test can still read.
-		this.errorEl?.setText('');
-		this.errorEl?.hide();
+		this.errors.clear();
 	}
 
 	/** A refused write: a Notice and the error line. */
 	protected refused(text: string): void {
-		new Notice(text);
+		new Notice(noticeText(text));
 		this.showError(text);
 	}
 
@@ -839,6 +839,13 @@ export abstract class ListEditWindow extends Modal {
 			this.saving = false;
 			this.modalEl.removeClass('is-saving');
 		}
+	}
+
+	/** Spec §6.1 stale write: a Notice, the new data in the window, and the draft kept with a message that says so. */
+	protected stale(body: string): void {
+		new Notice(WRITE_TEXT.staleWindow);
+		this.reload(body);
+		this.showError(this.staleText);
 	}
 
 	/**
@@ -894,11 +901,7 @@ export abstract class ListEditWindow extends Modal {
 
 	/** A failed step never leaves an exception in Obsidian (spec §8). */
 	protected guard(fn: () => void): void {
-		try {
-			fn();
-		} catch (e) {
-			console.error(`Crown and Kin: the ${KINDS[this.kind].name} window failed`, e);
-		}
+		guarded(`the ${KINDS[this.kind].name} window failed`, fn);
 	}
 }
 

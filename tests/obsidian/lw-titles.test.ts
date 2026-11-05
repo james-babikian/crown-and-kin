@@ -8,15 +8,15 @@ import { TitlesWindow, type TitlesOptions } from '../../src/obsidian/titles-wind
 import { closePluginModals } from '../../src/view/plugin-modals';
 import { ID_UI, SHEET, TITLES_UI, WIN_LIST_UI, WINDOW_UI, WRITE_TEXT } from '../../src/render/ui-text';
 import { FEl, clock, device, dispatch, fakeDoc, resetDom, runTimers, settle } from '../acceptance/fake-dom';
-import { lastMenu, notices, openModals, resetObsidian } from '../acceptance/fake-obsidian';
+import { notices, openModals, resetObsidian } from '../acceptance/fake-obsidian';
 import { BODY_13 } from '../acceptance/titles-support';
 import { fakeHost } from '../acceptance/tree-view-fakes';
 import { backButton, backToList, listRows, openPage, pageOf, press, rowNames, rowOf, rowTexts, searchFor } from '../support/lw-support';
-import { click, type, writingHandle, type Writing } from '../support/s113-c-support';
+import { click, type, writingHandle, type Writing } from '../support/windows-sheets-support';
 import { useFakeDom } from '../support/fake-dom-setup';
 
 /*
- * WP-lw-titles of 0.2.5 (the 0.2.5 contract D.3, D134, D138, D130 item 8): the Titles window as a searchable list with an
+ * WP-lw-titles of 0.2.5 (D134, D138, D130 item 8): the Titles window as a searchable list with an
  * edit page. The window is a draft: one Save writes every change in one batch, Cancel writes nothing, a close with
  * changes asks first. The tests run the real window on the fake DOM with sample tree 13; the other sample is made up.
  */
@@ -82,13 +82,13 @@ const save = async (o: Opened) => {
 const question = (o: Opened): FEl | null => o.modal.querySelector('.dynasty-sheet-confirm');
 const rowsOf = (o: Opened) => (o.win as unknown as { rows: { key: string; id: string | null; idDraft?: string; name: string }[] }).rows;
 const keyOf = (o: Opened, id: string) => rowsOf(o).find((t) => t.id === id)!.key;
-/** Opens the menu of a holder row ("more") and chooses an item of it, as a tap does. */
-const chooseFromMenu = async (more: FEl | null, title: string): Promise<void> => {
-	await click(more);
-	const item = lastMenu()!.item(title)!;
-	if (!item) throw new Error(`no menu item "${title}"`);
-	item.click();
-	await Promise.resolve();
+/** O-18: taps a holder row, which opens the holder form, and taps one action of the form (`move-up`, `move-down`, `remove`, `show-card`). */
+const holderAction = async (row: FEl | null, action: string): Promise<void> => {
+	await click(row);
+	const form = openModals[openModals.length - 1] as unknown as { contentEl: FEl };
+	const button = form.contentEl.querySelector(`[data-focus="${action}"]`);
+	if (!button) throw new Error(`no holder action "${action}"`);
+	await click(button);
 };
 const bodyLines = (s: string) => s.split('\n');
 
@@ -109,7 +109,7 @@ const SOB = [
 
 // ---------- the list ----------
 
-describe('open: the list of titles (D.3.1, D.3.2)', () => {
+describe('open: the list of titles', () => {
 	it('opens on the list, with the classes of both generations and no page', () => {
 		const o = openWin();
 		for (const c of ['dynasty-sheet', 'dynasty-titles', 'dynasty-lw']) expect(o.modal.hasClass(c)).toBe(true);
@@ -171,6 +171,15 @@ describe('open: the list of titles (D.3.1, D.3.2)', () => {
 		expect(o.content.querySelector('li.dynasty-lw-none')!.getText()).toBe(TITLES_UI.none);
 	});
 
+	it('shows no count line for an empty list, on a computer and on a phone, so the list says it once (P3-10)', () => {
+		const empty = 'people:\n  - {id: a, name: Aldo}\n';
+		expect(openWin(empty).content.querySelector('.dynasty-lw-meta-count')).toBeNull();
+		for (const m of [...openModals]) m.close();
+		device.width = 390;
+		device.coarse = true;
+		expect(openWin(empty).content.querySelector('.dynasty-lw-meta-count')).toBeNull();
+	});
+
 	it('returns null with a Notice when the tree text has an error', () => {
 		const handle = writingHandle('titles: [\n');
 		expect(TitlesWindow.create({} as never, { handle: handle as never, sourcePath: 'n.md' })).toBeNull();
@@ -180,7 +189,7 @@ describe('open: the list of titles (D.3.1, D.3.2)', () => {
 
 // ---------- the search ----------
 
-describe('the search of the list (D.3.3)', () => {
+describe('the search of the list', () => {
 	it('finds a title by the name of a holder and says why in a "Holder" line', () => {
 		const o = openWin();
 		searchFor(o.content, 'cosimo');
@@ -241,8 +250,8 @@ describe('the search of the list (D.3.3)', () => {
 
 // ---------- the edit page ----------
 
-describe('the edit page of a title (D.3.5, D.3.7)', () => {
-	it('has the four fields, the holder panel, the Succession section (0.2.7) and Other actions, in this order', () => {
+describe('the edit page of a title', () => {
+	it('has the four fields, the holder panel, the Succession section and Other actions, in this order', () => {
 		const o = openWin();
 		const page = openPage(o.content, 'duke-of-valmont');
 		expect(page.getAttribute('data-title')).toBe('duke-of-valmont');
@@ -343,11 +352,11 @@ for (const c of ['dynasty-title-name', 'dynasty-title-male', 'dynasty-title-fema
 	});
 });
 
-describe('the holder rows of the page (D.3.9 c, D130 item 8)', () => {
+describe('the holder rows of the page (D130 item 8)', () => {
 	it('puts the ruler text and the sobriquet in ONE inline label, so the space before the sobriquet stays', () => {
 		const o = openWin(SOB);
 		const page = openPage(o.content, 'duke');
-		const button = page.querySelectorAll('button.dynasty-holder-name')[0]!;
+		const button = page.querySelectorAll('.dynasty-holder-name')[0]!;
 		expect(button.getText()).toBe('Aldric II “the Bold”');
 		const labels = button.querySelectorAll(':scope > .dynasty-holder-label');
 		expect(labels).toHaveLength(1);
@@ -360,17 +369,14 @@ describe('the holder rows of the page (D.3.9 c, D130 item 8)', () => {
 		expect(sob.getText().startsWith(' ')).toBe(true);
 	});
 
-	it('keeps the accessible name of the button without the sobriquet, and the label on a holder with no sobriquet', () => {
+	it('is one row button that opens the holder form, named by its two text lines, with no sobriquet in a second item (O-18)', () => {
 		const o = openWin(SOB);
 		const page = openPage(o.content, 'duke');
-		const [first, second] = page.querySelectorAll('button.dynasty-holder-name');
-		expect(first!.getAttribute('aria-label')).toBe(TITLES_UI.showCardLabel('Aldric II'));
-		// A holder with no number and no written ruler name leads with the full name (holder-rows).
-		expect(second!.getText()).toBe('Bran Orsini');
-		expect(second!.getAttribute('aria-label')).toBe(TITLES_UI.showCardLabel('Bran Orsini'));
-		expect(second!.querySelector('.dynasty-picker-sob')).toBeNull();
-		// A holder who is not in the tree is plain text, with no button.
-		expect(page.querySelectorAll('span.dynasty-holder-name').map((d) => d.getText())).toEqual(['Orso the Old I']);
+		const rows = page.querySelectorAll('.dynasty-holder-row');
+		expect(rows.map((r) => r.tag)).toEqual(['button', 'button', 'button']);
+		expect(rows[1]!.querySelector('.dynasty-picker-sob')).toBeNull();
+		expect(page.querySelectorAll('.dynasty-holder-more')).toHaveLength(0);
+		expect(page.querySelectorAll('.dynasty-holder-name').map((d) => d.getText())).toEqual(['Aldric II “the Bold”', 'Orso the Old I', 'Bran Orsini']);
 	});
 
 	it('leads with the full name unless the entry has a number or a written ruler name; then the ruler text is bold and the full name is in the second text line (holder-rows)', () => {
@@ -378,7 +384,7 @@ describe('the holder rows of the page (D.3.9 c, D130 item 8)', () => {
 		const page = openPage(o.content, 'duke');
 		const [aldric, orso, bran] = page.querySelectorAll('.dynasty-holder-row');
 		// A number and a written ruler name: the ruler text leads, the full name follows in the second text line with the reign.
-		expect(aldric!.querySelector('button.dynasty-holder-name')!.getText()).toBe('Aldric II “the Bold”');
+		expect(aldric!.querySelector('.dynasty-holder-name')!.getText()).toBe('Aldric II “the Bold”');
 		expect(aldric!.querySelector('.dynasty-row-sub')!.getText()).toBe('Ser Aldric Valmont');
 		// A name only, with a number: the ruler text leads, and the text line says the person is not in the tree.
 		expect(orso!.querySelector('.dynasty-holder-name')!.getText()).toBe('Orso the Old I');
@@ -416,7 +422,7 @@ describe('the holder rows of the page (D.3.9 c, D130 item 8)', () => {
 
 // ---------- the draft: Save, Cancel, close ----------
 
-describe('Save writes the whole draft in ONE batch (D.3.8, spec §13.0 item 6)', () => {
+describe('Save writes the whole draft in ONE batch (spec §13.0 item 6)', () => {
 	it('two edited titles, a moved holder, a new title and a deleted title make one write and one Undo step', async () => {
 		const o = openWin();
 		let page = openPage(o.content, 'duke-of-valmont');
@@ -425,7 +431,7 @@ describe('Save writes the whole draft in ONE batch (D.3.8, spec §13.0 item 6)',
 		page = openPage(o.content, 'king-of-the-vale');
 		typeIn(page, 'dynasty-title-male', 'High King of the Vale');
 		const holders = page.querySelectorAll('.dynasty-holder-row');
-		await chooseFromMenu(holders[0]!.querySelector('.dynasty-holder-more'), TITLES_UI.moveLater);
+		await holderAction(holders[0]!, 'move-down');
 		backToList(o.content);
 		await click(o.content.querySelector('button[data-focus="add"]'));
 		typeIn(pageOf(o.content), 'dynasty-title-name', 'Margrave of the Reach');
@@ -462,14 +468,16 @@ describe('Save writes the whole draft in ONE batch (D.3.8, spec §13.0 item 6)',
 		expect(o.handle.body).toContain('plural: Dukes of Valmont');
 	});
 
-	it('writes nothing for Cancel, and closes at once', async () => {
+	it('writes nothing for Cancel; with a change it asks "Discard changes?" first, and "Discard changes" closes (O-14)', async () => {
 		const o = openWin();
 		const page = openPage(o.content, 'duke-of-valmont');
 		typeIn(page, 'dynasty-title-name', 'Grand Duke of Valmont');
 		await click(o.content.querySelector('button[data-focus="cancel"]'));
+		expect(isOpen(o.win)).toBe(true);
+		expect(question(o)!.getText()).toContain(SHEET.discardTitle);
+		await click(question(o)!.querySelector('.dynasty-sheet-discard'));
 		expect(o.handle.ops).toHaveLength(0);
 		expect(isOpen(o.win)).toBe(false);
-		expect(question(o)).toBeNull();
 	});
 
 	it('closes at once on Save when nothing changed, from a page (the list has only Close then)', async () => {
@@ -541,7 +549,7 @@ describe('Save writes the whole draft in ONE batch (D.3.8, spec §13.0 item 6)',
 		expect(active()).toBe(`id-open:${keyOf(o, 'duke-of-valmont')}`);
 		expect(page.hasClass('has-id-problem')).toBe(true);
 		expect(page.querySelector('.dynasty-id-new-problem')!.getText()).not.toBe('');
-		expect(o.content.querySelector('.dynasty-sheet-error')!.getText()).toBe('');
+		expect(o.content.querySelector('.dynasty-sheet-error')).toBeNull();
 	});
 
 	it('asks "Change the ID?" before it writes, and Keep old writes nothing', async () => {
@@ -605,7 +613,7 @@ describe('Save writes the whole draft in ONE batch (D.3.8, spec §13.0 item 6)',
 	});
 });
 
-describe('Change ID: the small ID window opens from the page (D.3.7, §13.17 rule 5)', () => {
+describe('Change ID: the small ID window opens from the page (§13.17 rule 5)', () => {
 	const topModal = () => (openModals[openModals.length - 1] as unknown as { modalEl: FEl }).modalEl;
 
 	it('"Use this ID" draws the note on the page and puts the focus back on Change ID; Keep old ID removes the note', async () => {
@@ -654,7 +662,7 @@ describe('Change ID: the small ID window opens from the page (D.3.7, §13.17 rul
 	});
 });
 
-describe('Delete (D.3.7)', () => {
+describe('Delete', () => {
 	it('removes a new title at once with no question; the focus goes to the neighbour row, else Add', async () => {
 		const o = openWin();
 		await click(o.content.querySelector('button[data-focus="add"]'));
@@ -693,21 +701,23 @@ describe('Delete (D.3.7)', () => {
 	});
 });
 
-describe('the holder buttons on the page (copied behaviour, D.3.5)', () => {
+describe('the holder buttons on the page (copied behaviour)', () => {
 	it('Move later, Remove and the focus stay on the page; Save writes one batch', async () => {
 		const o = openWin();
 		const page = openPage(o.content, 'king-of-the-vale');
 		const rows = page.querySelectorAll('.dynasty-holder-row');
-		// 0.2.8: the four actions of a holder are in the menu "more"; the first holder cannot move earlier, the last cannot move later.
-		await click(rows[0]!.querySelector('.dynasty-holder-more'));
-		expect(lastMenu()!.item(TITLES_UI.moveEarlier)!.disabled).toBe(true);
-		await click(rows[2]!.querySelector('.dynasty-holder-more'));
-		expect(lastMenu()!.item(TITLES_UI.moveLater)!.disabled).toBe(true);
-		await chooseFromMenu(rows[0]!.querySelector('.dynasty-holder-more'), TITLES_UI.moveLater);
+		// O-18: the four actions of a holder are in its form; the first holder cannot move up, the last cannot move down.
+		await click(rows[0]!);
+		expect((openModals[openModals.length - 1] as unknown as { contentEl: FEl }).contentEl.querySelector('[data-focus="move-up"]')!.disabled).toBe(true);
+		await click((openModals[openModals.length - 1] as unknown as { contentEl: FEl }).contentEl.querySelector('.dynasty-sheet-cancel'));
+		await click(rows[2]!);
+		expect((openModals[openModals.length - 1] as unknown as { contentEl: FEl }).contentEl.querySelector('[data-focus="move-down"]')!.disabled).toBe(true);
+		await click((openModals[openModals.length - 1] as unknown as { contentEl: FEl }).contentEl.querySelector('.dynasty-sheet-cancel'));
+		await holderAction(rows[0]!, 'move-down');
 		expect(pageOf(o.content).querySelectorAll('.dynasty-holder-name').map((n) => n.getText())).toContain('Aldric III');
 		expect(backButton(o.content)).not.toBeNull();
 		const first = pageOf(o.content).querySelectorAll('.dynasty-holder-row')[0]!;
-		await chooseFromMenu(first.querySelector('.dynasty-holder-more'), TITLES_UI.remove);
+		await holderAction(first, 'remove');
 		expect(pageOf(o.content).querySelectorAll('.dynasty-holder-row')).toHaveLength(2);
 		await save(o);
 		expect(o.handle.ops).toHaveLength(1);
@@ -717,7 +727,7 @@ describe('the holder buttons on the page (copied behaviour, D.3.5)', () => {
 	it('Edit opens the holder form over the window; its Save changes the draft only', async () => {
 		const o = openWin();
 		const page = openPage(o.content, 'duke-of-valmont');
-		await chooseFromMenu(page.querySelectorAll('.dynasty-holder-more')[2]!, TITLES_UI.edit);
+		await click(page.querySelectorAll('.dynasty-holder-row')[2]!);
 		const form = openModals[openModals.length - 1] as unknown as { modalEl: FEl; contentEl: FEl };
 		expect(form.modalEl.hasClass('dynasty-holder-form')).toBe(true);
 		const number = form.contentEl.querySelector('[data-field="number"] input')!;
@@ -726,7 +736,7 @@ describe('the holder buttons on the page (copied behaviour, D.3.5)', () => {
 		expect(o.handle.ops).toHaveLength(0);
 		expect(pageOf(o.content).querySelectorAll('.dynasty-holder-name')[2]!.getText()).toBe('Roderick I');
 		const holderKey = (o.win as unknown as { rows: { id: string | null; holders: { key: string }[] }[] }).rows.find((t) => t.id === 'duke-of-valmont')!.holders[2]!.key;
-		expect(active()).toBe(`more:${holderKey}`);
+		expect(active()).toBe(`holder:${holderKey}`);
 		await save(o);
 		expect(o.handle.body).toContain('{person: roderick, number: I, from: 1150, to: 1158}');
 	});
@@ -734,20 +744,20 @@ describe('the holder buttons on the page (copied behaviour, D.3.5)', () => {
 	it('shows the card of a holder: the window closes and the tree gets the person; with changes it asks first', async () => {
 		const o = openWin();
 		const page = openPage(o.content, 'king-of-the-vale');
-		await click(page.querySelectorAll('button.dynasty-holder-name')[0]!);
+		await holderAction(page.querySelectorAll('.dynasty-holder-row')[0]!, 'show-card');
 		expect(o.shown).toEqual(['young-aldric']);
 		expect(isOpen(o.win)).toBe(false);
 
 		const d = openWin();
 		openPage(d.content, 'king-of-the-vale');
 		typeIn(pageOf(d.content), 'dynasty-title-male', 'Kings');
-		await click(pageOf(d.content).querySelectorAll('button.dynasty-holder-name')[0]!);
+		await holderAction(pageOf(d.content).querySelectorAll('.dynasty-holder-row')[0]!, 'show-card');
 		expect(d.shown).toEqual([]);
 		expect(question(d)!.getText()).toContain(TITLES_UI.discardText);
 		await click(question(d)!.querySelector('.dynasty-sheet-keep'));
 		expect(d.shown).toEqual([]);
 		expect(isOpen(d.win)).toBe(true);
-		await click(pageOf(d.content).querySelectorAll('button.dynasty-holder-name')[0]!);
+		await holderAction(pageOf(d.content).querySelectorAll('.dynasty-holder-row')[0]!, 'show-card');
 		await click(question(d)!.querySelector('.dynasty-sheet-discard'));
 		expect(d.shown).toEqual(['young-aldric']);
 		expect(isOpen(d.win)).toBe(false);
@@ -780,7 +790,7 @@ describe('Make a note with this table (D55)', () => {
 		const o = openWin();
 		const create = withVault(o);
 		const page = openPage(o.content, 'duke-of-valmont');
-		await chooseFromMenu(page.querySelectorAll('.dynasty-holder-more')[0]!, TITLES_UI.remove);
+		await holderAction(page.querySelectorAll('.dynasty-holder-row')[0]!, 'remove');
 		await click(pageOf(o.content).querySelector('.dynasty-title-note'));
 		expect(create).not.toHaveBeenCalled();
 		expect(question(o)!.getText()).toContain(TITLES_UI.noteText);
@@ -790,7 +800,7 @@ describe('Make a note with this table (D55)', () => {
 	});
 });
 
-describe('long names (D.3.9 b) and the fields of the page', () => {
+describe('long names and the fields of the page', () => {
 	const LONG = 'Hereditary Keeper of the Salt Roads and Warden of the Southern Shore';
 
 	it('keeps the whole long name after Back and in the written note', async () => {
@@ -817,7 +827,7 @@ describe('long names (D.3.9 b) and the fields of the page', () => {
 	});
 });
 
-describe('the keyboard reveal (D.7 item 7)', () => {
+describe('the keyboard reveal', () => {
 	const scrolls = () => vi.spyOn(FEl.prototype, 'scrollIntoView');
 	/** The argument of the first call of a spy on a method that the fake declares with no parameter. */
 	const firstArg = (spy: { mock: { calls: unknown[][] } }): unknown => spy.mock.calls[0]![0];
@@ -873,7 +883,7 @@ describe('the window ends cleanly (spec §8)', () => {
 		expect(o.content.querySelector('button[data-focus="save"]')).toBeNull();
 		expect(o.content.querySelector('button[data-focus="cancel"]')!.getText()).toBe(SHEET.close);
 		openPage(o.content, 'duke-of-valmont');
-		expect(o.content.querySelector('button[data-focus="save"]')!.getText()).toBe(SHEET.save);
+		expect(o.content.querySelector('button[data-focus="save"]')!.getText()).toBe(`${SHEET.save} ${SHEET.saveKeysCtrl}`);
 		expect(o.content.querySelector('button[data-focus="cancel"]')!.getText()).toBe(SHEET.cancel);
 	});
 });
@@ -942,17 +952,26 @@ describe('the arms lead of a title (titles-arms-lead, D213)', () => {
 });
 
 describe('the list on a phone (lw-phone-header)', () => {
-	it('has no head, and the placeholder of the search box has the count, so the list starts with the search box', () => {
+	it('has no head; the count stands on its own line above the search box, and the placeholder is the plain one in every state (UX-22)', () => {
 		device.width = 390;
 		device.coarse = true;
 		const o = openWin();
 		expect(o.modal.hasClass('is-phone')).toBe(true);
 		expect(o.content.querySelector('.dynasty-lw-head')).toBeNull();
-		expect(o.content.querySelector('.dynasty-lw-meta-count')).toBeNull();
 		const n = G13.titles.length;
-		expect(o.content.querySelector('input.dynasty-lw-search')!.getAttribute('placeholder')).toBe(`Search ${WINDOW_UI.listMetaTitles(n)}`);
-		// The name for a screen reader is still the plain one.
+		expect(o.content.querySelector('.dynasty-lw-meta-count')!.getText()).toBe(WINDOW_UI.listMetaTitles(n));
+		expect(o.content.querySelector('input.dynasty-lw-search')!.getAttribute('placeholder')).toBe(WIN_LIST_UI.searchTitles);
 		expect(o.content.querySelector('input.dynasty-lw-search')!.getAttribute('aria-label')).toBe(WIN_LIST_UI.searchTitles);
+	});
+
+	it('says only the word "Title" in the bar of a page and keeps the heading with the full name (O-17)', () => {
+		device.width = 390;
+		device.coarse = true;
+		const o = openWin();
+		const page = openPage(o.content, 'duke-of-valmont');
+		expect(o.content.querySelector('.dynasty-bar-title')!.getText()).toBe(WIN_LIST_UI.barTitle);
+		expect(page.querySelector('.dynasty-lw-back-name')!.getText()).toBe('Duke of Valmont');
+		expect(o.modal.getAttribute('aria-labelledby')).toBe(page.querySelector('.dynasty-lw-back-name')!.getAttribute('id'));
 	});
 
 	it('keeps the head with the name and the count, and the plain placeholder, on a computer', () => {

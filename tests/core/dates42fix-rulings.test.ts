@@ -1,4 +1,4 @@
-// Fix round of step 4.2 (the decision notes "WP-4.2 built", rulings 1, 2, 3 and 6): the scope and the single copy of the tree date warnings,
+// Fix round of step 4.2 (2, 3 and 6): the scope and the single copy of the tree date warnings,
 // a date that fits two calendars, the notes while the calendars are not ready, and `calendar-no-anchor` in the line.
 import { describe, expect, it } from 'vitest';
 import { compileCalendars } from '../../src/core/dates';

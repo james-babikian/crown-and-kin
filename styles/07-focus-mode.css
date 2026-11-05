@@ -63,6 +63,15 @@
 	margin-right: 8px;
 }
 
+/*
+ * D330 TR-10: no grey fill; the bar has the page colour of the toolbar above it (opaque, so a pan never shows a card under the text) and its hairline below.
+ * On a computer the text starts where the label of the first tool starts (2 px toolbar padding, 6 px tool padding, the icon, a 6 px gap: the icon size plus 14 px). A phone keeps its own padding (chunk 18).
+ */
+.dynasty-viewport .dynasty-result.dynasty-focus-bar {
+	background-color: var(--background-primary);
+	padding-left: calc(var(--dynasty-icon-bar) + 3.5 * var(--dynasty-space-1));
+}
+
 .dynasty-focus-bar-text {
 	overflow-wrap: anywhere;
 }

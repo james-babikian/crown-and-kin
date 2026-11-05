@@ -9,7 +9,7 @@ import { FAR, desktop, embed, fakeHandle, fullViews, sheets, tabletDevice } from
 import { useFakeDom } from '../support/fake-dom-setup';
 
 /*
- * WP4.3 (G5, sample tree 6 at Fit): a far-couple tag's 44 px tap area covered a whole small card,
+ * WP4.3 (sample tree 6 at Fit): a far-couple tag's 44 px tap area covered a whole small card,
  * so a press on the card jumped to the partner. The tap areas now lie below the cards; the pills
  * stay above them.
  */

@@ -11,7 +11,7 @@ import { golden, replaceOnce } from './golden';
 import { allFixtures, fixtureNote, fixtureSource, topLevelBlocks } from './load';
 
 // The Houses window (spec §6.10, D32): rename and recolour a house, delete a house. Contract
-// (M6 after the design gate, src/core/edit.ts, the decision notes "M6 design gate"): `EditHouse`
+// (M6 after the design gate, src/core/edit.ts): `EditHouse`
 // changes only the given fields of the first house with the id; `color: null` removes the colour;
 // a colour must be `#rrggbb` (else `bad-value`) and is always written in double quotes; an empty
 // name is `bad-value`; a colour that YAML read as an end-of-line comment (unquoted `#…`) is
@@ -25,8 +25,8 @@ import { allFixtures, fixtureNote, fixtureSource, topLevelBlocks } from './load'
 // expected text is hand-written in tests/golden/09-house-*.yaml or built here by replacing exact
 // lines of the input.
 //
-// Reading of the rules for an empty `houses` list (test-author, WP6.1): deleting the last house
-// removes the whole `houses` section, like the last option (M2) and the last union (M3): with the
+// Reading of the rules for an empty `houses` list: deleting the last house
+// removes the whole `houses` section, like the last option and the last union: with the
 // one blank line that separated it from the next section, or, when it is the last section, with
 // the blank lines before it. A section is never left as `houses:` with no items, nor as `houses: []`.
 
@@ -334,7 +334,7 @@ describe('delete-house, clear: the house and every house: line of its people (§
 		);
 	});
 
-	it('a full-line comment above the deleted house stays (the decision notes "Relationship-op details")', () => {
+	it('a full-line comment above the deleted house stays', () => {
 		const b = 'houses:\n  # Founded in 1100.\n  - id: fenn\n    name: House Fenn\n  - id: marsh\n    name: House Marsh\n\npeople:\n  - id: a\n    name: A';
 		expect(body(applyOp(b, del('fenn', 'clear')))).toBe(replaceOnce(b, '  - id: fenn\n    name: House Fenn\n', ''));
 	});
@@ -378,7 +378,7 @@ describe('delete-house, keep: only the house item goes (§6.10, §8)', () => {
 	});
 });
 
-describe('an empty houses list is removed (reading above; the decision notes "Formatting details", "Write machinery after M3")', () => {
+describe('an empty houses list is removed (reading above)', () => {
 	const PEOPLE = 'people:\n  - id: a\n    name: A\n    house: fenn';
 
 	it('houses first: the section and the blank line after it go', () => {

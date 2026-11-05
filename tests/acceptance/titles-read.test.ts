@@ -165,7 +165,7 @@ describe('sample tree 13: the titles the tree uses (spec §13.4, contract rules 
 		expect(person(g(), 'aldric')?.cardTitle).toBeUndefined();
 	});
 
-	it('the Tree carries the same titles; a subgraph keeps them unchanged (contract rule 3)', async () => {
+	it('the Tree carries the same titles; a subgraph keeps them unchanged', async () => {
 		const tree = treeOf(BODY_13);
 		expect(tree.titles?.map((t) => t.id)).toEqual(expect.arrayContaining(['duke-of-valmont', 'count-of-orsini', 'king-of-the-vale']));
 		const focus = focusSubgraph(tree, 'edmund', 1);
@@ -293,7 +293,7 @@ describe('reading: tolerated forms and silent keys (spec §13.4 "Tolerated silen
 		expect(g.issues.map((i) => i.code)).toEqual(['card-title-not-held']);
 	});
 
-	it('a null holder item is not a holder: entry-not-map, section holders (supervisor ruling)', () => {
+	it('a null holder item is not a holder: entry-not-map, section holders', () => {
 		const g = graphOf('titles:\n  - id: duke\n    name: Duke\n    holders:\n      -\n      - aldric\n' + people);
 		expect(g.issues.map(asWritten)).toEqual([{ code: 'entry-not-map', params: { section: 'holders', title: 'Duke', index: '1' } }]);
 		expect(titles(g)[0].holders).toEqual([{ index: 1, person: 'aldric' }]);
@@ -310,7 +310,7 @@ describe('reading: tolerated forms and silent keys (spec §13.4 "Tolerated silen
 		expect(titles(g)[0].holders).toEqual([{ index: 1, person: 'ghost2', name: 'Ghost' }]);
 	});
 
-	it('a subgraph may report missing-holder for people it left out (contract rule 3)', () => {
+	it('a subgraph may report missing-holder for people it left out', () => {
 		const tree = treeOf(BODY_13);
 		const focus = focusSubgraph(tree, 'beatrix', 0);
 		expect(focus).not.toBeNull();

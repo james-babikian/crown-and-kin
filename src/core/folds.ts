@@ -180,7 +180,7 @@ function spread(g: FamilyGraph, folds: Iterable<FoldKey>, exempt: ReadonlySet<st
  * If the result would hide every person, nothing is hidden and the caller draws the tree unfolded.
  */
 export function foldHidden(g: FamilyGraph, folds: FoldSet): Set<string> {
-	if (!folds || !folds.size) return new Set();
+	if (!folds?.size) return new Set();
 	const { byKey } = indexOf(g);
 	const none: ReadonlySet<string> = new Set();
 	let hidden = spread(g, folds, none);

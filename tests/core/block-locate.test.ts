@@ -275,7 +275,7 @@ describe('replaceBody', () => {
 });
 
 describe('mixed and lone-\\r line endings', () => {
-	it('F5: untouched lines keep their own ending; new lines take the ending of the line above', () => {
+	it('untouched lines keep their own ending; new lines take the ending of the line above', () => {
 		const note = 'x\n```kin\r\na: 1\r\nb: 2\r\nc: 3\r\n```\r\n';
 		expect(replaceBody(note, only(note), 'a: 1\nb: 9\nc: 3')).toBe('x\n```kin\r\na: 1\r\nb: 9\r\nc: 3\r\n```\r\n');
 		expect(replaceBody(note, only(note), 'a: 1\nb: 2\nb2: 5\nc: 3')).toBe('x\n```kin\r\na: 1\r\nb: 2\r\nb2: 5\r\nc: 3\r\n```\r\n');

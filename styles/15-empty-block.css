@@ -6,9 +6,11 @@
 	align-items: center;
 	justify-content: center;
 	gap: var(--size-4-3);
-	padding: var(--size-4-6) var(--size-4-4);
-	border: 1px dashed var(--background-modifier-border);
-	border-radius: var(--radius-m);
+	padding: var(--dynasty-space-6) var(--dynasty-space-4);
+	/* D330 TR-06: plain paper between the two hairlines of a drawn tree, no dashed box. */
+	border: none;
+	border-block: var(--dynasty-hairline);
+	border-radius: 0;
 	font-family: var(--font-interface);
 	font-size: var(--dynasty-type-text);
 	color: var(--text-muted);
@@ -32,3 +34,23 @@
 	font-weight: var(--font-semibold);
 }
 
+/*
+ * D330 TR-13: the line of a tree of one person (a computer, or the note of a tablet). One quiet line in the muted colour and the small role,
+ * centred, 16 px above the hairline at the foot of the box. It does not take a press from the tree, and a read-only tree has no use for it.
+ */
+.dynasty-one-person-hint {
+	position: absolute;
+	right: var(--dynasty-space-4);
+	bottom: var(--dynasty-space-4);
+	left: var(--dynasty-space-4);
+	z-index: 1;
+	color: var(--dynasty-muted);
+	font-family: var(--font-interface);
+	font-size: var(--dynasty-type-small);
+	text-align: center;
+	pointer-events: none;
+}
+
+.dynasty-read-only .dynasty-one-person-hint {
+	display: none;
+}

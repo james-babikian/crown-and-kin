@@ -8,6 +8,8 @@ import { Notice, type App } from 'obsidian';
 import { REMOVE, WRITE_TEXT } from '../render/ui-text';
 import type { Handle, HandleRegistry } from './block-handle';
 import { choose } from './choice-modal';
+import { undoneText } from './undo-text';
+import { noticeText } from '../render/dom/name-marks';
 
 /** The name of a note as the user knows it: the last part of the path, with no ".md". */
 export function noteBaseName(path: string): string {
@@ -26,8 +28,11 @@ function refusal(code: string): string {
 async function undoNow(h: Handle): Promise<void> {
 	const out = await h.undo();
 	// The note can be renamed while the question is open: the handle then has the new path.
-	if (out.ok) new Notice(WRITE_TEXT.undoDoneIn(noteBaseName(h.key.path)));
-	else new Notice(refusal(out.code));
+	if (out.ok) {
+		const note = noteBaseName(h.key.path);
+		// D330 UX-17: a write that said what it changed gets the words for it; every other write keeps the generic text.
+		new Notice(noticeText(undoneText(out.label, note, WRITE_TEXT.undoDoneIn(note))));
+	} else new Notice(refusal(out.code));
 }
 
 /** The command. Nothing here throws: a fault shows the "cannot undo" Notice. */

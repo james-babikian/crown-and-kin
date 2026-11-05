@@ -31,7 +31,8 @@ describe('the texts of dates and calendars', () => {
 
 	it('has no sentence of more than 20 words', () => {
 		const sentences = all.flatMap((t) => t.split(/(?<=[.!?])\s+(?=[A-Z])/));
-		for (const s of sentences) expect(s.split(/\s+/).length, s).toBeLessThanOrEqual(20);
+		// D330 O-25: the purpose line is a description, which STE rule 1 allows to have 25 words.
+		for (const s of sentences) expect(s.split(/\s+/).length, s).toBeLessThanOrEqual(s === CALENDAR_WINDOW_UI.intro ? 25 : 20);
 	});
 
 	it('has no -ing word, no contraction and no straight quote mark', () => {
@@ -43,7 +44,7 @@ describe('the texts of dates and calendars', () => {
 		}
 	});
 
-	it('uses none of the words that the owner word list forbids', () => {
+	it('uses none of the words of the word list', () => {
 		const banned = /\b(graph|diagram|chart|node|box|tile|union|edge|path|stroke|layer|rank|partition|file|document|commit|fixture|sprint|phase)\b/i;
 		for (const t of all) expect(t, t).not.toMatch(banned);
 	});
@@ -62,7 +63,7 @@ describe('the texts of dates and calendars', () => {
 		expect(DATE_READOUT_UI.match('A', 'Era', 3, -2)).toBe('A: Era, Year 3 = year −2');
 	});
 
-	it('names every screen-reader label of a control that shows a text with that text first (spec §7.5 R1)', () => {
+	it('names every screen-reader label of a control that shows a text with that text first (spec §7.5)', () => {
 		expect(CALENDAR_UI.moreLabel.startsWith(`${CALENDAR_UI.more}:`)).toBe(true);
 		expect(CALENDAR_UI.noteMoreLabel.startsWith(`${CALENDAR_UI.noteMore}:`)).toBe(true);
 		expect(CALENDAR_BLOCK_UI.editLabel('Count').startsWith(`${CALENDAR_BLOCK_UI.edit}`)).toBe(true);

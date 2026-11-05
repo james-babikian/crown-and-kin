@@ -6,17 +6,12 @@
  */
 
 import { RELINFO, type RelationInfo } from '../render/tree-info';
-import { joined } from '../render/text-join';
+import { joined, lowerFirst } from '../render/text-join';
 import { WINDOW_UI } from '../render/ui-text';
 
 /** What the line shows for one person: the texts, and the action of "Show the line" (absent when there is none). */
 export interface RelationView extends RelationInfo {
 	showLine?: { label: string; aria: string; run(): void };
-}
-
-/** The small first letter of a relation word: "Half-sister, maybe full" reads "Your half-sister, maybe full". */
-export function lowerFirst(text: string): string {
-	return text.charAt(0).toLowerCase() + text.slice(1);
 }
 
 /** Draws the relation lines into `parent` and returns the first element. */

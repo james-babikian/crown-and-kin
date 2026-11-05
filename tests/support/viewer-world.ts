@@ -1,5 +1,5 @@
 /*
- * The fake world that `r033-c1-card-viewer` and `r033-b2c1-g2` share (the picture viewer opened from a card, 0.3.3 C1): three vault pictures, a picture
+ * The fake world that `tree-from-another-note-viewer` and `retired-view-no-card-action` share (the picture viewer opened from a card): three vault pictures, a picture
  * store whose `resolve` is the real one and whose copies are made by the test, a host with that store, and a tree view of one block inside a parent
  * box. Each test file keeps its own sample note and calls `viewIn` with it.
  */
@@ -9,7 +9,7 @@ import { TreeView } from '../../src/obsidian/tree-view';
 import { createPictureStore, type PictureCopy, type PictureIO, type PictureStore } from '../../src/obsidian/picture-store';
 import { FEl, flushFrames, resizeAll, settle } from '../acceptance/fake-dom';
 import { openModals } from '../acceptance/fake-obsidian';
-import { pngHead } from '../acceptance/m9-support';
+import { pngHead } from '../acceptance/picture-sample-support';
 import { fakeHandle, fakeHost, type Host } from '../acceptance/tree-view-fakes';
 
 const File = VaultFile as unknown as new (path: string, extension: string) => VaultFile;

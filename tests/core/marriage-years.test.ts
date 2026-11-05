@@ -8,7 +8,7 @@ import { compileCalendars } from '../../src/core/dates';
 import type { FamilyGraph, FamilyUnion } from '../../src/core/derive';
 import { MarriageYears } from '../../src/core/marriage-years';
 import { computeRelations, lineSubgraph, relationsKey } from '../../src/core/relations';
-import { CYCLES, graphOf, p, treeF, treeN, w, wordsOf, type Tree, type Wed } from './r05-marriage-years-trees';
+import { CYCLES, graphOf, p, treeF, treeN, w, wordsOf, type Tree, type Wed } from './marriage-years-trees';
 
 /** A and B marry; `died` are their death texts. Returns the years of the graph and the one marriage. */
 function pair(union: Omit<Wed, 'partners'>, died: [string?, string?] = ['1170', '1175'], born: [string?, string?] = ['1100', '1102']): { y: MarriageYears; u: FamilyUnion; g: FamilyGraph } {
@@ -17,7 +17,7 @@ function pair(union: Omit<Wed, 'partners'>, died: [string?, string?] = ['1170', 
 	return { y: new MarriageYears(g), u: g.unions[0], g };
 }
 
-describe('ENDED (RULES §A and §4)', () => {
+describe('ended-by words', () => {
 	it('a divorce or an annulment ends the marriage with no year, in any case, and the aliases too', () => {
 		for (const word of ['divorce', 'Divorce', ' DIVORCE ', 'annulment', 'divorced', 'annulled']) {
 			const { y, u } = pair({ endedBy: word }, [undefined, undefined]);
@@ -58,7 +58,7 @@ describe('ENDED (RULES §A and §4)', () => {
 	});
 });
 
-describe('APART (RULES §A)', () => {
+describe('APART', () => {
 	it('the marriage ended before K was born, or began after K died, by exact years', () => {
 		// A (1100) and B (1102) marry 1120 to 1130; deaths 1170 and 1175.
 		const k = graphOf({ people: [p('a', 'm', '1100', '1170'), p('b', 'f', '1102', '1175'), p('k1', 'f', '1135'), p('k2', 'f', '1125'), p('k3', 'f', '1100', '1110'), p('k4', 'f', undefined, '1119')], unions: [w('a', 'b', { start: '1120', end: '1130' })] });
@@ -153,7 +153,7 @@ describe('the verdict of a word', () => {
 	});
 });
 
-describe('the reader that is not ready: years do not count, ended-by does (RULES §5.1)', () => {
+describe('the reader that is not ready: years do not count, ended-by does', () => {
 	const tree = (union: Omit<Wed, 'partners'>) => treeF(union);
 	it('the fallback waits for the calendar; the key does not', () => {
 		const g = graphOf(tree({ start: '1120', end: '1130' }), compileCalendars([CYCLES], false));
@@ -166,7 +166,7 @@ describe('the reader that is not ready: years do not count, ended-by does (RULES
 	});
 });
 
-describe('the key of the words (RULES §6, §9 ruling 5)', () => {
+describe('the key of the words (§9 ruling 5)', () => {
 	const f = (union: Omit<Wed, 'partners'>, more: Partial<Tree> = {}): FamilyGraph => graphOf({ ...treeF(union), ...more });
 	const key = (g: FamilyGraph) => relationsKey(g, 'fa');
 	it('a change of only `ended-by` makes a new key and a new card word', () => {
@@ -201,7 +201,7 @@ describe('the key of the words (RULES §6, §9 ruling 5)', () => {
 	});
 });
 
-describe('lineSubgraph keeps `ended-by` (RULES §9 ruling 3)', () => {
+describe('lineSubgraph keeps `ended-by`', () => {
 	it('the small tree of a line has the key of the marriage', () => {
 		const g = graphOf(treeF({ start: '1120', endedBy: 'annulment' }));
 		const sub = lineSubgraph(g, { people: ['fa', 'fb'], links: [], unions: ['u0'] });

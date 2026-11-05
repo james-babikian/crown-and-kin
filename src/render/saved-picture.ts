@@ -17,7 +17,7 @@ import { LEGEND_DEAD_DOUBT_LABEL, LEGEND_DEAD_LABEL, LEGEND_HOUSES_LABEL, LEGEND
 import { dateLine } from './tree-info';
 
 /** What a saved picture's legend shows: the line kinds drawn, the D14 sign when used, the houses of the drawn people. */
-export interface SavedLegendContent {
+interface SavedLegendContent {
 	kinds: readonly StrokeKind[];
 	sign: boolean;
 	houses: readonly LegendHouse[];
@@ -75,13 +75,13 @@ const NOT_XML = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\uFFFE\uFFFF]/g;
 export const xmlText = (s: string) => s.replace(NOT_XML, '');
 
 /** The largest PNG a save makes (spec §13.8): pixels in all, and px on each side (the iPhone's limit for one image). */
-export const SAVED_PNG_MAX_PIXELS = 16_000_000;
+const SAVED_PNG_MAX_PIXELS = 16_000_000;
 /** The most px on one side of a saved PNG. */
 export const SAVED_PNG_MAX_SIDE = 8192;
 /** Spec §13.8, D71: names at 14 CSS px. */
-export const SAVED_NAME_PX = 14;
+const SAVED_NAME_PX = 14;
 /** Below this many CSS px, the Notice says the names are small (spec §13.8). */
-export const SAVED_SMALL_PX = 8;
+const SAVED_SMALL_PX = 8;
 
 /**
  * P5, B5: the scale a picture of `extent` (layout px) is written at. The CSS scale gives 14 px
@@ -152,7 +152,7 @@ export function fixedColour(value: string | undefined): string | undefined {
 }
 
 /** One text of the saved picture: where its baseline goes, its size, weight and family, as `renderSvg` writes them. */
-export interface SavedText {
+interface SavedText {
 	text: string;
 	x: number;
 	y: number;
@@ -163,7 +163,7 @@ export interface SavedText {
 }
 
 /** One cell of the legend grid, in the legend's frame (layout px). */
-export interface SavedCell<T> {
+interface SavedCell<T> {
 	item: T;
 	x: number;
 	y: number;

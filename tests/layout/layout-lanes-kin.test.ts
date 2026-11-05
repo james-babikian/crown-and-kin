@@ -15,7 +15,7 @@ describe('bars of two families of one card', () => {
 		const other = [bar('a', 0, 100, 'p'), bar('b', 124, 224, 'q')];
 		expect(orderNets(other, MARGIN, 7, 'up', 10, 22, [], KIN)).toBe(1);
 	});
-	it('a family of two parents names both: its bar and the bar of either parent alone take two lanes (second fix round, item 3)', () => {
+	it('a family of two parents names both: its bar and the bar of either parent alone take two lanes', () => {
 		const couple = (key: string, lo: number, hi: number) => net({ gap: 0, lo, hi, key, kind: 'bar', topVerts: [lo], downVerts: [hi], owners: ['p', 'q'] });
 		for (const one of ['p', 'q']) expect(orderNets([couple('a', 0, 100), bar('b', 124, 224, one)], MARGIN, 7, 'up', 10, 22, [], KIN)).toBe(2);
 		expect(orderNets([couple('a', 0, 100), bar('b', 124, 224, 'r')], MARGIN, 7, 'up', 10, 22, [], KIN)).toBe(1);

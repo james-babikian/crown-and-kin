@@ -1,4 +1,4 @@
-// Spec §14 rule 16 (WP-6 step 1): the text field of names, the known year, and the refusals of the Calendars window.
+// Spec §14 rule 16: the text field of names, the known year, and the refusals of the Calendars window.
 import { describe, expect, it } from 'vitest';
 import { calendarRefusalText } from '../../src/core/messages';
 import { checkCalendars, compileCalendars, exampleText, MAX_NAMES, nameLinesText, parseNameLines, startFromSameYear, yearName, type Calendar, type NameList } from '../../src/core/dates';

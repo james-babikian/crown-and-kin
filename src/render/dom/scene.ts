@@ -48,15 +48,15 @@ import type { FamilyGraph } from '../../core/derive';
 import type { CardLabel } from '../../core/titles';
 import { isDead } from '../../core/succession-keys';
 import type { Person } from '../../core/types';
-import { ORDINAL_EM, ROUNDEL_EM, centredWithoutWord, cardText, footSpan, isRoundel, nameCountOf, nameRoom, ordinalTabRect, relationY, ribbonWidth, roundelPics, signBelowRing, signBottomOf, tagTop, youTabRect, type CardText, type ShownLines } from '../../layout/geometry';
+import { ORDINAL_EM, ROUNDEL_EM, centredWithoutWord, cardText, isRoundel, nameCountOf, nameRoom, ordinalTabRect, relationY, ribbonWidth, roundelPics, signBelowRing, signBottomOf, tagTop, youTabRect, type CardText, type ShownLines } from '../../layout/geometry';
 import { farTagSigns } from '../../layout/far-tag-sign';
 import { illegitimateSigns } from '../../layout/index';
 import type { FarTag, LaidOut, NameLineCount, PersonBox, PlacedFoldControl, Rect } from '../../layout/model';
 import type { BreakList } from '../break-words';
-import { legendRows, unionMarkClass, type LegendPart } from '../legend';
+import { unionMarkClass } from '../legend';
 import { isColour } from '../colour-check';
 import { lineLook, type LineMarks, type LineState } from '../line-highlight';
-import { cardNameLines, isolateLines, titleLines, type NameMeasure, type NameRun } from '../name-lines';
+import { cardNameLines, svgNameLines, titleLines, type NameMeasure, type NameRun } from '../name-lines';
 import { ME_RING_INNER, TAG_MARK, UNION_MARKS, tagMarkGap, tagMarkHalfWidth, tagMarkSlot, unionMark, unionShape, type UnionShape } from '../styles';
 import { marksForSvg } from '../date-bidi';
 import { fitCardText, pickReign } from '../date-fit';
@@ -176,7 +176,7 @@ export interface SceneFolds {
 }
 
 /** A drawn far-couple tag, with its element and enlarged tap area. */
-export interface TagRef {
+interface TagRef {
 	tag: FarTag;
 	el: SVGGElement;
 	/** The invisible tap area. It lies below the cards (see buildScene), so it is not inside `el`. */
@@ -189,7 +189,7 @@ export interface TagRef {
 }
 
 /** The `+` badge of a card in focus mode (spec §5.6). */
-export interface BadgeRef {
+interface BadgeRef {
 	person: string;
 	el: SVGGElement;
 	/**
@@ -289,7 +289,7 @@ export const TAG_FONT_EM = 0.75;
 /** Tag text at the Compact level is as large as the Compact name, so it is as readable. */
 export const TAG_COMPACT_FONT_EM = COMPACT_NAME_EM;
 /** Height of the Compact and Overview tag pill, in em. It grows up into the card, below the Compact name. */
-export const TAG_COMPACT_PILL_EM = 2;
+const TAG_COMPACT_PILL_EM = 2;
 /** Radius of the focus-mode `+` badge, in em. Its centre lies on the arc of the card's rounded top right corner, the middle of that arc. */
 export const BADGE_RADIUS_EM = 0.55;
 // All font sizes are set in styles.css from --dynasty-font-size (spec §5.8: nothing that styles
@@ -376,7 +376,7 @@ export function resetLearnedCornerRadius(): void {
 /** Reads the computed corner radius (px) of an SVG rect; `fallback` when the element is detached or the value is unknown. */
 export function readCornerRadius(el: Element, fallback: number): number {
 	try {
-		if (typeof getComputedStyle !== 'function' || el.isConnected === false) return fallback;
+		if (typeof getComputedStyle !== 'function' || !el.isConnected) return fallback;
 		const cs = getComputedStyle(el) as CSSStyleDeclaration & { rx?: string };
 		const v = parseFloat(cs.rx ?? '');
 		return Number.isFinite(v) && v >= 0 ? v : fallback;
@@ -774,13 +774,6 @@ export function buildScene(parent: SVGGElement, g: FamilyGraph, laid: LaidOut, o
 		// D122: the sobriquet follows the name at the Full level (Compact and Overview show the name only).
 		const sob = cl?.sobriquet ?? p.sobriquet;
 		const full = body.createSvg('g', { cls: 'dynasty-card-full' });
-		if (ct.r1?.plate && relation?.text) {
-			// The foot is a hairline over the relation word (there is no footer plate). A person with no relation word has no hairline
-			// (the card keeps its height, so a row keeps one height).
-			const span = footSpan(geo, box.w, isMe ? ME_RING_INNER : 1);
-			const y0 = box.y + ct.r1.plate.y + 0.5;
-			full.createSvg('line', { cls: 'dynasty-card-foot-line', attr: { x1: box.x + span.x0, y1: y0, x2: box.x + span.x1, y2: y0 } });
-		}
 		const link = opts.link(p);
 		const nameEl = (baseline: number) =>
 			full.createSvg('text', {
@@ -805,7 +798,7 @@ export function buildScene(parent: SVGGElement, g: FamilyGraph, laid: LaidOut, o
 		}
 		const runNames = () => {
 			// A box the layout made taller for fewer text lines than the name needs shows at most that many until the tree view lays it out again.
-			const lines = isolateLines(cardNameLines(shownName, sob, room, nameMeasure, names.length as NameLineCount, opts.breaks));
+			const lines = svgNameLines(cardNameLines(shownName, sob, room, nameMeasure, names.length as NameLineCount, opts.breaks));
 			names.forEach((el, i) => setRuns(el, lines[i] ?? []));
 		};
 		addFit(runNames);
@@ -1039,7 +1032,7 @@ export function buildScene(parent: SVGGElement, g: FamilyGraph, laid: LaidOut, o
 	/** Builds up to `count` late lines, the nearest to the point first. The order is sorted once for each point, like `chain`. */
 	const fillLines = (cx: number, cy: number, count: number) => {
 		if (count <= 0 || !lateLines.size) return;
-		if (!lineChain || lineChain.cx !== cx || lineChain.cy !== cy) {
+		if (lineChain?.cx !== cx || lineChain.cy !== cy) {
 			const order = [...lateLines].map((l) => ({ l, k: (l.box.x + l.box.w / 2 - cx) ** 2 + (l.box.y + l.box.h / 2 - cy) ** 2 }));
 			order.sort((a, b) => a.k - b.k);
 			lineChain = { cx, cy, items: order.map((o) => o.l), at: 0 };
@@ -1084,7 +1077,7 @@ export function buildScene(parent: SVGGElement, g: FamilyGraph, laid: LaidOut, o
 					if (lateLines.size) fillLines(cx, cy, cardsLeft > 0 ? Math.ceil(lateLines.size / Math.ceil(cardsLeft / max)) : LATE_LINES_PER_CARD_SLOT * max);
 					if (!delayed.size) return 0;
 					// The order is sorted once per chain: the same view centre keeps the list and a cursor. Items that other fills attached meanwhile are skipped.
-					if (!chain || chain.cx !== cx || chain.cy !== cy) {
+					if (chain?.cx !== cx || chain.cy !== cy) {
 						// Squared distance from the view's centre to the item's centre: nearest first, so the cards the person looks at come first.
 						const order = [...delayed].map((d) => ({ d, k: (d.box.x + d.box.w / 2 - cx) ** 2 + (d.box.y + d.box.h / 2 - cy) ** 2 }));
 						order.sort((a, b) => a.k - b.k);
@@ -1159,21 +1152,4 @@ export function buildScene(parent: SVGGElement, g: FamilyGraph, laid: LaidOut, o
 	};
 }
 
-function addPart(parent: SVGElement, part: LegendPart): void {
-	const el = parent.createSvg(part.tag, { cls: part.cls, attr: part.attr });
-	if (part.text !== undefined) el.setText(part.text);
-	for (const c of part.children ?? []) addPart(el, c);
-}
-
-/**
- * Fills the legend popover (D25): one row per line kind, the D14 sign and the two dead signs, each sample drawn like the tree. D196 item 3: the
- * live legend shows the line styles only; the houses are in the Houses window, and the saved picture keeps its own house legend (`svg-string.ts`).
- */
-export function buildLegend(list: HTMLElement): void {
-	for (const r of legendRows()) {
-		const row = list.createDiv({ cls: r.kind === 'sign' ? 'dynasty-legend-row dynasty-legend-sign' : 'dynasty-legend-row' });
-		const sample = row.createSvg('svg', { cls: 'dynasty-legend-sample', attr: { width: r.w, height: r.h, viewBox: `0 0 ${r.w} ${r.h}` } });
-		for (const part of r.parts) addPart(sample, part);
-		row.createSpan({ cls: 'dynasty-legend-label', text: r.label });
-	}
-}
+export { buildLegend } from './legend-dom';

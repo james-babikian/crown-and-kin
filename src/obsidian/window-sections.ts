@@ -4,11 +4,17 @@
  * hidden when a window has one section. Which sections the user opened or closed is kept for each kind of window while Obsidian
  * runs, so a window that draws again (after a write) keeps them as the user left them. Only the user's own taps are kept: the
  * default of a page never becomes the default of another page. A new page keeps its state in its own window only. The bodies are built when the section is
- * drawn, so a window can find a field in a closed section (a test, or a focus that goes back to it).
+ * drawn, so a window can find a field in a closed section (a test, or a focus that goes back to it). A section that the user opens scrolls into
+ * view when it has opened (UX-01); no other section closes by itself.
  */
 
 import { setIcon } from 'obsidian';
+import { mediaMatches } from '../render/dom/page-reads';
+import { splitOutsideIsolates } from '../render/bidi-controls';
+import { joined } from '../render/text-join';
 import { WINDOW_UI } from '../render/ui-text';
+
+const SUM_JOIN = ' · ';
 
 /** One section of a window. */
 export interface SectionSpec {
@@ -59,10 +65,56 @@ let counter = 0;
 /** True when the system asks for less movement; a missing or failing `matchMedia` is false. */
 function prefersReducedMotion(parent: HTMLElement): boolean {
 	try {
-		return (parent.ownerDocument.defaultView ?? window).matchMedia?.('(prefers-reduced-motion: reduce)')?.matches === true;
+		return mediaMatches(parent.ownerDocument.defaultView ?? window, '(prefers-reduced-motion: reduce)');
 	} catch {
 		return false;
 	}
+}
+
+/** How long a section takes to open at most: the CSS change of its height lasts 200 ms. */
+const OPEN_WAIT_MS = 320;
+
+/**
+ * UX-01: brings an opened section into the visible part of the window body: its bottom comes up as far as the heading allows, and a heading above
+ * the top comes down to it. A section that is in view stays. `instant`: reduced motion, so the jump is not animated.
+ */
+function scrollIntoBody(el: HTMLElement, instant: boolean): void {
+	if (!el.isConnected || !el.hasClass('is-open')) return;
+	const box = el.closest<HTMLElement>('.dynasty-sheet-body');
+	if (!box) {
+		el.scrollIntoView({ block: 'nearest', behavior: instant ? 'instant' : 'smooth' });
+		return;
+	}
+	const at = el.getBoundingClientRect();
+	const view = box.getBoundingClientRect();
+	const hidden = at.bottom - view.bottom;
+	const delta = at.top < view.top ? at.top - view.top : hidden > 0 ? Math.min(hidden, at.top - view.top) : 0;
+	if (Math.abs(delta) < 1) return;
+	if (instant || typeof box.scrollTo !== 'function') box.scrollTop += delta;
+	else box.scrollTo({ top: box.scrollTop + delta, behavior: 'smooth' });
+}
+
+/** UX-01: scrolls `d` into view when its change of height has ended (a section grows over 200 ms); at once under reduced motion. */
+function revealWhenOpen(d: Drawn, instant: boolean): void {
+	if (instant) {
+		scrollIntoBody(d.el, true);
+		return;
+	}
+	const wrap = d.el.querySelector<HTMLElement>('.dynasty-section-wrap');
+	const win = d.el.win;
+	let done = false;
+	const run = () => {
+		if (done) return;
+		done = true;
+		wrap?.removeEventListener('transitionend', onEnd);
+		win.clearTimeout(timer);
+		scrollIntoBody(d.el, false);
+	};
+	const onEnd = (e: Event) => {
+		if (e.target === wrap) run();
+	};
+	wrap?.addEventListener('transitionend', onEnd);
+	const timer = win.setTimeout(run, OPEN_WAIT_MS);
 }
 
 /** One section as drawn: its spec and its parts. */
@@ -70,7 +122,28 @@ interface Drawn {
 	spec: SectionSpec;
 	el: HTMLElement;
 	head: HTMLButtonElement;
+	/** Replaced when the summary changes, because a joined text line is built once. */
 	sum: HTMLElement;
+	/** The text the summary shows now. */
+	text: string;
+}
+
+/**
+ * K-10: the summary line, with its parts as items of a joined text line. The "·" belongs to the item after it and hides when that item starts a wrapped
+ * text line, so a text line of the summary never ends with a dot (the dot at the end of a line was left behind by a plain text). A summary that has no "·"
+ * is one item. The element is the summary line itself, so its rules (one text line, or two on a phone) apply to it.
+ */
+function summaryLine(head: HTMLElement, text: string): HTMLElement {
+	return joined(head, 'dynasty-section-sum', splitOutsideIsolates(text, SUM_JOIN).filter((part) => part !== ''), 'span');
+}
+
+/** Draws the summary again: a joined text line is built once, so the new one stands where the old one stood. */
+function replaceSummary(d: Drawn, text: string): void {
+	const next = summaryLine(d.head, text);
+	d.head.insertBefore(next, d.sum);
+	d.sum.remove();
+	d.sum = next;
+	d.text = text;
 }
 
 /** The elements of one section: the title row (a button), its body and the animated wrapper; the body is built at once, so a closed section has its fields. */
@@ -79,11 +152,11 @@ function drawSection(parent: HTMLElement, spec: SectionSpec): Drawn {
 	const el = parent.createEl('section', { cls: 'dynasty-section', attr: { 'data-section': spec.key } });
 	const head = el.createEl('button', { cls: 'dynasty-section-head', attr: { type: 'button', 'aria-controls': id, 'aria-expanded': 'false', 'data-focus': `section:${spec.key}` } });
 	head.createSpan({ cls: 'dynasty-section-title', text: spec.title });
-	const sum = head.createSpan({ cls: 'dynasty-section-sum', text: spec.summary });
+	const sum = summaryLine(head, spec.summary);
 	setIcon(head.createSpan({ cls: 'dynasty-section-chevron', attr: { 'aria-hidden': 'true' } }), 'chevron-down');
 	const wrap = el.createDiv({ cls: 'dynasty-section-wrap', attr: { id } });
 	spec.build(wrap.createDiv({ cls: 'dynasty-section-inner' }).createDiv({ cls: 'dynasty-section-body' }));
-	return { spec, el, head, sum };
+	return { spec, el, head, sum, text: spec.summary };
 }
 
 /** Draws the sections of one window page into `parent`. */
@@ -127,8 +200,10 @@ export function renderSections(parent: HTMLElement, kind: string, specs: readonl
 		drawn.push(d);
 		setOpen(d, state[spec.key] ?? spec.open);
 		d.head.addEventListener('click', () => {
-			setOpen(d, !d.el.hasClass('is-open'), true);
+			const opening = !d.el.hasClass('is-open');
+			setOpen(d, opening, true);
 			changed();
+			if (opening) revealWhenOpen(d, parent.hasClass('dynasty-reduce-motion'));
 		});
 	}
 	allBtn?.addEventListener('click', () => {
@@ -141,13 +216,14 @@ export function renderSections(parent: HTMLElement, kind: string, specs: readonl
 	return {
 		setSummary(key, text) {
 			const d = find(key);
-			if (d && d.sum.getText() !== text) d.sum.setText(text);
+			if (d && d.text !== text) replaceSummary(d, text);
 		},
 		open(key) {
 			const d = find(key);
 			if (!d || d.el.hasClass('is-open')) return;
 			setOpen(d, true, true);
 			changed();
+			revealWhenOpen(d, parent.hasClass('dynasty-reduce-motion'));
 		},
 		isOpen: (key) => find(key)?.el.hasClass('is-open') ?? false,
 		el: (key) => find(key)?.el ?? null,

@@ -159,11 +159,11 @@ export function farRuleProblems(g: FamilyGraph, layout: TreeLayout, geo: Geometr
 }
 
 /**
- * Far tags (contract `FarTag`, the decision notes "WP5.5a fix"): anchored on the card's bottom edge; in
+ * Far tags (contract `FarTag`): anchored on the card's bottom edge; in
  * the left half of it when a partner is stacked directly below (so the tag does not sit on the
  * union point); hit areas of at least 44×44 px (§7.5) in the gap below the card, covering the
  * part of the visible tag below the card edge, and covering no card (not even their own) and no
- * other hit area. The card wins a press where the two meet (WP4.3), so a hit on a card is lost.
+ * other hit area. The card wins a press where the two meet, so a hit on a card is lost.
  */
 export function tagProblems(g: FamilyGraph, layout: TreeLayout): string[] {
 	const bad: string[] = [];
@@ -209,7 +209,7 @@ export function boundsProblems(g: FamilyGraph, layout: TreeLayout, edges: EdgeDr
 		const u = layout.unions.get(fu.key)!;
 		if (u.bar || fu.children.length) within(`union point of ${fu.partners}`, u.x - r, u.y - r, u.x + r, u.y + r);
 	}
-	// The whole hit area too (the decision notes "WP5.5a fix"), not only the visible tag.
+	// The whole hit area too, not only the visible tag.
 	for (const t of layout.farTags.values()) {
 		const top = tagTop(geo, t.y);
 		within(`tag of ${t.person}`, t.hit.x, Math.min(t.hit.y, top), right(t.hit), Math.max(bottom(t.hit), top + geo.tagH));

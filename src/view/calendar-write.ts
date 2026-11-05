@@ -12,7 +12,7 @@ import { editCalendarBlock, type CalendarOp } from '../core/calendar-block';
 export const NEW_NOTE_TEXT = '```kin-calendar\ncalendars: []\n```\n';
 
 /** `text` with one empty `kin-calendar` block after its last text line (a named note that holds no block yet gets its calendars there, D289). */
-export function appendBlock(text: string): string {
+function appendBlock(text: string): string {
 	const gap = text === '' || text.endsWith('\n\n') ? '' : text.endsWith('\n') ? '\n' : '\n\n';
 	return `${text}${gap}${NEW_NOTE_TEXT}`;
 }

@@ -8,7 +8,7 @@
 import { REST, doubleTapPicture, isPictureDoubleTap, isTap, panView, pinchPicture, settleView, sideSwipe, type Point, type Size, type View } from './picture-gestures';
 
 /** What the touch code needs from the viewer. */
-export interface TouchHooks {
+interface TouchHooks {
 	/** The element that takes the touch. */
 	stage: HTMLElement;
 	/** The size of the shown picture and of the stage now; null while no picture shows. */

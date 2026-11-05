@@ -116,7 +116,7 @@ describe('two calendars, two matches (§14 rule 4)', () => {
 		const r = compileCalendars([A, B], true).read('year 5 of cycle 3')!;
 		expect(r).toMatchObject({ year: 125, source: 'calendar', calendar: 'A', also: ['B'], span: 'Cycle 3', count: 5, warnings: [] });
 	});
-	it('different years: no year, fits-two-calendars, source stays calendar (the architecture notes §5.7 ruling 1)', () => {
+	it('different years: no year, fits-two-calendars, source stays calendar', () => {
 		const r = compileCalendars([A, B2, D], true).read('year 5 of cycle 3')!;
 		expect(r.year).toBeUndefined();
 		expect(r).toMatchObject({ source: 'calendar', calendar: 'A', also: ['B2', 'D'], warnings: ['fits-two-calendars'] });
@@ -243,7 +243,7 @@ describe('the memo and the key (§14 rule 9)', () => {
 	});
 });
 
-describe('readPlain (the architecture notes §5.7; years as yearOf reads them today)', () => {
+describe('readPlain (years as yearOf reads them today)', () => {
 	it('gives the year of yearOf for any text', () => {
 		for (const t of ['1203', '12 May 1203', '200 BC', '-200', '0', '1,250', '1.250', 'c. 1203', '1700/01', '1203/05/12', 'long ago', '', undefined]) expect(readPlain(t).year, String(t)).toBe(yearOf(t));
 		expect(readPlain(undefined)).toEqual({});
@@ -256,7 +256,7 @@ describe('readPlain (the architecture notes §5.7; years as yearOf reads them to
 	it('dual: the part after the slash is the last one or two digits of the next year', () => {
 		for (const t of ['1700/01', '1700/1', '1799/00', '1709/10', 'March 1700/01', 'c. 1700/01']) expect(readPlain(t).dual, t).toBe(true);
 		for (const t of ['1700/05', '1700/02', '1203/05/12', '1203/04/12', '12/05/1203', '1700/001', '1650 or 1700/01']) expect(readPlain(t).dual, t).toBeUndefined();
-		// §14 rule 8 (0.3.2): a dual date reads the later year (a flag only at step 4.1a, when the year stayed the first one).
+		// §14 rule 8: a dual date reads the later year (a flag only at step 4.1a, when the year stayed the first one).
 		expect(readPlain('1700/01').year).toBe(1701);
 	});
 });

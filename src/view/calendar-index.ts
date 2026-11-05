@@ -26,7 +26,7 @@ export interface CalendarVault {
 }
 
 /** What a tree view needs of the index (`TreeHost.dates`). */
-export interface DatesHost {
+interface DatesHost {
 	/** `holder` is the view that asks: its keys stay while it lives, so the cap never drops a key that a live view draws with. */
 	readerFor(treePath: string, calendarLink?: string, holder?: object): DateReader;
 	onChange(cb: () => void): () => void;

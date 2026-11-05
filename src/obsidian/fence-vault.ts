@@ -4,41 +4,30 @@
  * per vault and per device, never synced. `saveWhenLeaving` saves the index when the page hides or the app goes to the background. `cacheReady` follows the start-up gate of D183.
  */
 
-import { TFile, type App, type EventRef } from 'obsidian';
+import type { App, TFile } from 'obsidian';
+import { mediaMatches } from '../render/dom/page-reads';
 import { BLOCK_SECTIONS, type FenceFile, type FenceIndex, type FenceOptions, type FenceStore, type FenceVault } from '../view/fence-index';
 import { later } from '../view/idle';
+import { cacheReadyOf, fileAt, onVaultEvent, readNote, type CacheGate } from './vault-parts';
 
 /** The key of the saved copy. Obsidian adds the name of the vault. */
 export const FENCE_STORE_KEY = 'crown-and-kin-fence-index';
 
 /** What the adaptor needs of the start-up gate (`startedUp`, D183). */
-interface FenceGate {
-	/** True once the metadata cache has finished, or the start limit has passed. */
-	seen(): boolean;
+interface FenceGate extends CacheGate {
 	/** True only when the metadata cache has finished; the limit does not count. */
 	done(): boolean;
-	/** How long to wait for the cache at most, in ms. */
-	limitMs: number;
 }
 
-const markdown = (f: unknown): f is TFile => f instanceof TFile && f.extension === 'md';
 const record = (f: TFile): FenceFile => ({ path: f.path, mtime: f.stat.mtime, size: f.stat.size });
 
 /** Makes the fence vault of an app. */
 export function obsidianFenceVault(app: App, gate: FenceGate): FenceVault {
-	const fileAt = (path: string): TFile | null => {
-		const f = app.vault.getAbstractFileByPath(path);
-		return markdown(f) ? f : null;
-	};
 	return {
 		files: () => app.vault.getMarkdownFiles().map(record),
-		async read(path) {
-			const f = fileAt(path);
-			if (!f) throw new Error('not a note');
-			return app.vault.cachedRead(f);
-		},
+		read: (path) => readNote(app, path),
 		sectionState(path) {
-			const f = fileAt(path);
+			const f = fileAt(app, path);
 			if (!f) return 'no';
 			let cache;
 			try {
@@ -51,31 +40,13 @@ export function obsidianFenceVault(app: App, gate: FenceGate): FenceVault {
 		},
 		cacheDone: () => gate.done(),
 		on(event, cb) {
-			let ref: EventRef;
-			if (event === 'cache') {
-				ref = app.metadataCache.on('changed', (file, data) => markdown(file) && cb(record(file), data));
-				return () => app.metadataCache.offref(ref);
-			}
-			if (event === 'rename') ref = app.vault.on('rename', (file, old) => markdown(file) && cb(record(file), undefined, old));
-			else if (event === 'delete') ref = app.vault.on('delete', (file) => markdown(file) && cb(record(file)));
-			else if (event === 'create') ref = app.vault.on('create', (file) => markdown(file) && cb(record(file)));
-			else ref = app.vault.on('modify', (file) => markdown(file) && cb(record(file)));
-			return () => app.vault.offref(ref);
-		},
-		cacheReady() {
-			if (gate.seen()) return Promise.resolve();
-			return new Promise<void>((resolve) => {
-				let ref: EventRef | null = null;
-				let timer: number | null = null;
-				const done = () => {
-					if (ref) app.metadataCache.offref(ref);
-					if (timer !== null) window.clearTimeout(timer);
-					resolve();
-				};
-				ref = app.metadataCache.on('resolved', done);
-				timer = window.setTimeout(done, gate.limitMs);
+			return onVaultEvent(app, event, (file, text, old) => {
+				if (event === 'cache') cb(record(file), text);
+				else if (event === 'rename') cb(record(file), undefined, old);
+				else cb(record(file));
 			});
 		},
+		cacheReady: () => cacheReadyOf(app, gate),
 		idle: () => new Promise<void>((resolve) => later(() => resolve())),
 	};
 }
@@ -90,8 +61,7 @@ export function obsidianFenceStore(app: App): FenceStore {
 
 /** The options for this device: a phone reads fewer notes in one slice. Decided by pointer type, never by `Platform` (spec §7). */
 export function fenceOptionsForDevice(): FenceOptions {
-	const coarse = typeof window.matchMedia === 'function' && window.matchMedia('(pointer: coarse)').matches;
-	return coarse ? { readsPerSlice: 10 } : {};
+	return mediaMatches(window, '(pointer: coarse)') ? { readsPerSlice: 10 } : {};
 }
 
 /** The two event targets that tell that the page goes away; tests give small fakes. */

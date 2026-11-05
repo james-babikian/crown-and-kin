@@ -10,6 +10,7 @@ import { SHEET } from '../render/ui-text';
 import { ignoreGhostClick, phoneLayout } from './modal-layout';
 import { trackModal } from '../view/plugin-modals';
 import { revealFocused } from './sheet-parts';
+import { confirmBox } from './window-parts';
 import type { Shell } from './window-shell';
 
 /** The modal that both small forms extend: the frame set-up, the close rule with its question, and the clean-up. */
@@ -42,6 +43,11 @@ export abstract class SmallFormModal extends Modal {
 		this.close();
 	}
 
+	/** O-14: what the shell needs so that the left button asks the question that Esc asks when a typed change would be lost (`buildShell({ discard })`). */
+	protected discardOption(): { dirty: () => boolean; ask: () => void } {
+		return { dirty: () => this.dirty(), ask: () => this.close() };
+	}
+
 	/** Esc, the X button and a press outside: with changes, ask first (spec §6.3). */
 	override close(): void {
 		if (this.closing || !this.dirty()) {
@@ -53,20 +59,22 @@ export abstract class SmallFormModal extends Modal {
 			this.confirmEl = null;
 			return;
 		}
-		const layer = this.modalEl.createDiv({ cls: 'dynasty-sheet-confirm', attr: { role: 'alertdialog', 'aria-modal': 'true' } });
-		this.confirmEl = layer;
-		const box = layer.createDiv({ cls: 'dynasty-sheet-confirm-box' });
-		box.createDiv({ cls: 'dynasty-sheet-confirm-title', text: SHEET.discardTitle });
-		box.createDiv({ cls: 'dynasty-sheet-confirm-text', text: this.discardText() });
-		const row = box.createDiv({ cls: 'dynasty-sheet-confirm-actions' });
-		const keep = row.createEl('button', { cls: 'dynasty-sheet-keep', text: SHEET.keepEditing, attr: { type: 'button' } });
-		const discard = row.createEl('button', { cls: ['mod-warning', 'dynasty-sheet-discard'], text: SHEET.discard, attr: { type: 'button' } });
-		keep.addEventListener('click', () => {
-			layer.remove();
-			this.confirmEl = null;
+		const box = confirmBox(this.modalEl, {
+			title: SHEET.discardTitle,
+			text: [this.discardText()],
+			buttons: [
+				{
+					label: SHEET.keepEditing,
+					cls: 'dynasty-sheet-keep',
+					run: () => {
+						box.layer.remove();
+						this.confirmEl = null;
+					},
+				},
+				{ label: SHEET.discard, cls: ['mod-warning', 'dynasty-sheet-discard'], run: () => this.finish() },
+			],
 		});
-		discard.addEventListener('click', () => this.finish());
-		keep.focus();
+		this.confirmEl = box.layer;
 	}
 
 	override onClose(): void {

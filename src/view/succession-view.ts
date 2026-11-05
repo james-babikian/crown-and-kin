@@ -17,7 +17,7 @@ import { finderFirstView, fittedNamePx } from './focus-mode';
 import { around } from './tree-view-helpers';
 
 /** The mark on the tab of an open branch. */
-export const BRANCH_MARK = '?';
+const BRANCH_MARK = '?';
 /** On a phone the first view never shows the names smaller than this scale (prototype finding 2: a plain fit gave names of about 8 px). */
 export const PHONE_MIN_SCALE = 0.75;
 
@@ -39,7 +39,7 @@ export interface SuccessionDrawn {
 }
 
 /** The settings the line reads. */
-export interface LineSettings {
+interface LineSettings {
 	limit: number;
 	oldAge: number;
 	youngDeathAge: number;

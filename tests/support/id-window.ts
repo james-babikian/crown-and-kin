@@ -1,5 +1,5 @@
 /*
- * The set-up that `v112-obsidian-ids` and `r112-review-d-id-window` share for the small Id window of the Houses window (D110): a click that
+ * The set-up that `new-person-id-four-places` and `id-window` share for the small Id window of the Houses window (D110): a click that
  * waits, the sample note of three houses, and `openHouses`, which opens the real Houses window on the fakes. The `vi.mock` calls and the
  * `answers` list stay in each test file, because `vi.mock` is lifted to the top of the file.
  */

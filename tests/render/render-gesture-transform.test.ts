@@ -6,7 +6,7 @@ import { rng } from '../support/rng';
 /** Screen point of tree point `p` in `v` (the scene transform of `transformFor`). */
 const screen = (v: View, p: { x: number; y: number }, s: Size) => ({ x: (p.x - v.cx) * v.scale + s.w / 2, y: (p.y - v.cy) * v.scale + s.h / 2 });
 
-describe('gestureTransform (WP5.3, spec §7.6: a CSS transform on a wrapper during a pinch)', () => {
+describe('gestureTransform (spec §7.6: a CSS transform on a wrapper during a pinch)', () => {
 	it('shows every tree point where the real view would draw it', () => {
 		const next = rng(53);
 		for (let i = 0; i < 200; i++) {

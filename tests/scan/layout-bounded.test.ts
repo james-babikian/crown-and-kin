@@ -47,7 +47,7 @@ export function hasBoundComment(text: string, line: number): boolean {
 }
 
 describe('the scan finds what it should (self-test)', () => {
-	it('finds a while, a do-while, a constant while and for(;;), with their lines', () => {
+	it('finds a while, a do-while, a constant while and for, with their lines', () => {
 		expect(loopsIn('function f() {\n\twhile (a < b) a++;\n}').map((l) => [l.kind, l.condition, l.line])).toEqual([['while', 'a < b', 2]]);
 		expect(loopsIn('do { x++; } while (x < n);').map((l) => l.condition)).toEqual(['x < n']);
 		expect(loopsIn('while (true) { if (x) break; }').map((l) => l.kind)).toEqual(['constant']);
@@ -115,7 +115,7 @@ describe('every loop of the stage files is bounded (I8, §3.5 item 4)', () => {
 		expect(found.filter((l) => l.kind === 'while').length).toBeGreaterThanOrEqual(ALLOWED.length);
 	});
 
-	it('no loop has a constant condition (while (true), for (;;))', () => {
+	it('no loop has a constant condition (while (true), for)', () => {
 		expect(found.filter((l) => l.kind === 'constant').map((l) => `${l.file}:${l.line} ${l.condition}`)).toEqual([]);
 	});
 
@@ -125,7 +125,7 @@ describe('every loop of the stage files is bounded (I8, §3.5 item 4)', () => {
 		expect(have).toEqual(want);
 	});
 
-	it('every while has a comment "Bounded: ..." on its line or in the three lines above it', () => {
+	it('every while has a comment "Bounded:..." on its line or in the three lines above it', () => {
 		const bare = found.filter((l) => l.kind === 'while' && !hasBoundComment(read(l.file), l.line));
 		expect(bare.map((l) => `${l.file}:${l.line} ${l.condition}`)).toEqual([]);
 	});

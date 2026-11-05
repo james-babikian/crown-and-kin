@@ -49,6 +49,7 @@ class TestWindow extends ListEditWindow {
 	log: string[] = [];
 	typed: string[] = [];
 	reducedMotion = false;
+	protected readonly staleText = 'stale';
 	/** A throw in the page, to prove that a failed step never escapes. */
 	failPage = false;
 	private next = 3;
@@ -148,6 +149,9 @@ class TestWindow extends ListEditWindow {
 	protected released(): void {
 		this.log.push('released');
 	}
+	protected reload(): void {
+		this.log.push('reload');
+	}
 	protected override reduced(): boolean {
 		return this.reducedMotion;
 	}
@@ -220,7 +224,7 @@ const field = (w: TestWindow): FEl => pageOf(w.content).querySelector('textarea.
 const active = (): string | null => fakeDoc.activeElement?.getAttribute('data-focus') ?? null;
 const css = readFileSync(new URL('../../styles.css', import.meta.url), 'utf8');
 
-describe('open: header, bar, list (D.3.1, D.3.2)', () => {
+describe('open: header, bar, list', () => {
 	it('puts the classes on the window and gives the focus to the window itself', () => {
 		const w = open();
 		for (const c of ['dynasty-sheet', 'dynasty-titles', 'dynasty-lw']) expect(w.modal.hasClass(c)).toBe(true);
@@ -242,10 +246,10 @@ describe('open: header, bar, list (D.3.1, D.3.2)', () => {
 		w.dirty = true;
 		open(w);
 		expect(w.content.querySelector('button[data-focus="cancel"]')!.getText()).toBe(SHEET.cancel);
-		expect(w.content.querySelector('button[data-focus="save"]')!.getText()).toBe(SHEET.save);
+		expect(w.content.querySelector('button[data-focus="save"]')!.getText()).toBe(`${SHEET.save} ${SHEET.saveKeysCtrl}`);
 		const v = open(new TestWindow());
 		openPage(v.content, 't0');
-		expect(v.content.querySelector('button[data-focus="save"]')!.getText()).toBe(SHEET.save);
+		expect(v.content.querySelector('button[data-focus="save"]')!.getText()).toBe(`${SHEET.save} ${SHEET.saveKeysCtrl}`);
 		// Back to a list with no change: Close only again.
 		backToList(v.content);
 		expect(v.content.querySelector('button[data-focus="save"]')).toBeNull();
@@ -377,12 +381,10 @@ describe('open: header, bar, list (D.3.1, D.3.2)', () => {
 		expect(listRows(w.content)[0]!.querySelector('.dynasty-row-lead')).toBeNull();
 	});
 
-	it('has the error line (alert, hidden), the count line (status, polite) and the list in the body', () => {
+	it('has no error line until there is an error, the count line (status, polite) and the list in the body', () => {
 		const w = open();
 		const body = w.content.querySelector('.dynasty-sheet-body')!;
-		const err = body.querySelector('.dynasty-sheet-error')!;
-		expect(err.getAttribute('role')).toBe('alert');
-		expect(err.hidden).toBe(true);
+		expect(body.querySelector('.dynasty-sheet-error')).toBeNull();
 		const count = body.querySelector('.dynasty-lw-count')!;
 		expect(count.getAttribute('role')).toBe('status');
 		expect(count.getAttribute('aria-live')).toBe('polite');
@@ -417,7 +419,7 @@ describe('open: header, bar, list (D.3.1, D.3.2)', () => {
 	});
 });
 
-describe('search (D.3.3)', () => {
+describe('search', () => {
 	it('filters at once on every input event and shows the count line', () => {
 		const w = open();
 		searchFor(w.content, 'duke');
@@ -540,7 +542,7 @@ describe('search (D.3.3)', () => {
 	});
 });
 
-describe('keys (D.3.3)', () => {
+describe('keys', () => {
 	it('moves the focus from the search box to the first row on ArrowDown, and prevents the default', () => {
 		const w = open();
 		const box = searchBox(w.content);
@@ -628,7 +630,7 @@ describe('keys (D.3.3)', () => {
 	});
 });
 
-describe('open a page and go back (D.3.4)', () => {
+describe('open a page and go back', () => {
 	it('replaces the bar and the list with the Back bar and the page, and focuses Back', () => {
 		const w = open();
 		openPage(w.content, 'duke-of-valmont');
@@ -636,7 +638,7 @@ describe('open a page and go back (D.3.4)', () => {
 		expect(w.content.querySelector('.dynasty-lw-bar')).toBeNull();
 		expect(w.content.querySelector('.dynasty-lw-top')).toBeNull();
 		expect(w.content.querySelector('ul.dynasty-lw-list')).toBeNull();
-		// The way back is a link above the header of the page (G.7).
+		// The way back is a link above the header of the page.
 		expect(w.content.querySelector('.dynasty-sheet-body .dynasty-back')).not.toBeNull();
 		expect(active()).toBe('back');
 		expect(fakeDoc.activeElement).toBe(backButton(w.content));
@@ -654,7 +656,7 @@ describe('open a page and go back (D.3.4)', () => {
 		const back = backButton(w.content)!;
 		expect(back.hasClass('dynasty-back')).toBe(true);
 		expect(back.getAttribute('aria-label')).toBe(WIN_LIST_UI.backTitles);
-		// The link shows the name of the list that the user came from (G.7): "‹ Titles".
+		// The link shows the name of the list that the user came from: "‹ Titles".
 		expect(back.getText()).toBe(TITLES_UI.title);
 		expect(back.querySelector('.dynasty-back-chevron')!.getAttribute('aria-hidden')).toBe('true');
 	});
@@ -772,7 +774,7 @@ describe('open a page and go back (D.3.4)', () => {
 	});
 });
 
-describe('Add (D.3.4)', () => {
+describe('Add', () => {
 	it('clears the query, opens the page of the new item and focuses its name field', () => {
 		const w = open();
 		searchFor(w.content, 'duke');
@@ -793,7 +795,7 @@ describe('Add (D.3.4)', () => {
 	});
 });
 
-describe('the edit page fields (D.3.9 b)', () => {
+describe('the edit page fields', () => {
 	it('makes a one-row text area inside a labelled field with the old class', () => {
 		const w = open();
 		const page = openPage(w.content, 't0');
@@ -871,19 +873,18 @@ describe('the edit page fields (D.3.9 b)', () => {
 		expect(w.typed).toEqual(['  Duke  ']);
 	});
 
-	it('clears the error line when the owner types', () => {
+	it('clears the error line when the user types', () => {
 		const w = open();
 		openPage(w.content, 't0');
 		w.doError('Needs a name.');
 		const ta = field(w);
 		ta.value = 'x';
 		dispatch(ta, 'input');
-		expect(w.content.querySelector('.dynasty-sheet-error')!.getText()).toBe('');
-		expect(w.content.querySelector('.dynasty-sheet-error')!.hidden).toBe(true);
+		expect(w.content.querySelector('.dynasty-sheet-error')).toBeNull();
 	});
 });
 
-describe('growField (D.3.9 b)', () => {
+describe('growField', () => {
 	const textarea = (): FEl => {
 		const el = new FEl('textarea');
 		el.clientHeight = 44;
@@ -974,7 +975,7 @@ describe('growField (D.3.9 b)', () => {
 	});
 });
 
-describe('Other actions (D.3.7)', () => {
+describe('Other actions', () => {
 	it('is the last section of the page, with its label, Change ID before Delete', () => {
 		const w = open();
 		const page = openPage(w.content, 't0');
@@ -1022,7 +1023,7 @@ describe('Other actions (D.3.7)', () => {
 	});
 });
 
-describe('delete (D.3.7)', () => {
+describe('delete', () => {
 	it('removes a new item at once, shows the list and focuses the row that took its place', () => {
 		const list = [...items(), { key: 'n', id: null, name: 'Baron', holders: [] }];
 		const w = open(new TestWindow(list));
@@ -1062,7 +1063,7 @@ describe('delete (D.3.7)', () => {
 	});
 });
 
-describe('close rules (D.3.8)', () => {
+describe('close rules', () => {
 	it('goes from a page back to the list, then closes the window when nothing changed', () => {
 		const w = open();
 		openPage(w.content, 't0');
@@ -1135,12 +1136,20 @@ describe('close rules (D.3.8)', () => {
 		expect(w.log).toEqual(['dropWaiting']);
 	});
 
-	it('closes at once on Cancel, with a changed draft', () => {
+	it('asks "Discard changes?" on Cancel with a changed draft, and closes on "Discard changes" (O-14)', () => {
 		const w = open();
 		w.dirty = true;
 		dispatch(w.content.querySelector('button[data-focus="cancel"]')!, 'click');
+		expect(openModals).toContain(w);
+		dispatch(w.confirm!.querySelector('.dynasty-sheet-discard')!, 'click');
 		expect(openModals).not.toContain(w);
 		expect(w.log).not.toContain('save');
+	});
+
+	it('closes at once on Cancel when the draft has no change', () => {
+		const w = open();
+		dispatch(w.content.querySelector('button[data-focus="cancel"]')!, 'click');
+		expect(openModals).not.toContain(w);
 	});
 
 	it('runs Save from the list (when it has changes) and from a page', () => {
@@ -1226,15 +1235,15 @@ describe('questions, errors and notices', () => {
 		expect(active()).toBe('save');
 	});
 
-	it('shows an error in the alert line and clears the text too', () => {
+	it('shows an error in the alert line under the header and takes the line away when it clears (CX-11)', () => {
 		const w = open();
 		w.doError('Cannot save.');
 		const err = w.content.querySelector('.dynasty-sheet-error')!;
+		expect(err.getAttribute('role')).toBe('alert');
 		expect(err.getText()).toBe('Cannot save.');
 		expect(err.hidden).toBe(false);
 		w.doClear();
-		expect(err.getText()).toBe('');
-		expect(err.hidden).toBe(true);
+		expect(w.content.querySelector('.dynasty-sheet-error')).toBeNull();
 	});
 
 	it('shows a refused write as a Notice and in the error line', () => {
@@ -1263,7 +1272,7 @@ describe('questions, errors and notices', () => {
 	});
 });
 
-describe('keyboard reveal on a phone (D.3.4, D114)', () => {
+describe('keyboard reveal on a phone (D114)', () => {
 	it('scrolls the focused field into view once, after the keyboard settled', () => {
 		const w = open();
 		openPage(w.content, 't0');
@@ -1305,7 +1314,7 @@ describe('keyboard reveal on a phone (D.3.4, D114)', () => {
 	});
 });
 
-describe('the style block (D.2, D.3.9)', () => {
+describe('the style block', () => {
 	const START = '/* ===== list windows (D134) ===== */';
 	const END = '/* ===== end list windows ===== */';
 	const block = css.slice(css.indexOf(START) + START.length, css.indexOf(END));
@@ -1411,13 +1420,15 @@ describe('the style block (D.2, D.3.9)', () => {
 	it('keeps the focus ring on a row', () => {
 		const rule = rules.find((r) => r.selectors.some((x) => x.endsWith('.dynasty-lw-row:focus-visible')));
 		expect(rule).toBeDefined();
-		expect(rule!.body).toContain('outline: 2px solid var(--text-normal)');
+		expect(rule!.body).toContain('outline: var(--dynasty-focus-outline)');
+		expect(rule!.body).toContain('box-shadow: var(--dynasty-focus-inset-shadow)');
 	});
 
-	it('gives the name of the Back bar two text lines at most', () => {
+	it('lets the name of a page wrap as far as it needs: no clamp, no cut (P3-01)', () => {
 		const d = declarations('dynasty-lw-back-name');
-		expect(d).toContain('-webkit-line-clamp: 2');
-		expect(d).toContain('overflow: hidden');
+		expect(d).not.toContain('line-clamp');
+		expect(d).not.toContain('overflow: hidden');
+		expect(d).toContain('overflow-wrap: anywhere');
 	});
 
 	it('puts the two buttons of Other actions in one row on the computer, each full width on a phone', () => {
@@ -1427,7 +1438,7 @@ describe('the style block (D.2, D.3.9)', () => {
 
 	it('keeps the two width rules of the old windows', () => {
 		// 0.2.8: every window of the family is 620 px wide on a computer and top-anchored (10-edit-sheet.css); the old wide rules are gone.
-		expect(css).toContain('width: min(620px, calc(100vw - 2 * var(--size-4-4)))');
+		expect(css).toContain('width: min(620px, calc(100vw - 2 * var(--dynasty-space-4)))');
 		expect(css).not.toContain('.modal.dynasty-sheet.dynasty-titles:not(.is-phone)');
 	});
 });
@@ -1462,7 +1473,7 @@ describe('the texts (WIN_LIST_UI)', () => {
 		for (const t of texts) expect(t, t).not.toMatch(/\b[A-Za-z]{3,}ing\b/);
 	});
 
-	it('uses none of the words that the owner word list forbids', () => {
+	it('uses none of the words of the word list', () => {
 		const banned = /\b(graph|diagram|chart|node|box|tile|union|edge|path|stroke|layer|rank|partition|family|file|document|commit|fixture|sprint|phase)\b/i;
 		for (const t of texts) expect(t, t).not.toMatch(banned);
 	});

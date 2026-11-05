@@ -13,17 +13,31 @@ import { drawLists } from './calendar-list';
 import { field, type CardHost, type FieldError } from './calendar-parts';
 import { textButton } from './window-parts';
 
+/** What the start of a calendar or an era needs besides its draft. */
+interface StartSpec {
+	name: string;
+	cycles: boolean;
+	result: string;
+	calendar: () => Calendar | undefined;
+	error: FieldError;
+	/** Adds more fields at the end of the row (the Length of an era), with the box under the row for their hints and refusals. */
+	extra?: (row: HTMLElement, under: HTMLElement) => void;
+}
+
 /**
- * The "Start" part, in the order that the help text names the fields: the readback, then Cycle, Year, "=" and "Same year as" on one row, then the hint.
- * The refusals of the row stand under the hint, so a long refusal does not lift the other fields of the row.
+ * The start of a cycle calendar or of an era, in this order: the fields Cycle (cycles only), Year, "=" and "Same year as" on one row, then the reading line, then the hint of the
+ * field that has the focus and the refusals. The reading line is the example in the first format of the calendar: "Qinglong Emperor 1 = year 130" (D330 O-23). A cycle
+ * calendar keeps the sub-heading "Start"; an era needs none, so the era is two rows and the reading line (spec §14 rule 16: the order and the names of the sections stay).
  */
-function startForm(parent: HTMLElement, host: CardHost, s: StartDraft, o: { name: string; cycles: boolean; result: string; calendar: () => Calendar | undefined; error: FieldError }): void {
+function startForm(parent: HTMLElement, host: CardHost, s: StartDraft, o: StartSpec): void {
 	const box = parent.createDiv({ cls: 'dynasty-cal-start', attr: { 'data-start': o.name } });
-	box.createDiv({ cls: 'dynasty-cal-subhead', text: T.startLabel, attr: { role: 'heading', 'aria-level': '4' } });
+	if (o.cycles) box.createDiv({ cls: 'dynasty-cal-subhead', text: T.startLabel, attr: { role: 'heading', 'aria-level': '4' } });
+	const row = box.createDiv({ cls: ['dynasty-cal-start-row', o.cycles ? 'has-cycle' : 'is-era'] });
 	const back = box.createDiv({ cls: ['dynasty-sheet-hint', 'dynasty-cal-readback'], attr: { 'aria-live': 'polite', 'data-readback': o.name } });
+	const under = box.createDiv({ cls: 'dynasty-cal-under' });
 	host.register(() => {
 		back.empty();
-		// A calendar that counts from year 1 beside other years gets the short warning in place of the help (D278); the long sentence stays in the problem list of the tree.
+		// A calendar that counts from year 1 beside other years gets the short warning in place of the reading line (D278); the long sentence stays in the problem list of the tree.
 		const warn = host.checked().noAnchor.has(o.result);
 		back.toggleClass('is-warning', warn);
 		back.toggleClass('dynasty-marked', warn);
@@ -31,18 +45,17 @@ function startForm(parent: HTMLElement, host: CardHost, s: StartDraft, o: { name
 			drawMark(back, 'warning');
 			back.createSpan({ text: T.startNoAnchor });
 		} else back.setText(startReadback(host.checked().starts.get(o.result), o.calendar(), s.saved));
+		back.toggle(back.getText() !== '' || warn);
 	});
-	const hintId = `dynasty-cal-start-hint-${o.name}`;
-	const row = box.createDiv({ cls: ['dynasty-cal-start-row', o.cycles ? 'has-cycle' : 'is-era'] });
-	const described = { describedBy: hintId };
-	if (o.cycles) field(row, host, `${o.name}-cycle`, T.cycleLabel, s.cycle, (v) => (s.cycle = v), { numeric: true, ...described });
-	field(row, host, `${o.name}-year`, T.yearLabel, s.year, (v) => (s.year = v), { numeric: true, ...described });
+	const where = { errorIn: under, hintIn: under };
+	if (o.cycles) field(row, host, `${o.name}-cycle`, T.cycleLabel, s.cycle, (v) => (s.cycle = v), { numeric: true, hint: T.cycleHint, ...where });
+	field(row, host, `${o.name}-year`, T.yearLabel, s.year, (v) => (s.year = v), { numeric: true, placeholder: T.yearPlaceholder, hint: o.cycles ? T.yearHintCycles : T.yearHintEras, ...where });
 	row.createDiv({ cls: 'dynasty-cal-equals', text: '=', attr: { 'aria-hidden': 'true' } });
-	box.createDiv({ cls: ['dynasty-sheet-hint', 'is-on-focus'], text: o.cycles ? T.exampleHintCycles : T.exampleHintEras, attr: { id: hintId } });
-	field(row, host, `${o.name}-same`, T.sameAsLabel, s.same, (v) => (s.same = v), { placeholder: T.sameAsPlaceholder, wide: true, error: o.error, errorIn: box, ...described });
+	field(row, host, `${o.name}-same`, T.sameAsLabel, s.same, (v) => (s.same = v), { placeholder: T.sameAsPlaceholder, wide: true, hint: T.sameAsHint, error: o.error, ...where });
+	o.extra?.(row, under);
 }
 
-/** One era of an era calendar: its name, its start and its optional length. */
+/** One era of an era calendar: its name on one row, then its Year, "Same year as" and Length on a second row, and the reading line (D330 O-23). */
 function eraRow(parent: HTMLElement, host: CardHost, d: CalendarDraft, e: EraDraft, i: number, shown: Set<string>): void {
 	const at = (field: string): FieldError => ({ key: d.key, field: `era:${e.key}:${field}`, shown });
 	const box = parent.createDiv({ cls: 'dynasty-cal-era', attr: { 'data-era': String(e.key) } });
@@ -52,8 +65,8 @@ function eraRow(parent: HTMLElement, host: CardHost, d: CalendarDraft, e: EraDra
 		host.register(() => button.setAttribute('aria-label', T.removeEra(e.name)));
 	};
 	field(box, host, `era-${e.key}-name`, T.eraName, e.name, (v) => (e.name = v), { error: at('name'), labelEnd: remove });
-	startForm(box, host, e.start, { name: `era-${e.key}`, cycles: false, result: `e${e.key}`, calendar: () => host.checked().byKey.get(d.key), error: at('start') });
-	field(box, host, `era-${e.key}-length`, T.lengthOptional, e.length, (v) => (e.length = v), { numeric: true, half: true, hint: T.lengthHintEras, error: at('length') });
+	const length = (row: HTMLElement, under: HTMLElement) => field(row, host, `era-${e.key}-length`, T.lengthLabel, e.length, (v) => (e.length = v), { numeric: true, hint: T.lengthHintEras, error: at('length'), errorIn: under, hintIn: under });
+	startForm(box, host, e.start, { name: `era-${e.key}`, cycles: false, result: `e${e.key}`, calendar: () => host.checked().byKey.get(d.key), error: at('start'), extra: length });
 }
 
 /** The refusals and warnings of one calendar (or of the plain years), in place under its fields. */
@@ -71,7 +84,7 @@ export function messages(parent: HTMLElement, host: CardHost, key: number, shown
 
 /** The fields of a cycle calendar: the length and the start. */
 function cycleFields(parent: HTMLElement, host: CardHost, d: CalendarDraft, calendar: () => Calendar | undefined, shown: Set<string>): void {
-	field(parent, host, `${d.key}-length`, T.lengthLabel, d.length, (v) => (d.length = v), { numeric: true, half: true, hint: T.lengthHintCycles, error: { key: d.key, field: 'length', shown } });
+	field(parent, host, `${d.key}-length`, T.lengthLabel, d.length, (v) => (d.length = v), { numeric: true, hint: T.lengthHintCycles, error: { key: d.key, field: 'length', shown } });
 	startForm(parent, host, d.start, { name: `${d.key}`, cycles: true, result: `c${d.key}`, calendar, error: { key: d.key, field: 'start', shown } });
 }
 

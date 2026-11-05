@@ -25,7 +25,7 @@ import { fixtureNote, fixtureSource, topLevelBlocks } from './load';
 // - Insert "before X": above the comments X owns. "After X": directly below X's last line, so
 //   above the next item's comments and above a blank line.
 // - Delete or remove: the item's own lines go; the full-line comments above it stay, as for a
-//   removed key in M2 (the decision notes), so no user comment is lost.
+//   removed key in M2, so no user comment is lost.
 
 const applyOp: ApplyOp = edit.applyOp;
 
@@ -248,7 +248,7 @@ describe('add-person: where the new item goes (§6.2)', () => {
 		);
 	});
 
-	describe('a child for a union that is not the pair\'s last-listed one (the decision notes "Relationship-op details")', () => {
+	describe('a child for a union that is not the pair\'s last-listed one', () => {
 		/** Fixture 1 after a second union for Roderick and Mathilde: u1 has an id and both children. */
 		const TWO = golden('01-add-union-second.yaml').replace(/\n$/, '');
 		const bran = (union: UnionRef): Op => ({
@@ -303,7 +303,7 @@ describe('add-person: where the new item goes (§6.2)', () => {
 });
 
 describe('add-person in an empty block (§5.9 "Add first person")', () => {
-	// Decision: as for add-house in M2, a new section uses two-space indentation and "  - " items.
+	// Decision: as for add-house in M2, a new section uses two-space indentation and " - " items.
 
 	it('an empty body', () => {
 		const r = ok(applyOp('', { kind: 'add-person', id: 'aldric', fields: { name: 'Aldric Valmont', sex: 'm' } }));
@@ -325,7 +325,7 @@ describe('add-person in an empty block (§5.9 "Add first person")', () => {
 	});
 });
 
-describe('add-parent (§6.4, §4.2, the decision notes "Automatic marriage")', () => {
+describe('add-parent (§6.4, §4.2, the automatic marriage)', () => {
 	it('a second birth parent with no union between them adds a marriage and reports auto-union', () => {
 		// Decision: the automatic union is appended to `unions` with `type: marriage` written out
 		// (§6.4 names the type, and the user edits it from the spouse list). Its partners are in the
@@ -478,14 +478,14 @@ describe('add-parent (§6.4, §4.2, the decision notes "Automatic marriage")', (
 		expectRefused(applyOp(MAIN, { kind: 'add-parent', child: 'nobody', parent: 'edric', type: 'adoptive' }), 'unknown-person');
 	});
 
-	it('bad-value: already a parent of that type (the decision notes "Relationship-op details")', () => {
+	it('bad-value: already a parent of that type', () => {
 		expectRefused(applyOp(MAIN, { kind: 'add-parent', child: 'piers', parent: 'aldous', type: 'birth' }), 'bad-value');
 		expectRefused(applyOp(MAIN, { kind: 'add-parent', child: 'tamsin', parent: 'aldous', type: 'ward' }), 'bad-value');
 		expectRefused(applyOp(F8, { kind: 'add-parent', child: 'roderick', parent: 'marek', type: 'rumoured' }), 'bad-value');
 	});
 });
 
-describe('add-union (§6.4 Add spouse, §4.3, the decision notes "Second union for a couple")', () => {
+describe('add-union (§6.4 Add spouse, §4.3, a second union for a couple)', () => {
 	// Decision: a new union is appended to `unions` as a block map with keys in the §4.1 order (id,
 	// partners, type, start, end); `partners` is a flow sequence in the op's order; `type` is written
 	// only when the op gives it (also for marriage). A child gets `union:` in the §4.1 order.
@@ -534,7 +534,7 @@ describe('add-union (§6.4 Add spouse, §4.3, the decision notes "Second union f
 		expectClean(r.body);
 	});
 
-	it('a pair whose last union has no children: that union gets no id (the decision notes "Relationship-op details")', () => {
+	it('a pair whose last union has no children: that union gets no id', () => {
 		const once = ok(applyOp(MAIN, { kind: 'add-union', partners: ['edric', 'joan'], type: 'marriage', start: '1158' })).body;
 		expect(once).toBe(replaceOnce(MAIN, '    type: betrothal\n', '    type: betrothal\n  - partners: [edric, joan]\n    type: marriage\n    start: 1158\n'));
 		expectClean(once);
@@ -651,7 +651,7 @@ describe('remove-union (§6.7, D5)', () => {
 		);
 	});
 
-	it('union: keys that named the removed union go in the same write (the decision notes "Relationship-op details")', () => {
+	it('union: keys that named the removed union go in the same write', () => {
 		// Fixture 1 after a second union for Roderick and Mathilde; removing the first one leaves
 		// Edric and Alys under the second.
 		const two = golden('01-add-union-second.yaml').replace(/\n$/, '');
@@ -661,7 +661,7 @@ describe('remove-union (§6.7, D5)', () => {
 	});
 
 	it('removing the last union removes unions', () => {
-		// Decision: like the last option (M2), the section goes with the blank line that separated it.
+		// Decision: like the last option, the section goes with the blank line that separated it.
 		const body = 'people:\n  - id: a\n    name: A\n  - id: b\n    name: B\n\nunions:\n  - partners: [a, b]';
 		expect(ok(applyOp(body, { kind: 'remove-union', union: { index: 0, partners: ['a', 'b'] } })).body).toBe(
 			'people:\n  - id: a\n    name: A\n  - id: b\n    name: B',
@@ -884,7 +884,7 @@ describe('delete-person (§6.7)', () => {
 		expect(ok(applyOp(F8, { kind: 'delete-person', id: 'marek' })).body).toBe(want);
 	});
 
-	it('union: keys that named a removed union go too (the decision notes "Relationship-op details")', () => {
+	it('union: keys that named a removed union go too', () => {
 		// Fixture 1 after a second union for Roderick and Mathilde; Mathilde is deleted.
 		const two = golden('01-add-union-second.yaml').replace(/\n$/, '');
 		let want = replaceOnce(F1, '  - id: mathilde\n    name: Mathilde Harrow\n    sex: f\n    born: 1136\n', '');

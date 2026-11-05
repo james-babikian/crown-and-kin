@@ -12,7 +12,7 @@ import type { FamilyGraph } from '../core/derive';
 import { successionLine, type SuccessionNote, type SuccessionResult } from '../core/succession';
 import { INHERIT_ILLEGITIMATE, INHERIT_RULES, INHERIT_THROUGH, SUCCESSION_RULES, ordinal, type InheritIllegitimate } from '../core/succession-keys';
 import { afterPress } from '../render/dom/press-hold';
-import { dateLineShown, isolateDate, withoutBidiControls } from '../render/tree-info';
+import { dateLineShown, isolateDate, isolateName, withoutBidiControls } from '../render/tree-info';
 import { SUCCESSION_UI as T, TITLES_UI } from '../render/ui-text';
 import { draftSpec, draftTitle, holderLead, holderText, type SuccessionDraft, type TitleRow } from '../view/titles-draft';
 import { afterNotes, bornDateUnread, heirNotes, rulerLabelOf } from '../view/succession-notes';
@@ -20,6 +20,7 @@ import { bodyHints, firstInfo, illegitimateHint } from './body-hint';
 import { setRowHints, switchRow } from './switch-row';
 import { RowPictures, buildRow, iconButton, personLead, textButton } from './window-parts';
 import type { PictureStore } from './picture-store';
+import { guarded } from './start-guard';
 
 /** The draft value for a written value that the plugin cannot read. */
 const UNKNOWN = '?';
@@ -27,7 +28,7 @@ const UNKNOWN = '?';
 const YEAR_MS = 300;
 
 /** What the section needs from the window. */
-export interface SectionHost {
+interface SectionHost {
 	/** The family graph now: it changes when the window reloads. */
 	g(): FamilyGraph;
 	/** The draft row of the title; the section changes its `succ`. */
@@ -199,14 +200,14 @@ export function successionSection(host: SectionHost): SuccessionView {
 
 	/** The line for the draft, on the current graph. Null if the title is not in the tree. */
 	function compute(): SuccessionResult | null {
-		try {
-			const title = draftTitle(host.g(), host.row);
-			if (!title) return null;
-			return successionLine(host.g(), title, draftSpec(s()), host.limit(), host.oldAge(), host.youngDeathAge());
-		} catch (e) {
-			console.error('Crown and Kin: cannot compute the line of succession', e);
-			return null;
-		}
+		return guarded(
+			'cannot compute the line of succession',
+			() => {
+				const title = draftTitle(host.g(), host.row);
+				return title ? successionLine(host.g(), title, draftSpec(s()), host.limit(), host.oldAge(), host.youngDeathAge()) : null;
+			},
+			null,
+		);
 	}
 
 	function lineSummary(): string {
@@ -214,7 +215,7 @@ export function successionSection(host: SectionHost): SuccessionView {
 		if (!res || res.kind !== 'line' || !res.heirs.length) return T.noHeir;
 		return res.heirs
 			.slice(0, 2)
-			.map((id, i) => `${ordinal(i + 1)} ${nameOf(id)}`)
+			.map((id, i) => `${ordinal(i + 1)} ${isolateName(nameOf(id))}`)
 			.join(' · ');
 	}
 
@@ -489,7 +490,7 @@ export function successionSection(host: SectionHost): SuccessionView {
 			});
 			if (inTree) {
 				const name = r.title.createEl('button', { cls: 'dynasty-holder-name', attr: { type: 'button', 'aria-label': TITLES_UI.showCardLabel(who), 'data-focus': `succ-${kind}-name:${id}` } });
-				name.createSpan({ cls: 'dynasty-holder-label', text: who });
+				name.createSpan({ cls: 'dynasty-holder-label', text: isolateName(who) });
 				name.addEventListener('click', () => host.guard(() => host.showCard(id)));
 			} else {
 				r.title.createSpan({ cls: 'dynasty-holder-name', text: id });
@@ -662,7 +663,7 @@ export function successionSection(host: SectionHost): SuccessionView {
 				chevron: false,
 				lead: (row) => lead(row, id),
 			});
-			r.title.createSpan({ cls: 'dynasty-holder-label', text: nameOf(id) });
+			r.title.createSpan({ cls: 'dynasty-holder-label', text: isolateName(nameOf(id)) });
 			const p = g.byId.get(id);
 			const dates = p ? dateLineShown(p, g.dates) : '';
 			if (dates) r.sub.setText(dates);

@@ -30,7 +30,7 @@ export class Modal {
 	readonly modalEl: FEl;
 	readonly titleEl: FEl;
 	readonly contentEl: FEl;
-	// Obsidian sets these two as instance properties of every modal: a method of the same name in a subclass is hidden by them (WP-5 fix).
+	// Obsidian sets these two as instance properties of every modal: a method of the same name in a subclass is hidden by them.
 	readonly win: typeof fakeWin = fakeWin;
 	readonly doc: typeof fakeDoc = fakeDoc;
 
@@ -117,7 +117,11 @@ export class Notice {
 	readonly noticeEl = new FEl('div', { cls: 'notice' });
 	readonly messageEl = this.noticeEl;
 	hidden = false;
-	constructor(message: unknown) {
+	constructor(
+		message: unknown,
+		/** The time in ms that the caller asked for (0: stays until it is closed). */
+		readonly duration?: number,
+	) {
 		// A fragment (createFragment) is shown as its text.
 		notices.push(message instanceof FEl ? message.getText() : String(message));
 		noticeList.push(this);
@@ -228,8 +232,12 @@ export const setIcon = (el: FEl, name: string) => {
 	iconCalls.push(name);
 	if (knownIcons.has(name)) el.createSvg('svg', {});
 };
+/** Obsidian's icon ids (`lucide-` and the others); the plugin asks whether an icon exists before it uses a newer one. */
+export const getIconIds = (): string[] => ['lucide-fullscreen', 'lucide-minimize'];
 export const prepareFuzzySearch = () => () => null;
-export const debounce = <F>(f: F) => f;
+/** Obsidian's `debounce` for tests: it runs the function at once, so nothing is ever waiting and `cancel` and `run` do nothing, as the real `Debouncer` has them. */
+export const debounce = <A extends unknown[], R>(f: (...args: A) => R) =>
+	Object.assign((...args: A): R => f(...args), { cancel: (): void => undefined, run: (): void => undefined });
 
 // ---------- Settings (spec §9): Setting, SettingGroup and PluginSettingTab on the fake DOM ----------
 

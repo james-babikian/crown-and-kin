@@ -16,7 +16,7 @@ import { findBlocks } from '../../src/core/block-locate';
 import { HandleRegistry } from '../../src/obsidian/block-handle';
 
 /*
- * Write-path rules of the version 0.1.1 area B fix round (the decision notes "Version 0.1.1"): a copy of a
+ * Write-path rules of the version 0.1.1 area B fix round: a copy of a
  * block is not the block moved (1), a `missing` write is retried like a stale one (3), and a write
  * that changes nothing leaves no trace (4).
  */
@@ -150,6 +150,35 @@ describe('a missing write is retried under the same rules (area B (3))', () => {
 		const out = await h.write(queen);
 		expect(out).toMatchObject({ ok: false, code: 'missing' });
 		expect(v.get()).toBe(t1);
+	});
+});
+
+describe('the label of a write (D330 UX-17)', () => {
+	it('is kept with the undo entry and given back by Handle.undo, also when the label is made from the effects of the write', async () => {
+		const t0 = ['# Note', '', fence(X), ''].join('\n');
+		const v = fakeApp('n.md', t0);
+		const reg = new HandleRegistry(v.app as never);
+		const h = await handleOf(reg, 'n.md', t0, 0);
+		const seen: (readonly string[])[] = [];
+		const out = await h.write(queen, 'user', (effects) => {
+			seen.push(effects);
+			return { kind: 'change', names: ['Alys'] };
+		});
+		expect(out.ok).toBe(true);
+		expect(seen).toEqual([[]]);
+		const back = await h.undo();
+		expect(back).toMatchObject({ ok: true, label: { kind: 'change', names: ['Alys'] } });
+	});
+
+	it('a write with no label undoes with no label', async () => {
+		const t0 = ['# Note', '', fence(X), ''].join('\n');
+		const v = fakeApp('n.md', t0);
+		const reg = new HandleRegistry(v.app as never);
+		const h = await handleOf(reg, 'n.md', t0, 0);
+		await h.write(queen);
+		const back = await h.undo();
+		expect(back.ok).toBe(true);
+		expect('label' in back).toBe(false);
 	});
 });
 

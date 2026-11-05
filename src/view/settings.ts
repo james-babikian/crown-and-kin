@@ -14,7 +14,7 @@ export type ReduceMotion = 'system' | 'on' | 'off';
 export const REDUCE_MOTIONS: readonly ReduceMotion[] = ['system', 'on', 'off'];
 
 /** D204: which cards show the arms of their house. */
-export type ArmsOnCards = 'few' | 'all';
+type ArmsOnCards = 'few' | 'all';
 /** The values of `ArmsOnCards`. */
 export const ARMS_ON_CARDS: readonly ArmsOnCards[] = ['few', 'all'];
 
@@ -85,7 +85,7 @@ export const DEFAULT_SETTINGS: DynastySettings = {
  */
 
 /** Valid range for `embedHeightDesktop`, in px. */
-export const DESKTOP_HEIGHT = { min: 100, max: 5000 } as const;
+const DESKTOP_HEIGHT = { min: 100, max: 5000 } as const;
 /** Valid range for `focusGenerations`. */
 export const GENERATIONS = { min: 0, max: 10 } as const;
 /** Valid range for `successionLength`. */

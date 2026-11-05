@@ -1,4 +1,4 @@
-// Helpers of the name-list tests (spec §14 rules 13 to 16, WP-6 step 1): small builders for calendars with name lists.
+// Helpers of the name-list tests (spec §14 rules 13 to 16): small builders for calendars with name lists.
 import type { Calendar, ListName, NameList } from '../../src/core/dates';
 
 /** The seven planets of the contract's example; "Saturn (Sa)" is the first. */

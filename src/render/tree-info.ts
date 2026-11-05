@@ -13,11 +13,12 @@ import { cardLabels, entryReign, type CardLabel } from '../core/titles';
 import type { Holder, Person } from '../core/types';
 import { withoutBidiControls } from './bidi-controls';
 import { hasRtlDate, isolateDate, isolateDatesIn } from './date-bidi';
+import { isolateName } from './name-bidi';
 
-export { isolateDate, withoutBidiControls };
+export { isolateDate, isolateName, withoutBidiControls };
 
 // The legend texts live in legend-text.ts (one home each); these names stay importable from here.
-export { LEGEND_HOUSES_LABEL, LEGEND_LABELS, LEGEND_LINES_LABEL, LEGEND_ORDER, SIGN_LEGEND_LABEL } from './legend-text';
+export { LEGEND_GROUP_DEAD, LEGEND_GROUP_LINES, LEGEND_HOUSES_LABEL, LEGEND_LABELS, LEGEND_LINES_LABEL, LEGEND_ORDER, SIGN_LEGEND_LABEL } from './legend-text';
 
 /** The relation text builders below (spec §13.1, §13.2). Names come from `g.byId`; an empty name uses the id; the possessive is always "’s" (D99). */
 export interface RelationTexts {
@@ -110,9 +111,9 @@ export function partnersAndChildren(g: FamilyGraph, id: string): { partners: str
 }
 
 /** The sign of a dead person whose `died` holds no year ("yes", "true", a doubt such as "?"); '†?' for a doubt, '†' for any other text without a year. */
-export const DEAD_SIGN = '†';
+const DEAD_SIGN = '†';
 /** The sign for a doubt about the death. */
-export const DEAD_SIGN_DOUBT = '†?';
+const DEAD_SIGN_DOUBT = '†?';
 
 /** Screen-reader words for the two signs (the character itself is not read). */
 export const CARD_SPOKEN_DEAD = 'dead';
@@ -123,7 +124,7 @@ export const CARD_SPOKEN_DEAD_DOUBT = 'dead, but the death text is not clear';
 export type DatesRead = Pick<TreeDates, 'read'> & { readonly reader?: Pick<DateReader, 'hasLists'> };
 
 /** Which names a short date shows (spec §14 rule 15): the lists' own setting, full names, or none. */
-export type NamesForm = 'shown' | 'full' | 'none';
+type NamesForm = 'shown' | 'full' | 'none';
 
 /**
  * The short date `text` with the name of its year (spec §14 rule 15, D273): only a whole date gets names, one space after the date, in list order.
@@ -160,7 +161,7 @@ function hasNameOrWord(raw: string, shown: string, dates: DatesRead): boolean {
  * The two dates of a range with the dash between them: "1131–1160". A date that has a name of its year or an approximate word ("22.13 Sa", "c. 1131") would touch the dash
  * ("Sa–c."), so a thin space goes on each side of it. A plain range keeps the plain dash. `from` and `to` are the dates as written and as shown (with the names added).
  */
-export function dateRange(from: { raw: string; shown: string }, to: { raw: string; shown: string }, dates: DatesRead): string {
+function dateRange(from: { raw: string; shown: string }, to: { raw: string; shown: string }, dates: DatesRead): string {
 	return `${from.shown}${rangeDash(from, to, dates)}${to.shown}`;
 }
 
@@ -239,12 +240,13 @@ export function shownReignIsolated(label: Pick<CardLabel, 'reign' | 'shown'> | u
 /** The title of a card label with its reign, the reign with the names of its years (spec §14 rule 15); `written` when the tree has no list or the person has no label. */
 export function titleWithNames(g: FamilyGraph, id: string, written: string): string {
 	const label = written && g.dates.reader?.hasLists ? cardLabels(g).get(id) : undefined;
-	return label ? [label.title, shownReignIsolated(label, g.dates, 'shown')].filter((x) => x !== undefined && x !== '').join(' ') : written;
+	return label ? [label.title === undefined ? undefined : isolateName(label.title), shownReignIsolated(label, g.dates, 'shown')].filter((x) => x !== undefined && x !== '').join(' ') : isolateName(written);
 }
 
 /** The title text of the head of the person window: with a reign, the reign shows the names of its years, as the card does (spec §14 rule 15); the label keeps the text as written. */
 export function headTitle(label: Pick<CardLabel, 'title' | 'reign' | 'shown'> | undefined, titleText: string, dates: DatesRead): string {
-	return label?.title && label.reign ? `${titleText} ${shownReignIsolated(label, dates, 'shown') ?? label.reign}` : titleText;
+	const title = isolateName(titleText);
+	return label?.title && label.reign ? `${title} ${shownReignIsolated(label, dates, 'shown') ?? label.reign}` : title;
 }
 
 /** A holder entry (or the values of a holder form) with `from` and `until` as short dates with names (spec §14 rule 15); the text of a reign is built from it with `entryReign`. */
@@ -407,14 +409,14 @@ export function farTagLabel(g: FamilyGraph, spouses: string[]): string {
 	return `Show a list of ${spouses.length} partners.`;
 }
 
-/** A person's name as the card shows it; an empty or unknown name uses the id (spec §13.2). */
-const shownName = (g: FamilyGraph, id: string) => g.byId.get(id)?.name || id;
+/** A person's name as the card shows it; an empty or unknown name uses the id (spec §13.2). In a sentence the name is its own bidi run (D322). */
+const shownName = (g: FamilyGraph, id: string) => isolateName(g.byId.get(id)?.name || id);
 
 /** "NAME is OF's WORD." One sentence of the relation finder (spec §13.2). */
 const isOf = (g: FamilyGraph, person: string, of: string, word: string) => `${shownName(g, person)} is ${shownName(g, of)}${CURLY_APOSTROPHE}s ${word}.`;
 
 /** The most step sentences the finder shows before "and N more steps" (spec §13.2). */
-export const MAX_STEP_SENTENCES = 8;
+const MAX_STEP_SENTENCES = 8;
 
 /** The finder's sentence for `r` (spec §13.2): the relation at `index` for a named result, else the chain or "no relation" sentence. */
 export const finderSentence: RelationTexts['finderSentence'] = (g, r, index) => {

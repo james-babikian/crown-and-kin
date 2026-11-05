@@ -116,7 +116,7 @@ describe('the settings tab (spec §9, D33)', () => {
 		expect(control<ToggleComponent>(SETTINGS_UI.houseGeneration).getValue()).toBe(true);
 	});
 
-	it('every field and switch has its setting name as an accessible name (P4)', async () => {
+	it('every field and switch has its setting name as an accessible name', async () => {
 		const { fake } = await loadPlugin();
 		openTab(fake);
 		expect(control<TextComponent>(SETTINGS_UI.heightDesktop).inputEl.getAttribute('aria-label')).toBe(SETTINGS_UI.heightDesktop);
@@ -134,7 +134,7 @@ describe('the settings tab (spec §9, D33)', () => {
 		expect(last(fake.saved)).toEqual({ ...plugin.settings, settingsVersion: 1 });
 	});
 
-	it('0.2.8 (A.4, A.5): "Arms on cards" offers the two values and stores a change; "Warn about more than 2 parents of a type" is on by default and stores a change', async () => {
+	it('"Arms on cards" offers the two values and stores a change; "Warn about more than 2 parents of a type" is on by default and stores a change', async () => {
 		const { fake, plugin } = await loadPlugin();
 		openTab(fake);
 		const arms = control<DropdownComponent>(SETTINGS_UI.armsOnCards);
@@ -165,7 +165,7 @@ describe('the settings tab (spec §9, D33)', () => {
 		expect(last(fake.saved)).toEqual({ ...plugin.settings, settingsVersion: 1 });
 	});
 
-	it('0.2.4: the break list and "Reduce movement" show their stored values, with the choices in the plugin words and an accessible name', async () => {
+	it('the break list and "Reduce movement" show their stored values, with the choices in the plugin words and an accessible name', async () => {
 		const { fake } = await loadPlugin({ breakWords: 'Long-na-munda', reduceMotion: 'on' });
 		openTab(fake);
 		const motion = control<DropdownComponent>(SETTINGS_UI.reduceMotion);
@@ -182,14 +182,14 @@ describe('the settings tab (spec §9, D33)', () => {
 		for (const [c, name] of [[motion.selectEl, SETTINGS_UI.reduceMotion], [area.inputEl, SETTINGS_UI.breakWords]] as const) expect(c.getAttribute('aria-label')).toBe(name);
 	});
 
-	it('0.2.4: the defaults are an empty break list and "Follow the device"', async () => {
+	it('the defaults are an empty break list and "Follow the device"', async () => {
 		const { fake } = await loadPlugin();
 		openTab(fake);
 		expect(control<TextAreaComponent>(SETTINGS_UI.breakWords).getValue()).toBe('');
 		expect(control<DropdownComponent>(SETTINGS_UI.reduceMotion).getValue()).toBe('system');
 	});
 
-	it('0.2.4: the choice of Reduce movement stores its change; the break list stores the text as typed', async () => {
+	it('the choice of Reduce movement stores its change; the break list stores the text as typed', async () => {
 		const { fake, plugin } = await loadPlugin();
 		openTab(fake);
 		control<DropdownComponent>(SETTINGS_UI.reduceMotion).fire('off');
@@ -199,7 +199,7 @@ describe('the settings tab (spec §9, D33)', () => {
 		expect(last(fake.saved)).toEqual({ ...plugin.settings, settingsVersion: 1 });
 	});
 
-	it('0.2.4: the break list is stored when the field loses the focus, and when the tab closes with the typing not yet stored', async () => {
+	it('the break list is stored when the field loses the focus, and when the tab closes with the typing not yet stored', async () => {
 		const { fake, plugin } = await loadPlugin();
 		openTab(fake);
 		const area = control<TextAreaComponent>(SETTINGS_UI.breakWords);
@@ -214,7 +214,7 @@ describe('the settings tab (spec §9, D33)', () => {
 		expect(plugin.settings.breakWords).toBe('Val-mont\nAr-den');
 	});
 
-	it('0.2.4: a blur with the stored text stores nothing', async () => {
+	it('a blur with the stored text stores nothing', async () => {
 		const { fake } = await loadPlugin({ breakWords: 'Val-mont' });
 		openTab(fake);
 		dispatch(control<TextAreaComponent>(SETTINGS_UI.breakWords).inputEl, 'blur');
@@ -376,10 +376,10 @@ describe('dates and generations (spec §9)', () => {
 	});
 });
 
-describe('link updates in data.json and the command "Show the last link update" (M6 iPhone fix round)', () => {
+describe('link updates in data.json and the command "Show the last link update"', () => {
 	const entry = { oldPath: 'Old.md', newPath: 'New.md', others: [] };
 
-	// 0.4 (the index contract 3, G2 part 3 item 2): the updater drops the entry; the file does not keep a copy of a list that the updater has handled.
+	// 0.4: the updater drops the entry; the file does not keep a copy of a list that the updater has handled.
 	it('stored pending renames do not change the settings; with the setting off the updater drops them, and a save does not write them back', async () => {
 		const { fake, plugin } = await loadPlugin({ ...DEFAULT_SETTINGS, updateLinks: false, pendingRenames: [entry] });
 		expect(plugin.settings).toEqual({ ...DEFAULT_SETTINGS, updateLinks: false });
@@ -503,7 +503,7 @@ describe('keyboard (spec §5.2)', () => {
 	it('Esc closes the legend and gives the focus back to the Legend button', async () => {
 		desktop();
 		const { el } = await embed(TREE, { handle: fakeHandle('n.md', TREE) });
-		// 0.2.8 (G.13): the line styles are an item of More, and Esc gives the focus back to the button that opened the menu (More).
+		// 0.2.8: the line styles are an item of More, and Esc gives the focus back to the button that opened the menu (More).
 		const more = el.querySelector('.dynasty-more')!;
 		more.focus();
 		dispatch(more, 'click');
@@ -538,7 +538,7 @@ describe('keyboard (spec §5.2)', () => {
 	});
 
 	it('full-screen view: Obsidian 1.13 closes with the event (close(evt)): no Notice "[object PointerEvent]", and an open legend closes first', async () => {
-		// M6 iPhone test: a phone showed the Notice "[object PointerEvent]" (the decision notes "M6 iPhone test").
+		// M6 iPhone test: a phone showed the Notice "[object PointerEvent]".
 		const evt = { type: 'pointerup', pointerType: 'touch', toString: () => '[object PointerEvent]' };
 		const { root, modal } = await openFullScreen(TREE);
 		dispatch(root.querySelector('.dynasty-more')!, 'click');

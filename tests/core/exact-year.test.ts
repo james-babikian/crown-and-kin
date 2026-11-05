@@ -10,7 +10,7 @@ import type { NameList } from '../../src/core/name-lists';
 
 const plain = (text: string | undefined) => exactYear(text, PLAIN_READER);
 
-describe('plain texts that give an exact year (RULES §5.2 item 4)', () => {
+describe('plain texts that give an exact year', () => {
 	const rows: [string, number][] = [
 		['1135', 1135],
 		['  1135  ', 1135],
@@ -116,7 +116,7 @@ describe('the year comes from the reader, never from a second parse', () => {
 
 const cycles: Calendar = { id: 'C.md#0#0', name: 'C', note: 'C.md', formats: ['Year {year} of Cycle {cycle}'], kind: { type: 'cycles', length: 28, start: 1100 } };
 
-describe('calendar reads (RULES §5.2 item 3)', () => {
+describe('calendar reads', () => {
 	const ready = compileCalendars([cycles], true);
 	it('a whole calendar date is exact; the reader gives its year', () => {
 		expect(exactYear('Year 3 of Cycle 2', ready)).toBe(1130);
@@ -159,7 +159,7 @@ describe('calendar reads (RULES §5.2 item 3)', () => {
 });
 
 describe('the reader that is not ready', () => {
-	it('gives no exact year for any text, not even a plain year (RULES §5.1)', () => {
+	it('gives no exact year for any text, not even a plain year', () => {
 		const pending = compileCalendars([cycles], false);
 		expect(pending.ready).toBe(false);
 		expect(exactYear('1135', pending)).toBeUndefined();
@@ -167,7 +167,7 @@ describe('the reader that is not ready', () => {
 	});
 });
 
-describe('year names of the plain years (RULES §5.2 item 4, last shape)', () => {
+describe('year names of the plain years (last shape)', () => {
 	const list: NameList = { name: 'Planets', names: [{ name: 'Saturn' }, { name: 'Jupiter' }], known: { year: 1135, index: 0 }, show: 'full' };
 	const reader = compileCalendars([], true, [], [list]);
 	it('a year followed by its name is exact', () => {

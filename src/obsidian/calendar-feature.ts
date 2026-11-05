@@ -9,7 +9,7 @@ import { CALENDAR_UI } from '../render/calendar-text';
 import type { CalendarIndex } from '../view/calendar-index';
 import { calendarBlockProcessor } from './calendar-block-view';
 import { openCalendars } from './calendar-window';
-import { guardStart } from './start-guard';
+import { guarded, guardStart } from './start-guard';
 import type { TreeView } from './tree-view';
 
 /** What this file needs of the plugin: the open tree views. */
@@ -56,13 +56,7 @@ export function registerCalendars(plugin: CalendarPlugin, index: CalendarIndex):
 		}, turn);
 		timers.add(t);
 	};
-	const off = index.onChange(() => {
-		try {
-			redrawForDates(plugin.views, later);
-		} catch (e) {
-			console.error('Crown and Kin: cannot draw the trees again after a change of the calendars', e);
-		}
-	});
+	const off = index.onChange(() => guarded('cannot draw the trees again after a change of the calendars', () => redrawForDates(plugin.views, later)));
 	plugin.register(() => {
 		off();
 		for (const t of timers) window.clearTimeout(t);

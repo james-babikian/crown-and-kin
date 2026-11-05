@@ -4,9 +4,12 @@
  */
 
 import { Notice } from 'obsidian';
+import { noticeText, setNameText } from '../render/dom/name-marks';
 import { REMOVE, WRITE_TEXT } from '../render/ui-text';
 import { sameBody } from '../core/block-match';
+import type { UndoLabel } from '../core/block-write';
 import type { Handle } from './block-handle';
+import { undoneText } from './undo-text';
 import { trackModal } from '../view/plugin-modals';
 
 const UNDO_NOTICE_MS = 10_000;
@@ -18,24 +21,29 @@ const UNDO_NOTICE_MS = 10_000;
  * shows its Notice and gives false; the undo gives true.
  */
 export async function undoIfUnchanged(handle: Handle, written: string, depth: number | null = null): Promise<boolean> {
+	return (await undoWithLabel(handle, written, depth)) !== null;
+}
+
+/** `undoIfUnchanged` with the label of the undone write (null when it refused; `label` is absent for a write that said nothing about itself). */
+export async function undoWithLabel(handle: Handle, written: string, depth: number | null = null): Promise<{ label?: UndoLabel } | null> {
 	try {
 		// A link update after a rename (a maintenance write) does not count as a change of the tree.
 		const now = typeof handle.followed === 'function' ? handle.followed(written) : written;
 		const size = handle.undoSize;
 		if (!sameBody(handle.body, now) || (depth !== null && typeof size === 'number' && size !== depth)) {
 			new Notice(WRITE_TEXT.undoChanged);
-			return false;
+			return null;
 		}
 		const out = await handle.undo();
 		if (!out.ok) {
 			new Notice(out.code === 'missing' ? WRITE_TEXT.undoMissing : out.code === 'empty' ? WRITE_TEXT.undoEmpty : WRITE_TEXT.undoChanged);
-			return false;
+			return null;
 		}
-		return true;
+		return out.label ? { label: out.label } : {};
 	} catch (err) {
 		console.error('Crown and Kin: cannot undo', err);
 		new Notice(WRITE_TEXT.undoChanged);
-		return false;
+		return null;
 	}
 }
 
@@ -46,7 +54,7 @@ export async function undoIfUnchanged(handle: Handle, written: string, depth: nu
  */
 export function undoNotice(text: string, handle: Handle, written: string, onUndone?: () => void, doneText: string = WRITE_TEXT.undoDone): Notice {
 	const frag = createFragment((f) => {
-		f.createSpan({ cls: 'dynasty-undo-text', text });
+		setNameText(f.createSpan({ cls: 'dynasty-undo-text' }), text);
 	});
 	const notice = new Notice(frag, UNDO_NOTICE_MS);
 	const el = notice.messageEl;
@@ -73,9 +81,11 @@ export function undoNotice(text: string, handle: Handle, written: string, onUndo
 		if (!live) return;
 		end();
 		void (async () => {
-			if (!(await undoIfUnchanged(handle, written))) return;
+			const done = await undoWithLabel(handle, written);
+			if (!done) return;
 			try {
-				new Notice(doneText);
+				// The label of the undone write gives the words that say what changed; a write with no final text keeps the text the caller gave.
+				new Notice(noticeText(undoneText(done.label, null, doneText)));
 				onUndone?.();
 			} catch (err) {
 				console.error('Crown and Kin: cannot undo', err);

@@ -8,7 +8,8 @@
  */
 
 import { slugify } from './id-gen';
-import { quote } from './quote';
+import { isolateName } from './name-bidi';
+import { quote, upperFirst } from './quote';
 import { LIST_REFUSAL_TEXT, REFUSAL_TEXT } from './refusal-text';
 import { INHERIT_ILLEGITIMATE, INHERIT_RULES, INHERIT_THROUGH, SUCCESSION_RULES } from './succession-keys';
 import { PARENT_LIMIT } from './parent-types';
@@ -220,7 +221,6 @@ function strings(p: P, key: string): string[] {
 	return Array.isArray(v) ? v.filter((x) => typeof x === 'string' && x.trim() !== '') : [];
 }
 
-const cap = (x: string) => x.charAt(0).toUpperCase() + x.slice(1);
 const plural = (count: number, one: string, many: string) => `${count} ${count === 1 ? one : many}`;
 
 /** "A", "A and B", "A, B and C". */
@@ -229,12 +229,15 @@ export function andList(xs: readonly string[]): string {
 	return `${xs.slice(0, -1).join(', ')} and ${xs[xs.length - 1]}`;
 }
 
-const person = (p: P) => s(p, 'person', 'A person');
+/** A name param, isolated for its bidi run (D322); the fallback when it is absent or empty. */
+const nm = (p: P, key: string, fallback: string) => isolateName(s(p, key, fallback));
+
+const person = (p: P) => nm(p, 'person', 'A person');
 
 /** How a union is named in text: by its partners, else by its id, else by its place in the list. */
 function partnership(p: P): string {
 	const absent = strings(p, 'absent');
-	const partners = strings(p, 'partners').map((x) => (absent.includes(x) ? quote(x) : x));
+	const partners = strings(p, 'partners').map((x) => (absent.includes(x) ? quote(x) : isolateName(x)));
 	if (partners.length) return `the partnership of ${andList(partners)}`;
 	return byLabel(p);
 }
@@ -248,7 +251,7 @@ function byLabel(p: P): string {
 function house(p: P): string {
 	const name = s(p, 'house', '');
 	const id = s(p, 'id', '');
-	if (name && name !== id) return name;
+	if (name && name !== id) return isolateName(name);
 	return id ? `the house ${quote(id)}` : 'a house';
 }
 
@@ -261,11 +264,11 @@ const ENTRY: Record<string, { what: string; start: string }> = {
 
 /** The title a holder issue is about: "the title Duke of Valmont", or "a title" when the name is missing. */
 const titleOf = (p: P) => {
-	const name = s(p, 'title', '');
+	const name = nm(p, 'title', '');
 	return name ? `the title ${name}` : 'a title';
 };
 const holdersOf = (p: P) => {
-	const name = s(p, 'title', '');
+	const name = nm(p, 'title', '');
 	return name ? `the holders of ${name}` : 'the holders of a title';
 };
 const HOLDER_FORM = 'Write each holder like this: - {person: aldric}.';
@@ -287,14 +290,14 @@ function missingId(p: P): string {
 	const name = s(p, 'name', '');
 	if (section === 'parents') return `Entry ${index} in the parents of ${person(p)} has no ID. Add the ID of the parent.`;
 	if (section === 'houses') {
-		const who = name || `Entry ${index} in the “houses” list`;
+		const who = isolateName(name) || `Entry ${index} in the “houses” list`;
 		return `${who} has no ID, so the tree does not use this house. Add an ID, for example: id: ${name ? slugify(name) : 'valmont'}.`;
 	}
 	if (section === 'titles') {
-		const who = name || `Entry ${index} in the “titles” list`;
+		const who = isolateName(name) || `Entry ${index} in the “titles” list`;
 		return `${who} has no ID, so the tree does not use this title. Add an ID, for example: id: ${name ? slugify(name) : 'duke-of-valmont'}.`;
 	}
-	const who = name || `Entry ${index} in the “people” list`;
+	const who = isolateName(name) || `Entry ${index} in the “people” list`;
 	// The reader gives an id that no person has; `p1` only when the text comes without one.
 	return `${who} has no ID. Add an ID, for example: id: ${s(p, 'example', 'p1')}.`;
 }
@@ -303,7 +306,7 @@ function missingId(p: P): string {
 function duplicatePersonId(p: P): string {
 	const id = s(p, 'id', '?');
 	const name = s(p, 'name', '');
-	if (name && name !== id) return `${name} (${id}) has the same ID as another person. To edit the tree again, give each person a different ID.`;
+	if (name && name !== id) return `${isolateName(name)} (${id}) has the same ID as another person. To edit the tree again, give each person a different ID.`;
 	return `More than one person has the ID ${quote(id)}. To edit the tree again, give each person a different ID.`;
 }
 
@@ -311,7 +314,7 @@ function sectionWrongShape(p: P): string {
 	const section = s(p, 'section', 'people');
 	if (section === 'options') return 'The “options” section is not a set of options, so the tree ignores it. Write each option like this: start: aldric.';
 	if (section === 'holders') {
-		const name = s(p, 'title', '');
+		const name = nm(p, 'title', '');
 		return `The holders of ${name ? `the title ${name}` : 'a title'} are not a list, so the tree ignores them. ${HOLDER_FORM}`;
 	}
 	const e = ENTRY[section] ?? ENTRY.people;
@@ -324,11 +327,11 @@ function sectionWrongShape(p: P): string {
  */
 function pictureOwner(p: P): { who: string; uses: string; is: string; other: string } {
 	// The personal arms of a person.
-	if (s(p, 'owner', '') === 'person-arms') return { who: `The personal arms of ${s(p, 'person', 'a person')}`, uses: 'use', is: 'are', other: 'select other arms' };
+	if (s(p, 'owner', '') === 'person-arms') return { who: `The personal arms of ${nm(p, 'person', 'a person')}`, uses: 'use', is: 'are', other: 'select other arms' };
 	if (s(p, 'owner', '') === 'portrait' || (s(p, 'owner', '') === '' && s(p, 'person', '') !== '')) {
-		return { who: `The portrait of ${s(p, 'person', 'a person')}`, uses: 'uses', is: 'is', other: 'select another portrait' };
+		return { who: `The portrait of ${nm(p, 'person', 'a person')}`, uses: 'uses', is: 'is', other: 'select another portrait' };
 	}
-	return { who: `The arms of ${s(p, 'house', 'a house')}`, uses: 'use', is: 'are', other: 'select other arms' };
+	return { who: `The arms of ${nm(p, 'house', 'a house')}`, uses: 'use', is: 'are', other: 'select other arms' };
 }
 
 const PICTURE_FORMATS = 'Select a PNG, JPEG, WebP, GIF, BMP or SVG picture.';
@@ -355,9 +358,9 @@ function dateHead(p: P): string {
 		case 'died':
 			return `${person(p)} has “${s(p, 'where', 'born')}: ${value}”.`;
 		case 'reign':
-			return `${cap(titleOf(p))} has the reign date ${quote(value)}.`;
+			return `${upperFirst(titleOf(p))} has the reign date ${quote(value)}.`;
 		default:
-			return `${cap(titleOf(p))} has “year: ${value}”.`;
+			return `${upperFirst(titleOf(p))} has “year: ${value}”.`;
 	}
 }
 
@@ -402,18 +405,18 @@ const ISSUE_TEXT: { [C in IssueCode]: (p: P) => string } = {
 	'union-partner-count': (p) => {
 		const partners = strings(p, 'partners');
 		const what = partners.length
-			? `a partnership with ${plural(partners.length, 'person', 'people')}: ${andList(partners)}`
+			? `a partnership with ${plural(partners.length, 'person', 'people')}: ${andList(partners.map(isolateName))}`
 			: `${byLabel(p)}, because it has ${plural(n(p, 'count'), 'person', 'people')}`;
 		// A partnership of 3 or more people gets an example of the right form.
 		const example = n(p, 'count') >= 3 ? ' Write one partnership for each pair, for example “- partners: [aldric, isolde]”.' : '';
 		return `The tree does not show ${what}. Give each partnership exactly 2 people.${example}`;
 	},
 	'union-same-partner': (p) =>
-		`The tree does not show ${byLabel(p)}, because it has ${s(p, 'person', 'the same person')} two times. Change one partner to a different person.`,
+		`The tree does not show ${byLabel(p)}, because it has ${nm(p, 'person', 'the same person')} two times. Change one partner to a different person.`,
 	'cycle': (p) => {
 		const people = strings(p, 'people');
-		const who = people.length ? andList(people) : 'Some people';
-		return `${who} are ancestors of each other, so the tree has a time loop. The tree does not show the line from ${s(p, 'parent', 'one parent')} to ${s(p, 'dropped', 'one child')}. If this is a mistake, correct the parents.`;
+		const who = people.length ? andList(people.map(isolateName)) : 'Some people';
+		return `${who} are ancestors of each other, so the tree has a time loop. The tree does not show the line from ${nm(p, 'parent', 'one parent')} to ${nm(p, 'dropped', 'one child')}. If this is a mistake, correct the parents.`;
 	},
 	'self-parent': (p) => `The parents of ${person(p)} include ${person(p)}. If this is a mistake, remove ${person(p)} from these parents.`,
 	'placement-without-parents': (p) => {
@@ -422,13 +425,13 @@ const ISSUE_TEXT: { [C in IssueCode]: (p: P) => string } = {
 	},
 	'house-color-null': (p) => {
 		const value = s(p, 'value', '');
-		if (value) return `${cap(house(p))} has no colour. Put quotes around the colour: color: "${value}".`;
-		return `${cap(house(p))} has no colour. If you wrote a colour, put quotes around it, for example: color: "#8b1e3f".`;
+		if (value) return `${upperFirst(house(p))} has no colour. Put quotes around the colour: color: "${value}".`;
+		return `${upperFirst(house(p))} has no colour. If you wrote a colour, put quotes around it, for example: color: "#8b1e3f".`;
 	},
 	'duplicate-house-id': (p) => `More than one house has the ID ${quote(s(p, 'id', '?'))}, and the tree uses only the first. Give each house a different ID.`,
 	'duplicate-title-id': (p) => `More than one title has the ID ${quote(s(p, 'id', '?'))}, and the tree uses only the first. Give each title a different ID.`,
 	'missing-holder': (p) =>
-		`${cap(titleOf(p))} has a holder with the ID ${quote(s(p, 'ref', '?'))}, but no person has this ID. Correct the ID, or write the name of the holder.`,
+		`${upperFirst(titleOf(p))} has a holder with the ID ${quote(s(p, 'ref', '?'))}, but no person has this ID. Correct the ID, or write the name of the holder.`,
 	'holder-empty': (p) => `Entry ${s(p, 'index', '?')} in ${holdersOf(p)} has no person and no name. Add “person:” or “name:”.`,
 	'card-title-not-held': (p) =>
 		`${person(p)} has “card-title: ${s(p, 'ref', '?')}”, but ${person(p)} does not hold a title with this ID. The card shows the first title instead. Correct the ID, or remove it.`,
@@ -436,13 +439,13 @@ const ISSUE_TEXT: { [C in IssueCode]: (p: P) => string } = {
 	'unknown-union-type': (p) => {
 		const suggestion = s(p, 'suggestion', '');
 		const hint = suggestion ? ` If you mean ${quote(suggestion)}, write ${quote(`type: ${suggestion}`)}.` : '';
-		return `${cap(partnership(p))} has the type ${quote(s(p, 'value', '?'))}. The plugin shows it as a marriage.${hint}`;
+		return `${upperFirst(partnership(p))} has the type ${quote(s(p, 'value', '?'))}. The plugin shows it as a marriage.${hint}`;
 	},
 	'unknown-placement': (p) => `${person(p)} has the unknown placement ${quote(s(p, 'value', '?'))}. Use birth, adoptive or ward.`,
 	'unknown-parent-type': (p) => {
 		const suggestion = s(p, 'suggestion', '');
 		const hint = suggestion ? ` If you mean ${quote(suggestion)}, write ${quote(`type: ${suggestion}`)}.` : '';
-		const parent = s(p, 'parent', 'a parent');
+		const parent = nm(p, 'parent', 'a parent');
 		return `${person(p)} has the parent ${parent} with the type ${quote(s(p, 'value', '?'))}, which the plugin does not know. The plugin counts ${parent} as a birth parent of ${person(p)}. Use birth, adoptive, ward or rumoured.${hint}`;
 	},
 
@@ -457,7 +460,7 @@ const ISSUE_TEXT: { [C in IssueCode]: (p: P) => string } = {
 	'picture-not-image': pictureNotImage,
 	'picture-too-large': pictureTooLarge,
 	'bad-portrait-crop': (p) =>
-		`The plugin cannot read the selected part of the portrait of ${s(p, 'person', 'a person')}, so the card shows the automatic part. Select the part again, or remove ${quote('portrait-crop')}.`,
+		`The plugin cannot read the selected part of the portrait of ${nm(p, 'person', 'a person')}, so the card shows the automatic part. Select the part again, or remove ${quote('portrait-crop')}.`,
 
 	'unknown-succession': (p) => {
 		const value = s(p, 'value', '?');
@@ -468,18 +471,18 @@ const ISSUE_TEXT: { [C in IssueCode]: (p: P) => string } = {
 				: lower === 'semi-salic'
 					? ' For the semi-Salic law, use “succession: eldest-child” with “inherit: men-first-in-house”.'
 					: '';
-		return `${cap(titleOf(p))} has “succession: ${value}”. The plugin does not know this rule, so it shows no line of succession. Use one of these rules: ${SUCCESSION_RULES.join(', ')}.${hint}`;
+		return `${upperFirst(titleOf(p))} has “succession: ${value}”. The plugin does not know this rule, so it shows no line of succession. Use one of these rules: ${SUCCESSION_RULES.join(', ')}.${hint}`;
 	},
 	'unknown-inherit': (p) =>
-		`${cap(titleOf(p))} has “inherit: ${s(p, 'value', '?')}”. The plugin does not know this rule, so it shows no line of succession. Use one of these rules: ${INHERIT_RULES.join(', ')}.`,
+		`${upperFirst(titleOf(p))} has “inherit: ${s(p, 'value', '?')}”. The plugin does not know this rule, so it shows no line of succession. Use one of these rules: ${INHERIT_RULES.join(', ')}.`,
 	'unknown-inherit-through': (p) =>
-		`${cap(titleOf(p))} has “inherit-through: ${s(p, 'value', '?')}”. The plugin does not know this rule, so it shows no line of succession. Use one of these rules: ${INHERIT_THROUGH.join(', ')}.`,
+		`${upperFirst(titleOf(p))} has “inherit-through: ${s(p, 'value', '?')}”. The plugin does not know this rule, so it shows no line of succession. Use one of these rules: ${INHERIT_THROUGH.join(', ')}.`,
 	'unknown-inherit-illegitimate': (p) =>
-		`${cap(titleOf(p))} has “inherit-illegitimate: ${s(p, 'value', '?')}”. The plugin does not know this value, so it shows no line of succession. Use one of these values: ${INHERIT_ILLEGITIMATE.join(', ')}.`,
+		`${upperFirst(titleOf(p))} has “inherit-illegitimate: ${s(p, 'value', '?')}”. The plugin does not know this value, so it shows no line of succession. Use one of these values: ${INHERIT_ILLEGITIMATE.join(', ')}.`,
 	'year-unreadable': (p) =>
-		`${cap(titleOf(p))} has “year: ${s(p, 'value', '?')}”. The plugin cannot find a year in it. The line of succession uses the end of the last reign. If the last reign has no end, the line is for now. Write the year as a number, for example “year: 1210”.`,
-	'missing-heir': (p) => `${cap(titleOf(p))} has “heir: ${s(p, 'ref', '?')}”, but no person has this ID. Correct the ID, or remove it.`,
-	'missing-excluded': (p) => `${cap(titleOf(p))} has “exclude: ${s(p, 'ref', '?')}”, but no person has this ID. Correct the ID, or remove it.`,
+		`${upperFirst(titleOf(p))} has “year: ${s(p, 'value', '?')}”. The plugin cannot find a year in it. The line of succession uses the end of the last reign. If the last reign has no end, the line is for now. Write the year as a number, for example “year: 1210”.`,
+	'missing-heir': (p) => `${upperFirst(titleOf(p))} has “heir: ${s(p, 'ref', '?')}”, but no person has this ID. Correct the ID, or remove it.`,
+	'missing-excluded': (p) => `${upperFirst(titleOf(p))} has “exclude: ${s(p, 'ref', '?')}”, but no person has this ID. Correct the ID, or remove it.`,
 	'sex-spelling': (p) => {
 		const value = s(p, 'value', '?');
 		return `${person(p)} has “sex: ${value}”. The plugin reads only “m” and “f” as a man and a woman. If you mean a man or a woman, write “sex: m” or “sex: f”.`;
@@ -491,7 +494,7 @@ const ISSUE_TEXT: { [C in IssueCode]: (p: P) => string } = {
 
 	'childless-has-child': (p) => {
 		const name = person(p);
-		return `${name} has “childless: true”, but ${s(p, 'child', 'a person')} is a child of ${name} in the tree. Remove “childless: true”, or correct the parents of ${s(p, 'child', 'a person')}.`;
+		return `${name} has “childless: true”, but ${nm(p, 'child', 'a person')} is a child of ${name} in the tree. Remove “childless: true”, or correct the parents of ${nm(p, 'child', 'a person')}.`;
 	},
 
 	'year-zero': (p) => `${dateHead(p)} There is no year 0. The plugin reads 0 as 1 BC. If you mean AD 1, write “1”. For a year before that, write a number with a minus sign, such as ${quote('-5')}, for 5 BC.`,
@@ -533,14 +536,14 @@ const ISSUE_TEXT: { [C in IssueCode]: (p: P) => string } = {
 	'through-spouse-no-claim': (p) => {
 		const count = n(p, 'count');
 		const none = count === 2 ? 'Neither is' : 'None of them is';
-		return `${person(p)} has ${count} partners: ${andList(strings(p, 'partners'))}. ${none} an ancestor or a descendant of a holder of ${titleOf(p)}. As a result, the plugin cannot choose a partner and ignores “through-spouse”. Write the ID of one partner, for example “through-spouse: ${s(p, 'example', 'anna')}”.`;
+		return `${person(p)} has ${count} partners: ${andList(strings(p, 'partners').map(isolateName))}. ${none} an ancestor or a descendant of a holder of ${titleOf(p)}. As a result, the plugin cannot choose a partner and ignores “through-spouse”. Write the ID of one partner, for example “through-spouse: ${s(p, 'example', 'anna')}”.`;
 	},
 	'through-spouse-several-claims': (p) =>
-		`${person(p)} has ${n(p, 'count')} partners who are ancestors or descendants of a holder of ${titleOf(p)}: ${andList(strings(p, 'partners'))}. The plugin cannot choose a partner, so it ignores “through-spouse”. Write the ID of one partner, for example “through-spouse: ${s(p, 'example', 'anna')}”.`,
+		`${person(p)} has ${n(p, 'count')} partners who are ancestors or descendants of a holder of ${titleOf(p)}: ${andList(strings(p, 'partners').map(isolateName))}. The plugin cannot choose a partner, so it ignores “through-spouse”. Write the ID of one partner, for example “through-spouse: ${s(p, 'example', 'anna')}”.`,
 	'through-spouse-self': (p) => `${person(p)} holds ${titleOf(p)} with “through-spouse”, but the ID after it is the ID of ${person(p)}. The plugin ignores “through-spouse”. Write the ID of a partner, or remove “through-spouse”.`,
 	'through-spouse-not-partner': (p) => {
 		const ref = s(p, 'ref', '?');
-		return `${person(p)} holds ${titleOf(p)} with “through-spouse: ${ref}”, but ${s(p, 'other', ref)} is not a partner of ${person(p)}. The plugin ignores “through-spouse”. Write the ID of a partner, or remove “through-spouse: ${ref}”.`;
+		return `${person(p)} holds ${titleOf(p)} with “through-spouse: ${ref}”, but ${nm(p, 'other', ref)} is not a partner of ${person(p)}. The plugin ignores “through-spouse”. Write the ID of a partner, or remove “through-spouse: ${ref}”.`;
 	},
 	'through-spouse-unknown-person': (p) => {
 		const ref = s(p, 'ref', '?');

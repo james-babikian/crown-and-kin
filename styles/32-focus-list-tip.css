@@ -8,7 +8,7 @@
 	top: var(--dynasty-tip-y, 0px);
 	z-index: 30;
 	pointer-events: none;
-	padding: 4px 10px;
+	padding: var(--dynasty-space-1) 10px;
 	border-radius: var(--radius-s);
 	background: var(--text-normal);
 	color: var(--background-primary);

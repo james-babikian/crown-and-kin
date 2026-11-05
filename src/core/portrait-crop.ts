@@ -121,7 +121,7 @@ export function isAutomaticCrop(crop: CropFraction, w: number, h: number): boole
 
 /** The crop of a person for a card or the sheet: null means the automatic part (rule 24). */
 export function portraitCropOf(person: Pick<Person, 'portrait' | 'portraitCrop'>): CropFraction | null {
-	if (!person || person.portrait === undefined) return null;
+	if (person?.portrait === undefined) return null;
 	const read = readPortraitCrop(person.portraitCrop);
 	return read.kind === 'ok' ? read.crop : null;
 }

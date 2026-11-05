@@ -12,6 +12,7 @@ import { PLAIN_READER, checkCalendarsAt, exampleText, normalizeMarker, startFrom
 import { calendarRefusalText, codedIssue, type CodedIssue } from '../core/messages';
 import { REFUSAL_TEXT } from '../core/refusal-text';
 import { CALENDAR_WINDOW_UI as T } from '../render/calendar-text';
+import { isolateDate } from '../render/date-bidi';
 import { dateReadout, dateReadoutParts, type ReadoutParts } from '../render/date-readout';
 import {
 	PLAIN_KEY, builtList, calendarYearReader, emptyPlain, listDraftsOf, listOps, listUntouched, listsShape, markerLists, nameLinesRefusal, plainYearReader, type KnownInfo, type ListDraft, type PlainDraft,
@@ -134,7 +135,7 @@ export function newEra(key: () => number): EraDraft {
 }
 
 /** How one start comes out: the internal year, or why the entry form has no usable year. */
-export type StartResult = { ok: true; value: number; /** The year comes from a "Same year as" example. */ example: boolean; /** The year that the example names in the other calendar. */ other?: number } | { ok: false; reason: 'date' | 'number' | 'length' | 'cycle' };
+type StartResult = { ok: true; value: number; /** The year comes from a "Same year as" example. */ example: boolean; /** The year that the example names in the other calendar. */ other?: number } | { ok: false; reason: 'date' | 'number' | 'length' | 'cycle' };
 
 /** Reads the date text of "Same year as" through the reader of the other calendars; the internal year, or undefined. */
 const yearOfSame = (same: string, others: DateReader): number | undefined => others.read(same)?.year;
@@ -399,7 +400,11 @@ function startText(reason: 'date' | 'number' | 'length' | 'cycle'): string {
 	return reason === 'date' ? T.sameAsBad : reason === 'number' ? T.numberBad : reason === 'cycle' ? T.sameAsCycle : REFUSAL_TEXT.calendarLength;
 }
 
-/** The readback under a start (spec §14 rule 1): what the start is, and the example read back in the first format of the calendar. */
+/**
+ * The reading line under a start (spec §14 rule 1, D330 O-23): the example in the first format of the calendar, "Qinglong Emperor 1 = year 130" or "Cycle 3, Year 21 = year 1203".
+ * The instruction to write a date in "Same year as" is the hint of that field. The example is isolated for the text direction, so an Arabic era name keeps its digit after it (CAL-19, D322).
+ * Where the calendar has no format that can show the example, the sentence of the start stands in its place.
+ */
 export function startReadback(r: StartResult | undefined, calendar: Calendar | undefined, kept: number | null): string {
 	if (!r) return '';
 	if (!r.ok) return startText(r.reason);
@@ -408,10 +413,10 @@ export function startReadback(r: StartResult | undefined, calendar: Calendar | u
 		if (Number.isNaN(kept)) return T.startUnreadable;
 		// The note stores only the number: the example is worked out again from it, as the first year of the calendar reads in the formats (spec §14 rule 1).
 		const first = calendar ? exampleText(calendar, kept) : null;
-		return first === null ? T.startKept(kept) : `${T.startKept(kept)} ${T.exampleBack(first, kept)}`;
+		return first === null ? T.startKept(kept) : T.exampleBack(isolateDate(first), kept);
 	}
 	const back = calendar && r.other !== undefined ? exampleText(calendar, r.other) : null;
-	return back !== null && r.other !== undefined ? `${T.startNow(r.value)} ${T.exampleBack(back, r.other)}` : T.startNow(r.value);
+	return back !== null && r.other !== undefined ? T.exampleBack(isolateDate(back), r.other) : T.startNow(r.value);
 }
 
 /** The test line below a calendar (spec §14 rule 6): how the plugin reads a date that the user writes here; '' for an empty field. */

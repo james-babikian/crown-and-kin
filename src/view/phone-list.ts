@@ -135,7 +135,7 @@ export function listData(g: FamilyGraph, centre: string): ListData {
 	const home = (e: (typeof side)[number]) => {
 		if (e.unionKey) return partnerships.find((x) => x.key === e.unionKey);
 		const named = sideParents.get(`${e.child}|${parentKind(e.type)}`);
-		if (!named || named.size !== 2 || !named.has(centre)) return undefined;
+		if (named?.size !== 2 || !named.has(centre)) return undefined;
 		const [a, b] = [...named];
 		const key = `i:${pairKey(a, b)}`;
 		return partnerships.find((x) => x.key === key);
@@ -186,7 +186,7 @@ export function listIds(data: ListData): string[] {
 }
 
 /** What `listWord` reads. */
-export interface ListWordFacts {
+interface ListWordFacts {
 	me: string | null;
 	/** The setting "Show relation names on cards". */
 	showRelations: boolean;
@@ -216,4 +216,17 @@ export function popTrail(trail: readonly string[] | undefined, has: (id: string)
 	if (!trail) return null;
 	for (let i = trail.length - 1; i >= 0; i--) if (has(trail[i])) return { id: trail[i], rest: trail.slice(0, i).filter(has) };
 	return null;
+}
+
+/** The room between the bottom of the note's header and the top of the list after a move, in px. */
+export const LIST_HEADER_GAP = 8;
+
+/**
+ * The scroll margin that puts the top of the list under the header of the note, not behind it. `headerBottom` is the bottom edge of the header and `scrollerTop`
+ * the top edge of the scroll area, both in screen px. Zero when the header does not cover the scroll area (a computer, or no header).
+ */
+export function listScrollMargin(headerBottom: number | null, scrollerTop: number): number {
+	if (headerBottom === null) return 0;
+	const covered = headerBottom - scrollerTop;
+	return covered > 0 ? Math.ceil(covered) + LIST_HEADER_GAP : 0;
 }

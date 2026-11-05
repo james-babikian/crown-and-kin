@@ -150,11 +150,11 @@ export class DynastySettingTab extends PluginSettingTab {
 				if (n !== null) void this.host.changeSettings(patch(row.key, n));
 			};
 			const later = debounce(store, HEIGHT_TYPING_MS, true);
-			flushWaiting = () => later.run?.();
+			flushWaiting = () => later.run();
 			// A microtask first, so changes that come in one task count as one.
 			text.onChange(() => void Promise.resolve().then(() => later()));
 			const now = () => {
-				later.cancel?.();
+				later.cancel();
 				store();
 				// A value out of range is not stored: the field shows the stored value again.
 				text.setValue(String(this.host.settings[row.key]));
@@ -182,7 +182,7 @@ export class DynastySettingTab extends PluginSettingTab {
 			};
 			const later = debounce(store, HEIGHT_TYPING_MS, true);
 			flushWaiting = () => {
-				later.cancel?.();
+				later.cancel();
 				store();
 			};
 			area.onChange(() => void Promise.resolve().then(() => later()));
@@ -209,12 +209,12 @@ export class DynastySettingTab extends PluginSettingTab {
 			};
 			const later = debounce(save, HEIGHT_TYPING_MS, true);
 			const flush = () => {
-				later.cancel?.();
+				later.cancel();
 				save();
 				text.setValue(String(current()));
 			};
 			flushWaiting = () => {
-				later.cancel?.();
+				later.cancel();
 				save();
 			};
 			text.onChange(() => void Promise.resolve().then(() => later()));

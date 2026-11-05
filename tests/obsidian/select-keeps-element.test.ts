@@ -7,8 +7,8 @@ import { closePluginModals } from '../../src/view/plugin-modals';
 import type { SuccessionView } from '../../src/obsidian/succession-section';
 import { FEl, clock, device, dispatch, fakeDoc, resetDom } from '../acceptance/fake-dom';
 import { openModals, resetObsidian } from '../acceptance/fake-obsidian';
-import { openWin, page, save } from '../support/r027-window-support';
-import { stripNotDisabled, writingHandle } from '../support/s113-c-support';
+import { openWin, page, save } from '../support/titles-window-support';
+import { stripNotDisabled, writingHandle } from '../support/windows-sheets-support';
 import { useFakeDom } from '../support/fake-dom-setup';
 
 /*
@@ -179,7 +179,7 @@ describe('Person window, Family section: the parent-type select', () => {
 		expect(h.ops.length, 'the change wrote').toBe(1);
 		expect(modal.querySelector('select.dynasty-family-select'), 'the select that the user used is still the one on the page').toBe(sel);
 		expect(sel.value).toBe('adoptive');
-		// The page is updated in place (r032 fix round), so the select that the user used keeps its focus.
+		// The page is updated in place, so the select that the user used keeps its focus.
 		expect(fakeDoc.activeElement).toBe(sel);
 	});
 

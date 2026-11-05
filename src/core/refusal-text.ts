@@ -4,7 +4,7 @@
  * in `messages.ts`; these are the `detail` of a refused edit.
  */
 
-import { quote } from './quote';
+import { quote, upperFirst } from './quote';
 
 /** The `detail` sentences of refused edits, by name. */
 export const REFUSAL_TEXT = {
@@ -91,4 +91,3 @@ export const LIST_REFUSAL_TEXT: Readonly<Record<string, (r: ListRefusalInfo) => 
 	'known-no-name': (r) => `The known year of ${listOf(r)} has no name, or its name is not in the list. Write a name or a short form from the list.`,
 };
 
-const upperFirst = (s: string): string => s.charAt(0).toUpperCase() + s.slice(1);

@@ -65,20 +65,24 @@ describe('styles.css matches STROKES', () => {
 	});
 
 	it('a token (custom property) with color-mix() has a plain value first and is set again only inside @supports', () => {
+		// Every `@supports (color: color-mix(` block counts: the token chunk (the card edge) and the base chunk (the static colours) each have one.
 		const head = '@supports (color: color-mix(';
-		const start = css.indexOf(head);
-		expect(start).toBeGreaterThan(-1);
-		let depth = 0;
-		let end = -1;
-		for (let i = css.indexOf('{', start); i < css.length; i++) {
-			if (css[i] === '{') depth++;
-			else if (css[i] === '}' && --depth === 0) {
-				end = i;
-				break;
+		let inside = '';
+		let outside = css;
+		for (let start = outside.indexOf(head); start > -1; start = outside.indexOf(head)) {
+			let depth = 0;
+			let end = -1;
+			for (let i = outside.indexOf('{', start); i < outside.length; i++) {
+				if (outside[i] === '{') depth++;
+				else if (outside[i] === '}' && --depth === 0) {
+					end = i;
+					break;
+				}
 			}
+			inside += outside.slice(outside.indexOf('{', start) + 1, end);
+			outside = outside.slice(0, start) + outside.slice(end + 1);
 		}
-		const inside = css.slice(css.indexOf('{', start) + 1, end);
-		const outside = css.slice(0, start) + css.slice(end + 1);
+		expect(inside).not.toBe('');
 		const mixed = [...inside.matchAll(/(--dynasty-[\w-]+):\s*color-mix\(/g)].map((m) => m[1]);
 		expect(mixed.length).toBeGreaterThan(0);
 		for (const name of mixed) expect(outside, name).toMatch(new RegExp(`${name}:\\s*var\\(`));

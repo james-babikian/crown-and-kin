@@ -42,7 +42,7 @@ describe('sample tree 13: every card shows the texts in its comments (spec §13.
 });
 
 describe('card labels: the parts (contract CardLabel, spec §13.3)', () => {
-	it('one label for every person, memoised per graph (contract rule 4)', async () => {
+	it('one label for every person, memoised per graph', async () => {
 		const { cardLabels } = await titlesModule();
 		const g = graphOf(BODY_13);
 		const labels = cardLabels(g);
@@ -270,13 +270,13 @@ describe('the table note (D55, §13.4): noteName and holderTable', () => {
 		const g = graphOf(BODY_13);
 		const rows = tableRows(holderTable(g, titleOf(g, 'duke-of-valmont')));
 		expect(rows[0]).toEqual(['Ruler', 'Name', 'Reign']);
-		// Reign = entryReign of the entry: no "r.", no parentheses (supervisor ruling).
+		// Reign = entryReign of the entry: no "r.", no parentheses.
 		const body = rows.slice(1).map(([r, n, y]) => [r, n, y ?? '']);
 		expect(body.map((r) => r[0])).toEqual(['Aldric I', 'Aldric II', 'Roderick', 'Gareth I', 'Roderick I', 'Aldric III', 'Edmund']);
 		expect(body.map((r) => r[2])).toEqual(['1062–1110', '1110–1150', '1150–1158', '1158–1163', 'from 1163', '1175–1210', '1210–1228']);
 		expect(body.map((r) => r[1])).toEqual(['', 'Aldric Valmont', 'Roderick Valmont', 'Ser Gareth Orsini', 'Roderick Valmont', 'Aldric Valmont', 'Edmund Valmont']);
 		// The name-only "Aldric" (ruler name Aldric, number I): the full name equals the ruler name
-		// without the number, so the Name cell is empty (supervisor ruling).
+		// without the number, so the Name cell is empty.
 	});
 
 	it('Counts of Orsini: holders not in the tree, a name that is the same as the ruler name, an entry with no reign', async () => {

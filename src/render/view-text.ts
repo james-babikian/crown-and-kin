@@ -1,9 +1,11 @@
 /*
  * Fixed text of the tree view: the toolbar and its menus, the banner and the problem list, the
- * read-only note, the full-screen view, the focus menu, the relation finder and the phone list.
+ * read-only note, the full-screen view, the focus menu, the relation finder, the phone list, the fold buttons and the bar of a very large tree.
  * They have this one home so that the view code and the tests read the same words;
  * `ui-text.ts` re-exports every name. Simplified Technical English (ASD-STE100) and the project word list apply.
  */
+
+import { isolateName } from './name-bidi';
 
 /** The word on the "You" tab of the marked person; the same word as the relation text of that person. */
 export const ME_WORD = 'You';
@@ -19,8 +21,8 @@ export const UI = {
 	bannerTitle: 'Editing is off',
 	bannerLead: 'Correct these problems. Then you can edit this tree:',
 	fit: 'Fit the tree in the view',
-	legend: 'Show the line styles',
-	legendTitle: 'Line styles',
+	legend: 'Show the legend',
+	legendTitle: 'Legend',
 	spouseListTitle: 'Partners',
 } as const;
 
@@ -34,8 +36,30 @@ export function problemsTitle(count: number): string {
 	return count === 1 ? '1 problem in this tree' : `${count} problems in this tree`;
 }
 
+/** The text line of the small pop-up that the warning triangle opens in a note on a phone, for `count` problems. */
+export function problemsPopupLine(count: number): string {
+	return count === 1 ? 'This tree has 1 problem.' : `This tree has ${count} problems.`;
+}
+
+/** The button of that pop-up: it opens the full-screen view with the problem list. */
+export const PROBLEMS_POPUP_BUTTON = 'Show in full screen';
+
 /** Hint text shown above the problem list. */
-export const PROBLEMS_HINT = 'Select a problem to show the people it is about.';
+export const PROBLEMS_HINT = 'Select a problem to show the people it is about. Use the Open button to correct it.';
+
+/** D330 UX-20: the second action of a problem row; `target` is the name of the house or the person that the problem is about. */
+export const PROBLEMS_OPEN = {
+	button: (target: string) => `Open ${isolateName(target)}`,
+	label: (target: string) => `Open ${target}: open the window where you can correct this problem`,
+} as const;
+
+/** D330 TR-13: the hint of a tree with one person, by place. It goes when a second person exists. */
+export const ONE_PERSON_HINT = {
+	computer: 'Select the card to add a partner, a parent or a child.',
+	phoneList: 'Tap the pencil to add a partner, a parent or a child.',
+	/** A tree in a tablet note is a static preview (D1), so the hint first sends the user to Expand. */
+	tabletNote: 'Select Expand. Then select the card to add a partner, a parent or a child.',
+} as const;
 
 /** Read-only trees (spec §6.1) and the resize handle (spec §7.5). */
 export const BLOCK_UI = {
@@ -80,7 +104,7 @@ export const FOCUS_UI = {
 	clear: 'Clear focus',
 	clearLabel: 'Clear focus: show all people again',
 	/** D246: the sentence of the bar at the top of the tree while a focus shows. */
-	bar: (name: string) => `Focus on ${name}`,
+	bar: (name: string) => `Focus on ${isolateName(name)}`,
 	/** The accessible name and the tooltip of the Focus button while a focus shows: it says what a tap does (D263 B2). */
 	focusOn: 'Focus is on. Select this button to clear the focus and show all people.',
 	focusHere: 'Focus here',
@@ -105,7 +129,7 @@ export const FINDER_UI = {
 	otherTitle: 'Select the other person',
 	placeholder: PERSON_PLACEHOLDER,
 	/** The first row of a picker when the tree has a mark: the marked person. */
-	you: (name: string) => `You: ${name}`,
+	you: (name: string) => `You: ${isolateName(name)}`,
 	showSteps: 'Show the steps',
 	hideSteps: 'Hide the steps',
 	moreSteps: (n: number) => (n === 1 ? 'and 1 more step' : `and ${n} more steps`),
@@ -142,7 +166,7 @@ export const PHONE_LIST_UI = {
 	headChildren: 'Children',
 	headYou: 'You',
 	headPerson: 'This person',
-	withPartner: (name: string) => `With ${name}`,
+	withPartner: (name: string) => `With ${isolateName(name)}`,
 	noPartner: 'No partner listed',
 	otherChildren: 'Other children',
 	/** The accessible name of the list. */
@@ -162,6 +186,8 @@ export const PHONE_LIST_UI = {
 	editLabel: (name: string) => `Edit ${name}`,
 	you: 'You',
 	savedElsewhere: 'The plugin saved the person. Tap Find to see this person.',
+	/** D330 O-09a: the one Notice for the pinned, the marked and the new case; it names the person. */
+	savedElsewhereName: (name: string) => `The plugin saved ${isolateName(name)}. Tap Find to see this person.`,
 } as const;
 
 /**
@@ -196,4 +222,51 @@ export const VIEW_NOTICE = {
 	/** The update of the links in one note stopped because a write of the note took too long. */
 	renameGaveUp: (note: string, old: string, next: string) =>
 		`After a rename, the plugin updates the links in the trees. In the note ${note}, this update took too long, and the plugin stopped it. If a tree in the note still has the link “${old}”, replace it with “${next}”.`,
+} as const;
+
+/**
+ * Fold a branch (spec §13.10, D83–D85): the accessible names and tooltips of the fold
+ * button and the "+ N" sign, and the two buttons of the edit sheet. `names` are the parents' names.
+ */
+export const FOLD_UI = {
+	hideDescendants: 'Hide descendants',
+	showDescendants: 'Show descendants',
+	hideDescendantsLabel: (name: string) => `Hide descendants: hide the people below ${name}`,
+	showDescendantsLabel: (name: string) => `Show descendants: show the hidden people below ${name}`,
+	/** The button of an open family: no count. */
+	hideLabel: (names: readonly string[]) => `Hide the people below ${names.join(' and ')}`,
+	/** The sign of a folded family, with the number of hidden people. */
+	showLabel: (names: readonly string[], count: number) =>
+		count === 1 ? `Show the hidden person below ${names.join(' and ')}` : `Show the ${count} hidden people below ${names.join(' and ')}`,
+} as const;
+
+/** A number of people with a comma as the thousands separator ("1,600"): normal English, and a space can read as two numbers. */
+export function groupCount(n: number): string {
+	return String(Math.max(0, Math.trunc(n))).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+}
+
+/**
+ * The low bar of a very large tree (D159, D223, D226, D227; spec §7.7). The words are final; all of them
+ * are here, so one edit changes every surface. `n` is the people count, `m` the limit that applies.
+ */
+export const LARGE_UI = {
+	/** The name of the bar for a screen reader (a hidden text, not an `aria-label`: Obsidian shows an `aria-label` as a tooltip). */
+	region: 'Large tree',
+	/** Above the first limit, with the button. */
+	ask: (n: number) => `This tree has ${groupCount(n)} people. The plugin can take several seconds to draw it. Obsidian does not answer in that time.`,
+	drawButton: 'Draw the tree',
+	/** The button of a bar that does not draw (D227 item 3): it opens the person picker, then the family of the chosen person shows. */
+	chooseButton: 'Choose a person',
+	/** Above the top that applies on a computer or a tablet. */
+	top: (n: number, m: number) => `This tree has ${groupCount(n)} people. The plugin does not draw a tree with more than ${groupCount(m)} people. The plugin does not change your note. Choose a person to see the family of that person.`,
+	/** Above the phone top, in the full-screen view. */
+	phoneTop: (n: number, m: number) => `This tree has ${groupCount(n)} people. On a phone, the plugin does not draw a whole tree with more than ${groupCount(m)} people. Choose a person to see the family of that person.`,
+	/** After a tap on the button: the button area shows this, and a screen reader reads it. */
+	busy: 'Wait. The plugin draws the tree.',
+	/** A draw that passed its time budget. */
+	slow: 'The plugin stopped because this tree took too long to draw. The plugin does not change your note. Choose a person to see a family. To draw the whole tree, make the tree smaller in the note.',
+	/** A focus family whose own people pass the top (a pin with very many generations, or a chosen person with a very large family). */
+	focusTop: (n: number, m: number) => `The family of this person has ${groupCount(n)} people. The plugin does not draw a family with more than ${groupCount(m)} people. The plugin does not change your note. Choose another person to see a smaller family.`,
+	/** The button of that bar. */
+	chooseOtherButton: 'Choose another person',
 } as const;

@@ -8,7 +8,7 @@ import type { RawMap } from '../../src/core/tolerate';
 import type { Tree } from '../../src/core/types';
 import { fixture } from '../support/helpers';
 
-// Spec §13.3, §13.4 (M8 contract rules 1–3): reading `titles` and `card-title`, the title
+// Spec §13.3, §13.4: reading `titles` and `card-title`, the title
 // warnings, and the titles that the family graph and the subgraphs carry.
 
 function tree(src: string): Tree {
@@ -111,7 +111,7 @@ describe('reading titles (rule 1)', () => {
 		]);
 	});
 
-	it('an empty holder item is not a holder (supervisor ruling)', () => {
+	it('an empty holder item is not a holder', () => {
 		const t = tree('titles:\n  - id: t\n    name: T\n    holders:\n      -\n      - {as: Odo}\n      - ""\npeople: []\n');
 		expect(t.titles![0].holders.map((h) => h.index)).toEqual([1]);
 		expect(t.titles![0].items).toBe(3);

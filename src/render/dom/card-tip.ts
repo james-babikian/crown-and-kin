@@ -15,7 +15,7 @@
  */
 
 /** What `wireCardTips` needs from the tree view. */
-export interface CardTipOptions {
+interface CardTipOptions {
 	/** The HTML viewport. The tip is a child of it; the listeners are on it. */
 	host: HTMLElement;
 	/** The relation text of a person, or undefined when the person has none (then no tip shows). */
@@ -68,7 +68,7 @@ export function wireCardTips(o: CardTipOptions): CardTips {
 	};
 
 	const cardOf = (target: EventTarget | null): { id: string; card: Element } | null => {
-		const card = (target as Element | null)?.closest?.('.dynasty-card') ?? null;
+		const card = (target as Element | null)?.closest('.dynasty-card') ?? null;
 		const id = card?.getAttribute('data-person');
 		return card && id ? { id, card } : null;
 	};
@@ -115,7 +115,7 @@ export function wireCardTips(o: CardTipOptions): CardTips {
 			}
 			const hit = cardOf(e.target);
 			if (hit?.card !== pressed) pressed = null;
-			if (!hit || (e.target as Element).closest?.('.dynasty-name-link')) {
+			if (!hit || (e.target as Element).closest('.dynasty-name-link')) {
 				hide();
 				return;
 			}

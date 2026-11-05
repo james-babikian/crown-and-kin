@@ -68,6 +68,8 @@ interface BindingOwner {
 	/** Runs `fn`; an error never reaches Obsidian (spec §8). */
 	guard(fn: () => void): void;
 	updateEditUi(): void;
+	/** A late section or handle gave the block its state: a view that drew from another state follows it (the phone list, on its start person). */
+	stateTaken?(): void;
 	/** The start conditions hold: draw the tree. */
 	render(): void;
 	/** The start conditions do not hold yet: show the box of the last known height. */
@@ -248,6 +250,7 @@ export class BlockBinding {
 		this.unsubscribe?.();
 		this.unsubscribe = h.onChanged((body) => this.owner.guard(() => this.owner.changed(h, body)));
 		this.owner.updateEditUi();
+		this.owner.stateTaken?.();
 	}
 
 	/** A new handle of the same block (the old one was detached): the session state follows the block. */
@@ -320,6 +323,7 @@ export class BlockBinding {
 		}
 		if (!info) return;
 		this.takeSection(info);
+		if (this.started) this.owner.stateTaken?.();
 		if (!this.started) return;
 		void this.ready.then((h) => this.owner.guard(() => this.attach(h)));
 	}

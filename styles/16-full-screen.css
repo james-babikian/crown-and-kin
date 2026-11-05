@@ -103,7 +103,8 @@
 .dynasty-full .dynasty-toolbar {
 	box-sizing: border-box;
 	height: calc(44px + env(safe-area-inset-top, 0px));
-	padding: env(safe-area-inset-top, 0px) max(2px, env(safe-area-inset-right)) 0 max(2px, env(safe-area-inset-left));
+	/* CH-04: the first and the last glyph stand 16 px from the edge of the window (the bar's 10 px, and the button's own 6 px at the first glyph and in the last button's margin). */
+	padding: env(safe-area-inset-top, 0px) max(calc(var(--dynasty-space-3) - var(--dynasty-space-1) / 2), env(safe-area-inset-right)) 0 max(calc(var(--dynasty-space-3) - var(--dynasty-space-1) / 2), env(safe-area-inset-left));
 }
 
 .dynasty-full .dynasty-popover:not(.is-sheet) {
@@ -148,7 +149,7 @@
 	height: calc(52px + env(safe-area-inset-bottom));
 	align-items: flex-start;
 	justify-content: space-between;
-	padding: 4px max(8px, env(safe-area-inset-right)) env(safe-area-inset-bottom) max(8px, env(safe-area-inset-left));
+	padding: var(--dynasty-space-1) max(var(--dynasty-space-2), env(safe-area-inset-right)) env(safe-area-inset-bottom) max(var(--dynasty-space-2), env(safe-area-inset-left));
 	border-width: 1px 0 0 0;
 	border-style: solid;
 	border-color: var(--background-modifier-border);
@@ -186,6 +187,24 @@
 	position: sticky;
 	right: 0;
 	background-color: var(--background-primary);
+}
+
+/*
+ * O-27: the phone set with the problem badge is seven buttons. In a window of 320 px, 7 × 44 px and the 2 × 8 px of the bar are wider than the window, and the sticky Close
+ * lay over the badge. Under 360 px the badge is a 44 px button like the others and the bar keeps 4 px at its sides (the safe area still wins), so the row fits 320 px.
+ */
+@media (max-width: 359px) {
+	.modal.dynasty-fullscreen.is-phone-side .dynasty-full .dynasty-toolbar:not(.has-wide-set):has(.dynasty-warning-badge),
+	.modal.dynasty-fullscreen.is-phone .dynasty-full .dynasty-toolbar:not(.has-wide-set):has(.dynasty-warning-badge) {
+		padding-right: max(var(--dynasty-space-1), env(safe-area-inset-right));
+		padding-left: max(var(--dynasty-space-1), env(safe-area-inset-left));
+	}
+
+	.modal.dynasty-fullscreen.is-phone-side .dynasty-full .dynasty-toolbar:not(.has-wide-set) .dynasty-tool.dynasty-warning-badge,
+	.modal.dynasty-fullscreen.is-phone .dynasty-full .dynasty-toolbar:not(.has-wide-set) .dynasty-tool.dynasty-warning-badge {
+		width: 44px;
+		padding: 0;
+	}
 }
 
 /*

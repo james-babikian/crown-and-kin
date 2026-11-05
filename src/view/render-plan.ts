@@ -39,7 +39,7 @@ export interface FinderDrawn {
 }
 
 /** What `planRender` knows of the full-screen view; null for an embed in a note. */
-export interface FullFacts {
+interface FullFacts {
 	/** D21: this view's own focus (`id: null` is all people), or null. */
 	focus: { id: string | null } | null;
 	/** A person to centre and show when the view opens. */
@@ -73,7 +73,7 @@ export interface RenderInputs {
 }
 
 /** The changes to the block state `st` that a render makes. A key that is absent means no change. */
-export type BlockPatch = Partial<Pick<BlockState, 'focus' | 'autoFocus' | 'autoMark' | 'shown' | 'finder' | 'succession' | 'folds' | 'autoFolds' | 'autoFor'>>;
+type BlockPatch = Partial<Pick<BlockState, 'focus' | 'autoFocus' | 'autoMark' | 'shown' | 'finder' | 'succession' | 'folds' | 'autoFolds' | 'autoFor'>>;
 
 /** What the view applies before it draws, so that the render is the one place where state changes. */
 export interface StateChanges {
@@ -240,7 +240,7 @@ function focusFamily(inputs: RenderInputs, tree: Tree, whole: FamilyGraph, f: Pi
 	// §5.5: a person just saved is shown once, by the first view of the kind that saved them.
 	// If its family does not draw them, it shows all people, like Find.
 	const saved = st.shown;
-	if (saved && saved.place === (inputs.full ? 'full' : 'embed')) {
+	if (saved?.place === (inputs.full ? 'full' : 'embed')) {
 		d.block.shown = null;
 		if (sub && whole.byId.has(saved.id) && !sub.tree.people.some((p) => p.id === saved.id)) {
 			// A D21 full-screen view changes only its own focus; otherwise the session changes.
@@ -313,7 +313,7 @@ function finderFor(inputs: RenderInputs, whole: FamilyGraph, d: Draft): FinderDr
 }
 
 /** What decides whether the Show view draws in a tree: the device and the view. */
-export interface ShowDevice {
+interface ShowDevice {
 	full: boolean;
 	coarse: boolean;
 	phone: boolean;

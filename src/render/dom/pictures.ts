@@ -35,9 +35,11 @@ export interface PictureSlot {
 export type SlotProblem = 'missing' | 'other' | null;
 
 /** The class of a slot's picture element; styles.css keeps it from taking pointer events. */
-export const PICTURE_CLASS = 'dynasty-picture';
+const PICTURE_CLASS = 'dynasty-picture';
 /** Set on a slot's group while it shows a picture, so styles.css can drop the empty frame's fill. */
-export const HAS_PICTURE_CLASS = 'has-picture';
+const HAS_PICTURE_CLASS = 'has-picture';
+/** D330 TR-14: set on a new picture until it has loaded; styles.css keeps it clear, then fades it in (the empty ring stays under it). */
+const ARRIVING_CLASS = 'is-arriving';
 
 /**
  * S2: shows `url` in the slot (one `<image>`, the slot's box, "xMidYMid meet": the picture keeps its
@@ -63,6 +65,11 @@ export function setPicture(slot: PictureSlot, url: string | null): void {
 		cls: PICTURE_CLASS,
 		attr: { href: url, x: r.x, y: r.y, width: r.w, height: r.h, preserveAspectRatio: 'xMidYMid meet' },
 	});
+	// A picture that cannot load is removed by the caller (`setSlotProblem`), so a failed load needs no class change here beyond showing what there is.
+	img.addClass(ARRIVING_CLASS);
+	const arrived = () => img.removeClass(ARRIVING_CLASS);
+	img.addEventListener('load', arrived, { once: true });
+	img.addEventListener('error', arrived, { once: true });
 	if (slot.frame) el.insertBefore(img, slot.frame);
 	el.addClass(HAS_PICTURE_CLASS);
 }

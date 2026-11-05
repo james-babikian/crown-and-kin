@@ -1,0 +1,109 @@
+/*
+ * Design tokens of the plugin: the one place for spacing, type roles, radius, line weights, motion, icon sizes, the focus recipe, the error edge and the card edge.
+ * Every value comes from an Obsidian variable where Obsidian has one, so the theme still decides. This is the first chunk, so every later rule can use a token.
+ * The static colours (`--dynasty-edge`, `--dynasty-muted`, `--dynasty-link`, `--dynasty-error`) and the five text sizes (`--dynasty-type-*`) stay in `01-base.css`,
+ * where `color-mix()` sits behind `@supports` and where the theme reader and the tests look for them.
+ * Outside this file the style lint of the project accepts no colour, radius, font-size or spacing literal beyond its recorded baseline.
+ */
+
+body {
+	/* Spacing: the 4 px scale of Obsidian (`--size-4-n`), six steps. A negative step is written `calc(-1 * var(--dynasty-space-n))`. */
+	--dynasty-space-1: var(--size-4-1, 4px);
+	--dynasty-space-2: var(--size-4-2, 8px);
+	--dynasty-space-3: var(--size-4-3, 12px);
+	--dynasty-space-4: var(--size-4-4, 16px);
+	--dynasty-space-5: var(--size-4-6, 24px);
+	--dynasty-space-6: var(--size-4-8, 32px);
+
+	/* Type roles other than size (the sizes are `--dynasty-type-*` in `01-base.css`). */
+	--dynasty-weight-normal: var(--font-normal);
+	--dynasty-weight-semibold: var(--font-semibold);
+	--dynasty-line-tight: 1.2;
+	--dynasty-line-normal: 1.45;
+	--dynasty-line-text: var(--line-height-normal);
+	/* A person's, couple's, house's or title's name is set in the text font; the plugin's own window titles in the interface font. */
+	--dynasty-font-name: var(--font-text);
+	--dynasty-font-tool: var(--font-interface);
+
+	/* Radius by role. */
+	--dynasty-radius-field: var(--input-radius);
+	/* A multi-line field keeps a smaller bend than a one-line field (D320). */
+	--dynasty-radius-area: min(var(--input-radius), 12px);
+	--dynasty-radius-button: var(--button-radius);
+	/* A button on a phone has this radius: a pill, as on the iPhone and in themes that round their buttons (D330 O-33). Fields keep their own radius (D320). */
+	--dynasty-radius-button-phone: var(--dynasty-radius-pill);
+	--dynasty-radius-pill: 999px;
+	--dynasty-radius-chip: var(--radius-s);
+	--dynasty-radius-row: var(--radius-m);
+	--dynasty-radius-box: var(--radius-m);
+	--dynasty-radius-window: var(--modal-radius, var(--radius-l));
+	--dynasty-radius-round: 50%;
+	--dynasty-radius-card: min(var(--radius-m), 1.5em);
+
+	/* Line weights. The hairline divides sections, rows and bars; the field and button edges take their colours from `01-base.css`. */
+	--dynasty-width-hairline: 1px;
+	--dynasty-width-mark: 2px;
+	--dynasty-width-house: 3px;
+	--dynasty-width-house-card: 4px;
+	--dynasty-hairline: var(--dynasty-width-hairline) solid var(--background-modifier-border);
+	--dynasty-field-edge: var(--dynasty-width-hairline) solid var(--dynasty-edge);
+	--dynasty-button-edge: var(--dynasty-width-hairline) solid var(--dynasty-btn-edge);
+	--dynasty-mark-line: var(--dynasty-width-mark) solid var(--text-normal);
+
+	/* Motion: durations and the easings by name. */
+	--dynasty-dur-press: 150ms;
+	--dynasty-dur-open: 200ms;
+	--dynasty-dur-move: 200ms;
+	--dynasty-dur-pulse: 0.5s;
+	--dynasty-ease: ease-out;
+	--dynasty-ease-pulse: ease-in-out;
+
+	/* Icons: Obsidian's own sizes. The bar icon is 17 px with a mouse; the phone scope below gives it Obsidian's large size (D330 O-28). */
+	--dynasty-icon-s: var(--icon-s);
+	--dynasty-icon-m: var(--icon-m);
+	--dynasty-icon-l: var(--icon-l);
+	--dynasty-icon-bar: 17px;
+
+	/*
+	 * The focus recipe: two tones, the text colour next to the control and the accent outside it.
+	 * A free-standing control uses `--dynasty-focus-outline`, `--dynasty-focus-offset` and `--dynasty-focus-shadow`;
+	 * a control that fills its row uses the inset pair, so the bands stay inside the row.
+	 */
+	--dynasty-focus-width: 2px;
+	--dynasty-focus-outline: var(--dynasty-focus-width) solid var(--interactive-accent);
+	--dynasty-focus-offset: 2px;
+	--dynasty-focus-shadow: 0 0 0 var(--dynasty-focus-width) var(--text-normal);
+	--dynasty-focus-inset-offset: -2px;
+	--dynasty-focus-inset-shadow: inset 0 0 0 calc(2 * var(--dynasty-focus-width)) var(--text-normal);
+
+	/* The error edge: the error colour, no ring outside the field, never the focus recipe. A focused field with an error keeps a one-pixel edge shadow like any field. */
+	--dynasty-error-edge: var(--dynasty-width-hairline) solid var(--dynasty-error);
+	--dynasty-error-line: var(--dynasty-width-house) solid var(--dynasty-error);
+	--dynasty-error-focus-shadow: 0 0 0 var(--dynasty-width-hairline) var(--dynasty-error);
+
+	/* The card edge: colour and width of the line around a card. The theme's border grey is the plain value; the mix below replaces it where `color-mix()` works. */
+	--dynasty-card-edge: var(--background-modifier-border);
+	--dynasty-card-edge-width: 1;
+}
+
+/* D330 O-01: one clear edge, 14 % of the text colour in the card colour (18 % in a dark theme, where a dark grey needs more to show). The theme's own border grey is 1.1 to 1.3:1 on the note. */
+@supports (color: color-mix(in srgb, red 50%, blue)) {
+	body {
+		--dynasty-card-edge: color-mix(in srgb, var(--text-normal) 14%, var(--background-primary-alt));
+	}
+
+	body.theme-dark {
+		--dynasty-card-edge: color-mix(in srgb, var(--text-normal) 18%, var(--background-primary-alt));
+	}
+}
+
+/*
+ * A phone field has a rounder corner. The selector list is the one of the phone text sizes in `01-base.css`.
+ * D330 O-28: the bar icons of a phone take Obsidian's large icon, the size of its own phone bars (24 px on the iPhone, scaled with the system text size; 18 px in a narrow computer window).
+ */
+body.is-phone,
+.modal.is-phone,
+.prompt.dynasty-picker.is-phone {
+	--dynasty-radius-field: 10px;
+	--dynasty-icon-bar: var(--icon-l);
+}

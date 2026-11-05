@@ -46,7 +46,7 @@ If Obsidian shows the window "Do you trust the author of this vault?", select "T
 
 1. Open a note. If the vault has no note, press Ctrl+N (Cmd+N on a Mac) to make one.
 2. Put the cursor on an empty text line below a heading or other text. In a new note, type a heading and press Enter.
-3. Open the command list (Ctrl+P, or Cmd+P on a Mac). Select "Insert family tree". An empty tree shows in the note.
+3. Open the command list (Ctrl+P, or Cmd+P on a Mac). On a tablet, open the left bar and select the command icon. On a phone, swipe down in the note. Select "Insert family tree". An empty tree shows in the note.
 4. Select "Add first person". Type a name. Select Save.
 5. Click the card. On a phone, tap the pencil on the row of the person. The person window opens.
 6. Open the section Family. At Partners or Children, select Add, then "New person". If the person has a partner, a first window asks for the other parent of the child. Select the partner or "No other parent". Type a name. Select Save.
@@ -69,9 +69,9 @@ Each feature has its own button or window.
 - **Titles and succession.** The Titles button (the crown) holds the titles, their holders and their reigns. Choose a rule of succession, and the plugin works out the line of succession from the tree.
 - **Calendars.** More, then Calendars, opens the calendars of your world. The plugin then reads a date such as "the 10th Year of the Third Cycle". A plain year, for example 1203, needs no setup.
 - **Houses and arms.** The Houses button (the castle) gives a house its name, colour and coat of arms. A person can also have personal arms.
-- **Portraits.** In the person window, select the portrait circle. Choose a picture from your vault and the part that the card shows.
+- **Portraits.** In the person window, select "Add portrait or arms". Choose a picture from your vault and the part that the card shows. Later, select "Portrait and arms" or the portrait circle to change it.
 - **Find, Focus and folds.** Find selects a person by name. Focus shows the family of one person. The small "−" button below a couple folds a branch.
-- **The phone.** On a phone, a tree in a note shows as a list: one person and the family of that person. Tap Expand to see the tree.
+- **The phone and the tablet.** On a phone, a tree in a note shows as a list: one person and the family of that person. Tap Expand to see the whole tree in the full-screen view. On a tablet, the full-screen view has the Houses, Titles and More buttons. On a phone, it has the Houses and More buttons, and Titles is in More.
 - **Save as picture.** More, then Save as picture, saves the tree as a PNG or SVG picture in the attachment folder.
 - **Settings.** Open Settings, then Crown and Kin. There you set the height of a tree, the direction of the tree on a phone held upright and what the cards show.
 

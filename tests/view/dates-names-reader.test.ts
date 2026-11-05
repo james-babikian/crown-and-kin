@@ -1,4 +1,4 @@
-// Spec §14 rules 10, 14 and 15 (WP-6 step 1): the key of the reader and "not ready", the reader of 0.3.2 on a note with name lists, and the
+// Spec §14 rules 10, 14 and 15: the key of the reader and "not ready", the reader of 0.3.2 on a note with name lists, and the
 // warning `calendar-name-mismatch` in the tree list (and not in the line of succession).
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
@@ -218,7 +218,7 @@ titles:
 
 // ---------------------------------------------------------------------------------------------
 // Spec §14 rule 10: the reader of 0.3.2 (tag v0.3.2)
-// Note 8 (supervisor, fix round): with no lists at all, two behaviours still differ from 0.3.2 and stay so: an identical format twice in one
+// Note 8: with no lists at all, two behaviours still differ from 0.3.2 and stay so: an identical format twice in one
 // calendar is refused, and a word that is no place gives the marker sentence in the window instead of the format sentence.
 
 type OldDates = {
@@ -240,7 +240,7 @@ function oldSources(): Record<string, string> | null {
 
 const sources = oldSources();
 
-describe.skipIf(sources === null)('N19: the reader of 0.3.2 on a note with name lists (tag v0.3.2)', () => {
+describe.skipIf(sources === null)('the reader of 0.3.2 on a note with name lists', () => {
 	let old: OldDates;
 	const load = async () => {
 		const dir = mkdtempSync(join(tmpdir(), 'kin-v032-'));

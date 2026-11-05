@@ -1,7 +1,7 @@
-// Step 4.3 of WP-4 (the architecture notes §5.7, rule 11), as 0.4 WP-3a changes it (D289, the index contract 4.1): the calendar readers through a fake vault. A tree reads a calendar only when it
+// Step 4.3 of WP-4 (the architecture notes §5.7, rule 11), as 0.4 WP-3a changes it (D289): the calendar readers through a fake vault. A tree reads a calendar only when it
 // names a note, so every test asks for a reader with a link. Change, rename, delete, a note that cannot be read, the cache gate, the identity of the reader, the debounce and the problem of
 // a note that is missing. The cases of the old first scan (notes read for their sections, the "unknown" cache state, every note used by a tree with no key) and the sync-conflict copy
-// (`calendar-duplicate`) have no meaning now: the index reads no note that no tree names. The new rules are tested in `tests/acceptance/r04-calendar-readers.test.ts`.
+// (`calendar-duplicate`) have no meaning now: the index reads no note that no tree names. The new rules are tested in `tests/acceptance/calendar-readers.test.ts`.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CHANGE_WAIT_MS, createCalendarIndex } from '../../src/view/calendar-index';
 import { cycleNote, eraNote, fakeVault, settle } from '../support/calendar-vault';

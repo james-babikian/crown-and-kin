@@ -208,14 +208,14 @@ export const describeDelete: DescribeDelete = (g, id, options) => {
 	if (options?.me !== undefined) summary.clearsMe = options.me === id;
 	let titles = 0;
 	let entries = 0;
-	for (const t of g.writtenTitles ?? []) {
+	for (const t of g.writtenTitles) {
 		const n = t.holders.filter((h) => h.person === id).length;
 		if (n) titles++;
 		entries += n;
 	}
-	if (g.writtenTitles?.length) summary.holders = { titles, entries };
-	const heirs = (g.writtenTitles ?? []).filter((t) => t.heirs?.includes(id)).length;
-	const excluded = (g.writtenTitles ?? []).filter((t) => t.exclude?.includes(id)).length;
+	if (g.writtenTitles.length) summary.holders = { titles, entries };
+	const heirs = g.writtenTitles.filter((t) => t.heirs?.includes(id)).length;
+	const excluded = g.writtenTitles.filter((t) => t.exclude?.includes(id)).length;
 	if (heirs) summary.heirs = heirs;
 	if (excluded) summary.excluded = excluded;
 	return summary;

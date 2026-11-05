@@ -289,7 +289,7 @@ describe('containers: callouts and list items (§6.1)', () => {
 		expect(shape(only(text))).toEqual({ ordinal: 0, openLine: 3, closeLine: 5, prefix: '    ', body: 'a: 1' });
 	});
 
-	it('a callout inside a list item: the prefix is "  > "', () => {
+	it('a callout inside a list item: the prefix is " > "', () => {
 		const text = '- item\n  > [!note]\n  > ```kin\n  > a: 1\n  > ```\n';
 		const b = only(text);
 		expect(shape(b)).toEqual({ ordinal: 0, openLine: 2, closeLine: 4, prefix: '  > ', body: 'a: 1' });
@@ -357,7 +357,7 @@ describe('unclosed blocks end at their container (contract LocatedBlock.closeLin
 		]);
 	});
 
-	it('at the top level with a final line break: no empty body line (supervisor decision)', () => {
+	it('at the top level with a final line break: no empty body line', () => {
 		const text = '```kin\na: 1\n';
 		const b = only(text);
 		expect(shape(b)).toEqual({ ordinal: 0, openLine: 0, closeLine: null, prefix: '', body: 'a: 1' });

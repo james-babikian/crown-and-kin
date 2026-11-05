@@ -13,6 +13,8 @@ import { isolateDate } from './date-bidi';
 /** The grey line under Born and Died and the test line (spec §14 rule 6). */
 export const DATE_READOUT_UI = {
 	noYear: 'No year found. Write a year, or add a format for this date in a calendar.',
+	/** D330 UX-10: added after `noYear` when the line of succession skips a date with no year. */
+	noYearSuccession: 'The line of succession does not use this date.',
 	samePlace: 'Two formats read the same words and give different years. No year found. Change a format.',
 	fitsTwo: (calendars: readonly string[]) => `This date fits ${andList(calendars)}, with different years. No year found. Change a format.`,
 	/** "The Long Count: Cycle 3, Year 10 = year 130"; the era form has the era name for `span`. */
@@ -50,12 +52,15 @@ export const CALENDAR_UI = {
 /** The sentence that says how long the names take to repeat. */
 const T_REPEAT = (count: number): string => (count === 1 ? 'The name repeats every year.' : `The names repeat every ${count} years.`);
 
+/** D330 O-25: the one purpose line of the Calendars window, also in place of the short line. */
+const PURPOSE_LINE = 'A calendar lets the plugin find the year in dates like “the 10th Year of the Third Cycle” or “Qinglong Emperor 3”.';
+
 /** The Calendars window. */
 export const CALENDAR_WINDOW_UI = {
 	title: 'Calendars',
 	/** The line under the head while the window has a calendar; the long text below stands in the empty window. */
-	introShort: 'A calendar tells the plugin how to find the year in a date of your world.',
-	intro: 'A calendar lets the plugin find the year in a date of your world. An example is “the 10th Year of the Third Cycle”. The plugin needs the year for the line of succession, for ages and for the order of brothers and sisters. A cycle calendar has cycles of the same length. An era calendar has named eras, for example “the 3rd Year of the Qinglong Emperor”. The plugin never changes the text of a date.',
+	introShort: PURPOSE_LINE,
+	intro: PURPOSE_LINE,
 	noteLabel: 'Calendar note',
 	folder: (folder: string) => `Folder: ${folder === '' ? 'main folder of the vault' : folder}`,
 	newNote: 'New calendar note',
@@ -85,14 +90,20 @@ export const CALENDAR_WINDOW_UI = {
 	formatsPlaceholderEras: 'For example: {era} {year}',
 	noFormats: 'This calendar has no format. The plugin cannot read a date with it. Add a format.',
 	lengthLabel: 'Length (years)',
-	lengthOptional: 'Length (years), optional',
 	startLabel: 'Start',
 	sameAsLabel: 'Same year as',
 	sameAsPlaceholder: 'A date in another calendar, or a plain year',
 	cycleLabel: 'Cycle',
 	yearLabel: 'Year',
-	exampleHintCycles: 'Write a Cycle and a Year of this calendar, for example Cycle 3 and Year 21. Then, in “Same year as”, write a date in another calendar or a plain year for that same year. An example is 1203.',
-	exampleHintEras: 'Write a Year of this era, for example 3. Then, in “Same year as”, write a date in another calendar or a plain year for that same year. An example is 1203.',
+	/** D330 O-23: the placeholder of the Year field of the reading line. */
+	yearPlaceholder: '1',
+	/** D330 UX-11: the hints of the four fields of the reading line. */
+	cycleHint: 'A cycle number of this calendar. For example: 3.',
+	yearHintCycles: 'A year number in that cycle. For example: 21.',
+	yearHintEras: 'A year of this era. For example: 3.',
+	sameAsHint: 'Write the same year in another calendar, or as a plain year. For example: 1203.',
+	/** D330 UX-11: the heading over the name and the folder of the new note. */
+	noteGroup: 'Note for the calendars',
 	lengthHintCycles: 'The number of years in one cycle.',
 	lengthHintEras: 'The number of years in this era. Leave it empty if the era has no end.',
 	startNow: (year: number) => `Start: ${formatInternalYear(year)}. This is the plain year of Year 1 of this calendar.`,
@@ -100,7 +111,7 @@ export const CALENDAR_WINDOW_UI = {
 	/** In place of the help of Start, while the calendar has no “Same year as” date and the tree has other years (the long sentence stays in the tree list). */
 	startNoAnchor: 'No “Same year as” date. The plugin counts year 1 of this calendar as plain year 1. The tree also has dates in other calendars or plain years. Then the order of dates and the ages can be wrong. To correct this, write a date in “Same year as”.',
 	startKept: (year: number) => `The calendar starts at ${formatInternalYear(year)}. To change this, write a date in “Same year as”.`,
-	exampleBack: (text: string, year: number) => `Example: ${text} = ${formatInternalYear(year)}`,
+	exampleBack: (text: string, year: number) => `${text} = ${formatInternalYear(year)}`,
 	sameAsCycle: 'This calendar and another calendar use each other to find their start, so neither can start. Change one “Same year as” date.',
 	startUnreadable: 'The plugin cannot read the start in the note, because it is not a whole number. To set a start, write a date in “Same year as”.',
 	sameAsBad: 'The plugin cannot read a year in this date. Write a plain year, or a date that fits another calendar.',
@@ -125,10 +136,10 @@ export const CALENDAR_WINDOW_UI = {
 	summaryUnnamedList: 'A list with no name',
 	// The name lists (spec §14 rule 16).
 	plainTitle: 'Plain years',
-	plainHint: 'A plain year is a number, for example 1273. A name list here gives each plain year a name that repeats.',
+	plainHint: 'A plain year is a number, for example 1273. A name list gives each plain year a name from a list that repeats, for example the names of planets.',
 	listsLabel: 'Name lists',
 	addList: 'Add name list',
-	noLists: 'No name list. A name list gives each year a name from a list that repeats, for example a planet.',
+	noLists: 'No name list.',
 	listName: 'Name of the list',
 	listNamePlaceholder: 'For example: Planets',
 	// The name begins with the words of the visible link (WCAG 2.5.3).
@@ -157,11 +168,9 @@ export const CALENDAR_WINDOW_UI = {
 	showFull: 'Full name',
 	showNone: 'Do not show',
 	testLabel: 'Test a date',
-	/** Shows while the cursor is in the field. */
-	testHint: 'The plugin shows the date as a plain year, for example “year 1273”.',
 	testPlaceholder: 'Write a date to see how the plugin reads it',
 	save: 'Save',
-	discardText: 'The plugin discards your changes to the calendars.',
+	discardText: 'You did not save the changes to the calendars.',
 	saved: 'The plugin saved the calendars.',
 	madeNote: (name: string) => `The plugin made the note “${name}”.`,
 	// The end of the one Notice after a Save in a window that can set the key of the tree.

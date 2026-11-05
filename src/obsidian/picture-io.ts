@@ -5,6 +5,7 @@
  */
 
 import type { App, TFile } from 'obsidian';
+import { mediaMatches } from '../render/dom/page-reads';
 import { fitMeet, readPictureHeader, type SupportedFormat } from '../core/pictures';
 
 /** A decoded picture: its size after the EXIF rotation, what a canvas can draw, and how to free it. */
@@ -191,13 +192,7 @@ export function defaultIO(app: App): PictureIO {
 				return Promise.reject(e instanceof Error ? e : new Error(String(e)));
 			}
 		},
-		coarse: () => {
-			try {
-				return window.matchMedia('(pointer: coarse)').matches;
-			} catch {
-				return false;
-			}
-		},
+		coarse: () => mediaMatches(window, '(pointer: coarse)'),
 		dpr: () => {
 			try {
 				return typeof window.devicePixelRatio === 'number' ? window.devicePixelRatio : 1;

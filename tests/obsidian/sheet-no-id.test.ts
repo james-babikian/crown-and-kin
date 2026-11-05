@@ -8,16 +8,17 @@ vi.mock('../../src/obsidian/person-picker', () => ({ pickPerson: async () => ans
 import { deriveFamilies } from '../../src/core/derive';
 import type { Op } from '../../src/core/edit';
 import { parseDynasty } from '../../src/core/parse';
-import { applyOp } from '../../src/core/yaml-edit';
 import { EditSheet } from '../../src/obsidian/edit-sheet';
+import { isShownQuiet } from '../../src/obsidian/saved-quiet';
 import { mapIds } from '../../src/view/sheet-draft';
 import { FEl, clock, dispatch, resetDom, settle } from '../acceptance/fake-dom';
 import { noticeList, openModals, resetObsidian } from '../acceptance/fake-obsidian';
-import { fakeHandle, type FakeHandle } from '../acceptance/tree-view-fakes';
+import type { FakeHandle } from '../acceptance/tree-view-fakes';
 import { useFakeDom } from '../support/fake-dom-setup';
+import { undoStackHandle } from '../support/writing-handle';
 
 /*
- * Review 0.1.1 area E, finding 1 (the decision notes "Version 0.1.1", area E ruling 1): a person with no
+ * Review 0.1.1 area E, finding 1 (area E ruling 1): a person with no
  * written `id` is named `~N` after their place in the list. Every sheet action that needs a stable
  * id gives them one in the same write, and the sheet follows the new id.
  */
@@ -39,30 +40,6 @@ beforeEach(() => {
 afterEach(() => {
 	vi.restoreAllMocks();
 });
-
-type Writing = FakeHandle & { ops: Op[] };
-
-/** A handle whose writes apply the op to its body, with a one-step undo, as the real handle does. */
-function writingHandle(body: string): Writing {
-	const h = fakeHandle('n.md', body) as Writing;
-	h.ops = [];
-	const undo: string[] = [];
-	h.write.mockImplementation((async (op: Op) => {
-		h.ops.push(op);
-		const r = applyOp(h.body, op);
-		if (!r.ok) return { ok: false, code: 'refused', refusal: r };
-		undo.push(h.body);
-		h.body = r.body;
-		return { ok: true, body: r.body, created: r.created, effects: r.effects ?? [] };
-	}) as never);
-	h.undo.mockImplementation((async () => {
-		const prev = undo.pop();
-		if (prev === undefined) return { ok: false, code: 'empty' };
-		h.body = prev;
-		return { ok: true, body: prev };
-	}) as never);
-	return h;
-}
 
 // Aldric has an id; Bran (~2) and Cora (~3) have none. A new id is numbered (D104): the first is p1.
 const NO_IDS = ['people:', '  - id: a', '    name: Aldric', '  - name: Bran', '    parents: [a]', '  - name: Cora', '    parents: [a]', ''].join('\n');
@@ -95,7 +72,7 @@ const newest = () => openModals[openModals.length - 1] as unknown as EditSheet;
 
 describe('a person with no id: the sheet gives them one when an action needs it', () => {
 	it('Move later, then Save: the id goes in the move write, and Save edits the same person', async () => {
-		const h = writingHandle(NO_IDS);
+		const h = undoStackHandle(NO_IDS);
 		const sheet = open(h, '~2');
 		dispatch(el(sheet, '.dynasty-move-later'), 'click');
 		await settle();
@@ -116,7 +93,7 @@ describe('a person with no id: the sheet gives them one when an action needs it'
 	});
 
 	it('a field change in the draft goes in the same write, under the new id', async () => {
-		const h = writingHandle(NO_IDS);
+		const h = undoStackHandle(NO_IDS);
 		const sheet = open(h, '~3');
 		type(sheet, 'born', '1102');
 		dispatch(el(sheet, '.dynasty-move-earlier'), 'click');
@@ -128,7 +105,7 @@ describe('a person with no id: the sheet gives them one when an action needs it'
 	});
 
 	it('Add child with a new person: the child names the parent by the new id; a child with the same name as the parent gets the next number', async () => {
-		const h = writingHandle(NO_IDS);
+		const h = undoStackHandle(NO_IDS);
 		const sheet = open(h, '~3');
 		// Cora has no partners: the flow asks only "new or existing".
 		answers.push('new');
@@ -151,7 +128,7 @@ describe('a person with no id: the sheet gives them one when an action needs it'
 	});
 
 	it('Save and add another child: the next child has the same parent, by the new id', async () => {
-		const h = writingHandle(NO_IDS);
+		const h = undoStackHandle(NO_IDS);
 		const sheet = open(h, '~2');
 		answers.push('new');
 		dispatch(el(sheet, '.dynasty-add-child'), 'click');
@@ -171,7 +148,7 @@ describe('a person with no id: the sheet gives them one when an action needs it'
 	});
 
 	it('Add parent with a new person: the new parent is put before the child and linked to the child by the new id', async () => {
-		const h = writingHandle(NO_IDS);
+		const h = undoStackHandle(NO_IDS);
 		const sheet = open(h, '~2');
 		answers.push('birth', 'new');
 		dispatch(el(sheet, '.dynasty-add-parent'), 'click');
@@ -187,7 +164,7 @@ describe('a person with no id: the sheet gives them one when an action needs it'
 	});
 
 	it('Add partner with a person in the tree who has no id either: both get an id', async () => {
-		const h = writingHandle(NO_IDS);
+		const h = undoStackHandle(NO_IDS);
 		const sheet = open(h, '~3');
 		answers.push('existing', { kind: 'person', id: '~2' }, 'marriage');
 		dispatch(el(sheet, '.dynasty-add-partner'), 'click');
@@ -196,12 +173,12 @@ describe('a person with no id: the sheet gives them one when an action needs it'
 		expect(t.unions.map((u) => u.partners)).toEqual([['p1', 'p2']]);
 		expect(t.people.map((p) => p.id)).toEqual(['a', 'p2', 'p1']);
 		expect(personId(sheet)).toBe('p1');
-		// The partner is shown with the new id.
-		expect(h.state.lastEdited).toBe('p2');
+		// The list stays on the person of the window, under the id that the write gave.
+		expect(h.state.lastEdited).toBe('p1');
 	});
 
 	it('Pin focus here writes the new id as the focus', async () => {
-		const h = writingHandle(NO_IDS);
+		const h = undoStackHandle(NO_IDS);
 		const sheet = open(h, '~2');
 		dispatch(el(sheet, '.dynasty-pin'), 'click');
 		await settle();
@@ -211,13 +188,17 @@ describe('a person with no id: the sheet gives them one when an action needs it'
 	});
 
 	it('Remove parent, then Undo: the sheet shows the same person again under the old ~N', async () => {
-		const h = writingHandle(NO_IDS);
+		const h = undoStackHandle(NO_IDS);
 		const sheet = open(h, '~3');
 		dispatch(el(sheet, '.dynasty-remove-parent'), 'click');
 		await settle();
 		expect(personId(sheet)).toBe('p1');
-		const notice = noticeList[noticeList.length - 1];
-		dispatch(notice.noticeEl.querySelector('.dynasty-undo-button')!, 'click');
+		// D330 F02: the open window says what the removal did, with Undo in its own text line, and shows no Notice.
+		expect(noticeList).toHaveLength(0);
+		expect(el(sheet, '.dynasty-sheet-change-text').getText()).toContain('removed');
+		// D330 F03: the phone list does not say "saved elsewhere" for a write of a window that stays open.
+		expect(isShownQuiet(h.state.shown)).toBe(true);
+		dispatch(el(sheet, '.dynasty-sheet-change-undo'), 'click');
 		await settle();
 		expect(h.body).toBe(NO_IDS);
 		expect(personId(sheet)).toBe('~3');
@@ -226,12 +207,14 @@ describe('a person with no id: the sheet gives them one when an action needs it'
 	});
 
 	it('Save without a move writes no id', async () => {
-		const h = writingHandle(NO_IDS);
+		const h = undoStackHandle(NO_IDS);
 		const sheet = open(h, '~3');
 		type(sheet, 'title', 'Lady');
 		dispatch(el(sheet, '.dynasty-sheet-save'), 'click');
 		await settle();
 		expect(h.ops).toEqual([{ kind: 'set-person-fields', id: '~3', fields: { title: 'Lady' } }]);
+		// A Save ends its window: the phone list may say "saved elsewhere" for it.
+		expect(isShownQuiet(h.state.shown)).toBe(false);
 	});
 });
 

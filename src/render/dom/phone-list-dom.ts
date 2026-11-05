@@ -34,9 +34,12 @@ import { quote } from '../../core/quote';
 import { cardLabels, needsLabels, type CardLabel } from '../../core/titles';
 import type { ParentType } from '../../core/types';
 import { isColour } from '../colour-check';
+import { isolateName, nameNeedsRun } from '../name-bidi';
 import { joined, nb } from '../text-join';
 import { dateLineParts, shownReignIsolated, type DateSegment } from '../tree-info';
 import { PHONE_LIST_UI } from '../ui-text';
+import { markedSpan, setNameText } from './name-marks';
+import { nameRun } from './name-span';
 import type { IconFn } from './widgets';
 
 /** One row of the list: a person and why the person is in this section. */
@@ -48,7 +51,7 @@ export interface ListRow {
 }
 
 /** The sub-heading of a group of children: a partnership, children with no listed partner, or children of a side link only. */
-export type ListHeading = { kind: 'partner'; partner: string } | { kind: 'solo' } | { kind: 'other' };
+type ListHeading = { kind: 'partner'; partner: string } | { kind: 'solo' } | { kind: 'other' };
 
 /** The children of one partnership (or of none); `heading` is null when the centre has no partnership at all. */
 export interface ListGroup {
@@ -109,7 +112,7 @@ export interface PhoneListSpec {
 }
 
 /** What `buildPhoneList` gives back. */
-export interface PhoneListResult {
+interface PhoneListResult {
 	rows: number;
 	/** The heading of the centre section, which takes the focus after a move. */
 	centre: HTMLElement;
@@ -126,6 +129,17 @@ function yearsSpan(segs: readonly DateSegment[]): HTMLElement {
 	// The plain parts are spans too, so that the order of the parts is the order of the children (a text node would not be).
 	for (const seg of segs) el.createSpan(seg.date ? { cls: ['dynasty-list-date', `is-${seg.date}`], text: seg.text, attr: { dir: 'auto' } } : { cls: 'dynasty-list-dsep', text: seg.text });
 	return el;
+}
+
+/** The title line of the top row: the title is one run when it holds a right-to-left letter, then comes the reign with its own date isolates (the reign never breaks). */
+function heroTitle(parent: HTMLElement, title: string, reign: string | undefined): void {
+	const el = parent.createSpan({ cls: 'dynasty-list-title dynasty-hero-title' });
+	if (!nameNeedsRun(title)) {
+		el.setText(nb(reign ? `${title} ${reign}` : title));
+		return;
+	}
+	setNameText(el, isolateName(title));
+	if (reign) el.appendText(nb(` ${reign}`));
 }
 
 /** True when the click came from a finger or a pen (a key press or a mouse is not a tap). */
@@ -195,6 +209,11 @@ export function restoreListPictures(row: HTMLElement): void {
 	for (const undo of list.reverse()) undo();
 }
 
+/** A tree of one person: one quiet line under the rows that says what to do next. The look hides it in a read-only tree, where there is no pencil. */
+export function addListHint(list: HTMLElement, text: string): void {
+	list.createDiv({ cls: 'dynasty-list-hint', text });
+}
+
 /** Makes a built list editable or read-only: hides the pencils and makes the centre button inert. */
 export function setListEditable(list: HTMLElement, editable: boolean): void {
 	list.toggleClass('is-read-only', !editable);
@@ -217,7 +236,7 @@ export function buildPhoneList(parent: HTMLElement, spec: PhoneListSpec): PhoneL
 	if (spec.bar) {
 		const bar = spec.bar;
 		const el = list.createDiv({ cls: 'dynasty-succession-bar dynasty-list-succession', attr: { role: 'group' } });
-		el.createDiv({ cls: 'dynasty-succession-text', text: bar.sentence });
+		setNameText(el.createDiv({ cls: 'dynasty-succession-text' }), bar.sentence);
 		// D182: an icon with an aria-label, 44 px; the sentence is the visible text.
 		const close = el.createEl('button', { cls: ['clickable-icon', 'dynasty-succession-close', 'dynasty-succession-close-icon'], attr: { type: 'button', 'aria-label': bar.closeLabel } });
 		spec.icon(close.createSpan({ cls: 'dynasty-tool-icon', attr: { 'aria-hidden': 'true' } }), 'x');
@@ -247,9 +266,10 @@ export function buildPhoneList(parent: HTMLElement, spec: PhoneListSpec): PhoneL
 		lead.createSpan({ cls: 'dynasty-list-strip', attr: { 'aria-hidden': 'true' } });
 		// Spans, not divs: a button holds only inline content. The CSS makes them blocks.
 		const text = lead.createSpan({ cls: 'dynasty-list-text' });
-		const name = text.createSpan({ cls: 'dynasty-list-name' });
-		name.appendText(nameOf(id));
 		const sob = label?.sobriquet ?? p.sobriquet;
+		// D322: the name with its sobriquet is one run whose direction its first strong letter sets, as on the card.
+		const name = nameRun(text.createSpan({ cls: 'dynasty-list-name' }), nameOf(id), sob);
+		name.appendText(nameOf(id));
 		if (sob) {
 			// The space is outside the span: it is the only place where the line can break, so the sobriquet moves whole (D173 item 2).
 			name.appendText(' ');
@@ -264,12 +284,12 @@ export function buildPhoneList(parent: HTMLElement, spec: PhoneListSpec): PhoneL
 			link ? createSpan({ cls: 'dynasty-list-link', text: link.text }) : null,
 			shown ? createSpan({ cls: ['dynasty-list-word', ...(shown.strong ? ['is-strong'] : [])], text: shown.text }) : null,
 			years ? yearsSpan(years) : null,
-			!large && title ? createSpan({ cls: 'dynasty-list-title', text: title }) : null,
+			!large && title ? markedSpan('dynasty-list-title', isolateName(title)) : null,
 		];
 		if (parts.some(Boolean)) joined(text, 'dynasty-list-meta', parts, 'span');
 		if (large && title) {
 			const reign = spec.showDates ? shownReignIsolated(label, g.dates, 'shown') : undefined;
-			text.createSpan({ cls: 'dynasty-list-title dynasty-hero-title', text: nb(reign ? `${title} ${reign}` : title) });
+			heroTitle(text, title, reign);
 		}
 		// D213: a place for a picture only when the person has one; no initials disc, no empty ring.
 		const pic = has(id);
@@ -355,7 +375,7 @@ export function buildPhoneList(parent: HTMLElement, spec: PhoneListSpec): PhoneL
 		const s = section('children', count === 1 ? PHONE_LIST_UI.headChild : PHONE_LIST_UI.headChildren);
 		for (const gr of groups) {
 			// D209 item 7: a group heading only tells the groups apart.
-			if (gr.heading && groups.length > 1) s.el.createDiv({ cls: 'dynasty-list-sub', attr: { role: 'heading', 'aria-level': '4' }, text: subHeading(spec, gr.heading) });
+			if (gr.heading && groups.length > 1) setNameText(s.el.createDiv({ cls: 'dynasty-list-sub', attr: { role: 'heading', 'aria-level': '4' } }), subHeading(spec, gr.heading));
 			for (const r of gr.rows) row(s.el, r);
 		}
 	}

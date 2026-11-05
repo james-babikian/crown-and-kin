@@ -43,6 +43,8 @@ export interface FullSource {
 	readOnly: boolean;
 	/** After its first view, the keyboard focus goes here (the result's sentence when a static preview opened the view with it). */
 	focusDue?: string | null;
+	/** After its first view, the problem list opens (the pop-up of the phone list in a note sent the user here). */
+	problemsDue?: boolean;
 }
 
 /** The modal around a full-screen view. */
@@ -58,6 +60,8 @@ export interface FullHost {
 	 * focus in the view; `id: null` is all people, for this view only (a saved person it did not draw).
 	 */
 	focus: { id: string | null } | null;
+	/** True once when the pop-up of the phone list in a note opened this view: its first view then shows the problem list. A host without it never asks for the list. */
+	takeProblemsDue?(): boolean;
 }
 
 /** Where a view is: an embed in a note (with Obsidian's context), or the full-screen view. */

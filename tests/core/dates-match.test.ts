@@ -22,7 +22,7 @@ describe('§14 r4, r5: matching and the year', () => {
 	function table(title: string, cals: CalendarDef[], rows: Row[]) {
 		describe(title, () => {
 			for (const [text, year, warnings = []] of rows) {
-				it(`§14 r5: ${JSON.stringify(text)} is year ${year ?? 'none'}${warnings.length ? ` with ${warnings.join(', ')}` : ''}`, () => {
+				it(`§14 r5: ${JSON.stringify(text)} is year ${year ?? 'none'}${warnings.length ?` with ${warnings.join(', ')}` : ''}`, () => {
 					const r = read(cals, text);
 					expect(r.year).toBe(year);
 					expect([...r.warnings].sort()).toEqual([...warnings].sort());

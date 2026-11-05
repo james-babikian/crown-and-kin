@@ -1,7 +1,7 @@
 /*
  * The person picker (spec §6.6): live fuzzy filtering over name, title and dates; each row shows
- * the house colour, name, title and dates; the first row creates a new person with the typed text
- * (not in Find, spec §6.10). People in `exclude` are never offered. The relation finder (spec §13.2)
+ * the house colour, name, title and dates; the row "Create" makes a new person with the typed text
+ * (not in Find, spec §6.10; D330 O-20: it stands last when the typed text matches a person, so Enter picks the first match). People in `exclude` are never offered. The relation finder (spec §13.2)
  * puts the marked person first, as "You: NAME". Spec §13.5: the picker also matches the ruler name
  * with the number of every numbered holder entry ("Aldric II"), and a row shows the ruler name of the
  * shown title after the full name ("Aldric Valmont (Aldric II)"). The Titles window's picker has its
@@ -19,14 +19,16 @@ import { foldForMatch } from '../core/fold';
 import { quotedSobriquet } from '../core/sobriquet';
 import { cardLabels, needsLabels, pickerSuffix, searchNames, type CardLabel } from '../core/titles';
 import type { Person } from '../core/types';
+import { appendNameRun } from '../render/dom/name-span';
 import { cardLabel, dateLine, dateLineShown } from '../render/tree-info';
-import { WINDOW_UI } from '../render/ui-text';
+import { WINDOW_UI, isolateName } from '../render/ui-text';
 import type { RelationOptions } from '../core/relations';
 import type { PictureStore } from './picture-store';
 import { relationsFor, validMe, type CardLookup, type CardRelation } from '../view/relation-cache';
 import { RowPictures, personLead } from './window-parts';
 import { FINDER_UI, FLOW } from '../render/ui-text';
 import { ignoreGhostClick, phoneLayout } from './modal-layout';
+import { whenIdle } from '../view/idle';
 import { trackModal } from '../view/plugin-modals';
 import { nameDialog } from './sheet-parts';
 
@@ -39,10 +41,12 @@ export interface PickerContext {
 	relationOptions?: RelationOptions;
 	/** The block of the tree view that asks (relation-cache.ts): the relation words come from the lookup of this block. */
 	relationBlock?: string;
+	/** L-07: a phone shows the title ("Select the first person") as a quiet line under the field, instead of for a screen reader only. The relation finder asks for it. */
+	titleOnPhone?: boolean;
 }
 
 /** What the picker resolved to: a person already in the tree, or a new one by the typed name. */
-export type Picked = { kind: 'person'; id: string } | { kind: 'new'; name: string };
+type Picked = { kind: 'person'; id: string } | { kind: 'new'; name: string };
 
 type Item = { kind: 'new'; text: string } | { kind: 'person'; person: Person };
 
@@ -66,6 +70,35 @@ interface Chooser {
 	setSelectedItem?(index: number, evt: Event | null): void;
 }
 
+/**
+ * O-20: when the typed text matches a person, the first match comes first (so Enter picks it) and the row "Create" stands last; when nothing matches, "Create" is the one row.
+ * `first` is the row "Create" (empty where the picker makes no person).
+ */
+function createLast(found: Item[], first: Item[]): Item[] {
+	return found.length ? [...found, ...first] : first;
+}
+
+/**
+ * The heading of the prompt and its Cancel button. The heading has the title, as on the sheets (a phone keeps it for a screen reader only, or shows it as a quiet line in the
+ * relation finder). A phone has no Esc key, so there Cancel stands at the right of the grey pill, outside it, as in an iOS search bar; a computer hides it.
+ */
+function addHead(modalEl: HTMLElement, inputEl: HTMLElement, title: string, close: () => void): void {
+	const head = createDiv({ cls: 'dynasty-picker-head' });
+	nameDialog(modalEl, head.createDiv({ cls: 'dynasty-sheet-title', text: title }));
+	const cancel = createEl('button', { cls: 'dynasty-picker-cancel', text: FLOW.cancel, attr: { type: 'button' } });
+	cancel.addEventListener('click', close);
+	const field = inputEl.parentElement;
+	// A sibling of the pill, not a child: the stylesheet puts both in one row of the prompt.
+	if (field?.parentElement === modalEl) modalEl.insertBefore(cancel, field.nextElementSibling);
+	else modalEl.appendChild(cancel);
+	modalEl.prepend(head);
+}
+
+/** L-07: the class that shows the title of the picker on a phone, when the context asks for it. */
+function phoneTitleClass(ctx: PickerContext): string[] {
+	return ctx.titleOnPhone ? ['has-phone-title'] : [];
+}
+
 /** The people of a list of items, in order, without the marked person (the row of that person has no relation word). */
 function wordIds(items: Item[], you: string | null): string[] {
 	return items.flatMap((i) => (i.kind === 'person' && i.person.id !== you ? [i.person.id] : []));
@@ -78,15 +111,14 @@ export const IDLE_CHUNK = 50;
 /** An idle step waits at most this long when the browser stays busy; where there is no idle callback (Safari), it is the plain delay. */
 const IDLE_MS = 300;
 
-/** Runs `fn` in idle time, or after `IDLE_MS` where the browser has no idle callback; gives a function that cancels it. */
-function whenIdle(fn: () => void): () => void {
-	const g = window as unknown as { requestIdleCallback?: (f: () => void, o: { timeout: number }) => number; cancelIdleCallback?: (id: number) => void };
-	if (g.requestIdleCallback && g.cancelIdleCallback) {
-		const id = g.requestIdleCallback(fn, { timeout: IDLE_MS });
-		return () => g.cancelIdleCallback!(id);
-	}
-	const id = window.setTimeout(fn, IDLE_MS);
-	return () => window.clearTimeout(id);
+/**
+ * The name line of a person row: the name, the ruler name and the sobriquet in curly marks (D122, regular weight) are one run whose direction the first strong letter
+ * sets, as on the cards (D322). "You: " is the table's sentence without the name.
+ */
+function pickerName(parent: HTMLElement, p: Person, you: boolean, suffix: string | undefined): void {
+	const box = parent.createDiv({ cls: 'dynasty-picker-name' });
+	if (you) box.appendText(FINDER_UI.you(''));
+	appendNameRun(box, p.name, [suffix ? { cls: 'dynasty-picker-suffix', text: ` ${suffix}` } : undefined, p.sobriquet !== undefined ? { cls: 'dynasty-picker-sob', text: ` ${quotedSobriquet(p.sobriquet)}` } : undefined]);
 }
 
 // Defined on first use: tests that mock `obsidian` without SuggestModal can still load the sheet.
@@ -157,6 +189,7 @@ function definePicker() {
 		override onOpen(): void {
 			void super.onOpen();
 			this.modalEl.addClass('dynasty-picker');
+			this.modalEl.addClass(...phoneTitleClass(this.ctx));
 			// A placeholder is not a name for a screen reader.
 			this.inputEl.setAttribute('aria-label', FLOW.pickerSearchLabel);
 			// D101: no curly marks and no corrections in a name that the user types.
@@ -171,17 +204,7 @@ function definePicker() {
 			};
 			list.addEventListener('scroll', onScroll, { passive: true });
 			this.cleanup.push(() => list.removeEventListener('scroll', onScroll));
-			// A heading with the title, as on the sheets (a phone keeps it for a screen reader only). A phone has no Esc key, so there Cancel
-			// stands at the right of the grey pill, outside it, as in an iOS search bar; a computer hides it.
-			const head = createDiv({ cls: 'dynasty-picker-head' });
-			nameDialog(this.modalEl, head.createDiv({ cls: 'dynasty-sheet-title', text: this.title }));
-			const cancel = createEl('button', { cls: 'dynasty-picker-cancel', text: FLOW.cancel, attr: { type: 'button' } });
-			cancel.addEventListener('click', () => this.close());
-			const field = this.inputEl.parentElement;
-			// A sibling of the pill, not a child: the stylesheet puts both in one row of the prompt.
-			if (field?.parentElement === this.modalEl) this.modalEl.insertBefore(cancel, field.nextElementSibling);
-			else this.modalEl.appendChild(cancel);
-			this.modalEl.prepend(head);
+			addHead(this.modalEl, this.inputEl, this.title, () => this.close());
 		}
 
 		override onClose(): void {
@@ -239,7 +262,7 @@ function definePicker() {
 					const at = Math.min(selected, chooser.suggestions.length - 1);
 					if (chooser.setSelectedItem) chooser.setSelectedItem(at, null);
 					else chooser.selectedItem = at;
-					if (showSelected) chooser.suggestions[at]?.scrollIntoView?.({ block: 'nearest' });
+					if (showSelected) chooser.suggestions[at]?.scrollIntoView({ block: 'nearest' });
 				}
 			} finally {
 				this.restoring = false;
@@ -275,7 +298,7 @@ function definePicker() {
 		}
 
 		private schedule(): void {
-			if (this.queue.length) this.stopFill = whenIdle(() => this.fillStep());
+			if (this.queue.length) this.stopFill = whenIdle(() => this.fillStep(), { timeout: IDLE_MS, fallbackMs: IDLE_MS });
 		}
 
 		private fillStep(): void {
@@ -321,7 +344,7 @@ function definePicker() {
 			}
 			const rank = (s: { person: Person; exact: boolean }) => (this.isYou(s.person) ? 0 : s.exact ? 1 : 2);
 			scored.sort((a, b) => rank(a) - rank(b) || b.score - a.score || a.person.index - b.person.index);
-			return [...first, ...scored.map(({ person }): Item => ({ kind: 'person', person }))];
+			return createLast(scored.map(({ person }): Item => ({ kind: 'person', person })), first);
 		}
 
 		renderSuggestion(item: Item, el: HTMLElement): void {
@@ -337,15 +360,11 @@ function definePicker() {
 			const text = el.createDiv({ cls: 'dynasty-picker-text' });
 			const you = this.isYou(p);
 			if (you) el.addClass('dynasty-picker-you');
-			const name = text.createDiv({ cls: 'dynasty-picker-name', text: you ? FINDER_UI.you(p.name) : p.name });
 			const label = this.labels.get(p.id);
-			const suffix = label ? pickerSuffix(label, p.name) : undefined;
-			if (suffix) name.createSpan({ cls: 'dynasty-picker-suffix', text: ` ${suffix}` });
-			// D122: the sobriquet in curly marks, in regular weight, after the name and the ruler name.
-			if (p.sobriquet !== undefined) name.createSpan({ cls: 'dynasty-picker-sob', text: ` ${quotedSobriquet(p.sobriquet)}` });
+			pickerName(text, p, you, label ? pickerSuffix(label, p.name) : undefined);
 			// "You: Ann" already says who is marked, so the second text line does not repeat "You".
 			// D218 rule 4: the relation word is italic, as on the cards and in the window rows; the rest of the text line is plain.
-			const rest = WINDOW_UI.findRowSub('', dateLineShown(p, this.g.dates) ?? '', label?.title ?? p.title ?? '');
+			const rest = WINDOW_UI.findRowSub('', dateLineShown(p, this.g.dates) ?? '', isolateName(label?.title ?? p.title ?? ''));
 			let sub: HTMLElement | null = null;
 			const paintSub = () => {
 				sub?.remove();

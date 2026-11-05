@@ -1,4 +1,4 @@
-// The architecture notes §4.2.7 (the code-reviewer's gate test gate-r031-comparator on scratch/r031-gate). The research lane packer sorted its nets
+// The architecture notes §4.2.7 (an earlier gate test gate-r031-comparator on). The research lane packer sorted its nets
 // with a comparator that had a tolerance (not transitive), so the lane of a net depended on the order the nets were given in. WP-3 wrote `netOrder` of
 // lanes.ts as a total order (the starts chained by `TIE`, then the key), so the item was already cured when WP-5a began; this file keeps the proof as
 // the pointer, and adds a test with many nets and many input orders. The stage test A13 in an internal test has the same claim for the packer.

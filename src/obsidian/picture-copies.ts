@@ -22,11 +22,12 @@
  */
 
 import type { ArmsOutline } from '../layout/arms-outline';
+import { whenIdle } from '../view/idle';
 
 /** The total bytes of the copies kept for one vault. */
 export const COPIES_BUDGET = 8_000_000;
 /** A read of one record that takes longer than this counts as a miss, and the copies stay off: a picture must never wait for a stuck database. */
-export const FIND_LIMIT_MS = 1000;
+const FIND_LIMIT_MS = 1000;
 /** The first open of the database and the read of the index may take longer (a cold start on a phone); counted from the first request. */
 export const OPEN_LIMIT_MS = 3000;
 /** The copies of a vault that was not used for this many days are removed when another vault opens the database. */
@@ -45,7 +46,7 @@ export interface CopyId {
 }
 
 /** A copy as the store uses it. `outline` is the shape of an arms picture (null = known to show nothing); portraits have none. */
-export interface StoredCopy {
+interface StoredCopy {
 	blob: Blob;
 	w: number;
 	h: number;
@@ -73,7 +74,7 @@ export interface CopyBackend {
 }
 
 /** What `createPictureCopies` needs from outside. */
-export interface CopyOptions {
+interface CopyOptions {
 	/** The vault's name for the keys: two vaults never share a copy. */
 	vault: string;
 	/** Opens the storage; null when the device has none. */
@@ -106,13 +107,11 @@ const NUL = '\u0000';
 
 /** Runs `fn` when the browser is idle; Safari has no `requestIdleCallback`, so a short timer stands in. */
 function idle(fn: () => void): void {
-	const w = window as { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number };
-	if (typeof w.requestIdleCallback === 'function') w.requestIdleCallback(fn, { timeout: 2000 });
-	else window.setTimeout(fn, 200);
+	whenIdle(fn, { timeout: 2000, fallbackMs: 200 });
 }
 
 /** Pure: the storage key of a copy. */
-export function copyKey(vault: string, id: CopyId): string {
+function copyKey(vault: string, id: CopyId): string {
 	return ['c', vault, id.path, id.sig, id.kind, `${id.w}x${id.h}@${Math.round(id.dpr * 100) / 100}`, id.part].join(NUL);
 }
 

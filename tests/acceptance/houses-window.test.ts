@@ -95,7 +95,7 @@ const toolbar = (root: FEl) =>
 	Array.from(root.querySelector('.dynasty-toolbar')?.children ?? [])
 		.map((b) => [...b.classes].find((c) => c.startsWith('dynasty-') && c !== 'dynasty-tool') ?? '')
 		// The bars between the groups and the free room are no buttons.
-		.filter((c) => c && c !== 'dynasty-sep' && c !== 'dynasty-grow');
+		.filter((c) => c && c !== 'dynasty-sep' && c !== 'dynasty-grow' && c !== 'dynasty-sr-only');
 
 const housesWindows = () => openModals.filter((m) => (m as unknown) instanceof HousesWindow) as unknown as HousesWindow[];
 
@@ -136,7 +136,7 @@ function type(input: FEl, text: string): void {
 describe('the Houses button (D36, spec §6.10)', () => {
 	it('sits after Add person in the desktop embed', async () => {
 		const { el } = await embed(SOURCE, { handle: writingHandle() });
-		// 0.2.8 (G.13): Add person, Find, Focus, Fit | Houses, Titles | More … Expand.
+		// 0.2.8: Add person, Find, Focus, Fit | Houses, Titles | More … Expand.
 		expect(toolbar(el)).toEqual(['dynasty-add-person', 'dynasty-find', 'dynasty-focus', 'dynasty-fit', 'dynasty-houses-button', 'dynasty-titles-button', 'dynasty-more', 'dynasty-expand']);
 		const b = el.querySelector('.dynasty-houses-button')!;
 		expect(b.tag).toBe('button');
@@ -149,7 +149,7 @@ describe('the Houses button (D36, spec §6.10)', () => {
 		desk.modal.close();
 		phone();
 		const ph = await openFullScreen(SOURCE);
-		// The phone's bottom bar (G.13): Add person, Houses, Focus, Find, More, Close; Fit and Titles are in More.
+		// The phone's bottom bar: Add person, Houses, Focus, Find, More, Close; Fit and Titles are in More.
 		expect(toolbar(ph.root)).toEqual(['dynasty-add-person', 'dynasty-houses-button', 'dynasty-focus', 'dynasty-find', 'dynasty-more', 'dynasty-close']);
 	});
 
@@ -268,10 +268,12 @@ describe('draft and Save (spec §6.10, D32)', () => {
 		expect(fakeDoc.activeElement).toBe(nameField(content));
 	});
 
-	it('Cancel writes nothing; the focus goes back to the Houses button (spec §5.2)', async () => {
+	it('Cancel writes nothing; with a change it asks first; the focus goes back to the Houses button (spec §5.2, O-14)', async () => {
 		const { content, handle, win, el } = await openWindow();
 		type(nameInput(content, 'valmont'), 'Changed');
 		dispatch(content.querySelector('.dynasty-sheet-cancel')!, 'click');
+		expect(housesWindows()).toContain(win);
+		dispatch((win as unknown as { modalEl: FEl }).modalEl.querySelector('.dynasty-sheet-discard')!, 'click');
 		expect(housesWindows()).not.toContain(win);
 		expect(handle.write).not.toHaveBeenCalled();
 		expect(fakeDoc.activeElement).toBe(el.querySelector('.dynasty-houses-button'));
@@ -342,7 +344,7 @@ describe('delete a house (D32, spec §6.1 Notice with Undo)', () => {
 		const { content, modal, handle } = await openWindow();
 		dispatch(deleteOf(content, 'thorne'), 'click');
 		expect(modal.querySelector('.dynasty-sheet-confirm')).toBeNull();
-		// The list shows, and the focus goes to the row before the deleted one (D.3.7).
+		// The list shows, and the focus goes to the row before the deleted one.
 		expect(backButton(content)).toBeNull();
 		expect(fakeDoc.activeElement).toBe(row(content, 'orsini'));
 		save(content);

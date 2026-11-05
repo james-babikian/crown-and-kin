@@ -1,15 +1,16 @@
 /*
  * The parts of the ID change that both the Houses window and the Titles window draw (spec §13.17
  * rule 5, D109, D110, D113): the note "New ID: …" with its button "Keep old ID" on a row of the
- * list, and the ID field (a labelled text field, the button "Make ID from the name" and the line
- * that says why the draft ID is refused) inside the small ID window (`id-window.ts`). The button
+ * list, and the ID field (a label above a text field, the line that says why the draft ID is refused, the link "Make ID from the name"
+ * and the help) inside the small ID window (`id-window.ts`). The button
  * "Change ID" is part of the window page (`list-window.ts`). The draft logic is in `id-draft.ts`.
  */
 
 import { ID_UI } from '../render/ui-text';
+import { clearFieldError, fieldError, sheetField } from './sheet-parts';
 
 /** What a window gives the ID field of the small window. */
-export interface IdFieldOptions {
+interface IdFieldOptions {
 	/** The row's key: it makes the `data-focus` names `id:<key>` and `make-id:<key>`. */
 	key: string;
 	/** The name of the house or title, for the accessible names. */
@@ -17,6 +18,8 @@ export interface IdFieldOptions {
 	value: string;
 	/** The reason the draft is refused now, or an empty text. */
 	problem: string;
+	/** The help text: it stands under the link "Make ID from the name". */
+	hint?: string;
 	onInput: (value: string) => void;
 	onMake: () => void;
 	/** Enter in the field. */
@@ -24,7 +27,7 @@ export interface IdFieldOptions {
 }
 
 /** What a window changes in a field that is on screen, without drawing the window again. */
-export interface IdFieldView {
+interface IdFieldView {
 	input: HTMLInputElement;
 	setItem: (item: string) => void;
 	setValue: (value: string) => void;
@@ -34,12 +37,13 @@ export interface IdFieldView {
 /** Adds the ID row to `parent` and returns the handles that keep it up to date. */
 export function idField(parent: HTMLElement, o: IdFieldOptions): IdFieldView {
 	const row = parent.createDiv({ cls: 'dynasty-id-row', attr: { 'data-id-row': o.key } });
-	const field = row.createEl('label', { cls: 'dynasty-id-field' });
-	field.createSpan({ cls: 'dynasty-sheet-label', text: ID_UI.label });
-	const problemId = `dynasty-id-problem-${o.key}-${Math.random().toString(36).slice(2, 8)}`;
+	// D330 O-11: the label stands above a normal field, as in every window. Under the field: the error (when there is one), the link, the help.
+	const { row: field, id: inputId } = sheetField(row, ID_UI.label, 'id', 'dynasty-id');
+	field.addClass('dynasty-id-field');
+	const hintId = `${inputId}-hint`;
 	const input = field.createEl('input', {
 		cls: ['dynasty-sheet-input', 'dynasty-id-input'],
-		attr: { type: 'text', autocomplete: 'off', autocapitalize: 'off', autocorrect: 'off', spellcheck: 'false', enterkeyhint: 'done', 'aria-label': ID_UI.aria(o.item), 'aria-describedby': problemId, 'data-focus': `id:${o.key}` },
+		attr: { id: inputId, type: 'text', autocomplete: 'off', autocapitalize: 'off', autocorrect: 'off', spellcheck: 'false', enterkeyhint: 'done', 'aria-label': ID_UI.aria(o.item), 'aria-describedby': o.hint ? hintId : null, 'data-focus': `id:${o.key}` },
 	});
 	input.value = o.value;
 	input.addEventListener('input', () => o.onInput(input.value));
@@ -50,17 +54,16 @@ export function idField(parent: HTMLElement, o: IdFieldOptions): IdFieldView {
 		o.onEnter?.();
 	});
 	const make = row.createEl('button', {
-		cls: ['dynasty-sheet-action', 'dynasty-id-make'],
+		cls: ['dynasty-link', 'dynasty-id-make'],
 		text: ID_UI.make,
 		attr: { type: 'button', 'aria-label': ID_UI.makeAria(o.item), 'data-focus': `make-id:${o.key}` },
 	});
 	make.addEventListener('click', () => o.onMake());
-	const problem = row.createDiv({ cls: 'dynasty-id-problem', attr: { id: problemId, 'aria-live': 'polite' } });
+	if (o.hint) row.createDiv({ cls: 'dynasty-sheet-hint', text: o.hint, attr: { id: hintId } });
+	// The reason that the id is refused stands right under the field with the error edge; the field keeps the focus (it is typing).
 	const show = (text: string) => {
-		problem.setText(text);
-		problem.toggle(text !== '');
-		if (text === '') input.removeAttribute('aria-invalid');
-		else input.setAttribute('aria-invalid', 'true');
+		if (text === '') clearFieldError(input);
+		else fieldError(input, text, { focus: false }).addClass('dynasty-id-problem');
 	};
 	show(o.problem);
 	return {

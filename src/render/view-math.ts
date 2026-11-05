@@ -24,14 +24,21 @@ export type Lod = 'full' | 'compact' | 'overview';
 
 /** Name text on screen, in px, where the default view switches from fit to a readable zoom (§5.5). */
 export const FIT_MIN_NAME_PX = 11;
-/** Name text on screen, in px, for the readable zoom (§5.5). */
-export const READABLE_NAME_PX = 14;
+/** The smallest card text on screen, in px, that the readable zoom gives (D330 O-02). */
+export const READABLE_CARD_TEXT_PX = 12;
+/**
+ * Note font size on screen, in px, for the readable zoom (§5.5). Card text is 0.85 of the note font (D117), so this aims at 12 / 0.85 = 14.12 px of note font and the card text shows
+ * at 12 px, not at 11.9 px as with 14 (C1-07). Rounded up in the sixth place, so the product never falls under 12.
+ */
+export const READABLE_NAME_PX = Math.ceil((READABLE_CARD_TEXT_PX / 0.85) * 1e6) / 1e6;
+/** Note font size on screen, in px, of the sideways first view of a phone (D24, D247): it keeps 14 px names so that the parents' column or the children's column fits beside the person. */
+export const SIDEWAYS_NAME_PX = 14;
 /** A small tree is not blown up past its natural size by "fit". */
 export const MAX_FIT_SCALE = 1;
 /** Empty space around the tree in a fitted view, in layout px. */
 export const FIT_MARGIN = 24;
 /** Largest zoom: name text at this many px on screen. */
-export const MAX_NAME_PX = 64;
+const MAX_NAME_PX = 64;
 /** Movement in screen px before a press counts as a pan, not a tap or click (§7.2). */
 export const PAN_THRESHOLD = 8;
 /** Smallest tappable size in screen px (§7.5). */
@@ -76,6 +83,16 @@ export function treeBounds(width: number, height: number, margin = FIT_MARGIN): 
 	const w = Number.isFinite(width) && width > 0 ? width : 0;
 	const h = Number.isFinite(height) && height > 0 ? height : 0;
 	return { x: -margin, y: -margin, w: w + 2 * margin, h: h + 2 * margin };
+}
+
+/** The smallest box around `boxes` as its four edges (left, top, right, bottom); `boxes` must not be empty. */
+export function bounds(boxes: readonly Rect[]): { x0: number; y0: number; x1: number; y1: number } {
+	return {
+		x0: Math.min(...boxes.map((b) => b.x)),
+		y0: Math.min(...boxes.map((b) => b.y)),
+		x1: Math.max(...boxes.map((b) => b.x + b.w)),
+		y1: Math.max(...boxes.map((b) => b.y + b.h)),
+	};
 }
 
 function validSize(size: Size): boolean {
@@ -462,7 +479,7 @@ export function wheelFactor(deltaY: number, deltaMode: number): number {
 }
 
 /** How much one wheel px zooms by, in `wheelFactor`'s `exp`. */
-export const WHEEL_ZOOM_PER_PX = 0.002;
+const WHEEL_ZOOM_PER_PX = 0.002;
 
 /** True once a press has moved further than `PAN_THRESHOLD`, so it counts as a pan, not a tap. */
 export function isPan(dx: number, dy: number): boolean {
@@ -502,7 +519,7 @@ export function keepSpot(view: View, from: { x: number; y: number }, to: { x: nu
 }
 
 /** What the pan limits need to clamp a kept-place view: the new tree bounds, the viewport and (full-screen view) the bars. */
-export interface KeepPlaceArea {
+interface KeepPlaceArea {
 	bounds: Rect;
 	size: Size;
 	free?: FreeArea;
@@ -625,6 +642,20 @@ export const DOUBLE_TAP_MS = 300;
 /** …and within this distance (screen px) of it. */
 export const DOUBLE_TAP_PX = 24;
 
+/** The two limits of a double tap: the longest time (ms) and the longest distance (screen px) between the two taps. */
+export interface TapSetting {
+	readonly ms: number;
+	readonly px: number;
+}
+
+/** The limits of a double tap on the tree. */
+const TAP_TREE: TapSetting = { ms: DOUBLE_TAP_MS, px: DOUBLE_TAP_PX };
+
+/** True when two taps `dt` ms and `dist` px apart are inside the limits of `setting`; the tree and the picture viewer use their own limits. */
+export function withinTap(dt: number, dist: number, setting: TapSetting): boolean {
+	return dt <= setting.ms && dist <= setting.px;
+}
+
 /**
  * Two-finger pinch (§7.2): the tree point under the fingers' midpoint at the start stays under
  * the midpoint now, and the scale changes by the ratio of the finger distances. Clamped to
@@ -675,7 +706,7 @@ export const doubleTapView: DoubleTapView = (view, at, size, limits) => {
 export const isDoubleTap: IsDoubleTap = (t0, p0, t1, p1) => {
 	const dt = t1 - t0;
 	if (!Number.isFinite(dt) || !finitePoint(p0) || !finitePoint(p1)) return false;
-	return dt >= 0 && dt <= DOUBLE_TAP_MS && Math.hypot(p1.x - p0.x, p1.y - p0.y) <= DOUBLE_TAP_PX;
+	return dt >= 0 && withinTap(dt, Math.hypot(p1.x - p0.x, p1.y - p0.y), TAP_TREE);
 };
 
 /** Resize or orientation change (spec §7.5): see `ResizeView`. */
@@ -713,7 +744,7 @@ export function livePictureSlots(slots: readonly { kind: 'arms' | 'portrait'; lo
 }
 
 /** The tail that a cut card text with a maybe keeps (D176 5): the word is cut, the question mark stays. */
-export const MAYBE_CUT_TAIL = ' ?';
+const MAYBE_CUT_TAIL = ' ?';
 
 /**
  * Cuts a card relation text that has a maybe suffix (D176 5). If `word + suffix` fits, it is whole. If not, the relation word is cut

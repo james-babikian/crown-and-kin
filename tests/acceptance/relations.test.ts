@@ -7,7 +7,7 @@ import { graphOf, lowers, relationsModule, relationText, sample12, SPEC_4, type 
 
 /*
  * Relation names (spec §13.1, D40–D46): acceptance tests written from the spec before the build
- * (WP7.0). They fail until WP7.1 adds `src/core/relations.ts` and WP7.2 adds the sheet texts.
+ * . They fail until WP7.1 adds `src/core/relations.ts` and WP7.2 adds the sheet texts.
  *
  * Sample tree 12 keeps the expected names in its comments, worked out by hand from the §13.1 rules
  * (option A everywhere). The golden test compares the whole table for each marked person, so any
@@ -385,7 +385,7 @@ describe('words for each sex (spec §13.1, D12)', () => {
 		}
 	});
 
-	it('no sex, or any other value, gives the neutral words; only the spellings of contract 0.2.7 J.4 give a warning (K.9)', async () => {
+	it('no sex, or any other value, gives the neutral words; only the spellings of the sex key give a warning', async () => {
 		const { computeRelations } = await relationsModule();
 		for (const sex of ['', '    sex: x\n', '    sex: M\n', '    sex: other\n']) {
 			const source = SAMPLE.source.replace('  - id: nia\n    name: Nia\n', `  - id: nia\n    name: Nia\n${sex}`);

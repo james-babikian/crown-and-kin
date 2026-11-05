@@ -26,7 +26,7 @@ const linkOf = (src: string, id = 'a') => {
 };
 
 describe('normaliseTarget', () => {
-	it('backslashes to slashes, no trailing .md, lower case', () => {
+	it('backslashes to slashes, no trailing.md, lower case', () => {
 		expect(normaliseTarget('Folder\\Sub\\Old Note.md')).toBe('folder/sub/old note');
 		expect(normaliseTarget('Old.MD')).toBe('old');
 		expect(normaliseTarget('Old.md.md')).toBe('old.md');
@@ -92,12 +92,12 @@ describe('rewrite-links', () => {
 		expect(rewrite(one('"![[Old]]"'), map)).toBe(one('"![[New]]"'));
 	});
 
-	it('keys match after normalising: case, .md and backslashes', () => {
+	it('keys match after normalising: case,.md and backslashes', () => {
 		expect(rewrite(one('"[[old]]"'), { 'OLD.md': 'New' })).toBe(one('"[[New]]"'));
 		expect(rewrite(one('"[[Folder/Old]]"'), { 'folder\\old': 'Archive/New' })).toBe(one('"[[Archive/New]]"'));
 	});
 
-	it('a trailing .md stays if the old text had it', () => {
+	it('a trailing.md stays if the old text had it', () => {
 		expect(rewrite(one('"[[Old.md|x]]"'), map)).toBe(one('"[[New.md|x]]"'));
 		expect(rewrite(one('"[[Old.md]]"'), { old: 'New.md' })).toBe(one('"[[New.md]]"'));
 		expect(rewrite(one('"[[Old]]"'), { old: 'New.md' })).toBe(one('"[[New.md]]"'));
@@ -206,7 +206,7 @@ describe('rewrite-links', () => {
 	});
 });
 
-describe('M6 ops never throw (§8)', () => {
+describe('the link ops never throw (§8)', () => {
 	it('malformed ops give a refusal', () => {
 		const src = fixture('09');
 		const bad = [

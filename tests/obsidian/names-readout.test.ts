@@ -1,19 +1,17 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { compileCalendars, type NameList } from '../../src/core/dates';
-import type { Op } from '../../src/core/edit';
-import { applyOp } from '../../src/core/yaml-edit';
 import { EditSheet } from '../../src/obsidian/edit-sheet';
 import { DATE_READOUT_UI as T } from '../../src/render/calendar-text';
 import { dateReadout } from '../../src/render/date-readout';
 import { FEl, dispatch, resetDom } from '../acceptance/fake-dom';
 import { resetObsidian } from '../acceptance/fake-obsidian';
-import { fakeHandle, type FakeHandle } from '../acceptance/tree-view-fakes';
 import { PLANETS, cycles, list } from '../dates-support/names';
 import { useFakeDom } from '../support/fake-dom-setup';
+import { bareWritingHandle as writingHandle } from '../support/writing-handle';
 
 /*
- * Spec §14 rule 15 (WP-6 step 3): the grey text line under Born and Died and the test line. After the year there is one sentence for each name list, "Planets: Saturn.", with
+ * Spec §14 rule 15: the grey text line under Born and Died and the test line. After the year there is one sentence for each name list, "Planets: Saturn.", with
  * the full name; a whole plain year with a plain-year list has this line too; a wrong written name adds the sentence of the mismatch. The real person window shows it.
  */
 
@@ -93,19 +91,6 @@ const BODY = `people:
     born: 22.13
     died: 22.14 Sa
 `;
-
-function writingHandle(body: string): FakeHandle & { ops: Op[] } {
-	const h = fakeHandle('Tree.md', body) as FakeHandle & { ops: Op[] };
-	h.ops = [];
-	h.write.mockImplementation((async (op: Op) => {
-		h.ops.push(op);
-		const r = applyOp(h.body, op);
-		if (!r.ok) return { ok: false, code: 'refused', refusal: r };
-		h.body = r.body;
-		return { ok: true, body: r.body, created: r.created, effects: [] };
-	}) as never);
-	return h;
-}
 
 describe('the grey line in the person window', () => {
 	it('shows the name of the year under Born and Died, the mismatch under Died, and the field keeps the text as written', () => {

@@ -38,7 +38,7 @@ export function readPendingStore(value: unknown): PendingStoreValue | null {
 }
 
 /** What a load found: the store (a fresh one if none or broken) and whether the storage could be read at all. */
-export interface PendingLoad {
+interface PendingLoad {
 	value: PendingStoreValue;
 	/** False when the local storage threw: nothing is known, so no migration may run. */
 	readable: boolean;

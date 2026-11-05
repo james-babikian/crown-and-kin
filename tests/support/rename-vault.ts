@@ -1,6 +1,6 @@
 /*
  * A small fake vault of notes and pictures for the real `LinkUpdater` (the rename of a note or a picture rewrites the tree links).
- * Used by `m9-obsidian-a` and `review-m9-core-rename`, which each had a copy. The notes are in a map; `rename` moves a file the way
+ * Used by `picture-copy-store` and `vault-rename-note-and-picture`, which each had a copy. The notes are in a map; `rename` moves a file the way
  * Obsidian does and waits until the updater is idle.
  */
 

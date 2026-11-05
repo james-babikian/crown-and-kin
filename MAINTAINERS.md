@@ -54,7 +54,7 @@ The Obsidian review team uses `eslint-plugin-obsidianmd`. It is not in `package.
 
 Some tests compare against recorded results. A failing one means that output changed.
 - `tests/golden/*.yaml` are expected outputs of edits; `tests/golden/layout-down/*.txt` are the layout of each sample tree.
-- Picture hashes (sha256 of the SVG): `tests/acceptance/m11-spike-hashes.json`, `tests/acceptance/s025-card-hashes.json` and a few values inside tests. Re-record only when the change is meant: look at the difference, then record the new values (`npx tsx scripts/s025-record-hashes.ts` for the card hashes) and say why in the commit.
+- Picture hashes (sha256 of the SVG): `tests/acceptance/headless-sample-hashes.json`, `tests/acceptance/card-form-hashes.json` and a few values inside tests. Re-record only when the change is meant: look at the difference, then record the new values (`npx tsx scripts/s025-record-hashes.ts` for the card hashes) and say why in the commit.
 - `tests/styles/styles-drift.test.ts` fails if `styles.css` is not the join of `styles/*.css`. Run `npm run build` and commit the result.
 
 ## Make a release

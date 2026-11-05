@@ -19,7 +19,7 @@ function callsOf(code: string, name: string): string[] {
 	return out;
 }
 
-describe('deriveFamilies in the view and shell layers (the architecture notes §5.7)', () => {
+describe('deriveFamilies in the view and shell layers', () => {
 	const files = ['src/obsidian', 'src/view', 'src/render'].flatMap((d) => tsFiles(d));
 	const calls = files.flatMap((file) => callsOf(codeOf(read(file)), 'deriveFamilies').map((args) => ({ file, args })));
 

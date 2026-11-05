@@ -30,11 +30,13 @@
 
 import { Modal, setIcon, type App, type TFile } from 'obsidian';
 import { automaticCrop, clampCrop, isAutomaticCrop, moveCrop, readPortraitCrop, zoomCrop, CROP_MIN_SIDE, type CropFraction } from '../core/portrait-crop';
+import { mediaMatches } from '../render/dom/page-reads';
 import { CROP_UI } from '../render/ui-text';
 import { ignoreGhostClick, isPhoneWidth, phoneLayout } from './modal-layout';
 import type { PictureCopy, PictureStore } from './picture-store';
 import { trackModal } from '../view/plugin-modals';
 import { nameDialog } from './sheet-parts';
+import { guarded } from './start-guard';
 
 /** What opens the crop tool. */
 interface CropToolOptions {
@@ -190,7 +192,11 @@ class CropModal extends Modal {
 	private build(): void {
 		const el = this.contentEl;
 		el.addClass('dynasty-sheet-content');
-		nameDialog(this.modalEl, el.createDiv({ cls: ['dynasty-sheet-title', 'dynasty-crop-title'], text: CROP_UI.title(this.o.personName) }));
+		// O-34 item 3: the title, and the name of the person on a second, lighter line.
+		const title = el.createDiv({ cls: ['dynasty-sheet-title', 'dynasty-crop-title'] });
+		title.createDiv({ text: CROP_UI.title });
+		title.createDiv({ cls: 'dynasty-crop-name', text: CROP_UI.nameLine(this.o.personName) });
+		nameDialog(this.modalEl, title);
 		const body = el.createDiv({ cls: ['dynasty-sheet-body', 'dynasty-crop-body'] });
 
 		// The hint names the area for a screen reader. An aria-label would also show as a tooltip over the picture while it is dragged.
@@ -223,30 +229,18 @@ class CropModal extends Modal {
 		const b = parent.createEl('button', { cls: text ? ['dynasty-btn', 'dynasty-crop-button'] : ['dynasty-icon-btn', 'dynasty-crop-button'], text, attr: { type: 'button', 'aria-label': label } });
 		if (icon) setIcon(b, icon);
 		b.addEventListener('click', () => {
-			try {
-				run();
-			} catch (e) {
-				console.error('Crown and Kin: the crop tool action failed', e);
-			}
+			guarded('the crop tool action failed', run);
 		});
 		return b;
 	}
 
-	private hostWin(): Window {
-		return this.modalEl.win ?? window;
-	}
-
 	private coarse(): boolean {
-		try {
-			return this.hostWin().matchMedia('(pointer: coarse)').matches;
-		} catch {
-			return false;
-		}
+		return mediaMatches(this.modalEl.win, '(pointer: coarse)');
 	}
 
 	/** Sets the frame size from the window; the picture is drawn again at the new size. */
 	private layout(): void {
-		const win = this.hostWin();
+		const win = this.modalEl.win;
 		const phone = isPhoneWidth(win);
 		const vv = win.visualViewport;
 		const sizes = toolSizes(phone, win.innerWidth, phone && vv ? vv.height : win.innerHeight);
@@ -262,7 +256,7 @@ class CropModal extends Modal {
 	private async load(): Promise<void> {
 		const ctl = new AbortController();
 		this.abort = ctl;
-		const side = largeCopySide(this.hostWin());
+		const side = largeCopySide(this.modalEl.win);
 		try {
 			const r = await this.o.store.transient(this.o.file, { w: side, h: side, fit: 'meet' }, ctl.signal);
 			if (ctl.signal.aborted || this.settled) {

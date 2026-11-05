@@ -8,7 +8,7 @@ import { PENDING_KEY, readPending, type PendingRename } from '../view/settings';
 import { emptyPendingStore, loadPendingStore, mergePending, savePendingStore, type LocalStorageApp, type PendingStoreValue } from './pending-store';
 
 /** What `settle` tells `main.ts`. */
-export interface PendingSettle {
+interface PendingSettle {
 	/** The list the updater must hold now. */
 	list: PendingRename[];
 	/** The flag is set: `data.json` no longer holds the list (the caller clears its copy). */

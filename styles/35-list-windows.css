@@ -9,31 +9,31 @@
 /* The header of the list and the search bar sit above the part that scrolls. */
 .dynasty-lw .dynasty-lw-top {
 	flex: none;
-	padding: 22px 24px 0;
-	background: var(--modal-background, var(--background-primary));
+	padding: 22px var(--dynasty-space-5) 0;
+	/* CX-15: no colour of its own. The window has one surface (the plain page background), so the bar and the search row match in a dark theme too. */
+	background: none;
 }
 
 /* On a phone the bar says the name of the list, so the list starts with the search box (lw-phone-header). */
 .dynasty-lw.is-phone .dynasty-lw-top {
-	padding: 4px max(16px, env(safe-area-inset-right)) 0 max(16px, env(safe-area-inset-left));
+	padding: var(--dynasty-space-1) max(var(--dynasty-space-4), env(safe-area-inset-right)) 0 max(var(--dynasty-space-4), env(safe-area-inset-left));
 }
 
+/* P3-11: the count under a tool title is in the interface font, as the title is. */
+.dynasty-lw .dynasty-lw-meta-count {
+	font-family: var(--dynasty-font-tool);
+}
+
+/* UX-22: on a phone the count stands in a quiet line above the search box, in the muted text style of the header. */
+.dynasty-lw .dynasty-lw-meta-count.is-phone-count {
+	padding-bottom: var(--dynasty-space-2);
+}
+
+/* O-16, L-02: no icon tile; the title and the count start on the left edge of the search box and the rows. */
 .dynasty-lw .dynasty-lw-head {
-	grid-template-columns: auto minmax(0, 1fr);
+	grid-template-columns: minmax(0, 1fr);
 	align-items: center;
-	padding-bottom: 12px;
-}
-
-.dynasty-lw .dynasty-row-lead.is-list-icon {
-	width: 44px;
-	height: 44px;
-	background: var(--background-secondary);
-	color: var(--icon-color);
-}
-
-.dynasty-lw .dynasty-row-lead.is-list-icon .svg-icon {
-	width: 20px;
-	height: 20px;
+	padding-bottom: var(--dynasty-space-3);
 }
 
 /* ---------- the search box, with the Add button beside it ---------- */
@@ -41,9 +41,9 @@
 .dynasty-lw .dynasty-lw-bar {
 	display: flex;
 	align-items: center;
-	gap: 8px;
-	padding-bottom: 12px;
-	border-bottom: 1px solid var(--background-modifier-border);
+	gap: var(--dynasty-space-2);
+	padding-bottom: var(--dynasty-space-3);
+	border-bottom: var(--dynasty-hairline);
 }
 
 .dynasty-lw .dynasty-lw-searchwrap {
@@ -70,7 +70,7 @@
 .dynasty-lw input.dynasty-lw-search {
 	width: 100%;
 	min-height: var(--input-height);
-	padding-left: 32px;
+	padding-left: var(--dynasty-space-6);
 	padding-right: 44px;
 }
 
@@ -135,8 +135,10 @@
 	padding: 0;
 }
 
+/* L-10, CX-12: an empty list is one muted sentence on the common left edge, with no inset of its own. */
 .dynasty-lw li.dynasty-lw-none {
-	padding: var(--size-4-4) var(--size-4-1);
+	padding: var(--dynasty-space-4) 0;
+	color: var(--dynasty-muted);
 	list-style: none;
 }
 
@@ -144,7 +146,7 @@
 .dynasty-sheet.dynasty-lw button.dynasty-lw-row {
 	min-height: 56px;
 	border: 0;
-	border-radius: var(--radius-m);
+	border-radius: var(--dynasty-radius-row);
 	background: none;
 	box-shadow: none;
 }
@@ -170,9 +172,11 @@
 	order: 3;
 }
 
+/* CX-10: the row fills its line, so it takes the inset pair of the focus recipe. */
 .dynasty-sheet.dynasty-lw button.dynasty-lw-row:focus-visible {
-	outline: 2px solid var(--text-normal);
-	outline-offset: -2px;
+	outline: var(--dynasty-focus-outline);
+	outline-offset: var(--dynasty-focus-inset-offset);
+	box-shadow: var(--dynasty-focus-inset-shadow);
 }
 
 /* D218: the name of a title or a house is the Name role (Heading size, semibold, text font); the second text line is the Text role in the text font. */
@@ -267,13 +271,14 @@ body.theme-dark .dynasty-lw .dynasty-lw-dot {
 	flex: none;
 	display: flex;
 	flex-direction: column;
-	gap: var(--size-4-3);
+	/* CX-08: the header and the first section stand as far apart as in the person window; the sections carry their own space. */
+	gap: 0;
 }
 
 /* The header of a page: the name at the left and the arms at the right, as in the person window (D209 item 4, D213). With no arms there is only the name (and, on a house page, the link "Add arms"). */
 .dynasty-lw .dynasty-lw-pagehead {
 	grid-template-columns: minmax(0, 1fr) auto;
-	padding-bottom: 8px;
+	padding-bottom: var(--dynasty-space-2);
 }
 
 .dynasty-lw .dynasty-lw-pagehead > .dynasty-head-text {
@@ -296,12 +301,8 @@ body.theme-dark .dynasty-lw .dynasty-lw-dot {
 	min-width: 48px;
 }
 
-/* A long name wraps to two text lines and then ends with three dots. */
+/* P3-01: the bar says only "Title" or "House", so the full name stands here and wraps as far as it needs; it is never cut. */
 .dynasty-lw .dynasty-lw-back-name {
-	display: -webkit-box;
-	-webkit-box-orient: vertical;
-	-webkit-line-clamp: 2;
-	overflow: hidden;
 	overflow-wrap: anywhere;
 }
 

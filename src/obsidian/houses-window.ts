@@ -20,7 +20,7 @@ import { Notice, type App } from 'obsidian';
 import { armsColours } from '../core/arms-colours';
 import { houseNoteName, housePage, houseTableNote, type HousePage } from '../core/house-page';
 import { nb } from '../render/text-join';
-import { shownYears, titleWithNames } from '../render/tree-info';
+import { isolateName, shownYears, titleWithNames } from '../render/tree-info';
 import type { FamilyGraph } from '../core/derive';
 import { deriveDated, type DatesFor } from '../view/calendar-index';
 import type { Op } from '../core/edit';
@@ -41,14 +41,15 @@ import { matchesAll } from '../view/list-search';
 import { currentPictureOf, pickPicture } from './picture-picker';
 import { ARMS_PIXELS, type PictureCopy, type PictureStore } from './picture-store';
 import { freshOrStale } from './sheet-parts';
-import { HEX, drawHousePalette, paintHouseColour } from './house-swatches';
+import { HEX, drawArmsColours, drawHousePalette, paintHouseColour } from './house-swatches';
 import { houseViewItems } from './viewer-sources';
+import { guarded } from './start-guard';
 
 /** D202 (2): the People section shows this many people, then "and N more". */
 const PEOPLE_ROWS = 8;
 
 /** One house as the Houses window shows it: its id, name, colour and the people who have it. */
-export interface LoadedHouse {
+interface LoadedHouse {
 	id: string;
 	name: string;
 	/** As written in the tree; null when there is none. */
@@ -60,7 +61,7 @@ export interface LoadedHouse {
 }
 
 /** The tree's houses, loaded from one block body. */
-export interface LoadedHouses {
+interface LoadedHouses {
 	body: string;
 	houses: LoadedHouse[];
 	/** The `house` values of people that no house has (§13.17 rule 5): such an id is taken. */
@@ -191,10 +192,11 @@ export interface HousesOptions {
 }
 
 /** The arms box of the Houses window is this high, in CSS px (spec §13.6 "about 40 px"). */
-export const ARMS_BOX_PX = 40;
+const ARMS_BOX_PX = 40;
 
 /** The modal that lists a tree's houses and edits their names, colours and arms (spec §6.10). */
 export class HousesWindow extends ListEditWindow {
+	protected readonly staleText = HOUSES.stale;
 	private data: LoadedHouses;
 	private rows: HouseRow[];
 	/** Spec §13.6: the arms pictures of the window by link (a copy, a problem, or still loading). */
@@ -268,18 +270,10 @@ export class HousesWindow extends ListEditWindow {
 		this.pageBox = null;
 		this.addArmsEl = null;
 		this.armsGroup = null;
-		try {
-			this.o.onClosed?.();
-		} catch (e) {
-			console.error('Crown and Kin: cannot return the focus', e);
-		}
+		guarded('cannot return the focus', () => this.o.onClosed?.());
 		const after = this.afterClose;
 		this.afterClose = null;
-		try {
-			after?.();
-		} catch (e) {
-			console.error('Crown and Kin: cannot show the person', e);
-		}
+		guarded('cannot show the person', () => after?.());
 	}
 
 	/** True if the draft has an unsaved change (an edit, a delete or a new house). */
@@ -406,7 +400,7 @@ export class HousesWindow extends ListEditWindow {
 			{
 				key: 'details',
 				title: WINDOW_UI.sectionDetails,
-				summary: this.label(r),
+				summary: isolateName(this.label(r)),
 				open: true,
 				build: (body) => {
 					const field = this.textField(body, {
@@ -457,7 +451,7 @@ export class HousesWindow extends ListEditWindow {
 			// A plain full-width row: no chevron, no hairline (people-rows). The tap stays (spec §13.12), as a soft tint under the pointer.
 			const row = buildRow(rows, { cls: 'dynasty-hp-row', attr: { 'data-person': p.id }, ...(show ? { tap: () => this.guard(() => this.leaveThen(() => show(p.id))), chevron: false } : {}) });
 			// The name in bold, then the title with its reign; the reign never breaks.
-			row.title.createEl('b', { cls: 'dynasty-hp-name', text: p.name });
+			row.title.createEl('b', { cls: 'dynasty-hp-name', text: isolateName(p.name) });
 			// The reign shows the names of its years, as a card does; the table note keeps the text as written (spec §14 rule 15).
 			if (p.title) row.title.createSpan({ cls: 'dynasty-sob', text: ` · ${nb(titleWithNames(this.data.g, p.id, p.title))}` });
 			// A range with a name or a word has a thin space on each side of its dash, as on the card (D278).
@@ -752,12 +746,7 @@ export class HousesWindow extends ListEditWindow {
 		void store
 			.pixels(found.file)
 			.then((px) => {
-				let list: string[] | null = null;
-				try {
-					list = px ? armsColours(px, ARMS_PIXELS, ARMS_PIXELS) : null;
-				} catch (e) {
-					console.error('Crown and Kin: cannot read the colours of the arms', e);
-				}
+				const list = guarded('cannot read the colours of the arms', () => (px ? armsColours(px, ARMS_PIXELS, ARMS_PIXELS) : null), null);
 				this.colours.set(link, list);
 				const g = this.armsGroup;
 				const r = g ? this.rowByKey(g.key) : undefined;
@@ -768,7 +757,7 @@ export class HousesWindow extends ListEditWindow {
 	}
 
 	/**
-	 * The colours read from the arms (D68: the exact colours), as round swatches with a small dot. The group stays empty, and so hidden,
+	 * The colours read from the arms (D68: the exact colours), as round swatches under the label "From the arms" (D330 O-19). The group stays empty, and so hidden,
 	 * while the picture is read and when the plugin cannot read it: no empty box and no text ever shows (arms-colours).
 	 */
 	private fillArmsColours(group: HTMLElement, r: HouseRow, link: string): void {
@@ -776,15 +765,7 @@ export class HousesWindow extends ListEditWindow {
 		const list = this.armsColoursFor(link);
 		group.toggleClass('is-loading', list === 'loading');
 		if (list === 'loading' || list === null) return;
-		list.forEach((hex, i) => {
-			const chosen = lower(r.colour) === hex;
-			const b = group.createEl('button', {
-				cls: chosen ? ['dynasty-swatch', 'dynasty-house-arms-colour', 'is-selected'] : ['dynasty-swatch', 'dynasty-house-arms-colour'],
-				attr: { type: 'button', 'aria-label': PICTURES_UI.armsColourLabel(i + 1), 'aria-pressed': String(chosen), 'data-colour': hex, 'data-focus': `arms-colour:${r.key}:${hex}` },
-			});
-			b.style.setProperty('--dynasty-house-color', hex);
-			b.addEventListener('click', () => this.guard(() => this.pickColour(r, hex, b)));
-		});
+		drawArmsColours(group, { key: r.key, colour: r.colour, list, pick: (hex, used) => this.pickColour(r, hex, used), guard: (run) => this.guard(run) });
 	}
 
 	/**
@@ -900,9 +881,8 @@ export class HousesWindow extends ListEditWindow {
 		if (this.saving) return;
 		const empty = this.rows.find((r) => !r.deleted && r.name.trim() === '' && (r.id === null || r.name.trim() !== r.base?.name));
 		if (empty) {
-			// The error is set first: the page that opens draws it, and the page that is open shows it at once.
-			this.showError(HOUSES.needName);
 			this.showPage(empty.key, `name:${empty.key}`);
+			this.showFieldError(`name:${empty.key}`, HOUSES.needName);
 			return;
 		}
 		if (this.askAgain()) return;
@@ -963,19 +943,12 @@ export class HousesWindow extends ListEditWindow {
 		});
 	}
 
-	/** Spec §6.1 stale write: a Notice, the new data in the window, and the draft kept with a message that says so. */
-	private stale(body: string): void {
-		new Notice(WRITE_TEXT.staleWindow);
-		this.reload(body);
-		this.showError(HOUSES.stale);
-	}
-
 	/**
 	 * Shows the block's new houses. A house the user changed keeps the user's name or colour; the
 	 * other values are the new ones. A house that is gone leaves the draft; new houses stay. The open page
 	 * stays when its house is still there; else the list shows.
 	 */
-	private reload(body: string): void {
+	protected reload(body: string): void {
 		const l = loadHouses(body, this.o.dates);
 		if (l.kind !== 'ok') {
 			this.refused(l.kind === 'blocked' ? WRITE_TEXT.blocked : HOUSES.invalid);

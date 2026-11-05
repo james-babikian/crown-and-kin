@@ -107,7 +107,7 @@ export interface FinderState {
 }
 
 /** What the Show view of the line of succession shows: the id of the title. */
-export interface SuccessionState {
+interface SuccessionState {
 	title: string;
 }
 

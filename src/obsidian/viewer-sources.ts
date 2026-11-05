@@ -9,28 +9,30 @@ import type { App } from 'obsidian';
 import type { FamilyGraph } from '../core/derive';
 import { cardLabels, needsLabels } from '../core/titles';
 import type { Person } from '../core/types';
+import { isolateName } from '../render/name-bidi';
 import { dateLineShown } from '../render/tree-info';
 import { VIEWER_UI } from '../render/viewer-text';
 import { openPictureViewer, type ViewerPicture } from './picture-viewer';
 import type { PictureStore } from './picture-store';
 import type { MenuEntry } from './window-parts';
+import { guarded } from './start-guard';
 
 /** What every window gives the viewer. */
-export interface ViewerKit {
+interface ViewerKit {
 	app: App;
 	pictures: PictureStore | undefined;
 	sourcePath: string | undefined;
 }
 
 /** What the person window gives the viewer: the tree, the person and the draft of the form (the pictures the window shows now). */
-export interface PersonKit extends ViewerKit {
+interface PersonKit extends ViewerKit {
 	g: FamilyGraph;
 	person: Person;
 	draft: { name: string; portrait: string; arms: string; house: string; title: string; born: string; died: string };
 }
 
 /** What the house page gives the viewer: the name of the house and its arms link in the draft. */
-export interface HouseKit extends ViewerKit {
+interface HouseKit extends ViewerKit {
 	name: string;
 	arms: string | null;
 }
@@ -39,34 +41,34 @@ export interface HouseKit extends ViewerKit {
 export function personPictures(kit: PersonKit): ViewerPicture[] {
 	const d = kit.draft;
 	const name = d.name.trim() || kit.person.name || '';
-	const heading = name || VIEWER_UI.unnamed;
+	const heading = isolateName(name) || VIEWER_UI.unnamed;
 	const who = name || VIEWER_UI.thisPerson;
 	const out: ViewerPicture[] = [];
 	const portrait = d.portrait.trim();
 	if (portrait) {
 		const label = kit.person.id !== '' && needsLabels(kit.g) ? cardLabels(kit.g).get(kit.person.id) : undefined;
 		const dates = dateLineShown({ ...kit.person, born: d.born.trim() || undefined, died: d.died.trim() || undefined }, kit.g.dates) ?? '';
-		out.push({ kind: 'portrait', link: portrait, heading, line: VIEWER_UI.portraitLine([label?.title ?? d.title.trim(), dates]), label: VIEWER_UI.portraitOf(who), show: VIEWER_UI.showPortrait });
+		out.push({ kind: 'portrait', link: portrait, heading, line: VIEWER_UI.portraitLine([isolateName(label?.title ?? d.title.trim()), dates]), label: VIEWER_UI.portraitOf(who), show: VIEWER_UI.showPortrait });
 	}
 	const own = d.arms.trim();
 	const house = d.house !== '' ? kit.g.houses?.get(d.house) : undefined;
 	const arms = own || house?.arms?.trim() || '';
 	if (arms) {
 		const owner = own ? who : house?.name || house?.id || '';
-		const line = own ? VIEWER_UI.personalArms : owner ? VIEWER_UI.armsOf(owner) : VIEWER_UI.arms;
+		const line = own ? VIEWER_UI.personalArms : owner ? VIEWER_UI.armsOf(isolateName(owner)) : VIEWER_UI.arms;
 		out.push({ kind: 'arms', link: arms, heading, line, label: owner ? VIEWER_UI.armsOf(owner) : VIEWER_UI.arms, show: VIEWER_UI.showArms });
 	}
 	return out;
 }
 
 /** The arms of a house page. */
-export function housePictures(kit: HouseKit): ViewerPicture[] {
+function housePictures(kit: HouseKit): ViewerPicture[] {
 	const arms = kit.arms?.trim();
 	if (!arms) return [];
 	const name = kit.name.trim();
 	// The name above already says whose arms these are, so the text line is one word; the screen-reader label keeps the full name.
 	const label = name ? VIEWER_UI.armsOf(name) : VIEWER_UI.arms;
-	return [{ kind: 'arms', link: arms, heading: name || VIEWER_UI.arms, line: VIEWER_UI.arms, label, show: VIEWER_UI.showArms }];
+	return [{ kind: 'arms', link: arms, heading: isolateName(name) || VIEWER_UI.arms, line: VIEWER_UI.arms, label, show: VIEWER_UI.showArms }];
 }
 
 /** Only the pictures that the store can find; none without a store. */
@@ -88,12 +90,7 @@ function open(kit: ViewerKit, pics: ViewerPicture[], anchor: HTMLElement | null,
 
 /** What a window asks for must not throw: a failure is logged and the window gets no viewer (spec §8). */
 function safely<T>(fn: () => T, fallback: T): T {
-	try {
-		return fn();
-	} catch (e) {
-		console.error('Crown and Kin: cannot prepare the picture viewer', e);
-		return fallback;
-	}
+	return guarded('cannot prepare the picture viewer', fn, fallback);
 }
 
 /** A tap on a picture of a person window that cannot change the note: the viewer opens at once. */

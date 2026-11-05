@@ -1,4 +1,4 @@
-// Spec §14 rule 13 (WP-6 step 1): the name of an internal year, with a safe modulo.
+// Spec §14 rule 13: the name of an internal year, with a safe modulo.
 import { describe, expect, it } from 'vitest';
 import { compileCalendars, isUsableList, yearName } from '../../src/core/dates';
 import { cycles, list, PLANETS } from '../dates-support/names';

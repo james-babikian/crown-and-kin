@@ -1,7 +1,7 @@
 /*
  * Shared helpers for the M8 title tests (spec §13.3–§13.5, D54–D63): the modules under test,
  * loaded so the test files still compile before WP 8.1 adds them, typed views of the M8 additions
- * to existing types (the M8 contract, now in `src/core/types.ts`), and a reader for the
+ * to existing types (now in `src/core/types.ts`), and a reader for the
  * expected card texts and warnings that sample tree 13 keeps in its comments.
  */
 import { deriveFamilies, type FamilyGraph } from '../../src/core/derive';

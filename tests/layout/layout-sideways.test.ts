@@ -134,9 +134,11 @@ describe('far tags between stacked cards', () => {
 		// 44 × 16 / 14 = 50.3, rounded up.
 		expect(sideTagDepth(geo)).toBe(51);
 		expect(sideTagHit({ x: 90, w: 164 }, 100, Infinity, geo)).toEqual({ x: 8, y: 100, w: 164, h: 51 });
-		// Never less than 44 layout px, at the smallest font.
+		// Never less than 44 layout px, at the smallest font. D330: the smallest font is 12 / 0.85 = 14.1 px, so 44 × 14.1 / 14 = 44.4, rounded up.
 		const small = sidewaysGeometry(geometryFor(8));
-		expect(sideTagDepth(small)).toBe(MIN_HIT);
+		expect(small.fontPx).toBeCloseTo(12 / 0.85, 9);
+		expect(sideTagDepth(small)).toBe(45);
+		expect(sideTagDepth(small)).toBeGreaterThanOrEqual(MIN_HIT);
 	});
 
 	it('the gap below a tagged card holds the whole hit area and one routed leg (sample tree 7)', () => {
@@ -184,7 +186,7 @@ unions:
 		}
 	});
 
-	// WP-4b (class c, D239 V1/V2; a checker is changed only with a proof that it was wrong, the decision notes "0.3.1"): under the rule TIGHT every couple that does not stand side by side is far and has no line, so
+	// WP-4b (class c, D239 V1/V2, a checker is changed only with a proof that it was wrong): under the rule TIGHT every couple that does not stand side by side is far and has no line, so
 	// since the switch no line crosses a column there (0 of 724 tags in 150 random trees; the old code had 20 or more). The check below is kept for
 	// TIGHT and run too under a rule that leaves near couples across columns ({1 card width, 1 generation}: 40 crossings in the same 150 trees,
 	// and the spec default: 28), so the count of crossings that it needs is met without weakening a single assertion.

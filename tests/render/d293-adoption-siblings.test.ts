@@ -55,11 +55,11 @@ function check(source: string, a: string, b: string, want: { ab: string; ba: str
 }
 
 describe('D293: two legal parents through an adoption', () => {
-	it('each adopted by the partner of the birth parent of the other: adoptive siblings, not half (V5)', () => {
+	it('each adopted by the partner of the birth parent of the other: adoptive siblings, not half', () => {
 		check(block([PIA, FENN]), 'pia', 'fenn', { ab: 'Adoptive brother', ba: 'Adoptive sister' });
 	});
 
-	it('the same with a man and a woman (V1)', () => {
+	it('the same with a man and a woman', () => {
 		check(block([PIA, FENN], { wren: 'm' }), 'pia', 'fenn', { ab: 'Adoptive brother', ba: 'Adoptive sister' });
 	});
 
@@ -68,12 +68,12 @@ describe('D293: two legal parents through an adoption', () => {
 		check(src, 'pia', 'fenn', { ab: 'Adoptive half-brother', ba: 'Adoptive half-sister' });
 	});
 
-	it('a man and a woman: a sibling who is only the step-parent\'s child stays half (V2)', () => {
+	it('a man and a woman: a sibling who is only the step-parent\'s child stays half', () => {
 		const src = block([PIA, '{id: q, name: Quin, sex: m, parents: [calla]}'], { wren: 'm' });
 		check(src, 'pia', 'q', { ab: 'Adoptive half-brother', ba: 'Adoptive half-sister' });
 	});
 
-	it('a child of both partners and Pia share two legal parents: Brother, because they share a birth parent (V3)', () => {
+	it('a child of both partners and Pia share two legal parents: Brother, because they share a birth parent', () => {
 		check(block([PIA, '{id: y, name: Yan, sex: m, parents: [wren, calla]}']), 'pia', 'y', { ab: 'Brother', ba: 'Sister' });
 	});
 
@@ -94,17 +94,17 @@ describe('D293: two legal parents through an adoption', () => {
 		});
 	});
 
-	it('both children list both partners as birth parents: Brother (V6, unchanged)', () => {
+	it('both children list both partners as birth parents: Brother (unchanged)', () => {
 		const src = block(['{id: pia, name: Pia, sex: f, parents: [wren, calla]}', '{id: fenn, name: Fenn, sex: m, parents: [calla, wren]}']);
 		check(src, 'pia', 'fenn', { ab: 'Brother', ba: 'Sister' });
 	});
 
-	it('both children adopted by both, one of them by birth too: Adoptive brother (V7, unchanged)', () => {
+	it('both children adopted by both, one of them by birth too: Adoptive brother (unchanged)', () => {
 		const src = block(['{id: pia, name: Pia, sex: f, parents: [{id: wren, type: adoptive}, {id: calla, type: adoptive}]}', '{id: fenn, name: Fenn, sex: m, parents: [wren, calla]}']);
 		check(src, 'pia', 'fenn', { ab: 'Adoptive brother', ba: 'Adoptive sister' });
 	});
 
-	it('a full adoption by a couple, with unrelated birth parents listed, stays Adoptive brother (V4)', () => {
+	it('a full adoption by a couple, with unrelated birth parents listed, stays Adoptive brother', () => {
 		const src = [
 			'people:',
 			'  - {id: a1, name: A1, sex: f}',

@@ -9,7 +9,7 @@ import { fontsChanged } from '../render/fonts';
 import { safeSides, safeTop } from '../render/dom/page-reads';
 import { lodClass } from '../render/dom/scene';
 import { partnersAndChildren, startPerson } from '../render/tree-info';
-import { centreOn, cardShown, centredOpening, chooseLod, bandShift, clearBand, defaultView, embedHeight, fitView, READABLE_NAME_PX, bringInView, betweenSides, resizeView, treeBounds, type FreeArea, type Size, type View } from '../render/view-math';
+import { centreOn, cardShown, centredOpening, chooseLod, bandShift, clearBand, defaultView, embedHeight, fitView, SIDEWAYS_NAME_PX, bringInView, betweenSides, resizeView, treeBounds, type FreeArea, type Size, type View } from '../render/view-math';
 import type { BlockState } from '../view/block-state';
 import { badgeTap, clearToolbar, finderFirstView, finderOrientation, focusView, keepTopCardWhole, orientationFor, parentsAbove, sidewaysView, signRights } from '../view/focus-mode';
 import type { FinderDrawn } from '../view/render-plan';
@@ -398,7 +398,7 @@ export abstract class TreeViewPlacement extends TreeViewLifecycle {
 		).view);
 		// D222: a whole tree that fits between the bars opens centred there, at the same 14 px names. A focus family keeps its view (D18: the person near the top).
 		// D246 F3 starts from the 14 px names; the smaller names of V4 are for a tree that is not centred.
-		const small = this.focusId === null ? this.centredSmall(size, READABLE_NAME_PX / (laid.layout.geometry.fontPx > 0 ? laid.layout.geometry.fontPx : 16)) : null;
+		const small = this.focusId === null ? this.centredSmall(size, SIDEWAYS_NAME_PX / (laid.layout.geometry.fontPx > 0 ? laid.layout.geometry.fontPx : 16)) : null;
 		if (small) {
 			this.hintKids = [];
 			return small;
@@ -486,7 +486,7 @@ export abstract class TreeViewPlacement extends TreeViewLifecycle {
 	/** The saved view of the drawn family in the drawn orientation (D24: kept per orientation), or null. */
 	protected savedView(st: BlockState): View | null {
 		const s = st.views[this.orientation];
-		return s && s.viewFor === this.drawnKey ? s.view : null;
+		return s?.viewFor === this.drawnKey ? s.view : null;
 	}
 
 	/**

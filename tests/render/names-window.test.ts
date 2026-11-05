@@ -8,7 +8,7 @@ import { cycleNote, eraNote } from '../support/calendar-vault';
 import { useFakeDom } from '../support/fake-dom-setup';
 
 /*
- * Spec §14 rule 16 (WP-6 step 3): the Calendars window with folding sections, the list editor, the plain years, and the refusals that open their section. The real window on a fake
+ * Spec §14 rule 16: the Calendars window with folding sections, the list editor, the plain years, and the refusals that open their section. The real window on a fake
  * vault. The look (44 px targets, light and dark) is checked in the harness, not here.
  */
 

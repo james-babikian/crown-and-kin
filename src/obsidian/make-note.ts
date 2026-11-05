@@ -27,6 +27,7 @@ import { sameBody } from '../core/block-match';
 import { linkedNotePath, personNoteName } from '../core/note-make';
 import { NOTE_UI } from '../render/ui-text';
 import type { Handle, Written } from './block-handle';
+import { mediaMatches } from '../render/dom/page-reads';
 import { isPhoneWindow } from '../view/focus-mode';
 import { freeName, makeNote, namesIn } from './table-note';
 import { vaultPath } from './vault-path';
@@ -208,7 +209,7 @@ function link(app: App, file: TFile, sourcePath: string): string {
  */
 export async function openMadeNote(app: App, file: TFile): Promise<void> {
 	const win = typeof window !== 'undefined' ? window : undefined;
-	const coarse = !!win?.matchMedia?.('(pointer: coarse)').matches;
+	const coarse = win !== undefined && mediaMatches(win, '(pointer: coarse)');
 	const phone = isPhoneWindow(coarse, win?.innerWidth ?? 1024, win?.innerHeight ?? 768);
 	await app.workspace.getLeaf(phone ? false : 'tab').openFile(file);
 }

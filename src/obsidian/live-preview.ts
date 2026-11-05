@@ -12,6 +12,7 @@
 import type { Extension } from '@codemirror/state';
 import type { EditorView, ViewUpdate } from '@codemirror/view';
 import { findBlocks } from '../core/block-locate';
+import { guarded } from './start-guard';
 
 /** The two functions of @codemirror/language that this file uses. */
 interface Language {
@@ -85,11 +86,7 @@ export class TallBlockParser {
 		// Dispatching from inside an update is not allowed; wait for the next task.
 		this.timer = window.setTimeout(() => {
 			this.timer = 0;
-			try {
-				this.run();
-			} catch (e) {
-				console.error('Crown and Kin: cannot prepare the tree in Live Preview', e);
-			}
+			guarded('cannot prepare the tree in Live Preview', () => this.run());
 		}, delay);
 	}
 

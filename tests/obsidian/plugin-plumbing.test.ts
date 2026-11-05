@@ -41,7 +41,7 @@ import { noticeList, resetObsidian, settingRows, type Plugin as FakePlugin, type
 import { fakeApp, fakeHandle } from '../acceptance/tree-view-fakes';
 import { useFakeDom } from '../support/fake-dom-setup';
 
-/* Review 0.1.1 area E, findings 7, 8 and 9 (the decision notes "Version 0.1.1", area E rulings). */
+/* Review 0.1.1 area E, findings 7, 8 and 9 (area E rulings). */
 
 useFakeDom({ window: true });
 
@@ -79,7 +79,7 @@ async function typeText(text: TextComponent, value: string): Promise<void> {
 	}
 }
 
-describe('the desktop height field (finding 9)', () => {
+describe('the desktop height field', () => {
 	it('stores the value 400 ms after the last key press, once', async () => {
 		const { plugin, fake } = await loadPlugin();
 		const { text } = heightField(fake);
@@ -128,7 +128,7 @@ describe('the desktop height field (finding 9)', () => {
 	});
 });
 
-describe('the Undo Notice (finding 8)', () => {
+describe('the Undo Notice', () => {
 	it('is tracked while it shows; after it hides by itself its button does nothing', async () => {
 		const h = fakeHandle('n.md', 'people: []\n');
 		expect(pluginModalOpen()).toBe(false);
@@ -157,7 +157,7 @@ describe('the Undo Notice (finding 8)', () => {
 	});
 });
 
-describe('rename events and the plugin load (finding 7)', () => {
+describe('rename events and the plugin load', () => {
 	it('after the load, a rename waits for its link update with the stored setting; the handles follow a rename at any time', async () => {
 		const app = fakeApp();
 		Object.assign(app.vault, { getMarkdownFiles: () => [], getAbstractFileByPath: () => null });

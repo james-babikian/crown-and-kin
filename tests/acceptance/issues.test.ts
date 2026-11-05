@@ -51,7 +51,7 @@ describe('fixture 5 (malformed): spec §8, §10 item 5', () => {
 		{ code: 'cycle', level: 'warning', exactIds: ['arn', 'bram', 'col'] },
 		{ code: 'placement-without-parents', level: 'warning', ids: ['piers'], params: { placement: 'ward' } },
 		{ code: 'house-color-null', level: 'warning' },
-		// Unknown values. D188 item 12 (0.2.8): the unknown partnership word `handfasting` gives no warning (it is drawn
+		// Unknown values. D188 item 12: the unknown partnership word `handfasting` gives no warning (it is drawn
 		// as a marriage), so there is no `unknown-union-type` here. Only a near-typo warns (tested below).
 		{ code: 'unknown-placement', level: 'warning', ids: ['tilda'], params: { value: 'fostered' } },
 		{ code: 'unknown-parent-type', level: 'warning', ids: ['edda'], params: { value: 'godfather' } },

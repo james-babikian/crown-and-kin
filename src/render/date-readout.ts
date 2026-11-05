@@ -5,7 +5,7 @@
  * match shows the warning of rule 5 after it, and a date with name lists (spec §14 rule 15) gets one sentence for each list, "Planets: Saturn.", after the year; a whole
  * plain year with a plain-year list has this line too. A written name that is wrong for its year adds the sentence of the mismatch. The line shows the full names, also when the
  * cards show the short form. The line is not a warning of the tree. The sentence of a wrong written name is a separate part (`dateReadoutParts`), because the windows
- * show it on a text line of its own with a warning mark. Pure; the texts are in `calendar-text.ts`.
+ * show it on a text line of its own with a warning mark. A date with no year can also say that the line of succession does not use it (`succession`). Pure; the texts are in `calendar-text.ts`.
  */
 
 import { nameMismatches, type ReadDate } from '../core/dates';
@@ -51,11 +51,13 @@ const sentenceText = (list: readonly Sentence[]): string => list.map((x) => x.te
  * `text` is the field as typed: an empty field gives no line. The read comes from the reader of the tree (`TreeDates.read`), which reads a draft text as well
  * as a saved one. `ready` is the `ready` of that reader.
  */
-export function dateReadoutParts(text: string, r: ReadDate | undefined, ready = true): ReadoutParts {
+export function dateReadoutParts(text: string, r: ReadDate | undefined, ready = true, o: { succession?: boolean } = {}): ReadoutParts {
 	if (text.trim() === '') return plainParts('');
 	// A reader that is not ready reads plain years only: "No year found" would be wrong for a date that a calendar will read.
 	if (!ready) return plainParts('');
-	if (!r) return plainParts(T.noYear);
+	// D330 UX-10: a date with no year is skipped by the line of succession, when the tree has one; the line says so after "No year found".
+	const noYear = plainParts(o.succession ? `${T.noYear} ${T.noYearSuccession}` : T.noYear);
+	if (!r) return noYear;
 	if (r.samePlace) return plainParts(T.samePlace);
 	const names = [...(r.calendar !== undefined ? [r.calendar] : []), ...(r.also ?? [])];
 	if (r.warnings.includes('fits-two-calendars')) return plainParts(T.fitsTwo(names));
@@ -71,7 +73,7 @@ export function dateReadoutParts(text: string, r: ReadDate | undefined, ready = 
 		const all = nameSentences(r);
 		return { reading: sentenceText(all.filter((x) => !x.warning)), warning: sentenceText(all.filter((x) => x.warning)) };
 	}
-	return plainParts(T.noYear);
+	return noYear;
 }
 
 /** The line as one text: the two parts of `dateReadoutParts` with a space between; '' when no line shows. */

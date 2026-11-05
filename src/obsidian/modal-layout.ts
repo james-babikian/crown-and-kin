@@ -48,10 +48,66 @@ function readKeyboard(win: Window): number {
  * no longer takes it off the screen: the lower half pops away at the end. So `close()` first stops the window from
  * following the visible area and makes its box as tall as the tallest visible area seen. The extra room is padding at
  * the bottom, so the content keeps its size and does not reflow; the slide then takes the whole box off the screen.
+ *
+ * Scroll place (UX-18): a window that closes over another window of the plugin leaves that window where it was (`keepScrollPlace`).
  */
 export function phoneLayout(modal: Modal, onLayout?: () => void, holdAtClose = true): () => void {
+	const keep = keepScrollPlace(modal.modalEl);
+	const stop = followVisibleArea(modal, onLayout, holdAtClose);
+	return () => {
+		stop();
+		keep();
+	};
+}
+
+/** The windows of the plugin that called `phoneLayout` and have not closed, oldest first. */
+const OPEN_WINDOWS: HTMLElement[] = [];
+
+/** The part of a window that scrolls. */
+function scrollerOf(modalEl: HTMLElement): HTMLElement | null {
+	return modalEl.querySelector<HTMLElement>('.dynasty-sheet-body');
+}
+
+/**
+ * UX-18: when this window closes over windows that were open before it, each of them keeps the scroll place it has when the close ends. The focus
+ * that returns to a control, or a layout that settles, can move a covered window by some hundreds of pixels (a sheet moved 230 px when the partnership
+ * window closed). The place is set again at once and after 0 and 120 ms, and no more once the user scrolls or presses a key. Returns the function the
+ * window calls when it closes. A scroll that the covered window made on purpose before the close is kept, because the place is read at the close.
+ */
+function keepScrollPlace(modalEl: HTMLElement): () => void {
+	const below = OPEN_WINDOWS.slice();
+	OPEN_WINDOWS.push(modalEl);
+	return () => {
+		const at = OPEN_WINDOWS.indexOf(modalEl);
+		if (at >= 0) OPEN_WINDOWS.splice(at, 1);
+		const places = below.filter((m) => m.isConnected).map((m) => ({ m, top: scrollerOf(m)?.scrollTop ?? null }));
+		if (places.every((p) => p.top === null)) return;
+		const win = modalEl.win;
+		let moved = false;
+		const stopKeeping = () => {
+			moved = true;
+		};
+		const events = ['wheel', 'pointerdown', 'keydown', 'touchstart'];
+		for (const { m } of places) for (const e of events) m.addEventListener(e, stopKeeping, true);
+		const restore = () => {
+			if (moved) return;
+			for (const { m, top } of places) {
+				const box = top === null ? null : scrollerOf(m);
+				if (box && top !== null && box.scrollTop !== top) box.scrollTop = top;
+			}
+		};
+		restore();
+		for (const ms of [0, 120]) win.setTimeout(restore, ms);
+		win.setTimeout(() => {
+			for (const { m } of places) for (const e of events) m.removeEventListener(e, stopKeeping, true);
+		}, 200);
+	};
+}
+
+/** Follows the visible area for one window (`phoneLayout`): the `is-phone` class, the size, the keyboard and the close hold; returns the clean-up. */
+function followVisibleArea(modal: Modal, onLayout?: () => void, holdAtClose = true): () => void {
 	const el = modal.modalEl;
-	const win = el.win ?? window;
+	const win = el.win;
 	// The tallest visible height seen, the height now set, and whether a close has started.
 	let tallest = 0;
 	let shown = 0;
@@ -185,7 +241,7 @@ export function revealTarget(control: HTMLElement, modalEl?: HTMLElement): HTMLE
  */
 export function settledReveal(modalEl: HTMLElement, contentEl: HTMLElement, reduced: () => boolean = () => false): { schedule: (delay: number) => void; cancel: () => void } {
 	let timer: number | null = null;
-	const win = modalEl.win ?? window;
+	const win = modalEl.win;
 	const run = () => {
 		timer = null;
 		const a = modalEl.doc.activeElement as HTMLElement | null;
@@ -222,7 +278,7 @@ export function holdTab(modalEl: HTMLElement): () => void {
 		if (e.key !== 'Tab' || e.ctrlKey || e.metaKey || e.altKey || e.isComposing) return;
 		const stops = tabStops(modalEl);
 		if (stops.length === 0) return;
-		const active = modalEl.doc?.activeElement ?? null;
+		const active = modalEl.doc.activeElement ?? null;
 		const at = stops.indexOf(active as HTMLElement);
 		const to = e.shiftKey ? (at <= 0 ? stops.length - 1 : at - 1) : at < 0 || at === stops.length - 1 ? 0 : at + 1;
 		e.preventDefault();
@@ -248,9 +304,9 @@ export function startWithoutFocus(modalEl: HTMLElement): () => void {
 	modalEl.addEventListener('keydown', stop, true);
 	const take = (): void => {
 		if (done || !modalEl.isConnected) return;
-		if (modalEl.doc?.activeElement !== modalEl) modalEl.focus({ preventScroll: true });
+		if (modalEl.doc.activeElement !== modalEl) modalEl.focus({ preventScroll: true });
 	};
 	take();
-	for (const ms of [0, 120]) (modalEl.win ?? window).setTimeout(take, ms);
+	for (const ms of [0, 120]) modalEl.win.setTimeout(take, ms);
 	return stop;
 }

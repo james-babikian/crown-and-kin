@@ -16,6 +16,7 @@ import type { Rect } from '../layout/model';
 import { setArmsGap, setPicture, setSlotProblem, type PictureSlot, type SlotProblem } from '../render/dom/pictures';
 import { MAX_LIVE_PICTURES, livePictureSlots, type Lod } from '../render/view-math';
 import { isProblem, type CopyBox, type PictureCopy, type PictureStore } from './picture-store';
+import { guarded } from './start-guard';
 
 /** The live pictures of one scene. */
 export interface LivePictures {
@@ -62,7 +63,7 @@ interface SlotState {
 }
 
 /** Options of `createLivePictures`. */
-export interface LiveOptions {
+interface LiveOptions {
 	/** Spec §13.13: the selected part of a portrait slot's person (`portraitCropOf`); null or absent = the automatic part. */
 	cropOf?: (s: PictureSlot) => CropFraction | null;
 	/** Hears the number of slots that wait for a copy, after each change (the harness reads it). */
@@ -104,12 +105,7 @@ export function createLivePictures(
 		const r = s.kind === 'arms' && compact ? compact : s.rect;
 		const box: CopyBox = { w: r.w * step, h: r.h * step, fit: s.kind === 'portrait' ? 'portrait' : 'meet', onDevice: true };
 		if (s.kind === 'portrait') {
-			let crop: CropFraction | null = null;
-			try {
-				crop = opts.cropOf?.(s) ?? null;
-			} catch (e) {
-				console.error('Crown and Kin: cannot read the selected part of a portrait', e);
-			}
+			const crop: CropFraction | null = guarded('cannot read the selected part of a portrait', () => opts.cropOf?.(s) ?? null, null);
 			if (crop) box.crop = crop;
 		}
 		return box;
@@ -117,11 +113,7 @@ export function createLivePictures(
 	const keyOf = (file: TFile, box: CopyBox) => `${file.path}\u0000${versions.get(file.path) ?? 0}\u0000${box.w}x${box.h}\u0000${box.fit}${box.crop ? `\u0000${formatPortraitCrop(box.crop)}` : ''}`;
 
 	const tellPending = () => {
-		try {
-			opts.onPending?.(waiting);
-		} catch (e) {
-			console.error('Crown and Kin: cannot report the pictures that wait', e);
-		}
+		guarded('cannot report the pictures that wait', () => opts.onPending?.(waiting));
 	};
 
 	/** Shows `url` in slot `i`, or removes its picture; keeps the count of `<image>` elements. */
@@ -266,13 +258,8 @@ export function createLivePictures(
 		tellPending();
 	};
 
-	const guarded = (what: string, fn: () => void) => {
-		if (destroyed) return;
-		try {
-			fn();
-		} catch (e) {
-			console.error(`Crown and Kin: cannot ${what}`, e);
-		}
+	const whileLive = (what: string, fn: () => void) => {
+		if (!destroyed) guarded(`cannot ${what}`, fn);
 	};
 
 	// The frames of slots whose link already has a problem (a missing file: dashed) show from the start.
@@ -287,21 +274,21 @@ export function createLivePictures(
 
 	return {
 		update(view, lod, step = 1) {
-			guarded('show the pictures', () => {
+			whileLive('show the pictures', () => {
 				last = { view, lod, step };
 				run(view, lod, step, false);
 			});
 		},
 		prime(view, lod, step = 1) {
-			guarded('show the kept pictures', () => run(view, lod, step, true));
+			whileLive('show the kept pictures', () => run(view, lod, step, true));
 		},
 		problem(person, kind) {
-			guarded('show a picture problem', () => {
+			whileLive('show a picture problem', () => {
 				for (let i = 0; i < slots.length; i++) if (slots[i].person === person && slots[i].kind === kind) setProblem(i, 'other');
 			});
 		},
 		refresh(paths) {
-			guarded('show the changed pictures', () => {
+			whileLive('show the changed pictures', () => {
 				for (const p of paths) {
 					versions.set(p, (versions.get(p) ?? 0) + 1);
 					bad.delete(p);
@@ -311,7 +298,7 @@ export function createLivePictures(
 			});
 		},
 		pause() {
-			guarded('stop the pictures', () => {
+			whileLive('stop the pictures', () => {
 				if (paused) return;
 				paused = true;
 				for (const st of states) stopRequest(st);
@@ -319,7 +306,7 @@ export function createLivePictures(
 			});
 		},
 		resume() {
-			guarded('show the pictures', () => {
+			whileLive('show the pictures', () => {
 				if (!paused) return;
 				paused = false;
 				if (last) run(last.view, last.lod, last.step, false);

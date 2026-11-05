@@ -23,7 +23,7 @@ export function rulerLabelOf(g: FamilyGraph, holders: readonly HolderRow[], id: 
 }
 
 /** The sentence of a date warning row of the line (`SuccessionResult.dateWarnings`): the sentence of the warning list of the tree, with the owner of the date named. */
-export function dateWarningText(row: DateWarningRow, g: FamilyGraph, nameOf: (id: string) => string, title: string): string {
+function dateWarningText(row: DateWarningRow, g: FamilyGraph, nameOf: (id: string) => string, title: string): string {
 	if (row.warning === 'calendar-no-anchor') return issueText(codedIssue('calendar-no-anchor', 'warning', { calendar: row.text }));
 	const r = g.dates.read(row.text);
 	const base: IssueParams = { where: row.what, value: row.text, ...(row.id !== undefined ? { person: nameOf(row.id) } : { title }) };

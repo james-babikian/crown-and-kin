@@ -61,7 +61,7 @@ const comments = (body: string) => commentsOf(body).map((c) => c.text);
 const lines = (body: string) => body.split('\n');
 
 describe('parseCalendarBlock', () => {
-	it('reads the block of the owner\'s doc', () => {
+	it('reads the block of the user\'s doc', () => {
 		const { calendars: cals, issues } = parseCalendarBlock(DOC, 'Calendars.md', 0);
 		expect(issues).toEqual([]);
 		expect(cals).toEqual([

@@ -161,7 +161,7 @@ describe('§14 r1, r4: Shōwa 64 and Heisei 1 are one year (family history)', ()
 	});
 });
 
-describe('§14 r5: a death date with no year (family history M1)', () => {
+describe('§14 rule 5: a death date with no year', () => {
 	const A = datesApi;
 	const PEOPLE = `  - {id: c1, name: Cora, sex: f, born: 1060, died: "fell in the war", parents: [r]}
   - {id: c2, name: Cade, sex: m, born: 1070, parents: [r]}

@@ -11,7 +11,7 @@ import { fakeApp } from './tree-view-fakes';
 import { useFakeDom } from '../support/fake-dom-setup';
 
 /*
- * 0.4 WP-1d: the settings page from the declarative list of Obsidian 1.13 (`getSettingDefinitions()`) and from the old tab of
+ * 0.4 WP-1d: the settings page from the declarative list of Obsidian 1.13 (`getSettingDefinitions`) and from the old tab of
  * Obsidian 1.11 and 1.12 (`display()`). Both are drawn from the one list in `settings-rows.ts`. The fake Obsidian has the base
  * class of 1.11 (no `getSettingDefinitions`), so the old path runs on it as it runs on 1.11; the declarative path is run by
  * the test as Obsidian 1.13 runs it: a group with a heading and a class, a Setting for each item, and `render` on it.

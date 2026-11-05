@@ -15,10 +15,14 @@ import { showMenu, type MenuEntry } from './window-parts';
 import { personViewItems, viewPerson } from './viewer-sources';
 import { EditSheetBase } from './edit-sheet-base';
 import { SHEET_PORTRAIT_PX } from './edit-sheet-base';
+import { guarded } from './start-guard';
 
 /** The portrait, the personal arms and the links under the header. */
 export abstract class EditSheetPortrait extends EditSheetBase {
-	/** The short menu of the portrait and the personal arms (D198 Q6H A). It starts with View portrait or View arms (D256); a window that cannot change the note opens the viewer at once. A new person has no portrait yet. */
+	/**
+	 * The short menu of the portrait and the personal arms (D198 Q6H A, D256 item 1, D330 UX-19): View portrait or View arms first, then Select portrait and Select
+	 * personal arms, Select the part, and the two removals, with a line between the groups. A window that cannot change the note opens the viewer at once. A new person has no portrait yet.
+	 */
 	protected pictureMenu(anchor: HTMLElement): void {
 		const kit = { app: this.app, pictures: this.o.pictures, sourcePath: this.o.sourcePath, g: this.data.g, person: this.data.person, draft: this.draft };
 		if (this.readOnly) return viewPerson(kit, anchor);
@@ -28,11 +32,16 @@ export abstract class EditSheetPortrait extends EditSheetBase {
 		}
 		const link = this.draft.portrait.trim();
 		const p = link ? this.portraitFor(link) : null;
-		const items: (MenuEntry | 'sep')[] = [...personViewItems(kit, anchor), { icon: 'image', label: PICTURES_UI.selectPortrait, run: () => void this.selectPortrait() }];
+		const select: MenuEntry[] = [
+			{ icon: 'image', label: PICTURES_UI.selectPortrait, run: () => void this.selectPortrait() },
+			{ icon: 'shield', label: WINDOW_UI.selectPersonalArms, run: () => void this.selectArms() },
+		];
+		const look: MenuEntry[] = personViewItems(kit, anchor).filter((x): x is MenuEntry => x !== 'sep');
+		// Shown once the portrait can show; a picture with a problem has no part to select.
+		const part: MenuEntry[] = link && p && p.path !== null && p.problem === null ? [{ icon: 'crop', label: WINDOW_UI.selectPart, run: () => void this.selectPart() }] : [];
+		const remove: MenuEntry[] = [];
 		if (link) {
-			// Shown once the portrait can show; a picture with a problem has no part to select.
-			if (p && p.path !== null && p.problem === null) items.push({ icon: 'crop', label: WINDOW_UI.selectPart, run: () => void this.selectPart() });
-			items.push({
+			remove.push({
 				icon: 'trash-2',
 				label: PICTURES_UI.removePortrait,
 				warning: true,
@@ -44,9 +53,8 @@ export abstract class EditSheetPortrait extends EditSheetBase {
 				},
 			});
 		}
-		items.push('sep', { icon: 'shield', label: WINDOW_UI.selectPersonalArms, run: () => void this.selectArms() });
 		if (this.draft.arms.trim()) {
-			items.push({
+			remove.push({
 				icon: 'trash-2',
 				label: WINDOW_UI.removePersonalArms,
 				warning: true,
@@ -56,6 +64,12 @@ export abstract class EditSheetPortrait extends EditSheetBase {
 					this.head?.arms();
 				},
 			});
+		}
+		const items: (MenuEntry | 'sep')[] = [];
+		for (const group of [look, select, part, remove]) {
+			if (group.length === 0) continue;
+			if (items.length) items.push('sep');
+			items.push(...group);
 		}
 		showMenu(anchor, items);
 	}
@@ -72,9 +86,14 @@ export abstract class EditSheetPortrait extends EditSheetBase {
 		const link = this.draft.portrait.trim();
 		const p = link ? this.portraitFor(link) : null;
 		const name = this.shownName();
-		const key = [p?.copy?.url ?? '', p?.loading ? 'l' : '', p?.missing ? 'm' : '', name, p?.problem ?? ''].join('|');
+		// The name is not in the key: a key in the name field only changes the label, and the picture stays as it is.
+		const key = [p?.copy?.url ?? '', p?.loading ? 'l' : '', p?.missing ? 'm' : '', p?.problem ?? ''].join('|');
 		const host = this.problemEl;
-		if (key === this.portraitKey && frame.hasClass('is-painted')) return;
+		const label = WINDOW_UI.portraitOf(name || WINDOW_UI.thisPersonInSentence);
+		if (key === this.portraitKey && frame.hasClass('is-painted')) {
+			if (frame.getAttribute('aria-label') !== label) frame.setAttribute('aria-label', label);
+			return;
+		}
 		this.portraitKey = key;
 		frame.addClass('is-painted');
 		frame.empty();
@@ -89,7 +108,7 @@ export abstract class EditSheetPortrait extends EditSheetBase {
 			// D213: no picture, no circle. The text link "Add portrait" (saved person) is the way to add one; a problem shows in the text under the header.
 			frame.addClass('is-none');
 		}
-		frame.setAttribute('aria-label', WINDOW_UI.portraitOf(name || WINDOW_UI.thisPersonInSentence));
+		frame.setAttribute('aria-label', label);
 		this.paintAddPortrait();
 		const text = p?.problem ?? null;
 		if (!host) return;
@@ -103,9 +122,8 @@ export abstract class EditSheetPortrait extends EditSheetBase {
 	}
 
 	/**
-	 * D209 item 5, D218 item 8: "Add portrait or arms", a small text link at the left of the row of "Open all". Only a saved person that can
-	 * change has it, and only while the person has no portrait. Its tap opens the picture menu (Select portrait, Select personal arms), so the
-	 * arms stay reachable for a person with no portrait. A person with personal arms already sees "Add portrait".
+	 * D209 item 5, D218 item 8, D330 UX-19: a small text link at the left of the row of "Open all". Only a saved person that can change has it. It says
+	 * "Add portrait or arms" while the person has neither, and "Portrait and arms" once a portrait or personal arms exist. Its tap opens the picture menu.
 	 */
 	protected addPortraitLink(row: HTMLElement | null): void {
 		this.addPortraitEl = null;
@@ -144,24 +162,19 @@ export abstract class EditSheetPortrait extends EditSheetBase {
 	protected paintAddPortrait(): void {
 		const link = this.addPortraitEl;
 		if (!link) return;
-		link.setText(this.draft.arms.trim() ? WINDOW_UI.addPortraitHasArms : WINDOW_UI.addPortrait);
-		const hold = link === link.doc.activeElement;
-		const show = this.portraitFrame?.hasClass('is-none') === true;
-		link.toggle(show);
-		// A hidden control cannot keep the focus: it would drop to the page, outside the window. The portrait takes its place.
-		if (hold && !show) this.portraitFrame?.focus({ preventScroll: true });
+		link.setText(this.draft.portrait.trim() || this.draft.arms.trim() ? WINDOW_UI.portraitAndArms : WINDOW_UI.addPortrait);
 	}
 
 	/**
-	 * When the picture picker closes, the focus is on the page or on the hidden "Add portrait" link: the link hides itself when a portrait
-	 * is chosen. This moves the focus to the portrait (`data-focus="portrait"`) unless it is already inside the window.
+	 * When the picture picker closes, the focus is on the page. This moves it to the round portrait (`data-focus="portrait"`) when there is one, else to the
+	 * link that opened the menu, unless it is inside the window already.
 	 */
 	protected focusPortraitIfLost(): void {
 		const frame = this.portraitFrame;
-		if (!frame || !this.shown || frame.hasClass('is-none')) return;
+		if (!frame || !this.shown) return;
 		const active = frame.doc.activeElement;
-		const lost = !active || active === frame.doc.body || !this.modalEl.contains(active) || active === this.addPortraitEl;
-		if (lost) frame.focus({ preventScroll: true });
+		if (active && active !== frame.doc.body && this.modalEl.contains(active)) return;
+		(frame.hasClass('is-none') ? this.addPortraitEl : frame)?.focus({ preventScroll: true });
 	}
 
 	/**
@@ -174,11 +187,7 @@ export abstract class EditSheetPortrait extends EditSheetBase {
 		const hit = (p.path !== null && paths.includes(p.path)) || p.missing || p.waiting;
 		if (!hit) return;
 		this.dropPortrait();
-		try {
-			this.paintPortrait();
-		} catch (e) {
-			console.error('Crown and Kin: cannot show the portrait', e);
-		}
+		guarded('cannot show the portrait', () => this.paintPortrait());
 	}
 
 	/** The sheet's portrait state for `link`; starts the copy when the link is new. */

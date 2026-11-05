@@ -10,7 +10,7 @@ import { fixtureNote, topLevelBlocks } from './load';
 
 // The pin (spec §0 D18, §5.6 "Pin", §6.3 actions): Pin focus here writes `options.focus: <id>` as
 // one line and replaces an earlier pin; Remove pin removes that line. Both use the existing
-// `SetOption { key: 'focus' }` op (M5 contract, src/core/focus.ts). Formatting follows §6.2 and
+// `SetOption { key: 'focus' }` op (src/core/focus.ts). Formatting follows §6.2 and
 // The decision notes "Formatting details fixed by the WP2.1 tests": a new key goes before the first
 // later key in the §4.1 order (start, focus, generations, height), else after the map's last
 // entry; unknown keys never decide the position; a missing `options` goes first with one blank

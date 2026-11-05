@@ -1,7 +1,7 @@
 /* The break list of the settings tab (D118): a wide field, and 16 px text on a touch screen like the other fields. */
 .dynasty-settings .dynasty-setting-break-words {
 	/* The box has several text lines: a pill radius of a theme must not cut the text. */
-	border-radius: min(var(--input-radius, 8px), 12px);
+	border-radius: var(--dynasty-radius-area);
 	width: 18em;
 	max-width: 100%;
 	resize: vertical;
@@ -10,6 +10,11 @@
 @media (pointer: coarse), (max-width: 599px) {
 	.dynasty-settings textarea {
 		font-size: max(16px, var(--font-ui-medium));
+	}
+
+	/* CH-12: on a phone the box is as wide as the fields near it; the computer keeps its 18 em in the right column. */
+	.dynasty-settings .dynasty-setting-break-words {
+		width: 100%;
 	}
 }
 

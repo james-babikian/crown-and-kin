@@ -15,7 +15,7 @@ import { TFile } from 'obsidian';
 import { findBlocks } from '../../src/core/block-locate';
 import { HandleRegistry } from '../../src/obsidian/block-handle';
 
-/* O3 (0.2.4): `modified` reads a note only when a handle holds it; a watcher is told in both cases. */
+/* O3: `modified` reads a note only when a handle holds it; a watcher is told in both cases. */
 
 const text = ['```kin', 'people:', '  - id: p', '    name: Alys', '```', ''].join('\n');
 

@@ -17,7 +17,7 @@ const dropTo = (paths: EdgePath[], child: string, siblings: string[] = []) =>
 const kinds = (paths: EdgePath[]) => [...new Set(paths.map((p) => p.kind))].sort();
 
 /**
- * WP-4b (class c, the architecture notes §4.2.1 "ports"; the helper `hangsFrom` of ./paths assumed that a child's drop lands on the centre of its card): a child's drop lands on a
+ * WP-4b (class c, the architecture notes §4.2.1 "ports"; the helper `hangsFrom` of./paths assumed that a child's drop lands on the centre of its card): a child's drop lands on a
  * port of the top edge of its card, which need not be the centre (an only child under a trunk at x 134 on a card whose centre is 98). This is `hangsFrom` with
  * the x of the drop itself: True if the drop's top lies on a horizontal run (the sibling bar or the trunk) of a line that leaves the dot of this union.
  */
@@ -160,7 +160,7 @@ describe('line styles of families: spec §5.3', () => {
 	});
 });
 
-describe('lines to children placed under adoptive or ward parents: spec §5.3, the decision notes', () => {
+describe('lines to children placed under adoptive or ward parents: spec §5.3', () => {
 	it('a child placed under adoptive parents: its drop (and the only-child trunk) are adoptive', () => {
 		const { edges } = layOut(
 			lines(

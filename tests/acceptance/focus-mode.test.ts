@@ -1,9 +1,10 @@
+import { READABLE_NAME_PX } from '../../src/render/view-math';
 import { describe, expect, it, vi } from 'vitest';
 import type { Rect } from '../../src/layout/model';
 import { chooseFocus, focusView, isPhoneWindow, type FocusFacts } from '../../src/view/focus-mode';
 
 /*
- * The pure rules of focus mode (WP5.2, src/view/focus-mode.ts), from spec §5.5, §5.6, §7,
+ * The pure rules of focus mode (src/view/focus-mode.ts), from spec §5.5, §5.6, §7,
  * D18, D20 and the decision notes "M5 — Focus mode and scale":
  * - which focus a view shows: the session focus of the block (Show all people = none), then the
  *   pin, then on a phone the start person's family of a large tree, else the whole tree; a
@@ -35,7 +36,7 @@ function facts(o: Partial<Omit<FocusFacts, 'has' | 'large' | 'start'>> & { large
 	return { f, large, start };
 }
 
-describe('chooseFocus: session focus > pin > phone rule > whole tree (the decision notes M5, D18, D20)', () => {
+describe('chooseFocus: session focus > pin > phone rule > whole tree (D18, D20)', () => {
 	it('a session focus wins over the pin and the phone rule', () => {
 		const { f, large, start } = facts({ session: { id: 'a' }, pin: 'b', phone: true, large: true });
 		expect(chooseFocus(f)).toMatchObject({ id: 'a', from: 'session', dropSession: false });
@@ -126,7 +127,7 @@ describe('chooseFocus: session focus > pin > phone rule > whole tree (the decisi
 
 // ---------- isPhoneWindow ----------
 
-describe('isPhoneWindow: a coarse pointer and a window whose shorter side is under 600 px (§7, the decision notes M5)', () => {
+describe('isPhoneWindow: a coarse pointer and a window whose shorter side is under 600 px (§7)', () => {
 	it('phone in portrait and in landscape', () => {
 		expect(isPhoneWindow(true, 390, 844)).toBe(true);
 		expect(isPhoneWindow(true, 844, 390)).toBe(true);
@@ -185,7 +186,7 @@ describe('focusView: the first view of a focus tree (§5.6, D18)', () => {
 		const parent = card(2000, 404);
 		const child = card(2000, 732);
 		const v = focusView(bounds, PHONE, 16, focus, 0, [child]);
-		expect(v.scale * 16).toBeCloseTo(14, 6);
+		expect(v.scale * 16).toBeCloseTo(READABLE_NAME_PX, 6);
 		const s = on(v, PHONE);
 		expect(s.x(focus.x + focus.w / 2)).toBeCloseTo(PHONE.w / 2, 6);
 		expect(s.y(focus.y + focus.h / 2)).toBeCloseTo(PHONE.h / 2, 6);
@@ -213,13 +214,13 @@ describe('focusView: the first view of a focus tree (§5.6, D18)', () => {
 		expect(s.y(focus.y + focus.h / 2)).toBeCloseTo(PHONE.h / 2, 6);
 	});
 
-	it('children far to one side: the focus card stays whole and a whole child shows beside it (the decision notes WP5.2)', () => {
+	it('children far to one side: the focus card stays whole and a whole child shows beside it', () => {
 		const bounds = { x: 0, y: 0, w: 4000, h: 1200 };
 		const focus = card(2000, 568);
 		// At 14 px names a 390 px phone shows about 445 layout px: the child 200 px right of the focus card fits beside it.
 		const child = card(2200, 732);
 		const v = focusView(bounds, PHONE, 16, focus, 0, [child]);
-		expect(v.scale * 16).toBeCloseTo(14, 6);
+		expect(v.scale * 16).toBeCloseTo(READABLE_NAME_PX, 6);
 		expect(whole(v, PHONE, focus)).toBe(true);
 		expect(whole(v, PHONE, child)).toBe(true);
 	});
@@ -241,6 +242,6 @@ describe('focusView: the first view of a focus tree (§5.6, D18)', () => {
 
 	it('another font size: still 14 px names on screen', () => {
 		const v = focusView({ x: 0, y: 0, w: 4000, h: 1200 }, PHONE, 20, card(2000, 568), 0, []);
-		expect(v.scale * 20).toBeCloseTo(14, 6);
+		expect(v.scale * 20).toBeCloseTo(READABLE_NAME_PX, 6);
 	});
 });

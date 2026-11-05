@@ -7,7 +7,7 @@ import { parseDynasty } from '../../src/core/parse';
 import * as edit from '../../src/core/yaml-edit';
 import { replaceOnce } from './golden';
 
-// Insert family tree (spec §5.9, D34; the decision notes "M6 design gate", Insert): the command inserts
+// Insert family tree (spec §5.9, D34, Insert): the command inserts
 // an empty tree whose body is only a help comment, and the note shows "Add first person". The
 // core part: that body parses as an empty tree with no problem, and `add-person` on it keeps the
 // comment (§6.2: comments survive). The comment's wording belongs to WP6.3; these tests use a

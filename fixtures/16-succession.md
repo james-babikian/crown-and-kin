@@ -10,7 +10,7 @@ The line of succession of version 0.2.7 (spec §13.21, decisions D170 to D188). 
 - Three marriages (Bertram and Cecily, Bram and Wenna, Edith and Pell) are listed in `unions`, so the tree has partnership dots. The other children have one parent in the tree. The second parent of a child never changes a line here.
 - The tree has no warning.
 
-The comments under each title give the expected result (read by `tests/acceptance/r027-sample-16.test.ts`), for the setting "Length of the line of succession" at its default of 5 people and the setting "Warn about people older than" at its default of 110 years:
+The comments under each title give the expected result (read by `tests/acceptance/sample-16-succession-note.test.ts`), for the setting "Length of the line of succession" at its default of 5 people and the setting "Warn about people older than" at its default of 110 years:
 
 - `# ruler:` the id of the person that the line follows, and `# year:` the year of the line (`now`, or the year with `(field)` for a Year field, or `(reign end)`).
 - `# line:` the ids of the heirs, in order (`none` for no heir), and `# more:` `yes` when the line has more people than the setting shows.

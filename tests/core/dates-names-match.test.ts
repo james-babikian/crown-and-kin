@@ -1,4 +1,4 @@
-// Spec §14 rules 13 and 14 (WP-6 step 1): marker places in a format (the optional group), written names, whole dates and the
+// Spec §14 rules 13 and 14: marker places in a format (the optional group), written names, whole dates and the
 // names of a date that two calendars read.
 import { describe, expect, it } from 'vitest';
 import { checkCalendars, checkFormat, compileCalendars, markerValid, nameMismatches, normalizeMarker, plainWhole, type Calendar, type NameList } from '../../src/core/dates';

@@ -107,7 +107,7 @@ describe('validateTree: values', () => {
 		]);
 	});
 
-	it('any sex value is valid and kept; only the spellings of contract 0.2.7 J.4 give the warning sex-spelling (D12, K.9)', () => {
+	it('any sex value is valid and kept; only the known wrong spellings give the warning sex-spelling (D12)', () => {
 		const src = `people:\n${p('a', '    sex: m\n')}${p('b', '    sex: f\n')}${p('c', '    sex: x\n')}${p('d', '    sex: M\n')}${p('e', '    sex: nonbinary\n')}${p('f', '    sex: 3\n')}`;
 		const g = deriveFamilies(tree(src));
 		// `M` is the only spelling here: one warning, naming D with the written value; every value stays as written.
@@ -181,7 +181,7 @@ describe('deriveFamilies: issue order', () => {
 	});
 });
 
-describe('deriveFamilies: couple keys (review F1)', () => {
+describe('deriveFamilies: couple keys', () => {
 	it('does not throw on ids with a lone surrogate, for listed and implicit unions', () => {
 		expect(() => all('people:\n  - id: "\uD800"\n  - id: c\nunions:\n  - partners: ["\uD800", c]\n')).not.toThrow();
 		expect(() => all('people:\n  - id: "\uDC00"\n  - id: c\n  - id: k\n    parents: ["\uDC00", c]\n')).not.toThrow();

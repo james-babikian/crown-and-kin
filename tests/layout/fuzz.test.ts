@@ -14,8 +14,8 @@ import { geometryFor } from '../../src/layout/geometry';
 import { layoutTree } from '../../src/layout/index';
 import type { LayoutSettings } from '../../src/layout/model';
 import { allFixtures } from '../acceptance/load';
-import { exifSegment, isoFile, jpegHead, pngHead, type PictureSets, type PicturesModule } from '../acceptance/m9-support';
-import type { CropModule, FoldsModule } from '../acceptance/m10-support';
+import { exifSegment, isoFile, jpegHead, pngHead, type PictureSets, type PicturesModule } from '../acceptance/picture-sample-support';
+import type { CropModule, FoldsModule } from '../acceptance/fold-note-crop-support';
 import { linkTargets } from '../../src/core/link-rewrite';
 import { CROP_TEXTS, PICTURE_TEXTS, SPECIAL_IDS, TITLE_IDS, fail, mutate, section } from '../support/mutate';
 import { Rng, hash32 } from '../support/rng';
@@ -25,25 +25,25 @@ import { Rng, hash32 } from '../support/rng';
  * (fewer for the large ones, to keep the file near 3 s) and pushed through parse → derive →
  * layout (layout includes edge routing). A hard error is a fine outcome; a throw is not.
  *
- * Focus mode (spec §5.6, M5) runs the same mutated trees through focus subgraph → derive → layout
+ * Focus mode (spec §5.6) runs the same mutated trees through focus subgraph → derive → layout
  * for a few focus ids and generation counts, including ids that name no person.
  *
- * Relation names (spec §13.1, §13.2, M7) run the mutated trees through computeRelations for the
+ * Relation names (spec §13.1, §13.2) run the mutated trees through computeRelations for the
  * mark (`options.me`, which the mutations set to people, nobody, lists and maps) and a few other
  * people, findRelation for random pairs, and lineSubgraph → layout for some of the lines.
  *
- * Titles (spec §13.3–§13.5, M8; §13.0 item 10): the mutations add `titles` sections, holder entries
+ * Titles (spec §13.3–§13.5, §13.0 item 10): the mutations add `titles` sections, holder entries
  * of every shape and `card-title` keys. The pipeline above must pass on them, and a later group also
  * runs card labels, the reign and name helpers, the table note and random title ops on the mutated trees
  * (`src/core/titles.ts`).
  *
- * Pictures (spec §13.0 items 3 and 10, M9): the mutations add `arms` to houses and `portrait` to
+ * Pictures (spec §13.0 items 3 and 10): the mutations add `arms` to houses and `portrait` to
  * people in every written form (and unquoted `![[…]]` text, amendment A3). The pipeline above must pass
  * on them, and a later group also lays trees out with their picture sets (`pictureSets`), runs the pure
  * picture helpers (`src/core/pictures.ts`) on the values and on damaged headers, and applies random
  * picture ops.
  *
- * Portrait crop and folds (spec §13.0 item 10, §13.10, §13.13, M10): the mutations add `portrait-crop`
+ * Portrait crop and folds (spec §13.0 item 10, §13.10, §13.13): the mutations add `portrait-crop`
  * to people (three numbers, commas, exponents, lists, maps, empty and garbage), and the last group
  * runs the fold functions (families, hidden people, controls, tags, pruned graph, folds to open, folds
  * that end) on random sets of fold keys, valid and made up, and lays the folded trees out; it also runs
@@ -256,7 +256,7 @@ describe('fuzz: relation names and the finder never throw (spec §13.1, §13.2, 
 	}
 });
 
-// --- Titles (M8) ---------------------------------------------------------
+// --- Titles ---------------------------------------------------------
 
 interface TitlesHelpers {
 	cardLabels: typeof TitlesModule.cardLabels;
@@ -374,7 +374,7 @@ describe('fuzz: titles, card labels and title ops never throw (spec §13.3–§1
 	}
 });
 
-// --- Pictures (M9) -------------------------------------------
+// --- Pictures -------------------------------------------
 
 // Variable paths, like the titles group.
 const PICTURES_PATH = '../../src/core/pictures';
@@ -528,7 +528,7 @@ describe('fuzz: arms, portraits, picture helpers and picture ops never throw (sp
 	}
 });
 
-// --- Folds and the portrait crop (M10) -------------------------------------
+// --- Folds and the portrait crop -------------------------------------
 
 const FOLDS_PATH = '../../src/core/folds';
 const CROP_PATH = '../../src/core/portrait-crop';
@@ -741,7 +741,7 @@ describe('fuzz: fold sets, the pruned graph, the folded layout, the crop helpers
 	}
 });
 
-// --- Sobriquet (D122, 0.2.4) ---------------------------------------------------------
+// --- Sobriquet (D122) ---------------------------------------------------------
 
 const SOBRIQUET_TEXTS = ['the Wise', '“the Wise”', '"the Wise"', '‘Fox’', '“the ‘Wise’ one”', '„der Weise“', 'the  Old\tOne', '#1', 'a: b', '[x]', '- x', '"', "it's", 'x'.repeat(400), '日本語', '', '   ', 'null', '1066', 'true'];
 const SOBRIQUET_RAW: unknown[] = ['the Wise', '“the Wise”', 1066, true, [], ['x'], { a: 1 }, '', null, '  ', '"the Wise"', '‘Fox’', '“a” “b”', 'x'.repeat(2000)];

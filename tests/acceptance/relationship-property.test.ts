@@ -35,7 +35,7 @@ const NAMES = ['Aldric', 'Wynn', 'Maud Harrow', 'Þórr', 'Ysolde', '0042', 'Ser
 
 /**
  * Issues a relationship op must never leave behind (§8). remove-union and delete-person also
- * remove `union:` keys naming a removed union (the decision notes "Relationship-op details"), so
+ * remove `union:` keys naming a removed union, so
  * `missing-union` is listed. Stale `placement:` and `union:` keys are checked by STALE.
  */
 const NEVER: IssueCode[] = [
@@ -56,7 +56,7 @@ const NEVER: IssueCode[] = [
 	'section-wrong-shape',
 ];
 
-/** Keys an op must remove when it makes them stale (the decision notes "Relationship-op details"): an op may not create these. */
+/** Keys an op must remove when it makes them stale: an op may not create these. */
 const STALE: IssueCode[] = ['placement-without-parents', 'union-not-of-parents'];
 
 /** Refusals each op can give. `bad-value` is the WP2.3 guard against a change it cannot make safely. */

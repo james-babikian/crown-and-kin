@@ -8,7 +8,7 @@ import { closePluginModals } from '../../src/view/plugin-modals';
 import { SUCCESSION_UI as T } from '../../src/render/ui-text';
 import { FEl, clock, device, resetDom } from '../acceptance/fake-dom';
 import { openModals, resetObsidian } from '../acceptance/fake-obsidian';
-import { ctl, lineRows, notes, openWin, page } from '../support/r027-window-support';
+import { ctl, lineRows, notes, openWin, page } from '../support/titles-window-support';
 import { eraNote } from '../support/calendar-vault';
 import { findBlocks } from '../../src/core/block-locate';
 import { useFakeDom } from '../support/fake-dom-setup';

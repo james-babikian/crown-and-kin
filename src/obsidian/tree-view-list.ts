@@ -11,18 +11,22 @@ import { portraitCropOf } from '../core/portrait-crop';
 import { cardLabels, needsLabels } from '../core/titles';
 import type { ParseResult, Tree } from '../core/types';
 import type { Orientation } from '../layout/model';
-import { buildPhoneList, failListPicture, restoreListPictures, showListPicture, type ListPictureSlots } from '../render/dom/phone-list-dom';
+import { addListHint, buildPhoneList, failListPicture, restoreListPictures, showListPicture, type ListPictureSlots } from '../render/dom/phone-list-dom';
+import { noticeText } from '../render/dom/name-marks';
 import { Popover } from '../render/dom/widgets';
 import type { RenderTiming } from '../render/tree-info';
-import { ADD_UI, FOCUS_UI, FULL_UI, PHONE_LIST_UI, SUCCESSION_UI } from '../render/ui-text';
+import { ADD_UI, FOCUS_UI, FULL_UI, ONE_PERSON_HINT, PHONE_LIST_UI, SUCCESSION_UI } from '../render/ui-text';
 import { forgetHeight } from './block-height';
 import type { BlockState } from '../view/block-state';
 import { setFolds } from '../view/fold-view';
 import { buildLargeBar, showBusy, type LargeBarParts } from './large-bar';
 import type { LargeBar } from '../view/large-tree';
-import { linkWord, listData, listIds, listStart, listWord, popTrail, type ListStartFacts } from '../view/phone-list';
+import { LIST_HEADER_GAP, linkWord, listData, listIds, listScrollMargin, listStart, listWord, popTrail, type ListStartFacts } from '../view/phone-list';
 import { pickPerson } from './person-picker';
-import type { CopyBox } from './picture-store';
+import { drawProblemsPopup } from './problems-list';
+import { pluginModalOpen } from '../view/plugin-modals';
+import { isShownQuiet } from './saved-quiet';
+import type { CopyBox, PictureCopy } from './picture-store';
 import { relationsFor, validMe } from '../view/relation-cache';
 import { lineWords } from '../view/succession-view';
 import { TreeViewFinder } from './tree-view-finder';
@@ -44,7 +48,7 @@ const LIST_PORTRAIT_BOX: CopyBox = { w: 96, h: 96, fit: 'portrait', onDevice: tr
 const HERO_PORTRAIT_BOX: CopyBox = { w: 128, h: 128, fit: 'portrait', onDevice: true };
 
 /** The person a save just changed in a phone list and the time the row flash ends; kept per block, so a second build keeps the flash. */
-const savedFlashes = new WeakMap<BlockState, { id: string; until: number }>();
+const savedFlashes = new WeakMap<BlockState, { id: string; until: number; quiet: boolean }>();
 
 /** The phone list, the empty block and the bar that stands in place of a very large tree. */
 export abstract class TreeViewList extends TreeViewFinder {
@@ -53,6 +57,29 @@ export abstract class TreeViewList extends TreeViewFinder {
 
 	/** B1: the session choice that the start stood under; a tap on a name, Find or Back changes it, and then the list moves, also right after a window. */
 	private startSession: string | null = null;
+
+	/** The small picture copies of the rows, held until the list is drawn again or goes away. */
+	protected listCopies: PictureCopy[] = [];
+
+	/** The person of the large row, the only row with arms (D209 rule A: the personal arms, else the arms of the house). */
+	protected listCentre: string | null = null;
+
+	/** Stops the picture requests of the rows that still wait. */
+	protected listAbort: AbortController | null = null;
+
+	/** The extra draw of `followBlockState` was made: a view makes it once. */
+	private followed = false;
+
+	/**
+	 * A new view of a block can draw before Obsidian tells its section, from a fresh state (the start person). When the section or the handle comes, the block's own state
+	 * can name another person of this session. The list is drawn once more then; the draw runs `startOf` with its keep rules, scrolls nothing and moves no focus.
+	 */
+	protected followBlockState(): void {
+		const id = this.peekState()?.focus?.id;
+		if (!this.listMode || this.unloaded || this.followed || id == null || id === this.listCentre) return;
+		this.followed = true;
+		this.render(null);
+	}
 
 	/** The start of the phone list (spec §5.5): the rules of `listStart`, or the person the list stood on when only the calendars changed. */
 	protected startOf(facts: ListStartFacts): ReturnType<typeof listStart> {
@@ -104,8 +131,9 @@ export abstract class TreeViewList extends TreeViewFinder {
 		// §5.5: a person just saved shows once. The list never moves for it: the row flashes, or a Notice says where to look.
 		const saved = st.shown?.place === 'embed' ? st.shown.id : null;
 		if (saved !== null) {
+			// D330 F03: a write of a window that stays open is quiet: the row flashes, but no Notice says "saved".
+			savedFlashes.set(st, { id: saved, until: performance.now() + HIGHLIGHT_MS, quiet: isShownQuiet(st.shown) });
 			st.shown = null;
-			savedFlashes.set(st, { id: saved, until: performance.now() + HIGHLIGHT_MS });
 		}
 
 		const root = el.createDiv({
@@ -153,7 +181,7 @@ export abstract class TreeViewList extends TreeViewFinder {
 			onGo: (id) => this.guard(() => this.listMove(id)),
 			onEdit: (id, fromTap) => this.guard(() => this.activate(id, fromTap)),
 		});
-		this.listEl = result.list;
+		this.listEl = this.withHint(result.list, whole);
 		root.setAttribute('data-dynasty-people', String(result.rows));
 		if (succession) root.setAttribute('data-dynasty-succession', succession.titleId);
 		// A second build soon after the save (a note change event) must keep the flash, so the flash lives in the block state, not in this build.
@@ -162,7 +190,7 @@ export abstract class TreeViewList extends TreeViewFinder {
 		if (flash && left > 0 && whole.byId.has(flash.id)) {
 			const row = result.list.querySelector<HTMLElement>(`.dynasty-list-row[data-person="${flash.id}"]`);
 			if (row) this.flashRow(row, left);
-			else if (saved !== null) new Notice(PHONE_LIST_UI.savedElsewhere);
+			else if (saved !== null) this.noticeSavedElsewhere(whole.byId.get(saved)?.name, flash.quiet);
 		} else if (flash) {
 			savedFlashes.delete(st);
 		}
@@ -174,8 +202,7 @@ export abstract class TreeViewList extends TreeViewFinder {
 		this.updateEditUi();
 		const moved = this.focusDue !== null;
 		this.takeFocus();
-		// After a move the list may start above the part of the note that shows: bring its top into view.
-		if (moved && viewport.getBoundingClientRect().top < 0) viewport.scrollIntoView({ block: 'start' });
+		if (moved) this.bringListIntoView(viewport);
 		const t3 = performance.now();
 		const open = this.account(t0, t1, t2, t3);
 		const timing: RenderTiming = { path: this.sourcePath, people: whole.people.length, ...open.parts };
@@ -185,6 +212,94 @@ export abstract class TreeViewList extends TreeViewFinder {
 		this.keepHeight();
 		// The list checks its picture files too, so a file that is too large or not a picture shows on the badge.
 		this.startPictures();
+	}
+
+	/** The Notice for a saved person who has no row in the list (D330 O-09a): it names the person; a person with no name keeps the text without a name. A quiet write (a window that stays open) says nothing (D330 F03). */
+	private noticeSavedElsewhere(name: string | undefined, quiet: boolean): void {
+		if (quiet) return;
+		const shown = name?.trim();
+		new Notice(noticeText(shown ? PHONE_LIST_UI.savedElsewhereName(shown) : PHONE_LIST_UI.savedElsewhere));
+	}
+
+	/** A tree of one person says what to do next; the line is built with the list, so it is gone when a second person exists. */
+	protected withHint(list: HTMLElement, whole: FamilyGraph): HTMLElement {
+		if (whole.people.length === 1) addListHint(list, ONE_PERSON_HINT.phoneList);
+		return list;
+	}
+
+	/**
+	 * After a move the list may start above the part of the note that shows, or behind the fixed header of a phone: its top stands under the header, so the bar shows. The note scrolls
+	 * only when the top is above that place. The place is measured from the top of the scroll area, so a theme or a pane that moves the scroll area down moves the place with it.
+	 */
+	protected bringListIntoView(viewport: HTMLElement): void {
+		const scrollerTop = this.scrollerTop(viewport);
+		const clearance = this.headerClearance(viewport, scrollerTop);
+		if (clearance > 0) viewport.setCssProps({ '--dynasty-list-clear': `${clearance}px` });
+		if (viewport.getBoundingClientRect().top - scrollerTop < clearance) viewport.scrollIntoView({ block: 'start' });
+	}
+
+	/** The scroll area that holds the list (the note); null when there is none (the page scrolls). */
+	protected scrollerOf(viewport: HTMLElement): HTMLElement | null {
+		let scroller = viewport.parentElement;
+		while (scroller) {
+			const overflow = getComputedStyle(scroller).overflowY;
+			if (overflow === 'auto' || overflow === 'scroll') break;
+			scroller = scroller.parentElement;
+		}
+		return scroller;
+	}
+
+	/** The top edge, in screen px, of the scroll area that holds the list; 0 when there is none (the page scrolls). */
+	protected scrollerTop(viewport: HTMLElement): number {
+		return this.scrollerOf(viewport)?.getBoundingClientRect().top ?? 0;
+	}
+
+	/**
+	 * The small problem pop-up hangs under the bar and needs room below it, so the note scrolls until the bar stands just under the header. Only downwards in the note: a bar that already
+	 * stands higher is left alone.
+	 */
+	protected bringBarUp(bar: HTMLElement): void {
+		const scroller = this.scrollerOf(bar);
+		const top = scroller?.getBoundingClientRect().top ?? 0;
+		const want = Math.max(this.headerClearance(bar, top), LIST_HEADER_GAP);
+		const delta = bar.getBoundingClientRect().top - (top + want);
+		if (delta <= 0) return;
+		if (scroller) scroller.scrollTop += delta;
+		else this.containerEl.win.scrollBy(0, delta);
+	}
+
+	/**
+	 * The small pop-up under the bar of the phone list in a note: the count of the problems and the button that opens the full-screen view with its problem list. The long list does not
+	 * fit in a note, so it never shows here. Enter or Space on the triangle moves the focus to the button.
+	 */
+	protected openProblemsPopup(opener: HTMLElement, count: number, keyboard: boolean): void {
+		const pop = this.popover;
+		if (!pop) return;
+		const bar = opener.closest<HTMLElement>('.dynasty-toolbar') ?? opener;
+		const showFull = () => {
+			pop.close();
+			this.guard(() => void this.openFull(null, null, null, true));
+		};
+		pop.open('problems', (el) => {
+			const button = drawProblemsPopup(el, { count, icon: setIcon, showFull });
+			if (keyboard) button.focus();
+		}, opener, undefined, { panel: { anchor: () => bar.getBoundingClientRect(), bringUp: () => this.bringBarUp(bar) } });
+	}
+
+	/** The full-screen view that the pop-up opened shows its problem list after its first view, as a tap on the triangle would. */
+	protected override takeFocus(): void {
+		if (this.full?.takeProblemsDue?.() && !pluginModalOpen()) {
+			const badge = this.viewport?.querySelector<HTMLElement>(':scope > .dynasty-toolbar')?.querySelector<HTMLElement>('.dynasty-warning-badge');
+			if (badge) this.toggleProblems(badge, this.allIssues(), false);
+		}
+		super.takeFocus();
+	}
+
+	/** How far the header of the note covers the top of the scroll area, plus a small gap; 0 when it covers nothing. Read at run time: the height differs by theme and device. */
+	protected headerClearance(viewport: HTMLElement, scrollerTop: number = this.scrollerTop(viewport)): number {
+		const header = this.containerEl.closest('.workspace-leaf-content')?.querySelector<HTMLElement>('.view-header');
+		if (!header) return 0;
+		return listScrollMargin(header.getBoundingClientRect().bottom, scrollerTop);
 	}
 
 	/** The bar above the list (D144): the same flat row as the computer's toolbar: Add person and the tree text (made by `updateEditUi`) at the left, then Find, Back after a move, the problem badge and Expand. */
@@ -262,7 +377,7 @@ export abstract class TreeViewList extends TreeViewFinder {
 		const fileOf = (link: string | undefined): TFile | null | 'wait' => {
 			const r = link !== undefined ? info.resolved.get(link) : undefined;
 			if (r?.ok) return r.file;
-			return r && r.code === 'missing-picture' && su && !su.cache() ? 'wait' : null;
+			return r?.code === 'missing-picture' && su && !su.cache() ? 'wait' : null;
 		};
 		const load = (file: TFile | null | 'wait', box: CopyBox, slot: HTMLElement) => {
 			if (file === 'wait') return;

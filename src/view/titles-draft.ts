@@ -60,7 +60,7 @@ export function refOf(title: string, h: Holder): HolderRef {
 }
 
 /** `rulerName` for draft values (it needs no index). */
-export const rulerOf = (v: HolderValues, personName: string | undefined): string => rulerName({ ...v, index: 0 }, personName);
+const rulerOf = (v: HolderValues, personName: string | undefined): string => rulerName({ ...v, index: 0 }, personName);
 
 /** The person's name when the holder is in the tree; undefined for a holder who is not. */
 export function personNameOf(g: FamilyGraph | null, v: HolderValues): string | undefined {
@@ -68,7 +68,7 @@ export function personNameOf(g: FamilyGraph | null, v: HolderValues): string | u
 }
 
 /** What a holder row shows (spec §13.4): "Aldric II", the full name if different, the reign, and if the holder is in the tree. */
-export interface HolderText {
+interface HolderText {
 	/** The ruler name with the number ("Aldric II"). */
 	ruler: string;
 	/** D122: the sobriquet of the person, bare text (the row adds the curly marks); absent for a holder who is not in the tree. */
@@ -229,7 +229,7 @@ export interface SuccessionDraft {
 /** The fields of `SuccessionDraft`, in the order the window shows them. */
 export const SUCCESSION_FIELDS = ['rule', 'inherit', 'through', 'illegitimate', 'adopted', 'body', 'year', 'heirs', 'exclude'] as const;
 /** One field name of `SuccessionDraft`. */
-export type SuccessionField = (typeof SUCCESSION_FIELDS)[number];
+type SuccessionField = (typeof SUCCESSION_FIELDS)[number];
 
 /** The succession keys of a title as read. */
 export function successionOf(t: Title): SuccessionDraft {
@@ -246,6 +246,11 @@ export function successionOf(t: Title): SuccessionDraft {
 		heirs: [...(t.heirs ?? [])],
 		exclude: [...(t.exclude ?? [])],
 	};
+}
+
+/** The succession keys of a title that has none written: the start of a new title's draft (D330 O-22). */
+export function emptySuccession(): SuccessionDraft {
+	return { rule: '', inherit: '', through: '', illegitimate: 'no', adopted: false, body: false, year: '', heirs: [], exclude: [] };
 }
 
 const copySuccession = (s: SuccessionDraft): SuccessionDraft => ({ ...s, heirs: [...s.heirs], exclude: [...s.exclude] });
@@ -271,7 +276,7 @@ export interface TitleRow {
 	holders: HolderRow[];
 	/** The holders as read, in order (copies): a move, a removal or an edit changes the list. */
 	baseRows: HolderRow[];
-	/** The succession keys as typed; absent for a title that is new in the draft. */
+	/** The succession keys as typed. A title that is new in the draft starts with none written (O-22); the window makes them when the page opens. */
 	succ?: SuccessionDraft;
 	/** The succession keys as read; absent for a title that is new in the draft. */
 	baseSucc?: SuccessionDraft;
@@ -279,7 +284,7 @@ export interface TitleRow {
 
 /** The window's rows for the titles of a tree (the titles the tree uses, spec §13.4). */
 export function titleRows(g: FamilyGraph, key: () => string): TitleRow[] {
-	return (g.titles ?? []).map((t) => rowOf(t, key));
+	return g.titles.map((t) => rowOf(t, key));
 }
 
 function rowOf(t: Title, key: () => string): TitleRow {
@@ -328,7 +333,7 @@ export function savedListName(t: TitleRow): string {
 const sameValues = (a: HolderValues | null, b: HolderValues) => !!a && Object.keys(changedFields(a, b)).length === 0;
 
 /** True when the holder list of a title changed: order, a new or removed holder, or a changed value. */
-export function holdersChanged(t: TitleRow): boolean {
+function holdersChanged(t: TitleRow): boolean {
 	if (t.holders.length !== t.baseRows.length) return true;
 	return t.holders.some((h, i) => h.key !== t.baseRows[i].key || !h.ref || !sameValues(h.base, h.values));
 }
@@ -355,14 +360,15 @@ function successionDiffers(f: SuccessionField, s: SuccessionDraft, b: Succession
 
 /** The succession fields that the user changed in the draft of a saved title (the `*Changed` flags). */
 export function successionChanges(t: TitleRow): SuccessionField[] {
-	if (!t.succ || !t.baseSucc) return [];
+	// A new title has nothing written, so its keys are compared with an empty set; a saved title with no read keys has no baseline and writes none.
+	const b = t.baseSucc ?? (t.id === null ? emptySuccession() : undefined);
+	if (!t.succ || !b) return [];
 	const s = t.succ;
-	const b = t.baseSucc;
 	return SUCCESSION_FIELDS.filter((f) => successionDiffers(f, s, b));
 }
 
 /** The keys of an `edit-title` for the changed succession fields: only the changed ones, `null` for a removed key. */
-export function successionEdit(t: TitleRow): Partial<EditTitle> {
+function successionEdit(t: TitleRow): Partial<EditTitle> {
 	const out: Partial<EditTitle> = {};
 	const s = t.succ;
 	if (!s) return out;
@@ -407,7 +413,7 @@ export function draftSpec(s: SuccessionDraft): SuccessionSpec {
  * would drop (a person who is not in the tree and has no name, or an empty entry) is left out, as in `g.titles`.
  */
 export function draftTitle(g: FamilyGraph, t: TitleRow): Title | null {
-	const saved = t.id !== null ? g.titles?.find((x) => x.id === t.id) : undefined;
+	const saved = t.id !== null ? g.titles.find((x) => x.id === t.id) : undefined;
 	if (!saved) return null;
 	const holders: Holder[] = [];
 	t.holders.forEach((h, i) => {
@@ -437,6 +443,7 @@ export function windowOps(rows: readonly TitleRow[], newId: (name: string, taken
 	const ids = idOps('title', rows.map(titleIdRow));
 	const adds: Op[] = [];
 	const addLists: Op[] = [];
+	const addRules: Op[] = [];
 	const edits: Op[] = [];
 	const lists: Op[] = [];
 	const deletes: Op[] = [];
@@ -453,6 +460,9 @@ export function windowOps(rows: readonly TitleRow[], newId: (name: string, taken
 adds.push({ kind: 'add-title', id, name, ...(maleName !== null ? { maleName } : {}), ...(femaleName !== null ? { femaleName } : {}) });
 			// A new title gets its `holders` key only with its first holder.
 			if (t.holders.length) addLists.push({ kind: 'set-holders', title: id, items: t.holders.map((h) => ({ add: addFields(h.values) })) });
+			// O-22: `add-title` takes no rule, so the rule of a new title is one `edit-title` after it, in the same batch.
+			const rule = successionEdit(t);
+			if (Object.keys(rule).length) addRules.push({ kind: 'edit-title', id, ...rule });
 			continue;
 		}
 		if (t.deleted) {
@@ -484,7 +494,7 @@ adds.push({ kind: 'add-title', id, name, ...(maleName !== null ? { maleName } : 
 		});
 		lists.push({ kind: 'set-holders', title: id, items });
 	}
-	return [...ids, ...edits, ...lists, ...deletes, ...adds, ...addLists];
+	return [...ids, ...edits, ...lists, ...deletes, ...adds, ...addLists, ...addRules];
 }
 
 /** The draft rows whose title name is empty and must be entered before Save. */

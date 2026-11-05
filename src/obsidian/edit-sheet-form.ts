@@ -6,24 +6,112 @@
 import { setIcon } from 'obsidian';
 import { readerOfTree } from '../view/calendar-index';
 import { attachDateLine } from '../render/dom/date-line';
+import { appendNameRun } from '../render/dom/name-span';
+import { mediaMatches } from '../render/dom/page-reads';
+import { isolateName } from '../render/name-bidi';
 import type { UnionRef } from '../core/edit';
 import { UNION_TYPES, type Person } from '../core/types';
 import { dateLineShown, headTitle } from '../render/tree-info';
 import { quotedSobriquet } from '../core/sobriquet';
-import { joined, nb } from '../render/text-join';
-import { NEW_SHEET, REMOVE, SHEET, UI, UNION_TYPE_TEXT, WINDOW_UI, WRITE_TEXT, partnerDetail } from '../render/ui-text';
+import { specOf } from '../core/succession';
+import { joined, nb, refitJoined } from '../render/text-join';
+import { NEW_SHEET, REMOVE, SHEET, UI, UNION_TYPE_TEXT, WINDOW_UI, WRITE_TEXT } from '../render/ui-text';
 import { CHANGE_UI } from '../render/change-text';
 import { cardLabels, needsLabels } from '../core/titles';
 import { familyOf } from '../core/family-query';
 import type { NewRelation } from './family-flows';
 import { drawableColour, endEntryOnEnter, nameDialog, sheetField } from './sheet-parts';
+import { partnerLinkDetail } from './union-edit';
 import { renderRelationLine } from './sheet-relation';
 import { titlesBody, titlesSummary } from './sheet-titles';
-import { buildShell } from './window-shell';
+import { buildShell, cancelLabelFor } from './window-shell';
 import { renderSections, type SectionSpec } from './window-sections';
 import { RowPictures } from './window-parts';
 import { EditSheetPortrait } from './edit-sheet-portrait';
 import { TEXT_FIELDS, NEW_HOUSE, draftOf, placementChoices, findUnion, type Draft, type Loaded } from '../view/sheet-draft';
+
+/** The house of the draft as the detail line shows it. */
+interface HeadHouse {
+	name: string;
+	colour: string | null;
+	arms: string | null;
+}
+
+/**
+ * The detail line of the header (house, title, dates). The house span keeps its node and its arms picture while the house is the same, and the
+ * joined line stays while its parts are the same, so a key in another field does not move the page (D326). The house span moves into a new
+ * line when a part comes or goes; another arms picture in the same slot keeps the old picture in view until the new one has arrived.
+ */
+class HeaderMeta {
+	private house: { el: HTMLElement; mark: HTMLElement; arms: string | null; name: HTMLElement; shown: string } | null = null;
+	private parts: (HTMLElement | string)[] = [];
+	private box: HTMLElement | null = null;
+	/** True when the house name text changed in the last `paint` while the house span stayed. */
+	private nameChanged = false;
+
+	constructor(
+		private readonly host: HTMLElement,
+		private readonly pictures: RowPictures | null,
+	) {}
+
+	/** Shows the house and the other parts (title text, dates, the detail of a new person) in the line. */
+	paint(house: HeadHouse | null, rest: readonly (HTMLElement | string)[]): void {
+		this.nameChanged = false;
+		const houseEl = this.paintHouse(house);
+		const parts = houseEl ? [houseEl, ...rest] : [...rest];
+		if (parts.length === this.parts.length && parts.every((x, i) => x === this.parts[i])) {
+			// The kept line wraps from other places when the house name is longer or shorter, and the size watch sees no change at the same height.
+			if (this.nameChanged && this.box) refitJoined(this.box);
+			return;
+		}
+		this.host.empty();
+		this.box = parts.length ? joined(this.host, 'dynasty-head-meta', parts) : null;
+		this.parts = parts;
+	}
+
+	private makeMark(el: HTMLElement, arms: string | null, before: HTMLElement | null): HTMLElement {
+		const mark = el.createSpan({ cls: arms ? 'dynasty-house-armsmark' : 'dynasty-house-dot' });
+		if (before) el.insertBefore(mark, before);
+		// The slot stands in the header, always in view: the picture is asked for at once, so the slot is not empty in the next frame.
+		if (arms) this.pictures?.show(mark, arms, { px: 30, fit: 'meet', now: true });
+		return mark;
+	}
+
+	private paintHouse(house: HeadHouse | null): HTMLElement | null {
+		if (!house) {
+			if (this.house) this.pictures?.forget(this.house.el);
+			this.house = null;
+			return null;
+		}
+		const view = this.house;
+		if (!view) {
+			const el = createSpan({ cls: 'dynasty-house' });
+			const mark = this.makeMark(el, house.arms, null);
+			const shown = isolateName(house.name);
+			const name = el.createSpan({ cls: 'dynasty-house-name', text: shown });
+			this.house = { el, mark, arms: house.arms, name, shown };
+			return el;
+		}
+		if (view.arms && house.arms) {
+			// The same slot: `show` does nothing while its picture is there (and asks again when it could not be made); another link
+			// keeps the old picture in the slot until the new one has arrived.
+			this.pictures?.show(view.mark, house.arms, { px: 30, fit: 'meet', now: true });
+		} else if (view.arms !== house.arms) {
+			this.pictures?.forget(view.mark);
+			const old = view.mark;
+			view.mark = this.makeMark(view.el, house.arms, old);
+			old.remove();
+		}
+		view.arms = house.arms;
+		// The text of the span is compared with what was written, not read back: the window may have turned the marks into spans.
+		if (view.shown !== isolateName(house.name)) {
+			view.shown = isolateName(house.name);
+			view.name.setText(view.shown);
+			this.nameChanged = true;
+		}
+		return view.el;
+	}
+}
 
 /** The build of the window, its header and its fields. */
 export abstract class EditSheetForm extends EditSheetPortrait {
@@ -54,15 +142,19 @@ export abstract class EditSheetForm extends EditSheetPortrait {
 			title: this.title(),
 			// A new person has no header with a name yet, so the bar shows the title.
 			titled: this.isNew,
-			cancelLabel: ro ? SHEET.close : SHEET.cancel,
+			// O-13: Cancel while the window only edits, Close once it wrote something or when it only shows. O-14: Cancel asks the question that Esc asks.
+			cancelLabel: cancelLabelFor(ro ? 'show' : this.wrote ? 'wrote' : 'edit'),
 			saveLabel: ro ? null : SHEET.save,
 			onCancel: () => this.finish(),
+			discard: { dirty: () => this.isDirty(), ask: () => this.close() },
 			onSave: () => void this.save(),
 			// Spec §6.3: quick entry of several children; in the footer (a phone: under the bar), so it stays reachable (spec §7.4).
 			...(!ro && this.rel?.kind === 'child' ? { extra: { text: NEW_SHEET.saveAnother, focus: 'save-another', run: () => void this.save(true) } } : {}),
 		});
 		this.shell = shell;
 		nameDialog(this.modalEl, shell.titleEl);
+		// CX-18: the phone bar shows the name on one text line with an ellipsis.
+		if (shell.bar) shell.titleEl.addClass('dynasty-bar-line');
 		const body = shell.body;
 		this.bodyEl = body;
 		body.addEventListener('focusin', () => this.revealFocused(300));
@@ -83,8 +175,6 @@ export abstract class EditSheetForm extends EditSheetPortrait {
 		this.statusEl = body.createDiv({ cls: 'dynasty-sheet-status', attr: { role: 'status' } });
 		this.statusEl.setText(this.status);
 		this.statusEl.toggle(this.status !== '');
-		this.errorEl = body.createDiv({ cls: 'dynasty-sheet-error', attr: { role: 'alert' } });
-		this.errorEl.hide();
 		if (this.isNew) this.relationBox(body);
 
 		this.personHeader(body);
@@ -198,7 +288,6 @@ export abstract class EditSheetForm extends EditSheetPortrait {
 		const text = head.createDiv({ cls: 'dynasty-head-text' });
 		const nameLine = text.createDiv({ cls: 'dynasty-head-name' });
 		const nameText = nameLine.createSpan();
-		let armsMark: HTMLElement | null = null;
 		const metaHost = text.createDiv({ cls: 'dynasty-head-metahost' });
 		this.relHost = text;
 		this.relSig = this.relationSig();
@@ -210,57 +299,48 @@ export abstract class EditSheetForm extends EditSheetPortrait {
 		const problem = parent.createDiv({ cls: 'dynasty-head-problem' });
 		problem.hide();
 
+		// A key repaints only what it changed: the name line when the name or sobriquet changed, the house span while its picture is
+		// the same, and the detail line while its parts are the same. A header part that stays keeps its node, so the page does not move.
+		let nameSig: string | null = null;
 		const paintName = () => {
-			nameText.empty();
 			const name = this.draft.name.trim();
+			const sob = this.draft.sobriquet.trim();
+			const sig = JSON.stringify([name, sob]);
+			if (sig === nameSig) return;
+			nameSig = sig;
+			nameText.empty();
 			if (name) {
-				nameText.appendText(name);
-				const sob = this.draft.sobriquet.trim();
-				if (sob) nameText.createSpan({ cls: 'dynasty-sob', text: ` ${quotedSobriquet(sob)}` });
-			} else nameText.createSpan({ cls: 'is-empty', text: this.isNew ? WINDOW_UI.enterName : SHEET.unnamed });
-			this.shell?.setTitle(this.isNew ? this.title() : name || SHEET.unnamed, this.isNew);
+				// D322: the name with its sobriquet is one run whose direction its first strong letter sets, as on the cards.
+				appendNameRun(nameText, name, [sob ? { cls: 'dynasty-sob', text: ` ${quotedSobriquet(sob)}` } : undefined]);
+			} else if (this.isNew) {
+				// UX-22: one heading for a new person. The placeholder of the Name field says what to type.
+				nameText.appendText(this.title());
+			} else nameText.createSpan({ cls: 'is-empty', text: SHEET.unnamed });
+			this.shell?.setTitle(this.isNew ? this.title() : isolateName(name) || SHEET.unnamed, this.isNew);
 		};
+		const metaLine = new HeaderMeta(metaHost, this.rowPictures);
 		const paintMeta = () => {
-			metaHost.empty();
-			const parts: (HTMLElement | string)[] = [];
+			const rest: (HTMLElement | string)[] = [];
 			const house = this.draftHouse();
-			if (house) {
-				const hs = createSpan({ cls: 'dynasty-house' });
-				if (house.arms) {
-					const slot = hs.createSpan({ cls: 'dynasty-house-armsmark' });
-					this.rowPictures?.show(slot, house.arms, { px: 30, fit: 'meet' });
-				} else hs.createSpan({ cls: 'dynasty-house-dot' });
-				hs.appendText(house.name);
-				parts.push(hs);
-			}
 			const label = this.cardLabel();
 			const titleText = label?.title ?? this.draft.title.trim();
-			if (titleText) parts.push(nb(headTitle(label, titleText, this.data.g.dates)));
+			if (titleText) rest.push(nb(headTitle(label, titleText, this.data.g.dates)));
 			const dates = dateLineShown({ ...this.data.person, born: this.draft.born.trim() || undefined, died: this.draft.died.trim() || undefined }, this.data.g.dates);
-			if (dates) parts.push(dates);
-			if (this.isNew && this.rel) parts.push(this.newDetail());
-			if (parts.length) joined(metaHost, 'dynasty-head-meta', parts);
+			if (dates) rest.push(dates);
+			const detail = this.isNew && this.rel ? this.newDetail() : '';
+			if (detail) rest.push(detail);
+			metaLine.paint(house, rest);
 			const colour = house?.colour;
 			if (drawableColour(colour)) head.style.setProperty('--dynasty-house-color', colour);
 			else head.style.removeProperty('--dynasty-house-color');
 			head.toggleClass('has-house', !!house);
 		};
-		const paintArms = () => {
-			armsMark?.remove();
-			armsMark = null;
-			// "Add portrait or arms" becomes "Add portrait" when the person has arms.
-			this.paintAddPortrait();
-			const link = this.draft.arms.trim();
-			if (!link) return;
-			const name = this.shownName() || WINDOW_UI.thisPersonInSentence;
-			armsMark = nameLine.createEl('button', { cls: 'dynasty-arms-mark', attr: { type: 'button', 'aria-label': WINDOW_UI.armsOfPerson(name), 'aria-haspopup': 'menu', 'data-focus': 'personal-arms' } });
-			armsMark.addEventListener('click', () => this.pictureMenu(armsMark!));
-			this.rowPictures?.show(armsMark, link, { px: 44, fit: 'meet' });
-		};
+		const paintArms = () => this.paintPersonalArms(nameLine);
 		this.head = {
 			paint: () => {
 				paintName();
 				paintMeta();
+				this.armsButton?.setAttribute('aria-label', this.armsLabel());
 				this.paintPortrait();
 			},
 			arms: paintArms,
@@ -272,6 +352,27 @@ export abstract class EditSheetForm extends EditSheetPortrait {
 		this.paintPortrait();
 	}
 
+	private armsButton: HTMLElement | null = null;
+
+	private armsLabel(): string {
+		return WINDOW_UI.armsOfPerson(this.shownName() || WINDOW_UI.thisPersonInSentence);
+	}
+
+	/** Draws the small personal arms after the name again: the old picture goes back to the store first. */
+	private paintPersonalArms(nameLine: HTMLElement): void {
+		if (this.armsButton) this.rowPictures?.forget(this.armsButton);
+		this.armsButton?.remove();
+		this.armsButton = null;
+		// "Add portrait or arms" becomes "Add portrait" when the person has arms.
+		this.paintAddPortrait();
+		const link = this.draft.arms.trim();
+		if (!link) return;
+		const button = nameLine.createEl('button', { cls: 'dynasty-arms-mark', attr: { type: 'button', 'aria-label': this.armsLabel(), 'aria-haspopup': 'menu', 'data-focus': 'personal-arms' } });
+		button.addEventListener('click', () => this.pictureMenu(button));
+		this.armsButton = button;
+		this.rowPictures?.show(button, link, { px: 44, fit: 'meet' });
+	}
+
 	/** The card label of the person (title text and reign as the card shows them), or undefined when the tree has no titles. */
 	protected cardLabel() {
 		const id = this.data.person.id;
@@ -279,20 +380,25 @@ export abstract class EditSheetForm extends EditSheetPortrait {
 		return cardLabels(this.data.g).get(id);
 	}
 
-	/** The detail text of a new person: "Child of A and B", "Partner of A", "Birth parent of A". */
+	/** True when a title of the tree has a line of succession (a rule or a named heir): that line skips a date with no year (D330 UX-10). */
+	private hasSuccessionLine(): boolean {
+		return (this.data.tree.titles ?? []).some((t) => {
+			const spec = specOf(t);
+			return !spec.bad && (spec.rule !== undefined || (spec.heirs?.length ?? 0) > 0);
+		});
+	}
+
+	/** The detail text of a new person: "Child of A and B", "Partner of A", "Birth parent of A". The kind ("New child") is the heading while the name is empty, so it is not said twice. */
 	protected newDetail(): string {
 		const rel = this.rel;
 		if (!rel) return '';
-		const kind = rel.kind === 'parent' ? NEW_SHEET.titleParent : rel.kind === 'child' ? NEW_SHEET.titleChild : rel.kind === 'partner' ? NEW_SHEET.titlePartner : NEW_SHEET.titlePerson;
-		const detail =
-			rel.kind === 'parent'
-				? NEW_SHEET.parentOf(rel.type, this.name(rel.child))
-				: rel.kind === 'child'
-					? NEW_SHEET.childOf(this.name(rel.parent), rel.other === null ? null : this.name(rel.other))
-					: rel.kind === 'partner'
-						? NEW_SHEET.partnerOf(this.name(rel.partner))
-						: '';
-		return this.sum([kind, detail]);
+		return rel.kind === 'parent'
+			? NEW_SHEET.parentOf(rel.type, this.name(rel.child))
+			: rel.kind === 'child'
+				? NEW_SHEET.childOf(this.name(rel.parent), rel.other === null ? null : this.name(rel.other))
+				: rel.kind === 'partner'
+					? NEW_SHEET.partnerOf(this.name(rel.partner))
+					: '';
 	}
 
 	/**
@@ -301,7 +407,7 @@ export abstract class EditSheetForm extends EditSheetPortrait {
 	 */
 	protected focusMark(): { key: string; index: number; start: number | null; end: number | null } | 'sheet' | null {
 		const el = this.contentEl;
-		const active = this.modalEl.doc?.activeElement as HTMLInputElement | null | undefined;
+		const active = this.modalEl.doc.activeElement as HTMLInputElement | null;
 		if (!active || !el.contains(active)) return null;
 		const key = active.getAttribute('data-focus');
 		if (!key) return 'sheet';
@@ -322,7 +428,7 @@ export abstract class EditSheetForm extends EditSheetPortrait {
 			// Every control here was made by the build that just ran. A select that is new and gets the focus in code can open its phone
 			// menu again, so a touch screen leaves the focus on the sheet instead. A select that the user used is not rebuilt (the
 			// changes of a select update the page in place), so it never comes here and keeps the focus it has.
-			const touch = (this.modalEl.win ?? window).matchMedia?.('(pointer: coarse)')?.matches === true;
+			const touch = mediaMatches(this.modalEl.win, '(pointer: coarse)');
 			if (target && !(touch && target.matches('select'))) {
 				target.focus({ preventScroll: true });
 				if (mark.start !== null && mark.end !== null && target.setSelectionRange) target.setSelectionRange(mark.start, mark.end);
@@ -335,7 +441,7 @@ export abstract class EditSheetForm extends EditSheetPortrait {
 
 	protected title(): string {
 		const rel = this.rel;
-		if (!rel) return this.data.person.name || SHEET.unnamed;
+		if (!rel) return isolateName(this.data.person.name) || SHEET.unnamed;
 		return rel.kind === 'parent' ? NEW_SHEET.titleParent : rel.kind === 'child' ? NEW_SHEET.titleChild : rel.kind === 'partner' ? NEW_SHEET.titlePartner : NEW_SHEET.titlePerson;
 	}
 
@@ -440,7 +546,7 @@ export abstract class EditSheetForm extends EditSheetPortrait {
 		if (!rel.union) sel.createEl('option', { text: NEW_SHEET.choosePartnership, attr: { value: '' } });
 		couple.forEach((u, i) => {
 			const l = fam?.partners.find((x) => x.union?.index === u.index);
-			sel.createEl('option', { text: l ? partnerDetail(l.type, l.start, l.end) : String(i + 1), attr: { value: String(i) } });
+			sel.createEl('option', { text: l ? partnerLinkDetail(l) : String(i + 1), attr: { value: String(i) } });
 		});
 		sel.value = rel.union ? String(couple.findIndex((u) => u.index === rel.union!.index)) : '';
 		sel.addEventListener('change', () => {
@@ -483,7 +589,7 @@ export abstract class EditSheetForm extends EditSheetPortrait {
 					attr: { id, type: 'text', autocomplete: 'off', autocorrect: 'off', spellcheck: 'false', autocapitalize: extra.autocapitalize, placeholder: extra.placeholder, 'data-focus': `field:${key}` },
 				});
 		input.value = this.draft[key];
-		if (key === 'born' || key === 'died') attachDateLine(row, input, () => readerOfTree(this.o.dates, this.data.tree) ?? this.data.g.dates.reader, this.o.dates?.onChange, (stop) => this.cleanup.push(stop));
+		if (key === 'born' || key === 'died') attachDateLine(row, input, () => readerOfTree(this.o.dates, this.data.tree) ?? this.data.g.dates.reader, this.o.dates?.onChange, (stop) => this.cleanup.push(stop), key === 'born' ? () => this.hasSuccessionLine() : undefined);
 		// Read-only, not disabled: the user can still select and copy the text.
 		input.readOnly = this.readOnly;
 		if (o.hint) {
@@ -597,7 +703,8 @@ export abstract class EditSheetForm extends EditSheetPortrait {
 	/** Details: name, sobriquet, title text, house, sex, born, died, and the two tick boxes. */
 	protected detailsBody(body: HTMLElement): void {
 		const grid = body.createDiv({ cls: 'dynasty-grid' });
-		this.textField(grid, 'name', SHEET.name, { autocapitalize: 'off' });
+		// UX-22: a new person has the one heading "New person"; the placeholder of the Name field says what to type.
+		this.textField(grid, 'name', SHEET.name, { autocapitalize: 'off', ...(this.isNew ? { placeholder: NEW_SHEET.namePlaceholder } : {}) });
 		// D122: the card adds the quote marks, so the hint says so; a sobriquet usually starts with a small letter.
 		this.textField(grid, 'sobriquet', SHEET.sobriquet, { autocapitalize: 'off', hint: SHEET.sobriquetHint });
 		// D98: the hint points to the Titles section, which the window of a new person does not have.

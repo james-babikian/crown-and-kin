@@ -1,4 +1,4 @@
-// Spec §14 rule 15 (WP-6 step 2, render): `shownDate`, `dateLine`, `shownReign`, the screen-reader label, the holder rows, and the sample trees.
+// Spec §14 rule 15 (render): `shownDate`, `dateLine`, `shownReign`, the screen-reader label, the holder rows, and the sample trees.
 // The tests use a cycle calendar with a name list of seven planets (1273 = Saturn) and a plain-year list of the same planets.
 import { readdirSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
@@ -65,7 +65,7 @@ describe('§14 rule 15: shownDate', () => {
 		expect(shownDate('about 22.13', r, 'shown')).toBe('about 22.13 Sa');
 	});
 
-	it('gives no name to a date that is not whole (supervisor ruling)', () => {
+	it('gives no name to a date that is not whole', () => {
 		const r = reader();
 		expect(shownDate('between 22.13 and 22.15', r, 'shown')).toBe('between 22.13 and 22.15');
 		expect(shownDate('22.13, at dawn', r, 'shown')).toBe('22.13, at dawn');

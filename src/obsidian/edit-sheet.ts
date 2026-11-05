@@ -57,7 +57,7 @@ export class EditSheet extends EditSheetWrites {
 		this.childMark = null;
 		if (this.closing || !this.shown) return;
 		// Obsidian gives the focus back to the element that had it when the new window opened; after a Save this window was built again and that element is gone.
-		const doc = this.modalEl.doc ?? document;
+		const doc = this.modalEl.doc;
 		const active = doc.activeElement;
 		if (active && active !== doc.body && active.isConnected) return;
 		this.restoreFocus(mark ?? 'sheet');

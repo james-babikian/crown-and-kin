@@ -19,7 +19,7 @@
 import type { FamilyGraph } from '../core/derive';
 import { isDead } from '../core/succession-keys';
 import type { CardLabel } from '../core/titles';
-import { ORDINAL_EM, ROUNDEL_EM, centredWithoutWord, cardText, footSpan, isRoundel, nameCountOf, nameRoom, ordinalTabRect, relationY, ribbonWidth, roundelPics, signBelowRing, tagTop, youTabRect, type CardText, type ShownLines } from '../layout/geometry';
+import { ORDINAL_EM, ROUNDEL_EM, centredWithoutWord, cardText, isRoundel, nameCountOf, nameRoom, ordinalTabRect, relationY, ribbonWidth, roundelPics, signBelowRing, tagTop, youTabRect, type CardText, type ShownLines } from '../layout/geometry';
 import { armsGap, type ArmsOutline } from '../layout/arms-outline';
 import { farTagSigns } from '../layout/far-tag-sign';
 import { illegitimateSigns } from '../layout/illegitimate-sign';
@@ -29,7 +29,7 @@ import { FOLD_CHIP_EM, FRAME_STROKE_PX, RUMOUR_FONT_EM, TAB_TEXT_BASE_EM, TAB_TE
 import { legendRows, type LegendHouse, type LegendPart } from './legend';
 import { lineLook, type LineMarks, type LineState } from './line-highlight';
 import type { BreakList } from './break-words';
-import { cardNameLines, isolateLines, titleLines, type NameMeasure, type NameRun } from './name-lines';
+import { cardNameLines, svgNameLines, svgText, titleLines, type NameMeasure, type NameRun } from './name-lines';
 import { fixedColour, fontOf, savedFrame, xmlText, type PictureMap, type SavedFrame, type SavedParts } from './saved-picture';
 import { DEAD_STRIP_OPACITY, DEFAULT_DARK, DEFAULT_LIGHT, FADED_OPACITY, HEIR_LOOK, ME_LOOK, ME_RING_INNER, ON_LINE_EXTRA, SAVED_CARD_RADIUS, STROKES, TAG_MARK, UNION_MARKS, stripColour, tagMarkSlot, unionMark, unionShape, type Palette, type UnionShape } from './styles';
 import { LEGEND_DEAD_DOUBT_LABEL, LEGEND_DEAD_LABEL, LEGEND_LABELS, SIGN_LEGEND_LABEL } from './legend-text';
@@ -80,7 +80,7 @@ function fit(text: string, px: number, fontSize: number, bold = false): string {
 }
 
 /** A deceased person's arms and portrait are muted like the house strip. */
-export const DEAD_PICTURE_OPACITY = 0.8;
+const DEAD_PICTURE_OPACITY = 0.8;
 
 /** How the headless picture draws the fold controls of `layout.folds`. */
 export interface SvgFolds {
@@ -163,7 +163,7 @@ export function renderSvg(g: FamilyGraph, layout: TreeLayout, edges: EdgeDrawing
 		const h = frame.heading;
 		out.push(`<text x="${h.x}" y="${h.y}" font-size="${h.size}" font-weight="${esc(h.weight)}" font-family="${esc(fonts.ui)}" fill="${c.text}"${di('heading')}>${esc(h.text)}</text>`);
 		const sentence = frame.sentence;
-		if (sentence) out.push(`<text x="${sentence.x}" y="${sentence.y}" font-size="${sentence.size}" font-weight="${esc(sentence.weight)}" font-family="${esc(fonts.ui)}" fill="${c.text}"${di('heading-sentence')}>${esc(sentence.text)}</text>`);
+		if (sentence) out.push(`<text x="${sentence.x}" y="${sentence.y}" font-size="${sentence.size}" font-weight="${esc(sentence.weight)}" font-family="${esc(fonts.ui)}" fill="${c.text}"${di('heading-sentence')}>${esc(svgText(sentence.text))}</text>`);
 		out.push(`<g transform="translate(${frame.tree.x} ${frame.tree.y})">`);
 	} else {
 		const m = opts.margin ?? 24;
@@ -252,7 +252,7 @@ export function renderSvg(g: FamilyGraph, layout: TreeLayout, edges: EdgeDrawing
 		// in the text colour (D153), and its ordinal tab shows that it is an heir.
 		const heir = heirIds.has(p.id);
 		// D41, D153: the marked card has one thicker border in the text colour; no theme accent colour is used.
-		const border = isMe ? `stroke="${c.text}" stroke-width="${ME_LOOK.border}"` : heir ? `stroke="${c.accent}" stroke-width="${HEIR_LOOK.border}"` : `stroke="${c.cardBorder}"`;
+		const border = isMe ? `stroke="${c.text}" stroke-width="${ME_LOOK.border}"` : heir ? `stroke="${c.accent}" stroke-width="${HEIR_LOOK.border}"` : `stroke="${c.cardEdge}"`;
 		// The heir's outline is the card's own border now, so its parity id sits on the card rect.
 		out.push(`<rect x="${box.x}" y="${box.y}" width="${box.w}" height="${box.h}" rx="${SAVED_CARD_RADIUS}" fill="${c.cardFill}" ${border}${heir ? di(`heir:${p.id}`) : ''}/>`);
 		const barFill = `fill="${esc(accent)}"${dead ? ` fill-opacity="${DEAD_STRIP_OPACITY}"` : ''}`;
@@ -260,13 +260,7 @@ export function renderSvg(g: FamilyGraph, layout: TreeLayout, edges: EdgeDrawing
 		const rib = ribbonWidth(geo);
 		const inset = isMe ? ME_RING_INNER : 0;
 		out.push(`<path d="${ribbonPath(box.x + inset, box.y + inset, roundel ? box.w - 2 * inset : rib, roundel ? rib : box.h - 2 * inset, rib, Math.max(0, SAVED_CARD_RADIUS - inset), roundel ? 'top' : 'left')}" ${barFill}/>`);
-		if (t.r1?.plate && opts.relations?.get(p.id)?.text) {
-			// The foot hairline over the relation word (there is no footer plate). A person with no relation word has none.
-			const span = footSpan(geo, box.w, isMe ? ME_RING_INNER : 1);
-			const y0 = box.y + t.r1.plate.y + 0.5;
-			out.push(`<line x1="${box.x + span.x0}" y1="${y0}" x2="${box.x + span.x1}" y2="${y0}" stroke="${c.cardBorder}" stroke-width="1"${di(`foot:${p.id}`)}/>`);
-		}
-		isolateLines(names).forEach((runs: readonly NameRun[], i) => {
+		svgNameLines(names).forEach((runs: readonly NameRun[], i) => {
 			const y = box.y + [t.nameBaseline, t.name2Baseline!, t.name3Baseline!][i];
 			const inner = runs.map((r) => (r.sob ? `<tspan font-weight="400">${esc(r.text)}</tspan>` : esc(r.text))).join('');
 			out.push(`<text x="${tx}" y="${y}"${anchor} font-size="${t.nameSize}" font-weight="${esc(nameWeight)}" fill="${dead ? c.textMuted : c.text}">${inner}</text>`);

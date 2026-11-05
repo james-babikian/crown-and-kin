@@ -4,7 +4,7 @@
 	display: flex;
 	flex-wrap: wrap;
 	align-items: center;
-	gap: var(--size-4-2);
+	gap: var(--dynasty-space-2);
 }
 
 .dynasty-undo-button {

@@ -59,13 +59,13 @@ export interface Loaded {
 }
 
 /** The result of `loadSheet`: the loaded data, an unparsable block, or the person is not in the tree. */
-export type SheetLoad = { kind: 'ok'; data: Loaded } | { kind: 'invalid' } | { kind: 'gone' };
+type SheetLoad = { kind: 'ok'; data: Loaded } | { kind: 'invalid' } | { kind: 'gone' };
 
 /** The new-house fields of a draft before the user types in them. */
 export const blankHouse = () => ({ name: '', color: '#888888' });
 
 /** A person with no id and no fields, the starting point for a new-person draft. */
-export const blankPerson = (): Person => ({ id: '', name: '', parents: [], illegitimate: false, index: -1 });
+const blankPerson = (): Person => ({ id: '', name: '', parents: [], illegitimate: false, index: -1 });
 
 /** The sheet's data for a person (or a new person, `id` null), or why there is none. */
 export function loadSheet(body: string, id: string | null, dates?: DatesFor): SheetLoad {
@@ -127,7 +127,7 @@ export function findUnion(candidates: UnionRef[], chosen: UnionRef): UnionRef | 
 }
 
 /** Keys of an op whose values never name a person. */
-export const NOT_IDS = new Set(['kind', 'fields', 'text', 'name', 'color', 'key', 'type', 'from', 'to', 'direction', 'map', 'start', 'end', 'people']);
+const NOT_IDS = new Set(['kind', 'fields', 'text', 'name', 'color', 'key', 'type', 'from', 'to', 'direction', 'map', 'start', 'end', 'people']);
 
 /** A copy of `v` (ops, a relation) with every string that can name a person mapped by `f`. */
 export function mapIds<T>(v: T, f: (id: string) => string, key = ''): T {
@@ -208,7 +208,7 @@ export function withIds(ops: Op[], ids: ReadonlyMap<string, string>): Op[] {
 }
 
 /** A holder's `person` sits in `fields`, which `mapIds` leaves alone (they hold names): it names a person too. */
-export function holderPersons(op: Op, ids: ReadonlyMap<string, string>): Op {
+function holderPersons(op: Op, ids: ReadonlyMap<string, string>): Op {
 	if (op.kind === 'batch') return { ...op, ops: op.ops.map((o) => holderPersons(o, ids)) };
 	if ((op.kind === 'add-holder' || op.kind === 'edit-holder') && typeof op.fields.person === 'string') {
 		const next = ids.get(op.fields.person);

@@ -21,7 +21,7 @@ const rep = (n: number, s: string) => Array(n).fill(s).join(', ');
 const KEYS_LIMIT = 110;
 const TINY_LIMIT = 38;
 
-describe('F1: aliases that expand far beyond the text', () => {
+describe('aliases that expand far beyond the text', () => {
 	// 1 000 x 200 x 200 = 4 * 10^7 nodes from a text of about 3 KB.
 	const wide = `a: &a [${rep(1000, 'x')}]\nb: &b [${rep(200, '*a')}]\nx: [${rep(200, '*b')}]\n${BASE}`;
 
@@ -98,7 +98,7 @@ describe('F1: aliases that expand far beyond the text', () => {
 	});
 });
 
-describe('F2: a map with very many keys', () => {
+describe('a map with very many keys', () => {
 	speedTest(`40 000 keys read and edit in about a second (at most ${KEYS_LIMIT} times the reference work)`, () => {
 		const keys = Array.from({ length: 40_000 }, (_, i) => `    k${i}: v${i}`).join('\n');
 		const text = `people:\n  - id: aldric\n    name: Aldric\n${keys}\n`;
@@ -143,7 +143,7 @@ describe('F2: a map with very many keys', () => {
 	});
 });
 
-describe('F3: a nesting that overflows the stack', () => {
+describe('a nesting that overflows the stack', () => {
 	for (const depth of [10_000, 100_000]) {
 		it(`${depth} flow lists deep show a plain text`, () => {
 			const text = `people:\n  - id: aldric\n    name: Aldric\n    notes: ${'['.repeat(depth)}x${']'.repeat(depth)}\n`;

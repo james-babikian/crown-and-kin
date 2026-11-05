@@ -18,9 +18,10 @@ import { VIEW_NOTICE } from '../render/view-text';
 import { pause, type Handle } from './block-handle';
 import { BLOCK_SECTIONS } from '../view/fence-index';
 import type { PendingRename } from '../view/settings';
+import { guarded } from './start-guard';
 
 /** What the updater needs from the handle registry (`HandleRegistry.forBlock`). */
-export interface BlockSource {
+interface BlockSource {
 	/** The handle of block `ordinal` of the note at `path`, or null if the note or the block is gone. */
 	forBlock(path: string, ordinal: number, onBusy?: () => void): Promise<Pick<Handle, 'body' | 'write'> | null>;
 	/** Every handle: their undo entries follow the rename too. */
@@ -116,7 +117,7 @@ export function extensionOf(path: string): string {
 }
 
 /** Spec §13.0 item 3: a picture that the plugin shows (its rename updates `arms` and `portrait`). */
-export const isPicturePath = (path: string) => pictureFormat(extensionOf(path)).kind === 'supported';
+const isPicturePath = (path: string) => pictureFormat(extensionOf(path)).kind === 'supported';
 
 /**
  * B16: what a rename is about, from the extensions of the old and the new path: a note (md to md),
@@ -260,7 +261,7 @@ export class LinkUpdater {
 
 	/** `vault.on('rename')`. A folder rename sends one event per note; they are handled together. */
 	renamed(file: TAbstractFile, oldPath: string): void {
-		try {
+		guarded('cannot update the links after a rename', () => {
 			let moved = false;
 			for (const p of this.stored) {
 				if (p.newPath !== oldPath) continue;
@@ -276,9 +277,7 @@ export class LinkUpdater {
 			this.open.add(r);
 			this.persist();
 			this.start();
-		} catch (e) {
-			console.error('Crown and Kin: cannot update the links after a rename', e);
-		}
+		});
 	}
 
 	/** The renames that `data.json` keeps until they are handled. */
@@ -303,7 +302,7 @@ export class LinkUpdater {
 
 	/** After `onLayoutReady` (the vault's notes are known): continue the stored renames. */
 	resume(): void {
-		try {
+		guarded('cannot continue the link update of an earlier rename', () => {
 			const list = this.stored.splice(0);
 			if (!list.length || this.stopped) {
 				this.stored = list;
@@ -326,9 +325,7 @@ export class LinkUpdater {
 			}
 			this.persist();
 			if (this.queue.length) this.start();
-		} catch (e) {
-			console.error('Crown and Kin: cannot continue the link update of an earlier rename', e);
-		}
+		});
 	}
 
 	/** Resolves when every queued rename is handled (tests and the harness wait for it). */
@@ -395,11 +392,9 @@ export class LinkUpdater {
 			const obsidian = this.obsidianDone();
 			const st: Progress = { found: false, scanned: false, shown: null };
 			const timer = window.setTimeout(() => {
-				try {
+				guarded('cannot show the link update Notice', () => {
 					if (!this.halted() && (!st.scanned || st.found)) st.shown = new Notice(RENAME_UI.progressFor(kindOf(batch)), 0);
-				} catch (e) {
-					console.error('Crown and Kin: cannot show the link update Notice', e);
-				}
+				});
 			}, this.timing.progress ?? RENAME_TIMING.progress);
 			let batch: Renamed[] = [];
 			let report: LinkReportText | null = null;
@@ -520,12 +515,10 @@ export class LinkUpdater {
 	 */
 	private candidates(files: TFile[]): TFile[] {
 		const known = new Set<string>();
-		try {
+		guarded('cannot list the notes that show a tree', () => {
 			for (const h of this.blocks.all()) known.add(h.key.path);
 			for (const p of this.hooks.known?.() ?? []) known.add(p);
-		} catch (e) {
-			console.error('Crown and Kin: cannot list the notes that show a tree', e);
-		}
+		});
 		const fence = this.fenceNotes();
 		if (fence) {
 			const shown: TFile[] = [];
@@ -684,16 +677,14 @@ export class LinkUpdater {
 	 */
 	private carryUndo(batch: Renamed[]): void {
 		for (const h of this.blocks.all()) {
-			try {
+			guarded('cannot update the undo steps after a rename', () => {
 				h.mapUndo((body) => {
 					const map = this.linksFor(body, h.key.path, batch).map;
 					if (!Object.keys(map).length) return body;
 					const r = applyOp(body, { kind: 'rewrite-links', map });
 					return r.ok ? r.body.replace(/\r\n?/g, '\n') : body;
 				});
-			} catch (e) {
-				console.error('Crown and Kin: cannot update the undo steps after a rename', e);
-			}
+			});
 		}
 	}
 

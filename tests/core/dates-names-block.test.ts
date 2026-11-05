@@ -1,4 +1,4 @@
-// Spec §14 rule 13 (WP-6 step 1): the name lists in the `kin-calendar` block: reading, bad shapes, and the edits of the window with
+// Spec §14 rule 13: the name lists in the `kin-calendar` block: reading, bad shapes, and the edits of the window with
 // comments, unknown keys, quoting and styles kept.
 import { describe, expect, it } from 'vitest';
 import { CALENDAR_ORDER, editCalendarBlock, LIST_ORDER, parseCalendarBlock, type CalendarOp } from '../../src/core/calendar-block';

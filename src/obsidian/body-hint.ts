@@ -10,6 +10,7 @@ import type { SuccessionResult } from '../core/succession';
 import { firstHolderOf } from '../core/succession-first';
 import { cadetHint } from '../core/succession-hint';
 import { SUCCESSION_UI as T } from '../render/ui-text';
+import { guarded } from './start-guard';
 import { draftSpec, draftTitle, holderLead, holderText, type SuccessionDraft, type TitleRow } from '../view/titles-draft';
 
 const nameIn = (g: FamilyGraph, id: string) => g.byId.get(id)?.name ?? id;
@@ -36,15 +37,16 @@ export function firstInfo(g: FamilyGraph, row: TitleRow): { name: string; lead: 
 
 /** The cadet hint (D291), or ''. It runs the line two more times, so the caller reuses its own line when that line is complete. */
 function cadetText(g: FamilyGraph, row: TitleRow, draft: SuccessionDraft, line: SuccessionResult | null, first: string | undefined): string {
-	try {
-		const title = draftTitle(g, row);
-		if (!title) return '';
-		const found = cadetHint(g, title, draftSpec(draft), line ? { line } : {});
-		return found ? T.cadetHint(nameIn(g, found.person), first ?? nameIn(g, found.first)) : '';
-	} catch (e) {
-		console.error('Crown and Kin: cannot compute the cadet hint', e);
-		return '';
-	}
+	return guarded(
+		'cannot compute the cadet hint',
+		() => {
+			const title = draftTitle(g, row);
+			if (!title) return '';
+			const found = cadetHint(g, title, draftSpec(draft), line ? { line } : {});
+			return found ? T.cadetHint(nameIn(g, found.person), first ?? nameIn(g, found.first)) : '';
+		},
+		'',
+	);
 }
 
 /**

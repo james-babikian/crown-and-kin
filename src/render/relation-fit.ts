@@ -22,7 +22,7 @@ const DEGREES: Readonly<Record<string, string>> = {
 };
 
 /** The multiplication sign of a short removal ("1× removed"). */
-export const TIMES_SIGN = '×';
+const TIMES_SIGN = '×';
 
 /** The first form: "First cousin" becomes "1st cousin" (first to tenth; the plugin already writes 11th and on as numerals). */
 export function shortenDegree(word: string): string {

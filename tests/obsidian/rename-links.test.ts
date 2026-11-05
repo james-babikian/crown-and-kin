@@ -11,7 +11,7 @@ import { VIEW_NOTICE } from '../../src/render/view-text';
 import { noticeList, notices, resetObsidian } from '../acceptance/fake-obsidian';
 
 /*
- * WP6.4: link maintenance after a rename (spec §6.9, D6, D35; the decision notes "M6 design gate", Rename).
+ * WP6.4: link maintenance after a rename (spec §6.9, D6, D35, Rename).
  * The real HandleRegistry and LinkUpdater run on a small fake vault: notes are closed unless a test
  * opens one in a fake Live Preview editor.
  */
@@ -305,7 +305,7 @@ describe('Rename: tree links follow the renamed note (spec §6.9, D6)', () => {
 	});
 });
 
-describe('HandleRegistry.forBlock (M6 ForBlock)', () => {
+describe('HandleRegistry.forBlock', () => {
 	it('gives the handle of any block of a closed note, shares an existing handle, and null when the block or note is gone', async () => {
 		const s = setup({ 'T.md': tree(person('a')) + '\n' + tree(person('b')) });
 		const h1 = await s.handles.forBlock('T.md', 1);
@@ -317,7 +317,7 @@ describe('HandleRegistry.forBlock (M6 ForBlock)', () => {
 	});
 });
 
-describe('Rename, fix round after the M6 iPhone test (the decision notes "M6 iPhone test")', () => {
+describe('Rename: edge cases found on the iPhone', () => {
 	const code = { sections: [{ type: 'code' }] };
 	const para = { sections: [{ type: 'paragraph' }] };
 	const bodyOf = (s: ReturnType<typeof setup>, path: string) => findBlocks(s.texts.get(path)!)[0].body;
@@ -359,7 +359,7 @@ describe('Rename, fix round after the M6 iPhone test (the decision notes "M6 iPh
 			expect(RENAME_UI.moreKept(2)).toBe('The plugin also did not change the links in 2 other trees for the same reason.');
 		});
 
-		it('a kept link is also named when other links of the same tree changed (owner, 2026-10-13)', async () => {
+		it('a kept link is also named when other links of the same tree changed', async () => {
 			const s = setup({ 'T.md': tree(person('a', '"[[x/Old]]"'), person('b', '"[[Old]]"')), 'x/Old.md': '', 'y/Old.md': '' });
 			await s.rename(['x/Old.md', 'x/New.md']);
 			// "[[x/Old]]" changes; "[[Old]]" now opens y/Old.md and stays.
@@ -553,7 +553,7 @@ describe('Rename, fix round after the M6 iPhone test (the decision notes "M6 iPh
 		});
 	});
 
-	it('F-VIEW-04: a note that stays busy gives a Notice that names the note and the link, not a silent gap', async () => {
+	it('a note that stays busy gives a Notice that names the note and the link, not a silent gap', async () => {
 		const s = setup({ 'T.md': tree(person('a', '"[[Old]]"')), 'Old.md': '' });
 		vi.spyOn(s.handles, 'forBlock').mockImplementation(async (_p: string, _o: number, onBusy?: () => void) => {
 			onBusy?.();
@@ -596,7 +596,7 @@ describe('Rename, fix round after the M6 iPhone test (the decision notes "M6 iPh
 	});
 });
 
-describe('Rename, review 0.1.1 area E', () => {
+describe('Rename: write and scan edge cases', () => {
 	it('nameForms: as typed, with %20, as the plugin encodes it, as encodeURIComponent does, and fully decoded', () => {
 		expect(nameForms('castle (old)')).toEqual(['castle (old)', 'castle%20(old)', 'castle%20%28old%29']);
 		expect(nameForms('100%25 keep')).toEqual(['100%25 keep', '100%25%20keep', '100%2525%20keep', '100% keep']);

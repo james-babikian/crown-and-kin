@@ -61,7 +61,7 @@ describe('the sample trees themselves (guard against an empty test)', () => {
 	});
 
 	it('§14 r8: no sample has BC, a minus year, 0, BP, a dual date or non-ASCII digits (the spike hashes stay)', () => {
-		// Sample trees 17 to 19 (version 0.4) hold native digits on purpose; their hashes were recorded with them.
+		// Sample trees 17 to 19 hold native digits on purpose; their hashes were recorded with them.
 		const old = [...new Set(parsedBlocks.filter((b) => !/^1[789]-/.test(b.file)).flatMap((b) => Object.values(textsOf(b.source)!).flat()))];
 		const odd = old.filter((t) => t.trim() === '0' || /B\.?C\.?E?|BP|^\s*[-−]|\d{4}\/\d/i.test(t) || /[^\u0000-]/.test(t.replace(/[−–—   †]/g, '')) && /\p{Nd}/u.test(t.replace(/[0-9]/g, '')));
 		expect(odd).toEqual([]);

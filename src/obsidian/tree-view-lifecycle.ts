@@ -8,7 +8,7 @@ import { setIcon } from 'obsidian';
 import { sameBody } from '../core/block-match';
 import { fontsChanged, usesFamily, type FontState } from '../render/fonts';
 import { clearMeasureCache } from '../render/dom/measure';
-import { fontsOf, readFonts } from '../render/dom/page-reads';
+import { fontsOf, mediaMatches, readFonts } from '../render/dom/page-reads';
 import { calloutBackdrop } from '../render/dom/theme-read';
 import { buildCallout } from '../render/dom/widgets';
 import { FULL_UI, UI } from '../render/ui-text';
@@ -20,6 +20,7 @@ import { isPhoneDevice } from '../view/focus-mode';
 import { releaseRelations } from '../view/relation-cache';
 import { reducedMotion, type DynastySettings } from '../view/settings';
 import { hasArms, hasPortraits, hasReign } from '../view/tree-view-helpers';
+import { guarded } from './start-guard';
 import { TreeViewBase } from './tree-view-base';
 import type { KeepPlace } from './tree-view-types';
 
@@ -137,7 +138,7 @@ export abstract class TreeViewLifecycle extends TreeViewBase {
 				if (!this.unloaded) turned();
 			}, 300);
 		});
-		const portrait = win.matchMedia?.('(orientation: portrait)');
+		const portrait = win.matchMedia('(orientation: portrait)');
 		if (portrait?.addEventListener) {
 			portrait.addEventListener('change', turned);
 			this.register(() => portrait.removeEventListener('change', turned));
@@ -149,7 +150,7 @@ export abstract class TreeViewLifecycle extends TreeViewBase {
 			'keydown',
 			(e) => {
 				if (e.key !== 'Escape' || !(this.finderDrawn || this.successionDrawn) || this.popover?.isOpen) return;
-				const active = this.containerEl.doc?.activeElement ?? null;
+				const active = this.containerEl.doc.activeElement ?? null;
 				if (!active || !this.viewport?.contains(active)) return;
 				e.stopPropagation();
 				e.preventDefault();
@@ -367,29 +368,33 @@ export abstract class TreeViewLifecycle extends TreeViewBase {
 	}
 
 	protected guard(fn: () => void): void {
-		try {
-			fn();
-		} catch (e) {
-			console.error('Crown and Kin: the tree view failed', e);
-			// S7: a tree hidden until its first view must not stay hidden after an error.
-			this.showTree();
-			if (this.full) {
-				// On a phone the full-screen view has no other way out: close it (spec §8).
-				try {
-					this.teardown();
-				} catch {
-					// Closing still works.
-				}
-				this.full.close(FULL_UI.failed);
-				return;
-			}
+		const ok = guarded(
+			'the tree view failed',
+			() => {
+				fn();
+				return true;
+			},
+			false,
+		);
+		if (ok) return;
+		// S7: a tree hidden until its first view must not stay hidden after an error.
+		this.showTree();
+		if (this.full) {
+			// On a phone the full-screen view has no other way out: close it (spec §8).
 			try {
 				this.teardown();
-				this.containerEl.empty();
-				buildCallout(this.containerEl, 'error', UI.errorTitle, 'dynasty-error', setIcon).content.createDiv({ text: UI.internalError });
 			} catch {
-				// Nothing more can be done safely; the rest of the note still renders.
+				// Closing still works.
 			}
+			this.full.close(FULL_UI.failed);
+			return;
+		}
+		try {
+			this.teardown();
+			this.containerEl.empty();
+			buildCallout(this.containerEl, 'error', UI.errorTitle, 'dynasty-error', setIcon).content.createDiv({ text: UI.internalError });
+		} catch {
+			// Nothing more can be done safely; the rest of the note still renders.
 		}
 	}
 
@@ -488,7 +493,7 @@ export abstract class TreeViewLifecycle extends TreeViewBase {
 	 * (a pop-out window has its own media query) each time the highlight or a window starts, so a change of the device setting counts at once. No view change moves (D235).
 	 */
 	protected reduced(): boolean {
-		const prefers = this.containerEl.win.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches === true;
+		const prefers = mediaMatches(this.containerEl.win, '(prefers-reduced-motion: reduce)');
 		return reducedMotion(this.settings.reduceMotion, prefers);
 	}
 }

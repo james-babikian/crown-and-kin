@@ -1,19 +1,16 @@
 import { describe, expect, it } from 'vitest';
-import type { EditResult, Op } from '../../src/core/edit';
+import type { Op } from '../../src/core/edit';
 import { linkTargets } from '../../src/core/link-rewrite';
 import { parseLink } from '../../src/core/picture-link';
 import { parseDynasty } from '../../src/core/parse';
 import type { Tree } from '../../src/core/types';
 import { applyOp } from '../../src/core/yaml-edit';
+import { body } from '../support/edit-body';
 
 // Unit tests for `arms` and `portrait` in the tree text (spec §13.0 items 1 and 3, §13.6, §13.7;
 // M9 core contract rules 1–3 and 11, amendments A2 and A3): the unquoted embed, the writes and the
 // link rewrite, beyond the acceptance tests.
 
-function body(r: EditResult): string {
-	if (!r.ok) throw new Error(`refused: ${r.code} ${r.detail ?? ''}`);
-	return r.body;
-}
 const apply = (src: string, op: unknown) => applyOp(src, op as Op);
 function tree(src: string): Tree {
 	const r = parseDynasty(src);
@@ -21,7 +18,7 @@ function tree(src: string): Tree {
 	return r.tree;
 }
 
-describe('A3: an unquoted ![[…]] in a link key', () => {
+describe('an unquoted ![[…]] in a link key', () => {
 	it('reads in a flow map, with a comma, and with a comment after it', () => {
 		const t = tree(['houses:', '  - {id: h, name: H, arms: ![[a, b.png]]}', 'people:', '  - id: p', '    name: P', '    link: ![[Note]]   # the note', '    portrait: ![[p.png]]'].join('\n'));
 		expect(t.houses[0].arms).toBe('![[a, b.png]]');
@@ -96,7 +93,7 @@ describe('writing portraits and arms', () => {
 	});
 });
 
-describe('parseLink (A2)', () => {
+describe('parseLink', () => {
 	it('a Markdown destination with a `)` that closes nothing is not a Markdown link', () => {
 		expect(parseLink('[a](b)c)')).toMatchObject({ kind: 'bare', target: '[a](b)c)' });
 		expect(parseLink('[a](b(c)d)')).toMatchObject({ kind: 'md', target: 'b(c)d' });

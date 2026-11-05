@@ -8,7 +8,10 @@ import { Notice, type App } from 'obsidian';
 import type { FamilyGraph } from '../core/derive';
 import type { Op, ParentKind, UnionKind, UnionRef } from '../core/edit';
 import { PARENT_LIMIT, PARENT_TYPES, UNION_TYPES, type Person } from '../core/types';
-import { FLOW, parentTypeText, partnerDetail, UNION_TYPE_TEXT } from '../render/ui-text';
+import { noticeText } from '../render/dom/name-marks';
+import { isolateName } from '../render/name-bidi';
+import { FLOW, parentTypeText, UNION_TYPE_TEXT } from '../render/ui-text';
+import { partnerLinkDetail } from './union-edit';
 import type { Written } from './block-handle';
 import { choose, type Choice } from './choice-modal';
 import { pickerExclusions, type FamilyView } from '../core/family-query';
@@ -30,8 +33,11 @@ export interface FlowHost {
 	name(id: string): string;
 	/** False, with the reason shown in the sheet, if the sheet's draft cannot be written now. */
 	ready(): boolean;
-	/** Writes the ops together with the sheet's draft; null if nothing was written. */
-	commit(ops: Op[], highlight: string): Promise<Written | null>;
+	/**
+	 * Writes the ops together with the sheet's draft; null if nothing was written. `keepList` (O-09b): the phone list stays on the person of the sheet and
+	 * does not move to `highlight`. Add child and Add partner set it, for an existing person here and for a new person in the new-person sheet.
+	 */
+	commit(ops: Op[], highlight: string, o?: { keepList?: boolean }): Promise<Written | null>;
 	openNew(rel: NewRelation, name?: string): void;
 	/** What the person picker needs for its rows (portraits, the marked person); absent: plain rows. */
 	picker?(): PickerContext;
@@ -46,16 +52,19 @@ function roomFor(links: { id: string; type: string }[], t: string, need: number)
 
 /** The Notice when the write added a marriage by itself (spec §6.4). */
 export function autoUnionNotice(out: Written, a: string, b: string | undefined): void {
-	if (out.effects.includes('auto-union') && b) new Notice(FLOW.autoUnion(a, b), 10_000);
+	if (out.effects.includes('auto-union') && b) new Notice(noticeText(FLOW.autoUnion(a, b)), 10_000);
 }
 
-/** First choice of every Add flow: a new person, or one already in the tree. */
-async function newOrExisting(host: FlowHost, what: string, exclude: Set<string>): Promise<'new' | 'existing' | null> {
+/**
+ * First choice of every Add flow: a new person, or one already in the tree. `text` is the first sentence: Add child names both parents once the user chose the
+ * other parent, and Add parent names the type (D330 UX-08); Add partner keeps `FLOW.newOrExisting`.
+ */
+async function newOrExisting(host: FlowHost, what: string, exclude: Set<string>, text: string = FLOW.newOrExisting(host.person.name, what)): Promise<'new' | 'existing' | null> {
 	const any = host.g.people.some((p) => !exclude.has(p.id));
 	return choose<'new' | 'existing'>(host.app, {
 		name: 'new-or-existing',
 		title: what === 'parent' ? FLOW.addParentTitle : what === 'child' ? FLOW.addChildTitle : FLOW.addPartnerTitle,
-		text: [FLOW.newOrExisting(host.person.name, what)],
+		text: [text],
 		choices: [
 			{ value: 'new', label: FLOW.newPerson, detail: FLOW.newPersonDetail, cta: true },
 			{ value: 'existing', label: FLOW.existingPerson, detail: any ? FLOW.existingPersonDetail : FLOW.noneToPick, disabled: !any },
@@ -78,7 +87,7 @@ export async function addParentFlow(host: FlowHost): Promise<void> {
 	});
 	if (!type) return;
 	const exclude = pickerExclusions(host.g, p.id, 'add-parent', type);
-	const how = await newOrExisting(host, 'parent', exclude);
+	const how = await newOrExisting(host, 'parent', exclude, FLOW.newOrExistingParent(type, p.name));
 	if (!how) return;
 	if (how === 'new') {
 		host.openNew({ kind: 'parent', child: p.id, type });
@@ -107,8 +116,8 @@ export async function addChild(host: FlowHost): Promise<void> {
 	const extra = host.fam.otherParentChoices.filter((id) => !partnerships.some((l) => l.partner === id));
 	if (partnerships.length || extra.length) {
 		const choices: Choice<string>[] = [
-			...partnerships.map((l, i) => ({ value: `p${i}`, label: host.name(l.partner), detail: partnerDetail(l.type, l.start, l.end), cta: i === 0 })),
-			...extra.map((id) => ({ value: `x${id}`, label: host.name(id) })),
+			...partnerships.map((l, i) => ({ value: `p${i}`, label: isolateName(host.name(l.partner)), detail: partnerLinkDetail(l), cta: i === 0 })),
+			...extra.map((id) => ({ value: `x${id}`, label: isolateName(host.name(id)) })),
 			{ value: NONE, label: FLOW.noOtherParent, detail: FLOW.noOtherParentDetail(p.name) },
 		];
 		const pick = await choose(host.app, { name: 'other-parent', title: FLOW.addChildTitle, text: [FLOW.otherParentText(p.name)], choices });
@@ -123,7 +132,7 @@ export async function addChild(host: FlowHost): Promise<void> {
 	if (other) for (const id of pickerExclusions(host.g, other, 'add-child')) exclude.add(id);
 	// People who have this person as a birth parent are this person's children already.
 	for (const q of host.g.people) if (q.parents.some((l) => l.id === p.id && l.type === 'birth')) exclude.add(q.id);
-	const how = await newOrExisting(host, 'child', exclude);
+	const how = await newOrExisting(host, 'child', exclude, FLOW.newOrExistingChild(other ? [p.name, host.name(other)] : [p.name]));
 	if (!how) return;
 	if (how === 'new') {
 		host.openNew({ kind: 'child', parent: p.id, other, union });
@@ -143,7 +152,7 @@ export async function addChild(host: FlowHost): Promise<void> {
 	let type: ParentKind = 'birth';
 	// Spec §6.4: an existing child who has birth parents gets a choice of type.
 	if (links.some((l) => l.type === 'birth')) {
-		const who = other ? `${host.name(p.id)} and ${host.name(other)}` : host.name(p.id);
+		const who = other ? `${isolateName(host.name(p.id))} and ${isolateName(host.name(other))}` : isolateName(host.name(p.id));
 		const chosen = await choose<ParentKind>(host.app, {
 			name: 'child-type',
 			title: FLOW.childTypeTitle,
@@ -159,13 +168,13 @@ export async function addChild(host: FlowHost): Promise<void> {
 	}
 	const add = missing(type);
 	if (!add.length) {
-		new Notice(FLOW.alreadyChild(child.name, host.name(p.id)));
+		new Notice(noticeText(FLOW.alreadyChild(child.name, host.name(p.id))));
 		return;
 	}
 	// Only the Add parent action adds an automatic marriage. The op that completes
 	// the pair carries the chosen partnership, so the child sits under it (§4.3).
 	const ops: Op[] = add.map((id, i) => ({ kind: 'add-parent', child: child.id, parent: id, type, autoUnion: false, ...(union && i === add.length - 1 ? { union } : {}) }));
-	await host.commit(ops, child.id);
+	await host.commit(ops, child.id, { keepList: true });
 }
 
 /** Add partner (spec §6.4): new or existing person, existing partnerships shown first, then the union type. */
@@ -193,7 +202,7 @@ export async function addPartner(host: FlowHost): Promise<void> {
 			name: 'existing-partnership',
 			title: FLOW.existingTitle,
 			text: [FLOW.existingText(p.name, host.name(x), existing.length)],
-			list: existing.map((l) => partnerDetail(l.type, l.start, l.end)),
+			list: existing.map((l) => partnerLinkDetail(l)),
 			after: [FLOW.existingWarn],
 			// The header has the one Cancel control.
 			choices: [{ value: true, label: FLOW.addAnother }],
@@ -202,7 +211,7 @@ export async function addPartner(host: FlowHost): Promise<void> {
 	}
 	const type = await chooseUnionType(host.app, p.name, host.name(x));
 	if (!type) return;
-	await host.commit([unionOp(p.id, x, type)], x);
+	await host.commit([unionOp(p.id, x, type)], x, { keepList: true });
 }
 
 /** Asks which kind of partnership `a` and `b` have; null after Cancel. */

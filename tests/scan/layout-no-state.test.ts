@@ -1,8 +1,8 @@
-// Scan test `layout-no-state` (the architecture notes §4.2.7, the decision notes "0.3.1", invariant I7): the layout keeps no state between two calls. Two trees laid out in
+// Scan test `layout-no-state` (the architecture notes §4.2.7, invariant I7): the layout keeps no state between two calls. Two trees laid out in
 // one process must give what each gives alone, so a module may hold no `let` or `var`, no `Map`, `Set`, array or object that a function writes to, and no
 // counter. The allow-list has exactly three entries: the cache in `src/layout/index.ts` (keyed by tree and settings, bounded), the `WeakMap` memo in
 // `src/layout/geometry.ts` (keyed by a geometry object, so it lives only as long as that object) and the `WeakMap` of the generations in `src/layout/index.ts`
-// (keyed by a graph object, WP-E2 P5 by the supervisor's ruling; it lives only as long as that graph). Slot tables and settings objects are `readonly`
+// (keyed by a graph object, WP-E2 P5 by the decision; it lives only as long as that graph). Slot tables and settings objects are `readonly`
 // (`as const` or `Readonly<...>`), so a function cannot write to them.
 import { describe, expect, it } from 'vitest';
 import { balanced, codeOf, read, topLevel, tsFiles } from '../support/scan';

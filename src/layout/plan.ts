@@ -192,7 +192,7 @@ function familiesOf(g: FamilyGraph, items: Map<string, Item>, anchors: Map<strin
 	for (const c of fold?.controls ?? []) controlOf.set(familyKeyOf(c), c);
 	const withControl = (f: FamilySpec): FamilySpec => {
 		const c = controlOf.get(f.key);
-		return c && c.parents.every((p) => items.has(p)) ? { ...f, control: c } : f;
+		return c?.parents.every((p) => items.has(p)) ? { ...f, control: c } : f;
 	};
 	for (const fu of g.unions) if (fu.children.length) families.push(withControl({ key: fu.key, union: fu.key, parents: [...fu.partners], kids: [...fu.children], anchor: anchors.get(fu.key)! }));
 	for (const [parent, kids] of g.soloChildren) if (kids.length) families.push(withControl({ key: soloKey(parent), parents: [parent], kids: [...kids], anchor: parent }));

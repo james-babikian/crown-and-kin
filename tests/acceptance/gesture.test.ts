@@ -169,7 +169,7 @@ describe('doubleTapView (spec §7.2 double-tap on empty background)', () => {
 		// positive scale there is exactly one (cx, cy) that keeps a given tree point under a given
 		// screen point. So even clamped, the point should NOT move here. If the implementation
 		// instead keeps the pre-tap (cx, cy) and lets the point drift when clamped, this
-		// expectation is wrong -- ask the supervisor to confirm before "fixing" this test.
+		// expectation is wrong -- confirm with the owner before "fixing" this test.
 		const before = toTree(view, size, at);
 		const after = toTree(result, size, at);
 		expect(after.x).toBeCloseTo(before.x);

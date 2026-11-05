@@ -1,7 +1,7 @@
 /*
  * A cut-down fake vault for the link update after a rename (spec §6.9) on names with accents and punctuation: notes in a map, the real
- * `HandleRegistry` and `LinkUpdater` (no waiting), and `rename`, which moves a note and waits for the updater. Used by `s113-d-rename` and
- * `r113-review-c-rename`, which each had a copy.
+ * `HandleRegistry` and `LinkUpdater` (no waiting), and `rename`, which moves a note and waits for the updater. Used by `rename-scan-reads-matching-notes` and
+ * `link-other-case-found`, which each had a copy.
  */
 
 import { TFile } from 'obsidian';

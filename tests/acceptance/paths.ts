@@ -87,7 +87,7 @@ export const COUPLE_KINDS: StrokeKind[] = ['marriage', 'betrothal', 'concubinage
 export function hangsFrom(edges: EdgeDrawing, layout: TreeLayout, u: UnionPoint, child: string, tol: number): boolean {
 	const c = layout.persons.get(child)!;
 	const cx = c.x + c.w / 2;
-	// A trunk also lists every child of its family (the decision notes), so the child's own drop is the
+	// A trunk also lists every child of its family, so the child's own drop is the
 	// line that lists the fewest people. For an only child the two are alike, and either works.
 	const mine = edges.paths.filter((p) => DESCENT_KINDS.includes(p.kind) && p.people.includes(child));
 	if (!mine.length) return false;

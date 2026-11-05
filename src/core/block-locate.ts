@@ -285,7 +285,7 @@ export const findBlocks: FindBlocks = (text, language = KIN_LANGUAGE) => {
 			if (!blank && guards.some((g) => indentation(stripQuotes(lines[j].text, g.depth).rest).cols < g.need)) break;
 			if (!blank && ind.cols - container <= 3) {
 				const m = CLOSE.exec(q.rest.slice(ind.chars));
-				if (m && m[1][0] === fence.char && m[1].length >= fence.length) {
+				if (m?.[1][0] === fence.char && m[1].length >= fence.length) {
 					closeLine = j;
 					break;
 				}

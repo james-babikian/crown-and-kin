@@ -39,7 +39,7 @@ function changed(userEvent?: string) {
 const typed = changed('input.type');
 const scrolled = { docChanged: false, viewportChanged: true } as never;
 
-describe('Live Preview helper: scan of the note (WP-H2, P3)', () => {
+describe('Live Preview helper: scan of the note (WP-H2)', () => {
 	beforeEach(() => {
 		vi.useFakeTimers();
 		vi.stubGlobal('window', globalThis);

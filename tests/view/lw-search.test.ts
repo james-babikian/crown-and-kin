@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { matchesAll, queryWords } from '../../src/view/list-search';
 
 /*
- * The search rule of the Titles window and the Houses window (the 0.2.5 contract D.3.3, D134): every word of the
+ * The search rule of the Titles window and the Houses window (D134): every word of the
  * query must be inside one text of the row, both sides folded with foldForMatch (D100). No fuzzy match,
  * no ranking.
  */

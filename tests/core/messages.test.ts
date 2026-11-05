@@ -48,7 +48,7 @@ const SAMPLES: Record<IssueCode, IssueParams> = {
 	'picture-not-image': { owner: 'portrait', person: 'Wren', file: 'wren-photo.jpg', format: 'HEIC' },
 	'picture-too-large': { owner: 'arms', house: 'House Greymane', file: 'huge-banner.png', pixels: 54 },
 	'bad-portrait-crop': { person: 'Bertrand Valmont' },
-	// Contract 0.2.7 A.5, K.4 (J.4, J.7): the succession keys, the sex spellings and the doubtful death texts.
+	// Contract 0.2.7 A.5, K.4: the succession keys, the sex spellings and the doubtful death texts.
 	'unknown-succession': { title: 'Duke of Valmont', value: 'primogenitor' },
 	'unknown-inherit': { title: 'Duke of Valmont', value: 'sideways' },
 	'unknown-inherit-through': { title: 'Duke of Valmont', value: 'sideways' },
@@ -259,7 +259,7 @@ describe('issueText: title warnings (spec §13.3, §13.4)', () => {
 	});
 });
 
-describe('issueText: succession warnings (contract 0.2.7 A.5, J.4, J.7, K.4)', () => {
+describe('issueText: succession warnings', () => {
 	const text = (code: IssueCode, params: IssueParams) => issueText(issue(code, params));
 	const RULES = 'Use one of these rules: eldest-child, youngest-child, siblings-first, nearest-relative, born-in-reign.';
 
@@ -284,7 +284,7 @@ describe('issueText: succession warnings (contract 0.2.7 A.5, J.4, J.7, K.4)', (
 		);
 	});
 
-	it('unknown-inherit-through names the key and the three values (J.1, K.1)', () => {
+	it('unknown-inherit-through names the key and the three values', () => {
 		const t = text('unknown-inherit-through', { title: 'Duke of Valmont', value: 'sideways' });
 		expect(t).toMatch(/^The title Duke of Valmont has “inherit-through: sideways”\. /);
 		expect(t).toContain('shows no line of succession');
@@ -352,7 +352,7 @@ describe('issueText: picture warnings (spec §13.6, §13.7)', () => {
 		);
 	});
 
-	it('picture-too-large gives the millions of pixels only when known (A6)', () => {
+	it('picture-too-large gives the millions of pixels only when known', () => {
 		expect(text('picture-too-large', { ...arms, file: 'x.png', pixels: 41 })).toBe(
 			'The arms of House Valmont use the picture “x.png”, which is too large (41 million pixels). Use a picture with 40 million pixels or less.',
 		);
@@ -383,14 +383,14 @@ describe('hardErrorText', () => {
 	for (const [code, error] of Object.entries(HARD)) {
 		it(`${code}: filled and in STE`, () => {
 			const text = hardErrorText(error);
-			// F8: the parser's own message follows "Details:" in plain words (tests/obsidian/r031-small-a.test.ts checks them).
+			// F8: the parser's own message follows "Details:" in plain words (tests/obsidian/saved-view-no-card.test.ts checks them).
 			checkText(text.split(' Details: ')[0]);
 			// "line" alone means a drawn line (project word list); a line of text is a "text line".
 			expect(text.split(' Details: ')[0]).not.toMatch(/(?<!text )line/i);
 		});
 	}
 
-	it('yaml-invalid shows the line and the parser message in plain words (F8)', () => {
+	it('yaml-invalid shows the line and the parser message in plain words', () => {
 		expect(hardErrorText(HARD['yaml-invalid'])).toBe(
 			'Text line 3 of the tree text has an error. Correct this text line to show the tree. Details: The value of a field has a colon “:” in it. Put the value in quote marks.',
 		);
@@ -410,7 +410,7 @@ describe('hardErrorText', () => {
 		});
 	}
 
-	it('the limit details are the words that the owner approved', () => {
+	it('the limit details are the approved words', () => {
 		expect(LIMIT_DETAIL.tooLarge).toBe(
 			'The mark “*” repeats text that you named with the mark “&”. The tree text uses these marks so often that the plugin cannot read it. Replace some of the marks “*” with the text that they repeat.',
 		);

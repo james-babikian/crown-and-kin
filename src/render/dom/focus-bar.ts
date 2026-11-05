@@ -4,8 +4,10 @@
  * tree clear of it with the code it has for that bar. The tree view decides when the bar shows and what a tap does; this file only builds the elements.
  */
 
+import { setNameText } from './name-marks';
+
 /** What the bar says and does. The texts come from `FOCUS_UI`. */
-export interface FocusBarOptions {
+interface FocusBarOptions {
 	/** The sentence, for example "Focus on Maud Valmont". */
 	sentence: string;
 	/** The words of the link. */
@@ -27,7 +29,7 @@ export function buildFocusBar(viewport: HTMLElement, before: HTMLElement, o: Foc
 	const id = `dynasty-focus-bar-${++barIds}`;
 	const bar = viewport.createDiv({ cls: ['dynasty-result', 'dynasty-focus-bar', ...(o.phone ? ['dynasty-result-phone'] : [])], attr: { role: 'group', 'aria-labelledby': id } });
 	viewport.insertBefore(bar, before);
-	bar.createDiv({ cls: ['dynasty-result-text', 'dynasty-focus-bar-text'], text: o.sentence, attr: { id } });
+	setNameText(bar.createDiv({ cls: ['dynasty-result-text', 'dynasty-focus-bar-text'], attr: { id } }), o.sentence);
 	const row = bar.createDiv({ cls: 'dynasty-result-buttons' });
 	const clear = row.createEl('button', { cls: ['dynasty-result-button', 'dynasty-link', 'dynasty-focus-bar-clear'], text: o.clear, attr: { type: 'button', 'aria-label': o.clearLabel } });
 	clear.addEventListener('click', (e) => o.onClear(!e.detail));

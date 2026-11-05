@@ -1,7 +1,7 @@
 /*
  * Joined text lines.
  * A text line of items with "·" between them never starts a wrapped text line with "·", and a reign such as
- * "(r. 1160–1207)" never breaks. `nb` and `leadItems` are pure; `joined` builds the elements. Shared by the phone
+ * "(r. 1160–1207)" never breaks. `nb`, `leadItems` and `lowerFirst` are pure; `joined` builds the elements. Shared by the phone
  * list and the windows. The style rules (`dynasty-joined`, `dynasty-jitem`, `dynasty-jmark`, `is-lead`) come with the first caller.
  */
 
@@ -11,6 +11,11 @@
  */
 export function nb(text: string): string {
 	return text.replace(/\(([^)]*)\)/g, (m) => m.replace(/ /g, ' ').replace(/\u2009/g, '\u202f').replace(/–/g, '–⁠'));
+}
+
+/** The small first letter of a text: "Half-sister, maybe full" becomes "half-sister, maybe full". Only the first letter changes, so a user's own capitals stay. */
+export function lowerFirst(text: string): string {
+	return text.charAt(0).toLowerCase() + text.slice(1);
 }
 
 /** Where one item of a joined text line sits on screen. */
@@ -55,6 +60,11 @@ function fixJoined(box: HTMLElement): void {
 	}
 }
 
+/** Checks the text lines of a box again after its text changed. The size watch does not see a text that wraps elsewhere at the same height. */
+export function refitJoined(box: HTMLElement): void {
+	fixJoined(box);
+}
+
 /** Stops watching every joined box (the plugin calls it when it is turned off). */
 export function stopJoinedWatch(): void {
 	observer?.disconnect();
@@ -81,7 +91,7 @@ function observe(box: HTMLElement): void {
 }
 
 /**
- * Builds a text line of `parts` with "·" between them inside `parent`. The "·" belongs to the item after it. The box checks
+ * Builds a text line of `parts` with "·" between them inside `parent`. The "·" belongs to the item after it, with a space on each side. The box checks
  * its text lines when it is laid out and each time its size changes.
  */
 export function joined(parent: HTMLElement, cls: string, parts: readonly JoinKid[], tag: 'div' | 'span' = 'div'): HTMLElement {
@@ -89,7 +99,11 @@ export function joined(parent: HTMLElement, cls: string, parts: readonly JoinKid
 	parts.filter((part) => part).forEach((part, i) => {
 		if (i) box.appendText(' ');
 		const item = box.createSpan({ cls: 'dynasty-jitem' });
-		if (i) item.createSpan({ cls: 'dynasty-jmark', text: '·', attr: { 'aria-hidden': 'true' } });
+		if (i) {
+			item.createSpan({ cls: 'dynasty-jmark', text: '·', attr: { 'aria-hidden': 'true' } });
+			// A text space, as before the mark: the "·" has the same room on both sides, in any font. A margin would not match the width of a space.
+			item.appendText(' ');
+		}
 		if (typeof part === 'string') item.appendText(part);
 		else if (part) item.appendChild(part);
 	});

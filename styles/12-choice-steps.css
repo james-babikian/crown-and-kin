@@ -1,19 +1,11 @@
 /* ---------- Choice steps of the add flows (spec §6.4) ---------- */
 
 .modal.dynasty-choice {
-	width: min(480px, calc(100vw - 2 * var(--size-4-4)));
+	width: min(480px, calc(100vw - 2 * var(--dynasty-space-4)));
 }
 
 .modal.dynasty-choice.is-phone {
 	width: 100vw;
-}
-
-/* The title of a choice is its question, and the undo question names a note: on the phone bar it wraps and shows whole. */
-.dynasty-choice .dynasty-bar .dynasty-bar-title {
-	white-space: normal;
-	overflow-wrap: anywhere;
-	text-overflow: clip;
-	padding: 6px 0;
 }
 
 .dynasty-choice-text {
@@ -22,15 +14,16 @@
 
 .dynasty-choice-list {
 	margin: 0;
-	padding-left: var(--size-4-6);
+	padding-left: var(--dynasty-space-5);
 }
 
 .dynasty-choice-options {
 	display: flex;
 	flex-direction: column;
-	gap: var(--size-4-2);
+	gap: var(--dynasty-space-2);
 }
 
+/* D330 O-12: every option has the same plain look, with no fill; the first one has the focus. A tap goes on at once. */
 .dynasty-sheet .dynasty-choice-option {
 	display: flex;
 	flex-direction: column;
@@ -40,31 +33,33 @@
 	width: 100%;
 	min-height: 52px;
 	height: auto;
-	padding: var(--size-4-2) var(--size-4-3);
+	padding: var(--dynasty-space-2) var(--dynasty-space-3);
 	text-align: left;
 	font-size: var(--dynasty-type-control);
 	white-space: normal;
 	/* I39: the edge of a button reaches 3:1 on the window. */
-	border: 1px solid var(--dynasty-btn-edge);
+	border: var(--dynasty-button-edge);
+	border-radius: var(--dynasty-radius-button);
 	box-shadow: none;
 }
 
-.dynasty-choice-label {
-	font-weight: var(--font-semibold);
+/* O-33: a phone button has the phone radius of the tokens (a pill, D330), whatever radius the theme gives a button. */
+.dynasty-sheet.is-phone .dynasty-choice-option {
+	border-radius: var(--dynasty-radius-button-phone);
 }
 
+.dynasty-choice-label {
+	font-weight: var(--dynasty-weight-semibold);
+}
+
+/* The second line is regular on every device: a theme gives a phone button its own weight. */
 .dynasty-choice-detail {
 	font-size: var(--dynasty-type-small);
+	font-weight: var(--dynasty-weight-normal);
 	opacity: 0.85;
-}
-
-.dynasty-sheet .dynasty-choice-option.mod-cta {
-	border-color: transparent;
-	color: var(--dynasty-on-accent);
 }
 
 .dynasty-sheet .dynasty-choice-option:disabled {
 	opacity: 0.5;
 	cursor: not-allowed;
 }
-

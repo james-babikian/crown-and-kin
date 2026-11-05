@@ -1,6 +1,6 @@
 /*
  * A fake block handle that really applies the ops it is given (`applyOp` on its body), and the sample note of House Valmont that the
- * Houses window, house page and edit sheet tests share. Used by `obsidian-m10-notes` and `r028-n23-open-linked-note`, which each had a copy.
+ * Houses window, house page and edit sheet tests share. Used by `sheet-note-buttons` and `open-linked-note`, which each had a copy.
  */
 
 import type { Op } from '../../src/core/edit';
@@ -79,6 +79,32 @@ export function undoStackHandle(body: string): FakeHandle & { ops: Op[] } {
 		if (prev === undefined) return { ok: false, code: 'empty' };
 		h.body = prev;
 		return { ok: true, body: prev };
+	}) as never);
+	return h;
+}
+
+/** A handle on `Tree.md` whose writes apply each op to the body and record it, with no undo. */
+export function bareWritingHandle(body: string): FakeHandle & { ops: Op[] } {
+	const h = fakeHandle('Tree.md', body) as FakeHandle & { ops: Op[] };
+	h.ops = [];
+	h.write.mockImplementation((async (op: Op) => {
+		h.ops.push(op);
+		const r = applyOp(h.body, op);
+		if (!r.ok) return { ok: false, code: 'refused', refusal: r };
+		h.body = r.body;
+		return { ok: true, body: r.body, created: r.created, effects: [] };
+	}) as never);
+	return h;
+}
+
+/** A handle on `n.md` whose writes apply the op to its body and tell the handle about the change, with the effects of the op. */
+export function noteHandle(body: string): FakeHandle {
+	const h = fakeHandle('n.md', body);
+	h.write.mockImplementation((async (op: Op) => {
+		const r = applyOp(h.body, op);
+		if (!r.ok) return { ok: false, code: 'refused', refusal: r };
+		h.change(r.body);
+		return { ok: true, body: r.body, created: r.created, effects: r.effects ?? [] };
 	}) as never);
 	return h;
 }

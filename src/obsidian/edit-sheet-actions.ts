@@ -6,12 +6,15 @@
 import { Notice, type TFile } from 'obsidian';
 import { FAMILY, FINDER_UI, FOCUS_UI, FOLD_UI, ME_UI, NOTE_UI, SHEET } from '../render/ui-text';
 import type { Op } from '../core/edit';
+import type { UndoLabel } from '../core/block-write';
 import { andList } from '../core/messages';
 import { CHANGE_UI } from '../render/change-text';
+import { isolateName } from '../render/name-bidi';
 import { linkedNotePath, personNoteName } from '../core/note-make';
 import { makePersonNote, openMadeNote, type MakeNoteMode, type MakePersonNoteOutcome, type SameNameAnswer } from './make-note';
 import type { FlowHost } from './family-flows';
 import { pickPerson, type PickerContext } from './person-picker';
+import { confirmBox } from './window-parts';
 import type { TitlesHost } from './sheet-titles';
 import { EditSheetFamily } from './edit-sheet-family';
 import type { DraftWritten, SheetBase } from './edit-sheet-base';
@@ -150,7 +153,7 @@ export abstract class EditSheetActions extends EditSheetFamily {
 	/** N4: the success Notice with Undo. Undo reverts the whole write; the note stays in the vault. */
 	protected noteNotice(text: string, out: DraftWritten, name: string, was: string): void {
 		// One Notice after Undo: the note text replaces the generic one (spec §13.11).
-		this.removedNotice(text, out, was, NOTE_UI.undone(name));
+		this.undoableNotice(text, out, was, NOTE_UI.undone(name));
 	}
 
 	/** The same-name question (N2 step 2): resolves with the choice, and with Cancel if the question goes away. */
@@ -165,24 +168,23 @@ export abstract class EditSheetActions extends EditSheetFamily {
 				this.dismissQuestion = null;
 				resolve(answer);
 			};
-			const layer = this.modalEl.createDiv({ cls: 'dynasty-sheet-confirm', attr: { role: 'alertdialog', 'aria-modal': 'true' } });
-			this.confirmEl = layer;
-			this.dismissQuestion = () => settle('cancel');
-			const box = layer.createDiv({ cls: 'dynasty-sheet-confirm-box' });
-			box.createDiv({ cls: 'dynasty-sheet-confirm-title', text: NOTE_UI.askTitle(name) });
-			const row = box.createDiv({ cls: 'dynasty-sheet-confirm-actions' });
-			const choice = (text: string, cls: string, answer: SameNameAnswer) => {
-				const b = row.createEl('button', { cls, text, attr: { type: 'button' } });
-				b.addEventListener('click', () => {
+			const choice = (label: string, cls: string, answer: SameNameAnswer) => ({
+				label,
+				cls,
+				run: () => {
 					settle(answer);
 					this.hideConfirm();
-				});
-				return b;
-			};
-			const cancel = choice(NOTE_UI.askCancel, 'dynasty-sheet-keep', 'cancel');
-			choice(NOTE_UI.askLink, 'dynasty-note-ask-link', 'link');
-			choice(NOTE_UI.askNew(free), 'dynasty-note-ask-new', 'new');
-			cancel.focus();
+				},
+			});
+			this.dismissQuestion = () => settle('cancel');
+			this.confirmEl = confirmBox(this.modalEl, {
+				title: NOTE_UI.askTitle(name),
+				buttons: [
+					choice(NOTE_UI.askCancel, 'dynasty-sheet-keep', 'cancel'),
+					choice(NOTE_UI.askLink, 'dynasty-note-ask-link', 'link'),
+					choice(NOTE_UI.askNew(free), 'dynasty-note-ask-new', 'new'),
+				],
+			}).layer;
 		});
 	}
 
@@ -231,7 +233,9 @@ export abstract class EditSheetActions extends EditSheetFamily {
 		const held = h.state.listHold;
 		h.state.listHold = false;
 		const was = this.data.person.id;
-		const out = await this.writeWithDraft([{ kind: 'set-option', key: 'me', value: on ? this.data.person.id : null }], null);
+		// The name that the write saves: the draft name, as the line below shows it after the write.
+		const named = this.draft.name.trim() || this.data.person.name || SHEET.unnamed;
+		const out = await this.writeWithDraft([{ kind: 'set-option', key: 'me', value: on ? this.data.person.id : null }], null, 'build', { label: { kind: on ? 'marked-me' : 'unmarked-me', names: [named] } });
 		if (!out) {
 			h.state.listHold = held;
 			return;
@@ -244,9 +248,10 @@ export abstract class EditSheetActions extends EditSheetFamily {
 	/**
 	 * D267: the text of the line after an Add flow that wrote at once, from the ops it wrote: Add parent and Add child write `add-parent`
 	 * (the person of this window is the child or the parent), Add partner writes `add-union`. Null for any other write. The names are read
-	 * before the write, while the ids of the ops are the ones the tree has now.
+	 * before the write, while the ids of the ops are the ones the tree has now. It also gives the label of the undo entry (D330 UX-17): the
+	 * same facts for the words after an Undo.
 	 */
-	protected changeText(ops: readonly Op[]): ((effects: readonly string[]) => string) | null {
+	protected changeText(ops: readonly Op[]): { text: (effects: readonly string[]) => string; label: (effects: readonly string[]) => UndoLabel } | null {
 		const me = this.data.person.id;
 		const parents = ops.filter((op): op is Extract<Op, { kind: 'add-parent' }> => op.kind === 'add-parent');
 		if (parents.length) {
@@ -258,24 +263,34 @@ export abstract class EditSheetActions extends EditSheetFamily {
 				// The marriage is between the new parent and the first parent of the same type that the person has now (`addParent` in relationship-ops).
 				const otherId = this.data.g.byId.get(me)?.parents.find((l) => l.type === first.type && l.id !== first.parent)?.id;
 				const other = otherId === undefined ? null : this.name(otherId);
-				return (effects) => (other !== null && effects.includes('auto-union') ? CHANGE_UI.addedParentAndMarriage(parent, child, first.type, other) : plain);
+				const married = (effects: readonly string[]) => other !== null && effects.includes('auto-union');
+				return {
+					text: (effects) => (other !== null && married(effects) ? CHANGE_UI.addedParentAndMarriage(parent, child, first.type, other) : plain),
+					label: (effects) => ({ kind: 'added-parent', type: first.type, names: other !== null && married(effects) ? [parent, child, other] : [parent, child] }),
+				};
 			}
 			if (parents.some((op) => op.parent === me)) {
-				const text = CHANGE_UI.addedChild(this.name(first.child), andList(parents.map((op) => this.name(op.parent))), first.type);
-				return () => text;
+				const child = this.name(first.child);
+				const who = andList(parents.map((op) => isolateName(this.name(op.parent))));
+				const text = CHANGE_UI.addedChild(child, who, first.type);
+				return { text: () => text, label: () => ({ kind: 'added-child', type: first.type, names: [child, who] }) };
 			}
 			// Add child with another parent who is the only one to add: this person holds the link already, and the line names the parent who was added.
 			if (parents.length === 1) {
-				const text = CHANGE_UI.addedParent(this.name(first.parent), this.name(first.child), first.type);
-				return () => text;
+				const parent = this.name(first.parent);
+				const child = this.name(first.child);
+				const text = CHANGE_UI.addedParent(parent, child, first.type);
+				return { text: () => text, label: () => ({ kind: 'added-parent', type: first.type, names: [parent, child] }) };
 			}
 		}
 		const union = ops.find((op): op is Extract<Op, { kind: 'add-union' }> => op.kind === 'add-union');
 		if (union) {
 			const other = union.partners.find((id) => id !== me);
 			if (other) {
-				const text = CHANGE_UI.addedPartner(this.name(other), this.name(me));
-				return () => text;
+				const partner = this.name(other);
+				const self = this.name(me);
+				const text = CHANGE_UI.addedPartner(partner, self);
+				return { text: () => text, label: () => ({ kind: 'added-partner', names: [partner, self] }) };
 			}
 		}
 		return null;
@@ -332,12 +347,12 @@ export abstract class EditSheetActions extends EditSheetFamily {
 			fam,
 			name: (id) => this.name(id),
 			ready: () => this.pendingOps() !== null && this.fresh(),
-			commit: async (ops, highlight) => {
-				const text = this.changeText(ops);
+			commit: async (ops, highlight, o = {}) => {
+				const said = this.changeText(ops);
 				const was = this.data.person.id;
-				const out = await this.writeWithDraft(ops, highlight);
+				const out = await this.writeWithDraft(ops, highlight, 'build', { ...(said ? { label: said.label } : {}), ...(o.keepList ? { keepList: true } : {}) });
 				// D267: the window stays open, so it says what the action changed.
-				if (out && text) this.announce(text(out.effects), out.body, was, out.withFields);
+				if (out && said) this.announce(said.text(out.effects), out.body, was, out.withFields);
 				return out;
 			},
 			openNew: (rel, name) => this.openNew(rel, name),

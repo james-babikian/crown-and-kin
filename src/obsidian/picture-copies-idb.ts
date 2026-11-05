@@ -8,7 +8,7 @@ import type { App } from 'obsidian';
 import { NO_COPIES, createPictureCopies, type CopyBackend, type PictureCopies } from './picture-copies';
 
 /** The database name starts with the plugin id. */
-export const COPIES_DB_NAME = 'crown-and-kin-picture-copies';
+const COPIES_DB_NAME = 'crown-and-kin-picture-copies';
 const STORE = 'copies';
 
 function backendOf(db: IDBDatabase): CopyBackend {
@@ -44,7 +44,7 @@ function backendOf(db: IDBDatabase): CopyBackend {
 }
 
 /** Opens the database; null when this device has no IndexedDB. */
-export function openCopyBackend(): Promise<CopyBackend | null> {
+function openCopyBackend(): Promise<CopyBackend | null> {
 	let factory: IDBFactory | undefined;
 	try {
 		factory = window.indexedDB;

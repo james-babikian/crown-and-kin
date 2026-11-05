@@ -10,7 +10,7 @@ export type StampPair = readonly [key: number, stamp: number];
 export type FenceFlag = 1 | 2 | 3;
 
 /** The value in the local storage of the vault. */
-export interface StoreValue {
+interface StoreValue {
 	v: 1;
 	n: number;
 	f: Record<string, FenceFlag>;
@@ -18,20 +18,20 @@ export interface StoreValue {
 }
 
 /** What a good stored value holds: the flags, and the stamps by path key. */
-export interface StoredState {
+interface StoredState {
 	flags: Map<string, FenceFlag>;
 	stamps: Map<number, number>;
 }
 
 /** The most notes with a fence that the value holds. */
-export const MAX_FLAGS = 20_000;
+const MAX_FLAGS = 20_000;
 /** The most characters of the value as JSON (the local storage is shared by all vaults and plugins). */
-export const MAX_CHARS = 500_000;
+const MAX_CHARS = 500_000;
 
 const BASE64 = /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/;
 
 /** FNV-1a, 32 bits, unsigned, over the UTF-16 code units of a text. A code unit is cheaper than a byte encoding and equal for plain names. */
-export function fnv1a32(text: string): number {
+function fnv1a32(text: string): number {
 	let h = 0x811c9dc5;
 	for (let i = 0; i < text.length; i++) {
 		h ^= text.charCodeAt(i);
@@ -47,10 +47,10 @@ export const pathKey = (path: string): number => fnv1a32(path);
 export const stampOf = (mtime: number, size: number): number => fnv1a32(`${mtime}:${size}`);
 
 /** The length of `encodeStore` for `count` pairs, to test a limit before the work. */
-export const encodedLength = (count: number): number => 4 * Math.ceil((count * 8) / 3);
+const encodedLength = (count: number): number => 4 * Math.ceil((count * 8) / 3);
 
 /** Turns pairs into base64 of little-endian uint32 pairs, sorted by key (8 bytes each). */
-export function encodeStore(pairs: readonly StampPair[]): string {
+function encodeStore(pairs: readonly StampPair[]): string {
 	const sorted = [...pairs].sort((a, b) => a[0] - b[0]);
 	const bytes = new Uint8Array(sorted.length * 8);
 	const view = new DataView(bytes.buffer);
@@ -64,7 +64,7 @@ export function encodeStore(pairs: readonly StampPair[]): string {
 }
 
 /** Turns base64 back into pairs. It gives null when the text is not valid base64 or its size is not a multiple of 8 bytes. */
-export function decodeStore(text: string): StampPair[] | null {
+function decodeStore(text: string): StampPair[] | null {
 	if (typeof text !== 'string' || !BASE64.test(text)) return null;
 	let binary: string;
 	try {
@@ -102,7 +102,7 @@ export function readStoreValue(raw: unknown): StoredState | null {
 	if (value.s !== null) {
 		if (typeof value.s !== 'string') return null;
 		const pairs = decodeStore(value.s);
-		if (!pairs || pairs.length !== value.n) return null;
+		if (pairs?.length !== value.n) return null;
 		for (const [key, stamp] of pairs) stamps.set(key, stamp);
 	}
 	return { flags, stamps };

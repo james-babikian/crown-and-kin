@@ -8,7 +8,7 @@ import type { Editor } from 'obsidian';
 import { INSERT_UI } from '../render/ui-text';
 
 /** The text and cursor position `planInsert` produces. */
-export interface InsertPlan {
+interface InsertPlan {
 	/** Replaces the whole text lines from the selection's first line to its last line. */
 	text: string;
 	/** Where the cursor goes, relative to the first replaced line: the line after the closing fence. */
@@ -52,7 +52,7 @@ export function containerPrefix(line: string): { first: string; rest: string } {
 const FENCE = /^((?:[ \t]{0,3}>[ \t]?)*[ \t]*(?:(?:[-*+]|\d{1,9}[.)])[ \t]+)?)(`{3,}|~{3,})(.*)$/;
 
 /** A fenced block around the cursor, as `fenceAround` finds it. */
-export interface FenceAround {
+interface FenceAround {
 	/** The line of the opening fence. */
 	open: number;
 	/** The prefix of the opening fence line. */

@@ -12,14 +12,20 @@ import { NEW_SHEET, REMOVE, SHEET, UNION_EDIT, WRITE_TEXT, deleteText, unionType
 import { normBody } from '../core/block-match';
 import { andList } from '../core/messages';
 import { CHANGE_UI } from '../render/change-text';
+import { isolateName } from '../render/name-bidi';
 import type { HandleWriteOutcome, Written } from './block-handle';
 import { describeDelete, type ParentLink, type PartnerLink } from '../core/family-query';
 import { autoUnionNotice, unionOp } from './family-flows';
 import { afterPaint, freshOrStale, onWriteFailed } from './sheet-parts';
-import { undoIfUnchanged, undoNotice } from './undo-notice';
+import { undoNotice, undoWithLabel } from './undo-notice';
+import { cancelLabelFor } from './window-shell';
+import { undoneText } from './undo-text';
+import type { UndoLabel } from '../core/block-write';
 import { endedByChoice, openUnionEditor } from './union-edit';
 import { EditSheetActions } from './edit-sheet-actions';
-import { SLOW_SAVE_PEOPLE, type DraftWritten, type EditSheetBase } from './edit-sheet-base';
+import { guarded } from './start-guard';
+import { markShownQuiet } from './saved-quiet';
+import { SLOW_SAVE_PEOPLE, type DraftWritten, type EditSheetBase, type WriteExtra } from './edit-sheet-base';
 import { NEW_HOUSE, loadSheet, findUnion, mapIds, opNames, unwritten, sameUnwritten, takenIds, idsFor, withIds, holderNames, type Draft } from '../view/sheet-draft';
 
 /** The writes of the sheet: the draft, Save, the relationship writes and the reload. */
@@ -40,11 +46,11 @@ export abstract class EditSheetWrites extends EditSheetActions {
 	/** True if the draft has a name, and a name for a new house; otherwise shows what is missing. */
 	protected validate(): boolean {
 		if (this.draft.name.trim() === '') {
-			this.showError(SHEET.needName);
+			this.showError(SHEET.needName, this.fieldInput('name'));
 			return false;
 		}
 		if (this.draft.house === NEW_HOUSE && this.newHouse.name.trim() === '') {
-			this.showError(SHEET.needHouseName);
+			this.showError(SHEET.needHouseName, this.fieldInput('new-house-name'));
 			return false;
 		}
 		return true;
@@ -108,13 +114,16 @@ export abstract class EditSheetWrites extends EditSheetActions {
 		return ops;
 	}
 
+	/** The ids that the write in progress gives to people who had none; `listAnchor` reads it. */
+	private writeIds: Map<string, string> | null = null;
+
 	/**
 	 * One write through the handle, with the stale check first (spec §6.1). `highlight` is the
 	 * person the tree shows and highlights after the write (spec §5.5). Failures are reported in a
 	 * Notice and in the sheet, and the draft stays. `saves`: the write is a Save that closes the window (or a Save and add another);
-	 * only that moves the phone list to the person. An in-place write does not.
+	 * only that moves the phone list to the person. An in-place write does not. `extra` is the label of the Undo entry and the option that keeps the list (see `WriteExtra`).
 	 */
-	protected async write(ops: Op[], highlight: string | null, saves = false): Promise<Written | null> {
+	protected async write(ops: Op[], highlight: string | null, saves = false, extra: WriteExtra = {}): Promise<Written | null> {
 		if (this.saving || this.readOnly || !ops.length) return null;
 		const h = this.o.handle;
 		// The handle already knows of a change the user has not seen: same result as a stale write.
@@ -135,24 +144,35 @@ export abstract class EditSheetWrites extends EditSheetActions {
 		};
 		// Set before the write: the re-render that follows can run before the write returns.
 		if (highlight) {
-			h.state.lastEdited = highlight;
-			if (saves) {
+			// With `keepList` (O-09) the person last edited is the person who started the action, and the list does not move to `highlight`.
+			h.state.lastEdited = extra.keepList ? (this.listAnchor() ?? highlight) : highlight;
+			if (saves && !extra.keepList) {
 				h.state.lastSaved = highlight;
 				h.state.listHold = false;
 			} else {
 				h.state.listHold = true;
-				this.holdsList = true;
+				// A new person's window that was opened from another window leaves the hold to that window, which stays open; the hold must not end when this one closes.
+				if (!(extra.keepList && this.holdingParent())) this.holdsList = true;
 			}
 			h.state.highlight = { id: highlight, until: performance.now() + 3000 };
-			h.state.shown = { id: highlight, place: this.o.place ?? 'embed' };
+			const shown = { id: highlight, place: this.o.place ?? 'embed' };
+			// D330 F03: a write of a window that stays open is shown by that window; the phone list says "saved elsewhere" only for a Save that ends its window.
+			h.state.shown = saves ? shown : markShownQuiet(shown);
 		}
 		try {
-			if (slow) await afterPaint(this.modalEl.win ?? window);
+			if (slow) await afterPaint(this.modalEl.win);
 			this.o.beforeWrite?.();
-			const out = await h.write(op);
+			const out = await h.write(op, 'user', extra.label);
 			if (out.ok) {
 				// A Save moves the list (rung 4): the earlier in-place writes of this window hold it no more, also after the window closes.
-				if (saves) this.holdsList = false;
+				if (saves && !extra.keepList) this.holdsList = false;
+				else if (extra.keepList) {
+					const parent = this.holdingParent();
+					if (parent) parent.holdsList = true;
+				}
+				// O-13: the window wrote something, so its left button reads "Close" from now on (a window that shows a next page draws it again).
+				this.wrote = true;
+				this.shell?.setCancelLabel(cancelLabelFor('wrote'));
 				this.foldsWritten(highlight, out.created);
 				return out;
 			}
@@ -173,6 +193,27 @@ export abstract class EditSheetWrites extends EditSheetActions {
 	}
 
 	/**
+	 * O-09: the Save of a new person leaves the phone list where it is after Add partner, Add child (it stays on the person who started it) and Add person
+	 * when the tree has people. An empty tree shows the new person: there is nothing else to show.
+	 */
+	private keepsList(): boolean {
+		const kind = this.rel?.kind;
+		return kind === 'partner' || kind === 'child' || (kind === 'person' && this.data.g.people.length > 0);
+	}
+
+	/** O-09b: the person who started the action: the person of this window, or for a new person the person of the window that opened it; null for the bar. The id is the one that the write gives, when the person had none. */
+	private listAnchor(): string | null {
+		const raw = this.isNew ? (this.o.parentSheet?.data.person.id ?? null) : this.data.person.id;
+		return raw === null ? null : (this.writeIds?.get(raw) ?? raw);
+	}
+
+	/** O-09b: the window that opened this new-person window, if it can hold the phone list. */
+	private holdingParent(): EditSheetWrites | null {
+		const parent = this.o.parentSheet;
+		return this.isNew && parent instanceof EditSheetWrites ? parent : null;
+	}
+
+	/**
 	 * B1: the window no longer holds the phone list. The hold does not just stop: the next redraw of each list of the block still keeps the person it
 	 * stands on (`listKeep`, a count that each list reads once), because a redraw can come after the window (a write that ended late, a note change).
 	 * Nothing to do for a window that did not write in place, or that ended with a Save.
@@ -187,7 +228,7 @@ export abstract class EditSheetWrites extends EditSheetActions {
 
 	/** F6: the sign that a write runs: the Save button and the status line say "Wait" until the write ends. */
 	protected showSaving(on: boolean): void {
-		this.shell?.save?.setText(on ? SHEET.saveWait : SHEET.save);
+		this.shell?.setSaveLabel(on ? SHEET.saveWait : SHEET.save);
 		this.statusEl?.setText(on ? SHEET.savingStatus : this.status);
 		this.statusEl?.toggle(on || this.status !== '');
 	}
@@ -197,11 +238,7 @@ export abstract class EditSheetWrites extends EditSheetActions {
 		const folds = this.o.folds;
 		if (!folds) return;
 		const own = highlight ?? (this.isNew ? null : this.data.person.id);
-		try {
-			folds.written([...new Set([...(own ? [own] : []), ...created])]);
-		} catch (e) {
-			console.error('Crown and Kin: cannot show the people that folds hide', e);
-		}
+		guarded('cannot show the people that folds hide', () => folds.written([...new Set([...(own ? [own] : []), ...created])]));
 	}
 
 	protected failed(out: Exclude<HandleWriteOutcome, { ok: true }>): void {
@@ -231,7 +268,7 @@ export abstract class EditSheetWrites extends EditSheetActions {
 	 * result. A person of the write with no written id gets one in it; the sheet's own person always
 	 * does, so the sheet follows them by that id afterwards. `show`: 'in-place' updates the page without a build (see `showParentTypes`).
 	 */
-	protected async writeWithDraft(ops: Op[], highlight: string | null = this.data.person.id, show: 'build' | 'in-place' = 'build'): Promise<DraftWritten | null> {
+	protected async writeWithDraft(ops: Op[], highlight: string | null = this.data.person.id, show: 'build' | 'in-place' = 'build', extra: WriteExtra = {}): Promise<DraftWritten | null> {
 		this.lastError = '';
 		const pending = this.pendingOps();
 		if (pending === null) return null;
@@ -239,7 +276,8 @@ export abstract class EditSheetWrites extends EditSheetActions {
 		// The refusal `limit` says which type is full: the text differs for a rumoured parent.
 		this.limitType = ops.map((op) => (op.kind === 'add-parent' ? op.type : op.kind === 'set-parent-type' ? op.to : undefined)).find((t) => t !== undefined);
 		const ids = idsFor(this.data, [this.data.person.id, ...opNames(all), ...holderNames(all)]);
-		const out = await this.write(withIds(all, ids), highlight === null ? null : (ids.get(highlight) ?? highlight));
+		this.writeIds = ids;
+		const out = await this.write(withIds(all, ids), highlight === null ? null : (ids.get(highlight) ?? highlight), false, extra);
 		if (!out) return null;
 		// 'in-place' is for a control that the user is using now. A write that carries field changes needs the full form again.
 		if (show === 'in-place' && pending.length === 0) this.showParentTypes(out.body, ids);
@@ -248,12 +286,24 @@ export abstract class EditSheetWrites extends EditSheetActions {
 	}
 
 	/**
-	 * The Notice with Undo after a removal or a note write. Undo reverts the whole write, so the Notice says when
-	 * the write also saved field changes; after Undo the open sheet shows the restored data. `was`:
-	 * the person's id before the write, which Undo gives back if the write gave them their first id.
+	 * The result of a removal (a parent, a partner, a child link, a title). D330 F02: while this window stays open, the result is the window's own text
+	 * line with Undo (D267, as after Add partner), because a Notice stands over the bar of a phone window and hides Close and Save. A Notice shows only
+	 * when the window is gone. `was`: the person's id before the write, which Undo gives back if the write gave them their first id.
+	 */
+	protected removedNotice(text: string, out: DraftWritten, was: string): void {
+		if (this.shown && !this.closing) {
+			this.announce(text, out.body, was, out.withFields);
+			return;
+		}
+		this.undoableNotice(text, out, was);
+	}
+
+	/**
+	 * The Notice with Undo after a write of a window that closes at once (a note write) or is closed. Undo reverts the whole write, so the Notice says
+	 * when the write also saved field changes; after Undo the open sheet shows the restored data. `was`: the person's id before the write.
 	 * `undone` is the text after Undo, when it is not the generic one.
 	 */
-	protected removedNotice(text: string, out: DraftWritten, was: string, undone?: string): void {
+	protected undoableNotice(text: string, out: DraftWritten, was: string, undone?: string): void {
 		const h = this.o.handle;
 		undoNotice(out.withFields ? `${text} ${REMOVE.undoAlso}` : text, h, out.body, () => {
 			if (!this.shown) return;
@@ -272,7 +322,9 @@ export abstract class EditSheetWrites extends EditSheetActions {
 				this.finish();
 				return;
 			}
-			if (await this.write([op], this.data.person.id, true)) this.finish();
+			// The undo line names the person as the tree shows them after the undo: the saved name, not the draft.
+			const named = this.data.person.name || this.draft.name.trim() || SHEET.unnamed;
+			if (await this.write([op], this.data.person.id, true, { label: { kind: 'change', names: [named] } })) this.finish();
 			return;
 		}
 		if (this.relBlocked) {
@@ -289,10 +341,11 @@ export abstract class EditSheetWrites extends EditSheetActions {
 		const name = this.draft.name.trim();
 		// The related people and the parent sheet's person get an id if they have none (see `idsFor`).
 		const ids = idsFor(this.data, [...(parent ? [parent.data.person.id] : []), ...this.relIds(), ...opNames(pending)]);
+		this.writeIds = ids;
 		// The next free person id (D104), also unused by the ids above.
 		const id = nextPersonId(takenIds(this.data, ids.values()));
 		const taken = pending.flatMap((op) => (op.kind === 'batch' ? op.ops : [op])).filter((op) => op.kind === 'add-house').map((op) => (op.kind === 'add-house' && parent ? newHouseId(parent.data.data, op.name) : ''));
-		const out = await this.write(withIds([...pending, ...this.newPersonOps(id, taken)], ids), id, true);
+		const out = await this.write(withIds([...pending, ...this.newPersonOps(id, taken)], ids), id, true, { label: this.addedLabel(this.rel!, name), keepList: this.keepsList() });
 		if (!out) {
 			// The parent sheet shows the same new data as this one after a stale write.
 			if (parent && normBody(parent.data.body) !== normBody(this.o.handle.body)) parent.reload(this.o.handle.body);
@@ -352,6 +405,27 @@ export abstract class EditSheetWrites extends EditSheetActions {
 		if (text) parent.announce(text, out.body, was, withFields);
 	}
 
+	/** What the undo entry of a Save that added the new person says (D330 UX-17): the same facts as `addedText`; absent when the new person has no relative. */
+	protected addedLabel(rel: NonNullable<EditSheetWrites['rel']>, name: string): ((effects: readonly string[]) => UndoLabel) | undefined {
+		switch (rel.kind) {
+			case 'parent': {
+				const otherId = this.data.g.byId.get(rel.child)?.parents.find((l) => l.type === rel.type)?.id;
+				const child = this.name(rel.child);
+				return (effects) => ({ kind: 'added-parent', type: rel.type, names: otherId !== undefined && effects.includes('auto-union') ? [name, child, this.name(otherId)] : [name, child] });
+			}
+			case 'child': {
+				const parents = andList([rel.parent, ...(rel.other === null ? [] : [rel.other])].map((id) => isolateName(this.name(id))));
+				return () => ({ kind: 'added-child', type: 'birth', names: [name, parents] });
+			}
+			case 'partner': {
+				const other = this.name(rel.partner);
+				return () => ({ kind: 'added-partner', names: [name, other] });
+			}
+			default:
+				return undefined;
+		}
+	}
+
 	/** The text of the line for the new person that a Save added to the window that started this one (D267); null when the new person has no relative. */
 	protected addedText(rel: NonNullable<EditSheetWrites['rel']>, name: string, effects: readonly string[]): string | null {
 		switch (rel.kind) {
@@ -361,7 +435,7 @@ export abstract class EditSheetWrites extends EditSheetActions {
 				return otherId === undefined ? CHANGE_UI.addedParent(name, this.name(rel.child), rel.type) : CHANGE_UI.addedParentAndMarriage(name, this.name(rel.child), rel.type, this.name(otherId));
 			}
 			case 'child':
-				return CHANGE_UI.addedChild(name, andList([rel.parent, ...(rel.other === null ? [] : [rel.other])].map((id) => this.name(id))), 'birth');
+				return CHANGE_UI.addedChild(name, andList([rel.parent, ...(rel.other === null ? [] : [rel.other])].map((id) => isolateName(this.name(id)))), 'birth');
 			case 'partner':
 				return CHANGE_UI.addedPartner(name, this.name(rel.partner));
 			default:
@@ -380,8 +454,10 @@ export abstract class EditSheetWrites extends EditSheetActions {
 		this.changeBusy = true;
 		try {
 			// The depth check: when another write stands above the one of the line, the body can be the same again (a pin set and removed).
-			if (!(await undoIfUnchanged(h, c.written, c.depth))) return;
-			this.change = { text: CHANGE_UI.undone, written: null, was: c.was, depth: null };
+			const done = await undoWithLabel(h, c.written, c.depth);
+			if (!done) return;
+			// D330 UX-17: the line says what the Undo changed back; a write with no final text keeps the generic line.
+			this.change = { text: undoneText(done.label, null, CHANGE_UI.undone), written: null, was: c.was, depth: null };
 			if (!this.shown) return;
 			const id = this.data.person.id;
 			// reload, not afterWrite: text typed after the action stays in the draft.
@@ -401,6 +477,8 @@ export abstract class EditSheetWrites extends EditSheetActions {
 	 * the ids the write gave to people with none; the sheet follows its person by the new id.
 	 */
 	afterWrite(body: string, ids?: ReadonlyMap<string, string>): void {
+		// A write has happened (this window's own, or the Save of a window that it started): the left button reads "Close" (O-13).
+		this.wrote = true;
 		const id = ids?.get(this.data.person.id) ?? this.data.person.id;
 		const r = loadSheet(body, this.isNew ? null : id, this.o.dates);
 		if (r.kind !== 'ok') {
@@ -452,7 +530,10 @@ export abstract class EditSheetWrites extends EditSheetActions {
 			const sameMeaning = next.endedBy !== '' && readEndedBy(next.endedBy) !== null && readEndedBy(next.endedBy) === readEndedBy(current.endedBy);
 			if (next.endedBy !== current.endedBy && !sameMeaning) fields['ended-by'] = next.endedBy === '' ? null : next.endedBy;
 			if (!Object.keys(fields).length) return null;
+			const was = this.data.person.id;
 			const out = await this.writeWithDraft([{ kind: 'edit-union', union: now.union, fields }]);
+			// D330 UX-03: the window says what the Save changed, with Undo, as it does after Add partner. The names are the saved ones.
+			if (out) this.announce(CHANGE_UI.changedPartnership(this.data.person.name || SHEET.unnamed, this.name(link.partner)), out.body, was, out.withFields);
 			return out ? null : this.lastError || WRITE_TEXT.refused;
 		});
 	}
@@ -495,7 +576,7 @@ export abstract class EditSheetWrites extends EditSheetActions {
 	protected async deletePerson(): Promise<void> {
 		const p = this.data.person;
 		const h = this.o.handle;
-		const out = await this.write([{ kind: 'delete-person', id: p.id }], null);
+		const out = await this.write([{ kind: 'delete-person', id: p.id }], null, false, { label: { kind: 'deleted', names: [p.name || SHEET.unnamed] } });
 		if (!out) return;
 		if (h.state.lastEdited === p.id) h.state.lastEdited = null;
 		if (h.state.lastSaved === p.id) h.state.lastSaved = null;

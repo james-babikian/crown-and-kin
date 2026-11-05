@@ -1,5 +1,5 @@
 /*
- * Helpers for the tests of the Titles window and the Houses window as a list with an edit page (the 0.2.5 contract D.5.1).
+ * Helpers for the tests of the Titles window and the Houses window as a list with an edit page.
  * They work on the fake DOM, which is not a browser: its `querySelector` knows a tag, classes, quoted attributes, a
  * descendant space, a comma list and `:scope >`. So the helpers use only those forms.
  */

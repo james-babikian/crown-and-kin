@@ -3,7 +3,7 @@
 /* The three groups of the Family section stand under a small heading; each group is a list of rows. */
 .dynasty-family-group {
 	display: grid;
-	/* The width of the controls at the end of a person row (a parent: the type chip and a cross; a partner: Edit and a cross; a child: an arrow). */
+	/* The width of the controls at the end of a person row (a parent: the type chip and a cross; a partner: Edit and a cross; a child: an arrow). Each group below sets what its own controls need. */
 	--dynasty-family-end: 120px;
 }
 
@@ -11,8 +11,29 @@
 	--dynasty-family-end: 152px;
 }
 
+/*
+ * O-10, W-04 (D330; changes D214): each group keeps only the space that its own controls need, so a name has the rest of the row, and the pictures of the rows stand on
+ * one line inside a group (with a portrait or arms, and with none). A child row has the arrow, a partner row Edit and a cross; a parent row keeps the width above, which
+ * its type chip fills.
+ */
+.dynasty-family-group[data-family='children'] {
+	--dynasty-family-end: 24px;
+}
+
+.dynasty-family-group[data-family='partners'] {
+	--dynasty-family-end: 76px;
+}
+
+.dynasty-sheet.is-phone .dynasty-family-group[data-family='children'] {
+	--dynasty-family-end: 44px;
+}
+
+.dynasty-sheet.is-phone .dynasty-family-group[data-family='partners'] {
+	--dynasty-family-end: 92px;
+}
+
 .dynasty-family-empty {
-	padding: 4px 0;
+	padding: var(--dynasty-space-1) 0;
 }
 
 .dynasty-family-controls {
@@ -21,7 +42,7 @@
 	gap: 2px;
 }
 
-/* One width for the end controls of every person row, so the portraits of the rows stand on one vertical line (D214). */
+/* One width for the end controls of the rows of a group, so the portraits of its rows stand on one vertical line. */
 .dynasty-family-row[data-child] > .dynasty-row-chev {
 	flex: 0 0 var(--dynasty-family-end);
 	width: var(--dynasty-family-end);
@@ -39,7 +60,7 @@
 }
 
 .dynasty-family-row > .dynasty-row-text {
-	padding-right: var(--size-4-2);
+	padding-right: var(--dynasty-space-2);
 }
 
 /* The Actions section: a row with an icon lead; Delete stands last, in the error colour. The slot of "Make a note" holds one row of its own. */
@@ -52,5 +73,5 @@
 }
 
 .dynasty-sheet-confirm-text + .dynasty-sheet-confirm-text {
-	margin-top: var(--size-4-2);
+	margin-top: var(--dynasty-space-2);
 }

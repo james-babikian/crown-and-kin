@@ -3,15 +3,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { findBlocks } from '../../src/core/block-locate';
 import { parseCalendarBlock } from '../../src/core/calendar-block';
 import { compileCalendars, PLAIN_READER, type ReadDate } from '../../src/core/dates';
-import type { Op } from '../../src/core/edit';
-import { applyOp } from '../../src/core/yaml-edit';
 import { EditSheet } from '../../src/obsidian/edit-sheet';
 import { dateReadout } from '../../src/render/date-readout';
 import { FEl, dispatch, resetDom } from '../acceptance/fake-dom';
 import { resetObsidian } from '../acceptance/fake-obsidian';
-import { fakeHandle, type FakeHandle } from '../acceptance/tree-view-fakes';
 import { cycleNote, eraNote } from '../support/calendar-vault';
 import { useFakeDom } from '../support/fake-dom-setup';
+import { bareWritingHandle as writingHandle } from '../support/writing-handle';
 
 /*
  * Step 4.3 of WP-4 (spec §14 rule 6, the architecture notes §5.7): the grey line under Born and Died. The text of the line for every case of rule 6, and the line in the real person window:
@@ -90,19 +88,6 @@ const BODY = `people:
     born: Qinglong Emperor 3
     died: Qinglong Emperor 9
 `;
-
-function writingHandle(body: string): FakeHandle & { ops: Op[] } {
-	const h = fakeHandle('Tree.md', body) as FakeHandle & { ops: Op[] };
-	h.ops = [];
-	h.write.mockImplementation((async (op: Op) => {
-		h.ops.push(op);
-		const r = applyOp(h.body, op);
-		if (!r.ok) return { ok: false, code: 'refused', refusal: r };
-		h.body = r.body;
-		return { ok: true, body: r.body, created: r.created, effects: [] };
-	}) as never);
-	return h;
-}
 
 function openSheet(dates?: (link: string | undefined) => ReturnType<typeof read>) {
 	const handle = writingHandle(BODY);

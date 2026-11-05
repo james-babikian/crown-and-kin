@@ -75,6 +75,7 @@ import {
 } from '../core/picture-list';
 import { folderOf } from '../core/link-text';
 import { judgeHeader, readPictureHeader, type PictureProblem, type SupportedFormat } from '../core/pictures';
+import { mediaMatches } from '../render/dom/page-reads';
 import { PICKER_UI, PICTURES_UI, deviceNotice } from '../render/ui-text';
 import { NO_READ_BYTES, NO_READ_BYTES_COARSE, isShownPictureExtension, type CopyBox, type PictureCopy, type PictureStore } from './picture-store';
 import { phoneLayout, startWithoutFocus } from './modal-layout';
@@ -82,6 +83,7 @@ import { trackModal } from '../view/plugin-modals';
 import { freePath } from './save-picture';
 import { nameDialog } from './sheet-parts';
 import { buildShell, type Shell } from './window-shell';
+import { guarded } from './start-guard';
 /** The preview box of a picture, in CSS px: a thumbnail in a grid of pictures (D212 picker-grid; D93 had a 32 px box in a row). */
 export const PREVIEW_BOX_PX = 72;
 /** The copy box of a row preview: the picture's own proportions, never cut. */
@@ -89,15 +91,15 @@ export const PREVIEW_BOX: CopyBox = { w: PREVIEW_BOX_PX, h: PREVIEW_BOX_PX, fit:
 /** The most row previews that load at one time. */
 export const PREVIEW_LOADS = 4;
 /** The times, in ms, at which the scroller is put back to the top after open. */
-export const PICKER_TOP_MS: readonly number[] = [0, 60, 200];
+const PICKER_TOP_MS: readonly number[] = [0, 60, 200];
 
 /** The part of a `TFile` that the picker reads from `current`; a test passes a plain object. */
-export interface CurrentFileLike extends PictureFileLike {
+interface CurrentFileLike extends PictureFileLike {
 	stat: { ctime: number; mtime: number; size: number };
 }
 
 /** One picture row as the preview loader sees it. */
-export interface PreviewRowRef {
+interface PreviewRowRef {
 	/** The row's identity (`PickerRowKey`). */
 	key: string;
 	/** The picture to load. */
@@ -107,7 +109,7 @@ export interface PreviewRowRef {
 }
 
 /** What `createRowPreviews` gets. */
-export interface RowPreviewsOptions {
+interface RowPreviewsOptions {
 	/** The store; without it the boxes stay empty and nothing loads. */
 	store: PictureStore | undefined;
 	/** The element whose client rect is the visible part of the list. */
@@ -117,7 +119,7 @@ export interface RowPreviewsOptions {
 }
 
 /** What the picker asks of its preview loader. */
-export interface RowPreviews {
+interface RowPreviews {
 	/** Re-evaluates which rows are near (after open, scroll, open/close of a folder, a search change); a row that answered `null` asks again here. */
 	update(): void;
 	/** The rows were replaced: cancel and release what belongs to rows that are gone. */
@@ -130,7 +132,7 @@ export interface RowPreviews {
 }
 
 /** What opens the picker. */
-export interface PickPictureOptions {
+interface PickPictureOptions {
 	/** The tree's note: links are made from it, and a device picture goes to its attachment folder. */
 	sourcePath: string;
 	/** For the row previews; without it the rows show empty boxes. */
@@ -193,11 +195,7 @@ export function currentPictureOf(store: PictureStore | undefined, link: string |
 
 /** True on a touch-first device, from the picker's own window; a missing or failing `matchMedia` is false. */
 export function isTouchFirst(win: Window): boolean {
-	try {
-		return win.matchMedia?.('(pointer: coarse)')?.matches === true;
-	} catch {
-		return false;
-	}
+	return mediaMatches(win, '(pointer: coarse)');
 }
 
 /** The element that scrolls the list: the sheet body, on the phone and on the computer. The search bar is not inside it (D102). */
@@ -452,11 +450,7 @@ class PicturePicker extends Modal {
 		this.state = { cursor: cur === null ? null : `picture:${cur}`, selected: cur, armed: false };
 	}
 
-	private get pickerWin(): Window {
-		return this.modalEl.win ?? window;
-	}
-
-	override onOpen(): void {
+		override onOpen(): void {
 		this.modalEl.addClass('dynasty-sheet');
 		this.modalEl.addClass('dynasty-picture-picker');
 		this.cleanup.push(phoneLayout(this), trackModal(this, () => this.close()));
@@ -513,7 +507,7 @@ class PicturePicker extends Modal {
 		this.keepAtTop();
 		// A search list: a computer gives the field the focus (the keys and a screen reader work at once). A touch-first device
 		// opens with no field focused, so no keyboard covers the pictures.
-		if (isTouchFirst(this.pickerWin)) this.cleanup.push(startWithoutFocus(this.modalEl));
+		if (isTouchFirst(this.modalEl.win)) this.cleanup.push(startWithoutFocus(this.modalEl));
 		else this.focusSearch();
 		this.scheduleUpdate();
 	}
@@ -521,8 +515,8 @@ class PicturePicker extends Modal {
 	override onClose(): void {
 		this.closed = true;
 		for (const c of this.cleanup.splice(0)) c();
-		for (const t of this.timers.splice(0)) this.pickerWin.clearTimeout(t);
-		if (this.frame) this.pickerWin.cancelAnimationFrame(this.frame);
+		for (const t of this.timers.splice(0)) this.modalEl.win.clearTimeout(t);
+		if (this.frame) this.modalEl.win.cancelAnimationFrame(this.frame);
 		this.frame = 0;
 		this.previews?.dispose();
 		this.previews = null;
@@ -535,11 +529,7 @@ class PicturePicker extends Modal {
 
 	/** A failed step never leaves an exception in Obsidian (spec §8). */
 	private guard(fn: () => void): void {
-		try {
-			fn();
-		} catch (e) {
-			console.error('Crown and Kin: the picture picker failed', e);
-		}
+		guarded('the picture picker failed', fn);
 	}
 
 	/** The search field takes the focus back from Obsidian until the user presses a key or a pointer. */
@@ -548,7 +538,7 @@ class PicturePicker extends Modal {
 			if (!this.touched) this.searchEl?.focus({ preventScroll: true });
 		};
 		take();
-		for (const ms of [0, 60, 200]) this.timers.push(this.pickerWin.setTimeout(take, ms));
+		for (const ms of [0, 60, 200]) this.timers.push(this.modalEl.win.setTimeout(take, ms));
 	}
 
 	/** The listeners of the window: the user's actions, the keys and the scroll. */
@@ -571,8 +561,8 @@ class PicturePicker extends Modal {
 			if (!this.acted && this.scroller) this.scroller.scrollTop = 0;
 		};
 		top();
-		for (const ms of PICKER_TOP_MS) this.timers.push(this.pickerWin.setTimeout(top, ms));
-		const vv = this.pickerWin.visualViewport;
+		for (const ms of PICKER_TOP_MS) this.timers.push(this.modalEl.win.setTimeout(top, ms));
+		const vv = this.modalEl.win.visualViewport;
 		if (vv) {
 			const once = () => {
 				vv.removeEventListener('resize', once);
@@ -586,7 +576,7 @@ class PicturePicker extends Modal {
 	/** V6b: one frame after a change, the previews look at what is near. */
 	private scheduleUpdate(): void {
 		if (this.frame || !this.previews) return;
-		this.frame = this.pickerWin.requestAnimationFrame(() => {
+		this.frame = this.modalEl.win.requestAnimationFrame(() => {
 			this.frame = 0;
 			this.guard(() => this.previews?.update());
 		});
@@ -730,7 +720,7 @@ class PicturePicker extends Modal {
 	 * A screen reader follows only the focused element.
 	 */
 	private setActiveRow(id: string | null): void {
-		const holder = this.modalEl.doc?.activeElement === this.modalEl ? this.modalEl : this.searchEl;
+		const holder = this.modalEl.doc.activeElement === this.modalEl ? this.modalEl : this.searchEl;
 		for (const el of [this.modalEl, this.searchEl]) {
 			if (el && el === holder && id !== null) el.setAttribute('aria-activedescendant', id);
 			else el?.removeAttribute('aria-activedescendant');
@@ -740,11 +730,11 @@ class PicturePicker extends Modal {
 	/** Only the Arrow keys and typing scroll the cursor row into view. */
 	private keepRowInView(): void {
 		if (this.state.cursor === REMOVE_KEY) {
-			this.removeEl?.scrollIntoView?.({ block: 'nearest' });
+			this.removeEl?.scrollIntoView({ block: 'nearest' });
 			return;
 		}
 		const at = this.state.cursor === null ? undefined : this.index.get(this.state.cursor);
-		if (at !== undefined) this.els[at].scrollIntoView?.({ block: 'nearest' });
+		if (at !== undefined) this.els[at].scrollIntoView({ block: 'nearest' });
 	}
 
 	// ---------- keys and taps (the rules are the reducers of core/picture-list.ts) ----------
@@ -754,7 +744,7 @@ class PicturePicker extends Modal {
 		if (e.isComposing || e.keyCode === 229) return;
 		if (e.ctrlKey || e.metaKey || e.altKey || !HANDLED_KEYS.includes(e.key)) return;
 		// A key on Select or Cancel belongs to that button.
-		if ((e.target as HTMLElement | null)?.closest?.('button')) return;
+		if ((e.target as HTMLElement | null)?.closest('button')) return;
 		if (this.removeEl && this.onRemoveKey(e)) return;
 		const before = this.state.cursor;
 		const step = pickerKey(this.rows, this.state, e.key as PickerKey);
@@ -868,7 +858,7 @@ class PicturePicker extends Modal {
 		this.modalEl.addClass('is-saving');
 		try {
 			// A6: a file this large is too large without a read.
-			if (f.size > (isTouchFirst(this.pickerWin) ? NO_READ_BYTES_COARSE : NO_READ_BYTES)) {
+			if (f.size > (isTouchFirst(this.modalEl.win) ? NO_READ_BYTES_COARSE : NO_READ_BYTES)) {
 				new Notice(deviceNotice({ ok: false, code: 'picture-too-large', file: f.name }));
 				return;
 			}

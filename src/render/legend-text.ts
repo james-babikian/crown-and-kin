@@ -28,18 +28,24 @@ export const SIGN_LEGEND_LABEL = 'Illegitimate child (no dashed line)';
 /** The legend row for a dead person with no death year: a sample of the date text and its words. */
 export const LEGEND_DEAD_SAMPLE = 'b. 1131 †';
 /** The words of the legend row for a dead person with no death year. */
-export const LEGEND_DEAD_LABEL = 'Dead. The year of death is not known.';
+export const LEGEND_DEAD_LABEL = 'Dead: the year of death is not known';
 
 /** The legend row for a person counted as dead whose text for the death is not clear. */
 export const LEGEND_DEAD_DOUBT_SAMPLE = 'b. 1131 †?';
 /** The words of the legend row for a person counted as dead whose death text is not clear. */
-export const LEGEND_DEAD_DOUBT_LABEL = 'The plugin counts this person as dead, but the death entry in the note is not clear.';
+export const LEGEND_DEAD_DOUBT_LABEL = 'Counted as dead: the Died text in the note is not clear';
 
 /** Spec §13.6 "Legend", §13.8: the heading of the legend's houses part, on screen and in a saved picture. */
 export const LEGEND_HOUSES_LABEL = 'Houses';
 
 /** Spec §13.8, D74: the heading of the line styles part of a saved picture's legend. */
 export const LEGEND_LINES_LABEL = 'Line styles';
+
+/** D330 O-05: the heading of the first group of the legend window (the line styles and the card sign). The saved picture keeps `LEGEND_LINES_LABEL`. */
+export const LEGEND_GROUP_LINES = 'Lines';
+
+/** D330 O-05: the heading of the second group of the legend window (the two rows about death). */
+export const LEGEND_GROUP_DEAD = 'Death labels';
 
 /** Legend order: partnerships, then children, then other parents. */
 export const LEGEND_ORDER: StrokeKind[] = [

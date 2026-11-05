@@ -3,7 +3,7 @@
  * the structure (add, remove, swap, retype, nest, repeat; sections for titles, pictures, crops and folds) and
  * the text (stray characters and YAML snippets), from a seeded generator. `mutate` returns the new text and
  * the names of the mutations that made it, for the failure message. Used by `tests/layout/fuzz.test.ts` and
- * `tests/core/r112-review-a-fuzz-idops.test.ts` (which kept a copy of it until 0.4).
+ * `tests/core/id-ops-mutated-trees.test.ts` (which kept a copy of it until 0.4).
  */
 import { stringify } from 'yaml';
 import { Rng } from './rng';
@@ -102,7 +102,7 @@ function weird(rng: Rng, root: unknown): unknown {
 	return rng.pick(makers)();
 }
 
-// --- Titles (M8) --------------------------------------------------------------------------
+// --- Titles --------------------------------------------------------------------------
 
 export const TITLE_IDS = ['duke-of-valmont', 'count-of-orsini', 'king-of-the-vale', 'duke', '1066', '__proto__', ''];
 
@@ -135,7 +135,7 @@ function randomTitle(rng: Rng, root: unknown): unknown {
 	return t;
 }
 
-// --- Pictures (M9) ------------------------------------------------------------------------
+// --- Pictures ------------------------------------------------------------------------
 
 /** Written picture values of every form, good and bad (spec §13.0 item 3, contract rules 4 and 5). */
 export const PICTURE_TEXTS = [
@@ -310,7 +310,7 @@ const MUTATIONS: Record<string, Mutation> = {
 		(opts as Obj).me = rng.pick<unknown>([someone(), someone(), someone(), 'ghost', 42, '', null, [], [someone()], [someone(), someone()], { id: someone() }, true, rng.pick(SPECIAL_IDS)]);
 		return root;
 	},
-	// Spec §13.0 item 10: titles, holder entries and card-title (M8).
+	// Spec §13.0 item 10: titles, holder entries and card-title.
 	titles: (root, rng) => {
 		if (!isObj(root)) return root;
 		const list = Array.isArray(root.titles) ? (root.titles as unknown[]) : [];
@@ -349,7 +349,7 @@ const MUTATIONS: Record<string, Mutation> = {
 		}
 		return root;
 	},
-	// Spec §13.0 item 10: arms on houses and portraits on people (M9).
+	// Spec §13.0 item 10: arms on houses and portraits on people.
 	arms: (root, rng) => {
 		const houses = section(root, 'houses');
 		if (!houses.length) {
@@ -365,7 +365,7 @@ const MUTATIONS: Record<string, Mutation> = {
 		for (let k = 1 + rng.int(4); k > 0; k--) rng.pick(people).portrait = randomPicture(rng, root);
 		return root;
 	},
-	// Spec §13.0 item 10: `portrait-crop` on people (M10), with and without a `portrait`.
+	// Spec §13.0 item 10: `portrait-crop` on people, with and without a `portrait`.
 	'portrait-crop': (root, rng) => {
 		const people = section(root, 'people');
 		if (!people.length) return root;

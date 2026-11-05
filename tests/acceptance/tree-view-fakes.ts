@@ -168,7 +168,7 @@ export interface Host {
 	/** The plugin settings; absent means `DEFAULT_SETTINGS`. */
 	settings?: DynastySettings;
 	recordTiming(): void;
-	/** The full-screen part of the plugin as `TreeHost` has it (WP-1a): the real modal, made by the host. */
+	/** The full-screen part of the plugin as `TreeHost` has it: the real modal, made by the host. */
 	openFull(from: unknown, target: string | null, opener: HTMLElement, focus: string | null): void;
 	isFullOpenFor(key: string): boolean;
 	hasFullOpen(): boolean;

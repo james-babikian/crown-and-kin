@@ -9,7 +9,7 @@ import type { Orientation, Rect, TreeLayout } from '../layout/model';
 import { COMPACT_NAME_EM } from '../render/dom/scene';
 import type { PhoneDirection } from './settings';
 import { around } from './tree-view-helpers';
-import { FIT_MIN_NAME_PX, HIT_EM, MIN_HIT_PX, READABLE_NAME_PX, START_TOP_GAP, chooseLod, enlargeHit, fitScale, fitView, type Size, type View } from '../render/view-math';
+import { FIT_MIN_NAME_PX, HIT_EM, MIN_HIT_PX, READABLE_NAME_PX, SIDEWAYS_NAME_PX, START_TOP_GAP, bounds as boundsOf, chooseLod, enlargeHit, fitScale, fitView, type Size, type View } from '../render/view-math';
 
 /**
  * What the user chose for this block in this session (Focus, Focus here, a `+` badge, Clear focus).
@@ -23,7 +23,7 @@ export interface SessionFocus {
 export const PHONE_FOCUS_MIN_PEOPLE = 100;
 
 /** Below this width or height (the shorter side of the window), a touch-first device is a phone. */
-export const PHONE_SHORT_SIDE = 600;
+const PHONE_SHORT_SIDE = 600;
 
 /** A phone: a coarse pointer and a window whose shorter side is under 600 px. Tablets are not phones. */
 export function isPhoneWindow(coarse: boolean, innerWidth: number, innerHeight: number): boolean {
@@ -31,7 +31,7 @@ export function isPhoneWindow(coarse: boolean, innerWidth: number, innerHeight: 
 }
 
 /** The facts of a window that the phone tests read; a real `Window` fits. */
-export interface PhoneWindow {
+interface PhoneWindow {
 	innerWidth: number;
 	innerHeight: number;
 	screen?: { width: number; height: number } | null;
@@ -100,7 +100,7 @@ export interface FocusFacts {
 }
 
 /** What `chooseFocus` decided, and what the caller should remember or forget. */
-export interface FocusChoice {
+interface FocusChoice {
 	/** The focus person to draw, or null for the whole tree. */
 	id: string | null;
 	/** Where the choice came from. */
@@ -131,7 +131,10 @@ export function chooseFocus(f: FocusFacts): FocusChoice {
 }
 
 /** Screen px kept free at each side of the cards that the focus view moves into sight. */
-export const FOCUS_SIDE_PAD = 8;
+const FOCUS_SIDE_PAD = 8;
+
+/** D330 O-07: screen px between the left edge and the first card of the sideways first view, the same as the bar icons (spec §5.5). */
+const SIDEWAYS_START_PAD = 16;
 
 /**
  * First view of a focus tree (D18, §5.6): the whole focus family fitted if its names are then at
@@ -252,10 +255,10 @@ function childPlace(focus: Rect, children: Rect[], width: number, pad: number): 
 }
 
 /** Screen px around the badge disc in which the badge wins a tap over its own card (spec §13.10, §7.5). */
-export const BADGE_WIN_MARGIN_PX = 6;
+const BADGE_WIN_MARGIN_PX = 6;
 
 /** The tap shape of one badge at one zoom, in layout px: its square, and the disc in which it wins over its own card. */
-export interface BadgeTap {
+interface BadgeTap {
 	/** The square of the badge tap area, after the cap and the clip. */
 	square: Rect;
 	/** The disc around the badge centre in which the badge wins a tap over its own card. Nothing above `top` belongs to it. */
@@ -333,7 +336,7 @@ export function clearToolbar(view: View, size: Size, bar: { left: number; right:
 }
 
 /** The cards the sideways first view places (D24). */
-export interface SidewaysGroup {
+interface SidewaysGroup {
 	/** The focus person, or the start person of a whole tree. */
 	me: Rect | null;
 	partners: Rect[];
@@ -345,7 +348,7 @@ export interface SidewaysGroup {
 
 /**
  * First view in `sideways` (D24): names at 14 px, never a fit; smaller, not under 11 px, only when the children's column is cut at the right edge at 14 px. The person's column
- * sits at the left edge (8 screen px in) with the children's column beside it; with no children, the
+ * sits at the left edge (16 screen px in, D330 O-07) with the children's column beside it; with no children, the
  * parents' column goes at the left if the person still shows whole beside it. The group (the person,
  * partners, children and their partners; with no children, the parents) starts 24 layout px below
  * `top`, the top of the free area in screen px. A group taller than the free area (down to `bottom`)
@@ -353,16 +356,16 @@ export interface SidewaysGroup {
  */
 export function sidewaysView(size: Size, fontPx: number, g: SidewaysGroup, top: number, bottom: number, fallback: Rect): { view: View; tall: boolean } {
 	const f = fontPx > 0 ? fontPx : 16;
-	const readable = READABLE_NAME_PX / f;
+	const readable = SIDEWAYS_NAME_PX / f;
 	let scale = readable;
 	const me = g.me;
 	let left = me ? me.x : 0;
 	if (me && !g.children.length && g.parents.length) {
 		const px = Math.min(...g.parents.map((p) => p.x));
-		if ((me.x + me.w - px) * scale + 2 * FOCUS_SIDE_PAD <= size.w) left = px;
+		if ((me.x + me.w - px) * scale + SIDEWAYS_START_PAD + FOCUS_SIDE_PAD <= size.w) left = px;
 	}
 	if (me && g.children.length) scale = columnScale(g.children, left, size.w, readable, f) ?? scale;
-	const pad = FOCUS_SIDE_PAD / scale;
+	const pad = SIDEWAYS_START_PAD / scale;
 	const at = (x: number, freeTop: number): View => ({ scale, cx: x - pad + size.w / 2 / scale, cy: freeTop - top / scale + size.h / 2 / scale });
 	if (!me) return { view: at(fallback.x, fallback.y - START_TOP_GAP), tall: false };
 	const kids = g.children.map((c) => [c.card, ...c.partners]);
@@ -393,7 +396,7 @@ function columnScale(children: SidewaysGroup['children'], left: number, width: n
 	const column = children.filter((c) => c.card.x <= near + 1);
 	const scaleFor = (rights: number[]): number | null => {
 		const right = Math.max(...rights);
-		const fits = right > left ? (width - 2 * FOCUS_SIDE_PAD) / (right - left) : readable;
+		const fits = right > left ? (width - SIDEWAYS_START_PAD - FOCUS_SIDE_PAD) / (right - left) : readable;
 		return fits < readable && fits * fontPx >= FIT_MIN_NAME_PX ? fits * (1 - 1e-9) : null;
 	};
 	return scaleFor(column.map((c) => Math.max(c.card.x + c.card.w, c.sign ?? -Infinity))) ?? scaleFor(column.map((c) => c.card.x + c.card.w));
@@ -450,7 +453,7 @@ export function tagHitBelow(hit: Rect, card: Rect | undefined, scale: number): R
 }
 
 /** The press area of a sideways far-couple tag at one zoom, in layout px: the whole area, and the strip of it that wins over its own card. */
-export interface SideTagTap {
+interface SideTagTap {
 	/** The whole press area, at least 44 screen px each way. It lies below the cards, so a card wins over it except in `over`. */
 	area: Rect;
 	/** The part of `area` over the bottom of the tag's own card, where the tag wins (it lies above the cards); null when there is none. */
@@ -546,17 +549,17 @@ export function finderFirstView(bounds: Rect, size: Size, fontPx: number, insetT
 	const f = fontPx > 0 ? fontPx : 16;
 	if (!oldest.length || !(area.w > 0) || fittedNamePx(bounds, area, f) >= FIT_MIN_NAME_PX) return fitView(bounds, size, insetTop);
 	const scale = READABLE_NAME_PX / f;
-	const x0 = Math.min(...oldest.map((b) => b.x));
-	const y0 = Math.min(...oldest.map((b) => b.y));
-	const x1 = Math.max(...oldest.map((b) => b.x + b.w));
-	const y1 = Math.max(...oldest.map((b) => b.y + b.h));
+	const { x0, y0, x1, y1 } = boundsOf(oldest);
 	const halfW = area.w / 2 / scale;
 	const halfH = area.h / 2 / scale;
 	const pad = START_TOP_GAP;
 	// Across the generations the view starts at the ancestors; along a generation it shows as much of
 	// the line as it can, but never loses the ancestors (if they do not fit, it centres on the first).
 	const along = (lo: number, hi: number, firstLo: number, firstLen: number, bLo: number, bLen: number, half: number) => {
-		if (hi - lo + 2 * pad > 2 * half) return firstLo + firstLen / 2;
+		if (hi - lo + 2 * pad > 2 * half) {
+			// The pads are only a margin: a group that fits alone is centred whole rather than cut for the first card.
+			return hi - lo <= 2 * half ? (lo + hi) / 2 : firstLo + firstLen / 2;
+		}
 		return Math.min(lo - pad + half, Math.max(hi + pad - half, bLo + bLen / 2));
 	};
 	const first = oldest[0];

@@ -5,7 +5,7 @@
  */
 
 import { HOUSE_PALETTE } from '../render/styles';
-import { HOUSES, HOUSE_COLOUR_NAMES } from '../render/ui-text';
+import { HOUSES, HOUSE_COLOUR_NAMES, PICTURES_UI } from '../render/ui-text';
 
 /** A colour as the plugin writes it: `#rrggbb`. */
 export const HEX = /^#[0-9a-f]{6}$/i;
@@ -60,6 +60,34 @@ export function drawHousePalette(box: HTMLElement, o: PaletteSpec): void {
 	);
 }
 
+/** What the colours of the arms need from the window. */
+interface ArmsColoursSpec {
+	key: string;
+	colour: string | null;
+	/** The colours read from the arms, as `#rrggbb`. */
+	list: readonly string[];
+	pick: (hex: string, used: HTMLElement) => void;
+	guard: (run: () => void) => void;
+}
+
+/**
+ * Draws the colours read from the arms into `group`: the label "From the arms" (D330 O-19) and one round swatch for each colour. There is no line and no dot.
+ * The caller leaves the group empty while the picture is read, so the label and the swatches never show half.
+ */
+export function drawArmsColours(group: HTMLElement, o: ArmsColoursSpec): void {
+	group.createDiv({ cls: 'dynasty-house-arms-label', text: PICTURES_UI.fromArms, attr: { 'aria-hidden': 'true' } });
+	const now = o.colour?.toLowerCase() ?? null;
+	o.list.forEach((hex, i) => {
+		const chosen = now === hex;
+		const b = group.createEl('button', {
+			cls: chosen ? ['dynasty-swatch', 'dynasty-house-arms-colour', 'is-selected'] : ['dynasty-swatch', 'dynasty-house-arms-colour'],
+			attr: { type: 'button', 'aria-label': PICTURES_UI.armsColourLabel(i + 1), 'aria-pressed': String(chosen), 'data-colour': hex, 'data-focus': `arms-colour:${o.key}:${hex}` },
+		});
+		b.style.setProperty('--dynasty-house-color', hex);
+		b.addEventListener('click', () => o.guard(() => o.pick(hex, b)));
+	});
+}
+
 /** True for a colour that "Other colour" shows: a written `#rrggbb` that is not one of the 12. */
 function isCustom(colour: string | null): boolean {
 	return !!colour && HEX.test(colour) && !(HOUSE_PALETTE as readonly string[]).includes(colour.toLowerCase());
@@ -72,7 +100,7 @@ function isCustom(colour: string | null): boolean {
  * which already has the focus: moving it would close the iPhone colour window.
  */
 export function paintHouseColour(box: HTMLElement, colour: string | null, used: HTMLElement): void {
-	if (used.isConnected && (used.doc ?? document).activeElement !== used) used.focus({ preventScroll: true });
+	if (used.isConnected && used.doc.activeElement !== used) used.focus({ preventScroll: true });
 	const now = colour?.toLowerCase() ?? null;
 	const mark = (b: HTMLElement, on: boolean) => {
 		b.toggleClass('is-selected', on);

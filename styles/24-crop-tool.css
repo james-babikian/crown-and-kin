@@ -35,23 +35,33 @@
 	width: 100vw;
 }
 
+/* CH-09: the title is centred over the picture, as on a phone. The name stands on a second line, lighter (D330 O-34). */
 .dynasty-crop-title {
 	flex: none;
-	padding: 14px 18px 0;
+	padding: var(--dynasty-space-3) var(--dynasty-space-4) 0;
 	font-size: var(--dynasty-type-heading);
 	font-weight: var(--font-semibold);
+	text-align: center;
+}
+
+.dynasty-crop-name {
+	/* K-12: the name of a person stands in the text font, as in the picture viewer. */
+	font-family: var(--font-text);
+	font-size: var(--dynasty-type-small);
+	font-weight: var(--dynasty-weight-normal);
+	opacity: 0.7;
+	overflow-wrap: anywhere;
 }
 
 .dynasty-crop.is-phone .dynasty-crop-title {
-	padding-top: max(8px, env(safe-area-inset-top));
-	text-align: center;
+	padding-top: max(var(--dynasty-space-2), env(safe-area-inset-top));
 }
 
 .dynasty-crop-body {
 	flex: 1 1 auto;
 	align-items: center;
 	justify-content: center;
-	padding: 8px 16px 12px;
+	padding: var(--dynasty-space-2) var(--dynasty-space-4) var(--dynasty-space-3);
 	gap: 10px;
 }
 
@@ -189,6 +199,13 @@
 	border-color: gray;
 }
 
+/* CH-07: with a mouse the buttons are 30 px high, as in the other windows; a finger keeps 44 px. */
+@media (hover: hover) and (pointer: fine) {
+	.dynasty-crop .dynasty-btn.dynasty-crop-button {
+		min-height: var(--input-height);
+	}
+}
+
 .dynasty-crop .dynasty-btn.dynasty-crop-button.mod-cta {
 	background: var(--interactive-accent);
 	color: var(--dynasty-on-accent);
@@ -221,8 +238,8 @@
 .dynasty-crop.is-phone .dynasty-crop-bar {
 	box-sizing: border-box;
 	width: 100%;
-	padding-left: max(16px, env(safe-area-inset-left));
-	padding-right: max(16px, env(safe-area-inset-right));
+	padding-left: max(var(--dynasty-space-4), env(safe-area-inset-left));
+	padding-right: max(var(--dynasty-space-4), env(safe-area-inset-right));
 }
 
 .dynasty-crop.is-phone .dynasty-crop-bar {

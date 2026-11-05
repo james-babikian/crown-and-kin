@@ -1,9 +1,9 @@
 /*
- * T16 (the 0.3 contract E.4, the release plan W8): new code reads old trees.
+ * T16 (the release plan W8): new code reads old trees.
  *
  * `tests/old-trees/` holds a copy of every sample tree of the tags v0.1.0 and v0.2.0, each with its tag in a header comment.
  * The copies use the old block word `dynasty`; they are not edited, and `support/old-tag.ts` reads them with the word `kin`
- * (0.3.1, D167). For every tree block in them this test checks that:
+ * (D167). For every tree block in them this test checks that:
  * 1. the block parses and draws headless (or fails with the same hard error as before);
  * 2. its warnings equal the baseline in `tests/old-trees/baseline.json`, the warnings of the code of version 0.2.8
  *    (`main` when the file was recorded) for the same text. A change in a warning is a change in what the reader says
@@ -13,14 +13,14 @@
  *
  * The other direction (old code reads new trees, W8): 0.3 adds no key to the format, so every key of a new tree is a key
  * that 0.2.8 reads. That the plugin keeps a key it does not know at every level is tested in the existing unknown-key tests
- * (for example `acceptance/title-ops.test.ts`, `acceptance/houses-ops.test.ts`, `acceptance/me-option.test.ts` and `acceptance/r027-childless.test.ts`); the tests
+ * (for example `acceptance/title-ops.test.ts`, `acceptance/houses-ops.test.ts`, `acceptance/me-option.test.ts` and `acceptance/childless-key-reading.test.ts`); the tests
  * below add the keys that Format 1 reserves, and a union with the key `ended-by` of 0.5.
  */
 
 import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { parseDocument, isMap, isSeq } from 'yaml';
 import { describe, expect, it } from 'vitest';
-import { svgHash } from '../acceptance/m11-support';
+import { svgHash } from '../acceptance/picture-list-support';
 import { oldTag } from '../support/old-tag';
 import { findBlocks } from '../../src/core/block-locate';
 import { planWrite } from '../../src/core/block-write';

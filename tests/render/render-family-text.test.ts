@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { FLOW, NEW_SHEET, deleteText, parentTypeText, partnerDetail, unionDates, unionTypeText } from '../../src/render/ui-text';
 
-describe('family texts (WP3.3)', () => {
+describe('family texts', () => {
 	it('builds the §6.7 delete confirmation with the same meaning as the spec example', () => {
 		expect(deleteText('Aldric Valmont', { unions: 2, childLinks: 3, clearsStart: false, clearsFocus: false })).toEqual([
 			'The plugin also removes 2 partnerships of this person.',

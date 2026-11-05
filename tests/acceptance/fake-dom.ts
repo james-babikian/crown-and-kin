@@ -250,6 +250,8 @@ export class FEl {
 		for (const [k, v] of Object.entries(props)) this.style.setProperty(k, v);
 	}
 	text = '';
+	/** The texts added by `appendText`, each with the number of children before it, so `getText` keeps the order of the text and the children. */
+	private appended: { at: number; t: string }[] = [];
 	hidden = false;
 	isConnected = true;
 	clientWidth = 800;
@@ -321,16 +323,25 @@ export class FEl {
 
 	setText(t: string): void {
 		this.text = t;
+		this.appended = [];
 		this.children = [];
 	}
 
-	/** Obsidian's `appendText`: adds a text node after the existing content. The fake keeps it in `text`. */
+	/** Obsidian's `appendText`: adds a text node after the existing content. The fake keeps it in `text` and remembers where it stands among the children. */
 	appendText(t: string): void {
 		this.text += t;
+		this.appended.push({ at: this.children.length, t });
 	}
 
 	getText(): string {
-		return this.text + this.children.map((c) => c.getText()).join('');
+		if (!this.appended.length) return this.text + this.children.map((c) => c.getText()).join('');
+		const own = this.text.slice(0, this.text.length - this.appended.reduce((n, a) => n + a.t.length, 0));
+		let out = own;
+		for (let i = 0; i <= this.children.length; i++) {
+			for (const a of this.appended) if (Math.min(a.at, this.children.length) === i) out += a.t;
+			if (i < this.children.length) out += this.children[i].getText();
+		}
+		return out;
 	}
 
 	/** The DOM `textContent`: the own text plus the text of every child (a name `<text>` holds `<tspan>`s). */
@@ -370,6 +381,7 @@ export class FEl {
 		for (const c of this.children) c.parentElement = null;
 		this.children = [];
 		this.text = '';
+		this.appended = [];
 	}
 
 	remove(): void {
@@ -467,6 +479,11 @@ export class FEl {
 		if (fakeDoc.activeElement === this) fakeDoc.activeElement = null;
 	}
 
+	/** The DOM `click()`: a click event at this element; a disabled control does nothing. */
+	click(): void {
+		if (!this.disabled) dispatch(this, 'click');
+	}
+
 	scrollIntoView(): void {}
 }
 
@@ -542,7 +559,7 @@ export function installDom(): void {
 	g.createEl = (tag: string, o?: ElOptions | string) => new FEl(tag, typeof o === 'string' ? { cls: o } : o);
 	g.createDiv = (o?: ElOptions | string) => new FEl('div', typeof o === 'string' ? { cls: o } : o);
 	g.createSpan = (o?: ElOptions | string) => new FEl('span', typeof o === 'string' ? { cls: o } : o);
-	// The lazy scene (M11) builds card content in a detached holder made with the global `createSvg`.
+	// The lazy scene builds card content in a detached holder made with the global `createSvg`.
 	g.createSvg = (tag: string, o?: ElOptions | string) => new FEl(tag, typeof o === 'string' ? { cls: o } : o);
 	// Obsidian's createFragment: a fake element stands in for the DocumentFragment (the Notice with Undo).
 	g.createFragment = (cb?: (f: FEl) => void) => {

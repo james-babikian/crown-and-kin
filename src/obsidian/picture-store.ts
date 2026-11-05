@@ -38,6 +38,7 @@ import { cropSquare, formatPortraitCrop, type CropFraction } from '../core/portr
 import { outlineGrid, traceOutline, type ArmsOutline } from '../layout/arms-outline';
 import { defaultIO, linkOf, type DecodedPicture, type PictureIO } from './picture-io';
 import { NO_COPIES, deviceTicket, type CopyId, type DeviceTicket, type PictureCopies } from './picture-copies';
+import { guarded } from './start-guard';
 
 export type { DecodedPicture, PictureIO };
 
@@ -71,7 +72,7 @@ export interface PictureCopy {
 export type ResolvedPicture = { ok: true; file: TFile; format: SupportedFormat } | PictureProblem;
 
 /** The numbers of the memory checks (spec §13.6–§13.8 acceptance). */
-export interface PictureStats {
+interface PictureStats {
 	/** Encoded bytes of the copies the store holds. */
 	bytes: number;
 	/** Copies in the least-recently-used list. */
@@ -129,7 +130,7 @@ export interface PictureStore {
 /** O3: the encoded copies of all trees, in bytes (spec §13.0 item 3: 24 MB). */
 export const STORE_BYTES = 24_000_000;
 /** B12: each step of a job (read, decode, encode) has this limit, in ms. */
-export const STEP_LIMIT_MS = 8000;
+const STEP_LIMIT_MS = 8000;
 /** A6: a file larger than this on disk is too large without a read (64 MB when the pointer is coarse). */
 export const NO_READ_BYTES = 256 * 1024 * 1024;
 /** The same limit when the pointer is coarse (a phone). */
@@ -137,7 +138,7 @@ export const NO_READ_BYTES_COARSE = 64 * 1024 * 1024;
 /** B14: the header results kept across sessions, in the plugin's local storage. */
 export const HEADER_STORE_KEY = 'crown-and-kin-picture-headers';
 /** The most header results kept. */
-export const HEADER_STORE_MAX = 2000;
+const HEADER_STORE_MAX = 2000;
 /** O7: the size of the copy that "Colours from the arms" reads. */
 export const ARMS_PIXELS = 64;
 /**
@@ -334,12 +335,10 @@ export function createPictureStore(app: App, io: PictureIO = defaultIO(app), cop
 
 	function storeHeaders(): void {
 		saveTimer = null;
-		try {
+		guarded('cannot keep the picture checks', () => {
 			if (!saved) return;
 			app.saveLocalStorage(HEADER_STORE_KEY, { v: 1, e: [...saved].map(([p, x]) => [p, x.sig, x.result]) });
-		} catch (e) {
-			console.error('Crown and Kin: cannot keep the picture checks', e);
-		}
+		});
 	}
 
 	function remember(file: TFile, result: HeaderResult, keep: boolean): void {
@@ -919,7 +918,7 @@ export function createPictureStore(app: App, io: PictureIO = defaultIO(app), cop
 		},
 
 		invalidate(path) {
-			try {
+			guarded('cannot forget the picture', () => {
 				gens.set(path, gen(path) + 1);
 				headers.delete(path);
 				copies.forget(path);
@@ -934,18 +933,12 @@ export function createPictureStore(app: App, io: PictureIO = defaultIO(app), cop
 						staleInUse.add(e);
 					}
 				}
-			} catch (e) {
-				console.error('Crown and Kin: cannot forget the picture', e);
-			}
+			});
 		},
 
 		changed(paths) {
 			for (const fn of [...listeners]) {
-				try {
-					fn(paths);
-				} catch (e) {
-					console.error('Crown and Kin: cannot show the changed pictures', e);
-				}
+				guarded('cannot show the changed pictures', () => fn(paths));
 			}
 		},
 

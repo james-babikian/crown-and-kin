@@ -40,7 +40,7 @@ function expectGolden(r: EditResult, file: string, created: string[] = []): void
 
 const person = (id: string, fields: Extract<Op, { kind: 'set-person-fields' }>['fields']): Op => ({ kind: 'set-person-fields', id, fields });
 
-describe('fixture 9: a changed value (§6.2, the decision notes)', () => {
+describe('fixture 9: a changed value (§6.2)', () => {
 	it('name, plain → plain: only that line changes', () => {
 		expectGolden(applyOp(MAIN, person('edric', { name: 'Edric the Younger' })), '09-name-plain.yaml');
 	});
@@ -95,7 +95,7 @@ describe('fixture 9: a changed value (§6.2, the decision notes)', () => {
 	});
 });
 
-describe('fixture 9: a new key (§4.1 order, the decision notes)', () => {
+describe('fixture 9: a new key (§4.1 order)', () => {
 	// Decision: a new key goes directly before the first key already in the map that comes later in
 	// the §4.1 order, above any full-line comment attached to that key. If no later key is there, it
 	// goes after the map's last entry (and after that entry's end-of-line comment), above any
@@ -129,7 +129,7 @@ describe('fixture 9: a new key (§4.1 order, the decision notes)', () => {
 	});
 });
 
-describe('fixture 9: removing a key (the decision notes "only that key\'s lines")', () => {
+describe('fixture 9: removing a key', () => {
 	it('title removed: its line goes, with the end-of-line comment on that line', () => {
 		// Decision: an end-of-line comment belongs to its line and is removed with it.
 		expectGolden(applyOp(MAIN, person('aldous', { title: null })), '09-remove-title.yaml');
@@ -335,7 +335,7 @@ describe('round trip through the note: locate → planWrite → applyOp (§10 fi
 	});
 });
 
-describe('quoting: plain only when plain YAML reads back the same string (the decision notes)', () => {
+describe('quoting: plain only when plain YAML reads back the same string', () => {
 	// [person, field, new value, the exact old line, the exact new line]
 	const cases: [string, 'name' | 'born' | 'link', string, string, string][] = [
 		['edric', 'name', 'true', '    name: Edric Harrow\n', '    name: "true"\n'],
@@ -380,7 +380,7 @@ describe('quoting: plain only when plain YAML reads back the same string (the de
 	});
 });
 
-describe('supervisor decisions (the decision notes "Formatting details fixed by the WP2.1 tests")', () => {
+describe('formatting details of the yaml edit helpers', () => {
 	it("title: '' removes the key, like null", () => {
 		expectGolden(applyOp(MAIN, person('aldous', { title: '' })), '09-remove-title.yaml');
 	});

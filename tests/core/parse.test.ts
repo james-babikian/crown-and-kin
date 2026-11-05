@@ -86,7 +86,7 @@ describe('parseDynasty: shape issues and hard errors', () => {
 		expect(t.issues).toEqual([{ code: 'missing-id', level: 'warning', params: { section: 'people', index: 1, name: 'Aldric', example: 'p1' }, ids: ['~~1'] }]);
 	});
 
-	it('gives a person with no id an id that no reference uses (review F2)', () => {
+	it('gives a person with no id an id that no reference uses', () => {
 		const t = ok('options: {start: "~1", focus: "~~1"}\npeople:\n  - name: X\n  - id: b\n    parents: ["~~~1", {id: "~~~~1"}]\nunions:\n  - partners: ["~~~~~1", b]\n');
 		expect(t.people[0].id).toBe('~~~~~~1');
 		const g = deriveFamilies(ok('people:\n  - name: X\n  - id: b\n    parents: ["~1"]\n'));
@@ -186,7 +186,7 @@ describe('parseBody: the one parse for reading and editing', () => {
 		expect(readTree(p.doc, p.data, src)).toEqual(ok(src));
 	});
 
-	it('keeps free text that the core schema would retype (failsafe schema, the decision notes)', () => {
+	it('keeps free text that the core schema would retype (failsafe schema)', () => {
 		const t = ok('people:\n  - id: a\n    name: 1e3\n    title: "null"\n    born: 1.10\n    died: True\n');
 		expect(t.people[0]).toMatchObject({ name: '1e3', title: 'null', born: '1.10', died: 'True' });
 	});

@@ -13,7 +13,7 @@ import { usableFamily } from './measure';
  * does for the root; when the block is not in the document yet, the body is used.
  */
 export function readFonts(el: HTMLElement): FontState {
-	const host = el.isConnected ? el : (el.doc ?? document).body;
+	const host = el.isConnected ? el : el.doc.body;
 	const probe = host.createDiv({ cls: 'dynasty-font-probe' });
 	try {
 		return fontsOf(probe);
@@ -32,6 +32,18 @@ export function fontsOf(probe: HTMLElement): FontState {
 		ui: usableFamily(v('--font-interface') || 'sans-serif'),
 		bold: /^\d{3}$/.test(v('--bold-weight')) ? v('--bold-weight') : '600',
 	};
+}
+
+/**
+ * Answers a media query on the given window: false when the window has no `matchMedia` or the query cannot run.
+ * One place for the coarse-pointer, reduced-motion and orientation reads, so no caller needs its own guard.
+ */
+export function mediaMatches(win: Window, query: string): boolean {
+	try {
+		return win.matchMedia(query).matches;
+	} catch {
+		return false;
+	}
 }
 
 /** `env(safe-area-inset-top)` in px, read from the view's probe element (spec §7.5). */

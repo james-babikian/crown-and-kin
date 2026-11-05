@@ -260,7 +260,7 @@ function listPatches(p: Parsed, t: number, final: Final[], key = 'holders'): Pat
 	const src = p.src;
 	const layout = layoutOf(src);
 	const kept = final.flatMap((f) => ('from' in f ? [f.from] : []));
-	if ((!at.seq || !at.seq.items.length) && !at.scalar) return final.length ? [newList(src, at, final.map((f) => ('flow' in f ? f.flow : '')), layout, key)] : [];
+	if (!at.seq?.items.length && !at.scalar) return final.length ? [newList(src, at, final.map((f) => ('flow' in f ? f.flow : '')), layout, key)] : [];
 	if (!final.length) return emptyList(src, at);
 	if (at.scalar) {
 		// §13.0 item 6: `holders: aldric` first becomes a flow list.

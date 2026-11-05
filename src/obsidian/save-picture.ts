@@ -33,6 +33,7 @@ import type { PictureStore } from './picture-store';
 import { trackModal } from '../view/plugin-modals';
 import { nameDialog } from './sheet-parts';
 import { buildShell, type Shell } from './window-shell';
+import { guarded } from './start-guard';
 
 /** What the tree view gives the save: the drawn graph and the view's settings. */
 export interface SaveSource {
@@ -73,10 +74,12 @@ export interface SaveSource {
 }
 
 /** The kinds of file a save can make (D72). */
-export type SaveKind = 'png' | 'svg';
+type SaveKind = 'png' | 'svg';
 
 /** A save waits this long before it shows the progress Notice (spec §13.8). */
-export const PROGRESS_MS = 1000;
+const PROGRESS_MS = 1000;
+/** D330 UX-09: the result Notice of a saved picture closes after this long, in ms. */
+const RESULT_MS = 8000;
 /** Loading the drawn SVG into a picture for the canvas may take this long, in ms. */
 const LOAD_LIMIT_MS = 60_000;
 
@@ -104,6 +107,7 @@ export class SaveWindow extends Modal {
 			contentEl: this.contentEl,
 			title: SAVE_UI.title,
 			titled: true,
+			titleRole: 'tool',
 			cancelLabel: SAVE_UI.cancel,
 			saveLabel: SAVE_UI.save,
 			onCancel: () => this.close(),
@@ -114,36 +118,31 @@ export class SaveWindow extends Modal {
 		nameDialog(this.modalEl, shell.titleEl);
 		const cancel = shell.cancel;
 		const body = shell.body;
-		const group = body.createDiv({ cls: ['dynasty-choice-options', 'dynasty-save-kinds'], attr: { role: 'radiogroup', 'aria-label': SAVE_UI.kindLabel } });
+		const group = body.createDiv({ cls: 'dynasty-save-kinds', attr: { role: 'radiogroup', 'aria-label': SAVE_UI.kindLabel } });
 		const options: [SaveKind, string, string][] = [
 			['png', SAVE_UI.png, SAVE_UI.pngDetail],
 			['svg', SAVE_UI.svg, SAVE_UI.svgDetail],
 		];
-		const buttons: HTMLButtonElement[] = [];
-		const select = (kind: SaveKind, focus: boolean) => {
-			this.kind = kind;
-			buttons.forEach((b, i) => {
-				const on = options[i][0] === kind;
-				b.toggleClass('is-selected', on);
-				b.setAttribute('aria-checked', String(on));
-				b.setAttribute('tabindex', on ? '0' : '-1');
-				if (on && focus) b.focus();
+		// D330 O-06: two native radios (Obsidian draws them). One name makes them one group, so the arrow keys move the choice and one Tab stop reaches the group.
+		const radios: HTMLInputElement[] = [];
+		options.forEach(([kind, label, detail]) => {
+			const row = group.createEl('label', { cls: 'dynasty-save-kind', attr: { 'data-kind': kind } });
+			const radio = row.createEl('input', { cls: 'dynasty-save-radio', attr: { type: 'radio', name: 'dynasty-save-kind', value: kind } });
+			const text = row.createSpan({ cls: 'dynasty-save-kind-text' });
+			const name = text.createSpan({ cls: 'dynasty-save-kind-label', text: label });
+			const hint = text.createSpan({ cls: 'dynasty-save-kind-hint', text: detail });
+			// The accessible name is the choice; the hint is its description.
+			name.id = `dynasty-save-kind-${kind}`;
+			hint.id = `dynasty-save-kind-${kind}-hint`;
+			radio.setAttribute('aria-labelledby', name.id);
+			radio.setAttribute('aria-describedby', hint.id);
+			radio.addEventListener('change', () => {
+				if (radio.checked) this.kind = kind;
 			});
-		};
-		options.forEach(([kind, label, detail], i) => {
-			const b = group.createEl('button', { cls: ['dynasty-choice-option', 'dynasty-save-kind'], attr: { type: 'button', role: 'radio', 'data-kind': kind } });
-			b.createSpan({ cls: 'dynasty-choice-label', text: label });
-			b.createSpan({ cls: 'dynasty-choice-detail', text: detail });
-			b.addEventListener('click', () => select(kind, false));
-			// A radio group moves with the arrow keys (one Tab stop for the group).
-			b.addEventListener('keydown', (e) => {
-				if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp' && e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
-				e.preventDefault();
-				select(options[(i + 1) % options.length][0], true);
-			});
-			buttons.push(b);
+			radios.push(radio);
 		});
-		select('png', false);
+		// The first choice is selected (PNG).
+		radios[0].checked = true;
 		this.scope.register([], 'Enter', (e) => {
 			// Enter on Cancel stays Cancel; elsewhere it saves.
 			if (e.target === cancel) return;
@@ -164,11 +163,7 @@ export class SaveWindow extends Modal {
 		this.shell?.dispose();
 		this.shell = null;
 		this.contentEl.empty();
-		try {
-			this.o.onClosed?.();
-		} catch (e) {
-			console.error('Crown and Kin: cannot give the focus back', e);
-		}
+		guarded('cannot give the focus back', () => this.o.onClosed?.());
 	}
 }
 
@@ -211,7 +206,7 @@ export async function savePicture(app: App, store: PictureStore | undefined, src
 		resultNotice(file, made);
 	} catch (e) {
 		console.error('Crown and Kin: cannot show the result of the save', e);
-		new Notice(SAVE_UI.saved(file.name, folderOf(file.path)), 0);
+		new Notice(SAVE_UI.saved(file.name, folderOf(file.path)), RESULT_MS);
 	}
 	return file;
 }
@@ -375,13 +370,13 @@ export async function freePath(app: App, name: string, sourcePath: string): Prom
 	return app.fileManager.getAvailablePathForAttachment(name, sourcePath);
 }
 
-/** The result Notice (spec §13.8): the file and its folder, the small-names texts, and Share where the device can share the file. It stays until the user closes it. */
+/** The result Notice (spec §13.8): the file and its folder, the small-names texts, and Share where the device can share the file. It closes after about 8 seconds (D330 UX-09). */
 function resultNotice(file: TFile, made: Made): void {
 	let share: File | null = null;
 	try {
 		const f = new File([made.bytes], file.name, { type: made.type });
 		const nav = navigator as Navigator & { canShare?: (d: { files: File[] }) => boolean };
-		if (typeof nav.canShare === 'function' && nav.canShare({ files: [f] }) === true && typeof nav.share === 'function') share = f;
+		if (typeof nav.canShare === 'function' && nav.canShare({ files: [f] }) && typeof nav.share === 'function') share = f;
 	} catch {
 		// No Share button.
 	}
@@ -403,5 +398,5 @@ function resultNotice(file: TFile, made: Made): void {
 			});
 		}
 	});
-	new Notice(frag, 0);
+	new Notice(frag, RESULT_MS);
 }

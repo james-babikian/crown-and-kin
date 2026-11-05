@@ -1,15 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import type { EditResult, Op } from '../../src/core/edit';
+import type { Op } from '../../src/core/edit';
 import { parseDynasty } from '../../src/core/parse';
 import { applyOp } from '../../src/core/yaml-edit';
 import { fixture } from '../support/helpers';
+import { body } from '../support/edit-body';
 
 // Unit tests for the M6 house ops (spec §6.10, D32): edit-house and delete-house.
 
-function body(r: EditResult): string {
-	if (!r.ok) throw new Error(`refused: ${r.code} ${r.detail ?? ''}`);
-	return r.body;
-}
 const edit = (src: string, op: Op) => body(applyOp(src, op));
 const code = (src: string, op: Op) => {
 	const r = applyOp(src, op);

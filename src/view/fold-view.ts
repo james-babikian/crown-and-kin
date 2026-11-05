@@ -29,7 +29,7 @@ const NONE: FoldPlan = { effective: new Set(), hidden: new Set(), hiddenList: []
  */
 export function planFolds(g: FamilyGraph, whole: FamilyGraph, folds: FoldSet, canFold: boolean, line: readonly string[] | null): FoldPlan {
 	if (!canFold || !folds.size) return NONE;
-	const effective = line && line.length ? unfoldFor(g, whole, folds, line) : folds;
+	const effective = line?.length ? unfoldFor(g, whole, folds, line) : folds;
 	const families = new Set(foldFamilies(g).map((f) => f.key));
 	const foldedList = [...effective].filter((k) => families.has(k)).sort();
 	const hidden = foldHidden(g, effective);
@@ -73,7 +73,7 @@ export function setFolds(st: FoldMemory, next: FoldSet): void {
 export type AutoFocus = { kind: 'keep' } | { kind: 'clear' } | { kind: 'enter'; key: string; startKeys: () => readonly FoldKey[] };
 
 /** The changes to the block's folds that a draw makes for its automatic folds. A field that is absent means no change. */
-export interface AutoFoldPatch {
+interface AutoFoldPatch {
 	folds?: Set<FoldKey>;
 	autoFolds?: Set<FoldKey>;
 	autoFor?: string | null;

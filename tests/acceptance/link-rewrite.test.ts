@@ -101,7 +101,7 @@ describe('normaliseTarget (contract NormaliseTarget)', () => {
 // ---------- linkTargets ----------
 
 describe('linkTargets: every person link, in document order, every written form (contract LinkTargets)', () => {
-	it('quoted, single-quoted, unquoted, flow-map person; heading, alias and block reference removed; .md and path kept', () => {
+	it('quoted, single-quoted, unquoted, flow-map person; heading, alias and block reference removed;.md and path kept', () => {
 		const b = [
 			'people:',
 			'  - id: a',
@@ -131,7 +131,7 @@ describe('linkTargets: every person link, in document order, every written form 
 	});
 
 	it('sample trees: 4 (quoted) and 10 (unquoted) link to Wren of the Marches; the others have no links', () => {
-		// Sample trees 14 and 07b have picture links (M9, contract rule 11): m9-links.test.ts checks them.
+		// Sample trees 14 and 07b have picture links: arms-and-portrait-link-targets.test.ts checks them.
 		for (const f of allFixtures().filter((x) => x.id !== '14' && x.id !== '07b')) {
 			expect(linkTargets(f.source), f.file).toEqual(f.id === '04' || f.id === '10' ? ['Wren of the Marches'] : []);
 		}
@@ -151,7 +151,7 @@ describe('linkTargets: every person link, in document order, every written form 
 
 // ---------- the rewrite-links op ----------
 
-describe('rewrite-links: the target changes; heading, alias and .md stay (§6.9)', () => {
+describe('rewrite-links: the target changes; heading, alias and.md stay (§6.9)', () => {
 	const cases: [string, Record<string, string>, string][] = [
 		// [written value, map, expected value]
 		['"[[Old Hall]]"', HALL, '"[[New Hall]]"'],
@@ -201,7 +201,7 @@ describe('rewrite-links: the target changes; heading, alias and .md stay (§6.9)
 	});
 });
 
-describe('rewrite-links: quoting (§6.2, the decision notes "How a changed value is written")', () => {
+describe('rewrite-links: quoting (§6.2)', () => {
 	it('single quotes stay single quotes', () => {
 		expectOne("'[[Old Hall]]'", HALL, "'[[New Hall]]'");
 		expectOne("'[[Old Hall#Early years|the hall]]'", HALL, "'[[New Hall#Early years|the hall]]'");
@@ -513,7 +513,7 @@ describe('fuzz: linkTargets, normaliseTarget and rewrite-links never throw (§8)
 	const JUNK = ['[[', ']]', '|', '#', '"', "'", ':', ': ', '\n', '  ', '- ', '{', '}', '[', ']', ',', '\\', '\t', '&a', '*a', '!!str ', '%', '@', '`', 'link: ', '[[Old Hall]]', 'Old Hall', '\u0000', '\ud800', 'é', '.md'];
 	const TARGETS = ['old hall', 'Old Hall', '', ' ', 'houses/old hall', 'wren of the marches', 'a|b', 'a#b', ']]', '[[', '"', "'", '\n', 'x'.repeat(300), '.md', '$&', '\\', '__proto__', 'constructor'];
 
-	// Alone it takes 43 s and 52 s in a loaded suite (F-HARN-05); the limit leaves room for a slower machine. The 3000 cases stay.
+	// Alone it takes 43 s and 52 s in a loaded suite; the limit leaves room for a slower machine. The 3000 cases stay.
 	it('3000 mutated bodies and odd maps', { timeout: 240_000 }, () => {
 		const rng = new Rng(0x0dd5eed5);
 		for (let k = 0; k < 3000; k++) {

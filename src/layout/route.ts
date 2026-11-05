@@ -279,7 +279,7 @@ export function upperNets(plan: Plan, g: FamilyGraph, hp: HangPoints, geo: Geome
 	const linked = new Set(g.secondary.map((s) => s.unionKey));
 	const hasTrunk = (key: string) => familyOf.has(key) || linked.has(key);
 	for (const c of plan.couples.values()) {
-		if (c.kind === 'bar' || !c.hang || c.hang.kind !== 'port') continue;
+		if (c.kind === 'bar' || c.hang?.kind !== 'port') continue;
 		const xd = hp.x.get(c.union)!;
 		const gap = hp.dotGap.get(c.union)!;
 		const down = hasTrunk(c.union) ? [xd] : [];

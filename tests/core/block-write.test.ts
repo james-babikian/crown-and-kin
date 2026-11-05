@@ -82,7 +82,7 @@ describe('createUndoStack', () => {
 	});
 });
 
-describe('planWrite checks the written note (review F1)', () => {
+describe('planWrite checks the written note', () => {
 	const note = 'Intro\n\n```kin\npeople:\n- id: a\n  name: A\n  notes: |\n   old\n```\n\nMy prose.\n\n```kin\npeople:\n- id: z\n```\n';
 
 	it('refuses a body whose line would close the fence and spill the tree into the note', () => {
@@ -97,5 +97,25 @@ describe('planWrite checks the written note (review F1)', () => {
 		});
 		if (!r.ok) throw new Error(r.code);
 		expect(findBlocks(r.newText).map((b) => b.body)).toEqual([r.newBody, 'people:\n- id: z']);
+	});
+});
+
+describe('the label of an undo entry (D330 UX-17)', () => {
+	it('is given back by the undo of that entry, and an entry with no label gives none', () => {
+		const u = createUndoStack();
+		u.push('1', '2');
+		u.push('2', '3', { kind: 'added-partner', names: ['Rina Vane', 'Edmund Vane'] });
+		expect(u.undo('3')).toEqual({ ok: true, body: '2', label: { kind: 'added-partner', names: ['Rina Vane', 'Edmund Vane'] } });
+		const plain = u.undo('2');
+		expect(plain).toEqual({ ok: true, body: '1' });
+		expect('label' in (plain as object)).toBe(false);
+	});
+
+	it('survives a rewrite of the bodies (a link update after a rename) and a refused undo', () => {
+		const u = createUndoStack();
+		u.push('a', 'b', { kind: 'deleted', names: ['Edric Valmont'] });
+		u.map((x) => x.toUpperCase());
+		expect(u.undo('x')).toEqual({ ok: false, code: 'changed' });
+		expect(u.undo('B')).toEqual({ ok: true, body: 'A', label: { kind: 'deleted', names: ['Edric Valmont'] } });
 	});
 });

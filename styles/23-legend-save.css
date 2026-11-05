@@ -2,52 +2,77 @@
 
 /* Spec §13.8, D72: the window "Save as a picture", with PNG and SVG as a pair of choices. */
 .modal.dynasty-save-window {
-	width: min(480px, calc(100vw - 2 * var(--size-4-4)));
+	width: min(480px, calc(100vw - 2 * var(--dynasty-space-4)));
 }
 
 .modal.dynasty-save-window.is-phone {
 	width: 100vw;
 }
 
-.dynasty-sheet .dynasty-save-kind {
-	position: relative;
-	padding-left: calc(var(--size-4-3) + 26px);
+/* D330 O-06: the title shows on a computer (the shell's title role); the body then needs less air above its first choice. */
+.dynasty-save-window .dynasty-sheet-title.dynasty-title {
+	padding: var(--dynasty-space-5) var(--dynasty-space-5) 0;
 }
 
-/* A round mark shows the selected kind also without colour. */
-.dynasty-sheet .dynasty-save-kind::before {
-	content: '';
-	position: absolute;
-	left: var(--size-4-3);
-	top: 50%;
-	box-sizing: border-box;
-	width: 16px;
-	height: 16px;
-	margin-top: -8px;
-	border: 2px solid var(--text-muted);
-	border-radius: 50%;
+.dynasty-save-window .dynasty-sheet-title.dynasty-title ~ .dynasty-sheet-body {
+	padding-top: var(--dynasty-space-3);
 }
 
-.dynasty-sheet .dynasty-save-kind.is-selected {
-	box-shadow: 0 0 0 2px var(--interactive-accent);
+/* D330 O-06: two native radios on the window colour, with no box round a choice. A row is at least 44 px high, and the whole row selects. */
+.dynasty-save-kinds {
+	display: flex;
+	flex-direction: column;
+	gap: var(--dynasty-space-1);
 }
 
-.dynasty-sheet .dynasty-save-kind.is-selected::before {
-	border-color: var(--interactive-accent);
-	background: var(--interactive-accent);
-	box-shadow: inset 0 0 0 3px var(--background-primary);
+.dynasty-save-kind {
+	display: flex;
+	align-items: flex-start;
+	gap: var(--dynasty-space-3);
+	min-height: 44px;
+	padding: var(--dynasty-space-2) 0;
+	cursor: pointer;
+}
+
+/* The radio looks as Obsidian draws it (its own size and accent). It sits on the middle of the first text line. */
+.dynasty-save-kind .dynasty-save-radio {
+	margin: calc((var(--dynasty-line-text) * var(--dynasty-type-text) - var(--checkbox-size)) / 2) 0 0;
+}
+
+/* The focus recipe (CX-10): the accent outside, the text colour next to the radio. Obsidian's own thin shadow is replaced. */
+.dynasty-save-kind .dynasty-save-radio:focus-visible {
+	outline: var(--dynasty-focus-outline);
+	outline-offset: var(--dynasty-focus-offset);
+	box-shadow: var(--dynasty-focus-shadow);
+}
+
+.dynasty-save-kind-text {
+	display: flex;
+	flex-direction: column;
+	gap: var(--dynasty-space-1);
+	min-width: 0;
+}
+
+.dynasty-save-kind-label {
+	color: var(--text-normal);
+	font-size: var(--dynasty-type-text);
+}
+
+.dynasty-save-kind-hint {
+	color: var(--dynasty-muted);
+	font-size: var(--dynasty-type-small);
 }
 
 /* The result Notice (spec §13.8): Share has a 44 × 44 px hit area. */
 .dynasty-save-small {
-	margin-top: var(--size-4-1);
+	margin-top: var(--dynasty-space-1);
 }
 
 .notice button.dynasty-save-share {
 	display: block;
 	min-width: 88px;
 	min-height: 44px;
-	margin-top: var(--size-4-2);
+	margin-top: var(--dynasty-space-2);
 }
 
 
@@ -106,4 +131,32 @@
 		fill: var(--dynasty-edge);
 		fill: color-mix(in srgb, var(--dynasty-edge) 75%, var(--color-red));
 	}
+}
+
+/*
+ * D330 O-05: the legend has two groups. A group heading is a quiet semibold line in the muted colour; the second group starts under a hairline.
+ * The headings are rows of the same list, so the legend grows with its content.
+ */
+.dynasty-legend-group-title {
+	margin-top: var(--dynasty-space-2);
+	color: var(--dynasty-muted);
+	font-size: var(--dynasty-type-text);
+	font-weight: var(--dynasty-weight-semibold);
+	line-height: var(--dynasty-line-text);
+}
+
+.dynasty-legend-group-title.is-dead {
+	margin-top: var(--dynasty-space-3);
+	padding-top: var(--dynasty-space-3);
+	border-top: var(--dynasty-hairline);
+}
+
+/* The short box of a note: the same tight rows, so the heading takes less room too. */
+.dynasty-popover-legend.is-tight .dynasty-legend-group-title {
+	margin-top: var(--dynasty-space-1);
+}
+
+.dynasty-popover-legend.is-tight .dynasty-legend-group-title.is-dead {
+	margin-top: var(--dynasty-space-2);
+	padding-top: var(--dynasty-space-2);
 }

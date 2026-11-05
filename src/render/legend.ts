@@ -14,6 +14,8 @@ import {
 	LEGEND_DEAD_DOUBT_SAMPLE,
 	LEGEND_DEAD_LABEL,
 	LEGEND_DEAD_SAMPLE,
+	LEGEND_GROUP_DEAD,
+	LEGEND_GROUP_LINES,
 	LEGEND_LABELS,
 	LEGEND_ORDER,
 	SIGN_LEGEND_LABEL,
@@ -32,7 +34,7 @@ export interface LegendPart {
 export type LegendExtraKind = 'sign' | 'dead' | 'dead-doubt';
 
 /** One row of the legend: a line kind (or the D14 sign, or a dead sign) with its label and sample drawing. */
-export interface LegendRow {
+interface LegendRow {
 	/** Line kind, `sign` for the D14 card sign, `dead` and `dead-doubt` for the dead signs. */
 	kind: StrokeKind | LegendExtraKind;
 	label: string;
@@ -110,6 +112,27 @@ export function legendRows(): LegendRow[] {
 	rows.push({ kind: 'dead', label: LEGEND_DEAD_LABEL, w: LEGEND_DEAD_SAMPLE_W, h: LEGEND_SAMPLE_H, parts: deadSample(LEGEND_DEAD_SAMPLE) });
 	rows.push({ kind: 'dead-doubt', label: LEGEND_DEAD_DOUBT_LABEL, w: LEGEND_DEAD_SAMPLE_W, h: LEGEND_SAMPLE_H, parts: deadSample(LEGEND_DEAD_DOUBT_SAMPLE) });
 	return rows;
+}
+
+/** One group of the legend window (D330 O-05): a heading and its rows. */
+export interface LegendGroup {
+	/** `lines`: the line styles and the card sign; `dead`: the two rows about death. */
+	kind: 'lines' | 'dead';
+	heading: string;
+	rows: LegendRow[];
+}
+
+/**
+ * The legend window's rows in two groups (D330 O-05): "Lines" (every line style, then the card sign, so the sign row stays last) and "Death labels".
+ * The saved picture does not use the groups; it keeps its own heading (D74).
+ */
+export function legendGroups(): LegendGroup[] {
+	const rows = legendRows();
+	const dead = (r: LegendRow) => r.kind === 'dead' || r.kind === 'dead-doubt';
+	return [
+		{ kind: 'lines', heading: LEGEND_GROUP_LINES, rows: rows.filter((r) => !dead(r)) },
+		{ kind: 'dead', heading: LEGEND_GROUP_DEAD, rows: rows.filter(dead) },
+	];
 }
 
 /** One house row of a legend: colour strip, arms and name. */

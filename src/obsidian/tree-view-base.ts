@@ -20,6 +20,7 @@ import type { Geometry, LaidOut, LayoutSettings, Orientation, PersonBox, Rect } 
 import type { FontState } from '../render/fonts';
 import type { CardTips } from '../render/dom/card-tip';
 import { PanZoom } from '../render/dom/pan-zoom';
+import { mediaMatches } from '../render/dom/page-reads';
 import type { Scene, SceneOptions } from '../render/dom/scene';
 import { parseBreakList } from '../render/break-words';
 import { Popover } from '../render/dom/widgets';
@@ -38,7 +39,7 @@ import type { MeasuredResult } from '../view/measured-layout';
 import { pushTrail, type ListFrom } from '../view/phone-list';
 import { pluginWindowOpen } from '../view/plugin-modals';
 import type { PickerContext } from './person-picker';
-import type { PictureCopy, PictureStore } from './picture-store';
+import type { PictureStore } from './picture-store';
 import type { FinderDrawn } from '../view/render-plan';
 import { DEFAULT_SETTINGS, type DynastySettings } from '../view/settings';
 import type { SuccessionDrawn } from '../view/succession-view';
@@ -259,12 +260,6 @@ export abstract class TreeViewBase extends MarkdownRenderChild implements HoverP
 	protected listMode = false;
 	/** The list that is drawn, for `updateEditUi`; null when there is none. */
 	protected listEl: HTMLElement | null = null;
-	/** The small picture copies of the rows, held until the list is drawn again or goes away. */
-	protected listCopies: PictureCopy[] = [];
-	/** The person of the large row, the only row with arms (D209 rule A: the personal arms, else the arms of the house). */
-	protected listCentre: string | null = null;
-	/** Stops the picture requests of the rows that still wait. */
-	protected listAbort: AbortController | null = null;
 	/** 0.3 (spec §7.7, size limits): the low bar that this view shows in place of the tree (a very large tree), or null while it draws a tree, a list or an empty block. */
 	protected large: LargeBar | null = null;
 	/** The tap on "Draw the tree" started the work at this time (ms of `performance.now`): the time budget of the draw that follows counts from it (spec §7.7). */
@@ -277,13 +272,14 @@ export abstract class TreeViewBase extends MarkdownRenderChild implements HoverP
 		place: ViewPlace,
 	) {
 		super(containerEl);
-		this.coarse = containerEl.win.matchMedia('(pointer: coarse)').matches;
+		this.coarse = mediaMatches(containerEl.win, '(pointer: coarse)');
 		this.full = place.kind === 'full' ? place.host : null;
 		this.binding = new BlockBinding(host, containerEl, place, {
 			source: () => this.source,
 			unloaded: () => this.unloaded,
 			guard: (fn) => this.guard(fn),
 			updateEditUi: () => this.updateEditUi(),
+			stateTaken: () => this.followBlockState(),
 			render: () => this.render(null),
 			showPlaceholder: () => this.showPlaceholder(),
 			changed: (h, body) => this.changed(h, body),
@@ -593,8 +589,7 @@ export abstract class TreeViewBase extends MarkdownRenderChild implements HoverP
 		}
 		const doc = button?.doc ?? document;
 		const active = doc.activeElement as HTMLElement | null;
-		const free = !active || active === doc.body || !active.isConnected || !!active.closest?.(sel);
-		if (button && free && active !== button) button.focus();
+		if (button && active !== button && (!active || active === doc.body || !active.isConnected || active.closest(sel))) button.focus();
 		const wait = [150, 600][step];
 		if (wait !== undefined) (doc.defaultView ?? window).setTimeout(() => TreeViewBase.refocusButton(host, st, full, sel, step + 1), wait);
 	}
@@ -656,7 +651,7 @@ export abstract class TreeViewBase extends MarkdownRenderChild implements HoverP
 	 */
 	protected focusReturn(is: (el: Element) => boolean): { visible: boolean } | null {
 		const el = this.containerEl;
-		const active = el.doc?.activeElement;
+		const active = el.doc.activeElement;
 		if (!active || !el.contains(active) || !is(active)) return null;
 		return { visible: showsRing(active) };
 	}
@@ -715,7 +710,7 @@ export abstract class TreeViewBase extends MarkdownRenderChild implements HoverP
 		const known = ids.filter((id) => whole.byId.has(id));
 		if (!known.length) return;
 		// A static phone preview shows no fold, so a write there must not end the folds of the full-screen view.
-		if (!full && v && v.coarse) return;
+		if (!full && v?.coarse) return;
 		// The graph the view draws after the write: its focus family, if that has them all.
 		let drawn = whole;
 		if (v && v.focusId !== null && !v.finderDrawn && whole.byId.has(v.focusId)) {
@@ -867,7 +862,7 @@ export abstract class TreeViewBase extends MarkdownRenderChild implements HoverP
 	protected abstract linksResolved(): void;
 	protected abstract markInteractive(): void;
 	protected abstract modalAbove(): boolean;
-	protected abstract openFull(target: string | null, focus?: string | null, focusDue?: string | null): Promise<void>;
+	protected abstract openFull(target: string | null, focus?: string | null, focusDue?: string | null, problemsDue?: boolean): Promise<void>;
 	protected abstract openHouses(): Promise<void>;
 	protected abstract openNewPerson(): Promise<void>;
 	protected abstract openSheet(id: string, fromTap: boolean): Promise<void>;
@@ -878,6 +873,7 @@ export abstract class TreeViewBase extends MarkdownRenderChild implements HoverP
 	protected abstract pulse(ids: string[]): void;
 	protected abstract recheckTall(fresh?: boolean): boolean;
 	protected abstract redraw(g: FamilyGraph, laid: LaidOut): void;
+	protected abstract followBlockState(): void;
 	protected abstract refillList(): void;
 	protected abstract releaseList(): void;
 	protected abstract render(fontsOverride: FontState | null): void;

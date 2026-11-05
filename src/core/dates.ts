@@ -517,7 +517,7 @@ export function buildTreeDates(reader: DateReader, people: readonly Person[], ti
 			let plain = false;
 			const see = (text: string | undefined) => {
 				const r = reader.read(text);
-				if (!r || r.year === undefined) return;
+				if (r?.year === undefined) return;
 				if (r.source === 'plain') plain = true;
 				else {
 					const c = WINNER.get(r);

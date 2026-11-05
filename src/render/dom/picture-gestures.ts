@@ -5,11 +5,12 @@
  */
 
 import { finite } from '../../core/portrait-crop';
+import { withinTap, type TapSetting } from '../view-math';
 
 export { swipeCloses } from './sheet-swipe';
 
 /** The zoom stays between these limits (D256 item 5). */
-export const ZOOM_MIN = 1;
+const ZOOM_MIN = 1;
 /** The largest zoom. */
 export const ZOOM_MAX = 4;
 /** A double tap on a picture at rest zooms to this factor. */
@@ -17,19 +18,21 @@ export const DOUBLE_TAP_ZOOM = 2.5;
 /** A pinch that ends below this factor goes back to 1, so the picture never rests a hair larger than the stage. */
 export const ZOOM_SNAP = 1.08;
 /** A raster picture shows at twice its own size at most; it never blurs (D256 item 5). */
-export const RASTER_GROWTH = 2;
+const RASTER_GROWTH = 2;
 /** Two taps count as a double tap inside this time (ms) and this distance (px). */
 export const DOUBLE_TAP_MS = 320;
 /** The two taps of a double tap are this near (px). */
 export const DOUBLE_TAP_PX = 40;
+/** The limits of a double tap on a picture (longer and wider than on the tree). */
+const TAP_PICTURE: TapSetting = { ms: DOUBLE_TAP_MS, px: DOUBLE_TAP_PX };
 /** A finger that moves farther than this is not a tap. */
-export const TAP_SLOP_PX = 10;
+const TAP_SLOP_PX = 10;
 /** A sideways swipe needs this distance (px), or a flick of this speed (px per ms) over at least `FLICK_MIN_PX`. */
-export const SIDE_SWIPE_PX = 56;
+const SIDE_SWIPE_PX = 56;
 /** The speed of a flick that counts as a swipe (px per ms). */
-export const SIDE_FLICK = 0.45;
+const SIDE_FLICK = 0.45;
 /** The least distance of a flick (px). */
-export const FLICK_MIN_PX = 24;
+const FLICK_MIN_PX = 24;
 
 /** A width and a height in px. */
 export interface Size {
@@ -112,7 +115,7 @@ export const panView = (v: View, dx: number, dy: number, shown: Size, stage: Siz
 
 /** True when a tap at `now` is the second of a double tap that began with `prev`. */
 export function isPictureDoubleTap(prev: { t: number; x: number; y: number } | null, now: { t: number; x: number; y: number }): boolean {
-	return !!prev && now.t - prev.t <= DOUBLE_TAP_MS && Math.hypot(now.x - prev.x, now.y - prev.y) <= DOUBLE_TAP_PX;
+	return !!prev && withinTap(now.t - prev.t, Math.hypot(now.x - prev.x, now.y - prev.y), TAP_PICTURE);
 }
 
 /** True when a finger that moved from (0, 0) to (`dx`, `dy`) still counts as a tap. */

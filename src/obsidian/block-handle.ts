@@ -10,9 +10,10 @@ import type { EditorView } from '@codemirror/view';
 import type { WritePlan } from '../core/block-write';
 import { findBlocks, ordinalForSection, type LocatedBlock } from '../core/block-locate';
 import { relocate, relocateAll, sameBody, smallestChange, undoBlock } from '../core/block-match';
-import { createUndoStack, planWrite } from '../core/block-write';
+import { createUndoStack, planWrite, type UndoLabel } from '../core/block-write';
 import type { EditResult, Op } from '../core/edit';
 import { applyOp } from '../core/yaml-edit';
+import { guarded } from './start-guard';
 import { newBlockState, type BlockState } from '../view/block-state';
 
 /**
@@ -63,6 +64,12 @@ export type Written = { ok: true; body: string; created: string[]; effects: 'aut
 type WriteKind = 'user' | 'maintenance';
 
 /**
+ * What a user write says about itself for the words after an Undo (D330 UX-17): a label, or a function of the effects that the write had (an Add parent
+ * that also added a marriage says so only after the edit ran).
+ */
+export type LabelSource = UndoLabel | ((effects: readonly string[]) => UndoLabel);
+
+/**
  * `stale`: the block changed since the handle last read or wrote it; the handle has re-read it and
  * emitted `changed`. `missing`: the block is gone. `refused`: the op was refused.
  */
@@ -72,7 +79,7 @@ export type HandleWriteOutcome =
 	| { ok: false; code: 'refused'; refusal: Extract<EditResult, { ok: false }> };
 
 /** The result of `Handle.undo`: the restored body, or why it did not undo. */
-type UndoOutcome = { ok: true; body: string } | { ok: false; code: 'empty' | 'changed' | 'missing' };
+type UndoOutcome = { ok: true; body: string; label?: UndoLabel } | { ok: false; code: 'empty' | 'changed' | 'missing' };
 
 /** The one handle of a `kin` block (spec §6.1), shared by every view of that block. */
 export class Handle {
@@ -151,13 +158,7 @@ export class Handle {
 	/** Tells every view of this block that its body, its place or its state changed. */
 	notify(): void {
 		const body = this.body;
-		for (const l of [...this.listeners]) {
-			try {
-				l(body);
-			} catch (e) {
-				console.error('Crown and Kin: a tree view failed to update', e);
-			}
-		}
+		for (const l of [...this.listeners]) guarded('a tree view failed to update', () => l(body));
 	}
 
 	/** Runs `fn` after every earlier queued task: writes on one handle never overlap. */
@@ -173,7 +174,7 @@ export class Handle {
 	}
 
 	/** Queued: writes on one handle never overlap. */
-	write(op: Op, kind: WriteKind = 'user'): Promise<HandleWriteOutcome> {
+	write(op: Op, kind: WriteKind = 'user', label?: LabelSource): Promise<HandleWriteOutcome> {
 		return this.enqueue(async (): Promise<HandleWriteOutcome> => {
 			if (this.detached) return { ok: false, code: 'missing' };
 			let result: EditResult | null = null;
@@ -183,13 +184,17 @@ export class Handle {
 				return result.ok ? { ok: true as const, body: result.body } : { ok: false as const, reason: result.code };
 			};
 			const mode = kind === 'maintenance' ? ({ kind: 'maintenance', op } as const) : ('user' as const);
+			const labelOf = (): UndoLabel | undefined => {
+				const r = result as EditResult | null;
+				return typeof label === 'function' ? label(r?.ok ? (r.effects ?? []) : []) : label;
+			};
 			try {
 				const expected = this.body;
-				out = await this.apply(expected, edit, mode);
+				out = await this.apply(expected, edit, mode, labelOf);
 				// The block only moved (a block was added or removed elsewhere) and its text is what the
 				// user saw: the edit still means this block, so write it at its new place. `missing` is the
 				// same case when the block was the last one.
-				if ((out === 'stale' || out === 'missing') && !this.detached && this.body === expected) out = await this.apply(expected, edit, mode);
+				if ((out === 'stale' || out === 'missing') && !this.detached && this.body === expected) out = await this.apply(expected, edit, mode, labelOf);
 			} catch (e) {
 				// §8: a failed file write is an outcome for the caller, never an unhandled rejection.
 				console.error('Crown and Kin: cannot write the note', e);
@@ -235,9 +240,9 @@ export class Handle {
 				console.error('Crown and Kin: cannot write the note', e);
 				out = 'rejected';
 			}
-			if (out === 'written') return { ok: true, body: this.body };
+			if (out === 'written') return step.label ? { ok: true, body: this.body, label: step.label } : { ok: true, body: this.body };
 			// The entry was taken but not written: put it back so a later try can still undo.
-			this.undoStack.push(step.body, blocks[at].body);
+			this.undoStack.push(step.body, blocks[at].body, step.label);
 			return { ok: false, code: out === 'missing' ? 'missing' : 'changed' };
 		});
 	}
@@ -250,6 +255,7 @@ export class Handle {
 		expected: string,
 		edit: (body: string) => { ok: true; body: string } | { ok: false; reason: string },
 		mode: 'user' | 'undo' | { kind: 'maintenance'; op: Op },
+		labelOf?: () => UndoLabel | undefined,
 	): Promise<'written' | 'stale' | 'missing' | 'rejected'> {
 		const maintenance = typeof mode === 'object';
 		const path = this.key.path;
@@ -298,7 +304,7 @@ export class Handle {
 			return plan.code;
 		}
 		if (unchanged) return 'written';
-		if (mode === 'user') this.undoStack.push(plan.oldBody, plan.newBody);
+		if (mode === 'user') this.undoStack.push(plan.oldBody, plan.newBody, labelOf?.());
 		else if (maintenance) this.carryUndo(plan.oldBody, plan.newBody, mode.op);
 		this.body = plan.newBody;
 		this.count = findBlocks(plan.newText).length;
@@ -567,7 +573,7 @@ export class HandleRegistry {
 	wrote(h: Handle, text: string): void {
 		const path = h.key.path;
 		const seen = this.lastSeen.get(path);
-		if (seen && seen.length === h.count && h.key.ordinal < seen.length) seen[h.key.ordinal] = h.body;
+		if (seen?.length === h.count && h.key.ordinal < seen.length) seen[h.key.ordinal] = h.body;
 		else this.applyText(path, text);
 	}
 

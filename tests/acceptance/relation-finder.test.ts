@@ -8,7 +8,7 @@ import { graphOf, lowers, relationsModule, relationText, sample12, SPEC_4 } from
 
 /*
  * The relation finder (spec §13.2, D47, D48): acceptance tests written from the spec and the
- * line and step rules in the relations.ts header, before the build (WP7.0). They fail until WP7.1 adds
+ * line and step rules in the relations.ts header, before the build. They fail until WP7.1 adds
  * `src/core/relations.ts` (`findRelation`, `lineSubgraph`) and WP7.2 adds the sentence builders.
  *
  * Union keys in sample tree 12 are `u<index in unions>`: u0 sigmund–wilma, u2 odo–bertha,
@@ -309,7 +309,7 @@ describe('the small tree of the line (D47, LineSubgraph)', () => {
 		expect(g.people.map((p) => p.id).sort()).toEqual([...line.people].sort());
 		// Only the line's links: Dana keeps Hugo, not Clara. For the full relation through the couple
 		// Sigmund and Wilma, both children keep both parents, so the couple has its shared trunk
-		// (supervisor ruling, the decision notes "Ruling for WP7.1 lineSubgraph").
+		// .
 		expect(g.placementParents.get('hugo')).toEqual(['sigmund', 'wilma']);
 		expect(g.placementParents.get('maud')).toEqual(['sigmund', 'wilma']);
 		expect(g.placementParents.get('dana')).toEqual(['hugo']);

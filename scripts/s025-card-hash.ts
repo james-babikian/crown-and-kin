@@ -1,5 +1,5 @@
 // 0.2.5 WP-B6: the keys and the hash function of the golden pictures of the Roundel and the sideways text card. The test
-// `tests/scripts/s025-card-hashes.test.ts` and the recorder `scripts/s025-record-hashes.ts` both use it, so a key means one picture everywhere.
+// `tests/scripts/card-form-headless-hashes.test.ts` and the recorder `scripts/s025-record-hashes.ts` both use it, so a key means one picture everywhere.
 import { createHash } from 'node:crypto';
 import { allFixtures } from '../tests/acceptance/load';
 import { CARD_THEMES, CARD_VARIANTS, drawCard, type CardTheme, type CardVariant } from './s025-card-draw';
@@ -8,7 +8,7 @@ import { CARD_THEMES, CARD_VARIANTS, drawCard, type CardTheme, type CardVariant 
 export const HASH_SAMPLES = ['07', '07b', '12', '15'] as const;
 
 /** Where the recorded hashes live. */
-export const CARD_HASH_FILE = 'tests/acceptance/s025-card-hashes.json';
+export const CARD_HASH_FILE = 'tests/acceptance/card-form-hashes.json';
 
 /** All 32 keys, `<sample>|<variant>|<theme>`, in a fixed order. */
 export function cardHashKeys(): string[] {

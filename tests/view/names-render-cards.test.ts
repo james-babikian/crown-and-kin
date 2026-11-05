@@ -1,4 +1,4 @@
-// Spec §14 rule 15 (WP-6 step 2): the names of the years on the drawn card (live scene and saved picture, each with its own measure, also at a
+// Spec §14 rule 15: the names of the years on the drawn card (live scene and saved picture, each with its own measure, also at a
 // refit), the cut in three steps (names, no names, "…"), the reign on a card, the legend of the saved picture, and the phone list rows.
 import { describe, expect, it } from 'vitest';
 
@@ -233,7 +233,7 @@ describe('§14 rule 15: the rows of the phone list', () => {
 		const el = make(reader());
 		expect(years(el, 'c')).toBe(NAMED);
 		expect(years(el, 'a')).toBe(`22.10 Ve${THIN}–${THIN}22.12 Mo`);
-		// The reign never breaks (G.2): a word joiner sits after the dash.
+		// The reign never breaks: a word joiner sits after the dash.
 		expect(el.querySelector('.dynasty-hero-title')?.getText().replace(JOINERS, '').replace(NBSP, ' ').replace(NARROW, THIN)).toContain(`Duke (r. 22.13 Sa${THIN}–${THIN}22.14 Ju)`);
 	});
 
@@ -255,7 +255,7 @@ describe('the layout', () => {
 	});
 });
 
-describe('D278 item 3: a range with a word of its own ("c.") has the thin spaces, a plain range has not, in both renderers', () => {
+describe('D278: a range with a word of its own ("c.") has the thin spaces, a plain range has not, in both renderers', () => {
 	// No list: the only reason for the spaces is the word. The reign has a word too.
 	const WORD = SRC.replace('born: "22.13", died: "22.14"', 'born: "c. 1131", died: "1160"').replace('from: "22.13", to: "22.14"', 'from: "c. 1131", to: "1160"');
 	const SPACED = `c. 1131${THIN}–${THIN}1160`;

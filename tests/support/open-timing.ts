@@ -1,5 +1,5 @@
 /*
- * The set-up that the four tests of "Show render timing" share (`g2-k-timing`, `g2b-k-timing`, `r030-k-timing`, `r030-k-fix-timing`; spec §7.7):
+ * The set-up that the four tests of "Show render timing" share (`open-timing-closed-view`, `open-timing-replaced-view`, `render-timing-user-wait`, `render-timing-opens`; spec §7.7):
  * a fake host that keeps the opens as the plugin does, with a parse that takes 700 ms on the fake clock, and a call of the code-block
  * processor for one block. The clock is fixed, so the code under test takes no time of its own.
  */

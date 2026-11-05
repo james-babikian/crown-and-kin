@@ -5,13 +5,14 @@
  */
 import { andList } from '../core/messages';
 import { DOUBTFUL_DIED, formatYear, type InheritIllegitimate, type InheritRule, type InheritThrough, type SuccessionRule } from '../core/succession-keys';
+import { isolateName } from './name-bidi';
 import { PERSON_PLACEHOLDER } from './view-text';
 
 /**
  * The year in a sentence of the line: the text that gives Y, as written (`SuccessionResult.yearText`, spec §14 rule 7), or null for "now".
  * A number is the internal year and shows with `formatYear`; the Titles window still passes `result.year` until step 4.3 moves it to `yearText`.
  */
-export type YearInText = string | number | null;
+type YearInText = string | number | null;
 const yearIn = (year: string | number): string => (typeof year === 'number' ? formatYear(year) : year);
 
 /** A `died` text that only says "yes": the row of an open branch then gives no date. */
@@ -78,18 +79,18 @@ export const SUCCESSION_UI = {
 	adopted: 'Adopted children can inherit',
 	adoptedHint: 'Wards and rumoured children never inherit.',
 	body: 'Only descendants of the first holder can inherit',
-	bodyHint: (first: string) => `The first holder is ${first}. Only the descendants of ${first} are in the line. If the title goes to a new house, make a new title.`,
+	bodyHint: (first: string) => `The first holder is ${isolateName(first)}. Only the descendants of ${isolateName(first)} are in the line. If the title goes to a new house, make a new title.`,
 	// D291: while the switch is off, the hint says what the switch would do; the next hint (`cadetHint`) shows only when it matters.
-	bodyHintOff: (first: string) => `The first holder is ${first}. If you turn on this switch, only the descendants of ${first} are in the line.`,
+	bodyHintOff: (first: string) => `The first holder is ${isolateName(first)}. If you turn on this switch, only the descendants of ${isolateName(first)} are in the line.`,
 	cadetHint: (name: string, first: string) =>
-		`${name} is in the line of succession, but ${name} is not a descendant of ${first}. If only the descendants of ${first} can inherit this title, turn on this switch. Then ${name} leaves the line.`,
+		`${isolateName(name)} is in the line of succession, but ${isolateName(name)} is not a descendant of ${isolateName(first)}. If only the descendants of ${isolateName(first)} can inherit this title, turn on this switch. Then ${isolateName(name)} leaves the line.`,
 	// The first entry has a name only, so the first holder is the next entry that names a person in the tree.
 	bodyHintSkipped: (first: string, entry: string) =>
-		`The first holder in the tree is ${first}, so only the descendants of ${first} are in the line of succession. The first entry, ${entry}, is not a person in the tree. To use ${entry}, select a person in the tree as that holder. If the title goes to a new house, make a new title.`,
+		`The first holder in the tree is ${isolateName(first)}, so only the descendants of ${isolateName(first)} are in the line of succession. The first entry, ${isolateName(entry)}, is not a person in the tree. To use ${isolateName(entry)}, select a person in the tree as that holder. If the title goes to a new house, make a new title.`,
 	bodyHintSkippedOff: (first: string, entry: string) =>
-		`The first entry, ${entry}, is not a person in the tree, so the first holder in the tree is ${first}. If you turn on this switch, only the descendants of ${first} are in the line. To use ${entry}, select a person in the tree as that holder.`,
+		`The first entry, ${isolateName(entry)}, is not a person in the tree, so the first holder in the tree is ${isolateName(first)}. If you turn on this switch, only the descendants of ${isolateName(first)} are in the line. To use ${isolateName(entry)}, select a person in the tree as that holder.`,
 	outsideBody: (ruler: string, first: string) =>
-		`${ruler} is not a descendant of ${first}, so nobody can inherit this title. Check the choices for adopted children and for children with the box “Illegitimate” ticked.`,
+		`${isolateName(ruler)} is not a descendant of ${isolateName(first)}, so nobody can inherit this title. Check the choices for adopted children and for children with the box “Illegitimate” ticked.`,
 	// Named heirs and excluded people.
 	heirsLabel: 'Named heirs',
 	heirsHint: 'The named heirs come first, in the order of this list. The rule gives the order of the other people.',
@@ -108,13 +109,13 @@ export const SUCCESSION_UI = {
 	moveEarlierLabel: (who: string) => `Move earlier: move ${who} earlier`,
 	moveLaterLabel: (who: string) => `Move later: move ${who} later`,
 	// The state of a named heir: `year` is a number, or null for "now".
-	heirNotAlive: (name: string, year: YearInText) => (year === null ? `${name} is dead, so the plugin does not use ${name} as a named heir.` : `${name} is not alive in ${yearIn(year)}, so the plugin does not use ${name} as a named heir.`),
-	heirNotBorn: (name: string, year: YearInText) => (year === null ? `${name} is not born yet, so the plugin does not use ${name} as a named heir.` : `${name} is not born yet in ${yearIn(year)}, so the plugin does not use ${name} as a named heir.`),
-	heirIsRuler: (name: string) => `${name} is the ruler of this line, so the plugin does not use ${name} as a named heir.`,
-	heirExcluded: (name: string) => `${name} is in the list of excluded people, so ${name} is not in the line.`,
+	heirNotAlive: (name: string, year: YearInText) => (year === null ? `${isolateName(name)} is dead, so the plugin does not use ${isolateName(name)} as a named heir.` : `${isolateName(name)} is not alive in ${yearIn(year)}, so the plugin does not use ${isolateName(name)} as a named heir.`),
+	heirNotBorn: (name: string, year: YearInText) => (year === null ? `${isolateName(name)} is not born yet, so the plugin does not use ${isolateName(name)} as a named heir.` : `${isolateName(name)} is not born yet in ${yearIn(year)}, so the plugin does not use ${isolateName(name)} as a named heir.`),
+	heirIsRuler: (name: string) => `${isolateName(name)} is the ruler of this line, so the plugin does not use ${isolateName(name)} as a named heir.`,
+	heirExcluded: (name: string) => `${isolateName(name)} is in the list of excluded people, so ${isolateName(name)} is not in the line.`,
 	heirNotInTree: 'No person in the tree has this ID.',
 	// The bold heading above the rows of the Line of succession section.
-	lineAfter: (ruler: string, year: YearInText) => (year === null ? `After ${ruler} now` : `After ${ruler} in ${yearIn(year)}`),
+	lineAfter: (ruler: string, year: YearInText) => (year === null ? `After ${isolateName(ruler)} now` : `After ${isolateName(ruler)} in ${yearIn(year)}`),
 	lineRowLabel: (name: string, ordinal: string) => `${ordinal} ${name}: show the card in the tree`,
 	more: 'and more people',
 	// Open branches: a person who died and has no children in the tree. DIED is the text of the note.
@@ -122,9 +123,9 @@ export const SUCCESSION_UI = {
 	branchRow: (name: string, died: string) => {
 		const text = died.trim();
 		const word = text.toLowerCase();
-		if (text === '' || BARE_DEATH_WORDS.includes(word)) return `Open branch of ${name}: no children in the tree`;
-		if (DOUBTFUL_DIED.includes(word)) return `Open branch of ${name} (death not confirmed): no children in the tree`;
-		return `Open branch of ${name} (died ${text}): no children in the tree`;
+		if (text === '' || BARE_DEATH_WORDS.includes(word)) return `Open branch of ${isolateName(name)}: no children in the tree`;
+		if (DOUBTFUL_DIED.includes(word)) return `Open branch of ${isolateName(name)} (death not confirmed): no children in the tree`;
+		return `Open branch of ${isolateName(name)} (died ${text}): no children in the tree`;
 	},
 	branchRowLabel: (row: string) => `${row}: show the card in the tree`,
 	branchNote: 'A grey row shows a person who died and has no children in the tree. The person may have children that are not in the tree yet. If the person had no children, tick “No children” in the person window.',
@@ -136,35 +137,36 @@ export const SUCCESSION_UI = {
 	yearBad: (text: string) => `The plugin cannot read the year in the note: ${text}. If you type a year here, the plugin replaces it.`,
 	old: (name: string, age: number, year: YearInText) => {
 		const years = age === 1 ? '1 year' : `${age} years`;
-		return year === null ? `${name} is older than ${years}. If ${name} is dead, add a death date.` : `${name} is older than ${years} in ${yearIn(year)}. If ${name} is dead, add a death date.`;
+		return year === null ? `${isolateName(name)} is older than ${years}. If ${isolateName(name)} is dead, add a death date.` : `${isolateName(name)} is older than ${years} in ${yearIn(year)}. If ${isolateName(name)} is dead, add a death date.`;
 	},
 	noRuler: (year: YearInText) => (year === null ? 'The title has no holder now, so there is no line of succession.' : `The title has no holder in ${yearIn(year)}, so there is no line of succession.`),
 	rulerNotInTree: (year: YearInText) =>
 		year === null ? 'The holder of the title is not in the tree now. The plugin cannot show the line of succession.' : `The holder of the title in ${yearIn(year)} is not in the tree. The plugin cannot show the line of succession.`,
 	badRule: 'The succession rule in the tree text has an error. Open the list of warnings.',
-	newTitle: 'Save the title first. Then you can set a succession rule.',
+	/** D330 O-22: the note on a title that is not saved yet, in place of the line of succession. */
+	newTitleLine: 'Save the title first. Then you can show the line of succession.',
 	coRulers: (n: number, ruler: string, year: YearInText) => (year === null ? `${n} holders rule now. The line is after ${ruler}.` : `${n} holders rule in ${yearIn(year)}. The line is after ${ruler}.`),
 	// The notes under and above the line (SuccessionResult.notes). The window shows them as quiet text lines.
-	orderFromNote: (a: string, b: string) => `The order of ${a} and ${b} comes from the order in the note. Add a birth year to change it.`,
-	orderFromNoteSameYear: (a: string, b: string) => `The order of ${a} and ${b} comes from the order in the note, because both have the same birth year.`,
+	orderFromNote: (a: string, b: string) => `The order of ${isolateName(a)} and ${isolateName(b)} comes from the order in the note. Add a birth year to change it.`,
+	orderFromNoteSameYear: (a: string, b: string) => `The order of ${isolateName(a)} and ${isolateName(b)} comes from the order in the note, because both have the same birth year.`,
 	orderContradiction: (names: string | readonly string[]) =>
-		`The birth years and the order in the note do not agree for ${typeof names === 'string' ? names : andList(names)}. The plugin puts the people who have a birth year in the order of the birth years.`,
+		`The birth years and the order in the note do not agree for ${typeof names === 'string' ? isolateName(names) : andList(names.map(isolateName))}. The plugin puts the people who have a birth year in the order of the birth years.`,
 	coRulersNotInLine: 'The other holders are not in the line of succession, unless they are named heirs.',
 	bornInReignNoFrom: (parent: string) =>
-		`${parent} has no start year as a holder of this title. So the rule “Born during the reign first” puts the children of ${parent} in the order of “Eldest child first”. Add a start year in the field “From”.`,
-	throughSpouseNote: (holder: string, spouse: string) => `${holder} holds the title through the spouse, ${spouse}. The line of succession is for ${spouse}.`,
+		`${isolateName(parent)} has no start year as a holder of this title. So the rule “Born during the reign first” puts the children of ${isolateName(parent)} in the order of “Eldest child first”. Add a start year in the field “From”.`,
+	throughSpouseNote: (holder: string, spouse: string) => `${isolateName(holder)} holds the title through the spouse, ${isolateName(spouse)}. The line of succession is for ${isolateName(spouse)}.`,
 	// Only the birth date uses this text (`bornDateUnread`, `heirNotes`).
-	noYearDate: (name: string) => `The plugin cannot read a year in the birth date of ${name}. To change this, write a year in the birth date.`,
-	noYearReign: (name: string) => `The plugin cannot read a year in the reign of ${name}.`,
+	noYearDate: (name: string) => `The plugin cannot read a year in the birth date of ${isolateName(name)}. To change this, write a year in the birth date.`,
+	noYearReign: (name: string) => `The plugin cannot read a year in the reign of ${isolateName(name)}.`,
 	// Spec §14 rule 5: a `died` text with text and no year. `year` is the text that gives Y, as written.
-	diedNoYear: (name: string, year: string) => `The plugin cannot read a year in the death date of ${name}. So in this line, it counts ${name} as dead in ${year}. To change this, write a year in the death date.`,
+	diedNoYear: (name: string, year: string) => `The plugin cannot read a year in the death date of ${isolateName(name)}. So in this line, it counts ${isolateName(name)} as dead in ${year}. To change this, write a year in the death date.`,
 	leftOutNoSex: (n: number) => (n === 1 ? '1 person has no “sex: m” or “sex: f”, so this rule does not include this person.' : `${n} people have no “sex: m” or “sex: f”, so this rule does not include them.`),
 	noBirthYear: (n: number) => (n === 1 ? '1 heir has no birth year, so this rule cannot put this heir in order.' : `${n} heirs have no birth year, so this rule cannot put them in order.`),
 	show: 'Show',
 	showLabel: 'Show the line of succession on the tree',
 	// The Show view: the bar above the tree, the card label and the row of the phone list.
-	bar: (title: string, year: YearInText) => (year === null ? `Line of succession: ${title}, now` : `Line of succession: ${title}, ${yearIn(year)}`),
-	barNoHeir: (title: string, year: YearInText) => `${year === null ? `Line of succession: ${title}, now` : `Line of succession: ${title}, ${yearIn(year)}`}. No heir in the tree.`,
+	bar: (title: string, year: YearInText) => (year === null ? `Line of succession: ${isolateName(title)}, now` : `Line of succession: ${isolateName(title)}, ${yearIn(year)}`),
+	barNoHeir: (title: string, year: YearInText) => `${year === null ? `Line of succession: ${isolateName(title)}, now` : `Line of succession: ${isolateName(title)}, ${yearIn(year)}`}. No heir in the tree.`,
 	barClose: 'Close',
 	barCloseLabel: 'Close the line of succession',
 	inLine: (ordinal: string) => `${ordinal} in line`,
@@ -174,7 +176,7 @@ export const SUCCESSION_UI = {
 	unsaved: 'You did not save your changes. The plugin shows the line only after you save them. Save them now?',
 	saveAndShow: 'Save and show',
 	// The setting texts are in SETTINGS_UI. The delete texts:
-	deleteHeir: (name: string, titles: number) => (titles === 1 ? `The plugin also removes ${name} as the named heir of 1 title.` : `The plugin also removes ${name} as the named heir of ${titles} titles.`),
+	deleteHeir: (name: string, titles: number) => (titles === 1 ? `The plugin also removes ${isolateName(name)} as the named heir of 1 title.` : `The plugin also removes ${isolateName(name)} as the named heir of ${titles} titles.`),
 	deleteExcluded: (name: string, titles: number) =>
-		titles === 1 ? `The plugin also removes ${name} from the excluded people of 1 title.` : `The plugin also removes ${name} from the excluded people of ${titles} titles.`,
+		titles === 1 ? `The plugin also removes ${isolateName(name)} from the excluded people of 1 title.` : `The plugin also removes ${isolateName(name)} from the excluded people of ${titles} titles.`,
 } as const;

@@ -7,12 +7,15 @@
  */
 
 import { Modal, Notice, TFile, type EventRef } from 'obsidian';
+import { mediaMatches } from '../render/dom/page-reads';
 import { FULL_UI } from '../render/ui-text';
 import { isPhoneSideways } from '../view/focus-mode';
 import { isPhoneWidth } from './modal-layout';
 import { nameDialog } from './sheet-parts';
 import { TreeView, type FullHost, type FullSource, type TreeHost } from './tree-view';
 import { TreeViewBase, showsRing } from './tree-view-base';
+import { NARROW_BAR_PX } from './tree-view-toolbar';
+import { guarded } from './start-guard';
 
 // Obsidian's sidebar swipe and pull-down gestures listen above the modal; these must not reach them (spec §7.2).
 const STOPPED = ['touchstart', 'touchmove', 'touchend', 'touchcancel', 'pointerdown', 'pointermove', 'pointerup', 'pointercancel'];
@@ -42,11 +45,18 @@ export class FullScreenModal extends Modal implements FullHost {
 	) {
 		super(host.app);
 		this.focus = focusId === null ? null : { id: focusId };
-		const active = opener.doc?.activeElement;
+		const active = opener.doc.activeElement;
 		this.expandBack = active && opener.contains(active) && active.matches('.dynasty-expand') ? { visible: showsRing(active) } : null;
 		for (let el: HTMLElement | null = opener.parentElement; el; el = el.parentElement) {
 			if (el.scrollHeight > el.clientHeight || el.scrollWidth > el.clientWidth) this.scrolls.push({ el, top: el.scrollTop, left: el.scrollLeft });
 		}
+	}
+
+	/** True once when the pop-up of the phone list in a note opened this view (`FullSource.problemsDue`); the view then shows its problem list after its first view. */
+	takeProblemsDue(): boolean {
+		const due = !!this.from.problemsDue;
+		this.from.problemsDue = false;
+		return due;
 	}
 
 	override onOpen(): void {
@@ -58,12 +68,18 @@ export class FullScreenModal extends Modal implements FullHost {
 		this.setTitle(FULL_UI.dialog);
 		nameDialog(modalEl, this.titleEl);
 		contentEl.addClass('dynasty-fullscreen-content');
-		const win = modalEl.win ?? window;
+		const win = modalEl.win;
 		// D242: `is-phone` (a window under 600 px) and `is-phone-side` (a phone held sideways) give the same bottom bar. The sideways test
 		// is the one that picks the phone's buttons, so the look and the button set agree. The tree reads the coarse pointer when it is made; so does this.
-		const coarse = win.matchMedia?.('(pointer: coarse)')?.matches === true;
+		const coarse = mediaMatches(win, '(pointer: coarse)');
+		let narrow = win.innerWidth < NARROW_BAR_PX;
 		const layout = () => {
 			modalEl.toggleClass('is-phone', isPhoneWidth(win));
+			// O-27: a window under 400 px wide has the phone set of buttons; the bar is made again when the window crosses the limit.
+			if (narrow !== win.innerWidth < NARROW_BAR_PX) {
+				narrow = !narrow;
+				this.tree?.barWidthChanged();
+			}
 			const was = modalEl.hasClass('is-phone-side');
 			const now = isPhoneSideways(coarse, win);
 			if (was === now) return;
@@ -93,11 +109,11 @@ export class FullScreenModal extends Modal implements FullHost {
 		}
 		FullScreenModal.openViews.add(this);
 		// For the page preview of a linked name, which Obsidian puts outside the modal (styles.css).
-		const body = (modalEl.doc ?? document).body;
+		const body = modalEl.doc.body;
 		body.addClass('dynasty-fullscreen-open');
 		this.cleanup.push(() => {
 			FullScreenModal.openViews.delete(this);
-			if (![...FullScreenModal.openViews].some((m) => (m.modalEl.doc ?? document).body === body)) body.removeClass('dynasty-fullscreen-open');
+			if (![...FullScreenModal.openViews].some((m) => m.modalEl.doc.body === body)) body.removeClass('dynasty-fullscreen-open');
 		});
 		this.watchNote();
 		// The note's tree of the same block is hidden now: it stops asking for pictures, so this view gets them first.
@@ -172,11 +188,7 @@ export class FullScreenModal extends Modal implements FullHost {
 	/** The plugin unloads: close every full-screen view. */
 	static closeAll(): void {
 		for (const m of [...FullScreenModal.openViews]) {
-			try {
-				m.close(null);
-			} catch (e) {
-				console.error('Crown and Kin: cannot close the full-screen view', e);
-			}
+			guarded('cannot close the full-screen view', () => m.close(null));
 		}
 		FullScreenModal.openViews.clear();
 	}
@@ -184,18 +196,10 @@ export class FullScreenModal extends Modal implements FullHost {
 	override onClose(): void {
 		this.closing = true;
 		for (const c of this.cleanup.splice(0)) {
-			try {
-				c();
-			} catch (e) {
-				console.error('Crown and Kin: cannot clean up the full-screen view', e);
-			}
+			guarded('cannot clean up the full-screen view', c);
 		}
 		const key = this.tree?.stateKey ?? this.from.key;
-		try {
-			this.tree?.unload();
-		} catch (e) {
-			console.error('Crown and Kin: cannot close the full-screen view', e);
-		}
+		guarded('cannot close the full-screen view', () => this.tree?.unload());
 		this.tree = null;
 		this.contentEl.empty();
 		for (const v of this.host.views) {
@@ -215,19 +219,13 @@ export class FullScreenModal extends Modal implements FullHost {
 		const after = this.after;
 		this.after = null;
 		const back = this.expandBack;
-		(this.modalEl.win ?? window).requestAnimationFrame(() => {
+		this.modalEl.win.requestAnimationFrame(() => {
 			restore();
-			try {
+			guarded('cannot give the focus back', () => {
 				if (back) TreeViewBase.refocusAfterRedraw(this.host, (v) => v.stateKey === key && !v.isFull, (vp) => vp.querySelector<HTMLElement>('.dynasty-expand'), back.visible);
-			} catch (e) {
-				console.error('Crown and Kin: cannot give the focus back', e);
-			}
+			});
 			// Opened only now, so that the note's history entry keeps its scroll position.
-			try {
-				after?.();
-			} catch (e) {
-				console.error('Crown and Kin: cannot open the note', e);
-			}
+			guarded('cannot open the note', () => after?.());
 		});
 	}
 }

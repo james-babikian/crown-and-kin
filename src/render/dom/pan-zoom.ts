@@ -268,7 +268,7 @@ export class PanZoom {
 
 	private schedule(): void {
 		if (this.frame) return;
-		const win = this.o.viewport.win ?? window;
+		const win = this.o.viewport.win;
 		this.frame = win.requestAnimationFrame(() => {
 			this.frame = 0;
 			this.o.guard(() => this.apply());
@@ -280,7 +280,7 @@ export class PanZoom {
 		const w = this.o.wrapper;
 		const d = this.drawn;
 		const sameSize = !!d && d.size.w === this.size.w && d.size.h === this.size.h && d.view.scale > 0;
-		const win = this.o.viewport.win ?? window;
+		const win = this.o.viewport.win;
 		if (this.fillTimer) {
 			win.clearTimeout(this.fillTimer);
 			this.fillTimer = 0;
@@ -351,7 +351,7 @@ export class PanZoom {
 	}
 
 	private down(e: PointerEvent): void {
-		if (!this.view || (e.target as Element | null)?.closest?.(CONTROLS)) return;
+		if (!this.view || (e.target as Element | null)?.closest(CONTROLS)) return;
 		if (e.pointerType === 'mouse' && e.button !== 0) return;
 		if (!this.full) {
 			if (e.pointerType !== 'mouse' || !e.isPrimary) return;
@@ -361,7 +361,7 @@ export class PanZoom {
 		this.pointers.set(e.pointerId, this.local(e));
 		if (this.pinch) return;
 		if (this.pointers.size === 1) {
-			const onBackground = !(e.target as Element | null)?.closest?.(TARGETS);
+			const onBackground = !(e.target as Element | null)?.closest(TARGETS);
 			this.o.guard(() => this.o.onDragStart?.());
 			this.drag = { id: e.pointerId, x: e.clientX, y: e.clientY, start: this.view, panning: false, type: e.pointerType, onBackground };
 			return;
@@ -390,7 +390,7 @@ export class PanZoom {
 			return;
 		}
 		const d = this.drag;
-		if (!d || d.id !== e.pointerId) return;
+		if (d?.id !== e.pointerId) return;
 		const dx = e.clientX - d.x;
 		const dy = e.clientY - d.y;
 		if (!d.panning) {
@@ -426,8 +426,8 @@ export class PanZoom {
 			return;
 		}
 		const d = this.drag;
-		if (!d || d.id !== e.pointerId || (!had && this.full)) {
-			if (d && d.id === e.pointerId) this.drag = null;
+		if (d?.id !== e.pointerId || (!had && this.full)) {
+			if (d?.id === e.pointerId) this.drag = null;
 			return;
 		}
 		this.drag = null;
@@ -457,7 +457,7 @@ export class PanZoom {
 		}
 		// The click that follows this pointerup is part of the pan.
 		this.suppressClick = true;
-		(this.o.viewport.win ?? window).setTimeout(() => this.o.guard(() => (this.suppressClick = false)), 0);
+		this.o.viewport.win.setTimeout(() => this.o.guard(() => (this.suppressClick = false)), 0);
 		this.settleSoon();
 	}
 
@@ -467,7 +467,7 @@ export class PanZoom {
 	 */
 	private settleSoon(): void {
 		if (this.settleFrame) return;
-		const win = this.o.viewport.win ?? window;
+		const win = this.o.viewport.win;
 		this.settleFrame = win.requestAnimationFrame(() => {
 			this.settleFrame = 0;
 			this.o.guard(() => {
@@ -481,7 +481,7 @@ export class PanZoom {
 		const zoom = e.ctrlKey || e.metaKey;
 		if (!zoom && !this.full) return;
 		// A plain wheel over the legend or the problem list scrolls that list, as a press there is its own.
-		if (!zoom && (e.target as Element | null)?.closest?.(CONTROLS)) return;
+		if (!zoom && (e.target as Element | null)?.closest(CONTROLS)) return;
 		e.preventDefault();
 		e.stopPropagation();
 		if (zoom) {
@@ -496,7 +496,7 @@ export class PanZoom {
 			this.view = clampFrom(panFrom(this.view, -dx, -dy), this.view, this.o.bounds, this.size, this.o.freeArea?.());
 		}
 		this.schedule();
-		const win = this.o.viewport.win ?? window;
+		const win = this.o.viewport.win;
 		win.clearTimeout(this.settleTimer);
 		this.settleTimer = win.setTimeout(() => {
 			this.o.guard(() => {
@@ -509,7 +509,7 @@ export class PanZoom {
 	/** Removes all listeners and timers; called when the tree view tears down its scene. */
 	destroy(): void {
 		for (const f of this.off.splice(0)) f();
-		const win = this.o.viewport.win ?? window;
+		const win = this.o.viewport.win;
 		if (this.frame) win.cancelAnimationFrame(this.frame);
 		win.clearTimeout(this.settleTimer);
 		win.clearTimeout(this.fillTimer);

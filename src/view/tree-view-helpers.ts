@@ -12,7 +12,7 @@ import type { CardLabel } from '../core/titles';
 import type { PersonBox, Rect } from '../layout/model';
 import type { SceneOptions } from '../render/dom/scene';
 import { FOLD_UI } from '../render/ui-text';
-import { FIT_MARGIN } from '../render/view-math';
+import { FIT_MARGIN, bounds } from '../render/view-math';
 
 /** The drawn graph has a person with a portrait: only then does "Show portraits on cards" change its layout. */
 export function hasPortraits(g: FamilyGraph | null): boolean {
@@ -47,10 +47,7 @@ export function lineMarks(line: RelationLine, fade: boolean): NonNullable<SceneO
 
 /** The rectangle around `boxes`, with the tree's margin. */
 export function around(boxes: readonly Rect[], margin = FIT_MARGIN): Rect {
-	const x0 = Math.min(...boxes.map((b) => b.x));
-	const y0 = Math.min(...boxes.map((b) => b.y));
-	const x1 = Math.max(...boxes.map((b) => b.x + b.w));
-	const y1 = Math.max(...boxes.map((b) => b.y + b.h));
+	const { x0, y0, x1, y1 } = bounds(boxes);
 	return { x: x0 - margin, y: y0 - margin, w: x1 - x0 + 2 * margin, h: y1 - y0 + 2 * margin };
 }
 

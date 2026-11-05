@@ -102,7 +102,7 @@ describe('§14 rule 8: BP after a number gives no year', () => {
 	});
 });
 
-describe('§14 rule 8 and the architecture notes §5.7 ruling 3: dual dates', () => {
+describe('§14 rule 8: dual dates', () => {
 	it('reads the later year when the part after the slash fits', () => {
 		const rows: [string, number][] = [
 			['1700/01', 1701],

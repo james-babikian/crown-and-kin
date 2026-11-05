@@ -17,8 +17,8 @@
  */
 .dynasty-card-bg {
 	fill: var(--background-primary-alt);
-	stroke: var(--background-modifier-border);
-	stroke-width: 1;
+	stroke: var(--dynasty-card-edge);
+	stroke-width: var(--dynasty-card-edge-width);
 	rx: var(--radius-m);
 	ry: var(--radius-m);
 	rx: min(var(--radius-m), calc(var(--dynasty-font-size) * 1.5));

@@ -7,12 +7,12 @@
 
 .dynasty-line-marriage {
 	stroke: var(--text-muted);
-	stroke-width: 2.5;
+	stroke-width: 2;
 }
 
 .dynasty-line-betrothal {
 	stroke: var(--text-muted);
-	stroke-width: 2.5;
+	stroke-width: 2;
 	stroke-dasharray: 0.1 5;
 	stroke-linecap: round;
 }
@@ -63,17 +63,17 @@
 	stroke-dasharray: 20 6;
 }
 
-/* D38: bold square dots (butt caps). */
+/* D38: bold square dots (butt caps); D330 O-03: a wider gap, so the dots do not run into a dash. */
 .dynasty-line-ward {
 	stroke: var(--color-blue);
 	stroke-width: 3;
-	stroke-dasharray: 3 5;
+	stroke-dasharray: 3 7;
 }
 
 .dynasty-line-rumoured {
 	stroke: var(--color-red);
 	stroke-width: 1.5;
-	stroke-dasharray: 4 4;
+	stroke-dasharray: 10 4;
 	stroke-opacity: 0.85;
 }
 
@@ -87,7 +87,7 @@
 .dynasty-union-ring {
 	fill: var(--background-primary);
 	stroke: var(--text-muted);
-	stroke-width: 2.5;
+	stroke-width: 2;
 }
 
 .dynasty-union-open-triangle {

@@ -66,7 +66,7 @@ const fieldsOf = (l: ListDraft): string => JSON.stringify([l.name, l.marker, l.n
 export const listUntouched = (l: ListDraft): boolean => l.saved !== undefined && l.orig === fieldsOf(l);
 
 /** The place of a name in a list by its full name or its short form, folded; -1 when none. */
-export function nameIndex(names: readonly ListName[], text: string): number {
+function nameIndex(names: readonly ListName[], text: string): number {
 	const t = fold(text);
 	if (t === '') return -1;
 	return names.findIndex((n) => fold(n.name) === t || (n.short !== undefined && fold(n.short) === t));
@@ -157,7 +157,7 @@ export function builtList(l: ListDraft, readYear: (text: string) => number | und
 	const names = l.saved && l.names === l.namesWas && Array.isArray(l.saved.names) ? l.saved.names : parseNameLines(l.names).names;
 	let year = l.knownDate.trim() === '' ? undefined : readYear(l.knownDate);
 	// The date as the window made it from the saved year stays that year; a date that the plugin cannot read back stays as the note holds it.
-	if (l.pin && l.knownDate === l.pin.text) year = l.pin.year;
+	if (l.knownDate === l.pin?.text) year = l.pin.year;
 	else if (year === undefined && kept && l.knownDate.trim() !== '' && Number.isSafeInteger(kept.known.year)) year = kept.known.year;
 	const index = nameIndex(names, l.knownName);
 	const marker = normalizeMarker(l.marker);

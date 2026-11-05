@@ -6,7 +6,7 @@ const DIR = fileURLToPath(new URL('../golden/', import.meta.url));
 
 /**
  * A hand-written expected output from tests/golden/, exactly as stored (LF, one final newline). A whole note (`.md`) was
- * recorded with the old block word and is never edited: it is read with the word `kin` (`support/old-tag.ts`, 0.3.1).
+ * recorded with the old block word and is never edited: it is read with the word `kin` (`support/old-tag.ts`).
  */
 export function golden(name: string): string {
 	const text = readFileSync(DIR + name, 'utf8');
