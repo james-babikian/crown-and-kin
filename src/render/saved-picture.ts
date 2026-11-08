@@ -13,7 +13,7 @@ import { illegitimateSigns } from '../layout/illegitimate-sign';
 import type { LaidOut, StrokeKind } from '../layout/model';
 import type { Measure, SceneFonts } from './scene-model';
 import { LEGEND_DEAD_SAMPLE_W, LEGEND_SAMPLE_H, LEGEND_SAMPLE_W, legendHouses, type LegendExtraKind, type LegendHouse } from './legend';
-import { LEGEND_DEAD_DOUBT_LABEL, LEGEND_DEAD_LABEL, LEGEND_HOUSES_LABEL, LEGEND_LABELS, LEGEND_LINES_LABEL, LEGEND_ORDER, SIGN_LEGEND_LABEL } from './legend-text';
+import { LEGEND_DEAD_DOUBT_LABEL, LEGEND_DEAD_LABEL, LEGEND_HOUSES_LABEL, LEGEND_LABELS, LEGEND_LINES_LABEL, LEGEND_ORDER, SIGN_LEGEND_LABEL, legendLineOrder } from './legend-text';
 import { dateLine } from './tree-info';
 
 /** What a saved picture's legend shows: the line kinds drawn, the D14 sign when used, the houses of the drawn people. */
@@ -282,7 +282,7 @@ export function savedFrame(tree: { width: number; height: number }, legend: Save
 		const rows = items.map((item, i) => ({ item, x: (i % cols) * (cellW + colGap), y: titleH + Math.floor(i / cols) * rowH }));
 		return { rows, w: cols * cellW + (cols - 1) * colGap, h: titleH + Math.ceil(items.length / cols) * rowH };
 	};
-	const lineItems: (StrokeKind | LegendExtraKind)[] = [...legend.kinds, ...(legend.sign ? (['sign'] as const) : []), ...(legend.dead ?? [])];
+	const lineItems: (StrokeKind | LegendExtraKind)[] = [...legendLineOrder(legend.kinds, legend.sign), ...(legend.dead ?? [])];
 	const labelOf = (kind: StrokeKind | LegendExtraKind) => (kind === 'sign' ? SIGN_LEGEND_LABEL : kind === 'dead' ? LEGEND_DEAD_LABEL : kind === 'dead-doubt' ? LEGEND_DEAD_DOUBT_LABEL : LEGEND_LABELS[kind]);
 	const lineCell = Math.max(0, ...lineItems.map((kind) => labelX + measure(labelOf(kind), labelFont)));
 	const houseCell = Math.max(0, ...legend.houses.map((h) => houseLabelX + measure(h.name, labelFont)));

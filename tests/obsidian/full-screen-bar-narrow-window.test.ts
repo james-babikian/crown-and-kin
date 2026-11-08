@@ -125,7 +125,7 @@ describe('(B) the bar of the full-screen view in a narrow window', () => {
 		expect(bar).toContain('flex-wrap: wrap');
 		expect(bar).toContain('height: auto');
 		expect(bar).toContain('overflow: visible');
-		expect(bar).toContain('min-height: calc(52px + env(safe-area-inset-bottom))');
+		expect(bar).toContain('min-height: calc(52px + var(--dynasty-safe-bottom))');
 		const close = bodies('.modal.dynasty-fullscreen.is-phone .dynasty-full .dynasty-toolbar.has-wide-set .dynasty-close {').join('\n');
 		expect(close).toContain('position: relative');
 		expect(close).toContain('margin-left: auto');
@@ -134,8 +134,8 @@ describe('(B) the bar of the full-screen view in a narrow window', () => {
 
 	it('the problem list stands above the real height of the bar, not above a fixed one-row or two-row size', () => {
 		const rule = bodies('.dynasty-popover:not(.is-anchored):not(.is-sheet) {').join('\n');
-		expect(rule).toContain('bottom: calc(var(--dynasty-bar-h, calc(52px + env(safe-area-inset-bottom))) + var(--size-4-2))');
-		expect(rule).toContain('max-height: calc(100% - var(--dynasty-bar-h, calc(52px + env(safe-area-inset-bottom))) - 4 * var(--size-4-2))');
+		expect(rule).toContain('bottom: calc(var(--dynasty-bar-h, calc(52px + var(--dynasty-safe-bottom))) + var(--size-4-2))');
+		expect(rule).toContain('max-height: calc(100% - var(--dynasty-bar-h, calc(52px + var(--dynasty-safe-bottom))) - 4 * var(--size-4-2))');
 		expect(css).not.toContain('@container (max-width: 487px)');
 	});
 

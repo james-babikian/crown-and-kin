@@ -6,7 +6,43 @@
  * Outside this file the style lint of the project accepts no colour, radius, font-size or spacing literal beyond its recorded baseline.
  */
 
+/*
+ * The system bars (D335). Obsidian reads them through its own variables `--safe-area-inset-*` (`:root` gives `env(safe-area-inset-*)`; the Android shell
+ * and a window made by `emulateMobile` set real values; a pop-out window sets a bare `0`). `env()` alone gives 0 on Android, so no plugin rule reads `env()`:
+ * each reads one of these four tokens. On the iPhone the variable equals `env()`, so nothing changes there. Registered as a length, so a bare `0`
+ * becomes `0px` and every `max()` and `calc()` that takes a token stays valid.
+ */
+@property --dynasty-safe-top {
+	syntax: '<length>';
+	inherits: true;
+	initial-value: 0px;
+}
+
+@property --dynasty-safe-bottom {
+	syntax: '<length>';
+	inherits: true;
+	initial-value: 0px;
+}
+
+@property --dynasty-safe-left {
+	syntax: '<length>';
+	inherits: true;
+	initial-value: 0px;
+}
+
+@property --dynasty-safe-right {
+	syntax: '<length>';
+	inherits: true;
+	initial-value: 0px;
+}
+
 body {
+	/* The system bars (D335): the only place that names an inset. */
+	--dynasty-safe-top: var(--safe-area-inset-top, env(safe-area-inset-top, 0px));
+	--dynasty-safe-bottom: var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px));
+	--dynasty-safe-left: var(--safe-area-inset-left, env(safe-area-inset-left, 0px));
+	--dynasty-safe-right: var(--safe-area-inset-right, env(safe-area-inset-right, 0px));
+
 	/* Spacing: the 4 px scale of Obsidian (`--size-4-n`), six steps. A negative step is written `calc(-1 * var(--dynasty-space-n))`. */
 	--dynasty-space-1: var(--size-4-1, 4px);
 	--dynasty-space-2: var(--size-4-2, 8px);

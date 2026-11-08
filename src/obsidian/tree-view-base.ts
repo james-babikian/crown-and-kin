@@ -203,7 +203,7 @@ export abstract class TreeViewBase extends MarkdownRenderChild implements HoverP
 	 * engine compute the style of every element again, about 0.35 s for sample tree 7 on a slow phone.
 	 */
 	protected fontProbe: HTMLElement | null = null;
-	/** The same for `env(safe-area-inset-top)` in the full-screen view. */
+	/** The same for `--dynasty-safe-top` in the full-screen view. */
 	protected safeProbe: HTMLElement | null = null;
 	protected lod: Lod | null = null;
 	protected bounds: Rect = { x: 0, y: 0, w: 0, h: 0 };

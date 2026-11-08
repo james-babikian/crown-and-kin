@@ -77,7 +77,8 @@ function wholeGraph(tree: Tree): FamilyGraph {
 	return g;
 }
 
-const KNOWN_PARENT_TYPES = ['birth', 'adoptive', 'ward', 'rumoured'];
+// D332: the begetter link (0.5.3) is a known type.
+const KNOWN_PARENT_TYPES = ['birth', 'adoptive', 'ward', 'rumoured', 'begetter'];
 
 /** The parent links the whole tree draws for a person (after cycle breaking), as JSON [parent, type]. */
 function drawnLinks(g: FamilyGraph, id: string): Set<string> {

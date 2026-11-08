@@ -15,6 +15,7 @@ import { desktop, embed, fakeHost, fillAllCards, openFullScreen, phone, type Hos
 import { build } from '../support/helpers';
 import { BODY_16 } from '../support/titles-window-support';
 import { sample12 } from '../acceptance/relations-support';
+import { visibleBarText } from '../support/bar-text-support';
 import { useFakeDom } from '../support/fake-dom-setup';
 import { noteHandle } from '../support/writing-handle';
 
@@ -77,7 +78,8 @@ async function show(e: { host: Host; st: ReturnType<typeof noteHandle>['state'];
 const card = (root: FEl, id: string) => root.querySelector(`.dynasty-card[data-person="${id}"]`);
 const heirs = (root: FEl) => root.querySelectorAll('.dynasty-card.dynasty-heir').map((c) => c.getAttribute('data-person')!);
 const tabs = (root: FEl) => root.querySelectorAll('.dynasty-card').flatMap((c) => c.querySelectorAll('.dynasty-ordinal-tab-text').map((t) => [c.getAttribute('data-person')!, t.getText()] as const));
-const bar = (root: FEl) => root.querySelector('.dynasty-succession-text')?.getText() ?? null;
+const barEl = (root: FEl) => root.querySelector('.dynasty-succession-text');
+const bar = (root: FEl) => (barEl(root) ? visibleBarText(barEl(root)!) : null);
 const scale = (root: FEl) => Number(/scale\(([-\d.e]+)\)/.exec(root.querySelector('.dynasty-scene')!.getAttribute('transform')!)![1]);
 const press = async (root: FEl, sel: string) => {
 	dispatch(root.querySelector(sel)!, 'click', { button: 0, detail: 1 });
@@ -91,8 +93,8 @@ describe('the Show view on the computer', () => {
 		fillAllCards(e.root);
 		const root = e.root.querySelector('.dynasty-root')!;
 		expect(root.getAttribute('data-dynasty-succession')).toBe(DUKE);
-		expect(bar(e.root)).toBe('Line of succession: Duke of Carrowmere, now');
-		expect(bar(e.root)).toBe(T.bar('Duke of Carrowmere', null));
+		expect(bar(e.root)).toBe('Line of succession: Duke of Carrowmere, now · Eldest child first (primogeniture)');
+		expect(bar(e.root)).toBe(T.bar('Duke of Carrowmere', null, 'eldest-child'));
 		expect(heirs(e.root).sort()).toEqual([...LINE].sort());
 		// The ordinal texts are the order of the line; the ruler has no tab.
 		expect(tabs(e.root).sort()).toEqual(LINE.map((id, i) => [id, ['1st', '2nd', '3rd', '4th'][i]] as const).sort());
@@ -100,6 +102,15 @@ describe('the Show view on the computer', () => {
 		// The whole tree: no focus family, so every person of the tree has a card (the finder's small tree would have a few).
 		const people = build(BODY_16).g.people.length;
 		expect(root.getAttribute('data-dynasty-people')).toBe(String(people));
+	});
+
+	it('B-0036: the group of the bar is named by the sentence with the rule, so a screen reader says the rule too', async () => {
+		const e = await desk();
+		await show(e);
+		const group = e.root.querySelector('.dynasty-succession-bar')!;
+		const text = e.root.querySelector('.dynasty-succession-text')!;
+		expect(group.getAttribute('aria-labelledby')).toBe(text.getAttribute('id'));
+		expect(text.getText()).toContain(' · Eldest child first (primogeniture)');
 	});
 
 	it('the Close button ends the view and the focus goes to More', async () => {
@@ -196,8 +207,8 @@ describe('the Show view on the computer', () => {
 		const body = ['titles:', '  - id: crown', '    name: Crown', '    succession: eldest-child', '    holders:', '      - {person: rex, from: 1100}', 'people:', '  - {id: rex, name: Rex Ardent, sex: m, born: 1070}', ''].join('\n');
 		const e = await desk(body);
 		await show(e, 'crown');
-		expect(bar(e.root)).toBe('Line of succession: Crown, now. No heir in the tree.');
-		expect(bar(e.root)).toBe(T.barNoHeir('Crown', null));
+		expect(bar(e.root)).toBe('Line of succession: Crown, now · Eldest child first (primogeniture). No heir in the tree.');
+		expect(bar(e.root)).toBe(T.barNoHeir('Crown', null, 'eldest-child'));
 		expect(e.root.querySelectorAll('.dynasty-ordinal-tab-text')).toHaveLength(0);
 		expect(e.st.succession).toEqual({ title: 'crown' });
 	});
@@ -280,7 +291,7 @@ describe('the Titles window opens the view', () => {
 		o.showLine!(DUKE);
 		await redrawn();
 		expect(e.st.succession).toEqual({ title: DUKE });
-		expect(bar(e.root)).toBe(T.bar('Duke of Carrowmere', null));
+		expect(bar(e.root)).toBe(T.bar('Duke of Carrowmere', null, 'eldest-child'));
 	});
 
 	it('the settings come from the host at the moment of the call', async () => {
@@ -306,7 +317,7 @@ describe('the first view on a phone', () => {
 		TreeView.showSuccession(host as never, handle!.state, DUKE, null);
 		await redrawn();
 		expect(root.querySelector('.dynasty-root')!.getAttribute('data-dynasty-succession')).toBe(DUKE);
-		expect(bar(root)).toBe(T.bar('Duke of Carrowmere', null));
+		expect(bar(root)).toBe(T.bar('Duke of Carrowmere', null, 'eldest-child'));
 		expect(scale(root)).toBeGreaterThanOrEqual(0.75 - 1e-9);
 		// The ruler's card lies in the view.
 		const m = /translate\(([-\d.e]+)[ ,]([-\d.e]+)\) scale\(([-\d.e]+)\)/.exec(root.querySelector('.dynasty-scene')!.getAttribute('transform')!)!;
@@ -337,10 +348,10 @@ describe('the saved picture', () => {
 		const e = await desk();
 		await show(e);
 		const src = (e.view as unknown as { saveSource(): { succession?: { sentence: string; ordinalCards: string[]; heirs: string[] } } & Record<string, unknown> }).saveSource();
-		expect(src.succession?.sentence).toBe(T.bar('Duke of Carrowmere', null));
+		expect(src.succession?.sentence).toBe(T.bar('Duke of Carrowmere', null, 'eldest-child'));
 		expect(src.succession?.heirs).toEqual(LINE);
 		const svg = new TextDecoder().decode((await makePicture(undefined, src as never, 'svg')).bytes);
-		expect(svg).toContain('Line of succession: Duke of Carrowmere, now');
+		expect(svg).toContain('Line of succession: Duke of Carrowmere, now · Eldest child first (primogeniture)');
 		for (const id of LINE) {
 			expect(svg).toContain(`data-item="heir:${id}"`);
 			expect(svg).toContain(`data-item="ordinal:${id}"`);

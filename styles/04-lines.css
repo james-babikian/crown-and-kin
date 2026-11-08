@@ -77,6 +77,21 @@
 	stroke-opacity: 0.85;
 }
 
+/* D332: dash-dot (round caps make the 2 px dash a dot) in the theme's orange, moved towards the text colour like the adoptive line.
+   D339: 15 % of the text colour in a light theme (30 % turned the orange of the Minimal theme into a dark red, and 15 % still gives 3:1 on the note), 30 % in a dark theme. */
+.dynasty-line-begetter {
+	stroke: var(--color-orange);
+	stroke: color-mix(in srgb, var(--color-orange) 85%, var(--text-normal));
+	stroke-width: 1.5;
+	stroke-dasharray: 14 3 2 3;
+	stroke-linecap: round;
+}
+
+body.theme-dark .dynasty-line-begetter {
+	stroke: var(--color-orange);
+	stroke: color-mix(in srgb, var(--color-orange) 70%, var(--text-normal));
+}
+
 /* Union signs (D26, D38): dot = marriage, ring = betrothal, diamond = concubinage, open triangle =
    affair; no sign for two parents with no recorded partnership. Open shapes are filled with the
    page colour, so a line under them does not show through. */

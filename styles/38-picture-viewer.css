@@ -47,7 +47,7 @@
 
 .dynasty-viewer.is-phone .dynasty-sheet-grip {
 	grid-area: grip;
-	margin: max(var(--dynasty-space-2), env(safe-area-inset-top)) auto var(--dynasty-space-1);
+	margin: max(var(--dynasty-space-2), var(--dynasty-safe-top)) auto var(--dynasty-space-1);
 }
 
 .dynasty-viewer-head {
@@ -147,7 +147,7 @@
 
 .dynasty-viewer.is-phone .dynasty-viewer-thumbs {
 	justify-content: center;
-	padding: 10px var(--dynasty-space-4) max(18px, env(safe-area-inset-bottom));
+	padding: 10px var(--dynasty-space-4) max(18px, var(--dynasty-safe-bottom));
 }
 
 .dynasty-viewer.is-zoomed .dynasty-viewer-thumbs {

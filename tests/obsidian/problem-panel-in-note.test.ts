@@ -2,7 +2,10 @@ import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { buildSync } from 'esbuild';
 import puppeteer, { type Browser, type Page } from 'puppeteer-core';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+
+// A browser closes slowly when several test files start browsers at once; the default 10 s hook limit then fails the file with no failed test.
+vi.setConfig({ hookTimeout: 60_000 });
 
 /*
  * 0.5.2: the warning triangle of the phone list in a note opens a small pop-up under the bar: one text line and one button "Show in full screen". The real `Popover` and

@@ -5,6 +5,10 @@
  * handle (also in closed notes and in trees with blocking problems). A picture link keeps its file
  * extension. The writes are not the user's edits: they are on neither undo stack. Nothing here
  * throws into Obsidian.
+ *
+ * Which notes the scan reads (`kinNotes` hook): when the fence index is complete, the notes that show a tree now, then the notes in its `kin` set and its `unsure` set; otherwise the
+ * old rule (notes with a section that can hold a block, then notes with no cache yet). The scan tests the text of each note it reads, so a wrong flag costs a read and never a
+ * wrong write. `report.notes` is the number of notes of the vault and `report.read` the number of notes read. Calendar notes are not candidates: a `kin-calendar` block holds no tree link.
  */
 
 import { Notice, TFile, type App, type CachedMetadata, type EventRef, type TAbstractFile } from 'obsidian';

@@ -76,6 +76,10 @@
 	stroke-width: 3;
 }
 
+.dynasty-line-begetter.dynasty-on-line {
+	stroke-width: 3;
+}
+
 .dynasty-union-dot.dynasty-on-line {
 	fill: var(--interactive-accent);
 }

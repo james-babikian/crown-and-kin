@@ -46,7 +46,7 @@ describe('D330 TR-13, O-09a, UX-20: tree hints and the phone list', () => {
 	it('has the Open button of a problem and its hint', () => {
 		expect(PROBLEMS_OPEN.button('House Harrow')).toBe('Open House Harrow');
 		expect(PROBLEMS_OPEN.label('Oswin Valmont')).toBe('Open Oswin Valmont: open the window where you can correct this problem');
-		expect(PROBLEMS_HINT).toBe('Select a problem to show the people it is about. Use the Open button to correct it.');
+		expect(PROBLEMS_HINT).toBe('Select a problem to show the people it is about. Select Open next to a problem to correct it.');
 	});
 });
 

@@ -69,8 +69,9 @@ describe('the warning childless-has-child', () => {
 		expect(w[0]).toMatchObject({ code: 'childless-has-child', level: 'warning', ids: ['a'], params: { person: 'Aldric', child: 'Kay' } });
 		expect(issueText(w[0])).toBe('Aldric has “childless: true”, but Kay is a child of Aldric in the tree. Remove “childless: true”, or correct the parents of Kay.');
 	});
-	it('counts a birth link and a link with an unknown type', () => {
+	it('counts a birth link, a begetter link (D332) and a link with an unknown type', () => {
 		expect(issues(P(['{id: a, name: A, died: 1200, childless: true}', '{id: k, name: K, parents: [{id: a, type: birth}]}']))).toHaveLength(1);
+		expect(issues(P(['{id: a, name: A, died: 1200, childless: true}', '{id: k, name: K, parents: [{id: a, type: begetter}]}']))).toHaveLength(1);
 		expect(issues(P(['{id: a, name: A, died: 1200, childless: true}', '{id: k, name: K, parents: [{id: a, type: odd}]}']))).toHaveLength(1);
 	});
 	it('does not count an adoptive, ward or rumoured child', () => {

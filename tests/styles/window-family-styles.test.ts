@@ -85,6 +85,17 @@ describe('a right-to-left name keeps its quotes and the row keeps its left edge 
 	});
 });
 
+describe('the house in the head grows with a long name (D336 F1)', () => {
+	it('the house span has no fixed height, so a second text line has room; the mark stays in a one-line box', () => {
+		const house = rule(sheet, '.dynasty-head-meta .dynasty-house');
+		expect(house).not.toMatch(/(^|[\s;])height:/);
+		expect(house).toContain('min-height: 1.45em');
+		expect(house).toContain('align-items: flex-start');
+		expect(rule(sheet, '.dynasty-head-meta .dynasty-house-armsmark')).toContain('height: 1.45em');
+		expect(rule(sheet, '.dynasty-head-meta .dynasty-house-dot')).toContain('margin-top: calc((1.45em - 9px) / 2)');
+	});
+});
+
 describe('W-10 and CX-08: the grid is on the spacing scale', () => {
 	it('label to field 4 px, row to row 12 px, the section body 4 px above and 24 px below', () => {
 		expect(rule(sheet, '.dynasty-sheet-field')).toContain('gap: var(--dynasty-space-1)');

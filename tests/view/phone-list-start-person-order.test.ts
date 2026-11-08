@@ -14,6 +14,7 @@ import { FEl, resetDom } from '../acceptance/fake-dom';
 import { resetObsidian, setIcon } from '../acceptance/fake-obsidian';
 import { genPeople, peopleYaml, pick, q, rng, type GenPerson } from '../support/dated-tree-and-title-gen';
 import { accName } from '../acceptance/accessible-name';
+import { visibleBarText } from '../support/bar-text-support';
 import { useFakeDom } from '../support/fake-dom-setup';
 
 /*
@@ -585,7 +586,7 @@ describe('"1st in line", "2nd in line", "Open branch" while the Show view is ope
 			// The bar: a sentence and an icon-only Close with a name.
 			const bar = open.list.querySelector('.dynasty-succession-bar');
 			expect(bar, label).not.toBeNull();
-			expect(bar!.querySelector('.dynasty-succession-text')!.getText(), label).toBe(drawn.sentence);
+			expect(visibleBarText(bar!.querySelector('.dynasty-succession-text')!), label).toBe(drawn.sentence);
 			const close = bar!.querySelector('button')!;
 			expect(close.getAttribute('aria-label'), label).toBe(SUCCESSION_UI.barCloseLabel);
 			expect(before.list.querySelector('.dynasty-succession-bar'), `${label}: bar before`).toBeNull();

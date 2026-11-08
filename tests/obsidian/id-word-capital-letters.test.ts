@@ -118,8 +118,8 @@ describe('D113: the delete question of a house', () => {
 
 	it('the CSS: a box with a largest height, a layer with padding for the safe areas, one part that scrolls', () => {
 		const layer = rule('.dynasty-sheet-confirm');
-		expect(layer).toMatch(/padding-top:\s*max\(var\(--dynasty-space-4\), env\(safe-area-inset-top/);
-		expect(layer).toMatch(/padding-bottom:\s*max\(var\(--dynasty-space-4\), env\(safe-area-inset-bottom/);
+		expect(layer).toMatch(/padding-top:\s*max\(var\(--dynasty-space-4\), var\(--dynasty-safe-top/);
+		expect(layer).toMatch(/padding-bottom:\s*max\(var\(--dynasty-space-4\), var\(--dynasty-safe-bottom/);
 		const box = rule('.dynasty-sheet-confirm-box');
 		expect(box).toMatch(/max-height:\s*100%/);
 		expect(box).toMatch(/box-sizing:\s*border-box/);

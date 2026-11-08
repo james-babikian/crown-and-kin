@@ -159,7 +159,7 @@ describe('fit: styles.css names few elements at a level change', () => {
 				.map((s) => s.split(/\s+|>/).filter(Boolean).pop()!),
 		);
 
-	it('the Overview level names only the body group, the bg rect, the tag pills, the fold parts and the crown tap area', () => {
+	it('the Overview level names only the body group, the bg rect, the tag pills, the fold parts, the layer of the heir rings and the crown tap area', () => {
 		expect([...subjects('overview')].sort()).toEqual(
 			[
 				'.dynasty-card-bg',
@@ -171,6 +171,8 @@ describe('fit: styles.css names few elements at a level change', () => {
 				'.dynasty-fold-text',
 				'.dynasty-fold-text.is-sideways',
 				'.dynasty-fold.is-open',
+				// D334 Q3: the one layer of the numbered rings of the heirs (a computer only), not one rule for each ring.
+				'.dynasty-heir-numbers',
 				'.dynasty-tag-compact',
 				'.dynasty-tag-full',
 				'.dynasty-tag-sign',

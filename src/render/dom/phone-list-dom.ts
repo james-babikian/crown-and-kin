@@ -38,6 +38,7 @@ import { isolateName, nameNeedsRun } from '../name-bidi';
 import { joined, nb } from '../text-join';
 import { dateLineParts, shownReignIsolated, type DateSegment } from '../tree-info';
 import { PHONE_LIST_UI } from '../ui-text';
+import { setBarText } from './bar-text';
 import { markedSpan, setNameText } from './name-marks';
 import { nameRun } from './name-span';
 import type { IconFn } from './widgets';
@@ -46,7 +47,7 @@ import type { IconFn } from './widgets';
 export interface ListRow {
 	id: string;
 	role: 'parent' | 'centre' | 'partner' | 'child';
-	/** The kind of link between the person at the top and this parent or child (birth, adoptive, ward, rumoured); absent for the centre and a partner. */
+	/** The kind of link between the person at the top and this parent or child (birth, adoptive, ward, rumoured, begetter); absent for the centre and a partner. */
 	link?: ParentType;
 }
 
@@ -236,7 +237,7 @@ export function buildPhoneList(parent: HTMLElement, spec: PhoneListSpec): PhoneL
 	if (spec.bar) {
 		const bar = spec.bar;
 		const el = list.createDiv({ cls: 'dynasty-succession-bar dynasty-list-succession', attr: { role: 'group' } });
-		setNameText(el.createDiv({ cls: 'dynasty-succession-text' }), bar.sentence);
+		setBarText(el.createDiv({ cls: 'dynasty-succession-text' }), bar.sentence);
 		// D182: an icon with an aria-label, 44 px; the sentence is the visible text.
 		const close = el.createEl('button', { cls: ['clickable-icon', 'dynasty-succession-close', 'dynasty-succession-close-icon'], attr: { type: 'button', 'aria-label': bar.closeLabel } });
 		spec.icon(close.createSpan({ cls: 'dynasty-tool-icon', attr: { 'aria-hidden': 'true' } }), 'x');

@@ -575,6 +575,33 @@ export function finderFirstView(bounds: Rect, size: Size, fontPx: number, insetT
 	return { scale, cx, cy: cy - top / 2 / scale };
 }
 
+/** D334 Q1 B: the smallest note font (px) at which the first view of the relation view still zooms out to show both named people; under it the view stays as it is. */
+export const NAMED_MIN_NOTE_PX = 5;
+
+/**
+ * D334 Q1 B: true when every card of `named` (the two people of a relation) is whole in `view`: inside the width and between `insetTop`
+ * and `bottom` (the foot of the free area). A card that is cut or off counts as not whole.
+ */
+export function namedWhole(view: View, size: Size, insetTop: number, bottom: number, named: readonly Rect[]): boolean {
+	if (!(view.scale > 0)) return false;
+	return named.every((b) => {
+		const s = onScreen(view, size, b);
+		return s.left >= -0.5 && s.right <= size.w + 0.5 && s.top >= insetTop - 0.5 && s.bottom <= bottom + 0.5;
+	});
+}
+
+/**
+ * D334 Q1 B: the first view of the relation view on a phone. `first` (the readable view of `finderFirstView`) stays when both `named`
+ * people are whole in it. Else `fitted` (the whole line in the free area) replaces it, below the readable size (an exception of the
+ * 12 px card text floor, D330 O-02, for this first view only), when it is whole for both people, smaller than `first`, and its note
+ * font is at least `NAMED_MIN_NOTE_PX`: a line of 14 people in one column would give names no one can read, so that view stays as `first`.
+ */
+export function namedFirstView(first: View, fitted: View, size: Size, insetTop: number, bottom: number, named: readonly Rect[], fontPx: number): View {
+	if (!named.length || namedWhole(first, size, insetTop, bottom, named)) return first;
+	if (!(fitted.scale < first.scale) || fitted.scale * fontPx < NAMED_MIN_NOTE_PX) return first;
+	return namedWhole(fitted, size, insetTop, bottom, named) ? fitted : first;
+}
+
 /**
  * The readable first view of a note shows the start person with the row of their parents above. `view` is the view that
  * `defaultView` chose for the free area below `insetTop`; with the person's card at the top of the area the parents are cut off. The view moves up, just enough that the

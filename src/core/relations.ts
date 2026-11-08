@@ -30,7 +30,9 @@
  *   last-listed union, else their implicit key. A line uses a couple only if the two share a union
  *   of the tree (listed, or implicit through a child placed under both); else it passes X alone
  *   (two rumoured parents, an adoptive couple beside birth parents). A full line of rule 1 below
- *   follows rule 1. A double relation takes the line of its first couple (the lowest X).
+ *   follows rule 1. A double relation takes the line of its first couple (the lowest X). The walk of the finder goes up to X and
+ *   comes down from its partner, or the other way round when only that shows links as good as the word (a birth word never
+ *   comes down an adoptive link at the couple: "x1 is d's mother. x2 is x1's co-parent. a is x2's son").
  * - Partner: M and P, with the pair's last-listed union, or their implicit key. The word reads every marriage of the pair (see "Years").
  * - Guardian and ward: M and P, with the one ward link.
  * - By marriage, rule 1: the blood line from M to R, then P, with the last-listed marriage of R and P (the words read every marriage, see "Years").
@@ -57,8 +59,9 @@
  *   other lines (`also`: one flat list, each line once, only its people) and the line of its maybe
  *   (`maybeFrom`) only until the names of its person are made; then `forget` drops them, so a result
  *   keeps only the one line that each name shows.
- * - Step-sibling: M, N, Q, P, with the links N→M and Q→P and the N–Q marriage. N is the first
- *   parent of M (in `drawnParents` order) with such a marriage.
+ * - Step-sibling: M, N, Q, P, with the links N→M and Q→P and the N–Q marriage. Among the pairs (N, Q) with such a
+ *   marriage, one whose marriage is not "former" comes first, then the pair with the better links (birth before
+ *   adoptive), then the lowest document index of N and then of Q.
  * - Chain: the people of a breadth-first search in order. It counts raw links; from each person it
  *   visits the parents in `drawnParents` order, then the children in `g.people` order, then the
  *   partners in `unionsOf` order. The first chain found wins.
@@ -70,12 +73,15 @@
  * a step-grandparent, P or any stepchild of S on a shortest line to P for a stepchild or step-grandchild, and both M and P for a step-sibling. For a
  * confirmed name the K sets hold only birth and adoptive links on both steps (a rumour never changes a confirmed word); a rumoured name keeps every link. The
  * finder line goes through a K that passes (the line found first if its K passes, else the lowest document index). A step
- * word that fails is the possessive form ("Father's wife"). (2) "Former" (D305, D307): a marriage that ENDED (`ended-by` divorce or annulment, or an
+ * word that fails is the possessive form ("Father's wife"). So is the step word of a partner who is also a rumoured parent, grandparent, child or
+ * grandchild of M at the place of the step word ("Rumoured mother | Father's wife"): the step word is false if the rumour is true. (2) "Former" (D305, D307): a marriage that ENDED (`ended-by` divorce or annulment, or an
  * exact end year before both exact death years) gives "Former" to the partner word, to a step word and to an in-law or "by marriage" name (F4, D309: not
  * if the person on the blood side died, by exact years, before the exact end year), and to the partner word of a possessive form (rule P: "Father's
  * former wife", "Former wife's half-nephew", no death test). A death never adds a word (D308). "Former" stands before the whole name, after "Rumoured".
  * A candidate with "former" keeps the same name without it in `base`: the order of the names (key 10) and rule D read it, so "former" never changes a
- * tie; and when one name comes both with and without "former" (two marriages, one ended), only the form without stays (rule D). A restored name
+ * tie; and when one name comes both with and without "former" (two marriages, one ended), only the form without stays (rule D). In the same way a
+ * rumoured step, in-law or "by marriage" name goes beside a sure named form of the same word, unless only the sure one is "former"
+ * (`withoutRumouredTwins`); the possessive forms keep both. A restored name
  * (rule 2 above) gets the same test through the same marriages. The finder's partner steps read the pair's marriages too, so they agree with the card.
  * `relationsKey` holds the date texts, `ended-by` and the date reader (ready, key), so an edit of one of them makes new names.
  * Limits: a child born the year after his father died reads his widow as "Father's wife" (the strict test); a divorce with no `ended-by` is found only
@@ -115,8 +121,8 @@
  * distance, step-sibling 3, blood a + b.
  *
  * Known limits (D200 R5): the partner names of a child with three birth or three adoptive parents use the two parents
- * used for placement (so the parent order of such a child can decide "Co-parent", and whether two adoptive parents share an
- * implicit union, which decides D293: "Adoptive sister" or "Adoptive half-sister"); a pair with a sure and a rumoured line of equal length can have different "Also" lists in
+ * used for placement (so the parent order of such a child can decide "Co-parent"; the legal parents of D293 do not read that
+ * implicit union, see "Half or full"); a pair with a sure and a rumoured line of equal length can have different "Also" lists in
  * the two directions; rule 1 of the names by marriage skips a blood relative of M, rule 2 does not;
  * a rumoured link plus a person married to their own child can still make a name by marriage depend on
  * the order of the people.
@@ -130,7 +136,9 @@
  * "adoptive brother" if one is adoptive. The sibling steps of a rumoured name (a rumoured line, or
  * the extra "Rumoured X" name) all take half or full from rule 1, so the steps agree with the name;
  * a sibling step whose half or full the second test changes is "rumoured" also over two birth links.
- * A partner step uses the §13.1 partner table. "Through N other people" counts `line.people.length − 2`.
+ * A partner step uses the §13.1 partner table with the pair's last-listed union; on the line of a name by marriage or of a step-sibling
+ * it names the marriage of the line, which made the name ("Ola is Ned's former wife", also when a later affair is listed). "Through N
+ * other people" counts `line.people.length − 2`.
  *
  * Half or full (D123, D174). Per candidate (X, c1, c2), with c1 and c2 the children of X on the two
  * paths: S_i are the parents of c_i of the type of c_i's link to X; R_i are the rumoured parents of c_i
@@ -142,7 +150,17 @@
  *   ("Adoptive brother", or "Brother" if they share a birth parent: `orderCouple` puts that parent first, and the
  *   link to the second parent can only make a word rumoured). A full adoption by unrelated parents, a child with two
  *   birth parents, a child with more than one adoptive parent, and a sibling who has only one of the two stay as before.
- *   Only the sure test uses the legal parents; the second test and its choices count the birth and rumoured parents.
+ *   The union of the two is a listed union, or an implicit union that a child makes by listing exactly these two parents of
+ *   one type (`legalShare`); the implicit union of a child with three such parents does not count, so the legal parents
+ *   never depend on the order of a list of parents.
+ *   The second test uses the legal parents too: a rumoured parent of such a child only adds a choice of its birth parent and the
+ *   rumoured parents (a "maybe full"), never a "maybe half". It counts each rumoured link as a birth link before the legal-parent
+ *   rule, so a child adopted by one partner with a rumoured birth link to the other has the two legal parents if the rumour is
+ *   true (`byRumour`); such a full pair takes the couple of the second test, so it is never a "double" beside a line through that
+ *   couple. The doubt of a parent who is not listed still reads the birth parents.
+ *   A begetter link (D332) sets the legal parents aside: when c1 or c2 has a begetter link and neither link to X is adoptive or
+ *   ward, both tests compare the blood sets (birth parents and begetters, `bloodParents`); a pair that is full by its legal
+ *   parents takes the blood word only if the blood sets are full too, else it is "adoptive", with the line through the adoptive parent.
  * - The sure test. A child is incomplete if its link is not adoptive, S_i has fewer than two people, and
  *   the setting is on or the child has a rumoured parent who is not also a birth parent. The pair is full only if S1 equals S2 and
  *   neither child is incomplete. A rumoured parent is never in the S_i of a birth link. The finder's
@@ -173,7 +191,9 @@
  * rumour may be false), so Tom (Anna, rumoured Carl) and Sue (Carl, Anna, rumoured Dirk) read "Half-brother, maybe
  * full". The same outcomes serve the unlisted parent: Sue and Tom (Anna) read "maybe full" too. `choices` and so `secondHalf` do not change
  * (Eleanor and Fiona stay "Sister, maybe half"). The extra name takes the other outcome and its steps print it; a rumoured half line
- * of the same degree adds no second "Rumoured half-brother" beside "Rumoured brother" (D205 item 2). An 'unlisted' maybe says which of two sentences is true. (3) With the setting off, a parent who is not listed adds no maybe.
+ * of the same degree adds no second "Rumoured half-brother" beside "Rumoured brother" (D205 item 2), and the possessive forms of rule 2
+ * by marriage skip such a line of S too, so they say no more than S's own list (known limit: a rumoured half line of that degree through
+ * another person is then named in neither list). An 'unlisted' maybe says which of two sentences is true. (3) With the setting off, a parent who is not listed adds no maybe.
  * (4) A sure full candidate gets `maybe` 'half' if the rumoured parents of the two children differ; one rumoured parent is enough.
  * (5) No maybe on a rumoured line, on a `double` name, or where the link of c1 or c2 to X is adoptive.
  * The `cause` of a maybe is 'rumoured' for rule 4 and for rule 2 with equal A1 and A2; else 'unlisted'
@@ -340,11 +360,12 @@ export const lineSubgraph: LineSubgraph = (g, line) => {
 	for (const l of line.links) if (on.has(l.parent) && on.has(l.child) && !has(l)) push(own, l.child, l);
 	// A full relation's couple keeps its shared trunk. A child on the line with a
 	// link to one partner of a couple of the line also keeps its drawn link of the same type to the other.
+	// A begetter link never joins a couple (spec §0 D332).
 	const drawn = drawnParentMap(g);
 	for (const key of line.unions) {
 		const pair = g.unionByKey.get(key)?.partners ?? (key.startsWith('i:') ? parsePair(key.slice(2)) : undefined);
 		if (!pair || !pair.every((id) => on.has(id))) continue;
-		for (const l of [...line.links]) {
+		for (const l of line.links.filter((k) => k.type !== 'begetter')) {
 			const other = l.parent === pair[0] ? pair[1] : l.parent === pair[1] ? pair[0] : undefined;
 			if (other === undefined || !on.has(l.child) || !(drawn.get(l.child) ?? []).some((d) => d.id === other && d.type === l.type)) continue;
 			const link: RelationLink = { parent: other, child: l.child, type: l.type };
@@ -378,25 +399,7 @@ export const lineSubgraph: LineSubgraph = (g, line) => {
 	sub.writtenTitles = g.writtenTitles;
 	sub.dates = g.dates;
 
-	// A child on the line only through rumoured links hangs from its first rumoured parent (drawn
-	// with the rumoured line and its "?"), not as a separate root.
-	for (const p of sub.people) {
-		if ((sub.placementParents.get(p.id) ?? []).length) continue;
-		const links = own.get(p.id) ?? [];
-		if (!links.length || links.some((l) => l.type !== 'rumoured')) continue;
-		const parent = links[0].parent;
-		sub.placementParents.set(p.id, [parent]);
-		sub.placementType.set(p.id, 'rumoured');
-		const solo = sub.soloChildren.get(parent) ?? [];
-		solo.push(p.id);
-		solo.sort((a, b) => sub.byId.get(a)!.index - sub.byId.get(b)!.index);
-		sub.soloChildren.set(parent, solo);
-		sub.secondary = sub.secondary.flatMap((e) => {
-			if (e.child !== p.id || e.type !== 'rumoured' || !e.parents.includes(parent)) return [e];
-			const rest = e.parents.filter((q) => q !== parent);
-			return rest.length ? [{ child: e.child, type: e.type, parents: rest }] : [];
-		});
-	}
+	hangAlone(sub, own);
 
 	// An implicit couple of the line with no shared child on it stays as a plain connector.
 	for (const key of line.unions) {
@@ -410,6 +413,31 @@ export const lineSubgraph: LineSubgraph = (g, line) => {
 	}
 	return { ...sub, issues: [] };
 };
+
+/**
+ * A child of the small tree with no placement parent whose line links are all rumoured hangs from its first rumoured parent (drawn with
+ * the rumoured line and its "?"), not as a separate root. With a begetter link among only rumoured ones it hangs from its first begetter
+ * (spec §0 D332); the other links stay side links.
+ */
+function hangAlone(sub: FamilyGraph, own: ReadonlyMap<string, RelationLink[]>): void {
+	for (const p of sub.people) {
+		if ((sub.placementParents.get(p.id) ?? []).length) continue;
+		const links = own.get(p.id) ?? [];
+		if (!links.length || links.some((l) => l.type !== 'rumoured' && l.type !== 'begetter')) continue;
+		const { parent, type } = links.find((l) => l.type === 'begetter') ?? links[0];
+		sub.placementParents.set(p.id, [parent]);
+		sub.placementType.set(p.id, type);
+		const solo = sub.soloChildren.get(parent) ?? [];
+		solo.push(p.id);
+		solo.sort((a, b) => sub.byId.get(a)!.index - sub.byId.get(b)!.index);
+		sub.soloChildren.set(parent, solo);
+		sub.secondary = sub.secondary.flatMap((e) => {
+			if (e.child !== p.id || e.type !== type || !e.parents.includes(parent)) return [e];
+			const rest = e.parents.filter((q) => q !== parent);
+			return rest.length ? [{ child: e.child, type: e.type, parents: rest }] : [];
+		});
+	}
+}
 
 function parsePair(json: string): [string, string] | undefined {
 	try {

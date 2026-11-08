@@ -28,6 +28,8 @@ const PLAIN_VARS = {
 	adoptive: '--color-green',
 	ward: '--color-blue',
 	rumoured: '--color-red',
+	/** D332: the begetter line takes the theme's orange, no other line does. */
+	begetter: '--color-orange',
 	/** D47: the relation finder's line. The marked card does not use it (D153). */
 	accent: '--interactive-accent',
 } as const;
@@ -52,6 +54,8 @@ const MIXED_VARS = {
 	lineSoft: { mix: ['textMuted', 55, 'textFaint'] },
 	/** The theme's green moved towards the text colour: darker on a light note, lighter on a dark one. */
 	adoptiveLine: { mix: ['adoptive', 70, 'text'] },
+	/** D332: the theme's orange moved towards the text colour, as the adoptive line does, so the line keeps 3:1 on the note. D339: 85 % orange in a light theme (70 % made the Minimal orange a dark red), 70 % in a dark one. */
+	begetterLine: { mix: ['begetter', 85, 'text'], dark: 70 },
 	/** D330 O-01: the line round a card, 14 % of the text colour in the card colour (18 % in a dark theme); styles/00-tokens.css has the same numbers. */
 	cardEdge: { mix: ['text', 14, 'cardFill'], dark: 18 },
 } as const satisfies Record<string, MixedRole>;
@@ -99,6 +103,7 @@ export const DEFAULT_LIGHT: Palette = withMixes({
 	adoptive: '#08b94e',
 	ward: '#086ddd',
 	rumoured: '#e93147',
+	begetter: '#ec7500',
 	accent: '#8a5cf5',
 }, false);
 
@@ -116,6 +121,7 @@ export const DEFAULT_DARK: Palette = withMixes({
 	adoptive: '#44cf6e',
 	ward: '#027aff',
 	rumoured: '#fb464c',
+	begetter: '#e9973f',
 	accent: '#7f6df2',
 }, true);
 
@@ -173,6 +179,8 @@ export const STROKES: Record<StrokeKind, StrokeStyle> = {
 	adoptive: { role: 'adoptiveLine', width: 3, dash: '20 6', label: LEGEND_LABELS.adoptive },
 	ward: { role: 'ward', width: 3, dash: '3 7', label: LEGEND_LABELS.ward },
 	rumoured: { role: 'rumoured', width: 1.5, dash: '10 4', opacity: 0.85, label: LEGEND_LABELS.rumoured },
+	// D332: dash-dot, so it is told from the descent and implicit lines without colour; round caps turn the 2 px dash into a dot.
+	begetter: { role: 'begetterLine', width: 1.5, dash: '14 3 2 3', cap: 'round', label: LEGEND_LABELS.begetter },
 };
 
 /** D26, D38: the union point tells the kind of partnership. */

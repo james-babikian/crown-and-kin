@@ -36,6 +36,7 @@ export const PERF_FILES = [
 	'tests/core/missing-id-speed.test.ts',
 	'tests/obsidian/houses-draft-accepted-never-refused.test.ts',
 	'tests/obsidian/first-view-mark-matrix.test.ts',
+	'tests/obsidian/relation-view-first-view-sweep.test.ts',
 	'tests/core/relations-timing.test.ts',
 	'tests/core/relationship-ops-property.test.ts',
 	'tests/layout/rumoured-parent-every-person-speed.test.ts',

@@ -16,8 +16,8 @@ export interface Up {
 	type: ParentType;
 }
 
-/** One step of a walk from the first person to the second. */
-export type Edge = { k: 'up' | 'down'; type: ParentType } | { k: 'partner'; union: string };
+/** One step of a walk from the first person to the second. A partner step with `marriage` names that union, the marriage of a name by marriage; any other names the pair's last-listed union. */
+export type Edge = { k: 'up' | 'down'; type: ParentType } | { k: 'partner'; union: string; marriage?: true };
 
 /** Links left out of a view: the links from `parent` down to the people of `kids`. */
 export interface Drop {
@@ -151,6 +151,10 @@ export interface Counted {
 	 * that makes two, and also the whole `allList`.
 	 */
 	choices: number[][];
+	/** D293: only for a child with two legal parents, its sets as they are without them (birth and rumoured parents); the doubt of a parent who is not listed reads these. */
+	plain?: Counted;
+	/** D293 in the second test: the child has its legal pair only if its rumoured links are true (`allList` is that pair). */
+	byRumour?: true;
 }
 
 /**
@@ -159,12 +163,16 @@ export interface Counted {
  */
 export type Word = readonly [lower: string, group: number, base?: string];
 
+/** The `cat` of a name through a rumoured link ("Which name wins" rule 4). */
+export const RUMOURED_CAT = 4;
+/** "rumoured " goes before a named form by marriage whose blood leg is rumoured. */
+export const RUMOURED = `${WORDS.rumoured} `;
 /** "former " goes before the whole name, after "rumoured " (D304 to D309). */
 export const FORMER = `${WORDS.former} `;
 
 /** A name by marriage with its group (D200 R3 key 9); a leg through a rumoured link puts "rumoured" in front. */
 export function named(c: Blood, word: string, group: number, former: boolean): Word {
-	const rumoured = c.word === 'rumoured' ? `${WORDS.rumoured} ` : '';
+	const rumoured = c.word === 'rumoured' ? RUMOURED : '';
 	return former ? [`${rumoured}${FORMER}${word}`, group, `${rumoured}${word}`] : [`${rumoured}${word}`, group];
 }
 
@@ -177,7 +185,8 @@ export const BY_STEP = 0;
 export const BY_IN_LAW = 1;
 /** Group 2 of the names by marriage: the "by marriage" names. */
 export const BY_MARRIAGE = 2;
-const BY_POSSESSIVE = 3;
+/** Group 3 of the names by marriage: the possessive forms ("Wife’s half-nephew"). */
+export const BY_POSSESSIVE = 3;
 
 /** The years and `ended-by` of the marriages of a graph (D304 to D309), made when a partner word or a name by marriage first needs them. A graph never changes, so each mark of it shares them. */
 export const YEARS = new WeakMap<FamilyGraph, MarriageYears>();

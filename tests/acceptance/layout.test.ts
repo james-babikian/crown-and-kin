@@ -27,6 +27,7 @@ const SECONDARY_KIND: Record<string, StrokeKind[]> = {
 	adoptive: ['adoptive'],
 	ward: ['ward'],
 	rumoured: ['rumoured'],
+	begetter: ['begetter'],
 };
 
 describe('every fixture: spec §8 "nothing may throw", §10 "all fixtures render"', () => {

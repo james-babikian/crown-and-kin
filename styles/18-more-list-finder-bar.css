@@ -38,17 +38,17 @@
 }
 
 .dynasty-full .dynasty-result {
-	top: calc(max(0px, env(safe-area-inset-top)) + 44px);
-	padding-left: max(14px, env(safe-area-inset-left));
-	padding-right: max(var(--dynasty-space-1), env(safe-area-inset-right));
+	top: calc(max(0px, var(--dynasty-safe-top)) + 44px);
+	padding-left: max(14px, var(--dynasty-safe-left));
+	padding-right: max(var(--dynasty-space-1), var(--dynasty-safe-right));
 }
 
 /* Phone: the bar is at the bottom, so the banner is at the top, inside the safe area (spec §13.2). */
 .modal.dynasty-fullscreen.is-phone-side .dynasty-full .dynasty-result,
 .modal.dynasty-fullscreen.is-phone .dynasty-full .dynasty-result {
-	top: max(0px, env(safe-area-inset-top));
+	top: max(0px, var(--dynasty-safe-top));
 	min-height: 52px;
-	padding: var(--dynasty-space-1) max(0px, env(safe-area-inset-right)) var(--dynasty-space-1) max(var(--dynasty-space-4), env(safe-area-inset-left));
+	padding: var(--dynasty-space-1) max(0px, var(--dynasty-safe-right)) var(--dynasty-space-1) max(var(--dynasty-space-4), var(--dynasty-safe-left));
 }
 
 .dynasty-result-text {

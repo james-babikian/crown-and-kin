@@ -39,7 +39,7 @@ function view(g: FamilyGraph, id: string): FamilyView {
  * sorted pair. The type selectors are compared as sets, in the §4.2 order.
  */
 function norm(v: FamilyView) {
-	const order: ParentKind[] = ['birth', 'adoptive', 'ward', 'rumoured'];
+	const order: ParentKind[] = ['birth', 'adoptive', 'ward', 'rumoured', 'begetter'];
 	const byOrder = (a: ParentKind, b: ParentKind) => order.indexOf(a) - order.indexOf(b);
 	return {
 		...v,
@@ -60,6 +60,7 @@ const listed = (partner: string, index: number, pair: [string, string], type: st
 const implicit = (partner: string) => expect.objectContaining({ partner, union: null }) as PartnerLink;
 const b = (id: string) => ({ id, type: 'birth' as const });
 
+// D332/D334: two birth parents fill the blood limit (birth + begetter ≤ 2), so a begetter link is also full there.
 describe('familyOf (§6.3 Family, §6.4)', () => {
 	it('fixture 2, Edmund: three spouses in union order; a union with no type reads as marriage (§4.1)', () => {
 		expect(norm(view(F2, 'edmund'))).toEqual({
@@ -71,7 +72,7 @@ describe('familyOf (§6.3 Family, §6.4)', () => {
 			],
 			siblings: { group: ['edmund', 'cecily'], index: 0, canMoveEarlier: false, canMoveLater: true },
 			placementTypes: ['birth'],
-			fullTypes: ['birth'],
+			fullTypes: ['birth', 'begetter'],
 			otherParentChoices: ['agnes', 'beatrix', 'clarice'],
 		});
 	});
@@ -99,7 +100,7 @@ describe('familyOf (§6.3 Family, §6.4)', () => {
 			partners: [listed('lisette', 3, ['conrad', 'lisette'], 'marriage', '1113')],
 			siblings: { group: ['conrad', 'blanche'], index: 0, canMoveEarlier: false, canMoveLater: true },
 			placementTypes: ['birth'],
-			fullTypes: ['birth'],
+			fullTypes: ['birth', 'begetter'],
 			otherParentChoices: ['lisette'],
 		});
 		expect(view(F3, 'ulric').siblings).toEqual({ group: ['lisette', 'ulric'], index: 1, canMoveEarlier: true, canMoveLater: false });
@@ -113,7 +114,7 @@ describe('familyOf (§6.3 Family, §6.4)', () => {
 			// Jasper is under Marek and Anna; Tomas is alone under Aldric and Isolde.
 			siblings: null,
 			placementTypes: ['birth', 'adoptive'],
-			fullTypes: ['birth', 'adoptive'],
+			fullTypes: ['birth', 'adoptive', 'begetter'],
 			otherParentChoices: ['sabine'],
 		});
 	});
@@ -124,7 +125,7 @@ describe('familyOf (§6.3 Family, §6.4)', () => {
 			partners: [],
 			siblings: { group: ['piers', 'roderick'], index: 0, canMoveEarlier: false, canMoveLater: true },
 			placementTypes: ['birth', 'ward'],
-			fullTypes: ['birth'],
+			fullTypes: ['birth', 'begetter'],
 			otherParentChoices: [],
 		});
 		expect(norm(view(F8, 'roderick'))).toEqual({
@@ -132,7 +133,7 @@ describe('familyOf (§6.3 Family, §6.4)', () => {
 			partners: [],
 			siblings: { group: ['piers', 'roderick'], index: 1, canMoveEarlier: true, canMoveLater: false },
 			placementTypes: ['birth'],
-			fullTypes: ['birth'],
+			fullTypes: ['birth', 'begetter'],
 			otherParentChoices: [],
 		});
 	});
@@ -149,7 +150,7 @@ describe('familyOf (§6.3 Family, §6.4)', () => {
 			partners: [listed('maud', 2, ['corwin', 'maud'], 'marriage', '1048', '1051'), listed('alys', 3, ['corwin', 'alys'], 'marriage', '1066')],
 			siblings: { group: ['varian', 'yseult', 'corwin'], index: 2, canMoveEarlier: true, canMoveLater: false },
 			placementTypes: ['birth'],
-			fullTypes: ['birth'],
+			fullTypes: ['birth', 'begetter'],
 			otherParentChoices: ['maud', 'alys'],
 		});
 		expect(view(F11, 'yseult').siblings).toEqual({ group: ['varian', 'yseult', 'corwin'], index: 1, canMoveEarlier: true, canMoveLater: true });

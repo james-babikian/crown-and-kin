@@ -171,17 +171,17 @@ describe('D242: styles.css', () => {
 		};
 		const bar = rule('.modal.dynasty-fullscreen.is-phone-side .dynasty-full .dynasty-toolbar');
 		expect(bar).toContain('bottom: 0');
-		expect(bar).toContain('height: calc(52px + env(safe-area-inset-bottom))');
-		expect(bar).toContain('env(safe-area-inset-left)');
-		expect(bar).toContain('env(safe-area-inset-right)');
+		expect(bar).toContain('height: calc(52px + var(--dynasty-safe-bottom))');
+		expect(bar).toContain('var(--dynasty-safe-left)');
+		expect(bar).toContain('var(--dynasty-safe-right)');
 		expect(css).toMatch(/\.is-phone-side \.dynasty-full \.dynasty-toolbar \.dynasty-close,\n\.modal\.dynasty-fullscreen\.is-phone \.dynasty-full \.dynasty-toolbar \.dynasty-close \{[^}]*position: sticky/);
 	});
 
 	it('a sheet, the problem list and the result bar keep clear of the notch at the sides', () => {
-		expect(css).toMatch(/\.dynasty-popover\.is-sheet \{[^}]*padding: 6px max\(12px, env\(safe-area-inset-right, 0px\)\)[^}]*max\(12px, env\(safe-area-inset-left, 0px\)\)/);
+		expect(css).toMatch(/\.dynasty-popover\.is-sheet \{[^}]*padding: 6px max\(12px, var\(--dynasty-safe-right\)\)[^}]*max\(12px, var\(--dynasty-safe-left\)\)/);
 		// `width: auto` lets left and right set the width; `max-content` made a long problem text wider than the screen (found in 0.3.1 on a phone upright too).
 		expect(css).toMatch(/is-phone \.dynasty-full \.dynasty-popover:not\(\.is-anchored\):not\(\.is-sheet\) \{[^}]*width: auto;[^}]*max-width: none/);
-		expect(css).toMatch(/is-phone \.dynasty-full \.dynasty-popover:not\(\.is-anchored\):not\(\.is-sheet\) \{[^}]*left: max\(var\(--size-4-2\), env\(safe-area-inset-left\)\);[^}]*right: max\(var\(--size-4-2\), env\(safe-area-inset-right\)\)/);
-		expect(css).toMatch(/is-phone \.dynasty-full \.dynasty-result \{[^}]*padding: var\(--dynasty-space-1\) max\(0px, env\(safe-area-inset-right\)\) var\(--dynasty-space-1\) max\(var\(--dynasty-space-4\), env\(safe-area-inset-left\)\)/);
+		expect(css).toMatch(/is-phone \.dynasty-full \.dynasty-popover:not\(\.is-anchored\):not\(\.is-sheet\) \{[^}]*left: max\(var\(--size-4-2\), var\(--dynasty-safe-left\)\);[^}]*right: max\(var\(--size-4-2\), var\(--dynasty-safe-right\)\)/);
+		expect(css).toMatch(/is-phone \.dynasty-full \.dynasty-result \{[^}]*padding: var\(--dynasty-space-1\) max\(0px, var\(--dynasty-safe-right\)\) var\(--dynasty-space-1\) max\(var\(--dynasty-space-4\), var\(--dynasty-safe-left\)\)/);
 	});
 });

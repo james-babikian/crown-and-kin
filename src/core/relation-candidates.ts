@@ -3,7 +3,7 @@
  * read only the candidates they get, not the graph.
  */
 
-import type { Blood, BloodLine, Cand, Counted, Line, Via, Walk } from './relation-internal';
+import { type Blood, type BloodLine, BY_POSSESSIVE, type Cand, type Counted, type Line, RUMOURED, RUMOURED_CAT, type Via, type Walk } from './relation-internal';
 import { type RelationMaybe, WORD_RANK } from './relation-types';
 import { sameList } from './same-list';
 
@@ -23,6 +23,31 @@ export function withoutFormerTwins(cands: Cand[]): Cand[] {
 	const plain = new Set<string>();
 	for (const c of cands) if (c.base === undefined) plain.add(c.lower);
 	return cands.filter((c) => c.base === undefined || !plain.has(c.base));
+}
+
+/**
+ * One tie, one name (rule D, D123): a rumoured named form by marriage (a step, in-law or "by marriage" name; never a possessive form) adds
+ * nothing beside a sure named form of the same word, since the named forms leave out "half" and "adoptive". It stays only where it is not
+ * "former" and the sure one is: "Rumoured sister-in-law" beside "Former sister-in-law" says that a tie may still hold.
+ */
+export function withoutRumouredTwins(cands: Cand[]): Cand[] {
+	const namedForm = (c: Cand) => c.kind === 'by-marriage' && c.group < BY_POSSESSIVE;
+	const sure = new Map<string, boolean>();
+	for (const c of cands) if (namedForm(c) && c.cat !== RUMOURED_CAT) sure.set(c.base ?? c.lower, sure.get(c.base ?? c.lower) === false ? false : c.base !== undefined);
+	if (!sure.size) return cands;
+	return cands.filter((c) => {
+		if (!namedForm(c) || c.cat !== RUMOURED_CAT) return true;
+		const former = sure.get((c.base ?? c.lower).slice(RUMOURED.length));
+		return former === undefined || (former && c.base === undefined);
+	});
+}
+
+/**
+ * A rumoured half line of the same degree as a sure line of `list` whose "maybe full" the rumour causes adds no name: the "maybe" has made
+ * its "Rumoured" name already. It reads no pair of children, since the lines kept for a key depend on the order of the people.
+ */
+export function isDupRumoured(list: Blood[], rc: Blood): boolean {
+	return rc.word === 'rumoured' && rc.half && list.some((c) => c !== rc && c.word !== 'rumoured' && c.maybe === 'full' && c.cause === 'rumoured' && c.half && c.a === rc.a && c.b === rc.b);
 }
 
 /** Smaller a + b first, then the smaller removal, then the smaller first distance. */

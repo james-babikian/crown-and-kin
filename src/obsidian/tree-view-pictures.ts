@@ -337,6 +337,7 @@ export abstract class TreeViewPictures extends TreeViewScene {
 			...(this.meId !== null && !relationLine ? { youTab: this.meId } : {}),
 			...(breaks.size ? { breaks } : {}),
 			fonts: opts.fonts,
+			doc: this.containerEl.doc,
 			showDates: this.settings.showDates,
 			showPortraits: this.settings.showPortraits,
 			armsOnCards: this.settings.armsOnCards,

@@ -48,3 +48,14 @@ export function usesFamily(state: FontState, loaded: string[]): boolean {
 	const mine = new Set([...familyNames(state.text), ...familyNames(state.ui)]);
 	return loaded.some((f) => familyNames(f).some((n) => mine.has(n)));
 }
+
+/**
+ * `list` (a CSS font-family list) without the families in `gone` (lower-case names), or `sans-serif` if none is left. A picture made on a
+ * canvas cannot draw a font that only the page loaded, so the cards are measured with the list that the canvas will really use (D334).
+ */
+export function withoutPageFonts(list: string, gone: ReadonlySet<string>): string {
+	const all = list.split(',').filter((f) => f.trim() !== '');
+	const kept = all.filter((f) => !gone.has(f.trim().replace(/^["']|["']$/g, '').toLowerCase()));
+	if (kept.length === all.length) return list;
+	return kept.map((f) => f.trim()).join(', ') || 'sans-serif';
+}

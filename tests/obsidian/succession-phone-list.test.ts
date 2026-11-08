@@ -11,6 +11,7 @@ import { resetObsidian } from '../acceptance/fake-obsidian';
 import { embed, fakeHandle, fakeHost, fullViews, phone } from '../acceptance/tree-view-fakes';
 import { BODY_16 } from '../support/titles-window-support';
 import { accName } from '../acceptance/accessible-name';
+import { visibleBarText } from '../support/bar-text-support';
 import { useFakeDom } from '../support/fake-dom-setup';
 
 /*
@@ -68,7 +69,7 @@ describe('the phone list while the view is open', () => {
 		await showList(o);
 		const bar = listBar(o.root)!;
 		expect(bar).not.toBeNull();
-		expect(bar.querySelector('.dynasty-succession-text')!.getText()).toBe('Line of succession: Duke of Carrowmere, now');
+		expect(visibleBarText(bar.querySelector('.dynasty-succession-text')!)).toBe('Line of succession: Duke of Carrowmere, now · Eldest child first (primogeniture)');
 		const close = bar.querySelector('.dynasty-succession-close')!;
 		// D182: an icon, no text, a name for the screen reader.
 		expect(close.getText()).toBe('');
@@ -115,7 +116,7 @@ describe('the phone list while the view is open', () => {
 		const body = ['titles:', '  - id: crown', '    name: Crown', '    succession: eldest-child', '    holders:', '      - {person: rex, from: 1100}', 'people:', '  - {id: rex, name: Rex Ardent, sex: m, born: 1070}', ''].join('\n');
 		const o = await openList(body);
 		await showList(o, 'crown');
-		expect(listBar(o.root)!.querySelector('.dynasty-succession-text')!.getText()).toBe('Line of succession: Crown, now. No heir in the tree.');
+		expect(visibleBarText(listBar(o.root)!.querySelector('.dynasty-succession-text')!)).toBe('Line of succession: Crown, now · Eldest child first (primogeniture). No heir in the tree.');
 	});
 
 	it('the setting "Length of the line" redraws the list', async () => {
@@ -163,7 +164,7 @@ describe('Show with only a phone list on the page', () => {
 		await redrawn();
 		expect(fullViews()).toHaveLength(1);
 		const full = (fullViews()[0] as unknown as { containerEl: FEl }).containerEl;
-		expect(full.querySelector('.dynasty-succession-text')!.getText()).toBe('Line of succession: Duke of Carrowmere, now');
+		expect(visibleBarText(full.querySelector('.dynasty-succession-text')!)).toBe('Line of succession: Duke of Carrowmere, now · Eldest child first (primogeniture)');
 		expect(full.querySelector('.dynasty-root')!.getAttribute('data-dynasty-succession')).toBe(DUKE);
 	});
 });

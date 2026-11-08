@@ -17,7 +17,7 @@ export interface RelationView extends RelationInfo {
 /** Draws the relation lines into `parent` and returns the first element. */
 export function renderRelationLine(parent: HTMLElement, v: RelationView): HTMLElement {
 	if (v.kind === 'me') return parent.createDiv({ cls: ['dynasty-head-rel', 'is-me'], text: v.value });
-	// A person with no relation keeps the button: the line view then says so in its own words.
+	// A person with no relation has the button only when a chain links the two (the caller decides, C1).
 	const parts: (HTMLElement | string)[] = [v.kind === 'none' ? v.value : WINDOW_UI.relationYour(lowerFirst(v.value))];
 	let also: HTMLElement | null = null;
 	if (v.kind !== 'none' && v.others > 0 && v.also) {

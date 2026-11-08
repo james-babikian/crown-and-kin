@@ -149,6 +149,11 @@
 	padding-bottom: var(--dynasty-space-3);
 }
 
+/* D338 point 6: on a phone the bar says "ID" and the full name of the house or title is the label of the field; a long name wraps. */
+.dynasty-id-window.is-phone .dynasty-id-field .dynasty-sheet-label {
+	overflow-wrap: anywhere;
+}
+
 /* phone-B: picker */
 /* New rules for `.dynasty-picker*` (person list height, `.dynasty-picker-sob`) go below this line. */
 /* D122: the sobriquet after a name in a person list and in a holder list: regular weight (the name is semibold). */

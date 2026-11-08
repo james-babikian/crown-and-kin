@@ -1,6 +1,14 @@
 /*
  * The saved value of the fence index. Pure code: the stamp of a note, the codec of the stamp list, and the check of a stored value.
  * `src/view/fence-index.ts` keeps the state and decides when to save; this file only turns state into a value and a value back into state, and never throws on bad input.
+ *
+ * The value (key `crown-and-kin-fence-index`, per vault and per device, never synced): `{ v: 1, n, f, s }`. `f` maps a path to its flags for notes that hold a fence (1 `kin`,
+ * 2 `kin-calendar`, 3 both). `s` is base64 of little-endian uint32 pairs `[pathKey, stamp]`, sorted by path key, one pair (8 bytes) for each checked note; `n` is the number of pairs.
+ * `pathKey` is FNV-1a of the path, `stamp` is FNV-1a of `mtime:size`. There is no "pass ended" flag: each stamp proves its note alone, so a half-built copy is as good as any other.
+ * A path key that two current notes share is never trusted: both are checked at each start and neither is saved in `s`. A value is valid only if `v` is 1, `f` is a plain object of at
+ * most 20 000 entries with values 1, 2 or 3, and `s` is null or base64 of exactly `8 * n` bytes; anything else is ignored whole (a first start) and the next save overwrites it.
+ * Limits: the JSON of the value is at most 500 000 characters (the storage is shared by all vaults and plugins); above that `s` is null (about 45 000 notes, so every start is a first
+ * start), and above 20 000 flags nothing is saved.
  */
 
 /** A path key and a stamp, both unsigned 32 bit numbers. */

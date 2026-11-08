@@ -29,7 +29,7 @@ Install the tool one time; later runs need only the last command. The project ne
 
 ## Result
 
-A clean run has 0 errors and 4 warnings: `@typescript-eslint/no-deprecated` on the `keyCode === 229` checks (the IME check; Safari has no replacement). Any error makes the CI job fail.
+A clean run has 0 errors and 5 warnings: `@typescript-eslint/no-deprecated` on the `keyCode === 229` checks (the IME check; Safari has no replacement). Any error makes the CI job fail.
 
 ## Switched-off rules
 

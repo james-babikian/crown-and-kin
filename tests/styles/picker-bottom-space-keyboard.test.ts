@@ -30,7 +30,7 @@ function decl(selector: string, property: string): string {
 
 /** Evaluates `max(0px, calc(var(--a, 0px) - var(--b, 0px)))` with the two custom properties given in px. */
 function paddingBottom(value: string, vars: Record<string, number>): number {
-	const m = /^max\(0px,\s*calc\(var\((--[\w-]+),\s*0px\)\s*-\s*var\((--[\w-]+),\s*0px\)\)\)$/.exec(value);
+	const m = /^max\(0px,\s*calc\(var\((--[\w-]+)(?:,\s*0px)?\)\s*-\s*var\((--[\w-]+)(?:,\s*0px)?\)\)\)$/.exec(value);
 	if (!m) throw new Error(`the padding rule has an unexpected shape: ${value}`);
 	return Math.max(0, (vars[m[1]!] ?? 0) - (vars[m[2]!] ?? 0));
 }
@@ -39,7 +39,8 @@ const PHONE = '.prompt.dynasty-picker.is-phone';
 
 describe('D125 (3): no bottom space under the list while the keyboard is up', () => {
 	const value = decl(PHONE, 'padding-bottom');
-	const safe = '--safe-area-inset-bottom';
+	// D335: the plugin token, which reads Obsidian's `--safe-area-inset-bottom`.
+	const safe = '--dynasty-safe-bottom';
 	const keyboard = '--keyboard-height';
 
 	it('the rule names the safe area and the keyboard height', () => {
@@ -83,13 +84,13 @@ describe('D125 (3): a lower head and a first row close to the field', () => {
 	it('the top row (the pill and Cancel, D212) has no space above or under it; the gap to the list is the list padding below', () => {
 		// 0.3 B.3: Cancel is outside the pill, so the pill keeps its safe area on the left only; its right side holds the X.
 		const pad = decl('.dynasty-picker.is-phone .prompt-input-container', 'padding');
-		expect(pad).toMatch(/^0 var\(--size-4-2\) 0 max\(var\(--size-4-3\), env\(safe-area-inset-left\)\)$/);
+		expect(pad).toMatch(/^0 var\(--size-4-2\) 0 max\(var\(--size-4-3\), var\(--dynasty-safe-left\)\)$/);
 		// Cancel has the safe area on its right.
-		expect(decl('.dynasty-picker.is-phone > button.dynasty-picker-cancel', 'padding')).toMatch(/env\(safe-area-inset-right\)\) 0 var\(--size-4-2\)$/);
+		expect(decl('.dynasty-picker.is-phone > button.dynasty-picker-cancel', 'padding')).toMatch(/var\(--dynasty-safe-right\)\) 0 var\(--size-4-2\)$/);
 	});
 
 	it('the top still clears the notch: the prompt, not the grey pill, keeps the top safe area', () => {
-		expect(decl(PHONE, 'padding-top')).toBe('env(safe-area-inset-top)');
+		expect(decl(PHONE, 'padding-top')).toBe('var(--dynasty-safe-top)');
 	});
 
 	it('the Cancel button keeps a 44 px hit area', () => {

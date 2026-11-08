@@ -269,6 +269,17 @@
 	font-weight: var(--font-normal);
 }
 
+/* D338 point 4: a new title has the row of a saved title: the sentence at the left, the compact "Save and show" at the right. */
+.dynasty-succ-new > .dynasty-succ-msg {
+	flex: 1 1 0;
+	min-width: 0;
+}
+
+.dynasty-succ-save-show {
+	flex: none;
+	white-space: nowrap;
+}
+
 .dynasty-succ-more {
 	margin-top: 2px;
 }

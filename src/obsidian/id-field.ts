@@ -16,6 +16,8 @@ interface IdFieldOptions {
 	/** The name of the house or title, for the accessible names. */
 	item: string;
 	value: string;
+	/** The visible label above the field; the text of `ID_UI.label` when it is not set. The accessible name of the field stays `ID_UI.aria(item)`. */
+	label?: string;
 	/** The reason the draft is refused now, or an empty text. */
 	problem: string;
 	/** The help text: it stands under the link "Make ID from the name". */
@@ -29,6 +31,8 @@ interface IdFieldOptions {
 /** What a window changes in a field that is on screen, without drawing the window again. */
 interface IdFieldView {
 	input: HTMLInputElement;
+	/** The visible label above the field. */
+	labelEl: HTMLElement;
 	setItem: (item: string) => void;
 	setValue: (value: string) => void;
 	setProblem: (text: string) => void;
@@ -38,7 +42,7 @@ interface IdFieldView {
 export function idField(parent: HTMLElement, o: IdFieldOptions): IdFieldView {
 	const row = parent.createDiv({ cls: 'dynasty-id-row', attr: { 'data-id-row': o.key } });
 	// D330 O-11: the label stands above a normal field, as in every window. Under the field: the error (when there is one), the link, the help.
-	const { row: field, id: inputId } = sheetField(row, ID_UI.label, 'id', 'dynasty-id');
+	const { row: field, id: inputId } = sheetField(row, o.label ?? ID_UI.label, 'id', 'dynasty-id');
 	field.addClass('dynasty-id-field');
 	const hintId = `${inputId}-hint`;
 	const input = field.createEl('input', {
@@ -68,6 +72,7 @@ export function idField(parent: HTMLElement, o: IdFieldOptions): IdFieldView {
 	show(o.problem);
 	return {
 		input,
+		labelEl: field.querySelector<HTMLElement>('.dynasty-sheet-label')!,
 		setItem: (item) => {
 			input.setAttribute('aria-label', ID_UI.aria(item));
 			make.setAttribute('aria-label', ID_UI.makeAria(item));

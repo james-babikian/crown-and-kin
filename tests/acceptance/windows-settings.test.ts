@@ -134,7 +134,7 @@ describe('the settings tab (spec §9, D33)', () => {
 		expect(last(fake.saved)).toEqual({ ...plugin.settings, settingsVersion: 1 });
 	});
 
-	it('"Arms on cards" offers the two values and stores a change; "Warn about more than 2 parents of a type" is on by default and stores a change', async () => {
+	it('"Arms on cards" offers the two values and stores a change; "Warn about more than 2 parents" is on by default and stores a change', async () => {
 		const { fake, plugin } = await loadPlugin();
 		openTab(fake);
 		const arms = control<DropdownComponent>(SETTINGS_UI.armsOnCards);
@@ -571,6 +571,32 @@ describe('keyboard (spec §5.2)', () => {
 		dispatch(fakeDoc.activeElement!, 'keydown', { key: 'Escape' });
 		expect(pop.isOpen).toBe(false);
 		expect(fakeDoc.activeElement).toBe(tag);
+	});
+
+	it('Esc closes a popover that a mouse click opened, when the clicked menu item is gone and the focus is on the page body (B-0053)', () => {
+		const host = new FEl('div');
+		const opener = host.createEl('button');
+		const pop = new Popover(host as never);
+		pop.open('legend', () => {}, opener as never);
+		fakeDoc.activeElement = fakeDoc.body;
+		const e = dispatch(fakeDoc.body, 'keydown', { key: 'Escape' });
+		expect(pop.isOpen).toBe(false);
+		expect(e.defaultPrevented).toBe(true);
+		expect(fakeDoc.activeElement).toBe(opener);
+	});
+
+	it('an Esc with the focus on the body does not close a popover while a window of Obsidian is open elsewhere', () => {
+		const host = new FEl('div');
+		const opener = host.createEl('button');
+		const pop = new Popover(host as never);
+		pop.open('legend', () => {}, opener as never);
+		const modal = fakeDoc.body.createDiv({ cls: 'modal-container' });
+		fakeDoc.activeElement = fakeDoc.body;
+		const e = dispatch(fakeDoc.body, 'keydown', { key: 'Escape' });
+		expect(pop.isOpen).toBe(true);
+		expect(e.defaultPrevented).toBe(false);
+		modal.remove();
+		pop.close();
 	});
 
 	it('an Esc with the focus outside the tree does not close the popover', () => {

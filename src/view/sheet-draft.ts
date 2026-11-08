@@ -102,11 +102,11 @@ export function draftOf(l: Loaded): Draft {
 	};
 }
 
-/** Placement types the person has parents of (spec §4.3); an unknown parent type counts as birth. */
+/** Placement types the person has parents of (spec §4.3); an unknown parent type counts as birth. A begetter is never a placement parent (D332). */
 export function placementChoices(p: Person): string[] {
 	const out = new Set<string>();
 	for (const ref of p.parents) {
-		if (ref.type === 'rumoured') continue;
+		if (ref.type === 'rumoured' || ref.type === 'begetter') continue;
 		out.add((PLACEMENT_TYPES as readonly string[]).includes(ref.type) ? ref.type : 'birth');
 	}
 	return PLACEMENT_TYPES.filter((t) => out.has(t));

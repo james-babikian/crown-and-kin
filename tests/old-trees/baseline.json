@@ -85,7 +85,7 @@
 				{
 					"level": "warning",
 					"code": "unknown-parent-type",
-					"text": "Edda Brennock has the parent Ranulf Brennock with the type “godfather”, which the plugin does not know. The plugin counts Ranulf Brennock as a birth parent of Edda Brennock. Use birth, adoptive, ward or rumoured."
+					"text": "Edda Brennock has the parent Ranulf Brennock with the type “godfather”, which the plugin does not know. The plugin counts Ranulf Brennock as a birth parent of Edda Brennock. Use birth, adoptive, ward, rumoured or begetter."
 				},
 				{
 					"level": "warning",
@@ -258,7 +258,7 @@
 				{
 					"level": "warning",
 					"code": "unknown-parent-type",
-					"text": "Edda Brennock has the parent Ranulf Brennock with the type “godfather”, which the plugin does not know. The plugin counts Ranulf Brennock as a birth parent of Edda Brennock. Use birth, adoptive, ward or rumoured."
+					"text": "Edda Brennock has the parent Ranulf Brennock with the type “godfather”, which the plugin does not know. The plugin counts Ranulf Brennock as a birth parent of Edda Brennock. Use birth, adoptive, ward, rumoured or begetter."
 				},
 				{
 					"level": "warning",

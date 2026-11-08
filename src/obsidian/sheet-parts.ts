@@ -72,7 +72,7 @@ export function freshOrStale(h: Pick<Handle, 'body'>, shown: string, stale: (bod
 /** Sends a failed write to the window's reaction for it; the detail of a refusal goes to the console. */
 export function onWriteFailed(
 	out: Exclude<HandleWriteOutcome, { ok: true }>,
-	on: { stale(): void; missing(): void; refused(code: Extract<EditResult, { ok: false }>['code']): void },
+	on: { stale(): void; missing(): void; refused(code: Extract<EditResult, { ok: false }>['code'], detail?: string): void },
 ): void {
 	if (out.code !== 'refused') {
 		if (out.code === 'stale') on.stale();
@@ -80,7 +80,7 @@ export function onWriteFailed(
 		return;
 	}
 	if (out.refusal.detail) console.warn('Crown and Kin: the edit was refused:', out.refusal.detail);
-	on.refused(out.refusal.code);
+	on.refused(out.refusal.code, out.refusal.detail);
 }
 
 /** True when the first pointer is a mouse or a trackpad. A touch screen (a phone or a tablet) has no window keys (spec §7). */

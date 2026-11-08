@@ -186,6 +186,14 @@ function scrollAreas(host: HTMLElement, delta: number): void {
 	}
 }
 
+/**
+ * Takes away the floating label that Obsidian shows for an `aria-label` (B-0039). It stays on screen after a click, and a menu that opens
+ * under the pointer would sit below it. Obsidian puts the label as a `tooltip` element straight into the page body and removes it by itself later.
+ */
+export function hideTooltips(doc: Document): void {
+	for (const tip of Array.from(doc.body.querySelectorAll(':scope > .tooltip'))) tip.remove();
+}
+
 /** A single popover attached to `host`: one open at a time, closed by Escape or a press outside it. */
 export class Popover {
 	private el: HTMLElement | null = null;
@@ -212,6 +220,7 @@ export class Popover {
 	 */
 	open(kind: string, build: (el: HTMLElement) => void, opener: Element | null, anchor?: DOMRect, opts: PopoverOptions = {}): HTMLElement {
 		this.close();
+		hideTooltips(this.host.doc);
 		const shape = opts.sheet ? ['is-sheet'] : opts.panel ? ['is-panel'] : [];
 		const el = this.host.createDiv({ cls: ['dynasty-popover', `dynasty-popover-${kind}`, ...shape], attr: { 'data-kind': kind, role: 'dialog' } });
 		this.el = el;
@@ -250,7 +259,7 @@ export class Popover {
 			this.close();
 		};
 		// Esc closes the popover and gives the focus back to its opener (spec §5.2), also when the focus
-		// is still on the opener (the legend takes no focus). The window hears it first, so the
+		// is still on the opener (the legend takes no focus) or on the page body (the menu item that opened it is gone). The window hears it first, so the
 		// full-screen view around the tree stays open.
 		const key = (e: KeyboardEvent) => {
 			if (e.key !== 'Escape') {
@@ -261,7 +270,8 @@ export class Popover {
 				return;
 			}
 			const active = doc.activeElement;
-			if (!(active && (el.contains(active) || this.host.contains(active)))) return;
+			const here = !!active && (el.contains(active) || this.host.contains(active));
+			if (!here && !(this.focusOnPage(active) && !this.otherWindowOpen())) return;
 			e.stopPropagation();
 			e.preventDefault();
 			this.close(true);
@@ -274,6 +284,20 @@ export class Popover {
 		}
 		doc.addEventListener('pointerdown', outside, true);
 		this.cleanup.push(() => doc.removeEventListener('pointerdown', outside, true));
+	}
+
+	/** True when no element holds the focus (the page body): a mouse click on a menu item that is then removed leaves the focus there. */
+	private focusOnPage(active: Element | null): boolean {
+		const doc = this.host.doc;
+		return !active || active === doc.body || active === doc.documentElement;
+	}
+
+	/** True when a window of Obsidian lies over the page and does not hold this popover (a sheet, a picker, a window of another tree), so that its Esc is not ours. */
+	private otherWindowOpen(): boolean {
+		for (const modal of Array.from(this.host.doc.body.querySelectorAll('.modal-container'))) {
+			if (!modal.contains(this.host)) return true;
+		}
+		return false;
 	}
 
 	/**

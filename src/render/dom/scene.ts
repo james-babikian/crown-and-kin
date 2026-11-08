@@ -48,7 +48,7 @@ import type { FamilyGraph } from '../../core/derive';
 import type { CardLabel } from '../../core/titles';
 import { isDead } from '../../core/succession-keys';
 import type { Person } from '../../core/types';
-import { ORDINAL_EM, ROUNDEL_EM, centredWithoutWord, cardText, isRoundel, nameCountOf, nameRoom, ordinalTabRect, relationY, ribbonWidth, roundelPics, signBelowRing, signBottomOf, tagTop, youTabRect, type CardText, type ShownLines } from '../../layout/geometry';
+import { ROUNDEL_EM, centredWithoutWord, cardText, isRoundel, nameCountOf, nameRoom, ordinalTabRect, relationY, ribbonWidth, roundelPics, signBelowRing, signBottomOf, tagTop, youTabRect, type CardText, type ShownLines } from '../../layout/geometry';
 import { farTagSigns } from '../../layout/far-tag-sign';
 import { illegitimateSigns } from '../../layout/index';
 import type { FarTag, LaidOut, NameLineCount, PersonBox, PlacedFoldControl, Rect } from '../../layout/model';
@@ -68,6 +68,7 @@ import { drawFold, type FoldRef } from './folds';
 // The word moved to view-text.ts (all plugin texts live there); other modules still read it from here.
 export { ME_WORD };
 import type { PictureOwner, PictureSlot } from './pictures';
+import { buildRings, drawOrdinalTab, type HeirRing, type RingSpec } from './heir-ring';
 import { FRAME_STROKE_PX, RUMOUR_FONT_EM, TAB_TEXT_BASE_EM, type Measure, type SceneFonts } from '../scene-model';
 
 /** A card name's internal link, as `buildScene`'s `link` option returns it. */
@@ -231,6 +232,8 @@ export interface Scene {
 	pictures: PictureSlot[];
 	/** The fold controls, in drawing order; empty without `SceneOptions.folds`. */
 	folds: FoldRef[];
+	/** The numbered rings of the heirs (Compact, and Overview on a computer); empty without a line of succession. The tree view places them with the zoom (`placeRings`). */
+	rings: HeirRing[];
 	/**
 	 * Truncates every text again with the current measurements, in place: for a web font that
 	 * finished loading after the first measurement. No element is replaced, so focus, a highlight
@@ -696,6 +699,7 @@ export function buildScene(parent: SVGGElement, g: FamilyGraph, laid: LaidOut, o
 	};
 
 	const heirIds = new Set(opts.heirs ?? []);
+	const ringSpecs: RingSpec[] = [];
 	const ordinalIds = new Set(layout.ordinalCards ?? []);
 	for (const box of layout.persons.values()) {
 		const p = g.byId.get(box.id);
@@ -861,12 +865,8 @@ export function buildScene(parent: SVGGElement, g: FamilyGraph, laid: LaidOut, o
 			tabEl.createSvg('text', { cls: 'dynasty-r1-tab-text', attr: { x: box.x + tab.x + tab.w / 2, y: box.y + tab.y + tab.h / 2 + TAB_TEXT_BASE_EM * f } }).setText(ME_WORD);
 		}
 		if (ordTab) {
-			// The ordinal tab, at the Full level only like the "You" tab. A card-colour base keeps the border and the line above the card from showing through.
-			const tabEl = full.createSvg('g', { cls: 'dynasty-ordinal-tab-group', attr: { 'aria-hidden': 'true' } });
-			const rect = { x: box.x + ordTab.x, y: box.y + ordTab.y, width: ordTab.w, height: ordTab.h, rx: ORDINAL_EM.corner * f };
-			tabEl.createSvg('rect', { cls: 'dynasty-ordinal-tab-base', attr: rect });
-			tabEl.createSvg('rect', { cls: 'dynasty-ordinal-tab', attr: rect });
-			tabEl.createSvg('text', { cls: 'dynasty-ordinal-tab-text', attr: { x: box.x + ordTab.x + ordTab.w / 2, y: box.y + ordTab.y + ordTab.h / 2 + TAB_TEXT_BASE_EM * f } }).setText(ordinal!);
+			// The word tab stands in the Full group and shows at the Full level only, like the "You" tab; the ring takes its place at the smaller levels.
+			drawOrdinalTab(full, box, ordTab, ordinal!, f, roundel, ringSpecs);
 		}
 
 		const compact = body.createSvg('text', {
@@ -1137,7 +1137,7 @@ export function buildScene(parent: SVGGElement, g: FamilyGraph, laid: LaidOut, o
 		}
 	};
 
-	return { cards, tags, badges, links, pictures, folds, refit: () => fitters.forEach((run) => run()),
+	return { cards, tags, badges, links, pictures, folds, rings: buildRings(parent, ringSpecs), refit: () => fitters.forEach((run) => run()),
 		setCornerRadius: (r) => {
 			cornerR = r;
 			verified = true;

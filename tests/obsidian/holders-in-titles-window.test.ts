@@ -438,7 +438,7 @@ describe('card labels in the tree view (spec §13.3, §13.5)', () => {
 		expect(cardText(el, 'roderick', 'dynasty-card-name')).toBe('Roderick I');
 		expect(cardText(el, 'roderick', 'dynasty-card-title')).toContain('(r.');
 		const label = cardLabels(G13).get('roderick')!;
-		expect(el.querySelector('.dynasty-card[data-person="roderick"]')!.getAttribute('aria-label')).toBe(`Roderick I, Duke of Valmont ${label.reign}, 1112–1175`);
+		expect(el.querySelector('.dynasty-card[data-person="roderick"]')!.getAttribute('aria-label')).toBe(`Roderick I, Duke of Valmont ${label.reign}, born 1112, died 1175`);
 		expect(cardText(el, 'young-aldric', 'dynasty-card-name')).toBe('Aldric III');
 	});
 

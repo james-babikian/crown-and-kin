@@ -1,7 +1,10 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import puppeteer, { type Browser, type Page } from 'puppeteer-core';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+
+// A browser closes slowly when several test files start browsers at once; the default 10 s hook limit then fails the file with no failed test.
+vi.setConfig({ hookTimeout: 60_000 });
 
 // O-27 follow-up (G5 0.5.2, R3): the phone bar with the problem badge in a 320 px window. The real styles.css in a real Chrome, with hand-built DOM of the shape of the plugin's bar;
 // Obsidian's own styles are not here (only the variables the plugin reads), so the test checks the plugin's rules, not a theme.

@@ -10,12 +10,16 @@ import { isolateName } from './name-bidi';
 export const ownText = (table: Record<string, string>, key: string): string | undefined => (Object.prototype.hasOwnProperty.call(table, key) ? table[key] : undefined);
 
 /** The word for the person who is added, by the type of the parent link. */
-const ADDED_AS_PARENT: Record<string, string> = { birth: 'a parent', adoptive: 'an adoptive parent', ward: 'a guardian', rumoured: 'a rumoured parent' };
-const ADDED_AS_CHILD: Record<string, string> = { birth: 'a child', adoptive: 'an adoptive child', ward: 'a ward', rumoured: 'a rumoured child' };
+const ADDED_AS_PARENT: Record<string, string> = { birth: 'a parent', adoptive: 'an adoptive parent', ward: 'a guardian', rumoured: 'a rumoured parent', begetter: 'a begetter' };
+const ADDED_AS_CHILD: Record<string, string> = { birth: 'a child', adoptive: 'an adoptive child', ward: 'a ward', rumoured: 'a rumoured child', begetter: 'a begotten child' };
 
-/** The words for a person who is added as a parent: "a parent", "an adoptive parent", "a guardian", "a rumoured parent". An unknown type gives "a parent". */
+/** The words for a person who is added as a parent: "a parent", "an adoptive parent", "a guardian", "a rumoured parent", "a begetter". An unknown type gives "a parent". */
 export const addedAsParent = (type: string): string => ownText(ADDED_AS_PARENT, type) ?? 'a parent';
-/** The words for a person who is added as a child: "a child", "an adoptive child", "a ward", "a rumoured child". An unknown type gives "a child". */
+const PARENT_TYPE_WORD: Record<string, string> = { birth: 'a birth parent', adoptive: 'an adoptive parent', ward: 'a guardian', rumoured: 'a rumoured parent', begetter: 'a begetter' };
+/** The name of a parent type inside a sentence, with its article: "a birth parent", "an adoptive parent", "a guardian", "a rumoured parent", "a begetter". An unknown type gives "a parent of the type “x”". */
+export const parentTypeWord = (type: string): string => ownText(PARENT_TYPE_WORD, type) ?? `a parent of the type ${quote(type)}`;
+
+/** The words for a person who is added as a child: "a child", "an adoptive child", "a ward", "a rumoured child", "a begotten child". An unknown type gives "a child". */
 export const addedAsChild = (type: string): string => ownText(ADDED_AS_CHILD, type) ?? 'a child';
 
 /**
@@ -29,6 +33,11 @@ export const CHANGE_UI = {
 	/** Add parent that also added the marriage of the new parent and the other parent of the child (spec §6.4); one sentence, the Undo takes both away. */
 	addedParentAndMarriage: (parent: string, child: string, type: string, other: string) =>
 		`The plugin added ${isolateName(parent)} as ${addedAsParent(type)} of ${isolateName(child)}. It also added a marriage of ${isolateName(parent)} and ${isolateName(other)}.`,
+	/** B-0054: the line after the user changes the kind of a parent link in the Family section. */
+	changedParentType: (parent: string, child: string, from: string, to: string) =>
+		`The plugin changed ${isolateName(parent)} from ${parentTypeWord(from)} to ${parentTypeWord(to)} of ${isolateName(child)}.`,
+	/** B-0054: after Undo of that change; `type` is the type before the change, which Undo gave back. */
+	undoneChangedParentType: (parent: string, child: string, type: string) => `The plugin changed ${isolateName(parent)} back to ${parentTypeWord(type)} of ${isolateName(child)}.`,
 	addedPartner: (partner: string, other: string) => `The plugin added ${isolateName(partner)} as a partner of ${isolateName(other)}.`,
 	markedMe: (name: string) => `The plugin marked ${isolateName(name)} with ${quote('This is me')}.`,
 	unmarkedMe: (name: string) => `The plugin removed the mark ${quote('This is me')} from ${isolateName(name)}.`,

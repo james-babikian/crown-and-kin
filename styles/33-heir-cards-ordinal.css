@@ -24,3 +24,49 @@
 	stroke-width: 5;
 }
 
+
+/*
+ * D334 Q3: the numbered ring of an heir. The word tab belongs to the Full level; the layer of rings shows at the Compact level on every device and at the
+ * Overview level on every device except a phone. A phone keeps the Overview as it was. The ring is a pill with the number (the tab's look: card colour inside, a 1 px border
+ * in the text colour), drawn in screen px (the tree view scales it against the zoom), so the number stays 12 px or more. Colour is never the only signal:
+ * the border and the number stay without the accent. The layer is one element, so a level change restyles one element, not one for each heir.
+ */
+.dynasty-heir-numbers {
+	display: none;
+	pointer-events: none;
+}
+
+.dynasty-lod-compact .dynasty-heir-numbers,
+.dynasty-lod-overview .dynasty-heir-numbers {
+	display: inline;
+}
+
+/* Only a phone device loses the ring at the Overview level (coarse pointer and a short screen side under 600 px, set by the tree view as `is-phone-device`). */
+/* A narrow computer window or an iPad in a narrow Split View keeps it. */
+.dynasty-root.is-phone-device .dynasty-lod-overview .dynasty-heir-numbers {
+	display: none;
+}
+
+.dynasty-heir-number-base {
+	fill: var(--background-primary-alt);
+	stroke: var(--background-primary-alt);
+	stroke-width: 3;
+	pointer-events: none;
+}
+
+.dynasty-heir-number-rim {
+	fill: var(--background-primary-alt);
+	stroke: var(--text-normal);
+	stroke-width: 1;
+	pointer-events: none;
+}
+
+.dynasty-heir-number-text {
+	font-family: var(--font-interface);
+	font-size: var(--dynasty-type-small);
+	font-style: normal;
+	font-weight: var(--font-semibold);
+	fill: var(--text-normal);
+	text-anchor: middle;
+	pointer-events: none;
+}

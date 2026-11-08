@@ -426,6 +426,8 @@ export class TreeView extends TreeViewList {
 	protected placeClasses(root: HTMLElement): void {
 		if (this.full) root.addClass('dynasty-full');
 		else if (this.coarse) root.addClass('dynasty-static');
+		// The Overview ring of the heirs hides on a phone device only, not on a narrow window (D334 Q3); the screen decides, as for the bar.
+		root.toggleClass('is-phone-device', this.isPhone());
 	}
 
 	/**

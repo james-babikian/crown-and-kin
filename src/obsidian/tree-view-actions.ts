@@ -331,7 +331,7 @@ export abstract class TreeViewActions extends TreeViewToolbar {
 		const keep = control?.spot ?? null;
 		const near = anchor?.kind === 'person' ? this.anchorOn(anchor.id) : control ? this.anchorOn(control.parents[0]) : null;
 		const fallback = near ?? this.keptAnchor();
-		const active = this.containerEl.doc.activeElement as Element | null;
+		const active = this.containerEl.doc.activeElement;
 		const focused = this.foldByKey ? (active?.closest('.dynasty-fold')?.getAttribute('data-fold') ?? null) : null;
 		this.foldByKey = false;
 		const plan = planFolds(g, whole, this.ensureState().folds, true, this.linePeopleNow());

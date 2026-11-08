@@ -70,7 +70,7 @@ unions:
 describe('card text', () => {
 	it('labels a card with name, title and dates', () => {
 		const g = graph(TREE);
-		expect(cardLabel(g.byId.get('a')!)).toBe('Aldric, Duke, 1102–1161');
+		expect(cardLabel(g.byId.get('a')!)).toBe('Aldric, Duke, born 1102, died 1161');
 		expect(cardLabel(g.byId.get('b')!)).toBe('Berthe');
 	});
 

@@ -17,6 +17,7 @@ import { SUCCESSION_UI as T, TITLES_UI } from '../render/ui-text';
 import { draftSpec, draftTitle, holderLead, holderText, type SuccessionDraft, type TitleRow } from '../view/titles-draft';
 import { afterNotes, bornDateUnread, heirNotes, rulerLabelOf } from '../view/succession-notes';
 import { bodyHints, firstInfo, illegitimateHint } from './body-hint';
+import { firstHeirNote, quietNote as note, type FirstHeirNoteInput } from './first-heir-note';
 import { setRowHints, switchRow } from './switch-row';
 import { RowPictures, buildRow, iconButton, personLead, textButton } from './window-parts';
 import type { PictureStore } from './picture-store';
@@ -61,6 +62,8 @@ interface SectionHost {
 	pictures?: PictureStore;
 	/** The tree's note, for the pictures. */
 	sourcePath?: string;
+	/** The relation options (the setting "Assume an unknown second parent"): the note about the first heir names a relation. */
+	relationOptions?(): FirstHeirNoteInput['options'];
 }
 
 /** What the window does with a section it made. */
@@ -617,15 +620,12 @@ export function successionSection(host: SectionHost): SuccessionView {
 		head.createEl('b', { cls: 'dynasty-succ-heading', text: T.lineAfter(rulerLabel(ruler, res.year), y), attr: { role: 'heading', 'aria-level': '3' } });
 		// Show works for a line, also an empty one.
 		textButton(head, ['dynasty-btn', 'dynasty-succ-show'], T.show, () => host.guard(() => host.show()), { icon: 'eye', label: T.showLabel, focus: 'succ-show' });
-		const note = (parent: HTMLElement, text: string, name: string, warn = false) => {
-			// A warning is a quiet roman text line in the text colour (D218 item 4), with no sign (quiet-warnings): the words carry the warning.
-			parent.createDiv({ cls: warn ? ['dynasty-succ-note', 'is-warning'] : ['dynasty-succ-note'], attr: { 'data-note': name }, text });
-		};
 		const notes = res.notes.map((n) => ({ n, text: noteText(n) })).filter((x): x is { n: SuccessionNote; text: string } => x.text !== null);
 		// The holder who holds through the spouse comes first, then the other holders; each note that belongs to a row stands under that row.
 		for (const x of notes) if (x.n.kind === 'through-spouse') note(box, x.text, x.n.kind);
 		if (res.coRulers.length) note(box, T.coRulers(res.coRulers.length + 1, rulerLabel(ruler, res.year), y), 'co-rulers');
 		for (const x of notes) if (x.n.kind === 'co-rulers-not-in-line') note(box, x.text, x.n.kind);
+		firstHeirNote(box, { g, res, spec: draftSpec(d), options: host.relationOptions?.(), nameOf, rulerLabel: (id) => (id === ruler ? rulerLabel(id, res.year) : nameOf(id)) });
 		for (const n of res.noYear) {
 			if (n.what !== 'reign') continue;
 			const entry = n.entry === undefined ? undefined : host.row.holders[n.entry];

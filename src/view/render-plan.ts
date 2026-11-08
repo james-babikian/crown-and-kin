@@ -179,7 +179,7 @@ export function planRender(inputs: RenderInputs): { plan: RenderPlan; stateChang
 	if (!parsed.ok) return none(inputs.full ? { kind: 'invalid-full' } : { kind: 'error', error: parsed.error });
 	// Spec §7.7 (size limits): the people are counted right after the parse, before the derive, the relations and the layout.
 	const count = peopleCount(parsed.tree);
-	// "Warn about more than 2 parents of a type". The derive is not cached (`parse-cache.ts`), so the setting needs no cache key.
+	// "Warn about more than 2 parents". The derive is not cached (`parse-cache.ts`), so the setting needs no cache key.
 	const whole = deriveFamilies(parsed.tree, { warnManyParents: inputs.settings.warnManyParents, ...(inputs.dates ? { dates: inputs.dates } : {}) });
 	const derived: Derived = { tree: parsed.tree, count, whole, t1: inputs.clock() };
 	if (!whole.people.length && !whole.issues.some((i) => i.level === 'blocking')) return none({ kind: 'empty', ...derived });

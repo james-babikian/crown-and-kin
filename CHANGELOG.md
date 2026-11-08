@@ -2,6 +2,78 @@
 
 All notable changes for users. The newest version is first.
 
+## 0.5.3
+
+### Repairs
+
+- **"Save as picture" (PNG) now uses the font of your notes.** Before, a font from a CSS snippet showed in the tree. The PNG showed a standard font, and a long name could be wider than its card. If the plugin cannot read the font file, the PNG uses a standard font, and the cards are wide enough for that font.
+- **On Android, the bars of the windows no longer go behind the status bar of the phone.** Before, Cancel, Save and the search field of a person list were behind the clock. On an iPhone, nothing changes.
+- **Esc now also closes the legend when you opened it with the mouse.**
+- **The hint above the problem list now says "Select Open next to a problem to correct it."** Before, it named an "Open button", but the problem row shows a link.
+- **In the window of a new person, the hint in the Name field now shows in full.** Before, on a phone, the plugin cut the hint "For example: Edmund Vane". Now Name and Sobriquet have a row each.
+- **On a phone, a long house name at the top of the person window now uses two text lines.** The title and the years move down below the house name. Before, the house name ran over the title.
+- **In the phone list, the pictures in the row of the person marked "This is me" now line up with the pictures in the other rows.** Before, they stood 8 pixels further to the right.
+- **When you open a menu from a bar, no small hint text (a tooltip) stays over the menu.** Before, a tooltip could cover the first item of the More menu.
+
+### Tree
+
+- **On a phone, the relation view now shows both people that you chose.** The first view zooms out until both cards are on the screen. For this, the card text can be smaller than the 12-pixel minimum of 0.5.2. If very many people stand between the two people, the plugin does not zoom out so far. Then the second person can be off the screen. Before, one of the two cards could be outside the screen.
+- **When you show a line of succession, the heirs keep their numbers when you zoom out.** At a middle zoom level, each heir card has a small ring with its number, for example "1". On a computer and on a tablet, the ring also shows at the smallest zoom level. A phone shows no ring at that level. At the largest zoom level, the card keeps its label, for example "1st". Before, the numbers showed only at the largest zoom level.
+- **In the legend, the row "Illegitimate child (no dashed line)" now stands directly under "Illegitimate child".** So the two rows about illegitimate children are together. The legend of a saved picture uses the same order. Before, the row stood last in the group "Lines".
+- **A screen reader now says "born" and "died" for the years of a card.** For example, "Roderick Valmont, born 1131, died 1161". The card still shows "b." and "d.".
+- **When you add the first person to an empty tree, the plugin now removes its own help comment.** This is the text line `# To add the first person, select "Add first person" in Reading view or Live Preview.` The plugin removes only this exact text line. Your own comments stay.
+
+### Begetter: a new type of parent
+
+- **A parent can now have the type "Begetter".** A begetter is a parent by blood who does not raise the child as a parent in the family. For example, two women are married and have a child. A man is the father of the child by blood. He is the begetter. The same type is for a woman who is the mother by blood of a child of a couple of two men.
+- **To add a begetter, choose "Begetter" as the type of parent.** Add parent and Add child show it with the other types. In the Family section, you can also change "Type of parent" next to a parent. In the tree text, write `{id: oswin, type: begetter}`. Here "oswin" is the ID of the begetter.
+- **An older version of the plugin reads "begetter" as a birth parent, with a warning.** It draws the begetter as a normal birth parent and names the begetter "Father".
+- **The tree draws a begetter with a thin orange line of long and short dashes.** The line goes in a curve from the begetter to the child. It has no marriage dot and no line to the mother of the child. The line uses the orange of your theme, in light mode and in dark mode. The legend shows it as "Begetter: a parent by blood, not a parent in the family".
+- **The relation names follow the blood relation.** The child sees the begetter as "Begetter". The begetter sees the child as "Begotten son", "Begotten daughter" or "Begotten child". The parents of the begetter are grandparents of the child.
+- **The other children of the begetter are brothers and sisters, or half-brothers and half-sisters.** A child of the begetter who has the same other parent by blood is a brother or a sister. A child of the begetter with other parents is a half-brother or a half-sister.
+- **The wife or the husband of a begetter is "Begetter's wife" or "Begetter's husband", not "Stepmother" or "Stepfather".** The phone list uses the same words.
+- **The titles of a begetter do not pass to the child.** The child is not in the line of succession of the begetter. The child still inherits through a birth parent. The child also inherits through an adoptive parent, if the title lets adopted children inherit. The hint in the rules of a title now says "No claim passes through a guardian, a rumoured parent or a begetter."
+- **A person can have at most 2 parents by blood. Birth parents and begetters count together.** The windows do not let you add a third. If the setting "Warn about more than 2 parents" is on, a tree text with more parents by blood gives a warning. Before, the name of this setting was "Warn about more than 2 parents of a type".
+
+### Relation names
+
+These repairs change names mostly in trees with rumoured parents. The first repair also changes names in a tree where a child lists three birth or adoptive parents. The last repair is different. It changes the steps in the relation view. This happens in two cases. One case is a tree with adopted children. The other case is a tree where the same two people have a marriage and also an affair or concubinage. You do not need to do anything. The tree text in your notes does not change. The plugin corrects the names and the steps by itself.
+
+- **The order of three parents in the tree text no longer changes the names of other people.** Before, the order of the three parents could decide whether two of them counted as partners. Now the order never decides. For example, two women each have a child, and each woman adopts the child of the other. A third child lists these two women and one more parent. Before, the first child could see the second child as "Adoptive brother". Now the name is "Adoptive half-brother", because nothing in the tree says that the two women are partners.
+- **A rumour no longer removes a sure relation by marriage.** For example, a person who is a rumoured father and a rumoured half-uncle now also keeps "Uncle by marriage".
+- **A rumour no longer adds a false "half" to a name.** For example, a mother has a son, and her husband adopts him. The son is a brother of their other children. For the son, the rumoured grandchild of one of those other children is now a "Rumoured great-nephew", not a "Rumoured half-great-nephew".
+- **A rumoured mother who is the wife of the father is no longer also a "Stepmother".** The person window now names her "Rumoured mother" and "Father's wife". From her side, it says, for example, "Rumoured son" and "Husband's son".
+- **A former sister-in-law now has one name.** For example, the person window shows "Former sister-in-law" only, not also "Rumoured former sister-in-law".
+- **A husband no longer has a rumoured name that his wife does not have.** For example, the person window of the husband shows "Wife's rumoured half-great-nephew" only if the person window of the wife shows "Rumoured half-great-nephew".
+- **The steps in the relation view now agree with the relation name.** If a marriage makes the relation, the steps name the marriage, not an affair of the same two people. If the name has no "adoptive", the steps go through the birth parent, not the adoptive parent.
+
+### Titles, Houses and lists
+
+- **After Save in the Titles window or the Houses window, a message with Undo now shows.** For example, "The plugin saved the title Lord of Testmark." Before, the window closed with no message.
+- **A new title now has the button "Save and show" in its Line section.** It is a small button at the right of the sentence "Save the title first. Then you can show the line of succession.", like the button Show of a saved title. It saves the title and shows its line of succession on the tree.
+- **When you add a title or a house, the new page now opens with no cursor in a field.** On a phone, the keyboard does not open until you tap a field.
+- **On a phone, the ID window now shows the full name of the title or the house above the field.** The name is the label of the field, and a long name uses more text lines. The bar says only "ID". Before, the bar said "ID of" and the name, and the plugin cut a long name, for example "ID of House Valmont of the ce…".
+- **The row "A holder who is not in the tree" now stays under the list of people.** It is always on the screen. Before, it stood at the end of a long list.
+- **The bar of a line of succession now also names the rule.** For example, "Line of succession: Lord of Testmark, 1203 · Eldest child first (primogeniture)". The rule is in grey text, so the title and the year are easier to see. On a phone, the bar shows the full text on up to 3 text lines.
+- **If the first heir is not a child of the ruler, a short text line above the heirs now says why.** The text line shows only when the plugin is sure of the reason. For example, "Konrad VI has no child in the tree. So the first place in the line goes to Jadwiga, the sister of Konrad VI."
+
+### Windows
+
+- **Name and Sobriquet now have a row each in every person window.** Before, only the window of a new person had this form. In the window of a person in the tree, the two fields shared one row.
+- **After you change the type of a parent, the person window now shows a text line with Undo.** For example, "The plugin changed Aldric from a rumoured parent to a birth parent of Edric." Before, no text showed.
+- **A message with an Undo button no longer ends with "You can undo this."** For example, this was the case after you removed a parent or a partner. The button already says it.
+- **The link "Show the line" in the person window now shows only when there is a line to show.** Before, it also showed for a person with no relation to the person marked "This is me".
+- **A screen reader now reads the link that removes an era as "Remove this era:", then the name of the era.** This is the same form as the link that removes a calendar.
+
+### Known limits
+
+- **On a phone, the ring with the number of an heir can cover a small part of the card above the heir.** The name on that card stays readable.
+- **In a tree in a note, you must scroll the open legend to see its last row.** The new Begetter row makes the legend a little taller than the space for a tree in a note. The last row is "Counted as dead". In full screen, the whole legend shows.
+
+### Also in 0.5.2
+
+- **Version 0.5.2 also repaired the order of the parts of names that mix Arabic or Hebrew letters with Latin letters.** Before, the parts of such a name could show in the wrong order. This applies to the cards, the lists and the windows, also on an iPhone. The release text of 0.5.2 did not name this repair.
+
 ## 0.5.2
 
 ### Repairs

@@ -209,8 +209,9 @@ describe('draft and Save (spec §6.10, D32)', () => {
 		backToList(content);
 		dispatch(content.querySelector('.dynasty-house-add')!, 'click');
 		const fresh = pageOf(content);
-		// The new name field has the focus; the new house takes the first colour no house uses (D32).
-		expect(fakeDoc.activeElement).toBe(fresh.querySelector('textarea'));
+		// No field has the focus (D320): the user taps the name field. The new house takes the first colour no house uses (D32).
+		expect(fakeDoc.activeElement).toBe(backButton(content));
+		expect(fakeDoc.activeElement).not.toBe(fresh.querySelector('textarea'));
 		expect(fresh.querySelectorAll('.dynasty-house-colour').filter((c) => c.getAttribute('aria-pressed') === 'true').map((c) => c.getAttribute('data-colour'))).toEqual([P[0]]);
 		type(fresh.querySelector('textarea')!, 'House Harrow');
 		expect(handle.write).not.toHaveBeenCalled();
@@ -229,8 +230,8 @@ describe('draft and Save (spec §6.10, D32)', () => {
 		expect(handle.body).toContain('name: House Orsini of Vel');
 		expect(handle.body).toContain(`name: House Harrow\n    color: "${P[0]}"`);
 		expect(housesWindows()).not.toContain(win);
-		// No house was deleted: no Notice.
-		expect(notices).toEqual([]);
+		// D334 Q4: no house was deleted, so the Notice says what Save wrote: three houses, with Undo.
+		expect(notices).toEqual([HOUSES.saved(['House Valmont', 'House Orsini of Vel', 'House Harrow'])]);
 	});
 
 	it('a colour from "Other colour" is written as #rrggbb', async () => {

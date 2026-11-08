@@ -665,11 +665,12 @@ describe('arms in the draft (spec §13.6)', () => {
 });
 
 describe('Add', () => {
-	it('clears the query, opens the page of the new house with the focus on its name, and the row shows New', async () => {
+	it('clears the query, opens the page of the new house with no field focused (D320), and the row shows New', async () => {
 		const { content } = open();
 		searchFor(content, 'orsini');
 		await click(content.querySelector('button[data-focus="add"]'));
-		expect(active()).toBe('name:h12');
+		expect(active()).toBe('back');
+		expect(['input', 'textarea', 'select']).not.toContain(fakeDoc.activeElement?.tag);
 		expect(backButton(content)).not.toBeNull();
 		expect(content.querySelector('.dynasty-lw-back-name')!.getText()).toBe(HOUSES.newHouse);
 		backToList(content);

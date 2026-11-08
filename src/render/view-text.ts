@@ -45,7 +45,7 @@ export function problemsPopupLine(count: number): string {
 export const PROBLEMS_POPUP_BUTTON = 'Show in full screen';
 
 /** Hint text shown above the problem list. */
-export const PROBLEMS_HINT = 'Select a problem to show the people it is about. Use the Open button to correct it.';
+export const PROBLEMS_HINT = 'Select a problem to show the people it is about. Select Open next to a problem to correct it.';
 
 /** D330 UX-20: the second action of a problem row; `target` is the name of the house or the person that the problem is about. */
 export const PROBLEMS_OPEN = {
@@ -193,7 +193,7 @@ export const PHONE_LIST_UI = {
 /**
  * D210: the kind of parent link seen from the person at the top of the phone list, as the first item of a row's text line. The words are those of
  * the relation finder's steps (`parentStepWord`, `childStepWord` in `core/relations.ts`) in capital form; the order is male, female, other. A birth
- * parent has a word only when the person also has an adoptive parent; a birth child has none.
+ * parent has a word only when the person also has an adoptive parent; a birth child has none. D332: a begetter and a begotten child have their own words.
  */
 export const LINK_WORDS = {
 	parent: {
@@ -201,11 +201,13 @@ export const LINK_WORDS = {
 		adoptive: ['Adoptive father', 'Adoptive mother', 'Adoptive parent'],
 		ward: ['Guardian', 'Guardian', 'Guardian'],
 		rumoured: ['Rumoured father', 'Rumoured mother', 'Rumoured parent'],
+		begetter: ['Begetter', 'Begetter', 'Begetter'],
 	},
 	child: {
 		adoptive: ['Adopted son', 'Adopted daughter', 'Adopted child'],
 		ward: ['Ward', 'Ward', 'Ward'],
 		rumoured: ['Rumoured son', 'Rumoured daughter', 'Rumoured child'],
+		begetter: ['Begotten son', 'Begotten daughter', 'Begotten child'],
 	},
 } as const;
 

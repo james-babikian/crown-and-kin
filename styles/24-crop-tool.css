@@ -54,7 +54,7 @@
 }
 
 .dynasty-crop.is-phone .dynasty-crop-title {
-	padding-top: max(var(--dynasty-space-2), env(safe-area-inset-top));
+	padding-top: max(var(--dynasty-space-2), var(--dynasty-safe-top));
 }
 
 .dynasty-crop-body {
@@ -238,11 +238,11 @@
 .dynasty-crop.is-phone .dynasty-crop-bar {
 	box-sizing: border-box;
 	width: 100%;
-	padding-left: max(var(--dynasty-space-4), env(safe-area-inset-left));
-	padding-right: max(var(--dynasty-space-4), env(safe-area-inset-right));
+	padding-left: max(var(--dynasty-space-4), var(--dynasty-safe-left));
+	padding-right: max(var(--dynasty-space-4), var(--dynasty-safe-right));
 }
 
 .dynasty-crop.is-phone .dynasty-crop-bar {
 	margin-top: auto;
-	padding-bottom: env(safe-area-inset-bottom);
+	padding-bottom: var(--dynasty-safe-bottom);
 }

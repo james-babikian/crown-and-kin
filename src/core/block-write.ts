@@ -31,11 +31,11 @@ export type PlanWrite = (
 /**
  * What a write changed, kept with its undo entry so the words after an Undo can say it (D330 UX-17). Core keeps the facts; the wording is in the text tables.
  * `names` are the names that the words show, in the order of the words: a person's change `[person]`, an added child `[child, parents]` (parents already joined),
- * an added parent `[parent, child]` (a third name: the other parent of the marriage that the write also added), an added partner `[partner, other]`,
- * a deleted person and the two marks "This is me" `[person]`. `type` is the parent type of an added parent or child.
+ * an added parent `[parent, child]` (a third name: the other parent of the marriage that the write also added), an added partner `[partner, other]`, a changed parent type `[parent, child]` (`type`: the type before the change),
+ * a deleted person and the two marks "This is me" `[person]`. `type` is the parent type of an added parent or child, and the old type of a changed parent type.
  */
 export interface UndoLabel {
-	kind: 'change' | 'added-child' | 'added-parent' | 'added-partner' | 'deleted' | 'marked-me' | 'unmarked-me';
+	kind: 'change' | 'added-child' | 'added-parent' | 'added-partner' | 'changed-parent-type' | 'deleted' | 'marked-me' | 'unmarked-me';
 	names: readonly string[];
 	type?: string;
 }

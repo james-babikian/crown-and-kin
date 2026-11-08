@@ -18,6 +18,10 @@ const SAMPLES: Record<IssueCode, IssueParams> = {
 	'missing-me': { ref: 'roderik' },
 	'me-not-id': {},
 	'too-many-parents': { person: 'Joss Ashford', type: 'birth', count: 3, limit: 2 },
+	// D332: the parents by blood (birth parents and begetters).
+	'too-many-blood-parents': { person: 'Ada Merrow', count: 3, limit: 2 },
+	'begetter-is-birth-parent': { person: 'Ada Merrow', parent: 'Oswin Thorne' },
+	'begetter-married-to-parent': { person: 'Ada Merrow', parent: 'Oswin Thorne', partner: 'Isaut Merrow' },
 	'union-partner-count': { union: '#3', partners: ['Joss Ashford', 'Maren Holt', 'Piers Ashford'], count: 3 },
 	'union-same-partner': { union: '#4', partners: ['Tilda Ashford', 'Tilda Ashford'], person: 'Tilda Ashford' },
 	cycle: { people: ['Arn Marsh', 'Bram Marsh', 'Col Marsh'], dropped: 'Arn Marsh', parent: 'Col Marsh' },
@@ -90,6 +94,8 @@ const MOST_SENTENCES: Partial<Record<IssueCode, number>> = {
 	'unknown-parent-type': 3,
 	'union-partner-count': 3,
 	'too-many-parents': 3,
+	'begetter-is-birth-parent': 3,
+	'begetter-married-to-parent': 4,
 	'through-spouse-no-partner': 3,
 	'through-spouse-no-marriage': 3,
 	'through-spouse-no-claim': 4,
@@ -115,7 +121,8 @@ const MOST_SENTENCES: Partial<Record<IssueCode, number>> = {
 
 /** Texts whose first sentence is a description of 21 to 25 words (STE allows 25 for a description; D205 words). */
 // ruling 4.2 fix: the first sentence of calendar-note-missing is 15 words and holds the link, which the sample makes 5 words.
-const LONG_SENTENCE: IssueCode[] = ['through-spouse-no-claim', 'through-spouse-several-claims', 'calendar-note-missing'];
+// D332: the second sentence of begetter-married-to-parent describes the begetter in 24 words (the clarity editor's text).
+const LONG_SENTENCE: IssueCode[] = ['through-spouse-no-claim', 'through-spouse-several-claims', 'calendar-note-missing', 'begetter-married-to-parent'];
 
 /** Picture warnings name a picture file, which is not a note, so the word list allows "file" there (spec §13.6). */
 const FILE_WORD: IssueCode[] = ['missing-picture', 'picture-not-image'];

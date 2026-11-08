@@ -210,7 +210,7 @@
 }
 
 .dynasty-sheet.is-phone .dynasty-picture-intro {
-	padding: var(--dynasty-space-2) max(var(--dynasty-space-4), env(safe-area-inset-left)) var(--dynasty-space-1);
+	padding: var(--dynasty-space-2) max(var(--dynasty-space-4), var(--dynasty-safe-left)) var(--dynasty-space-1);
 }
 
 .dynasty-picture-searchbar {
@@ -221,8 +221,8 @@
 }
 
 .dynasty-sheet.is-phone .dynasty-picture-searchbar {
-	padding-left: max(var(--size-4-3), env(safe-area-inset-left));
-	padding-right: max(var(--size-4-3), env(safe-area-inset-right));
+	padding-left: max(var(--size-4-3), var(--dynasty-safe-left));
+	padding-right: max(var(--size-4-3), var(--dynasty-safe-right));
 }
 
 .dynasty-picture-picker .dynasty-sheet-body {

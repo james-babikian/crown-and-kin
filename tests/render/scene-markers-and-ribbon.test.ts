@@ -113,8 +113,11 @@ describe('scene: D25 legend', () => {
 		const rows = list.children.filter((c) => c.hasClass('dynasty-legend-row'));
 		// 0.2.8: after the sign row come the two dead signs (I19).
 		expect(rows).toHaveLength(LEGEND_ORDER.length + 3);
-		expect(rows[LEGEND_ORDER.length].hasClass('dynasty-legend-sign')).toBe(true);
-		LEGEND_ORDER.forEach((kind, i) => {
+		// D338 point 7: the sign row stands directly under "Illegitimate child".
+		const signAt = LEGEND_ORDER.indexOf('illegitimate') + 1;
+		expect(rows[signAt].hasClass('dynasty-legend-sign')).toBe(true);
+		LEGEND_ORDER.forEach((kind, n) => {
+			const i = n < signAt ? n : n + 1;
 			expect(all(rows[i]).some((e) => e.hasClass(`dynasty-line-${kind}`)), kind).toBe(true);
 			for (const e of all(rows[i])) for (const k of ['fill', 'stroke', 'style']) expect(e.attrs.has(k), `${kind} ${e.tag} ${k}`).toBe(false);
 		});

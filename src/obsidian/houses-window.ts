@@ -931,7 +931,7 @@ export class HousesWindow extends ListEditWindow {
 			return;
 		}
 		this.finish();
-		this.undoAfterWrite(h, out, ops, deleted, HOUSES.deleted);
+		this.undoAfterWrite(h, out, ops, deleted, HOUSES);
 	}
 
 	private failed(out: Exclude<HandleWriteOutcome, { ok: true }>): void {

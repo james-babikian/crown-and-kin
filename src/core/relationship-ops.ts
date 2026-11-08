@@ -10,7 +10,8 @@ import { deriveFamilies, type FamilyGraph } from './derive';
 import type {
 	AddParent, AddPerson, AddUnion, DeletePerson, EditResult, EditUnion, MoveSibling, ParentKind, Placement, RemoveParent, RemoveUnion, SetParentType, UnionRef,
 } from './edit';
-import { descendantsOf, siblingGroup, writtenParents } from './family-query';
+import { bloodRefusal } from './blood-parents';
+import { descendantsOf, siblingGroup, validKeys, writtenParents } from './family-query';
 import { newIdIn } from './id-gen';
 import { parseBody, readTree, textWithoutComments } from './parse';
 import { dropHolderPatches, dropHolders, dropIdPatches, dropIds } from './title-ops';
@@ -18,10 +19,10 @@ import { isEmpty, isMap as isRawMap, isRawList, list, str, unwrapCurly, type Raw
 import { ENDED_BY, isParentType, isPlacementType, isUnionType, PARENT_LIMIT, parentKind, PLACEMENT_TYPES, readEndedBy, type Tree } from './types';
 import { dashOf, flowComment, insertItem, itemEnd, itemStart, removeFromSection, removeItems, section, type Where } from './yaml-list';
 import {
-	addPair, clone, commentsOf, doubleQuoted, findPair, finish, finishTogether, flowInsertAfter, insertAt, isBooleanField, isRefusal, layoutOf, PERSON_FIELDS, PERSON_ORDER, personNode, personValue,
-	QUOTED_FIELDS, refuse, removePair, renderScalar, setPairValue, TEXT_FIELDS, topMap, type Parsed, type Patch, type Refusal, Source, type Step,
+	addPair, clone, commentsOf, doubleQuoted, findPair, finish, finishTogether, flowInsertAfter, insertAt, isBooleanField, isRefusal, layoutOf, PERSON_FIELDS, PERSON_ORDER, personNode, personValue, QUOTED_FIELDS, refuse, removePair, renderScalar, setPairValue, TEXT_FIELDS, topMap, type Parsed, type Patch, type Refusal, Source, type Step,
 } from './yaml-patch';
 import { REFUSAL_TEXT } from './refusal-text';
+import { helpLineRemoval } from './help-comment';
 
 /** The parsed body, its family graph, and other state a relationship op needs to run. */
 interface OpContext {
@@ -136,6 +137,20 @@ function mapPatches(src: Source, map: YAMLMap, changes: FieldChange[], order: st
 // ---------------------------------------------------------------------------------------------
 // Ops
 
+/** The parents of a new person (Add person): each names a person once per type, of a known type, within `PARENT_LIMIT` and the limit by blood (D332). */
+function parentsRefusal(ctx: OpContext, parents: NonNullable<AddPerson['parents']>): Refusal | undefined {
+	const seen = new Set<string>();
+	for (const r of parents) {
+		if (!r || refIndex(ctx, r.id) === undefined) return refuse('unknown-person', typeof r?.id === 'string' ? r.id : undefined);
+		if (!isParentType(r.type)) return refuse('bad-value', REFUSAL_TEXT.unknownParentType);
+		if (seen.has(`${r.id}\0${r.type}`)) return refuse('bad-value', 'The same parent is given twice.');
+		seen.add(`${r.id}\0${r.type}`);
+		const bad = parents.filter((x) => x.type === r.type).length > PARENT_LIMIT[r.type] ? refuse('limit') : bloodRefusal(parents.filter((x) => x !== r), r.id, r.type);
+		if (bad) return bad;
+	}
+	return undefined;
+}
+
 function addPerson(ctx: OpContext, op: AddPerson): EditResult {
 	const { data, tree } = ctx;
 	if (typeof op.id !== 'string' || str(op.id) !== op.id) return refuse('bad-value', REFUSAL_TEXT.newIdText);
@@ -153,14 +168,8 @@ function addPerson(ctx: OpContext, op: AddPerson): EditResult {
 	}
 
 	const parents = Array.isArray(op.parents) ? op.parents : [];
-	const seen = new Set<string>();
-	for (const r of parents) {
-		if (!r || refIndex(ctx, r.id) === undefined) return refuse('unknown-person', typeof r?.id === 'string' ? r.id : undefined);
-		if (!isParentType(r.type)) return refuse('bad-value', REFUSAL_TEXT.unknownParentType);
-		if (seen.has(`${r.id}\0${r.type}`)) return refuse('bad-value', 'The same parent is given twice.');
-		seen.add(`${r.id}\0${r.type}`);
-		if (parents.filter((x) => x.type === r.type).length > PARENT_LIMIT[r.type]) return refuse('limit');
-	}
+	const badParent = parentsRefusal(ctx, parents);
+	if (badParent) return badParent;
 
 	const where = placement(ctx, op.at);
 	if (isRefusal(where)) return where;
@@ -208,7 +217,8 @@ function addPerson(ctx: OpContext, op: AddPerson): EditResult {
 		const node = unionNode(p, chosen!.index);
 		return isRefusal(node) ? node : [item, ...mapPatches(p.src, node, [{ key: 'id', write: named.id, text: true }], UNION_ORDER)];
 	};
-	return finish(ctx.first, [step], expected, [op.id]);
+	// D335: the first person of a tree takes the help comment of "Insert family tree" away, in the same write.
+	return finish(ctx.first, tree.people.length === 0 ? [step, helpLineRemoval] : [step], expected, [op.id]);
 }
 
 /** Where a new person goes (§6.2), as a position in `people`. */
@@ -249,8 +259,8 @@ function addParent(ctx: OpContext, op: AddParent): EditResult {
 	if (op.parent === op.child || descendantsOf(g, op.child).has(op.parent)) return refuse('cycle');
 	const current = writtenParents(g, op.child);
 	const same = current.filter((r) => r.type === op.type);
-	if (same.some((r) => r.id === op.parent)) return refuse('bad-value', REFUSAL_TEXT.alreadyParent);
-	if (same.length >= PARENT_LIMIT[op.type]) return refuse('limit');
+	const full = same.some((r) => r.id === op.parent) ? refuse('bad-value', REFUSAL_TEXT.alreadyParent) : same.length >= PARENT_LIMIT[op.type] ? refuse('limit') : bloodRefusal(current, op.parent, op.type);
+	if (full) return full;
 	const chosen = op.union === undefined ? undefined : resolveUnion(ctx, op.union);
 	if (isRefusal(chosen)) return chosen;
 
@@ -258,7 +268,7 @@ function addParent(ctx: OpContext, op: AddParent): EditResult {
 	const person = (expected.people as RawMap[])[childIndex];
 	person.parents = [...rawParents(person), entryRaw(op.parent, op.type)];
 
-	// §6.4: two birth or two adoptive parents with no union between them get a marriage.
+	// §6.4: two birth or two adoptive parents with no union between them get a marriage; a begetter never does (D332).
 	const other = same[0]?.id;
 	const auto = op.autoUnion !== false && (op.type === 'birth' || op.type === 'adoptive') && other !== undefined && !g.unions.some((u) => !u.implicit && u.partners.includes(other) && u.partners.includes(op.parent));
 	if (auto) expected.unions = [...(isRawList(expected.unions) ? expected.unions : []), { partners: [other, op.parent], type: 'marriage' }];
@@ -543,17 +553,6 @@ function staleKeys(ctx: OpContext, expected: RawMap, people: Iterable<number>, g
 	return out;
 }
 
-/** The `placement` and `union` values of a person that are valid in this graph. */
-function validKeys(g: FamilyGraph, id: string): { placement?: string; union?: string } {
-	const person = g.byId.get(id);
-	const out: { placement?: string; union?: string } = {};
-	if (!person) return out;
-	if (person.placement !== undefined && writtenParents(g, id).some((r) => r.type === person.placement)) out.placement = person.placement;
-	const key = g.primaryUnion.get(id);
-	if (person.union !== undefined && key !== undefined && g.unionByKey.get(key)?.id === person.union) out.union = person.union;
-	return out;
-}
-
 /**
  * The stale-key rule for a batch, judged once on its final data: a `placement` or `union` that
  * was valid before the batch, still has the same value, and is stale after it goes. A key the
@@ -652,9 +651,11 @@ function setParentType(ctx: OpContext, op: SetParentType): EditResult {
 	const { match, seq, pair } = matchingEntries(ctx.first, item, op.parent, op.from);
 	if (!match.length) return refuse('bad-value', `${op.parent} is not a ${op.from} parent.`);
 	if (op.from === op.to) return { ok: true, body: ctx.first.src.text, created: [] };
-	const current = writtenParents(ctx.g, op.child).filter((r) => r.type === op.to);
-	if (current.some((r) => r.id === op.parent)) return refuse('bad-value', REFUSAL_TEXT.alreadyParent);
-	if (current.length >= PARENT_LIMIT[op.to]) return refuse('limit');
+	// The other links of the child: the changed link is left out (D332).
+	const others = writtenParents(ctx.g, op.child).filter((r) => r.id !== op.parent || r.type !== op.from);
+	const current = others.filter((r) => r.type === op.to);
+	const full = current.some((r) => r.id === op.parent) ? refuse('bad-value', REFUSAL_TEXT.alreadyParent) : current.length >= PARENT_LIMIT[op.to] ? refuse('limit') : bloodRefusal(others, op.parent, op.to);
+	if (full) return full;
 
 	const src = ctx.first.src;
 	const expected = clone(ctx.data) as RawMap;

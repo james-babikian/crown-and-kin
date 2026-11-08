@@ -37,7 +37,7 @@ describe('Titles and Houses (P3-01, P3-11)', () => {
 describe('the pickers (P3-04, P3-05, P3-06, F07)', () => {
 	it('the hint of the relation finder and its title start on the edge of the names: 8 px in from the window padding', () => {
 		const head = rule(picker, '.dynasty-picker.is-phone.has-phone-title .dynasty-picker-head');
-		expect(head).toMatch(/padding: [^;]*calc\(max\(var\(--dynasty-space-4\), env\(safe-area-inset-left\)\) \+ var\(--dynasty-space-2\)\)/);
+		expect(head).toMatch(/padding: [^;]*calc\(max\(var\(--dynasty-space-4\), var\(--dynasty-safe-left\)\) \+ var\(--dynasty-space-2\)\)/);
 	});
 
 	it('the quiet plus keeps a 20 px column on the phone too', () => {

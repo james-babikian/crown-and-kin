@@ -97,11 +97,11 @@
 }
 
 .dynasty-full .dynasty-large-viewport {
-	padding-top: calc(env(safe-area-inset-top, 0px) + 44px + var(--size-4-4));
+	padding-top: calc(var(--dynasty-safe-top) + 44px + var(--size-4-4));
 }
 
 .modal.dynasty-fullscreen.is-phone-side .dynasty-full .dynasty-large-viewport,
 .modal.dynasty-fullscreen.is-phone .dynasty-full .dynasty-large-viewport {
-	padding-top: max(var(--size-4-4), env(safe-area-inset-top));
-	padding-bottom: calc(52px + env(safe-area-inset-bottom) + var(--size-4-4));
+	padding-top: max(var(--size-4-4), var(--dynasty-safe-top));
+	padding-bottom: calc(52px + var(--dynasty-safe-bottom) + var(--size-4-4));
 }

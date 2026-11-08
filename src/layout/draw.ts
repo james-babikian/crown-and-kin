@@ -176,7 +176,7 @@ export function drawDescent(plan: Plan, g: FamilyGraph, hp: HangPoints, nets: Up
 	const rumours: Rumour[] = [];
 	const dropKind = (k: string): StrokeKind => {
 		const type = g.placementType.get(k);
-		if (type === 'adoptive' || type === 'ward' || type === 'rumoured') return type;
+		if (type === 'adoptive' || type === 'ward' || type === 'rumoured' || type === 'begetter') return type;
 		return g.byId.get(k)!.illegitimate ? 'illegitimate' : 'descent';
 	};
 	const dropEnd = (id: string, x: number): number => {

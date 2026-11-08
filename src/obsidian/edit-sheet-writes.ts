@@ -6,6 +6,7 @@
 import { Notice } from 'obsidian';
 import type { Op } from '../core/edit';
 import { nextPersonId } from '../core/id-gen';
+import { REFUSAL_TEXT } from '../core/refusal-text';
 import { readEndedBy } from '../core/types';
 import { newHouseId } from '../core/yaml-edit';
 import { NEW_SHEET, REMOVE, SHEET, UNION_EDIT, WRITE_TEXT, deleteText, unionTypeText } from '../render/ui-text';
@@ -247,7 +248,7 @@ export abstract class EditSheetWrites extends EditSheetActions {
 		onWriteFailed(out, {
 			stale: () => this.stale(h.body),
 			missing: () => this.refused(WRITE_TEXT.missing),
-			refused: (code) => {
+			refused: (code, detail) => {
 				if (code === 'unknown-person' && !this.isNew) this.markGone();
 				else if (code === 'blocked') {
 					new Notice(WRITE_TEXT.blocked);
@@ -257,6 +258,7 @@ export abstract class EditSheetWrites extends EditSheetActions {
 				else if (code === 'unknown-union' || code === 'unknown-person' || code === 'unknown-title' || code === 'unknown-holder' || code === 'id-taken') this.stale(h.body);
 				else if (code === 'cycle') this.refused(WRITE_TEXT.cycle);
 				else if (code === 'limit') this.refused(WRITE_TEXT.limit(this.limitType));
+				else if (code === 'bad-value' && detail === REFUSAL_TEXT.alreadyBloodParent) this.refused(WRITE_TEXT.alreadyBloodParent);
 				else if (code === 'no-sibling') this.refused(WRITE_TEXT.noSibling);
 				else this.refused(WRITE_TEXT.refused);
 			},
@@ -273,14 +275,17 @@ export abstract class EditSheetWrites extends EditSheetActions {
 		const pending = this.pendingOps();
 		if (pending === null) return null;
 		const all = [...pending, ...ops];
+		// A new house changes the list of the house field, which only a build gives; every other draft is shown in place.
+		const newHouse = this.draft.house === NEW_HOUSE;
 		// The refusal `limit` says which type is full: the text differs for a rumoured parent.
 		this.limitType = ops.map((op) => (op.kind === 'add-parent' ? op.type : op.kind === 'set-parent-type' ? op.to : undefined)).find((t) => t !== undefined);
 		const ids = idsFor(this.data, [this.data.person.id, ...opNames(all), ...holderNames(all)]);
 		this.writeIds = ids;
 		const out = await this.write(withIds(all, ids), highlight === null ? null : (ids.get(highlight) ?? highlight), false, extra);
 		if (!out) return null;
-		// 'in-place' is for a control that the user is using now. A write that carries field changes needs the full form again.
-		if (show === 'in-place' && pending.length === 0) this.showParentTypes(out.body, ids);
+		// 'in-place' is for a control that the user is using now: a build would take its select out of the page (iOS keeps the native list open),
+		// also when the write saved field changes (those fields already show what the user typed). Only a new house needs the full form.
+		if (show === 'in-place' && !newHouse) this.showParentTypes(out.body, ids);
 		else this.afterWrite(out.body, ids);
 		return { ...out, withFields: pending.length > 0 };
 	}

@@ -5,8 +5,8 @@ import { DEFAULT_SETTINGS, normaliseSettings } from '../../src/view/settings';
 // 0.2.8 P0: the stubs that later packages fill. They must exist, have their defaults and change nothing yet.
 
 describe('PARENT_LIMIT', () => {
-	it('has one limit for each parent type: birth, adoptive and ward 2, rumoured 8', () => {
-		expect(PARENT_LIMIT).toEqual({ birth: 2, adoptive: 2, ward: 2, rumoured: 8 });
+	it('has one limit for each parent type: birth, adoptive, ward and begetter 2, rumoured 8 (D332)', () => {
+		expect(PARENT_LIMIT).toEqual({ birth: 2, adoptive: 2, ward: 2, rumoured: 8, begetter: 2 });
 		expect(Object.keys(PARENT_LIMIT).sort()).toEqual([...PARENT_TYPES].sort());
 	});
 });

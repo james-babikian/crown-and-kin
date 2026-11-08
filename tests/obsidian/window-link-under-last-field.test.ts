@@ -1,7 +1,10 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import puppeteer, { type Browser, type Page } from 'puppeteer-core';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+
+// A browser closes slowly when several test files start browsers at once; the default 10 s hook limit then fails the file with no failed test.
+vi.setConfig({ hookTimeout: 60_000 });
 
 // Window review of the narrow-window repairs (D316): the real styles.css in a real Chrome, with hand-built DOM of the same shape as the plugin's.
 // Obsidian's own styles are not here (only the variables the plugin reads), so these tests check the plugin's rules, not a theme.

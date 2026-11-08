@@ -51,7 +51,9 @@ export const HOUSES = {
 	discardText: 'You did not save the changes to the houses.',
 	cannotOpen: 'The plugin cannot show the houses. The tree text has an error.',
 	needName: 'Enter a name for each house.',
-	deleted: (houses: string[]) => (houses.length === 1 ? `The plugin deleted ${isolateName(houses[0])}. You can undo this.` : `The plugin deleted ${houses.length} houses. You can undo this.`),
+	deleted: (houses: string[]) => (houses.length === 1 ? `The plugin deleted ${isolateName(houses[0])}.` : `The plugin deleted ${houses.length} houses.`),
+	/** D334 Q4: the Notice after Save, with Undo; a new house and a changed house read alike. */
+	saved: (houses: string[]) => (houses.length === 1 ? (/^house /i.test(houses[0].trim()) ? `The plugin saved ${isolateName(houses[0])}.` : `The plugin saved the house ${isolateName(houses[0])}.`) : `The plugin saved ${houses.length} houses.`),
 	stale: STALE_TEXT,
 	...SAVE_FAILED,
 } as const;
@@ -90,7 +92,7 @@ export const ID_UI = {
 	confirmLine: (item: string, from: string, to: string, places: string) => `${isolateName(item)}: the plugin changes the ID ${quote(from)} to ${quote(to)}. ${places}`,
 	change: (n: number) => (n === 1 ? 'Change the ID' : 'Change the IDs'),
 	keep: 'Do not change',
-	changed: (n: number) => (n === 1 ? 'The plugin changed the ID. You can undo this.' : `The plugin changed ${n} IDs. You can undo this.`),
+	changed: (n: number) => (n === 1 ? 'The plugin changed the ID.' : `The plugin changed ${n} IDs.`),
 	inUse: 'The plugin cannot save. An ID in this window is in use in the tree now. The note did not change. Your changes are still in the window.',
 	notAllowed: 'The plugin cannot save. An ID in this window has a character that is not allowed. The note did not change. Your changes are still in the window.',
 	anchor:
@@ -151,7 +153,9 @@ export const TITLES_UI = {
 	deleteHolders: (n: number) =>
 		n === 1 ? 'The plugin also removes the list of its 1 holder. The people stay in the tree.' : `The plugin also removes the list of its ${n} holders. The people stay in the tree.`,
 	deleteCards: (n: number) => (n === 1 ? '1 card then shows a different title or no title.' : `${n} cards then show a different title or no title.`),
-	deleted: (titles: string[]) => (titles.length === 1 ? `The plugin deleted ${isolateName(titles[0])}. You can undo this.` : `The plugin deleted ${titles.length} titles. You can undo this.`),
+	deleted: (titles: string[]) => (titles.length === 1 ? `The plugin deleted ${isolateName(titles[0])}.` : `The plugin deleted ${titles.length} titles.`),
+	/** D334 Q4: the Notice after Save, with Undo; a new title and a changed title read alike. */
+	saved: (titles: string[]) => (titles.length === 1 ? `The plugin saved the title ${isolateName(titles[0])}.` : `The plugin saved ${titles.length} titles.`),
 	// The table note (D55, D60).
 	makeNote: MAKE_NOTE_TEXT,
 	makeNoteLabel: (title: string) => `Make a note with this table: a note with the list of holders of ${title}`,
@@ -192,7 +196,7 @@ export const TITLES_UI = {
 	addTitleText: (name: string) => `Select a title for ${isolateName(name)}.`,
 	newTitleChoice: 'New title…',
 	newTitleDetail: 'Enter a title that is not in the tree.',
-	removed: (person: string, title: string) => `The plugin removed ${isolateName(person)} from the holders of ${isolateName(title)}. You can undo this.`,
+	removed: (person: string, title: string) => `The plugin removed ${isolateName(person)} from the holders of ${isolateName(title)}.`,
 	/** Added to the Delete person confirmation (D57). */
 	deleteHolder: (name: string, titles: number) =>
 		titles === 1 ? `The plugin also removes ${isolateName(name)} from the holders of 1 title.` : `The plugin also removes ${isolateName(name)} from the holders of ${titles} titles.`,
@@ -300,7 +304,14 @@ export const WRITE_TEXT = {
 	undoChanged: 'The plugin cannot undo the last tree edit. The tree changed after the edit.',
 	undoMissing: 'The plugin cannot find the tree of the last edit.',
 	cycle: 'The plugin cannot make this change. A person cannot be their own ancestor.',
-	limit: (type?: string) => (type === 'rumoured' ? 'The plugin cannot make this change. A person can have only 8 rumoured parents.' : 'The plugin cannot make this change. A person can have only 2 parents of each type.'),
+	limit: (type?: string) =>
+		type === 'rumoured'
+			? 'The plugin cannot make this change. A person can have only 8 rumoured parents.'
+			: type === 'birth' || type === 'begetter'
+				? 'The plugin cannot make this change. A person can have only 2 parents by blood. Birth parents and begetters count together.'
+				: 'The plugin cannot make this change. A person can have only 2 parents of each type.',
+	/** D332: the refusal `alreadyBloodParent`, shown when a person would be both a birth parent and a begetter of one child. */
+	alreadyBloodParent: 'The plugin cannot make this change. A person cannot be a birth parent and a begetter of the same child.',
 	noSibling: 'There is no sibling in that direction.',
 	needNameFirst: 'First, enter a name for this person.',
 } as const;

@@ -704,9 +704,10 @@ export abstract class EditSheetForm extends EditSheetPortrait {
 	protected detailsBody(body: HTMLElement): void {
 		const grid = body.createDiv({ cls: 'dynasty-grid' });
 		// UX-22: a new person has the one heading "New person"; the placeholder of the Name field says what to type.
-		this.textField(grid, 'name', SHEET.name, { autocapitalize: 'off', ...(this.isNew ? { placeholder: NEW_SHEET.namePlaceholder } : {}) });
+		// B-0064, D336: Name and Sobriquet have a row each in every person window, new or not (half a row on a phone, 171 px, cut a long name and the placeholder).
+		this.textField(grid, 'name', SHEET.name, { autocapitalize: 'off', wide: true, ...(this.isNew ? { placeholder: NEW_SHEET.namePlaceholder } : {}) });
 		// D122: the card adds the quote marks, so the hint says so; a sobriquet usually starts with a small letter.
-		this.textField(grid, 'sobriquet', SHEET.sobriquet, { autocapitalize: 'off', hint: SHEET.sobriquetHint });
+		this.textField(grid, 'sobriquet', SHEET.sobriquet, { autocapitalize: 'off', hint: SHEET.sobriquetHint, wide: true });
 		// D98: the hint points to the Titles section, which the window of a new person does not have.
 		this.textField(grid, 'title', SHEET.title, { autocapitalize: 'off', wide: true, ...(this.isNew ? {} : { hint: SHEET.titleHint }) });
 		this.houseField(grid);

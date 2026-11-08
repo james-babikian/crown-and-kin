@@ -64,7 +64,7 @@ export interface Batch {
 // ---- Relationship ops ----
 
 /** The parent types a parent entry can have (spec §4.2). */
-export type ParentKind = 'birth' | 'adoptive' | 'ward' | 'rumoured';
+export type ParentKind = 'birth' | 'adoptive' | 'ward' | 'rumoured' | 'begetter';
 /** The partnership types a union can have (spec §4.1). */
 export type UnionKind = 'marriage' | 'betrothal' | 'concubinage' | 'affair';
 

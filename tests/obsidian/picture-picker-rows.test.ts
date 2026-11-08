@@ -46,13 +46,13 @@ function rows(you: string | null) {
 
 describe('the rows of the picker', () => {
 	it('a plain Find row of the marked person keeps the word "You" in the second text line', () => {
-		expect(rows(null)[0]).toEqual({ sub: 'You · b. 1100', label: 'Ann, b. 1100, you', tip: null });
+		expect(rows(null)[0]).toEqual({ sub: 'You · b. 1100', label: 'Ann, born 1100, you', tip: null });
 	});
 
 	it('the marked row of the relation finder leaves the word out, and a spoken label names the relation', () => {
 		const [ann, bob] = rows('a');
-		expect(ann).toEqual({ sub: 'b. 1100', label: 'Ann, b. 1100, you', tip: null });
+		expect(ann).toEqual({ sub: 'b. 1100', label: 'Ann, born 1100, you', tip: null });
 		expect(bob?.sub).toBe('Child · 1130–1190 · Count');
-		expect(bob?.label).toBe('Bob, Count, 1130–1190, child');
+		expect(bob?.label).toBe('Bob, Count, born 1130, died 1190, child');
 	});
 });

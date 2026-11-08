@@ -103,17 +103,17 @@ describe('the finder line goes through a K that passes', () => {
 	});
 });
 
-describe('a partner step of the finder says what the card says', () => {
+describe('a partner step of the finder in a stepmother line and the card word of the pair', () => {
 	// Ned and Ola married 1140-1150 (divorce) and had an affair after it. The card of the pair follows the last-listed union.
 	const tree = (marriageLast: boolean): Tree => {
 		const wed = w('ned', 'ola', { start: '1140', end: '1150', endedBy: 'divorce' });
 		const affair = w('ned', 'ola', { type: 'affair', start: '1160' });
 		return { people: [p('ned', 'm', '1100', '1170'), p('ola', 'f', '1102', '1175'), p('pip', 'm', '1130', undefined, ['ned'])], unions: marriageLast ? [affair, wed] : [wed, affair] };
 	};
-	it('affair listed last: the card says "Lover" and so does the step', () => {
+	it('affair listed last: the card says "Lover"; the step of the stepmother line names the marriage (spec §13.1 rule 6)', () => {
 		const g = graphOf(tree(false));
 		expect(wordsOf(g, 'ned', 'ola')).toBe('Lover');
-		expect(stepsOf(g, 'pip', 'ola')).toContain('ola is ned’s lover');
+		expect(stepsOf(g, 'pip', 'ola')).toContain('ola is ned’s former wife');
 	});
 	it('marriage listed last: the card says "Former wife" and so does the step', () => {
 		const g = graphOf(tree(true));

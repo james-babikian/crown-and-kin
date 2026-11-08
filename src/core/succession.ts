@@ -11,7 +11,7 @@
  */
 
 import type { TreeDates } from './dates';
-import { drawnParentMap, type DrawnParent, type FamilyGraph } from './derive';
+import { drawnParentMap, noClimb, type DrawnParent, type FamilyGraph } from './derive';
 import { isDead, readInherit, readRule, resolveSpouse, type InheritRule, type InheritThrough, type SpouseWorld, type SuccessionRule } from './succession-keys';
 import { firstHolderOf, spouseWorldOf } from './succession-first';
 import { bornNoYear, dateRows, deathNotes, findRuler, fitsTwoCalendars, lineYear, makeLife, missingBirthYears, personTexts, yearNotes, type DateText, type DateWarningRow, type Life, type NoYearRow, type YearReader } from './succession-dates';
@@ -532,7 +532,7 @@ function makeEngine(
 		if (x.length < 2) return x.length === 0 || x[0] === y[0];
 		return (x[0] === y[0] && x[1] === y[1]) || (x[0] === y[1] && x[1] === y[0]);
 	};
-	// A person who has a child in the tree by a birth, adoptive or rumoured link has a drawn family; a ward link does not count (D191). Made on first need.
+	// A person who has a child in the tree by a birth, adoptive, rumoured or begetter link (D332) has a drawn family; a ward link does not count (D191). Made on first need.
 	let parentOf: Set<string> | undefined;
 	const hasChild = (id: string): boolean => {
 		if (!parentOf) {
@@ -649,7 +649,7 @@ function makeEngine(
 		const nextParents = (x: string): string[] => {
 			const holders: string[] = [];
 			for (const d of drawn.get(x) ?? []) {
-				if (d.type === 'ward' || d.type === 'rumoured' || !earlier.has(d.id) || holders.includes(d.id)) continue;
+				if (noClimb(d.type) || !earlier.has(d.id) || holders.includes(d.id)) continue;
 				if (body !== undefined && !(carries(d, P(x), illOn) && inBody(d.id))) continue;
 				if (through === undefined || passes(d.id)) holders.push(d.id);
 			}

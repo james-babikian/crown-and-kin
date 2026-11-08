@@ -127,12 +127,15 @@ export function listData(g: FamilyGraph, centre: string): ListData {
 	// The parents that a child has by side links of one kind: a pair of them is a couple even when no union is written (implicit partnership).
 	const sideParents = new Map<string, Set<string>>();
 	for (const e of g.secondary) {
+		// D332: a begetter is never half of a couple, so two begetters of one child make no partnership.
+		if (parentKind(e.type) === 'begetter') continue;
 		const k = `${e.child}|${parentKind(e.type)}`;
 		const set = sideParents.get(k) ?? new Set<string>();
 		for (const q of e.parents) set.add(q);
 		sideParents.set(k, set);
 	}
 	const home = (e: (typeof side)[number]) => {
+		if (parentKind(e.type) === 'begetter') return undefined;
 		if (e.unionKey) return partnerships.find((x) => x.key === e.unionKey);
 		const named = sideParents.get(`${e.child}|${parentKind(e.type)}`);
 		if (named?.size !== 2 || !named.has(centre)) return undefined;

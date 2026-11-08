@@ -364,11 +364,11 @@ describe('the dead sign in the date line and the screen-reader label', () => {
 	it('cardLabel speaks the sign with words and never the character', () => {
 		expect(CARD_SPOKEN_DEAD).toBe('dead');
 		expect(CARD_SPOKEN_DEAD_DOUBT).toBe('dead, but the death text is not clear');
-		expect(cardLabel(person({ born: '1131', died: 'yes' }), 'half-sister')).toBe('Aldric, b. 1131, dead, half-sister');
-		expect(cardLabel(person({ born: '1131', died: '?' }))).toBe('Aldric, b. 1131, dead, but the death text is not clear');
+		expect(cardLabel(person({ born: '1131', died: 'yes' }), 'half-sister')).toBe('Aldric, born 1131, dead, half-sister');
+		expect(cardLabel(person({ born: '1131', died: '?' }))).toBe('Aldric, born 1131, dead, but the death text is not clear');
 		expect(cardLabel(person({ died: 'yes' }))).toBe('Aldric, dead');
 		expect(cardLabel(person({ died: '?' }))).toBe('Aldric, dead, but the death text is not clear');
-		expect(cardLabel(person({ born: '1131', died: '1190' }))).toBe('Aldric, 1131–1190');
+		expect(cardLabel(person({ born: '1131', died: '1190' }))).toBe('Aldric, born 1131, died 1190');
 		expect(cardLabel(person({ born: '1131', died: 'yes' }))).not.toMatch(/†/);
 	});
 });
@@ -396,7 +396,7 @@ describe('a tree with no rumoured link has no sure view and gives the names of 0
 });
 
 describe('the edit sheet blocks a third parent of a type at PARENT_LIMIT', () => {
-	it('fullTypes: 2 birth, 2 adoptive and 2 ward parents are full; up to 7 rumoured parents are not', () => {
+	it('fullTypes: 2 birth (and so the begetter, D332), 2 adoptive and 2 ward parents are full; up to 7 rumoured parents are not', () => {
 		const rumoured = (n: number) => rum(n, 'x').map((x) => `{id: ${x}, type: rumoured}`);
 		const src = (parents: string[]) => ['people:', ...rum(9, 'x').map((x) => `  - {id: ${x}, name: ${x}}`), `  - {id: k, name: K, parents: [${parents.join(', ')}]}`, ''].join('\n');
 		const full = (parents: string[]) => {
@@ -404,7 +404,7 @@ describe('the edit sheet blocks a third parent of a type at PARENT_LIMIT', () =>
 			if (!r.ok) throw new Error('parse');
 			return familyOf(deriveFamilies(r.tree), 'k')!.fullTypes;
 		};
-		expect(full(['x0', 'x1'])).toEqual(['birth']);
+		expect(full(['x0', 'x1'])).toEqual(['birth', 'begetter']);
 		expect(full(['{id: x0, type: adoptive}', '{id: x1, type: adoptive}'])).toEqual(['adoptive']);
 		expect(full(['{id: x0, type: ward}', '{id: x1, type: ward}'])).toEqual(['ward']);
 		expect(full(rumoured(2))).toEqual([]);
@@ -442,10 +442,11 @@ describe('D205: rumoured parents, the unlisted-parent maybe, the extra name and 
 		expect(all(g, 'Sue', 'Tom')).not.toMatch(/Rumoured half-brother/);
 	});
 
-	it('a rumoured mother P who is the partner of the sure father R is also a stepmother', () => {
+	// D334 Q13 repair 3: a stepmother is a father's wife who is not your mother, so beside "Rumoured mother" only the possessive form is true.
+	it('a rumoured mother P who is the partner of the sure father R is named "Father’s wife", not a stepmother', () => {
 		const g = tree(['R m', 'P f', 'M m R P:rumoured'], ['R,P']);
-		expect(all(g, 'M', 'P')).toBe('Rumoured mother | Stepmother');
-		expect(all(g, 'P', 'M')).toBe('Rumoured son | Stepson');
+		expect(all(g, 'M', 'P')).toBe('Rumoured mother | Father’s wife');
+		expect(all(g, 'P', 'M')).toBe('Rumoured son | Husband’s son');
 	});
 
 	it('a sure child of the partner is still no stepchild', () => {

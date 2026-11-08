@@ -342,13 +342,14 @@ for (const c of ['dynasty-title-name', 'dynasty-title-male', 'dynasty-title-fema
 		expect(again.hasClass('has-id-problem')).toBe(true);
 	});
 
-	it('opens a page with the focus on Back, and Add with the focus in the new name field', async () => {
+	it('opens a page with the focus on Back, and Add with no field focused (D320)', async () => {
 		const o = openWin();
 		openPage(o.content, 'duke-of-valmont');
 		expect(active()).toBe('back');
 		backToList(o.content);
 		await click(o.content.querySelector('button[data-focus="add"]'));
-		expect(active()).toMatch(/^name:/);
+		expect(active()).toBe('back');
+		expect(['input', 'textarea', 'select']).not.toContain(fakeDoc.activeElement?.tag);
 	});
 });
 

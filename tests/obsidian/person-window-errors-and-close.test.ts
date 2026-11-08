@@ -198,6 +198,15 @@ describe('one heading for a new person (UX-22)', () => {
 		expect(meta()).toBe('Child of Aldric');
 	});
 
+	// B-0064, D336: the rule `.dynasty-grid > .is-wide` is in the CSS (new-person-name-placeholder-fits); here the form puts the class on both windows.
+	it('Name and Sobriquet have a row each (is-wide) in the window of a new person and in the window of a person in the tree', () => {
+		for (const m of [modalOf(openNew({ kind: 'person' }).s), modalOf(open('a').s)]) {
+			for (const field of ['name', 'sobriquet']) expect(m.querySelector(`[data-field="${field}"]`)!.hasClass('is-wide'), field).toBe(true);
+			// The other short fields keep two in a row.
+			for (const field of ['born', 'died']) expect(m.querySelector(`[data-field="${field}"]`)!.hasClass('is-wide'), field).toBe(false);
+		}
+	});
+
 	it('a person in the tree keeps its name and an unnamed person says so', () => {
 		const { s } = open('a');
 		expect(modalOf(s).querySelector('.dynasty-head-name')!.getText()).toBe('Aldric');

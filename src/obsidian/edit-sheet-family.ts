@@ -5,7 +5,9 @@
 
 import { setIcon } from 'obsidian';
 import type { ParentKind } from '../core/edit';
-import { PARENT_LIMIT, PARENT_TYPES } from '../core/types';
+import { linkTypeFull } from '../core/family-query';
+import { PARENT_TYPES } from '../core/types';
+import { CHANGE_UI } from '../render/change-text';
 import { appendNameRun } from '../render/dom/name-span';
 import { dateLine, dateLineShown, relationInfo } from '../render/tree-info';
 import { quotedSobriquet } from '../core/sobriquet';
@@ -13,6 +15,7 @@ import { FAMILY, ME_UI, SHEET, WINDOW_UI, parentTypeText } from '../render/ui-te
 import { partnerLinkDetail } from './union-edit';
 import type { FamilyView, ParentLink, PartnerLink } from '../core/family-query';
 import { addChild, addParentFlow, addPartner } from './family-flows';
+import { findRelation } from '../core/relations';
 import { relationsFor, validMe } from '../view/relation-cache';
 import { renderRelationLine, type RelationView } from './sheet-relation';
 import { titlesBody, titlesSummary } from './sheet-titles';
@@ -227,7 +230,9 @@ export abstract class EditSheetFamily extends EditSheetForm {
 		const p = this.data.person;
 		const v: RelationView = relationInfo(relationsFor(this.data.g, me, this.o.relationOptions, this.o.relationBlock).all.get(p.id), p.id === me);
 		const finder = this.o.finder;
-		if (v.kind !== 'me' && finder && !this.gone) v.showLine = { label: ME_UI.showLine, aria: ME_UI.showLineLabel(p.name || p.id), run: () => this.leaveFor(() => finder.show(me, p.id)) };
+		// C1: a person with no relation and no chain to the marked person has no line to show, so the link would lead to an empty view.
+		const hasLine = v.kind === 'relation' || (v.kind === 'none' && findRelation(this.data.g, me, p.id, this.o.relationOptions).kind !== 'none');
+		if (hasLine && finder && !this.gone) v.showLine = { label: ME_UI.showLine, aria: ME_UI.showLineLabel(p.name || p.id), run: () => this.leaveFor(() => finder.show(me, p.id)) };
 		return v;
 	}
 
@@ -260,10 +265,15 @@ export abstract class EditSheetFamily extends EditSheetForm {
 			const to = sel.value as ParentKind;
 			if (to === now.type) return;
 			// The page changes in place after the write: this select is never taken out of the page while the user uses it.
-			void this.writeWithDraft([{ kind: 'set-parent-type', child: this.data.person.id, parent: now.id, from: now.type, to }], this.data.person.id, 'in-place').then(
+			// B-0054: the names are the ones before the write, as after a removal; the Undo label names the people and the old type.
+			const parentName = this.name(now.id);
+			const childName = this.data.person.name || SHEET.unnamed;
+			const was = this.data.person.id;
+			void this.writeWithDraft([{ kind: 'set-parent-type', child: was, parent: now.id, from: now.type, to }], was, 'in-place', { label: { kind: 'changed-parent-type', type: now.type, names: [parentName, childName] } }).then(
 				(out) => {
 					const cur = this.parentSelects.get(sel);
 					if (!out && cur) sel.value = cur.type;
+					if (out) this.removedNotice(CHANGE_UI.changedParentType(parentName, childName, now.type, to), out, was);
 				},
 				(e) => console.error('Crown and Kin: cannot change the type of the parent', e),
 			);
@@ -275,11 +285,10 @@ export abstract class EditSheetFamily extends EditSheetForm {
 	/** Sets what a parent-type select derives from the parent types: the link it answers for, its value, and the types that are full. */
 	protected paintParentSelect(sel: HTMLSelectElement, fam: FamilyView, link: ParentLink): void {
 		this.parentSelects.set(sel, link);
-		const count = (t: string) => fam.parents.filter((l) => l.type === t).length;
 		for (const opt of Array.from(sel.querySelectorAll<HTMLOptionElement>('option'))) {
 			const t = opt.getAttribute('value') as ParentKind;
-			// A type that has its most parents already is full (spec §4.2, `PARENT_LIMIT`).
-			opt.disabled = t !== link.type && count(t) >= PARENT_LIMIT[t];
+			// A type that has its most parents already is full (spec §4.2, `PARENT_LIMIT`); D332: birth and begetter also count together, and one person is never both.
+			opt.disabled = linkTypeFull(fam.parents, link, t);
 		}
 		sel.value = link.type;
 	}

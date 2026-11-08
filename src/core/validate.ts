@@ -3,19 +3,21 @@
  * draw, together with every problem found (spec §8, §4.1). `derive.ts` calls `validateTree` before
  * building the family graph; anything that needs the derived families (for example a `union` that
  * does not name a union of the person's own parents) is checked there instead. It also checks the parent limits
- * (`PARENT_LIMIT`, with the setting that stops the warning for 2 parents of a type), the near-typos of type words, and the
+ * (`PARENT_LIMIT` and the limit by blood of D332, with the setting that stops the warning for 2 parents), the near-typos of type words, and the
  * `through-spouse` key of a holder.
  */
 
+import { begetterMarriageWarnings, bloodWarnings, withoutDoubledBegetter } from './blood-parents';
 import { nameMismatches, PLAIN_READER, type DateReader, type ReadDate, type TreeDates } from './dates';
 import { codedIssue, type CodedIssue, type IssueCode, type IssueParams } from './messages';
 import { readPortraitCrop } from './portrait-crop';
 import { DOUBTFUL_DIED, isDead, readInherit, readRule, resolveSpouse, type SpouseWorld } from './succession-keys';
+import { isBloodType } from './parent-types';
 import { isParentType, isPlacementType, isUnionType, PARENT_LIMIT, parentKind, PARENT_TYPES, PLACEMENT_TYPES, UNION_TYPES, type Holder, type House, type ParentRef, type ParentType, type Person, type Title, type Tree, type Union } from './types';
 
 /** What the caller can switch in validation. Absent fields mean the default. */
 export interface ValidateOptions {
-	/** The setting "Warn about more than 2 parents of a type". Off stops `too-many-parents` for birth, adoptive and ward parents; the limit for rumoured parents stays. Default: on. */
+	/** The setting "Warn about more than 2 parents". Off stops `too-many-parents` for birth, adoptive, ward and begetter parents and `too-many-blood-parents` (D332); the limit for rumoured parents stays. Default: on. */
 	warnManyParents?: boolean;
 	/** Spec §14: the date reader of the tree (calendars). Absent: plain years. Validation reads the dates of a title with a rule or a named heir through it and turns its problems into issues; `deriveFamilies` puts it in `FamilyGraph.dates`. */
 	dates?: DateReader;
@@ -120,6 +122,11 @@ const PARENT_TYPE_WORDS: Readonly<Record<string, ParentType>> = Object.assign(Ob
 	biological: 'birth',
 	alleged: 'rumoured',
 	putative: 'rumoured',
+	// D332: words for a parent by blood outside the family. The plugin quotes such a word only as the user's own value.
+	genitor: 'begetter',
+	sire: 'begetter',
+	begot: 'begetter',
+	donor: 'begetter',
 });
 
 class Collector {
@@ -259,15 +266,9 @@ export function validateTree(tree: Tree, options: ValidateOptions = {}): Validat
 				out.warn('unknown-parent-type', { ...who, value: r.type, parent: name(r.id), ...(suggestion ? { suggestion } : {}) }, [p.id, r.id]);
 			}
 		});
-		refs.set(p.id, valid);
-
-		const byType = new Map<string, number>();
-		for (const r of valid) byType.set(r.type, (byType.get(r.type) ?? 0) + 1);
-		// The limit of each type; the setting stops the warning for birth, adoptive and ward parents only.
-		for (const [type, count] of byType) {
-			const limit = PARENT_LIMIT[type as ParentType];
-			if (count > limit && (type === 'rumoured' || options.warnManyParents !== false)) out.warn('too-many-parents', { ...who, type, count, limit }, [p.id]);
-		}
+		// D332: the birth link wins over a begetter link of the same id in the drawn links; the warnings read every cleaned link.
+		refs.set(p.id, withoutDoubledBegetter(valid));
+		const byType = limitWarnings(p, valid, name, options.warnManyParents !== false, out);
 		if (p.placement !== undefined) {
 			if (!isPlacementType(p.placement)) out.warn('unknown-placement', { ...who, value: p.placement }, [p.id]);
 			else if (!byType.has(p.placement)) out.warn('placement-without-parents', { ...who, placement: p.placement }, [p.id]);
@@ -279,10 +280,10 @@ export function validateTree(tree: Tree, options: ValidateOptions = {}): Validat
 		if (p.died !== undefined && DOUBTFUL_DIED.includes(p.died.trim().toLowerCase())) out.warn('died-doubtful', { ...who, value: p.died }, [p.id]);
 	}
 
-	// `childless: true` on a dead person who has a birth child. The first child in written order is named.
+	// `childless: true` on a dead person who has a birth child (or a begotten child, D332). The first child in written order is named.
 	const birthChild = new Map<string, Person>();
 	for (const p of people) {
-		for (const r of refs.get(p.id)!) if (r.type === 'birth' && !birthChild.has(r.id)) birthChild.set(r.id, p);
+		for (const r of refs.get(p.id)!) if (isBloodType(r.type) && !birthChild.has(r.id)) birthChild.set(r.id, p);
 	}
 	for (const p of people) {
 		const child = p.childless ? birthChild.get(p.id) : undefined;
@@ -313,12 +314,28 @@ export function validateTree(tree: Tree, options: ValidateOptions = {}): Validat
 		}
 		unions.push(u);
 	}
+	begetterMarriageWarnings(people, refs, unions, name, out.warn.bind(out));
 
 	breakCycles(people, refs, byId, out);
 	const titles = validateTitles(tree.titles ?? [], people, byId, refs, unions, out, options.dates);
 	calendarProblems(options.dates, out, people);
 
 	return { people, byId, houses, unions, refs, unionIds, titles, issues: out.issues };
+}
+
+/**
+ * The parent limits of one person: `too-many-parents` for each type over `PARENT_LIMIT` (the setting stops it for every type but
+ * rumoured), then the warnings about the parents by blood (D332). Returns the count of each type for the placement check.
+ */
+function limitWarnings(p: Person, valid: { id: string; type: ParentType }[], name: (id: string) => string, warnMany: boolean, out: Collector): Map<string, number> {
+	const byType = new Map<string, number>();
+	for (const r of valid) byType.set(r.type, (byType.get(r.type) ?? 0) + 1);
+	for (const [type, count] of byType) {
+		const limit = PARENT_LIMIT[type as ParentType];
+		if (count > limit && (type === 'rumoured' || warnMany)) out.warn('too-many-parents', { person: p.name, type, count, limit }, [p.id]);
+	}
+	bloodWarnings(p, valid, name, warnMany, out.warn.bind(out));
+	return byType;
 }
 
 /** Spec §13.3, §13.4 rules for titles, holders and `card-title` (the first title with an id wins). */

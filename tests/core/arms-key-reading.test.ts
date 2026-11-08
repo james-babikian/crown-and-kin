@@ -103,8 +103,8 @@ describe('the limit of parents of one type', () => {
 	};
 	const many = (src: string, options?: { warnManyParents?: boolean }) => warningsOf(src, options).filter((i) => i.code === 'too-many-parents');
 
-	it('PARENT_LIMIT is 2 for birth, adoptive and ward and 8 for rumoured', () => {
-		expect(PARENT_LIMIT).toEqual({ birth: 2, adoptive: 2, ward: 2, rumoured: 8 });
+	it('PARENT_LIMIT is 2 for birth, adoptive, ward and begetter and 8 for rumoured (D332)', () => {
+		expect(PARENT_LIMIT).toEqual({ birth: 2, adoptive: 2, ward: 2, rumoured: 8, begetter: 2 });
 	});
 
 	it('3 birth, adoptive or ward parents warn, and the setting off stops the warning', () => {
@@ -182,7 +182,7 @@ describe('a partnership word and a parent type word', () => {
 		expect(w).toHaveLength(1);
 		expect(w[0].params).toEqual({ person: 'Cora', value: 'godfather', parent: 'Aldric' });
 		expect(issueText(w[0])).toBe(
-			'Cora has the parent Aldric with the type “godfather”, which the plugin does not know. The plugin counts Aldric as a birth parent of Cora. Use birth, adoptive, ward or rumoured.',
+			'Cora has the parent Aldric with the type “godfather”, which the plugin does not know. The plugin counts Aldric as a birth parent of Cora. Use birth, adoptive, ward, rumoured or begetter.',
 		);
 		// The person is a birth child in the graph (spec §8).
 		expect(deriveFamilies(treeOf(parentSource('godfather'))).placementType.get('c')).toBe('birth');
@@ -196,7 +196,7 @@ describe('a partnership word and a parent type word', () => {
 			expect(w[0].params, value).toMatchObject({ value, suggestion });
 		}
 		expect(issueText(parentWarning('birht')[0])).toBe(
-			'Cora has the parent Aldric with the type “birht”, which the plugin does not know. The plugin counts Aldric as a birth parent of Cora. Use birth, adoptive, ward or rumoured. If you mean “birth”, write “type: birth”.',
+			'Cora has the parent Aldric with the type “birht”, which the plugin does not know. The plugin counts Aldric as a birth parent of Cora. Use birth, adoptive, ward, rumoured or begetter. If you mean “birth”, write “type: birth”.',
 		);
 	});
 });

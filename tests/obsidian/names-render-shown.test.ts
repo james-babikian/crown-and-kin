@@ -134,11 +134,11 @@ describe('§14 rule 15: the date line of a card', () => {
 describe('§14 rule 15: the screen-reader label', () => {
 	it('says the full names, whatever the list shows on the card, and does not cut them', () => {
 		const p = person({ born: '22.13', died: '22.14' });
-		for (const show of ['short', 'full'] as const) expect(cardLabel(p, undefined, undefined, undefined, reader([planets({ show })]))).toBe('Aldric, 22.13 Saturn\u2009–\u200922.14 Jupiter');
+		for (const show of ['short', 'full'] as const) expect(cardLabel(p, undefined, undefined, undefined, reader([planets({ show })]))).toBe('Aldric, born 22.13 Saturn, died 22.14 Jupiter');
 		// A list set to `none` is not shown on the card, and so it is not said.
-		expect(cardLabel(p, undefined, undefined, undefined, reader([planets({ show: 'none' })]))).toBe('Aldric, 22.13–22.14');
-		expect(cardLabel(p, 'brother', undefined, undefined, reader())).toBe('Aldric, 22.13 Saturn\u2009–\u200922.14 Jupiter, brother');
-		expect(cardLabel(person({ born: '1131', died: '1160' }))).toBe('Aldric, 1131–1160');
+		expect(cardLabel(p, undefined, undefined, undefined, reader([planets({ show: 'none' })]))).toBe('Aldric, born 22.13, died 22.14');
+		expect(cardLabel(p, 'brother', undefined, undefined, reader())).toBe('Aldric, born 22.13 Saturn, died 22.14 Jupiter, brother');
+		expect(cardLabel(person({ born: '1131', died: '1160' }))).toBe('Aldric, born 1131, died 1160');
 	});
 
 	it('says the full names of the years of the reign', () => {
@@ -148,7 +148,7 @@ describe('§14 rule 15: the screen-reader label', () => {
 		);
 		const label = cardLabels(g).get('a')!;
 		expect(label.reign).toBe('(r. 22.13–22.14)');
-		expect(cardLabel(g.byId.get('a')!, undefined, label, undefined, g.dates)).toBe('Aldric, Crown (r. 22.13 Saturn\u2009–\u200922.14 Jupiter), b. 22.10 Venus');
+		expect(cardLabel(g.byId.get('a')!, undefined, label, undefined, g.dates)).toBe('Aldric, Crown (r. 22.13 Saturn\u2009–\u200922.14 Jupiter), born 22.10 Venus');
 	});
 });
 

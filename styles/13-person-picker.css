@@ -167,12 +167,12 @@
 	 * bar and the plugin already ends the prompt at the keyboard (`--dynasty-sheet-height`), so while a keyboard is up the
 	 * space is blank. It goes by the keyboard height itself: no number is compared, and no keyboard gives the old space.
 	 */
-	padding-bottom: max(0px, calc(var(--safe-area-inset-bottom, 0px) - var(--keyboard-height, 0px)));
+	padding-bottom: max(0px, calc(var(--dynasty-safe-bottom) - var(--keyboard-height, 0px)));
 	/*
 	 * The status bar space belongs to the prompt, not to the field container: Obsidian 1.13+ draws that container as the grey pill, so padding
 	 * inside it made the pill 105 px high and left the clear button above the field.
 	 */
-	padding-top: env(safe-area-inset-top);
+	padding-top: var(--dynasty-safe-top);
 }
 
 /* The title is for a screen reader only: the field and Cancel share the top row, so the first result sits higher (D212 find-rows). */
@@ -203,7 +203,7 @@
 	height: auto;
 	margin: 0;
 	/* P3-04, F07: the hint starts on the edge of the names, 8 px in from the window padding, as the title of the other pickers (L-08). */
-	padding: var(--dynasty-space-2) max(var(--dynasty-space-4), env(safe-area-inset-right)) 0 calc(max(var(--dynasty-space-4), env(safe-area-inset-left)) + var(--dynasty-space-2));
+	padding: var(--dynasty-space-2) max(var(--dynasty-space-4), var(--dynasty-safe-right)) 0 calc(max(var(--dynasty-space-4), var(--dynasty-safe-left)) + var(--dynasty-space-2));
 	overflow: visible;
 	clip-path: none;
 	white-space: normal;
@@ -258,7 +258,7 @@
 	align-items: center;
 	gap: 6px;
 	/* D125 (3): a low top row gives the list more rows above the keyboard. The container is the field row only; the top inset is on the prompt. The right side is short: the X ends the pill, Cancel is outside. */
-	padding: 0 var(--size-4-2) 0 max(var(--size-4-3), env(safe-area-inset-left));
+	padding: 0 var(--size-4-2) 0 max(var(--size-4-3), var(--dynasty-safe-left));
 	border-bottom: 1px solid var(--background-modifier-border);
 }
 
@@ -314,7 +314,7 @@
 	min-height: 44px;
 	min-width: 44px;
 	/* The text keeps the distance to the screen edge that the pill had on its right side. */
-	padding: 0 max(var(--size-4-3), env(safe-area-inset-right)) 0 var(--size-4-2);
+	padding: 0 max(var(--size-4-3), var(--dynasty-safe-right)) 0 var(--size-4-2);
 	border: 0;
 	background: none;
 	box-shadow: none;
@@ -336,6 +336,32 @@
 /* Cupertino gives the list its own padding (75 px at the top, under a top bar that is not there once the pill is pinned); the strong selector keeps the first row 12 px under the pill. */
 .prompt.dynasty-picker.is-phone.is-phone .prompt-results {
 	padding-top: calc(var(--size-4-1) + var(--size-4-2));
+}
+
+/*
+ * D334 Q7: the row "A holder who is not in the tree" stands under the list, always in view. On a phone it is a third row of the prompt grid, so it stays
+ * above the keyboard (the prompt ends there); it is a grid row, not `position: sticky`. On a computer it is a row under the scrolling list.
+ */
+.dynasty-picker-pinned {
+	flex: none;
+	padding: var(--dynasty-space-1) var(--dynasty-space-2);
+	border-top: var(--dynasty-hairline);
+}
+
+.prompt.dynasty-picker.is-phone.has-pinned-row {
+	grid-template-rows: auto minmax(0, 1fr) auto;
+}
+
+.dynasty-picker.is-phone .dynasty-picker-pinned {
+	grid-column: 1 / -1;
+	padding: var(--dynasty-space-1) var(--dynasty-space-3);
+}
+
+/* Obsidian marks a row under the pointer through its list; the row in the foot is outside that list, so it has its own hover. */
+@media (hover: hover) {
+	.dynasty-picker-pinned .suggestion-item:hover {
+		background: var(--background-modifier-hover);
+	}
 }
 
 /*

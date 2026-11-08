@@ -185,7 +185,7 @@ export class Handle {
 			};
 			const mode = kind === 'maintenance' ? ({ kind: 'maintenance', op } as const) : ('user' as const);
 			const labelOf = (): UndoLabel | undefined => {
-				const r = result as EditResult | null;
+				const r = result;
 				return typeof label === 'function' ? label(r?.ok ? (r.effects ?? []) : []) : label;
 			};
 			try {

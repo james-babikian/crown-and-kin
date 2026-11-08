@@ -24,6 +24,8 @@ export const REFUSAL_TEXT = {
 	unknownUnionType: 'Unknown partnership type.',
 	unknownEndedBy: 'This is not a choice for “Ended by”. Use Divorce, Annulment or Death.',
 	alreadyParent: 'This person is already a parent of that type.',
+	// D332: one person is never both the birth parent and the begetter of one child.
+	alreadyBloodParent: 'This person is already a parent of the child by blood, as a birth parent or a begetter. A person cannot be both. To change the type, open Family in the person window of the child. Then change Type of parent next to the name of the parent.',
 	notWritable: 'The change cannot be written. Edit the note text.',
 	commentWouldChange: 'The change cannot be written without a change to a comment. Edit the note text.',
 	otherValuesWouldChange: 'The change cannot be written without a change to other values. Edit the note text.',

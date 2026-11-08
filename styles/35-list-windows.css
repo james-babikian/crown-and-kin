@@ -16,7 +16,7 @@
 
 /* On a phone the bar says the name of the list, so the list starts with the search box (lw-phone-header). */
 .dynasty-lw.is-phone .dynasty-lw-top {
-	padding: var(--dynasty-space-1) max(var(--dynasty-space-4), env(safe-area-inset-right)) 0 max(var(--dynasty-space-4), env(safe-area-inset-left));
+	padding: var(--dynasty-space-1) max(var(--dynasty-space-4), var(--dynasty-safe-right)) 0 max(var(--dynasty-space-4), var(--dynasty-safe-left));
 }
 
 /* P3-11: the count under a tool title is in the interface font, as the title is. */

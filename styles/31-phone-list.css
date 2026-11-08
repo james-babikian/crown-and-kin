@@ -263,11 +263,6 @@
 	color: var(--dynasty-muted, var(--text-muted));
 }
 
-/* In the large row the box of the pencil takes 8 px of the gap before it, so the text keeps its width when the pencil stands on the grid of the bar. */
-.dynasty-list-whole > .dynasty-list-edit-icon {
-	margin-left: calc(-1 * var(--dynasty-space-2));
-}
-
 .dynasty-list-edit-icon .svg-icon {
 	width: var(--dynasty-icon-bar);
 	height: var(--dynasty-icon-bar);

@@ -22,7 +22,7 @@ import type { PictureStore } from './picture-store';
 import { trackModal } from '../view/plugin-modals';
 import { ListErrors } from './list-errors';
 import { drawableColour, nameDialog, noticeText, onWriteFailed } from './sheet-parts';
-import { undoNotice } from './undo-notice';
+import { afterWriteNotice, type WriteNoticeTexts } from './write-notice';
 import { renderSections, type SectionSpec, type SectionsView } from './window-sections';
 import { buildRow, confirmBox, iconLead, textButton } from './window-parts';
 import { buildShell, type Shell } from './window-shell';
@@ -149,6 +149,8 @@ export abstract class ListEditWindow extends Modal {
 	protected keys = 0;
 	/** The batch that is being written had id ops: a refusal of `id-taken` or `bad-value` is about an id. */
 	protected sentIds = false;
+	/** The names of the new and changed items at the time of the write, for the Notice after Save. */
+	private savedNames: string[] = [];
 	/** A picker or a form is open over the window. */
 	protected busy = false;
 	/** True while the small ID window is open, so a second "Change ID" opens no second window. */
@@ -592,13 +594,13 @@ export abstract class ListEditWindow extends Modal {
 		this.focusFirst([next ? `row:${next}` : '', before ? `row:${before}` : '', 'add']);
 	}
 
-	/** Add: the page of the new item opens with the focus in its name field. A phone keyboard opens then, as in the older windows. */
+	/** Add: the page of the new item opens with the focus on the Back button, as for a row. No field takes it (D320: a phone keyboard would open); one Tab reaches the name. */
 	private add(): void {
 		const key = this.addItem();
 		this.query = '';
 		this.clearError();
 		this.shownKeys = this.rowViews().map((v) => v.key);
-		this.openPage(key, `name:${key}`);
+		this.openPage(key);
 		this.listTop = 0;
 	}
 
@@ -826,6 +828,7 @@ export abstract class ListEditWindow extends Modal {
 	 */
 	protected async writeBatch(handle: Handle, ops: Op[], beforeWrite: (() => void) | undefined, logText: string): Promise<HandleWriteOutcome | null> {
 		this.sentIds = ops.some(isIdOp);
+		this.savedNames = this.rowViews().filter((v) => v.state === 'new' || v.state === 'changed').map((v) => v.name);
 		this.saving = true;
 		this.modalEl.addClass('is-saving');
 		try {
@@ -848,18 +851,9 @@ export abstract class ListEditWindow extends Modal {
 		this.showError(this.staleText);
 	}
 
-	/**
-	 * The Undo notice after a good write: a delete says what went (and "also" when more was written), else an id change says how many.
-	 * `deletedText` makes the text of the delete from the names.
-	 */
-	protected undoAfterWrite(handle: Handle, out: { body: string }, ops: Op[], deleted: string[], deletedText: (names: string[]) => string): void {
-		const idCount = ops.filter(isIdOp).length;
-		if (deleted.length) {
-			const others = ops.length > deleted.length;
-			undoNotice(others ? `${deletedText(deleted)} ${REMOVE.undoAlso}` : deletedText(deleted), handle, out.body);
-		} else if (idCount) {
-			undoNotice(ops.length > idCount ? `${ID_UI.changed(idCount)} ${REMOVE.undoAlso}` : ID_UI.changed(idCount), handle, out.body);
-		}
+	/** The Undo notice after a good write (`write-notice.ts`); `deleted` are the names of the deleted items, the names of the saved ones were taken in `writeBatch`. */
+	protected undoAfterWrite(handle: Handle, out: { body: string }, ops: Op[], deleted: string[], texts: WriteNoticeTexts): void {
+		afterWriteNotice(handle, out.body, ops, deleted, this.savedNames, texts);
 	}
 
 	/**

@@ -7,12 +7,12 @@
  */
 
 import { Modal, type App } from 'obsidian';
-import { ID_UI } from '../render/ui-text';
+import { ID_UI, isolateName } from '../render/ui-text';
 import { reasonText, type IdKind, type IdReason } from '../view/id-draft';
 import { idField } from './id-field';
 import { ignoreGhostClick, phoneLayout, startWithoutFocus } from './modal-layout';
 import { trackModal } from '../view/plugin-modals';
-import { nameDialog } from './sheet-parts';
+import { nameDialog, uniqueId } from './sheet-parts';
 import { buildShell, type Shell } from './window-shell';
 
 /** What the Houses window or the Titles window gives the small window. */
@@ -53,10 +53,12 @@ class IdWindow extends Modal {
 		this.cleanup.push(phoneLayout(this, undefined, false), ignoreGhostClick(this), trackModal(this, () => this.close()));
 		const el = this.contentEl;
 		// The window family: a bar on a phone, a footer on a computer; "Use this ID" is the main button.
+		// D334 Q6, D338 point 6: a phone bar is short, so it says "ID" and the full name is the label of the field; a computer title has room for "ID of NAME".
+		const phone = this.modalEl.hasClass('is-phone');
 		const shell = buildShell({
 			modalEl: this.modalEl,
 			contentEl: el,
-			title: ID_UI.windowTitle(s.item),
+			title: phone ? ID_UI.label : ID_UI.windowTitle(s.item),
 			// A computer window shows its title, as the other plugin windows do (D330 O-11, O-32); the phone bar shows it as before.
 			titleRole: 'tool',
 			titled: true,
@@ -81,6 +83,8 @@ class IdWindow extends Modal {
 			key: s.key,
 			item: s.item,
 			value: s.value,
+			// D338 point 6: on a phone the name of the house or title is the visible label right above the field. A computer keeps "ID" there, as its title already says "ID of NAME".
+			label: phone ? isolateName(s.item) : undefined,
 			problem: '',
 			hint: ID_UI.hint(s.kind),
 			onInput: refresh,
@@ -92,6 +96,12 @@ class IdWindow extends Modal {
 			},
 			onEnter: () => use?.click(),
 		});
+		// The dialog is named by the bar and the label together: "ID", then the name.
+		if (phone) {
+			const labelId = uniqueId('dynasty-id-item');
+			view.labelEl.setAttribute('id', labelId);
+			this.modalEl.setAttribute('aria-labelledby', `${shell.titleEl.getAttribute('id')} ${labelId}`);
+		}
 		// The shell's Save button runs `onSave`, which clicks the button below it: the click handler stands on the button itself.
 		const useButton = shell.save!;
 		use = useButton;

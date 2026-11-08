@@ -77,7 +77,7 @@ export abstract class TreeViewLifecycle extends TreeViewBase {
 			if (this.listMode) {
 				const kinWords = prev.oneParentUnknown !== now.oneParentUnknown && this.meId !== null;
 				// The list does not follow "Arms on cards" (D209 item 6: only the top row shows arms), so a change of it draws the list again
-				// without need; the badge counts by "Warn about more than 2 parents of a type".
+				// without need; the badge counts by "Warn about more than 2 parents".
 				const arms = prev.armsOnCards !== now.armsOnCards;
 				if (prev.showDates !== now.showDates || prev.showRelations !== now.showRelations || prev.showPortraits !== now.showPortraits || kinWords || arms || prev.warnManyParents !== now.warnManyParents) this.render(this.fonts);
 				return;

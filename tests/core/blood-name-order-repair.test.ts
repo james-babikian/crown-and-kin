@@ -188,8 +188,9 @@ describe('blood-name order: known limits (the output today, pinned)', () => {
 		];
 		for (const on of SETTINGS) one('Grandson | Half-nephew | Adoptive great-nephew | Wife’s half-nephew', seen(m2, ['m, s'], 'm', 'p', on));
 	});
-	it('the parent list of a child with three adoptive parents decides "Adoptive sister" or "Adoptive half-sister" (setting on)', () => {
-		// D293: the first two parents of T share an implicit union only if they are next to each other in the list; that union makes C and E full.
+	it('a child with three adoptive parents makes no legal pair of the two it lists first: the same name in every order of its list', () => {
+		// D293: the first two parents of T share an implicit union, but a child with three parents of one type makes no union for a legal
+		// pair, so C and E have no legal parents in any order of T's list (once the order made them full with the setting on).
 		const people = (t: string[]): Spec[] => [
 			['g0a', 'f'],
 			['g1a', 'f'],
@@ -199,7 +200,7 @@ describe('blood-name order: known limits (the output today, pinned)', () => {
 			['g2e', 'f', 'g0a~adoptive', 'g1a'],
 		];
 		const lists: [string[], boolean, string][] = [
-			[['g0a~adoptive', 'g1a~adoptive', 'g1b~adoptive'], true, 'Adoptive sister'],
+			[['g0a~adoptive', 'g1a~adoptive', 'g1b~adoptive'], true, 'Adoptive half-sister'],
 			[['g0a~adoptive', 'g1b~adoptive', 'g1a~adoptive'], true, 'Adoptive half-sister'],
 			[['g0a~adoptive', 'g1a~adoptive', 'g1b~adoptive'], false, 'Adoptive sister'],
 			[['g0a~adoptive', 'g1b~adoptive', 'g1a~adoptive'], false, 'Adoptive sister'],

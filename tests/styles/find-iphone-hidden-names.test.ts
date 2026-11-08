@@ -201,6 +201,7 @@ describe('Find on an iPhone: the hidden names do not grow the scroll area of the
 		['purpose of the partnership window (union-edit.ts)', () => el('span', ['dynasty-sr-only'], el('div', ['modal-content'], windowOf())), (h) => h.parent?.parent ?? null],
 		['low bar of a very large tree (large-bar.ts)', () => el('span', ['dynasty-sr-only'], el('div', ['dynasty-large-bar'], el('div', ['dynasty-large-root'], windowOf())))],
 		['label of the picture viewer (picture-viewer.ts)', () => el('span', ['dynasty-sr-only'], el('div', ['modal-content', 'dynasty-viewer-content'], windowOf())), (h) => h.parent?.parent ?? null],
+		['spoken comma of the Show bar (bar-text.ts)', () => el('span', ['dynasty-sr-only'], el('div', ['dynasty-succession-text'], el('div', ['dynasty-list-root'], windowOf())))],
 		['button of the phone list (phone-list-dom.ts nameBy)', () => el('span', ['dynasty-sr-only'], el('button', ['dynasty-list-go'], el('div', ['dynasty-list-row'], el('div', ['dynasty-list-root'], windowOf()))))],
 	];
 	for (const [name, make, box] of places) {
@@ -236,7 +237,7 @@ describe('Find on an iPhone: the hidden names do not grow the scroll area of the
 			}
 		};
 		walk(new URL('../../src/', import.meta.url));
-		expect(found.sort()).toEqual(['edit-sheet-family.ts', 'large-bar.ts', 'person-picker.ts', 'phone-list-dom.ts', 'picture-viewer.ts', 'tree-view-toolbar.ts', 'union-edit.ts', 'window-shell.ts']);
+		expect(found.sort()).toEqual(['bar-text.ts', 'edit-sheet-family.ts', 'large-bar.ts', 'person-picker.ts', 'phone-list-dom.ts', 'picture-viewer.ts', 'save-picture.ts', 'tree-view-toolbar.ts', 'union-edit.ts', 'window-shell.ts']);
 	});
 });
 
@@ -254,11 +255,11 @@ describe('Find on an iPhone: the header', () => {
 	it('the status bar space is the padding of the prompt, not of the grey pill', () => {
 		const { prompt, container } = parts();
 		const css = sheet();
-		expect(computed(css, prompt, 'padding-top')).toBe('env(safe-area-inset-top)');
+		expect(computed(css, prompt, 'padding-top')).toBe('var(--dynasty-safe-top)');
 		const padding = computed(css, container, 'padding')!;
-		expect(padding).not.toContain('safe-area-inset-top');
+		expect(padding).not.toContain('dynasty-safe-top');
 		// 0 at the top and the bottom; the left keeps the safe area, the right is short because the X ends the pill (Cancel is outside).
-		expect(padding.replace(/max\(var\(--size-4-3\), env\(safe-area-inset-left\)\)/, 'M')).toBe('0 var(--size-4-2) 0 M');
+		expect(padding.replace(/max\(var\(--size-4-3\), var\(--dynasty-safe-left\)\)/, 'M')).toBe('0 var(--size-4-2) 0 M');
 	});
 
 	it('the clear button is the last item of the pill, 44 px high, and 16 px or more from the Cancel box (the margin beats the Cupertino theme)', () => {
@@ -352,7 +353,7 @@ describe('Find on an iPhone: the header', () => {
 
 	it('no rule gives the container the top inset again', () => {
 		const css = chunk('13-person-picker.css').replace(/\/\*[\s\S]*?\*\//g, '');
-		expect(css).not.toMatch(/prompt-input-container \{[^}]*safe-area-inset-top/);
+		expect(css).not.toMatch(/prompt-input-container \{[^}]*dynasty-safe-top/);
 	});
 });
 

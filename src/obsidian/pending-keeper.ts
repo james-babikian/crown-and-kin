@@ -2,6 +2,11 @@
  * The keeper of the renames that wait for a link update, on this device. It sits between `main.ts` and the pending store: it loads the store at start, moves the list
  * of `data.json` into the store once (the migration), writes the store at each change of the list, and, if the local storage fails, switches to the fallback (the list goes to
  * `data.json` again). `main.ts` decides when each step runs and owns `data.json`; this file owns the rules of the store.
+ *
+ * Until the store flag `migrated` is true the list also stays in `data.json`, so a failed read at start cannot lose it. A device whose flag is set ignores a `pendingRenames` key of the
+ * file (only an older version writes it) unless the fallback wrote it. Two devices that start before the cleaned file has synced both migrate and both run an entry; that is safe, because an
+ * entry runs only if its new path exists on the device and `linksFor` rewrites only a link that still names the old note, so the second run finds nothing. "Show the last link update" reads
+ * only the updates of this device and session.
  */
 
 import { PENDING_KEY, readPending, type PendingRename } from '../view/settings';

@@ -39,6 +39,9 @@ export const WORDS = {
 	coParent: 'co-parent',
 	guardian: 'guardian',
 	ward: 'ward',
+	// Spec §0 D332: the words of the direct pair over a begetter link only.
+	begetter: 'begetter',
+	begotten: 'begotten',
 	byMarriage: 'by marriage',
 	parentInLaw: ['father-in-law', 'mother-in-law', 'parent-in-law'],
 	grandparentInLaw: ['grandfather-in-law', 'grandmother-in-law', 'grandparent-in-law'],
@@ -120,12 +123,28 @@ export function siblingStepWord(sex: Sex, half: boolean, up: ParentType, down: P
 	return word;
 }
 
-/** The word of a step up to a parent, with its link type ("adoptive father"). */
+/** The word of a step up to a parent, with its link type ("adoptive father"; "begetter" for every sex, D332). */
 export const parentStepWord = (type: ParentType, sex: Sex) =>
-	type === 'ward' ? WORDS.guardian : type === 'adoptive' ? `${WORDS.adoptive} ${WORDS.parent[sex]}` : type === 'rumoured' ? `${WORDS.rumoured} ${WORDS.parent[sex]}` : WORDS.parent[sex];
-/** The word of a step down to a child, with its link type ("adopted son"). */
+	type === 'ward'
+		? WORDS.guardian
+		: type === 'begetter'
+			? WORDS.begetter
+			: type === 'adoptive'
+				? `${WORDS.adoptive} ${WORDS.parent[sex]}`
+				: type === 'rumoured'
+					? `${WORDS.rumoured} ${WORDS.parent[sex]}`
+					: WORDS.parent[sex];
+/** The word of a step down to a child, with its link type ("adopted son", "begotten daughter", D332). */
 export const childStepWord = (type: ParentType, sex: Sex) =>
-	type === 'ward' ? WORDS.ward : type === 'adoptive' ? `${WORDS.adopted} ${WORDS.child[sex]}` : type === 'rumoured' ? `${WORDS.rumoured} ${WORDS.child[sex]}` : WORDS.child[sex];
+	type === 'ward'
+		? WORDS.ward
+		: type === 'begetter'
+			? `${WORDS.begotten} ${WORDS.child[sex]}`
+			: type === 'adoptive'
+				? `${WORDS.adopted} ${WORDS.child[sex]}`
+				: type === 'rumoured'
+					? `${WORDS.rumoured} ${WORDS.child[sex]}`
+					: WORDS.child[sex];
 
 /** The text with its first letter in capitals. */
 export const capital = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);

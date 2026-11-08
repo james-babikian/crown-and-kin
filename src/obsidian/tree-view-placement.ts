@@ -7,11 +7,12 @@
 import type { LaidOut, Orientation, Rect } from '../layout/model';
 import { fontsChanged } from '../render/fonts';
 import { safeSides, safeTop } from '../render/dom/page-reads';
+import { placeRings } from '../render/dom/heir-ring';
 import { lodClass } from '../render/dom/scene';
 import { partnersAndChildren, startPerson } from '../render/tree-info';
 import { centreOn, cardShown, centredOpening, chooseLod, bandShift, clearBand, defaultView, embedHeight, fitView, SIDEWAYS_NAME_PX, bringInView, betweenSides, resizeView, treeBounds, type FreeArea, type Size, type View } from '../render/view-math';
 import type { BlockState } from '../view/block-state';
-import { badgeTap, clearToolbar, finderFirstView, finderOrientation, focusView, keepTopCardWhole, orientationFor, parentsAbove, sidewaysView, signRights } from '../view/focus-mode';
+import { badgeTap, clearToolbar, finderFirstView, finderOrientation, focusView, keepTopCardWhole, namedFirstView, orientationFor, parentsAbove, sidewaysView, signRights } from '../view/focus-mode';
 import type { FinderDrawn } from '../view/render-plan';
 import { PHONE_MIN_SCALE, successionFirstView, type SuccessionDrawn } from '../view/succession-view';
 import { around, boxesOf } from '../view/tree-view-helpers';
@@ -451,8 +452,14 @@ export abstract class TreeViewPlacement extends TreeViewLifecycle {
 		return this.insetTop > 0 ? bandShift(v, size, this.insetTop, boxes) === 0 : keepTopCardWhole(v, size, 0, size.h, boxes, []) === v;
 	}
 
-	/** Sets the level of detail class for `view`; true when the level changed. */
+	/** Sets the level of detail class for `view`; true when the level changed. The numbered rings of the heirs are written for the level and the zoom either way. */
 	protected applyLod(view: View): boolean {
+		const changed = this.swapLod(view);
+		if (this.scene?.rings.length) placeRings(this.scene.rings, this.lod, view.scale);
+		return changed;
+	}
+
+	private swapLod(view: View): boolean {
 		const svg = this.svg;
 		const laid = this.laid;
 		if (!svg || !laid) return false;
@@ -570,6 +577,12 @@ export abstract class TreeViewPlacement extends TreeViewLifecycle {
 		const least = Math.min(...boxes.map(edge));
 		const oldest = boxes.filter((b) => edge(b) <= least + 1);
 		const v = this.aboveBottomBar(size, (area) => finderFirstView(bounds, area, laid.layout.geometry.fontPx, this.insetTop, oldest, laid.layout.orientation));
-		return this.keepTopWhole(v, size, laid, boxes);
+		const first = this.keepTopWhole(v, size, laid, boxes);
+		// D334 Q1 B: only a phone needs it; the computer and the tablet keep the readable first view.
+		if (!this.isPhone()) return first;
+		const people = d.line?.people ?? [];
+		const named = [people[0], people[people.length - 1]].flatMap((id) => (id !== undefined && laid.layout.persons.get(id)) || []);
+		const fitted = this.keepTopWhole(this.aboveBottomBar(size, (area) => fitView(around(boxes), area, this.insetTop)), size, laid, boxes);
+		return namedFirstView(first, fitted, size, this.insetTop, size.h - Math.max(0, this.insetBottom), named, laid.layout.geometry.fontPx);
 	}
 }

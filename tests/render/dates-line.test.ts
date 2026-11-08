@@ -463,7 +463,7 @@ describe('§14 r7, I19: the screen-reader label of the card says the same', () =
 	const dead = person({ id: 'a', name: 'Ada', died: 'Year 5 of Cycle 3' });
 
 	it('§14 r7: a calendar death date is read as written; with no calendar the label says "dead"', () => {
-		expect(cardLabelWith(dead, A.buildTreeDates(A.compileCalendars([LONG_COUNT], true), [], []))).toBe('Ada, d. Year 5 of Cycle 3');
+		expect(cardLabelWith(dead, A.buildTreeDates(A.compileCalendars([LONG_COUNT], true), [], []))).toBe('Ada, died Year 5 of Cycle 3');
 		expect(cardLabelWith(dead, A.buildTreeDates(A.PLAIN_READER, [], []))).toBe('Ada, dead');
 	});
 });

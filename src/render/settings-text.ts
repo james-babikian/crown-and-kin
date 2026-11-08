@@ -38,8 +38,8 @@ export const SETTINGS_UI = {
 	armsAll: 'Every card',
 	armsOnCardsDesc: 'Choose which cards show the arms of a house. For example, with the first choice, the founder of House Valmont shows the arms. A person who married into a house also shows them. A child of the founder shows them only if the child holds a title. A card always shows personal arms.',
 	/** D188 item 10. */
-	manyParents: 'Warn about more than 2 parents of a type',
-	manyParentsDesc: 'If this is on, the plugin warns when a person has more than 2 parents of one type. The types are birth, adoptive and ward. If this is off, the plugin gives no warning for these types. A person can have up to 8 rumoured parents. The plugin always warns about more than 8 rumoured parents.',
+	manyParents: 'Warn about more than 2 parents',
+	manyParentsDesc: 'If this is on, the plugin warns when a person has more than 2 parents of one type: birth, adoptive, ward or begetter. It also warns when a person has more than 2 parents by blood. Birth parents and begetters together are the parents by blood. If this is off, the plugin gives no warning for these. A person can have up to 8 rumoured parents. The plugin always warns about more than 8 rumoured parents.',
 	phoneDirection: 'Tree direction on a phone held upright',
 	directionSideways: 'Sideways',
 	directionDown: 'Like the computer',

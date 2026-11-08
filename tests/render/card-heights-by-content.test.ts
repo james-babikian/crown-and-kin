@@ -377,13 +377,13 @@ unions:
 
 	it('the accessible name uses the label: ruler name, title with the reign, dates', () => {
 		const root = scene(lay(g, { ...DEFAULT_LAYOUT_SETTINGS, tallTitles }), { labels });
-		expect(cardEl(root, 'aldric').getAttribute('aria-label')).toBe('Aldric II, Lord of the Keep (r. 1131–1160), 1102–1160');
-		expect(cardEl(root, 'isolde').getAttribute('aria-label')).toBe('Isolde Orsini, b. 1106');
-		expect(cardLabel(g.byId.get('rod')!, 'son', labels.get('rod'))).toBe('Roderick, Duke of Valmont (r. from 1160), b. 1130, son');
-		expect(cardLabel(g.byId.get('aldric')!)).toBe('Aldric Valmont, Lord of the Keep, 1102–1160');
+		expect(cardEl(root, 'aldric').getAttribute('aria-label')).toBe('Aldric II, Lord of the Keep (r. 1131–1160), born 1102, died 1160');
+		expect(cardEl(root, 'isolde').getAttribute('aria-label')).toBe('Isolde Orsini, born 1106');
+		expect(cardLabel(g.byId.get('rod')!, 'son', labels.get('rod'))).toBe('Roderick, Duke of Valmont (r. from 1160), born 1130, son');
+		expect(cardLabel(g.byId.get('aldric')!)).toBe('Aldric Valmont, Lord of the Keep, born 1102, died 1160');
 		// The reign stays in the label with dates off, like the dates.
 		const off = scene(lay(g, DEFAULT_LAYOUT_SETTINGS), { labels, showDates: false });
-		expect(cardEl(off, 'aldric').getAttribute('aria-label')).toBe('Aldric II, Lord of the Keep (r. 1131–1160), 1102–1160');
+		expect(cardEl(off, 'aldric').getAttribute('aria-label')).toBe('Aldric II, Lord of the Keep (r. 1131–1160), born 1102, died 1160');
 	});
 
 	it('dates off: no reign on any card, and one title text line', () => {

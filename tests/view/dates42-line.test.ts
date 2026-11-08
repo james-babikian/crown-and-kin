@@ -65,11 +65,11 @@ describe('the year text of the line, as written (vet item 1; spec §14 rule 7)',
 	it('the Show view bar names the text that gives Y, with a calendar and with a plain year', () => {
 		const settings = { limit: 5, oldAge: 110, youngDeathAge: 0 };
 		const withCalendar = graphOf(tree({ title: '    year: "Aldric 10"\n' }), compileCalendars([ALDRIC], true));
-		expect(successionDrawn(withCalendar, 'crown', settings)?.sentence).toBe('Line of succession: Crown, Aldric 10');
+		expect(successionDrawn(withCalendar, 'crown', settings)?.sentence).toBe('Line of succession: Crown, Aldric 10 · Eldest child first (primogeniture)');
 		const plain = graphOf(tree({ title: '    year: "c. 1109"\n' }));
-		expect(successionDrawn(plain, 'crown', settings)?.sentence).toBe('Line of succession: Crown, c. 1109');
+		expect(successionDrawn(plain, 'crown', settings)?.sentence).toBe('Line of succession: Crown, c. 1109 · Eldest child first (primogeniture)');
 		const zero = graphOf(tree({ people: '  - {id: c, name: Cade, sex: m, born: -50, parents: [r]}\n', title: '    year: "0"\n' }));
-		expect(successionDrawn(zero, 'crown', settings)?.sentence).toBe('Line of succession: Crown, 0');
+		expect(successionDrawn(zero, 'crown', settings)?.sentence).toBe('Line of succession: Crown, 0 · Eldest child first (primogeniture)');
 	});
 
 	it('the year text is trimmed, and "now" has none for every kind of result', () => {

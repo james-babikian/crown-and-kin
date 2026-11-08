@@ -23,6 +23,8 @@ export function undoneText(label: UndoLabel | undefined, note: string | null, fa
 			return c === '' ? CHANGE_UI.undoneAddedParent(a, b, label.type ?? 'birth') : CHANGE_UI.undoneAddedParentAndMarriage(a, b, label.type ?? 'birth', c);
 		case 'added-partner':
 			return CHANGE_UI.undoneAddedPartner(a, b);
+		case 'changed-parent-type':
+			return label.type === undefined ? fallback : CHANGE_UI.undoneChangedParentType(a, b, label.type);
 		case 'deleted':
 			return REMOVE.undoneDelete(a);
 		case 'marked-me':

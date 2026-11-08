@@ -31,6 +31,7 @@ import { ignoreGhostClick, phoneLayout } from './modal-layout';
 import { whenIdle } from '../view/idle';
 import { trackModal } from '../view/plugin-modals';
 import { nameDialog } from './sheet-parts';
+import { paintNewRow, pinFor, pinMissing } from './picker-pinned';
 
 /** What the picker may use for its rows: the picture store (portraits), the tree's note, the marked person and the relation options (the second text line). */
 export interface PickerContext {
@@ -228,6 +229,7 @@ function definePicker() {
 			this.pool = this.suggest(query);
 			const out = this.pool.slice(0, this.window);
 			this.built = out.length;
+			pinMissing(this.pool, out, this.newRow, this);
 			this.fillWords(out);
 			return out;
 		}
@@ -350,9 +352,7 @@ function definePicker() {
 		renderSuggestion(item: Item, el: HTMLElement): void {
 			el.addClass('dynasty-picker-row');
 			if (item.kind === 'new') {
-				el.addClass('dynasty-picker-new');
-				el.createSpan({ cls: 'dynasty-picker-swatch is-new', text: '+' });
-				el.createSpan({ cls: 'dynasty-picker-name', text: this.newRow ? this.newRow(item.text) : FLOW.createNew(item.text) });
+				paintNewRow(el, this.newRow ? this.newRow(item.text) : FLOW.createNew(item.text), pinFor(this.newRow !== null, this, item));
 				return;
 			}
 			const p = item.person;

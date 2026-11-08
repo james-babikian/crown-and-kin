@@ -5,6 +5,7 @@
 
 import { setIcon } from 'obsidian';
 import type { FamilyGraph } from '../core/derive';
+import { setBarText } from '../render/dom/bar-text';
 import { setNameText } from '../render/dom/name-marks';
 import { finderSentence, stepSentences } from '../render/tree-info';
 import { FINDER_UI, SUCCESSION_UI } from '../render/ui-text';
@@ -161,7 +162,7 @@ export abstract class TreeViewFinder extends TreeViewActions {
 		const bar = viewport.createDiv({ cls: ['dynasty-result', 'dynasty-succession-bar', ...(this.barKind() === 'phone' ? ['dynasty-result-phone'] : [])], attr: { role: 'group', 'aria-labelledby': id } });
 		// After the toolbar and before the cards in the Tab order, like the finder's bar.
 		viewport.insertBefore(bar, before);
-		setNameText(bar.createDiv({ cls: ['dynasty-result-text', 'dynasty-succession-text'], attr: { id, role: 'status', tabindex: -1 } }), d.sentence);
+		setBarText(bar.createDiv({ cls: ['dynasty-result-text', 'dynasty-succession-text'], attr: { id, role: 'status', tabindex: -1 } }), d.sentence);
 		const row = bar.createDiv({ cls: 'dynasty-result-buttons' });
 		this.closeLink(row, 'dynasty-succession-close', SUCCESSION_UI.barClose, SUCCESSION_UI.barCloseLabel, () => this.closeSuccession());
 	}

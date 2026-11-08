@@ -18,6 +18,7 @@ import {
 	LEGEND_GROUP_LINES,
 	LEGEND_LABELS,
 	LEGEND_ORDER,
+	legendLineOrder,
 	SIGN_LEGEND_LABEL,
 } from './legend-text';
 
@@ -54,7 +55,7 @@ export const LEGEND_SAMPLE_H = 22;
 const UNION_PX = 9;
 
 const PARTNER_KINDS: readonly StrokeKind[] = ['marriage', 'betrothal', 'concubinage', 'affair', 'implicit'];
-const CURVE_KINDS: readonly StrokeKind[] = ['birth-link', 'rumoured'];
+const CURVE_KINDS: readonly StrokeKind[] = ['birth-link', 'rumoured', 'begetter'];
 
 const line = (kind: StrokeKind, d: string): LegendPart => ({ tag: 'path', cls: ['dynasty-line', `dynasty-line-${kind}`], attr: { d } });
 // The card ends are 8 px wide.
@@ -95,10 +96,9 @@ function sample(kind: StrokeKind): LegendPart[] {
 /** The sample of a dead sign: the date text with the sign, in the size of a date on a card. */
 const deadSample = (text: string): LegendPart[] => [{ tag: 'text', cls: ['dynasty-legend-dagger'], attr: { x: LEGEND_DEAD_SAMPLE_W / 2, y: 15.5, 'text-anchor': 'middle' }, text }];
 
-/** Every legend row, in legend order, then the D14 card sign on the corner of a card, then the two dead signs. */
+/** Every legend row, in legend order with the D14 card sign directly after "Illegitimate child" (D338 point 7), then the two dead signs. */
 export function legendRows(): LegendRow[] {
-	const rows: LegendRow[] = LEGEND_ORDER.map((kind) => ({ kind, label: LEGEND_LABELS[kind], w: LEGEND_SAMPLE_W, h: LEGEND_SAMPLE_H, parts: sample(kind) }));
-	rows.push({
+	const signRow: LegendRow = {
 		kind: 'sign',
 		label: SIGN_LEGEND_LABEL,
 		w: LEGEND_SAMPLE_W,
@@ -108,7 +108,8 @@ export function legendRows(): LegendRow[] {
 			{ tag: 'rect', cls: ['dynasty-legend-card'], attr: { x: 1, y: 1, width: LEGEND_SAMPLE_W - 2, height: 20, rx: 3 } },
 			{ tag: 'line', cls: ['dynasty-sign'], attr: { x1: LEGEND_SAMPLE_W - 7, y1: 4, x2: LEGEND_SAMPLE_W - 19, y2: 16, 'stroke-width': 2, 'stroke-dasharray': '7.5 2' } },
 		],
-	});
+	};
+	const rows: LegendRow[] = legendLineOrder(LEGEND_ORDER, true).map((kind) => (kind === 'sign' ? signRow : { kind, label: LEGEND_LABELS[kind], w: LEGEND_SAMPLE_W, h: LEGEND_SAMPLE_H, parts: sample(kind) }));
 	rows.push({ kind: 'dead', label: LEGEND_DEAD_LABEL, w: LEGEND_DEAD_SAMPLE_W, h: LEGEND_SAMPLE_H, parts: deadSample(LEGEND_DEAD_SAMPLE) });
 	rows.push({ kind: 'dead-doubt', label: LEGEND_DEAD_DOUBT_LABEL, w: LEGEND_DEAD_SAMPLE_W, h: LEGEND_SAMPLE_H, parts: deadSample(LEGEND_DEAD_DOUBT_SAMPLE) });
 	return rows;
@@ -123,7 +124,7 @@ export interface LegendGroup {
 }
 
 /**
- * The legend window's rows in two groups (D330 O-05): "Lines" (every line style, then the card sign, so the sign row stays last) and "Death labels".
+ * The legend window's rows in two groups (D330 O-05): "Lines" (every line style, with the card sign under "Illegitimate child") and "Death labels".
  * The saved picture does not use the groups; it keeps its own heading (D74).
  */
 export function legendGroups(): LegendGroup[] {

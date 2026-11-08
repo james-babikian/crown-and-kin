@@ -135,10 +135,10 @@ describe('the rule: which families start folded', () => {
 		expect(wholeFactsOf(s.tree, s.whole)).toBe(wholeFactsOf(s.tree, s.whole));
 	});
 
-	it('the focus views that change: 108 of 389 in sample tree 7 and 125 of 803 over all samples (07b left out), the same in a second run', () => {
+	it('the focus views that change: 108 of 389 in sample tree 7 and 129 of 829 over all samples (07b left out; sample tree 20 added, D332), the same in a second run', () => {
 		const w = sweep();
 		expect({ views: w.views07, changed: w.changed07 }).toEqual({ views: 389, changed: 108 });
-		expect({ views: w.views, changed: w.changed }).toEqual({ views: 803, changed: 125 });
+		expect({ views: w.views, changed: w.changed }).toEqual({ views: 829, changed: 129 });
 		expect(w.unstable).toBe(0);
 	});
 });

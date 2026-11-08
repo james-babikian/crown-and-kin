@@ -139,9 +139,10 @@ describe('D293: two legal parents through an adoption', () => {
 		check(src, 'kp', 'kf', { ab: 'Adoptive first cousin', ba: 'Adoptive first cousin' });
 	});
 
-	it('a rumoured parent on Pia gives "maybe half" as for any complete child', () => {
+	// D334 Q13 repair 2: the second test uses the legal set, so a rumoured birth father of a legal child adds no "maybe half" to a legal full sibling.
+	it('a rumoured parent on Pia, a legal child of Wren and Calla, does not make her legal brother "maybe half"', () => {
 		const src = block(['{id: xav, name: Xavier, sex: m}', '{id: pia, name: Pia, sex: f, parents: [wren, {id: calla, type: adoptive}, {id: xav, type: rumoured}]}', '{id: y, name: Yan, sex: m, parents: [wren, calla]}']);
-		check(src, 'pia', 'y', { ab: 'Brother, maybe half | Rumoured half-brother', ba: 'Sister, maybe half | Rumoured half-sister' });
+		check(src, 'pia', 'y', { ab: 'Brother', ba: 'Sister' });
 	});
 
 	it('the second test counts birth and rumoured parents, not the legal parents: Pia and Yves share Wren and a rumoured Xavier', () => {

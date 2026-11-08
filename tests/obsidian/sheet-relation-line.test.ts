@@ -112,14 +112,28 @@ describe('the relation text line of the header', () => {
 		expect(modal.querySelector('.dynasty-show-line')).toBeNull();
 	});
 
-	it('a person with no relation: the text and no "more"; the button stays', () => {
+	it('a person with no relation and no chain: the text, no "more" and no "Show the line"', () => {
 		computer();
 		const { modal } = open('quill');
 		const line = lines(modal)[0]!;
 		expect(line.hasClass('is-none')).toBe(true);
 		expect(line.querySelector('.dynasty-jitem')!.getText()).toBe('No relation to you in this tree.');
 		expect(line.querySelector('.dynasty-more')).toBeNull();
+		expect(modal.querySelector('.dynasty-show-line')).toBeNull();
+	});
+
+	it('a person with no relation but a chain to the marked person (an affair partner) keeps "Show the line", because a line shows', () => {
+		computer();
+		const { modal } = open('yara');
+		const line = lines(modal)[0]!;
+		expect(line.hasClass('is-none')).toBe(true);
 		expect(line.querySelector('.dynasty-show-line')).not.toBeNull();
+	});
+
+	it('the phone window has the same rule', () => {
+		phone();
+		expect(open('quill').modal.querySelector('.dynasty-show-line')).toBeNull();
+		expect(open('orla').modal.querySelector('.dynasty-show-line')).not.toBeNull();
 	});
 
 	it('a tree with no mark shows nothing on a computer and on a phone; a new person shows nothing', () => {

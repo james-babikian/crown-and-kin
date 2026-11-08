@@ -192,11 +192,11 @@ describe('the hidden measure of a drop-down does not widen the settings tab', ()
 });
 
 describe('the pencil stands on the grid of the bar: 8 px inside the block, with no negative margin at the right', () => {
-	it('neither the pencil button nor the icon inside it has a margin; the pencil box of the large row takes 8 px of the gap before it', () => {
+	it('neither the pencil button nor the icon inside it has a margin, also in the large row: its pictures end where those of the other rows end (0.5.3)', () => {
 		const css = chunk('31-phone-list.css');
 		expect(rule(css, '.dynasty-list button.dynasty-list-edit:not(.dynasty-list-whole)')).not.toMatch(/margin/);
 		expect(rule(css, '.dynasty-list-edit-icon')).not.toMatch(/margin/);
-		expect(rule(css, '.dynasty-list-whole > .dynasty-list-edit-icon')).toMatch(/margin-left:\s*calc\(-1 \* var\(--dynasty-space-2\)\)/);
+		expect(css).not.toMatch(/\.dynasty-list-whole\s*>\s*\.dynasty-list-edit-icon/);
 	});
 });
 

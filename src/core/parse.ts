@@ -10,6 +10,7 @@
 import { isAlias, isMap as isYamlMap, isNode, isPair, isScalar, isSeq, Lexer, parseDocument, type Document } from 'yaml';
 import { personIdSource } from './id-gen';
 import { codedIssue, LIMIT_DETAIL, type CodedIssue, type HardError } from './messages';
+import { PARENT_TYPES } from './parent-types';
 import { cropValue } from './portrait-crop';
 import { normaliseSobriquet } from './sobriquet';
 import { readIllegitimate, readThrough } from './succession-keys';
@@ -43,12 +44,12 @@ export function readUnionType(v: Raw): string {
 	return UNION_WORDS[text.trim().toLowerCase()] ?? text;
 }
 
-/** The type of a parent link: one of the four known types in any case is that type; no type is birth; any other text stays (validation warns). */
+/** The type of a parent link: one of the known types (`PARENT_TYPES`) in any case is that type; no type is birth; any other text stays (validation warns). */
 function readParentType(v: Raw): string {
 	const text = str(v);
 	if (text === undefined) return 'birth';
 	const word = text.trim().toLowerCase();
-	return word === 'birth' || word === 'adoptive' || word === 'ward' || word === 'rumoured' ? word : text;
+	return (PARENT_TYPES as readonly string[]).includes(word) ? word : text;
 }
 
 /** Holder keys read as text (spec §13.4); `person` and `name` are read first. */

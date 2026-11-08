@@ -458,6 +458,16 @@ describe('the look of the Calendars window and the block', () => {
 		expect(c.querySelectorAll('.dynasty-cal-era')).toHaveLength(1);
 	});
 
+	it('the screen-reader name of the era Remove link has the form of the calendar link and begins with the visible word (WCAG 2.5.3)', async () => {
+		const o = await open({ 'Calendars.md': eraNote() });
+		const button = o.win.contentEl.querySelector('.dynasty-cal-era .dynasty-cal-remove')!;
+		const name = button.getAttribute('aria-label')!;
+		expect(name).toBe(T.removeEra('Qinglong Emperor'));
+		expect(name).toMatch(/^Remove this era: /);
+		expect(name.startsWith(button.getText())).toBe(true);
+		expect(T.removeEra('')).toBe('Remove this era: without a name');
+	});
+
 	it('the start of a cycle calendar has a sub-heading, one row of Cycle, Year, "=" and Same year as, the reading line, then the hint of the field that has the focus', async () => {
 		const o = await open({ 'Calendars.md': cycleNote() });
 		const start = o.win.contentEl.querySelector('.dynasty-cal-start')!;

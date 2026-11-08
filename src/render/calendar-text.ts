@@ -126,7 +126,8 @@ export const CALENDAR_WINDOW_UI = {
 	removeThisCalendar: 'Remove this calendar',
 	/** A quiet line under the link: what changes in the tree when the calendar is gone. */
 	removeNote: 'If you remove this calendar, the plugin no longer reads dates in this calendar as years. Cards show these dates as written. The line of succession then uses plain years only.',
-	removeEra: (name: string) => `Remove the era ${name || 'without a name'}`,
+	// The visible link is "Remove"; the name begins with it (WCAG 2.5.3) and has the form of `removeCalendar` (D322).
+	removeEra: (name: string) => `Remove this era: ${name || 'without a name'}`,
 	// The summary line of a closed section (spec §14 rule 16).
 	summaryYears: (n: number) => (n === 1 ? '1 year in a cycle' : `${n} years in a cycle`),
 	summaryFormats: (n: number) => (n === 0 ? 'No format' : n === 1 ? '1 format' : `${n} formats`),

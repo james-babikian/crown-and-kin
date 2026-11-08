@@ -7,7 +7,8 @@ import type { Tree } from '../../src/core/types';
  */
 
 const PLACEMENT = ['birth', 'adoptive', 'ward'];
-const KNOWN_PARENT_TYPES = ['birth', 'adoptive', 'ward', 'rumoured'];
+// D332: the begetter link (0.5.3) is a known type.
+const KNOWN_PARENT_TYPES = ['birth', 'adoptive', 'ward', 'rumoured', 'begetter'];
 
 export interface SecondaryLink {
 	parent: string;

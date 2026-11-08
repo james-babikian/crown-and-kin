@@ -69,7 +69,7 @@ export const SHEET = {
 } as const;
 
 /** Names of parent types, as the sheet and the flows show them. */
-const PARENT_TYPE_TEXT: Record<string, string> = { birth: 'Birth parent', adoptive: 'Adoptive parent', ward: 'Guardian', rumoured: 'Rumoured parent' };
+const PARENT_TYPE_TEXT: Record<string, string> = { birth: 'Birth parent', adoptive: 'Adoptive parent', ward: 'Guardian', rumoured: 'Rumoured parent', begetter: 'Begetter' };
 /** Names of partnership types, as the sheet and the flows show them. */
 export const UNION_TYPE_TEXT: Record<string, string> = { marriage: 'Marriage', betrothal: 'Betrothal', concubinage: 'Concubinage', affair: 'Affair' };
 
@@ -135,6 +135,8 @@ export const FLOW = {
 	addParentTitle: 'Add a parent',
 	parentTypeText: (name: string) => `Select the type of parent for ${isolateName(name)}.`,
 	typeFull: (limit: number) => `This person has ${limit} parents of this type.`,
+	/** D332: the detail of Birth parent and Begetter in Add parent when the person has 2 parents by blood; the two types count together. */
+	bloodFull: 'This person has 2 parents by blood. Birth parents and begetters count together.',
 	newOrExisting: (name: string, what: string) => `Add a ${what} to ${isolateName(name)}. Select a new person or a person who is in the tree.`,
 	newPerson: 'New person',
 	newPersonDetail: 'Enter a person who is not in the tree.',
@@ -149,6 +151,10 @@ export const FLOW = {
 	childTypeText: (child: string, parents: string) => `${isolateName(child)} has birth parents now. Select how ${isolateName(parents)} are related to ${isolateName(child)}.`,
 	childTypeTextOne: (child: string, parent: string) => `${isolateName(child)} has birth parents now. Select how ${isolateName(parent)} is related to ${isolateName(child)}.`,
 	childTypeFull: 'The child cannot have more parents of this type.',
+	/** D332: the detail of Birth parent or Begetter in the type step of Add child when the child would have more than 2 parents by blood. */
+	childBloodFull: 'The child cannot have more than 2 parents by blood. Birth parents and begetters count together.',
+	/** D332: the detail of Birth parent or Begetter in the type step of Add child when a parent is already the other of the two for this child. */
+	childBloodBoth: 'A person cannot be a birth parent and a begetter of the same child.',
 	alreadyChild: (child: string, parent: string) => `${isolateName(child)} is a child of ${isolateName(parent)} now.`,
 	addPartnerTitle: 'Add a partner',
 	unionTypeTitle: 'Type of partnership',
@@ -222,11 +228,11 @@ export const REMOVE = {
 	partnershipText: (type: string, a: string, b: string) =>
 		`The plugin removes the ${lowerFirst(type)} of ${isolateName(a)} and ${isolateName(b)}. If ${isolateName(a)} and ${isolateName(b)} have children, the children stay connected to both parents.`,
 	canUndo: 'You can undo this.',
-	deleted: (name: string) => `The plugin deleted ${isolateName(name)}. You can undo this.`,
-	removedPartnership: (a: string, b: string) => `The plugin removed the partnership of ${isolateName(a)} and ${isolateName(b)}. You can undo this.`,
+	deleted: (name: string) => `The plugin deleted ${isolateName(name)}.`,
+	removedPartnership: (a: string, b: string) => `The plugin removed the partnership of ${isolateName(a)} and ${isolateName(b)}.`,
 	/** D330 UX-17: the Notice after Undo of a delete. */
 	undoneDelete: (name: string) => `The plugin undid the deletion of ${isolateName(name)}.`,
-	removedParent: (parent: string, child: string) => `The plugin removed ${isolateName(parent)} as a parent of ${isolateName(child)}. You can undo this.`,
+	removedParent: (parent: string, child: string) => `The plugin removed ${isolateName(parent)} as a parent of ${isolateName(child)}.`,
 	undo: 'Undo',
 	undoAlso: 'If you select Undo, the plugin also removes the other changes that you saved with this change.',
 } as const;

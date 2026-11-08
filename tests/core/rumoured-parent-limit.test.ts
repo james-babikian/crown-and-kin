@@ -22,7 +22,7 @@ function withRumoured(n: number): string {
 
 describe('a child takes up to 8 rumoured parents (D200 P1)', () => {
 	it('the limit in the code is 8 for rumoured and 2 for the other types', () => {
-		expect(PARENT_LIMIT).toEqual({ birth: 2, adoptive: 2, ward: 2, rumoured: 8 });
+		expect(PARENT_LIMIT).toEqual({ birth: 2, adoptive: 2, ward: 2, rumoured: 8, begetter: 2 });
 	});
 
 	it('the 3rd and the 8th rumoured parent are written', () => {

@@ -274,10 +274,10 @@ describe('D40, D41: the scene draws the relation text and the marked card', () =
 		const { root } = scene(g, on, { relations: CONRAD, me: 'conrad' });
 		expect(cardEl(root, 'blanche').getAttribute('aria-label')).toBe(`${cardLabel(g.byId.get('blanche')!)}, sister`);
 		expect(cardEl(root, 'conrad').getAttribute('aria-label')).toBe(`${cardLabel(g.byId.get('conrad')!)}, you`);
-		expect(cardLabel(g.byId.get('blanche')!, 'sister')).toBe('Blanche Castellane, b. 1095, sister');
+		expect(cardLabel(g.byId.get('blanche')!, 'sister')).toBe('Blanche Castellane, born 1095, sister');
 		// The marked card says "you" also with no relation texts at all.
 		const bare = scene(g, on, { me: 'conrad' }).root;
-		expect(cardEl(bare, 'conrad').getAttribute('aria-label')).toBe('Conrad Castellane, b. 1092, you');
+		expect(cardEl(bare, 'conrad').getAttribute('aria-label')).toBe('Conrad Castellane, born 1092, you');
 		expect(all(bare).some((e) => e.hasClass('dynasty-card-relation'))).toBe(false);
 	});
 
@@ -285,7 +285,7 @@ describe('D40, D41: the scene draws the relation text and the marked card', () =
 		const src = `people:\n  - {id: w, name: Wren, born: '1135', illegitimate: true}\n`;
 		const b = build(src).g;
 		const { root } = scene(b, lay(b, { ...DEFAULT_LAYOUT_SETTINGS, relationLine: true }), { relations: new Map([['w', rel('Half-sister')]]) });
-		expect(cardEl(root, 'w').getAttribute('aria-label')).toBe('Wren, b. 1135, half-sister, illegitimate');
+		expect(cardEl(root, 'w').getAttribute('aria-label')).toBe('Wren, born 1135, half-sister, illegitimate');
 	});
 
 	it('without the finder options the scene has no finder classes and the labels are as before', () => {

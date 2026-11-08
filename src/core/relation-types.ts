@@ -118,7 +118,9 @@ export type FindRelation = (g: FamilyGraph, first: string, second: string, optio
  * links among them (never the raw `person.parents`) and whose unions are the original union objects
  * of `line.unions` (same keys), then makes two patches: a child whose only line link to a parent is
  * `rumoured` gets `placementParents = [parent]` and `placementType = 'rumoured'` (`layout/draw.ts` draws it
- * with the rumoured stroke and the "?" marker); an implicit union of `line.unions` with no shared
+ * with the rumoured stroke and the "?" marker), and a child whose line links are begetter links (and rumoured
+ * ones) hangs from its first begetter with `placementType = 'begetter'` (D332; a begetter never joins a couple);
+ * an implicit union of `line.unions` with no shared
  * child stays as an implicit `FamilyUnion` with `children: []` (a plain connector). Pure.
  */
 export type LineSubgraph = (g: FamilyGraph, line: RelationLine) => FamilyGraph;
@@ -139,6 +141,6 @@ export const FINDER_LIMIT: number = Infinity;
  * one with adoptive links (1), before one with rumoured links (2), as §13.1 "Which name wins" rule 4
  * orders the words. Ward links make no blood line.
  */
-export const RANK: Record<ParentType, number> = { birth: 0, adoptive: 1, rumoured: 2, ward: 2 };
+export const RANK: Record<ParentType, number> = { birth: 0, adoptive: 1, rumoured: 2, ward: 2, begetter: 0 };
 /** The rank of the three link words of a blood line, as `RANK` without the ward link. */
 export const WORD_RANK: Record<'birth' | 'adoptive' | 'rumoured', number> = { birth: 0, adoptive: 1, rumoured: 2 };

@@ -29,6 +29,29 @@
 	line-height: 1.35;
 }
 
+/* The hidden comma of the bar text (`render/dom/bar-text.ts`) is placed in this block, so a find on the page does not show it elsewhere. */
+.dynasty-succession-text {
+	position: relative;
+}
+
+/* D338 point 3: the rule after the dot is in the muted text colour; the title and the year stay in the normal colour. The bar on the tree, in full screen and in the phone list share it. */
+.dynasty-succession-text .dynasty-succession-rule {
+	color: var(--text-muted);
+}
+
+/*
+ * B-0036: with the rule in it the sentence is long. On a phone it wraps in the bar and does not stay on one line with an ellipsis, so the rule and "No heir in the tree." stay in sight.
+ * Chrome at 320, 375 and 390 px: two text lines at 390 px, three for the longest sentences at 320 px. The limit of three lines only keeps a very long title from covering the tree.
+ */
+.dynasty-list-succession .dynasty-succession-text,
+.dynasty-result-phone .dynasty-succession-text {
+	display: -webkit-box;
+	-webkit-box-orient: vertical;
+	-webkit-line-clamp: 3;
+	overflow: hidden;
+	overflow-wrap: anywhere;
+}
+
 .dynasty-list-succession .dynasty-succession-close {
 	flex: none;
 	display: inline-flex;

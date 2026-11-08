@@ -20,6 +20,7 @@ export const LEGEND_LABELS: Record<StrokeKind, string> = {
 	adoptive: 'Adoptive parent',
 	ward: 'Guardian of a ward',
 	rumoured: 'Rumoured parent',
+	begetter: 'Begetter: a parent by blood, not a parent in the family',
 };
 
 /** Legend label for the card sign (spec D14): illegitimacy that no dashed line shows. */
@@ -60,4 +61,16 @@ export const LEGEND_ORDER: StrokeKind[] = [
 	'ward',
 	'rumoured',
 	'birth-link',
+	'begetter',
 ];
+
+/**
+ * The line rows of a legend in order, with the card sign directly after "Illegitimate child" (D338 point 7), so the two rows about illegitimacy stand together.
+ * A saved picture that draws no "Illegitimate child" row still puts the sign where that row would stand.
+ */
+export function legendLineOrder(kinds: readonly StrokeKind[], sign: boolean): (StrokeKind | 'sign')[] {
+	if (!sign) return [...kinds];
+	const after = LEGEND_ORDER.indexOf('illegitimate');
+	const at = kinds.filter((k) => LEGEND_ORDER.indexOf(k) <= after).length;
+	return [...kinds.slice(0, at), 'sign', ...kinds.slice(at)];
+}

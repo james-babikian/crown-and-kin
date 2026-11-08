@@ -5,6 +5,7 @@
  */
 import { andList } from '../core/messages';
 import { DOUBTFUL_DIED, formatYear, type InheritIllegitimate, type InheritRule, type InheritThrough, type SuccessionRule } from '../core/succession-keys';
+import { quote } from '../core/quote';
 import { isolateName } from './name-bidi';
 import { PERSON_PLACEHOLDER } from './view-text';
 
@@ -17,6 +18,9 @@ const yearIn = (year: string | number): string => (typeof year === 'number' ? fo
 
 /** A `died` text that only says "yes": the row of an open branch then gives no date. */
 const BARE_DEATH_WORDS: readonly string[] = ['yes', 'true', 'dead', 'died', 'deceased'];
+
+/** The one separator of the bar sentence, between the year and the rule (B-0036). */
+export const BAR_SEPARATOR = ' · ';
 
 /**
  * The Succession section of the Titles window (J, K, L), the line of succession, and the texts of the
@@ -77,7 +81,7 @@ export const SUCCESSION_UI = {
 	// Women first in the whole dynasty with no written inherit-through: the first group is the women of the female line.
 	illHintFirstGroup: 'The first group, the women of the female line, has a claim only through the mother’s side. For everyone else the father’s side also counts, so the box “Illegitimate” matters there.',
 	adopted: 'Adopted children can inherit',
-	adoptedHint: 'Wards and rumoured children never inherit.',
+	adoptedHint: 'No claim passes through a guardian, a rumoured parent or a begetter.',
 	body: 'Only descendants of the first holder can inherit',
 	bodyHint: (first: string) => `The first holder is ${isolateName(first)}. Only the descendants of ${isolateName(first)} are in the line. If the title goes to a new house, make a new title.`,
 	// D291: while the switch is off, the hint says what the switch would do; the next hint (`cadetHint`) shows only when it matters.
@@ -151,6 +155,18 @@ export const SUCCESSION_UI = {
 	orderFromNoteSameYear: (a: string, b: string) => `The order of ${isolateName(a)} and ${isolateName(b)} comes from the order in the note, because both have the same birth year.`,
 	orderContradiction: (names: string | readonly string[]) =>
 		`The birth years and the order in the note do not agree for ${typeof names === 'string' ? isolateName(names) : andList(names.map(isolateName))}. The plugin puts the people who have a birth year in the order of the birth years.`,
+	// D334 Q11: why the first heir is not a child of the ruler. `relation` is the lower-case word of the heir for the ruler ("sister"); `rule` is the name of the rule as the Rule list or the list of "Who can inherit" shows it.
+	firstHeirNoChild: (ruler: string, heir: string, relation: string) => `${isolateName(ruler)} has no child in the tree. So the first place in the line goes to ${isolateName(heir)}, the ${relation} of ${isolateName(ruler)}.`,
+	firstHeirDeadChild: (via: string, ruler: string) => `${isolateName(via)}, a child of ${isolateName(ruler)}, is dead. So the children of ${isolateName(via)} come first, in the place of ${isolateName(via)}.`,
+	firstHeirByRule: (heir: string, rule: string) => `${isolateName(heir)} comes first because of the rule ${quote(rule)}.`,
+	// The only living child of the ruler who would stand in front is left out by the box "Illegitimate" or by an adoption (the switch is off).
+	firstHeirBarred: {
+		illegitimate: (child: string, heir: string) =>
+			`${isolateName(child)} has the box “Illegitimate” ticked. For this title, children with this box ticked cannot inherit. So the first place in the line goes to ${isolateName(heir)}.`,
+		'illegitimate-after': (child: string, heir: string) =>
+			`${isolateName(child)} has the box “Illegitimate” ticked. For this title, these children inherit after all people who do not have this box ticked. So the first place in the line goes to ${isolateName(heir)}.`,
+		adopted: (child: string, heir: string) => `${isolateName(child)} is an adopted child. For this title, adopted children cannot inherit. So the first place in the line goes to ${isolateName(heir)}.`,
+	},
 	coRulersNotInLine: 'The other holders are not in the line of succession, unless they are named heirs.',
 	bornInReignNoFrom: (parent: string) =>
 		`${isolateName(parent)} has no start year as a holder of this title. So the rule “Born during the reign first” puts the children of ${isolateName(parent)} in the order of “Eldest child first”. Add a start year in the field “From”.`,
@@ -165,8 +181,11 @@ export const SUCCESSION_UI = {
 	show: 'Show',
 	showLabel: 'Show the line of succession on the tree',
 	// The Show view: the bar above the tree, the card label and the row of the phone list.
-	bar: (title: string, year: YearInText) => (year === null ? `Line of succession: ${isolateName(title)}, now` : `Line of succession: ${isolateName(title)}, ${yearIn(year)}`),
-	barNoHeir: (title: string, year: YearInText) => `${year === null ? `Line of succession: ${isolateName(title)}, now` : `Line of succession: ${isolateName(title)}, ${yearIn(year)}`}. No heir in the tree.`,
+	// B-0036: the bar names the rule after the year, with the one separator. `rule` is absent only for a line that the engine would refuse.
+	bar: (title: string, year: YearInText, rule?: SuccessionRule) => `Line of succession: ${isolateName(title)}, ${year === null ? 'now' : yearIn(year)}${rule ? `${BAR_SEPARATOR}${SUCCESSION_UI.rules[rule]}` : ''}`,
+	/** What a screen reader says in place of the middle dot of the bar: the dot is read as a word or not at all. */
+	barSpokenSeparator: ', ',
+	barNoHeir: (title: string, year: YearInText, rule?: SuccessionRule) => `${SUCCESSION_UI.bar(title, year, rule)}. No heir in the tree.`,
 	barClose: 'Close',
 	barCloseLabel: 'Close the line of succession',
 	inLine: (ordinal: string) => `${ordinal} in line`,

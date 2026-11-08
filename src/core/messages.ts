@@ -12,7 +12,7 @@ import { isolateName } from './name-bidi';
 import { quote, upperFirst } from './quote';
 import { LIST_REFUSAL_TEXT, REFUSAL_TEXT } from './refusal-text';
 import { INHERIT_ILLEGITIMATE, INHERIT_RULES, INHERIT_THROUGH, SUCCESSION_RULES } from './succession-keys';
-import { PARENT_LIMIT } from './parent-types';
+import { BLOOD_LIMIT, PARENT_LIMIT } from './parent-types';
 
 /** Tree not rendered (spec §8). */
 export type HardErrorCode =
@@ -60,6 +60,12 @@ type WarningCode =
 	// Structure.
 	/** More parents of one type than `PARENT_LIMIT` allows. params: person, type, count; limit (2, or 8 for rumoured) */
 	| 'too-many-parents'
+	/** D332: more distinct parents by blood (birth and begetter links) than `BLOOD_LIMIT`, for a person with a begetter link and no `too-many-parents` of those types. params: person, count, limit */
+	| 'too-many-blood-parents'
+	/** D332: one id is a birth parent and a begetter of the person; the tree draws the birth link only. params: person, parent */
+	| 'begetter-is-birth-parent'
+	/** D332: a begetter of the person shares a listed marriage with a birth parent of the person. params: person, parent (the begetter), partner (the birth parent) */
+	| 'begetter-married-to-parent'
 	/** params: union (label), partners (names), count */
 	| 'union-partner-count'
 	/** params: union (label), partners (names), person */
@@ -400,7 +406,18 @@ const ISSUE_TEXT: { [C in IssueCode]: (p: P) => string } = {
 		if (type === 'rumoured') {
 			return `${person(p)} has ${n(p, 'count')} rumoured parents, but a person can have only ${limit} of this type. If a person has more than ${limit}, a relation name can lack a “maybe”. Remove the extra parents, or change their type.`;
 		}
-		return `${person(p)} has ${n(p, 'count')} ${type} parents, but a person can have only ${limit} of each type. Remove the extra parents, or change their type.`;
+		return `${person(p)} has ${n(p, 'count')} ${type === 'begetter' ? 'begetters' : `${type} parents`}, but a person can have only ${limit} of each type. Remove the extra parents, or change their type.`;
+	},
+	'too-many-blood-parents': (p) =>
+		`${person(p)} has ${n(p, 'count')} parents by blood (birth parents and begetters together), but a person can have only ${n(p, 'limit') || BLOOD_LIMIT}. Remove the extra parents, or change their type.`,
+	'begetter-is-birth-parent': (p) => {
+		const parent = nm(p, 'parent', 'A parent');
+		return `${parent} is a birth parent and a begetter of ${person(p)}. The tree shows ${parent} only as a birth parent. Remove one of the two entries.`;
+	},
+	// text-lint: description
+	'begetter-married-to-parent': (p) => {
+		const parent = nm(p, 'parent', 'A begetter');
+		return `${person(p)} has the begetter ${parent}, who is married to the birth parent ${nm(p, 'partner', 'of this person')}. A begetter is a parent by blood who is not a parent in the family, but the spouse of a birth parent often is. If ${parent} is a parent in the family, change the type to birth. If not, keep the type begetter.`;
 	},
 	'union-partner-count': (p) => {
 		const partners = strings(p, 'partners');
@@ -446,7 +463,7 @@ const ISSUE_TEXT: { [C in IssueCode]: (p: P) => string } = {
 		const suggestion = s(p, 'suggestion', '');
 		const hint = suggestion ? ` If you mean ${quote(suggestion)}, write ${quote(`type: ${suggestion}`)}.` : '';
 		const parent = nm(p, 'parent', 'a parent');
-		return `${person(p)} has the parent ${parent} with the type ${quote(s(p, 'value', '?'))}, which the plugin does not know. The plugin counts ${parent} as a birth parent of ${person(p)}. Use birth, adoptive, ward or rumoured.${hint}`;
+		return `${person(p)} has the parent ${parent} with the type ${quote(s(p, 'value', '?'))}, which the plugin does not know. The plugin counts ${parent} as a birth parent of ${person(p)}. Use birth, adoptive, ward, rumoured or begetter.${hint}`;
 	},
 
 	'missing-picture': (p) => {

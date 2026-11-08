@@ -33,14 +33,14 @@ describe('successionDrawn', () => {
 			['cedric-carrow', '3rd'],
 			['dunstan-carrow', '4th'],
 		]);
-		expect(d.sentence).toBe('Line of succession: Duke of Carrowmere, now');
+		expect(d.sentence).toBe('Line of succession: Duke of Carrowmere, now · Eldest child first (primogeniture)');
 		expect(linePeople(d)).toEqual(['bertram-carrow', ...d.heirs]);
 	});
 
 	it('uses the year of the line in the sentence', () => {
 		const d = successionDrawn(g, 'countess-of-harrowfen', SET)!;
 		expect(d.result.year).toBe(1215);
-		expect(d.sentence).toBe('Line of succession: Countess of Harrowfen, 1215');
+		expect(d.sentence).toBe('Line of succession: Countess of Harrowfen, 1215 · Youngest child first (ultimogeniture)');
 		expect(d.heirs).toHaveLength(5);
 	});
 
@@ -96,6 +96,21 @@ describe('the card label and the texts', () => {
 		expect(cardLabel(p)).not.toContain('in line');
 		expect(cardLabel(p, 'son', undefined, '2nd in line')).toBe(`${cardLabel(p, 'son')}, 2nd in line`);
 		expect(cardLabel(p, undefined, undefined, 'open branch').endsWith(', open branch')).toBe(true);
+	});
+
+	it('B-0036: the bar names the rule after the year, with the one separator, for every rule', () => {
+		for (const [key, name] of Object.entries(T.rules)) {
+			expect(T.bar('Duke of Valmont', null, key as never)).toBe(`Line of succession: Duke of Valmont, now · ${name}`);
+			expect(T.barNoHeir('Duke of Valmont', 1210, key as never)).toBe(`Line of succession: Duke of Valmont, 1210 · ${name}. No heir in the tree.`);
+		}
+		expect(T.bar('Duke of Carrowmere', null, 'eldest-child')).toBe('Line of succession: Duke of Carrowmere, now · Eldest child first (primogeniture)');
+	});
+
+	it('B-0036: a phone wraps the sentence in the bar of the tree and in the bar of the list, with no single-line ellipsis', () => {
+		const r = rule(['.dynasty-list-succession .dynasty-succession-text,', '.dynasty-result-phone .dynasty-succession-text'].join('\n'));
+		expect(r).not.toContain('white-space: nowrap');
+		expect(r).not.toContain('text-overflow: ellipsis');
+		expect(r).toContain('-webkit-line-clamp: 3');
 	});
 
 	it('the texts', () => {

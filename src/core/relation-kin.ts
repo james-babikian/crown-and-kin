@@ -5,10 +5,11 @@
 
 import { deepFreeze } from './deep-freeze';
 import type { FamilyUnion } from './derive';
-import { compareCands, forget, isFullCousin, maybeRank, walkLine, withoutFormerTwins } from './relation-candidates';
-import { type Blood, type BloodLine, BY_IN_LAW, BY_MARRIAGE, BY_STEP, type Cand, type Edge, FORMER, implicitKey, isStepLink, type Line, named, possessive, type Up, type Walk, type Word } from './relation-internal';
+import { compareCands, forget, isDupRumoured, isFullCousin, maybeRank, walkLine, withoutFormerTwins, withoutRumouredTwins } from './relation-candidates';
+import { type Blood, type BloodLine, BY_IN_LAW, BY_MARRIAGE, BY_STEP, type Cand, type Edge, FORMER, implicitKey, isStepLink, type Line, named, possessive, RUMOURED_CAT, type Up, type Walk, type Word } from './relation-internal';
+import { isBloodType } from './parent-types';
 import { KinBlood } from './relation-kin-blood';
-import { type Relation, relationCallStats, type RelationLine, type RelationMaybe, type RelationStep } from './relation-types';
+import { RANK, type Relation, relationCallStats, type RelationLine, type RelationMaybe, type RelationStep, WORD_RANK } from './relation-types';
 import { capital, childStepWord, cousinWord, nephewWord, parentStepWord, type Sex, siblingStepWord, uncleWord, WORDS } from './relation-words';
 
 /** The top layer of the relation search: the names of one person to another, the chain, the steps and the frozen relations. */
@@ -16,22 +17,40 @@ export class Kin extends KinBlood {
 	/**
 	 * The walk of a blood candidate (file header, "Lines", blood): up from the first person to `x`;
 	 * for a full relation across the couple to `x`'s partner; then down to the second person.
+	 * At a couple the walk goes up through `y` and down from `x` instead when only that shows links as good as the word.
 	 */
 	bloodWalk(c: BloodLine): Walk {
-		const nodes = [...c.pathF];
+		const couple = c.y >= 0 && c.a > 0 && c.b > 0;
+		const [up, down] = couple && this.acrossTheOtherWay(c) ? [c.y, c.x] : [c.x, c.y];
+		const pathF = couple ? [...c.pathF.slice(0, -1), up] : c.pathF;
+		const nodes = [...pathF];
 		const edges: Edge[] = [];
-		for (let i = 0; i + 1 < c.pathF.length; i++) edges.push({ k: 'up', type: this.typeOf(c.pathF[i], c.pathF[i + 1]) });
+		for (let i = 0; i + 1 < pathF.length; i++) edges.push({ k: 'up', type: this.typeOf(pathF[i], pathF[i + 1]) });
 		let top = c.x;
-		if (c.y >= 0 && c.a > 0 && c.b > 0) {
-			nodes.push(c.y);
+		if (couple) {
+			nodes.push(down);
 			edges.push({ k: 'partner', union: this.coupleUnion(c.pathF[c.pathF.length - 2], c.x, c.y) });
-			top = c.y;
+			top = down;
 		}
 		for (let i = c.pathP.length - 2; i >= 0; i--) {
 			nodes.push(c.pathP[i]);
 			edges.push({ k: 'down', type: this.typeOf(c.pathP[i], i === c.pathP.length - 2 ? top : c.pathP[i + 1]) });
 		}
 		return { nodes, edges };
+	}
+
+	/**
+	 * True if the walk of a full line should cross its couple the other way. The word of the line reads the links of both children to `x`
+	 * (and a rumoured link to `y`); the walk shows the link of the first child to the member it goes up to and of the second child to the
+	 * member it comes down from. If that shows a worse link than the word ("a is x1's adopted son" under "Great-uncle") and the other
+	 * way does not, the walk goes up through `y` and down from `x`, so the steps follow the word. Never for a link word the steps must
+	 * show: then the walk already shows it (D293 "Adoptive brother").
+	 */
+	private acrossTheOtherWay(c: BloodLine): boolean {
+		const [c1, c2] = [c.pathF[c.pathF.length - 2], c.pathP[c.pathP.length - 2]];
+		const rank = (child: number, parent: number) => RANK[this.typeOf(child, parent)];
+		const word = WORD_RANK[this.wordOf(c.pathF, c.pathP, c.y)];
+		return Math.max(rank(c1, c.x), rank(c2, c.y)) > word && Math.max(rank(c1, c.y), rank(c2, c.x)) <= word;
 	}
 
 	/** The line of a blood candidate. */
@@ -53,15 +72,11 @@ export class Kin extends KinBlood {
 			cands.push({ ...this.partnerOf(pu, m, p), kind: 'partner', distance: 1, cat: 0, direct: 1, half: 0, removal: 0, elder: 0, group: 0, anc: -1, make: () => ({ line: walkLine(walk), walk }) });
 		}
 
-		if (this.drawn[m].some((l) => l.p === p && l.type === 'ward')) cands.push(this.wardCand(m, p, 'guardian'));
-		if (this.drawn[p].some((l) => l.p === m && l.type === 'ward')) cands.push(this.wardCand(m, p, 'ward'));
+		this.directExtras(m, p, cands);
 
 		const blood = this.blood(m, p, aP);
-		// A rumoured half line of the same degree as a sure line whose "maybe full" the rumour causes adds no name: the "maybe" has made its
-		// "Rumoured" name already. It reads no pair of children, since the lines kept for a key depend on the order of the people.
-		const dupRumoured = (rc: Blood) => rc.word === 'rumoured' && blood.some((c) => c !== rc && c.word !== 'rumoured' && c.maybe === 'full' && c.cause === 'rumoured' && c.half && rc.half && c.a === rc.a && c.b === rc.b);
 		for (const c of blood) {
-			if (dupRumoured(c)) continue;
+			if (isDupRumoured(blood, c)) continue;
 			const lower = this.bloodLower(c, sexP);
 			cands.push({
 				lower,
@@ -115,23 +130,9 @@ export class Kin extends KinBlood {
 		// A sure blood name of P puts the names by marriage after it (D200 R3 key 2) and hides rule 1; a name through a rumoured link does neither.
 		const sureBlood = blood.some((c) => c.word !== 'rumoured');
 		// By marriage, rule 1: P is married to a blood relative R of M, and P is not a sure blood relative.
-		if (!sureBlood) {
-			// A rumoured blood relative P can lie on the line from M to R, and the line lists each person once: such a name is left out.
-			// The test reads the ancestors, not the line found, so the names never depend on the order of the people.
-			const aM = blood.length ? this.ancFrom(m) : undefined;
-			for (const r of this.spouses(p)) {
-				if (r === m) continue;
-				const marriages = this.marriagesOf(r, p);
-				const aR = aM ? this.anc(r) : undefined;
-				for (const c of this.blood(m, r)) {
-					// The first member of a couple is chosen by the order of the people, so every member counts.
-					if (aM && (c.x === p || c.y === p || c.couple.includes(p) || ((aM.has(p) || aR!.has(p)) && (aP.has(c.x) || c.couple.some((q) => aP.has(q)))))) continue;
-					cands.push(this.ruleOneCand(c, m, r, p, sexP, marriages));
-				}
-			}
-		}
+		if (!sureBlood) cands.push(...this.byMarriageOne(m, p, aP, sexP, blood));
 
-		cands.push(...this.byMarriageTwo(m, p, aP, sexP));
+		cands.push(...this.byMarriageTwo(m, p, aP, sexP, blood));
 		// Only this call reads the other lines of these lists; rule 1 reads none.
 		forget(blood);
 
@@ -142,7 +143,7 @@ export class Kin extends KinBlood {
 		if (sureBlood) for (const c of cands) if (c.kind === 'by-marriage') c.after = 1;
 		cands.sort(compareCands);
 		const seen = new Map<string, Cand>();
-		return withoutFormerTwins(cands).filter((c) => {
+		return withoutRumouredTwins(withoutFormerTwins(cands)).filter((c) => {
 			const first = seen.get(c.lower);
 			if (!first) {
 				seen.set(c.lower, c);
@@ -154,10 +155,31 @@ export class Kin extends KinBlood {
 		});
 	}
 
-	/** By marriage, rule 2: P is a blood relative of M's spouse S (the names of §13.1 "Names by marriage"). */
-	private byMarriageTwo(m: number, p: number, aP: Map<number, number>, sexP: Sex): Cand[] {
+	/** By marriage, rule 1: P is married to a blood relative R of M (§13.1 "Names by marriage"); `blood` holds P's own blood candidates to M, all rumoured. */
+	private byMarriageOne(m: number, p: number, aP: Map<number, number>, sexP: Sex, blood: Blood[]): Cand[] {
 		const cands: Cand[] = [];
-		const avoids = (d: BloodLine) => d.y !== m && !d.pathF.includes(m) && !d.pathP.includes(m);
+		// A rumoured blood relative P can lie on the line from M to R, and the line lists each person once: such a name is left out.
+		// The test reads the ancestors, not the line found, so the names never depend on the order of the people.
+		const aM = blood.length ? this.ancFrom(m) : undefined;
+		for (const r of this.spouses(p)) {
+			if (r === m) continue;
+			const marriages = this.marriagesOf(r, p);
+			const aR = aM ? this.anc(r) : undefined;
+			for (const c of this.blood(m, r)) {
+				// The first member of a couple is chosen by the order of the people, so every member counts. Only a leg through a
+				// rumoured link can pass P: a sure leg through P would make P a sure blood relative, and a rumour never removes a sure name (D200 R1).
+				if (aM && c.word === 'rumoured' && (c.x === p || c.y === p || c.couple.includes(p) || ((aM.has(p) || aR!.has(p)) && (aP.has(c.x) || c.couple.some((q) => aP.has(q)))))) continue;
+				cands.push(this.ruleOneCand(c, m, r, p, sexP, marriages, c.b === 0 && rumouredAt(blood, c.a, 0)));
+			}
+		}
+		return cands;
+	}
+
+	/** By marriage, rule 2: P is a blood relative of M's spouse S (the names of §13.1 "Names by marriage"). */
+	private byMarriageTwo(m: number, p: number, aP: Map<number, number>, sexP: Sex, blood: Blood[]): Cand[] {
+		const cands: Cand[] = [];
+		// A full line through a couple that a begetter link keeps off the line still runs through M if M is in that couple (D332).
+		const avoids = (d: BloodLine) => d.y !== m && !d.pathF.includes(m) && !d.pathP.includes(m) && !this.bloodCoupleHas(d, m);
 		for (const s of this.spouses(m)) {
 			if (s === p) continue;
 			const marriage = this.lastUnion(m, s, true)!;
@@ -182,19 +204,23 @@ export class Kin extends KinBlood {
 			const add = (c: Blood, via: BloodLine) => {
 				// The years read the stepchildren of S on a shortest line to P, never the one found first.
 				const stepKids = c.a === 0 ? this.lineKids(s, p, aP, c.b, c.word !== 'rumoured').filter((k) => !own.includes(k)) : [];
+				// A rumoured child (or grandchild) of M is no stepchild if the rumour is true: the possessive form holds either way.
+				const years = c.a === 0 && rumouredAt(blood, 0, c.b) ? ([false, this.years.allEnded(marriages)] as const) : this.ruleTwoYears(c, p, stepKids, marriages);
 				cands.push(
-					this.marriageCand(this.rule2Word(c, sexP, sexS, ...this.ruleTwoYears(c, p, stepKids, marriages)), c, () => {
+					this.marriageCand(this.rule2Word(c, sexP, sexS, ...years), c, () => {
 						const top = this.throughPassingK(via, stepKids, marriages);
 						const inner = this.bloodLine(top);
 						const walk = this.bloodWalk(top);
 						return {
 							line: { people: [m, ...inner.people], links: inner.links, unions: [marriage.key, ...inner.unions] },
-							walk: { nodes: [m, ...walk.nodes], edges: [{ k: 'partner', union: marriage.key }, ...walk.edges] },
+							walk: { nodes: [m, ...walk.nodes], edges: [{ k: 'partner', union: marriage.key, marriage: true }, ...walk.edges] },
 						};
 					}),
 				);
 			};
 			for (const c of list) {
+				// S's own list does not name it, so the possessive form does not either.
+				if (isDupRumoured(ofS, c)) continue;
 				const forms = this.restoredDouble(c, m, s, p, dM, avoids);
 				if (forms) {
 					forgotten.push(forms);
@@ -252,6 +278,42 @@ export class Kin extends KinBlood {
 		return Object.freeze({ effect: c.maybe!, text: capital(lower), lower, cause: c.cause ?? 'rumoured', ...(c.some ? { some: true as const } : {}), ...(c.cause === 'unlisted' && c.form ? { unlistedForm: c.form } : {}) });
 	}
 
+	/**
+	 * The names of the direct pair that a link beside the kept one gives (spec §0 D332): "Guardian" and "Ward" for a ward
+	 * link; a second adoptive link of the parent gives only its direct name ("Adoptive father" beside "Begetter"), and a second rumoured link
+	 * gives its direct name only beside a link that is not by blood ("Rumoured father" beside "Adoptive father"). Added to `cands`.
+	 */
+	private directExtras(m: number, p: number, cands: Cand[]): void {
+		this.extrasOf(m, p, true, cands);
+		this.extrasOf(m, p, false, cands);
+	}
+
+	/** `directExtras` for one direction: P is M's parent (`up`), else M's child. It runs for every pair, so it makes no array before it finds a link. */
+	private extrasOf(m: number, p: number, up: boolean, cands: Cand[]): void {
+		const child = up ? m : p;
+		const parent = up ? p : m;
+		let count = 0;
+		for (const l of this.drawn[child]) if (l.p === parent) count++;
+		if (!count) return;
+		const links = this.drawn[child].filter((l) => l.p === parent);
+		if (links.some((l) => l.type === 'ward')) cands.push(this.wardCand(m, p, up ? 'guardian' : 'ward'));
+		const kept = this.kept[child].find((l) => l.p === parent)?.type;
+		if (kept === undefined || count < 2) return;
+		for (const type of ['adoptive', 'rumoured'] as const) {
+			if (kept !== type && (type === 'adoptive' || !isBloodType(kept)) && links.some((l) => l.type === type)) cands.push(this.secondLinkCand(m, p, up, type));
+		}
+	}
+
+	/** The direct name of a second link (`directExtras`): P is M's parent (`up`) or child by a link of `type`. */
+	private secondLinkCand(m: number, p: number, up: boolean, type: 'adoptive' | 'rumoured'): Cand {
+		const [parent, child] = up ? [p, m] : [m, p];
+		const lower = up ? parentStepWord(type, this.sex[p]) : childStepWord(type, this.sex[p]);
+		const walk: Walk = { nodes: [m, p], edges: [{ k: up ? 'up' : 'down', type }] };
+		const line: Line = { people: [m, p], links: [{ parent, child, type }], unions: [] };
+		const cat = type === 'rumoured' ? RUMOURED_CAT : 1;
+		return { lower, kind: 'blood', distance: 1, cat, second: type === 'rumoured', direct: 0, half: 0, removal: 1, elder: up ? 1 : -1, group: 0, anc: parent, make: () => ({ line, walk }) };
+	}
+
 	private wardCand(m: number, p: number, kind: 'guardian' | 'ward'): Cand {
 		const [parent, child] = kind === 'guardian' ? [p, m] : [m, p];
 		const walk: Walk = { nodes: [m, p], edges: [{ k: kind === 'guardian' ? 'up' : 'down', type: 'ward' }] };
@@ -277,18 +339,23 @@ export class Kin extends KinBlood {
 		};
 	}
 
-	/** The name of P by marriage, rule 1: P is married (`marriages`, the last-listed shows on the line) to R, a blood relative of M by `c`. */
-	private ruleOneCand(c: Blood, m: number, r: number, p: number, sexP: Sex, marriages: FamilyUnion[]): Cand {
+	/**
+	 * The name of P by marriage, rule 1: P is married (`marriages`, the last-listed shows on the line) to R, a blood relative of M by `c`.
+	 * `rumouredParent`: P is also a rumoured parent (or grandparent) of M where the step word would stand; a stepmother is a father's wife
+	 * who is not one's mother, false if the rumour is true, so the possessive form shows ("Rumoured mother | Father's wife").
+	 */
+	private ruleOneCand(c: Blood, m: number, r: number, p: number, sexP: Sex, marriages: FamilyUnion[], rumouredParent: boolean): Cand {
 		const marriage = marriages[marriages.length - 1];
 		const ks = this.ruleOneKs(c, m, r);
-		return this.marriageCand(this.rule1Word(c, this.sex[r], sexP, ...this.ruleOneYears(c, m, marriages, ks)), c, () => {
+		const years = rumouredParent ? ([false, this.years.allEnded(marriages)] as const) : this.ruleOneYears(c, m, marriages, ks);
+		return this.marriageCand(this.rule1Word(c, this.sex[r], sexP, ...years), c, () => {
 			const top = this.throughPassingK(c, ks, marriages);
 			const line = this.bloodLine(top);
 			line.people.push(p);
 			line.unions.push(marriage.key);
 			const walk = this.bloodWalk(top);
 			walk.nodes.push(p);
-			walk.edges.push({ k: 'partner', union: marriage.key });
+			walk.edges.push({ k: 'partner', union: marriage.key, marriage: true });
 			return { line, walk };
 		});
 	}
@@ -296,13 +363,13 @@ export class Kin extends KinBlood {
 	/**
 	 * Rule 1 and the years: the people whose life the step word is read at (indices). A step-parent is read at the life of M; a step-grandparent
 	 * at the life of every parent of M who is a child of R (the set of parents, never the line found, so the order of the people cannot
-	 * decide). For a confirmed name only birth and adoptive links count on both steps; a rumoured name keeps every link.
+	 * decide). For a confirmed name only birth and adoptive links count on both steps; a rumoured name keeps every link but a begetter link alone (D332).
 	 */
 	private ruleOneKs(c: Blood, m: number, r: number): number[] {
 		if (c.b !== 0 || (c.a !== 1 && c.a !== 2)) return [];
 		if (c.a === 1) return [m];
 		const sure = c.word !== 'rumoured';
-		return this.up[m].filter((l) => (!sure || isStepLink(l)) && this.up[l.p].some((u) => u.p === r && (!sure || isStepLink(u)))).map((l) => l.p);
+		return this.up[m].filter((l) => this.stepLinked(m, l.p, sure) && this.up[l.p].some((u) => u.p === r && this.stepLinked(l.p, r, sure))).map((l) => l.p);
 	}
 
 	/**
@@ -311,6 +378,8 @@ export class Kin extends KinBlood {
 	 */
 	private ruleOneYears(c: Blood, m: number, marriages: FamilyUnion[], ks: number[]): [boolean, boolean] {
 		const me = this.ids[m];
+		// D332: a begetter step gives the possessive form, so "former" follows rule P.
+		if (this.begotStep(c)) return this.years.verdict(marriages, 'possessive', [me]);
 		if (c.b === 0 && (c.a === 1 || c.a === 2)) return this.years.verdict(marriages, 'step', [me], ks.map((k) => this.ids[k]));
 		return this.years.verdict(marriages, (c.b === 0 && c.a >= 3) || (c.a === 0 && c.b >= 3) ? 'possessive' : 'named', [me]);
 	}
@@ -337,6 +406,7 @@ export class Kin extends KinBlood {
 	 */
 	private ruleTwoYears(c: Blood, p: number, stepKids: number[], marriages: FamilyUnion[]): [boolean, boolean] {
 		const you = this.ids[p];
+		if (this.begotStep(c)) return this.years.verdict(marriages, 'possessive', [you]);
 		if (c.a === 0 && (c.b === 1 || c.b === 2)) return this.years.verdict(marriages, 'step', [you], stepKids.map((k) => this.ids[k]));
 		return this.years.verdict(marriages, (c.b === 0 && (c.a === 1 || c.a === 2)) || (c.a === 1 && c.b === 1) ? 'named' : 'possessive', [you]);
 	}
@@ -347,6 +417,8 @@ export class Kin extends KinBlood {
 	 */
 	private rule1Word(c: Blood, sexR: Sex, sexP: Sex, step = true, former = false): Word {
 		const { a, b } = c;
+		// D332: R one step from M over a begetter link is not a parent or a child: the possessive form ("Begetter’s wife").
+		if (this.begotStep(c)) return this.possessiveOne(c, sexR, sexP, former);
 		// A step word that the years remove (D304) is the possessive form instead.
 		if (step && b === 0 && a === 1) return named(c, WORDS.stepParent[sexP], BY_STEP, former);
 		if (step && b === 0 && a === 2) return named(c, WORDS.stepGrandparent[sexP], BY_STEP, former);
@@ -356,6 +428,11 @@ export class Kin extends KinBlood {
 		if (a >= 2 && b === 1) return named(c, `${uncleWord(a, sexP, false)} ${WORDS.byMarriage}`, BY_MARRIAGE, former);
 		if (a === 1 && b >= 2) return named(c, `${nephewWord(b, sexP, false)} ${WORDS.byMarriage}`, BY_MARRIAGE, former);
 		if (a >= 2 && b >= 2) return named(c, `${cousinWord(a, b, false)} ${WORDS.byMarriage}`, BY_MARRIAGE, former);
+		return this.possessiveOne(c, sexR, sexP, former);
+	}
+
+	/** The possessive form of rule 1: R's name, "’s", then P's partner word ("Great-grandson’s wife", "Begetter’s wife"). */
+	private possessiveOne(c: Blood, sexR: Sex, sexP: Sex, former: boolean): Word {
 		return possessive((f) => `${this.bloodLower(c, sexR)}${WORDS.possessive} ${f}${WORDS.spouse[sexP]}`, former);
 	}
 
@@ -371,6 +448,8 @@ export class Kin extends KinBlood {
 	/** Rule 2 names, by P's relation `c` to M's spouse S, with the group of D200 R3 key 9 (see `rule1Word`). */
 	private rule2Word(c: Blood, sexP: Sex, sexS: Sex, step = true, former = false): Word {
 		const { a, b } = c;
+		// D332: P one step from S over a begetter link gives the possessive form ("Wife’s begetter", "Husband’s begotten daughter").
+		if (this.begotStep(c)) return possessive((f) => `${f}${WORDS.spouse[sexS]}${WORDS.possessive} ${this.bloodLower(c, sexP)}`, former);
 		if (b === 0 && a === 1) return named(c, WORDS.parentInLaw[sexP], BY_IN_LAW, former);
 		if (b === 0 && a === 2) return named(c, WORDS.grandparentInLaw[sexP], BY_IN_LAW, former);
 		if (a === 1 && b === 1) return named(c, WORDS.siblingInLaw[sexP], BY_IN_LAW, former);
@@ -381,9 +460,10 @@ export class Kin extends KinBlood {
 
 	/** Rule 3: P is a child of Q, Q is married to M's parent N, and P and M share no parent (birth and adoptive parents only). */
 	private stepSibling(m: number, p: number): Cand | undefined {
-		const mine = this.up[m].filter(isStepLink);
-		const theirs = this.up[p].filter(isStepLink);
-		if (mine.some((l) => theirs.some((t) => t.p === l.p))) return undefined;
+		// A parent by blood that both share (a begetter too, D332) makes them siblings, never step-siblings.
+		if (this.up[m].some((l) => l.type !== 'rumoured' && this.up[p].some((t) => t.p === l.p && t.type !== 'rumoured'))) return undefined;
+		const mine = this.stepLinks(m);
+		const theirs = this.stepLinks(p);
 		// Every pair (N, Q) that has a marriage, and every marriage of it (D304 to D309). Most people have none, so nothing is made before one is found.
 		let pairs: { n: Up; q: number; link: Up; marriages: FamilyUnion[] }[] | undefined;
 		for (const n of mine) {
@@ -393,8 +473,10 @@ export class Kin extends KinBlood {
 			}
 		}
 		if (!pairs) return undefined;
-		// A fixed order, so the name never depends on the order of the people; only the line follows it.
-		pairs.sort((i, j) => i.n.p - j.n.p || i.q - j.q);
+		// A fixed order, so the name never depends on the order of the people; only the line follows it. A line through birth links comes
+		// before one through an adoptive link ("bea is mia's mother", not "abe is mia's adoptive father"), as for a blood line.
+		const rank = (x: { n: Up; link: Up }) => Math.max(RANK[x.n.type], RANK[x.link.type]) * 4 + RANK[x.n.type] + RANK[x.link.type];
+		pairs.sort((i, j) => rank(i) - rank(j) || i.n.p - j.n.p || i.q - j.q);
 		// A marriage counts if it may overlap the life of both children (D304).
 		const y = this.years;
 		const both = [this.ids[m], this.ids[p]];
@@ -410,12 +492,25 @@ export class Kin extends KinBlood {
 			nodes: [m, pick.n.p, pick.q, p],
 			edges: [
 				{ k: 'up', type: pick.n.type },
-				{ k: 'partner', union: marriage.key },
+				{ k: 'partner', union: marriage.key, marriage: true },
 				{ k: 'down', type: pick.link.type },
 			],
 		};
 		const word = WORDS.stepSibling[this.sex[p]];
 		return { lower: former ? `${FORMER}${word}` : word, ...(former ? { base: word } : {}), kind: 'step-sibling', distance: 3, cat: 3, direct: 1, half: 0, removal: 0, elder: 0, group: BY_STEP, anc: -1, make: () => ({ line: walkLine(walk), walk }) };
+	}
+
+	/**
+	 * The birth and adoptive links of a person for rule 3, one per parent of `up`: the kept link, or, when that is not a birth or adoptive link,
+	 * the first birth or adoptive link of the same parent (D332: an adoptive link beside a begetter link still counts).
+	 */
+	private stepLinks(i: number): Up[] {
+		const out: Up[] = [];
+		for (const l of this.up[i]) {
+			const step = isStepLink(l) ? l : this.drawn[i].find((d) => d.p === l.p && isStepLink(d));
+			if (step) out.push(step);
+		}
+		return out;
 	}
 
 	/** The shortest chain of links of any type and partnerships (§13.2), by the search order of the file header. */
@@ -469,8 +564,9 @@ export class Kin extends KinBlood {
 				continue;
 			}
 			let word: string;
-			// The word type comes from the pair's last-listed union, as the card says it, not from the union the walk crossed.
-			if (e.k === 'partner') word = this.partnerOf(this.pairUnion(from, to) ?? this.g.unionByKey.get(e.union), from, to).lower;
+			// The word type comes from the pair's last-listed union, as the card says it, not from the union the walk crossed; the line of a
+			// name by marriage names its marriage, which made the name (§13.1 rule 6: "Ola is Ned's former wife", not "lover").
+			if (e.k === 'partner') word = this.partnerOf((e.marriage ? undefined : this.pairUnion(from, to)) ?? this.g.unionByKey.get(e.union), from, to).lower;
 			else word = e.k === 'up' ? parentStepWord(e.type, this.sex[to]) : childStepWord(e.type, this.sex[to]);
 			out.push({ person: this.ids[to], of: this.ids[from], word });
 		}
@@ -500,4 +596,9 @@ export class Kin extends KinBlood {
 			},
 		});
 	}
+}
+
+/** True if `blood` (P's blood candidates to M) has a rumoured line with legs `a` and `b`: P is a rumoured parent, grandparent, child or grandchild of M there. */
+function rumouredAt(blood: Blood[], a: number, b: number): boolean {
+	return blood.some((d) => d.word === 'rumoured' && d.a === a && d.b === b);
 }

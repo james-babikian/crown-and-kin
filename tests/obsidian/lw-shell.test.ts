@@ -775,13 +775,14 @@ describe('open a page and go back', () => {
 });
 
 describe('Add', () => {
-	it('clears the query, opens the page of the new item and focuses its name field', () => {
+	it('clears the query, opens the page of the new item and focuses no field (D320)', () => {
 		const w = open();
 		searchFor(w.content, 'duke');
 		dispatch(w.content.querySelector('button.dynasty-lw-add')!, 'click');
 		expect(w.queryText).toBe('');
 		expect(w.pageKey).toBe('t3');
-		expect(active()).toBe('name:t3');
+		expect(active()).toBe('back');
+		expect(['input', 'textarea', 'select']).not.toContain(fakeDoc.activeElement?.tag);
 		expect(field(w).getAttribute('data-focus')).toBe('name:t3');
 	});
 
@@ -1488,7 +1489,7 @@ describe('the shared save pipeline', () => {
 	class Piped extends TestWindow {
 		keyOf = () => this.nextKey();
 		write = (handle: never, ops: Op[], before: (() => void) | undefined) => this.writeBatch(handle, ops, before, 'test write');
-		undo = (handle: never, ops: Op[], deleted: string[]) => this.undoAfterWrite(handle, { body: 'x' }, ops, deleted, (n) => `Gone: ${n.join(', ')}`);
+		undo = (handle: never, ops: Op[], deleted: string[]) => this.undoAfterWrite(handle, { body: 'x' }, ops, deleted, { deleted: (n) => `Gone: ${n.join(', ')}`, saved: (n) => `Kept: ${n.join(', ')}` });
 		fail = (out: never, handle: never, onStale: (b: string) => void, onRefusal: (code: string, idText: string | null) => void) => this.failedWrite(out, handle, onStale, onRefusal as never);
 		plain = (code: string) => this.refusedPlainly(code as never);
 		sent = () => this.sentIds;
@@ -1543,6 +1544,22 @@ describe('the shared save pipeline', () => {
 		expect(notices[1]).toContain('Gone: Duke');
 		expect(notices[1]).toContain(REMOVE.undoAlso);
 		expect(notices[2]).toBe(ID_UI.changed(1));
+	});
+
+	it('the Undo notice after a Save names the new and changed items, and shows nothing when the Save wrote no item (D334 Q4)', async () => {
+		const w = new Piped([
+			{ key: 'a', id: 'duke', name: 'Duke', holders: [], deleted: false, state: 'changed' },
+			{ key: 'b', id: null, name: 'Count', holders: [], deleted: false },
+			{ key: 'c', id: 'earl', name: 'Earl', holders: [], deleted: false, state: '' },
+		] as never);
+		const handle = handleOf(async () => ({ ok: true, body: '' }));
+		await w.write(handle, [textOp], undefined);
+		w.undo(handle, [textOp], []);
+		expect(notices).toEqual(['Kept: Duke, Count']);
+		const quiet = new Piped([{ key: 'c', id: 'earl', name: 'Earl', holders: [], deleted: false, state: '' }] as never);
+		await quiet.write(handle, [textOp], undefined);
+		quiet.undo(handle, [textOp], []);
+		expect(notices).toHaveLength(1);
 	});
 
 	it('a failed write: stale reloads, missing says so, a refusal gets its code and the id text only after an id op', async () => {

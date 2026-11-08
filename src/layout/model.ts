@@ -192,7 +192,8 @@ export type StrokeKind =
 	| 'birth-link'
 	| 'adoptive'
 	| 'ward'
-	| 'rumoured';
+	| 'rumoured'
+	| 'begetter';
 
 /** One drawn line: its SVG path data, its kind and the people it connects. */
 export interface EdgePath {

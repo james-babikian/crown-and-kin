@@ -518,8 +518,9 @@ export class KinBlood extends KinBase {
 	private collateralCandidate(shape: Shape, pf: number[], pp: number[], x: number, c1: number, c2: number, rumour: boolean): Blood {
 		const lx = shape.couple[0];
 		// A couple with no union in the tree (two rumoured parents, an adoptive couple beside birth parents) is not
-		// drawn: the line passes `lx` alone. Every member has the same link type, so the word stays the same.
-		const y = shape.couple.length > 1 && this.sharesUnion(lx, shape.couple[1]) ? shape.couple[1] : -1;
+		// drawn: the line passes `lx` alone. Every member has the same link type, so the word stays the same. A couple
+		// that a begetter link joins is never on a line either, also when its members share a union (D332).
+		const y = shape.couple.length > 1 && this.sharesUnion(lx, shape.couple[1]) && !this.begotCouple(c1, c2, shape.couple) ? shape.couple[1] : -1;
 		const pathF = [...pf, lx];
 		const pathP = [...pp, lx];
 		const word = this.wordOf(pathF, pathP, y);
@@ -530,10 +531,10 @@ export class KinBlood extends KinBase {
 			// Rule 1. When the result changes, the new key keeps the line apart from the sure shape of the pair.
 			const half = this.halfCounted(c1, t1, c2, t2);
 			if (half !== shape.half) {
-				const s1 = this.counted(c1, t1);
+				const [s1, s2] = this.countedPair(c1, t1, c2, t2);
 				out.half = half;
 				// A half key holds no set, so the set of the matching choices is built only for a full line.
-				const setList = half ? [x] : this.matchedPeople(s1, this.counted(c2, t2));
+				const setList = half ? [x] : this.matchedPeople(s1, s2);
 				out.key = ruleOneKey(half, x, half ? '' : setList === s1.allList ? s1.all : setList.join(','), out.a, out.b);
 				out.couple = setList;
 				// A half line passes `x` alone. A full line passes the couple of the second test (D175), the same at
@@ -546,6 +547,11 @@ export class KinBlood extends KinBase {
 					out.pathF = [...pf, nx];
 					out.pathP = [...pp, nx];
 				}
+			} else if (!half && shape.couple.length < 2) {
+				// A full pair whose sure couple is one parent, where a rumour makes the legal pair (D293), has the couple of the second
+				// test (D175): it and a line through that couple are one couple, never a "double". The key and the line stay.
+				const [s1, s2] = this.countedPair(c1, t1, c2, t2);
+				if (s1.byRumour || s2.byRumour) out.couple = this.matchedPeople(s1, s2);
 			}
 			return out;
 		}
@@ -576,7 +582,7 @@ export class KinBlood extends KinBase {
 		for (const top of members) {
 			for (const other of members) {
 				if (other === top || (!below && top.type !== 'rumoured' && this.typeOf(c2, other.p) !== 'rumoured')) continue;
-				if (this.sharesUnion(top.p, other.p)) return [top.p, other.p];
+				if (this.sharesUnion(top.p, other.p) && !this.begotCouple(c1, c2, [top.p, other.p])) return [top.p, other.p];
 			}
 		}
 		const alone = members.find((l) => l.type === 'rumoured' || this.typeOf(c2, l.p) === 'rumoured');
@@ -587,7 +593,7 @@ export class KinBlood extends KinBase {
 	private doubtOf(shape: Shape, x: number, c1: number, c2: number, sibling: boolean): { maybe: 'full' | 'half'; cause: RelationMaybe['cause']; some?: true; form?: RelationMaybe['unlistedForm'] } | undefined {
 		const [t1, t2] = [this.typeOf(c1, x), this.typeOf(c2, x)];
 		if (t1 === 'adoptive' || t2 === 'adoptive') return undefined;
-		const [s1, s2] = [this.counted(c1, t1), this.counted(c2, t2)];
+		const [s1, s2] = this.countedPair(c1, t1, c2, t2);
 		const rumoured = s1.hasRumoured || s2.hasRumoured;
 		if (shape.half) {
 			// Rule 2: the rumour gives equal sets (the second test says full), or (setting on) an unknown parent could make them equal.
@@ -603,8 +609,9 @@ export class KinBlood extends KinBase {
 					return { maybe: 'full', cause: 'rumoured', ...(equal.some((t) => all.some((r) => !t.includes(r))) ? { some: true as const } : {}) };
 				}
 			}
-			if (this.options.oneParentUnknown && outcomesOf(s1).some((a) => outcomesOf(s2).some((b) => joinedSize(a, b) <= 2))) {
-				return { maybe: 'full', cause: 'unlisted', form: unlistedForm(sibling, s1, s2) };
+			const [u1, u2] = [s1.plain ?? s1, s2.plain ?? s2];
+			if (this.options.oneParentUnknown && outcomesOf(u1).some((a) => outcomesOf(u2).some((b) => joinedSize(a, b) <= 2))) {
+				return { maybe: 'full', cause: 'unlisted', form: unlistedForm(sibling, u1, u2) };
 			}
 			return undefined;
 		}
@@ -613,12 +620,12 @@ export class KinBlood extends KinBase {
 
 	/** The key of a candidate on a rumoured line of the pair (`c1`, `c2`) at `x`: its sure key, or the rule 1 key if the second test differs. */
 	private ruleOneKey(shape: Shape, x: number, c1: number, c2: number, a: number, b: number): string {
-		const t1 = this.typeOf(c1, x);
-		const half = this.secondHalf(c1, t1, c2, this.typeOf(c2, x));
+		const [t1, t2] = [this.typeOf(c1, x), this.typeOf(c2, x)];
+		const half = this.secondHalf(c1, t1, c2, t2);
 		if (half === shape.half) return shape.key;
 		if (half) return ruleOneKey(true, x, '', a, b);
-		const q1 = this.counted(c1, t1);
-		const setList = this.matchedPeople(q1, this.counted(c2, this.typeOf(c2, x)));
+		const [q1, q2] = this.countedPair(c1, t1, c2, t2);
+		const setList = this.matchedPeople(q1, q2);
 		return ruleOneKey(false, x, setList === q1.allList ? q1.all : setList.join(','), a, b);
 	}
 
@@ -640,6 +647,7 @@ export class KinBlood extends KinBase {
 		for (const view of this.stepViews.values()) view.release();
 		this.stepViews.clear();
 		this.ownKids.clear();
+		this.releaseBlood();
 		this.fromAnc.clear();
 		this.bloodMemo.clear();
 		this.firstPaths.clear();

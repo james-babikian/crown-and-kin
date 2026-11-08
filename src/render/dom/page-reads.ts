@@ -46,12 +46,12 @@ export function mediaMatches(win: Window, query: string): boolean {
 	}
 }
 
-/** `env(safe-area-inset-top)` in px, read from the view's probe element (spec §7.5). */
+/** `--dynasty-safe-top` (the system bar, D335) in px, read from the view's probe element (spec §7.5). */
 export function safeTop(probe: HTMLElement | null): number {
 	return probe?.isConnected ? (parsePx(getComputedStyle(probe).paddingTop) ?? 0) : 0;
 }
 
-/** `env(safe-area-inset-left)` and `-right` in px (the notch of a phone held sideways), read from the same probe element. */
+/** `--dynasty-safe-left` and `-right` in px (the notch of a phone held sideways), read from the same probe element. */
 export function safeSides(probe: HTMLElement | null): { left: number; right: number } {
 	if (!probe?.isConnected) return { left: 0, right: 0 };
 	const cs = getComputedStyle(probe);

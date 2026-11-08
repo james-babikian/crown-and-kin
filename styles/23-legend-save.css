@@ -20,6 +20,7 @@
 
 /* D330 O-06: two native radios on the window colour, with no box round a choice. A row is at least 44 px high, and the whole row selects. */
 .dynasty-save-kinds {
+	position: relative;
 	display: flex;
 	flex-direction: column;
 	gap: var(--dynasty-space-1);
@@ -80,6 +81,7 @@
  * The legend lines reach 3:1 on the window colour in every theme (Cupertino light had ward 2.34, rumoured 2.35, its "?" 2.7 and the phone birth link 2.48).
  * The grey lines take the run-time line token (`--dynasty-edge`, see `paintContrast` in main.ts). The ward and the rumoured line keep a part of their hue, in a mix
  * that leans on the token. The mix sits in `@supports`, because var() hides `color-mix()` from the parser and an engine without it would draw no line.
+ * The begetter sample has no rule here: it keeps the orange of the drawn line (`04-lines.css`; at least 3.3:1 in the default, Minimal and AnuPpuccin looks).
  */
 .dynasty-legend-sample .dynasty-line-marriage,
 .dynasty-legend-sample .dynasty-line-betrothal,

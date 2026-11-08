@@ -333,7 +333,7 @@ people:
 		expect(armsOf(el, 'cy')).not.toBeNull();
 	});
 
-	it('"Warn about more than 2 parents of a type" off takes the warning off the badge', async () => {
+	it('"Warn about more than 2 parents" off takes the warning off the badge', async () => {
 		desktop();
 		const MANY = `people:
   - {id: p1, name: One}

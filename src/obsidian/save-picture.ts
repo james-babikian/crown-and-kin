@@ -34,6 +34,7 @@ import { trackModal } from '../view/plugin-modals';
 import { nameDialog } from './sheet-parts';
 import { buildShell, type Shell } from './window-shell';
 import { guarded } from './start-guard';
+import { fontsForPng } from './save-font';
 
 /** What the tree view gives the save: the drawn graph and the view's settings. */
 export interface SaveSource {
@@ -53,6 +54,8 @@ export interface SaveSource {
 	/** D148: the person who gets the "You" tab; set when there is a mark and `relationLine` is false (`LayoutSettings.youTab`). */
 	youTab?: string;
 	fonts: SceneFonts;
+	/** The document of the tree's window; the PNG reads the page fonts from it (a pop-out window has its own). */
+	doc?: Document;
 	showDates: boolean;
 	showPortraits: boolean;
 	/** "Arms on cards" (D206): the saved picture follows the cards (open to veto). */
@@ -118,7 +121,9 @@ export class SaveWindow extends Modal {
 		nameDialog(this.modalEl, shell.titleEl);
 		const cancel = shell.cancel;
 		const body = shell.body;
-		const group = body.createDiv({ cls: 'dynasty-save-kinds', attr: { role: 'radiogroup', 'aria-label': SAVE_UI.kindLabel } });
+		const group = body.createDiv({ cls: 'dynasty-save-kinds', attr: { role: 'radiogroup', 'aria-labelledby': 'dynasty-save-kinds-label' } });
+		// A hidden text names the group: an aria-label would show as Obsidian's tooltip over the PNG row.
+		group.createSpan({ cls: 'dynasty-sr-only', text: SAVE_UI.kindLabel, attr: { id: 'dynasty-save-kinds-label' } });
 		const options: [SaveKind, string, string][] = [
 			['png', SAVE_UI.png, SAVE_UI.pngDetail],
 			['svg', SAVE_UI.svg, SAVE_UI.svgDetail],
@@ -228,10 +233,13 @@ export async function makePicture(store: PictureStore | undefined, src: SaveSour
 		// The picture shows the view's folds: the same people are hidden, and each folded family has its "+ N" sign (spec §13.8).
 		...(folds ? { foldHidden: folds.hidden, foldedFamilies: folds.folded, foldControls: true as const } : {}),
 	};
+	// D334: a PNG draws the font of the page when it can be embedded; else the lists lose the page-only families, so the cards are measured for what is drawn.
+	const look = kind === 'png' ? await fontsForPng(src.fonts, undefined, src.doc) : { fonts: src.fonts, css: '' };
+	const fonts = look.fonts;
 	// P2: the canvas measures every text with the font strings the file names.
 	const measure = measureText;
 	const { laid } = measuredLayout(g, src.geo, base, {
-		fonts: src.fonts,
+		fonts,
 		measure,
 		labels: src.labels,
 		showDates: src.showDates,
@@ -244,13 +252,13 @@ export async function makePicture(store: PictureStore | undefined, src: SaveSour
 	const fontPx = laid.layout.geometry.fontPx;
 	const legend = savedLegend(g, laid);
 	const heading = src.note;
-	const extent = savedExtent(laid, legend, heading, fontPx, measure, src.fonts, src.succession?.sentence);
+	const extent = savedExtent(laid, legend, heading, fontPx, measure, fonts, src.succession?.sentence);
 	const sc = savedScale(extent, fontPx, kind);
-	const { pictures, outlines } = await picturesFor(store, src, laid, sc.pictureScale, savedFrame(laid.layout, legend, heading, fontPx, measure, src.fonts).legend?.arms);
+	const { pictures, outlines } = await picturesFor(store, src, laid, sc.pictureScale, savedFrame(laid.layout, legend, heading, fontPx, measure, fonts).legend?.arms);
 	const svg = renderSvg(g, laid.layout, laid.edges, {
 		palette: DEFAULT_LIGHT,
 		dark: false,
-		fontFamily: src.fonts.text,
+		fontFamily: fonts.text,
 		...(src.relations ? { relations: src.relations } : {}),
 		...(src.me !== undefined ? { me: src.me } : {}),
 		...(src.line ? { line: src.line } : {}),
@@ -259,7 +267,7 @@ export async function makePicture(store: PictureStore | undefined, src: SaveSour
 		...(src.succession ? { heirs: src.succession.heirs, ordinals: src.succession.ordinals, barSentence: src.succession.sentence } : {}),
 		showDates: src.showDates,
 		measure,
-		fonts: src.fonts,
+		fonts,
 		outlines,
 		saved: { heading, legend, pictures, scale: sc.scale, ...(folds ? { folds: new Set(folds.folded) } : {}) },
 	});
@@ -269,7 +277,7 @@ export async function makePicture(store: PictureStore | undefined, src: SaveSour
 	const w = Number(size?.[1] ?? Math.ceil(extent.w * sc.scale));
 	const h = Number(size?.[2] ?? Math.ceil(extent.h * sc.scale));
 	// B13: the canvas of the whole picture is the largest memory use of a save; no decode runs beside it.
-	const bytes = store ? await store.alone(() => pngOf(svg, w, h)) : await pngOf(svg, w, h);
+	const bytes = store ? await store.alone(() => pngOf(svg, w, h, look.css)) : await pngOf(svg, w, h, look.css);
 	return { name, bytes, type: 'image/png', small: sc.small };
 }
 
@@ -325,14 +333,16 @@ async function picturesFor(store: PictureStore | undefined, src: SaveSource, lai
 
 /**
  * The PNG of `svg` at `w` × `h` px: the SVG is drawn on a canvas from a blob URL (its pictures are
- * data URIs, which the iPhone draws). The caller holds the picture queue alone for
- * it, and the canvas is emptied after use.
+ * data URIs, which the iPhone draws). `fontCss` holds the `@font-face` rules of the page fonts (D334); they are put into this copy of the SVG
+ * only, never into a saved SVG. The caller holds the picture queue alone for it, and the canvas is emptied after use.
  */
-async function pngOf(svg: string, w: number, h: number): Promise<ArrayBuffer> {
-	const url = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml' }));
+async function pngOf(svg: string, w: number, h: number, fontCss: string): Promise<ArrayBuffer> {
+	const url = URL.createObjectURL(new Blob([withFontRules(svg, fontCss)], { type: 'image/svg+xml' }));
 	const canvas = createEl('canvas');
 	try {
 		const img = await loadImage(url);
+		// The font in the image is ready when the image has decoded; WebKit may draw the first frame without it, so wait for the decode before the canvas.
+		if (fontCss) await img.decode().catch(() => undefined);
 		canvas.width = w;
 		canvas.height = h;
 		const ctx = canvas.getContext('2d');
@@ -347,6 +357,13 @@ async function pngOf(svg: string, w: number, h: number): Promise<ArrayBuffer> {
 		canvas.height = 0;
 		URL.revokeObjectURL(url);
 	}
+}
+
+/** `svg` with a style element of `css` right after the opening tag (the first `>` ends it: attribute values are escaped). */
+function withFontRules(svg: string, css: string): string {
+	if (!css || !svg.startsWith('<svg ')) return svg;
+	const at = svg.indexOf('>') + 1;
+	return `${svg.slice(0, at)}<style>${css}</style>${svg.slice(at)}`;
 }
 
 function loadImage(url: string): Promise<HTMLImageElement> {

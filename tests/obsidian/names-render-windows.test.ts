@@ -131,7 +131,7 @@ describe('§14 rule 15: the Find row and its search text', () => {
 	it('the spoken text of the row has the full names, and the visible text is hidden from the screen reader', () => {
 		const p = openPicker();
 		const el = row(p, 'bran');
-		expect(el.querySelector('.dynasty-sr-only')!.getText()).toBe('Bran Orsini, b. 22.14 Jupiter');
+		expect(el.querySelector('.dynasty-sr-only')!.getText()).toBe('Bran Orsini, born 22.14 Jupiter');
 		expect(el.querySelector('.dynasty-picker-text')!.getAttribute('aria-hidden')).toBe('true');
 	});
 });

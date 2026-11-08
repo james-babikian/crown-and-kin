@@ -469,8 +469,25 @@
 	margin-right: 1px;
 }
 
+/*
+ * D336 F1: the house grows with its name, so a long name takes a second text line and the title and years move down. The mark stands in a box of one text line,
+ * so it stays level with the first text line, and a short name looks as before (one line of 1.45em).
+ */
 .dynasty-head-meta .dynasty-house {
+	align-items: flex-start;
+	min-height: 1.45em;
+}
+
+.dynasty-head-meta .dynasty-house-armsmark {
+	flex: none;
+	align-items: center;
 	height: 1.45em;
+}
+
+.dynasty-head-meta .dynasty-house-dot {
+	flex: none;
+	/* token-allow: half of the free room above and below the 9 px dot in a text line (1.45em less 9 px) */
+	margin-top: calc((1.45em - 9px) / 2);
 }
 
 .dynasty-house-armsmark {
@@ -1449,8 +1466,8 @@ body.theme-dark .dynasty-house-dot {
 	justify-content: center;
 	padding: var(--dynasty-space-4);
 	/* A phone window reaches under the status bar and the home bar: the box keeps clear of them (D113 item 1). */
-	padding-top: max(var(--dynasty-space-4), env(safe-area-inset-top, 0px));
-	padding-bottom: max(var(--dynasty-space-4), env(safe-area-inset-bottom, 0px));
+	padding-top: max(var(--dynasty-space-4), var(--dynasty-safe-top));
+	padding-bottom: max(var(--dynasty-space-4), var(--dynasty-safe-bottom));
 	background: var(--background-modifier-cover);
 }
 
@@ -1542,7 +1559,7 @@ body.theme-dark .dynasty-house-dot {
 
 /* Obsidian's phone prompt already has the safe area as padding at the bottom. */
 .prompt.dynasty-picker.is-holding {
-	padding-bottom: calc(var(--safe-area-inset-bottom, 0px) + var(--dynasty-sheet-extra, 0px));
+	padding-bottom: calc(var(--dynasty-safe-bottom) + var(--dynasty-sheet-extra, 0px));
 }
 
 /* The bar: Cancel (or "‹ Name"), the title, and Save; the title fades in when the header has scrolled away. */
@@ -1552,7 +1569,7 @@ body.theme-dark .dynasty-house-dot {
 	grid-template-columns: minmax(80px, auto) 1fr minmax(80px, auto);
 	align-items: center;
 	min-height: 54px;
-	padding: max(0px, env(safe-area-inset-top)) max(6px, env(safe-area-inset-right)) 0 max(6px, env(safe-area-inset-left));
+	padding: max(0px, var(--dynasty-safe-top)) max(6px, var(--dynasty-safe-right)) 0 max(6px, var(--dynasty-safe-left));
 	border-bottom: 1px solid transparent;
 	transition: border-color var(--dynasty-dur-press) var(--dynasty-ease);
 }
@@ -1641,7 +1658,7 @@ body.theme-dark .dynasty-house-dot {
 }
 
 .dynasty-sheet.is-phone .dynasty-sheet-body {
-	padding: var(--dynasty-space-1) max(var(--dynasty-space-4), env(safe-area-inset-right)) max(var(--dynasty-space-6), env(safe-area-inset-bottom)) max(var(--dynasty-space-4), env(safe-area-inset-left));
+	padding: var(--dynasty-space-1) max(var(--dynasty-space-4), var(--dynasty-safe-right)) max(var(--dynasty-space-6), var(--dynasty-safe-bottom)) max(var(--dynasty-space-4), var(--dynasty-safe-left));
 	flex: 1 1 auto;
 }
 

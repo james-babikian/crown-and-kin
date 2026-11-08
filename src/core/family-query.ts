@@ -6,6 +6,8 @@
 
 import { partnerOf, type FamilyGraph } from './derive';
 import type { ParentKind, UnionKind, UnionRef } from './edit';
+import { bloodProblem } from './blood-parents';
+import { BLOOD_LIMIT, isBloodType } from './parent-types';
 import { PARENT_LIMIT, PARENT_TYPES, PLACEMENT_TYPES } from './types';
 import { cleanParents, push } from './validate';
 
@@ -46,7 +48,10 @@ export interface FamilyView {
 	siblings: SiblingPosition | null;
 	/** Placement-eligible parent types the person has (for "Shown under", §6.3). */
 	placementTypes: ParentKind[];
-	/** Parent types already at their limit, `PARENT_LIMIT`: 2 birth, adoptive or ward parents, 8 rumoured ones (disabled in Add parent, §6.4). */
+	/**
+	 * Parent types already at their limit for a new parent (Add parent, §6.4): `PARENT_LIMIT` (2 birth, adoptive, ward or begetter parents, 8 rumoured
+	 * ones), and birth and begetter both when the distinct parents by blood reach `BLOOD_LIMIT` (D332). The type chip of one link reads `linkTypeFull`.
+	 */
 	fullTypes: ParentKind[];
 	/** Choices for "other parent" in Add child: partners in union order, then implicit co-parents (§6.4). "No other parent" is added by the UI. */
 	otherParentChoices: string[];
@@ -60,7 +65,8 @@ export type PickerAction = 'add-parent' | 'add-child' | 'add-spouse' | 'focus' |
 
 /**
  * People the picker must not offer (§6.6): add-parent → the person, all their descendants
- * through any parent type, and people already their parent of `parentType`; add-child → the
+ * through any parent type, and people already their parent of `parentType` (of both blood types for a birth parent
+ * or a begetter, D332); add-child → the
  * person and all their ancestors through any parent type; add-spouse → the person; focus and
  * find → nobody.
  */
@@ -164,15 +170,40 @@ export const familyOf: FamilyOf = (g, id) => {
 	}
 
 	const count = (t: ParentKind) => parents.filter((r) => r.type === t).length;
+	// D332: with the distinct parents by blood at the limit, a new birth parent or begetter is full too.
+	const bloodFull = new Set(parents.filter((r) => isBloodType(r.type)).map((r) => r.id)).size >= BLOOD_LIMIT;
 	return {
 		parents,
 		partners,
 		siblings,
 		placementTypes: PLACEMENT_TYPES.filter((t) => count(t) > 0),
-		fullTypes: PARENT_TYPES.filter((t) => count(t) >= PARENT_LIMIT[t]),
+		fullTypes: PARENT_TYPES.filter((t) => count(t) >= PARENT_LIMIT[t] || (bloodFull && isBloodType(t))),
 		otherParentChoices: choices,
 	};
 };
+
+/** The `placement` and `union` values of a person that are valid in this graph (the stale-key rule of the edits reads them). */
+export function validKeys(g: FamilyGraph, id: string): { placement?: string; union?: string } {
+	const person = g.byId.get(id);
+	const out: { placement?: string; union?: string } = {};
+	if (!person) return out;
+	if (person.placement !== undefined && writtenParents(g, id).some((r) => r.type === person.placement)) out.placement = person.placement;
+	const key = g.primaryUnion.get(id);
+	if (person.union !== undefined && key !== undefined && g.unionByKey.get(key)?.id === person.union) out.union = person.union;
+	return out;
+}
+
+/**
+ * D332, the type chip of one written parent link (`link`, one of `parents`): true if `to` is full for it. The other links of the child count
+ * (the link itself is left out): `to` is full when they have `PARENT_LIMIT[to]` links of that type, or when `to` is birth or begetter and
+ * their parents by blood and the link's parent are more than `BLOOD_LIMIT`, or when the parent would be a birth parent and a begetter of
+ * the child. So a change between birth and begetter on one link never meets the limit by blood.
+ */
+export function linkTypeFull(parents: readonly ParentLink[], link: ParentLink, to: ParentKind): boolean {
+	if (to === link.type) return false;
+	const others = parents.filter((r) => r.id !== link.id || r.type !== link.type);
+	return others.filter((r) => r.type === to).length >= PARENT_LIMIT[to] || bloodProblem(others, link.id, to) !== undefined;
+}
 
 /** Implements `PickerExclusions`. */
 export const pickerExclusions: PickerExclusions = (g, id, action, parentType) => {
@@ -181,7 +212,8 @@ export const pickerExclusions: PickerExclusions = (g, id, action, parentType) =>
 			const type = parentType ?? 'birth';
 			const out = descendantsOf(g, id);
 			out.add(id);
-			for (const r of writtenParents(g, id)) if (r.type === type) out.add(r.id);
+			// D332: a birth parent cannot be added as a begetter of the same child, nor the reverse.
+			for (const r of writtenParents(g, id)) if (r.type === type || (isBloodType(type) && isBloodType(r.type))) out.add(r.id);
 			return out;
 		}
 		case 'add-child': {

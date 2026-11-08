@@ -4,6 +4,12 @@
  * "requested": the first call starts one load of the note it names and answers the one "pending" reader (plain years, no warning) until the load ends; then the listeners hear of
  * it after a short wait, once for a burst of events. Which notes hold a `kin-calendar` fence is not known here: the host gives that list (`IndexOptions.notes`, from the fence
  * index). It is pure: the vault sits behind the small `CalendarVault` interface, so a test uses a fake vault and the plugin uses `src/obsidian/calendar-vault.ts`.
+ *
+ * Keys: a key is (tree path, trimmed link). The index keeps at most `MAX_KEYS` idle keys; a key that a live view holds, or that was asked within `IDLE_MS`, is never dropped, and a note
+ * that no key targets is dropped with the last key. `ensure` waits for `cacheReady()` and never for `start()`. A read that throws gives a ready reader with `calendar-note-missing`; the
+ * key is tried again at the next `cache`, `create` or `rename` event of its target. A `cache` event for any target of a requested key parses the text with no read, also when the note
+ * had no entry before. `create`, `rename` and `delete` mark the keys dirty, and one re-resolve runs for each 300 ms burst. A tree uses at most one note, so a duplicate across notes
+ * is no longer a case; a duplicate inside one note stays a refusal of the window.
  */
 
 import { CALENDAR_LANGUAGE, findBlocks } from '../core/block-locate';

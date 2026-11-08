@@ -39,6 +39,7 @@ import type { SectionSpec } from './window-sections';
 import { makeTableNote } from './table-note';
 import { titlesDraftChanged, emptyNames, emptySuccession, holderLead, holderText, keepsRulerText, personNameOf, rebase, savedListName, titleIdRow, titleRows, windowOps, withHolderIds, type HolderRow, type HolderValues, type TitleRow } from '../view/titles-draft';
 import { guarded } from './start-guard';
+import { newTitleLine, shownId } from './title-save-show';
 
 /** The tree that the window edits, loaded from one block body. */
 interface LoadedTitles {
@@ -400,7 +401,7 @@ protected labelOf(key: string): string {
 				title: WINDOW_UI.sectionLine,
 				summary: t.id === null ? '' : view.lineSummary(),
 				open: false,
-				build: (body) => (t.id === null ? void body.createDiv({ cls: ['dynasty-sheet-none', 'dynasty-succ-msg'], text: SUCCESSION_UI.newTitleLine, attr: { 'data-msg': 'new-title' } }) : view.renderLine(body)),
+				build: (body) => (t.id === null ? newTitleLine(body, () => this.save(null, t.key)) : view.renderLine(body)),
 			},
 			{ key: 'rules', title: WINDOW_UI.sectionRules, summary: view.rulesSummary(), open: false, build: (body) => view.renderRules(body), onOpen: (open) => view.rulesOpened(open) },
 		];
@@ -422,6 +423,7 @@ protected labelOf(key: string): string {
 			showCard: (id) => this.showCard(id),
 			...(this.o.openPerson ? { openPerson: (id: string) => this.openPerson(id) } : {}),
 			show: () => this.showLine(t),
+			relationOptions: () => this.o.relationOptions?.(),
 			pick: (kind, skip) => this.pickForSection(kind, skip),
 			summaries: (s) => {
 				this.sections?.setSummary('line', t.id === null ? '' : s.line);
@@ -767,8 +769,7 @@ protected labelOf(key: string): string {
 	private async commit(ops: Op[], show: string | null = null): Promise<void> {
 		if (this.saving) return;
 		// The id the title has after the write, for "Save and show".
-		const showRow = show !== null ? this.byKey(show) : undefined;
-		const showId = showRow && showRow.id !== null ? (idChanged(titleIdRow(showRow)) ? draftId(titleIdRow(showRow)) : showRow.id) : null;
+		const showId = show !== null ? shownId(this.rows, show, ops) : null;
 		const deleted = this.rows.filter((t) => t.id !== null && t.deleted).map((t) => t.baseName || t.id!);
 		const h = this.o.handle;
 		const out = await this.writeBatch(h, ops, this.o.beforeWrite, 'Crown and Kin: cannot save the titles');
@@ -778,10 +779,8 @@ protected labelOf(key: string): string {
 			return;
 		}
 		this.finish();
-		if (showId !== null) {
-			guarded('cannot show the line of succession', () => this.o.showLine?.(showId));
-		}
-		this.undoAfterWrite(h, out, ops, deleted, TITLES_UI.deleted);
+		if (showId !== null) guarded('cannot show the line of succession', () => this.o.showLine?.(showId));
+		this.undoAfterWrite(h, out, ops, deleted, TITLES_UI);
 	}
 
 	private failed(out: Exclude<HandleWriteOutcome, { ok: true }>): void {

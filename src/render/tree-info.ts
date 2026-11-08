@@ -119,6 +119,8 @@ const DEAD_SIGN_DOUBT = '†?';
 export const CARD_SPOKEN_DEAD = 'dead';
 /** What a screen reader says for the doubt sign. */
 export const CARD_SPOKEN_DEAD_DOUBT = 'dead, but the death text is not clear';
+/** What a screen reader says for the "b. " and "d. " leads of a card's dates (D334 Q9: whole words in spoken text; the visible leads stay short). */
+export const CARD_SPOKEN_LEAD = { born: 'born ', died: 'died ' } as const;
 
 /** What the date helpers need of the dates view: `read`, and (when known) `reader.hasLists`, so a tree with no name list pays nothing. */
 export type DatesRead = Pick<TreeDates, 'read'> & { readonly reader?: Pick<DateReader, 'hasLists'> };
@@ -259,8 +261,9 @@ export function shownHolder<T extends { from?: string; to?: string }>(entry: T, 
  * The two parts of a card's dates: the text with the years, and the sign of a dead person with no death year.
  * A `died` that means alive ("no", "false") gives neither a death year nor the sign. A death text that fits a calendar of the
  * tree has a year, so it shows as written and not as the sign (spec §14 rule 7); `dates` reads it. `names` says which names follow a whole date (rule 15).
+ * `spoken` writes the leads as words for a screen-reader label: "born 1131", "died 1161", and a range as "born 1131, died 1161".
  */
-function dateParts(p: Person, dates: DatesRead, names: NamesForm = 'shown'): { text?: string; sign?: string; pieces?: DatePieces } {
+function dateParts(p: Person, dates: DatesRead, names: NamesForm = 'shown', spoken = false): { text?: string; sign?: string; pieces?: DatePieces } {
 	const dead = isDead(p);
 	const died = dead ? p.died : undefined;
 	const hasYear = died !== undefined && dates.read(died)?.year !== undefined;
@@ -269,9 +272,12 @@ function dateParts(p: Person, dates: DatesRead, names: NamesForm = 'shown'): { t
 	if (p.born && hasYear) {
 		const from = { raw: p.born, shown: shownDate(p.born, dates, names) };
 		const to = { raw: died, shown: shownDate(died, dates, names) };
-		pieces = { lead: '', born: from.shown, dash: rangeDash(from, to, dates), died: to.shown };
-	} else if (p.born) pieces = { lead: 'b. ', born: shownDate(p.born, dates, names), dash: '' };
-	else if (hasYear) pieces = { lead: 'd. ', dash: '', died: shownDate(died, dates, names) };
+		// A spoken range is two phrases, so a screen reader does not read a dash as "to" or "minus".
+		pieces = spoken
+			? { lead: CARD_SPOKEN_LEAD.born, born: from.shown, dash: `, ${CARD_SPOKEN_LEAD.died}`, died: to.shown }
+			: { lead: '', born: from.shown, dash: rangeDash(from, to, dates), died: to.shown };
+	} else if (p.born) pieces = { lead: spoken ? CARD_SPOKEN_LEAD.born : 'b. ', born: shownDate(p.born, dates, names), dash: '' };
+	else if (hasYear) pieces = { lead: spoken ? CARD_SPOKEN_LEAD.died : 'd. ', dash: '', died: shownDate(died, dates, names) };
 	const text = pieces && `${pieces.lead}${pieces.born ?? ''}${pieces.dash}${pieces.died ?? ''}`;
 	return { ...(text !== undefined ? { text } : {}), ...(sign !== undefined ? { sign } : {}), ...(pieces ? { pieces } : {}) };
 }
@@ -322,7 +328,7 @@ export function dateLine(p: Person, dates: DatesRead, opts: { names?: NamesForm 
 /**
  * `dateLine` for the eye: each born and died date that holds a right-to-left letter is in a first-strong isolate, so a range, "b. " and the sign keep the order in
  * which they are written (same text as `dateLine` with the isolate controls added; a line with no right-to-left letter is the same string). The card, the saved
- * picture, the person window and the pickers draw this; a screen-reader label and a search text keep `dateLine`.
+ * picture, the person window and the pickers draw this; a search text keeps `dateLine`. A screen-reader label says the dates in words (`cardLabel`), with no isolate.
  */
 export function dateLineShown(p: Person, dates: DatesRead, opts: { names?: NamesForm } = {}): string | undefined {
 	const text = dateLine(p, dates, opts);
@@ -331,10 +337,10 @@ export function dateLineShown(p: Person, dates: DatesRead, opts: { names?: Names
 }
 
 /**
- * What a screen reader says for a card: name, title and dates, then (spec §13.1) the relation to the
+ * What a screen reader says for a card: name, title and dates in words ("born 1131, died 1161"), then (spec §13.1) the relation to the
  * marked person in lower case ("half-sister"; "you" on the marked card). With the card's `label`
  * (spec §13.3, §13.5) the name and title are the card's: "Roderick II, Duke of Valmont (r.
- * 1160–1190), 1140–1190". The reign stays also when "Show dates on cards" hides it, like the dates.
+ * 1160–1190), born 1140, died 1190". The reign stays also when "Show dates on cards" hides it, like the dates.
  * While the Show view of a line of succession is open, `inLine` ("2nd in line", "open branch") comes last.
  * `dates` reads the death text like `dateLine` does. Every caller in `src` passes `g.dates`; it is optional so that the older
  * tests can leave it out (they read plain years).
@@ -344,7 +350,7 @@ export function cardLabel(p: Person, relation?: string, label?: CardLabel, inLin
 	// The label says the full names of the years and never cuts them (spec §14 rule 15).
 	const title = label ? [label.title, shownReign(label, dates ?? PLAIN_READER, 'full')].filter((x) => x !== undefined && x !== '').join(' ') : p.title;
 	// The sign is a character, so the label says it with words.
-	const { text, sign } = dateParts(p, dates ?? PLAIN_READER, 'full');
+	const { text, sign } = dateParts(p, dates ?? PLAIN_READER, 'full', true);
 	const dead = sign === undefined ? undefined : sign === DEAD_SIGN_DOUBT ? CARD_SPOKEN_DEAD_DOUBT : CARD_SPOKEN_DEAD;
 	return [name, title, text, dead, relation, inLine].filter((x) => x !== undefined && x !== '').join(', ');
 }

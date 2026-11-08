@@ -7,6 +7,7 @@
 import { Notice, type App } from 'obsidian';
 import type { FamilyGraph } from '../core/derive';
 import type { Op, ParentKind, UnionKind, UnionRef } from '../core/edit';
+import { BLOOD_LIMIT, BLOOD_TYPES } from '../core/parent-types';
 import { PARENT_LIMIT, PARENT_TYPES, UNION_TYPES, type Person } from '../core/types';
 import { noticeText } from '../render/dom/name-marks';
 import { isolateName } from '../render/name-bidi';
@@ -45,9 +46,20 @@ export interface FlowHost {
 
 const NONE = '\u0000none';
 
-/** Types with room for `need` more parents, given the parent entries a person has now (`PARENT_LIMIT`: 2, and 8 rumoured). */
+const isBlood = (t: string): boolean => (BLOOD_TYPES as readonly string[]).includes(t);
+
+/**
+ * Types with room for `need` more parents, given the parent entries a person has now (`PARENT_LIMIT`: 2, and 8 rumoured). D332: birth and begetter
+ * also count together, as distinct people: `need` people who are not parents by blood yet, and the ones who are, are at most `BLOOD_LIMIT`.
+ */
 function roomFor(links: { id: string; type: string }[], t: string, need: number): boolean {
-	return links.filter((l) => l.type === t).length + need <= (PARENT_LIMIT[t as ParentKind] ?? PARENT_LIMIT.birth);
+	if (links.filter((l) => l.type === t).length + need > (PARENT_LIMIT[t as ParentKind] ?? PARENT_LIMIT.birth)) return false;
+	return !isBlood(t) || new Set(links.filter((l) => isBlood(l.type)).map((l) => l.id)).size + need <= BLOOD_LIMIT;
+}
+
+/** D332: true when one of the `ids` is a parent of the child by the other blood type, so `t` would make that person a birth parent and a begetter. */
+function bothBlood(links: { id: string; type: string }[], t: string, ids: readonly string[]): boolean {
+	return isBlood(t) && ids.some((id) => links.some((l) => l.id === id && isBlood(l.type) && l.type !== t));
 }
 
 /** The Notice when the write added a marriage by itself (spec §6.4). */
@@ -82,7 +94,8 @@ export async function addParentFlow(host: FlowHost): Promise<void> {
 		text: [FLOW.parentTypeText(p.name)],
 		choices: (PARENT_TYPES as readonly ParentKind[]).map((t) => {
 			const full = host.fam.fullTypes.includes(t);
-			return { value: t, label: parentTypeText(t), detail: full ? FLOW.typeFull(PARENT_LIMIT[t]) : undefined, disabled: full, cta: t === 'birth' && !full };
+			// Birth and begetter are full together (D332): a full type of these two is always full by blood.
+			return { value: t, label: parentTypeText(t), detail: full ? (isBlood(t) ? FLOW.bloodFull : FLOW.typeFull(PARENT_LIMIT[t])) : undefined, disabled: full, cta: t === 'birth' && !full };
 		}),
 	});
 	if (!type) return;
@@ -130,8 +143,8 @@ export async function addChild(host: FlowHost): Promise<void> {
 	}
 	const exclude = pickerExclusions(host.g, p.id, 'add-child');
 	if (other) for (const id of pickerExclusions(host.g, other, 'add-child')) exclude.add(id);
-	// People who have this person as a birth parent are this person's children already.
-	for (const q of host.g.people) if (q.parents.some((l) => l.id === p.id && l.type === 'birth')) exclude.add(q.id);
+	// People who have this person as a birth parent or a begetter are this person's children already (D332).
+	for (const q of host.g.people) if (q.parents.some((l) => l.id === p.id && isBlood(l.type))) exclude.add(q.id);
 	const how = await newOrExisting(host, 'child', exclude, FLOW.newOrExistingChild(other ? [p.name, host.name(other)] : [p.name]));
 	if (!how) return;
 	if (how === 'new') {
@@ -150,8 +163,8 @@ export async function addChild(host: FlowHost): Promise<void> {
 	const parents = other ? [p.id, other] : [p.id];
 	const missing = (t: string) => parents.filter((id) => !links.some((l) => l.id === id && l.type === t));
 	let type: ParentKind = 'birth';
-	// Spec §6.4: an existing child who has birth parents gets a choice of type.
-	if (links.some((l) => l.type === 'birth')) {
+	// Spec §6.4: an existing child who has birth parents or begetters gets a choice of type.
+	if (links.some((l) => isBlood(l.type))) {
 		const who = other ? `${isolateName(host.name(p.id))} and ${isolateName(host.name(other))}` : isolateName(host.name(p.id));
 		const chosen = await choose<ParentKind>(host.app, {
 			name: 'child-type',
@@ -159,8 +172,10 @@ export async function addChild(host: FlowHost): Promise<void> {
 			text: [other ? FLOW.childTypeText(child.name, who) : FLOW.childTypeTextOne(child.name, who)],
 			choices: (PARENT_TYPES as readonly ParentKind[]).map((t) => {
 				const need = missing(t).length;
-				const ok = need > 0 && roomFor(links, t, need);
-				return { value: t, label: parentTypeText(t), detail: ok ? undefined : need === 0 ? FLOW.alreadyChild(child.name, who) : FLOW.childTypeFull, disabled: !ok };
+				const both = need > 0 && bothBlood(links, t, missing(t));
+				const ok = need > 0 && !both && roomFor(links, t, need);
+				const why = need === 0 ? FLOW.alreadyChild(child.name, who) : both ? FLOW.childBloodBoth : isBlood(t) ? FLOW.childBloodFull : FLOW.childTypeFull;
+				return { value: t, label: parentTypeText(t), detail: ok ? undefined : why, disabled: !ok };
 			}),
 		});
 		if (!chosen) return;

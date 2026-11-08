@@ -168,4 +168,31 @@ describe('the ID window (O-11)', () => {
 		const { w } = openId();
 		expect(w.modalEl.querySelector('.dynasty-bar .dynasty-sheet-title')!.hasClass('dynasty-bar-line')).toBe(true);
 	});
+
+	// D334 Q6, D338 point 6: the bar says "ID"; the full name is the label of the field, right above it; the computer title is unchanged.
+	it('a phone bar says "ID" and the full name is the label of the field, right above it', () => {
+		phone();
+		const { w } = openId();
+		expect(w.modalEl.querySelector('.dynasty-bar .dynasty-sheet-title')!.getText()).toBe(ID_UI.label);
+		const body = w.modalEl.querySelector('.dynasty-sheet-body')!;
+		const field = body.querySelector('.dynasty-id-field')!;
+		const label = field.querySelector('.dynasty-sheet-label')!;
+		expect(label.getText()).toContain('House Valmont');
+		expect(label.getText()).not.toBe(ID_UI.label);
+		expect(field.children[0]).toBe(label);
+		const input = field.querySelector('.dynasty-id-input')!;
+		expect(field.children[1]).toBe(input);
+		expect(label.getAttribute('for')).toBe(input.getAttribute('id'));
+		// The name above the field is not drawn twice, and the field keeps a meaningful accessible name that holds the visible label.
+		expect(body.querySelector('.dynasty-id-itemname')).toBeNull();
+		expect(input.getAttribute('aria-label')).toBe(ID_UI.aria('House Valmont'));
+		expect(input.getAttribute('aria-label')).toContain(label.getText());
+		expect(w.modalEl.getAttribute('aria-labelledby')).toBe(`${w.modalEl.querySelector('.dynasty-bar .dynasty-sheet-title')!.getAttribute('id')} ${label.getAttribute('id')}`);
+	});
+
+	it('a computer window keeps the label "ID" above the field; its title names the house', () => {
+		const { w } = openId();
+		expect(w.modalEl.querySelector('.dynasty-id-field .dynasty-sheet-label')!.getText()).toBe(ID_UI.label);
+		expect(w.modalEl.querySelector('.dynasty-sheet-title')!.getText()).toBe(ID_UI.windowTitle('House Valmont'));
+	});
 });

@@ -41,7 +41,7 @@ function body(n: number): string {
 	return `${lines.join('\n')}\n`;
 }
 
-/** Opens the window, taps Add house, and returns the new name field that has the focus. */
+/** Opens the window, taps Add house, taps the new name field, and returns it. */
 async function addHouse(reduced?: () => boolean) {
 	const handle = writingHandle(body(12));
 	const win = HousesWindow.create({} as never, { handle: handle as never, ...(reduced ? { reduced } : {}) })!;
@@ -50,9 +50,11 @@ async function addHouse(reduced?: () => boolean) {
 	// The window has finished taking the focus (0 and 120 ms); a later focus is the user's.
 	runTimers(200);
 	await click(content.querySelector('.dynasty-house-add'));
-	const input = fakeDoc.activeElement!;
-	expect(input).not.toBeNull();
-	expect(input.getAttribute('data-focus')).toMatch(/^name:/);
+	// D320: the new page opens with no field focused; the user taps the name field, and the keyboard opens then.
+	expect(fakeDoc.activeElement!.getAttribute('data-focus')).toBe('back');
+	const input = content.querySelectorAll('textarea, input').find((f) => (f.getAttribute('data-focus') ?? '').startsWith('name:'))!;
+	input.focus();
+	expect(fakeDoc.activeElement).toBe(input);
 	return { win, content, input };
 }
 
@@ -60,7 +62,11 @@ const scrolls = () => vi.spyOn(FEl.prototype, 'scrollIntoView');
 
 /** The argument of the first call of a spy on a method that the fake declares with no parameter. */
 const firstArg = (spy: { mock: { calls: unknown[][] } }): unknown => spy.mock.calls[0]![0];
-const lastArg = (spy: { mock: { calls: unknown[][] } }): unknown => spy.mock.calls[spy.mock.calls.length - 1]![0];
+/** The argument of the last focus call that the window made on its Back button (the new page; the test's own tap on the field comes after). */
+const backFocusArg = (spy: { mock: { calls: unknown[][]; contexts: unknown[] } }): unknown => {
+	const at = spy.mock.contexts.map((c) => (c as FEl).getAttribute('data-focus')).lastIndexOf('back');
+	return spy.mock.calls[at]![0];
+};
 
 describe('the Houses window scrolls once, after the keyboard has settled', () => {
 	it('six steps of the keyboard slide cause no scroll, then one scroll to the new field', async () => {
@@ -95,17 +101,17 @@ describe('the Houses window scrolls once, after the keyboard has settled', () =>
 		expect(content.contains(spy.mock.contexts[0] as FEl)).toBe(true);
 	});
 
-	it('the focus of the new row does not scroll by itself on a phone (the one scroll waits for the keyboard)', async () => {
+	it('the focus of the new page does not scroll by itself on a phone (the one scroll waits for the keyboard)', async () => {
 		const focus = vi.spyOn(FEl.prototype, 'focus');
 		await addHouse();
-		expect(lastArg(focus)).toEqual({ preventScroll: true });
+		expect(backFocusArg(focus)).toEqual({ preventScroll: true });
 	});
 
 	it('on a computer the focus scrolls at once, as before', async () => {
 		device.width = 1280;
 		const focus = vi.spyOn(FEl.prototype, 'focus');
 		await addHouse();
-		expect(lastArg(focus)).toEqual({ preventScroll: false });
+		expect(backFocusArg(focus)).toEqual({ preventScroll: false });
 	});
 
 	it('the timer goes with the window: a close before it fires scrolls nothing', async () => {

@@ -345,14 +345,14 @@ describe('the result bar on the computer is as wide as the tree', () => {
 		expect(bar).toContain('width: auto;');
 		expect(bar).not.toMatch(/460px/);
 		const full = rule('.dynasty-full .dynasty-result');
-		expect(full).toContain('padding-left: max(14px, env(safe-area-inset-left));');
-		expect(full).toContain('padding-right: max(var(--dynasty-space-1), env(safe-area-inset-right));');
+		expect(full).toContain('padding-left: max(14px, var(--dynasty-safe-left));');
+		expect(full).toContain('padding-right: max(var(--dynasty-space-1), var(--dynasty-safe-right));');
 		expect(rule('.dynasty-result-buttons')).toContain('flex-wrap: wrap;');
 	});
 
 	it('styles.css: the phone banner is one row at the top inside the safe area', () => {
 		const phoneBar = rule('.modal.dynasty-fullscreen.is-phone .dynasty-full .dynasty-result');
-		expect(phoneBar).toContain('top: max(0px, env(safe-area-inset-top));');
+		expect(phoneBar).toContain('top: max(0px, var(--dynasty-safe-top));');
 		expect(phoneBar).toContain('min-height: 52px;');
 	});
 

@@ -142,11 +142,12 @@ export function deriveFamilies(tree: Tree, options: ValidateOptions = {}): Famil
 			issues.push(codedIssue('union-not-of-parents', 'warning', { person: p.name, ref: p.union }, [p.id]));
 		}
 
-		// Everything not used for placement is a side link, grouped per type.
+		// Everything not used for placement is a side link, grouped per type. A begetter link is a side link of its own and never
+		// comes from a union dot, also for two begetters with a union (spec §0 D332).
 		for (const [t, ids] of byType) {
 			const rest = t === type ? ids.slice(2) : ids;
 			if (!rest.length) continue;
-			const listed = rest.length === 2 ? listedByPair.get(pairKey(rest[0], rest[1])) : undefined;
+			const listed = rest.length === 2 && t !== 'begetter' ? listedByPair.get(pairKey(rest[0], rest[1])) : undefined;
 			if (listed) secondary.push({ child: p.id, type: t, parents: rest, unionKey: listed[listed.length - 1].key });
 			else for (const parent of rest) secondary.push({ child: p.id, type: t, parents: [parent] });
 		}
@@ -169,6 +170,9 @@ export interface DrawnParent {
 	id: string;
 	type: ParentType;
 }
+
+/** Spec §13.21 rule 13: true for a link type that the climb of the succession never follows: ward, rumoured and begetter (D332: a begetter carries no claim). */
+export const noClimb = (type: string): boolean => type === 'ward' || type === 'rumoured' || type === 'begetter';
 
 /**
  * Every person's drawn parent links, after validation and cycle breaking: placement links first,

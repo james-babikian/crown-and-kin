@@ -3,6 +3,25 @@
  * scan the whole vault at each task. It is a hint, not a proof: callers that write still check the text. The state is kept per note with a stamp (modified time and size). A saved copy in the
  * local storage of the vault lets the next start skip every note that did not change; vault events keep the index up to date while Obsidian runs. Pure logic: the vault, the store and the
  * idle wait come in as arguments (`src/obsidian/fence-vault.ts` is the real adaptor).
+ *
+ * Rules (spec §0 D289; the store format is in `fence-store.ts`):
+ * - Match: `fenceFlags` uses `findBlocks` of `core/block-locate.ts` (case-sensitive; fences in callouts, quotes and list items count; a fence inside a longer fence does not). The
+ *   cheap pre-test is `text.includes('kin')`. A regular expression on the fence marker is wrong: the fence info may follow a no-break, form feed or ideographic space.
+ * - Events: every event for a path (`cache`, `create`, `modify`, `rename` from or to, `delete`) raises the sequence number of the path. A read that ends under another number is
+ *   discarded, so a late read never overwrites newer information. A `cache` event brings the text and settles the path. A `create` or `modify` event makes the path unsure and
+ *   arms a safety timer; if no `cache` event comes, the timer reads the note once (unless the cache says it has no section that can hold a block). Obsidian sends no `changed`
+ *   for a rename: a stamped old path moves its entry and stamp with no read; an old path that the check has not reached yet sends the new path to the check list and to `unsure`.
+ * - Check of the vault (`start`, called at layout ready): events first, then the saved copy (its flags are provisional), then `cacheReady()` and one idle turn. A note whose stamp
+ *   equals the saved stamp is skipped. A note with no stamp is read, unless the finished cache lists no section that can hold a block, there was no event for it and its stamp did
+ *   not change (`doubted`): then it has no fence and is not read. A cold or unknown cache proves nothing, so every note is read once, in idle slices (25 reads or 12 ms, 10 reads on
+ *   a phone), with a save after every 300 reads. The pass repeats on the new file list (at most 5 rounds) until nothing is left; what is left then goes to `unsure`.
+ * - `unsure()` holds failed reads, the check list and paths with a pending safety timer; it is empty in a calm vault. A read that fails for a path that has left the vault is ignored;
+ *   any other failed read gives no stamp and no entry change, and the next start tries again. `complete` is true when the pass ended and the check list is empty. `onChange` fires once
+ *   for a burst (300 ms) when the set of notes of a kind changed, never for an edit that keeps it.
+ * - Cost: with a valid saved copy the compare is in memory and only notes that changed while the plugin did not run are read. A first start reads each note that has a block section
+ *   once, in idle time. A cold cache costs one full pass, once. The result is a hint: callers that write test the text themselves (`rename-links.ts`).
+ * - Saves: at most one write in `saveWaitMs` (10 s) after a change, after every 300 reads, on `dispose` and on `flush` (the adaptor calls it when the page hides). A save that throws is
+ *   logged once and ends all saving for the session; the index goes on in memory. Known limit: iOS can flush the local storage late, so a killed app can lose the last saves.
  */
 
 import { CALENDAR_LANGUAGE, KIN_LANGUAGE, findBlocks } from '../core/block-locate';

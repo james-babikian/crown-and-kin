@@ -3,7 +3,8 @@ import { describe, expect, it } from 'vitest';
 import { findBlocks } from '../../src/core/block-locate';
 import { deriveFamilies, type FamilyGraph } from '../../src/core/derive';
 import type { EditRefusal, Op, ParentKind, UnionKind } from '../../src/core/edit';
-import { familyOf, pickerExclusions } from '../../src/core/family-query';
+import { familyOf, linkTypeFull, pickerExclusions } from '../../src/core/family-query';
+import { PARENT_LIMIT } from '../../src/core/parent-types';
 import { parseDynasty } from '../../src/core/parse';
 import { commentsOf } from '../../src/core/yaml-patch';
 import { applyOp } from '../../src/core/yaml-edit';
@@ -15,7 +16,9 @@ import { rng } from '../support/rng';
 // leave a body that parses with editing still on. Ops that the pickers allow must succeed; the
 // others must be refused with the code the contract names.
 
-const PARENT_KINDS: ParentKind[] = ['birth', 'adoptive', 'ward', 'rumoured'];
+const PARENT_KINDS: ParentKind[] = ['birth', 'adoptive', 'ward', 'rumoured', 'begetter'];
+/** D332: the parent types by blood, which share one limit and never name one id twice. */
+const isBlood = (t: string) => t === 'birth' || t === 'begetter';
 const UNION_KINDS: UnionKind[] = ['marriage', 'betrothal', 'concubinage', 'affair'];
 const NAMES = ['Ada', 'Ünïcødé Þórr', '1234', 'a: b', 'Aldric Valmont', '', '#x', 'Wat'];
 
@@ -67,6 +70,9 @@ function randomOp(body: string, g: FamilyGraph, random: () => number): { op: Op;
 			let expect: EditRefusal | null = null;
 			if (parent === child || pickerExclusions(g, child, 'add-parent', 'birth').has(parent) && !fam.parents.some((r) => r.id === parent)) expect = 'cycle';
 			else if (fam.parents.some((r) => r.id === parent && r.type === type)) expect = 'bad-value';
+			else if (fam.parents.filter((r) => r.type === type).length >= PARENT_LIMIT[type]) expect = 'limit';
+			// D332: a birth parent never becomes a begetter of the same child, nor the reverse; then the limit by blood (`fullTypes`).
+			else if (isBlood(type) && fam.parents.some((r) => r.id === parent && isBlood(r.type))) expect = 'bad-value';
 			else if (fam.fullTypes.includes(type)) expect = 'limit';
 			return { op: { kind: 'add-parent', child, parent, type }, expect, removes: false };
 		}
@@ -94,8 +100,12 @@ function randomOp(body: string, g: FamilyGraph, random: () => number): { op: Op;
 			const link = pick(fam.parents);
 			const to = pick(PARENT_KINDS);
 			let expect: EditRefusal | null = null;
+			// D332: the per-link rule; the other links of the child count, the changed link is left out.
+			const others = fam.parents.filter((r) => r !== link);
 			if (to !== link.type && fam.parents.some((r) => r.id === link.id && r.type === to)) expect = 'bad-value';
-			else if (to !== link.type && fam.fullTypes.includes(to)) expect = 'limit';
+			else if (to !== link.type && others.filter((r) => r.type === to).length >= PARENT_LIMIT[to]) expect = 'limit';
+			else if (to !== link.type && isBlood(to) && others.some((r) => r.id === link.id && isBlood(r.type))) expect = 'bad-value';
+			else if (linkTypeFull(fam.parents, link, to)) expect = 'limit';
 			return { op: { kind: 'set-parent-type', child, parent: link.id, from: link.type, to }, expect, removes: false };
 		}
 		case 'remove-parent': {

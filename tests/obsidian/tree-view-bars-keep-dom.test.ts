@@ -128,7 +128,7 @@ describe('the bars of a tree view keep their DOM', () => {
 		phone();
 		const { root } = await openFullScreen('people: []\n');
 		expect(bars(root)).toMatchInlineSnapshot(`
-			"parent dynasty-root.dynasty-empty-root.dynasty-full, child 1 of 2
+			"parent dynasty-root.dynasty-empty-root.dynasty-full.is-phone-device, child 1 of 2
 			div.dynasty-toolbar [role=toolbar aria-labelledby=dynasty-bar-N]
 			  span.dynasty-sr-only [id=dynasty-bar-N] "Tools for this tree"
 			  span.dynasty-grow [aria-hidden=true]
