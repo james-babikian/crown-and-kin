@@ -47,6 +47,15 @@
 	display: none;
 }
 
+/* The stems of the rings that stand above their blocks (two rings that would touch, D341): one path, a hairline in the text colour, under every pill. */
+.dynasty-heir-number-stems {
+	fill: none;
+	stroke: var(--text-normal);
+	stroke-width: 1;
+	vector-effect: non-scaling-stroke;
+	pointer-events: none;
+}
+
 .dynasty-heir-number-base {
 	fill: var(--background-primary-alt);
 	stroke: var(--background-primary-alt);

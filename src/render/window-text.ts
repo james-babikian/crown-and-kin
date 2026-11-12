@@ -28,7 +28,7 @@ export const HOUSES = {
 	none: 'This tree has no houses.',
 	newHouse: 'New house',
 	/** D330 UX-22: the placeholder of the name of a new house, under the one heading "New house". */
-	namePlaceholder: 'For example: House Valmont',
+	namePlaceholder: 'For example: House Plantagenet',
 	nameLabel: 'Name of the house',
 	count: (n: number) => (n === 0 ? 'No people' : n === 1 ? '1 person' : `${n} people`),
 	delete: 'Delete',
@@ -81,7 +81,7 @@ export const ID_UI = {
 	make: 'Make ID from the name',
 	makeAria: (item: string) => `Make ID from the name: make the ID of ${item} from the name`,
 	empty: 'Enter an ID.',
-	characters: 'Use only letters, digits and hyphens (-).',
+	characters: 'Use only small letters, digits and hyphens (-).',
 	taken: 'This ID is in use. Enter a different ID.',
 	/** The note of a new row whose name gives an ID that a changed row has taken. */
 	newName: 'This name gives an ID that is in use. Enter a different name.',
@@ -170,6 +170,8 @@ export const TITLES_UI = {
 	formNew: 'New holder',
 	titleName: 'Name of the title',
 	holderName: 'Name of the holder',
+	/** D341: the grey example of the name of a holder who is not in the tree. */
+	holderNamePlaceholder: 'For example: Rosamund de Clifford',
 	number: 'Number',
 	numberPlaceholder: 'For example: II',
 	ruler: 'Ruler name',
@@ -181,7 +183,7 @@ export const TITLES_UI = {
 	holderTickHint: 'If you tick this box, the line of succession follows the relatives of the spouse, as if the spouse held the title.',
 	holderTickDisabled: 'This holder is not a person in the tree. To use this tick box, select a person in the tree as the holder.',
 	// I15, D188 item 23.
-	rulerHint: 'If you leave this field empty, the ruler name is the first word of the name of the holder. If the name starts with a word such as “Ser”, write the ruler name here.',
+	rulerHint: 'If you leave this field empty, the ruler name is the first word of the name of the holder. If the first word is not the ruler name, for example “Sir”, write the ruler name here.',
 	needTitleName: 'Enter a name for the title.',
 	needHolderName: 'Enter the name of the holder.',
 	formDiscardText: 'You did not save the changes to this holder.',
@@ -296,12 +298,14 @@ export const WRITE_TEXT = {
 	undoDoneIn: (note: string) => `The plugin undid the last tree edit in ${quote(note)}.`,
 	/** D330 UX-17: the same text with the person that the edit changed: "The plugin undid the change to Edric Valmont in “01-three-generations”." */
 	undoDoneChange: (person: string, note: string) => `The plugin undid the change to ${isolateName(person)} in ${quote(note)}.`,
+	/** D346: the same after a rename: the name before the undo, then the name that the tree shows again. "The plugin undid the change to Aldric III. The name is Aldric the Elder again." */
+	undoDoneRename: (now: string, was: string) => `The plugin undid the change to ${isolateName(now)}. The name is ${isolateName(was)} again.`,
 	/** D284: the question when the last tree edit is in a note that is not the active note. */
 	undoAskTitle: (note: string) => `Undo the last tree edit in ${quote(note)}?`,
 	/** The two sentences of the question: the first names the note in a line that everyone can see, also on a phone (the title can be cut). */
 	undoAskText: (note: string): string[] => [`The last tree edit is in the note ${quote(note)}, not in the active note.`, `If you select Undo, the plugin reverses that edit in ${quote(note)}.`],
 	undoEmpty: 'There is no tree edit to undo.',
-	undoChanged: 'The plugin cannot undo the last tree edit. The tree changed after the edit.',
+	undoChanged: 'The plugin cannot undo the last tree edit. The tree changed after the edit. Make the change again by hand.',
 	undoMissing: 'The plugin cannot find the tree of the last edit.',
 	cycle: 'The plugin cannot make this change. A person cannot be their own ancestor.',
 	limit: (type?: string) =>

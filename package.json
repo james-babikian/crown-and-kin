@@ -1,10 +1,10 @@
 {
   "name": "dynasty-tree",
-  "version": "0.5.3",
+  "version": "0.5.4",
   "description": "Obsidian plugin: editable family trees for fictional dynasties",
   "scripts": {
-    "test": "vitest run --project fast",
-    "test:perf": "vitest run --project perf",
+    "test": "vitest run --project fast --project browser",
+    "test:perf": "vitest run --project perf --project perf-browser",
     "test:all": "vitest run",
     "typecheck": "tsc --noEmit",
     "format-doc": "tsx scripts/format/generate.ts",

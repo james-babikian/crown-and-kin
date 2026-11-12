@@ -86,6 +86,7 @@ function stageFiles(): string[] {
 		'src/layout/draw.ts',
 		'src/layout/pipeline.ts',
 		'src/layout/rumour-spot.ts',
+		'src/layout/side-route.ts',
 		'src/core/order.ts',
 	];
 }
@@ -101,6 +102,12 @@ const ALLOWED: { file: string; condition: string; bound: string }[] = [
 	{ file: 'src/layout/lanes.ts', condition: 'blocked(n, lane)', bound: 'the nets and fixed zones block a fixed number of lanes, so a free lane comes within that many' },
 	{ file: 'src/layout/route.ts', condition: 'a < b', bound: 'a binary search: every pass halves [a, b)' },
 	{ file: 'src/layout/rumour-spot.ts', condition: 'i < d.length', bound: 'every pass moves i forward (readNumbers)' },
+	{ file: 'src/layout/side-route.ts', condition: 'lo < hi', bound: 'the span of the binary search halves on every pass (rowFrom)' },
+	{ file: 'src/layout/side-route.ts', condition: 'lo < hi', bound: 'the span of the binary search halves on every pass (stopIndex)' },
+	{ file: 'src/layout/side-route.ts', condition: 'lo < hi', bound: 'the span of the binary search halves on every pass (firstAbove)' },
+	{ file: 'src/layout/side-route.ts', condition: 'lo < hi', bound: 'the span of the binary search halves on every pass (cardIndex)' },
+	{ file: 'src/layout/side-route.ts', condition: 'lo < hi', bound: 'the span of the binary search halves on every pass (laneFrom)' },
+	{ file: 'src/layout/side-route.ts', condition: 'j < q.length && q[j][1] < a', bound: 'j only grows, up to the length of q (overlap)' },
 	{ file: 'src/layout/rumour-spot.ts', condition: 'i < d.length', bound: 'every pass reads one command letter and moves i past it' },
 ];
 

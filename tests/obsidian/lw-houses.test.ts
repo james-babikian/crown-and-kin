@@ -273,6 +273,17 @@ describe('the edit page', () => {
 		expect(page.querySelector('label.dynasty-house-name')).not.toBeNull();
 	});
 
+	it('D341: the name field of a new house shows the grey example "For example: House Plantagenet", and a saved house shows its name', async () => {
+		const { content } = open();
+		const saved = openPage(content, 'orsini');
+		expect(field(content).value).toBe('House Orsini');
+		expect(saved.querySelector('textarea.dynasty-lw-field')!.getAttribute('placeholder')).toBe(HOUSES.namePlaceholder);
+		backToList(content);
+		await click(content.querySelector('button[data-focus="add"]'));
+		expect(field(content).value).toBe('');
+		expect(field(content).getAttribute('placeholder')).toBe('For example: House Plantagenet');
+	});
+
 	it('shows the number of people once, in the summary of the closed People section and not in the header (D216 item 2), and the whole palette with no toggle', () => {
 		const { content } = open();
 		const page = openPage(content, 'orsini');

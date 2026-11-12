@@ -21,6 +21,11 @@ const CURVE_PIECES = 16;
 /** The "?" keeps this far (px) from every other line, and this far from every dot (a dot's radius is counted in the second). */
 const LINE_CLEAR_PX = 10;
 const DOT_CLEAR_PX = 16;
+/** px: the places of the "?" search along a routed line are this far apart, and at most this many over the whole route. */
+const ROUTED_STEP_PX = 5;
+const ROUTED_MAX_PLACES = 400;
+/** The clearest point is not searched in the twentieth of a curve at each end. */
+const CLEAREST_END_PARTS = 20;
 /** The middle of a curve (its parameter), where every search starts. */
 const MIDDLE = 0.5;
 /** Along the curve the search takes this many steps each way from the middle, each a fortieth of the curve. */
@@ -31,6 +36,8 @@ const ALT_STEPS = 20;
 /** The clearest point is searched at the fortieths of the curve (not at its two ends); it looks this far (px) for lines, and `DOT_RADIUS_PX` more for dots, which count that much less. */
 const CLEAREST_STEPS = 40;
 const CLEAREST_REACH_PX = 40;
+/** Around the best of those places the search looks again at this many finer places on each side, within one step (a narrow free stretch, between a tag and a card, can lie between two fortieths). */
+const CLEAREST_REFINE = 8;
 const DOT_RADIUS_PX = 6;
 /** The last fallback walks this many places along the curve; a card is looked for within this many times the card room. */
 const FALLBACK_STEPS = 200;
@@ -50,6 +57,22 @@ const CHAR_POINT = 46;
 export function bezier([sx, sy, my, tx, ty]: Curve, t: number): Spot {
 	const u = 1 - t;
 	return { x: u * u * u * sx + 3 * u * u * t * sx + 3 * u * t * t * tx + t * t * t * tx, y: u * u * u * sy + 3 * u * u * t * my + 3 * u * t * t * my + t * t * t * ty };
+}
+
+/** The nodes and weights of the five-point Gauss-Legendre rule on 0 to 1. */
+const GAUSS_T: readonly number[] = [0.04691007703066802, 0.23076534494715845, 0.5, 0.7692346550528415, 0.953089922969332];
+const GAUSS_W: readonly number[] = [0.11846344252809454, 0.23931433524968324, 0.28444444444444444, 0.23931433524968324, 0.11846344252809454];
+
+/** The length of a piece of a line: a straight vertical exactly, an S-curve by the Gauss-Legendre rule on its speed (exact to well under a pixel for these curves). */
+export function pieceLength([sx, sy, my, tx, ty]: Curve): number {
+	if (sx === tx) return Math.abs(ty - sy);
+	let sum = 0;
+	for (let k = 0; k < GAUSS_T.length; k++) {
+		const t = GAUSS_T[k];
+		const u = 1 - t;
+		sum += GAUSS_W[k] * Math.hypot(6 * (tx - sx) * t * u, 3 * (u * u * (my - sy) + t * t * (ty - my)));
+	}
+	return sum;
 }
 
 const isDigit = (c: number): boolean => c >= CHAR_0 && c <= CHAR_9;
@@ -159,6 +182,17 @@ class BoxGrid {
 		}
 		return [...seen].sort((a, b) => a - b);
 	}
+	/**
+	 * True if `ok` holds for every index whose box touches the query box. The indexes come in no fixed order and maybe more than once, so it serves only
+	 * a test whose answer does not depend on order (all clear, a smallest distance); it builds no list, which made most of the work of a crowded search.
+	 */
+	every(x0: number, y0: number, x1: number, y1: number, ok: (i: number) => boolean): boolean {
+		const c = GRID_CELL_PX;
+		for (let cx = Math.floor((x0 - TIE) / c); cx <= Math.floor((x1 + TIE) / c); cx++) {
+			for (let cy = Math.floor((y0 - TIE) / c); cy <= Math.floor((y1 + TIE) / c); cy++) for (const i of this.cells.get(this.key(cx, cy)) ?? []) if (!ok(i)) return false;
+		}
+		return true;
+	}
 }
 
 /**
@@ -190,6 +224,14 @@ export class RumourIndex {
 			return Math.max(ax, bx) >= x0 - TIE && Math.min(ax, bx) <= x1 + TIE && Math.max(ay, by) >= y0 - TIE && Math.min(ay, by) <= y1 + TIE;
 		});
 	}
+	/** True if `ok` holds for every line whose grid cells meet the box (in no fixed order; see `BoxGrid.every`). */
+	everySeg(x0: number, y0: number, x1: number, y1: number, ok: (i: number) => boolean): boolean {
+		return this.segGrid.every(x0, y0, x1, y1, ok);
+	}
+	/** True if `ok` holds for every box whose grid cells meet the box (in no fixed order). */
+	everyCard(x0: number, y0: number, x1: number, y1: number, ok: (i: number) => boolean): boolean {
+		return this.cardGrid.every(x0, y0, x1, y1, ok);
+	}
 	/** The dots inside the box. */
 	dotsIn(x0: number, y0: number, x1: number, y1: number): number[] {
 		return this.dotGrid.near(x0, y0, x1, y1).filter((i) => this.dots[i].x >= x0 - TIE && this.dots[i].x <= x1 + TIE && this.dots[i].y >= y0 - TIE && this.dots[i].y <= y1 + TIE);
@@ -220,13 +262,13 @@ interface Probes {
  * Only what lies near a point is looked at: nothing farther than `LINE_CLEAR_PX` (`DOT_CLEAR_PX` for a dot) from a point changes whether
  * it is clear. The grids give those by the point, not by the box of the curve's ends, which for a long link would hold half the drawing.
  */
-function probesOf(ix: RumourIndex, own: [number, number], room: number): Probes {
+function probesOf(ix: RumourIndex, own: [number, number], room: number, lineClear = LINE_CLEAR_PX): Probes {
 	const { all, dots, cards } = ix;
 	const other = (i: number) => i < own[0] || i >= own[1];
-	const offCards = (p: Spot) => ix.cardsIn(p.x - room, p.y - room, p.x + room, p.y + room).every((i) => boxGap(p, cards[i]) >= room - TIE);
+	const offCards = (p: Spot) => ix.everyCard(p.x - room, p.y - room, p.x + room, p.y + room, (i) => boxGap(p, cards[i]) >= room - TIE);
 	const dotsClear = (p: Spot) => ix.dotsIn(p.x - DOT_CLEAR_PX, p.y - DOT_CLEAR_PX, p.x + DOT_CLEAR_PX, p.y + DOT_CLEAR_PX).every((i) => Math.hypot(p.x - dots[i].x, p.y - dots[i].y) > DOT_CLEAR_PX + TIE);
 	// `ok` names the segments the place may touch: a place on the trunk's alternative is clear of every line but the curve's own pieces.
-	const clearAll = (p: Spot, ok: (i: number) => boolean) => ix.segsIn(p.x - LINE_CLEAR_PX, p.y - LINE_CLEAR_PX, p.x + LINE_CLEAR_PX, p.y + LINE_CLEAR_PX).every((i) => ok(i) || beyond(p, all[i], LINE_CLEAR_PX) || distance(p, all[i]) > LINE_CLEAR_PX + TIE) && dotsClear(p) && offCards(p);
+	const clearAll = (p: Spot, ok: (i: number) => boolean) => ix.everySeg(p.x - lineClear, p.y - lineClear, p.x + lineClear, p.y + lineClear, (i) => ok(i) || beyond(p, all[i], lineClear) || distance(p, all[i]) > lineClear + TIE) && dotsClear(p) && offCards(p);
 	return { offCards, clear: (p) => clearAll(p, (i) => !other(i)), clearAll, other };
 }
 
@@ -237,25 +279,47 @@ const along = (at: (t: number) => Spot, steps: number): Spot[] => {
 	return out;
 };
 
-/** The point of the curve that has the most room: a card-free point farthest from the other lines and the dots (nearer than the reach counts as the reach). */
-function clearestOnCurve(curve: Curve, ix: RumourIndex, pr: Probes, start: Spot): Spot {
+/** The room at `p`: its distance to the nearest other line or dot (a dot counts `DOT_RADIUS_PX` less), at most the reach. */
+function roomAt(p: Spot, ix: RumourIndex, pr: Probes): number {
 	const { all, dots } = ix;
 	const reach = CLEAREST_REACH_PX;
+	// A line farther than the reach counts as the reach, so a line met twice or in any order gives the same smallest distance.
+	let d = reach;
+	ix.everySeg(p.x - reach, p.y - reach, p.x + reach, p.y + reach, (s) => {
+		if (pr.other(s) && !beyond(p, all[s], reach)) d = Math.min(d, distance(p, all[s]));
+		return true;
+	});
+	for (const k of ix.dotsIn(p.x - reach - DOT_RADIUS_PX, p.y - reach - DOT_RADIUS_PX, p.x + reach + DOT_RADIUS_PX, p.y + reach + DOT_RADIUS_PX)) d = Math.min(d, Math.hypot(p.x - dots[k].x, p.y - dots[k].y) - DOT_RADIUS_PX);
+	return d;
+}
+
+/** The point of the curves that has the most room: a card-free point farthest from the other lines and the dots (nearer than the reach counts as the reach); `start` and room -1 when none is off the cards. */
+function clearestOn(curves: readonly Curve[], ix: RumourIndex, pr: Probes, start: Spot, steps = CLEAREST_STEPS): { spot: Spot; room: number } {
 	let best = start;
 	let room = -1;
-	for (let i = 2; i <= CLEAREST_STEPS - 2; i++) {
-		const p = bezier(curve, i / CLEAREST_STEPS);
-		if (!pr.offCards(p)) continue;
-		// A loop, not a spread: a crowded drawing can have more lines here than an argument list takes.
-		let d = reach;
-		for (const s of ix.segsIn(p.x - reach, p.y - reach, p.x + reach, p.y + reach)) if (pr.other(s) && !beyond(p, all[s], reach)) d = Math.min(d, distance(p, all[s]));
-		for (const k of ix.dotsIn(p.x - reach - DOT_RADIUS_PX, p.y - reach - DOT_RADIUS_PX, p.x + reach + DOT_RADIUS_PX, p.y + reach + DOT_RADIUS_PX)) d = Math.min(d, Math.hypot(p.x - dots[k].x, p.y - dots[k].y) - DOT_RADIUS_PX);
-		if (d > room + TIE) {
-			room = d;
-			best = p;
-		}
+	let at: { curve: Curve; t: number } | undefined;
+	const margin = Math.round(steps / CLEAREST_END_PARTS);
+	const take = (curve: Curve, t: number): boolean => {
+		const p = bezier(curve, t);
+		if (!pr.offCards(p)) return false;
+		const d = roomAt(p, ix, pr);
+		if (d <= room + TIE) return false;
+		room = d;
+		best = p;
+		return true;
+	};
+	for (const curve of curves) for (let i = margin; i <= steps - margin; i++) if (take(curve, i / steps)) at = { curve, t: i / steps };
+	if (at) for (let k = 1 - CLEAREST_REFINE; k < CLEAREST_REFINE; k++) if (k !== 0) take(at.curve, at.t + k / (steps * CLEAREST_REFINE));
+	return { spot: best, room };
+}
+
+/** The first place along `curve`, from its middle outward, that is clear of the other lines, the dots and the cards. */
+function clearAlong(curve: Curve, pr: Probes): Spot | undefined {
+	for (let i = 0; i <= ALONG_STEPS; i++) {
+		const p = bezier(curve, MIDDLE + (i % 2 ? 1 : -1) * Math.ceil(i / 2) * ALONG_STEP_T);
+		if (pr.clear(p)) return p;
 	}
-	return best;
+	return undefined;
 }
 
 /**
@@ -266,10 +330,8 @@ function clearestOnCurve(curve: Curve, ix: RumourIndex, pr: Probes, start: Spot)
  */
 export function rumourSpot(curve: Curve, ix: RumourIndex, own: [number, number], clearest: boolean, near: RumourRoom): Spot {
 	const pr = probesOf(ix, own, near.room);
-	for (let i = 0; i <= ALONG_STEPS; i++) {
-		const p = bezier(curve, MIDDLE + (i % 2 ? 1 : -1) * Math.ceil(i / 2) * ALONG_STEP_T);
-		if (pr.clear(p)) return p;
-	}
+	const along0 = clearAlong(curve, pr);
+	if (along0) return along0;
 	const altSpots = (near.alt?.segs ?? []).flatMap(([x1, y1, x2, y2]) => along((t) => ({ x: x1 + t * (x2 - x1), y: y1 + t * (y2 - y1) }), ALT_STEPS));
 	if (near.alt) {
 		const mine = near.alt.own;
@@ -281,7 +343,7 @@ export function rumourSpot(curve: Curve, ix: RumourIndex, own: [number, number],
 	if (!clearest) {
 		if (pr.offCards(mid)) return mid;
 	} else {
-		const best = clearestOnCurve(curve, ix, pr, mid);
+		const best = clearestOn([curve], ix, pr, mid).spot;
 		if (pr.offCards(best)) return best;
 	}
 	// No place clear of the cards is also clear of the lines: the cards come first. A link between two cards of one row crosses only the
@@ -293,4 +355,76 @@ export function rumourSpot(curve: Curve, ix: RumourIndex, own: [number, number],
 	const reach = FALLBACK_REACH * near.room;
 	const gap = (p: Spot) => ix.cardsIn(p.x - reach, p.y - reach, p.x + reach, p.y + reach).reduce((m, i) => Math.min(m, boxGap(p, ix.cards[i])), Infinity);
 	return places.reduce((a, b) => (gap(b) > gap(a) + TIE ? b : a));
+}
+
+/** The places along a routed line, `step` apart by length, from its middle outward to its two ends (the ends left out), and how far each is from the middle. */
+function placesAlong(pieces: readonly Curve[], lengths: readonly number[], step: number): { places: Spot[]; off: number[] } {
+	const starts: number[] = [];
+	let total = 0;
+	for (const l of lengths) {
+		starts.push(total);
+		total += l;
+	}
+	const at = (s: number): Spot => {
+		let k = pieces.length - 1;
+		for (let i = 1; i < pieces.length; i++) {
+			if (starts[i] > s) {
+				k = i - 1;
+				break;
+			}
+		}
+		const c = pieces[k];
+		const t = lengths[k] > 0 ? Math.min(1, (s - starts[k]) / lengths[k]) : 0;
+		return c[0] === c[3] ? { x: c[0], y: c[1] + t * (c[4] - c[1]) } : bezier(c, t);
+	};
+	const places: Spot[] = [];
+	const off: number[] = [];
+	const half = Math.floor(total / 2 / step);
+	for (let i = 0; i <= 2 * half; i++) {
+		const s = total / 2 + (i % 2 ? 1 : -1) * Math.ceil(i / 2) * step;
+		if (s <= 0 || s >= total) continue;
+		places.push(at(s));
+		off.push(Math.abs(s - total / 2));
+	}
+	return { places, off };
+}
+
+/**
+ * The "?" spot on a side link routed between the cards (side-route.ts, D343): the place nearest the middle of the whole route, by its length, that is clear
+ * of every other line, dot and card (as `clearAlong` searches a plain curve; a mark in the plain search's middle may lie on another line, for example the
+ * dots of a ward line, when the route bends near it). With none, as for a plain curve: the middle of the route (sideways: its place with the most room), if
+ * it is off the cards; at last the fallbacks of `rumourSpot` on the longest piece. `lengths` are the lengths of the pieces (the router measured them).
+ */
+export function routedSpot(pieces: readonly Curve[], lengths: readonly number[], ix: RumourIndex, own: [number, number], clearest: boolean, near: RumourRoom): Spot {
+	// A routed line runs beside other lines at a few px through its rows: the "?" keeps them out of its whole disc (the room it keeps from a card), at large
+	// sizes too.
+	const pr = probesOf(ix, own, near.room, Math.max(LINE_CLEAR_PX, near.room));
+	const total = lengths.reduce((n, l) => n + l, 0);
+	// Places a few px apart over the whole route; a very long route gets at most ROUTED_MAX_PLACES of them.
+	const { places, off } = placesAlong(pieces, lengths, Math.max(ROUTED_STEP_PX, total / ROUTED_MAX_PLACES));
+	const clear = places.find(pr.clear);
+	if (clear) return clear;
+	const mid = places[0] ?? bezier(pieces[0], MIDDLE);
+	if (!clearest) {
+		if (pr.offCards(mid)) return mid;
+	} else {
+		// The places with the most room, away from the two ends (as `clearestOn` leaves out a twentieth at each end).
+		const reach = total / 2 - total / CLEAREST_END_PARTS;
+		let best = mid;
+		let room = -1;
+		places.forEach((p, i) => {
+			if (off[i] > reach || !pr.offCards(p)) return;
+			const d = roomAt(p, ix, pr);
+			if (d > room + TIE) {
+				room = d;
+				best = p;
+			}
+		});
+		if (pr.offCards(best)) return best;
+	}
+	let longest = 0;
+	lengths.forEach((l, i) => {
+		if (l > lengths[longest]) longest = i;
+	});
+	return rumourSpot(pieces[longest], ix, own, clearest, near);
 }

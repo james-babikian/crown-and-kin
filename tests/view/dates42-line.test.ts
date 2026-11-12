@@ -183,7 +183,7 @@ describe('the tree warning list (spec §14 rules 5 and 7)', () => {
 		const g = graphOf(tree({ title: '    year: "0"\n' }));
 		const issue = g.issues.find((i) => i.code === 'year-zero')!;
 		expect(issue.params).toMatchObject({ where: 'year', title: 'Crown', value: '0' });
-		expect(issueText(issue)).toBe('The title Crown has “year: 0”. There is no year 0. The plugin reads 0 as 1 BC. If you mean AD 1, write “1”. For a year before that, write a number with a minus sign, such as “-5”, for 5 BC.');
+		expect(issueText(issue)).toBe('The title Crown has “year: 0”. There is no year 0. The plugin reads 0 as 1 BC. If you mean AD 1, write “1”. For a year before that, write a number with a minus sign, for example “-5” for 5 BC.');
 	});
 
 	it('only the people the line can read: a named heir, the holders and their descendants', () => {

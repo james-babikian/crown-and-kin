@@ -15,12 +15,19 @@ import { afterPress } from './press-hold';
 const TYPING_PAUSE_MS = 300;
 
 /**
- * Writes the two parts of a date line into `line`: the reading as grey text, and the warning about a wrong written name (when there is one) on a text line of its own, with
- * a warning mark and the text colour (D278). The line is empty, and takes no room, when there is nothing to say.
+ * Writes the parts of a date line into `line`: the reading as grey text, with the warning sentence of rule 5 (when there is one) after it on the same text line in the text colour
+ * (D348 2 A), and the warning about a wrong written name (when there is one) on a text line of its own, with a warning mark and the text colour (D278). The line is empty, and
+ * takes no room, when there is nothing to say. The text of the line is the same with or without the colour, so a screen reader says the same words.
  */
 export function paintDateLine(line: HTMLElement, parts: ReadoutParts): void {
 	line.empty();
-	if (parts.reading !== '') line.createDiv({ cls: 'dynasty-date-reading', text: parts.reading });
+	if (parts.reading !== '' || parts.tail !== '') {
+		const reading = line.createDiv({ cls: 'dynasty-date-reading', text: parts.reading });
+		if (parts.tail !== '') {
+			if (parts.reading !== '') reading.appendText(' ');
+			reading.createSpan({ cls: 'dynasty-date-tail', text: parts.tail });
+		}
+	}
 	if (parts.warning !== '') markedLine(line, 'warning', parts.warning, 'dynasty-date-warning').setAttribute('data-warning', '');
 }
 

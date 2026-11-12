@@ -117,8 +117,8 @@ export interface FarTag {
 	spouses: string[];
 	/**
 	 * Visible tag anchor: horizontal centre and the card's bottom edge. The renderer sizes the text.
-	 * In `sideways` also the bottom edge; when a partner is stacked directly below, the tag uses the
-	 * left half of that edge so it does not sit on the couple's union point.
+	 * In `sideways` also the bottom edge, in its middle; the tag uses the whole edge between the insets, also when a partner
+	 * is stacked directly below: it then stands over the start of the line to that partner, above the couple's union point (D344 1 A).
 	 */
 	x: number;
 	y: number;
@@ -207,6 +207,8 @@ export interface EdgePath {
 	parents?: string[];
 	/** A drop or a side link: the child. */
 	child?: string;
+	/** px: how far into its dash pattern the line starts (SVG `stroke-dashoffset`); set on a begetter line that shares a run with others of its group, so their dashes line up (D338 point 5). */
+	dashOffset?: number;
 }
 
 /** A dot or "?" mark drawn on top of the lines: a union's sign, or a rumoured parent's mark. */

@@ -73,16 +73,16 @@ describe('the picture list (P3-07, P3-08, P3-09)', () => {
 });
 
 describe('the Calendars window (K-01, K-02, K-04, K-11)', () => {
-	it('the number columns of the era and cycle rows are as wide as their fields, so Length ends on the shared edge', () => {
+	it('the number columns of the cycle row are as wide as their fields', () => {
 		expect(rule(calendars, '.dynasty-cal-start-row')).toContain('grid-template-columns: max-content max-content auto minmax(0, 1fr)');
-		expect(rule(calendars, '.dynasty-cal-start-row.is-era')).toContain('grid-template-columns: max-content auto minmax(0, 1fr) max-content');
 	});
 
-	it('the tap area of Remove on a phone grows upward only, clear of the Era name field', () => {
-		expect(rule(calendars, '.dynasty-sheet.is-phone .dynasty-cal-labelrow')).toContain('align-items: flex-end');
-		const remove = rule(calendars, '.dynasty-sheet.is-phone .dynasty-cal-labelrow .dynasty-cal-remove');
-		expect(remove).toContain('margin-block: -27px 0');
-		expect(remove).toContain('align-items: flex-end');
+	it('D342: the era rows, their Remove link and its label line are gone; the reading list puts the end at the right and never wraps it', () => {
+		expect(calendars).not.toContain('.dynasty-cal-start-row.is-era');
+		expect(calendars).not.toContain('dynasty-cal-labelrow');
+		expect(calendars).not.toMatch(/\.dynasty-cal-remove[ ,{]/);
+		expect(rule(calendars, '.dynasty-cal-era-read')).toContain('justify-content: space-between');
+		expect(rule(calendars, '.dynasty-cal-era-end')).toContain('white-space: nowrap');
 	});
 
 	it('the refusal under a field takes its size and weight from the shared error rule (semibold)', () => {

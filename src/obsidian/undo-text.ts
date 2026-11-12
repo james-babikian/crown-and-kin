@@ -8,7 +8,7 @@ import { CHANGE_UI } from '../render/change-text';
 import { REMOVE, WRITE_TEXT } from '../render/ui-text';
 
 /**
- * The text that says what an Undo changed back. `note` is the name of the note, for the one text that names it (the change to a person: "in “note”");
+ * The text that says what an Undo changed back. `note` is the name of the note, for the one text that names it (the change to a person: "in “note”"; a rename names both names and no note);
  * with no note that text is the generic `fallback`. The other texts name the people only.
  */
 export function undoneText(label: UndoLabel | undefined, note: string | null, fallback: string): string {
@@ -16,6 +16,8 @@ export function undoneText(label: UndoLabel | undefined, note: string | null, fa
 	const [a = '', b = '', c = ''] = label.names;
 	switch (label.kind) {
 		case 'change':
+			// A rename names both names; it does not name the note, so it also reads well in the change line of a window.
+			if (b !== '' && b !== a) return WRITE_TEXT.undoDoneRename(b, a);
 			return note === null ? fallback : WRITE_TEXT.undoDoneChange(a, note);
 		case 'added-child':
 			return CHANGE_UI.undoneAddedChild(a, b, label.type ?? 'birth');

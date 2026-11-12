@@ -5,7 +5,7 @@ import { findBlocks } from '../../src/core/block-locate';
 import { openCalendars } from '../../src/obsidian/calendar-window';
 import { chooseCalendarNote } from '../../src/obsidian/calendar-note-choice';
 import { calendarBlockProcessor } from '../../src/obsidian/calendar-block-view';
-import { CALENDAR_UI, CALENDAR_WINDOW_UI as T } from '../../src/render/calendar-text';
+import { CALENDAR_BLOCK_UI as T_BLOCK, CALENDAR_UI, CALENDAR_WINDOW_UI as T } from '../../src/render/calendar-text';
 import { createCalendarIndex } from '../../src/view/calendar-index';
 import { FEl, device, dispatch, resetDom } from '../acceptance/fake-dom';
 import { lastMenu, notices, openModals, resetObsidian } from '../acceptance/fake-obsidian';
@@ -148,19 +148,23 @@ describe('the Calendars window', () => {
 		expect(o.index.calendarsOf('Calendars.md')[0].name).toBe('The Count');
 	});
 
-	it('adds an era calendar with an era; the start comes from the Same year as form', async () => {
+	it('adds an era calendar with its eras as text lines; the reading list follows each key press (D342)', async () => {
 		const o = await open({ 'Calendars.md': cycleNote() });
 		const c = o.win.contentEl;
 		await addKind(c, 'eras');
 		type(c, '1-name', 'Houses');
 		type(c, '1-formats', '{era} {year}');
-		type(c, 'era-2-name', 'Aldric');
-		type(c, 'era-2-same', '1500');
-		type(c, 'era-2-year', '4');
-		expect(c.querySelector('[data-readback="era-2"]')?.getText()).toBe('Aldric 4 = year 1500');
+		type(c, '1-eras', 'Reign of Aldric, 1100');
+		const list = () => c.querySelectorAll('[data-era-list="1"] .dynasty-cal-era-read').map((r) => r.children.map((k) => k.getText()));
+		expect(list()).toEqual([['Reign of Aldric 1 = year 1100', 'no end']]);
+		type(c, '1-eras', 'Reign of Aldric, 1100\nReign of Bran, 1140 to 1159');
+		expect(list()).toEqual([
+			['Reign of Aldric 1 = year 1100', 'to 1139'],
+			['Reign of Bran 1 = year 1140', 'to 1159'],
+		]);
 		await save(c);
 		const added = o.index.calendarsOf('Calendars.md').find((k) => k.name === 'Houses');
-		expect(added?.kind).toMatchObject({ type: 'eras', eras: [{ name: 'Aldric', start: 1497 }] });
+		expect(added?.kind).toEqual({ type: 'eras', eras: [{ name: 'Reign of Aldric', start: 1100 }, { name: 'Reign of Bran', start: 1140, length: 20 }] });
 	});
 
 	it('removes a calendar', async () => {
@@ -258,7 +262,7 @@ describe('the Calendars window', () => {
 		const k = Number(c.querySelector('[data-calendar]')!.getAttribute('data-calendar'));
 		type(c, `${k}-name`, 'Houses');
 		type(c, `${k}-formats`, '{era} {year}');
-		type(c, `era-${k + 1}-name`, 'Aldric');
+		type(c, `${k}-eras`, 'Aldric, 1');
 		await save(c);
 		expect(o.created).toEqual(['Worlds/Far Land.md']);
 	});
@@ -373,6 +377,16 @@ describe('the kin-calendar block in a note', () => {
 		expect(rows[1]).toEqual(['Qinglong Emperor', 'year 130', '11']);
 	});
 
+	it('D342: an era with no length ends where the next era starts; only the last era has no end', () => {
+		const source = ['```kin-calendar', 'calendars:', '  - name: Reigns', '    kind: eras', '    formats: ["{era} {year}"]', '    eras:', '      - {name: Bran, start: 1140}', '      - {name: Aldric, start: 1100}', '```', ''].join('\n');
+		const { el } = render(source);
+		const rows = el.querySelectorAll('.dynasty-cal-eras tr').map((tr) => tr.querySelectorAll('td').map((td) => td.getText()));
+		expect(rows.slice(1)).toEqual([
+			['Bran', 'year 1140', T_BLOCK.noLength],
+			['Aldric', 'year 1100', 'No length (to year 1139)'],
+		]);
+	});
+
 	it('shows the message of a block that cannot be read, and nothing throws', () => {
 		const { el } = render('```kin-calendar\ncalendars: not a list\n```\n');
 		expect(el.querySelector('.dynasty-cal-block-error')?.getText()).toContain('has an error');
@@ -431,41 +445,57 @@ describe('the look of the Calendars window and the block', () => {
 		}
 	});
 
-	it('an era calendar has one "Eras" heading, and each era has Remove on the line of its name', async () => {
+	it('D342: an era calendar has one text field "Eras", then its refusals, its help (always shown) and the reading list; no "Add era" and no "Remove"', async () => {
 		const o = await open({ 'Calendars.md': eraNote() });
 		const c = o.win.contentEl;
-		await press(c, '.dynasty-cal-add-era');
 		const card = c.querySelector('[data-calendar="0"]')!;
-		const heads = card.querySelectorAll('.dynasty-cal-subhead').filter((e) => e.getText() === T.erasLabel);
-		expect(heads).toHaveLength(1);
-		expect(card.querySelectorAll('.dynasty-cal-era')).toHaveLength(2);
-		for (const era of card.querySelectorAll('.dynasty-cal-era')) {
-			expect(era.querySelector('.dynasty-cal-head')).toBeNull();
-			const line = era.querySelector('.dynasty-cal-labelrow')!;
-			expect(line.querySelector('label')!.getText()).toBe(T.eraName);
-			expect(line.querySelector('.dynasty-cal-remove')!.getText()).toBe(T.remove);
-		}
-		// The "Eras" heading stands before the first era.
-		const order = card.children.map((e) => (e.hasClass('dynasty-cal-subhead') ? e.getText() : e.hasClass('dynasty-cal-era') ? 'era' : ''));
-		expect(order.indexOf(T.erasLabel)).toBeLessThan(order.indexOf('era'));
+		const box = card.querySelector('.dynasty-cal-eras-box')!;
+		expect(box.children.map((e) => [...e.classes][0])).toEqual(['dynasty-sheet-field', 'dynasty-cal-under', 'dynasty-sheet-hint', 'dynasty-sheet-hint']);
+		expect(box.querySelector('label')!.getText()).toBe(T.erasLabel);
+		const area = field(c, '0-eras');
+		expect(area.tag).toBe('textarea');
+		expect(area.value).toBe('Qinglong Emperor, 130 to 140');
+		expect(area.getAttribute('placeholder')).toBe('For example: Reign of Aldric, 1100');
+		const help = box.children[2];
+		expect(help.getText()).toBe(T.erasHint);
+		expect(help.hasClass('is-on-focus')).toBe(false);
+		expect(area.getAttribute('aria-describedby')).toBe(help.getAttribute('id'));
+		expect(card.querySelector('.dynasty-cal-add-era')).toBeNull();
+		expect(card.querySelector('.dynasty-cal-remove')).toBeNull();
+		expect(card.querySelectorAll('.dynasty-cal-subhead').map((e) => e.getText())).not.toContain(T.erasLabel);
+		// Enter in the field makes a new text line: no key handler of the window takes it.
+		const enter = dispatch(area, 'keydown', { key: 'Enter' });
+		expect(enter.defaultPrevented).toBe(false);
 	});
 
-	it('removes one era with the Remove of its name line', async () => {
+	it('D342: a text line with no year refuses with its number, under the field, and the window does not save', async () => {
 		const o = await open({ 'Calendars.md': eraNote() });
 		const c = o.win.contentEl;
-		await press(c, '.dynasty-cal-add-era');
-		await press(c, '.dynasty-cal-era .dynasty-cal-labelrow .dynasty-cal-remove');
-		expect(c.querySelectorAll('.dynasty-cal-era')).toHaveLength(1);
+		const before = o.notes.get('Calendars.md');
+		type(c, '0-eras', 'Qinglong Emperor, 130 to 140\n\nReign of Aldric, the Elder');
+		await save(c);
+		expect(o.notes.get('Calendars.md')).toBe(before);
+		const under = c.querySelector('.dynasty-cal-eras-box')!.children[1];
+		expect(under.querySelectorAll('[data-refusal]').map((e) => e.getText())).toEqual(['Text line 3: write the name, a comma and the first year.']);
+		expect(field(c, '0-eras').getAttribute('aria-invalid')).toBe('true');
+		// The text line with the refusal has no entry in the reading list.
+		expect(c.querySelectorAll('[data-era-list="0"] .dynasty-cal-era-read')).toHaveLength(1);
 	});
 
-	it('the screen-reader name of the era Remove link has the form of the calendar link and begins with the visible word (WCAG 2.5.3)', async () => {
-		const o = await open({ 'Calendars.md': eraNote() });
-		const button = o.win.contentEl.querySelector('.dynasty-cal-era .dynasty-cal-remove')!;
-		const name = button.getAttribute('aria-label')!;
-		expect(name).toBe(T.removeEra('Qinglong Emperor'));
-		expect(name).toMatch(/^Remove this era: /);
-		expect(name.startsWith(button.getText())).toBe(true);
-		expect(T.removeEra('')).toBe('Remove this era: without a name');
+	it('D341: Cycle shows the same grey 1 as Year, Era name shows its grey example, and a new calendar shows the new example names', async () => {
+		const o = await open({ 'Calendars.md': cycleNote() });
+		const c = o.win.contentEl;
+		expect(field(c, '0-cycle').getAttribute('placeholder')).toBe('1');
+		expect(field(c, '0-cycle').getAttribute('placeholder')).toBe(field(c, '0-year').getAttribute('placeholder'));
+		expect(field(c, '0-cycle').value).toBe('');
+		await addKind(c, 'cycles');
+		expect(field(c, '1-name').getAttribute('placeholder')).toBe('For example: Greek Olympiads');
+		expect(field(c, '1-formats').getAttribute('placeholder')).toBe('For example: {year} Year of the {cycle} Olympiad');
+		await addKind(c, 'eras');
+		expect(field(c, '2-name').getAttribute('placeholder')).toBe('For example: Reign names');
+		// D342: the eras are one text field; its grey example is the owner's example of a text line.
+		expect(field(c, '2-eras').getAttribute('placeholder')).toBe('For example: Reign of Aldric, 1100');
+		expect(field(c, '2-eras').value).toBe('');
 	});
 
 	it('the start of a cycle calendar has a sub-heading, one row of Cycle, Year, "=" and Same year as, the reading line, then the hint of the field that has the focus', async () => {
@@ -488,21 +518,15 @@ describe('the look of the Calendars window and the block', () => {
 		expect(hints.some((h) => h.hasClass('is-shown'))).toBe(false);
 	});
 
-	it('an era is a name row, then one row of Year, "=", Same year as and Length, and the reading line; a refusal of the row stands under the row, not in it (O-23)', async () => {
-		const o = await open({ 'Calendars.md': eraNote() });
+	it('D342 repair: a saved cycle start shows again in Cycle, Year and Same year as, and the window opens with no change', async () => {
+		const o = await open({ 'Calendars.md': cycleNote('The Long Count', '{year} Year of the {cycle} Cycle', 1133) });
 		const c = o.win.contentEl;
-		const start = c.querySelector('.dynasty-cal-era .dynasty-cal-start')!;
-		expect(start.querySelector('.dynasty-cal-subhead')).toBeNull();
-		const row = start.querySelector('.dynasty-cal-start-row')!;
-		expect(row.children.map((e) => e.getAttribute('data-field') ?? e.getText())).toEqual(['era-1-year', '=', 'era-1-same', 'era-1-length']);
-		expect(row.querySelector('[data-field="era-1-year"] input')!.getAttribute('placeholder')).toBe(T.yearPlaceholder);
-		expect(start.querySelectorAll('.dynasty-cal-field-hint').map((h) => h.getText())).toEqual([T.yearHintEras, T.sameAsHint, T.lengthHintEras]);
-		// One width for every number field.
-		for (const name of ['era-1-year', 'era-1-length']) expect(row.querySelector(`[data-field="${name}"]`)!.hasClass('is-number'), name).toBe(true);
-		type(c, 'era-1-same', 'no year in these words');
+		expect([field(c, '0-cycle').value, field(c, '0-year').value, field(c, '0-same').value]).toEqual(['1', '1', '1133']);
+		expect(c.querySelector('[data-readback="0"]')?.getText()).toBe('1 Year of the 1 Cycle = year 1133');
+		const before = o.notes.get('Calendars.md');
 		await save(c);
-		expect(row.querySelector('[data-refusal]')).toBeNull();
-		expect(start.querySelector('.dynasty-cal-field-error [data-refusal]')).not.toBeNull();
+		expect(o.notes.get('Calendars.md')).toBe(before);
+		expect(openModals).toHaveLength(0);
 	});
 
 	it('the block shows the kind after the name and has no row "Kind"', () => {

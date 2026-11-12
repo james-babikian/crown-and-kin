@@ -29,6 +29,25 @@ interface DrawnPath {
 	d: string;
 	kind: StrokeKind;
 	state: LineState;
+	/** px: the dash offset of a begetter line that lines up with the others of its group (`EdgePath.dashOffset`); a whole line only. */
+	dashOffset?: number;
+}
+
+/** A path whole and unmarked, with the dash offset of its group (`EdgePath.dashOffset`) when it has one. */
+function plainPath(p: EdgePath): DrawnPath {
+	return { d: p.d, kind: p.kind, state: undefined, ...(p.dashOffset ? { dashOffset: p.dashOffset } : {}) };
+}
+
+/** Gives each whole line of `drawn` the dash offset of the path it came from; a piece of a split line has none. */
+function withDashOffsets(drawn: DrawnPath[], paths: readonly EdgePath[]): DrawnPath[] {
+	const phase = new Map(paths.filter((p) => p.dashOffset).map((p) => [p.d, p.dashOffset!]));
+	if (phase.size) for (const p of drawn) if (phase.has(p.d)) p.dashOffset = phase.get(p.d)!;
+	return drawn;
+}
+
+/** The attributes of a drawn path on screen: its data, and its dash offset when it has one. */
+export function pathAttr(p: { d: string; dashOffset?: number }): Record<string, string | number> {
+	return p.dashOffset ? { d: p.d, 'stroke-dashoffset': p.dashOffset } : { d: p.d };
 }
 
 /** What `lineLook` returns: the lines in drawing order, and the state of each marker, card and tag. */
@@ -105,7 +124,7 @@ function split(s: Sub, on: [number, number][]): { on: string[]; off: string[] } 
  */
 export function lineLook(g: FamilyGraph, layout: TreeLayout, edges: EdgeDrawing, line?: LineMarks): LineLook {
 	if (!line) {
-		return { paths: edges.paths.map((p) => ({ d: p.d, kind: p.kind, state: undefined })), markers: edges.markers.map(() => undefined), card: () => undefined, tag: () => undefined };
+		return { paths: edges.paths.map(plainPath), markers: edges.markers.map(() => undefined), card: () => undefined, tag: () => undefined };
 	}
 	const off: LineState = line.fade ? 'faded' : undefined;
 	const has = (parent: string, child: string) => line.links.has(`${parent}\0${child}`);
@@ -241,5 +260,5 @@ export function lineLook(g: FamilyGraph, layout: TreeLayout, edges: EdgeDrawing,
 		const named = line.people.has(t.person) && (g.unionsOf.get(t.person) ?? []).some((k) => line.unions.has(k) && g.unionByKey.get(k)!.partners.some((x) => x !== t.person && t.spouses.includes(x)));
 		return named || t.spouses.some((x) => farPairs.has(`${t.person}\0${x}`)) ? 'on' : off;
 	};
-	return { paths: [...normal, ...onLine], markers, card: (id) => (line.people.has(id) ? undefined : off), tag };
+	return { paths: withDashOffsets([...normal, ...onLine], edges.paths), markers, card: (id) => (line.people.has(id) ? undefined : off), tag };
 }

@@ -14,6 +14,8 @@ import { sampleSources, svgHash } from '../acceptance/picture-list-support';
  * 0.5.2 (D322): the hash of tree 19 was recorded again, once, because a card name in the right-to-left scripts is now written with an embedding (U+202A to U+202C) instead of an isolate: WebKit honours the embedding in an SVG text. Trees 01 to 18 are as before.
  * 0.5.3 (D332, D334 Q17): sample tree 20 (a begetter outside the family) is new; its hash was recorded once, from the build that draws the begetter line (orange, dash-dot, width 1.5). Trees 01 to 19 are as before, byte for byte.
  * 0.5.3 (D339): the hash of tree 20 was recorded again, once, because the light begetter line is 85 % orange instead of 70 % (the dark one is as before). Trees 01 to 19 are as before.
+ * 0.5.4 (D338 (5), D341): the hash of tree 20 was recorded again, once, because the three begetter lines of Oswin into one row now run 4 px apart with one dash phase (two lines move and two get a stroke-dashoffset). Trees 01 to 19 and 07b are as before.
+ * 0.5.4 (D343 1 C, D344 1 A and 2 A, D345 1 A): the hashes of trees 12 and 20 were recorded again, once: side-link curves go between the cards, the "?" keeps off tag pills, and tags use the whole lower edge and the card name at an exact x. Trees 01 to 11, 13 to 19 and 07b are as before.
  * Run: npx vitest run tests/render/headless-pictures-sample-hashes.test.ts
  */
 

@@ -13,6 +13,7 @@
  * work packages B1 to B5 had merged, so a failure here is a change of the Roundel or text card drawing. The test name carries the key. If a change is meant, look at
  * the pictures (`npm run spike`, `out/s025-cards/`), then run `npx tsx scripts/s025-record-hashes.ts` and commit the new JSON with the reason.
  * 0.5.2 (D330 O-01, O-03, TR-05): all 32 hashes were recorded again, once (one card edge, no foot hairline, the new line widths and dashes).
+ * 0.5.4 (D343 1 C, D344 1 A and 2 A, D345 1 A): the 16 hashes of pictures 07, 07b and 12 were recorded again, once (side-link curves between the cards, the "?" off tag pills, whole-edge tags with the card name at an exact x); the other 16 are as before.
  * Run: npx vitest run tests/scripts/card-form-headless-hashes.test.ts
  */
 import { readFileSync } from 'node:fs';

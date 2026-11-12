@@ -1,38 +1,36 @@
 /*
  * The body of one calendar section of the Calendars window (spec §14 rules 1, 3, 6 and 16): the name, formats, length, start ("Same year as" entry
- * form), eras, name lists, the refusals and warnings that belong to the calendar, and "Remove this calendar". The window owns the draft (`view/calendar-draft.ts`); the
+ * form), eras (one text field, D342, `calendar-eras.ts`), name lists, the refusals and warnings that belong to the calendar, and "Remove this calendar". The window owns the draft (`view/calendar-draft.ts`); the
  * body changes the draft in place and tells the window (`changed`), which works the draft out again and calls the `update` functions that the body registered, so a
- * key press never rebuilds a field and never takes the focus away. A new structure (an added or removed calendar, era or list) is a new draw by the window.
+ * key press never rebuilds a field and never takes the focus away. A new structure (an added or removed calendar or list) is a new draw by the window.
  */
 
 import type { Calendar } from '../core/dates';
 import { CALENDAR_WINDOW_UI as T } from '../render/calendar-text';
 import { drawMark } from '../render/dom/marks';
-import { PLAIN_KEY, startReadback, type CalendarDraft, type EraDraft, type ListDraft, type StartDraft } from '../view/calendar-draft';
+import { PLAIN_KEY, startReadback, type CalendarDraft, type ListDraft, type StartDraft } from '../view/calendar-draft';
+import { drawEras } from './calendar-eras';
 import { drawLists } from './calendar-list';
 import { field, type CardHost, type FieldError } from './calendar-parts';
 import { textButton } from './window-parts';
 
-/** What the start of a calendar or an era needs besides its draft. */
+/** What the start of a cycle calendar needs besides its draft. */
 interface StartSpec {
 	name: string;
-	cycles: boolean;
 	result: string;
 	calendar: () => Calendar | undefined;
 	error: FieldError;
-	/** Adds more fields at the end of the row (the Length of an era), with the box under the row for their hints and refusals. */
-	extra?: (row: HTMLElement, under: HTMLElement) => void;
 }
 
 /**
- * The start of a cycle calendar or of an era, in this order: the fields Cycle (cycles only), Year, "=" and "Same year as" on one row, then the reading line, then the hint of the
- * field that has the focus and the refusals. The reading line is the example in the first format of the calendar: "Qinglong Emperor 1 = year 130" (D330 O-23). A cycle
- * calendar keeps the sub-heading "Start"; an era needs none, so the era is two rows and the reading line (spec §14 rule 16: the order and the names of the sections stay).
+ * The start of a cycle calendar, in this order: the sub-heading "Start", the fields Cycle, Year, "=" and "Same year as" on one row, then the reading line, then the hint of the
+ * field that has the focus and the refusals. The reading line is the example in the first format of the calendar: "21 Year of the 3 Cycle = year 1273" (D330 O-23).
+ * The eras of an era calendar have their first year on their text line (D342).
  */
 function startForm(parent: HTMLElement, host: CardHost, s: StartDraft, o: StartSpec): void {
 	const box = parent.createDiv({ cls: 'dynasty-cal-start', attr: { 'data-start': o.name } });
-	if (o.cycles) box.createDiv({ cls: 'dynasty-cal-subhead', text: T.startLabel, attr: { role: 'heading', 'aria-level': '4' } });
-	const row = box.createDiv({ cls: ['dynasty-cal-start-row', o.cycles ? 'has-cycle' : 'is-era'] });
+	box.createDiv({ cls: 'dynasty-cal-subhead', text: T.startLabel, attr: { role: 'heading', 'aria-level': '4' } });
+	const row = box.createDiv({ cls: ['dynasty-cal-start-row', 'has-cycle'] });
 	const back = box.createDiv({ cls: ['dynasty-sheet-hint', 'dynasty-cal-readback'], attr: { 'aria-live': 'polite', 'data-readback': o.name } });
 	const under = box.createDiv({ cls: 'dynasty-cal-under' });
 	host.register(() => {
@@ -48,25 +46,10 @@ function startForm(parent: HTMLElement, host: CardHost, s: StartDraft, o: StartS
 		back.toggle(back.getText() !== '' || warn);
 	});
 	const where = { errorIn: under, hintIn: under };
-	if (o.cycles) field(row, host, `${o.name}-cycle`, T.cycleLabel, s.cycle, (v) => (s.cycle = v), { numeric: true, hint: T.cycleHint, ...where });
-	field(row, host, `${o.name}-year`, T.yearLabel, s.year, (v) => (s.year = v), { numeric: true, placeholder: T.yearPlaceholder, hint: o.cycles ? T.yearHintCycles : T.yearHintEras, ...where });
+	field(row, host, `${o.name}-cycle`, T.cycleLabel, s.cycle, (v) => (s.cycle = v), { numeric: true, placeholder: T.cyclePlaceholder, hint: T.cycleHint, ...where });
+	field(row, host, `${o.name}-year`, T.yearLabel, s.year, (v) => (s.year = v), { numeric: true, placeholder: T.yearPlaceholder, hint: T.yearHintCycles, ...where });
 	row.createDiv({ cls: 'dynasty-cal-equals', text: '=', attr: { 'aria-hidden': 'true' } });
 	field(row, host, `${o.name}-same`, T.sameAsLabel, s.same, (v) => (s.same = v), { placeholder: T.sameAsPlaceholder, wide: true, hint: T.sameAsHint, error: o.error, ...where });
-	o.extra?.(row, under);
-}
-
-/** One era of an era calendar: its name on one row, then its Year, "Same year as" and Length on a second row, and the reading line (D330 O-23). */
-function eraRow(parent: HTMLElement, host: CardHost, d: CalendarDraft, e: EraDraft, i: number, shown: Set<string>): void {
-	const at = (field: string): FieldError => ({ key: d.key, field: `era:${e.key}:${field}`, shown });
-	const box = parent.createDiv({ cls: 'dynasty-cal-era', attr: { 'data-era': String(e.key) } });
-	const remove = (line: HTMLElement) => {
-		const button = textButton(line, ['dynasty-link', 'dynasty-cal-remove'], T.remove, () => host.removeEra(d.key, i), { label: T.removeEra(e.name), focus: `cal:era-remove:${e.key}` });
-		// The label follows the name while the user types it.
-		host.register(() => button.setAttribute('aria-label', T.removeEra(e.name)));
-	};
-	field(box, host, `era-${e.key}-name`, T.eraName, e.name, (v) => (e.name = v), { error: at('name'), labelEnd: remove });
-	const length = (row: HTMLElement, under: HTMLElement) => field(row, host, `era-${e.key}-length`, T.lengthLabel, e.length, (v) => (e.length = v), { numeric: true, hint: T.lengthHintEras, error: at('length'), errorIn: under, hintIn: under });
-	startForm(box, host, e.start, { name: `era-${e.key}`, cycles: false, result: `e${e.key}`, calendar: () => host.checked().byKey.get(d.key), error: at('start'), extra: length });
 }
 
 /** The refusals and warnings of one calendar (or of the plain years), in place under its fields. */
@@ -85,14 +68,7 @@ export function messages(parent: HTMLElement, host: CardHost, key: number, shown
 /** The fields of a cycle calendar: the length and the start. */
 function cycleFields(parent: HTMLElement, host: CardHost, d: CalendarDraft, calendar: () => Calendar | undefined, shown: Set<string>): void {
 	field(parent, host, `${d.key}-length`, T.lengthLabel, d.length, (v) => (d.length = v), { numeric: true, hint: T.lengthHintCycles, error: { key: d.key, field: 'length', shown } });
-	startForm(parent, host, d.start, { name: `${d.key}`, cycles: true, result: `c${d.key}`, calendar, error: { key: d.key, field: 'start', shown } });
-}
-
-/** The eras of an era calendar, and the link that adds one after the last. */
-function eraFields(parent: HTMLElement, host: CardHost, d: CalendarDraft, shown: Set<string>): void {
-	parent.createDiv({ cls: 'dynasty-cal-subhead', text: T.erasLabel, attr: { role: 'heading', 'aria-level': '4' } });
-	d.eras.forEach((e, i) => eraRow(parent, host, d, e, i, shown));
-	textButton(parent, ['dynasty-link', 'dynasty-cal-add-link', 'dynasty-cal-add-era'], T.addEra, () => host.addEra(d.key), { icon: 'plus', focus: `cal:add-era:${d.key}` });
+	startForm(parent, host, d.start, { name: `${d.key}`, result: `c${d.key}`, calendar, error: { key: d.key, field: 'start', shown } });
 }
 
 /**
@@ -119,7 +95,7 @@ export function drawCalendarBody(body: HTMLElement, host: CardHost, d: CalendarD
 	// The calendar as worked out, for the example that the start shows back.
 	const calendar = () => host.checked().byKey.get(d.key);
 	if (cycles) cycleFields(body, host, d, calendar, shown);
-	else eraFields(body, host, d, shown);
+	else drawEras(body, host, d, shown);
 	drawLists(body, host, { key: d.key, plain: false, lists: d.lists, shown });
 	messages(body, host, d.key, shown);
 	const removeCal = textButton(body, ['dynasty-link', 'dynasty-cal-remove-cal'], T.removeThisCalendar, () => host.removeCalendar(d.key), { label: T.removeCalendar(d.name.trim()), focus: `cal:remove:${d.key}` });

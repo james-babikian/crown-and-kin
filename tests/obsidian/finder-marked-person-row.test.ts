@@ -33,7 +33,7 @@ interface PickerLike {
 }
 
 describe('the relation finder: the row of the marked person', () => {
-	it('"You: Ann" does not repeat "You" in its second text line', () => {
+	it('D346 item 4: the marked person shows the name, then "You · b. 1100" under it, as in the Find list', () => {
 		const r = parseDynasty(SRC);
 		if (!r.ok) throw new Error('parse');
 		const g = deriveFamilies(r.tree);
@@ -45,6 +45,28 @@ describe('the relation finder: the row of the marked person', () => {
 		p.renderSuggestion(p.getSuggestions('')[0], el);
 		const name = el.querySelector('.dynasty-picker-name')!.getText();
 		const sub = el.querySelector('.dynasty-picker-sub')?.getText() ?? '';
-		expect({ name, sub }).toEqual({ name: 'You: Ann', sub: 'b. 1100' });
+		expect({ name, sub }).toEqual({ name: 'Ann', sub: 'You · b. 1100' });
+	});
+
+	it('the Find list (no `you` argument, the mark in the context) shows the same two text lines and the same spoken label', () => {
+		const r = parseDynasty(SRC);
+		if (!r.ok) throw new Error('parse');
+		const g = deriveFamilies(r.tree);
+		const rowOf = (you: string | null): { name: string; sub: string; spoken: string } => {
+			openModals.length = 0;
+			void pickPerson(fakeHost().app as never, g, new Set(), 'Type', 'First', false, you, null, { sourcePath: 'n.md', me: 'a' });
+			const p = openModals.find((m) => (m.modalEl as unknown as FEl).hasClass('dynasty-picker')) as unknown as PickerLike;
+			const item = p.getSuggestions('').find((i) => (i as { person?: { id: string } }).person?.id === 'a');
+			const el = new FEl('div');
+			p.renderSuggestion(item, el);
+			return {
+				name: el.querySelector('.dynasty-picker-name')!.getText(),
+				sub: el.querySelector('.dynasty-picker-sub')?.getText() ?? '',
+				spoken: el.querySelector('.dynasty-sr-only')?.getText() ?? '',
+			};
+		};
+		const finder = rowOf('a');
+		expect(finder).toEqual({ name: 'Ann', sub: 'You · b. 1100', spoken: expect.any(String) });
+		expect(finder).toEqual(rowOf(null));
 	});
 });

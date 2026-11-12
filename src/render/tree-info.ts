@@ -14,6 +14,7 @@ import type { Holder, Person } from '../core/types';
 import { withoutBidiControls } from './bidi-controls';
 import { hasRtlDate, isolateDate, isolateDatesIn } from './date-bidi';
 import { isolateName } from './name-bidi';
+import { svgNameLines } from './name-lines';
 
 export { isolateDate, isolateName, withoutBidiControls };
 
@@ -402,16 +403,30 @@ export function timingText(t: RenderTiming | null): string {
 }
 
 /**
- * The visible text of a far-couple tag after its ⚭ sign (spec §5.3, D10): the partner's name, or
- * "N partners" for several (STE wording; the spec says spouses). Both renderers draw the sign apart.
+ * The visible text of a far-couple tag after its ⚭ sign (spec §5.3, D10): the name that the partner's own card shows when it is a numbered
+ * ruler name (D344 2 A: "Ermengarde III", from the card label, D58, D131), else the person's full name ("A person with no number keeps the
+ * full name": a written `as` alone does not count, as on the house page); "N partners" for several (STE wording; the spec says spouses).
+ * Both renderers draw the sign apart. `labels` is the drawn graph's `cardLabels(g)`, as the card text reads it.
  */
-export function farTagName(g: FamilyGraph, spouses: string[]): string {
-	return spouses.length === 1 ? (g.byId.get(spouses[0])?.name ?? spouses[0]) : `${spouses.length} partners`;
+export function farTagName(g: FamilyGraph, spouses: string[], labels?: ReadonlyMap<string, CardLabel>): string {
+	if (spouses.length !== 1) return `${spouses.length} partners`;
+	const label = labels?.get(spouses[0]);
+	if (label?.numbered && label.name) return label.name;
+	return g.byId.get(spouses[0])?.name ?? spouses[0];
 }
 
-/** Screen-reader text for a far-couple tag; the visible text comes from `farTagName`. */
-export function farTagLabel(g: FamilyGraph, spouses: string[]): string {
-	if (spouses.length === 1) return `Show the partner ${farTagName(g, spouses)}.`;
+/**
+ * The text of a far-couple tag's name in an SVG text, live and saved (the text direction of names, D322): the embedding a card
+ * name gets (`svgNameLines`: RLE or LRE by the first strong letter), as WebKit ignores isolates in SVG text. A left-to-right name comes back
+ * as it is. `name` is the text as drawn (after any cut); the spoken label keeps the plain name.
+ */
+export function farTagSvgName(name: string): string {
+	return svgNameLines([[{ text: name, sob: false }]])[0].map((r) => r.text).join('');
+}
+
+/** Screen-reader text for a far-couple tag; the visible text comes from `farTagName`, and the spoken name holds it in order (WCAG 2.5.3). */
+export function farTagLabel(g: FamilyGraph, spouses: string[], labels?: ReadonlyMap<string, CardLabel>): string {
+	if (spouses.length === 1) return `Show the partner ${farTagName(g, spouses, labels)}.`;
 	return `Show a list of ${spouses.length} partners.`;
 }
 

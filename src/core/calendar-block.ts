@@ -17,9 +17,9 @@ import { inNames, MAX_LISTS, MAX_NAME_CHARS, MAX_NAMES, markerValid, normalizeMa
 import { parseBody } from './parse';
 import { REFUSAL_TEXT } from './refusal-text';
 import { isEmpty, isMap as isRawMap, isRawList, str, type Raw, type RawMap } from './tolerate';
-import { emptyItems, insertItem, itemEnd, removeItems, section } from './yaml-list';
+import { dashOf, emptyItems, insertItem, itemEnd, itemStart, removeItems, section } from './yaml-list';
 import {
-	addPair, addSection, appendItem, clone, doubleQuoted, finishTogether, findPair, isRefusal, itemBlock, layoutOf, parse, refuse, removePair, renderScalar, setPairValue, topMap, type Layout, type NewValue, type Parsed, type Patch, type Source, type Step,
+	addPair, addSection, appendItem, clone, doubleQuoted, finishTogether, findPair, insertAt, isRefusal, itemBlock, layoutOf, parse, refuse, removePair, renderScalar, setPairValue, topMap, type Layout, type NewValue, type Parsed, type Patch, type Source, type Step,
 } from './yaml-patch';
 
 /** The write order of the keys of a calendar. */
@@ -140,7 +140,8 @@ export type CalendarOp =
 	| { kind: 'add-calendar'; calendar: NewCalendar }
 	| { kind: 'edit-calendar'; index: number; fields: { name?: string; formats?: string[]; length?: number; start?: number } }
 	| { kind: 'remove-calendar'; index: number }
-	| { kind: 'add-era'; calendar: number; era: EraFields }
+	/** `at`: the place in the written eras that the new era takes (the era there and the eras after it move down one place); none, or past the end: after the last era. */
+	| { kind: 'add-era'; calendar: number; era: EraFields; at?: number }
 	/** `length: null` removes the length of the era. */
 	| { kind: 'edit-era'; calendar: number; era: number; fields: { name?: string; start?: number; length?: number | null } }
 	| { kind: 'remove-era'; calendar: number; era: number }
@@ -416,9 +417,25 @@ function rawEras(raw: RawMap): Raw[] | ReturnType<typeof refuse> {
 	return rawArray(raw, 'eras', REFUSAL_TEXT.unknownEra);
 }
 
-function addEra(body: string, cal: number, era: EraFields): EditResult {
+/**
+ * A patch that puts a new item in front of item `k` of a nested list, in the style of that item: a one-line item in a block list, or an entry in a flow list. The
+ * comment lines that item `k` owns above it stay with item `k` (`itemStart`). `block` lines are relative to the dash, as for `appendItem`.
+ */
+function insertBefore(src: Source, seq: YAMLSeq, k: number, block: string[], flow: string): Patch {
+	const item = seq.items[k] as Node;
+	if (seq.flow) return insertAt(item.range![0], `${flow}, `);
+	const dashCol = src.column(dashOf(src, item));
+	const at = itemStart(src, seq, k);
+	if (isMap(item) && item.flow) return insertAt(at, `${' '.repeat(dashCol)}- ${flow}\n`);
+	const itemCol = isMap(item) && item.items.length ? src.column((item.items[0].key as Node).range![0]) : dashCol + 2;
+	const lines = block.map((l, n) => (n === 0 ? ' '.repeat(dashCol) + '-' + ' '.repeat(Math.max(1, itemCol - dashCol - 1)) + l : ' '.repeat(itemCol) + l));
+	return insertAt(at, lines.map((l) => l + '\n').join(''));
+}
+
+function addEra(body: string, cal: number, era: EraFields, at: number | undefined): EditResult {
 	const bad = badEra(era);
 	if (bad) return refuse('bad-value', bad);
+	if (at !== undefined && (!Number.isSafeInteger(at) || at < 0)) return refuse('bad-value', REFUSAL_TEXT.unknownEra);
 	const o = open(body);
 	if (isRefusal(o)) return o;
 	const { p, expected, list } = o;
@@ -426,11 +443,13 @@ function addEra(body: string, cal: number, era: EraFields): EditResult {
 	if (!isRawMap(raw)) return refuse('bad-value', REFUSAL_TEXT.unknownCalendar);
 	const eras = rawEras(raw);
 	if (isRefusal(eras)) return eras;
-	raw.eras = [...eras, eraRaw(era)];
+	const place = at === undefined ? eras.length : Math.min(at, eras.length);
+	raw.eras = [...eras.slice(0, place), eraRaw(era), ...eras.slice(place)];
 	const step: Step = (q) => {
 		const map = calendarNode(q, cal);
 		if (isRefusal(map)) return map;
 		const seq = seqAt(map, 'eras');
+		if (seq && place < seq.items.length) return insertBefore(q.src, seq, place, [eraText(era)], eraText(era));
 		if (seq?.items.length) return appendItem(q.src, seq, [eraText(era)], eraText(era), seq.flow ? undefined : itemEnd(q.src, seq, seq.items.length - 1));
 		const layout = layoutOf(q.src);
 		const value: NewValue = { block: [`${' '.repeat(layout.seqIndent)}- ${eraText(era)}`], flow: `[${eraText(era)}]` };
@@ -670,7 +689,7 @@ export function editCalendarBlock(body: string, op: CalendarOp): EditResult {
 			case 'remove-calendar':
 				return removeCalendar(body, op.index);
 			case 'add-era':
-				return addEra(body, op.calendar, op.era);
+				return addEra(body, op.calendar, op.era, op.at);
 			case 'edit-era':
 				return editEra(body, op.calendar, op.era, op.fields ?? {});
 			case 'remove-era':

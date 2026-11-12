@@ -107,6 +107,8 @@ interface CompiledEra {
 	folded: string;
 	start: number;
 	length?: number;
+	/** D342: the years of an era with no length up to the start of the next era; only for the warning `calendar-year-past-end`. */
+	implied?: number;
 }
 
 interface Compiled {
@@ -127,6 +129,28 @@ interface Compiled {
 }
 
 const validLength = (n: unknown): boolean => isWhole(n) && n >= 1;
+
+/**
+ * The last internal year of each era (D342, spec §14 rule 5): the written length when there is one, else the year before the start of the next era, the era with
+ * the smallest start greater than this start (not the next in the list). The last era has no end (undefined), as has an era whose start is not a whole number.
+ * No year of a date changes with this; it gives the warning `calendar-year-past-end` and tells which era holds a year.
+ */
+export function eraEnds(eras: readonly { start: number; length?: number }[]): (number | undefined)[] {
+	const starts = [...new Set(eras.filter((e) => e && isWhole(e.start)).map((e) => e.start))].sort((a, b) => a - b);
+	return eras.map((e) => {
+		if (!e || !isWhole(e.start)) return undefined;
+		if (e.length !== undefined) return validLength(e.length) ? e.start + e.length - 1 : undefined;
+		// The starts are sorted and unique: the next start is the first one greater than this one (a binary search keeps 1 000 eras fast).
+		let lo = 0;
+		let hi = starts.length;
+		while (lo < hi) {
+			const mid = (lo + hi) >> 1;
+			if (starts[mid] <= e.start) lo = mid + 1;
+			else hi = mid;
+		}
+		return lo < starts.length ? starts[lo] - 1 : undefined;
+	});
+}
 
 /** The compiled form of a calendar, or null for one that cannot read anything (bad numbers). Never throws. */
 function compileOne(c: Calendar, order: number): Compiled | null {
@@ -153,6 +177,10 @@ function compileOne(c: Calendar, order: number): Compiled | null {
 		const folded = fold(e.name);
 		if (folded !== '') eras.push({ name: e.name, folded, start: e.start, length: e.length });
 	}
+	// D342: an era with no length ends where the next era starts, for the warning only.
+	eraEnds(eras).forEach((end, i) => {
+		if (eras[i].length === undefined && end !== undefined) eras[i].implied = end - eras[i].start + 1;
+	});
 	out.unanchored = eras.length > 0 && eras[0].start === 1;
 	// Stable: eras of one length stay in the written order.
 	eras.sort((a, b) => b.folded.length - a.folded.length);
@@ -214,7 +242,9 @@ function yearOfMatch(cal: Compiled, value: number, cycle: number, era: CompiledE
 	} else {
 		year = era!.start + (value - 1);
 		span = era!.name;
-		if (era!.length !== undefined && value > era!.length) warnings.push('calendar-year-past-end');
+		// D342: an era with no length counts to the start of the next era; the year itself stays.
+		const length = era!.length ?? era!.implied;
+		if (length !== undefined && value > length) warnings.push('calendar-year-past-end');
 	}
 	if (!Number.isSafeInteger(year)) return null;
 	if (value === 0) warnings.unshift('calendar-year-zero');
@@ -661,7 +691,10 @@ function exampleParts(kind: Calendar['kind'], internalYear: number): { year: num
 		if (cycle < 0) return null;
 		return { year: d - (cycle - 1) * kind.length + 1, other: String(cycle) };
 	}
-	const era = kind.eras.find((e) => internalYear >= e.start && (e.length === undefined || internalYear < e.start + e.length));
+	// D342: the era that holds the year, by the same ends as the warning, so the text names that era and not an earlier era with no length.
+	const ends = eraEnds(kind.eras);
+	const at = kind.eras.findIndex((e, i) => internalYear >= e.start && (ends[i] === undefined ? e.length === undefined : internalYear <= ends[i]));
+	const era = at >= 0 ? kind.eras[at] : undefined;
 	return era ? { year: internalYear - era.start + 1, other: era.name } : null;
 }
 

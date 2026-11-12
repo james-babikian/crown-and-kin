@@ -272,7 +272,10 @@ export function sideTagDepth(geo: Geometry): number {
 	return Math.max(MIN_HIT, Math.ceil((MIN_HIT * geo.fontPx) / SIDE_VIEW_NAME_PX));
 }
 
-/** Sideways: the space a far tag keeps from the bar of a partner stacked below (the tag's edge inset, or the dot's radius and 2 px). */
+/**
+ * Sideways: the space the tag zone of a card with a partner stacked below kept from the bar's dot before the tag took the whole edge (the tag's edge
+ * inset, or the dot's radius and 2 px). Only the bound of the next column's tag area reads it now (`nextTagIn`, draw.ts), so the gaps stay as they were.
+ */
 export const barClear = (geo: Geometry) => Math.max(lineMetrics(geo).tagInset, geo.unionSize / 2 + 2);
 
 /**

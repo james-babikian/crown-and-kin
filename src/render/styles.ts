@@ -255,6 +255,23 @@ export function tagMarkSlot(shape: UnionShape, font: number): number {
 	return TAG_MARK.slot * font + 2 * (tagMarkHalfWidth(shape, font) - tagMarkHalfWidth('dot', font));
 }
 
+/**
+ * The parts of a far-couple tag pill along its text line, one formula for the live tree and the saved picture: the pill is centred on
+ * `x` and never wider than `zone`; the ⚭ starts after the padding `pad`, the partnership sign sits in the middle of its room `slot`
+ * after the ⚭'s room `sign`, and the name starts at an exact x after both (D108: so the gap G before the name is the same for every
+ * shape). `room` is the width the name may take; `nameW` the width of the name as drawn (after any cut).
+ */
+export function tagPillParts(x: number, zone: number, pad: number, sign: number, slot: number, nameW: number): { left: number; w: number; signX: number; markX: number; nameX: number } {
+	const w = Math.min(zone, nameW + sign + slot + 2 * pad);
+	const left = x - w / 2;
+	return { left, w, signX: left + pad, markX: left + pad + sign + slot / 2, nameX: left + pad + sign + slot };
+}
+
+/** The width a far-couple tag's name may take in a pill of `zone` (see `tagPillParts`). */
+export function tagNameRoom(zone: number, pad: number, sign: number, slot: number): number {
+	return Math.max(0, zone - 2 * pad - sign - slot);
+}
+
 const r2 = (n: number) => Math.round(n * 100) / 100;
 
 /**

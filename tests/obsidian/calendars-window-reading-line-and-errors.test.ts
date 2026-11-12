@@ -3,8 +3,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { BIDI_FSI, BIDI_PDI } from '../../src/render/bidi-controls';
 import { CALENDAR_WINDOW_UI as T } from '../../src/render/calendar-text';
-import { checkDraft, draftOf, startReadback } from '../../src/view/calendar-draft';
-import { parseCalendarBlock } from '../../src/core/calendar-block';
 import { FEl, dispatch, resetDom } from '../acceptance/fake-dom';
 import { openModals, resetObsidian } from '../acceptance/fake-obsidian';
 import { calField, openWindow, saveWindow, typeInto } from '../support/calendar-window-app';
@@ -29,22 +27,25 @@ const win = () => (openModals[openModals.length - 1] as unknown as { modalEl: FE
 
 const ARABIC = 'عهد الإمبراطور العظيم';
 
-describe('the reading line (O-23, CAL-19)', () => {
-	function eraLine(name: string, same: string): string {
-		const text = `\`\`\`kin-calendar\ncalendars:\n  - name: Reigns\n    kind: eras\n    formats: ["{era} {year}"]\n    eras:\n      - {name: ${name}, start: 130}\n\`\`\`\n`;
-		const { calendars } = parseCalendarBlock(text.split('\n').slice(1, -2).join('\n'), 'n.md', 0);
-		const drafts = draftOf(calendars, (() => { let n = 0; return () => n++; })());
-		drafts[0].eras[0].start.same = same;
-		const checked = checkDraft(drafts, 'Calendars.md');
-		return startReadback(checked.starts.get(`e${drafts[0].eras[0].key}`), checked.calendars[0], null);
-	}
+describe('the reading list of the eras (D342, CAL-19)', () => {
+	const eraNoteOf = (name: string) => `\`\`\`kin-calendar\ncalendars:\n  - name: Reigns\n    kind: eras\n    formats: ["{era} {year}"]\n    eras:\n      - {name: ${name}, start: 130}\n\`\`\`\n`;
+	const firstRead = async (name: string) => {
+		const o = await openWindow({ 'Calendars.md': eraNoteOf(name) });
+		return o.win.contentEl.querySelector('[data-era-list] .dynasty-cal-era-read .dynasty-cal-era-first')!;
+	};
 
-	it('is only the example, with no "Example:" and no instruction', () => {
-		expect(eraLine('Qinglong Emperor', '130')).toBe('Qinglong Emperor 1 = year 130');
+	it('is only the era and its first year, with no "Example:" and no instruction', async () => {
+		expect((await firstRead('Qinglong Emperor')).getText()).toBe('Qinglong Emperor 1 = year 130');
 	});
 
-	it('isolates an Arabic era name, so the digit stays after the name', () => {
-		expect(eraLine(ARABIC, '130')).toBe(`${BIDI_FSI}${ARABIC} 1${BIDI_PDI} = year 130`);
+	it('puts an Arabic era name in a run of its own (D322), so the digit stays after the name', async () => {
+		const first = await firstRead(ARABIC);
+		const run = first.querySelector('.dynasty-name-run')!;
+		expect(run.getAttribute('dir')).toBe('auto');
+		expect(run.getText()).toBe(ARABIC);
+		expect(first.getText()).toBe(`${ARABIC} 1 = year 130`);
+		expect(first.getText()).not.toContain(BIDI_FSI);
+		expect(first.getText()).not.toContain(BIDI_PDI);
 	});
 });
 

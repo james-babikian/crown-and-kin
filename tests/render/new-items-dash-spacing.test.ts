@@ -236,7 +236,7 @@ describe('texts: the word ID is written in capital letters (spec D113)', () => {
 	it('the key in an example stays lower case', async () => {
 		const { issueText, codedIssue } = await import('../../src/core/messages');
 		const text = issueText(codedIssue('missing-id', 'warning', { section: 'people', index: 2, example: 'p9' }));
-		expect(text).toBe('Entry 2 in the “people” list has no ID. Add an ID, for example: id: p9.');
+		expect(text).toBe('Entry 2 in the “people” list has no ID. Add an ID, for example “id: p9”.');
 	});
 });
 

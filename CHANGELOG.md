@@ -2,6 +2,53 @@
 
 All notable changes for users. The newest version is first.
 
+## 0.5.4
+
+### Examples and help
+
+- **All example names in the windows and in the help are new.** For example, the new person window shows "For example: Rosamund de Clifford", and the sobriquet hint shows "the Conqueror". The Houses window shows "For example: House Plantagenet". Before, the example for a house name never showed. The examples for titles, calendars and years are new too.
+- **Some empty fields now show a grey example.** The field "Name of the new house" in the person window, the field "Name of the holder" and the text box for eras have one. The Cycle field shows a grey "1", the same as the Year field. An empty Cycle still means 1.
+- **The rule for the ID of a house or a title now says "small letters".** Before, it said "letters", but the plugin refuses capital letters. The rule is "Use only small letters, digits and hyphens (-)."
+
+### Calendars
+
+- **You now write the eras of an era calendar in one text box.** Write one era on each text line: the name, a comma and the first year, for example "Reign of Aldric, 1100". For an end, write "to" and the last year, for example "Reign of Aldric, 1100 to 1139". There is no "Add era" button and no "Remove" link now. To add an era, write a text line. To remove an era, delete its text line.
+- **A list under the box shows how the plugin reads each text line.** For example, "Reign of Aldric 1 = year 1100" (year 1 of the era is the plain year 1100), and at the right "to 1139" or "no end".
+- **The list under the box now stands a little apart from the help text.** Before, its first row looked like one more line of the help.
+- **An error names the text line.** For example, "Text line 3: write the name, a comma and the first year." The plugin shows an error for a first year that it cannot read, a last year before the first year, and the same era name twice.
+- **The two errors for a wrong format now start their example with "For example:".** One of them ends with "For example: “{era} {year}”." Before, it said "An example is".
+- **An era with no last year now ends where the next era starts.** Only the last era has no end. If a date is after the end of its era, the plugin shows a warning. The date keeps its year.
+- **The warning for a date after the end of its era or cycle now stands in the normal text colour.** The line before it, which shows how the plugin reads the date, stays grey.
+- **The start of a calendar that you saved now shows again.** The fields Cycle, Year and "Same year as" show the saved start. Before, the start did not show after Save.
+- **A tap on a link in the Calendars window is no longer lost.** Before, a help text under a field hid when you left the field. The links moved during your tap, and the tap was lost. For example, the first tap on "Add era" in the old window could do nothing.
+
+### Tree
+
+- **The curved lines of rumoured, adoptive, ward and begetter children now go between the cards.** Before, such a line could go over a card. In 300 test trees, the number of lines over cards went from 328 to 88. In the sample trees, it went from 4 to 1. This is true in a tree from top to bottom and in a sideways tree.
+- **In a sideways tree, the name tag of a partner now has the whole lower edge of the card.** A name tag is the small label under a card that names a partner whose card stands far away. The tag stands in the middle under the card. The tree does not get bigger. The area that you can tap is wider.
+- **A name tag now shows the name that the partner's card shows.** For example, "Ermengarde III" instead of the full name. A person with no ruler number keeps the full name. This is the same in a tree from top to bottom and in a sideways tree.
+- **On a phone, at the middle zoom level, the text in a name tag is now smaller.** It is two thirds of the size of the name on the card. So more tags show the whole first name. The tag keeps its form, its place and its tap area.
+- **On a computer, at the smallest zoom level, heir rings that touch now stand higher.** A ring moves up until it touches no other ring. A thin line joins it to its card. A ring can go up 4 steps of 20 pixels.
+- **On a phone, in a sideways tree, the ring of an heir now stands on the left edge of the card.** The ring moves left as far as needed to keep the first letter of the name free. At the edge, the ring could cover another card or touch a fold button. Then it stays at the top left corner, as before.
+- **Several begetter lines from one begetter to children in one row now keep a small gap and one dash pattern.** Before, the lines could cross each other again and again, and their dashes did not match.
+
+### Undo and the legend
+
+- **If "Undo last tree edit" cannot undo the change, the message now says what to do.** This happens when the tree changed after your edit. The message ends with "Make the change again by hand."
+- **After you undo a rename, the message now names both names.** For example, "The plugin undid the change to Aldric III. The name is Aldric the Elder again."
+- **In a saved picture, the legend now shows a house name in the right order.** This is for a name that mixes right-to-left letters and Latin letters. The order is the same as on the cards.
+- **The relation finder now shows "You" in the same form as the Find list.** The name is on the first line and "You" with the dates on the second line. Before, the relation finder showed "You: name" on one line.
+
+### Known limits
+
+- **At the middle zoom level, a name tag can still be cut.** In the sample trees, 90 of 292 tags are cut at that level. Each keeps the whole first name, with one exception. In one test tree from top to bottom, one tag shows "Ermengard…".
+- **A curve can still cross a card where no gap is free.** The curves also cross more straight lines than before. In a sideways tree, a curve can run for a long way beside a straight line.
+- **A curved line that goes across more than 12 rows stays as before.** The plugin does not move it between the cards.
+- **A begetter with 16 or more children in one row loses the small gap between the lines.** The line still ends at the child.
+- **If you write a comma instead of "to" in an era, the plugin reads it as part of the name.** For example, "Reign of Aldric, 1100, 1139". The reading list under the box shows this, so you can see the mistake.
+- **On a phone with a screen only 320 points wide, name tags are not yet repaired.** The text of a name tag is about 8.5 pixels there.
+- **A tag for two far partners shows "2 partners".** A tag that shows both names is for a later version.
+
 ## 0.5.3
 
 ### Repairs

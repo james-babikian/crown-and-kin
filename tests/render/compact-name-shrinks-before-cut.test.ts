@@ -157,7 +157,7 @@ describe('the dead signs in the legend', () => {
 		expect(rows).toHaveLength(legendRows().length);
 		expect(all(list).some((e) => e.hasClass('dynasty-legend-houses'))).toBe(false);
 		const dagger = all(list).filter((e) => e.hasClass('dynasty-legend-dagger')).map((e) => e.getText());
-		expect(dagger).toEqual(['b. 1131 †', 'b. 1131 †?']);
+		expect(dagger).toEqual(['b. 769 †', 'b. 769 †?']);
 	});
 
 	it('the saved legend lists a dead sign only when a drawn date text has one (dateLine of P1 prints it)', () => {

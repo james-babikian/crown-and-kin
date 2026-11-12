@@ -2,6 +2,9 @@
  * The first class of the search for relation names, `KinBase`: the people and links by index, the memos, the parent sets of the half and full tests, and the readers of unions and
  * partners. `KinBlood` (`relation-kin-blood.ts`) adds the blood search and `Kin` (`relation-kin.ts`) the names; the chain is one object with three layers, as `tree-view-base.ts`
  * to `tree-view.ts` are, and no member calls up the chain. The rules are in the header of `relations.ts`.
+ * Every memo keyed by parent type uses `PARENT_TYPES.length`, so a type appended to `PARENT_TYPES` never shares a key with the next
+ * child. The blood sets of D332 (birth parents and begetters, `bloodSet` in `blood-parents.ts`) have memos of their own, which
+ * `KinBlood.release` clears with the rest.
  */
 
 import { drawnParentMap, type FamilyGraph, type FamilyUnion } from './derive';

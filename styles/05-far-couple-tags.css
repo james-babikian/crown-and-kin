@@ -31,7 +31,11 @@
 	font-size: calc(var(--dynasty-font-size) * 0.75);
 }
 
-.dynasty-tag-compact .dynasty-tag-text,
+/* D345 1 A: the Compact tag text is two thirds of the Compact name (1.5 em); the Overview sign pill keeps the size of the name. */
+.dynasty-tag-compact .dynasty-tag-text {
+	font-size: var(--dynasty-font-size);
+}
+
 .dynasty-tag-sign .dynasty-tag-text {
 	font-size: calc(var(--dynasty-font-size) * 1.5);
 }

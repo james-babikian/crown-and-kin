@@ -38,7 +38,7 @@ function open() {
 describe('D98: the Title field of the edit sheet', () => {
 	it('the label reads "Title shown under the name" and the hint reads the approved sentence', () => {
 		expect(SHEET.title).toBe('Title shown under the name');
-		expect(SHEET.titleHint).toBe('Write any text, for example “Warden of the East”. For a title with a number and dates, use the Titles section below.');
+		expect(SHEET.titleHint).toBe('Write any text, for example “Keeper of the Swans”. For a title with a number and dates, use the Titles section below.');
 		const { content } = open();
 		const field = content.querySelector('[data-field="title"]')!;
 		expect(field.querySelector('label')!.getText()).toBe('Title shown under the name');

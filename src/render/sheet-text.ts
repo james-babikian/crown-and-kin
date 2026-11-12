@@ -28,10 +28,10 @@ export const SHEET = {
 	name: 'Name',
 	// D98: the free text under the name. The Titles section holds titles with a number and dates.
 	title: 'Title shown under the name',
-	titleHint: `Write any text, for example ${quote('Warden of the East')}. For a title with a number and dates, use the Titles section below.`,
+	titleHint: `Write any text, for example ${quote('Keeper of the Swans')}. For a title with a number and dates, use the Titles section below.`,
 	// D122: the sobriquet shows after the name in quote marks.
 	sobriquet: 'Sobriquet',
-	sobriquetHint: `The card shows this text after the name, in quote marks. The plugin adds the quote marks. An example is ${quote('the Wise')}.`,
+	sobriquetHint: `The card shows this text after the name, in quote marks. The plugin adds the quote marks. Write only the words, for example ${quote('the Conqueror')}.`,
 	house: 'House',
 	noHouse: 'No house',
 	newHouse: 'New house…',
@@ -181,7 +181,7 @@ export const FLOW = {
 export const NEW_SHEET = {
 	titlePerson: 'New person',
 	/** D330 UX-22: the placeholder of the name of a new person, under the one heading "New person". */
-	namePlaceholder: 'For example: Edmund Vane',
+	namePlaceholder: 'For example: Rosamund de Clifford',
 	titleParent: 'New parent',
 	titleChild: 'New child',
 	titlePartner: 'New partner',

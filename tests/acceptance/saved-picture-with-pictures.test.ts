@@ -1,3 +1,4 @@
+// 0.5.4 (D343 1 C, D344 1 A and 2 A, D345 1 A): the "M8" hash of sample tree 12 was recorded again, once: side-link curves go between the cards, the "?" keeps off tag pills, and tags use the whole lower edge and the card name at an exact x.
 // 0.5.2 (D330 O-01, O-03, TR-05): all 16 "M8" hashes were recorded again, once (one card edge, no foot hairline, the new line widths and dashes).
 // 0.3 (D231, WP-Q): the "M8" hashes of the sample trees were recorded again, once, because the added step of the placement moves cards.
 import { createHash } from 'node:crypto';
@@ -370,7 +371,7 @@ describe('without `saved` (and without `pictures`), renderSvg draws exactly as b
 		'09': 'a3e678391ed23509',
 		'10': 'a6d595ae5308980d',
 		'11': '8fc82ca899596745',
-		'12': '7e83f827ec2ce1cb',
+		'12': 'ef786dc29104de5c',
 		'13': '7a90cef4aeb947d6',
 		'14': 'e4639cd19ff4e43a',
 		'15': '36327f01564ae05e',

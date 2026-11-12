@@ -5,7 +5,7 @@
  * match shows the warning of rule 5 after it, and a date with name lists (spec §14 rule 15) gets one sentence for each list, "Planets: Saturn.", after the year; a whole
  * plain year with a plain-year list has this line too. A written name that is wrong for its year adds the sentence of the mismatch. The line shows the full names, also when the
  * cards show the short form. The line is not a warning of the tree. The sentence of a wrong written name is a separate part (`dateReadoutParts`), because the windows
- * show it on a text line of its own with a warning mark. A date with no year can also say that the line of succession does not use it (`succession`). Pure; the texts are in `calendar-text.ts`.
+ * show it on a text line of its own with a warning mark; the warning of rule 5 is a part too (`tail`), shown in the text colour at the end of the reading. A date with no year can also say that the line of succession does not use it (`succession`). Pure; the texts are in `calendar-text.ts`.
  */
 
 import { nameMismatches, type ReadDate } from '../core/dates';
@@ -37,13 +37,17 @@ function nameSentences(r: ReadDate): Sentence[] {
 	return [...out, ...[...wrong.values()].map(mismatch)];
 }
 
-/** The two parts of the line: the reading of the date, and the warning about a wrong written name (empty when there is none). */
+/**
+ * The three parts of the line: the reading of the date (grey); the `tail`, the warning sentences of rule 5 that follow a calendar match (the windows show them in the text colour on the
+ * same text line, D348 2 A); and the warning about a wrong written name (on a text line of its own). A part is empty when there is nothing to say.
+ */
 export interface ReadoutParts {
 	reading: string;
+	tail: string;
 	warning: string;
 }
 
-const plainParts = (reading: string): ReadoutParts => ({ reading, warning: '' });
+const plainParts = (reading: string): ReadoutParts => ({ reading, tail: '', warning: '' });
 const sentenceText = (list: readonly Sentence[]): string => list.map((x) => x.text).join(' ');
 
 /**
@@ -62,22 +66,23 @@ export function dateReadoutParts(text: string, r: ReadDate | undefined, ready = 
 	const names = [...(r.calendar !== undefined ? [r.calendar] : []), ...(r.also ?? [])];
 	if (r.warnings.includes('fits-two-calendars')) return plainParts(T.fitsTwo(names));
 	if (r.source === 'calendar' && r.year !== undefined && r.calendar !== undefined && r.span !== undefined && r.count !== undefined) {
-		const all: Sentence[] = [...nameSentences(r), ...(r.also?.length ? [{ text: T.alsoSame(r.also) }] : []), ...warningTails(r).map((x) => ({ text: x }))];
+		const all: Sentence[] = [...nameSentences(r), ...(r.also?.length ? [{ text: T.alsoSame(r.also) }] : [])];
 		const rest = sentenceText(all.filter((x) => !x.warning));
 		const warning = sentenceText(all.filter((x) => x.warning));
+		const tail = warningTails(r).join(' ');
 		const match = T.match(r.calendar, r.span, r.count, r.year);
-		return { reading: rest ? `${match}. ${rest}` : warning ? `${match}.` : match, warning };
+		return { reading: rest ? `${match}. ${rest}` : warning || tail ? `${match}.` : match, tail, warning };
 	}
 	if (r.source === 'plain' && r.dual && r.year !== undefined) return plainParts(T.dual(r.year));
 	if (r.source === 'plain' && r.year !== undefined) {
 		const all = nameSentences(r);
-		return { reading: sentenceText(all.filter((x) => !x.warning)), warning: sentenceText(all.filter((x) => x.warning)) };
+		return { reading: sentenceText(all.filter((x) => !x.warning)), tail: '', warning: sentenceText(all.filter((x) => x.warning)) };
 	}
 	return noYear;
 }
 
-/** The line as one text: the two parts of `dateReadoutParts` with a space between; '' when no line shows. */
+/** The line as one text: the parts of `dateReadoutParts` with a space between; '' when no line shows. */
 export function dateReadout(text: string, r: ReadDate | undefined, ready = true): string {
-	const { reading, warning } = dateReadoutParts(text, r, ready);
-	return [reading, warning].filter((x) => x !== '').join(' ');
+	const { reading, tail, warning } = dateReadoutParts(text, r, ready);
+	return [reading, tail, warning].filter((x) => x !== '').join(' ');
 }

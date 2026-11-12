@@ -155,11 +155,12 @@ describe('the live drawing: the same gap G before the name for the four shapes (
 						const mark = part.all().find((e) => e.classes.has('dynasty-tag-mark'))!;
 						const textEl = part.all().find((e) => e.classes.has('dynasty-tag-text'))!;
 						const pill = part.all().find((e) => e.classes.has('dynasty-tag-pill'))!;
-						const label = textEl.text;
-						const lead = /^⚭[  ]*/.exec(label)![0];
-						expect(label.slice(lead.length), shape).toBe('Zelda');
-						const textStart = Number(textEl.getAttribute('x')) - measure(label) / 2;
-						const nameStart = textStart + measure(lead);
+						// The ⚭ starts at the text's x; the name is a tspan with its own exact x after the ⚭ and the sign (`tagPillParts`).
+						const nameEl = textEl.all().find((e) => e.classes.has('dynasty-tag-name'))!;
+						expect(nameEl.textContent, shape).toBe('Zelda');
+						expect(textEl.textContent, shape).toBe('⚭ Zelda');
+						const textStart = Number(textEl.getAttribute('x'));
+						const nameStart = Number(nameEl.getAttribute('x'));
 						const e = edges(shape, { cx: mark.getAttribute('cx') ?? undefined, r: mark.getAttribute('r') ?? undefined, d: mark.getAttribute('d') ?? undefined });
 						const gap = nameStart - e.right;
 						gaps.push(gap);
@@ -185,20 +186,25 @@ describe('the live drawing: the same gap G before the name for the four shapes (
 			const tag = laid.layout.farTags.get('x')!;
 			const zone = tag.zoneW ?? tag.hit.w;
 			const s = buildScene(new FEl('g') as unknown as SVGGElement, g, laid, { fonts: FONTS, measure, link: () => null });
-			const el = s.tags.find((t) => t.tag.person === 'z')!.el as unknown as FEl;
-			for (const level of ['dynasty-tag-full', 'dynasty-tag-compact']) {
+			// x's tag names Zelda and is cut; z's tag names Xavier whole.
+			for (const [person, level] of ['x', 'z'].flatMap((who) => ['dynasty-tag-full', 'dynasty-tag-compact'].map((lv) => [who, lv] as const))) {
+				const el = s.tags.find((t) => t.tag.person === person)!.el as unknown as FEl;
 				const part = el.all().find((e) => e.classes.has(level))!;
 				const pill = part.all().find((e) => e.classes.has('dynasty-tag-pill'))!;
 				const textEl = part.all().find((e) => e.classes.has('dynasty-tag-text'))!;
 				expect(Number(pill.getAttribute('width')), `${level} ${shape}`).toBeLessThanOrEqual(zone + 1e-6);
 				const mark = part.all().find((e) => e.classes.has('dynasty-tag-mark'))!;
-				const label = textEl.text;
-				const lead = /^⚭[  ]*/.exec(label)![0];
-				const nameStart = Number(textEl.getAttribute('x')) - measure(label) / 2 + measure(lead);
+				const nameEl = textEl.all().find((e) => e.classes.has('dynasty-tag-name'))!;
+				const name = nameEl.textContent;
+				expect(name.endsWith('…'), `${person} ${level} ${shape}`).toBe(person === 'x');
+				const nameStart = Number(nameEl.getAttribute('x'));
 				const e = edges(shape, { cx: mark.getAttribute('cx') ?? undefined, r: mark.getAttribute('r') ?? undefined, d: mark.getAttribute('d') ?? undefined });
 				expect(nameStart - e.right, `${level} ${shape}`).toBeGreaterThan(0);
-				// The text, the sign and the room all lie in the pill.
-				expect(measure(label) + 2 * (Number(pill.getAttribute('height')) / 2), `${level} ${shape}`).toBeLessThanOrEqual(zone + 1e-6);
+				// The ⚭, the sign and the cut name all lie in the pill, with its padding at the end.
+				const left = Number(pill.getAttribute('x'));
+				const pad = Number(pill.getAttribute('height')) / 2;
+				expect(Number(textEl.getAttribute('x')), `${level} ${shape}`).toBeCloseTo(left + pad, 6);
+				expect(nameStart + measure(name) + pad, `${level} ${shape}`).toBeLessThanOrEqual(left + Number(pill.getAttribute('width')) + 1e-6);
 			}
 		}
 	});

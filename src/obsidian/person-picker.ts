@@ -2,7 +2,7 @@
  * The person picker (spec §6.6): live fuzzy filtering over name, title and dates; each row shows
  * the house colour, name, title and dates; the row "Create" makes a new person with the typed text
  * (not in Find, spec §6.10; D330 O-20: it stands last when the typed text matches a person, so Enter picks the first match). People in `exclude` are never offered. The relation finder (spec §13.2)
- * puts the marked person first, as "You: NAME". Spec §13.5: the picker also matches the ruler name
+ * puts the marked person first, with "You" in the second text line as in the Find list. Spec §13.5: the picker also matches the ruler name
  * with the number of every numbered holder entry ("Aldric II"), and a row shows the ruler name of the
  * shown title after the full name ("Aldric Valmont (Aldric II)"). The Titles window's picker has its
  * own first row, "A holder who is not in the tree". The typed text and the text of each person are
@@ -114,11 +114,10 @@ const IDLE_MS = 300;
 
 /**
  * The name line of a person row: the name, the ruler name and the sobriquet in curly marks (D122, regular weight) are one run whose direction the first strong letter
- * sets, as on the cards (D322). "You: " is the table's sentence without the name.
+ * sets, as on the cards (D322). The marked person has no prefix here: "You" stands in the second text line, as in the Find list (D346 item 4).
  */
-function pickerName(parent: HTMLElement, p: Person, you: boolean, suffix: string | undefined): void {
+function pickerName(parent: HTMLElement, p: Person, suffix: string | undefined): void {
 	const box = parent.createDiv({ cls: 'dynasty-picker-name' });
-	if (you) box.appendText(FINDER_UI.you(''));
 	appendNameRun(box, p.name, [suffix ? { cls: 'dynasty-picker-suffix', text: ` ${suffix}` } : undefined, p.sobriquet !== undefined ? { cls: 'dynasty-picker-sob', text: ` ${quotedSobriquet(p.sobriquet)}` } : undefined]);
 }
 
@@ -158,7 +157,7 @@ function definePicker() {
 			private readonly title: string,
 			private readonly allowNew: boolean,
 			private readonly done: (p: Picked | null) => void,
-			/** The marked person, offered first as "You: NAME" (spec §13.2); null for none. */
+			/** The marked person, offered first (spec §13.2); null for none. */
 			private readonly you: string | null = null,
 			/** The text of the first row, when it is not "Create a new person" (the Titles window). */
 			private readonly newRow: ((typed: string) => string) | null = null,
@@ -182,7 +181,7 @@ function definePicker() {
 			return (this.allowNew ? 1 : 0) + PICKER_PAGE;
 		}
 
-		/** The marked person's row, "You: NAME" (spec §13.2). */
+		/** The marked person's row (spec §13.2): first in the list, with "You" in its second text line. */
 		private isYou(p: Person): boolean {
 			return p.id === this.you;
 		}
@@ -359,17 +358,16 @@ function definePicker() {
 			el.setAttribute('data-person', p.id);
 			const text = el.createDiv({ cls: 'dynasty-picker-text' });
 			const you = this.isYou(p);
-			if (you) el.addClass('dynasty-picker-you');
 			const label = this.labels.get(p.id);
-			pickerName(text, p, you, label ? pickerSuffix(label, p.name) : undefined);
-			// "You: Ann" already says who is marked, so the second text line does not repeat "You".
+			pickerName(text, p, label ? pickerSuffix(label, p.name) : undefined);
+			// The marked person's word is "You" in both lists, the relation finder's and Find (D346 item 4): the second text line starts with it.
 			// D218 rule 4: the relation word is italic, as on the cards and in the window rows; the rest of the text line is plain.
 			const rest = WINDOW_UI.findRowSub('', dateLineShown(p, this.g.dates) ?? '', isolateName(label?.title ?? p.title ?? ''));
 			let sub: HTMLElement | null = null;
 			const paintSub = () => {
 				sub?.remove();
 				sub = null;
-				const word = you ? '' : (this.relationOf(p.id)?.text ?? '');
+				const word = you ? FINDER_UI.you : (this.relationOf(p.id)?.text ?? '');
 				if (!word && !rest) return;
 				sub = text.createDiv({ cls: 'dynasty-picker-sub', ...(word ? {} : { text: rest }) });
 				if (word) sub.createEl('i', { text: word });
@@ -422,7 +420,7 @@ let Picker: ReturnType<typeof definePicker> | null = null;
 
 /**
  * Opens the picker; resolves to the chosen person, "create new" with the typed text, or null. `you`:
- * the marked person, offered first as "You: NAME" (the relation finder, spec §13.2). `newRow`: the
+ * the marked person, offered first (the relation finder, spec §13.2). `newRow`: the
  * text of the first row instead of "Create a new person" (it still resolves to `new`).
  */
 export function pickPerson(

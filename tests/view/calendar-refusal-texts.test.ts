@@ -21,7 +21,7 @@ describe('B: the refusal texts', () => {
 		expect(refusal('name-length')).toBe('In the name list “Planets”, a name or a short form has no text or has more than 40 characters. Write 1 to 40 characters.');
 		expect(refusal('marker-invalid')).toBe('The marker of the name list “Planets” is not valid. Use 1 to 24 letters, digits or hyphens. Start with a letter. Do not use year, cycle or era.');
 		expect(refusal('known-no-year')).toBe('The plugin cannot read the known year of the name list “Planets”. Write a date that the calendar can read.');
-		expect(refusal('known-no-year', { plain: true })).toBe('The plugin cannot read the known year of the name list “Planets”. Write a plain year, for example 1273.');
+		expect(refusal('known-no-year', { plain: true })).toBe('The plugin cannot read the known year of the name list “Planets”. Write a plain year, for example 1178.');
 		expect(refusal('known-no-name')).toBe('The known year of the name list “Planets” has no name, or its name is not in the list. Write a name or a short form from the list.');
 		expect(refusal('list-name-length')).toBe('Name list 1 of the calendar “Long Count” has a name with more than 60 characters. Write a name with 60 characters or fewer.');
 		expect(refusal('calendar-name-twice', { calendar: 'Count' })).toBe('Two calendars of this note have the name “Count”. Give each calendar its own name, so that the plugin can tell them apart.');
@@ -55,7 +55,7 @@ describe('A: the texts of the Calendars window', () => {
 		expect(T.summaryLists(['Planets'])).toBe('Name list: Planets');
 		expect(T.summaryLists(['Planets', 'Moons'])).toBe('Name lists: Planets, Moons');
 		expect(T.knownBackPlain(1273, 'Saturn', 7)).toBe('The name of year 1273 is Saturn. The names repeat every 7 years.');
-		expect(T.knownDateBadPlain).toBe('The plugin cannot read a year in this date. Write a plain year, for example 1273.');
+		expect(T.knownDateBadPlain).toBe('The plugin cannot read a year in this date. Write a plain year, for example 1178.');
 		expect(T.showLabel).toBe('Name of the year on cards');
 		expect(T.showHint).toBe('The plugin adds the name after a date on cards and in lists. A date that already has the name shows as you wrote it.');
 		expect(T.showShort).toBe('Short form');

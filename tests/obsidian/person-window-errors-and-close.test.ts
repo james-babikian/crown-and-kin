@@ -6,7 +6,7 @@ vi.mock('../../src/obsidian/choice-modal', () => ({ choose: async () => answers.
 vi.mock('../../src/obsidian/person-picker', () => ({ pickPerson: async () => answers.shift() ?? null }));
 
 import { EditSheet } from '../../src/obsidian/edit-sheet';
-import { NEW_SHEET, SHEET, WRITE_TEXT } from '../../src/render/ui-text';
+import { HOUSES, NEW_SHEET, SHEET, WRITE_TEXT } from '../../src/render/ui-text';
 import { NEW_HOUSE } from '../../src/view/sheet-draft';
 import { FEl, clock, dispatch, resetDom, settle } from '../acceptance/fake-dom';
 import { openModals, resetObsidian } from '../acceptance/fake-obsidian';
@@ -87,6 +87,18 @@ describe('an error about one field stands under that field (W-02)', () => {
 		const input = type(m, 'name', 'E');
 		expect(m.querySelector('.dynasty-field-error')).toBeNull();
 		expect(input.getAttribute('aria-invalid')).toBeNull();
+	});
+
+	it('D341: the field "Name of the new house" shows the grey house example, the same as the Houses window', () => {
+		const { s } = openNew({ kind: 'person' });
+		const m = modalOf(s);
+		const house = m.querySelector('[data-field="house"] select') as FEl;
+		house.value = NEW_HOUSE;
+		dispatch(house, 'change');
+		const input = m.querySelector('[data-field="new-house-name"] input')!;
+		expect(input.getAttribute('placeholder')).toBe('For example: House Plantagenet');
+		expect(input.getAttribute('placeholder')).toBe(HOUSES.namePlaceholder);
+		expect(input.value).toBe('');
 	});
 
 	it('a new house with no name: the line stands under the name of the new house', () => {
@@ -181,7 +193,7 @@ describe('one heading for a new person (UX-22)', () => {
 		const m = modalOf(s);
 		expect(m.querySelector('.dynasty-head-name')!.getText()).toBe(NEW_SHEET.titlePerson);
 		expect(m.querySelector('[data-field="name"] input')!.getAttribute('placeholder')).toBe(NEW_SHEET.namePlaceholder);
-		expect(NEW_SHEET.namePlaceholder).toBe('For example: Edmund Vane');
+		expect(NEW_SHEET.namePlaceholder).toBe('For example: Rosamund de Clifford');
 		expect(m.getText()).not.toContain('Enter a name below');
 		// The detail line has nothing to say for a person with no relative: it takes no room.
 		expect(m.querySelector('.dynasty-head-meta')).toBeNull();

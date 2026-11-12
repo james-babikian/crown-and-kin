@@ -1,6 +1,6 @@
 /**
  * The user's list of break places for long names (D118, spec §13.19 rule 2). The setting "Break places in long
- * names" holds one word on each text line with a hyphen at each place where the word can break ("Long-na-munda").
+ * names" holds one word on each text line with a hyphen at each place where the word can break ("Es-clar-monde").
  * `parseBreakList` turns that text into a lookup; `render/name-lines.ts` reads it when a word does not fit on a text
  * line. Pure and in `render/` because only the drawing and the saved picture use it; `src/layout` never imports it.
  */

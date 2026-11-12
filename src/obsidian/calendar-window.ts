@@ -14,7 +14,7 @@ import type { DateReader } from '../core/dates';
 import { issueText, type CodedIssue } from '../core/messages';
 import { CALENDAR_UI, CALENDAR_WINDOW_UI as T } from '../render/calendar-text';
 import { markedLine } from '../render/dom/marks';
-import { PLAIN_KEY, checkDraft, calendarDraftChanged, draftOf, emptyPlain, markerIssues, newCalendar, newEra, newListDraft, opsOf, type CalendarDraft, type Checked, type ListDraft, type PlainDraft } from '../view/calendar-draft';
+import { PLAIN_KEY, checkDraft, calendarDraftChanged, draftOf, emptyPlain, markerIssues, newCalendar, newListDraft, opsOf, type CalendarDraft, type Checked, type ListDraft, type PlainDraft } from '../view/calendar-draft';
 import { byNameThenPath, type CalendarIndex } from '../view/calendar-index';
 import { listDraftsOf } from '../view/calendar-list-draft';
 import { calendarSummary, calendarTitle, listsSummary } from '../view/calendar-summary';
@@ -163,17 +163,6 @@ class CalendarsWindow extends SmallFormModal {
 			removeCalendar: (key) => {
 				this.drafts = this.drafts.filter((d) => d.key !== key);
 				this.draw({ focus: this.drafts.length ? 'cal:add' : 'cal:add-cycles' });
-			},
-			addEra: (key) => {
-				const d = this.drafts.find((x) => x.key === key);
-				if (!d) return;
-				const era = newEra(() => this.counter++);
-				d.eras.push(era);
-				this.draw({ focus: `cal:era-${era.key}-name` });
-			},
-			removeEra: (key, era) => {
-				this.drafts.find((x) => x.key === key)?.eras.splice(era, 1);
-				this.draw({ focus: `cal:add-era:${key}` });
 			},
 			addList: (key) => {
 				const l = newListDraft(() => this.counter++);

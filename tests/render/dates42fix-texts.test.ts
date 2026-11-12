@@ -11,8 +11,8 @@ const TITLE = { where: 'year', value: '0', title: 'Crown' };
 
 describe('the date warnings', () => {
 	it('year-zero', () => {
-		expect(text('year-zero', TITLE)).toBe('The title Crown has “year: 0”. There is no year 0. The plugin reads 0 as 1 BC. If you mean AD 1, write “1”. For a year before that, write a number with a minus sign, such as “-5”, for 5 BC.');
-		expect(text('year-zero', PERSON)).toBe('Hugo has “born: 0”. There is no year 0. The plugin reads 0 as 1 BC. If you mean AD 1, write “1”. For a year before that, write a number with a minus sign, such as “-5”, for 5 BC.');
+		expect(text('year-zero', TITLE)).toBe('The title Crown has “year: 0”. There is no year 0. The plugin reads 0 as 1 BC. If you mean AD 1, write “1”. For a year before that, write a number with a minus sign, for example “-5” for 5 BC.');
+		expect(text('year-zero', PERSON)).toBe('Hugo has “born: 0”. There is no year 0. The plugin reads 0 as 1 BC. If you mean AD 1, write “1”. For a year before that, write a number with a minus sign, for example “-5” for 5 BC.');
 	});
 
 	it('calendar-year-zero', () => {
@@ -21,7 +21,7 @@ describe('the date warnings', () => {
 
 	it('calendar-year-past-end', () => {
 		expect(text('calendar-year-past-end', PERSON)).toBe(
-			'Hugo has “born: 0”. The year in this date is after the last year of its cycle or era. The plugin continues the count past the end. If this is a mistake, correct the date. If the cycle or era is longer, change its length in the Calendars window.',
+			'Hugo has “born: 0”. The year in this date is after the last year of its cycle or era. The plugin continues the count past the end. If this is a mistake, correct the date. If the cycle is longer, change its “Length (years)” in the Calendars window. If the era is longer, give the era a later last year, or make the next era start later.',
 		);
 	});
 
@@ -50,7 +50,7 @@ describe('the date warnings', () => {
 	});
 
 	it('calendar-entry-invalid, with the four reasons', () => {
-		const why = { 'no-name': 'it has no name', 'not-map': 'it is not a group of keys, such as “name:”', kind: 'its “kind:” is not “cycles” or “eras”', era: 'one of its eras has no name' };
+		const why = { 'no-name': 'it has no name', 'not-map': 'it is not a group of keys such as “name:”', kind: 'its “kind:” is not “cycles” or “eras”', era: 'one of its eras has no name' };
 		for (const [key, reason] of Object.entries(why)) {
 			expect(text('calendar-entry-invalid', { note: 'A.md', index: 2, why: key })).toBe(`Calendar 2 in the block of the note “A.md” cannot be used, because ${reason}. The plugin ignores it. Edit the text of the block in the note.`);
 		}
@@ -61,8 +61,8 @@ describe('the Calendars window refusals', () => {
 	const refuse = (key: string, other?: string) => calendarRefusalText({ calendar: 'Reign names', key, ...(other ? { other } : {}) });
 
 	it('the format refusals', () => {
-		expect(refuse('calendar-format-cycle')).toBe('A cycle format needs {year} and {cycle}, one time each. It cannot have any other word in curly brackets. An example is “{year} Year of the {cycle} Cycle”.');
-		expect(refuse('calendar-format-era')).toBe('An era format needs {year} and {era}, one time each. It cannot have any other word in curly brackets. An example is “{era} {year}”.');
+		expect(refuse('calendar-format-cycle')).toBe('A cycle format needs {year} and {cycle}, one time each. It cannot have any other word in curly brackets. For example: “{year} Year of the {cycle} Olympiad”.');
+		expect(refuse('calendar-format-era')).toBe('An era format needs {year} and {era}, one time each. It cannot have any other word in curly brackets. For example: “{era} {year}”.');
 		expect(refuse('calendar-format-touching')).toBe('In this format, {cycle} and {year} are next to each other, so the plugin cannot tell where one ends. Put a word or a space between them.');
 	});
 

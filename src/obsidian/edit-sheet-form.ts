@@ -15,7 +15,7 @@ import { dateLineShown, headTitle } from '../render/tree-info';
 import { quotedSobriquet } from '../core/sobriquet';
 import { specOf } from '../core/succession';
 import { joined, nb, refitJoined } from '../render/text-join';
-import { NEW_SHEET, REMOVE, SHEET, UI, UNION_TYPE_TEXT, WINDOW_UI, WRITE_TEXT } from '../render/ui-text';
+import { HOUSES, NEW_SHEET, REMOVE, SHEET, UI, UNION_TYPE_TEXT, WINDOW_UI, WRITE_TEXT } from '../render/ui-text';
 import { CHANGE_UI } from '../render/change-text';
 import { cardLabels, needsLabels } from '../core/titles';
 import { familyOf } from '../core/family-query';
@@ -636,7 +636,7 @@ export abstract class EditSheetForm extends EditSheetPortrait {
 		const name = sheetField(form, SHEET.newHouseName, 'new-house-name');
 		const nameInput = name.row.createEl('input', {
 			cls: ['dynasty-sheet-input', 'dynasty-input'],
-			attr: { id: name.id, type: 'text', autocomplete: 'off', autocorrect: 'off', spellcheck: 'false', autocapitalize: 'off' },
+			attr: { id: name.id, type: 'text', autocomplete: 'off', autocorrect: 'off', spellcheck: 'false', autocapitalize: 'off', placeholder: HOUSES.namePlaceholder },
 		});
 		nameInput.value = this.newHouse.name;
 		endEntryOnEnter(nameInput);

@@ -149,7 +149,7 @@ describe('the live tree draws the sign inside the tag, at the Full and the Compa
 			const el = s.tags.find((t) => t.tag.person === 'x')!.el as unknown as FEl;
 			const full = el.all().find((e) => e.classes.has('dynasty-tag-full'))!;
 			const text = full.all().find((e) => e.classes.has('dynasty-tag-text'))!;
-			return { w: Number(full.all().find((e) => e.classes.has('dynasty-tag-pill'))!.getAttribute('width')), text: text.text };
+			return { w: Number(full.all().find((e) => e.classes.has('dynasty-tag-pill'))!.getAttribute('width')), text: text.textContent };
 		};
 		const a = widthOf(withSign);
 		const b = widthOf(withKid);

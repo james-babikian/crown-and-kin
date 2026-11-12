@@ -31,11 +31,11 @@ import { lineLook, type LineMarks, type LineState } from './line-highlight';
 import type { BreakList } from './break-words';
 import { cardNameLines, svgNameLines, svgText, titleLines, type NameMeasure, type NameRun } from './name-lines';
 import { fixedColour, fontOf, savedFrame, xmlText, type PictureMap, type SavedFrame, type SavedParts } from './saved-picture';
-import { DEAD_STRIP_OPACITY, DEFAULT_DARK, DEFAULT_LIGHT, FADED_OPACITY, HEIR_LOOK, ME_LOOK, ME_RING_INNER, ON_LINE_EXTRA, SAVED_CARD_RADIUS, STROKES, TAG_MARK, UNION_MARKS, stripColour, tagMarkSlot, unionMark, unionShape, type Palette, type UnionShape } from './styles';
+import { DEAD_STRIP_OPACITY, DEFAULT_DARK, DEFAULT_LIGHT, FADED_OPACITY, HEIR_LOOK, ME_LOOK, ME_RING_INNER, ON_LINE_EXTRA, SAVED_CARD_RADIUS, STROKES, TAG_MARK, UNION_MARKS, stripColour, tagMarkSlot, tagNameRoom, tagPillParts, unionMark, unionShape, type Palette, type UnionShape } from './styles';
 import { LEGEND_DEAD_DOUBT_LABEL, LEGEND_DEAD_LABEL, LEGEND_LABELS, SIGN_LEGEND_LABEL } from './legend-text';
 import { marksForSvg } from './date-bidi';
 import { fitNamed, pickReign } from './date-fit';
-import { dateLineShown, farTagName, reignShown, shownReignIsolated } from './tree-info';
+import { dateLineShown, farTagName, farTagSvgName, reignShown, shownReignIsolated } from './tree-info';
 import { fitRelationText } from './relation-fit';
 import { ribbonPath } from './view-math';
 import { closeIsolates, truncateClosed, withoutBidiControls } from './bidi-controls';
@@ -43,6 +43,8 @@ import { ME_WORD } from './view-text';
 
 /** The fade of a part beside the finder's line, as an SVG attribute (D47). */
 const fadeAttr = (s: LineState) => (s === 'faded' ? ` opacity="${FADED_OPACITY}"` : '');
+/** The dash offset of a begetter line that lines up with its group (`EdgePath.dashOffset`); nothing for a line with none. */
+const dashOffsetAttr = (offset?: number) => (offset ? ` stroke-dashoffset="${offset}"` : '');
 
 const esc = (s: string) => xmlText(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
@@ -184,7 +186,7 @@ export function renderSvg(g: FamilyGraph, layout: TreeLayout, edges: EdgeDrawing
 		const dash = s.dash ? ` stroke-dasharray="${s.dash}"` : '';
 		const cap = s.cap ? ` stroke-linecap="${s.cap}"` : '';
 		const opacity = s.opacity && !on ? ` stroke-opacity="${s.opacity}"` : '';
-		out.push(`<path d="${p.d}" fill="none" stroke="${on ? c.accent : c[s.role]}" stroke-width="${on ? s.width + ON_LINE_EXTRA : s.width}"${dash}${cap}${opacity}${fadeAttr(p.state)}${di(`line:${p.kind}`)}/>`);
+		out.push(`<path d="${p.d}" fill="none" stroke="${on ? c.accent : c[s.role]}" stroke-width="${on ? s.width + ON_LINE_EXTRA : s.width}"${dash}${cap}${dashOffsetAttr(p.dashOffset)}${opacity}${fadeAttr(p.state)}${di(`line:${p.kind}`)}/>`);
 	}
 
 	const geo = layout.geometry;
@@ -422,9 +424,9 @@ export function renderSvg(g: FamilyGraph, layout: TreeLayout, edges: EdgeDrawing
 		const slot = farShape ? tagMarkSlot(farShape, tagFont) : 0;
 		// The widest the tag may be; a sideways hit area can be wider than the part of the edge the tag may use.
 		const room = tag.zoneW ?? tag.hit.w;
-		const label = measured ? cutWith(farTagName(g, tag.spouses), room - 2 * pad - sign - slot, tagFontStr) : fit(farTagName(g, tag.spouses), room - 2 * pad - sign - slot, tagFont);
-		const w = Math.min(room, (measured ? measured(label, tagFontStr) : textWidth(label, tagFont)) + sign + slot + 2 * pad);
-		const left = tag.x - w / 2;
+		const nameRoom = tagNameRoom(room, pad, sign, slot);
+		const label = measured ? cutWith(farTagName(g, tag.spouses, opts.labels), nameRoom, tagFontStr) : fit(farTagName(g, tag.spouses, opts.labels), nameRoom, tagFont);
+		const { left, w, signX, markX, nameX } = tagPillParts(tag.x, room, pad, sign, slot, measured ? measured(label, tagFontStr) : textWidth(label, tagFont));
 		const top = tagTop(geo, tag.y);
 		const base = top + tagH / 2 + 0.35 * tagFont;
 		// D47: a tag of a marriage on the finder's line gets an accent edge; a tag beside it fades.
@@ -434,16 +436,16 @@ export function renderSvg(g: FamilyGraph, layout: TreeLayout, edges: EdgeDrawing
 		// D212: the pill is a chip with the line colour as its edge, so it still reads as a tag without colour (3:1 on the page).
 		const edge = state === 'on' ? `stroke="${c.accent}" stroke-width="2"` : `stroke="${c.line}" stroke-width="1"`;
 		out.push(`<rect x="${left}" y="${top}" width="${w}" height="${tagH}" rx="${tagH / 2}" fill="${c.cardFill}" ${edge}/>`);
-		out.push(`<text x="${left + pad}" y="${base}" font-size="${1.25 * tagFont}" font-family="Segoe UI Symbol, DejaVu Sans, sans-serif" fill="${c.textMuted}">⚭</text>`);
+		out.push(`<text x="${signX}" y="${base}" font-size="${1.25 * tagFont}" font-family="Segoe UI Symbol, DejaVu Sans, sans-serif" fill="${c.textMuted}">⚭</text>`);
 		if (farShape) {
 			const spec = UNION_MARKS[farShape];
-			const m = unionMark(farShape, left + pad + sign + slot / 2, top + tagH / 2, spec.size * TAG_MARK.unit * tagFont);
+			const m = unionMark(farShape, markX, top + tagH / 2, spec.size * TAG_MARK.unit * tagFont);
 			const at = Object.entries(m.attr).map(([k, v]) => `${k}="${v}"`).join(' ');
 			const paint = spec.stroke ? `fill="${c.cardFill}" stroke="${c.textMuted}" stroke-width="${spec.stroke}" stroke-linejoin="round"` : `fill="${c.textMuted}"`;
 			// The sign is listed like any union sign, as the live tree's sign has the class of one.
 			out.push(`<${m.tag} ${at} ${paint}${di(`union:${farShape}`)}/>`);
 		}
-		out.push(`<text x="${left + pad + sign + slot}" y="${base}" font-size="${tagFont}"${tagFamily} fill="${c.textMuted}">${esc(label)}</text>`);
+		out.push(`<text x="${nameX}" y="${base}" font-size="${tagFont}"${tagFamily} fill="${c.textMuted}">${esc(farTagSvgName(label))}</text>`);
 		if (group) out.push('</g>');
 	}
 
@@ -483,7 +485,8 @@ function legendSvg(frame: SavedFrame, saved: SavedParts, c: Palette, fonts: Scen
 			out.push(`<rect x="${L.strip.x}" y="${(L.rowH - L.strip.h) / 2}" width="${L.strip.w}" height="${L.strip.h}" rx="${L.strip.w / 2}" fill="${esc(fill)}"/>`);
 			const uri = h.arms ? saved.pictures.get(`arms:${h.id}`) : undefined;
 			if (isUri(uri)) out.push(`<image href="${esc(uri)}" x="${L.arms.x}" y="${(L.rowH - L.arms.h) / 2}" width="${L.arms.w}" height="${L.arms.h}" preserveAspectRatio="xMidYMid meet" data-item="legend-arms:${esc(h.id)}"/>`);
-			out.push(label(L.houseLabelX, h.name));
+			// D346 item 3: the house name gets the embedding of a card name, so a mixed name reads in the order of the cards (WebKit ignores an isolate here).
+			out.push(label(L.houseLabelX, svgNameLines([[{ text: h.name, sob: false }]])[0].map((r) => r.text).join('')));
 			out.push('</g>');
 		}
 	}

@@ -455,7 +455,7 @@ export abstract class TreeViewPlacement extends TreeViewLifecycle {
 	/** Sets the level of detail class for `view`; true when the level changed. The numbered rings of the heirs are written for the level and the zoom either way. */
 	protected applyLod(view: View): boolean {
 		const changed = this.swapLod(view);
-		if (this.scene?.rings.length) placeRings(this.scene.rings, this.lod, view.scale);
+		if (this.scene?.rings.length) placeRings(this.scene.rings, this.lod, view.scale, this.isPhone());
 		return changed;
 	}
 

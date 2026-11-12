@@ -1,3 +1,4 @@
+// 0.5.4 (D343 1 C, D344 1 A and 2 A, D345 1 A): 07, 07b and 12 recorded again, once: side-link curves go between the cards, the "?" keeps off tag pills, and tags use the whole lower edge and the card name at an exact x. 15 is as before.
 // 0.5.2 (D330 O-01, O-03, TR-05): all four were recorded again, once (one card edge, no foot hairline, the new line widths and dashes).
 // 0.3 (D231, WP-Q): the hashes of this file were recorded again, once, because the added step of the placement moves cards.
 // 0.3.1 (golden record of the card-and-line switch): all four recorded again, once, for the new walk, the passages and the ports.
@@ -40,9 +41,9 @@ function sidewaysHash(source: string): string {
 }
 
 const RECORDED: Record<string, string> = {
-	'07': '19ce3ddbd5d536a93e951231d93fd17ea1de6ad2372398ab83bd18add4464ece',
-	'07b': '19ce3ddbd5d536a93e951231d93fd17ea1de6ad2372398ab83bd18add4464ece',
-	'12': '07346ada100d00bfd7b50084942af45e3342696627e14405eb337e96de128f3a',
+	'07': '2d9c6ad29a260dc72def6ca220654baec8e7c57b4fd2b6fda029738256f1d2d0',
+	'07b': '2d9c6ad29a260dc72def6ca220654baec8e7c57b4fd2b6fda029738256f1d2d0',
+	'12': '3b7099ee9a75d1979575f66c67069f6112558ca089e9910c1858bc34b32cd308',
 	'15': '445109e9e31175d0bc983fc3188ec689215087277673b69fcbc7ad5295e66237',
 };
 

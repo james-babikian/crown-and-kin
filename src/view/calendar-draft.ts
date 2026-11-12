@@ -2,7 +2,8 @@
  * The draft of the Calendars window (spec §14 rules 1, 3 and 6, D251), with no DOM and no Obsidian. The window edits the calendars of one calendar
  * note: this file turns the calendars as read into a draft of text fields, works out the start of each calendar and era from the "Same year as" entry form,
  * checks the draft (refusals and warnings), makes the test line, and turns the changes into the edit operations of `core/calendar-block.ts`. A refusal
- * means the window does not save; a warning does not stop a save. Nothing here writes.
+ * means the window does not save; a warning does not stop a save. Nothing here writes. The eras of an era calendar are one text field, one era on each
+ * text line (D342, `calendar-era-lines.ts`): each check reads the text lines into eras again.
  */
 
 import type { CalendarOp, EraFields, NewCalendar } from '../core/calendar-block';
@@ -11,12 +12,14 @@ import { fold } from '../core/date-text';
 import { PLAIN_READER, checkCalendarsAt, exampleText, normalizeMarker, startFromSameYear, type Calendar, type CalendarRefusal, type DateReader, type NameList } from '../core/dates';
 import { calendarRefusalText, codedIssue, type CodedIssue } from '../core/messages';
 import { REFUSAL_TEXT } from '../core/refusal-text';
+import { formatYear } from '../core/succession-keys';
 import { CALENDAR_WINDOW_UI as T } from '../render/calendar-text';
 import { isolateDate } from '../render/date-bidi';
 import { dateReadout, dateReadoutParts, type ReadoutParts } from '../render/date-readout';
 import {
 	PLAIN_KEY, builtList, calendarYearReader, emptyPlain, listDraftsOf, listOps, listUntouched, listsShape, markerLists, nameLinesRefusal, plainYearReader, type KnownInfo, type ListDraft, type PlainDraft,
 } from './calendar-list-draft';
+import { eraLinesOf, eraLineText as savedLineText, pairEraLines, roughEraName, splitEraLine, erasTextOf, type SavedEra } from './calendar-era-lines';
 import { compileCapped } from './calendar-reader';
 
 export { PLAIN_KEY, emptyPlain, newListDraft, type KnownInfo, type ListDraft, type PlainDraft } from './calendar-list-draft';
@@ -30,12 +33,18 @@ export interface StartDraft {
 	/** The example in this calendar, as typed: the cycle (cycle calendars) and the year. Empty reads as 1. */
 	cycle: string;
 	year: string;
+	/** The last year of an era as typed after "to" (D342); undefined: no end written. */
+	last?: string;
 }
 
-/** One era in the draft. `at` is its place in the written list; null for an era that the draft adds. */
+/**
+ * One era in the draft, read from one text line of the box (D342). `key` is its place in `CalendarDraft.eras`; `at` is the place in the written list of the saved
+ * era that it keeps or changes (`pairEraLines`; null for a new era); `line` is the number of its text line.
+ */
 export interface EraDraft {
 	key: number;
 	at: number | null;
+	line: number;
 	name: string;
 	start: StartDraft;
 	/** The length in years as typed; empty for none. */
@@ -56,7 +65,14 @@ export interface CalendarDraft {
 	/** The length that the note holds: NaN when it is not a whole number (the field is empty then and the note text stays). */
 	lengthWas?: number;
 	start: StartDraft;
+	/** The eras as read from `erasText` at the last check (`syncEras`). */
 	eras: EraDraft[];
+	/** D342: the text field of an era calendar, one era on each text line. */
+	erasText: string;
+	/** The eras that the note holds: an unchanged text line keeps its era as written, wherever it stands in the box. */
+	erasSaved: SavedEra[];
+	/** The refusals of text lines that hold no era (no year, no year after "to", a name twice), with their text line numbers, from the last check. */
+	eraErrors: { line: number; text: string }[];
 	/** The name lists (spec §14 rule 16): each is a group of text fields. */
 	lists: ListDraft[];
 	/** The formats that the note holds, as written: a line of the field that still equals one of them is not trimmed. */
@@ -88,13 +104,26 @@ function lengthOf(text: string, was: number | undefined): number | undefined | n
 const sameNumber = (a: number | undefined, b: number | undefined): boolean => a === b || (a !== undefined && b !== undefined && Number.isNaN(a) && Number.isNaN(b));
 
 /** The fields of a calendar as one text, to see whether the user changed it. */
-const fieldsOf = (d: CalendarDraft): string =>
-	JSON.stringify([d.name, d.formats, d.length, d.start.same, d.start.cycle, d.start.year, d.eras.map((e) => [e.at, e.name, e.length, e.start.same, e.start.cycle, e.start.year])]);
+const fieldsOf = (d: CalendarDraft): string => JSON.stringify([d.name, d.formats, d.length, d.start.same, d.start.cycle, d.start.year, d.erasText]);
 
 /** True when the user did not change this calendar since the window opened (an untouched calendar is never refused for a number that the note holds as text). */
 const untouched = (d: CalendarDraft): boolean => d.orig !== undefined && d.orig === fieldsOf(d);
 
 const blankStart = (saved: number | null): StartDraft => ({ saved, same: '', cycle: '', year: '' });
+
+/**
+ * The start of a cycle calendar as the window shows it when it opens (D342 repair): Cycle 1, Year 1 and the saved start as a plain year, so the fields show the start
+ * again. A start of 1 is "no example" (spec §14 rule 1) and stays empty, as does a start or a length that the note holds as text.
+ */
+function shownStart(saved: number, length: number): StartDraft {
+	if (!Number.isSafeInteger(saved) || saved === 1 || !Number.isSafeInteger(length) || length < 1) return blankStart(saved);
+	return { saved, same: formatYear(saved), cycle: '1', year: '1' };
+}
+
+/** The draft of a saved era in its place, with no text line changed. */
+function keptEra(e: SavedEra, at: number, line: number, key: number): EraDraft {
+	return { key, at, line, name: e.name, start: blankStart(e.start), length: e.length !== undefined && Number.isFinite(e.length) ? String(e.length) : '', lengthWas: e.length };
+}
 
 /** The place of a calendar in its note, from its id (`<note path>#<block>#<index>`). */
 function placeOf(id: string): { block: number; index: number } | null {
@@ -115,8 +144,11 @@ export function draftOf(calendars: readonly Calendar[], key: () => number): Cale
 			length: c.kind.type === 'cycles' && Number.isFinite(c.kind.length) ? String(c.kind.length) : '',
 			...(c.kind.type === 'cycles' ? { lengthWas: c.kind.length } : {}),
 			// A start that the note holds as text stays NaN: the window cannot show it, and it never writes over it.
-			start: blankStart(c.kind.type === 'cycles' ? c.kind.start : null),
-			eras: c.kind.type === 'eras' ? c.kind.eras.map((e, i) => ({ key: key(), at: i, name: e.name, start: blankStart(e.start), length: e.length !== undefined && Number.isFinite(e.length) ? String(e.length) : '', lengthWas: e.length })) : [],
+			start: c.kind.type === 'cycles' ? shownStart(c.kind.start, c.kind.length) : blankStart(null),
+			eras: c.kind.type === 'eras' ? c.kind.eras.map((e, i) => keptEra(e, i, i + 1, i)) : [],
+			erasText: c.kind.type === 'eras' ? erasTextOf(c.kind.eras) : '',
+			erasSaved: c.kind.type === 'eras' ? c.kind.eras : [],
+			eraErrors: [],
 			lists: listDraftsOf(c.lists, c, key),
 		};
 		d.orig = fieldsOf(d);
@@ -126,16 +158,16 @@ export function draftOf(calendars: readonly Calendar[], key: () => number): Cale
 
 /** A calendar that the draft adds (Add cycle calendar, Add era calendar). */
 export function newCalendar(kind: 'cycles' | 'eras', key: () => number): CalendarDraft {
-	return { key: key(), at: null, kind, name: '', formats: '', length: '', start: blankStart(null), eras: kind === 'eras' ? [newEra(key)] : [], lists: [] };
+	return { key: key(), at: null, kind, name: '', formats: '', length: '', start: blankStart(null), eras: [], erasText: '', erasSaved: [], eraErrors: [], lists: [] };
 }
 
-/** An era that the draft adds. */
-export function newEra(key: () => number): EraDraft {
-	return { key: key(), at: null, name: '', start: blankStart(null), length: '' };
-}
+/** Why a start does not come out: no year in "Same year as" or in the first year of an era, bad numbers, a bad cycle length, two calendars that start from each other, no year after "to", or a last year before the first. */
+type StartFault = 'date' | 'number' | 'length' | 'cycle' | 'last' | 'order';
 
 /** How one start comes out: the internal year, or why the entry form has no usable year. */
-type StartResult = { ok: true; value: number; /** The year comes from a "Same year as" example. */ example: boolean; /** The year that the example names in the other calendar. */ other?: number } | { ok: false; reason: 'date' | 'number' | 'length' | 'cycle' };
+type StartResult =
+	| { ok: true; value: number; /** The year comes from a "Same year as" example. */ example: boolean; /** The year that the example names in the other calendar. */ other?: number; /** D342: the length from the last year after "to". */ length?: number }
+	| { ok: false; reason: StartFault };
 
 /** Reads the date text of "Same year as" through the reader of the other calendars; the internal year, or undefined. */
 const yearOfSame = (same: string, others: DateReader): number | undefined => others.read(same)?.year;
@@ -150,7 +182,13 @@ export function startOf(s: StartDraft, others: () => DateReader, cycles: boolean
 	if (year === null || cycle === null) return { ok: false, reason: 'number' };
 	if (cycles && (length === undefined || !(length >= 1))) return { ok: false, reason: 'length' };
 	const value = startFromSameYear({ ...(cycles ? { cycle: cycle ?? 1 } : {}), year: year ?? 1 }, other, length);
-	return Number.isSafeInteger(value) ? { ok: true, value, example: true, other } : { ok: false, reason: 'number' };
+	if (!Number.isSafeInteger(value)) return { ok: false, reason: 'number' };
+	if (s.last === undefined) return { ok: true, value, example: true, other };
+	// D342: the last year of an era is read as its first year is; the note keeps the length (last − first + 1).
+	const last = yearOfSame(s.last, others());
+	if (last === undefined) return { ok: false, reason: 'last' };
+	if (last < value) return { ok: false, reason: 'order' };
+	return { ok: true, value, example: true, other, length: last - value + 1 };
 }
 
 /** The draft as `Calendar` objects (the starts as they come out; one that does not come out keeps its saved value, else 1), for the checks and the readers. */
@@ -172,8 +210,9 @@ function calendarOf(d: CalendarDraft, i: number, note: string, results: Readonly
 		kind: {
 			type: 'eras',
 			eras: d.eras.map((e) => {
-				const length = lengthOf(e.length, e.lengthWas);
-				return { name: e.name.trim(), start: value(`e${e.key}`, e.start.saved), ...(typeof length === 'number' && (length || Number.isNaN(length)) ? { length } : {}) };
+				const r = results.get(eraId(d, e));
+				const length = r?.ok && r.length !== undefined ? r.length : lengthOf(e.length, e.lengthWas);
+				return { name: e.name.trim(), start: value(eraId(d, e), e.start.saved), ...(typeof length === 'number' && (length || Number.isNaN(length)) ? { length } : {}) };
 			}),
 		},
 	};
@@ -187,7 +226,7 @@ export interface Checked {
 	starts: ReadonlyMap<string, StartResult>;
 	/**
 	 * The refusals: the window does not save while there is one. `key` is the draft key of the calendar it belongs to (`null`: the whole note; `PLAIN_KEY`: the plain years). `field` names the
-	 * field in error (`name`, `formats`, `length`, `start`, `era:<key>:name|length|start`, `list:<key>:name|marker|names|known`, or `lists`), so the card shows the refusal next to it; none: it shows at the end of the card.
+	 * field in error (`name`, `formats`, `length`, `start`, `eras` (the text field of the eras, D342), `list:<key>:name|marker|names|known`, or `lists`), so the card shows the refusal next to it; none: it shows at the end of the card.
 	 */
 	refusals: { key: number | null; text: string; field?: string }[];
 	/** The warnings: shown, and the save goes ahead. */
@@ -205,15 +244,93 @@ export interface Checked {
 	knowns: ReadonlyMap<number, KnownInfo>;
 }
 
+/** The key of the start result of an era: the calendar and the place of the era in the draft. */
+export const eraId = (d: CalendarDraft, e: EraDraft): string => `e${d.key}.${e.key}`;
+
 /** The start entry forms of one draft item, with the key of their result. */
 function sameTexts(d: CalendarDraft): { id: string; start: StartDraft; cycles: boolean }[] {
-	return d.kind === 'cycles' ? [{ id: `c${d.key}`, start: d.start, cycles: true }] : d.eras.map((e) => ({ id: `e${e.key}`, start: e.start, cycles: false }));
+	return d.kind === 'cycles' ? [{ id: `c${d.key}`, start: d.start, cycles: true }] : d.eras.map((e) => ({ id: eraId(d, e), start: e.start, cycles: false }));
+}
+
+/**
+ * Reads the text lines of the box of every era calendar into eras (D342). Whether the text after a comma gives a year is asked of the plain years and the other
+ * calendars of the draft, so a first year can be a date in an era of another era calendar, which itself starts from a third one (a chain, as "Same year as" reads
+ * it). Only the era names of the other calendars matter here, not their starts: the first guess takes each name up to the last comma, and each round reads the text
+ * lines again with the names of the round before, until the names stay the same. Two calendars that start from each other keep their names, so `solveStarts`
+ * refuses them as a cycle (`eraLineCycle`) and not as a text line with no year.
+ */
+function syncEras(drafts: readonly CalendarDraft[], note: string): void {
+	const own = drafts.flatMap((d, i) => (d.kind === 'eras' ? [i] : []));
+	if (!own.length) return;
+	const asRead = (read: ReadonlyMap<number, EraDraft[]>) => drafts.map((d, i) => calendarOf(read.has(i) ? { ...d, eras: read.get(i)! } : d, i, note, new Map()));
+	const namesOf = (read: ReadonlyMap<number, EraDraft[]>) => JSON.stringify(own.map((i) => read.get(i)!.map((e) => e.name.trim())));
+	let read = new Map(own.map((i) => [i, readLines(drafts[i], () => true).eras]));
+	let names = namesOf(read);
+	let lines = new Map<number, ReturnType<typeof readLines>>();
+	// Each round can make the names of one more calendar of a chain known; one round more than the era calendars shows that they stay.
+	for (let round = 0; round <= own.length; round++) {
+		const rough = asRead(read);
+		lines = new Map(own.map((i) => {
+			const reader = drafts.length > 1 ? compileCapped(rough.filter((_, k) => k !== i), true) : PLAIN_READER;
+			return [i, readLines(drafts[i], (t) => reader.read(t)?.year !== undefined)];
+		}));
+		read = new Map(own.map((i) => [i, lines.get(i)!.eras]));
+		const next = namesOf(read);
+		// One era calendar reads its text lines with the other calendars only, so a second round gives the same.
+		if (next === names || own.length === 1) break;
+		names = next;
+	}
+	for (const i of own) {
+		drafts[i].eras = lines.get(i)!.eras;
+		drafts[i].eraErrors = lines.get(i)!.errors;
+	}
+}
+
+/**
+ * The eras and the refusals of the text lines of one era calendar; `reads` tells whether a text gives a year. Each text line is paired with a saved era by content
+ * (`pairEraLines`): an unchanged text line keeps its era as the note holds it, so a number that the note holds as text stays, and the Save leaves that era as written.
+ * A text line with no era, or with a name that an earlier text line has, gives a refusal and no era.
+ */
+function readLines(d: CalendarDraft, reads: (text: string) => boolean): { eras: EraDraft[]; errors: { line: number; text: string }[] } {
+	const saved = d.erasSaved;
+	const eras: EraDraft[] = [];
+	const errors: { line: number; text: string }[] = [];
+	const names = new Map<string, number>();
+	const lines = eraLinesOf(d.erasText);
+	const pairs = pairEraLines(
+		saved.map((e) => ({ text: savedLineText(e).trim(), name: e.name.trim() })),
+		lines.map((l) => ({ text: l.text, name: roughEraName(l.text) })),
+	);
+	lines.forEach(({ line, text }, k) => {
+		const { saved: at, same } = pairs[k];
+		const kept = same && at !== null ? saved[at] : null;
+		const split = kept ? null : splitEraLine(text, reads);
+		if (split && !split.ok) return void errors.push({ line, text: split.why === 'last-bad' ? T.eraLineLastBad(line) : T.eraLineNoYear(line) });
+		const name = split ? (split.ok ? split.name : '') : kept!.name.trim();
+		const before = names.get(fold(name));
+		if (before !== undefined) return void errors.push({ line, text: T.eraLineTwice(line, before) });
+		names.set(fold(name), line);
+		if (kept) return void eras.push(keptEra(kept, at!, line, eras.length));
+		if (!split || !split.ok) return;
+		eras.push({ key: eras.length, at, line, name, start: { saved: null, same: split.first, cycle: '', year: '', ...(split.last !== undefined ? { last: split.last } : {}) }, length: '' });
+	});
+	return { eras, errors };
+}
+
+/** True when a start reads a date of another calendar of the draft (`i` is its own place) that is not worked out yet (`done`): it waits for that calendar. */
+function waitsFor(s: StartDraft, reader: DateReader, drafts: readonly CalendarDraft[], i: number, done: ReadonlySet<number>): boolean {
+	const needs = [s.same, s.last ?? ''].flatMap((text) => {
+		const r = text.trim() === '' ? undefined : reader.read(text);
+		return r?.year === undefined ? [] : [r.calendar, ...(r.also ?? [])];
+	});
+	return drafts.some((o, j) => j !== i && !done.has(j) && needs.includes(o.name.trim()));
 }
 
 /**
  * Works out the start of every calendar and era (spec §14 rule 1). A "Same year as" date that names another calendar of this window reads the start that
  * calendar will have when it is saved, so the calendars are worked out in the order of these references: a calendar goes after the calendars that read its
- * dates. A cycle of references (two calendars that start from each other) has no answer: each calendar in the cycle is refused.
+ * dates. A cycle of references (two calendars that start from each other) has no answer: each start in the cycle is refused; an era of such a calendar whose
+ * first and last year need no calendar of the cycle is worked out as usual, so only the text lines of the cycle show the refusal.
  */
 function solveStarts(drafts: readonly CalendarDraft[], note: string): Map<string, StartResult> {
 	const results = new Map<string, StartResult>();
@@ -231,12 +348,7 @@ function solveStarts(drafts: readonly CalendarDraft[], note: string): Map<string
 		for (const i of waiting) {
 			const d = drafts[i];
 			const reader = compileCapped(current.filter((_, k) => k !== i), true);
-			// The calendars that read the dates of this one: it waits for those that are not worked out yet.
-			const needs = sameTexts(d).flatMap((t) => {
-				const r = t.start.same.trim() === '' ? undefined : reader.read(t.start.same);
-				return r?.year === undefined ? [] : [r.calendar, ...(r.also ?? [])];
-			});
-			if (drafts.some((o, j) => j !== i && !done.has(j) && needs.includes(o.name.trim()))) {
+			if (sameTexts(d).some((t) => waitsFor(t.start, reader, drafts, i, done))) {
 				later.push(i);
 				continue;
 			}
@@ -246,7 +358,11 @@ function solveStarts(drafts: readonly CalendarDraft[], note: string): Map<string
 			current[i] = calendarOf(d, i, note, results);
 		}
 		if (later.length === waiting.length) {
-			for (const i of later) for (const t of sameTexts(drafts[i])) results.set(t.id, { ok: false, reason: 'cycle' });
+			for (const i of later) {
+				const reader = compileCapped(current.filter((_, k) => k !== i), true);
+				// A start that does not wait is an era start (a cycle calendar has one start, and it waits), so it has no cycle length.
+				for (const t of sameTexts(drafts[i])) results.set(t.id, waitsFor(t.start, reader, drafts, i, done) ? { ok: false, reason: 'cycle' } : startOf(t.start, () => reader, t.cycles, undefined));
+			}
 			break;
 		}
 		waiting = later;
@@ -269,13 +385,15 @@ function ownTexts(d: CalendarDraft, results: ReadonlyMap<string, StartResult>): 
 		if (r && !r.ok) add(startText(r.reason), 'start');
 		return out;
 	}
-	if (!d.eras.length) add(T.noEras, 'eras');
+	if (!d.eras.length && !d.eraErrors.length) add(T.noEras, 'eras');
+	// D342: each refusal of the box names its text line; they stand under the box in the order of the text lines.
+	const lines = [...d.eraErrors];
 	for (const e of d.eras) {
-		if (e.name.trim() === '') add(REFUSAL_TEXT.eraName, `era:${e.key}:name`);
-		if (badLength(lengthOf(e.length, e.lengthWas))) add(REFUSAL_TEXT.calendarLength, `era:${e.key}:length`);
-		const r = results.get(`e${e.key}`);
-		if (r && !r.ok) add(startText(r.reason), `era:${e.key}:start`);
+		if (badLength(lengthOf(e.length, e.lengthWas))) lines.push({ line: e.line, text: REFUSAL_TEXT.calendarLength });
+		const r = results.get(eraId(d, e));
+		if (r && !r.ok) lines.push({ line: e.line, text: eraLineRefusal(r.reason, e.line) });
 	}
+	for (const l of lines.sort((a, b) => a.line - b.line)) add(l.text, 'eras');
 	return out;
 }
 
@@ -290,6 +408,8 @@ function fieldOf(f: CalendarRefusal, d: CalendarDraft | undefined, list: ListDra
 	if (f.key.startsWith('calendar-format-') || f.key.startsWith('calendar-marker-')) return 'formats';
 	if (f.key === 'lists-too-many') return 'lists';
 	if (f.key === 'calendar-name-twice') return 'name';
+	// D342: an era name that another calendar of the note has stands under the text field of the eras.
+	if (f.key === 'calendar-era-duplicate' && d?.kind === 'eras') return 'eras';
 	if (list && LIST_FIELD[f.key]) return `list:${list.key}:${LIST_FIELD[f.key]}`;
 	return d?.kind === 'cycles' ? ({ 'calendar-length': 'length', 'calendar-number': 'start' } as Record<string, string>)[f.key] : undefined;
 }
@@ -349,6 +469,7 @@ function coreRefusals(drafts: readonly CalendarDraft[], calendars: readonly Cale
  * `solveStarts`): a tree uses one calendar note (D289), so no other note adds calendars. `plain` holds the name lists of the plain years of this note.
  */
 export function checkDraft(drafts: readonly CalendarDraft[], note: string, plain: PlainDraft = emptyPlain()): Checked {
+	syncEras(drafts, note);
 	const results = solveStarts(drafts, note);
 	const refusals: Checked['refusals'] = [];
 	const warnings: Checked['warnings'] = [];
@@ -370,10 +491,10 @@ export function checkDraft(drafts: readonly CalendarDraft[], note: string, plain
 	// A calendar with no example, beside another calendar: its Year 1 counts as plain year 1 (spec §14 rule 1).
 	const used = calendars.length > 1;
 	const noAnchor = new Set<string>();
+	// Each era has its first year on its text line (D342), so only a cycle calendar shows this warning in the window; the tree list keeps it for both kinds.
 	for (const d of drafts) {
-		const id = d.kind === 'cycles' ? `c${d.key}` : `e${d.eras[0]?.key}`;
-		const first = results.get(id);
-		if (used && first?.ok && !first.example && first.value === 1) noAnchor.add(id);
+		const first = d.kind === 'cycles' ? results.get(`c${d.key}`) : undefined;
+		if (used && first?.ok && !first.example && first.value === 1) noAnchor.add(`c${d.key}`);
 	}
 	// The same sentence can come from the draft and from `checkCalendars`.
 	const once = <T extends { key: number | null; text: string }>(list: T[]) => list.filter((x, i) => list.findIndex((y) => y.key === x.key && y.text === x.text) === i);
@@ -396,8 +517,16 @@ export function markerIssues(drafts: readonly CalendarDraft[], note: string): Co
 }
 
 /** The sentence for a start that does not come out. */
-function startText(reason: 'date' | 'number' | 'length' | 'cycle'): string {
+function startText(reason: StartFault): string {
 	return reason === 'date' ? T.sameAsBad : reason === 'number' ? T.numberBad : reason === 'cycle' ? T.sameAsCycle : REFUSAL_TEXT.calendarLength;
+}
+
+/** The sentence for an era whose text line gives no start or no length (D342), with the number of its text line. */
+function eraLineRefusal(reason: StartFault, line: number): string {
+	if (reason === 'last') return T.eraLineLastBad(line);
+	if (reason === 'order') return T.eraLineOrder(line);
+	if (reason === 'cycle') return T.eraLineCycle(line);
+	return T.eraLineNoYear(line);
 }
 
 /**
@@ -438,8 +567,9 @@ function newOf(d: CalendarDraft, c: Calendar): NewCalendar {
 }
 
 /**
- * The edit operations that turn the saved calendars into the draft, in one list for each block of the note: first the edits and the added eras (by their written
- * places), then the removed eras and calendars from the end, then the added calendars. `checked` is `checkDraft` of the same draft; call this only when it has no refusal.
+ * The edit operations that turn the saved calendars into the draft, in one list for each block of the note: first the edits, then the removed eras (from the end), then
+ * the added eras (each at its place in the new list, from the first), then the removed calendars from the end, then the added calendars. `checked` is `checkDraft` of
+ * the same draft; call this only when it has no refusal.
  */
 export function opsOf(saved: readonly Calendar[], drafts: readonly CalendarDraft[], checked: Checked, plain: PlainDraft = emptyPlain()): { block: number; ops: CalendarOp[] }[] {
 	const blocks = new Map<number, { edits: CalendarOp[]; adds: CalendarOp[]; eraRemoves: CalendarOp[]; listRemoves: CalendarOp[]; listAdds: CalendarOp[]; removes: CalendarOp[]; plain: CalendarOp[] }>();
@@ -483,19 +613,22 @@ export function opsOf(saved: readonly Calendar[], drafts: readonly CalendarDraft
 		.sort(([a], [b]) => a - b)
 		.map(([block, b]) => ({
 			block,
-			ops: [...b.edits, ...b.adds.filter((o) => o.kind === 'add-era'), ...b.eraRemoves, ...b.listRemoves, ...b.listAdds, ...b.removes.sort(byIndexDesc), ...b.adds.filter((o) => o.kind === 'add-calendar'), ...b.plain],
+			ops: [...b.edits, ...b.eraRemoves, ...b.adds.filter((o) => o.kind === 'add-era'), ...b.listRemoves, ...b.listAdds, ...b.removes.sort(byIndexDesc), ...b.adds.filter((o) => o.kind === 'add-calendar'), ...b.plain],
 		}))
 		.filter((x) => x.ops.length);
 }
 
 const byIndexDesc = (a: CalendarOp, b: CalendarOp): number => ((b as { index: number }).index ?? 0) - ((a as { index: number }).index ?? 0);
 
-/** The era operations of one calendar: edits of the eras that stay, the removed eras (from the end) and the added ones. */
+/**
+ * The era operations of one calendar: edits of the eras that stay, the removed eras (from the end) and the added ones. The kept eras are in the order of the text lines
+ * (`pairEraLines` keeps the order), so after the removals each added era goes in at its place in the new list, `k`, in the order of the text lines.
+ */
 function eraOps(was: readonly { name: string; start: number; length?: number }[], d: CalendarDraft, now: readonly { name: string; start: number; length?: number }[], calendar: number, b: { edits: CalendarOp[]; adds: CalendarOp[]; eraRemoves: CalendarOp[] }): void {
 	const kept = new Set<number>();
 	d.eras.forEach((e, k) => {
 		if (e.at === null) {
-			b.adds.push({ kind: 'add-era', calendar, era: now[k] });
+			b.adds.push({ kind: 'add-era', calendar, era: now[k], at: k });
 			return;
 		}
 		kept.add(e.at);
@@ -512,7 +645,8 @@ function eraOps(was: readonly { name: string; start: number; length?: number }[]
 /** True when the draft differs from the calendars as saved (the window asks before it closes with changes). */
 export function calendarDraftChanged(saved: readonly Calendar[], drafts: readonly CalendarDraft[], checked: Checked, plain: PlainDraft = emptyPlain()): boolean {
 	if (drafts.some((d) => d.at === null)) return true;
-	if (drafts.some((d) => d.start.same.trim() !== '' || d.eras.some((e) => e.start.same.trim() !== ''))) return true;
+	// The start that the window shows again when it opens (D342) is no change; a typed example is a change, also when it gives the same year.
+	if (drafts.some((d) => !untouched(d) && (d.start.same.trim() !== '' || d.eras.some((e) => e.start.same.trim() !== '')))) return true;
 	if (listsShape(checked.plain) !== listsShape(plain.saved)) return true;
 	return JSON.stringify(checked.calendars.map(shape)) !== JSON.stringify(saved.map(shape));
 }

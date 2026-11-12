@@ -5,7 +5,7 @@ import { editCalendarBlock, parseCalendarBlock } from '../../src/core/calendar-b
 import { findBlocks } from '../../src/core/block-locate';
 import { planWrite } from '../../src/core/block-write';
 import type { Calendar } from '../../src/core/dates';
-import { checkDraft, calendarDraftChanged, draftOf, formatsOf, newCalendar, newEra, opsOf, startReadback, testLine, wholeOf, type CalendarDraft } from '../../src/view/calendar-draft';
+import { checkDraft, calendarDraftChanged, draftOf, formatsOf, newCalendar, opsOf, startReadback, testLine, wholeOf, type CalendarDraft } from '../../src/view/calendar-draft';
 import { cycleNote, eraNote } from '../support/calendar-vault';
 
 const NOTE = 'Calendars.md';
@@ -73,8 +73,8 @@ describe('the draft of a note', () => {
 		const cycle = newCalendar('cycles', key);
 		Object.assign(cycle, { name: 'Moon count', formats: '{year} of the {cycle} Moon', length: '12' });
 		const eras = newCalendar('eras', key);
-		Object.assign(eras, { name: 'Houses', formats: '{era} {year}' });
-		Object.assign(eras.eras[0], { name: 'Aldric', length: '20' });
+		// D342: the eras are text lines; "1 to 20" is a first year of 1 and a length of 20.
+		Object.assign(eras, { name: 'Houses', formats: '{era} {year}', erasText: 'Aldric, 1 to 20' });
 		const out = apply(text, saved, [...drafts.slice(1), cycle, eras]);
 		expect(out.refused).toEqual([]);
 		// The new calendars go in the first block, in front of the second block that holds the era calendar that stays.
@@ -86,11 +86,10 @@ describe('the draft of a note', () => {
 		const text = `\`\`\`kin-calendar\ncalendars:\n  - name: Reigns\n    kind: eras\n    formats: ["{era} {year}"]\n    eras:\n      - {name: Aldan, start: 100, length: 10}\n      - {name: Bram, start: 110}\n      - {name: Cora, start: 130, length: 5}\n\`\`\`\n`;
 		const saved = readNote(text);
 		const d = draftOf(saved, key);
-		d[0].eras[0].name = 'Aldan the First';
-		d[0].eras[1].length = '20';
-		d[0].eras.splice(2, 1);
-		d[0].eras.push(Object.assign(newEra(key), { name: 'Dagny' }));
-		d[0].eras[2].length = '';
+		// D342: the box shows each era as "name, first year" with "to" and the last year when the era has a length.
+		expect(d[0].erasText).toBe('Aldan, 100 to 109\nBram, 110\nCora, 130 to 134');
+		// A text line takes the place of the era on the same text line: the third text line now writes Dagny over Cora.
+		d[0].erasText = 'Aldan the First, 100 to 109\nBram, 110 to 129\nDagny, 1';
 		const out = apply(text, saved, d);
 		expect(out.refused).toEqual([]);
 		expect(out.calendars[0].kind).toMatchObject({ type: 'eras', eras: [{ name: 'Aldan the First', start: 100, length: 10 }, { name: 'Bram', start: 110, length: 20 }, { name: 'Dagny', start: 1 }] });
@@ -100,7 +99,8 @@ describe('the draft of a note', () => {
 		const text = eraNote('Reigns', 'Aldan', 100);
 		const saved = readNote(text);
 		const d = draftOf(saved, key);
-		d[0].eras[0].length = '';
+		expect(d[0].erasText).toBe('Aldan, 100 to 110');
+		d[0].erasText = 'Aldan, 100';
 		const out = apply(text, saved, d);
 		expect(out.calendars[0].kind).toMatchObject({ eras: [{ name: 'Aldan', start: 100 }] });
 		expect((out.calendars[0].kind as { eras: { length?: number }[] }).eras[0].length).toBeUndefined();
@@ -148,15 +148,12 @@ describe('Same year as', () => {
 		expect(checked.calendars[1].kind).toMatchObject({ start: 132 });
 	});
 
-	it('works the start of an era out of a date', () => {
+	it('works the first year of an era out of a plain year or a date in another calendar of the note (D342)', () => {
 		const d = newCalendar('eras', key);
-		Object.assign(d, { name: 'Houses', formats: '{era} {year}' });
-		Object.assign(d.eras[0], { name: 'Aldric' });
-		d.eras[0].start.same = '1500';
-		d.eras[0].start.year = '4';
-		const checked = checkDraft([d], NOTE);
-		expect(checked.calendars[0].kind).toMatchObject({ eras: [{ name: 'Aldric', start: 1497 }] });
-		expect(startReadback(checked.starts.get(`e${d.eras[0].key}`), checked.calendars[0], null)).toContain('Aldric 4 = year 1500');
+		Object.assign(d, { name: 'Houses', formats: '{era} {year}', erasText: 'Aldric, 1497\nBran, Qinglong Emperor 3 to Qinglong Emperor 10' });
+		const checked = checkDraft([...draftOf(outside, key), d], NOTE);
+		expect(checked.refusals).toEqual([]);
+		expect(checked.calendars[1].kind).toMatchObject({ eras: [{ name: 'Aldric', start: 1497 }, { name: 'Bran', start: 132, length: 8 }] });
 	});
 
 	it('refuses a date with no year, and whole numbers that are not', () => {
@@ -172,9 +169,22 @@ describe('Same year as', () => {
 		const text = cycleNote('The Long Count', '{year} Year of the {cycle} Cycle', 130);
 		const saved = readNote(text);
 		const d = draftOf(saved, key);
+		// D342: the fields show the saved start again (Cycle 1, Year 1, the plain year), and that is no change.
+		expect(d[0].start).toMatchObject({ same: '130', cycle: '1', year: '1' });
 		const checked = checkDraft(d, NOTE);
+		expect(calendarDraftChanged(saved, d, checked)).toBe(false);
 		expect(startReadback(checked.starts.get(`c${d[0].key}`), checked.calendars[0], 130)).toBe('1 Year of the 1 Cycle = year 130');
-		expect(startReadback(checked.starts.get(`c${d[0].key}`), checked.calendars[0], null)).toBe('No “Same year as” date. The calendar starts at year 1. If you use other calendars or plain years, write a date in “Same year as”.');
+		// When the user empties the three fields, the saved start stays and the line shows it; a new calendar with empty fields says that it has no example.
+		Object.assign(d[0].start, { same: '', cycle: '', year: '' });
+		const emptied = checkDraft(d, NOTE);
+		expect(emptied.calendars[0].kind).toMatchObject({ start: 130 });
+		expect(startReadback(emptied.starts.get(`c${d[0].key}`), emptied.calendars[0], 130)).toBe('1 Year of the 1 Cycle = year 130');
+		expect(startReadback(emptied.starts.get(`c${d[0].key}`), emptied.calendars[0], null)).toBe('No “Same year as” date. The calendar starts at year 1. If you use other calendars or plain years, write a date in “Same year as”.');
+	});
+
+	it('shows no example for a saved start of 1, which is "no example" (spec §14 rule 1), so the window still warns beside other years', () => {
+		const d = draftOf(readNote(cycleNote('The Long Count', '{year} Year of the {cycle} Cycle', 1)), key);
+		expect(d[0].start).toMatchObject({ same: '', cycle: '', year: '' });
 	});
 });
 
@@ -192,11 +202,10 @@ describe('refusals and warnings', () => {
 	});
 
 	it('refuses the same era name twice and an era calendar with no era', () => {
-		const eras = Object.assign(newCalendar('eras', key), { name: 'Houses', formats: '{era} {year}' });
-		eras.eras = [Object.assign(newEra(key), { name: 'Aldric' }), Object.assign(newEra(key), { name: 'ALDRIC' })];
-		expect(checkDraft([eras], NOTE).refusals.map((r) => r.text).join('|')).toContain('same era name');
-		eras.eras = [];
-		expect(checkDraft([eras], NOTE).refusals.map((r) => r.text)).toContain('This calendar has no era. Add an era.');
+		const eras = Object.assign(newCalendar('eras', key), { name: 'Houses', formats: '{era} {year}', erasText: 'Aldric, 1\nALDRIC, 5' });
+		expect(checkDraft([eras], NOTE).refusals.map((r) => r.text)).toEqual(['Text line 2: text line 1 has the same era name. Give each era its own name.']);
+		eras.erasText = '';
+		expect(checkDraft([eras], NOTE).refusals.map((r) => r.text)).toContain('This calendar has no era. Write one era on each text line, for example “Reign of Aldric, 1100”.');
 	});
 
 	it('warns that a calendar with no example is read from year 1, beside another calendar', () => {

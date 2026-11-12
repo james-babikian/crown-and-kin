@@ -406,7 +406,7 @@ export class HousesWindow extends ListEditWindow {
 					const field = this.textField(body, {
 						cls: 'dynasty-house-name',
 						label: HOUSES.nameLabel,
-						value: r.name,
+						value: r.name, placeholder: HOUSES.namePlaceholder,
 						aria: HOUSES.nameLabel,
 						focus: `name:${r.key}`,
 						onInput: (value) => {

@@ -17,7 +17,7 @@ export const PERSON_PLACEHOLDER = 'Type a name';
 export const UI = {
 	errorTitle: 'The plugin cannot show this tree',
 	internalError: 'The plugin cannot show this tree because of an error in the plugin. Close the note. Open it again.',
-	startFailed: 'Crown and Kin could not start one of its features. Some features, such as trees or calendars, may not work. Close Obsidian and open it again, because this can fix a short fault. If this message shows again, update Crown and Kin and Obsidian, or report the problem.',
+	startFailed: 'Crown and Kin could not start one of its features. Some features, for example trees or calendars, may not work. Close Obsidian and open it again, because this can fix a short fault. If this message shows again, update Crown and Kin and Obsidian, or report the problem.',
 	bannerTitle: 'Editing is off',
 	bannerLead: 'Correct these problems. Then you can edit this tree:',
 	fit: 'Fit the tree in the view',
@@ -128,8 +128,8 @@ export const FINDER_UI = {
 	/** The picker of "Show the relation to…" in the edit sheet. */
 	otherTitle: 'Select the other person',
 	placeholder: PERSON_PLACEHOLDER,
-	/** The first row of a picker when the tree has a mark: the marked person. */
-	you: (name: string) => `You: ${isolateName(name)}`,
+	/** The word at the start of the second text line of the marked person's row; the Find list shows the same (D346 item 4). */
+	you: 'You',
 	showSteps: 'Show the steps',
 	hideSteps: 'Hide the steps',
 	moreSteps: (n: number) => (n === 1 ? 'and 1 more step' : `and ${n} more steps`),

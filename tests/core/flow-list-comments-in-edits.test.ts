@@ -184,7 +184,7 @@ describe('ids keep the letters of other writing systems', () => {
 describe('the refusal sentences of an id change are exported constants', () => {
 	const src = 'houses:\n  - {id: old, name: O}\npeople:\n  - {id: a, name: A, house: old}\n';
 	it('REFUSAL_TEXT.idCharacters is the detail of a refused character', () => {
-		expect(REFUSAL_TEXT.idCharacters).toBe('An ID has only letters, digits and hyphens.');
+		expect(REFUSAL_TEXT.idCharacters).toBe('An ID has only small letters, digits and hyphens.');
 		const r = applyOp(src, { kind: 'set-house-id', id: 'old', newId: 'Crown' });
 		expect(!r.ok && r.detail).toBe(REFUSAL_TEXT.idCharacters);
 	});

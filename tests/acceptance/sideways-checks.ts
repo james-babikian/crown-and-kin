@@ -5,6 +5,7 @@ import type { EdgeDrawing, EdgePath, FarCoupleRule, FarTag, Geometry, PersonBox,
 import { renderSvg } from '../../src/render/svg-string';
 import { isStructuralFar } from '../support/far-structure';
 import { isForkShare } from '../support/fork-share';
+import { ownStackLine } from '../support/own-stack-line';
 import { specModel } from './spec-model';
 
 /*
@@ -24,8 +25,6 @@ const bottom = (b: Rect) => b.y + b.h;
 export function overlap(a: Rect, b: Rect): boolean {
 	return a.x < right(b) - E && b.x < right(a) - E && a.y < bottom(b) - E && b.y < bottom(a) - E;
 }
-
-const strictlyInside = (p: { x: number; y: number }, r: Rect) => p.x > r.x + E && p.x < right(r) - E && p.y > r.y + E && p.y < bottom(r) - E;
 
 /** Every card once; `rows[i]` is generation i, one column, listed top to bottom; columns left to right. */
 export function columnProblems(g: FamilyGraph, layout: TreeLayout): string[] {
@@ -158,10 +157,13 @@ export function farRuleProblems(g: FamilyGraph, layout: TreeLayout, geo: Geometr
 	return bad;
 }
 
+/** The least room between the foot of a tag's pill and the union point of a partner stacked below, in px (D344 1 A: the designer measured 9 at 16 px). */
+export const STACK_SIGN_CLEAR = 8;
+
 /**
- * Far tags (contract `FarTag`): anchored on the card's bottom edge; in
- * the left half of it when a partner is stacked directly below (so the tag does not sit on the
- * union point); hit areas of at least 44×44 px (§7.5) in the gap below the card, covering the
+ * Far tags (contract `FarTag`): anchored on the card's bottom edge; in the middle of it when a partner is
+ * stacked directly below (D344 1 A: the tag stands over the start of the line, and the union point stays
+ * clear below the pill); hit areas of at least 44×44 px (§7.5) in the gap below the card, covering the
  * part of the visible tag below the card edge, and covering no card (not even their own) and no
  * other hit area. The card wins a press where the two meet, so a hit on a card is lost.
  */
@@ -187,8 +189,9 @@ export function tagProblems(g: FamilyGraph, layout: TreeLayout): string[] {
 			if (!u.bar || !fu.partners.includes(t.person)) continue;
 			const other = layout.persons.get(fu.partners.find((p) => p !== t.person) ?? t.person)!;
 			if (other.y <= card.y) continue;
-			if (!(t.x < card.x + card.w / 2)) bad.push(`${t.person}: partner ${other.id} is stacked below, but the tag (x ${t.x}) is not in the left half`);
-			if (strictlyInside(u, t.hit)) bad.push(`${t.person}: tag hit area covers the union point with ${other.id}`);
+			if (Math.abs(t.x - (card.x + card.w / 2)) > E) bad.push(`${t.person}: partner ${other.id} is stacked below, but the tag (x ${t.x}) is not in the middle of the card`);
+			const pillFoot = tagTop(geo, t.y) + geo.tagH;
+			if (u.y - geo.unionSize / 2 < pillFoot + STACK_SIGN_CLEAR - E) bad.push(`${t.person}: the union point with ${other.id} is ${u.y - geo.unionSize / 2 - pillFoot} px below the pill, under ${STACK_SIGN_CLEAR}`);
 		}
 	}
 	for (let i = 0; i < tags.length; i++) for (let j = i + 1; j < tags.length; j++) if (overlap(tags[i].hit, tags[j].hit)) bad.push(`tags of ${tags[i].person} and ${tags[j].person} overlap`);
@@ -239,8 +242,8 @@ export function firstViewHit(t: FarTag, fontPx: number): Rect {
 
 /**
  * The decision notes "WP5.5a fix" (1): at the D24 first view, each far tag's whole 44 px tap area lies
- * in the gap below its card: it covers no card (not even its own), no union dot, and no other
- * tag's tap area.
+ * in the gap below its card: it covers no card (not even its own), no union dot (but the one of the bar
+ * to a partner stacked below, D344 1 A), and no other tag's tap area.
  */
 export function firstViewTagProblems(layout: TreeLayout, edges: EdgeDrawing): string[] {
 	const bad: string[] = [];
@@ -251,7 +254,9 @@ export function firstViewTagProblems(layout: TreeLayout, edges: EdgeDrawing): st
 		const card = layout.persons.get(t.person)!;
 		if (r.y < bottom(card) - E) bad.push(`${t.person}: the first-view tap area starts at ${r.y}, inside its own card (bottom ${bottom(card)})`);
 		for (const b of layout.persons.values()) if (overlap(r, b)) bad.push(`${t.person}: the first-view tap area covers ${b.id === t.person ? 'its own card' : b.id}`);
-		for (const d of dotRects) if (overlap(r, d)) bad.push(`${t.person}: the first-view tap area covers the union dot at ${d.x + d.w / 2},${d.y + d.h / 2}`);
+		// D344 1 A: the bar of a partner stacked below starts under the tag, so its union point lies in the tap area (the pill stays clear of it).
+		const own = [...layout.unions.values()].filter((u) => u.bar && Math.abs(u.x - t.x) <= E && u.y > bottom(card) - E);
+		for (const d of dotRects) if (overlap(r, d) && !own.some((u) => Math.abs(u.x - (d.x + d.w / 2)) <= E && Math.abs(u.y - (d.y + d.h / 2)) <= E)) bad.push(`${t.person}: the first-view tap area covers the union dot at ${d.x + d.w / 2},${d.y + d.h / 2}`);
 	}
 	for (let i = 0; i < tags.length; i++) for (let j = i + 1; j < tags.length; j++) if (overlap(tags[i].r, tags[j].r)) bad.push(`first-view tap areas of ${tags[i].t.person} and ${tags[j].t.person} overlap`);
 	return bad;
@@ -279,9 +284,10 @@ export function visibleTags(g: FamilyGraph, layout: TreeLayout, edges: EdgeDrawi
 
 /**
  * The decision notes "WP5.5a fix" (2), for very small fonts: the visible tag (at its widest) stays in its
- * tag zone and on the card: the bottom edge less 0.5 em each side, or, with a partner stacked
- * directly below, the left half, clear of the union dot. The hit area stays inside the layout
- * and covers no union dot and no other tag's hit area.
+ * tag zone and on the card: the bottom edge less 0.5 em each side (also with a partner stacked directly below:
+ * the tag stands over the start of the line, D344 1 A). The hit area stays inside the layout and covers no
+ * union dot and no other tag's hit area, except the union point of that stacked partner, which lies in
+ * the tag's own gap below the pill (the pill stays clear of it by `STACK_SIGN_CLEAR`).
  */
 export function smallTagProblems(g: FamilyGraph, layout: TreeLayout, edges: EdgeDrawing): string[] {
 	const bad: string[] = [];
@@ -298,18 +304,24 @@ export function smallTagProblems(g: FamilyGraph, layout: TreeLayout, edges: Edge
 			continue;
 		}
 		let lo = card.x + 0.5 * geo.fontPx;
-		let hi = right(card) - 0.5 * geo.fontPx;
+		const hi = right(card) - 0.5 * geo.fontPx;
+		const own: { x: number; y: number }[] = [];
 		for (const fu of g.unions) {
 			const u = layout.unions.get(fu.key)!;
 			if (!u.bar || !fu.partners.includes(t.person)) continue;
 			const other = layout.persons.get(fu.partners.find((p) => p !== t.person) ?? t.person)!;
-			if (other.y > card.y) hi = Math.min(hi, card.x + card.w / 2, u.x - r);
+			if (other.y > card.y) own.push(u);
 		}
 		if (pill.x < lo - E || right(pill) > hi + E) bad.push(`${t.person}: the visible tag ${pill.x}–${right(pill)} leaves its zone ${lo}–${hi}`);
 		lo = card.x;
 		if (pill.x < lo - E || right(pill) > right(card) + E) bad.push(`${t.person}: the visible tag leaves the card`);
 		if (t.hit.x < -E || t.hit.y < -E || right(t.hit) > layout.width + E || bottom(t.hit) > layout.height + E) bad.push(`${t.person}: tag hit area is outside the layout ${layout.width}×${layout.height}`);
-		for (const d of dotRects) if (overlap(t.hit, d)) bad.push(`${t.person}: tag hit area covers the union dot at ${d.x + d.w / 2},${d.y + d.h / 2}`);
+		for (const d of dotRects) {
+			const at = { x: d.x + d.w / 2, y: d.y + d.h / 2 };
+			if (own.some((u) => Math.abs(u.x - at.x) <= E && Math.abs(u.y - at.y) <= E)) {
+				if (at.y - r < tagTop(geo, t.y) + geo.tagH + STACK_SIGN_CLEAR - E) bad.push(`${t.person}: the union dot at ${at.x},${at.y} is under ${STACK_SIGN_CLEAR} px below the pill`);
+			} else if (overlap(t.hit, d)) bad.push(`${t.person}: tag hit area covers the union dot at ${at.x},${at.y}`);
+		}
 	}
 	for (let i = 0; i < tags.length; i++) for (let j = i + 1; j < tags.length; j++) if (overlap(tags[i].hit, tags[j].hit)) bad.push(`tags of ${tags[i].person} and ${tags[j].person} overlap`);
 	return bad;
@@ -407,7 +419,7 @@ function crosses(s: Seg, b: Rect): boolean {
 
 /**
  * The line rules of spec §5.3 and review 1.3 that the `down` layout keeps on random trees: no
- * straight line behind a card or through a visible tag (other than the person's own far couple lines),
+ * straight line behind a card or through a visible tag (other than the person's own far couple lines and, sideways, the line to a partner stacked below),
  * no union dot on another family's line, and no two families on one stretch of line.
  */
 export function lineProblems(g: FamilyGraph, layout: TreeLayout, edges: EdgeDrawing, pills?: ReadonlyMap<string, Rect>): string[] {
@@ -425,6 +437,8 @@ export function lineProblems(g: FamilyGraph, layout: TreeLayout, edges: EdgeDraw
 		const pill = pills?.get(tag.person) ?? { x: tag.hit.x, y: tagTop(geo, tag.y), w: tag.hit.w, h: geo.tagH };
 		for (const { p, segs } of lines) {
 			if (COUPLE.has(p.kind) && p.people.includes(tag.person) && tag.spouses.some((s) => p.people.includes(s))) continue;
+			// D344 1 A: sideways, the line to a partner stacked below starts under the tag, its dot clear below the pill.
+			if (COUPLE.has(p.kind) && ownStackLine(layout, tag, p, segs)) continue;
 			if (segs.some((s) => crosses(s, pill))) bad.push(`${p.kind} [${p.people}] through ${tag.person}'s tag`);
 		}
 	}

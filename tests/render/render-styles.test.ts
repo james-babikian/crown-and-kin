@@ -2,7 +2,7 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { cardText, geometryFor } from '../../src/layout/geometry';
-import { COMPACT_NAME_EM, TAG_COMPACT_FONT_EM, TAG_FONT_EM } from '../../src/render/dom/scene';
+import { COMPACT_NAME_EM, TAG_COMPACT_FONT_EM, TAG_FONT_EM, TAG_SIGN_FONT_EM } from '../../src/render/dom/scene';
 import { RUMOUR_FONT_EM } from '../../src/render/scene-model';
 import { DEAD_STRIP_OPACITY, HOUSE_DARK_LIFT, STROKES, UNION_MARKS } from '../../src/render/styles';
 import { roleCss } from '../support/role-css';
@@ -146,9 +146,11 @@ describe('styles.css text sizes match what the renderer measures', () => {
 		expect(rule('.dynasty-card-compact')?.['font-size']).toBe(`calc(var(--dynasty-font-size) * var(--dynasty-compact-em, ${COMPACT_NAME_EM}))`);
 	});
 
-	it('Compact and Overview tags', () => {
-		const group = /\.dynasty-tag-compact \.dynasty-tag-text,\s*\.dynasty-tag-sign \.dynasty-tag-text\s*\{\s*font-size: ([^;]+);/.exec(css);
-		expect(group?.[1]).toBe(times(TAG_COMPACT_FONT_EM));
+	it('Compact tag text is two thirds of the Compact name (D345 1 A); the Overview sign pill keeps the size of the name', () => {
+		expect(rule('.dynasty-tag-compact .dynasty-tag-text')?.['font-size']).toBe(times(TAG_COMPACT_FONT_EM));
+		expect(TAG_COMPACT_FONT_EM).toBeCloseTo((2 / 3) * COMPACT_NAME_EM, 9);
+		expect(rule('.dynasty-tag-sign .dynasty-tag-text')?.['font-size']).toBe(times(TAG_SIGN_FONT_EM));
+		expect(TAG_SIGN_FONT_EM).toBe(COMPACT_NAME_EM);
 	});
 
 	it('no text size is written into the SVG by the renderer', () => {

@@ -13,6 +13,7 @@ import { rumourTree } from '../support/random-trees';
 // old "?" search are gone: the dots hang on ports, the "?" search is `rumour-spot.ts` without counters), so the two bounds on counts became ratios of
 // time in one process (the I34 lesson). The picture hashes are golden values (class a): the one record of the switch writes them again.
 // 0.3.1 golden record: the five picture hashes were recorded again, once, for the new walk, passages and ports.
+// 0.5.4 (D343 1 C, D344 1 A, D345 1 A): the sample 07 sideways hash and both 400-person hashes were recorded again, once (routed side-link curves, the "?" off tag pills, whole-edge tags).
 
 const FAR = { maxCardWidths: 3, maxGenerations: 1 };
 
@@ -65,7 +66,7 @@ describe('speed 1: the dots of one row cost about as much as the people (was the
 		const src = fixture('07');
 		for (const [settings, hashed] of [
 			[{ sweeps: 4, far: FAR }, 'fb023097'],
-			[{ sweeps: 4, far: FAR, orientation: 'sideways' as const }, 'e4022e54'],
+			[{ sweeps: 4, far: FAR, orientation: 'sideways' as const }, 'b398b685'], // 0.5.4 (D343 1 C, D344 1 A): routed curves, tags
 		] as const) expect(picture(src, settings).hash).toBe(hashed);
 	});
 	it('keeps the picture of sample tree 6', () => {
@@ -83,8 +84,8 @@ describe('speed 2: the "?" search looks only near its curve', () => {
 
 	it('a 400-person tree with a rumoured link on every person: same pictures', () => {
 		for (const [settings, hashed] of [
-			[{ sweeps: 4, far: FAR }, '36b798db'], // 0.3.1 second fix round (an internal note)
-			[{ sweeps: 4, far: FAR, orientation: 'sideways' as const }, '47ee646'], // 0.3.1 second fix round, as above
+			[{ sweeps: 4, far: FAR }, 'e29c4078'], // 0.5.4 (D343 1 C, D344 1 A): routed curves, the "?" off tag pills
+			[{ sweeps: 4, far: FAR, orientation: 'sideways' as const }, '80d62eb3'], // 0.5.4 (D343 1 C, D344 1 A), as above
 		] as const) expect(picture(rumourTree(400), settings).hash).toBe(hashed);
 	});
 });

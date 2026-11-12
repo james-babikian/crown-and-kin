@@ -109,10 +109,27 @@ describe('a number field has one width (CAL-04)', () => {
 		const o = await openWindow({ 'Calendars.md': `${cycleNote('Count')}
 ${eraNote()}` });
 		const c = o.win.contentEl;
+		// D342: an era calendar has no number fields (its eras are text lines), so the three fields of the cycle calendar are all.
 		const inputs = all(c).filter((e) => /-(length|year|cycle)$/.test(e.getAttribute('data-focus') ?? ''));
-		expect(inputs.length).toBeGreaterThanOrEqual(5);
+		expect(inputs.map((e) => e.getAttribute('data-focus'))).toEqual(['cal:0-length', 'cal:0-cycle', 'cal:0-year']);
 		for (const el of inputs) expect(el.parentElement!.hasClass('is-number'), el.getAttribute('data-focus') ?? '').toBe(true);
 		expect(c.querySelectorAll('.dynasty-sheet-field.is-half')).toHaveLength(0);
+	});
+});
+
+describe('the eras box is one text line higher than its eras, and grows while the user types (D342)', () => {
+	it('is the number of text lines plus one, from 3 to 10 text lines', async () => {
+		const o = await openWindow({ 'Calendars.md': eraNote() });
+		const c = o.win.contentEl;
+		const area = all(c).find((e) => e.tag === 'textarea' && (e.getAttribute('data-focus') ?? '').endsWith('-eras'))!;
+		expect(area.getAttribute('rows')).toBe('3');
+		const typeLines = (n: number) => {
+			area.value = Array.from({ length: n }, (_, i) => `Era ${i}, ${100 + i * 10}`).join('\n');
+			dispatch(area, 'input');
+			return area.getAttribute('rows');
+		};
+		expect(typeLines(4)).toBe('5');
+		expect(typeLines(12)).toBe('10');
 	});
 });
 
@@ -196,11 +213,18 @@ describe('"New calendar note" ends the text line under the title', () => {
 describe('the style sheet', () => {
 	const css = readFileSync('styles.css', 'utf8');
 	it('has the sizes of the links, the phone rules and no colour value in the new rules (D278)', () => {
-		expect(css).toMatch(/button\.dynasty-cal-remove,[^{]*button\.dynasty-cal-add-link,[^{]*button\.dynasty-cal-remove-cal\s*\{\s*font-size:\s*var\(--dynasty-type-control\)/);
+		// D342: the era Remove link is gone with the era rows; the other links keep the Control size.
+		expect(css).not.toContain('button.dynasty-cal-remove,');
+		expect(css).toMatch(/button\.dynasty-cal-add-link,[^{]*button\.dynasty-cal-remove-cal\s*\{\s*font-size:\s*var\(--dynasty-type-control\)/);
 		expect(css).toMatch(/\.dynasty-sheet\.is-phone \.dynasty-section:not\(\.is-open\) \.dynasty-section-sum[^{]*\{[^}]*-webkit-line-clamp:\s*2/);
 		expect(css).toMatch(/\.dynasty-sheet\.is-phone \.dynasty-cal-add\.dynasty-actions\s*\{[^}]*flex-direction:\s*column/);
 		expect(css).toMatch(/\.dynasty-calendars \.dynasty-sheet-field\.is-number > input\.dynasty-sheet-input\s*\{[^}]*width: 6\.5em/);
 		const rule = (sel: string) => css.slice(css.indexOf(sel), css.indexOf('}', css.indexOf(sel)));
+		// D348 1 A: a gap above the reading list of the eras, from the space token; its colour stays grey (the rule has no colour).
+		expect(rule('.dynasty-cal-era-list {')).toMatch(/margin-top:\s*var\(--dynasty-space-2\)/);
+		expect(rule('.dynasty-cal-era-list {')).not.toMatch(/color:/);
+		// D348 2 A: the warning sentence of a reading has the text colour.
+		expect(rule('.dynasty-date-line .dynasty-date-tail {')).toMatch(/color:\s*var\(--text-normal\)/);
 		for (const sel of ['.dynasty-date-warning {', '.dynasty-mark.is-warning {', '.dynasty-cal-readback.is-warning {']) expect(rule(sel)).not.toMatch(/#[0-9a-f]{3,6}\b|rgb\(/i);
 	});
 });

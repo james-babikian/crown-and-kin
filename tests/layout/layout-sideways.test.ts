@@ -154,7 +154,7 @@ describe('far tags between stacked cards', () => {
 		}
 	});
 
-	it('at 8 and 9 px fonts a tag beside a stacked partner keeps a 44 px zone: the bar moves right, inside the card', () => {
+	it('at 8 and 9 px fonts a tag over a stacked partner keeps a 44 px area and stands over the start of the bar, which stays in the middle (D344 1 A)', () => {
 		const src = `people:
   - {id: r1, name: R1}
   - {id: r2, name: R2}
@@ -178,10 +178,11 @@ unions:
 			const u = layout.unions.get(g.unions.find((fu) => fu.partners.includes('z'))!.key)!;
 			expect(u.bar).toBe(true);
 			expect(t.hit.w).toBeGreaterThanOrEqual(MIN_HIT);
-			expect(t.hit.x).toBeGreaterThanOrEqual(card.x);
-			expect(t.hit.x + t.hit.w).toBeLessThanOrEqual(u.x - layout.geometry.unionSize / 2);
-			expect(u.x).toBeLessThan(card.x + card.w);
-			expect(t.x).toBeLessThan(card.x + card.w / 2);
+			expect(t.hit.x).toBeGreaterThanOrEqual(card.x - 1e-6);
+			expect(t.x).toBeCloseTo(card.x + card.w / 2, 6);
+			expect(u.x).toBeCloseTo(t.x, 6);
+			// The pill ends above the dot.
+			expect(u.y - layout.geometry.unionSize / 2).toBeGreaterThanOrEqual(tagTop(layout.geometry, t.y) + layout.geometry.tagH + 8 - 1e-6);
 			expect(lineProblems(g, layout, edges)).toEqual([]);
 		}
 	});

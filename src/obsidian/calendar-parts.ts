@@ -9,6 +9,7 @@ import { setIcon } from 'obsidian';
 import type { DateReader } from '../core/dates';
 import { CALENDAR_WINDOW_UI as T } from '../render/calendar-text';
 import { paintDateLine } from '../render/dom/date-line';
+import { afterPress } from '../render/dom/press-hold';
 import { testParts, type Checked } from '../view/calendar-draft';
 import { clearFieldError, endEntryOnEnter, fieldError, sheetField } from './sheet-parts';
 
@@ -25,8 +26,6 @@ export interface CardHost {
 	/** True after the user pressed Save once with a refusal: from then on an empty field shows its refusal (before, a new calendar would start with red text). */
 	attempted(): boolean;
 	removeCalendar(key: number): void;
-	addEra(key: number): void;
-	removeEra(key: number, era: number): void;
 	/** `key` is the draft key of the calendar, or `PLAIN_KEY` for the plain years. */
 	addList(key: number): void;
 	removeList(key: number, list: number): void;
@@ -56,8 +55,6 @@ interface FieldOptions {
 	errorIn?: HTMLElement;
 	/** UX-11: the hint of the field stands in this box (under a row of fields), and shows only while its own field has the focus. */
 	hintIn?: HTMLElement;
-	/** Fills the line of the label, at the right of it (the Remove link of an era or a name list). */
-	labelEnd?: (line: HTMLElement) => void;
 	/** An `aria-describedby` id of a hint that stands outside the field (the hint under the row of the start). */
 	describedBy?: string;
 }
@@ -102,18 +99,11 @@ function fieldErrors(row: HTMLElement, input: HTMLElement, host: CardHost, e: Fi
 	else fieldRefusals(input, host, e);
 }
 
-/** The row of a field, with its label (and the link at the right end of the label, when `labelEnd` is given) and its hint. */
+/** The row of a field, with its label and its hint. */
 function fieldRow(parent: HTMLElement, name: string, label: string, o: FieldOptions): { row: HTMLElement; id: string } {
 	const { row, id } = sheetField(parent, label, name, 'dynasty-cal');
 	if (o.wide) row.addClass('is-wide');
 	if (o.numeric) row.addClass('is-number');
-	const labelEl = row.querySelector('label');
-	if (o.labelEnd && labelEl) {
-		const line = row.createDiv({ cls: 'dynasty-cal-labelrow' });
-		row.insertBefore(line, labelEl);
-		line.appendChild(labelEl);
-		o.labelEnd(line);
-	}
 	return { row, id };
 }
 
@@ -157,7 +147,8 @@ export function field(parent: HTMLElement, host: CardHost, name: string, label: 
 		const hintId = `${id}-hint`;
 		const hint = o.hintIn.createDiv({ cls: ['dynasty-sheet-hint', 'dynasty-cal-field-hint'], text: o.hint, attr: { id: hintId } });
 		input.addEventListener('focus', () => hint.addClass('is-shown'));
-		input.addEventListener('blur', () => hint.removeClass('is-shown'));
+		// D342: the hint hides only after the press that took the focus away has ended, so a link under it does not move between the press and the release.
+		input.addEventListener('blur', () => afterPress(hint, hint, () => hint.removeClass('is-shown')));
 		input.setAttribute('aria-describedby', hintId);
 	} else if (o.hint) {
 		const hintId = `${id}-hint`;

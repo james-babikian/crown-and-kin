@@ -19,7 +19,7 @@ import { net, orderNets, type Net, type Zone } from './lanes';
 import { sideTagHit } from './layout';
 import type { Geometry, PersonBox, Rect, UnionPoint } from './model';
 import { hangX } from './place';
-import { familyKeyOf, hangRow, portX, type Couple, type Family, type Item, type Leg, type Plan } from './plan-model';
+import { familyKeyOf, hangRow, portX, type Family, type Item, type Leg, type Plan } from './plan-model';
 import { markHalf, nearOf } from './ports';
 
 /** A vertical line through a gap and how far other lines keep from it (a dot radius and 2 px; more for a stem with a fold control). */
@@ -415,21 +415,14 @@ interface FoldZones {
 
 /**
  * Sideways: the zone of a tag on the real bottom edge of a card, from the card's real left edge (the turned frame's `h` is the real
- * width): the width between the insets, or, when a partner stacked below is joined by a bar, the left half short of the bar's dot.
+ * width): the whole width between the insets (D344 1 A). A partner stacked below does not narrow it: the tag stands in the middle over
+ * the start of the line to that partner. The bar's dot stays in the middle of the gap below the card, so the sign stays clear below the pill
+ * (9 px at a 16 px note font).
  */
 export function sideTagZone(plan: Plan, id: string, geo: Geometry): { x: number; w: number } {
 	const m = lineMetrics(geo);
 	const it = plan.items.get(id)!;
-	const lo = m.tagInset;
-	// The unions of one pair share a bar, so the first bar to a partner farther along the row decides.
-	let bar: Couple | undefined;
-	for (const c of plan.couples.values()) {
-		if (bar || c.kind !== 'bar' || (c.a !== it && c.b !== it)) continue;
-		if ((c.a === it ? c.b : c.a).x > it.x) bar = c;
-	}
-	if (!bar) return { x: (lo + it.h - m.tagInset) / 2, w: it.h - 2 * m.tagInset };
-	const hi = Math.min(it.h / 2, Math.min(bar.a.h, bar.b.h) / 2 - Math.max(m.tagInset, geo.unionSize / 2 + 2));
-	return { x: (lo + hi) / 2, w: hi - lo };
+	return { x: it.h / 2, w: it.h - 2 * m.tagInset };
 }
 
 /** The tap area of a sideways tag in the turned frame (x and y swapped), for a card whose row starts at `rowTop`: as `sideTagHit` makes it in the finished layout. */

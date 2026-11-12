@@ -90,7 +90,7 @@
 				{
 					"level": "warning",
 					"code": "union-partner-count",
-					"text": "The tree does not show a partnership with 3 people: Joss Ashford, Maren Holt and Piers Ashford. Give each partnership exactly 2 people. Write one partnership for each pair, for example “- partners: [aldric, isolde]”."
+					"text": "The tree does not show a partnership with 3 people: Joss Ashford, Maren Holt and Piers Ashford. Give each partnership exactly 2 people. Write one partnership for each pair, for example “- partners: [robert, gwendoline]”."
 				},
 				{
 					"level": "warning",
@@ -263,7 +263,7 @@
 				{
 					"level": "warning",
 					"code": "union-partner-count",
-					"text": "The tree does not show a partnership with 3 people: Joss Ashford, Maren Holt and Piers Ashford. Give each partnership exactly 2 people. Write one partnership for each pair, for example “- partners: [aldric, isolde]”."
+					"text": "The tree does not show a partnership with 3 people: Joss Ashford, Maren Holt and Piers Ashford. Give each partnership exactly 2 people. Write one partnership for each pair, for example “- partners: [robert, gwendoline]”."
 				},
 				{
 					"level": "warning",
@@ -364,12 +364,12 @@
 				{
 					"level": "warning",
 					"code": "entry-not-map",
-					"text": "Entry 4 in the holders of King of the Vale is not a holder. Write each holder like this: - {person: aldric}."
+					"text": "Entry 4 in the holders of King of the Vale is not a holder. Write each holder with the ID of a person, for example “- {person: robert}”."
 				},
 				{
 					"level": "warning",
 					"code": "section-wrong-shape",
-					"text": "The holders of the title Warden of the Marches are not a list, so the tree ignores them. Write each holder like this: - {person: aldric}."
+					"text": "The holders of the title Warden of the Marches are not a list, so the tree ignores them. Write each holder with the ID of a person, for example “- {person: robert}”."
 				},
 				{
 					"level": "warning",
@@ -379,7 +379,7 @@
 				{
 					"level": "warning",
 					"code": "missing-id",
-					"text": "Margrave of the Salt Coast has no ID, so the tree does not use this title. Add an ID, for example: id: margrave-of-the-salt-coast."
+					"text": "Margrave of the Salt Coast has no ID, so the tree does not use this title. Add an ID, for example “id: margrave-of-the-salt-coast”."
 				},
 				{
 					"level": "warning",

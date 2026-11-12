@@ -46,9 +46,29 @@ export const PERF_FILES = [
 	'tests/core/relations-random-sweep.test.ts',
 ];
 
+// The browser tests: every file that starts a real browser (Chrome through puppeteer-core, WebKit through playwright). Started together on a busy
+// machine, their browsers are slow to start and some files time out in `afterAll`. So these files run one at a time in a project of their own
+// (`fileParallelism: false`), next to the other tests of `npm test`. A test checks that every file that starts a browser is in this list.
+export const BROWSER_FILES = [
+	'tests/obsidian/calendar-eras-box-chrome.test.ts',
+	'tests/obsidian/calendar-hint-no-lost-press-chrome.test.ts',
+	'tests/obsidian/full-screen-bar-badge-narrow.test.ts',
+	'tests/obsidian/head-house-long-name-wraps.test.ts',
+	'tests/obsidian/legend-begetter-sample-colour.test.ts',
+	'tests/obsidian/new-person-name-placeholder-fits.test.ts',
+	'tests/obsidian/problem-panel-in-note.test.ts',
+	'tests/obsidian/succession-bar-phone-wraps.test.ts',
+	'tests/obsidian/window-link-under-last-field.test.ts',
+];
+
 // A name that is not a file would silently move nothing, so a wrong list stops here.
-const missing = PERF_FILES.filter((file) => !existsSync(file));
-if (missing.length > 0) throw new Error(`vitest.config.ts: PERF_FILES names files that do not exist: ${missing.join(', ')}`);
+const missing = [...PERF_FILES, ...BROWSER_FILES].filter((file) => !existsSync(file));
+if (missing.length > 0) throw new Error(`vitest.config.ts: PERF_FILES or BROWSER_FILES names files that do not exist: ${missing.join(', ')}`);
+
+// A browser file that is also slow keeps its place in the slow run, in a project that also runs one file at a time.
+const SLOW_BROWSER_FILES = BROWSER_FILES.filter((file) => PERF_FILES.includes(file));
+const FAST_BROWSER_FILES = BROWSER_FILES.filter((file) => !PERF_FILES.includes(file));
+const PERF_ONLY_FILES = PERF_FILES.filter((file) => !BROWSER_FILES.includes(file));
 
 export default defineConfig({
 	test: {
@@ -60,8 +80,10 @@ export default defineConfig({
 		// (16 test files at once, or another agent's run) is slow for seconds, and the limits are meant for a quiet moment. A real slowdown fails every time.
 		tags: [{ name: 'timing', retry: { count: 3, delay: 1500 } }],
 		projects: [
-			{ extends: true, test: { name: 'fast', include: ['tests/**/*.test.ts'], exclude: [...PERF_FILES] } },
-			{ extends: true, test: { name: 'perf', include: [...PERF_FILES] } },
+			{ extends: true, test: { name: 'fast', include: ['tests/**/*.test.ts'], exclude: [...PERF_FILES, ...BROWSER_FILES] } },
+			{ extends: true, test: { name: 'browser', include: FAST_BROWSER_FILES, fileParallelism: false } },
+			{ extends: true, test: { name: 'perf', include: [...PERF_ONLY_FILES] } },
+			{ extends: true, test: { name: 'perf-browser', include: SLOW_BROWSER_FILES, fileParallelism: false } },
 		],
 	},
 });

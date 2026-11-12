@@ -105,7 +105,7 @@ describe('D122: the person list shows the sobriquet', () => {
 
 	it('the "You" row also shows it', () => {
 		const p = openPicker(PEOPLE, 'aldric');
-		expect(row(p, 'aldric').querySelector('.dynasty-picker-name')!.getText()).toBe('You: Aldric Valmont “the Wise”');
+		expect(row(p, 'aldric').querySelector('.dynasty-picker-name')!.getText()).toBe('Aldric Valmont “the Wise”');
 	});
 
 	it('the search matches the text of the sobriquet, with or without the marks of the row', () => {

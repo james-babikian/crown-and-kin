@@ -205,7 +205,7 @@ describe('texts of a partnership with 3 people and of a time loop', () => {
 	it('union-partner-count gets an example for 3 or more people', () => {
 		const text = (count: number, partners: string[]) => issueText({ code: 'union-partner-count', level: 'warning', params: { union: '#2', partners, count } });
 		expect(text(3, ['A', 'B', 'C'])).toBe(
-			'The tree does not show a partnership with 3 people: A, B and C. Give each partnership exactly 2 people. Write one partnership for each pair, for example “- partners: [aldric, isolde]”.',
+			'The tree does not show a partnership with 3 people: A, B and C. Give each partnership exactly 2 people. Write one partnership for each pair, for example “- partners: [robert, gwendoline]”.',
 		);
 		expect(text(1, ['A'])).toBe('The tree does not show a partnership with 1 person: A. Give each partnership exactly 2 people.');
 	});

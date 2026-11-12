@@ -277,13 +277,13 @@ const holdersOf = (p: P) => {
 	const name = nm(p, 'title', '');
 	return name ? `the holders of ${name}` : 'the holders of a title';
 };
-const HOLDER_FORM = 'Write each holder like this: - {person: aldric}.';
+const HOLDER_FORM = 'Write each holder with the ID of a person, for example “- {person: robert}”.';
 
 function entryNotMap(p: P): string {
 	const section = s(p, 'section', 'people');
 	const index = s(p, 'index', '?');
 	if (section === 'parents') {
-		return `Entry ${index} in the parents of ${person(p)} is not a person ID. Write an ID, or a parent such as {id: aldric, type: adoptive}.`;
+		return `Entry ${index} in the parents of ${person(p)} is not a person ID. Write an ID, or a parent with a type, for example “{id: robert, type: adoptive}”.`;
 	}
 	if (section === 'holders') return `Entry ${index} in ${holdersOf(p)} is not a holder. ${HOLDER_FORM}`;
 	const e = ENTRY[section] ?? ENTRY.people;
@@ -297,15 +297,15 @@ function missingId(p: P): string {
 	if (section === 'parents') return `Entry ${index} in the parents of ${person(p)} has no ID. Add the ID of the parent.`;
 	if (section === 'houses') {
 		const who = isolateName(name) || `Entry ${index} in the “houses” list`;
-		return `${who} has no ID, so the tree does not use this house. Add an ID, for example: id: ${name ? slugify(name) : 'valmont'}.`;
+		return `${who} has no ID, so the tree does not use this house. Add an ID, for example “id: ${name ? slugify(name) : 'plantagenet'}”.`;
 	}
 	if (section === 'titles') {
 		const who = isolateName(name) || `Entry ${index} in the “titles” list`;
-		return `${who} has no ID, so the tree does not use this title. Add an ID, for example: id: ${name ? slugify(name) : 'duke-of-valmont'}.`;
+		return `${who} has no ID, so the tree does not use this title. Add an ID, for example “id: ${name ? slugify(name) : 'duchy-of-normandy'}”.`;
 	}
 	const who = isolateName(name) || `Entry ${index} in the “people” list`;
 	// The reader gives an id that no person has; `p1` only when the text comes without one.
-	return `${who} has no ID. Add an ID, for example: id: ${s(p, 'example', 'p1')}.`;
+	return `${who} has no ID. Add an ID, for example “id: ${s(p, 'example', 'p1')}”.`;
 }
 
 /** D105: the name shows with the id as `NAME (id)`; the brackets mark the id, so it has no quote marks. */
@@ -318,7 +318,7 @@ function duplicatePersonId(p: P): string {
 
 function sectionWrongShape(p: P): string {
 	const section = s(p, 'section', 'people');
-	if (section === 'options') return 'The “options” section is not a set of options, so the tree ignores it. Write each option like this: start: aldric.';
+	if (section === 'options') return 'The “options” section is not a set of options, so the tree ignores it. Write each option as a word, a colon and a value, for example “start: robert”.';
 	if (section === 'holders') {
 		const name = nm(p, 'title', '');
 		return `The holders of ${name ? `the title ${name}` : 'a title'} are not a list, so the tree ignores them. ${HOLDER_FORM}`;
@@ -425,7 +425,7 @@ const ISSUE_TEXT: { [C in IssueCode]: (p: P) => string } = {
 			? `a partnership with ${plural(partners.length, 'person', 'people')}: ${andList(partners.map(isolateName))}`
 			: `${byLabel(p)}, because it has ${plural(n(p, 'count'), 'person', 'people')}`;
 		// A partnership of 3 or more people gets an example of the right form.
-		const example = n(p, 'count') >= 3 ? ' Write one partnership for each pair, for example “- partners: [aldric, isolde]”.' : '';
+		const example = n(p, 'count') >= 3 ? ' Write one partnership for each pair, for example “- partners: [robert, gwendoline]”.' : '';
 		return `The tree does not show ${what}. Give each partnership exactly 2 people.${example}`;
 	},
 	'union-same-partner': (p) =>
@@ -443,7 +443,7 @@ const ISSUE_TEXT: { [C in IssueCode]: (p: P) => string } = {
 	'house-color-null': (p) => {
 		const value = s(p, 'value', '');
 		if (value) return `${upperFirst(house(p))} has no colour. Put quotes around the colour: color: "${value}".`;
-		return `${upperFirst(house(p))} has no colour. If you wrote a colour, put quotes around it, for example: color: "#8b1e3f".`;
+		return `${upperFirst(house(p))} has no colour. If you wrote a colour, put quotes around it, for example “color: "#8b1e3f"”.`;
 	},
 	'duplicate-house-id': (p) => `More than one house has the ID ${quote(s(p, 'id', '?'))}, and the tree uses only the first. Give each house a different ID.`,
 	'duplicate-title-id': (p) => `More than one title has the ID ${quote(s(p, 'id', '?'))}, and the tree uses only the first. Give each title a different ID.`,
@@ -497,7 +497,7 @@ const ISSUE_TEXT: { [C in IssueCode]: (p: P) => string } = {
 	'unknown-inherit-illegitimate': (p) =>
 		`${upperFirst(titleOf(p))} has “inherit-illegitimate: ${s(p, 'value', '?')}”. The plugin does not know this value, so it shows no line of succession. Use one of these values: ${INHERIT_ILLEGITIMATE.join(', ')}.`,
 	'year-unreadable': (p) =>
-		`${upperFirst(titleOf(p))} has “year: ${s(p, 'value', '?')}”. The plugin cannot find a year in it. The line of succession uses the end of the last reign. If the last reign has no end, the line is for now. Write the year as a number, for example “year: 1210”.`,
+		`${upperFirst(titleOf(p))} has “year: ${s(p, 'value', '?')}”. The plugin cannot find a year in it. The line of succession uses the end of the last reign. If the last reign has no end, the line is for now. Write the year as a number, for example “year: 1066”.`,
 	'missing-heir': (p) => `${upperFirst(titleOf(p))} has “heir: ${s(p, 'ref', '?')}”, but no person has this ID. Correct the ID, or remove it.`,
 	'missing-excluded': (p) => `${upperFirst(titleOf(p))} has “exclude: ${s(p, 'ref', '?')}”, but no person has this ID. Correct the ID, or remove it.`,
 	'sex-spelling': (p) => {
@@ -514,10 +514,10 @@ const ISSUE_TEXT: { [C in IssueCode]: (p: P) => string } = {
 		return `${name} has “childless: true”, but ${nm(p, 'child', 'a person')} is a child of ${name} in the tree. Remove “childless: true”, or correct the parents of ${nm(p, 'child', 'a person')}.`;
 	},
 
-	'year-zero': (p) => `${dateHead(p)} There is no year 0. The plugin reads 0 as 1 BC. If you mean AD 1, write “1”. For a year before that, write a number with a minus sign, such as ${quote('-5')}, for 5 BC.`,
+	'year-zero': (p) => `${dateHead(p)} There is no year 0. The plugin reads 0 as 1 BC. If you mean AD 1, write “1”. For a year before that, write a number with a minus sign, for example ${quote('-5')} for 5 BC.`,
 	'calendar-year-zero': (p) => `${dateHead(p)} A cycle or an era has no Year 0. The plugin counts this date as the year before Year 1. If you mean Year 1, correct the date.`,
 	'calendar-year-past-end': (p) =>
-		`${dateHead(p)} The year in this date is after the last year of its cycle or era. The plugin continues the count past the end. If this is a mistake, correct the date. If the cycle or era is longer, change its length in the Calendars window.`,
+		`${dateHead(p)} The year in this date is after the last year of its cycle or era. The plugin continues the count past the end. If this is a mistake, correct the date. If the cycle is longer, change its “Length (years)” in the Calendars window. If the era is longer, give the era a later last year, or make the next era start later.`,
 	'fits-two-calendars': (p) => {
 		const calendars = strings(p, 'calendars');
 		const which = calendars.length > 1 ? `the calendars ${andList(calendars.map(quote))}` : 'two calendars';
@@ -532,13 +532,13 @@ const ISSUE_TEXT: { [C in IssueCode]: (p: P) => string } = {
 	'calendar-block-invalid': (p) =>
 		`The calendar block in the note ${quote(s(p, 'note', '?'))} has an error, so the plugin ignores it. The tree uses no calendar from this block. Edit the text of the block in the note. The block must have a list under “calendars:”.`,
 	'calendar-entry-invalid': (p) => {
-		const why = { 'not-map': 'it is not a group of keys, such as “name:”', 'no-name': 'it has no name', kind: 'its “kind:” is not “cycles” or “eras”', era: 'one of its eras has no name' }[s(p, 'why', 'kind')] ?? 'it has an error';
+		const why = { 'not-map': 'it is not a group of keys such as “name:”', 'no-name': 'it has no name', kind: 'its “kind:” is not “cycles” or “eras”', era: 'one of its eras has no name' }[s(p, 'why', 'kind')] ?? 'it has an error';
 		return `Calendar ${s(p, 'index', '?')} in the block of the note ${quote(s(p, 'note', '?'))} cannot be used, because ${why}. The plugin ignores it. Edit the text of the block in the note.`;
 	},
 
 	'calendar-list-invalid': (p) => {
 		const key = s(p, 'why', 'names');
-		const why = { 'not-map': 'it is not a group of keys, such as “name:”', names: 'it has no names, or a name is not text', known: 'its known year in the note is not a whole number', size: 'it has more than 60 names, or it is the fifth list or later (a calendar has at most 4 name lists)', lists: 'they are not a list. A list has one item on each text line, after a “-”' }[key] ?? 'it has an error';
+		const why = { 'not-map': 'it is not a group of keys such as “name:”', names: 'it has no names, or a name is not text', known: 'its known year in the note is not a whole number', size: 'it has more than 60 names, or it is the fifth list or later (a calendar has at most 4 name lists)', lists: 'they are not a list. A list has one item on each text line, after a “-”' }[key] ?? 'it has an error';
 		const owner = typeof p.calendar === 'string' && p.calendar !== '' ? `the calendar ${quote(p.calendar)}` : 'the plain years';
 		// A format with a marker that no list has: the dates still read without the marker (spec §14 rule 13).
 		if (key === 'marker') return `A format of ${owner} in the note ${quote(s(p, 'note', '?'))} has the marker ${quote(`{${s(p, 'marker', '?')}}`)}, but no name list of the calendar has this marker. The plugin reads such dates without the name, and it does not check a name. Add a name list with this marker, or remove the marker from the format.`;
@@ -553,10 +553,10 @@ const ISSUE_TEXT: { [C in IssueCode]: (p: P) => string } = {
 	'through-spouse-no-claim': (p) => {
 		const count = n(p, 'count');
 		const none = count === 2 ? 'Neither is' : 'None of them is';
-		return `${person(p)} has ${count} partners: ${andList(strings(p, 'partners').map(isolateName))}. ${none} an ancestor or a descendant of a holder of ${titleOf(p)}. As a result, the plugin cannot choose a partner and ignores “through-spouse”. Write the ID of one partner, for example “through-spouse: ${s(p, 'example', 'anna')}”.`;
+		return `${person(p)} has ${count} partners: ${andList(strings(p, 'partners').map(isolateName))}. ${none} an ancestor or a descendant of a holder of ${titleOf(p)}. As a result, the plugin cannot choose a partner and ignores “through-spouse”. Write the ID of one partner, for example “through-spouse: ${s(p, 'example', 'juliana')}”.`;
 	},
 	'through-spouse-several-claims': (p) =>
-		`${person(p)} has ${n(p, 'count')} partners who are ancestors or descendants of a holder of ${titleOf(p)}: ${andList(strings(p, 'partners').map(isolateName))}. The plugin cannot choose a partner, so it ignores “through-spouse”. Write the ID of one partner, for example “through-spouse: ${s(p, 'example', 'anna')}”.`,
+		`${person(p)} has ${n(p, 'count')} partners who are ancestors or descendants of a holder of ${titleOf(p)}: ${andList(strings(p, 'partners').map(isolateName))}. The plugin cannot choose a partner, so it ignores “through-spouse”. Write the ID of one partner, for example “through-spouse: ${s(p, 'example', 'juliana')}”.`,
 	'through-spouse-self': (p) => `${person(p)} holds ${titleOf(p)} with “through-spouse”, but the ID after it is the ID of ${person(p)}. The plugin ignores “through-spouse”. Write the ID of a partner, or remove “through-spouse”.`,
 	'through-spouse-not-partner': (p) => {
 		const ref = s(p, 'ref', '?');
@@ -577,8 +577,8 @@ const ISSUE_TEXT: { [C in IssueCode]: (p: P) => string } = {
  * the sentence. `other` is the name of the other calendar that the refusal names. Like the issue texts, they are plugin texts.
  */
 export const CALENDAR_REFUSAL_TEXT = {
-	'calendar-format-cycle': () => 'A cycle format needs {year} and {cycle}, one time each. It cannot have any other word in curly brackets. An example is “{year} Year of the {cycle} Cycle”.',
-	'calendar-format-era': () => 'An era format needs {year} and {era}, one time each. It cannot have any other word in curly brackets. An example is “{era} {year}”.',
+	'calendar-format-cycle': () => 'A cycle format needs {year} and {cycle}, one time each. It cannot have any other word in curly brackets. For example: “{year} Year of the {cycle} Olympiad”.',
+	'calendar-format-era': () => 'An era format needs {year} and {era}, one time each. It cannot have any other word in curly brackets. For example: “{era} {year}”.',
 	'calendar-format-touching': () => 'In this format, {cycle} and {year} are next to each other, so the plugin cannot tell where one ends. Put a word or a space between them.',
 	'calendar-format-duplicate': (calendar: string, other?: string) =>
 		other ? `The calendar ${quote(calendar)} and the calendar ${quote(other)} have the same format. A date in this format would fit both. Change one format.` : `The calendar ${quote(calendar)} has the same format two times. Change one format.`,
@@ -682,7 +682,7 @@ const HARD_ERROR_TEXT: { [C in HardErrorCode]: (e: HardError, source?: string) =
 		const where = line !== undefined ? `Text line ${line} of the tree text has an error. Correct this text line to show the tree.` : BLOCK_ERROR;
 		return e.detail ? `${where} Details: ${plainDetail(e.detail)}` : where;
 	},
-	'not-a-map': () => 'The tree text does not have sections such as “people:”. To show the tree, put each person in a list below “people:”.',
+	'not-a-map': () => 'The tree text has no sections such as “people:”. To show the tree, put each person in a list below “people:”.',
 };
 
 /**

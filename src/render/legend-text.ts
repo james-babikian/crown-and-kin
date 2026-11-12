@@ -27,12 +27,12 @@ export const LEGEND_LABELS: Record<StrokeKind, string> = {
 export const SIGN_LEGEND_LABEL = 'Illegitimate child (no dashed line)';
 
 /** The legend row for a dead person with no death year: a sample of the date text and its words. */
-export const LEGEND_DEAD_SAMPLE = 'b. 1131 †';
+export const LEGEND_DEAD_SAMPLE = 'b. 769 †';
 /** The words of the legend row for a dead person with no death year. */
 export const LEGEND_DEAD_LABEL = 'Dead: the year of death is not known';
 
 /** The legend row for a person counted as dead whose text for the death is not clear. */
-export const LEGEND_DEAD_DOUBT_SAMPLE = 'b. 1131 †?';
+export const LEGEND_DEAD_DOUBT_SAMPLE = 'b. 769 †?';
 /** The words of the legend row for a person counted as dead whose death text is not clear. */
 export const LEGEND_DEAD_DOUBT_LABEL = 'Counted as dead: the Died text in the note is not clear';
 

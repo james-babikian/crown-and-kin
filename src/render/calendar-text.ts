@@ -39,7 +39,7 @@ export const CALENDAR_UI = {
 	noteTitle: 'Calendar note',
 	noteText: 'Select the note with the calendars for this tree.',
 	noCalendar: 'No calendar',
-	noCalendarDetail: 'The tree reads only plain years, such as 1205.',
+	noCalendarDetail: 'The tree reads only plain years, for example 936.',
 	inUse: 'In use',
 	/** Stands under the choice while the plugin still looks for calendar notes (the list can grow). */
 	stillLooking: 'The plugin still looks for calendar notes. More notes can appear in this list.',
@@ -53,7 +53,8 @@ export const CALENDAR_UI = {
 const T_REPEAT = (count: number): string => (count === 1 ? 'The name repeats every year.' : `The names repeat every ${count} years.`);
 
 /** D330 O-25: the one purpose line of the Calendars window, also in place of the short line. */
-const PURPOSE_LINE = 'A calendar lets the plugin find the year in dates like “the 10th Year of the Third Cycle” or “Qinglong Emperor 3”.';
+// text-lint: description
+const PURPOSE_LINE = 'A calendar lets the plugin find the year in dates, for example “the 3rd Year of the 92nd Olympiad” or “Qinglong Emperor 3”.';
 
 /** The Calendars window. */
 export const CALENDAR_WINDOW_UI = {
@@ -62,7 +63,7 @@ export const CALENDAR_WINDOW_UI = {
 	introShort: PURPOSE_LINE,
 	intro: PURPOSE_LINE,
 	noteLabel: 'Calendar note',
-	folder: (folder: string) => `Folder: ${folder === '' ? 'main folder of the vault' : folder}`,
+	folder: (folder: string) => `Folder: ${folder === '' ? 'top folder of the vault' : folder}`,
 	newNote: 'New calendar note',
 	newNoteName: 'Name of the new note',
 	newNoteFolder: 'Folder of the new note',
@@ -81,12 +82,12 @@ export const CALENDAR_WINDOW_UI = {
 	kindCycles: 'Cycle calendar',
 	kindEras: 'Era calendar',
 	nameLabel: 'Name',
-	namePlaceholderCycles: 'For example: The Long Count',
+	namePlaceholderCycles: 'For example: Greek Olympiads',
 	namePlaceholderEras: 'For example: Reign names',
 	formatsLabel: 'Formats',
 	formatsHintCycles: 'A format shows how you write a date. Write {year} where the year number is, and {cycle} where the cycle number is. Write one format on each text line.',
 	formatsHintEras: 'A format shows how you write a date. Write {year} where the year number is, and {era} where the era name is. Write one format on each text line.',
-	formatsPlaceholderCycles: 'For example: {year} Year of the {cycle} Cycle',
+	formatsPlaceholderCycles: 'For example: {year} Year of the {cycle} Olympiad',
 	formatsPlaceholderEras: 'For example: {era} {year}',
 	noFormats: 'This calendar has no format. The plugin cannot read a date with it. Add a format.',
 	lengthLabel: 'Length (years)',
@@ -94,18 +95,18 @@ export const CALENDAR_WINDOW_UI = {
 	sameAsLabel: 'Same year as',
 	sameAsPlaceholder: 'A date in another calendar, or a plain year',
 	cycleLabel: 'Cycle',
+	/** D341: the Cycle field shows the same grey 1 as the Year field; an empty Cycle means 1. */
+	cyclePlaceholder: '1',
 	yearLabel: 'Year',
 	/** D330 O-23: the placeholder of the Year field of the reading line. */
 	yearPlaceholder: '1',
 	/** D330 UX-11: the hints of the four fields of the reading line. */
-	cycleHint: 'A cycle number of this calendar. For example: 3.',
-	yearHintCycles: 'A year number in that cycle. For example: 21.',
-	yearHintEras: 'A year of this era. For example: 3.',
-	sameAsHint: 'Write the same year in another calendar, or as a plain year. For example: 1203.',
+	cycleHint: 'Write a cycle number of this calendar, for example 92.',
+	yearHintCycles: 'Write a year number in that cycle, for example 3.',
+	sameAsHint: 'Write the same year in another calendar, or as a plain year, for example 867.',
 	/** D330 UX-11: the heading over the name and the folder of the new note. */
 	noteGroup: 'Note for the calendars',
 	lengthHintCycles: 'The number of years in one cycle.',
-	lengthHintEras: 'The number of years in this era. Leave it empty if the era has no end.',
 	startNow: (year: number) => `Start: ${formatInternalYear(year)}. This is the plain year of Year 1 of this calendar.`,
 	startNone: 'No “Same year as” date. The calendar starts at year 1. If you use other calendars or plain years, write a date in “Same year as”.',
 	/** In place of the help of Start, while the calendar has no “Same year as” date and the tree has other years (the long sentence stays in the tree list). */
@@ -116,18 +117,28 @@ export const CALENDAR_WINDOW_UI = {
 	startUnreadable: 'The plugin cannot read the start in the note, because it is not a whole number. To set a start, write a date in “Same year as”.',
 	sameAsBad: 'The plugin cannot read a year in this date. Write a plain year, or a date that fits another calendar.',
 	numberBad: 'Write whole numbers in Cycle and Year.',
+	/** D342: the text field of the eras, one era on each text line. */
 	erasLabel: 'Eras',
-	eraName: 'Era name',
-	addEra: 'Add era',
-	noEras: 'This calendar has no era. Add an era.',
-	remove: 'Remove',
+	erasPlaceholder: 'For example: Reign of Aldric, 1100',
+	erasHint: 'Write one era on each text line: the name, a comma and the first year. For an end, add “to” and the last year. If you write no end, the era ends where the next era starts. The list below shows how the plugin reads each text line.',
+	noEras: 'This calendar has no era. Write one era on each text line, for example “Reign of Aldric, 1100”.',
+	/** D342: the refusals of one text line of the eras; each names its text line. */
+	eraLineNoYear: (line: number) => `Text line ${line}: write the name, a comma and the first year.`,
+	eraLineLastBad: (line: number) => `Text line ${line}: the plugin cannot read the year after “to”. Write a plain year, or a date in another calendar.`,
+	eraLineOrder: (line: number) => `Text line ${line}: the last year is before the first year. Write a last year that is not before the first year.`,
+	eraLineTwice: (line: number, other: number) => `Text line ${line}: text line ${other} has the same era name. Give each era its own name.`,
+	eraLineCycle: (line: number) => `Text line ${line}: the first year is a date that needs this calendar to be read. Write a plain year.`,
+	/** D342: the reading list under the eras, "Reign of Aldric 1 = year 1100" and at the right "to 1139" or "no end". The era name stands before this text. */
+	eraFirst: (year: number) => `1 = ${formatInternalYear(year)}`,
+	eraEnd: (year: number) => `to ${year < 0 ? `−${-year}` : year}`,
+	eraNoEnd: 'no end',
+	/** In the reading list, for an era whose first year the note holds as text that is not a whole number. */
+	eraUnreadable: 'The plugin cannot read the first year of this era in the note. Write the first year again in the Eras field.',
 	// The name begins with the words of the visible link (WCAG 2.5.3).
 	removeCalendar: (name: string) => `Remove this calendar: ${name || 'without a name'}`,
 	removeThisCalendar: 'Remove this calendar',
 	/** A quiet line under the link: what changes in the tree when the calendar is gone. */
 	removeNote: 'If you remove this calendar, the plugin no longer reads dates in this calendar as years. Cards show these dates as written. The line of succession then uses plain years only.',
-	// The visible link is "Remove"; the name begins with it (WCAG 2.5.3) and has the form of `removeCalendar` (D322).
-	removeEra: (name: string) => `Remove this era: ${name || 'without a name'}`,
 	// The summary line of a closed section (spec §14 rule 16).
 	summaryYears: (n: number) => (n === 1 ? '1 year in a cycle' : `${n} years in a cycle`),
 	summaryFormats: (n: number) => (n === 0 ? 'No format' : n === 1 ? '1 format' : `${n} formats`),
@@ -137,7 +148,7 @@ export const CALENDAR_WINDOW_UI = {
 	summaryUnnamedList: 'A list with no name',
 	// The name lists (spec §14 rule 16).
 	plainTitle: 'Plain years',
-	plainHint: 'A plain year is a number, for example 1273. A name list gives each plain year a name from a list that repeats, for example the names of planets.',
+	plainHint: 'A plain year is a number, for example 1178. A name list gives each plain year a name from a list that repeats, for example the names of planets.',
 	listsLabel: 'Name lists',
 	addList: 'Add name list',
 	noLists: 'No name list.',
@@ -153,15 +164,15 @@ export const CALENDAR_WINDOW_UI = {
 	markerHintKeep: ['{planet}'] as readonly string[],
 	namesLabel: 'Names in order',
 	namesPlaceholder: 'For example: Saturn, Sa',
-	namesHint: 'Write one name on each text line. To add a short form for the cards, write it after a comma, for example Saturn, Sa. The names repeat in this order, one name for each year. If a name has its own comma, write a comma at the end of the text line. An example is Mary, Queen of Scots,',
+	namesHint: 'Write one name on each text line. To add a short form for the cards, write it after a comma, for example “Saturn, Sa”. The names repeat in this order, one name for each year. If a name has its own comma, end the text line with a comma, for example “Mary, Queen of Scots,”.',
 	knownLabel: 'Known year',
 	knownNameLabel: 'Name of that year',
-	knownHint: 'Write a date and the name of its year. The plugin then counts the names of all other years from this one. For example, if year 1273 is Saturn, year 1274 is the next name in the list.',
+	knownHint: 'Write a date and the name of its year. The plugin then counts the names of all other years from this one. For example, if year 1178 is Saturn, year 1179 is the next name in the list.',
 	knownBack: (date: string, year: number, name: string, count: number) => `${isolateDate(date)} = ${formatInternalYear(year)}. The name of this year is ${name}. ${T_REPEAT(count)}`,
 	/** The known year of the plain years: the date is a plain year, so the line has no "=". */
 	knownBackPlain: (year: number, name: string, count: number) => `The name of ${formatInternalYear(year)} is ${name}. ${T_REPEAT(count)}`,
 	knownDateBad: 'The plugin cannot read a year in this date. Write a date that this calendar can read.',
-	knownDateBadPlain: 'The plugin cannot read a year in this date. Write a plain year, for example 1273.',
+	knownDateBadPlain: 'The plugin cannot read a year in this date. Write a plain year, for example 1178.',
 	knownNameBad: 'This name is not in the list. Write a name or a short form from the list.',
 	showLabel: 'Name of the year on cards',
 	showHint: 'The plugin adds the name after a date on cards and in lists. A date that already has the name shows as you wrote it.',
@@ -204,6 +215,8 @@ export const CALENDAR_BLOCK_UI = {
 	era: 'Era',
 	noFormats: 'No format',
 	noLength: 'No length (no end)',
+	/** D342: an era with no length that ends where the next era starts. */
+	noLengthEnds: (year: number) => `No length (to ${formatInternalYear(year)})`,
 	nameList: 'Name list',
 	plainYears: 'Plain years',
 	/** The names of a list in the table: the first few, with the short form after each, and "and N more". */

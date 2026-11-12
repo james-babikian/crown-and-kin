@@ -6,7 +6,7 @@
 
 import { MarkdownRenderChild, type App, type MarkdownPostProcessorContext } from 'obsidian';
 import { parseCalendarBlock } from '../core/calendar-block';
-import { formatInternalYear, isUsableList, type Calendar, type DateReader, type NameList } from '../core/dates';
+import { eraEnds, formatInternalYear, isUsableList, type Calendar, type DateReader, type NameList } from '../core/dates';
 import { issueText } from '../core/messages';
 import { CALENDAR_BLOCK_UI as T, CALENDAR_WINDOW_UI as W } from '../render/calendar-text';
 import type { CalendarIndex } from '../view/calendar-index';
@@ -37,12 +37,15 @@ function eraTable(parent: HTMLElement, c: Calendar & { kind: { type: 'eras' } })
 	const table = parent.createEl('table', { cls: 'dynasty-cal-table dynasty-cal-eras' });
 	const head = table.createEl('tr');
 	for (const h of [T.era, T.start, T.length]) head.createEl('th', { text: h, attr: { scope: 'col' } });
-	for (const e of c.kind.eras) {
+	// D342: an era with no length ends where the next era starts; only the last era has no end.
+	const ends = eraEnds(c.kind.eras);
+	c.kind.eras.forEach((e, i) => {
 		const tr = table.createEl('tr');
 		tr.createEl('td', { text: e.name });
 		tr.createEl('td', { text: Number.isFinite(e.start) ? formatInternalYear(e.start) : '' });
-		tr.createEl('td', { text: e.length === undefined ? T.noLength : String(e.length) });
-	}
+		const end = ends[i];
+		tr.createEl('td', { text: e.length !== undefined ? String(e.length) : end !== undefined ? T.noLengthEnds(end) : T.noLength });
+	});
 }
 
 /** The rows of the name lists of a calendar or of the plain years: the name (with the marker), the first names with their short forms, and the known year. A list that cannot be used has no row. */

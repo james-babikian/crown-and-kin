@@ -102,11 +102,18 @@ class HolderFormModal extends SmallFormModal {
 		}
 		let ruler: HTMLInputElement | null = null;
 		if (this.fields.name !== undefined) {
-			this.nameInput = this.input(body, TITLES_UI.holderName, 'holder-name', this.fields.name, (v) => {
-				this.fields.name = v;
-				// The empty ruler field shows the holder's name as its hint (§13.5, D131); typed text is never replaced.
-				ruler?.setAttribute('placeholder', rulerHint(undefined, v));
-			});
+			this.nameInput = this.input(
+				body,
+				TITLES_UI.holderName,
+				'holder-name',
+				this.fields.name,
+				(v) => {
+					this.fields.name = v;
+					// The empty ruler field shows the holder's name as its hint (§13.5, D131); typed text is never replaced.
+					ruler?.setAttribute('placeholder', rulerHint(undefined, v));
+				},
+				{ placeholder: TITLES_UI.holderNamePlaceholder },
+			);
 		}
 		const row = body.createDiv({ cls: 'dynasty-holder-form-row' });
 		this.input(row, TITLES_UI.number, 'number', this.fields.number, (v) => (this.fields.number = v), { placeholder: TITLES_UI.numberPlaceholder });

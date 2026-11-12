@@ -615,6 +615,16 @@ describe('the Titles window on the fakes (spec §13.4)', () => {
 		expect(handle.body).toBe(BODY_13.replace('      - {person: roderick, from: 1150, to: 1158}\n', '      - {person: roderick, number: I, from: 1150, to: 1158}\n'));
 	});
 
+	it('D341: the field "Name of the holder" of a holder who is not in the tree shows the grey example "For example: Rosamund de Clifford"', async () => {
+		const { content } = await openTitles();
+		await click(titleBox(content, 'count-of-orsini').querySelectorAll('.dynasty-holder-row')[0]);
+		const name = top().contentEl.querySelector('[data-field="holder-name"] input')!;
+		expect(name.getAttribute('placeholder')).toBe(TITLES_UI.holderNamePlaceholder);
+		expect(TITLES_UI.holderNamePlaceholder).toBe('For example: Rosamund de Clifford');
+		// The ruler field keeps its own hint, the first word of the typed name (D131): the new example does not feed it.
+		expect(top().contentEl.querySelector('[data-field="ruler"] input')!.getAttribute('placeholder')).toBe('Orso the Old');
+	});
+
 	it('D131: a holder who is not in the tree: the ruler field stays empty and its hint follows the name field; a typed ruler name is kept', async () => {
 		const { content } = await openTitles();
 		await click(titleBox(content, 'count-of-orsini').querySelectorAll('.dynasty-holder-row')[0]);

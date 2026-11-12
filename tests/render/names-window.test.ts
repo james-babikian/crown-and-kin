@@ -177,18 +177,12 @@ describe('Add and Remove keep the place and the open state', () => {
 		expect(fakeDoc.activeElement).toBe(calField(c, `${keys[2]}-name`));
 	});
 
-	it('"Add era" and "Add name list" put the focus in the new name field, and the scroll place stays', async () => {
+	it('"Add name list" puts the focus in the new name field, and the scroll place stays (D342: the eras have no "Add era")', async () => {
 		const o = await openWindow({ 'Calendars.md': eraNote() });
 		const c = o.win.contentEl;
 		const body = c.querySelector('.dynasty-sheet-body')!;
 		body.scrollTop = 240;
-		await press(c, '.dynasty-cal-add-era');
-		expect(body.scrollTop).toBe(240);
-		const eras = c.querySelectorAll('.dynasty-cal-era');
-		expect(eras).toHaveLength(2);
-		const field = fakeDoc.activeElement!;
-		expect(field.getAttribute('data-focus')).toMatch(/^cal:era-\d+-name$/);
-		expect(eras[1].contains(field)).toBe(true);
+		expect(c.querySelector('.dynasty-cal-add-era')).toBeNull();
 		await press(c, '.dynasty-cal-add-list');
 		expect(body.scrollTop).toBe(240);
 		expect(fakeDoc.activeElement!.getAttribute('data-focus')).toMatch(/^cal:list-\d+-name$/);
@@ -375,13 +369,12 @@ describe('a refusal opens the section that holds it (§14 rule 16)', () => {
 		const o = await open2();
 		const c = o.win.contentEl;
 		const [, second] = sections(c);
-		await press(c, `[data-section="${second}"] .dynasty-cal-add-era`);
-		const era = c.querySelectorAll(`[data-section="${second}"] .dynasty-cal-era`)[1].getAttribute('data-era');
-		typeInto(c, `era-${era}-name`, 'Qinglong Emperor');
+		// D342: the second text line repeats the name of the first; the refusal names both text lines.
+		typeInto(c, `${second}-eras`, 'Qinglong Emperor, 130 to 140\nQinglong Emperor, 150');
 		expect(isOpen(c, second)).toBe(false);
 		await saveWindow(c);
 		expect(isOpen(c, second)).toBe(true);
-		expect(c.querySelector(`[data-section="${second}"] [data-refusal]`)).not.toBeNull();
+		expect(c.querySelector(`[data-section="${second}"] [data-refusal]`)?.getText()).toBe('Text line 2: text line 1 has the same era name. Give each era its own name.');
 		expect(isOpen(c, sections(c)[0])).toBe(false);
 	});
 

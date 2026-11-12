@@ -231,8 +231,38 @@ describe('the Notice after the delete of a person, and the command', () => {
 		dispatch(el(sheet, '.dynasty-sheet-save'), 'click');
 		await settle();
 		const label = (h.write.mock.calls[0] as unknown[])[2] as { label?: UndoLabel } | UndoLabel | undefined;
-		expect(label).toEqual({ kind: 'change', names: ['Cora'] });
+		// The edit renamed the person, so the label also keeps the name before the undo (D346 item 2).
+		expect(label).toEqual({ kind: 'change', names: ['Cora', 'Corinna'] });
 		const out = await h.undo();
-		expect(out).toMatchObject({ ok: true, label: { kind: 'change', names: ['Cora'] } });
+		expect(out).toMatchObject({ ok: true, label: { kind: 'change', names: ['Cora', 'Corinna'] } });
+	});
+
+	it('a Save that does not change the name keeps the one-name label', async () => {
+		const h = labelledHandle(BODY);
+		const sheet = open(h, 'c');
+		const born = el(sheet, '[data-field="born"] input') as FEl;
+		born.value = '1132';
+		dispatch(born, 'input');
+		dispatch(el(sheet, '.dynasty-sheet-save'), 'click');
+		await settle();
+		const label = (h.write.mock.calls[0] as unknown[])[2] as { label?: UndoLabel } | UndoLabel | undefined;
+		expect(label).toEqual({ kind: 'change', names: ['Cora'] });
+	});
+
+	it('D346 item 2: rename Aldric the Elder to Aldric III, then Undo names both names', async () => {
+		const body = ['people:', '  - {id: a, name: Aldric the Elder, sex: m, born: 1102}', ''].join('\n');
+		const h = labelledHandle(body);
+		const sheet = open(h, 'a');
+		const name = el(sheet, '[data-field="name"] input') as FEl;
+		name.value = 'Aldric III';
+		dispatch(name, 'input');
+		dispatch(el(sheet, '.dynasty-sheet-save'), 'click');
+		await settle();
+		const done = await h.undo();
+		expect(done).toMatchObject({ ok: true });
+		const label = (done as { label?: UndoLabel }).label;
+		expect(undoneText(label, 'n', 'generic')).toBe('The plugin undid the change to Aldric III. The name is Aldric the Elder again.');
+		// The same text with no note (the change line of a window).
+		expect(undoneText(label, null, 'generic')).toBe('The plugin undid the change to Aldric III. The name is Aldric the Elder again.');
 	});
 });

@@ -109,7 +109,7 @@ describe('the picker works out the first rows at once and the others when idle',
 		let withWord = 0;
 		for (const [id, row] of rows) {
 			const rels = all.get(id);
-			const want = id === me ? '' : rels?.[0] ? cardRelationText(rels[0]) : '';
+			const want = id === me ? 'You' : rels?.[0] ? cardRelationText(rels[0]) : '';
 			expect(wordOf(row), id).toBe(want);
 			if (want) withWord++;
 			// The sentence for a screen reader follows the visible word.

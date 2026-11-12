@@ -12,7 +12,7 @@ import { ONE_PERSON_HINT, PHONE_LIST_UI, PROBLEMS_HINT, PROBLEMS_OPEN, UI } from
 import { HOUSES, TITLES_UI, WIN_LIST_UI, WINDOW_UI, WRITE_TEXT } from '../../src/render/window-text';
 
 const words = (t: string): number => t.split(/\s+/).length;
-const sentences = (t: string): string[] => t.split(/(?<=[.!?])\s+(?=[A-Z])/);
+const sentences = (t: string): string[] => t.split(/(?<=[.!?])\s+(?=[A-Z“{])/);
 
 describe('D330 O-05: the legend', () => {
 	it('has the words of the title, the More item and the two group headings', () => {
@@ -83,7 +83,7 @@ describe('D330 O-15, O-17, O-19, O-06: buttons, bars and labels', () => {
 describe('D330 O-34: four word changes', () => {
 	it('has the Details field and its hint', () => {
 		expect(SHEET.title).toBe('Title shown under the name');
-		expect(SHEET.titleHint).toBe('Write any text, for example “Warden of the East”. For a title with a number and dates, use the Titles section below.');
+		expect(SHEET.titleHint).toBe('Write any text, for example “Keeper of the Swans”. For a title with a number and dates, use the Titles section below.');
 	});
 
 	it('has "Kind" in the partnership window only', () => {
@@ -100,10 +100,10 @@ describe('D330 O-34: four word changes', () => {
 
 	it('has the two short settings help texts', () => {
 		expect(SETTINGS_UI.armsOnCardsDesc).toBe(
-			'Choose which cards show the arms of a house. For example, with the first choice, the founder of House Valmont shows the arms. A person who married into a house also shows them. A child of the founder shows them only if the child holds a title. A card always shows personal arms.',
+			'Choose which cards show the arms of a house. For example, with “Founders and holders”, the founder of House Plantagenet shows the arms. A person who married into a house also shows them. A child of the founder shows them only if the child holds a title. A card always shows personal arms.',
 		);
 		expect(SETTINGS_UI.phoneDirectionDesc).toBe(
-			'This sets the direction of the tree in the full-screen view on a phone that you hold upright. For example, Sideways puts the parents at the left, and Like the computer puts them at the top.',
+			'This sets the direction of the tree in the full-screen view on a phone that you hold upright. “Sideways” puts the parents at the left. “Like the computer” puts them at the top.',
 		);
 	});
 });
@@ -112,7 +112,7 @@ describe('D330 O-23 to O-26, UX-10, UX-11: the Calendars window', () => {
 	const T = CALENDAR_WINDOW_UI;
 
 	it('has the one purpose line in place of the short line', () => {
-		expect(T.intro).toBe('A calendar lets the plugin find the year in dates like “the 10th Year of the Third Cycle” or “Qinglong Emperor 3”.');
+		expect(T.intro).toBe('A calendar lets the plugin find the year in dates, for example “the 3rd Year of the 92nd Olympiad” or “Qinglong Emperor 3”.');
 		expect(T.introShort).toBe(T.intro);
 	});
 
@@ -123,15 +123,14 @@ describe('D330 O-23 to O-26, UX-10, UX-11: the Calendars window', () => {
 	});
 
 	it('has the field hints and the group heading', () => {
-		expect(T.cycleHint).toBe('A cycle number of this calendar. For example: 3.');
-		expect(T.yearHintCycles).toBe('A year number in that cycle. For example: 21.');
-		expect(T.yearHintEras).toBe('A year of this era. For example: 3.');
-		expect(T.sameAsHint).toBe('Write the same year in another calendar, or as a plain year. For example: 1203.');
+		expect(T.cycleHint).toBe('Write a cycle number of this calendar, for example 92.');
+		expect(T.yearHintCycles).toBe('Write a year number in that cycle, for example 3.');
+		expect(T.sameAsHint).toBe('Write the same year in another calendar, or as a plain year, for example 867.');
 		expect(T.noteGroup).toBe('Note for the calendars');
 	});
 
 	it('has the Plain years texts', () => {
-		expect(T.plainHint).toBe('A plain year is a number, for example 1273. A name list gives each plain year a name from a list that repeats, for example the names of planets.');
+		expect(T.plainHint).toBe('A plain year is a number, for example 1178. A name list gives each plain year a name from a list that repeats, for example the names of planets.');
 		expect(T.noLists).toBe('No name list.');
 	});
 
@@ -181,8 +180,8 @@ describe('D330 UX-03, UX-08, UX-17, UX-19, UX-21, UX-22: repairs', () => {
 		expect(WINDOW_UI.addPortrait).toBe('Add portrait or arms');
 		expect(WINDOW_UI.portraitAndArms).toBe('Portrait and arms');
 		expect(TITLES_UI.numberPlaceholder).toBe('For example: II');
-		expect(NEW_SHEET.namePlaceholder).toBe('For example: Edmund Vane');
-		expect(HOUSES.namePlaceholder).toBe('For example: House Valmont');
+		expect(NEW_SHEET.namePlaceholder).toBe('For example: Rosamund de Clifford');
+		expect(HOUSES.namePlaceholder).toBe('For example: House Plantagenet');
 		expect(WIN_LIST_UI.searchTitles).toBe('Search titles');
 		expect(WIN_LIST_UI.searchHouses).toBe('Search houses');
 	});

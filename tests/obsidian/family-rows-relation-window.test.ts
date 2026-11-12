@@ -96,7 +96,7 @@ describe('D215: the Family rows name no relation outside the window of the marke
 describe('D330: the text of "Arms on cards"', () => {
 	it('is the final text', () => {
 		expect(SETTINGS_UI.armsOnCardsDesc).toBe(
-			'Choose which cards show the arms of a house. For example, with the first choice, the founder of House Valmont shows the arms. A person who married into a house also shows them. A child of the founder shows them only if the child holds a title. A card always shows personal arms.',
+			'Choose which cards show the arms of a house. For example, with “Founders and holders”, the founder of House Plantagenet shows the arms. A person who married into a house also shows them. A child of the founder shows them only if the child holds a title. A card always shows personal arms.',
 		);
 	});
 });

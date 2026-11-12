@@ -2,6 +2,7 @@ import type { FamilyGraph } from '../../src/core/derive';
 import { tagTop } from '../../src/layout/geometry';
 import type { EdgeDrawing, EdgePath, Rect, TreeLayout } from '../../src/layout/model';
 import { isForkShare } from './fork-share';
+import { ownStackLine } from './own-stack-line';
 import { rng } from './rng';
 
 // Seeded random family trees (half-siblings, remarriages, parent–child and cousin marriages,
@@ -114,6 +115,8 @@ export function lineProblems(g: FamilyGraph, layout: TreeLayout, edges: EdgeDraw
 		const pill = { x: tag.hit.x, y: tagTop(layout.geometry, tag.y), w: tag.hit.w, h: layout.geometry.tagH };
 		for (const { p, segs } of lines) {
 			if (COUPLE.has(p.kind) && p.people.includes(tag.person) && tag.spouses.some((s) => p.people.includes(s))) continue;
+			// D344 1 A: sideways, the line to a partner stacked below starts under the tag, its dot clear below the pill.
+			if (COUPLE.has(p.kind) && ownStackLine(layout, tag, p, segs)) continue;
 			if (segs.some((s) => inside(s, pill))) bad.push(`${p.kind} [${p.people}] through ${tag.person}'s tag`);
 		}
 	}

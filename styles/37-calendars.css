@@ -9,6 +9,11 @@
 	overflow-wrap: anywhere;
 }
 
+/* The warning sentence at the end of a reading (D348 2 A): the text colour, on the same text line as the grey reading, as the warning "This calendar has no format." stands. */
+.dynasty-date-line .dynasty-date-tail {
+	color: var(--text-normal);
+}
+
 /* ---------- the Calendars window ---------- */
 
 .dynasty-calendars .dynasty-sheet-body {
@@ -121,31 +126,7 @@
 	font-weight: var(--font-semibold);
 }
 
-/* A label with a link at its right end (Remove of an era). The negative margin keeps the line the height of a label; the touch area stays. */
-.dynasty-cal-labelrow {
-	display: flex;
-	align-items: center;
-	justify-content: space-between;
-	gap: var(--dynasty-space-3);
-}
-
-.dynasty-cal-labelrow .dynasty-cal-remove {
-	margin-block: -6px;
-}
-
-/* K-02: the 44 px tap area of Remove grows upward only, and the text stays on the label line. A box that grew downward would lie over the Era name field under it, and the field would win the tap. */
-.dynasty-sheet.is-phone .dynasty-cal-labelrow {
-	align-items: flex-end;
-}
-
-.dynasty-sheet.is-phone .dynasty-cal-labelrow .dynasty-cal-remove {
-	display: inline-flex;
-	align-items: flex-end;
-	margin-block: -27px 0;
-}
-
 /* Every link of the window has the Control size, as "Add calendar" and "Open all" do (D278). */
-.dynasty-sheet button.dynasty-cal-remove,
 .dynasty-sheet button.dynasty-cal-add-link,
 .dynasty-sheet button.dynasty-cal-remove-list,
 .dynasty-sheet button.dynasty-cal-remove-cal {
@@ -159,18 +140,6 @@
 }
 
 /* A text button in a card has a touch area of 44 px on a screen that is touched (spec §7.5). */
-.dynasty-cal-remove {
-	min-height: 30px;
-	min-width: 44px;
-	padding: 0 var(--dynasty-space-2);
-	border: 0;
-	background: none;
-	box-shadow: none;
-	color: var(--dynasty-link);
-	cursor: pointer;
-}
-
-.dynasty-sheet.is-phone .dynasty-cal-remove,
 .dynasty-sheet.is-phone button.dynasty-cal-add-link,
 .dynasty-sheet.is-phone button.dynasty-cal-remove-list,
 .dynasty-sheet.is-phone button.dynasty-cal-remove-cal,
@@ -180,7 +149,6 @@
 }
 
 .dynasty-cal-start,
-.dynasty-cal-era,
 .dynasty-cal-list {
 	display: flex;
 	flex-direction: column;
@@ -188,7 +156,6 @@
 	padding-top: var(--dynasty-space-1);
 }
 
-.dynasty-cal-era,
 .dynasty-cal-list {
 	padding: 0;
 }
@@ -197,11 +164,42 @@
 	gap: 14px;
 }
 
-/* One thin line between two eras or two name lists, none above the first. */
-.dynasty-cal-era + .dynasty-cal-era,
+/* One thin line between two name lists, none above the first. */
 .dynasty-cal-list + .dynasty-cal-list {
 	padding-top: 14px;
 	border-top: 1px solid var(--background-modifier-border);
+}
+
+/* D342: the eras of an era calendar, one under the other: the text field, its refusals, its help (always shown, so nothing moves when the focus leaves) and the reading list. */
+.dynasty-cal-eras-box {
+	display: flex;
+	flex-direction: column;
+	gap: var(--dynasty-space-2);
+}
+
+/* The reading list: one text line for each era, the era and its first year at the left and its end at the right; a long name wraps and the end keeps its place. The extra space above (D348 1 A) sets the list apart from the help text, so its first row is not read as one more text line of the help; the colour stays grey. */
+.dynasty-cal-era-list {
+	margin-top: var(--dynasty-space-2);
+	display: flex;
+	flex-direction: column;
+	gap: var(--dynasty-space-1);
+}
+
+.dynasty-cal-era-read {
+	display: flex;
+	justify-content: space-between;
+	align-items: baseline;
+	gap: var(--dynasty-space-3);
+}
+
+.dynasty-cal-era-first {
+	min-width: 0;
+	overflow-wrap: anywhere;
+}
+
+.dynasty-cal-era-end {
+	flex: none;
+	white-space: nowrap;
 }
 
 /* The help text of a field (`is-on-focus`, styles/10) shows while the cursor is in its field. The start and the known year are groups of fields: their help shows while the cursor is in any of them. A calendar that was just added shows its help at once. */
@@ -217,12 +215,6 @@
 	grid-template-columns: max-content max-content auto minmax(0, 1fr);
 	gap: 0 var(--dynasty-space-3);
 	align-items: end;
-}
-
-/* O-23: an era has Year, "=", "Same year as" and Length on its second row. */
-.dynasty-cal-start-row.is-era {
-	/* K-01: the last column is as wide as the Length field, so the field ends on the right edge of the window text. */
-	grid-template-columns: max-content auto minmax(0, 1fr) max-content;
 }
 
 /* The reading line stands under the row; the hint of the field that has the focus and the refusals stand under it. A line with no text takes no room. */
@@ -260,9 +252,8 @@
 	font-size: var(--dynasty-type-heading);
 }
 
-/* A phone: Cycle and Year (an era: Year and Length) share one row, "Same year as" stands under them, and the "=" is not needed. */
+/* A phone: Cycle and Year share one row, "Same year as" stands under them, and the "=" is not needed. */
 .dynasty-sheet.is-phone .dynasty-cal-start-row,
-.dynasty-sheet.is-phone .dynasty-cal-start-row.is-era,
 .dynasty-sheet.is-phone .dynasty-cal-start-row.is-known {
 	grid-template-columns: 1fr 1fr;
 	gap: var(--dynasty-space-3);
@@ -270,11 +261,6 @@
 
 .dynasty-sheet.is-phone .dynasty-cal-start-row > .is-wide {
 	grid-column: 1 / -1;
-}
-
-/* In an era the Length stands in the DOM after "Same year as"; on a phone it takes the place beside Year. */
-.dynasty-sheet.is-phone .dynasty-cal-start-row.is-era > .is-wide {
-	order: 1;
 }
 
 .dynasty-sheet.is-phone .dynasty-cal-equals {
@@ -311,7 +297,7 @@
 	justify-content: flex-start;
 }
 
-/* "Add era" and "Add name list" are quiet links with a plus, at the left, after the last era or list; "Remove this calendar" is a quiet link at the end of the section. */
+/* "Add name list" is a quiet link with a plus, at the left, after the last list; "Remove this calendar" is a quiet link at the end of the section. */
 .dynasty-sheet button.dynasty-cal-add-link,
 .dynasty-sheet button.dynasty-cal-remove-list,
 .dynasty-sheet button.dynasty-cal-remove-cal {
@@ -453,8 +439,7 @@
 
 	.dynasty-sheet button.dynasty-cal-add-link,
 	.dynasty-sheet button.dynasty-cal-remove-list,
-	.dynasty-sheet button.dynasty-cal-remove-cal,
-	.dynasty-sheet button.dynasty-cal-remove {
+	.dynasty-sheet button.dynasty-cal-remove-cal {
 		min-height: 44px;
 		min-width: 44px;
 	}

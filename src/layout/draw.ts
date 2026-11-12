@@ -1,19 +1,22 @@
 /*
  * The route stage, the drawing half (stage S4). From the lanes and the y of every row (route.ts) it writes the
  * boxes and union points (`TreeLayout`) and the paths and markers (`EdgeDrawing`): couple lines through their dots, trunks, bars and
- * drops, the stems of folded families to their signs, the side links as curves, the "?" of a rumoured parent (the
+ * drops, the stems of folded families to their signs, the side links as curves (routed between the cards by side-route.ts where the plain
+ * curve would run over a card), the "?" of a rumoured parent (the
  * search of rumour-spot.ts), the far tags, and the size of the picture. `routeTree` composes the steps of both halves. It reads the plan
  * and the nets and writes no plan field.
  */
 import { partnerOf, type FamilyGraph, type FamilyUnion } from '../core/derive';
 import { FOLD_EM, workExtent, type FoldInput } from './fold-spots';
-import { barClear, isRoundel, lineMetrics, MIN_HIT, roundelAxis, roundelLineEnd, tagHit, TIE, type LineMetrics } from './geometry';
+import { barClear, isRoundel, lineMetrics, MIN_HIT, roundelAxis, roundelLineEnd, sideTagDepth, tagHit, tagTop, TIE, type LineMetrics } from './geometry';
 import type { Net, Zone } from './lanes';
-import type { EdgeDrawing, EdgeMarker, EdgePath, FarTag, Geometry, PersonBox, PlacedFoldControl, StrokeKind, TreeLayout, UnionPoint } from './model';
-import { familyKeyOf, hangRow, portX, type Couple, type Family, type Plan } from './plan-model';
+import type { EdgeDrawing, EdgeMarker, EdgePath, FarTag, Geometry, PersonBox, PlacedFoldControl, Rect, StrokeKind, TreeLayout, UnionPoint } from './model';
+import { bundleBegetters } from './begetter-bundle';
+import { familyKeyOf, hangRow, portX, type Family, type Plan, type SideLink } from './plan-model';
 import { barNets, childPorts, foldZones, hangPoints, packLanes, passageLines, rowHeights, rowYs, sideTagZone, tagZoneOf, upperNets, type HangPoints, type OnFallback, type RouteInput, type RowYs, type UpperNets } from './route';
 import { nearOf, pairOf } from './ports';
-import { RumourIndex, rumourSpot, segmentsOf, type Curve, type Seg } from './rumour-spot';
+import { routedSpot, RumourIndex, rumourSpot, segmentsOf, type Curve, type Seg } from './rumour-spot';
+import { sideRouter as makeRouter, type SideRouter } from './side-route';
 
 /** em: how far right of the card middle a dotted side link lands on a Roundel card. */
 const SIDE_LINK_EM = 3.4;
@@ -50,22 +53,9 @@ export interface Routed {
 }
 
 /**
- * Sideways (D24), in the turned frame: how far below the top of the row the bar of a couple meets the cards. The middle, unless a tag hangs from
- * the upper partner: its tap area is at least `MIN_HIT` wide and the zone of a short card (small fonts) is narrower, so the area reaches over the
- * middle and over the bar's dot. The bar then moves right, until the dot clears the area by `barClear`; it stays on both cards.
- */
-export function barDepth(plan: Plan, c: Couple, geo: Geometry, side: Geometry | undefined): number {
-	const middle = Math.min(c.a.h, c.b.h) / 2;
-	const upper = c.a.x < c.b.x ? c.a : c.b;
-	if (!side || !plan.tagged.has(upper.id)) return middle;
-	const zone = sideTagZone(plan, upper.id, geo);
-	const need = zone.x + Math.max(MIN_HIT, zone.w) / 2 + barClear(geo);
-	return Math.max(middle, Math.min(need, Math.min(c.a.h, c.b.h) - barClear(geo)));
-}
-
-/**
- * Sideways, in the turned frame: how far in from the card's edge the tag tap area of the next column starts. It is `tagInset`, but a card with
- * a partner stacked below keeps its tag in the left half (`sideTagZone`), and its area (at least `MIN_HIT` wide) then starts a little less far in.
+ * Sideways, in the turned frame: how far in from the card's edge the tag tap area of the next column starts at the earliest. It is `tagInset`, but
+ * the area is at least `MIN_HIT` wide and a short card's zone is narrower, so it can start nearer the edge; this bound holds for the whole zone
+ * (`sideTagZone`, D344 1 A) and is a little more careful than the whole zone needs, which keeps the gaps as they were.
  */
 function nextTagIn(geo: Geometry): number {
 	const m = lineMetrics(geo);
@@ -89,7 +79,7 @@ export function withTapRoom(upper: readonly (readonly Net[])[], fixed: readonly 
 }
 
 /** Step 9: the boxes of the cards and the union points (a bar's point on the bar, a dot's on its net's lane, a far couple's without a hang point below its anchor). */
-export function boxes(plan: Plan, g: FamilyGraph, hp: HangPoints, dotOf: ReadonlyMap<string, Net>, ys: RowYs, geo?: Geometry, side?: Geometry): { persons: Map<string, PersonBox>; unions: Map<string, UnionPoint>; rows: string[][] } {
+export function boxes(plan: Plan, g: FamilyGraph, hp: HangPoints, dotOf: ReadonlyMap<string, Net>, ys: RowYs): { persons: Map<string, PersonBox>; unions: Map<string, UnionPoint>; rows: string[][] } {
 	const persons = new Map<string, PersonBox>();
 	const rows: string[][] = plan.rows.map((row) => row.filter((it) => it.kind === 'card').map((it) => it.id));
 	for (const row of plan.rows) for (const it of row) if (it.kind === 'card') persons.set(it.id, { id: it.id, x: it.x, y: ys.rowTop[it.row], w: it.w, h: it.h, gen: it.row, ...it.flags });
@@ -98,7 +88,7 @@ export function boxes(plan: Plan, g: FamilyGraph, hp: HangPoints, dotOf: Readonl
 		const c = plan.couples.get(fu.key)!;
 		if (c.hang?.kind === 'bar') {
 			const [a, b] = fu.partners.map((p) => persons.get(p)!);
-			unions.set(fu.key, { key: fu.key, x: hp.x.get(fu.key)!, y: a.y + (geo && side ? barDepth(plan, c, geo, side) : Math.min(a.h, b.h) / 2), bar: true, far: false });
+			unions.set(fu.key, { key: fu.key, x: hp.x.get(fu.key)!, y: a.y + Math.min(a.h, b.h) / 2, bar: true, far: false });
 			continue;
 		}
 		const dot = dotOf.get(fu.key);
@@ -158,6 +148,8 @@ export interface Rumour {
 	from?: number;
 	alt?: Seg[];
 	trunk?: number;
+	/** A routed side link: its pieces in path order and their lengths; the "?" goes on the free place nearest the route's middle. */
+	routed?: { pieces: Curve[]; lengths: number[] };
 }
 
 /** Where a family's trunk starts: the union point of a couple, the card bottom of a single parent, or the stem net's lane for a parent with a hang passage. */
@@ -266,12 +258,29 @@ function turnY(gap: number, sx: number, sy: number, tx: number, ty: number, ys: 
 	return ((top + bottom) / 2 - (sy + ty) / 8) / 0.75;
 }
 
-/** Step 10d: side links as curves, as today (not routed): from the union dot, or from each parent's side port, to a point right of the child's middle. */
-export function drawSideLinks(plan: Plan, g: FamilyGraph, persons: ReadonlyMap<string, PersonBox>, unions: ReadonlyMap<string, UnionPoint>, ys: RowYs, geo: Geometry, side: Geometry | undefined, m: LineMetrics, num: Num = r1, bands?: { upper: readonly (readonly Net[])[]; lower: readonly (readonly Net[])[] }): { paths: EdgePath[]; rumours: Rumour[] } {
+/** A side-link curve before it is written: where it starts and ends, and the control height the plain rule gave it. */
+interface LinkCurve {
+	s: SideLink;
+	src: { x: number; y: number; drop?: number; people: string[] };
+	sy: number;
+	my: number;
+	tx: number;
+	ty: number;
+	kind: StrokeKind;
+}
+
+/**
+ * Step 10d: side links as curves: from the union dot, or from each parent's side port, to a point right of the child's middle. Begetter lines of one person
+ * into one row keep a gap and one dash phase (`bundleBegetters`); then `router` (side-route.ts) routes a curve that would run over a foreign card between
+ * the cards. The bundle comes first: its lines go one row down and stay in one gap, so the router never changes them and the bundle holds.
+ */
+export function drawSideLinks(plan: Plan, g: FamilyGraph, persons: ReadonlyMap<string, PersonBox>, unions: ReadonlyMap<string, UnionPoint>, ys: RowYs, geo: Geometry, side: Geometry | undefined, m: LineMetrics, num: Num = r1, bands?: { upper: readonly (readonly Net[])[]; lower: readonly (readonly Net[])[] }, router?: SideRouter): { paths: EdgePath[]; rumours: Rumour[] } {
 	const roundel = !side && isRoundel(geo);
 	const paths: EdgePath[] = [];
 	const rumours: Rumour[] = [];
 	const near = nearOf(geo);
+	const curves: LinkCurve[] = [];
+	const groups: string[] = [];
 	for (const s of plan.sideLinks) {
 		const cb = persons.get(s.child)!;
 		const tx = cb.x + cb.w / 2 + (side ? Math.min(SIDE_LINK_PX, cb.w / 2 - m.tagInset) : roundel ? SIDE_LINK_EM * geo.fontPx : SIDE_LINK_PX);
@@ -291,18 +300,30 @@ export function drawSideLinks(plan: Plan, g: FamilyGraph, persons: ReadonlyMap<s
 		for (const src of sources) {
 			const sy = src.drop ?? src.y;
 			const my = src.drop !== undefined && cb.gen === src.gap! + 1 ? turnY(src.gap!, src.x, sy, tx, ty, ys, near, bands) : (sy + ty) / 2;
-			const kind = (s.type === 'birth' ? 'birth-link' : s.type) as StrokeKind;
-			const head = src.drop === undefined ? '' : `V${num(sy)}`;
-			const link = s.union ? { union: s.union } : {};
-			paths.push({ d: `M${num(src.x)} ${num(src.y)}${head}C${num(src.x)} ${num(my)} ${num(tx)} ${num(my)} ${num(tx)} ${num(ty)}`, kind, people: src.people, ...link, parents: [...s.parents], child: s.child });
-			if (s.type === 'rumoured') rumours.push({ path: paths.length - 1, curve: [src.x, sy, my, tx, ty] });
+			curves.push({ s, src, sy, my, tx, ty, kind: (s.type === 'birth' ? 'birth-link' : s.type) as StrokeKind });
+			// A group is one begetter and one row of children: only a line from a begetter's port to the next row down is in one. Such a curve stays between the two rows, so a lift never puts it over a card.
+			groups.push(s.type === 'begetter' && !s.union && src.drop !== undefined && cb.gen === src.gap! + 1 ? JSON.stringify([src.people[0], cb.gen]) : '');
 		}
 	}
+	const placed = bundleBegetters(curves.map((c, i) => ({ group: groups[i] || `alone${i}`, child: c.s.child, x0: c.src.x, y0: c.src.y, sy: c.sy, my: c.my, tx: c.tx, ty: c.ty })));
+	// The router places all links at once, in its own order, each clear of the routes before it; the lines of a begetter bundle stay as the bundle drew them
+	// (`keep`), and the bends of the routes keep off them.
+	const asks = curves.map(({ src, sy, tx, ty, s, kind }, i) => ({ sx: src.x, sy, tx, ty, my: placed[i].my, own: new Set(src.people), order: `${s.child}\u0000${[...src.people].sort().join(',')}\u0000${kind}`, ...(groups[i] ? { keep: true } : {}) }));
+	const routes = router ? router.routeAll(asks, num) : [];
+	curves.forEach(({ s, src, sy, tx, ty, kind }, i) => {
+		const { my, phase } = placed[i];
+		const head = src.drop === undefined ? '' : `V${num(sy)}`;
+		const link = s.union ? { union: s.union } : {};
+		const routed = routes[i];
+		const body = routed ? routed.d : `C${num(src.x)} ${num(my)} ${num(tx)} ${num(my)} ${num(tx)} ${num(ty)}`;
+		paths.push({ d: `M${num(src.x)} ${num(src.y)}${head}${body}`, kind, people: src.people, ...link, parents: [...s.parents], child: s.child, ...(phase ? { dashOffset: phase } : {}) });
+		if (s.type === 'rumoured') rumours.push({ path: paths.length - 1, curve: [src.x, sy, my, tx, ty], ...(routed ? { routed: { pieces: routed.pieces, lengths: routed.lengths } } : {}) });
+	});
 	return { paths, rumours };
 }
 
-/** Step 10e: the "?" of a rumoured parent: where no other line and no dot is near it. */
-export function rumourMarkers(paths: readonly EdgePath[], markers: readonly EdgeMarker[], rumours: readonly Rumour[], persons: ReadonlyMap<string, PersonBox>, geo: Geometry, side: Geometry | undefined): EdgeMarker[] {
+/** Step 10e: the "?" of a rumoured parent: where no other line and no dot is near it, off the cards and off the tag pills (`pills`, `tagPills`). */
+export function rumourMarkers(paths: readonly EdgePath[], markers: readonly EdgeMarker[], rumours: readonly Rumour[], persons: ReadonlyMap<string, PersonBox>, geo: Geometry, side: Geometry | undefined, pills: readonly Rect[] = []): EdgeMarker[] {
 	if (!rumours.length) return [];
 	const out: EdgeMarker[] = [];
 	const segs = paths.map((p) => segmentsOf(p.d));
@@ -313,12 +334,13 @@ export function rumourMarkers(paths: readonly EdgePath[], markers: readonly Edge
 		firstSeg.push(count);
 		count += s.length;
 	}
-	const index = new RumourIndex(all, markers.map((mk) => ({ x: mk.x, y: mk.y })), [...persons.values()]);
+	const index = new RumourIndex(all, markers.map((mk) => ({ x: mk.x, y: mk.y })), [...persons.values(), ...pills]);
 	const cardRoom = Math.max(RUMOUR_RADIUS_MIN_PX, RUMOUR_RADIUS_EM * geo.fontPx) + RUMOUR_EDGE_PX;
 	const range = (i: number): [number, number] => [firstSeg[i], firstSeg[i] + segs[i].length];
-	for (const { path, curve, from, alt, trunk } of rumours) {
+	for (const { path, curve, from, alt, trunk, routed } of rumours) {
 		const nearRoom = { room: cardRoom, ...(alt && trunk !== undefined ? { alt: { segs: alt, own: [range(trunk), range(path)] } } : {}) };
-		const spot = rumourSpot(curve, index, [firstSeg[from ?? path], firstSeg[path] + segs[path].length], !!side, nearRoom);
+		const own: [number, number] = [firstSeg[from ?? path], firstSeg[path] + segs[path].length];
+		const spot = routed ? routedSpot(routed.pieces, routed.lengths, index, own, !!side, nearRoom) : rumourSpot(curve, index, own, !!side, nearRoom);
 		index.addDot(spot);
 		out.push({ ...spot, kind: 'rumour' });
 	}
@@ -344,7 +366,7 @@ export function farSpouses(g: FamilyGraph, plan: Plan, id: string, fold?: FoldIn
 	return out;
 }
 
-/** Step 11: the tags. Top to bottom: the part of the bottom edge between the innermost ports. Sideways: the zone on the real bottom edge (the pipeline places the tags from it); a partner stacked below (a bar) keeps it to the left half. */
+/** Step 11: the tags. Top to bottom: the part of the bottom edge between the innermost ports. Sideways: the zone on the real bottom edge, the whole edge between the insets (`sideTagZone`, D344 1 A); the pipeline places the tags from it. */
 export function tags(plan: Plan, g: FamilyGraph, ys: RowYs, geo: Geometry, side: Geometry | undefined, fold: FoldInput | undefined): { tagZones: Map<string, { x: number; w: number }>; farTags: Map<string, FarTag> } {
 	const m = lineMetrics(geo);
 	const tagZones = new Map<string, { x: number; w: number }>();
@@ -364,6 +386,23 @@ export function tags(plan: Plan, g: FamilyGraph, ys: RowYs, geo: Geometry, side:
 	return { tagZones, farTags };
 }
 
+/**
+ * The widest pill of every tag, in the frame of the route (D344 1 A: sideways the pill takes the whole lower edge, so a "?" must keep off it as
+ * off a card). Top to bottom the pill hangs from the card's bottom edge in its zone; sideways it hangs from the real bottom edge, which in the
+ * turned frame is the card's right edge, and the zone runs along the card from its real left edge (`sideTagZone`).
+ */
+export function tagPills(tagZones: ReadonlyMap<string, { x: number; w: number }>, persons: ReadonlyMap<string, PersonBox>, geo: Geometry, side: Geometry | undefined): Rect[] {
+	const out: Rect[] = [];
+	for (const [id, zone] of tagZones) {
+		const p = persons.get(id);
+		const w = Math.max(0, zone.w);
+		if (!p || w <= 0) continue;
+		if (side) out.push({ x: tagTop(side, p.x + p.w), y: p.y + zone.x - w / 2, w: side.tagH, h: w });
+		else out.push({ x: zone.x - w / 2, y: tagTop(geo, p.y + p.h), w, h: geo.tagH });
+	}
+	return out;
+}
+
 /** Routes a placed plan: the steps of route.ts and this file in order. `onFallback` hears of each passage line and child slot that had no clear place. */
 export function routeTree({ plan, g, geo, side, tabbed, youTab, ordinalCards, fold }: RouteInput, onFallback?: OnFallback): Routed {
 	const m = lineMetrics(geo);
@@ -377,22 +416,27 @@ export function routeTree({ plan, g, geo, side, tabbed, youTab, ordinalCards, fo
 	const lanes = packLanes(nets.upper, lower, zones.fixed, geo);
 	// Sideways the gaps also hold the tap areas of the controls (small fonts: the area is wider than the signs).
 	const ys = rowYs(plan, nets.upper, side ? withTapRoom(nets.upper, zones.fixed, lanes, geo) : zones.fixed, lanes, geo, side);
-	const { persons, unions, rows } = boxes(plan, g, hp, nets.dotOf, ys, geo, side);
-	const draw = (num: Num) => ({ couples: drawCouples(plan, g, nets, persons, unions, ys, num), descent: drawDescent(plan, g, hp, nets, barOf, dropX, persons, unions, ys, geo, side, num), links: drawSideLinks(plan, g, persons, unions, ys, geo, side, m, num, { upper: nets.upper, lower }) });
-	const { couples, descent, links } = draw(r1);
+	const { persons, unions, rows } = boxes(plan, g, hp, nets.dotOf, ys);
+	const drawLines = (num: Num) => ({ couples: drawCouples(plan, g, nets, persons, unions, ys, num), descent: drawDescent(plan, g, hp, nets, barOf, dropX, persons, unions, ys, geo, side, num) });
+	const lines = drawLines(r1);
 	const folds = drawFolds(plan, hp, nets, zones.fixedSpot, persons, unions, ys, geo, fold);
+	const lineX = Math.max(0, ...nets.upper.flat().map((n) => n.hi), ...lower.flat().map((n) => n.hi));
+	// One router for both drawings (rounded, and exact for the "?" search): it reads the rounded lines, so both take the same routes.
+	const router = plan.sideLinks.length ? sideRouter(plan, persons, unions, ys, geo, side, m, [...lines.couples.paths, ...lines.descent.paths, ...folds.paths], lineX) : undefined;
+	const draw = (num: Num, l = drawLines(num)) => ({ ...l, links: drawSideLinks(plan, g, persons, unions, ys, geo, side, m, num, { upper: nets.upper, lower }, router) });
+	const { couples, descent, links } = draw(r1, lines);
 	const pathsOf = (d: ReturnType<typeof draw>) => [...d.couples.paths, ...d.descent.paths, ...folds.paths, ...d.links.paths];
 	const paths = pathsOf({ couples, descent, links });
 	// The rumours name their paths by index in the lists they came from: offset into the whole list.
 	const rumours = [...descent.rumours.map((r) => shiftRumour(r, couples.paths.length)), ...links.rumours.map((r) => shiftRumour(r, couples.paths.length + descent.paths.length + folds.paths.length))];
 	// The "?" search must read the exact lines, not the text rounded to a tenth of a px (I7): where there is a rumour, the lines are drawn again unrounded for it.
-	const markers = [...couples.markers, ...rumourMarkers(rumours.length ? pathsOf(draw(exact)) : paths, couples.markers, rumours, persons, geo, side)];
 	const { tagZones, farTags } = tags(plan, g, ys, geo, side, fold);
+	const pills = rumours.length ? tagPills(tagZones, persons, geo, side) : [];
+	const markers = [...couples.markers, ...rumourMarkers(rumours.length ? pathsOf(draw(exact)) : paths, couples.markers, rumours, persons, geo, side, pills)];
 	const rowGaps = rows.slice(1).map((_, r) => ({ top: ys.gapTop(r), bottom: ys.rowTop[r + 1] }));
 	// The picture holds every item, net, dot, tag and control (its largest mark and hit area, spec §13.10 F5b); the left margin for the controls is the placement's.
 	const extents = (folds.folds ?? []).map((c) => workExtent(c, c.spot, geo.fontPx, !!side));
 	// Only a line gets the half gap beyond it: a picture whose lines all stay between the cards ends at the last card's edge.
-	const lineX = Math.max(0, ...nets.upper.flat().map((n) => n.hi), ...lower.flat().map((n) => n.hi));
 	const width = Math.max(0, lineX + geo.nodeGap / 2, ...[...persons.values()].map((p) => p.x + p.w), ...extents.map((b) => b.x + b.w));
 	// The gap below the last row has no next row to hold it: the picture holds every net there (the dots and stems of folded families) with its marks.
 	const last = plan.rows.length - 1;
@@ -401,6 +445,12 @@ export function routeTree({ plan, g, geo, side, tabbed, youTab, ordinalCards, fo
 	const height = Math.max(0, ...[...persons.values()].map((p) => p.y + p.h), ...lastBand, ...[...nets.dotOf.keys()].filter((k) => unions.has(k)).map((k) => unions.get(k)!.y + geo.unionSize / 2), ...[...farTags.values()].map((t) => t.hit.y + t.hit.h), ...extents.map((b) => b.y + b.h));
 	const layout: TreeLayout = { persons, unions, rows, rowGaps, farTags, width, height, geometry: geo, orientation: 'down', ...(youTab !== undefined ? { youTab } : {}), ...(ordinalCards?.length ? { ordinalCards } : {}), ...(folds.folds ? { folds: folds.folds } : {}) };
 	return { layout, edges: { paths, markers }, tagZones, ...(folds.folds ? { folds: folds.folds } : {}) };
+}
+
+/** The router of the side links of one drawing: the picture's right edge (the last card, or the farthest line and half a gap), and sideways the room of the name tags. */
+function sideRouter(plan: Plan, persons: ReadonlyMap<string, PersonBox>, unions: ReadonlyMap<string, UnionPoint>, ys: RowYs, geo: Geometry, side: Geometry | undefined, m: LineMetrics, others: EdgePath[], lineX: number): SideRouter {
+	const right = Math.max(lineX + geo.nodeGap / 2, ...[...persons.values()].map((p) => p.x + p.w));
+	return makeRouter({ persons, ys, unions, others, right, pad: nearOf(geo), comfort: geo.nodeGap, tagged: side ? plan.tagged : new Set(), tagRoom: side ? sideTagDepth(side) + m.exitStep : 0 });
 }
 
 const shiftRumour = (r: Rumour, by: number): Rumour => ({ ...r, path: r.path + by, ...(r.from !== undefined ? { from: r.from + by } : {}), ...(r.trunk !== undefined ? { trunk: r.trunk + by } : {}) });

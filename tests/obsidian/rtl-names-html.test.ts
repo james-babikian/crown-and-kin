@@ -28,7 +28,7 @@ import { buildPhoneList, type PhoneListSpec } from '../../src/render/dom/phone-l
 import { CHANGE_UI } from '../../src/render/change-text';
 import { drawProblems } from '../../src/obsidian/problems-list';
 import { finderSentence, stepSentences } from '../../src/render/tree-info';
-import { FINDER_UI, FLOW, FOCUS_UI, NEW_SHEET, PHONE_LIST_UI, PROBLEMS_OPEN, REMOVE, SUCCESSION_UI, TITLES_UI, WIN_LIST_UI, WINDOW_UI } from '../../src/render/ui-text';
+import { FLOW, FOCUS_UI, NEW_SHEET, PHONE_LIST_UI, PROBLEMS_OPEN, REMOVE, SUCCESSION_UI, TITLES_UI, WIN_LIST_UI, WINDOW_UI } from '../../src/render/ui-text';
 import { listData, listWord } from '../../src/view/phone-list';
 import { closePluginModals } from '../../src/view/plugin-modals';
 import { undoneText } from '../../src/obsidian/undo-text';
@@ -129,7 +129,6 @@ describe('the name helper', () => {
 describe('the texts of the text tables isolate the name and only the name', () => {
 	const ALL: [string, (n: string) => string][] = [
 		['the focus bar', (n) => FOCUS_UI.bar(n)],
-		['the marked person in a picker', (n) => FINDER_UI.you(n)],
 		['the group of children with a partner', (n) => PHONE_LIST_UI.withPartner(n)],
 		['the Notice for a person who has no row', (n) => PHONE_LIST_UI.savedElsewhereName(n)],
 		['the change line after Add child', (n) => CHANGE_UI.addedChild(n, 'Aldric', 'birth')],
@@ -316,11 +315,10 @@ describe('Find and the person pickers', () => {
 		expect(name.querySelector('.dynasty-picker-sob')).toBeTruthy();
 	});
 
-	it('the row of the marked person says "You: " outside the run', () => {
+	it('the row of the marked person has the name alone on its name line, as in the Find list (D346 item 4)', () => {
 		const name = rowOf('kareem', 'kareem').querySelector('.dynasty-picker-name')!;
-		expect(name.getText()).toBe(`You: ${MIXED} “الشجاع”`);
+		expect(name.getText()).toBe(`${MIXED} “الشجاع”`);
 		expect(runs(name)).toHaveLength(1);
-		expect(name.text.startsWith('You: ')).toBe(true);
 	});
 
 	it('a left-to-right name has no run', () => {

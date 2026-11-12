@@ -115,13 +115,13 @@ describe('the next person id and add-person (D104)', () => {
 
 describe('the "has no id" example for a person (D104, the reader)', () => {
 	it('is p1 in a tree with no numbered id', () => {
-		expect(texts('people:\n  - {name: Aldric}\n', 'missing-id')).toEqual(['Aldric has no ID. Add an ID, for example: id: p1.']);
-		expect(texts('people:\n  - {id: aldric, name: Aldric}\n  - {name: Bea}\n', 'missing-id')).toEqual(['Bea has no ID. Add an ID, for example: id: p1.']);
+		expect(texts('people:\n  - {name: Aldric}\n', 'missing-id')).toEqual(['Aldric has no ID. Add an ID, for example “id: p1”.']);
+		expect(texts('people:\n  - {id: aldric, name: Aldric}\n  - {name: Bea}\n', 'missing-id')).toEqual(['Bea has no ID. Add an ID, for example “id: p1”.']);
 	});
 
 	it('is a number that is not used when the tree has p1 to p3', () => {
 		const body = 'people:\n  - {id: p1, name: One}\n  - {id: p2, name: Two}\n  - {id: p3, name: Three}\n  - {name: Four}\n';
-		expect(texts(body, 'missing-id')).toEqual(['Four has no ID. Add an ID, for example: id: p4.']);
+		expect(texts(body, 'missing-id')).toEqual(['Four has no ID. Add an ID, for example “id: p4”.']);
 	});
 
 	it('two people with no id get two different examples', () => {
@@ -134,11 +134,11 @@ describe('the "has no id" example for a person (D104, the reader)', () => {
 
 	it('does not use the name, and a reference counts as taken', () => {
 		const body = 'people:\n  - {name: Aldric Valmont, parents: [p4]}\n';
-		expect(texts(body, 'missing-id')).toEqual(['Aldric Valmont has no ID. Add an ID, for example: id: p5.']);
+		expect(texts(body, 'missing-id')).toEqual(['Aldric Valmont has no ID. Add an ID, for example “id: p5”.']);
 	});
 
 	it('an entry with no name is named by its place', () => {
-		expect(texts('people:\n  - {house: x}\n', 'missing-id')).toEqual(['Entry 1 in the “people” list has no ID. Add an ID, for example: id: p1.']);
+		expect(texts('people:\n  - {house: x}\n', 'missing-id')).toEqual(['Entry 1 in the “people” list has no ID. Add an ID, for example “id: p1”.']);
 	});
 
 	it('the example pasted into the tree gives no duplicate id', () => {
@@ -153,10 +153,10 @@ describe('the "has no id" example for a person (D104, the reader)', () => {
 
 	it('houses and titles keep the slug of the name as the example', () => {
 		expect(texts('houses:\n  - {name: House Valmont}\n', 'missing-id')).toEqual([
-			'House Valmont has no ID, so the tree does not use this house. Add an ID, for example: id: house-valmont.',
+			'House Valmont has no ID, so the tree does not use this house. Add an ID, for example “id: house-valmont”.',
 		]);
 		expect(texts('titles:\n  - {name: Duke of Valmont}\n', 'missing-id')).toEqual([
-			'Duke of Valmont has no ID, so the tree does not use this title. Add an ID, for example: id: duke-of-valmont.',
+			'Duke of Valmont has no ID, so the tree does not use this title. Add an ID, for example “id: duke-of-valmont”.',
 		]);
 	});
 

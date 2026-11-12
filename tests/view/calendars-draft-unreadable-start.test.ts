@@ -79,10 +79,8 @@ describe('"Same year as" that names a calendar of the same session', () => {
 		Object.assign(a, { name: 'Long Count', formats: '{year} Year of the {cycle} Cycle', length: '60' });
 		Object.assign(a.start, { same: '1500', cycle: '1', year: '1' }); // Year 1 of Cycle 1 is the plain year 1500
 		const b = newCalendar('eras', key);
-		Object.assign(b, { name: 'Reigns', formats: '{era} {year}' });
-		Object.assign(b.eras[0], { name: 'Aldric' });
-		// Year 1 of Aldric is the same year as Year 1 of Cycle 1 of the Long Count.
-		Object.assign(b.eras[0].start, { same: '1 Year of the 1 Cycle', year: '1' });
+		// Year 1 of Aldric is the same year as Year 1 of Cycle 1 of the Long Count (D342: the first year of an era is on its text line).
+		Object.assign(b, { name: 'Reigns', formats: '{era} {year}', erasText: 'Aldric, 1 Year of the 1 Cycle' });
 		const drafts = [a, b];
 		const checked = checkDraft(drafts, NOTE);
 		expect(checked.refusals).toEqual([]);

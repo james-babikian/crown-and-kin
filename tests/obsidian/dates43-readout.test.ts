@@ -4,7 +4,8 @@ import { findBlocks } from '../../src/core/block-locate';
 import { parseCalendarBlock } from '../../src/core/calendar-block';
 import { compileCalendars, PLAIN_READER, type ReadDate } from '../../src/core/dates';
 import { EditSheet } from '../../src/obsidian/edit-sheet';
-import { dateReadout } from '../../src/render/date-readout';
+import { DATE_READOUT_UI } from '../../src/render/calendar-text';
+import { dateReadout, dateReadoutParts } from '../../src/render/date-readout';
 import { FEl, dispatch, resetDom } from '../acceptance/fake-dom';
 import { resetObsidian } from '../acceptance/fake-obsidian';
 import { cycleNote, eraNote } from '../support/calendar-vault';
@@ -53,6 +54,17 @@ describe('the text of the grey line', () => {
 	it('adds the warning text after a calendar match', () => {
 		expect(line(cycles, '0 Year of the 3 Cycle')).toBe('The Long Count: Cycle 3, Year 0 = year 219. Year 0 counts as the year before Year 1. Check that you mean this.');
 		expect(line(cycles, '61 Year of the 3 Cycle')).toBe('The Long Count: Cycle 3, Year 61 = year 280. This year is after the end of its cycle or era. The plugin counts on from the last year.');
+	});
+
+	it('keeps the warning of rule 5 as a part of its own, after the grey reading (D348 2 A), and the one text is the same as before', () => {
+		const text = '61 Year of the 3 Cycle';
+		const parts = dateReadoutParts(text, cycles.read(text));
+		expect(parts).toEqual({ reading: 'The Long Count: Cycle 3, Year 61 = year 280.', tail: DATE_READOUT_UI.pastEnd, warning: '' });
+		const zero = dateReadoutParts('0 Year of the 3 Cycle', cycles.read('0 Year of the 3 Cycle'));
+		expect(zero.tail).toBe(DATE_READOUT_UI.yearZero);
+		expect(zero.reading).toBe('The Long Count: Cycle 3, Year 0 = year 219.');
+		// A date with no warning has no tail.
+		expect(dateReadoutParts('10 Year of the 3 Cycle', cycles.read('10 Year of the 3 Cycle')).tail).toBe('');
 	});
 
 	it('names both calendars when two calendars give the same year, and says that no year is found when they differ', () => {
@@ -125,6 +137,23 @@ describe('the grey line in the person window', () => {
 		input.value = '1203';
 		dispatch(input, 'blur');
 		expect(readout(content, 'born')).toBe('');
+	});
+
+	it('shows the warning after the reading in the text colour on the same text line, and says the same words (D348 2 A)', () => {
+		const content = openSheet(() => cycles);
+		const input = content.querySelector('[data-field="born"] input')!;
+		input.value = '61 Year of the 3 Cycle';
+		dispatch(input, 'blur');
+		const reading = content.querySelector('[data-field="born"] .dynasty-date-reading')!;
+		const tail = reading.querySelector('.dynasty-date-tail')!;
+		expect(tail.getText()).toBe(DATE_READOUT_UI.pastEnd);
+		expect(reading.getText()).toBe(`The Long Count: Cycle 3, Year 61 = year 280. ${DATE_READOUT_UI.pastEnd}`);
+		expect(readout(content, 'born')).toBe(`The Long Count: Cycle 3, Year 61 = year 280. ${DATE_READOUT_UI.pastEnd}`);
+		// No new text line: the part is no text line of its own and has no mark.
+		expect(content.querySelector('[data-field="born"] [data-warning]')).toBeNull();
+		input.value = '10 Year of the 3 Cycle';
+		dispatch(input, 'blur');
+		expect(content.querySelector('[data-field="born"] .dynasty-date-tail')).toBeNull();
 	});
 
 	it('the other fields have no grey line', () => {

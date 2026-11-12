@@ -55,15 +55,16 @@ import type { FarTag, LaidOut, NameLineCount, PersonBox, PlacedFoldControl, Rect
 import type { BreakList } from '../break-words';
 import { unionMarkClass } from '../legend';
 import { isColour } from '../colour-check';
-import { lineLook, type LineMarks, type LineState } from '../line-highlight';
+import { lineLook, pathAttr, type LineMarks, type LineState } from '../line-highlight';
 import { cardNameLines, svgNameLines, titleLines, type NameMeasure, type NameRun } from '../name-lines';
-import { ME_RING_INNER, TAG_MARK, UNION_MARKS, tagMarkGap, tagMarkHalfWidth, tagMarkSlot, unionMark, unionShape, type UnionShape } from '../styles';
+import { ME_RING_INNER, UNION_MARKS, unionMark, unionShape } from '../styles';
 import { marksForSvg } from '../date-bidi';
 import { fitCardText, pickReign } from '../date-fit';
 import { SIGN_CARD_LABEL, cardLabel, dateLine, dateLineShown, farTagLabel, farTagName, reignShown, shownReignIsolated } from '../tree-info';
 import { HIT_EM, boxNearView, pathBox, ribbonPath, truncate } from '../view-math';
 import { ME_WORD } from '../view-text';
 import { drawFold, type FoldRef } from './folds';
+import { drawTagPill } from './tag-pill';
 
 // The word moved to view-text.ts (all plugin texts live there); other modules still read it from here.
 export { ME_WORD };
@@ -289,10 +290,14 @@ export function compactNameStep(widthAt: (k: number) => number, maxW: number): n
 
 /** Tag text size in em of the note font (matches the headless renderer). */
 export const TAG_FONT_EM = 0.75;
-/** Tag text at the Compact level is as large as the Compact name, so it is as readable. */
-export const TAG_COMPACT_FONT_EM = COMPACT_NAME_EM;
-/** Height of the Compact and Overview tag pill, in em. It grows up into the card, below the Compact name. */
-const TAG_COMPACT_PILL_EM = 2;
+/** D345 1 A: tag text at the Compact level is two thirds of the Compact name, so the name stays the first thing on the card and more of a name fits. */
+export const TAG_COMPACT_FONT_EM = COMPACT_NAME_EM / 1.5;
+/** Height of the Compact tag pill, in em. It grows up into the card, below the Compact name. */
+const TAG_COMPACT_PILL_EM = 1.5;
+/** The sign pill of the Overview shows two signs and no name, so it keeps its size: as large as the Compact name. */
+export const TAG_SIGN_FONT_EM = COMPACT_NAME_EM;
+/** Height of the Overview sign pill, in em. */
+const TAG_SIGN_PILL_EM = 2;
 /** Radius of the focus-mode `+` badge, in em. Its centre lies on the arc of the card's rounded top right corner, the middle of that arc. */
 export const BADGE_RADIUS_EM = 0.55;
 // All font sizes are set in styles.css from --dynasty-font-size (spec §5.8: nothing that styles
@@ -557,7 +562,7 @@ export function buildScene(parent: SVGGElement, g: FamilyGraph, laid: LaidOut, o
 	const linesEl = parent.createSvg('g', { cls: 'dynasty-lines' });
 	const linesLayer = lazy ? orderedLayer(linesEl) : null;
 	for (const p of look.paths) {
-		const info = { cls: ['dynasty-line', `dynasty-line-${p.kind}`, ...stateCls(p.state)], attr: { d: p.d } };
+		const info = { cls: ['dynasty-line', `dynasty-line-${p.kind}`, ...stateCls(p.state)], attr: pathAttr(p) };
 		if (!linesLayer) {
 			linesEl.createSvg('path', info);
 			continue;
@@ -866,7 +871,7 @@ export function buildScene(parent: SVGGElement, g: FamilyGraph, laid: LaidOut, o
 		}
 		if (ordTab) {
 			// The word tab stands in the Full group and shows at the Full level only, like the "You" tab; the ring takes its place at the smaller levels.
-			drawOrdinalTab(full, box, ordTab, ordinal!, f, roundel, ringSpecs);
+			drawOrdinalTab(full, box, ordTab, ordinal!, f, roundel, ringSpecs, rib + 0.6 * f);
 		}
 
 		const compact = body.createSvg('text', {
@@ -948,20 +953,16 @@ export function buildScene(parent: SVGGElement, g: FamilyGraph, laid: LaidOut, o
 	const tagsEl = parent.createSvg('g', { cls: 'dynasty-tags' });
 	const tags: TagRef[] = [];
 	const tagFont = (em: number) => `400 ${em * f}px ${opts.fonts.ui}`;
-	const small = tagFont(TAG_FONT_EM);
-	const large = tagFont(TAG_COMPACT_FONT_EM);
-	const bigH = TAG_COMPACT_PILL_EM * f;
 	// A far couple with no children has no union dot, so its tag carries the partnership sign.
 	const farSigns = farTagSigns(g, layout, edges);
 	for (const tag of layout.farTags.values()) {
-		const prefix = '⚭ ';
-		const rest = farTagName(g, tag.spouses);
+		const rest = farTagName(g, tag.spouses, opts.labels);
 		const top = tagTop(geo, tag.y);
 		const bottom = top + geo.tagH;
 		const tagState = stateCls(look.tag(tag));
 		const el = tagsEl.createSvg('g', {
 			cls: tagState.length ? ['dynasty-tag', ...tagState] : 'dynasty-tag',
-			attr: { tabindex: 0, role: 'button', 'aria-label': farTagLabel(g, tag.spouses), 'data-person': tag.person },
+			attr: { tabindex: 0, role: 'button', 'aria-label': farTagLabel(g, tag.spouses, opts.labels), 'data-person': tag.person },
 		});
 		const over = el.createSvg('rect', { cls: 'dynasty-tag-over', attr: { x: tag.hit.x, y: tag.hit.y, width: 0, height: 0 } });
 		const pills = holderFor(el);
@@ -969,52 +970,16 @@ export function buildScene(parent: SVGGElement, g: FamilyGraph, laid: LaidOut, o
 		// The pill never grows past its zone (FarTag.zoneW): in `sideways` the tap area can be wider than the card's edge.
 		const zone = tag.zoneW ?? tag.hit.w;
 		// One rendering per level of detail, like the cards; a class on the <svg> shows one.
-		const pill = (cls: string, font: string, fontEm: number, h: number, text: string, fitText: boolean, shape?: UnionShape) => {
-			const pad = h / 2;
-			const part = pills.createSvg('g', { cls });
-			const ring = part.createSvg('rect', { cls: 'dynasty-tag-ring', attr: { y: bottom - h, height: h, rx: h / 2 } });
-			const rect = part.createSvg('rect', { cls: 'dynasty-tag-pill', attr: { y: bottom - h, height: h, rx: h / 2 } });
-			const textEl = part.createSvg('text', { cls: 'dynasty-tag-text', attr: { x: tag.x, y: bottom - h / 2 + 0.35 * fontEm * f, 'text-anchor': 'middle' } });
-			// The partnership sign sits between the ⚭ and the name. The text stays one text element; en spaces leave
-			// the room, and the sign is drawn on that room, found with the same measure as the text.
-			const markPx = fontEm * f;
-			const markAt = (cx: number) => unionMark(shape!, cx, bottom - h / 2, UNION_MARKS[shape!].size * TAG_MARK.unit * markPx);
-			const markEl = shape ? part.createSvg(markAt(0).tag, { cls: ['dynasty-tag-mark', ...unionMarkClass(shape)], attr: markAt(0).attr }) : undefined;
-			const run = () => {
-				let lead = prefix;
-				if (shape) {
-					const en = opts.measure(' ', font);
-					// Rounded up: the room is never smaller than the shape needs (D108); a little more only moves the name right.
-					lead = prefix + ' '.repeat(en > 0 ? Math.max(1, Math.ceil(tagMarkSlot(shape, markPx) / en - 1e-9)) : 2);
-				}
-				const label = fitText ? lead + fit(rest, Math.max(0, zone - 2 * pad - opts.measure(lead, font)), font) : text;
-				const w = Math.min(zone, opts.measure(label, font) + 2 * pad);
-				for (const r of [ring, rect]) {
-					r.setAttribute('x', String(tag.x - w / 2));
-					r.setAttribute('width', String(w));
-				}
-				textEl.setText(label);
-				if (markEl) {
-					// D108: the sign is placed from the start of the name, so the gap before the name is the same for every
-					// shape whatever the width of a space; the spaces above leave at least a gap G on the left of the shape.
-					const nameStart = tag.x - opts.measure(label, font) / 2 + opts.measure(lead, font);
-					const cx = nameStart - tagMarkGap(markPx) - tagMarkHalfWidth(shape!, markPx);
-					const at = markAt(cx).attr;
-					if ('d' in at) markEl.setAttribute('d', at.d);
-					else {
-						markEl.setAttribute('cx', String(at.cx));
-						markEl.setAttribute('cy', String(at.cy));
-						markEl.setAttribute('r', String(at.r));
-					}
-				}
-			};
-			addFit(run);
+		const shape = farSigns.has(tag.person) ? (unionShape('union', farSigns.get(tag.person)) ?? undefined) : undefined;
+		const pill = (cls: string, em: number, h: number, named: boolean) => {
+			const font = tagFont(em);
+			const spec = { cls, font, fontPx: em * f, h, bottom, x: tag.x, zone, measure: (t: string) => opts.measure(t, font), fit: (t: string, w: number) => fit(t, w, font) };
+			addFit(drawTagPill(pills, named ? { ...spec, lead: '⚭ ', name: rest, shape } : { ...spec, lead: '⚭' }));
 		};
-		const farShape = farSigns.has(tag.person) ? unionShape('union', farSigns.get(tag.person)) : null;
 		pendingFits = lazy ? [] : null;
-		pill('dynasty-tag-full', small, TAG_FONT_EM, geo.tagH, '', true, farShape ?? undefined);
-		pill('dynasty-tag-compact', large, TAG_COMPACT_FONT_EM, bigH, '', true, farShape ?? undefined);
-		pill('dynasty-tag-sign', large, TAG_COMPACT_FONT_EM, bigH, '⚭', false);
+		pill('dynasty-tag-full', TAG_FONT_EM, geo.tagH, true);
+		pill('dynasty-tag-compact', TAG_COMPACT_FONT_EM, TAG_COMPACT_PILL_EM * f, true);
+		pill('dynasty-tag-sign', TAG_SIGN_FONT_EM, TAG_SIGN_PILL_EM * f, false);
 		const tagFits = fitsOnAttach();
 		if (lazy)
 			delay(tag.person, tag.hit, false, () => {
@@ -1137,7 +1102,7 @@ export function buildScene(parent: SVGGElement, g: FamilyGraph, laid: LaidOut, o
 		}
 	};
 
-	return { cards, tags, badges, links, pictures, folds, rings: buildRings(parent, ringSpecs), refit: () => fitters.forEach((run) => run()),
+	return { cards, tags, badges, links, pictures, folds, rings: buildRings(parent, ringSpecs, layout.persons, folds.map((c) => c.mark)), refit: () => fitters.forEach((run) => run()),
 		setCornerRadius: (r) => {
 			cornerR = r;
 			verified = true;

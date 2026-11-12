@@ -18,7 +18,7 @@ export const REFUSAL_TEXT = {
 	holderNeeds: 'A holder needs a person or a name.',
 	newIdText: 'The new id must be text without spaces at the ends.',
 	// The ID window compares a refusal with these two exactly (`idRefusalText`), so they are constants, not literals.
-	idCharacters: 'An ID has only letters, digits and hyphens.',
+	idCharacters: 'An ID has only small letters, digits and hyphens.',
 	idNotText: 'The new ID must be a word or a number.',
 	unknownParentType: 'Unknown parent type.',
 	unknownUnionType: 'Unknown partnership type.',
@@ -89,7 +89,7 @@ export const LIST_REFUSAL_TEXT: Readonly<Record<string, (r: ListRefusalInfo) => 
 	'name-length': (r) => `In ${listOf(r)}, a name or a short form has no text or has more than 40 characters. Write 1 to 40 characters.`,
 	'marker-invalid': (r) => `The marker of ${listOf(r)} is not valid. Use 1 to 24 letters, digits or hyphens. Start with a letter. Do not use year, cycle or era.`,
 	'marker-twice': (r) => `Two name lists of ${whereOf(r)} have the marker ${curly(r.detail ?? '')}. Give each list its own marker.`,
-	'known-no-year': (r) => `The plugin cannot read the known year of ${listOf(r)}. ${r.plain ? 'Write a plain year, for example 1273.' : 'Write a date that the calendar can read.'}`,
+	'known-no-year': (r) => `The plugin cannot read the known year of ${listOf(r)}. ${r.plain ? 'Write a plain year, for example 1178.' : 'Write a date that the calendar can read.'}`,
 	'known-no-name': (r) => `The known year of ${listOf(r)} has no name, or its name is not in the list. Write a name or a short form from the list.`,
 };
 

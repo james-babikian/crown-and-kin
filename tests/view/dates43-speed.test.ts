@@ -4,6 +4,7 @@ import { compileCalendars, type Calendar } from '../../src/core/dates';
 import { deriveFamilies } from '../../src/core/derive';
 import { parseDynasty } from '../../src/core/parse';
 import { dateLine } from '../../src/render/tree-info';
+import { checkDraft, newCalendar } from '../../src/view/calendar-draft';
 import { listData, listIds, listStart } from '../../src/view/phone-list';
 import { fixtureNote, topLevelBlocks } from '../acceptance/load';
 import { timedRatio } from '../support/speed-ref';
@@ -57,5 +58,22 @@ describe('the phone list with 50 eras', () => {
 		const first = timedRatio(job, 1);
 		const second = timedRatio(job, 3);
 		expect(second.ratio).toBeLessThanOrEqual(first.ratio * 1.5 + 0.05);
+	});
+});
+
+/** The text lines of 20 000 characters that cost the most for the search of the last comma: many commas, many "to", and one comma with a long text after it. */
+const LONG_LINES = ['a,'.repeat(10_000), ', to '.repeat(4_000), `Name, ${'x to '.repeat(4_000)}`, `${'Reign of Aldric '.repeat(1_250)}, 1100`];
+
+describe('a very long text line in the eras box (D342)', () => {
+	speedTest('reads four text lines of 20 000 characters in about the time of the reference work, not one reading for each comma', () => {
+		let n = 0;
+		const job = () => {
+			const d = Object.assign(newCalendar('eras', () => n++), { name: 'Reigns', formats: '{era} {year}', erasText: LONG_LINES.join('\n') });
+			return checkDraft([d], 'Calendars.md');
+		};
+		const r = timedRatio(job, 5);
+		expect(r.out.calendars[0].kind).toEqual({ type: 'eras', eras: [{ name: 'Reign of Aldric '.repeat(1_250).trim(), start: 1100 }] });
+		// Measured: 0.5 to 0.8 of the reference. With one reading for each comma, the first text line alone took about 20 times the reference.
+		expect(r.ratio, `${r.ms.toFixed(1)} ms, reference ${r.refMs.toFixed(1)} ms`).toBeLessThan(1);
 	});
 });

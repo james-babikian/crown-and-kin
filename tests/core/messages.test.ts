@@ -109,7 +109,8 @@ const MOST_SENTENCES: Partial<Record<IssueCode, number>> = {
 	// ruling 4.2 fix: the clarity editor's rewrites of the date texts say what the plugin does and what the user can do.
 	'year-zero': 5,
 	'calendar-year-zero': 4,
-	'calendar-year-past-end': 5,
+	// D342: an era has no length field any more, so the way out for a cycle and for an era are two sentences.
+	'calendar-year-past-end': 6,
 	'fits-two-calendars': 4,
 	'calendar-no-anchor': 5,
 	'calendar-note-missing': 4, // 0.4 clarity check: the two ways out as two sentences
@@ -191,8 +192,8 @@ describe('issueText: one STE entry per code', () => {
 	});
 
 	it('suggests the example id that the reader gives (D104), and p1 when there is none', () => {
-		expect(issueText(issue('missing-id', { ...SAMPLES['missing-id'], example: 'p4' }))).toBe('Aldric Valmont has no ID. Add an ID, for example: id: p4.');
-		expect(issueText(issue('missing-id', { section: 'people', index: 2 }))).toBe('Entry 2 in the “people” list has no ID. Add an ID, for example: id: p1.');
+		expect(issueText(issue('missing-id', { ...SAMPLES['missing-id'], example: 'p4' }))).toBe('Aldric Valmont has no ID. Add an ID, for example “id: p4”.');
+		expect(issueText(issue('missing-id', { section: 'people', index: 2 }))).toBe('Entry 2 in the “people” list has no ID. Add an ID, for example “id: p1”.');
 		// The name never makes the example.
 		expect(issueText(issue('missing-id', SAMPLES['missing-id']))).not.toContain('aldric-valmont');
 	});
@@ -214,12 +215,12 @@ describe('issueText: title warnings (spec §13.3, §13.4)', () => {
 		expect(text('section-wrong-shape', { section: 'titles' })).toBe('The “titles” section is not a list, so the tree ignores it. Start each title with “- id:”.');
 		expect(text('entry-not-map', { section: 'titles', index: 2 })).toBe('Entry 2 in the “titles” list is not a title, so the tree does not show it. Start each title with “- id:”.');
 		expect(text('missing-id', { section: 'titles', index: 3 })).toBe(
-			'Entry 3 in the “titles” list has no ID, so the tree does not use this title. Add an ID, for example: id: duke-of-valmont.',
+			'Entry 3 in the “titles” list has no ID, so the tree does not use this title. Add an ID, for example “id: duchy-of-normandy”.',
 		);
 		expect(text('missing-id', { section: 'titles', index: 3, name: 'Duke of Valmont' })).toBe(
-			'Duke of Valmont has no ID, so the tree does not use this title. Add an ID, for example: id: duke-of-valmont.',
+			'Duke of Valmont has no ID, so the tree does not use this title. Add an ID, for example “id: duke-of-valmont”.',
 		);
-		expect(text('missing-id', { section: 'titles', index: 1, name: 'King of Ostmark' })).toContain('id: king-of-ostmark.');
+		expect(text('missing-id', { section: 'titles', index: 1, name: 'King of Ostmark' })).toContain('“id: king-of-ostmark”.');
 		expect(text('duplicate-title-id', SAMPLES['duplicate-title-id'])).toBe(
 			'More than one title has the ID “duke-of-valmont”, and the tree uses only the first. Give each title a different ID.',
 		);
@@ -227,10 +228,10 @@ describe('issueText: title warnings (spec §13.3, §13.4)', () => {
 
 	it('the holders of a title', () => {
 		expect(text('section-wrong-shape', { section: 'holders', title: 'Duke of Valmont' })).toBe(
-			'The holders of the title Duke of Valmont are not a list, so the tree ignores them. Write each holder like this: - {person: aldric}.',
+			'The holders of the title Duke of Valmont are not a list, so the tree ignores them. Write each holder with the ID of a person, for example “- {person: robert}”.',
 		);
 		expect(text('entry-not-map', { section: 'holders', index: 5, title: 'Duke of Valmont' })).toBe(
-			'Entry 5 in the holders of Duke of Valmont is not a holder. Write each holder like this: - {person: aldric}.',
+			'Entry 5 in the holders of Duke of Valmont is not a holder. Write each holder with the ID of a person, for example “- {person: robert}”.',
 		);
 		expect(text('missing-holder', { title: 'Duke of Valmont', ref: 'aldrik' })).toBe(
 			'The title Duke of Valmont has a holder with the ID “aldrik”, but no person has this ID. Correct the ID, or write the name of the holder.',
@@ -306,7 +307,7 @@ describe('issueText: succession warnings', () => {
 
 	it('year-unreadable says that the end of the last reign is used', () => {
 		expect(text('year-unreadable', { title: 'Duke of Valmont', value: 'the old days' })).toBe(
-			'The title Duke of Valmont has “year: the old days”. The plugin cannot find a year in it. The line of succession uses the end of the last reign. If the last reign has no end, the line is for now. Write the year as a number, for example “year: 1210”.',
+			'The title Duke of Valmont has “year: the old days”. The plugin cannot find a year in it. The line of succession uses the end of the last reign. If the last reign has no end, the line is for now. Write the year as a number, for example “year: 1066”.',
 		);
 	});
 
@@ -438,7 +439,7 @@ describe('hardErrorText', () => {
 
 	it('a hard error says "tree text", not "block"', () => {
 		expect(hardErrorText({ code: 'not-a-map' })).toBe(
-			'The tree text does not have sections such as “people:”. To show the tree, put each person in a list below “people:”.',
+			'The tree text has no sections such as “people:”. To show the tree, put each person in a list below “people:”.',
 		);
 		for (const e of [HARD['yaml-invalid'], { code: 'yaml-invalid' as const }, HARD['not-a-map']]) expect(hardErrorText(e)).not.toMatch(/block/i);
 	});
@@ -464,7 +465,7 @@ describe('quote marks in the message table (D99)', () => {
 
 	it('the colour message keeps its YAML example straight and quotes the rest with curly marks', () => {
 		const text = issueText(issue('house-color-null', { house: 'valmont', id: 'valmont' }));
-		expect(text).toContain('color: "#8b1e3f".');
+		expect(text).toContain('“color: "#8b1e3f"”.');
 		expect(text).toContain(quote('valmont'));
 		expect(text.replace('color: "#8b1e3f"', '')).not.toMatch(/["']/);
 		const recovered = issueText(issue('house-color-null', SAMPLES['house-color-null']));
@@ -519,7 +520,7 @@ describe('calendarRefusalText: the refusals of the Calendars window (spec §14 r
 			expect(unquoted(text), text).not.toMatch(FORBIDDEN);
 		}
 		expect(calendarRefusalText({ calendar: 'Reign names', key: 'calendar-era-duplicate', other: 'Dynasties' })).toBe('The calendar “Reign names” and the calendar “Dynasties” have the same era name. A date with this name would fit both. Change one era name.');
-		expect(calendarRefusalText({ calendar: 'A', key: 'calendar-format-cycle' })).toBe('A cycle format needs {year} and {cycle}, one time each. It cannot have any other word in curly brackets. An example is “{year} Year of the {cycle} Cycle”.');
+		expect(calendarRefusalText({ calendar: 'A', key: 'calendar-format-cycle' })).toBe('A cycle format needs {year} and {cycle}, one time each. It cannot have any other word in curly brackets. For example: “{year} Year of the {cycle} Olympiad”.');
 	});
 
 	it('gives a plain sentence for a key it does not know, and never throws', () => {

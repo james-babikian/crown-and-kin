@@ -13,7 +13,7 @@ export const SETTINGS_UI = {
 	heightDesktopDesc: 'This is the height of a tree in a note, in pixels. The default is 500. If you drag the bottom edge of a tree, that tree keeps its new height.',
 	/** D118: the user's own break places in long names. */
 	breakWords: 'Break places in long names',
-	breakWordsDesc: `The plugin can break a long word into parts. Write one word on each text line. Put a hyphen at each place where the word can break. An example is ${quote('Long-na-munda')}. If a name has a hyphen, write each part on its own text line. The plugin breaks a word from this list only at your places.`,
+	breakWordsDesc: `The plugin can break a long word into parts. Write one word on each text line. Put a hyphen at each place where the word can break, for example ${quote('Es-clar-monde')}. If a name has a hyphen, write each part on its own text line. The plugin breaks a word from this list only at your places.`,
 	/** D124 item 5, D126. */
 	reduceMotion: 'Reduce movement',
 	reduceMotionDesc: 'If you choose On, the tree changes at once and does not move slowly. If you choose Follow the device, the tree uses the setting of your phone or your computer.',
@@ -36,14 +36,14 @@ export const SETTINGS_UI = {
 	armsOnCards: 'Arms on cards',
 	armsFew: 'Founders and holders',
 	armsAll: 'Every card',
-	armsOnCardsDesc: 'Choose which cards show the arms of a house. For example, with the first choice, the founder of House Valmont shows the arms. A person who married into a house also shows them. A child of the founder shows them only if the child holds a title. A card always shows personal arms.',
+	armsOnCardsDesc: `Choose which cards show the arms of a house. For example, with ${quote('Founders and holders')}, the founder of House Plantagenet shows the arms. A person who married into a house also shows them. A child of the founder shows them only if the child holds a title. A card always shows personal arms.`,
 	/** D188 item 10. */
 	manyParents: 'Warn about more than 2 parents',
 	manyParentsDesc: 'If this is on, the plugin warns when a person has more than 2 parents of one type: birth, adoptive, ward or begetter. It also warns when a person has more than 2 parents by blood. Birth parents and begetters together are the parents by blood. If this is off, the plugin gives no warning for these. A person can have up to 8 rumoured parents. The plugin always warns about more than 8 rumoured parents.',
 	phoneDirection: 'Tree direction on a phone held upright',
 	directionSideways: 'Sideways',
 	directionDown: 'Like the computer',
-	phoneDirectionDesc: 'This sets the direction of the tree in the full-screen view on a phone that you hold upright. For example, Sideways puts the parents at the left, and Like the computer puts them at the top.',
+	phoneDirectionDesc: `This sets the direction of the tree in the full-screen view on a phone that you hold upright. ${quote('Sideways')} puts the parents at the left. ${quote('Like the computer')} puts them at the top.`,
 	/** D174 (spec §9): the text is the spec's, word for word. */
 	oneParentUnknown: 'Assume an unknown second parent',
 	oneParentUnknownDesc:

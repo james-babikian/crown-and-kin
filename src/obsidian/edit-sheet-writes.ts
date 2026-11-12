@@ -318,6 +318,13 @@ export abstract class EditSheetWrites extends EditSheetActions {
 		}, undone);
 	}
 
+	/** The names of the undo label of a Save: the saved name and, when the edit renamed the person, the name before the undo (D346 item 2). */
+	private changeNames(named: string): string[] {
+		const draft = this.draft.name.trim();
+		const renamed = this.data.person.name !== '' && draft !== '' && draft !== this.data.person.name;
+		return renamed ? [named, draft] : [named];
+	}
+
 	protected async save(another = false): Promise<void> {
 		if (this.saving || this.readOnly) return;
 		if (!this.validate()) return;
@@ -329,7 +336,7 @@ export abstract class EditSheetWrites extends EditSheetActions {
 			}
 			// The undo line names the person as the tree shows them after the undo: the saved name, not the draft.
 			const named = this.data.person.name || this.draft.name.trim() || SHEET.unnamed;
-			if (await this.write([op], this.data.person.id, true, { label: { kind: 'change', names: [named] } })) this.finish();
+			if (await this.write([op], this.data.person.id, true, { label: { kind: 'change', names: this.changeNames(named) } })) this.finish();
 			return;
 		}
 		if (this.relBlocked) {
