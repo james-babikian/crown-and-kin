@@ -9,6 +9,7 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { deriveFamilies, type FamilyGraph } from '../../src/core/derive';
 import { computeGenerations } from '../../src/core/generations';
+import { withWardUnions } from '../../src/core/ward-unions';
 import { computeModelOrder, sideByWalk, soloKey, type ModelOrder } from '../../src/core/order';
 import { parseDynasty } from '../../src/core/parse';
 import { randomTree } from '../support/random-trees';
@@ -369,7 +370,8 @@ describe('D2: the written sibling order never changes', () => {
 			const g = deriveFamilies(parsed.tree);
 			const order = computeModelOrder(g, computeGenerations(g));
 			expect(personIds(order).sort()).toEqual(g.people.map((p) => p.id).sort());
-			expect(unionKeys(order).sort()).toEqual(g.unions.map((u) => u.key).sort());
+			// Two guardians of a ward with no union are walked as a private union (D354 1 B), as the pair was an implicit union before.
+			expect(unionKeys(order).sort()).toEqual(withWardUnions(g).unions.map((u) => u.key).sort());
 		}
 	});
 });

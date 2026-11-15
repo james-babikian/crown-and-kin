@@ -4,7 +4,8 @@
  * break a cycle still counts, because the ops and the pickers work on what is written.
  */
 
-import { partnerOf, type FamilyGraph } from './derive';
+import { partnershipsOf } from './co-parents';
+import { pairKey, type FamilyGraph } from './derive';
 import type { ParentKind, UnionKind, UnionRef } from './edit';
 import { bloodProblem } from './blood-parents';
 import { BLOOD_LIMIT, isBloodType } from './parent-types';
@@ -128,13 +129,19 @@ export const descendantsOf = (g: FamilyGraph, id: string) => reach(g, id, true);
 /** Everyone reachable from `id` by following parent links upward (parents, grandparents, and so on). */
 export const ancestorsOf = (g: FamilyGraph, id: string) => reach(g, id, false);
 
-/** The person's sibling group (§4.3, §6.5): the children of their primary union, or of their one placement parent. */
+/**
+ * The person's sibling group (§4.3, §6.5): the children of their primary union, or of their one placement parent. The wards of two
+ * guardians with no union (`wardPairs`, D354 1 B) are a group too, so their written order can still be changed as before.
+ */
 export function siblingGroup(g: FamilyGraph, id: string): string[] | null {
 	const key = g.primaryUnion.get(id);
 	if (key !== undefined) return g.unionByKey.get(key)?.children ?? null;
 	const placed = g.placementParents.get(id) ?? [];
 	if (placed.length === 1) return g.soloChildren.get(placed[0]) ?? null;
-	return null;
+	if (placed.length !== 2) return null;
+	const pair = pairKey(placed[0], placed[1]);
+	const group = g.wardPairs.filter((w) => pairKey(w.guardians[0], w.guardians[1]) === pair).map((w) => w.child);
+	return group.includes(id) ? group : null;
 }
 
 /** Implements `FamilyOf`. */
@@ -144,12 +151,11 @@ export const familyOf: FamilyOf = (g, id) => {
 
 	const partners: PartnerLink[] = [];
 	const choices: string[] = [];
-	for (const key of g.unionsOf.get(id) ?? []) {
-		const fu = g.unionByKey.get(key);
-		if (!fu) continue;
-		const partner = partnerOf(fu, id);
+	// D356: an implicit union counts only for exactly two birth or two adoptive parents; a pair with no union (a ward-placed child's birth
+	// parents) has a row too, with no edit button, as an implicit row.
+	for (const { partner, fu } of partnershipsOf(g, id)) {
 		if (!choices.includes(partner)) choices.push(partner);
-		if (fu.implicit || fu.unionIndex === undefined) {
+		if (!fu || fu.implicit || fu.unionIndex === undefined) {
 			partners.push({ partner, union: null, type: null });
 			continue;
 		}

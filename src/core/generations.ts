@@ -8,6 +8,7 @@
 import { partnerOf, type FamilyGraph } from './derive';
 import { equalisePartners, RowGroups } from './row-partners';
 import { loneRumouredRoots } from './rumoured-roots';
+import { withWardUnions } from './ward-unions';
 
 /**
  * Assigns each person a generation (0 = top row), using placement parents only (spec §5.1 step 1).
@@ -30,7 +31,9 @@ import { loneRumouredRoots } from './rumoured-roots';
  *
  * Cycles in the parent links must already be broken (deriveFamilies does this).
  */
-export function computeGenerations(g: FamilyGraph): Map<string, number> {
+export function computeGenerations(graph: FamilyGraph): Map<string, number> {
+	// Two guardians of a ward are seated as a pair (D354 1 B): the one source of the rows, so core and layout cannot differ.
+	const g = withWardUnions(graph);
 	const ids = g.people.map((p) => p.id);
 	const isRoot = (id: string) => g.placementParents.get(id)!.length === 0;
 	const partnersOf = (id: string) => (g.unionsOf.get(id) ?? []).map((k) => partnerOf(g.unionByKey.get(k)!, id));

@@ -7,12 +7,14 @@
 
 import { setIcon, type App } from 'obsidian';
 import type { PartnerLink } from '../core/family-query';
-import { ENDED_BY, isUnionType, readEndedBy, UNION_TYPES } from '../core/types';
-import { SHEET, UNION_EDIT, UNION_TYPE_TEXT, partnerDetail } from '../render/ui-text';
+import { ENDED_BY, readEndedBy, UNION_TYPES } from '../core/types';
+import { SHEET, UNION_EDIT, UNION_TYPE_TEXT, partnerDetail, shownEndedBy, showsEndedBy } from '../render/ui-text';
 import { buildShell } from './window-shell';
 import { startWithoutFocus } from './modal-layout';
 import { endEntryOnEnter, nameDialog, sheetField, uniqueId } from './sheet-parts';
 import { SmallFormModal } from './small-form';
+
+export { showsEndedBy };
 
 /** The editable fields of one partnership. */
 export interface UnionValues {
@@ -32,17 +34,13 @@ export function endedByChoice(raw: string | undefined | null): string {
 	return readEndedBy(raw) ?? (raw ?? '').trim();
 }
 
-/** D310: "Ended by" shows for a marriage and for a type word of the tree's own (drawn as a marriage); not for a betrothal, a concubinage or an affair. */
-export const showsEndedBy = (type: string): boolean => type === 'marriage' || !isUnionType(type);
-
 /**
  * D330 UX-03: the detail of a partner row, in every place that lists a partnership (the Family row, the other-parent step, the "already partners" list, the
  * "Partnership of the parents" choice): the type, the dates and, only for a marriage or a type word of the tree's own (`showsEndedBy`) with an `ended-by`
  * that `readEndedBy` reads, "ended by divorce". Another kind, an unknown value, no value and a pair with no recorded partnership (a null type) give no such part.
  */
 export function partnerLinkDetail(l: Pick<PartnerLink, 'type' | 'start' | 'end' | 'endedBy'>): string {
-	const why = l.type !== null && showsEndedBy(l.type) ? readEndedBy(l.endedBy) : null;
-	return partnerDetail(l.type, l.start, l.end, why);
+	return partnerDetail(l.type, l.start, l.end, shownEndedBy(l.type, l.endedBy));
 }
 
 /** Writes the values; resolves to null after a successful write, or to the message to show. */

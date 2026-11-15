@@ -258,7 +258,7 @@ describe('chain and none (spec §13.2 "No relation of §13.1")', () => {
 		expect(rolf.steps).toEqual([step('alan', 'gwen', 'father'), step('fenna', 'alan', 'wife'), step('rolf', 'fenna', 'husband')]);
 		expect(sentences(G, rolf.steps)).toEqual({ shown: ["Alan is Gwen’s father.", "Fenna is Alan’s wife.", "Rolf is Fenna’s husband."], more: 0 });
 		const alan = findRelation(G, 'alan', 'rolf');
-		expect(sentence(G, alan, 0)).toBe('Alan and Rolf have a relation through 1 other person.');
+		expect(sentence(G, alan, 0)).toBe('Alan and Rolf are connected through 1 other person.');
 	});
 
 	it('an affair partner and a ward give no relation of §13.1, only a chain', async () => {

@@ -118,7 +118,9 @@ export function listData(g: FamilyGraph, centre: string): ListData {
 		for (const r of rows) seen.add(r.id);
 		partnerships.push({ key, partner: pid, rows });
 	}
-	const solo = (g.soloChildren.get(centre) ?? []).filter((c) => !seen.has(c) && g.byId.has(c));
+	// The wards of two guardians who share no union (D354 1 B) are in no partnership, so they stand with the children of the centre alone.
+	const wards = g.wardPairs.filter((w) => w.guardians.includes(centre)).map((w) => w.child);
+	const solo = [...(g.soloChildren.get(centre) ?? []), ...wards].filter((c, i, all) => !seen.has(c) && g.byId.has(c) && all.indexOf(c) === i);
 	for (const c of solo) seen.add(c);
 
 	// The side links of the centre, the other kinds before the rumoured ones, each in the order of the note.

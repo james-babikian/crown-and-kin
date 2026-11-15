@@ -5,11 +5,12 @@
 
 import { setIcon } from 'obsidian';
 import type { ParentKind } from '../core/edit';
-import { linkTypeFull } from '../core/family-query';
+import type { FamilyGraph } from '../core/derive';
+import { linkTypeFull, writtenParents } from '../core/family-query';
 import { PARENT_TYPES } from '../core/types';
 import { CHANGE_UI } from '../render/change-text';
 import { appendNameRun } from '../render/dom/name-span';
-import { dateLine, dateLineShown, relationInfo } from '../render/tree-info';
+import { chainOthers, dateLine, dateLineShown, noRelationButLine, relationInfo } from '../render/tree-info';
 import { quotedSobriquet } from '../core/sobriquet';
 import { FAMILY, ME_UI, SHEET, WINDOW_UI, parentTypeText } from '../render/ui-text';
 import { partnerLinkDetail } from './union-edit';
@@ -23,6 +24,19 @@ import { buildRow, iconButton, iconLead, personLead, textButton } from './window
 import { EditSheetForm } from './edit-sheet-form';
 import { EditSheetBase } from './edit-sheet-base';
 import { loadSheet, placementChoices, type Draft } from '../view/sheet-draft';
+
+/**
+ * D356 4 A: the two guardians to name in the heading of a ward-only group, or null. Every ward of the group must have exactly two ward-type guardians;
+ * the order is that of the first ward of the group in document order, so all wards of the group show the same words.
+ */
+function wardGroupGuardians(g: FamilyGraph, id: string, group: readonly string[]): [string, string] | null {
+	if (g.primaryUnion.has(id)) return null;
+	const guardiansOf = (w: string) => writtenParents(g, w).filter((l) => l.type === 'ward').map((l) => l.id);
+	if (!group.every((w) => guardiansOf(w).length === 2 && !g.primaryUnion.has(w))) return null;
+	const first = g.people.find((p) => group.includes(p.id));
+	const pair = first ? guardiansOf(first.id) : [];
+	return pair.length === 2 ? [pair[0], pair[1]] : null;
+}
 
 /** The Family section and the rows it is made of. */
 export abstract class EditSheetFamily extends EditSheetForm {
@@ -165,7 +179,10 @@ export abstract class EditSheetFamily extends EditSheetForm {
 	protected siblingsGroup(body: HTMLElement, fam: FamilyView): void {
 		const sib = fam.siblings;
 		if (!sib) return;
-		const place = this.familyGroup(body, 'siblings', FAMILY.siblings);
+		// D356 4 A: the ward heading names the guardians only for a group of wards who all have exactly two ward-type guardians.
+		const pair = wardGroupGuardians(this.data.g, this.data.person.id, sib.group);
+		const heading = pair ? FAMILY.siblingsWards(this.name(pair[0]), this.name(pair[1])) : FAMILY.siblings;
+		const place = this.familyGroup(body, 'siblings', heading);
 		const r = buildRow(place, { cls: 'dynasty-family-row' });
 		r.title.addClass('dynasty-family-position');
 		r.title.setText(FAMILY.position(sib.index + 1, sib.group.length));
@@ -231,7 +248,10 @@ export abstract class EditSheetFamily extends EditSheetForm {
 		const v: RelationView = relationInfo(relationsFor(this.data.g, me, this.o.relationOptions, this.o.relationBlock).all.get(p.id), p.id === me);
 		const finder = this.o.finder;
 		// C1: a person with no relation and no chain to the marked person has no line to show, so the link would lead to an empty view.
-		const hasLine = v.kind === 'relation' || (v.kind === 'none' && findRelation(this.data.g, me, p.id, this.o.relationOptions).kind !== 'none');
+		const found = v.kind === 'none' ? findRelation(this.data.g, me, p.id, this.o.relationOptions) : null;
+		const hasLine = v.kind === 'relation' || (found !== null && found.kind !== 'none');
+		// D356 2 A: a line exists, so the window says how many people stand between; no line keeps the old words.
+		if (found?.kind === 'chain') v.value = noRelationButLine(chainOthers(found));
 		if (hasLine && finder && !this.gone) v.showLine = { label: ME_UI.showLine, aria: ME_UI.showLineLabel(p.name || p.id), run: () => this.leaveFor(() => finder.show(me, p.id)) };
 		return v;
 	}

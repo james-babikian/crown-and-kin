@@ -15,7 +15,9 @@ export function isStructuralFar(g: FamilyGraph, layout: TreeLayout, key: string,
 	const lower = a.gen > b.gen ? a : b;
 	const row = layout.rows[lower.gen];
 	const at = row.indexOf(lower.id);
-	const joined = (other: string | undefined) => other !== undefined && (g.unionsOf.get(lower.id) ?? []).some((k) => g.unionByKey.get(k)!.partners.includes(other) && layout.unions.get(k)!.bar);
+	// Two guardians of a ward with no union stand as a unit too (D354 1 B): the layout seats them side by side though no bar is drawn.
+	const guardians = (other: string) => g.wardPairs.some((w) => w.guardians.includes(lower.id) && w.guardians.includes(other));
+	const joined = (other: string | undefined) => other !== undefined && ((g.unionsOf.get(lower.id) ?? []).some((k) => g.unionByKey.get(k)!.partners.includes(other) && layout.unions.get(k)!.bar) || guardians(other));
 	return joined(row[at - 1]) && joined(row[at + 1]);
 }
 

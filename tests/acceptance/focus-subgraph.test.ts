@@ -583,7 +583,8 @@ describe('implicit co-parents come in only through a shown child', () => {
 
 	it('placement: ward puts the ward pair in instead, and the birth parents stay out', () => {
 		const tree = parse(TYPES.replace('{id: w1, type: ward}]}', '{id: w1, type: ward}], placement: ward}'));
-		expect(implicitPairs(tree)).toEqual(['a1+f', 'f+w1']);
+		// D354 1 B: two guardians who share no union are never a union, so f+w1 is gone.
+		expect(implicitPairs(tree)).toEqual(['a1+f']);
 		const r = run(tree, 'f', 1);
 		expect(ids(r)).toEqual(['a1', 'w1', 'f', 'c', 'e', 'd', 'y']);
 		expect(parentsIn(r, 'e')).toEqual(['f:ward', 'w1:ward']);

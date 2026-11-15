@@ -85,19 +85,51 @@ describe('D219: the gap round the arms follows the outline of the picture', () =
 		expect(group.children.map((c) => c.tag)).toEqual(['path', 'image']);
 		const gap = group.children[0]!;
 		expect(gap.hasClass(ARMS_GAP_CLASS)).toBe(true);
-		const want = armsGap(OUTLINE, slot.rect, slot.gap!);
+		const want = armsGap(OUTLINE, slot.rect, slot.gap!, slot.align);
 		expect(gap.getAttribute('d')).toBe(want.d);
 		expect(gap.getAttribute('transform')).toBeNull();
 		expect(Number(gap.getAttribute('stroke-width'))).toBeCloseTo(want.strokeWidth, 9);
 		const other = { ...OUTLINE, d: 'M0 0L9 0L9 9Z' };
 		setArmsGap(slot, other);
 		expect(group.children).toHaveLength(2);
-		expect(gap.getAttribute('d')).toBe(armsGap(other, slot.rect, slot.gap!).d);
+		expect(gap.getAttribute('d')).toBe(armsGap(other, slot.rect, slot.gap!, slot.align).d);
 		setArmsGap(slot, null);
 		expect(group.children.map((c) => c.tag)).toEqual(['image']);
 		setArmsGap(slot, OUTLINE);
 		setPicture(slot, null);
 		expect(group.children).toHaveLength(0);
+	});
+
+	it('D353 1 B: beside a portrait the gap of a narrow banner starts at the left of its box, as the picture does ("xMinYMid meet"), in the scene and in the saved picture; arms alone stay in the middle', () => {
+		const BANNER = { w: 43, h: 100, d: 'M0 0L43 0L43 80L21.5 100L0 80Z' };
+		const xs = (d: string) => [...d.matchAll(/(-?[\d.]+) (-?[\d.]+)/g)].map((m) => Number(m[1]));
+		const ys = (d: string) => [...d.matchAll(/(-?[\d.]+) (-?[\d.]+)/g)].map((m) => Number(m[2]));
+		// Aldric has a portrait and the arms of his house; Edric has the arms alone.
+		const g2 = build(`${SRC}  - {id: e, name: Edric, house: v, parents: [a], born: 1132}\n`).g;
+		clearLayoutCache();
+		const laid = layoutTree(g2, ROUNDEL, { ...DEFAULT_LAYOUT_SETTINGS, ...pictureSets(g2, true), armsOnCards: 'all' } as LayoutSettings, 'test');
+		const scene = buildScene(new FEl('g') as unknown as SVGGElement, g2, laid, { fonts: FONTS, measure, link: () => null });
+		const beside = scene.pictures.find((s) => s.kind === 'arms' && s.person === 'a' && s.lod === 'full')!;
+		const alone = scene.pictures.find((s) => s.kind === 'arms' && s.person === 'e' && s.lod === 'full')!;
+		expect(beside.align).toBe('left');
+		for (const [slot, left] of [[beside, true], [alone, false]] as const) {
+			setPicture(slot, 'blob:x');
+			setArmsGap(slot, BANNER);
+			const d = (slot.el as unknown as FEl).children.find((e) => e.hasClass(ARMS_GAP_CLASS))!.getAttribute('d')!;
+			const r = slot.rect;
+			// The banner meets the height of the box: 2.3 em beside a portrait (as high as the portrait), 2 em alone.
+			expect(Math.min(...ys(d))).toBeCloseTo(r.y, 1);
+			expect(Math.max(...ys(d))).toBeCloseTo(r.y + r.h, 1);
+			const w = (43 / 100) * r.h;
+			expect(Math.min(...xs(d))).toBeCloseTo(left ? r.x : r.x + (r.w - w) / 2, 1);
+		}
+		// The saved picture places the same gap and the picture with the same alignment.
+		const saved = { heading: 'T', legend: { kinds: [], sign: false, houses: [] }, pictures: new Map([['arms:v', PNG_URI]]), scale: 1 };
+		const svg = renderSvg(g2, laid.layout, laid.edges, { palette: DEFAULT_LIGHT, measure: approxMeasure, fonts: FONTS, saved, outlines: new Map([['arms:v', BANNER]]) });
+		expect(svg).toContain(`<path d="${armsGap(BANNER, beside.rect, ROUNDEL_EM.halo * 16, 'left').d}"`);
+		expect(svg).toContain(`<path d="${armsGap(BANNER, alone.rect, ROUNDEL_EM.halo * 16, 'middle').d}"`);
+		expect(svg).toContain(`x="${beside.rect.x}" y="${beside.rect.y}" width="${beside.rect.w}" height="${beside.rect.h}" preserveAspectRatio="xMinYMid meet"`);
+		expect(svg).toContain(`x="${alone.rect.x}" y="${alone.rect.y}" width="${alone.rect.w}" height="${alone.rect.h}" preserveAspectRatio="xMidYMid meet"`);
 	});
 
 	it('a portrait slot never gets a gap path (its gap is the halo circle)', () => {
@@ -123,7 +155,7 @@ describe('D219: the gap round the arms follows the outline of the picture', () =
 		const box = laid.layout.persons.get('a')!;
 		const rp = roundelPics(laid.layout.geometry, { arms: true, portrait: true });
 		const rect = { x: box.x + rp.arms!.x, y: box.y + rp.arms!.y, w: rp.arms!.w, h: rp.arms!.h };
-		const want = armsGap(OUTLINE, rect, ROUNDEL_EM.halo * 16);
+		const want = armsGap(OUTLINE, rect, ROUNDEL_EM.halo * 16, rp.armsAlign);
 		const withGap = renderSvg(g, laid.layout, laid.edges, { palette: DEFAULT_LIGHT, measure: approxMeasure, fonts: FONTS, saved, outlines: new Map([['arms:v', OUTLINE]]) });
 		const path = `<path d="${want.d}" fill="${DEFAULT_LIGHT.background}" stroke="${DEFAULT_LIGHT.background}" stroke-width="${want.strokeWidth}" stroke-linejoin="round" fill-rule="evenodd"/>`;
 		expect(withGap).toContain(path);

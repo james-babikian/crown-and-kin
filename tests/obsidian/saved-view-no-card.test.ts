@@ -320,7 +320,8 @@ describe('error boxes', () => {
 		expect(button).not.toBeNull();
 		expect(button!.getText()).toBe(BLOCK_UI.showText);
 		await press(button);
-		expect(showSource).toHaveBeenCalledWith('n.md', 0);
+		// D346 item 5, D350: the button goes to the text line that the box names (text line 3 of BAD).
+		expect(showSource).toHaveBeenCalledWith('n.md', 0, 3);
 	});
 
 	it('a block that cannot be edited here has no such button', async () => {

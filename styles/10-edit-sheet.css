@@ -587,12 +587,15 @@ body.theme-dark .dynasty-house-dot {
 	object-position: 50% 20%;
 }
 
-.dynasty-pic:hover::after {
-	content: '';
-	position: absolute;
-	inset: 0;
-	border-radius: 50%;
-	background: var(--background-modifier-hover);
+/* The shade over the portrait shows only with a mouse: on a touch screen a tap leaves :hover on the button until the next tap, and the shade covered the portrait while its menu was open. */
+@media (hover: hover) and (pointer: fine) {
+	.dynasty-pic:hover::after {
+		content: '';
+		position: absolute;
+		inset: 0;
+		border-radius: 50%;
+		background: var(--background-modifier-hover);
+	}
 }
 
 .dynasty-pic.is-none {

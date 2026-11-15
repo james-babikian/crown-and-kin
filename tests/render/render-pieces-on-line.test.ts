@@ -425,8 +425,8 @@ describe('RelationTexts: the finder and sheet sentences (spec §13.1, §13.2)', 
 
 	it('a chain and no relation', () => {
 		const line = { people: ['rod', 'isolde', 'gareth', 'mira'], links: [], unions: [] };
-		expect(finderSentence(g, { kind: 'chain', first: 'rod', second: 'mira', steps: [], line }, 0)).toBe('Roderick and Mira have a relation through 2 other people.');
-		expect(finderSentence(g, { kind: 'chain', first: 'rod', second: 'mira', steps: [], line: { ...line, people: ['rod', 'isolde', 'mira'] } }, 0)).toBe('Roderick and Mira have a relation through 1 other person.');
+		expect(finderSentence(g, { kind: 'chain', first: 'rod', second: 'mira', steps: [], line }, 0)).toBe('Roderick and Mira are connected through 2 other people.');
+		expect(finderSentence(g, { kind: 'chain', first: 'rod', second: 'mira', steps: [], line: { ...line, people: ['rod', 'isolde', 'mira'] } }, 0)).toBe('Roderick and Mira are connected through 1 other person.');
 		expect(finderSentence(g, { kind: 'none', first: 'rod', second: 'mira' }, 0)).toBe('Roderick and Mira have no relation in this tree.');
 	});
 

@@ -36,7 +36,7 @@ import type { FontState } from '../render/fonts';
 import { clearMeasureCache, measureText } from '../render/dom/measure';
 import { readFonts } from '../render/dom/page-reads';
 import { wireCardTips } from '../render/dom/card-tip';
-import { PanZoom } from '../render/dom/pan-zoom';
+import { PanZoom, visibleRect } from '../render/dom/pan-zoom';
 import { FILL_ALL_EVENT, buildScene, lodClass, type SceneOptions } from '../render/dom/scene';
 import { sameTall } from '../render/dom/tall-cards';
 import { parseBreakList } from '../render/break-words';
@@ -47,7 +47,8 @@ import { treeBounds } from '../render/view-math';
 import { START_LIMIT_MS, STYLES_LIMIT_MS } from './block-binding';
 import { newBlockState, type BlockState } from '../view/block-state';
 import type { FoldRef } from '../render/dom/folds';
-import { askInGroups, drawBudget, rememberStop, wasStopped } from '../view/large-tree';
+import { RELATION_GROUP, askInGroups, drawBudget, rememberStop, wasStopped } from '../view/large-tree';
+import { LATE_WORDS_MIN_CARDS, startWordQueue, wordsComeLate } from '../view/late-words';
 import { measuredLayout, type MeasuredResult } from '../view/measured-layout';
 import { relationsFor, type TreeRelations } from '../view/relation-cache';
 import { planRender, type RenderInputs, type StateChanges, type TreePlan } from '../view/render-plan';
@@ -87,6 +88,9 @@ export interface TreeHost extends ViewHost {
  * at worst, shows the internal-error box (spec §8).
  */
 export class TreeView extends TreeViewList {
+	/** D352 item 1: the fewest drawn cards for which the relation words come late; tests lower it to run the late words on small sample trees. */
+	static lateWordsMin = LATE_WORDS_MIN_CARDS;
+
 	/** The fields that a render starts from: nothing of the old draw is left. */
 	protected resetDrawn(): void {
 		this.emptyEl = null;
@@ -200,7 +204,8 @@ export class TreeView extends TreeViewList {
 			result = this.layOut(plan.g, plan.geo, plan.laidBase, plan.fonts, plan.labels, plan.foldPlan.hidden, stop);
 			// The names of the cards that are drawn, in one request (all cards of the whole tree, the people of a focus family); the scene reads each from the lookup.
 			// Spec §7.7 (time budget): the request of a whole tree is cut into groups, with the time check between them.
-			if (rel) askInGroups((ids) => rel.cards.getMany(ids), result.laid.layout.persons.keys(), stop);
+			// D352 item 1: a large tree asks only the words of the cards near the first view, at its first fill; the rest come in idle time (`late-words.ts`).
+			if (rel && !this.lateWords(result)) askInGroups((ids) => rel.cards.getMany(ids), result.laid.layout.persons.keys(), stop);
 		} catch (e) {
 			if (!(e instanceof LayoutStopped)) throw e;
 			// Spec §7.7 (time budget): the draw passed its time budget before its next phase. Nothing of it was cached; the bar with no button stays until the tree text changes.
@@ -213,6 +218,33 @@ export class TreeView extends TreeViewList {
 		const alt = plan.alt;
 		this.finderAlt = alt ? { ...this.layOut(plan.g, alt.geo, alt.base, plan.fonts, plan.labels, plan.foldPlan.hidden), geo: alt.geo } : null;
 		return result;
+	}
+
+	/**
+	 * D352 item 1: starts the idle queue of the late relation words of the scene (`late-words.ts`), one for each scene. The queue holds its own scene and pan and
+	 * zoom, so a new scene (a redraw, a new render) never gets the words of an old lookup; the teardown and the next scene stop it.
+	 */
+	protected startWords(): void {
+		const scene = this.scene;
+		const pz = this.panZoom;
+		if (!scene || !pz || this.wordsScene === scene) return;
+		this.wordsStop?.();
+		this.wordsStop = null;
+		this.wordsScene = null;
+		if (scene.words.pending === 0) return;
+		this.wordsScene = scene;
+		this.wordsStop = startWordQueue({
+			words: scene.words,
+			view: () => (pz.view ? visibleRect(pz.view, pz.size) : null),
+			busy: () => this.moving(pz),
+			alive: () => !this.unloaded && this.wordsScene === scene,
+			guard: (fn) => this.guard(fn),
+		});
+	}
+
+	/** D352 item 1: the words of this layout's cards come late (`late-words.ts`). Tests lower `TreeView.lateWordsMin`. */
+	protected lateWords(result: MeasuredResult): boolean {
+		return wordsComeLate(result.laid.layout.persons.size, TreeView.lateWordsMin);
 	}
 
 	/** Takes the planned tree and its layout as the drawn one. */
@@ -324,6 +356,7 @@ export class TreeView extends TreeViewList {
 			link: (p) => this.cardLink(p),
 			badges: sub ? { hidden: sub.hidden, label: (p, n) => FOCUS_UI.badgeLabel(p.name, n) } : undefined,
 			...(rel ? { relations: rel.cards } : {}),
+			...(rel && this.lateWords(result) ? { lateWords: RELATION_GROUP } : {}),
 			...(me !== null ? { me } : {}),
 			...(finder?.line ? { line: lineMarks(finder.line, finder.state.whole) } : {}),
 			...(succession ? { heirs: succession.heirs, ordinals: succession.ordinals } : {}),
@@ -378,6 +411,8 @@ export class TreeView extends TreeViewList {
 		if (this.full) this.safeProbe = root.createDiv({ cls: 'dynasty-safe-probe' });
 		// D28: the hint labels stay in the tree, hidden until a first view counts children outside the box.
 		if (this.orientation === 'sideways') for (const dir of ['up', 'down']) viewport.createDiv({ cls: 'dynasty-hint-slot', attr: { 'data-dir': dir } });
+		// D352 item 1: a wheel zoom or pan holds no press, so the queue of the late words reads the time of the last wheel event.
+		viewport.addEventListener('wheel', () => (this.wheelAt = performance.now()), { passive: true });
 		this.observer = new ResizeObserver(() => this.guard(() => this.resized()));
 		this.observer.observe(viewport);
 		// A banner that grows (the steps open, a long sentence wraps) takes room from the drawing area below it without a change of the box.
@@ -395,7 +430,10 @@ export class TreeView extends TreeViewList {
 			// A touch embed is a static preview (D1); the full-screen view always pans and zooms (spec §7.2).
 			interactive: !!this.full || !this.coarse,
 			mode: this.full ? 'full' : 'embed',
-			onSettle: (v, byUser) => this.settled(v, byUser),
+			onSettle: (v, byUser) => {
+				this.settled(v, byUser);
+				this.startWords();
+			},
 			// A D19 fill in a pinch out also takes the level of detail for its zoom: the smaller level has
 			// less text to lay out, so the fills are cheaper (measured: 83–133 ms instead of 133–167 ms at 4×).
 			onFill: (v) => {
@@ -405,9 +443,12 @@ export class TreeView extends TreeViewList {
 					this.placeFolds(v, this.foldsDue(v));
 				}
 				this.fillFolds(v);
-				this.fillNear(v);
+				this.fillNear(v, false);
 			},
-			onFirstDraw: (v) => this.firstDraw(v),
+			onFirstDraw: (v) => {
+				this.firstDraw(v);
+				this.startWords();
+			},
 			guard: (fn) => this.guard(fn),
 			// D222: only the full-screen view keeps a small tree between its bars (the values are cached by `measureInsets`).
 			...(this.full
@@ -490,6 +531,7 @@ export class TreeView extends TreeViewList {
 		if (view) this.fillNear(view);
 		else this.syncPending();
 		this.startIdleSoon();
+		this.startWords();
 	}
 
 	/**

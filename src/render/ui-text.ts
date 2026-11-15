@@ -7,7 +7,7 @@
 
 export { ADD_UI, BLOCK_UI, FINDER_UI, FOCUS_UI, FOLD_UI, FULL_UI, HINT_UI, LARGE_UI, PHONE_LIST_UI, PROBLEMS_HINT, PROBLEMS_OPEN, PROBLEMS_POPUP_BUTTON, ONE_PERSON_HINT, UI, groupCount, problemsLabel, problemsPopupLine, problemsTitle } from './view-text';
 export { SUCCESSION_UI } from './succession-text';
-export { FAMILY, FLOW, ME_UI, NEW_SHEET, NOTE_UI, REMOVE, SHEET, UNION_EDIT, UNION_TYPE_TEXT, deleteText, endedByText, parentTypeText, partnerDetail, unionDates, unionTypeText } from './sheet-text';
+export { FAMILY, FLOW, ME_UI, NEW_SHEET, NOTE_UI, REMOVE, SHEET, UNION_EDIT, UNION_TYPE_TEXT, deleteText, endedByText, parentTypeText, partnerDetail, shownEndedBy, showsEndedBy, unionDates, unionTypeText } from './sheet-text';
 export { HOUSES, HOUSE_COLOUR_NAMES, HOUSE_PAGE_UI, ID_UI, TITLES_UI, WINDOW_UI, WIN_LIST_UI, WRITE_TEXT } from './window-text';
 export { INSERT_UI, RENAME_UI, SETTINGS_UI, TIMING_UI, renamedKind, renamedText } from './settings-text';
 export type { LinkReportText } from './settings-text';

@@ -2,6 +2,48 @@
 
 All notable changes for users. The newest version is first.
 
+## 0.5.5
+
+### Speed
+
+- **A large tree now shows faster.** In a tree of 500 cards or more, the cards on the screen and near it get their relation words first. The other cards get their words a moment later, when you do not pan or zoom. In a test, a computer had the screen size and the speed of a phone. There, the whole tree of 1,000 people showed after 1.3 seconds instead of 2.7 seconds. On a computer, a tree of 5,000 people in a note took 1.8 seconds instead of 6.6 seconds. The relation words are the same as before.
+- **On an iPhone or an iPad, the text of new cards now has no long pauses.** This is for the cards that come into view after a pan or a zoom. Before, the text came in groups, with a pause of 0.3 seconds between them. Now the groups are smaller, and the pause between them is very short.
+
+### Name tags
+
+- **The text in a name tag is now as large as the dates on the card.** On a phone 390 points wide, the text is 11.9 pixels high instead of 10.5. On a small phone 320 points wide, it is 9.7 pixels instead of 8.6. In a sideways tree, no name tag in the sample trees is cut.
+- **A name tag for two partners whose cards stand far apart now shows the first name of each partner.** A middle dot stands between the two names, for example "Katrin · Ermengarde". If the two names do not fit, or if they look the same, the tag shows "2 partners", as before. A tag for three partners or more shows "3 partners", and so on. A screen reader says the full names of both partners.
+- **A name tag for several partners now has no "⚭" sign.** Before, it started with "⚭". That sign means "married", but the partnership could be a betrothal or an affair. A name tag for one partner keeps its signs, as before.
+- **The list of a name tag for several partners now shows the kind of each partnership.** The list opens when you select the tag. Under each name, it shows "Marriage", "Betrothal", "Concubinage" or "Affair". If no partnership is written, it shows "No recorded partnership". A marriage that ended shows the cause, for example "Marriage, ended by divorce". These are the words of the person window. Before, the list showed only the names.
+- **The gap before the name in a name tag is now the same in every font.** The gap is the same on the screen and in a saved picture. Before, in some fonts, the sign "⚭" almost touched the name.
+
+### Pictures
+
+- **Narrow arms beside a portrait are now larger.** In a tree from top to bottom, arms on a card now have a space as high as the portrait. For example, a banner on a phone is about 14 by 32 pixels instead of 9 by 21. A narrow shield is about 11 % larger. Wider shields, round arms and wide arms keep their size. Arms of every shape now stand at the same small distance from the portrait. The name, the portrait and the card do not move.
+- **On a phone or a tablet, a tap on a portrait no longer hides it.** Before, a tap on the portrait in the person window put a dark shade over it. The shade stayed while the portrait menu was open. On an iPhone, the portrait looked like an empty dark circle. Now this shade shows only when a mouse pointer is on the picture. The colour change over the arms button of a house and over the picture list works the same way.
+
+### Guardians and co-parents
+
+- **Two guardians with no partnership in the note are no longer drawn as a couple.** Each guardian now has its own dotted guardian line to the child. No line joins the two guardians, and no name tag names one as the partner of the other. Before, a line joined them, and the child hung from that line. The cards stay where they were. If the two guardians stand far apart on two rows, the child hangs from the guardian in the lower row.
+- **Two guardians are no longer "Co-parent" to each other.** They show no relation word to each other. A guardian and a ward keep "Guardian" and "Ward".
+- **Two birth parents are now "Co-parent" also when the card of their child stands under guardians.** For example, Aldo and Cara have a child, and the note puts the card of the child under two guardians. Aldo and Cara now show "Co-parent" to each other. Before, they showed no word. The same is true for two adoptive parents.
+- **With three birth parents or three adoptive parents, no two of them are "Co-parent" now.** Before, the order of the parents in the note could make two of them "Co-parent". Now the order never changes the result. The person window, Add child, the relation finder and the line of succession use the same rule.
+- **The person window of a ward of two guardians now names the guardians.** The heading over the order buttons says, for example, "Position among the wards of Roderick Harrow and Sabine Kestrel". Before, it said "Position among siblings", but the wards are not siblings. For children of the same parents, the heading stays "Position among siblings".
+
+### Relations and errors
+
+- **The person window now says that you are connected to a person who is not family.** For example, "No family relation to you. Connected through 1 other person." Before, it said "No relation to you in this tree.", but the button "Show the line" showed a connection. If no line connects you, the old words stay.
+- **The relation finder now uses the same words.** For example, "Roderick Harrow and Sabine Kestrel are connected through 1 other person." Before, it said that they "have a relation through 1 other person". The relation finder no longer says "relation" for people who are not family.
+- **"Show the tree text" now goes to the text line with the error.** The error box names the text line, for example "Text line 5 of the tree text has an error." The button "Show the tree text" now puts the cursor at the start of that text line. Before, the cursor went to the first text line of the tree text.
+
+### Known limits
+
+- **In a tree of 500 cards or more, a card can show without its relation word for a moment.** This can happen if you pan far in the first 1 or 2 seconds. Until the word comes, a screen reader does not say the relation of that card. On an iPhone, the words take about 1 second to come in a tree of 1,000 people and about 10 seconds in a tree of 5,000.
+- **On a computer, a very long name in a tag can be cut in a tree from top to bottom.** This happens in the default theme. In the sample trees, 1 of 164 tags is cut: "Gwendolyn Castel…" in sample tree 6.
+- **If a child has three birth parents or three adoptive parents, the tree still joins two of them with a line, as for a couple.** The order in the note decides which two. If the two cards stand far apart, each card gets a name tag with the other name. The two are not "Co-parent" to each other. A new drawing is for a later version.
+- **If you fold two guardians whose cards stand far apart, the fold button can be missing.** This happens when both guardians already have a fold button. To show the child again, select "Show descendants" in the person window of a guardian.
+- **When Obsidian 1.15 starts, portraits and arms can be blank for about half a second.** At the start, Obsidian first shows its own copy of the last screen. Portraits and arms are blank in that copy.
+
 ## 0.5.4
 
 ### Examples and help

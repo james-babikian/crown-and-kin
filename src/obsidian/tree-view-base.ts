@@ -887,7 +887,7 @@ export abstract class TreeViewBase extends MarkdownRenderChild implements HoverP
 	protected abstract startFinder(): Promise<void>;
 	protected abstract startPictures(): void;
 	abstract syncFocus(own?: boolean): void;
-	protected abstract tagActivated(spouses: readonly string[], tagEl: SVGGElement, hit: SVGRectElement): void;
+	protected abstract tagActivated(person: string, spouses: readonly string[], tagEl: SVGGElement, hit: SVGRectElement): void;
 	protected abstract takeFocus(): void;
 	protected abstract toggleFold(c: FoldControl): void;
 	protected abstract turnDue(): boolean;

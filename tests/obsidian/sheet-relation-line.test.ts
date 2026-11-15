@@ -128,6 +128,14 @@ describe('the relation text line of the header', () => {
 		const line = lines(modal)[0]!;
 		expect(line.hasClass('is-none')).toBe(true);
 		expect(line.querySelector('.dynasty-show-line')).not.toBeNull();
+		// D356 2 A: with a line, the window counts the people between, as the finder does.
+		expect(line.querySelector('.dynasty-jitem')!.getText()).toMatch(/^No family relation to you\. Connected through \d+ other (person|people)\.$/);
+	});
+
+	it('D356 2 A: the phone window says the same, and the count is the finder count', () => {
+		phone();
+		const t = lines(open('yara').modal)[0]!.querySelector('.dynasty-jitem')!.getText();
+		expect(t).toMatch(/^No family relation to you\. Connected through (1 other person|[2-9] other people)\.$/);
 	});
 
 	it('the phone window has the same rule', () => {

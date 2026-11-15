@@ -374,10 +374,10 @@ describe('the dead sign in the date line and the screen-reader label', () => {
 });
 
 describe('known limits (D200) stay as documented', () => {
-	it('three birth parents: the partner words use the two parents used for placement', () => {
+	it('three birth parents: no two of them are co-parents (D356 3 A)', () => {
 		const g = tree(['a m', 'b f', 'c m', 'k - a b c']);
-		expect(all(g, 'a', 'b')).toBe('Co-parent');
-		expect(all(g, 'a', 'c')).not.toBe('Co-parent');
+		expect(all(g, 'a', 'b')).toBe('(none)');
+		expect(all(g, 'a', 'c')).toBe('(none)');
 	});
 
 	it('sure-on-sure collapse: a mother who is also the great-grandmother shows only as "Mother"', () => {

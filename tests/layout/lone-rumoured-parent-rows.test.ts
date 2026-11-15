@@ -7,6 +7,7 @@ import { speedTest } from '../support/speed-test';
 import type { FamilyGraph } from '../../src/core/derive';
 import { pruneGraph } from '../../src/core/folds';
 import { computeGenerations } from '../../src/core/generations';
+import { withWardUnions } from '../../src/core/ward-unions';
 import { computeModelOrder } from '../../src/core/order';
 import { rowStats } from '../../src/core/row-partners';
 import { loneRumouredRoots } from '../../src/core/rumoured-roots';
@@ -22,9 +23,9 @@ const SETTINGS = { sweeps: 4, far: DEFAULT_FAR_RULE };
 const SAMPLES = ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12', '13', '14', '15'];
 
 const pair = (partners: readonly string[]) => [...partners].sort().join('+');
-/** The partnerships whose two partners stand on different rows, as sorted "a+b" texts. */
+/** The partnerships whose two partners stand on different rows, as sorted "a+b" texts. The pair of two guardians counts as one: the rows seat it so (D354 1 B). */
 const unequal = (g: FamilyGraph, gen: Map<string, number>) =>
-	g.unions.filter((u) => gen.get(u.partners[0]) !== gen.get(u.partners[1])).map((u) => pair(u.partners));
+	withWardUnions(g).unions.filter((u) => gen.get(u.partners[0]) !== gen.get(u.partners[1])).map((u) => pair(u.partners));
 
 /** Spec §5.1 step 1: every person with placement parents is exactly one row below the lower one; no row is empty. */
 function rowProblems(g: FamilyGraph, gen: Map<string, number>): string[] {

@@ -77,7 +77,8 @@ describe('card text', () => {
 	it('names far partners', () => {
 		const g = graph(TREE);
 		expect(farTagLabel(g, ['b'])).toBe('Show the partner Berthe.');
-		expect(farTagLabel(g, ['b', 'c'])).toBe('Show a list of 2 partners.');
+		// D353 3 A (genealogy vet, ruling 2): two far partners are named in full, whatever the tag shows.
+		expect(farTagLabel(g, ['b', 'c'])).toBe('Show a list of 2 partners: Berthe and Cora.');
 	});
 
 	it('gives the visible far-tag text after the sign: a name, or the number of partners', () => {

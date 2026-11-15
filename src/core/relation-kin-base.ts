@@ -7,8 +7,9 @@
  * `KinBlood.release` clears with the rest.
  */
 
-import { drawnParentMap, type FamilyGraph, type FamilyUnion } from './derive';
+import { drawnParentMap, type FamilyGraph, type FamilyUnion, pairKey } from './derive';
 import { bloodSet } from './blood-parents';
+import { coParentPairs, coParentPartners } from './co-parents';
 import { type CoupleKeys, legalParents, orderCouple } from './legal-parents';
 import { MarriageYears } from './marriage-years';
 import { addLines, anyPair, isFullCousin, notOneCouple, outcomesOf, twoCouples } from './relation-candidates';
@@ -441,34 +442,22 @@ export class KinBase {
 	}
 
 	/**
-	 * D293: true if `a` and `b` are partners for a legal pair: they share a listed union, or an implicit union that a child makes by listing
-	 * exactly these two parents of its placement type. A child with three such parents makes an implicit union of the first two it lists
-	 * only, so that union would make the names depend on the order of its list; it does not count.
+	 * D293: true if `a` and `b` are partners for a legal pair: they share a listed union, or a child lists exactly these two parents of one kind,
+	 * birth or adoptive (`coParentPairs`). A child with three such parents makes no pair, so the names never depend on the order of its list;
+	 * two guardians never make one (D354 1 B, D356).
 	 */
-	private readonly legalShare = (a: number, b: number): boolean => {
-		for (const key of this.g.unionsOf.get(this.ids[a]) ?? []) {
-			const fu = this.g.unionByKey.get(key);
-			if (!fu || (fu.partners[0] !== this.ids[b] && fu.partners[1] !== this.ids[b])) continue;
-			if (!fu.implicit) return true;
-			for (const id of fu.children) {
-				const k = this.idx.get(id);
-				if (k === undefined) continue;
-				const type = this.drawn[k].find((l) => l.p === a)?.type;
-				if (type !== undefined && new Set(this.drawn[k].filter((l) => l.type === type).map((l) => l.p)).size === 2) return true;
-			}
-		}
-		return false;
-	};
+	private readonly legalShare = (a: number, b: number): boolean => this.paired(a, b) || this.lastUnion(a, b, false) !== undefined;
+
+	/** True if `x` and `y` are the only two birth parents or the only two adoptive parents of some child (`coParentPairs`, D356 3 A). */
+	protected paired(x: number, y: number): boolean {
+		return coParentPairs(this.g).has(pairKey(this.ids[x], this.ids[y]));
+	}
 
 	/** True if `x` and `y` share a union of the tree, listed or implicit: then `coupleUnion` gives a key of the tree. */
 	protected sharesUnion(x: number, y: number): boolean {
 		let partners = this.unionPeople[x];
 		if (!partners) {
-			partners = [];
-			for (const key of this.g.unionsOf.get(this.ids[x]) ?? []) {
-				const fu = this.g.unionByKey.get(key);
-				if (fu) for (const id of fu.partners) partners.push(this.idx.get(id) ?? -1);
-			}
+			partners = this.partners(x);
 			this.unionPeople[x] = partners;
 		}
 		return partners.includes(y);
@@ -629,10 +618,10 @@ export class KinBase {
 		return fu && isMarriage(fu) && this.years.allEnded(this.marriagesOf(x, y)) ? { lower: `${FORMER}${word}`, base: word } : { lower: word };
 	}
 
-	/** The union a partner step uses: the pair's last-listed union, or their implicit union. */
+	/** The union a partner step uses: the pair's last-listed union, or their implicit union if the pair is a pair of `coParentPairs`. */
 	pairUnion(x: number, y: number): FamilyUnion | undefined {
 		const listed = this.lastUnion(x, y, false);
-		if (listed) return listed;
+		if (listed || !this.paired(x, y)) return listed;
 		const key = implicitKey(this.ids[x], this.ids[y]);
 		return (this.g.unionsOf.get(this.ids[x]) ?? []).includes(key) ? this.g.unionByKey.get(key) : undefined;
 	}
@@ -652,15 +641,23 @@ export class KinBase {
 		return out;
 	}
 
-	/** Partners in any union, also implicit, in `unionsOf` order. */
+	/**
+	 * Partners in a listed union or as a pair of `coParentPairs`, in `unionsOf` order, then the pairs that have no union in the graph
+	 * (a ward-placed child's birth parents). The implicit union of the first two of three parents of one kind is no partnership here (D356 3 A).
+	 */
 	partners(x: number): number[] {
 		const out: number[] = [];
+		const add = (id: string) => {
+			const other = this.idx.get(id);
+			if (other !== undefined && other !== x && !out.includes(other)) out.push(other);
+		};
 		for (const key of this.g.unionsOf.get(this.ids[x]) ?? []) {
 			const fu = this.g.unionByKey.get(key);
 			if (!fu) continue;
-			const other = this.idx.get(fu.partners[0] === this.ids[x] ? fu.partners[1] : fu.partners[0]);
-			if (other !== undefined && other !== x && !out.includes(other)) out.push(other);
+			const other = fu.partners[0] === this.ids[x] ? fu.partners[1] : fu.partners[0];
+			if (!fu.implicit || this.paired(x, this.idx.get(other) ?? -1)) add(other);
 		}
+		for (const id of coParentPartners(this.g).get(this.ids[x]) ?? []) add(id);
 		return out;
 	}
 

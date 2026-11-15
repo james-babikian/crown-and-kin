@@ -19,7 +19,7 @@ import { sampleSources } from '../acceptance/picture-list-support';
  * The values are recorded from the code of the 0.2.1 fix round: a later change of the sideways layout or of its
  * drawing must change them on purpose. 0.2.2 (D108): the values of 07 and 07b were recorded again, because their far-couple
  * tags show a ring or an open triangle, which now keep the same gap before the name as the dot. 0.2.4: recorded again for the card geometry (the card is 61 px
- * high, the name text 0.85 em, the arms box and portrait at the lower right; the sideways layout has the same columns and card widths). 0.2.5 (D140, WP-A1): the keys '12 normal' and '12 narrow' were recorded again (partners on one row). 0.2.6 (D179): all four were recorded again for the text card; the same values come from the code of 0.2.5 with `cardForm(geometryFor(16, 'normal'), 'sideways')`. 0.2.8 look round (D212–D214): all four were recorded again. Run: npx vitest run tests/render/sideways-headless-hashes.test.ts
+ * high, the name text 0.85 em, the arms box and portrait at the lower right; the sideways layout has the same columns and card widths). 0.2.5 (D140, WP-A1): the keys '12 normal' and '12 narrow' were recorded again (partners on one row). 0.2.6 (D179): all four were recorded again for the text card; the same values come from the code of 0.2.5 with `cardForm(geometryFor(16, 'normal'), 'sideways')`. 0.2.8 look round (D212–D214): all four were recorded again. 0.5.5 (D353 2 A, 4): all four were recorded again (tag text 0.85 em, the fixed gap before the tag name). Run: npx vitest run tests/render/sideways-headless-hashes.test.ts
  */
 
 // 0.2.6 (D179): the sideways tree has the text card (the classic card is gone).
@@ -41,10 +41,10 @@ function sidewaysHash(source: string): string {
 }
 
 const RECORDED: Record<string, string> = {
-	'07': '2d9c6ad29a260dc72def6ca220654baec8e7c57b4fd2b6fda029738256f1d2d0',
-	'07b': '2d9c6ad29a260dc72def6ca220654baec8e7c57b4fd2b6fda029738256f1d2d0',
-	'12': '3b7099ee9a75d1979575f66c67069f6112558ca089e9910c1858bc34b32cd308',
-	'15': '445109e9e31175d0bc983fc3188ec689215087277673b69fcbc7ad5295e66237',
+	'07': 'a041c7d4bb85d32eb0f75e15f91a21d265dec64d75ef5a3381e4a50dbb4a8720',
+	'07b': 'a041c7d4bb85d32eb0f75e15f91a21d265dec64d75ef5a3381e4a50dbb4a8720',
+	'12': '864a1a83f45ffd885254814078fed1760cc55eb45c0a5cbe75414da3c2870359',
+	'15': '60bc1c63e95c0f0484902e082523eda674b1380668795c884ea5cef7e8937907',
 };
 
 const SAMPLES = sampleSources().filter((s) => IDS.includes(s.id));

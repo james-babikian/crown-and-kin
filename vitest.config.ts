@@ -6,6 +6,7 @@ import { defineConfig } from 'vitest/config';
 // `npm test` (G1 and CI) runs every other file; `npm run test:perf` runs these; `npx vitest run` runs both. Move a file into this list when it becomes slow.
 // The choice is by file, so a file with one slow test takes its fast tests with it.
 export const PERF_FILES = [
+	'tests/core/finder-partner-index-speed.test.ts',
 	'tests/obsidian/window-link-under-last-field.test.ts',
 	'tests/obsidian/phone-list-arrival-order.test.ts',
 	'tests/acceptance/focus-subgraph.test.ts',

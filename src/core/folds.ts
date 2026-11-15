@@ -117,6 +117,15 @@ function build(g: FamilyGraph): Index {
 	for (const [parent, kids] of g.soloChildren) {
 		if (kids.length) families.push({ key: foldKey([parent]), parents: [parent], children: [...kids].sort(bySibling) });
 	}
+	// The wards of two guardians who share no union (D354 1 B) fold as the family of that pair: no union, so no `union` on the control.
+	const wards = new Map<string, { parents: readonly string[]; children: string[] }>();
+	for (const w of g.wardPairs) {
+		const key = pairKey(w.guardians[0], w.guardians[1]);
+		const known = wards.get(key) ?? { parents: w.guardians, children: [] };
+		known.children.push(w.child);
+		wards.set(key, known);
+	}
+	for (const [key, e] of wards) if (!pairs.has(key)) families.push({ key, parents: [...e.parents], children: e.children.sort(bySibling) });
 	const smallest = (f: FoldFamily) => Math.min(...f.parents.map(at));
 	families.sort((a, b) => smallest(a) - smallest(b) || (a.key < b.key ? -1 : a.key > b.key ? 1 : 0));
 	const byKey = new Map(families.map((f) => [f.key, f]));
@@ -331,7 +340,9 @@ export function pruneGraph(g: FamilyGraph, hidden: ReadonlySet<string>): FamilyG
 		const kept = kids.filter(shown);
 		if (kept.length) soloChildren.set(id, kept);
 	}
+	// A ward pair stays only while the ward and both guardians are shown.
+	const wardPairs = g.wardPairs.filter((w) => shown(w.child) && w.guardians.every(shown));
 	const secondary = g.secondary.filter((e) => shown(e.child) && e.parents.every(shown) && (e.unionKey === undefined || unionByKey.has(e.unionKey)));
 
-	return { ...g, people, byId, placementParents, placementType, primaryUnion, unions, unionByKey, unionsOf, soloChildren, secondary };
+	return { ...g, people, byId, placementParents, placementType, primaryUnion, unions, unionByKey, unionsOf, soloChildren, secondary, wardPairs };
 }

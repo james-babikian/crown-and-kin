@@ -8,14 +8,13 @@ import { deriveFamilies, type FamilyGraph } from '../core/derive';
 import { focusGenerationsFor, focusSubgraph } from '../core/focus-subgraph';
 import { unfoldFor, type FoldControl } from '../core/folds';
 import type { Tree } from '../core/types';
-import { setNameText } from '../render/dom/name-marks';
-import { isolateName } from '../render/name-bidi';
 import { FOCUS_UI, UI, WRITE_TEXT } from '../render/ui-text';
 import { keepSpot } from '../render/view-math';
 import type { Handle } from './block-handle';
 import { EditSheet } from './edit-sheet';
 import { planFolds, withFolds } from '../view/fold-view';
 import { HousesWindow } from './houses-window';
+import { fillPartnerList } from './tag-partner-list';
 import { pickPerson } from './person-picker';
 import { DEFAULT_SETTINGS } from '../view/settings';
 import { TitlesWindow } from './titles-window';
@@ -209,7 +208,7 @@ export abstract class TreeViewActions extends TreeViewToolbar {
 		if (v && !this.unloaded) this.storeView(v);
 	}
 
-	protected tagActivated(spouses: readonly string[], tagEl: SVGGElement, hit: SVGRectElement): void {
+	protected tagActivated(person: string, spouses: readonly string[], tagEl: SVGGElement, hit: SVGRectElement): void {
 		if (spouses.length === 1) {
 			this.jumpTo(spouses[0]);
 			return;
@@ -220,14 +219,10 @@ export abstract class TreeViewActions extends TreeViewToolbar {
 			'spouses',
 			(el) => {
 				el.createDiv({ cls: 'dynasty-popover-title', text: UI.spouseListTitle });
-				for (const id of spouses) {
-					const b = el.createEl('button', { cls: 'dynasty-popover-item' });
-					setNameText(b, isolateName(g.byId.get(id)?.name ?? id));
-					b.addEventListener('click', () => {
-						this.popover?.close();
-						this.guard(() => this.jumpTo(id));
-					});
-				}
+				fillPartnerList(el, g, this.whole ?? g, person, spouses, (id) => {
+					this.popover?.close();
+					this.guard(() => this.jumpTo(id));
+				});
 				el.querySelector<HTMLElement>('button')?.focus();
 			},
 			tagEl,

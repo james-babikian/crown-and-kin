@@ -58,6 +58,14 @@ export class Kin extends KinBlood {
 		return walkLine(this.bloodWalk(c));
 	}
 
+	/** The partner name of `p` to `m`: from the pair's last-listed union, or from a pair of `coParentPairs` (D356). */
+	private partnerCand(m: number, p: number): Cand | undefined {
+		const pu = this.pairUnion(m, p);
+		if (!pu && !this.paired(m, p)) return undefined;
+		const walk: Walk = { nodes: [m, p], edges: [{ k: 'partner', union: pu?.key ?? implicitKey(this.ids[m], this.ids[p]) }] };
+		return { ...this.partnerOf(pu, m, p), kind: 'partner', distance: 1, cat: 0, direct: 1, half: 0, removal: 0, elder: 0, group: 0, anc: -1, make: () => ({ line: walkLine(walk), walk }) };
+	}
+
 	/** Every named relation of `p` to `m` (§13.1), best first, one per name. */
 	relationsFor(m: number, p: number): Cand[] {
 		relationCallStats.calls++;
@@ -66,11 +74,8 @@ export class Kin extends KinBlood {
 		const sexP = this.sex[p];
 		const aP = this.anc(p);
 
-		const pu = this.pairUnion(m, p);
-		if (pu) {
-			const walk: Walk = { nodes: [m, p], edges: [{ k: 'partner', union: pu.key }] };
-			cands.push({ ...this.partnerOf(pu, m, p), kind: 'partner', distance: 1, cat: 0, direct: 1, half: 0, removal: 0, elder: 0, group: 0, anc: -1, make: () => ({ line: walkLine(walk), walk }) });
-		}
+		const partner = this.partnerCand(m, p);
+		if (partner) cands.push(partner);
 
 		this.directExtras(m, p, cands);
 

@@ -9,6 +9,7 @@ import { Transaction } from '@codemirror/state';
 import type { EditorView } from '@codemirror/view';
 import type { WritePlan } from '../core/block-write';
 import { findBlocks, ordinalForSection, type LocatedBlock } from '../core/block-locate';
+import { bodyLineOffset } from '../core/error-line';
 import { relocate, relocateAll, sameBody, smallestChange, undoBlock } from '../core/block-match';
 import { createUndoStack, planWrite, type UndoLabel } from '../core/block-write';
 import type { EditResult, Op } from '../core/edit';
@@ -388,9 +389,10 @@ export class HandleRegistry {
 	 * "Show the tree text" (D176 item 2): makes the editor of the note show the text of block `ordinal`, the same
 	 * result as Obsidian's hidden "Edit this block" button. The note switches to Live Preview if it is in Reading view,
 	 * and the cursor goes to the start of the block text, which makes the editor show the source of a rendered block.
-	 * Returns false if the note or the block is gone.
+	 * With `line` (the 1-based text line that an error box names, D346 item 5) the cursor goes to the start of the tree
+	 * text on that line, and the editor scrolls it into view. Returns false if the note or the block is gone.
 	 */
-	async showSource(path: string, ordinal: number): Promise<boolean> {
+	async showSource(path: string, ordinal: number, line?: number): Promise<boolean> {
 		const file = this.file(path);
 		if (!file) return false;
 		const ws = this.app.workspace;
@@ -411,24 +413,26 @@ export class HandleRegistry {
 			if (!mine(view)) return false;
 		}
 		const editor = view.editor;
-		const block = findBlocks(editor.getValue())[ordinal];
+		const text = editor.getValue();
+		const block = findBlocks(text)[ordinal];
 		if (!block) return false;
-		const put = (b: { bodyStart: number }) => {
-			const pos = editor.offsetToPos(b.bodyStart);
+		const put = (now: string, b: LocatedBlock) => {
+			const pos = editor.offsetToPos(line === undefined ? b.bodyStart : bodyLineOffset(now, b, line));
 			editor.setCursor(pos);
 			editor.scrollIntoView({ from: pos, to: pos }, true);
 			editor.focus();
 		};
 		void ws.revealLeaf(leaf);
-		put(block);
+		put(text, block);
 		// A view that just switched mode can lay out its editor after this call; the cursor goes in again once. The text can have changed by then, so the block is found again, and a closed leaf or a lost block is skipped.
 		if (switched) {
 			const leafNow = leaf;
 			window.setTimeout(() => {
 				try {
 					if (leafNow.view !== view || !mine(leafNow.view) || leafNow.view.editor !== editor) return;
-					const again = findBlocks(editor.getValue())[ordinal];
-					if (again) put(again);
+					const now = editor.getValue();
+					const again = findBlocks(now)[ordinal];
+					if (again) put(now, again);
 				} catch {
 					// The view closed in between: no second cursor.
 				}

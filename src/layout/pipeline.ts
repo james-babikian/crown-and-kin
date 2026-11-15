@@ -7,6 +7,7 @@
  * into (the plan, the counts). `index.ts` calls `arrangeTree` behind the cache; the tests and scripts call it through an internal script.
  */
 import type { FamilyGraph } from '../core/derive';
+import { computeGenerations } from '../core/generations';
 import { computeModelOrder } from '../core/order';
 import { FOLD_EM, type FoldInput } from './fold-spots';
 import { lineMetrics, MIN_HIT, sidewaysGeometry, sidewaysPartnerGap, tabbedCards, tagTop, TIE, turnedGeometry, withRelationLine } from './geometry';
@@ -18,6 +19,7 @@ import type { Plan } from './plan-model';
 import { derive, farByDistance, markFar, nearAgain, planTree, walkSide, type PlanInput } from './plan';
 import { hangX, shiftToMargin, placeItems, startMargin } from './place';
 import { pairOf } from './ports';
+import { hasWardPairs, layoutFold, layoutGraph, wardKeysOf } from './ward-graph';
 
 /** A placement: gives every item of the plan an x, keeping the order of every row and its minimum gaps. */
 export type Placement = (plan: Plan, g: FamilyGraph, geo: Geometry) => void;
@@ -102,7 +104,7 @@ function turnLayout(routed: Routed, plan: Plan, g: FamilyGraph, side: Geometry, 
  * Runs the stages on `g` and returns the result with the plan and the counts. `plain` is the geometry before the relation line, as
  * `layoutTree` takes it; `coreGen` the generations of the whole graph, so a fold never changes the order of the rows (spec §13.10).
  */
-export function runStages(g: FamilyGraph, coreGen: Map<string, number>, plain: Geometry, given0: LayoutSettings, fold?: FoldInput, opts: ArrangeOptions = {}): Stages {
+function stagesOn(g: FamilyGraph, coreGen: Map<string, number>, plain: Geometry, given0: LayoutSettings, fold?: FoldInput, opts: ArrangeOptions = {}): Stages {
 	const check = opts.check ?? (() => undefined);
 	// A tab belongs to a person of the drawn graph; any other id gives no tab and no `reach` (the finder's small tree). The picture's
 	// reach is made from the settings, so they are cleaned first.
@@ -162,6 +164,34 @@ export function runStages(g: FamilyGraph, coreGen: Map<string, number>, plain: G
 	check('route');
 	const done: LaidOut = side ? turnLayout(routed, plan, g, side, fold, youTab, ordinalCards) : { layout: routed.layout, edges: routed.edges };
 	return { ...done, plan, hangAtPlacement, derives, rounds, cameBack: [...stayNear].sort(), fallbacks };
+}
+
+/**
+ * Runs the stages on `g` (see `stagesOn`). Two guardians of a ward who share no union are laid out as a pair first; a pair that then stands
+ * far apart is laid out again with the ward hung from the guardian written first (D354 1 B, `ward-graph.ts`). The private unions of the
+ * pairs and the controls' stand-ins never leave `runStages`.
+ */
+export function runStages(g: FamilyGraph, coreGen: Map<string, number>, plain: Geometry, given0: LayoutSettings, fold?: FoldInput, opts: ArrangeOptions = {}): Stages {
+	if (!hasWardPairs(g, fold)) return stagesOn(g, coreGen, plain, given0, fold, opts);
+	// The rows come from the pair as a union, so the two guardians can stand on one row as they always did.
+	const gens = computeGenerations(layoutGraph(fold?.full ?? g, new Set(), fold?.full));
+	const hung = new Set<string>();
+	const pairs = wardKeysOf(g, fold?.full);
+	const layOut = () => stagesOn(layoutGraph(g, hung, fold?.full, gens), gens, plain, given0, fold && layoutFold(fold, hung, gens), opts);
+	const farPairs = (s: Stages) => pairs.filter((k) => !hung.has(k) && s.layout.unions.get(k)?.far === true);
+	let stages = layOut();
+	// Each round hangs at least one more pair, and a hung pair is never far, so the last round finds none.
+	for (let round = 0; round < pairs.length; round++) {
+		const far = farPairs(stages);
+		if (!far.length) break;
+		for (const k of far) hung.add(k);
+		stages = layOut();
+	}
+	const keys = new Set(pairs.filter((k) => !hung.has(k)));
+	const unions = new Map([...stages.layout.unions].filter(([k]) => !keys.has(k)));
+	const original = new Map((fold?.controls ?? []).map((c) => [c.key, c]));
+	const folds = stages.layout.folds?.map((c) => ({ ...(original.get(c.key) ?? c), spot: c.spot }));
+	return { ...stages, layout: { ...stages.layout, unions, ...(folds ? { folds } : {}) } };
 }
 
 /** Lays out and routes `g` (uncached): the cards and the lines of the card-and-line system. See `runStages` for the arguments. */

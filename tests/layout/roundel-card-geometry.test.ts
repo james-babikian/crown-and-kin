@@ -2,6 +2,7 @@
 // Heights, text places, the name room beside the D14 sign, the raised relation word, `reach` by form, `cardForm` and the idempotent `withRelationLine`.
 import { describe, expect, it } from 'vitest';
 import {
+	CARD_TEXT_MIN_PX,
 	ROUNDEL_EM,
 	SIGN_LINE_CLEAR_PX,
 	TAB_REACH_PAD_PX,
@@ -14,6 +15,7 @@ import {
 	ribbonWidth,
 	relationExtra,
 	relationY,
+	roundelArmsCopyBox,
 	roundelAxis,
 	roundelLineEnd,
 	roundelPics,
@@ -287,7 +289,7 @@ describe('text slots', () => {
 });
 
 describe('medallion and arms', () => {
-	it('12 px (raised to 14.1 px, D330): medallion 2.3 em at (cx - 1.15 em, -1.2 em) (D219: the portrait takes the space of the ring); arms beside it 1.25 x 1.5 em; arms alone 1.67 x 2 em; the line ends 1.4 / 1.25 em above the card', () => {
+	it('12 px (raised to 14.1 px, D330): medallion 2.3 em at (cx - 1.15 em, -1.2 em) (D219: the portrait takes the space of the ring); arms beside it 1.25 x 2.3 em at the left (D353 1 B: as high as the portrait); arms alone 1.67 x 2 em in the middle; the line ends 1.4 / 1.25 em above the card', () => {
 		const g = roundel(12, { ...pics, relationLine: true });
 		const f = g.fontPx;
 		const both = roundelPics(g, { arms: true, portrait: true });
@@ -301,11 +303,15 @@ describe('medallion and arms', () => {
 		expect(both.ringR).toBeCloseTo(1.15 * f, 9);
 		expect(both.haloR).toBeCloseTo(1.35 * f, 9);
 		expect(both.arms!.w).toBeCloseTo(1.25 * f, 9);
-		expect(both.arms!.h).toBeCloseTo(1.5 * f, 9);
+		// D353 1 B: the box was 1.5 em high; it is now as high as the portrait, so a narrow banner starts and ends with it.
+		expect(both.arms!.h).toBeCloseTo(2.3 * f, 9);
+		expect(both.arms!.y).toBeCloseTo(both.portrait!.y, 9);
+		expect(both.armsAlign).toBe('left');
 		expect(both.arms!.x).toBeCloseTo(79.5 + 1.15 * f + 0.55 * f, 9); // 0.2.8 (G.5): 0.55 em from the ring, 0.3 em more than in 0.2.7
 		expect(both.arms!.y + both.arms!.h / 2).toBeCloseTo(-0.25 * f, 9);
 		const alone = roundelPics(g, { arms: true, portrait: false });
 		expect(alone.portrait).toBeUndefined();
+		expect(alone.armsAlign).toBe('middle');
 		expect(alone.arms!.x).toBeCloseTo(79.5 - (5 / 6) * f, 9);
 		expect(alone.arms!.y).toBeCloseTo(-1.25 * f, 9);
 		expect(alone.arms!.w).toBeCloseTo((5 / 3) * f, 9);
@@ -325,6 +331,101 @@ describe('medallion and arms', () => {
 		expect(roundelLineEnd(g, { arms: true })).toBe(20);
 		// the halo reaches exactly `reach` above the card
 		expect(both.haloR - both.cy).toBeLessThanOrEqual(g.reach!);
+	});
+});
+
+describe('D353 1 B: arms beside a portrait have a box as high as the portrait, and the picture sits at its left', () => {
+	/** What an SVG `<image>` with "meet" draws of a picture of aspect `a` (width / height) in `box`: its width and height. */
+	const meet = (a: number, box: { w: number; h: number }) => {
+		const s = Math.min(box.w / a, box.h);
+		return { w: a * s, h: s };
+	};
+	/** The arms box beside a portrait before D353 1 B: 1.25 x 1.5 em, the picture in the middle. */
+	const before = (f: number) => ({ w: 1.25 * f, h: 1.5 * f });
+	// The phone's first view: the readable zoom shows card text (0.85 em) at 12 px, so the note font is drawn at 12 / 0.85 = 14.1 px.
+	const phoneFirstView = CARD_TEXT_MIN_PX / 0.85;
+	const BANNER = 0.43;
+
+	it("the example of D353 1 B: a banner of aspect 0.43 beside a portrait at the phone's first view is about 14 x 32 px (it was 9 x 21)", () => {
+		const g = roundel(12, { ...pics });
+		const k = phoneFirstView / g.fontPx;
+		const rp = roundelPics(g, { arms: true, portrait: true });
+		const now = meet(BANNER, rp.arms!);
+		expect([Math.round(now.w * k), Math.round(now.h * k)]).toEqual([14, 32]);
+		expect(now.h).toBeCloseTo(rp.portrait!.h, 9);
+		const was = meet(BANNER, before(g.fontPx));
+		expect([Math.round(was.w * k), Math.round(was.h * k)]).toEqual([9, 21]);
+	});
+
+	it.each([
+		['a shield', 5 / 6],
+		['a heater shield', 0.84],
+		['a round', 1],
+		['wide arms', 1.6],
+	])('%s keeps its size beside a portrait', (_, a) => {
+		for (const fpx of [12, 16, 24]) {
+			const g = roundel(fpx, { ...pics });
+			const now = meet(a, roundelPics(g, { arms: true, portrait: true }).arms!);
+			const was = meet(a, before(g.fontPx));
+			expect(now.w).toBeCloseTo(was.w, 9);
+			expect(now.h).toBeCloseTo(was.h, 9);
+		}
+	});
+
+	it('every arms picture stands 0.55 em from the portrait: the left edge of what "xMinYMid meet" draws is the left edge of the box', () => {
+		const g = roundel(16, { ...pics });
+		const f = g.fontPx;
+		const rp = roundelPics(g, { arms: true, portrait: true });
+		// "xMin": whatever the aspect, the picture starts at the box's left edge, 0.55 em from the portrait's edge (the banner stood 0.85 em off in the middle).
+		expect(rp.arms!.x - (rp.cx + rp.ringR)).toBeCloseTo(ROUNDEL_EM.armsGap * f, 9);
+		const banner = meet(BANNER, before(f));
+		expect(rp.arms!.x + (before(f).w - banner.w) / 2 - (rp.cx + rp.ringR)).toBeGreaterThan(0.84 * f);
+	});
+
+	it('arms alone keep their box and their place in the middle', () => {
+		const g = roundel(16, { ...pics });
+		const f = g.fontPx;
+		const alone = roundelPics(g, { arms: true, portrait: false });
+		expect(alone.arms).toEqual({ x: g.cardW / 2 - (5 / 6) * f, y: -1.25 * f, w: (5 / 3) * f, h: 2 * f });
+		expect(alone.armsAlign).toBe('middle');
+	});
+
+	it("the gap round the tallest arms ends where the portrait's halo ends: above every name line, also a long two- or three-line name, and left of the D14 sign", () => {
+		for (const fpx of [12, 16, 24, 40]) {
+			for (const plate of [false, true]) {
+				const g = roundel(fpx, { ...pics, ...(plate ? { relationLine: true } : {}) });
+				const f = g.fontPx;
+				const rp = roundelPics(g, { arms: true, portrait: true });
+				const a = rp.arms!;
+				// A picture that fills the whole box, grown by its gap (the halo's width).
+				const gapBottom = a.y + a.h + ROUNDEL_EM.halo * f;
+				const gapRight = a.x + a.w + ROUNDEL_EM.halo * f;
+				expect(gapBottom).toBeCloseTo(rp.cy + rp.haloR, 9);
+				for (const names of [1, 2, 3] as const) {
+					for (const tall of [false, true]) {
+						const t = cardText(g, names, tall);
+						// The top of name line 1's box (line height 1.2, the baseline 0.35 em of the name under its middle).
+						const lineTop = t.nameBaseline - 0.35 * t.nameSize - (1.2 * t.nameSize) / 2;
+						expect(lineTop).toBeGreaterThanOrEqual(gapBottom - 0.5);
+						// The D14 sign: its left end with half its stroke.
+						expect(Math.min(t.sign.x1, t.sign.x2) - t.sign.width).toBeGreaterThan(gapRight + 0.5 * f);
+					}
+				}
+			}
+		}
+	});
+
+	it('one arms copy serves both boxes: it is made for the width of arms alone and the height of arms beside a portrait, so "meet" never enlarges it', () => {
+		const g = roundel(16, { ...pics });
+		const f = g.fontPx;
+		const copy = roundelArmsCopyBox(g);
+		expect(copy.w).toBeCloseTo((5 / 3) * f, 9);
+		expect(copy.h).toBeCloseTo(2.3 * f, 9);
+		const boxes = [roundelPics(g, { arms: true, portrait: true }).arms!, roundelPics(g, { arms: true, portrait: false }).arms!];
+		for (const a of [0.3, BANNER, 0.6, 5 / 6, 1, 1.6, 3]) {
+			const made = meet(a, copy);
+			for (const b of boxes) expect(made.w).toBeGreaterThanOrEqual(meet(a, b).w - 1e-9);
+		}
 	});
 });
 

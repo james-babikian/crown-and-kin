@@ -27,7 +27,7 @@ The comments in the block give the expected names (read by `tests/acceptance/rel
 # pair: alan > nils | Nils is Alan’s wife’s first cousin. | 1 | alan, dana, hugo, sigmund, wilma, maud, nils
 # pair: nora > zed | Zed is Nora’s co-parent. | 1 | nora, zed
 # pair: wat > alan | Alan is Wat’s guardian. | 1 | wat, alan
-# pair: gwen > rolf | Gwen and Rolf have a relation through 2 other people. | chain | gwen, alan, fenna, rolf
+# pair: gwen > rolf | Gwen and Rolf are connected through 2 other people. | chain | gwen, alan, fenna, rolf
 # pair: gwen > quill | Gwen and Quill have no relation in this tree. | none | -
 options:
   me: gwen

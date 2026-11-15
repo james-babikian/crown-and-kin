@@ -13,8 +13,11 @@
 	box-shadow: none;
 }
 
-.dynasty-sheet button.dynasty-house-arms:hover {
-	background: var(--background-modifier-hover);
+/* With a mouse only: a tap on a touch screen leaves :hover on the button, and the tint would stay behind the arms. */
+@media (hover: hover) and (pointer: fine) {
+	.dynasty-sheet button.dynasty-house-arms:hover {
+		background: var(--background-modifier-hover);
+	}
 }
 
 /*
@@ -249,9 +252,15 @@
 	content-visibility: auto;
 }
 
-.dynasty-picture-row:hover,
 .dynasty-picture-row.is-cursor {
 	background: var(--background-modifier-hover);
+}
+
+/* With a mouse only: a tap on a touch screen leaves :hover on the row around the thumbnail. */
+@media (hover: hover) and (pointer: fine) {
+	.dynasty-picture-row:hover {
+		background: var(--background-modifier-hover);
+	}
 }
 
 /* The selected picture: a bar in the text colour, not colour alone, so a weak theme accent cannot hide it. */

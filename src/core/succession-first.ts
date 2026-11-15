@@ -4,7 +4,8 @@
  * "only descendants of the first holder".
  */
 
-import { drawnParentMap, partnerOf, type FamilyGraph } from './derive';
+import { partnershipsOf } from './co-parents';
+import { drawnParentMap, type FamilyGraph } from './derive';
 import { resolveSpouse, type SpouseWorld } from './succession-keys';
 import type { Holder } from './types';
 
@@ -12,11 +13,7 @@ import type { Holder } from './types';
 export function spouseWorldOf(g: FamilyGraph): SpouseWorld {
 	const drawn = drawnParentMap(g);
 	return {
-		partners: (id) =>
-			(g.unionsOf.get(id) ?? []).map((key) => {
-				const fu = g.unionByKey.get(key)!;
-				return { id: partnerOf(fu, id), type: fu.type };
-			}),
+		partners: (id) => partnershipsOf(g, id).map(({ partner, fu }) => ({ id: partner, type: fu?.type ?? 'implicit' })),
 		claimParents: (id) => [...new Set((drawn.get(id) ?? []).filter((d) => d.type === 'birth' || d.type === 'adoptive').map((d) => d.id))],
 		exists: (id) => g.byId.has(id),
 	};

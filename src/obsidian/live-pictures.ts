@@ -13,7 +13,7 @@ import type { TFile } from 'obsidian';
 import type { PictureProblem } from '../core/pictures';
 import { formatPortraitCrop, type CropFraction } from '../core/portrait-crop';
 import type { Rect } from '../layout/model';
-import { setArmsGap, setPicture, setSlotProblem, type PictureSlot, type SlotProblem } from '../render/dom/pictures';
+import { armsCopyBox, setArmsGap, setPicture, setSlotProblem, type PictureSlot, type SlotProblem } from '../render/dom/pictures';
 import { MAX_LIVE_PICTURES, livePictureSlots, type Lod } from '../render/view-math';
 import { isProblem, type CopyBox, type PictureCopy, type PictureStore } from './picture-store';
 import { guarded } from './start-guard';
@@ -98,11 +98,11 @@ export function createLivePictures(
 	let shown = 0;
 	let waiting = 0;
 	let last: { view: Rect; lod: Lod; step: number } | null = null;
-	// O3: one arms copy per house for the Full and the Compact cards, at the larger (Compact) box.
-	const compact = slots.find((s) => s.kind === 'arms' && s.lod === 'compact')?.rect;
+	// O3: one arms copy per house for every card, at the box that holds every arms box of the tree (D353 1 B).
+	const armsBox = armsCopyBox(slots);
 
 	const boxOf = (s: PictureSlot, step: number): CopyBox => {
-		const r = s.kind === 'arms' && compact ? compact : s.rect;
+		const r = s.kind === 'arms' && armsBox ? armsBox : s.rect;
 		const box: CopyBox = { w: r.w * step, h: r.h * step, fit: s.kind === 'portrait' ? 'portrait' : 'meet', onDevice: true };
 		if (s.kind === 'portrait') {
 			const crop: CropFraction | null = guarded('cannot read the selected part of a portrait', () => opts.cropOf?.(s) ?? null, null);

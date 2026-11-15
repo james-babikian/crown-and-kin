@@ -13,7 +13,7 @@ import { codedIssue, type CodedIssue, type IssueCode, type IssueParams } from '.
 import { readPortraitCrop } from './portrait-crop';
 import { DOUBTFUL_DIED, isDead, readInherit, readRule, resolveSpouse, type SpouseWorld } from './succession-keys';
 import { isBloodType } from './parent-types';
-import { isParentType, isPlacementType, isUnionType, PARENT_LIMIT, parentKind, PARENT_TYPES, PLACEMENT_TYPES, UNION_TYPES, type Holder, type House, type ParentRef, type ParentType, type Person, type Title, type Tree, type Union } from './types';
+import { isParentType, isPlacementType, isUnionType, PARENT_LIMIT, parentKind, PARENT_TYPES, UNION_TYPES, type Holder, type House, type ParentRef, type ParentType, type Person, type Title, type Tree, type Union } from './types';
 
 /** What the caller can switch in validation. Absent fields mean the default. */
 export interface ValidateOptions {
@@ -525,9 +525,9 @@ export function anchorIssues(titles: readonly Title[], dates: TreeDates): CodedI
 }
 
 /**
- * The partners and claim parents of the tree as `derive.ts` makes them: a listed union is a partnership of its type, and two
- * placement parents of one child (the first two of the placement type) are partners in an implicit union. The same facts
- * reach `succession.ts` through the family graph, so the warning and the line agree.
+ * The partners and claim parents of the tree: a listed union is a partnership of its type, and the only two birth parents, or the only
+ * two adoptive parents, of one child are partners in an implicit union (D356, as `coParentPairs`). Two guardians of a ward are never
+ * partners for that reason (D354 1 B). The same facts reach `succession.ts` through the family graph, so the warning and the line agree.
  */
 function spouseWorld(people: Person[], byId: Map<string, Person>, refs: Map<string, ParentRef[]>, unions: readonly Union[]): SpouseWorld {
 	const partners = new Map<string, { id: string; type: string }[]>();
@@ -546,14 +546,14 @@ function spouseWorld(people: Person[], byId: Map<string, Person>, refs: Map<stri
 	for (const p of people) {
 		const byType = new Map<string, string[]>();
 		for (const r of refs.get(p.id)!) push(byType, r.type, r.id);
-		let type: string | undefined = PLACEMENT_TYPES.find((t) => byType.has(t));
-		if (p.placement !== undefined && isPlacementType(p.placement) && byType.has(p.placement)) type = p.placement;
-		const placed = type ? byType.get(type)!.slice(0, 2) : [];
-		if (placed.length === 2) {
-			const key = pair(placed[0], placed[1]);
+		// D356: only exactly two birth parents, or exactly two adoptive parents, are partners without a listed union (the same rule as `coParentPairs`).
+		for (const kind of ['birth', 'adoptive'] as const) {
+			const ids = [...new Set(refs.get(p.id)!.filter((r) => parentKind(r.type) === kind).map((r) => r.id))];
+			if (ids.length !== 2) continue;
+			const key = pair(ids[0], ids[1]);
 			if (!listed.has(key) && !implicit.has(key)) {
 				implicit.add(key);
-				add(placed[0], placed[1], 'implicit');
+				add(ids[0], ids[1], 'implicit');
 			}
 		}
 		const up = [...new Set([...(byType.get('birth') ?? []), ...(byType.get('adoptive') ?? [])])];

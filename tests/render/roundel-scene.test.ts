@@ -9,6 +9,7 @@ import { cardForm, cardText, centredWithoutWord, geometryFor, nameRoom, ribbonWi
 import { DEFAULT_LAYOUT_SETTINGS, clearLayoutCache, layoutTree, pictureSets } from '../../src/layout/index';
 import type { Geometry, LaidOut, LayoutSettings } from '../../src/layout/model';
 import { cardNameLines } from '../../src/render/name-lines';
+import { armsCopyBox, setPicture } from '../../src/render/dom/pictures';
 import { COMPACT_NAME_EM, buildScene, type Scene, type SceneOptions } from '../../src/render/dom/scene';
 import { tallCardsFor } from '../../src/render/dom/tall-cards';
 import { ME_RING_INNER } from '../../src/render/styles';
@@ -176,6 +177,27 @@ describe('picture slots', () => {
 		// D219: the frame circle (shown only while the picture is missing) lies on the picture's edge: its centre on the medallion, its 1 px stroke inside the radius.
 		expect(num(portrait.frame as unknown as FEl, 'r')).toBeCloseTo(rp.ringR - 0.5, 9);
 		expect(num(portrait.frame as unknown as FEl, 'cx')).toBeCloseTo(box.x + rp.cx, 9);
+	});
+
+	it('D353 1 B: arms beside a portrait have a slot as high as the portrait and draw at its left ("xMinYMid meet"); arms alone keep "xMidYMid meet"', () => {
+		const laid = lay(ROUNDEL);
+		const { scene: s } = scene(laid);
+		const slot = (id: string, kind: 'arms' | 'portrait') => s.pictures.find((p) => p.person === id && p.kind === kind && p.lod === 'full')!;
+		const beside = slot('a', 'arms');
+		const alone = slot('b', 'arms');
+		expect(beside.rect.h).toBeCloseTo(slot('a', 'portrait').rect.h, 9);
+		expect(beside.rect.y).toBeCloseTo(slot('a', 'portrait').rect.y, 9);
+		expect(beside.align).toBe('left');
+		expect(alone.align).not.toBe('left');
+		const ratio = (sl: typeof beside) => {
+			setPicture(sl, 'blob:x');
+			return all(sl.el as unknown as FEl).find((e) => e.tag === 'image')!.getAttribute('preserveAspectRatio');
+		};
+		expect(ratio(beside)).toBe('xMinYMid meet');
+		expect(ratio(alone)).toBe('xMidYMid meet');
+		// One live copy serves both boxes: the width of arms alone, the height of arms beside a portrait.
+		expect(armsCopyBox(s.pictures)).toEqual({ w: alone.rect.w, h: beside.rect.h });
+		expect(armsCopyBox(s.pictures.filter((p) => p.kind === 'portrait'))).toBeUndefined();
 	});
 
 	it('the Compact slots are the elements of the Full slots, in the Full group, which the Compact level shows (WP-B8)', () => {

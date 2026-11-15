@@ -27,8 +27,9 @@
 	fill: var(--dynasty-muted, var(--text-muted));
 }
 
+/* D353 2 A: the Full tag text has the size of the card's small text (the dates), 0.85 em, centred in the pill of the layout's tag band (1.125 em). */
 .dynasty-tag-full .dynasty-tag-text {
-	font-size: calc(var(--dynasty-font-size) * 0.75);
+	font-size: calc(var(--dynasty-font-size) * 0.85);
 }
 
 /* D345 1 A: the Compact tag text is two thirds of the Compact name (1.5 em); the Overview sign pill keeps the size of the name. */
@@ -60,3 +61,14 @@
 	stroke-width: 6;
 }
 
+
+/* D355: the kind of the partnership stands on its own line under the name in the partner list of a several-partner tag. */
+.dynasty-popover .dynasty-tag-partner-name,
+.dynasty-popover .dynasty-tag-partner-kind {
+	display: block;
+}
+
+.dynasty-popover .dynasty-tag-partner-kind {
+	font-size: var(--dynasty-type-small);
+	color: var(--text-muted);
+}

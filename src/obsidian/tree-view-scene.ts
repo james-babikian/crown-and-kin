@@ -22,6 +22,9 @@
  *      each scene. A chunk that finds the view busy asks again; it never drops the chain. Folds go
  *      first and the two kinds never share an idle callback. The static phone preview starts no chain.
  *   i. A new scene (`redraw`) fills near in the same task, stops the old chain and starts its own.
+ * - Late relation words (D352 item 1, `view/late-words.ts`, `render/dom/scene-fill.ts`): in a tree of `TreeView.lateWordsMin` cards or more,
+ *   every fill above asks the words of the late cards it attaches before their content, except the fill of `onFill` during a pinch or a
+ *   wheel zoom; `startWords` (`tree-view.ts`, after each first draw and settle) runs the idle queue of the rest after the first draw, one queue for each scene, never while `moving`.
  * - S6 The live pictures work on slots of attached cards; the fold controls keep their own rule.
  * - S7 Hide until the first view. The `.dynasty-canvas` wrapper of the svg is `hidden` until the first
  *   transform is written (the browser then lays out the tree once). `showTree()` is idempotent and never
@@ -52,7 +55,7 @@ import { viewCard } from './viewer-sources';
 import { TreeViewBase } from './tree-view-base';
 import { HIGHLIGHT_MS, HOVER_SOURCE } from './tree-view-types';
 import { hintSide, showOnePersonHint } from './hint-place';
-import { later } from '../view/idle';
+import { chunkDone, later, runChunk, TIMED_WAIT_MS } from '../view/idle';
 
 /** The most cards attached in one idle chunk. */
 const IDLE_CARDS_PER_CHUNK = 25;
@@ -193,13 +196,13 @@ export abstract class TreeViewScene extends TreeViewPlacement {
 	protected startIdle(scene: Scene): void {
 		if (this.idleScene === scene || !this.idleWork(scene)) return;
 		this.idleScene = scene;
-		const step = (idle: { timeRemaining(): number }) => {
+		const step = (idle: { timeRemaining(): number; timed?: boolean }) => {
 			if (this.unloaded || this.scene !== scene) return;
 			this.guard(() => {
 				const pz = this.panZoom;
-				// A gesture is running: ask again, never drop the chain.
-				if (pz?.busy) {
-					later(step);
+				// A gesture is running: ask again, never drop the chain. A chunk can work relation words out (D352 item 1), which never happens during a pan or zoom.
+				if (pz && this.moving(pz)) {
+					later(step, TIMED_WAIT_MS);
 					return;
 				}
 				// The fold controls go first, and the two kinds never share one idle callback.
@@ -208,7 +211,7 @@ export abstract class TreeViewScene extends TreeViewPlacement {
 					if (f.filled) continue;
 					f.fill();
 					made.push(f);
-					if (made.length >= 40 || idle.timeRemaining() < IDLE_STOP_MS) break;
+					if (chunkDone(idle, made.length, 40, IDLE_STOP_MS)) break;
 				}
 				const v = pz?.view;
 				if (made.length) {
@@ -221,25 +224,29 @@ export abstract class TreeViewScene extends TreeViewPlacement {
 						this.idleScene = null;
 						return;
 					}
-					scene.fill.fillChunk(rect, IDLE_CARDS_PER_CHUNK);
+					// Safari: the chunk works for its time budget, in small groups, in the same order as the fixed chunk.
+					runChunk(idle, IDLE_CARDS_PER_CHUNK, (max) => scene.fill.fillChunk(rect, max), () => scene.fill.pending + scene.fill.pendingLines > 0);
 					this.syncPending();
 				}
-				if (this.idleWork(scene)) later(step);
+				if (this.idleWork(scene)) later(step, TIMED_WAIT_MS);
 				// R026 fit: the work can come back (a level change puts the card groups back), so the next start must not be blocked.
 				else this.idleScene = null;
 			});
 		};
-		later(step);
+		later(step, TIMED_WAIT_MS);
 	}
 
-	/** The delayed card content near `view`. A view with no size has no near part: the first draw or settle fills it. */
-	protected fillNear(view: View): void {
+	/**
+	 * The delayed card content near `view`. A view with no size has no near part: the first draw or settle fills it. `words` false is a fill during a pinch or a wheel
+	 * zoom (`onFill`): it works no relation word out, and a late card gets an empty word line until the settle (D352 item 1, `scene-fill.ts`).
+	 */
+	protected fillNear(view: View, words = true): void {
 		this.learnRadius();
 		const pz = this.panZoom;
 		const scene = this.scene;
 		if (!pz || !scene) return;
 		const rect = visibleRect(view, pz.size);
-		if (rect) scene.fill.fillNear(rect);
+		if (rect) scene.fill.fillNear(rect, words);
 		this.syncPending();
 	}
 
@@ -545,7 +552,7 @@ export abstract class TreeViewScene extends TreeViewPlacement {
 			const act = (e: Event) => {
 				e.preventDefault();
 				e.stopPropagation();
-				this.guard(() => this.tagActivated(t.tag.spouses, t.el, t.hit));
+				this.guard(() => this.tagActivated(t.tag.person, t.tag.spouses, t.el, t.hit));
 			};
 			t.el.addEventListener('click', act);
 			t.hit.addEventListener('click', act);

@@ -15,7 +15,7 @@ import type { FoldKey } from '../core/folds';
 import { folderOf } from '../core/link-text';
 import { portraitCropOf, type CropFraction } from '../core/portrait-crop';
 import type { CardLabel } from '../core/titles';
-import { PICTURE_EM, isRoundel, pictureSize, roundelPics } from '../layout/geometry';
+import { PICTURE_EM, isRoundel, pictureSize, roundelArmsCopyBox, roundelPics } from '../layout/geometry';
 import { DEFAULT_FAR_RULE, NEVER_FAR_RULE } from '../layout/index';
 import type { Geometry, LaidOut, LayoutSettings, Orientation } from '../layout/model';
 import type { BreakList } from '../render/break-words';
@@ -294,8 +294,8 @@ async function picturesFor(store: PictureStore | undefined, src: SaveSource, lai
 	if (!store) return { pictures: out, outlines };
 	const { g } = src;
 	const geo = laid.layout.geometry;
-	// The Roundel's medallion is 2 em across and its arms alone 2 em high: so the copies are made at that size.
-	const round = isRoundel(geo) ? { portrait: roundelPics(geo, { arms: false, portrait: true }).portrait!, arms: roundelPics(geo, { arms: true, portrait: false }).arms! } : undefined;
+	// The copies are made at the size of the Roundel's medallion and of the box that holds both of its arms boxes (alone, and beside a portrait: D353 1 B).
+	const round = isRoundel(geo) ? { portrait: roundelPics(geo, { arms: false, portrait: true }).portrait!, arms: roundelArmsCopyBox(geo) } : undefined;
 	const d = round ? round.portrait.w : pictureSize(geo);
 	const armsW = Math.max(round ? round.arms.w : PICTURE_EM.armsAspect * d, legendArms?.w ?? 0);
 	const armsH = Math.max(round ? round.arms.h : d, legendArms?.h ?? 0);

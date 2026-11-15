@@ -279,6 +279,9 @@ describe('pictures in the saved picture', () => {
 		const node = cardNode(svg, 'a');
 		const arms = item(node, 'arms:a')!;
 		expect([Number(arms.attrs.x), Number(arms.attrs.y), Number(arms.attrs.width), Number(arms.attrs.height)]).toEqual([box.x + rp.arms!.x, box.y + rp.arms!.y, rp.arms!.w, rp.arms!.h]);
+		// D353 1 B: beside the portrait the arms box is as high as the portrait, and the picture sits at its left, so every arms stands 0.55 em from the portrait.
+		expect(rp.arms!.h).toBeCloseTo(rp.portrait!.h, 9);
+		expect(arms.attrs.preserveAspectRatio).toBe('xMinYMid meet');
 		const portrait = item(node, 'portrait:a')!;
 		expect([Number(portrait.attrs.x), Number(portrait.attrs.y), Number(portrait.attrs.width), Number(portrait.attrs.height)]).toEqual([box.x + rp.portrait!.x, box.y + rp.portrait!.y, rp.portrait!.w, rp.portrait!.h]);
 		// D219: a portrait that shows has no frame and no ring.
@@ -312,6 +315,8 @@ describe('pictures in the saved picture', () => {
 		const rp = roundelPics(laid.layout.geometry, { arms: true, portrait: false });
 		const arms = item(cardNode(svgOf(laid), 'b'), 'arms:b')!;
 		expect([Number(arms.attrs.x), Number(arms.attrs.y), Number(arms.attrs.width), Number(arms.attrs.height)]).toEqual([box.x + rp.arms!.x, box.y + rp.arms!.y, rp.arms!.w, rp.arms!.h]);
+		// D353 1 B changes only arms beside a portrait: arms alone stay in the middle, on the card axis.
+		expect(arms.attrs.preserveAspectRatio).toBe('xMidYMid meet');
 	});
 
 	it('a sideways tree has no <image>, no portrait or arms item and no circle on a card, whatever the picture map holds', () => {

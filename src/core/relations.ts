@@ -28,12 +28,14 @@
  *   children (c1, c2) in `down` order. For a full relation, X is the member of the couple first in
  *   c1's list, and the union is c1's `primaryUnion` if it is the couple's, else the couple's
  *   last-listed union, else their implicit key. A line uses a couple only if the two share a union
- *   of the tree (listed, or implicit through a child placed under both); else it passes X alone
- *   (two rumoured parents, an adoptive couple beside birth parents). A full line of rule 1 below
+ *   of the tree or are a pair of `coParentPairs` (D356); else it passes X alone
+ *   (two rumoured parents, two guardians, an adoptive couple beside birth parents). A full line of rule 1 below
  *   follows rule 1. A double relation takes the line of its first couple (the lowest X). The walk of the finder goes up to X and
  *   comes down from its partner, or the other way round when only that shows links as good as the word (a birth word never
  *   comes down an adoptive link at the couple: "x1 is d's mother. x2 is x1's co-parent. a is x2's son").
  * - Partner: M and P, with the pair's last-listed union, or their implicit key. The word reads every marriage of the pair (see "Years").
+ *   Only a child with exactly two birth or two adoptive parents makes a pair (`coParentPairs`): two guardians of one ward are no partners,
+ *   so they have no name for each other, and two wards of one pair are no siblings (D354 1 B).
  * - Guardian and ward: M and P, with the one ward link.
  * - By marriage, rule 1: the blood line from M to R, then P, with the last-listed marriage of R and P (the words read every marriage, see "Years").
  * - By marriage, rule 2: M, then M's spouse S, then S's blood line to P; the M–S marriage comes first.
@@ -120,9 +122,12 @@
  * (the first in the order is kept). Distances: self 0, partner 1, guardian and ward 1, by marriage 1 + the blood
  * distance, step-sibling 3, blood a + b.
  *
- * Known limits (D200 R5): the partner names of a child with three birth or three adoptive parents use the two parents
- * used for placement (so the parent order of such a child can decide "Co-parent"; the legal parents of D293 do not read that
- * implicit union, see "Half or full"); a pair with a sure and a rumoured line of equal length can have different "Also" lists in
+ * Co-parent (D356 3 A and 5 A): a pair is "Co-parent" without a written partnership if a child has exactly two birth parents or exactly two
+ * adoptive parents (`coParentPairs`); with three or more of one kind it makes no pair, so no word depends on the order of a list. Where the
+ * child's card stands does not change it, and a guardian never joins a pair. The drawing keeps the implicit union of the first two placement
+ * parents; only the words and the finder read the pairs.
+ *
+ * Known limits (D200 R5): a pair with a sure and a rumoured line of equal length can have different "Also" lists in
  * the two directions; rule 1 of the names by marriage skips a blood relative of M, rule 2 does not;
  * a rumoured link plus a person married to their own child can still make a name by marriage depend on
  * the order of the people.
@@ -150,9 +155,9 @@
  *   ("Adoptive brother", or "Brother" if they share a birth parent: `orderCouple` puts that parent first, and the
  *   link to the second parent can only make a word rumoured). A full adoption by unrelated parents, a child with two
  *   birth parents, a child with more than one adoptive parent, and a sibling who has only one of the two stay as before.
- *   The union of the two is a listed union, or an implicit union that a child makes by listing exactly these two parents of
- *   one type (`legalShare`); the implicit union of a child with three such parents does not count, so the legal parents
- *   never depend on the order of a list of parents.
+ *   The union of the two is a listed union, or a pair of `coParentPairs` (a child lists exactly these two parents of
+ *   one kind, birth or adoptive; `legalShare`); three such parents make no pair, so the legal parents never depend on the order of a list
+ *   of parents, and two guardians never count (D354 1 B, D356).
  *   The second test uses the legal parents too: a rumoured parent of such a child only adds a choice of its birth parent and the
  *   rumoured parents (a "maybe full"), never a "maybe half". It counts each rumoured link as a birth link before the legal-parent
  *   rule, so a child adopted by one partner with a rumoured birth link to the other has the two legal parents if the rumour is

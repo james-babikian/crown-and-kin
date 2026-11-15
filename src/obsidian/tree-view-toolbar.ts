@@ -7,6 +7,7 @@
 import { Keymap, Notice, getIconIds, setIcon } from 'obsidian';
 import type { CodedIssue } from '../core/messages';
 import { issueText } from '../core/messages';
+import { errorTextLine } from '../core/error-line';
 import { buildFocusBar } from '../render/dom/focus-bar';
 import { buildLegend } from '../render/dom/scene';
 import { setListEditable } from '../render/dom/phone-list-dom';
@@ -268,12 +269,23 @@ export abstract class TreeViewToolbar extends TreeViewPictures {
 	/**
 	 * "Show the tree text" (D176 item 2): the note opens for edits with the cursor at the start of the block text. The
 	 * full-screen view closes first (`openNote`), so the note is visible. The block comes from the handle, which tracks it.
+	 * When the error box names a text line, the cursor goes to that text line (D346 item 5, D350).
 	 */
 	protected async showText(): Promise<void> {
 		const handle = await this.validHandle();
 		if (!handle || this.unloaded) return;
 		const { path, ordinal } = handle.key;
-		this.openNote(() => this.host.handles.showSource(path, ordinal).then(() => undefined));
+		const line = this.errorLine();
+		const handles = this.host.handles;
+		this.openNote(() => (line === null ? handles.showSource(path, ordinal) : handles.showSource(path, ordinal, line)).then(() => undefined));
+	}
+
+	/** The text line that the error box names (the box and the cursor read the same parse), or null with no error box or no text line. */
+	protected errorLine(): number | null {
+		// Only an error box has a text line: a drawn tree is not parsed again here.
+		if (!this.errorBox) return null;
+		const parsed = this.parse(this.source);
+		return parsed.ok ? null : errorTextLine(parsed.error, this.source);
 	}
 
 	protected openSource(e: MouseEvent): void {

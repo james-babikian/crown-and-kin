@@ -2,12 +2,13 @@
  * Draws one pill of a far-couple tag into the live scene (spec §5.3, D10): the ring, the pill, the text and the partnership sign of one level of
  * detail. `scene.ts` calls `drawTagPill` three times for each tag (Full, Compact and the Overview sign pill) and runs the returned fit when the
  * tag's content is attached. A pill with a name places the ⚭ after the padding and the name at an exact x after the ⚭ and the sign, with the
- * saved picture's formula (`tagPillParts` in `render/styles.ts`), so both drawings keep the same gap before the name (D108). The name is a
- * `tspan` with the embedding a card name gets (`farTagSvgName`, D322).
+ * saved picture's formula (`tagPillParts` in `render/styles.ts`), so both drawings keep the same gap before the name (D108); the gap before the
+ * name is fixed, not a space of the font (D353 4 Now, `tagSignRoom`). The name is a `tspan` with the embedding a card name gets (`farTagSvgName`, D322).
+ * A tag of two far partners shows their two short names where they fit uncut (D353 3 A, `farTagPairRuns`), else its "2 partners".
  */
 import { unionMarkClass } from '../legend';
-import { TAG_MARK, UNION_MARKS, tagMarkSlot, tagNameRoom, tagPillParts, unionMark, type UnionShape } from '../styles';
-import { farTagSvgName } from '../tree-info';
+import { TAG_MARK, UNION_MARKS, tagMarkCentre, tagMarkSlot, tagNameRoom, tagPillParts, tagSignRoom, unionMark, type UnionShape } from '../styles';
+import { farTagPairRuns, tagRunSvg, type TagRun } from '../tree-info';
 
 /** What one tag pill is drawn from. */
 export interface TagPillSpec {
@@ -22,15 +23,22 @@ export interface TagPillSpec {
 	x: number;
 	/** The widest the pill may be (`FarTag.zoneW`). */
 	zone: number;
-	/** The lead text: "⚭ " before a name, or the whole text of a pill with no name. */
+	/** The lead text: the ⚭ alone before a name (its room is `tagSignRoom`), or the whole text of a pill with no name. Empty for a tag of several partners (D354 2 C). */
 	lead: string;
 	/** The name to fit after the lead; none for the Overview sign pill. */
 	name?: string;
+	/** D353 3 A: the two short names of a tag of two far partners (`farTagPair`), shown in place of `name` where they fit uncut. */
+	pair?: readonly [string, string];
 	/** The partnership sign of a far couple with no union dot. */
 	shape?: UnionShape;
 	measure: (text: string) => number;
 	/** Cuts a text to a width (the card's cut, with the ellipsis). */
 	fit: (text: string, maxW: number) => string;
+}
+
+/** D354 2 C: the lead of a named tag: the ⚭ for one partner, nothing for several. */
+export function tagLead(partners: number): string {
+	return partners === 1 ? '⚭' : '';
 }
 
 /** Writes the x of a union mark's element from `unionMark`'s attributes. */
@@ -41,6 +49,16 @@ function placeMark(el: SVGElement, at: ReturnType<typeof unionMark>['attr']): vo
 		el.setAttribute('cy', String(at.cy));
 		el.setAttribute('r', String(at.r));
 	}
+}
+
+/** Writes the name of a tag into its `tspan`: one run as its text, or three runs (D353 3 A, a name with a right-to-left letter) as `tspan`s at exact x. */
+function putName(nameEl: SVGTSpanElement, runs: readonly TagRun[], nameX: number): void {
+	if (runs.length === 1) {
+		nameEl.setText(tagRunSvg(runs[0]));
+		return;
+	}
+	nameEl.setText('');
+	for (const r of runs) nameEl.createSvg('tspan', { attr: { x: nameX + r.dx } }).setText(tagRunSvg(r));
 }
 
 /** Draws one tag pill into `holder` and returns its fit: it cuts the name to the room, sizes the pill and places the text and the sign. */
@@ -61,15 +79,19 @@ export function drawTagPill(holder: SVGGElement, s: TagPillSpec): () => void {
 		let w = Math.min(zone, s.measure(s.lead) + 2 * pad);
 		let markX = 0;
 		if (nameEl) {
-			const sign = s.measure(s.lead);
+			const signW = s.measure(s.lead);
+			// D354 2 C: a tag for several partners has an empty lead and takes no room for a sign.
+			const sign = s.lead ? tagSignRoom(signW, shape ? s.measure(`${s.lead} `) - signW : 0, s.fontPx, shape) : 0;
 			const slot = shape ? tagMarkSlot(shape, s.fontPx) : 0;
-			const name = s.fit(s.name!, tagNameRoom(zone, pad, sign, slot));
-			const parts = tagPillParts(x, zone, pad, sign, slot, s.measure(name));
+			const room = tagNameRoom(zone, pad, sign, slot);
+			const two = s.pair ? farTagPairRuns(s.pair, room, s.measure) : undefined;
+			const name = two ? '' : s.fit(s.name!, room);
+			const parts = tagPillParts(x, zone, pad, sign, slot, two ? two.w : s.measure(name), shape ? tagMarkCentre(shape, s.fontPx) : 0);
 			w = parts.w;
 			markX = parts.markX;
 			textEl.setAttribute('x', String(parts.signX));
 			nameEl.setAttribute('x', String(parts.nameX));
-			nameEl.setText(farTagSvgName(name));
+			putName(nameEl, two ? two.runs : [{ text: name, dx: 0, name: true }], parts.nameX);
 		}
 		for (const r of [ring, rect]) {
 			r.setAttribute('x', String(x - w / 2));

@@ -14,6 +14,7 @@
  * A card of the Show view of a line of succession can carry an ordinal tab ("2nd") on its top edge, as the marked card
  * carries its "You" tab; `LayoutSettings.ordinalCards` makes the reach for it and the route stage keeps the drop places clear of it.
  */
+import type { ArmsAlign } from './arms-outline';
 import type { Geometry, GeometryFor, LayoutSettings, NameLineCount, NameRoom, Orientation, Rect } from './model';
 
 /** Obsidian's default note font size; the card geometry (180×64 cards) was tuned at this size. */
@@ -537,8 +538,10 @@ function formText(geo: Geometry, names: NameLineCount, tall: boolean, shown?: Sh
 interface RoundelPics {
 	/** The portrait's picture square: 2 em plus the ring's width on each side (D219: the picture takes the space that the house ring had). */
 	portrait?: Rect;
-	/** The arms box: 1.25 x 1.5 em beside the medallion, or 1.67 x 2 em in the medallion's place. */
+	/** The arms box: 1.25 x 2.3 em beside the medallion (as high as the portrait, D353 1 B), or 1.67 x 2 em in the medallion's place. */
 	arms?: Rect;
+	/** Where the arms picture sits across its box: at the left beside the medallion, in the middle alone (`armsAspectRatio`). Set when `arms` is. */
+	armsAlign?: ArmsAlign;
 	/** The portrait's outer radius (the edge of the picture; the name dates from the house ring), the halo's radius and the medallion's centre. */
 	ringR: number;
 	haloR: number;
@@ -560,16 +563,27 @@ export function roundelPics(geo: Geometry, o: { arms: boolean; portrait: boolean
 	let arms: Rect | undefined;
 	if (o.arms) {
 		if (o.portrait) {
-			const h = pictureSize(geo);
-			const w = PICTURE_EM.armsAspect * h;
-			arms = { x: cx + ringR + E.armsGap * f, y: cy - h / 2, w, h };
+			// D353 1 B: the box is as high as the portrait and as wide as before, and the picture sits at its left. A shield, a round or a wide picture meets
+			// the width and keeps its size; a narrow banner meets the height and grows (0.64 x 1.5 em became 0.98 x 2.3 em); every one stands 0.55 em from the portrait.
+			const w = PICTURE_EM.armsAspect * pictureSize(geo);
+			arms = { x: cx + ringR + E.armsGap * f, y: cy - ringR, w, h: 2 * ringR };
 		} else {
 			const h = 2 * r;
 			const w = PICTURE_EM.armsAspect * h;
 			arms = { x: cx - w / 2, y: cy - h / 2, w, h };
 		}
 	}
-	return { ...(portrait ? { portrait } : {}), ...(arms ? { arms } : {}), ringR, haloR, cx, cy };
+	return { ...(portrait ? { portrait } : {}), ...(arms ? { arms, armsAlign: o.portrait ? ('left' as const) : ('middle' as const) } : {}), ringR, haloR, cx, cy };
+}
+
+/**
+ * The box an arms copy of a Roundel is made for: the width of arms alone and the height of arms beside a portrait (D353 1 B), so one copy drawn
+ * with "meet" is never enlarged in either box (a banner made for the box of arms alone drew 15 % enlarged, and soft, beside a portrait).
+ */
+export function roundelArmsCopyBox(geo: Geometry): { w: number; h: number } {
+	const alone = roundelPics(geo, { arms: true, portrait: false }).arms!;
+	const beside = roundelPics(geo, { arms: true, portrait: true }).arms!;
+	return { w: Math.max(alone.w, beside.w), h: Math.max(alone.h, beside.h) };
 }
 
 /** How far above the card top a line from the parents stops: at the ring of a portrait, at the top of arms alone, or 0 with no picture. */

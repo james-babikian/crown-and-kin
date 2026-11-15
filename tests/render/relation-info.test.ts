@@ -89,3 +89,13 @@ describe('RELINFO texts', () => {
 		}
 	});
 });
+
+describe('D356 2 A: the window text of a person with a line but no relation', () => {
+	it('counts the people between, singular and plural', async () => {
+		const { noRelationButLine } = await import('../../src/render/tree-info');
+		expect(noRelationButLine(1)).toBe('No family relation to you. Connected through 1 other person.');
+		expect(noRelationButLine(2)).toBe('No family relation to you. Connected through 2 other people.');
+		expect(noRelationButLine(7)).toBe('No family relation to you. Connected through 7 other people.');
+		expect(noRelationButLine(0)).toBe('No relation to you in this tree.');
+	});
+});

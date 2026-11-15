@@ -1,9 +1,9 @@
 /*
- * Several begetter lines of one person into one row of children (owner, D338 point 5, D341). The lines are unrouted curves from the begetter's bottom edge to
+ * Several begetter lines of one person into one row of children (owner, D338 point 5, D341). The lines are curves from the begetter's bottom edge to
  * the top of each child; with one shape for all of them they run on one path, and their dashes meet out of step, so they look braided. This stage gives
  * each line of such a group its own height on the long run (a small gap between neighbours) and one dash phase there. A single line, and every other kind of
- * side link, is not changed. It only picks a control height and a dash offset: it adds no line and routes nothing, so the count of curves over cards is the
- * count of before (the rule "Side links are unrouted curves").
+ * side link, is not changed. It only picks a control height and a dash offset: it adds no line and routes nothing. The router of side links never routes
+ * the lines of a bundle (the rule "Side links are routed", D343 1 C).
  */
 
 /** px: the gap kept between two neighbouring lines of a group at the middle of the long run (spec §13.17, D338 point 5). */

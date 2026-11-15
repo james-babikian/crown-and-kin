@@ -5,11 +5,17 @@
  * `order.ts` and the layout code read the result; `family-query.ts` answers questions about one
  * person's family from it. `drawnParents` gives the cycle-broken parent links that focus mode and
  * relation names (`relations.ts`) follow.
+ *
+ * Only a child placed by birth or adoption makes an implicit union (D15, D354 1 B). A ward placed under
+ * two guardians who share no union joins no union at all: guardianship is no partnership, so the pair
+ * reaches no relation name, partner list or spouse choice. `wardPairs` keeps the pair for the code that
+ * sets the cards, so the guardians can still stand side by side. The unions are for the drawing; the "Co-parent" pairs of the relation words
+ * come from `co-parents.ts` (D356), so a child with three parents of one kind keeps its implicit union here and makes no pair there.
  */
 
 import { buildTreeDates, PLAIN_READER, type TreeDates } from './dates';
 import { codedIssue, type CodedIssue } from './messages';
-import { isPlacementType, parentKind, PLACEMENT_TYPES, type House, type ParentType, type Person, type Title, type Tree } from './types';
+import { isPlacementType, parentKind, PLACEMENT_TYPES, type House, type ParentRef, type ParentType, type Person, type Title, type Tree } from './types';
 import { anchorIssues, push, validateTree, type ValidateOptions } from './validate';
 
 /** One partnership as it is drawn: a union listed in the block, or one inferred from shared children. */
@@ -31,6 +37,16 @@ export interface FamilyUnion {
 	text?: string;
 	/** Children whose primary union this is, in sibling order. */
 	children: string[];
+}
+
+/**
+ * A ward placed under two guardians who share no union (D354 1 B). The guardians are no couple, so this is a hint for the layout,
+ * drawing, fold and focus code only, never a partnership.
+ */
+export interface WardPair {
+	child: string;
+	/** The child's placement parents, as in `placementParents`. */
+	guardians: [string, string];
 }
 
 /** A parent link that is drawn but does not decide where the child sits. */
@@ -58,6 +74,8 @@ export interface FamilyGraph {
 	/** Parent → children who have only that one placement parent. */
 	soloChildren: Map<string, string[]>;
 	secondary: SecondaryEdge[];
+	/** Wards placed under two guardians with no shared union, in document order; such a child is in no union (D354 1 B). */
+	wardPairs: WardPair[];
 	/** Partners of every union item as written, drawable or not, in list order. */
 	writtenUnions: string[][];
 	/** Spec §13.4: the titles that can show (`Validated.titles`), in list order; `[]` with none. */
@@ -78,6 +96,41 @@ export const pairKey = (a: string, b: string) => {
 	const [x, y] = a < b ? [a, b] : [b, a];
 	return JSON.stringify([x, y]);
 };
+
+/** Each person's parent ids by link type, placement parents (the first two of the placement type) and placement type (spec §4.3). */
+function placementOf(people: readonly Person[], refs: Map<string, ParentRef[]>) {
+	const byTypeOf = new Map<string, Map<string, string[]>>();
+	const placementParents = new Map<string, string[]>();
+	const placementType = new Map<string, string>();
+	for (const p of people) {
+		const byType = new Map<string, string[]>();
+		for (const r of refs.get(p.id)!) push(byType, r.type, r.id);
+		byTypeOf.set(p.id, byType);
+
+		let type = PLACEMENT_TYPES.find((t) => byType.has(t));
+		if (p.placement !== undefined && isPlacementType(p.placement) && byType.has(p.placement)) type = p.placement;
+
+		placementParents.set(p.id, type ? byType.get(type)!.slice(0, 2) : []);
+		if (type) placementType.set(p.id, type);
+	}
+	return { byTypeOf, placementParents, placementType };
+}
+
+/**
+ * The implicit unions of the tree, in the order of the first child who makes each (spec §4.3, D15): the two placement parents of a child
+ * placed by birth or adoption who share no listed union. They are all found before any ward is placed, so a ward listed first never
+ * decides one (D354 1 B).
+ */
+function implicitUnions(people: readonly Person[], placementParents: Map<string, string[]>, placementType: Map<string, string>, listedByPair: Map<string, FamilyUnion[]>): Map<string, FamilyUnion> {
+	const out = new Map<string, FamilyUnion>();
+	for (const p of people) {
+		const placed = placementParents.get(p.id)!;
+		if (placed.length !== 2 || placementType.get(p.id) === 'ward') continue;
+		const key = pairKey(placed[0], placed[1]);
+		if (!listedByPair.has(key) && !out.has(key)) out.set(key, { key: `i:${key}`, partners: [placed[0], placed[1]], type: 'implicit', implicit: true, children: [] });
+	}
+	return out;
+}
 
 /** Validates `tree`, then builds its `FamilyGraph`: placement parents, primary unions and side links (spec §4.3). */
 export function deriveFamilies(tree: Tree, options: ValidateOptions = {}): FamilyGraph {
@@ -101,39 +154,30 @@ export function deriveFamilies(tree: Tree, options: ValidateOptions = {}): Famil
 	}
 
 	// Placement parents, primary unions, secondary links.
-	const placementParents = new Map<string, string[]>();
-	const placementType = new Map<string, string>();
+	const { byTypeOf, placementParents, placementType } = placementOf(people, refs);
 	const primaryUnion = new Map<string, string>();
 	const soloChildren = new Map<string, string[]>();
 	const secondary: SecondaryEdge[] = [];
-	const implicitByPair = new Map<string, FamilyUnion>();
+	const wardPairs: WardPair[] = [];
+	const implicitByPair = implicitUnions(people, placementParents, placementType, listedByPair);
 
 	for (const p of people) {
-		const byType = new Map<string, string[]>();
-		for (const r of refs.get(p.id)!) push(byType, r.type, r.id);
-
-		let type = PLACEMENT_TYPES.find((t) => byType.has(t));
-		if (p.placement !== undefined && isPlacementType(p.placement) && byType.has(p.placement)) type = p.placement;
-
-		const placed = type ? byType.get(type)!.slice(0, 2) : [];
-		placementParents.set(p.id, placed);
-		if (type) placementType.set(p.id, type);
+		const byType = byTypeOf.get(p.id)!;
+		const type = placementType.get(p.id);
+		const placed = placementParents.get(p.id)!;
 
 		let fu: FamilyUnion | undefined;
 		if (placed.length === 2) {
 			const key = pairKey(placed[0], placed[1]);
 			const listed = listedByPair.get(key);
-			if (listed) {
-				fu = (p.union !== undefined && listed.find((u) => u.id === p.union)) || listed[listed.length - 1];
+			// A ward joins a union of its guardians only when they already have one (D354 1 B); it never makes one.
+			fu = listed ? (p.union !== undefined && listed.find((u) => u.id === p.union)) || listed[listed.length - 1] : implicitByPair.get(key);
+			if (fu) {
+				primaryUnion.set(p.id, fu.key);
+				fu.children.push(p.id);
 			} else {
-				fu = implicitByPair.get(key);
-				if (!fu) {
-					fu = { key: `i:${key}`, partners: [placed[0], placed[1]], type: 'implicit', implicit: true, children: [] };
-					implicitByPair.set(key, fu);
-				}
+				wardPairs.push({ child: p.id, guardians: [placed[0], placed[1]] });
 			}
-			primaryUnion.set(p.id, fu.key);
-			fu.children.push(p.id);
 		} else if (placed.length === 1) {
 			push(soloChildren, placed[0], p.id);
 		}
@@ -162,7 +206,7 @@ export function deriveFamilies(tree: Tree, options: ValidateOptions = {}): Famil
 
 	const writtenUnions = tree.unions.map((u) => [...u.partners]);
 	const dates = buildTreeDates(options.dates ?? PLAIN_READER, people, v.titles);
-	return { people, byId, houses, placementParents, placementType, primaryUnion, unions, unionByKey, unionsOf, soloChildren, secondary, writtenUnions, titles: v.titles, writtenTitles: tree.titles ?? [], dates, issues: [...issues, ...anchorIssues(v.titles, dates)] };
+	return { people, byId, houses, placementParents, placementType, primaryUnion, unions, unionByKey, unionsOf, soloChildren, secondary, wardPairs, writtenUnions, titles: v.titles, writtenTitles: tree.titles ?? [], dates, issues: [...issues, ...anchorIssues(v.titles, dates)] };
 }
 
 /** One parent link the tree draws: the parent's id and the link type (unknown types read as birth). */
@@ -202,10 +246,11 @@ export function partnerOf(fu: FamilyUnion, id: string): string {
 	return fu.partners[0] === id ? fu.partners[1] : fu.partners[0];
 }
 
-/** Children placed under this person, via any of their unions or directly. */
+/** Children placed under this person: through any of their unions, directly, or as a ward of two guardians (`wardPairs`). */
 export function placedChildren(g: FamilyGraph, id: string): string[] {
 	const out: string[] = [];
 	for (const key of g.unionsOf.get(id) ?? []) out.push(...g.unionByKey.get(key)!.children);
 	out.push(...(g.soloChildren.get(id) ?? []));
+	for (const w of g.wardPairs) if (w.guardians[0] === id || w.guardians[1] === id) out.push(w.child);
 	return out;
 }

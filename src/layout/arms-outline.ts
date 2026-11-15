@@ -177,15 +177,23 @@ interface ArmsGap {
 	strokeWidth: number;
 }
 
+/**
+ * D353 1 B: where an arms picture sits across its box. Beside a portrait it sits at the left, so a narrow banner stands as near the portrait as a
+ * shield does; alone it sits in the middle, on the card axis. The picture is always vertically in the middle and never cropped ("meet").
+ */
+export type ArmsAlign = 'left' | 'middle';
+
+/** The `preserveAspectRatio` of an arms picture: the scene and the saved picture draw with it, and `armsGap` places the outline the same way. */
+export const armsAspectRatio = (align: ArmsAlign = 'middle'): string => (align === 'left' ? 'xMinYMid meet' : 'xMidYMid meet');
 
 /**
- * Places `outline` in the box `rect` of a card's arms picture (the picture is drawn there with "meet", in the middle) and sizes the stroke so that the gap is
- * `gap` layout px wide on every side. The coordinates are written out in layout px and the path has no transform: with a transform attribute the 55 paths of
- * a view cost about a millisecond more main-thread time in every frame of a pan (measured in Chrome on sample tree 07b); the path of one card is short.
+ * Places `outline` in the box `rect` of a card's arms picture (the picture is drawn there with "meet", at the left or in the middle, `armsAspectRatio`) and sizes
+ * the stroke so that the gap is `gap` layout px wide on every side. The coordinates are written out in layout px and the path has no transform: with a transform
+ * attribute the 55 paths of a view cost about a millisecond more main-thread time in every frame of a pan (measured in Chrome on sample tree 07b); the path of one card is short.
  */
-export function armsGap(outline: ArmsOutline, rect: Rect, gap: number): ArmsGap {
+export function armsGap(outline: ArmsOutline, rect: Rect, gap: number, align: ArmsAlign = 'middle'): ArmsGap {
 	const s = Math.min(rect.w / outline.w, rect.h / outline.h);
-	const tx = rect.x + (rect.w - outline.w * s) / 2;
+	const tx = rect.x + (align === 'left' ? 0 : (rect.w - outline.w * s) / 2);
 	const ty = rect.y + (rect.h - outline.h * s) / 2;
 	const d = outline.d.replace(/(-?[\d.]+) (-?[\d.]+)/g, (_, x: string, y: string) => `${rounded(tx + Number(x) * s)} ${rounded(ty + Number(y) * s)}`);
 	return { d, strokeWidth: Math.round(2 * gap * 100) / 100 };

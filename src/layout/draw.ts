@@ -7,6 +7,7 @@
  * and the nets and writes no plan field.
  */
 import { partnerOf, type FamilyGraph, type FamilyUnion } from '../core/derive';
+import { isWardUnion, wardUnionKey } from '../core/ward-unions';
 import { FOLD_EM, workExtent, type FoldInput } from './fold-spots';
 import { barClear, isRoundel, lineMetrics, MIN_HIT, roundelAxis, roundelLineEnd, sideTagDepth, tagHit, tagTop, TIE, type LineMetrics } from './geometry';
 import type { Net, Zone } from './lanes';
@@ -28,6 +29,8 @@ const ON_AXIS = 0.5;
 const RUMOUR_RADIUS_EM = 0.5;
 const RUMOUR_RADIUS_MIN_PX = 8;
 const RUMOUR_EDGE_PX = 2;
+/** em: how far each of two guardians' ward lines ends from the ward's own line (D354 1 B). */
+const WARD_PAIR_APART_EM = 0.3125;
 /** Paths are written to a tenth of a px, a stem to a thousandth so that it ends where its sign is. */
 const PATH_ROUND = 10;
 const STEM_ROUND = 1000;
@@ -106,6 +109,8 @@ export function drawCouples(plan: Plan, g: FamilyGraph, nets: UpperNets, persons
 	const barStyle = new Map<string, { kind: StrokeKind; union: string }>();
 	for (const fu of g.unions) if (plan.couples.get(fu.key)!.kind === 'bar') barStyle.set(pairOf(fu), { kind: coupleKind(fu), union: fu.key });
 	for (const fu of g.unions) {
+		// Two guardians with no union (D354 1 B) are placed as a pair but nothing joins them: no line, no sign.
+		if (isWardUnion(fu)) continue;
 		const c = plan.couples.get(fu.key)!;
 		const u = unions.get(fu.key)!;
 		const kind = coupleKind(fu);
@@ -186,6 +191,8 @@ export function drawDescent(plan: Plan, g: FamilyGraph, hp: HangPoints, nets: Up
 		}
 		// A folded family has no bar and no drop: its stem is drawn with the fold controls (`drawFolds`).
 		if (!f.kids.length) continue;
+		// The ward of two guardians with no union hangs from no trunk: each guardian has a ward line of its own (`drawSideLinks`).
+		if (f.union !== undefined && isWardUnion(g.unionByKey.get(f.union)!)) continue;
 		const bar = barOf.get(f.key)!;
 		const by = ys.barY(bar.gap, bar.lane);
 		const fromX = hp.x.get(f.key)!;
@@ -274,7 +281,7 @@ interface LinkCurve {
  * into one row keep a gap and one dash phase (`bundleBegetters`); then `router` (side-route.ts) routes a curve that would run over a foreign card between
  * the cards. The bundle comes first: its lines go one row down and stay in one gap, so the router never changes them and the bundle holds.
  */
-export function drawSideLinks(plan: Plan, g: FamilyGraph, persons: ReadonlyMap<string, PersonBox>, unions: ReadonlyMap<string, UnionPoint>, ys: RowYs, geo: Geometry, side: Geometry | undefined, m: LineMetrics, num: Num = r1, bands?: { upper: readonly (readonly Net[])[]; lower: readonly (readonly Net[])[] }, router?: SideRouter): { paths: EdgePath[]; rumours: Rumour[] } {
+export function drawSideLinks(plan: Plan, g: FamilyGraph, persons: ReadonlyMap<string, PersonBox>, unions: ReadonlyMap<string, UnionPoint>, ys: RowYs, geo: Geometry, side: Geometry | undefined, m: LineMetrics, num: Num = r1, bands?: { upper: readonly (readonly Net[])[]; lower: readonly (readonly Net[])[] }, router?: SideRouter, dropX?: ReadonlyMap<string, number>): { paths: EdgePath[]; rumours: Rumour[] } {
 	const roundel = !side && isRoundel(geo);
 	const paths: EdgePath[] = [];
 	const rumours: Rumour[] = [];
@@ -283,8 +290,15 @@ export function drawSideLinks(plan: Plan, g: FamilyGraph, persons: ReadonlyMap<s
 	const groups: string[] = [];
 	for (const s of plan.sideLinks) {
 		const cb = persons.get(s.child)!;
-		const tx = cb.x + cb.w / 2 + (side ? Math.min(SIDE_LINK_PX, cb.w / 2 - m.tagInset) : roundel ? SIDE_LINK_EM * geo.fontPx : SIDE_LINK_PX);
+		const shift = side ? Math.min(SIDE_LINK_PX, cb.w / 2 - m.tagInset) : roundel ? SIDE_LINK_EM * geo.fontPx : SIDE_LINK_PX;
+		const tx0 = cb.x + cb.w / 2 + shift;
 		const ty = cb.y;
+		// Two guardians with no union (D354 1 B): the two ward lines end a little apart on the ward's own line, the guardian who stands first to
+		// its left (beside the medallion on a Roundel card), so the two never cross at the end.
+		// Only a pair the layout seated as a ward pair: a ward placed under its birth parents with two guardians who share no union keeps its old drawing.
+		const pair = s.type === 'ward' && s.parents.length === 2 && !s.union && g.unionByKey.get(wardUnionKey(s.parents[0], s.parents[1]))?.children.includes(s.child) === true && isWardUnion(g.unionByKey.get(wardUnionKey(s.parents[0], s.parents[1]))!);
+		const apart = roundel ? SIDE_LINK_EM * geo.fontPx : Math.min(WARD_PAIR_APART_EM * geo.fontPx, shift);
+		const centre = dropX?.get(s.child) ?? cb.x + cb.w / 2;
 		const sources: { x: number; y: number; drop?: number; gap?: number; people: string[] }[] = [];
 		if (s.union) {
 			const u = unions.get(s.union)!;
@@ -299,6 +313,7 @@ export function drawSideLinks(plan: Plan, g: FamilyGraph, persons: ReadonlyMap<s
 		}
 		for (const src of sources) {
 			const sy = src.drop ?? src.y;
+			const tx = pair ? centre + (src.x < Math.max(...sources.map((o) => o.x)) ? -apart : apart) : tx0;
 			const my = src.drop !== undefined && cb.gen === src.gap! + 1 ? turnY(src.gap!, src.x, sy, tx, ty, ys, near, bands) : (sy + ty) / 2;
 			curves.push({ s, src, sy, my, tx, ty, kind: (s.type === 'birth' ? 'birth-link' : s.type) as StrokeKind });
 			// A group is one begetter and one row of children: only a line from a begetter's port to the next row down is in one. Such a curve stays between the two rows, so a lift never puts it over a card.
@@ -423,7 +438,7 @@ export function routeTree({ plan, g, geo, side, tabbed, youTab, ordinalCards, fo
 	const lineX = Math.max(0, ...nets.upper.flat().map((n) => n.hi), ...lower.flat().map((n) => n.hi));
 	// One router for both drawings (rounded, and exact for the "?" search): it reads the rounded lines, so both take the same routes.
 	const router = plan.sideLinks.length ? sideRouter(plan, persons, unions, ys, geo, side, m, [...lines.couples.paths, ...lines.descent.paths, ...folds.paths], lineX) : undefined;
-	const draw = (num: Num, l = drawLines(num)) => ({ ...l, links: drawSideLinks(plan, g, persons, unions, ys, geo, side, m, num, { upper: nets.upper, lower }, router) });
+	const draw = (num: Num, l = drawLines(num)) => ({ ...l, links: drawSideLinks(plan, g, persons, unions, ys, geo, side, m, num, { upper: nets.upper, lower }, router, dropX) });
 	const { couples, descent, links } = draw(r1, lines);
 	const pathsOf = (d: ReturnType<typeof draw>) => [...d.couples.paths, ...d.descent.paths, ...folds.paths, ...d.links.paths];
 	const paths = pathsOf({ couples, descent, links });

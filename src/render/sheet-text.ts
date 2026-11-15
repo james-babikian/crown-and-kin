@@ -4,8 +4,10 @@
  * Simplified Technical English (ASD-STE100) and the project word list apply. `ui-text.ts` re-exports every name, so old imports keep working.
  */
 
+import type { FamilyUnion } from '../core/derive';
 import type { DeleteSummary } from '../core/family-query';
 import { quote } from '../core/quote';
+import { isUnionType, readEndedBy } from '../core/types';
 import { addedAsParent, ownText } from './change-text';
 import { isolateName } from './name-bidi';
 import { SUCCESSION_UI } from './succession-text';
@@ -82,6 +84,26 @@ export function unionTypeText(t: string | null): string {
 	return ownText(UNION_TYPE_TEXT, t) ?? `Other (${t})`;
 }
 
+/** D310: "Ended by" shows for a marriage and for a type word of the tree's own (drawn as a marriage); not for a betrothal, a concubinage or an affair. */
+export const showsEndedBy = (type: string): boolean => type === 'marriage' || !isUnionType(type);
+
+/** D330 UX-03, D356 6 A: the `ended-by` value that a partnership shows, or null. The person window and the partner list of a name tag both read it here, so they always agree. */
+export function shownEndedBy(type: string | null, raw: string | null | undefined): string | null {
+	return type !== null && showsEndedBy(type) ? readEndedBy(raw) : null;
+}
+
+/**
+ * D355, D356 6 A: the kinds of the unions of one pair, in the order given, never merged: "Marriage, ended by divorce, Marriage". The years stay out.
+ * A union with no written cause shows only its kind, as the person window does.
+ */
+export const unionKindsText = (unions: readonly Pick<FamilyUnion, 'type' | 'implicit' | 'endedBy'>[]): string =>
+	unions
+		.map((fu) => {
+			const type = fu.implicit ? null : fu.type;
+			return [unionTypeText(type), endedByText(shownEndedBy(type, fu.endedBy))].filter(Boolean).join(', ');
+		})
+		.join(', ');
+
 /** "1129–1161", "from 1129", "until 1161" or "". */
 export function unionDates(start?: string, end?: string): string {
 	if (start && end) return `${start}–${end}`;
@@ -118,6 +140,8 @@ export const FAMILY = {
 	editLabel: (name: string) => `Edit the partnership with ${name}`,
 	removePartnershipLabel: (name: string) => `Remove partnership: remove the partnership with ${name}`,
 	siblings: 'Position among siblings',
+	/** D356 4 A: the heading for wards of two guardians who are no couple; each name is its own bidi run. */
+	siblingsWards: (a: string, b: string) => `Position among the wards of ${isolateName(a)} and ${isolateName(b)}`,
 	position: (i: number, n: number) => `Position ${i} of ${n}`,
 	moveEarlier: 'Move earlier',
 	moveLater: 'Move later',

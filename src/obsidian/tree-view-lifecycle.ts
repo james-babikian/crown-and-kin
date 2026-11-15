@@ -23,6 +23,8 @@ import { hasArms, hasPortraits, hasReign } from '../view/tree-view-helpers';
 import { guarded } from './start-guard';
 import { TreeViewBase } from './tree-view-base';
 import type { KeepPlace } from './tree-view-types';
+import type { Scene } from '../render/dom/scene';
+import { WHEEL_QUIET_MS } from '../view/late-words';
 
 /** The height of the box that stands in for a tree on a phone, when no height of the block is known, in px. */
 const PHONE_PLACEHOLDER_PX = 260;
@@ -39,6 +41,17 @@ const calloutBgSet = new WeakMap<HTMLElement, string | null>();
 
 /** Lifecycle and environment of a tree view: load, unload, settings, theme, fonts and the safe wrapper for every entry point. */
 export abstract class TreeViewLifecycle extends TreeViewBase {
+	/** D352 item 1: the scene whose late relation words the idle queue writes, and the step that stops that queue (`late-words.ts`). */
+	protected wordsScene: Scene | null = null;
+	protected wordsStop: (() => void) | null = null;
+	/** The time of the last wheel event over the tree: a wheel zoom or pan is not a press, so the queue of the late words reads this too. */
+	protected wheelAt = -Infinity;
+
+	/** True while a pan, a pinch or a wheel zoom runs: no relation word is worked out then (spec §13.1). */
+	protected moving(pz: { busy: boolean }): boolean {
+		return pz.busy || performance.now() - this.wheelAt < WHEEL_QUIET_MS;
+	}
+
 	/**
 	 * The calendar index changed (a scan ended, a calendar note changed): when this tree's reader key is another one, draw again with the kept anchor.
 	 * Dates move no card, so the layout comes from the cache; the phone list keeps its centre person (spec §14 rule 9).
@@ -409,6 +422,10 @@ export abstract class TreeViewLifecycle extends TreeViewBase {
 		this.tips = null;
 		this.panZoom?.destroy();
 		this.panZoom = null;
+		// D352 item 1: no word of an old scene is written after it is gone.
+		this.wordsStop?.();
+		this.wordsStop = null;
+		this.wordsScene = null;
 		this.cancelPulse();
 		this.popover?.close();
 		this.popover = null;

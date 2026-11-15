@@ -242,7 +242,7 @@ describe('pictures and problems in a slot (render/dom/pictures.ts)', () => {
 		return scene(laid, g).scene.pictures;
 	};
 
-	it('setPicture: one <image class="dynasty-picture"> with the slot rect and "xMidYMid meet"; replaced, then removed with null', async () => {
+	it('setPicture: one <image class="dynasty-picture"> with the slot rect and "meet" ("xMinYMid" for arms beside a portrait, D353 1 B; else "xMidYMid"); replaced, then removed with null', async () => {
 		const { setPicture } = await load();
 		const arms = slots().find((x) => x.kind === 'arms' && x.lod === 'full')!;
 		const el = arms.el as unknown as FEl;
@@ -252,7 +252,8 @@ describe('pictures and problems in a slot (render/dom/pictures.ts)', () => {
 		const img = images()[0];
 		expect(img.hasClass('dynasty-picture')).toBe(true);
 		expect(img.getAttribute('href')).toBe('blob:one');
-		expect(img.getAttribute('preserveAspectRatio')).toBe('xMidYMid meet');
+		// D353 1 B: arms beside a portrait sit at the left of their box, so every arms stands at the same distance from the portrait.
+		expect(img.getAttribute('preserveAspectRatio')).toBe(arms.align === 'left' ? 'xMinYMid meet' : 'xMidYMid meet');
 		for (const [attr, k] of [['x', 'x'], ['y', 'y'], ['width', 'w'], ['height', 'h']] as const) expect(Number(img.getAttribute(attr))).toBeCloseTo(arms.rect[k], 6);
 		setPicture(arms, 'blob:two');
 		expect(images().map((e) => e.getAttribute('href'))).toEqual(['blob:two']);

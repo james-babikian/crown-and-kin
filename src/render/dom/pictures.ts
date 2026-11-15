@@ -7,7 +7,7 @@
  * a URL, and no colour is written: styles.css styles the classes.
  */
 
-import { armsGap, type ArmsOutline } from '../../layout/arms-outline';
+import { armsAspectRatio, armsGap, type ArmsAlign, type ArmsOutline } from '../../layout/arms-outline';
 import type { Rect } from '../../layout/model';
 
 /** D204: whose arms a slot shows: the arms of a house, or the personal arms of a person. */
@@ -29,6 +29,8 @@ export interface PictureSlot {
 	frame?: SVGCircleElement;
 	/** D219: arms only. How wide the gap in the colour of the page is round the arms picture, in layout px. */
 	gap?: number;
+	/** D353 1 B: arms only. Where the picture sits across its box: at the left beside a portrait, in the middle alone (the default). */
+	align?: ArmsAlign;
 }
 
 /** B1: a slot's picture problem: `missing` (the file is not in the vault: dashed frame), `other`, or null for none. */
@@ -42,9 +44,9 @@ const HAS_PICTURE_CLASS = 'has-picture';
 const ARRIVING_CLASS = 'is-arriving';
 
 /**
- * S2: shows `url` in the slot (one `<image>`, the slot's box, "xMidYMid meet": the picture keeps its
- * own proportions, D75), replaces the picture that is there, or removes it with null. A portrait
- * picture goes under its frame; the small copy is already the round upper-centre square.
+ * S2: shows `url` in the slot (one `<image>`, the slot's box, "meet": the picture keeps its own
+ * proportions, D75; arms beside a portrait sit at the left of the box, D353 1 B), replaces the picture that is there, or removes it with null.
+ * A portrait picture goes under its frame; the small copy is already the round upper-centre square.
  */
 export function setPicture(slot: PictureSlot, url: string | null): void {
 	const el = slot.el;
@@ -63,7 +65,7 @@ export function setPicture(slot: PictureSlot, url: string | null): void {
 	const r = slot.rect;
 	const img = el.createSvg('image', {
 		cls: PICTURE_CLASS,
-		attr: { href: url, x: r.x, y: r.y, width: r.w, height: r.h, preserveAspectRatio: 'xMidYMid meet' },
+		attr: { href: url, x: r.x, y: r.y, width: r.w, height: r.h, preserveAspectRatio: armsAspectRatio(slot.align) },
 	});
 	// A picture that cannot load is removed by the caller (`setSlotProblem`), so a failed load needs no class change here beyond showing what there is.
 	img.addClass(ARRIVING_CLASS);
@@ -72,6 +74,17 @@ export function setPicture(slot: PictureSlot, url: string | null): void {
 	img.addEventListener('error', arrived, { once: true });
 	if (slot.frame) el.insertBefore(img, slot.frame);
 	el.addClass(HAS_PICTURE_CLASS);
+}
+
+/**
+ * O3, D353 1 B: the box one arms copy is made for, so that it serves every arms slot of a tree: the widest and the tallest arms box together. Arms beside a
+ * portrait have a taller, narrower box than arms alone; a copy drawn with "meet" into a box no larger than this is never enlarged (a banner made for the box
+ * of arms alone drew soft beside a portrait). Undefined when no slot is an arms slot.
+ */
+export function armsCopyBox(slots: readonly PictureSlot[]): { w: number; h: number } | undefined {
+	let box: { w: number; h: number } | undefined;
+	for (const s of slots) if (s.kind === 'arms') box = { w: Math.max(box?.w ?? 0, s.rect.w), h: Math.max(box?.h ?? 0, s.rect.h) };
+	return box;
 }
 
 /** D219: the class of the path that makes the gap round arms; styles.css fills it and strokes it in the colour of the page. */
@@ -89,7 +102,7 @@ export function setArmsGap(slot: PictureSlot, outline: ArmsOutline | null): void
 		old?.remove();
 		return;
 	}
-	const g = armsGap(outline, slot.rect, slot.gap);
+	const g = armsGap(outline, slot.rect, slot.gap, slot.align);
 	if (old) {
 		old.setAttribute('d', g.d);
 		old.setAttribute('stroke-width', String(g.strokeWidth));

@@ -19,23 +19,23 @@
 import type { FamilyGraph } from '../core/derive';
 import { isDead } from '../core/succession-keys';
 import type { CardLabel } from '../core/titles';
-import { ORDINAL_EM, ROUNDEL_EM, centredWithoutWord, cardText, isRoundel, nameCountOf, nameRoom, ordinalTabRect, relationY, ribbonWidth, roundelPics, signBelowRing, tagTop, youTabRect, type CardText, type ShownLines } from '../layout/geometry';
-import { armsGap, type ArmsOutline } from '../layout/arms-outline';
+import { ORDINAL_EM, ROUNDEL_EM, centredWithoutWord, cardText, isRoundel, nameCountOf, nameRoom, ordinalTabRect, relationY, ribbonWidth, roundelPics, signBelowRing, youTabRect, type CardText, type ShownLines } from '../layout/geometry';
+import { armsAspectRatio, armsGap, type ArmsOutline } from '../layout/arms-outline';
 import { farTagSigns } from '../layout/far-tag-sign';
 import { illegitimateSigns } from '../layout/illegitimate-sign';
 import { FOLD_EM } from '../layout/fold-spots';
-import type { EdgeDrawing, NameLineCount, StrokeKind, TreeLayout } from '../layout/model';
+import type { EdgeDrawing, FarTag, Geometry, NameLineCount, StrokeKind, TreeLayout } from '../layout/model';
 import { FOLD_CHIP_EM, FRAME_STROKE_PX, RUMOUR_FONT_EM, TAB_TEXT_BASE_EM, TAB_TEXT_EM, signText, type Measure, type SceneFonts } from './scene-model';
 import { legendRows, type LegendHouse, type LegendPart } from './legend';
 import { lineLook, type LineMarks, type LineState } from './line-highlight';
 import type { BreakList } from './break-words';
 import { cardNameLines, svgNameLines, svgText, titleLines, type NameMeasure, type NameRun } from './name-lines';
 import { fixedColour, fontOf, savedFrame, xmlText, type PictureMap, type SavedFrame, type SavedParts } from './saved-picture';
-import { DEAD_STRIP_OPACITY, DEFAULT_DARK, DEFAULT_LIGHT, FADED_OPACITY, HEIR_LOOK, ME_LOOK, ME_RING_INNER, ON_LINE_EXTRA, SAVED_CARD_RADIUS, STROKES, TAG_MARK, UNION_MARKS, stripColour, tagMarkSlot, tagNameRoom, tagPillParts, unionMark, unionShape, type Palette, type UnionShape } from './styles';
+import { DEAD_STRIP_OPACITY, DEFAULT_DARK, DEFAULT_LIGHT, FADED_OPACITY, HEIR_LOOK, ME_LOOK, ME_RING_INNER, ON_LINE_EXTRA, SAVED_CARD_RADIUS, STROKES, TAG_FONT_EM, TAG_MARK, UNION_MARKS, fullTagPill, stripColour, tagMarkCentre, tagMarkSlot, tagNameRoom, tagPillParts, tagSignRoom, unionMark, unionShape, type Palette, type UnionShape } from './styles';
 import { LEGEND_DEAD_DOUBT_LABEL, LEGEND_DEAD_LABEL, LEGEND_LABELS, SIGN_LEGEND_LABEL } from './legend-text';
 import { marksForSvg } from './date-bidi';
 import { fitNamed, pickReign } from './date-fit';
-import { dateLineShown, farTagName, farTagSvgName, reignShown, shownReignIsolated } from './tree-info';
+import { dateLineShown, farTagName, farTagPair, farTagPairRuns, reignShown, shownReignIsolated, tagRunSvg, type TagRun } from './tree-info';
 import { fitRelationText } from './relation-fit';
 import { ribbonPath } from './view-math';
 import { closeIsolates, truncateClosed, withoutBidiControls } from './bidi-controls';
@@ -308,10 +308,10 @@ export function renderSvg(g: FamilyGraph, layout: TreeLayout, edges: EdgeDrawing
 				// No `opacity` on the gap (a dead person's arms are faded, the gap behind them is not): resvg 2.6 panics on a layer outside a cropped view, as it does on an image.
 				const outline = isUri(uri) ? opts.outlines?.get(p.arms ? `person-arms:${p.id}` : `arms:${house!.id}`) : undefined;
 				if (outline) {
-					const gap = armsGap(outline, { x: box.x + r.x, y: box.y + r.y, w: r.w, h: r.h }, ROUNDEL_EM.halo * geo.fontPx);
+					const gap = armsGap(outline, { x: box.x + r.x, y: box.y + r.y, w: r.w, h: r.h }, ROUNDEL_EM.halo * geo.fontPx, rp.armsAlign);
 					out.push(`<path d="${gap.d}" fill="${ground}" stroke="${ground}" stroke-width="${gap.strokeWidth}" stroke-linejoin="round" fill-rule="evenodd"/>`);
 				}
-				if (isUri(uri)) out.push(`<image href="${esc(uri)}" x="${box.x + r.x}" y="${box.y + r.y}" width="${r.w}" height="${r.h}" preserveAspectRatio="xMidYMid meet"${muted}${di(`arms:${p.id}`)}/>`);
+				if (isUri(uri)) out.push(`<image href="${esc(uri)}" x="${box.x + r.x}" y="${box.y + r.y}" width="${r.w}" height="${r.h}" preserveAspectRatio="${armsAspectRatio(rp.armsAlign)}"${muted}${di(`arms:${p.id}`)}/>`);
 			}
 			if (rp.portrait) {
 				const r = rp.portrait;
@@ -409,49 +409,106 @@ export function renderSvg(g: FamilyGraph, layout: TreeLayout, edges: EdgeDrawing
 	}
 
 	// Far-couple tags sit on top of the card's bottom edge and any line under it.
-	const tagH = geo.tagH;
-	const tagFont = 0.75 * geo.fontPx;
+	const tagFont = TAG_FONT_EM * layout.geometry.fontPx;
 	const tagFontStr = fontOf('400', tagFont, fonts.ui);
-	const tagFamily = saved ? ` font-family="${esc(fonts.ui)}"` : '';
+	const tagCtx: TagSvg = {
+		g, labels: opts.labels, geo: layout.geometry, c, font: tagFont, family: saved ? ` font-family="${esc(fonts.ui)}"` : '', di,
+		// D353 4 Now: the ⚭ is measured in its own font where the picture gets a real measure, so the gap after it is the fixed gap of the live tree.
+		signW: savedSignWidth(real, opts.fonts, tagFont), measure: (t) => (measured ? measured(t, tagFontStr) : textWidth(t, tagFont)),
+		cut: (t, px) => (measured ? cutWith(t, px, tagFontStr) : fit(t, px, tagFont)),
+	};
 	// A far couple with no children has no union dot, so its tag carries the partnership sign.
 	const farSigns = farTagSigns(g, layout, edges);
 	for (const tag of layout.farTags.values()) {
-		const pad = tagH / 2;
-		// The marriage sign is drawn apart: few text fonts have it, and resvg would switch the whole label to the fallback font.
-		const sign = tagFont * 1.4;
-		const farShape = farSigns.has(tag.person) ? unionShape('union', farSigns.get(tag.person)) : null;
-		// The partnership sign takes its own room between the marriage sign and the name; the room depends on the shape, so the gap before the name is the same (D108).
-		const slot = farShape ? tagMarkSlot(farShape, tagFont) : 0;
-		// The widest the tag may be; a sideways hit area can be wider than the part of the edge the tag may use.
-		const room = tag.zoneW ?? tag.hit.w;
-		const nameRoom = tagNameRoom(room, pad, sign, slot);
-		const label = measured ? cutWith(farTagName(g, tag.spouses, opts.labels), nameRoom, tagFontStr) : fit(farTagName(g, tag.spouses, opts.labels), nameRoom, tagFont);
-		const { left, w, signX, markX, nameX } = tagPillParts(tag.x, room, pad, sign, slot, measured ? measured(label, tagFontStr) : textWidth(label, tagFont));
-		const top = tagTop(geo, tag.y);
-		const base = top + tagH / 2 + 0.35 * tagFont;
-		// D47: a tag of a marriage on the finder's line gets an accent edge; a tag beside it fades.
 		const state = look.tag(tag);
-		const group = saved || state === 'faded';
-		if (group) out.push(`<g${di(`tag:${tag.person}`)}${fadeAttr(state)}>`);
-		// D212: the pill is a chip with the line colour as its edge, so it still reads as a tag without colour (3:1 on the page).
-		const edge = state === 'on' ? `stroke="${c.accent}" stroke-width="2"` : `stroke="${c.line}" stroke-width="1"`;
-		out.push(`<rect x="${left}" y="${top}" width="${w}" height="${tagH}" rx="${tagH / 2}" fill="${c.cardFill}" ${edge}/>`);
-		out.push(`<text x="${signX}" y="${base}" font-size="${1.25 * tagFont}" font-family="Segoe UI Symbol, DejaVu Sans, sans-serif" fill="${c.textMuted}">⚭</text>`);
-		if (farShape) {
-			const spec = UNION_MARKS[farShape];
-			const m = unionMark(farShape, markX, top + tagH / 2, spec.size * TAG_MARK.unit * tagFont);
-			const at = Object.entries(m.attr).map(([k, v]) => `${k}="${v}"`).join(' ');
-			const paint = spec.stroke ? `fill="${c.cardFill}" stroke="${c.textMuted}" stroke-width="${spec.stroke}" stroke-linejoin="round"` : `fill="${c.textMuted}"`;
-			// The sign is listed like any union sign, as the live tree's sign has the class of one.
-			out.push(`<${m.tag} ${at} ${paint}${di(`union:${farShape}`)}/>`);
-		}
-		out.push(`<text x="${nameX}" y="${base}" font-size="${tagFont}"${tagFamily} fill="${c.textMuted}">${esc(farTagSvgName(label))}</text>`);
-		if (group) out.push('</g>');
+		out.push(...tagSvg(tag, farSigns.has(tag.person) ? unionShape('union', farSigns.get(tag.person)) : null, state, saved !== undefined || state === 'faded', tagCtx));
 	}
 
 	if (saved && frame?.legend) out.push('</g>', ...legendSvg(frame, saved, c, fonts, dark), '</svg>');
 	else out.push('</g></svg>');
 	return out.join('\n');
+}
+
+/** What `tagSvg` draws a far-couple tag with: the tag text size `font` (px), its measure and cut, the `font-family` attribute of a saved picture, and the parity ids. */
+interface TagSvg {
+	g: FamilyGraph;
+	labels: ReadonlyMap<string, CardLabel> | undefined;
+	geo: Geometry;
+	c: Palette;
+	font: number;
+	family: string;
+	di: (item: string) => string;
+	measure: (text: string) => number;
+	cut: (text: string, px: number) => string;
+	/** The drawn width of the ⚭ (`SIGN_FAMILY`, `SAVED_SIGN_SIZE` tag text sizes). */
+	signW: number;
+}
+
+/** The ⚭ of the saved picture is drawn apart from the name, in a symbol font, this many tag text sizes high. */
+const SAVED_SIGN_SIZE = 1.25;
+/** The fonts of that ⚭: few text fonts have it, and resvg would switch the whole label to the fallback font. */
+const SIGN_FAMILY = 'Segoe UI Symbol, DejaVu Sans, sans-serif';
+/**
+ * The width of that ⚭ in tag text sizes where no real measure is given (the headless pictures): its advance in Segoe UI Symbol (0.659 em) at
+ * `SAVED_SIGN_SIZE`. Before D353 4 Now the ⚭ had a room of 1.4 text sizes, a gap of about 0.58 against the 0.3 of the live tree.
+ */
+export const SAVED_SIGN_EM = 0.82;
+
+/** The drawn width of the saved picture's ⚭ at tag text size `font`: measured in its own font with a real measure, else `SAVED_SIGN_EM`. */
+function savedSignWidth(real: Measure | undefined, fonts: SceneFonts | undefined, font: number): number {
+	return real && real !== approxMeasure && fonts ? real('⚭', fontOf('400', SAVED_SIGN_SIZE * font, SIGN_FAMILY)) : SAVED_SIGN_EM * font;
+}
+
+/**
+ * One far-couple tag of the saved picture (spec §5.3, D10): the pill (D353 2 A, `fullTagPill`), the ⚭ and its room (D353 4 Now, `tagSignRoom`),
+ * the partnership sign of a couple with no union dot, and the name, or the two short names of two far partners where they fit uncut (D353 3 A).
+ * `grouped` wraps the parts in one group (a saved picture's parity id, or a fade).
+ */
+function tagSvg(tag: FarTag, farShape: UnionShape | null, state: LineState, grouped: boolean, t: TagSvg): string[] {
+	const { c, font } = t;
+	const out: string[] = [];
+	const { top, h } = fullTagPill(t.geo, tag.y);
+	const pad = h / 2;
+	// D354 2 C: a tag for several partners has no sign and takes no room for one; the two names get that room.
+	const bare = tag.spouses.length !== 1;
+	const spaceW = farShape ? t.measure(' ') : 0;
+	const drawn = bare ? 0 : tagSignRoom(t.signW, spaceW, font, farShape);
+	// The partnership sign takes its own room between the marriage sign and the name; the room depends on the shape, so the gap before the name is the same (D108).
+	const slot = farShape ? tagMarkSlot(farShape, font) : 0;
+	// The widest the tag may be; a sideways hit area can be wider than the part of the edge the tag may use.
+	const room = tag.zoneW ?? tag.hit.w;
+	const pair = farTagPair(t.g, tag.spouses, t.labels);
+	// D353 3 A: the two names are chosen with the room of the live tag (its ⚭ in the tag font), so a tag never reads "Katrin · Ermengarde" on
+	// the screen and "2 partners" in the saved picture. The larger ⚭ of the picture then takes its room from the room the names leave.
+	const liveW = t.measure('⚭');
+	const live = bare ? 0 : tagSignRoom(liveW, farShape ? t.measure('⚭ ') - liveW : 0, font, farShape);
+	const liveRoom = tagNameRoom(room, pad, live, slot);
+	const two = pair ? farTagPairRuns(pair, liveRoom, t.measure) : undefined;
+	const sign = two ? Math.min(drawn, live + liveRoom - two.w) : drawn;
+	const label = two ? '' : t.cut(farTagName(t.g, tag.spouses, t.labels), tagNameRoom(room, pad, sign, slot));
+	const { left, w, signX, markX, nameX } = tagPillParts(tag.x, room, pad, sign, slot, two ? two.w : t.measure(label), farShape ? tagMarkCentre(farShape, font) : 0);
+	const base = top + h / 2 + 0.35 * font;
+	// D47: a tag of a marriage on the finder's line gets an accent edge; a tag beside it fades.
+	if (grouped) out.push(`<g${t.di(`tag:${tag.person}`)}${fadeAttr(state)}>`);
+	// D212: the pill is a chip with the line colour as its edge, so it still reads as a tag without colour (3:1 on the page).
+	const edge = state === 'on' ? `stroke="${c.accent}" stroke-width="2"` : `stroke="${c.line}" stroke-width="1"`;
+	out.push(`<rect x="${left}" y="${top}" width="${w}" height="${h}" rx="${h / 2}" fill="${c.cardFill}" ${edge}/>`);
+	if (!bare) out.push(`<text x="${signX}" y="${base}" font-size="${SAVED_SIGN_SIZE * font}" font-family="${SIGN_FAMILY}" fill="${c.textMuted}">⚭</text>`);
+	if (farShape) {
+		const spec = UNION_MARKS[farShape];
+		const m = unionMark(farShape, markX, top + h / 2, spec.size * TAG_MARK.unit * font);
+		const at = Object.entries(m.attr).map(([k, v]) => `${k}="${v}"`).join(' ');
+		const paint = spec.stroke ? `fill="${c.cardFill}" stroke="${c.textMuted}" stroke-width="${spec.stroke}" stroke-linejoin="round"` : `fill="${c.textMuted}"`;
+		// The sign is listed like any union sign, as the live tree's sign has the class of one.
+		out.push(`<${m.tag} ${at} ${paint}${t.di(`union:${farShape}`)}/>`);
+	}
+	const runs = two ? two.runs : [{ text: label, dx: 0, name: true }];
+	const runText = (r: TagRun) => esc(tagRunSvg(r));
+	// Three runs (a name with a right-to-left letter) are tspans at exact x, each its own text chunk, as on screen (`putName`, dom/tag-pill.ts).
+	const body = runs.length === 1 ? runText(runs[0]) : runs.map((r) => `<tspan x="${nameX + r.dx}">${runText(r)}</tspan>`).join('');
+	out.push(`<text x="${nameX}" y="${base}" font-size="${font}"${t.family} fill="${c.textMuted}">${body}</text>`);
+	if (grouped) out.push('</g>');
+	return out;
 }
 
 /** The saved picture's legend (D74): "Line styles" with the samples of the kinds drawn, then "Houses". */

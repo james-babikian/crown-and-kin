@@ -5,7 +5,8 @@
  * the same styles for the DOM). `scene.ts`, `svg-string.ts` and `legend.ts` draw union signs from
  * `unionShape`, `UNION_MARKS` and `unionMark`.
  */
-import type { StrokeKind } from '../layout/model';
+import { tagTop } from '../layout/geometry';
+import type { Geometry, StrokeKind } from '../layout/model';
 import { LEGEND_LABELS } from './legend-text';
 
 /**
@@ -218,10 +219,9 @@ export const UNION_MARKS: Record<UnionShape, { size: number; stroke?: number }> 
 
 /**
  * The partnership sign inside a far-couple tag. `unit` is the sign's size unit as a fraction of the
- * tag's text size (it replaces the union size of a near couple's sign, so the sign fits the pill); `slot` is
- * the room of the dot only, in text sizes, with a small gap on each side (`tagMarkSlot` gives the room of
- * each shape, wider for the ring, the diamond and the triangle). The shapes and outline widths are those of
- * `UNION_MARKS`.
+ * tag's text size (it replaces the union size of a near couple's sign, so the sign fits the pill); `slot` was
+ * the room of the dot, in text sizes, with a small gap on each side, and half of it less the dot's radius is still the gap on the
+ * sign's left (`tagMarkSlot` gives the room of each shape). The shapes and outline widths are those of `UNION_MARKS`.
  */
 export const TAG_MARK = { unit: 0.5, slot: 1.1 } as const;
 
@@ -237,34 +237,75 @@ export function tagMarkHalfWidth(shape: UnionShape, font: number): number {
 }
 
 /**
- * D108: the clear gap G between the right edge of the partnership sign and the start of the name in a
- * far-couple tag, for text size `font` px. It is the gap that the dot always had (the dot sits in the middle of the
- * 1.1 text-size slot), and every shape gets the same one: the shapes differ in width, so a fixed centred slot
- * left the ring and the open triangle 1 to 2 px from the first letter.
+ * D108: the clear gap between the marriage sign's room (the ⚭ and one space of the font) and the left edge of the partnership sign, for text
+ * size `font` px. It is the gap the dot always had on its left (the dot sat in the middle of the 1.1 text-size slot), so the ⚭ and the
+ * partnership sign keep the spacing they had before D353 4 Now.
  */
-export function tagMarkGap(font: number): number {
+function tagMarkLeftGap(font: number): number {
 	return (TAG_MARK.slot * font) / 2 - tagMarkHalfWidth('dot', font);
 }
 
 /**
- * D108: the room a sign of `shape` takes in a far-couple tag, in px: the gap G on each side of the shape.
- * The sign sits in the middle of this room. For the dot it is `TAG_MARK.slot` text sizes; wider shapes
- * take more room, so the gap before the name is the same and the shape never touches the marriage sign.
+ * D108 with D353 4 Now: the clear gap G between the right edge of the partnership sign and the start of the name in a far-couple tag, for
+ * text size `font` px. It is the fixed gap before every name (`TAG_SIGN_GAP_EM`), the same for every shape: the shapes differ in width, so a
+ * fixed centred slot left the ring and the open triangle 1 to 2 px from the first letter.
+ */
+export function tagMarkGap(font: number): number {
+	return TAG_SIGN_GAP_EM * font;
+}
+
+/**
+ * D108: the room a sign of `shape` takes in a far-couple tag, in px: the old gap on its left (`tagMarkLeftGap`), the shape, and the fixed gap
+ * G before the name (`tagMarkGap`). Wider shapes take more room, so the gap before the name is the same and the shape never touches the
+ * marriage sign.
  */
 export function tagMarkSlot(shape: UnionShape, font: number): number {
-	return TAG_MARK.slot * font + 2 * (tagMarkHalfWidth(shape, font) - tagMarkHalfWidth('dot', font));
+	return tagMarkLeftGap(font) + 2 * tagMarkHalfWidth(shape, font) + tagMarkGap(font);
+}
+
+/** The x of the partnership sign's centre from the start of its room (`tagMarkSlot`), in px. */
+export function tagMarkCentre(shape: UnionShape, font: number): number {
+	return tagMarkLeftGap(font) + tagMarkHalfWidth(shape, font);
+}
+
+/** D353 2 A: the text of a Full far-couple tag, in em of the note font: the size of the card's small text (dates), so a tag follows the card text floor. */
+export const TAG_FONT_EM = 0.85;
+
+/**
+ * D353 2 A: the top and height of the drawn Full tag pill of a tag anchored at `y` (the card's bottom edge), in the live tree and the saved picture.
+ * The pill is the layout's tag band (`tagTop`, `Geometry.tagH`, 1.125 em) and the 0.85 em text sits centred in it: a taller pill covered the
+ * descenders of the relation word and the last text line of a three-line card, and its growth below the band would bring the dot of a partner
+ * stacked below nearer than the 8 px of the I6 exception (D344 1 A, spec §5.3).
+ */
+export function fullTagPill(geo: Geometry, y: number): { top: number; h: number } {
+	return { top: tagTop(geo, y), h: geo.tagH };
+}
+
+/**
+ * D353 4 Now: the clear gap before the name of a named tag, in tag text sizes. It is a fixed gap, not a space of the font: one space
+ * of the interface font was 9.9 px in one font and 11.2 px in another beside the same sign.
+ */
+export const TAG_SIGN_GAP_EM = 0.3;
+
+/**
+ * The room of the lead of a named tag (`sign` of `tagPillParts`) at text size `font` px, from the drawn width `signW` of the ⚭ and the width
+ * `spaceW` of one space of the tag font. With no partnership sign it is the ⚭ and the fixed gap before the name (D353 4 Now). With one, the
+ * fixed gap stands after the partnership sign (`tagMarkGap`), and the ⚭ keeps its old room: its width and one space of the font.
+ */
+export function tagSignRoom(signW: number, spaceW: number, font: number, shape?: UnionShape | null): number {
+	return shape ? signW + spaceW : signW + TAG_SIGN_GAP_EM * font;
 }
 
 /**
  * The parts of a far-couple tag pill along its text line, one formula for the live tree and the saved picture: the pill is centred on
- * `x` and never wider than `zone`; the ⚭ starts after the padding `pad`, the partnership sign sits in the middle of its room `slot`
- * after the ⚭'s room `sign`, and the name starts at an exact x after both (D108: so the gap G before the name is the same for every
- * shape). `room` is the width the name may take; `nameW` the width of the name as drawn (after any cut).
+ * `x` and never wider than `zone`; the ⚭ starts after the padding `pad`, the partnership sign has the room `slot` after the ⚭'s room
+ * `sign` (`tagSignRoom`), with its centre `markAt` after the start of that room (`tagMarkCentre`), and the name starts at an exact x after
+ * both (D108: so the gap G before the name is the same for every shape). `nameW` is the width of the name as drawn (after any cut).
  */
-export function tagPillParts(x: number, zone: number, pad: number, sign: number, slot: number, nameW: number): { left: number; w: number; signX: number; markX: number; nameX: number } {
+export function tagPillParts(x: number, zone: number, pad: number, sign: number, slot: number, nameW: number, markAt: number): { left: number; w: number; signX: number; markX: number; nameX: number } {
 	const w = Math.min(zone, nameW + sign + slot + 2 * pad);
 	const left = x - w / 2;
-	return { left, w, signX: left + pad, markX: left + pad + sign + slot / 2, nameX: left + pad + sign + slot };
+	return { left, w, signX: left + pad, markX: left + pad + sign + markAt, nameX: left + pad + sign + slot };
 }
 
 /** The width a far-couple tag's name may take in a pill of `zone` (see `tagPillParts`). */

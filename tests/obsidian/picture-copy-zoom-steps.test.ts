@@ -162,6 +162,19 @@ describe('live pictures', () => {
 		expect(log.released).toEqual([first]);
 	});
 
+	it('D353 1 B: one arms copy for a house is made for the widest and the tallest arms box of the tree, so a banner beside a portrait is not enlarged', async () => {
+		const group = new FEl('g');
+		const arms = (person: string, w: number, h: number): PictureSlot => ({ kind: 'arms', lod: 'full', person, owner: { house: 'v' }, rect: { x: 0, y: 0, w, h }, el: group.createSvg('g') as unknown as SVGGElement });
+		// Beside a portrait: 1.25 x 2.3 em; alone: 1.67 x 2 em (16 px).
+		const s = [arms('a', 20, 36.8), arms('b', 26.67, 32)];
+		const { store, log } = fakeStore();
+		const live = createLivePictures(s, store, () => file('v.png'));
+		live.update(VIEW, 'full', 1);
+		await drain();
+		expect([...new Set(log.acquire)]).toEqual(['v.png@26.67x36.8:meet']);
+		live.destroy();
+	});
+
 	it('refresh asks for a new copy of a changed file and keeps the old one until it comes', async () => {
 		const s = slots(2);
 		const { store, log } = fakeStore();
@@ -326,6 +339,12 @@ describe('Save as picture (P1–P6)', () => {
 		// P5: pictures at 4 × their CSS size in an SVG (the Roundel's medallion is 2.3 em = 36.8 px since D219) (14 px names at 16 px text: scale 0.875).
 		const portrait = log.exports.find((x) => x.startsWith('aldric.jpg'))!;
 		expect(portrait).toBe(`aldric.jpg@${Math.ceil(36.8 * 4 * 0.875)}x${Math.ceil(36.8 * 4 * 0.875)}:portrait`);
+		// D353 1 B: an arms copy is made as wide as arms alone (5/3 em) and as high as arms beside a portrait (2.3 em), so a banner beside a portrait is not enlarged.
+		for (const x of log.exports.filter((e) => e.endsWith(':meet'))) {
+			const [w, h] = /@(\d+)x(\d+):/.exec(x)!.slice(1).map(Number);
+			expect(w, x).toBeGreaterThanOrEqual(Math.ceil((5 / 3) * 16 * 4 * 0.875));
+			expect(h, x).toBeGreaterThanOrEqual(Math.ceil(36.8 * 4 * 0.875));
+		}
 	});
 
 	it('focus mode names the family in the file name', async () => {

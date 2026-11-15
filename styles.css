@@ -858,8 +858,9 @@ body.theme-dark .dynasty-line-begetter {
 	fill: var(--dynasty-muted, var(--text-muted));
 }
 
+/* D353 2 A: the Full tag text has the size of the card's small text (the dates), 0.85 em, centred in the pill of the layout's tag band (1.125 em). */
 .dynasty-tag-full .dynasty-tag-text {
-	font-size: calc(var(--dynasty-font-size) * 0.75);
+	font-size: calc(var(--dynasty-font-size) * 0.85);
 }
 
 /* D345 1 A: the Compact tag text is two thirds of the Compact name (1.5 em); the Overview sign pill keeps the size of the name. */
@@ -891,6 +892,17 @@ body.theme-dark .dynasty-line-begetter {
 	stroke-width: 6;
 }
 
+
+/* D355: the kind of the partnership stands on its own line under the name in the partner list of a several-partner tag. */
+.dynasty-popover .dynasty-tag-partner-name,
+.dynasty-popover .dynasty-tag-partner-kind {
+	display: block;
+}
+
+.dynasty-popover .dynasty-tag-partner-kind {
+	font-size: var(--dynasty-type-small);
+	color: var(--text-muted);
+}
 /* ---------- You and your family (spec §13.1, §13.2) ---------- */
 
 /* D40: the relation to the marked person, one small text line after the card's other text lines: italic and muted. */
@@ -2486,12 +2498,15 @@ body.theme-dark .dynasty-house-dot {
 	object-position: 50% 20%;
 }
 
-.dynasty-pic:hover::after {
-	content: '';
-	position: absolute;
-	inset: 0;
-	border-radius: 50%;
-	background: var(--background-modifier-hover);
+/* The shade over the portrait shows only with a mouse: on a touch screen a tap leaves :hover on the button until the next tap, and the shade covered the portrait while its menu was open. */
+@media (hover: hover) and (pointer: fine) {
+	.dynasty-pic:hover::after {
+		content: '';
+		position: absolute;
+		inset: 0;
+		border-radius: 50%;
+		background: var(--background-modifier-hover);
+	}
 }
 
 .dynasty-pic.is-none {
@@ -5362,8 +5377,11 @@ body.dynasty-fullscreen-open .popover.hover-popover {
 	box-shadow: none;
 }
 
-.dynasty-sheet button.dynasty-house-arms:hover {
-	background: var(--background-modifier-hover);
+/* With a mouse only: a tap on a touch screen leaves :hover on the button, and the tint would stay behind the arms. */
+@media (hover: hover) and (pointer: fine) {
+	.dynasty-sheet button.dynasty-house-arms:hover {
+		background: var(--background-modifier-hover);
+	}
 }
 
 /*
@@ -5598,9 +5616,15 @@ body.dynasty-fullscreen-open .popover.hover-popover {
 	content-visibility: auto;
 }
 
-.dynasty-picture-row:hover,
 .dynasty-picture-row.is-cursor {
 	background: var(--background-modifier-hover);
+}
+
+/* With a mouse only: a tap on a touch screen leaves :hover on the row around the thumbnail. */
+@media (hover: hover) and (pointer: fine) {
+	.dynasty-picture-row:hover {
+		background: var(--background-modifier-hover);
+	}
 }
 
 /* The selected picture: a bar in the text colour, not colour alone, so a weak theme accent cannot hide it. */

@@ -6,8 +6,8 @@ import { MIN_HIT, geometryFor } from '../../src/layout/geometry';
 import { DEFAULT_LAYOUT_SETTINGS, clearLayoutCache, layoutTree } from '../../src/layout/index';
 import type { LaidOut, LayoutSettings } from '../../src/layout/model';
 import { buildScene } from '../../src/render/dom/scene';
-import { DEFAULT_LIGHT, UNION_MARKS, tagMarkSlot, unionShape, type UnionShape } from '../../src/render/styles';
-import { approxMeasure, renderSvg, textWidth } from '../../src/render/svg-string';
+import { DEFAULT_LIGHT, TAG_FONT_EM, TAG_SIGN_GAP_EM, UNION_MARKS, fullTagPill, tagMarkSlot, unionShape, type UnionShape } from '../../src/render/styles';
+import { SAVED_SIGN_EM, approxMeasure, renderSvg, textWidth } from '../../src/render/svg-string';
 import { FEl } from '../acceptance/fake-dom';
 import { useFakeDom } from '../support/fake-dom-setup';
 
@@ -17,6 +17,8 @@ import { useFakeDom } from '../support/fake-dom-setup';
 useFakeDom({ css: true });
 
 const FONTS = { text: 'serif', ui: 'sans', bold: '700' };
+/** D353 4 Now: the room of the saved picture's ⚭ in tag text sizes: the ⚭ alone and the fixed gap of 0.3. */
+const SIGN_ROOM = SAVED_SIGN_EM + TAG_SIGN_GAP_EM;
 const measure = (s: string) => [...s].length * 7;
 // Far when the partners are more than 1.5 card widths apart: x and z are siblings with y between them.
 const FAR: LayoutSettings = { ...DEFAULT_LAYOUT_SETTINGS, far: { maxCardWidths: 1.5, maxGenerations: 1 } };
@@ -153,7 +155,8 @@ describe('the live tree draws the sign inside the tag, at the Full and the Compa
 		};
 		const a = widthOf(withSign);
 		const b = widthOf(withKid);
-		expect(b.text).toBe('⚭ Zelda');
+		// D353 4 Now: the lead is the ⚭ alone; the gap after it is a fixed room, not a space of the font.
+		expect(b.text).toBe('⚭Zelda');
 		expect(a.text.startsWith('⚭')).toBe(true);
 		expect(a.text.endsWith('Zelda')).toBe(true);
 		expect(a.w).toBeGreaterThan(b.w);
@@ -185,17 +188,20 @@ describe('the headless drawing', () => {
 		const geo = laid.layout.geometry;
 		const svg = renderSvg(g, laid.layout, laid.edges, { palette: DEFAULT_LIGHT, measure: approxMeasure, fonts: FONTS });
 		const tag = laid.layout.farTags.get('x')!;
-		const tagFont = 0.75 * geo.fontPx;
-		const rect = new RegExp(`<rect x="([\\d.]+)" y="[\\d.]+" width="([\\d.]+)" height="${geo.tagH}" rx="${geo.tagH / 2}" fill`);
+		// D353 2 A: the Full tag text is 0.85 em, in a pill of its own height (`fullTagPill`).
+		const tagFont = TAG_FONT_EM * geo.fontPx;
+		const pillH = fullTagPill(geo, 0).h;
+		const rect = new RegExp(`<rect x="([\\d.]+)" y="[\\d.]+" width="([\\d.]+)" height="${pillH}" rx="${pillH / 2}" fill`);
 		const pills = [...svg.matchAll(new RegExp(rect, 'g'))].map((m) => ({ left: Number(m[1]), w: Number(m[2]) }));
 		const pill = pills.find((p) => Math.abs(p.left + p.w / 2 - tag.x) < 0.01)!;
 		expect(pill).toBeTruthy();
-		const label = new RegExp(String.raw`<text x="([\d.]+)" y="[\d.]+" font-size="${tagFont}"[^>]*>Zelda</text>`).exec(svg)!;
-		const pad = geo.tagH / 2;
+		// The tags are drawn last; at 0.85 em a card text has the tag's size too.
+		const label = [...svg.matchAll(new RegExp(String.raw`<text x="([\d.]+)" y="[\d.]+" font-size="${tagFont}"[^>]*>Zelda</text>`, 'g'))].pop()!;
+		const pad = pillH / 2;
 		// 0.2.2 (D108): the room depends on the shape; this tag shows a ring.
 		const slot = tagMarkSlot('ring', tagFont);
-		expect(Number(label[1])).toBeCloseTo(pill.left + pad + tagFont * 1.4 + slot, 6);
-		expect(pill.w).toBeCloseTo(textWidth('Zelda', tagFont) + tagFont * 1.4 + slot + 2 * pad, 6);
+		expect(Number(label[1])).toBeCloseTo(pill.left + pad + tagFont * SIGN_ROOM + slot, 6);
+		expect(pill.w).toBeCloseTo(textWidth('Zelda', tagFont) + tagFont * SIGN_ROOM + slot + 2 * pad, 6);
 		expect(tagMark(svg)).not.toBeNull();
 	});
 
@@ -205,10 +211,11 @@ describe('the headless drawing', () => {
 		const geo = laid.layout.geometry;
 		const svg = renderSvg(g, laid.layout, laid.edges, { palette: DEFAULT_LIGHT, measure: approxMeasure, fonts: FONTS });
 		expect(tagMark(svg)).toBeNull();
-		const tagFont = 0.75 * geo.fontPx;
-		const widths = [...svg.matchAll(new RegExp(`<rect x="[\\d.]+" y="[\\d.]+" width="([\\d.]+)" height="${geo.tagH}" rx="${geo.tagH / 2}" fill`, 'g'))].map((m) => Number(m[1]));
+		const tagFont = TAG_FONT_EM * geo.fontPx;
+		const pillH = fullTagPill(geo, 0).h;
+		const widths = [...svg.matchAll(new RegExp(`<rect x="[\\d.]+" y="[\\d.]+" width="([\\d.]+)" height="${pillH}" rx="${pillH / 2}" fill`, 'g'))].map((m) => Number(m[1]));
 		expect(widths.length).toBeGreaterThan(0);
-		const expected = [textWidth('Zelda', tagFont), textWidth('Xavier', tagFont)].map((t) => t + tagFont * 1.4 + geo.tagH);
+		const expected = [textWidth('Zelda', tagFont), textWidth('Xavier', tagFont)].map((t) => t + tagFont * SIGN_ROOM + pillH);
 		for (const w of widths) expect(expected.some((e) => Math.abs(e - w) < 1e-6)).toBe(true);
 	});
 });

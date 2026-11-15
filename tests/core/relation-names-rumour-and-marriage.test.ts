@@ -336,15 +336,15 @@ unions: [{partners: [milo, sela]}]`,
 		[{ me: 'milo', to: 'pell', on: 'Son | Half-great-nephew', steps: ["pell is milo's son", "jude is milo's half-brother. kit is jude's daughter. pell is kit's son"] }],
 	);
 	tree(
-		'three birth parents: only the first two listed are co-parents',
+		'three birth parents: no two of them are co-parents (D356 3 A)',
 		`people: [{id: abe, sex: m}, {id: bea, sex: f}, {id: cy, sex: m}, {id: kim, sex: f, parents: [abe, bea, cy]}]`,
 		[
-			{ me: 'abe', to: 'bea', on: 'Co-parent', steps: ["bea is abe's co-parent"] },
+			{ me: 'abe', to: 'bea', on: '' },
 			{ me: 'abe', to: 'cy', on: '' },
 		],
 	);
 	tree(
-		'three birth parents in another order: the first one listed is no co-parent of the last',
+		'three birth parents in another order: the same, no co-parent',
 		`people: [{id: abe, sex: m}, {id: bea, sex: f}, {id: cy, sex: m}, {id: kim, sex: f, parents: [cy, bea, abe]}]`,
 		[
 			{ me: 'abe', to: 'bea', on: '' },

@@ -6,12 +6,13 @@
 import { PLAIN_READER, type DateReader, type TreeDates } from '../core/dates';
 import type { FamilyGraph } from '../core/derive';
 import { linkText } from '../core/link-text';
+import { needsBidiIsolate } from '../core/name-bidi';
 import { CURLY_APOSTROPHE } from '../core/quote';
 import { DOUBTFUL_DIED, isDead } from '../core/succession-keys';
 import type { FinderResult, Relation, RelationStep } from '../core/relations';
 import { cardLabels, entryReign, type CardLabel } from '../core/titles';
 import type { Holder, Person } from '../core/types';
-import { withoutBidiControls } from './bidi-controls';
+import { BIDI_LRM, withoutBidiControls } from './bidi-controls';
 import { hasRtlDate, isolateDate, isolateDatesIn } from './date-bidi';
 import { isolateName } from './name-bidi';
 import { svgNameLines } from './name-lines';
@@ -108,6 +109,8 @@ export function partnersAndChildren(g: FamilyGraph, id: string): { partners: str
 		for (const c of u.children) children.add(c);
 	}
 	for (const c of g.soloChildren.get(id) ?? []) children.add(c);
+	// A ward of two guardians who share no union is placed under both (D354 1 B), though no union holds it.
+	for (const w of g.wardPairs) if (w.guardians.includes(id)) children.add(w.child);
 	return { partners: [...partners], children: [...children] };
 }
 
@@ -424,10 +427,119 @@ export function farTagSvgName(name: string): string {
 	return svgNameLines([[{ text: name, sob: false }]])[0].map((r) => r.text).join('');
 }
 
-/** Screen-reader text for a far-couple tag; the visible text comes from `farTagName`, and the spoken name holds it in order (WCAG 2.5.3). */
+/** D353 3 A: the one separator between the two names of a tag (the middle dot with a space on each side). */
+export const TAG_PAIR_JOIN = ' · ';
+
+/** The spoken texts of a far-couple tag (spec §5.3). The visible text is `farTagName` or the two short names of `farTagPair`. */
+export const FAR_TAG_SPOKEN = {
+	/** One far partner. */
+	one: (name: string) => `Show the partner ${name}.`,
+	/** D353 3 A: two far partners, with the names their own tags would show, whatever the tag shows at this zoom. */
+	two: (first: string, second: string) => `Show a list of 2 partners: ${first} and ${second}.`,
+	/** Three or more far partners. */
+	many: (count: number) => `Show a list of ${count} partners.`,
+} as const;
+
+/**
+ * D353 3 A (genealogy vet): first words that are a title, an honorific, a word for a kin role, a placeholder or a part of a patronym, not a first
+ * name, in lower case (NFC). A tag with such a word says "2 partners". The list is closed; "Don" is not in it, as it is also a first name. A word that
+ * does not start with a letter, starts with a lower-case letter ("de"), ends with "." ("J.") or is one letter is no first name either.
+ */
+export const NOT_FIRST_NAMES: ReadonlySet<string> = new Set([
+	'sir', 'dame', 'lady', 'lord', 'saint', 'st', 'mr', 'mrs', 'ms', 'miss', 'dr', 'king', 'queen', 'prince', 'princess',
+	'duke', 'duchess', 'count', 'countess', 'earl', 'baron', 'baroness', 'emperor', 'empress', 'abd', 'abu', 'umm',
+	'grand', 'archduke', 'archduchess', 'tsar', 'tsarina', 'infanta', 'infante', 'marquess', 'marchioness', 'marquise', 'viscount', 'viscountess',
+	'margrave', 'margravine', 'sultan', 'sultana', 'emir', 'amir', 'pope', 'bishop', 'archbishop', 'cardinal', 'abbot', 'abbess', 'prioress',
+	'brother', 'sister', 'father', 'doña', 'dona', 'donna', 'dom', 'mme', 'madame', 'mlle', 'herr', 'frau', 'rev', 'hon', 'ibn', 'bint',
+	'shaykh', 'sheikh', 'jarl', 'wife', 'husband', 'widow', 'daughter', 'son', 'unnamed', 'unknown', 'nn',
+]);
+
+/** Format characters (direction marks and the like): they draw nothing, so two words that differ only in them look the same. */
+const FORMAT_CHARS = /\p{Cf}/gu;
+/** A breaking space: every white space but the no-break spaces U+00A0, U+2007 and U+202F, which keep two words as one. */
+const BREAKING_SPACE = /[^\S\u00a0\u2007\u202f]+/u;
+
+/** The first word of a tag name, split at breaking spaces only, with a trailing ",", ";" or ":" removed (a hyphen stays inside the word). */
+const firstWord = (name: string): string => (name.trim().split(BREAKING_SPACE)[0] ?? '').replace(/[,;:]+$/u, '');
+
+/**
+ * Whether a first word can stand for a person in a tag: it starts with a letter that is not lower case, is not an initial or an abbreviation,
+ * and is not in `NOT_FIRST_NAMES`. A word that starts with a digit, a bracket or a mark ("(Ermengarde)", "?", "1st") says "2 partners".
+ */
+function isFirstName(word: string): boolean {
+	const bare = word.replace(FORMAT_CHARS, '').normalize('NFC');
+	if (!/^\p{L}/u.test(bare) || /^\p{Ll}/u.test(bare) || bare.endsWith('.') || Array.from(bare).length === 1) return false;
+	return !NOT_FIRST_NAMES.has(bare.toLowerCase());
+}
+
+let collator: Intl.Collator | null | undefined;
+/** "Looks the same": canonically equal text with case ignored and accents counted (`Intl.Collator`, accent sensitivity); NFC and lower case where no `Intl` exists. */
+function looksSame(a: string, b: string): boolean {
+	const x = a.replace(FORMAT_CHARS, '');
+	const y = b.replace(FORMAT_CHARS, '');
+	if (collator === undefined) collator = typeof Intl !== 'undefined' && typeof Intl.Collator === 'function' ? new Intl.Collator('und', { sensitivity: 'accent' }) : null;
+	return collator ? collator.compare(x, y) === 0 : x.normalize('NFC').toLowerCase() === y.normalize('NFC').toLowerCase();
+}
+
+/**
+ * D353 3 A: the two short names of a tag for exactly two far partners, in the order of `FarTag.spouses`: the first word of the name each partner's own tag
+ * would show (`farTagName`; a numbered card name loses its number, "Ermengarde III" gives "Ermengarde"). None, so the tag says "2 partners", when there are
+ * not two partners, when a first word is no first name (`isFirstName`), or when the two look the same (`looksSame`).
+ */
+export function farTagPair(g: FamilyGraph, spouses: readonly string[], labels?: ReadonlyMap<string, CardLabel>): readonly [string, string] | undefined {
+	if (spouses.length !== 2) return undefined;
+	const a = firstWord(farTagName(g, [spouses[0]], labels));
+	const b = firstWord(farTagName(g, [spouses[1]], labels));
+	return isFirstName(a) && isFirstName(b) && !looksSame(a, b) ? [a, b] : undefined;
+}
+
+/** One piece of a two-name tag text: its plain text, its x from the start of the name, and whether it is a name (a name gets the embedding of a card name). */
+export interface TagRun {
+	text: string;
+	dx: number;
+	name: boolean;
+	/** A left-to-right mark after the first name or before the second, so the dot between them is never taken into their right-to-left run. */
+	mark?: 'after' | 'before';
+}
+
+/** The SVG text of one run of a tag name (not yet escaped): a name with the embedding of a card name (D322) and its left-to-right mark. */
+export function tagRunSvg(r: TagRun): string {
+	const text = r.name ? farTagSvgName(r.text) : r.text;
+	return r.mark === 'after' ? text + BIDI_LRM : r.mark === 'before' ? BIDI_LRM + text : text;
+}
+
+/**
+ * D353 3 A: the one fit rule of a two-name tag, for the live tree and the saved picture: the text "A · B" when it fits `room` uncut, else none (the tag
+ * says "2 partners"). Two left-to-right names are one run. When a name holds a right-to-left letter, the text is three runs at exact x: each name
+ * with its own embedding (D322) and the dot apart, so no name takes the other's direction. A left-to-right mark stands on each side of the dot
+ * (`TagRun.mark`): WebKit orders the runs of one `<text>` as one line, and between two right-to-left embeddings the dot turns right to left, so
+ * the second name stood first from the left. `w` is the drawn width.
+ */
+export function farTagPairRuns(pair: readonly [string, string], room: number, measure: (text: string) => number): { runs: TagRun[]; w: number } | undefined {
+	const [a, b] = pair;
+	if (!needsBidiIsolate(a) && !needsBidiIsolate(b)) {
+		const whole = a + TAG_PAIR_JOIN + b;
+		const w = measure(whole);
+		return w <= room ? { runs: [{ text: whole, dx: 0, name: true }], w } : undefined;
+	}
+	const wa = measure(a);
+	const join = measure(TAG_PAIR_JOIN);
+	const w = wa + join + measure(b);
+	if (w > room) return undefined;
+	// The dot alone, in the middle of the separator's room: a space at the edge of a text run may be dropped, so the runs carry no spaces.
+	const dot = TAG_PAIR_JOIN.trim();
+	return { runs: [{ text: a, dx: 0, name: true, mark: 'after' }, { text: dot, dx: wa + (join - measure(dot)) / 2, name: false }, { text: b, dx: wa + join, name: true, mark: 'before' }], w };
+}
+
+/**
+ * Screen-reader text for a far-couple tag (WCAG 2.5.3: the spoken name holds the visible text in order). Two partners: both names as their own tags
+ * would show them, whatever the tag shows at this zoom ("Show a list of 2 partners: Katrin Valmont and Ermengarde III." holds "Katrin · Ermengarde"
+ * and "2 partners"), in the order of `spouses`.
+ */
 export function farTagLabel(g: FamilyGraph, spouses: string[], labels?: ReadonlyMap<string, CardLabel>): string {
-	if (spouses.length === 1) return `Show the partner ${farTagName(g, spouses, labels)}.`;
-	return `Show a list of ${spouses.length} partners.`;
+	if (spouses.length === 1) return FAR_TAG_SPOKEN.one(farTagName(g, spouses, labels));
+	if (spouses.length === 2) return FAR_TAG_SPOKEN.two(farTagName(g, [spouses[0]], labels), farTagName(g, [spouses[1]], labels));
+	return FAR_TAG_SPOKEN.many(spouses.length);
 }
 
 /** A person's name as the card shows it; an empty or unknown name uses the id (spec §13.2). In a sentence the name is its own bidi run (D322). */
@@ -439,6 +551,9 @@ const isOf = (g: FamilyGraph, person: string, of: string, word: string) => `${sh
 /** The most step sentences the finder shows before "and N more steps" (spec §13.2). */
 const MAX_STEP_SENTENCES = 8;
 
+/** The number of people between the two ends of a chain: the one count of the finder and of the person window. */
+export const chainOthers = (r: { line: { people: readonly unknown[] } }): number => Math.max(0, r.line.people.length - 2);
+
 /** The finder's sentence for `r` (spec §13.2): the relation at `index` for a named result, else the chain or "no relation" sentence. */
 export const finderSentence: RelationTexts['finderSentence'] = (g, r, index) => {
 	const pair = `${shownName(g, r.first)} and ${shownName(g, r.second)}`;
@@ -448,12 +563,18 @@ export const finderSentence: RelationTexts['finderSentence'] = (g, r, index) => 
 		return `${pair} have no relation in this tree.`;
 	}
 	if (r.kind === 'chain') {
-		const others = Math.max(0, r.line.people.length - 2);
+		const others = chainOthers(r);
 		if (!others) return `${pair} have a relation.`;
-		return `${pair} have a relation through ${others} other ${others === 1 ? 'person' : 'people'}.`;
+		return `${pair} are connected through ${others} other ${others === 1 ? 'person' : 'people'}.`;
 	}
 	return `${pair} have no relation in this tree.`;
 };
+
+/** D356 2 A: the window text of a person with no relation but a line to the marked person; `others` is the finder's count of people between the two. With none between, the old text stays (D357). */
+export function noRelationButLine(others: number): string {
+	if (others < 1) return 'No relation to you in this tree.';
+	return `No family relation to you. Connected through ${others} other ${others === 1 ? 'person' : 'people'}.`;
+}
 
 /** The step sentences of the finder (spec §13.2): at most 8, and how many more steps there are. */
 export const stepSentences: RelationTexts['stepSentences'] = (g, steps: readonly RelationStep[]) => ({
