@@ -1,3 +1,4 @@
+// 0.5.6 (D365 (4): a dashed line from the side ends on its own side of the child's main line): all four recorded again, once.
 // 0.5.4 (D343 1 C, D344 1 A and 2 A, D345 1 A): 07, 07b and 12 recorded again, once: side-link curves go between the cards, the "?" keeps off tag pills, and tags use the whole lower edge and the card name at an exact x. 15 is as before.
 // 0.5.2 (D330 O-01, O-03, TR-05): all four were recorded again, once (one card edge, no foot hairline, the new line widths and dashes).
 // 0.3 (D231, WP-Q): the hashes of this file were recorded again, once, because the added step of the placement moves cards.
@@ -41,10 +42,10 @@ function sidewaysHash(source: string): string {
 }
 
 const RECORDED: Record<string, string> = {
-	'07': 'a041c7d4bb85d32eb0f75e15f91a21d265dec64d75ef5a3381e4a50dbb4a8720',
-	'07b': 'a041c7d4bb85d32eb0f75e15f91a21d265dec64d75ef5a3381e4a50dbb4a8720',
-	'12': '864a1a83f45ffd885254814078fed1760cc55eb45c0a5cbe75414da3c2870359',
-	'15': '60bc1c63e95c0f0484902e082523eda674b1380668795c884ea5cef7e8937907',
+	'07': 'ea5a6fe471a8ccb313d47d7b8206986310a5404a53df4ed945e344d93e518030',
+	'07b': 'ea5a6fe471a8ccb313d47d7b8206986310a5404a53df4ed945e344d93e518030',
+	'12': '86da4a112d3c49240259cfd90612c32d984d70431d195a1e8e89509b6e50d257',
+	'15': '5e66f98e9ab8564a70c4b7dd9846b4e8b5cbe294e1e97eaa9fa06d475d1d2073',
 };
 
 const SAMPLES = sampleSources().filter((s) => IDS.includes(s.id));

@@ -2,8 +2,8 @@
  * The pairs that the relation words call "Co-parent" without a written partnership (spec §13.1, D356 3 A and 5 A). A child with
  * exactly two birth parents, or exactly two adoptive parents, makes its two parents a pair; with three or more of one kind it makes
  * none, so no word depends on the order of a list. Where the child's card stands (`placement`) does not change this, and a guardian
- * never joins a pair. This set serves the relation words and the finder only: the drawing keeps reading `FamilyGraph.unions`,
- * which still hold the implicit union of the first two placement parents.
+ * never joins a pair. This set serves the relation words and the finder only: the drawing reads `FamilyGraph.unions`, which
+ * hold no union for such a child unless two of its parents are a couple (`parent-groups.ts`).
  */
 
 import { drawnParentMap, type FamilyGraph, type FamilyUnion, pairKey, partnerOf } from './derive';

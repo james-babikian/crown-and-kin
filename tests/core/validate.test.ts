@@ -137,7 +137,7 @@ describe('validateTree: values', () => {
 		const src = `people:\n${p('a')}${p('b')}${p('x')}${p('c', '    parents: [a, b, {id: x, type: step}]\n')}`;
 		const g = deriveFamilies(tree(src));
 		expect(g.issues.map((i) => i.code)).toEqual(['unknown-parent-type', 'too-many-parents']);
-		expect(g.secondary).toEqual([{ child: 'c', type: 'birth', parents: ['x'] }]);
+		expect(g.parentGroups).toEqual([{ child: 'c', kind: 'birth', parents: ['a', 'b', 'x'] }]);
 	});
 
 	it('the same parent written twice with the same type is used once, without an issue', () => {

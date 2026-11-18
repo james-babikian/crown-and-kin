@@ -23,6 +23,6 @@ function marksHash(source: string): string {
 }
 
 describe('the "?" marks of a tree with a rumoured parent on every person', () => {
-	it('250 people: the marks of the full scan', () => expect(marksHash(rumourTree(250))).toBe('80d2d052e8')); // 0.5.4 (D343 1 C, D344 1 A): routed curves and the "?" off tag pills
-	it('1000 people: the marks of the full scan', () => expect(marksHash(rumourTree(1000))).toBe('57547cc36a')); // 0.5.4 (D343 1 C, D344 1 A): routed curves and the "?" off tag pills
+	it('250 people: the marks of the full scan', () => expect(marksHash(rumourTree(250))).toBe('d78e490a35')); // 0.5.6 (D365 (4)): side links end on their own side of the child's line (before: 80d2d052e8)
+	it('1000 people: the marks of the full scan', () => expect(marksHash(rumourTree(1000))).toBe('3f89932b7c')); // 0.5.6 (D365 (4)): side links end on their own side of the child's line (before: 57547cc36a)
 });

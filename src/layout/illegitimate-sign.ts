@@ -27,6 +27,10 @@ export function illegitimateSigns(g: FamilyGraph, edges: EdgeDrawing): Set<strin
 		const rest = p.people.slice(1);
 		if (parents.length && rest.length === parents.length && parents.every((x) => rest.includes(x))) shown.add(child);
 	}
+	// A child of a group (three or more parents, no couple) has a line of its own from every parent: it is shown when each of them has an illegitimate line to it.
+	const lines = new Map<string, Set<string>>();
+	for (const p of edges.paths) if (p.kind === 'illegitimate' && p.child !== undefined && p.parents) for (const x of p.parents) (lines.get(p.child) ?? lines.set(p.child, new Set()).get(p.child)!).add(x);
+	for (const grp of g.parentGroups) if (grp.parents.every((x) => lines.get(grp.child)?.has(x))) shown.add(grp.child);
 	return new Set(g.people.filter((p) => p.illegitimate && !shown.has(p.id)).map((p) => p.id));
 }
 

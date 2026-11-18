@@ -1,7 +1,7 @@
 /*
  * The graph the layout arranges when two guardians of a ward share no union (D354 1 B). The cards stand as they did when the pair was an
  * implicit union: the two guardians side by side, the ward centred under them. Each guardian then gets its own dotted ward line to the ward
- * (a side link) and nothing joins the two guardians. When the two stand far apart the ward hangs from the guardian written first and the
+ * (a side link) and nothing joins the two guardians. When the two stand far apart the ward hangs from one guardian (on different rows the lower one, D356 1 A; else the one written first) and the
  * second guardian has a ward line to it, no tag (the look of option A). `runStages` (pipeline.ts) lays out once as a pair, finds the pairs
  * that turned far, and lays out again with those hung. Layout only: nothing here leaves `src/layout`.
  */

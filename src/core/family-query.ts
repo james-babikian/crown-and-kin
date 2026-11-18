@@ -8,6 +8,7 @@ import { partnershipsOf } from './co-parents';
 import { pairKey, type FamilyGraph } from './derive';
 import type { ParentKind, UnionKind, UnionRef } from './edit';
 import { bloodProblem } from './blood-parents';
+import { groupKey, parentGroupOf } from './parent-groups';
 import { BLOOD_LIMIT, isBloodType } from './parent-types';
 import { PARENT_LIMIT, PARENT_TYPES, PLACEMENT_TYPES } from './types';
 import { cleanParents, push } from './validate';
@@ -130,12 +131,18 @@ export const descendantsOf = (g: FamilyGraph, id: string) => reach(g, id, true);
 export const ancestorsOf = (g: FamilyGraph, id: string) => reach(g, id, false);
 
 /**
- * The person's sibling group (§4.3, §6.5): the children of their primary union, or of their one placement parent. The wards of two
+ * The person's sibling group (§4.3, §6.5): the children of their primary union, of their one placement parent, or of their group of three or more parents. The wards of two
  * guardians with no union (`wardPairs`, D354 1 B) are a group too, so their written order can still be changed as before.
  */
 export function siblingGroup(g: FamilyGraph, id: string): string[] | null {
 	const key = g.primaryUnion.get(id);
 	if (key !== undefined) return g.unionByKey.get(key)?.children ?? null;
+	// The children of one group: the same parents, in the order of the note (a group has no union).
+	const own = parentGroupOf(g, id);
+	if (own) {
+		const same = groupKey(own.parents);
+		return g.parentGroups.filter((x) => groupKey(x.parents) === same && x.kind === own.kind).map((x) => x.child);
+	}
 	const placed = g.placementParents.get(id) ?? [];
 	if (placed.length === 1) return g.soloChildren.get(placed[0]) ?? null;
 	if (placed.length !== 2) return null;

@@ -117,6 +117,48 @@ body {
 	height: 100%;
 }
 
+/*
+ * D366: the drawn picture of a large tree on the wrapped drag path is larger than the screen. The <svg> reaches the margin past each edge of the wrapper, and
+ * the viewport (overflow hidden) cuts what lies outside; the scene transform is written for the larger size, so the picture on screen is the same. D367: the
+ * style sheet reads a margin for each side (the plugin writes the same margin on both sides of an axis). The four properties are set from code only when a
+ * margin changes, on the <svg> itself, and they do not inherit, so a new value restyles the <svg> and not the cards.
+ */
+@property --dynasty-margin-left {
+	syntax: '<length>';
+	initial-value: 0px;
+	inherits: false;
+}
+
+@property --dynasty-margin-right {
+	syntax: '<length>';
+	initial-value: 0px;
+	inherits: false;
+}
+
+@property --dynasty-margin-top {
+	syntax: '<length>';
+	initial-value: 0px;
+	inherits: false;
+}
+
+@property --dynasty-margin-bottom {
+	syntax: '<length>';
+	initial-value: 0px;
+	inherits: false;
+}
+
+.dynasty-canvas.dynasty-margin {
+	position: relative;
+}
+
+.dynasty-canvas.dynasty-margin > .dynasty-svg {
+	position: absolute;
+	left: calc(var(--dynasty-margin-left) * -1);
+	top: calc(var(--dynasty-margin-top) * -1);
+	width: calc(100% + var(--dynasty-margin-left) + var(--dynasty-margin-right));
+	height: calc(100% + var(--dynasty-margin-top) + var(--dynasty-margin-bottom));
+}
+
 .dynasty-canvas.dynasty-gesture {
 	transform: var(--dynasty-gesture-transform);
 	transform-origin: 0 0;

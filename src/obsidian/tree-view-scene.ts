@@ -6,7 +6,8 @@
  * - S5 When the tree fills. `fillNear` runs at the first draw, at each settle and pinch fill, during a
  *   wheel or trackpad zoom (through `onFill`, only when the view leaves the last filled rectangle) and
  *   in a new scene. The cases below use `fillPerson` and the idle chain uses `fillChunk`. A drag pan
- *   never fills; it ends at its settle.
+ *   never fills; it ends at its settle. Exceptions: a wrapped drag fills at the edge of its drawn picture, and with a margin
+ *   wider than one screen it fills ahead through `onFill` (D367), so no card on screen is an empty shell.
  *   a. First draw: `PanZoomOptions.onFirstDraw` runs once, right after the first write of the scene
  *      transform: `fillNear`, then `showTree`.
  *   b. Settle and pinch fill: `settled` and `onFill` call `fillNear` next to `fillFolds` (folds first).

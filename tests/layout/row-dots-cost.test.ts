@@ -14,6 +14,7 @@ import { rumourTree } from '../support/random-trees';
 // time in one process (the I34 lesson). The picture hashes are golden values (class a): the one record of the switch writes them again.
 // 0.3.1 golden record: the five picture hashes were recorded again, once, for the new walk, passages and ports.
 // 0.5.4 (D343 1 C, D344 1 A, D345 1 A): the sample 07 sideways hash and both 400-person hashes were recorded again, once (routed side-link curves, the "?" off tag pills, whole-edge tags).
+// 0.5.6 (D365 (4)): the same four hashes (07 down and sideways, 400-person down and sideways) were recorded again, once: every dashed line from the side lands on its own side of the child's main line. Checked by diffing the drawings of the commit before that change with the present ones: cards, dots, row gaps and size are equal; only side-link paths (kinds birth-link and rumoured) and rumour marks differ.
 
 const FAR = { maxCardWidths: 3, maxGenerations: 1 };
 
@@ -65,8 +66,8 @@ describe('speed 1: the dots of one row cost about as much as the people (was the
 	it('keeps the picture of sample tree 07, down and sideways', () => {
 		const src = fixture('07');
 		for (const [settings, hashed] of [
-			[{ sweeps: 4, far: FAR }, 'fb023097'],
-			[{ sweeps: 4, far: FAR, orientation: 'sideways' as const }, 'b398b685'], // 0.5.4 (D343 1 C, D344 1 A): routed curves, tags
+			[{ sweeps: 4, far: FAR }, '337e8177'],
+			[{ sweeps: 4, far: FAR, orientation: 'sideways' as const }, '5fbe245'], // 0.5.4 (D343 1 C, D344 1 A): routed curves, tags
 		] as const) expect(picture(src, settings).hash).toBe(hashed);
 	});
 	it('keeps the picture of sample tree 6', () => {
@@ -84,8 +85,8 @@ describe('speed 2: the "?" search looks only near its curve', () => {
 
 	it('a 400-person tree with a rumoured link on every person: same pictures', () => {
 		for (const [settings, hashed] of [
-			[{ sweeps: 4, far: FAR }, 'e29c4078'], // 0.5.4 (D343 1 C, D344 1 A): routed curves, the "?" off tag pills
-			[{ sweeps: 4, far: FAR, orientation: 'sideways' as const }, '80d62eb3'], // 0.5.4 (D343 1 C, D344 1 A), as above
+			[{ sweeps: 4, far: FAR }, '32eeb115'], // 0.5.4 (D343 1 C, D344 1 A): routed curves, the "?" off tag pills
+			[{ sweeps: 4, far: FAR, orientation: 'sideways' as const }, 'cc7c496f'], // 0.5.4 (D343 1 C, D344 1 A), as above
 		] as const) expect(picture(rumourTree(400), settings).hash).toBe(hashed);
 	});
 });

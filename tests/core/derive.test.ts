@@ -49,10 +49,12 @@ describe('deriveFamilies', () => {
 		expect(g.secondary).toEqual([{ child: 'c', type: 'rumoured', parents: ['r'] }]);
 	});
 
-	it('warns about a third birth parent and draws it as a side link', () => {
+	it('warns about a third birth parent; the three with no couple are a group, each with its own link', () => {
 		const { g } = build(`people:\n${person('a')}${person('b')}${person('x')}${person('c', '    parents: [a, b, x]\n')}`);
-		expect(g.placementParents.get('c')).toEqual(['a', 'b']);
-		expect(g.secondary).toEqual([{ child: 'c', type: 'birth', parents: ['x'] }]);
+		expect(g.placementParents.get('c')).toEqual(['a', 'b', 'x']);
+		expect(g.parentGroups).toEqual([{ child: 'c', kind: 'birth', parents: ['a', 'b', 'x'] }]);
+		expect(g.unions).toEqual([]);
+		expect(g.secondary).toEqual([]);
 		expect(g.issues).toMatchObject([{ code: 'too-many-parents', params: { type: 'birth', count: 3 }, ids: ['c'] }]);
 	});
 

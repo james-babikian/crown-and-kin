@@ -232,7 +232,7 @@ function placement(ctx: OpContext, at: Placement | undefined): Where | Refusal {
 	}
 	if (at.kind !== 'after-siblings') return refuse('bad-value', 'Unknown position.');
 	const parents = Array.isArray(at.parents) ? at.parents : [];
-	if (parents.length < 1 || parents.length > 2 || parents.some((id) => personIndex(ctx, id) === undefined)) return refuse('unknown-person');
+	if (parents.length < 1 || parents.some((id) => personIndex(ctx, id) === undefined)) return refuse('unknown-person');
 	let unionKey: string | undefined;
 	if (at.union !== undefined) {
 		const u = resolveUnion(ctx, at.union);
@@ -507,11 +507,11 @@ function parentsByType(raw: RawMap, self: string, exists: (id: string | undefine
 	return byType;
 }
 
-/** Placement parents from raw data (§4.3): the `placement` type if it has parents, else birth, adoptive, ward. */
-function placedFrom(raw: RawMap, byType: Map<string, string[]>): string[] {
+/** Placement parents from raw data (§4.3): the `placement` type if it has parents, else birth, adoptive, ward; the first two, or with `every` all of that type (a child of three or more parents is under any couple of them). */
+function placedFrom(raw: RawMap, byType: Map<string, string[]>, every = false): string[] {
 	const named = str(raw.placement);
 	const type = (isPlacementType(named) && byType.has(named) ? named : undefined) ?? PLACEMENT_TYPES.find((t) => byType.has(t));
-	return type ? byType.get(type)!.slice(0, 2) : [];
+	return type ? (every ? byType.get(type)! : byType.get(type)!.slice(0, 2)) : [];
 }
 
 /**
@@ -540,10 +540,10 @@ function staleKeys(ctx: OpContext, expected: RawMap, people: Iterable<number>, g
 		const unionId = str(raw.union);
 		const primary = g.primaryUnion.get(person.id);
 		if (unionId === undefined || primary === undefined || g.unionByKey.get(primary)?.id !== unionId) continue;
-		const placed = placedFrom(raw, byType);
+		const placed = placedFrom(raw, byType, true);
 		const named = unions.some((u) => {
 			const partners = list(u.partners).map(str);
-			return str(u.id) === unionId && placed.length === 2 && partners.length === 2 && placed.every((id) => partners.includes(id));
+			return str(u.id) === unionId && placed.length >= 2 && partners.length === 2 && partners.every((id) => id !== undefined && placed.includes(id));
 		});
 		if (!named) {
 			delete raw.union;

@@ -71,10 +71,11 @@ describe('three or more parents of one kind: no two of them are co-parents (D356
 		}
 	});
 
-	it('keeps the drawing: the layout still holds the implicit union of the first two parents it lists', () => {
+	it('agrees with the drawing: three parents with no couple make no union, so the child is a group', () => {
 		const { g } = build(note(THREE_ADOPTIVE));
-		expect(g.unions.map((u) => u.key)).toEqual(['i:["a","b"]']);
-		expect(g.primaryUnion.get('w')).toBe('i:["a","b"]');
+		expect(g.unions).toEqual([]);
+		expect(g.primaryUnion.has('w')).toBe(false);
+		expect(g.parentGroups.map((x) => x.child)).toEqual(['w']);
 		expect(coParentPairs(g).size).toBe(0);
 	});
 

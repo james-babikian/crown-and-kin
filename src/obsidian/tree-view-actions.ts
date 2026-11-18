@@ -7,6 +7,7 @@ import { Notice } from 'obsidian';
 import { deriveFamilies, type FamilyGraph } from '../core/derive';
 import { focusGenerationsFor, focusSubgraph } from '../core/focus-subgraph';
 import { unfoldFor, type FoldControl } from '../core/folds';
+import { partOptions } from '../core/parent-groups';
 import type { Tree } from '../core/types';
 import { FOCUS_UI, UI, WRITE_TEXT } from '../render/ui-text';
 import { keepSpot } from '../render/view-math';
@@ -361,7 +362,7 @@ export abstract class TreeViewActions extends TreeViewToolbar {
 	protected focusGraph(tree: Tree, focus: string): FamilyGraph | null {
 		const n = focusGenerationsFor(tree.options, this.settings.focusGenerations);
 		const sub = focusSubgraph(tree, focus, n);
-		return sub ? deriveFamilies(sub.tree, { dates: this.whole?.dates.reader }) : null;
+		return sub ? deriveFamilies(sub.tree, { dates: this.whole?.dates.reader, ...(this.whole ? partOptions(this.whole) : {}) }) : null;
 	}
 
 	/**

@@ -178,6 +178,15 @@ export interface TreeLayout {
 	youTab?: string;
 	/** A copy of `LayoutSettings.ordinalCards` that are people of the drawn graph, sorted; absent when none. The scene and the saved picture read the ordinal tabs from here. */
 	ordinalCards?: readonly string[];
+	/** D365 (2): how each child with three or more parents of one kind and no couple (a group) was laid out, by child id; absent when the tree has none. */
+	groups?: ReadonlyMap<string, GroupLayout>;
+}
+
+/** How a group was laid out: the parent the child hangs under, whether the three parents stand side by side (measured on the finished layout), and the trial seatings it took. */
+export interface GroupLayout {
+	hub: string;
+	seated: boolean;
+	trials: number;
 }
 
 /** Every kind of line the tree draws (spec §5.3). `render/styles.ts` gives each one its `STROKES` style. */

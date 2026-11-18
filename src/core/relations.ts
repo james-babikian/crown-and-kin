@@ -218,6 +218,7 @@
 
 import { deepFreeze, lockMap } from './deep-freeze';
 import { deriveFamilies, type DrawnParent, drawnParentMap, type FamilyGraph, type FamilyUnion } from './derive';
+import { partOptions } from './parent-groups';
 import { walkLine } from './relation-candidates';
 import { Kin } from './relation-kin';
 import { type ComputeRelations, DEFAULT_RELATION_OPTIONS, FINDER_LIMIT, type FinderResult, type FindRelation, type LineSubgraph, type Relation, type RelationLink, type RelationOptions, type RelationsKey } from './relation-types';
@@ -398,7 +399,8 @@ export const lineSubgraph: LineSubgraph = (g, line) => {
 	}
 	unions.sort((a, b) => a.index - b.index);
 	const tree: Tree = { options: {}, houses: [...g.houses.values()], people, unions, issues: [] };
-	const sub = deriveFamilies(tree);
+	// The whole tree's verdicts: a child that has two of its three parents on the line is a group of those, never a pair with an implicit union (contract §3.6).
+	const sub = deriveFamilies(tree, partOptions(g));
 	// Spec §13.4, titles rule 3 (`titles.ts` header): the whole tree's titles, unchanged, so the cards show the same texts.
 	sub.titles = g.titles;
 	sub.writtenTitles = g.writtenTitles;

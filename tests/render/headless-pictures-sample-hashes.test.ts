@@ -17,6 +17,7 @@ import { sampleSources, svgHash } from '../acceptance/picture-list-support';
  * 0.5.4 (D338 (5), D341): the hash of tree 20 was recorded again, once, because the three begetter lines of Oswin into one row now run 4 px apart with one dash phase (two lines move and two get a stroke-dashoffset). Trees 01 to 19 and 07b are as before.
  * 0.5.4 (D343 1 C, D344 1 A and 2 A, D345 1 A): the hashes of trees 12 and 20 were recorded again, once: side-link curves go between the cards, the "?" keeps off tag pills, and tags use the whole lower edge and the card name at an exact x. Trees 01 to 11, 13 to 19 and 07b are as before.
  * 0.5.5 (D353 2 A, 3 A, 4): the hashes of trees 06, 07, 07b, 12, 15 and 20 were recorded again, once: Full tag text 0.85 em inside the layout band, a fixed 0.3 em gap before the tag name, the saved ⚭ room. Trees 01 to 05, 08 to 11, 13, 14 and 16 to 19 are as before.
+ * 0.5.6 (D365 (4)): the hashes of trees 07, 07b, 08, 12, 15 and 20 were recorded again, once: a dashed line from the side ends on its own side of the child's main line. The others are as before.
  * Run: npx vitest run tests/render/headless-pictures-sample-hashes.test.ts
  */
 

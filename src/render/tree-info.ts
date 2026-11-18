@@ -111,6 +111,8 @@ export function partnersAndChildren(g: FamilyGraph, id: string): { partners: str
 	for (const c of g.soloChildren.get(id) ?? []) children.add(c);
 	// A ward of two guardians who share no union is placed under both (D354 1 B), though no union holds it.
 	for (const w of g.wardPairs) if (w.guardians.includes(id)) children.add(w.child);
+	// The children of a group of three or more parents are in no union either; each parent of the group has them as children (no partner).
+	for (const grp of g.parentGroups) if (grp.parents.includes(id)) children.add(grp.child);
 	return { partners: [...partners], children: [...children] };
 }
 

@@ -11,6 +11,7 @@ import type { DateReader } from '../core/dates';
 import { deriveFamilies, type FamilyGraph } from '../core/derive';
 import { focusGenerationsFor, focusSubgraph, type FocusSubgraphResult } from '../core/focus-subgraph';
 import { pruneFolds, unfoldFor, type FoldSet } from '../core/folds';
+import { partOptions } from '../core/parent-groups';
 import { findRelation, lineSubgraph, type FinderResult, type RelationLine } from '../core/relations';
 import { cardLabels, needsLabels, type CardLabel } from '../core/titles';
 import type { HardError } from '../core/messages';
@@ -422,7 +423,7 @@ function layoutPlan(inputs: RenderInputs, derived: Derived, f: FocusStep, fonts:
 	const { sub, small, finder, succession, focus, n } = f;
 	const orientation = inputs.orientation;
 	// D47: the small tree of the line has only its people, and a couple on it is never split.
-	const g = small ? lineSubgraph(whole, small) : sub ? deriveFamilies(sub.tree, { dates: whole.dates.reader }) : whole;
+	const g = small ? lineSubgraph(whole, small) : sub ? deriveFamilies(sub.tree, { dates: whole.dates.reader, ...partOptions(whole) }) : whole;
 	// Spec §13.1: the names come from the whole tree, also in focus mode.
 	const me = validMe(whole, tree.options.me);
 	autoFoldsStep(inputs, derived, f, g, d);

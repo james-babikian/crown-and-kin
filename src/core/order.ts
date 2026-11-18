@@ -14,6 +14,7 @@
 
 import { partnerOf, type FamilyGraph } from './derive';
 import { loneRumouredRoots } from './rumoured-roots';
+import { withDefaultGroupSeats } from './group-seats';
 import { withWardUnions } from './ward-unions';
 
 /** One entry of the left-to-right order: a person card, or a union's dot. */
@@ -115,8 +116,8 @@ function blockRow(g: FamilyGraph, id: string, spouses: string[], others: Map<str
  * Exempt from the size rule (an internal test holds its size): 122 code lines and 55 branches. The walk is a
  * stack machine whose tasks share the closures over its state; a split is a later clean-up.
  */
-export function computeModelOrder(graph: FamilyGraph, gen: Map<string, number>, farGenerations: number = DEFAULT_FAR_GENERATIONS, all: FamilyGraph = graph, g = withWardUnions(graph), whole = withWardUnions(all)): ModelOrder {
-	// `g` and `whole` are the two graphs with two guardians of a ward who share no union walked as a pair, so the ward is seated beside them as ever (D354 1 B); callers pass four arguments at most.
+export function computeModelOrder(graph: FamilyGraph, gen: Map<string, number>, farGenerations: number = DEFAULT_FAR_GENERATIONS, all: FamilyGraph = graph, g = withDefaultGroupSeats(withWardUnions(graph)), whole = withDefaultGroupSeats(withWardUnions(all))): ModelOrder {
+	// `g` and `whole` are the two graphs with two guardians of a ward who share no union walked as a pair, so the ward is seated beside them as ever (D354 1 B), and with the parents of a group seated side by side (D365 (2)); callers pass four arguments at most.
 	const isRoot = (id: string) => g.placementParents.get(id)!.length === 0;
 	const unionsOf = (id: string) => g.unionsOf.get(id) ?? [];
 	/**

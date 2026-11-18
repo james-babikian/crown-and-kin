@@ -9,7 +9,7 @@
  * 1. Family. A fold belongs to one family: the children whose placement parents are exactly one set of
  *    parents. Two parents: every child of that pair, whichever union (listed or implicit) it is placed
  *    under; the children of two listed unions of the same pair fold together with one control. One
- *    parent: `g.soloChildren`. A pair and one of its two people alone are three different families. A
+ *    parent: `g.soloChildren`. Three or more parents of one kind with no couple (`g.parentGroups`): the children with exactly those parents, no union. A pair and one of its two people alone are three different families. A
  *    family exists only with at least one child in the graph that is asked.
  * 2. Key. The ids sorted with the default string order, as a JSON array. It never uses the position
  *    of a union, so a fold stays after an edit that moves unions.
@@ -57,7 +57,7 @@ export type FoldSet = ReadonlySet<FoldKey>;
 /** One family that can fold: the children of one set of parents. */
 interface FoldFamily {
 	key: FoldKey;
-	/** One or two parent ids; a pair in the partner order of the family's union. */
+	/** One or two parent ids (a pair in the partner order of the family's union), or the sorted ids of a parent group of three or more (D365 (2)). */
 	parents: readonly string[];
 	/** The placement children in sibling order (D2). */
 	children: readonly string[];
@@ -126,6 +126,17 @@ function build(g: FamilyGraph): Index {
 		wards.set(key, known);
 	}
 	for (const [key, e] of wards) if (!pairs.has(key)) families.push({ key, parents: [...e.parents], children: e.children.sort(bySibling) });
+	// The children of a group (three or more parents of one kind, no couple) fold as the family of those parents: no union, the key of the sorted ids.
+	const seated = g.parentGroups.length ? new Set([...g.soloChildren.values()].flat()) : undefined;
+	const groups = new Map<string, { parents: readonly string[]; children: string[] }>();
+	for (const grp of g.parentGroups) {
+		if (seated?.has(grp.child) || !g.byId.has(grp.child)) continue;
+		const key = foldKey(grp.parents);
+		const known = groups.get(key) ?? { parents: grp.parents, children: [] };
+		known.children.push(grp.child);
+		groups.set(key, known);
+	}
+	for (const [key, e] of groups) families.push({ key, parents: [...e.parents], children: e.children.sort(bySibling) });
 	const smallest = (f: FoldFamily) => Math.min(...f.parents.map(at));
 	families.sort((a, b) => smallest(a) - smallest(b) || (a.key < b.key ? -1 : a.key > b.key ? 1 : 0));
 	const byKey = new Map(families.map((f) => [f.key, f]));
@@ -342,7 +353,9 @@ export function pruneGraph(g: FamilyGraph, hidden: ReadonlySet<string>): FamilyG
 	}
 	// A ward pair stays only while the ward and both guardians are shown.
 	const wardPairs = g.wardPairs.filter((w) => shown(w.child) && w.guardians.every(shown));
+	// A group stays only while the child and every parent are shown.
+	const parentGroups = g.parentGroups.filter((x) => shown(x.child) && x.parents.every(shown));
 	const secondary = g.secondary.filter((e) => shown(e.child) && e.parents.every(shown) && (e.unionKey === undefined || unionByKey.has(e.unionKey)));
 
-	return { ...g, people, byId, placementParents, placementType, primaryUnion, unions, unionByKey, unionsOf, soloChildren, secondary, wardPairs };
+	return { ...g, people, byId, placementParents, placementType, primaryUnion, unions, unionByKey, unionsOf, soloChildren, secondary, wardPairs, parentGroups };
 }

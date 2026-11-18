@@ -36,10 +36,10 @@ path descent [roderick gareth odette] M1134.1 131V161
 path descent [tomas sabine lucan] M304.9 191.5V292
 path descent [lucan tomas sabine] M304.9 292V322
 path birth-link [marek anna tomas] M614 30.5V83C614 122 210.9 122 210.9 161
-path ward [aldric piers] M90 61V83C90 122 939.8 122 939.8 161
-path rumoured [marek roderick] M506 61V83C506 122 1148.1 122 1148.1 161
+path ward [aldric piers] M90 61V83C90 122 911.8 122 911.8 161
+path rumoured [marek roderick] M506 61V83C506 122 1120.1 122 1120.1 161
 marker union at 198 30.5
 marker union at 614 30.5
 marker union at 1030 30.5
 marker union at 304.891 191.5
-marker rumour at 827.026 122
+marker rumour at 813.026 122

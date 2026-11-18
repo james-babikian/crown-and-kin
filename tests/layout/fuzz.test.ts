@@ -5,6 +5,7 @@ import { focusSubgraph } from '../../src/core/focus-subgraph';
 import type { HolderFields, HolderRef, Op, TitleOp } from '../../src/core/edit';
 import type { IssueCode } from '../../src/core/messages';
 import { parseDynasty } from '../../src/core/parse';
+import { groupKey } from '../../src/core/parent-groups';
 import { normaliseSobriquet } from '../../src/core/sobriquet';
 import { computeRelations, findRelation, lineSubgraph, relationsKey } from '../../src/core/relations';
 import type * as TitlesModule from '../../src/core/titles';
@@ -570,7 +571,16 @@ function runFolds(text: string, rng: Rng, m: FoldsModule) {
 		seenKeys.add(f.key);
 		if (!f.children.length) fail(`family ${f.key} has no child`);
 		if (f.key !== m.foldKey(f.parents)) fail(`family ${f.key} does not have the key of its parents`);
-		if (f.parents.length < 1 || f.parents.length > 2) fail(`family ${f.key} has ${f.parents.length} parents`);
+		if (f.parents.length < 1) fail(`family ${f.key} has no parent`);
+		// 0.5.6 (D365 (2)): one or two parents, or three or more that are exactly a parent group of the graph (§4.3): no union, the key of the sorted ids, and every child holds exactly those parents.
+		if (f.parents.length > 2) {
+			if (f.union !== undefined) fail(`group family ${f.key} has a union`);
+			if (f.key !== JSON.stringify([...f.parents].sort())) fail(`group family ${f.key} does not have the key of its sorted ids`);
+			for (const c of f.children) {
+				const grp = g.parentGroups.find((x) => x.child === c && groupKey(x.parents) === f.key);
+				if (!grp) fail(`family ${f.key} has ${f.parents.length} parents and child ${c} is not a child of that parent group`);
+			}
+		}
 		for (const id of [...f.parents, ...f.children]) if (!g.byId.has(id)) fail(`family ${f.key} names ${id}, who is not in the tree`);
 	}
 	const focusId = ids.length ? rng.pick(ids) : undefined;

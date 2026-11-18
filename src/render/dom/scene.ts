@@ -51,7 +51,7 @@ import type { Person } from '../../core/types';
 import { ROUNDEL_EM, centredWithoutWord, cardText, isRoundel, nameCountOf, nameRoom, ordinalTabRect, relationY, ribbonWidth, roundelPics, signBelowRing, signBottomOf, tagTop, youTabRect, type CardText, type ShownLines } from '../../layout/geometry';
 import { farTagSigns } from '../../layout/far-tag-sign';
 import { illegitimateSigns } from '../../layout/index';
-import type { FarTag, LaidOut, NameLineCount, PersonBox, PlacedFoldControl, Rect } from '../../layout/model';
+import type { FarTag, LaidOut, NameLineCount, PersonBox, PlacedFoldControl, Rect, TreeLayout } from '../../layout/model';
 import type { BreakList } from '../break-words';
 import { unionMarkClass } from '../legend';
 import { isColour } from '../colour-check';
@@ -398,6 +398,19 @@ export function readCornerRadius(el: Element, fallback: number): number {
 	}
 }
 
+/**
+ * The names of the parents of a fold control. The parents of a group are named from left to right (from top to bottom sideways), so the order of the
+ * child's list never shows in the label.
+ */
+function parentNames(c: PlacedFoldControl, layout: TreeLayout, g: FamilyGraph): string[] {
+	const along = (id: string) => {
+		const b = layout.persons.get(id);
+		return b ? (layout.orientation === 'sideways' ? b.y : b.x) : Infinity;
+	};
+	const ordered = c.union === undefined && c.parents.length > 2 ? [...c.parents].sort((a, b) => along(a) - along(b) || (a < b ? -1 : a > b ? 1 : 0)) : c.parents;
+	return ordered.map((id) => g.byId.get(id)?.name ?? id);
+}
+
 /** Draws the whole tree's SVG content (lines, markers, cards, badges, tags) into `parent`. */
 export function buildScene(parent: SVGGElement, g: FamilyGraph, laid: LaidOut, opts: SceneOptions): Scene {
 	const { layout, edges } = laid;
@@ -633,10 +646,7 @@ export function buildScene(parent: SVGGElement, g: FamilyGraph, laid: LaidOut, o
 	}
 	const drawFolds = (list: readonly PlacedFoldControl[] | undefined) => {
 		for (const c of list ?? []) {
-			const label = opts.folds!.label(
-				c,
-				c.parents.map((id) => g.byId.get(id)?.name ?? id),
-			);
+			const label = opts.folds!.label(c, parentNames(c, layout, g));
 			folds.push(drawFold({ controls: cardsEl, hits: hitsEl, openHits: openFoldHitsEl, fonts: opts.fonts, measure: opts.measure, em: f, label, fitters, ...(layout.orientation === 'sideways' ? { anchored: true } : {}), ...(opts.folds!.wire ? { wire: opts.folds!.wire } : {}), ...(opts.folds!.lazy ? { lazy: true } : {}) }, c));
 		}
 	};

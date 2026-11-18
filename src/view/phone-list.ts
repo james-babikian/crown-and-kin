@@ -82,6 +82,9 @@ export function listStart(f: ListStartFacts): { id: string; from: ListFrom } | n
 	return first === null ? null : { id: first, from: 'first' };
 }
 
+/** The children of the groups that hold `centre` as a parent that the graph shows, in the order of the note. */
+const groupChildrenOf = (g: FamilyGraph, centre: string): string[] => g.parentGroups.filter((x) => x.parents.includes(centre) && g.byId.has(x.child)).map((x) => x.child);
+
 /**
  * The sections of the list for `centre`: the drawn parents (placement links first, then side links), the centre with each
  * partner once in union order, and the children in groups by partnership, then the children with no listed partner,
@@ -146,6 +149,12 @@ export function listData(g: FamilyGraph, centre: string): ListData {
 		return partnerships.find((x) => x.key === key);
 	};
 	const other: ListRow[] = [];
+	// A child of a group (three or more parents of one kind, no couple) is in no partnership and no one-parent family: it stands with the other children (contract §3.1).
+	for (const c of groupChildrenOf(g, centre)) {
+		if (seen.has(c)) continue;
+		seen.add(c);
+		other.push(child(c));
+	}
 	for (const e of ordered) {
 		if (seen.has(e.child)) continue;
 		seen.add(e.child);

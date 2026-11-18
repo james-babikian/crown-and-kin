@@ -50,7 +50,7 @@ describe('placement parents of shown children, exactly as deriveFamilies places 
 		expect(run(tree, 'c', 0)).toMatchObject({ ids: ['c'], hidden: { c: 2 } });
 	});
 
-	it('only the two placement parents: not a rumoured parent, not a third parent of the type', () => {
+	it('the placement parents, all of a group of three: not a rumoured parent', () => {
 		const tree = parse(`people:
   - {id: a, name: A}
   - {id: b, name: B}
@@ -58,9 +58,9 @@ describe('placement parents of shown children, exactly as deriveFamilies places 
   - {id: r, name: R}
   - {id: c, name: C, parents: [a, b, d, {id: r, type: rumoured}]}
 `);
-		expect(run(tree, 'a', 1)).toMatchObject({ ids: ['a', 'b', 'c'], hidden: { c: 2 } });
+		expect(run(tree, 'a', 1)).toMatchObject({ ids: ['a', 'b', 'd', 'c'], hidden: { c: 1 } });
 		expect(run(tree, 'd', 1)).toMatchObject({ ids: ['a', 'b', 'd', 'c'], hidden: { c: 1 } });
-		expect(run(tree, 'r', 1)).toMatchObject({ ids: ['a', 'b', 'r', 'c'], hidden: { c: 1 } });
+		expect(run(tree, 'r', 1)).toMatchObject({ ids: ['a', 'b', 'd', 'r', 'c'], hidden: {} });
 	});
 
 	it('placement decides the couple: adoptive parents come in only when they place the child', () => {

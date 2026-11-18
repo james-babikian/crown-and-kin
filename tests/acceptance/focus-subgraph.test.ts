@@ -591,18 +591,31 @@ describe('implicit co-parents come in only through a shown child', () => {
 		expect(hidden(r)).toEqual({ e: 2, d: 1, y: 1 });
 	});
 
-	it('as deriveFamilies: the first two placement parents after ids that name no person; a third is not added', () => {
+	it('as deriveFamilies: ids that name no person are skipped, so ghost and one real parent make one parent, and no union', () => {
+		const tree = parse(`people:
+  - {id: a, name: A}
+  - {id: f, name: F}
+  - {id: k, name: K, parents: [ghost, f, a]}
+`);
+		expect(implicitPairs(tree)).toEqual(['a+f']);
+		const r = run(tree, 'f', 1);
+		expect(ids(r)).toEqual(['a', 'f', 'k']);
+		expect(parentsIn(r, 'k')).toEqual(['f', 'a']);
+		expect(hidden(r)).toEqual({});
+	});
+
+	it('three parents of one kind and no couple (D365 (2)): no implicit union; the parents are a group, so all three come in with the shown child', () => {
 		const tree = parse(`people:
   - {id: a, name: A}
   - {id: c, name: C}
   - {id: f, name: F}
   - {id: k, name: K, parents: [ghost, f, a, c]}
 `);
-		expect(implicitPairs(tree)).toEqual(['a+f']);
+		expect(implicitPairs(tree)).toEqual([]);
 		const r = run(tree, 'f', 1);
-		expect(ids(r)).toEqual(['a', 'f', 'k']);
-		expect(parentsIn(r, 'k')).toEqual(['f', 'a']);
-		expect(hidden(r)).toEqual({ k: 1 });
+		expect(ids(r)).toEqual(['a', 'c', 'f', 'k']);
+		expect(parentsIn(r, 'k')).toEqual(['f', 'a', 'c']);
+		expect(hidden(r)).toEqual({});
 	});
 
 	it('a listed union for the same couple gives the same people; the union is kept', () => {

@@ -309,10 +309,11 @@ describe('dotted side links that cross a picture are counted', () => {
 		return new Set(r.sideCrossings.map((c) => c.card)).size;
 	};
 
-	it('sample 07b at 12 px, with its real pictures: 3 cards (the count of the prototype)', () => {
+	it('sample 07b at 12 px, with its real pictures: 2 cards (3 before D365 (4))', () => {
 		// 0.3 (D231): the added step moves cards of tree 07b, and one of the three cards no longer has a side link across its picture.
 		// 0.3.1 golden record: the new walk and ports move the cards again, and the count is 3 again (a dotted side link across a picture is counted, not a fault: B.3.3; the test 'no line enters a medallion' has 0 problems).
-		expect(count('07b', 12, 'real')).toBe(3);
+		// 0.5.6 (D365 (4)): a curve from the left now ends on the left of the axis (3.4 em), so one card's picture is no longer crossed: 2 cards.
+		expect(count('07b', 12, 'real')).toBe(2);
 	});
 
 	it('the count at 16 px, and with a picture for everyone, is pinned (a change is a layout change that someone must look at)', () => {
@@ -349,7 +350,7 @@ describe('where the lines meet the Roundel', () => {
 		}
 	});
 
-	it('a side link lands 3.4 em right of the card middle on the top edge; every other form keeps 14 px', () => {
+	it('a side link lands 3.4 em from the card middle on the top edge, on the side its curve comes from (D365 (4)); every other form keeps 14 px', () => {
 		for (const note of [12, 16]) {
 			const f = geometryFor(note).fontPx;
 			const s = ids().find((x) => x.id === '07b')!;
@@ -360,7 +361,9 @@ describe('where the lines meet the Roundel', () => {
 			for (const p of links) {
 				const b = roundel.laid.layout.persons.get(p.child!)!;
 				const m = /C[\d.-]+ [\d.-]+ ([\d.-]+) ([\d.-]+) ([\d.-]+) ([\d.-]+)$/.exec(p.d)!;
-				expect(Number(m[3])).toBeCloseTo(b.x + b.w / 2 + 3.4 * f, 0);
+				// A curve from the left of the axis used to end right of it and cross the drop; it now ends 3.4 em left (no tab on this card).
+				const from = Number(/^M([\d.-]+)/.exec(p.d)![1]);
+				expect(Number(m[3])).toBeCloseTo(b.x + b.w / 2 + (from < b.x + b.w / 2 - 1e-6 ? -3.4 : 3.4) * f, 0);
 				expect(Number(m[4])).toBeCloseTo(b.y, 0);
 			}
 			clearLayoutCache();
@@ -368,7 +371,10 @@ describe('where the lines meet the Roundel', () => {
 			for (const p of classic.edges.paths.filter((x) => x.d.includes('C'))) {
 				const b = classic.layout.persons.get(p.child!)!;
 				const m = /C[\d.-]+ [\d.-]+ ([\d.-]+) ([\d.-]+) ([\d.-]+) ([\d.-]+)$/.exec(p.d)!;
-				expect(Number(m[3])).toBeCloseTo(b.x + b.w / 2 + 14, 0);
+				const from = Number(/^M([\d.-]+)/.exec(p.d)![1]);
+				// From the left the end is min(drop, middle) - 14 px: the drop can stand left of the middle, so the end can stand further left.
+				if (from < b.x + b.w / 2 - 1e-6) expect(Number(m[3])).toBeLessThanOrEqual(b.x + b.w / 2 - 14 + 0.05);
+				else expect(Number(m[3])).toBeCloseTo(b.x + b.w / 2 + 14, 0);
 			}
 		}
 	});

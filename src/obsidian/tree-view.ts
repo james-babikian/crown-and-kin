@@ -53,7 +53,7 @@ import { measuredLayout, type MeasuredResult } from '../view/measured-layout';
 import { relationsFor, type TreeRelations } from '../view/relation-cache';
 import { planRender, type RenderInputs, type StateChanges, type TreePlan } from '../view/render-plan';
 import { foldLabel, lineMarks } from '../view/tree-view-helpers';
-import { BIG_TREE_CLASS, keepsStandingLayer } from './move-layer';
+import { BIG_TREE_CLASS, dragMarginOverride, dragMovesWrapper, isIosWebKit, keepsStandingLayer, panWrapperOverride } from './move-layer';
 import { TreeViewList } from './tree-view-list';
 import type { ViewHost } from './tree-view-base';
 export { HOVER_SOURCE, OPEN_GAP_MS, THEME_RECHECK_MS } from './tree-view-types';
@@ -436,9 +436,10 @@ export class TreeView extends TreeViewList {
 			},
 			// A D19 fill in a pinch out also takes the level of detail for its zoom: the smaller level has
 			// less text to lay out, so the fills are cheaper (measured: 83–133 ms instead of 133–167 ms at 4×).
-			onFill: (v) => {
-				// D285: a new level changes the signs of every control, but the tap areas are placed only near the view.
-				if (this.applyLod(v)) {
+			onFill: (v, ahead) => {
+				// D285: a new level changes the signs of every control, but the tap areas are placed only near the view. A fill ahead (D367) wrote no <g>, so a new
+				// level class would restyle the whole tree in mid-gesture for nothing; the settle takes it.
+				if (!ahead && this.applyLod(v)) {
 					this.refreshSignBoosts(v);
 					this.placeFolds(v, this.foldsDue(v));
 				}
@@ -450,6 +451,10 @@ export class TreeView extends TreeViewList {
 				this.startWords();
 			},
 			guard: (fn) => this.guard(fn),
+			// D365 (1): asked at the start of each pan, never on a move; the count is the one of the standing layer.
+			wrapDrag: () => dragMovesWrapper(this.laid?.layout.persons.size ?? 0, isIosWebKit(frame.viewport.win), panWrapperOverride(frame.viewport.doc)),
+			// D367: only the harness and the study build set the switch, so the release keeps `DRAG_MARGIN` (`range`).
+			marginRule: () => dragMarginOverride(frame.viewport.doc),
 			// D222: only the full-screen view keeps a small tree between its bars (the values are cached by `measureInsets`).
 			...(this.full
 				? {

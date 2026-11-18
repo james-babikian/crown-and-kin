@@ -388,7 +388,7 @@ function bendY(grid: Grid, x0: number, y0: number, x1: number, y1: number): numb
 		const lanes = grid.lanes[g];
 		for (let k = laneFrom(lanes, lo + TIE); k < lanes.length && lanes[k].y < hi - TIE; k++) {
 			const h = lanes[k];
-			if (h.x2 <= Math.min(x0, x1) || h.x1 >= Math.max(x0, x1)) continue;
+			if (h.x2 <= Math.min(x0, x1) + TIE || h.x1 >= Math.max(x0, x1) - TIE) continue;
 			if (h.y - prev > size + TIE) {
 				size = h.y - prev;
 				best = (prev + h.y) / 2;

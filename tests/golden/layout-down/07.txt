@@ -1198,7 +1198,7 @@ path rumoured [rowan-orsini aldric-valmont] M6044.3 383V405C6044.3 444 3942.1 44
 path ward [jasper-orsini hugo-valmont] M4729.5 705V727C4729.5 766 1742.9 766 1742.9 805
 path rumoured [jasper-orsini perrine-valmont] M4741.5 705V727C4741.5 766 2770.3 766 2770.3 805
 path rumoured [leofric-orsini-2 nerys-valmont] M3805 1027V1049C3805 1088 614.1 1088 614.1 1127
-path birth-link [percival-valmont adela-orsini roderick-valmont-2] M700.1 1049C700.1 1088 7862.3 1088 7862.3 1127
+path birth-link [percival-valmont adela-orsini roderick-valmont-2] M700.1 1049C700.1 1088 7830.6 1088 7830.6 1127
 marker union at 4643.813 30.5
 marker union at 6866.337 30.5
 marker union at 8848.251 30.5

@@ -133,6 +133,13 @@ const NONE: Person[] = [];
 const NONE_DRAWN: DrawnParent[] = [];
 const NO_IDS: string[] = [];
 
+/** Whether two lists of distinct ids hold the same ids, in any order. */
+function sameIds(x: readonly string[], y: readonly string[]): boolean {
+	if (x.length !== y.length) return false;
+	const ys = new Set(y);
+	return x.every((q) => ys.has(q));
+}
+
 const empty = (kind: SuccessionKind, year: number | null, yearFrom: SuccessionResult['yearFrom'], yearText: string | null = null): SuccessionResult => ({
 	kind,
 	year,
@@ -524,14 +531,8 @@ function makeEngine(
 		});
 	}
 	// The primary parents are the ones the edit sheet orders brothers and sisters by (it moves a person among the same parents).
-	// A placement list holds at most two ids, so the test is a few comparisons.
-	const sameParents = (a: string, b: string): boolean => {
-		const x = g.placementParents.get(a) ?? NO_IDS;
-		const y = g.placementParents.get(b) ?? NO_IDS;
-		if (x.length !== y.length) return false;
-		if (x.length < 2) return x.length === 0 || x[0] === y[0];
-		return (x[0] === y[0] && x[1] === y[1]) || (x[0] === y[1] && x[1] === y[0]);
-	};
+	// The same set of ids: a placement list holds two ids, or all of a group (three or more).
+	const sameParents = (a: string, b: string): boolean => sameIds(g.placementParents.get(a) ?? NO_IDS, g.placementParents.get(b) ?? NO_IDS);
 	// A person who has a child in the tree by a birth, adoptive, rumoured or begetter link (D332) has a drawn family; a ward link does not count (D191). Made on first need.
 	let parentOf: Set<string> | undefined;
 	const hasChild = (id: string): boolean => {

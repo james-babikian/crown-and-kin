@@ -226,6 +226,11 @@ export const VIEW_NOTICE = {
 		`After a rename, the plugin updates the links in the trees. In the note ${note}, this update took too long, and the plugin stopped it. If a tree in the note still has the link “${old}”, replace it with “${next}”.`,
 } as const;
 
+/** The names of the parents in one phrase: "A", "A and B", "A, B and C". The caller gives them in a fixed order (a group: the cards from left to right). */
+export function nameList(names: readonly string[]): string {
+	return names.length < 3 ? names.join(' and ') : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
+}
+
 /**
  * Fold a branch (spec §13.10, D83–D85): the accessible names and tooltips of the fold
  * button and the "+ N" sign, and the two buttons of the edit sheet. `names` are the parents' names.
@@ -236,10 +241,10 @@ export const FOLD_UI = {
 	hideDescendantsLabel: (name: string) => `Hide descendants: hide the people below ${name}`,
 	showDescendantsLabel: (name: string) => `Show descendants: show the hidden people below ${name}`,
 	/** The button of an open family: no count. */
-	hideLabel: (names: readonly string[]) => `Hide the people below ${names.join(' and ')}`,
+	hideLabel: (names: readonly string[]) => `Hide the people below ${nameList(names)}`,
 	/** The sign of a folded family, with the number of hidden people. */
 	showLabel: (names: readonly string[], count: number) =>
-		count === 1 ? `Show the hidden person below ${names.join(' and ')}` : `Show the ${count} hidden people below ${names.join(' and ')}`,
+		count === 1 ? `Show the hidden person below ${nameList(names)}` : `Show the ${count} hidden people below ${nameList(names)}`,
 } as const;
 
 /** A number of people with a comma as the thousands separator ("1,600"): normal English, and a space can read as two numbers. */

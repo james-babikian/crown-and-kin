@@ -8,6 +8,7 @@
  */
 import type { FamilyGraph } from '../core/derive';
 import { computeGenerations } from '../core/generations';
+import { isGroupSeat } from '../core/group-seats';
 import { computeModelOrder } from '../core/order';
 import { FOLD_EM, type FoldInput } from './fold-spots';
 import { lineMetrics, MIN_HIT, sidewaysGeometry, sidewaysPartnerGap, tabbedCards, tagTop, TIE, turnedGeometry, withRelationLine } from './geometry';
@@ -19,7 +20,8 @@ import type { Plan } from './plan-model';
 import { derive, farByDistance, markFar, nearAgain, planTree, walkSide, type PlanInput } from './plan';
 import { hangX, shiftToMargin, placeItems, startMargin } from './place';
 import { pairOf } from './ports';
-import { hasWardPairs, layoutFold, layoutGraph, wardKeysOf } from './ward-graph';
+import { groupLayouts, initialGroupStates, layoutFoldAll, layoutGraphAll, separateGroupControls, settleGroups, shownGroups } from './group-graph';
+import { hasWardPairs, layoutGraph, wardKeysOf } from './ward-graph';
 
 /** A placement: gives every item of the plan an x, keeping the order of every row and its minimum gaps. */
 export type Placement = (plan: Plan, g: FamilyGraph, geo: Geometry) => void;
@@ -130,7 +132,8 @@ function stagesOn(g: FamilyGraph, coreGen: Map<string, number>, plain: Geometry,
 	// limit again goes back to near and stays near. So each couple changes at most twice (near to far, far to near for good) and the rounds
 	// end after at most two per couple; when they end, every far couple is more than the limit apart in the finished layout (A15).
 	const farKeys = new Set<string>();
-	const stayNear = new Set<string>();
+	// A seat pair of a group never turns far (a far seat would make a tag that the notes do not hold, A15): a group that cannot stand side by side is hung instead.
+	const stayNear = new Set<string>(g.unions.filter(isGroupSeat).map((u) => u.key));
 	let rounds = 0;
 	for (let round = 0; round <= 2 * g.unions.length; round++) {
 		place(plan, g, geo);
@@ -172,12 +175,18 @@ function stagesOn(g: FamilyGraph, coreGen: Map<string, number>, plain: Geometry,
  * pairs and the controls' stand-ins never leave `runStages`.
  */
 export function runStages(g: FamilyGraph, coreGen: Map<string, number>, plain: Geometry, given0: LayoutSettings, fold?: FoldInput, opts: ArrangeOptions = {}): Stages {
-	if (!hasWardPairs(g, fold)) return stagesOn(g, coreGen, plain, given0, fold, opts);
+	const groups = shownGroups(g);
+	if (!hasWardPairs(g, fold) && !groups.length) return stagesOn(g, coreGen, plain, given0, fold, opts);
 	// The rows come from the pair as a union, so the two guardians can stand on one row as they always did.
 	const gens = computeGenerations(layoutGraph(fold?.full ?? g, new Set(), fold?.full));
 	const hung = new Set<string>();
+	const states = initialGroupStates(g, groups, gens);
 	const pairs = wardKeysOf(g, fold?.full);
-	const layOut = () => stagesOn(layoutGraph(g, hung, fold?.full, gens), gens, plain, given0, fold && layoutFold(fold, hung, gens), opts);
+	let used = g;
+	const layOut = () => {
+		used = layoutGraphAll(g, hung, states, fold?.full, gens);
+		return stagesOn(used, gens, plain, given0, fold && layoutFoldAll(fold, hung, states, gens), opts);
+	};
 	const farPairs = (s: Stages) => pairs.filter((k) => !hung.has(k) && s.layout.unions.get(k)?.far === true);
 	let stages = layOut();
 	// Each round hangs at least one more pair, and a hung pair is never far, so the last round finds none.
@@ -187,11 +196,21 @@ export function runStages(g: FamilyGraph, coreGen: Map<string, number>, plain: G
 		for (const k of far) hung.add(k);
 		stages = layOut();
 	}
-	const keys = new Set(pairs.filter((k) => !hung.has(k)));
+	if (groups.length) {
+		stages = settleGroups(g, groups, states, stages, layOut);
+		// A pair that turned far in the final run is hung once more (the "+1" of contract �1.5).
+		const far = farPairs(stages);
+		if (far.length) {
+			for (const k of far) hung.add(k);
+			stages = layOut();
+		}
+	}
+	const keys = new Set([...pairs.filter((k) => !hung.has(k)), ...used.unions.filter(isGroupSeat).map((u) => u.key)]);
 	const unions = new Map([...stages.layout.unions].filter(([k]) => !keys.has(k)));
 	const original = new Map((fold?.controls ?? []).map((c) => [c.key, c]));
-	const folds = stages.layout.folds?.map((c) => ({ ...(original.get(c.key) ?? c), spot: c.spot }));
-	return { ...stages, layout: { ...stages.layout, unions, ...(folds ? { folds } : {}) } };
+	const restored = stages.layout.folds?.map((c) => ({ ...(original.get(c.key) ?? c), spot: c.spot }));
+	const folds = restored && groups.length || restored && fold?.full.parentGroups.length ? separateGroupControls(restored, stages.layout.geometry.fontPx, stages.layout.orientation === 'sideways') : restored;
+	return { ...stages, layout: { ...stages.layout, unions, ...(folds ? { folds } : {}), ...(groups.length ? { groups: groupLayouts(stages.layout, groups, states) } : {}) } };
 }
 
 /** Lays out and routes `g` (uncached): the cards and the lines of the card-and-line system. See `runStages` for the arguments. */

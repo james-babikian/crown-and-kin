@@ -2,6 +2,26 @@
 
 All notable changes for users. The newest version is first.
 
+## 0.5.6
+
+### Three parents of one kind
+
+- **A child with three birth parents or three adoptive parents now has a line from each parent.** No line, dot or name tag joins two of the parents. Before, the tree joined the first two parents in the note with a line, as for a couple, and the order in the note decided which two. If the three parents stand side by side and no other card is in the way, the child stands under the middle parent. The note still shows a warning, because a child can have only two parents of one kind. You can keep the note as it is: the warning does not stop the tree.
+- **If two of the three parents are a couple, the child stands under the couple.** Two parents count as a couple in two cases. The note gives them a partnership. Or they are the only two birth parents, or the only two adoptive parents, of another child. The third parent has a line of its own. If the note has two or more such couples, write `union:` and the ID of the partnership in the text of the child, for example `union: bran-cara`. Before, the tree ignored `union` and showed a warning, if it named the partnership of the second and the third parent. Now the child stands under that partnership.
+- **A dashed line from a parent at the side now ends on that parent's side of the child's card.** Before, it could cross the line from the other parents. This changes every tree with such a line a little.
+- **The fold button below the three parents of a child names all three parents.** For example: "Show the hidden person below Cara Wexley, Bran Thorne and Tilda Veyle".
+
+### Speed
+
+- **On an iPhone or an iPad, a drag of a large tree is now smoother.** This is for trees of more than 500 people in the full-screen view (the Expand button). While you drag, the iPhone moves one ready picture of the tree. This picture is larger than the screen. The plugin draws the cards again only when you drag near the edge of the picture. In a test on a real iPhone, one minute of drag in a tree of 1,000 people had 112 pauses longer than 1/20 of a second. Version 0.5.5 had 347.
+
+### Known limits
+
+- **A child of three parents can stand far from its parents.** This happens when other children fill the row under the parents. They push the child to the side.
+- **On an iPhone, a large tree stops for about 0.1 seconds when you first touch it.** Then the drag is smooth.
+- **On an iPad, a move with two fingers on a trackpad, or with a mouse wheel, is not smoother yet.** The smoother drag is for a finger only.
+- **If you write the same person as a birth parent and as a rumoured parent of one child, the tree draws two lines to that child.** The plugin shows no warning, so check the note yourself.
+
 ## 0.5.5
 
 ### Speed

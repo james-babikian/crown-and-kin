@@ -7,6 +7,7 @@
  * and the nets and writes no plan field.
  */
 import { partnerOf, type FamilyGraph, type FamilyUnion } from '../core/derive';
+import { isGroupSeat } from '../core/group-seats';
 import { isWardUnion, wardUnionKey } from '../core/ward-unions';
 import { FOLD_EM, workExtent, type FoldInput } from './fold-spots';
 import { barClear, isRoundel, lineMetrics, MIN_HIT, roundelAxis, roundelLineEnd, sideTagDepth, tagHit, tagTop, TIE, type LineMetrics } from './geometry';
@@ -17,12 +18,9 @@ import { familyKeyOf, hangRow, portX, type Family, type Plan, type SideLink } fr
 import { barNets, childPorts, foldZones, hangPoints, packLanes, passageLines, rowHeights, rowYs, sideTagZone, tagZoneOf, upperNets, type HangPoints, type OnFallback, type RouteInput, type RowYs, type UpperNets } from './route';
 import { nearOf, pairOf } from './ports';
 import { routedSpot, RumourIndex, rumourSpot, segmentsOf, type Curve, type Seg } from './rumour-spot';
+import { groupLandings, groupLinkKind, sideLanding, wardPairApart, type LandingInput } from './side-landing';
 import { sideRouter as makeRouter, type SideRouter } from './side-route';
 
-/** em: how far right of the card middle a dotted side link lands on a Roundel card. */
-const SIDE_LINK_EM = 3.4;
-/** px: how far right of the card middle a side link lands on a text card. */
-const SIDE_LINK_PX = 14;
 /** A drop this near the Roundel's axis ends at the medallion ring, not at the card's edge (half a stroke width). */
 const ON_AXIS = 0.5;
 /** The "?" disc: half an em in radius in the plugin, at least 8 px in the headless pictures; it keeps 2 px more from every card's edge. */
@@ -110,7 +108,7 @@ export function drawCouples(plan: Plan, g: FamilyGraph, nets: UpperNets, persons
 	for (const fu of g.unions) if (plan.couples.get(fu.key)!.kind === 'bar') barStyle.set(pairOf(fu), { kind: coupleKind(fu), union: fu.key });
 	for (const fu of g.unions) {
 		// Two guardians with no union (D354 1 B) are placed as a pair but nothing joins them: no line, no sign.
-		if (isWardUnion(fu)) continue;
+		if (isWardUnion(fu) || isGroupSeat(fu)) continue;
 		const c = plan.couples.get(fu.key)!;
 		const u = unions.get(fu.key)!;
 		const kind = coupleKind(fu);
@@ -276,46 +274,49 @@ interface LinkCurve {
 	kind: StrokeKind;
 }
 
+/** Where a side link's curves start: the union dot, or each parent's side port (people: the parent or the partners, then the child). */
+function linkSources(s: SideLink, g: FamilyGraph, persons: ReadonlyMap<string, PersonBox>, unions: ReadonlyMap<string, UnionPoint>, ys: RowYs, m: LineMetrics, childGen: number): { x: number; y: number; drop?: number; gap?: number; people: string[] }[] {
+	if (s.union) {
+		const u = unions.get(s.union)!;
+		const partners = g.unionByKey.get(s.union)!.partners;
+		const a = persons.get(partners[0])!;
+		return [{ x: u.x, y: u.y, ...(u.bar ? { drop: ys.gapTop(a.gen) + m.coupleLane0 } : {}), gap: a.gen, people: [...partners, s.child] }];
+	}
+	return s.ports.map((port) => {
+		const pb = persons.get(port.item.id)!;
+		return { x: portX(port), y: pb.y + pb.h, ...(childGen > pb.gen ? { drop: ys.gapTop(pb.gen) + m.coupleLane0 } : {}), gap: pb.gen, people: [port.item.id, s.child] };
+	});
+}
+
 /**
  * Step 10d: side links as curves: from the union dot, or from each parent's side port, to a point right of the child's middle. Begetter lines of one person
  * into one row keep a gap and one dash phase (`bundleBegetters`); then `router` (side-route.ts) routes a curve that would run over a foreign card between
  * the cards. The bundle comes first: its lines go one row down and stay in one gap, so the router never changes them and the bundle holds.
  */
-export function drawSideLinks(plan: Plan, g: FamilyGraph, persons: ReadonlyMap<string, PersonBox>, unions: ReadonlyMap<string, UnionPoint>, ys: RowYs, geo: Geometry, side: Geometry | undefined, m: LineMetrics, num: Num = r1, bands?: { upper: readonly (readonly Net[])[]; lower: readonly (readonly Net[])[] }, router?: SideRouter, dropX?: ReadonlyMap<string, number>): { paths: EdgePath[]; rumours: Rumour[] } {
+export function drawSideLinks(plan: Plan, g: FamilyGraph, persons: ReadonlyMap<string, PersonBox>, unions: ReadonlyMap<string, UnionPoint>, ys: RowYs, geo: Geometry, side: Geometry | undefined, m: LineMetrics, num: Num = r1, bands?: { upper: readonly (readonly Net[])[]; lower: readonly (readonly Net[])[] }, router?: SideRouter, dropX?: ReadonlyMap<string, number>, tabbed?: ReadonlySet<string>, youTab?: string): { paths: EdgePath[]; rumours: Rumour[] } {
 	const roundel = !side && isRoundel(geo);
 	const paths: EdgePath[] = [];
 	const rumours: Rumour[] = [];
 	const near = nearOf(geo);
 	const curves: LinkCurve[] = [];
 	const groups: string[] = [];
+	const landing: LandingInput = { roundel, sideways: !!side, fontPx: geo.fontPx, axis: roundelAxis(geo), m, ...(tabbed ? { tabbed } : {}), ...(youTab !== undefined ? { youTab } : {}) };
+	const group = groupLandings(plan.sideLinks, g, persons, dropX, landing);
 	for (const s of plan.sideLinks) {
 		const cb = persons.get(s.child)!;
-		const shift = side ? Math.min(SIDE_LINK_PX, cb.w / 2 - m.tagInset) : roundel ? SIDE_LINK_EM * geo.fontPx : SIDE_LINK_PX;
-		const tx0 = cb.x + cb.w / 2 + shift;
 		const ty = cb.y;
 		// Two guardians with no union (D354 1 B): the two ward lines end a little apart on the ward's own line, the guardian who stands first to
 		// its left (beside the medallion on a Roundel card), so the two never cross at the end.
 		// Only a pair the layout seated as a ward pair: a ward placed under its birth parents with two guardians who share no union keeps its old drawing.
 		const pair = s.type === 'ward' && s.parents.length === 2 && !s.union && g.unionByKey.get(wardUnionKey(s.parents[0], s.parents[1]))?.children.includes(s.child) === true && isWardUnion(g.unionByKey.get(wardUnionKey(s.parents[0], s.parents[1]))!);
-		const apart = roundel ? SIDE_LINK_EM * geo.fontPx : Math.min(WARD_PAIR_APART_EM * geo.fontPx, shift);
+		const apart = wardPairApart(cb, landing, WARD_PAIR_APART_EM);
 		const centre = dropX?.get(s.child) ?? cb.x + cb.w / 2;
-		const sources: { x: number; y: number; drop?: number; gap?: number; people: string[] }[] = [];
-		if (s.union) {
-			const u = unions.get(s.union)!;
-			const partners = g.unionByKey.get(s.union)!.partners;
-			const a = persons.get(partners[0])!;
-			sources.push({ x: u.x, y: u.y, ...(u.bar ? { drop: ys.gapTop(a.gen) + m.coupleLane0 } : {}), gap: a.gen, people: [...partners, s.child] });
-		} else {
-			for (const port of s.ports) {
-				const pb = persons.get(port.item.id)!;
-				sources.push({ x: portX(port), y: pb.y + pb.h, ...(cb.gen > pb.gen ? { drop: ys.gapTop(pb.gen) + m.coupleLane0 } : {}), gap: pb.gen, people: [port.item.id, s.child] });
-			}
-		}
+		const sources = linkSources(s, g, persons, unions, ys, m, cb.gen);
 		for (const src of sources) {
 			const sy = src.drop ?? src.y;
-			const tx = pair ? centre + (src.x < Math.max(...sources.map((o) => o.x)) ? -apart : apart) : tx0;
+			const tx = pair ? centre + (src.x < Math.max(...sources.map((o) => o.x)) ? -apart : apart) : (group.get(s) ?? sideLanding(cb, src.x, dropX?.get(s.child), landing));
 			const my = src.drop !== undefined && cb.gen === src.gap! + 1 ? turnY(src.gap!, src.x, sy, tx, ty, ys, near, bands) : (sy + ty) / 2;
-			curves.push({ s, src, sy, my, tx, ty, kind: (s.type === 'birth' ? 'birth-link' : s.type) as StrokeKind });
+			curves.push({ s, src, sy, my, tx, ty, kind: groupLinkKind(g, s) ?? ((s.type === 'birth' ? 'birth-link' : s.type) as StrokeKind) });
 			// A group is one begetter and one row of children: only a line from a begetter's port to the next row down is in one. Such a curve stays between the two rows, so a lift never puts it over a card.
 			groups.push(s.type === 'begetter' && !s.union && src.drop !== undefined && cb.gen === src.gap! + 1 ? JSON.stringify([src.people[0], cb.gen]) : '');
 		}
@@ -438,7 +439,7 @@ export function routeTree({ plan, g, geo, side, tabbed, youTab, ordinalCards, fo
 	const lineX = Math.max(0, ...nets.upper.flat().map((n) => n.hi), ...lower.flat().map((n) => n.hi));
 	// One router for both drawings (rounded, and exact for the "?" search): it reads the rounded lines, so both take the same routes.
 	const router = plan.sideLinks.length ? sideRouter(plan, persons, unions, ys, geo, side, m, [...lines.couples.paths, ...lines.descent.paths, ...folds.paths], lineX) : undefined;
-	const draw = (num: Num, l = drawLines(num)) => ({ ...l, links: drawSideLinks(plan, g, persons, unions, ys, geo, side, m, num, { upper: nets.upper, lower }, router, dropX) });
+	const draw = (num: Num, l = drawLines(num)) => ({ ...l, links: drawSideLinks(plan, g, persons, unions, ys, geo, side, m, num, { upper: nets.upper, lower }, router, dropX, tabbed, youTab) });
 	const { couples, descent, links } = draw(r1, lines);
 	const pathsOf = (d: ReturnType<typeof draw>) => [...d.couples.paths, ...d.descent.paths, ...folds.paths, ...d.links.paths];
 	const paths = pathsOf({ couples, descent, links });

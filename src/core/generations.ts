@@ -8,6 +8,7 @@
 import { partnerOf, type FamilyGraph } from './derive';
 import { equalisePartners, RowGroups } from './row-partners';
 import { loneRumouredRoots } from './rumoured-roots';
+import { withDefaultGroupSeats } from './group-seats';
 import { withWardUnions } from './ward-unions';
 
 /**
@@ -32,8 +33,8 @@ import { withWardUnions } from './ward-unions';
  * Cycles in the parent links must already be broken (deriveFamilies does this).
  */
 export function computeGenerations(graph: FamilyGraph): Map<string, number> {
-	// Two guardians of a ward are seated as a pair (D354 1 B): the one source of the rows, so core and layout cannot differ.
-	const g = withWardUnions(graph);
+	// Two guardians of a ward are seated as a pair (D354 1 B), and the parents of a group side by side (D365 (2)): the one source of the rows, so core and layout cannot differ.
+	const g = withDefaultGroupSeats(withWardUnions(graph));
 	const ids = g.people.map((p) => p.id);
 	const isRoot = (id: string) => g.placementParents.get(id)!.length === 0;
 	const partnersOf = (id: string) => (g.unionsOf.get(id) ?? []).map((k) => partnerOf(g.unionByKey.get(k)!, id));
