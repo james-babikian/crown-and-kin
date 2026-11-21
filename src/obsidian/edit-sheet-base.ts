@@ -36,6 +36,8 @@ export interface SheetFolds {
 	mode: 'live' | 'preview';
 	/** The keys for this person now; in 'preview' computed without the fold state. */
 	state(personId: string): PersonFolds;
+	/** The distinct people that the keys of `state(id).folded` hide together. */
+	hiddenCount(personId: string): number;
 	/** Folds every key of `state(id).open`; keeps the person's card in place. In 'preview': adds them to the block's folds and opens the full-screen view on the person. */
 	hide(personId: string): void;
 	/** Opens every key of `state(id).folded`; keeps the person's card in place. Not called in 'preview'. */

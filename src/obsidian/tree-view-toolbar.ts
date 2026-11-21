@@ -1,6 +1,6 @@
 /*
  * The bars of a tree view: the toolbar of the computer and of the phone, the order of its parts, the menus (Focus, More, the legend, the problem
- * list), the edit controls that follow the block's state (`updateEditUi`), Find and the Focus picker, and the resize handle. Sixth layer of the chain listed in
+ * list), the edit controls that follow the block's state (`updateEditUi`), Find and the Focus picker, and the resize handle. Fifth layer of the chain listed in
  * `tree-view.ts`.
  */
 
@@ -21,7 +21,7 @@ import { pluginModalOpen } from '../view/plugin-modals';
 import { openCalendars } from './calendar-window';
 import { chooseCalendarNote } from './calendar-note-choice';
 import { drawProblems, type ProblemTarget } from './problems-list';
-import { TreeViewPictures } from './tree-view-pictures';
+import { TreeViewScene } from './tree-view-scene';
 
 /** The order of the parts of each toolbar, by class; `orderBar` sorts the bar by it. */
 const BAR_ORDER = {
@@ -80,16 +80,25 @@ export function toolbarIn(parent: HTMLElement, first = true): { bar: HTMLElement
 	const bar = parent.createDiv({ cls: 'dynasty-toolbar', attr: { role: 'toolbar', 'aria-labelledby': id } });
 	bar.createSpan({ cls: 'dynasty-sr-only', text: TOOLBAR_UI.region, attr: { id } });
 	if (first) parent.prepend(bar);
-	const button = (icon: string, label: string, cls: string) => {
-		const b = bar.createEl('button', { cls: ['clickable-icon', 'dynasty-tool', cls], attr: { 'aria-label': label, type: 'button' } });
-		setIcon(b.createSpan({ cls: 'dynasty-tool-icon' }), icon);
-		return b;
-	};
-	return { bar, button };
+	return { bar, button: (icon: string, label: string, cls: string) => toolButton(bar, icon, label, cls) };
+}
+
+/** An icon-only button at the end of `bar`. */
+function toolButton(bar: HTMLElement, icon: string, label: string, cls: string): HTMLButtonElement {
+	const b = bar.createEl('button', { cls: ['clickable-icon', 'dynasty-tool', cls], attr: { 'aria-label': label, type: 'button' } });
+	setIcon(b.createSpan({ cls: 'dynasty-tool-icon' }), icon);
+	return b;
+}
+
+/** Keeps one optional child of `parent` in step with `want`: makes it with `make` when it is wanted and missing, removes it when it is not wanted and there. */
+function keepChild(parent: ParentNode, sel: string, want: boolean, make: () => void): void {
+	const el = parent.querySelector<HTMLElement>(sel);
+	if (want && !el) make();
+	else if (!want && el) el.remove();
 }
 
 /** The toolbar and its menus, and the controls that depend on whether the block can be edited. */
-export abstract class TreeViewToolbar extends TreeViewPictures {
+export abstract class TreeViewToolbar extends TreeViewScene {
 	/**
 	 * D246: while a focus shows, the bar at the top of the tree says whose family it is and has the link Clear focus (one tap, on every device). The Focus button
 	 * does the same since D263. A static touch embed (D1) has no controls, so it has no bar. Clear focus is `focusOn(null)`: it writes nothing, a pin stays in the note.
@@ -163,77 +172,37 @@ export abstract class TreeViewToolbar extends TreeViewPictures {
 			// First in the viewport, so Tab reaches the toolbar before the cards (spec §5.2).
 			vp.prepend(bar);
 		}
-		let open = bar.querySelector<HTMLElement>('.dynasty-open-source');
-		if (say && !open) {
-			open = bar.createEl('button', { cls: ['dynasty-tool', 'dynasty-open-source'], attr: { type: 'button', 'aria-label': BLOCK_UI.openSourceLabel } });
+		keepChild(bar, '.dynasty-open-source', say, () => {
+			const open = bar.createEl('button', { cls: ['dynasty-tool', 'dynasty-open-source'], attr: { type: 'button', 'aria-label': BLOCK_UI.openSourceLabel } });
 			setIcon(open.createSpan({ cls: 'dynasty-tool-icon' }), 'file-symlink');
 			open.createSpan({ cls: 'dynasty-tool-text', text: BLOCK_UI.openSource });
 			open.addEventListener('click', (e) => this.guard(() => this.openSource(e)));
-		} else if (!say && open) {
-			open.remove();
-			open = null;
-		}
+		});
 		// Say why a press on a card does nothing.
 		const noEdits = readOnly || this.blocked;
 		if (this.listEl) setListEditable(this.listEl, !noEdits);
-		let label = bar.querySelector<HTMLElement>('.dynasty-read-only-label');
-		const showLabel = say || this.blocked;
-		if (showLabel && !label) {
-			label = bar.createSpan({ cls: 'dynasty-read-only-label', text: BLOCK_UI.readOnly });
-		} else if (!showLabel && label) {
-			label.remove();
-			label = null;
-		}
+		keepChild(bar, '.dynasty-read-only-label', say || this.blocked, () => void bar.createSpan({ cls: 'dynasty-read-only-label', text: BLOCK_UI.readOnly }));
 		// Spec §6.10: "Add person" on embedded desktop and embedded touch views that can be edited. The computer row shows its word; the phone bars show the icon.
 		const canAdd = !noEdits && !!this.handle;
 		const kind = this.barKind();
-		let add = bar.querySelector<HTMLElement>('.dynasty-add-person');
-		if (canAdd && !add) {
-			add = bar.createEl('button', { cls: ['clickable-icon', 'dynasty-tool', 'dynasty-add-person'], attr: { 'aria-label': ADD_UI.addPerson, type: 'button' } });
-			setIcon(add.createSpan({ cls: 'dynasty-tool-icon' }), 'user-plus');
+		keepChild(bar, '.dynasty-add-person', canAdd, () => {
+			const add = toolButton(bar, 'user-plus', ADD_UI.addPerson, 'dynasty-add-person');
 			if (kind === 'desktop') {
 				add.addClass('dynasty-tool-main');
 				add.createSpan({ cls: 'dynasty-tool-text', text: PHONE_LIST_UI.addPerson });
 			}
 			add.addEventListener('click', () => this.guard(() => void this.openNewPerson()));
-		} else if (!canAdd && add) {
-			add.remove();
-			add = null;
-		}
+		});
 		// D176 (2): in the list (no More list) the button for the tree text sits next to Add person.
 		const canText = this.listMode && this.canShowText();
-		let text = bar.querySelector<HTMLElement>('.dynasty-show-text');
-		if (canText && !text) {
-			text = bar.createEl('button', { cls: ['clickable-icon', 'dynasty-tool', 'dynasty-show-text'], attr: { 'aria-label': BLOCK_UI.showTextLabel, type: 'button' } });
-			setIcon(text.createSpan({ cls: 'dynasty-tool-icon' }), 'code');
-			text.addEventListener('click', () => this.guard(() => void this.showText()));
-		} else if (!canText && text) {
-			text.remove();
-			text = null;
-		}
+		keepChild(bar, '.dynasty-show-text', canText, () => toolButton(bar, 'code', BLOCK_UI.showTextLabel, 'dynasty-show-text').addEventListener('click', () => this.guard(() => void this.showText())));
 		// D36: Houses next to Add person, on the computer and in the full-screen view; not in the static touch embed (D1).
 		const canHouses = canAdd && (!!this.full || !this.coarse);
-		let houses = bar.querySelector<HTMLElement>('.dynasty-houses-button');
-		if (canHouses && !houses) {
-			houses = bar.createEl('button', { cls: ['clickable-icon', 'dynasty-tool', 'dynasty-houses-button'], attr: { 'aria-label': TOOLBAR_UI.housesLabel, type: 'button' } });
-			setIcon(houses.createSpan({ cls: 'dynasty-tool-icon' }), 'castle');
-			houses.addEventListener('click', () => this.guard(() => void this.openHouses()));
-		} else if (!canHouses && houses) {
-			houses.remove();
-			houses = null;
-		}
+		keepChild(bar, '.dynasty-houses-button', canHouses, () => toolButton(bar, 'castle', TOOLBAR_UI.housesLabel, 'dynasty-houses-button').addEventListener('click', () => this.guard(() => void this.openHouses())));
 		// Titles leave the More list on the computer: a button of their own next to Houses. On a phone they stay in More.
 		const canTitles = kind === 'desktop' && this.canEditWindows();
-		let titles = bar.querySelector<HTMLElement>('.dynasty-titles-button');
-		if (canTitles && !titles) {
-			titles = bar.createEl('button', { cls: ['clickable-icon', 'dynasty-tool', 'dynasty-titles-button'], attr: { 'aria-label': TITLES_UI.moreLabel, type: 'button' } });
-			setIcon(titles.createSpan({ cls: 'dynasty-tool-icon' }), 'crown');
-			titles.addEventListener('click', () => this.guard(() => void this.openTitles()));
-		} else if (!canTitles && titles) {
-			titles.remove();
-			titles = null;
-		}
-		bar.querySelector<HTMLElement>('.dynasty-sep-a')?.toggle(!!houses || !!titles);
+		keepChild(bar, '.dynasty-titles-button', canTitles, () => toolButton(bar, 'crown', TITLES_UI.moreLabel, 'dynasty-titles-button').addEventListener('click', () => this.guard(() => void this.openTitles())));
+		bar.querySelector<HTMLElement>('.dynasty-sep-a')?.toggle(canHouses || canTitles);
 		this.orderBar(bar);
 		// The hidden name of the bar is no part: a bar with only that is empty.
 		if (Array.from(bar.children).every((c) => c.hasClass('dynasty-sr-only'))) bar.remove();
@@ -597,11 +566,11 @@ export abstract class TreeViewToolbar extends TreeViewPictures {
 		}
 		if (this.unloaded) return false;
 		if (this.successionDrawn) {
-			this.closeSuccession();
+			this.finder.closeSuccession();
 			return true;
 		}
 		if (!this.finderDrawn) return false;
-		this.closeFinder();
+		this.finder.close();
 		return true;
 	}
 
@@ -693,7 +662,7 @@ export abstract class TreeViewToolbar extends TreeViewPictures {
 	 */
 	protected updateBadge(bar: HTMLElement | null = this.viewport?.querySelector<HTMLElement>(':scope > .dynasty-toolbar') ?? null): void {
 		if (!bar) return;
-		const issues = this.allIssues();
+		const issues = this.pictures.allIssues();
 		let badge = bar.querySelector<HTMLElement>(':scope > .dynasty-warning-badge');
 		if (!issues.length) {
 			badge?.remove();
@@ -704,7 +673,7 @@ export abstract class TreeViewToolbar extends TreeViewPictures {
 			setIcon(b.createSpan({ cls: 'dynasty-tool-icon' }), 'alert-triangle');
 			b.createSpan({ cls: 'dynasty-warning-count' });
 			// A click that a key makes has no press count (detail 0); a mouse or touch press has 1 or more.
-			b.addEventListener('click', (e) => this.guard(() => this.toggleProblems(b, this.allIssues(), !e.detail)));
+			b.addEventListener('click', (e) => this.guard(() => this.toggleProblems(b, this.pictures.allIssues(), !e.detail)));
 			// Before Close or Expand, as when the toolbar is built.
 			this.orderBar(bar);
 			badge = b;
@@ -738,7 +707,7 @@ export abstract class TreeViewToolbar extends TreeViewPictures {
 					if (this.canEditWindows()) rows.push(item('crown', TITLES_UI.more, 'dynasty-more-titles', () => void this.openTitles(), TITLES_UI.moreLabel));
 				}
 				rows.push(item('book-open', UI.legend, 'dynasty-more-legend', () => this.toggleLegend(opener)));
-				rows.push(item('route', FINDER_UI.relation, 'dynasty-more-relation', () => void this.startFinder(), FINDER_UI.relationLabel));
+				rows.push(item('route', FINDER_UI.relation, 'dynasty-more-relation', () => void this.finder.start(), FINDER_UI.relationLabel));
 				// Spec §13.8, O11: wherever the More list is, read-only views included.
 				if (this.laid) rows.push(item('image-down', SAVE_UI.more, 'dynasty-more-save', () => this.openSave(), SAVE_UI.moreLabel));
 				// Spec §14 rule 7: the Calendars window of every tree, and the calendar note of the tree where the block can be edited.

@@ -73,7 +73,7 @@ export function drawProblems(el: HTMLElement, s: ProblemsSpec): HTMLElement | nu
 	title.createSpan({ text: problemsTitle(s.issues.length) });
 	if (s.sheet) head.createEl('button', { cls: ['dynasty-link', 'dynasty-sheet-close'], text: SHEET.close, attr: { type: 'button' } }).addEventListener('click', s.close);
 	const rows = s.issues.map((issue) => ({ issue, people: s.peopleOf(issue), target: problemTarget(issue, s.whole) }));
-	if (rows.some((r) => r.people.length || r.target)) el.createDiv({ cls: 'dynasty-problems-hint', text: PROBLEMS_HINT });
+	if (rows.some((r) => r.people.length || r.target)) el.createDiv({ cls: 'dynasty-problems-hint', text: s.sheet ? PROBLEMS_HINT.phone : PROBLEMS_HINT.computer });
 	const list = el.createEl('ul', { cls: 'dynasty-problems-list' });
 	for (const { issue, people, target } of rows) {
 		const li = list.createEl('li', { cls: issue.level === 'blocking' ? 'dynasty-problem is-blocking' : 'dynasty-problem' });

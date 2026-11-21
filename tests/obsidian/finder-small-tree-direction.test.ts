@@ -6,7 +6,7 @@ import { finderOrientation, fittedNamePx } from '../../src/view/focus-mode';
 import { FullScreenModal } from '../../src/obsidian/full-screen';
 import { closePluginModals } from '../../src/view/plugin-modals';
 import { clearRelationCache } from '../../src/view/relation-cache';
-import { COMPACT_NAME_EM } from '../../src/render/dom/scene';
+import { COMPACT_NAME_EM } from '../../src/render/scene-model';
 import { BLOCK_UI, FINDER_UI, UI } from '../../src/render/ui-text';
 import { FEl, clock, dispatch, dispatchWindow, fakeDoc, flushFrames, resetDom, resizeAll, runTimers, settle } from '../acceptance/fake-dom';
 import { openModals, resetObsidian } from '../acceptance/fake-obsidian';

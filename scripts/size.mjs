@@ -1,6 +1,7 @@
 // Reports how many bytes of main.js each layer of the plugin makes (0.4, slim assessment Q1).
 // `npm run size` prints the table. `npm run size -- --check` fails when a layer is over its budget in scripts/size-budget.json.
 // `npm run size -- --write-budget` sets every budget to today's size plus 5 %: run it only when a bigger size is on purpose.
+// A fixed ceiling (CEILING) is above both: the check fails past it and --write-budget refuses to pass it.
 // It builds in memory with the options of esbuild.config.mjs (production), so the numbers are those of the file in a release.
 import esbuild from 'esbuild';
 import fs from 'node:fs';
@@ -12,6 +13,11 @@ import { bundleOptions } from '../esbuild.config.mjs';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const BUDGET_FILE = path.join(ROOT, 'scripts', 'size-budget.json');
 const MARGIN = 1.05;
+
+// The fixed ceiling for main.js in bytes, for 1.0 (spec D376 (c)). It is not a budget: `--write-budget` never changes it and
+// refuses a budget above it. Only the owner changes this number. It is one constant here, not a key in the budget file, so that
+// the command that rewrites the budget file cannot reach it.
+export const CEILING = 1_400_000;
 
 // The layers in the order of spec §3, lowest first. `yaml` is the one package that the plugin ships.
 export const LAYERS = ['core', 'layout', 'render', 'view', 'obsidian', 'yaml'];
@@ -47,7 +53,24 @@ export function overBudget(sizes, budget) {
 	return problems;
 }
 
-async function measure() {
+/** The ceiling problems of a measured size, as plain sentences. The budget file cannot move the ceiling. */
+export function overCeiling(sizes) {
+	if (sizes.total <= CEILING) return [];
+	return [`total: ${sizes.total} bytes, the fixed ceiling is ${CEILING} bytes (${sizes.total - CEILING} over). The ceiling is fixed: only the owner can change it.`];
+}
+
+/** The new budget (size plus 5 %) for the given sizes. It throws when the total or the sum of the layer budgets would pass the ceiling. */
+export function nextBudget(sizes) {
+	const next = Object.fromEntries([...LAYERS, 'other', 'total'].map((name) => [name, Math.ceil(sizes[name] * MARGIN)]));
+	const layerSum = [...LAYERS, 'other'].reduce((sum, name) => sum + next[name], 0);
+	if (next.total > CEILING || layerSum > CEILING) {
+		throw new Error(`The new budget would pass the fixed ceiling of ${CEILING} bytes (total ${next.total}, layers ${layerSum}). The ceiling is fixed: only the owner can change it. Reduce main.js; the budget file was not written.`);
+	}
+	return next;
+}
+
+/** Bytes per layer of an in-memory production build. */
+export async function measure() {
 	process.chdir(ROOT);
 	const result = await esbuild.build({ ...bundleOptions(true), metafile: true, write: false, logLevel: 'silent' });
 	const bytes = result.outputFiles.find((file) => file.path.endsWith('main.js')).contents.length;
@@ -59,7 +82,7 @@ async function main() {
 	const sizes = await measure();
 	const budget = fs.existsSync(BUDGET_FILE) ? JSON.parse(fs.readFileSync(BUDGET_FILE, 'utf8')) : {};
 	if (args.includes('--write-budget')) {
-		const next = Object.fromEntries([...LAYERS, 'other', 'total'].map((name) => [name, Math.ceil(sizes[name] * MARGIN)]));
+		const next = nextBudget(sizes);
 		fs.writeFileSync(BUDGET_FILE, JSON.stringify(next, null, '\t') + '\n');
 		console.log(`Wrote ${path.relative(ROOT, BUDGET_FILE)} (size plus 5 %).`);
 	}
@@ -67,9 +90,9 @@ async function main() {
 	console.log(`${'layer'.padEnd(10)}${pad('bytes', 10)}${pad('budget', 10)}`);
 	for (const name of [...LAYERS, 'other', 'total']) console.log(`${name.padEnd(10)}${pad(sizes[name], 10)}${pad(budget[name] ?? '-', 10)}`);
 	if (args.includes('--check')) {
-		const problems = overBudget(sizes, budget);
+		const problems = [...overCeiling(sizes), ...overBudget(sizes, budget)];
 		if (problems.length > 0) {
-			console.error(`\nmain.js is over its size budget:\n${problems.map((p) => `  ${p}`).join('\n')}\nIf the growth is on purpose, run "npm run size -- --write-budget" and commit scripts/size-budget.json.`);
+			console.error(`\nmain.js is over its size limit:\n${problems.map((p) => `  ${p}`).join('\n')}\nIf the growth is on purpose, run "npm run size -- --write-budget" and commit scripts/size-budget.json.`);
 			process.exit(1);
 		}
 		console.log('\nAll layers are inside their budget.');

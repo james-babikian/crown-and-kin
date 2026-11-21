@@ -6,6 +6,8 @@ import { FEl, clock, dispatch, flushFrames, resetDom, resizeAll, settle } from '
 import { openModals, resetObsidian } from '../acceptance/fake-obsidian';
 import { embed, fakeHandle, fakeHost, fullViews, phone } from '../acceptance/tree-view-fakes';
 import { useFakeDom } from '../support/fake-dom-setup';
+import { BlockViews } from '../../src/obsidian/block-views';
+
 
 useFakeDom({ window: true });
 beforeEach(() => {
@@ -110,8 +112,7 @@ describe('large-tree bar with a mark (D226)', () => {
 		expect(rootOf(m).getAttribute('data-dynasty-focus')).toBe('p5');
 		expect(m.querySelector('.dynasty-large-bar')).toBeNull();
 		handle.state.focus = { id: null };
-		const { TreeView } = await import('../../src/obsidian/tree-view');
-		TreeView.redrawState(fakeHost() as never, handle.state as never);
+		BlockViews.of(fakeHost() as never, handle.state as never).redrawState();
 		for (const v of [...(e.host?.views ?? [])]) v.syncFocus?.();
 	});
 });

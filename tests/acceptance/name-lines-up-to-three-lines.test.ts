@@ -3,7 +3,7 @@ import { DEFAULT_LAYOUT_SETTINGS, clearLayoutCache, layoutKey, layoutTree } from
 import { cardText, geometryFor, tallExtra } from '../../src/layout/geometry';
 import type { Geometry, LayoutSettings, PersonBox } from '../../src/layout/model';
 import { buildScene, type Scene } from '../../src/render/dom/scene';
-import { tallCardsFor } from '../../src/render/dom/tall-cards';
+import { tallCardsFor } from '../../src/render/tall-cards';
 import { cardNameLines, nameLines, runsText, titleLines } from '../../src/render/name-lines';
 import { approxMeasure, renderSvg } from '../../src/render/svg-string';
 import { FEl } from './fake-dom';

@@ -1,6 +1,6 @@
 # Notes for maintainers
 
-This file is for a programmer who takes over Crown and Kin. It says where things are, how to check a change, and how to make a release. `README.md` is the short start guide for users; the windows of the plugin explain the rest. `docs/format.md` describes the tree text.
+This file is for a programmer who takes over Crown and Kin. It says where things are, how to check a change, and how to make a release. `README.md` is the short start guide for users; the windows of the plugin explain the rest. `docs/code-map.md` has the long version of the code map. `docs/format.md` describes the tree text.
 
 ## What the plugin is
 
@@ -33,7 +33,8 @@ Use Node 22. Run `npm ci` once.
 | `npm run typecheck` | TypeScript, strict mode. |
 | `npm run lint` | Project rules: the layer rules above and the DOM and colour rules. It checks `src`, `scripts` and `tests`. |
 | `npm test` | The fast tests (Vitest project `fast`). |
-| `npm run test:perf` | The slow tests (project `perf`): speed limits, large random trees, fuzz runs. The list is `PERF_FILES` in `vitest.config.ts`. A test that becomes slow goes into that list. |
+| `npm run test:slow` | The slow tests that check values (project `slow`): large random trees, fuzz runs. The list is `SLOW_FILES` in `vitest.config.ts`. A test that becomes slow goes into that list. |
+| `npm run test:timing` | The tests with a speed limit (project `timing`). The list is `TIMING_FILES`. `npm run test:perf` runs both. |
 | `npm run test:all` | Both. |
 | `npm run size -- --check` | The size gate: fails if a layer of `main.js` is over its budget in `scripts/size-budget.json`. Run `npm run size` to see the table. Raise a budget only on purpose (`-- --write-budget` sets each to today's size plus 5 %). |
 | `npm run format-doc -- --check` | Fails if `docs/format.md` differs from `scripts/format/keys.ts`. Run without `--check` to write it. The README has no generated part. |

@@ -74,22 +74,18 @@ body {
 	--dynasty-radius-box: var(--radius-m);
 	--dynasty-radius-window: var(--modal-radius, var(--radius-l));
 	--dynasty-radius-round: 50%;
-	--dynasty-radius-card: min(var(--radius-m), 1.5em);
 
 	/* Line weights. The hairline divides sections, rows and bars; the field and button edges take their colours from `01-base.css`. */
 	--dynasty-width-hairline: 1px;
 	--dynasty-width-mark: 2px;
 	--dynasty-width-house: 3px;
-	--dynasty-width-house-card: 4px;
 	--dynasty-hairline: var(--dynasty-width-hairline) solid var(--background-modifier-border);
 	--dynasty-field-edge: var(--dynasty-width-hairline) solid var(--dynasty-edge);
 	--dynasty-button-edge: var(--dynasty-width-hairline) solid var(--dynasty-btn-edge);
-	--dynasty-mark-line: var(--dynasty-width-mark) solid var(--text-normal);
 
 	/* Motion: durations and the easings by name. */
 	--dynasty-dur-press: 150ms;
 	--dynasty-dur-open: 200ms;
-	--dynasty-dur-move: 200ms;
 	--dynasty-dur-pulse: 0.5s;
 	--dynasty-ease: ease-out;
 	--dynasty-ease-pulse: ease-in-out;
@@ -114,7 +110,6 @@ body {
 
 	/* The error edge: the error colour, no ring outside the field, never the focus recipe. A focused field with an error keeps a one-pixel edge shadow like any field. */
 	--dynasty-error-edge: var(--dynasty-width-hairline) solid var(--dynasty-error);
-	--dynasty-error-line: var(--dynasty-width-house) solid var(--dynasty-error);
 	--dynasty-error-focus-shadow: 0 0 0 var(--dynasty-width-hairline) var(--dynasty-error);
 
 	/* The card edge: colour and width of the line around a card. The theme's border grey is the plain value; the mix below replaces it where `color-mix()` works. */

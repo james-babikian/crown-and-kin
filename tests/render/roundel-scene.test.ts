@@ -10,8 +10,9 @@ import { DEFAULT_LAYOUT_SETTINGS, clearLayoutCache, layoutTree, pictureSets } fr
 import type { Geometry, LaidOut, LayoutSettings } from '../../src/layout/model';
 import { cardNameLines } from '../../src/render/name-lines';
 import { armsCopyBox, setPicture } from '../../src/render/dom/pictures';
-import { COMPACT_NAME_EM, buildScene, type Scene, type SceneOptions } from '../../src/render/dom/scene';
-import { tallCardsFor } from '../../src/render/dom/tall-cards';
+import { buildScene, type Scene, type SceneOptions } from '../../src/render/dom/scene';
+import { COMPACT_NAME_EM } from '../../src/render/scene-model';
+import { tallCardsFor } from '../../src/render/tall-cards';
 import { ME_RING_INNER } from '../../src/render/styles';
 import { cardLabel } from '../../src/render/tree-info';
 import { FEl } from '../acceptance/fake-dom';

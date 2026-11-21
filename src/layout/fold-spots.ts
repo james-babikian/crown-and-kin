@@ -72,7 +72,9 @@ interface FoldMark {
 export function foldMark(control: FoldControl, spot: FoldSpot, em: number, turned: boolean, anchored = false): FoldMark {
 	if (!control.folded) return { x1: spot.x, y1: spot.y, x2: spot.x, y2: spot.y, r: (FOLD_EM.button / 2) * em };
 	const r = (FOLD_EM.signHeight / 2) * em;
-	const digits = String(Math.max(0, Math.trunc(control.count))).length;
+	const whole = String(Math.max(0, Math.trunc(control.count))).length;
+		// The sign shows the number with a thousands comma (the same rule as `groupCount` in the render layer, which layout may not import).
+		const digits = whole + Math.floor((whole - 1) / 3);
 	const long = (FOLD_EM.signPad + (2 + digits) * 0.6) * em - 2 * r;
 	// The first cap centre lies one radius inside the pill's left edge.
 	const start = r - (FOLD_EM.chip / 2) * em;
@@ -320,7 +322,9 @@ export function foldExtent(control: FoldControl, spot: FoldSpot, em: number, anc
 	let y1 = spot.y + half;
 	if (control.folded) {
 		const h = FOLD_EM.signHeightOverview * em;
-		const digits = String(Math.max(0, Math.trunc(control.count))).length;
+		const whole = String(Math.max(0, Math.trunc(control.count))).length;
+		// The sign shows the number with a thousands comma (the same rule as `groupCount` in the render layer, which layout may not import).
+		const digits = whole + Math.floor((whole - 1) / 3);
 		const w = (FOLD_EM.signPad + (2 + digits) * FOLD_EM.signTextOverview) * em;
 		const left = anchored ? spot.x - (FOLD_EM.signHeight / 2) * em : spot.x - w / 2;
 		// The hit area of the Full sign is centred on that pill and the Overview one on the larger pill.

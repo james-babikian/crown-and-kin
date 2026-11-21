@@ -18,6 +18,8 @@ import { sample12 } from '../acceptance/relations-support';
 import { visibleBarText } from '../support/bar-text-support';
 import { useFakeDom } from '../support/fake-dom-setup';
 import { noteHandle } from '../support/writing-handle';
+import { BlockViews } from '../../src/obsidian/block-views';
+
 
 /*
  * Version 0.2.7, WP4 view: the Show view of the line of succession in the tree view. The real views run on the fake
@@ -71,7 +73,7 @@ async function redrawn(): Promise<void> {
 
 /** Opens the Show view as the Titles window does after Show. */
 async function show(e: { host: Host; st: ReturnType<typeof noteHandle>['state']; view: TreeView }, title = DUKE): Promise<void> {
-	TreeView.showSuccession(e.host as never, e.st, title, e.view);
+	BlockViews.of(e.host as never, e.st).showSuccession(title, e.view);
 	await redrawn();
 }
 
@@ -161,7 +163,7 @@ describe('the Show view on the computer', () => {
 	it('a focus choice ends the view', async () => {
 		const e = await desk();
 		await show(e);
-		TreeView.focusState(e.host as never, e.st, 'bertram-carrow', null, e.view);
+		BlockViews.of(e.host as never, e.st).focusState('bertram-carrow', null, e.view);
 		await redrawn();
 		expect(e.st.succession).toBeNull();
 		expect(bar(e.root)).toBeNull();
@@ -170,7 +172,7 @@ describe('the Show view on the computer', () => {
 	it('the relation finder replaces the view, and the view replaces the finder', async () => {
 		const e = await desk();
 		await show(e);
-		TreeView.showFinder(e.host as never, e.st, 'bertram-carrow', 'fenwick-carrow', e.view);
+		BlockViews.of(e.host as never, e.st).showFinder('bertram-carrow', 'fenwick-carrow', e.view);
 		await redrawn();
 		expect(e.st.succession).toBeNull();
 		expect(e.root.querySelector('.dynasty-root')!.getAttribute('data-dynasty-finder')).toBe('line');
@@ -251,7 +253,7 @@ describe('folds open for the ruler and the heirs', () => {
 		const keys = foldFamilies(g).map((f) => f.key);
 		expect(keys.length).toBeGreaterThan(0);
 		e.st.folds = new Set(keys);
-		TreeView.redrawState(e.host as never, e.st);
+		BlockViews.of(e.host as never, e.st).redrawState();
 		await redrawn();
 		const hiddenBefore = LINE.filter((id) => !card(e.root, id));
 		expect(hiddenBefore.length).toBeGreaterThan(0);
@@ -314,7 +316,7 @@ describe('the first view on a phone', () => {
 	it('keeps a scale of 0.75 or more and starts at the ruler', async () => {
 		phone();
 		const { root, handle, host } = await openFullScreen(BODY_16);
-		TreeView.showSuccession(host as never, handle!.state, DUKE, null);
+		BlockViews.of(host as never, handle!.state).showSuccession(DUKE, null);
 		await redrawn();
 		expect(root.querySelector('.dynasty-root')!.getAttribute('data-dynasty-succession')).toBe(DUKE);
 		expect(bar(root)).toBe(T.bar('Duke of Carrowmere', null, 'eldest-child'));
@@ -335,7 +337,7 @@ describe('the first view on a phone', () => {
 	it('Close ends the view in the full-screen view', async () => {
 		phone();
 		const { root, handle, host } = await openFullScreen(BODY_16);
-		TreeView.showSuccession(host as never, handle!.state, DUKE, null);
+		BlockViews.of(host as never, handle!.state).showSuccession(DUKE, null);
 		await redrawn();
 		await press(root, '.dynasty-succession-close');
 		expect(handle!.state.succession).toBeNull();

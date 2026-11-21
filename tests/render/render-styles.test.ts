@@ -2,7 +2,8 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { cardText, geometryFor } from '../../src/layout/geometry';
-import { COMPACT_NAME_EM, TAG_COMPACT_FONT_EM, TAG_FONT_EM, TAG_SIGN_FONT_EM } from '../../src/render/dom/scene';
+import { TAG_COMPACT_FONT_EM, TAG_FONT_EM, TAG_SIGN_FONT_EM } from '../../src/render/dom/scene';
+import { COMPACT_NAME_EM } from '../../src/render/scene-model';
 import { RUMOUR_FONT_EM } from '../../src/render/scene-model';
 import { DEAD_STRIP_OPACITY, HOUSE_DARK_LIFT, STROKES, UNION_MARKS } from '../../src/render/styles';
 import { roleCss } from '../support/role-css';
@@ -156,7 +157,8 @@ describe('styles.css text sizes match what the renderer measures', () => {
 	it('no text size is written into the SVG by the renderer', () => {
 		// The tree view is a chain of files since 0.3.3: every file of it counts.
 		const treeView = readdirSync(join(__dirname, '..', '..', 'src/obsidian')).filter((n) => /^tree-view.*\.ts$/.test(n)).map((n) => `src/obsidian/${n}`);
-		for (const f of ['src/render/dom/scene.ts', ...treeView]) {
+		const scene = readdirSync(join(__dirname, '..', '..', 'src/render/dom')).filter((n) => /^scene(-.*)?\.ts$/.test(n)).map((n) => `src/render/dom/${n}`);
+		for (const f of [...scene, ...treeView]) {
 			expect(readFileSync(join(__dirname, '..', '..', f), 'utf8')).not.toMatch(/'font-size'/);
 		}
 	});

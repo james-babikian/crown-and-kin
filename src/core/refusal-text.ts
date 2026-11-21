@@ -26,6 +26,9 @@ export const REFUSAL_TEXT = {
 	alreadyParent: 'This person is already a parent of that type.',
 	// D332: one person is never both the birth parent and the begetter of one child.
 	alreadyBloodParent: 'This person is already a parent of the child by blood, as a birth parent or a begetter. A person cannot be both. To change the type, open Family in the person window of the child. Then change Type of parent next to the name of the parent.',
+	// D375 (3): one person is not both a birth parent and a rumoured parent of one child through a window; the window shows these texts as they are.
+	alreadyRumouredParent: 'This person is already a rumoured parent of the child. To change the type, open Family in the person window of the child. Then change Type of parent next to the name of the parent.',
+	alreadyBirthParent: 'This person is already a birth parent of the child. To change the type, open Family in the person window of the child. Then change Type of parent next to the name of the parent.',
 	notWritable: 'The change cannot be written. Edit the note text.',
 	commentWouldChange: 'The change cannot be written without a change to a comment. Edit the note text.',
 	otherValuesWouldChange: 'The change cannot be written without a change to other values. Edit the note text.',

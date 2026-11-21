@@ -22,6 +22,9 @@ const SAMPLES: Record<IssueCode, IssueParams> = {
 	'too-many-blood-parents': { person: 'Ada Merrow', count: 3, limit: 2 },
 	'begetter-is-birth-parent': { person: 'Ada Merrow', parent: 'Oswin Thorne' },
 	'begetter-married-to-parent': { person: 'Ada Merrow', parent: 'Oswin Thorne', partner: 'Isaut Merrow' },
+	// D371 (4): one parent written as a birth parent and as a rumoured parent.
+	'rumoured-is-birth-parent': { person: 'Mira Thorne', parent: 'Oren Thorne' },
+	'rumoured-is-begetter': { person: 'Mira Thorne', parent: 'Oren Thorne' },
 	'union-partner-count': { union: '#3', partners: ['Joss Ashford', 'Maren Holt', 'Piers Ashford'], count: 3 },
 	'union-same-partner': { union: '#4', partners: ['Tilda Ashford', 'Tilda Ashford'], person: 'Tilda Ashford' },
 	cycle: { people: ['Arn Marsh', 'Bram Marsh', 'Col Marsh'], dropped: 'Arn Marsh', parent: 'Col Marsh' },
@@ -96,6 +99,9 @@ const MOST_SENTENCES: Partial<Record<IssueCode, number>> = {
 	'too-many-parents': 3,
 	'begetter-is-birth-parent': 3,
 	'begetter-married-to-parent': 4,
+	// D371 (4): what the tree shows, and one way out for each of the two cases.
+	'rumoured-is-birth-parent': 4,
+	'rumoured-is-begetter': 4,
 	'through-spouse-no-partner': 3,
 	'through-spouse-no-marriage': 3,
 	'through-spouse-no-claim': 4,

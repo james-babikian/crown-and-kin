@@ -7,6 +7,7 @@ import { FEl, clock, flushFrames, resetDom, resizeAll, settle } from '../accepta
 import { openModals, resetObsidian } from '../acceptance/fake-obsidian';
 import { desktop, fakeHandle, fakeHost, sheets } from '../acceptance/tree-view-fakes';
 import { useFakeDom } from '../support/fake-dom-setup';
+import { BlockViews } from '../../src/obsidian/block-views';
 
 /*
  * G2 review of the 0.2.8 part-A repairs: wiring of openPersonOf. Run: npx vitest run tests/obsidian/open-person-of-heir.test.ts
@@ -56,7 +57,7 @@ describe('openPersonOf (a tap on an heir in the Titles window)', () => {
 		// The note drew the block again while the Titles window was open: the opening view is gone.
 		own.unload();
 		expect((foreign as unknown as { peekState(): unknown }).peekState()).toBe(handle.state);
-		(TreeView as unknown as { openPersonOf(h: unknown, st: unknown, full: boolean, id: string, own: TreeView | null): void }).openPersonOf(host, handle.state, false, 'b', null);
+		BlockViews.of(host as never, handle.state as never).openPersonOf(false, 'b', null);
 		await settle();
 		expect(sheets().length).toBe(0);
 	});

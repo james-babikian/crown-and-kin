@@ -41,7 +41,7 @@ export abstract class EditSheetActions extends EditSheetFamily {
 		if (folds && !this.isNew && !this.gone) {
 			const state = folds.state(p.id);
 			if (state.open.length) this.actionRow(list, 'fold-vertical', FOLD_UI.hideDescendants, 'dynasty-hide-descendants', () => this.leaveFor(() => folds.hide(p.id)), FOLD_UI.hideDescendantsLabel(p.name));
-			if (state.folded.length) this.actionRow(list, 'fold-vertical', FOLD_UI.showDescendants, 'dynasty-show-descendants', () => this.leaveFor(() => folds.show(p.id)), FOLD_UI.showDescendantsLabel(p.name));
+			if (state.folded.length) this.actionRow(list, 'fold-vertical', FOLD_UI.showDescendants, 'dynasty-show-descendants', () => this.leaveFor(() => folds.show(p.id)), FOLD_UI.showDescendantsLabel(p.name, folds.hiddenCount(p.id)));
 		}
 		const finder = this.o.finder;
 		if (finder && !this.gone) this.actionRow(list, 'git-branch', ME_UI.showRelationTo, 'dynasty-relation-to', () => void this.relationTo(finder), ME_UI.showRelationToLabel(p.name));

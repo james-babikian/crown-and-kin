@@ -3,7 +3,8 @@
  * from the top size gives (D203), and a name that fits is measured once.
  */
 import { describe, expect, it } from 'vitest';
-import { COMPACT_NAME_EM, COMPACT_NAME_MIN_EM, COMPACT_STEPS, compactNameStep } from '../../src/render/dom/scene';
+import { COMPACT_NAME_MIN_EM, COMPACT_STEPS, compactNameStep } from '../../src/render/dom/scene';
+import { COMPACT_NAME_EM } from '../../src/render/scene-model';
 
 /** The walk of 0.2.8 before the repair: from 1.5 em down in steps of 0.05 em to the first size that fits, else the smallest. */
 function walk(widthAt: (em: number) => number, maxW: number): { em: number; measures: number } {

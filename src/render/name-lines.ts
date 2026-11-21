@@ -2,7 +2,7 @@
  * Splits a long name onto up to three text lines instead of truncating it to one (D29, D37, D81),
  * and a title text line with a reign onto up to two (D61, spec §13.3). `cardNameLines` breaks
  * a card name with its sobriquet: at spaces first, then at a hyphen with a syllable rule or the user's list
- * of break places (D117, D118), and cuts the sobriquet first (D122, D127). `render/dom/tall-cards.ts` calls
+ * of break places (D117, D118), and cuts the sobriquet first (D122, D127). `render/tall-cards.ts` calls
  * it to find the tall cards; `render/dom/scene.ts` and `render/svg-string.ts` call it to draw the text lines
  * at the baselines `layout/geometry.ts`'s `cardText(geo, names, tallTitle)` gives, so all three agree.
  * `nameLines` and `titleLines` stay for title text lines. Every search here is a binary search that

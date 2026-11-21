@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { dragMovesWrapper, isIosWebKit, PAN_WRAPPER_ATTR, panWrapperOverride, STANDING_LAYER_MAX_PEOPLE } from '../../src/obsidian/move-layer';
+import { dragMovesWrapper, isIosWebKit, keepsStandingLayer, PAN_WRAPPER_ATTR, panWrapperOverride, STANDING_LAYER_MAX_PEOPLE } from '../../src/obsidian/move-layer';
 import { FILL_MS, GESTURE_CLASS, PanZoom, type MarginRule } from '../../src/render/dom/pan-zoom';
 import { treeBounds, type View } from '../../src/render/view-math';
 import { FEl, clock, dispatch, flushFrames, pointer, resetDom, runFrame, runTimers } from '../acceptance/fake-dom';
@@ -62,18 +62,28 @@ function drag(r: ReturnType<typeof fullScreen>, steps: number, stepPx = 6): stri
 }
 
 describe('which drag moves the wrapper', () => {
-	it('500 cards take today\'s path and 501 take the wrapper path, on iOS only', () => {
-		expect(dragMovesWrapper(STANDING_LAYER_MAX_PEOPLE, true)).toBe(false);
-		expect(dragMovesWrapper(STANDING_LAYER_MAX_PEOPLE + 1, true)).toBe(true);
-		expect(dragMovesWrapper(1000, true)).toBe(true);
-		expect(dragMovesWrapper(1000, false)).toBe(false);
-		expect(dragMovesWrapper(0, true)).toBe(false);
+	it('on iOS every tree takes the wrapper path, whatever its size (D374 (2))', () => {
+		for (const n of [1, 57, 58, 499, 500, 501, 3000]) expect(dragMovesWrapper(n, true)).toBe(true);
+	});
+
+	it('on a computer or Android no tree does', () => {
+		for (const n of [1, 57, 58, 499, 500, 501, 3000]) expect(dragMovesWrapper(n, false)).toBe(false);
+	});
+
+	it('the wrapper rule and the standing-layer rule are independent', () => {
+		expect(keepsStandingLayer(499)).toBe(true);
+		expect(keepsStandingLayer(STANDING_LAYER_MAX_PEOPLE)).toBe(true);
+		expect(keepsStandingLayer(501)).toBe(false);
+		// A small iOS tree keeps the layer and moves the wrapper; a big one on Blink drops the layer and writes the <g>.
+		expect(keepsStandingLayer(300) && dragMovesWrapper(300, true)).toBe(true);
+		expect(!keepsStandingLayer(3000) && !dragMovesWrapper(3000, false)).toBe(true);
 	});
 
 	it('the harness switch decides alone: on for a small tree on Blink, off for a large tree on iOS', () => {
 		expect(dragMovesWrapper(10, false, 'on')).toBe(true);
 		expect(dragMovesWrapper(5000, true, 'off')).toBe(false);
 		expect(dragMovesWrapper(5000, true, null)).toBe(true);
+		expect(dragMovesWrapper(1, true, 'off')).toBe(false);
 	});
 });
 

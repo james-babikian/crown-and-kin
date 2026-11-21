@@ -6,7 +6,7 @@
 
 import { foldMark } from '../layout/fold-spots';
 import type { Orientation, Rect, TreeLayout } from '../layout/model';
-import { COMPACT_NAME_EM } from '../render/dom/scene';
+import { COMPACT_NAME_EM } from '../render/scene-model';
 import type { PhoneDirection } from './settings';
 import { around } from './tree-view-helpers';
 import { FIT_MIN_NAME_PX, HIT_EM, MIN_HIT_PX, READABLE_NAME_PX, SIDEWAYS_NAME_PX, START_TOP_GAP, bounds as boundsOf, chooseLod, enlargeHit, fitScale, fitView, type Size, type View } from '../render/view-math';

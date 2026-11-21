@@ -215,8 +215,8 @@ describe('pickerExclusions (§6.6)', () => {
 		expect(ex(F8, 'tomas', 'add-parent', 'birth')).toEqual(sorted('tomas', 'lucan', 'marek', 'anna'));
 		expect(ex(F8, 'tomas', 'add-parent', 'adoptive')).toEqual(sorted('tomas', 'lucan', 'aldric', 'isolde'));
 		expect(ex(F8, 'tomas', 'add-parent', 'ward')).toEqual(sorted('tomas', 'lucan'));
-		expect(ex(F8, 'roderick', 'add-parent', 'rumoured')).toEqual(sorted('roderick', 'marek'));
-		expect(ex(F8, 'roderick', 'add-parent', 'birth')).toEqual(sorted('roderick', 'gareth', 'odette'));
+		expect(ex(F8, 'roderick', 'add-parent', 'rumoured')).toEqual(sorted('roderick', 'marek', 'gareth', 'odette')); // D375 (3): the birth parents are hidden for a rumoured link
+		expect(ex(F8, 'roderick', 'add-parent', 'birth')).toEqual(sorted('roderick', 'gareth', 'odette', 'marek')); // D375 (3): the rumoured parent is hidden for a birth link
 		expect(ex(F9.g, 'tamsin', 'add-parent', 'ward')).toEqual(sorted('tamsin', 'aldous'));
 		expect(ex(F9.g, 'tamsin', 'add-parent', 'birth')).toEqual(sorted('tamsin'));
 	});

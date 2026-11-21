@@ -1,6 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { FullScreenModal } from '../../src/obsidian/full-screen';
-import { TreeView } from '../../src/obsidian/tree-view';
 import { buildPhoneList, type PhoneListSpec } from '../../src/render/dom/phone-list-dom';
 import { SUCCESSION_UI } from '../../src/render/ui-text';
 import { listData, listWord } from '../../src/view/phone-list';
@@ -13,6 +12,8 @@ import { desktop, embed, fakeHost } from '../acceptance/tree-view-fakes';
 import { BODY_16 } from '../support/titles-window-support';
 import { useFakeDom } from '../support/fake-dom-setup';
 import { noteHandle } from '../support/writing-handle';
+import { BlockViews } from '../../src/obsidian/block-views';
+
 
 /*
  * `SUCCESSION_UI.bar` puts the title name between FSI and PDI. The Show view bar of the tree in a note and the bar of the phone list must write the sentence
@@ -40,7 +41,7 @@ describe('the Show view bar of a tree in a note', () => {
 		const handle = noteHandle(body);
 		const host = fakeHost();
 		const e = await embed(body, { host, handle });
-		TreeView.showSuccession(host as never, handle.state, 'duke-of-carrowmere', e.view);
+		BlockViews.of(host as never, handle.state).showSuccession('duke-of-carrowmere', e.view);
 		await settle();
 		resizeAll();
 		flushFrames();

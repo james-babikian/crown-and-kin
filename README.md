@@ -48,7 +48,7 @@ If Obsidian shows the window "Do you trust the author of this vault?", select "T
 2. Put the cursor on an empty text line below a heading or other text. In a new note, type a heading and press Enter.
 3. Open the command list (Ctrl+P, or Cmd+P on a Mac). On a tablet, open the left bar and select the command icon. On a phone, swipe down in the note. Select "Insert family tree". An empty tree shows in the note.
 4. Select "Add first person". Type a name. Select Save.
-5. Click the card. On a phone, tap the pencil on the row of the person. The person window opens.
+5. Click the card. A name that is a link to a note opens that note, so click another part of the card. On a phone, tap the pencil on the row of the person. The person window opens.
 6. Open the section Family. At Partners or Children, select Add, then "New person". If the person has a partner, a first window asks for the other parent of the child. Select the partner or "No other parent". Type a name. Select Save.
 7. Repeat steps 5 and 6 until the family is complete.
 8. In the person window of the person who is you (or your character), open the section Actions. Select "This is me". Each card now shows its relation to you, for example "Mother" or "Second cousin".

@@ -81,7 +81,8 @@ describe('the problem list (CH-02, UX-20)', () => {
 		const { el } = draw();
 		expect(el.querySelector('.callout')).toBeNull();
 		expect(el.querySelector('.dynasty-problems-title')!.getText()).toBe(problemsTitle(3));
-		expect(el.querySelector('.dynasty-problems-hint')!.getText()).toBe(PROBLEMS_HINT);
+		expect(el.querySelector('.dynasty-problems-hint')!.getText()).toBe(PROBLEMS_HINT.computer);
+		expect(draw(true).el.querySelector('.dynasty-problems-hint')!.getText()).toBe(PROBLEMS_HINT.phone);
 		expect(el.querySelectorAll('li.dynasty-problem')).toHaveLength(3);
 		expect(el.querySelector('li.is-blocking')).not.toBeNull();
 	});

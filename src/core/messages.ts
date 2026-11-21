@@ -64,6 +64,10 @@ type WarningCode =
 	| 'too-many-blood-parents'
 	/** D332: one id is a birth parent and a begetter of the person; the tree draws the birth link only. params: person, parent */
 	| 'begetter-is-birth-parent'
+	/** D371 (4): one id is written as a birth parent and as a rumoured parent of the person; the tree draws the birth link only. params: person, parent */
+	| 'rumoured-is-birth-parent'
+	/** D375 (4): one id is written as a begetter and as a rumoured parent of the person (and not as a birth parent); the tree draws the begetter link only. params: person, parent */
+	| 'rumoured-is-begetter'
 	/** D332: a begetter of the person shares a listed marriage with a birth parent of the person. params: person, parent (the begetter), partner (the birth parent) */
 	| 'begetter-married-to-parent'
 	/** params: union (label), partners (names), count */
@@ -413,6 +417,14 @@ const ISSUE_TEXT: { [C in IssueCode]: (p: P) => string } = {
 	'begetter-is-birth-parent': (p) => {
 		const parent = nm(p, 'parent', 'A parent');
 		return `${parent} is a birth parent and a begetter of ${person(p)}. The tree shows ${parent} only as a birth parent. Remove one of the two entries.`;
+	},
+	'rumoured-is-birth-parent': (p) => {
+		const parent = nm(p, 'parent', 'A parent');
+		return `The note lists ${parent} as a birth parent and as a rumoured parent of ${person(p)}. The tree shows ${parent} only as a birth parent. If ${parent} is the birth parent, remove ${parent} from the rumoured parents. If ${parent} is only a rumoured parent, remove ${parent} from the birth parents.`;
+	},
+	'rumoured-is-begetter': (p) => {
+		const parent = nm(p, 'parent', 'A parent');
+		return `The note lists ${parent} as a begetter and as a rumoured parent of ${person(p)}. The tree shows ${parent} only as a begetter. If ${parent} is the begetter, remove ${parent} from the rumoured parents. If ${parent} is only a rumoured parent, remove ${parent} from the begetters.`;
 	},
 	// text-lint: description
 	'begetter-married-to-parent': (p) => {

@@ -7,6 +7,7 @@
 import { Notice, type App } from 'obsidian';
 import type { FamilyGraph } from '../core/derive';
 import type { Op, ParentKind, UnionKind, UnionRef } from '../core/edit';
+import { bloodProblem } from '../core/blood-parents';
 import { BLOOD_LIMIT, BLOOD_TYPES } from '../core/parent-types';
 import { PARENT_LIMIT, PARENT_TYPES, UNION_TYPES, type Person } from '../core/types';
 import { noticeText } from '../render/dom/name-marks';
@@ -60,6 +61,11 @@ function roomFor(links: { id: string; type: string }[], t: string, need: number)
 /** D332: true when one of the `ids` is a parent of the child by the other blood type, so `t` would make that person a birth parent and a begetter. */
 function bothBlood(links: { id: string; type: string }[], t: string, ids: readonly string[]): boolean {
 	return isBlood(t) && ids.some((id) => links.some((l) => l.id === id && isBlood(l.type) && l.type !== t));
+}
+
+/** D375 (3): true when one of the `ids` is a parent of the child by the other of birth and rumoured, so `t` would make that person both. */
+function rumourBoth(links: { id: string; type: string }[], t: string, ids: readonly string[]): boolean {
+	return ids.some((id) => ['rumoured-exists', 'birth-exists'].includes(bloodProblem(links, id, t) ?? ''));
 }
 
 /** The Notice when the write added a marriage by itself (spec §6.4). */
@@ -117,6 +123,18 @@ export async function addParentFlow(host: FlowHost): Promise<void> {
 	if (out) autoUnionNotice(out, host.name(picked.id), other && host.name(other));
 }
 
+/** The choices of the type step of Add child: a type is off when the picked parents are in the child already, would be both birth and begetter or birth and rumoured, or find no room. */
+function childTypeChoices(childName: string, who: string, links: { id: string; type: string }[], missing: (t: string) => string[]): Choice<ParentKind>[] {
+	return (PARENT_TYPES as readonly ParentKind[]).map((t) => {
+		const need = missing(t).length;
+		const both = need > 0 && bothBlood(links, t, missing(t));
+		const mixed = need > 0 && rumourBoth(links, t, missing(t));
+		const ok = need > 0 && !both && !mixed && roomFor(links, t, need);
+		const why = need === 0 ? FLOW.alreadyChild(childName, who) : both ? FLOW.childBloodBoth : mixed ? FLOW.childRumourBoth : isBlood(t) ? FLOW.childBloodFull : FLOW.childTypeFull;
+		return { value: t, label: parentTypeText(t), detail: ok ? undefined : why, disabled: !ok };
+	});
+}
+
 /** Add child (spec §6.4): other parent, then new or existing person, then, for an existing child who has birth parents, the parent type, then the write. */
 export async function addChild(host: FlowHost): Promise<void> {
 	if (!host.ready()) return;
@@ -170,13 +188,7 @@ export async function addChild(host: FlowHost): Promise<void> {
 			name: 'child-type',
 			title: FLOW.childTypeTitle,
 			text: [other ? FLOW.childTypeText(child.name, who) : FLOW.childTypeTextOne(child.name, who)],
-			choices: (PARENT_TYPES as readonly ParentKind[]).map((t) => {
-				const need = missing(t).length;
-				const both = need > 0 && bothBlood(links, t, missing(t));
-				const ok = need > 0 && !both && roomFor(links, t, need);
-				const why = need === 0 ? FLOW.alreadyChild(child.name, who) : both ? FLOW.childBloodBoth : isBlood(t) ? FLOW.childBloodFull : FLOW.childTypeFull;
-				return { value: t, label: parentTypeText(t), detail: ok ? undefined : why, disabled: !ok };
-			}),
+			choices: childTypeChoices(child.name, who, links, missing),
 		});
 		if (!chosen) return;
 		type = chosen;

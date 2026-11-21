@@ -117,6 +117,9 @@ describe('the live tree draws the sign inside the tag, at the Full and the Compa
 			const g = graph(family(unionOf(type)));
 			const laid = lay(g);
 			const s = buildScene(new FEl('g') as unknown as SVGGElement, g, laid, { fonts: FONTS, measure, link: () => null });
+			// D377 step 8: the hidden tag pills make their text when their level first shows.
+			s.showLevel('compact');
+			s.showLevel('overview');
 			for (const person of ['x', 'z']) {
 				const el = s.tags.find((t) => t.tag.person === person)!.el as unknown as FEl;
 				const marks = el.all().filter((e) => e.classes.has('dynasty-tag-mark'));
@@ -148,6 +151,9 @@ describe('the live tree draws the sign inside the tag, at the Full and the Compa
 		const widthOf = (g: FamilyGraph) => {
 			const laid = lay(g);
 			const s = buildScene(new FEl('g') as unknown as SVGGElement, g, laid, { fonts: FONTS, measure, link: () => null });
+			// D377 step 8: the hidden tag pills make their text when their level first shows.
+			s.showLevel('compact');
+			s.showLevel('overview');
 			const el = s.tags.find((t) => t.tag.person === 'x')!.el as unknown as FEl;
 			const full = el.all().find((e) => e.classes.has('dynasty-tag-full'))!;
 			const text = full.all().find((e) => e.classes.has('dynasty-tag-text'))!;

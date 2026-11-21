@@ -9,19 +9,19 @@
  * (the Roundel's room depends on it).
  */
 
-import type { FamilyGraph } from '../../core/derive';
-import { sameList } from '../../core/same-list';
-import type { CardLabel } from '../../core/titles';
-import type { Person } from '../../core/types';
-import { cardText, nameRoom } from '../../layout/geometry';
-import { couldBeSigned } from '../../layout/illegitimate-sign';
-import type { Geometry, NameLineCount, NameRoom } from '../../layout/model';
-import type { BreakList } from '../break-words';
-import { marksForSvg } from '../date-bidi';
-import { cardNameLines, titleLines, type NameMeasure } from '../name-lines';
-import { ME_RING_INNER } from '../styles';
-import { reignShown } from '../tree-info';
-import type { Measure, SceneFonts } from '../scene-model';
+import type { FamilyGraph } from '../core/derive';
+import { sameList } from '../core/same-list';
+import type { CardLabel } from '../core/titles';
+import type { Person } from '../core/types';
+import { cardText, nameRoom } from '../layout/geometry';
+import { couldBeSigned } from '../layout/illegitimate-sign';
+import type { Geometry, NameLineCount, NameRoom } from '../layout/model';
+import type { BreakList } from './break-words';
+import { marksForSvg } from './date-bidi';
+import { cardNameLines, titleLines, type NameMeasure } from './name-lines';
+import { ME_RING_INNER } from './styles';
+import { reignShown } from './tree-info';
+import type { Measure, SceneFonts } from './scene-model';
 
 /** D29, D81: the people whose name needs two or three text lines (`tall`) and the ones that need three (`long`, a subset of `tall`), both sorted. */
 interface TallNames {

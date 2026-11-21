@@ -2,6 +2,36 @@
 
 All notable changes for users. The newest version is first.
 
+## 0.6.0
+
+This is the first version for human testers. To report a fault, see "Report a problem" in the README.
+
+### Parents
+
+- **A person written as a birth parent and as a rumoured parent of the same child now has one line.** The tree shows only the birth line. A warning asks you to remove one of the two entries. The same is true for a begetter who is also written as a rumoured parent: the tree shows only the begetter line. Before, the tree drew two lines and showed no warning.
+- **The windows of the plugin do not make such a double entry.** If you add a person as a rumoured parent, and that person is already a birth parent of the child, a notice tells you how to change the type of the entry. If you add a person as a birth parent, and that person is already a rumoured parent of the child, a notice also tells you how to change the type. A person who is already an adoptive parent or a guardian of the child can still be added as a rumoured parent.
+
+### Speed on an iPhone or iPad
+
+- **The first touch on a large tree is a little faster.** In a test on an iPhone with a tree of 1,000 people, the tree waited 0.07 seconds before it moved, not 0.10, when the touch was on the empty background. On a card, the wait was 0.04 seconds, not 0.05.
+- **A one-finger drag now moves one ready picture of the tree in every tree.** Before, only trees of more than 500 people did this. The drag is smoother, and the plugin draws the cards again only near the edge of the picture.
+
+### Texts
+
+- **A large number on a fold sign now has a comma,** for example "+ 1,200".
+- **On a phone, the hint of the problem list now says "Tap":** "Tap a problem to show the people it is about. Tap Open next to a problem to correct it."
+- **When Undo cannot undo an edit, the notice now tells you what to do:** "To undo the edit, change the tree text back by hand."
+- **In the person window, you can no longer choose a parent type that the child already has for this person.** The list of parent types switches off that type. If the note already has two entries for this person, a notice tells you to remove one entry.
+- **The README now says that a name that is a link opens its note.** To open the person window, click another part of the card.
+
+### Known limits
+
+- **On an iPhone, Find in a tree of about 1,000 people takes about 1 second to show the person.**
+- **On an iPhone, the first zoom out to small cards on a large tree can pause one time, for about 0.5 seconds.**
+- **A child of three parents can stand far from its parents.** This happens when other children fill the row under the parents.
+- **On an iPad, a move with two fingers on a trackpad, or with a mouse wheel, does not use the smoother drag yet.**
+- **An unknown word for a type of parent, for example "foster", counts as a birth parent.** The note shows a warning.
+
 ## 0.5.6
 
 ### Three parents of one kind

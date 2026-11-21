@@ -49,8 +49,11 @@ describe('names do not depend on the order of the people and of the parents list
 	});
 });
 
-const RATIO_BIRTH = 5;
-const RATIO_BEGETTER = 9;
+// Re-measured 2026-11-19 alone on this machine: release 0.5.6 and the 0.6.0 tip both 4.1 to 5.3 (the same 58 to 65 ms; the reference loop varies),
+// so 5 failed a correct build; 6.5 is about 1.4 times the alone value and still fails the quadratic fault (ratio about 70) and 2 times today's code.
+const RATIO_BIRTH = 6.5;
+// The same re-measure for the begetters: 0.5.6 and the 0.6.0 tip both 6.8 to 8.4 (103 to 116 ms); 12 is about 1.4 times that and fails twice today's code.
+const RATIO_BEGETTER = 12;
 
 describe('a huge parents list stays fast (spec §8)', () => {
 	const big = (n: number, withBegetters: boolean): string => {

@@ -215,6 +215,8 @@ export function validKeys(g: FamilyGraph, id: string): { placement?: string; uni
 export function linkTypeFull(parents: readonly ParentLink[], link: ParentLink, to: ParentKind): boolean {
 	if (to === link.type) return false;
 	const others = parents.filter((r) => r.id !== link.id || r.type !== link.type);
+	// The same person already has the target type: the write would refuse as `alreadyParent`.
+	if (others.some((r) => r.id === link.id && r.type === to)) return true;
 	return others.filter((r) => r.type === to).length >= PARENT_LIMIT[to] || bloodProblem(others, link.id, to) !== undefined;
 }
 
@@ -226,7 +228,8 @@ export const pickerExclusions: PickerExclusions = (g, id, action, parentType) =>
 			const out = descendantsOf(g, id);
 			out.add(id);
 			// D332: a birth parent cannot be added as a begetter of the same child, nor the reverse.
-			for (const r of writtenParents(g, id)) if (r.type === type || (isBloodType(type) && isBloodType(r.type))) out.add(r.id);
+			// D375 (3): and a birth parent cannot be added as a rumoured parent of the same child, nor the reverse.
+			for (const r of writtenParents(g, id)) if (r.type === type || (isBloodType(type) && isBloodType(r.type)) || (type === 'birth' && r.type === 'rumoured') || (type === 'rumoured' && r.type === 'birth')) out.add(r.id);
 			return out;
 		}
 		case 'add-child': {

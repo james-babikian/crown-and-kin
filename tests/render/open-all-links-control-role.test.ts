@@ -270,7 +270,7 @@ describe('the error colour is checked on every surface it sits on', () => {
 describe('the dead-sign samples are 12 px and fit their slot (D218: nothing under 12 px)', () => {
 	it('the screen class and the saved picture use 12 px', () => {
 		expect(PLUGIN).toMatch(/\.dynasty-legend-dagger \{[^}]*font-size: 12px;/);
-		expect(readFileSync(new URL('../../src/render/svg-string.ts', import.meta.url), 'utf8')).toContain('font-size="12" fill="${c.textMuted}"');
+		expect(readFileSync(new URL('../../src/render/svg-frame.ts', import.meta.url), 'utf8')).toContain('font-size="12" fill="${c.textMuted}"');
 	});
 
 	it('the two samples have a slot that leaves 8 px or more at each side of "b. 1131 †?" (about 55 px at 12 px)', async () => {

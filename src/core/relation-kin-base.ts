@@ -693,7 +693,7 @@ export class KinBase {
  * place of the parent's first link. A ward link is left out (`ward` false: a ward link makes no blood line and keeps its own name), or
  * counted like the others (the children of `downAll`, which the chain follows).
  */
-function keepOne(links: readonly Up[], ward: boolean): Up[] {
+export function keepOne(links: readonly Up[], ward: boolean): Up[] {
 	const out: Up[] = [];
 	// A huge parents list (spec §8) finds a parent's place through a map; the usual short list scans, which allocates nothing.
 	const at = links.length > SHORT_LIST ? new Map<number, number>() : undefined;

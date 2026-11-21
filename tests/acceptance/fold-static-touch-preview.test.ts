@@ -6,6 +6,7 @@ import { resetObsidian } from './fake-obsidian';
 import { block15, comments15 } from './fold-note-crop-support';
 import { desktop, embed, fakeHandle, fullViews, tabletDevice } from './tree-view-fakes';
 import { useFakeDom } from '../support/fake-dom-setup';
+import { BlockViews } from '../../src/obsidian/block-views';
 
 /*
  * Adopted from the M10 review B (`m10/review-b`): folds in the Obsidian views (spec §13.10, F11, F12).
@@ -75,18 +76,14 @@ describe('finder and folds', () => {
 	it('while a result shows the line people show; after Close the fold hides them again and st.folds never changed', async () => {
 		const handle = handleWith('A');
 		const { el, view } = await embed(SOURCE, { handle });
-		const V = view.constructor as unknown as {
-			showFinder(host: unknown, st: unknown, a: string, b: string, o: unknown): void;
-			redrawState(host: unknown, st: unknown, o: object): void;
-		};
 		const host = (view as unknown as { host: unknown }).host;
 		const st = (handle as unknown as { state: { finder: unknown } }).state;
-		V.showFinder(host, st, 'osric', 'corwin', view);
+		BlockViews.of(host as never, st as never).showFinder('osric', 'corwin', view as never);
 		await run();
 		expect(el.querySelector('.dynasty-card[data-person="corwin"]')).not.toBeNull();
 		expect(folds(handle)).toEqual(new Set([key('A')]));
 		st.finder = null;
-		V.redrawState(host, st, {});
+		BlockViews.of(host as never, st as never).redrawState({});
 		await run();
 		expect(el.querySelector('.dynasty-card[data-person="corwin"]')).toBeNull();
 		expect(folds(handle)).toEqual(new Set([key('A')]));

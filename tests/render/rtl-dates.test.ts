@@ -11,7 +11,7 @@ import { carryIsolates, closeIsolates, truncateClosed } from '../../src/render/b
 import { hasRtlDate, isolateDate, isolateDatesIn, marksForSvg } from '../../src/render/date-bidi';
 import { fitCardText, pickReign } from '../../src/render/date-fit';
 import { buildScene } from '../../src/render/dom/scene';
-import { tallTitlesFor } from '../../src/render/dom/tall-cards';
+import { tallTitlesFor } from '../../src/render/tall-cards';
 import { titleLines } from '../../src/render/name-lines';
 import { renderSvg, textWidth } from '../../src/render/svg-string';
 import { truncate } from '../../src/render/view-math';

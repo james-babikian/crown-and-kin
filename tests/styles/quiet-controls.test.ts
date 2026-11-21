@@ -75,7 +75,7 @@ describe('quiet help texts (window-hints)', () => {
 	it('the Titles and Houses windows use the window names, so chunk 20 keeps no scoped rule for the two tree names', () => {
 		expect(TITLES).not.toContain('dynasty-hint');
 		expect(TITLES).not.toContain('dynasty-empty');
-		for (const file of ['obsidian/titles-window', 'obsidian/houses-window', 'obsidian/list-window', 'view/list-search', 'obsidian/succession-section', 'obsidian/holder-form']) {
+		for (const file of ['obsidian/titles-window', 'obsidian/houses-window', 'obsidian/list-window', 'view/list-search', 'obsidian/succession-section', 'obsidian/succession-rules-ui', 'obsidian/succession-people-ui', 'obsidian/succession-line-ui', 'obsidian/holder-form']) {
 			const src = readFileSync(new URL(`../../src/${file}.ts`, import.meta.url), 'utf8');
 			expect(src, file).not.toMatch(/'dynasty-hint'|'dynasty-empty'/);
 		}

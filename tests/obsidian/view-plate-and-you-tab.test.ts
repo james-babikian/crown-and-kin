@@ -5,13 +5,14 @@ import { FullScreenModal } from '../../src/obsidian/full-screen';
 import { clearRelationCache, relationsFor } from '../../src/view/relation-cache';
 import { makePicture, type SaveSource } from '../../src/obsidian/save-picture';
 import { DEFAULT_SETTINGS, type DynastySettings } from '../../src/view/settings';
-import { TreeView } from '../../src/obsidian/tree-view';
 import { clearMeasureCache } from '../../src/render/dom/measure';
 import { FEl, clock, flushFrames, resetDom, resizeAll } from '../acceptance/fake-dom';
 import { resetObsidian } from '../acceptance/fake-obsidian';
 import { desktop, embed, fakeHandle, fakeHost, fillAllCards, phone } from '../acceptance/tree-view-fakes';
 import { build } from '../support/helpers';
 import { useFakeDom } from '../support/fake-dom-setup';
+import { BlockViews } from '../../src/obsidian/block-views';
+
 
 /*
  * 0.2.5, WP-C2b, the hunks of section B in the tree view: the card form of the drawn orientation,
@@ -244,7 +245,7 @@ describe('the small tree of the relation finder (D47, D51)', () => {
 		const { openFullScreen } = await import('../acceptance/tree-view-fakes');
 		const host = fakeHost();
 		const r = await openFullScreen(MARKED, { host });
-		TreeView.showFinder(host as never, r.handle!.state, 'ann', 'cy', null);
+		BlockViews.of(host as never, r.handle!.state).showFinder('ann', 'cy', null);
 		// A phone-sized box for the first view of the small tree, which picks the direction that shows the line larger.
 		const vp = r.root.querySelector('.dynasty-viewport')!;
 		vp.clientWidth = 390;

@@ -641,3 +641,25 @@ export const TIE = 1e-6;
 export function tabbedCards(youTab: string | undefined, ordinalCards: readonly string[] | undefined): ReadonlySet<string> {
 	return new Set([...(ordinalCards ?? []), ...(youTab !== undefined ? [youTab] : [])]);
 }
+
+/** A memo of the card texts of one geometry: the base text, and one text for each kind of tall, shown or wordless card. The key is the same for the live scene and the saved picture. */
+export function cardTexts(geo: Geometry): (count: NameLineCount, tallTitle?: true, shown?: ShownLines, wordless?: boolean) => CardText {
+	const base = cardText(geo);
+	const memo = new Map<string, CardText>();
+	return (count, tallTitle, shown, wordless = false) => {
+		if (count === 1 && !tallTitle && !shown && !wordless) return base;
+		const key = `${count}${tallTitle ? 1 : 0}${shown ? `${shown.title ? 1 : 0}${shown.dates ? 1 : 0}` : ''}${wordless ? 'w' : ''}`;
+		let t = memo.get(key);
+		if (!t) {
+			t = cardText(geo, count, tallTitle, shown);
+			if (wordless) t = centredWithoutWord(geo, t);
+			memo.set(key, t);
+		}
+		return t;
+	};
+}
+
+/** D204: a card shows arms when the layout gave it room for them and its person or its house has arms. */
+export function showsArms(box: { readonly arms?: true }, personArms: unknown, house: unknown): boolean {
+	return !!(box.arms && (personArms || house));
+}

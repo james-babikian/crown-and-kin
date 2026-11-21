@@ -13,7 +13,7 @@ import { applyOp } from '../../src/core/yaml-edit';
 import { cardForm, geometryFor } from '../../src/layout/geometry';
 import { DEFAULT_LAYOUT_SETTINGS, clearLayoutCache, layoutTree } from '../../src/layout/index';
 import { buildScene } from '../../src/render/dom/scene';
-import { tallCardsFor } from '../../src/render/dom/tall-cards';
+import { tallCardsFor } from '../../src/render/tall-cards';
 import { cardNameLines, fitRuns, nameLines, runsText, syllableBreaks, titleLines, type NameRun } from '../../src/render/name-lines';
 import { savedLegend } from '../../src/render/saved-picture';
 import { DEFAULT_LIGHT } from '../../src/render/styles';

@@ -259,6 +259,9 @@ export abstract class EditSheetWrites extends EditSheetActions {
 				else if (code === 'cycle') this.refused(WRITE_TEXT.cycle);
 				else if (code === 'limit') this.refused(WRITE_TEXT.limit(this.limitType));
 				else if (code === 'bad-value' && detail === REFUSAL_TEXT.alreadyBloodParent) this.refused(WRITE_TEXT.alreadyBloodParent);
+				else if (code === 'bad-value' && detail === REFUSAL_TEXT.alreadyRumouredParent) this.refused(WRITE_TEXT.alreadyRumouredParent);
+				else if (code === 'bad-value' && detail === REFUSAL_TEXT.alreadyBirthParent) this.refused(WRITE_TEXT.alreadyBirthParent);
+				else if (code === 'bad-value' && detail === REFUSAL_TEXT.alreadyParent) this.refused(WRITE_TEXT.alreadyParent);
 				else if (code === 'no-sibling') this.refused(WRITE_TEXT.noSibling);
 				else this.refused(WRITE_TEXT.refused);
 			},

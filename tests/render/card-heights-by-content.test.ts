@@ -5,7 +5,7 @@ import { cardText, centredWithoutWord, drawnGeometry, geometryFor, relationExtra
 import { DEFAULT_LAYOUT_SETTINGS, clearLayoutCache, layoutKey, layoutTree } from '../../src/layout/index';
 import type { LaidOut, LayoutSettings, PersonBox } from '../../src/layout/model';
 import { buildScene, type SceneOptions } from '../../src/render/dom/scene';
-import { tallCardsFor, tallTitlesFor, titleMeasure } from '../../src/render/dom/tall-cards';
+import { tallCardsFor, tallTitlesFor, titleMeasure } from '../../src/render/tall-cards';
 import { titleLines } from '../../src/render/name-lines';
 import { renderSvg } from '../../src/render/svg-string';
 import { cardLabel, dateLine } from '../../src/render/tree-info';

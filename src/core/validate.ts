@@ -7,7 +7,7 @@
  * `through-spouse` key of a holder.
  */
 
-import { begetterMarriageWarnings, bloodWarnings, withoutDoubledBegetter } from './blood-parents';
+import { begetterMarriageWarnings, bloodWarnings, drawnLinks, rumourWarnings } from './blood-parents';
 import { nameMismatches, PLAIN_READER, type DateReader, type ReadDate, type TreeDates } from './dates';
 import { codedIssue, type CodedIssue, type IssueCode, type IssueParams } from './messages';
 import { readPortraitCrop } from './portrait-crop';
@@ -266,8 +266,8 @@ export function validateTree(tree: Tree, options: ValidateOptions = {}): Validat
 				out.warn('unknown-parent-type', { ...who, value: r.type, parent: name(r.id), ...(suggestion ? { suggestion } : {}) }, [p.id, r.id]);
 			}
 		});
-		// D332: the birth link wins over a begetter link of the same id in the drawn links; the warnings read every cleaned link.
-		refs.set(p.id, withoutDoubledBegetter(valid));
+		// D332, D371 (4): the birth link wins over a begetter or rumoured link of the same id in the drawn links; the warnings read every cleaned link.
+		refs.set(p.id, drawnLinks(p.parents, valid));
 		const byType = limitWarnings(p, valid, name, options.warnManyParents !== false, out);
 		if (p.placement !== undefined) {
 			if (!isPlacementType(p.placement)) out.warn('unknown-placement', { ...who, value: p.placement }, [p.id]);
@@ -325,7 +325,7 @@ export function validateTree(tree: Tree, options: ValidateOptions = {}): Validat
 
 /**
  * The parent limits of one person: `too-many-parents` for each type over `PARENT_LIMIT` (the setting stops it for every type but
- * rumoured), then the warnings about the parents by blood (D332). Returns the count of each type for the placement check.
+ * rumoured), then the warnings about the parents by blood (D332) and about a birth parent also written as rumoured (D371 (4)). Returns the count of each type for the placement check.
  */
 function limitWarnings(p: Person, valid: { id: string; type: ParentType }[], name: (id: string) => string, warnMany: boolean, out: Collector): Map<string, number> {
 	const byType = new Map<string, number>();
@@ -335,6 +335,7 @@ function limitWarnings(p: Person, valid: { id: string; type: ParentType }[], nam
 		if (count > limit && (type === 'rumoured' || warnMany)) out.warn('too-many-parents', { person: p.name, type, count, limit }, [p.id]);
 	}
 	bloodWarnings(p, valid, name, warnMany, out.warn.bind(out));
+	rumourWarnings(p, valid, name, out.warn.bind(out));
 	return byType;
 }
 

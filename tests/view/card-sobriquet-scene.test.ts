@@ -7,7 +7,7 @@ import type { LaidOut, LayoutSettings } from '../../src/layout/model';
 import { measuredLayout } from '../../src/view/measured-layout';
 import { parseBreakList } from '../../src/render/break-words';
 import { BADGE_RADIUS_EM, buildScene, relationFont, type Scene, type SceneOptions } from '../../src/render/dom/scene';
-import { tallCardsFor } from '../../src/render/dom/tall-cards';
+import { tallCardsFor } from '../../src/render/tall-cards';
 import { cardNameLines, runsText } from '../../src/render/name-lines';
 import { DEFAULT_LIGHT } from '../../src/render/styles';
 import { approxMeasure, renderSvg } from '../../src/render/svg-string';

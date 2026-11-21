@@ -8,7 +8,7 @@ import { couldBeSigned, illegitimateSigns } from '../../src/layout/illegitimate-
 import { DEFAULT_LAYOUT_SETTINGS, clearLayoutCache, layoutKey, layoutTree } from '../../src/layout/index';
 import type { LayoutSettings } from '../../src/layout/model';
 import { parseBreakList } from '../../src/render/break-words';
-import { sameTall, tallCardsFor } from '../../src/render/dom/tall-cards';
+import { sameTall, tallCardsFor } from '../../src/render/tall-cards';
 import { sampleSources } from '../acceptance/picture-list-support';
 import { build } from '../support/helpers';
 

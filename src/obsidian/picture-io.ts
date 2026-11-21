@@ -95,9 +95,89 @@ export function linkOf(blob: Blob): string | null {
 	}
 }
 
+/** An SVG is drawn once on a canvas of a known size, so the crop and the fit work in its pixels. */
+async function decodeSvg(bytes: ArrayBuffer): Promise<DecodedPicture> {
+	const url = URL.createObjectURL(new Blob([bytes], { type: MIME.svg }));
+	let img: HTMLImageElement;
+	try {
+		img = await loadImageUnlimited(url);
+	} catch (e) {
+		URL.revokeObjectURL(url);
+		throw e;
+	}
+	try {
+		const head = readPictureHeader(new Uint8Array(bytes));
+		const nat = sourceSize(img);
+		let w = head.width ?? nat.w;
+		let h = head.height ?? nat.h;
+		if (!(w > 0 && h > 0)) {
+			w = 512;
+			h = 512;
+		}
+		const k = Math.min(1, SVG_RASTER_MAX / Math.max(w, h));
+		const { c, ctx } = canvasOf(w * k, h * k);
+		try {
+			ctx.drawImage(img, 0, 0, c.width, c.height);
+		} catch (e) {
+			emptyCanvas(c);
+			throw e;
+		}
+		return { width: c.width, height: c.height, source: c, close: () => emptyCanvas(c) };
+	} finally {
+		URL.revokeObjectURL(url);
+		img.src = '';
+	}
+}
+
+/** Decodes the bytes of a picture; `createImageBitmap` applies the EXIF rotation (checked on an iPhone). */
+async function decodePicture(bytes: ArrayBuffer, format: SupportedFormat): Promise<DecodedPicture> {
+	if (format === 'svg') return decodeSvg(bytes);
+	const bmp = await createImageBitmap(new Blob([bytes], { type: MIME[format] }));
+	return { width: bmp.width, height: bmp.height, source: bmp, close: () => bmp.close() };
+}
+
+/** Draws the crop of `source` on a new canvas of the copy's size (round: clipped to a circle); the draw happens in the call. */
+function drawCopy(source: CanvasImageSource, crop: { sx: number; sy: number; sw: number; sh: number }, out: { w: number; h: number }, round: boolean): HTMLCanvasElement {
+	const { c, ctx } = canvasOf(out.w, out.h);
+	if (round) {
+		ctx.beginPath();
+		ctx.arc(c.width / 2, c.height / 2, Math.min(c.width, c.height) / 2, 0, Math.PI * 2);
+		ctx.closePath();
+		ctx.clip();
+	}
+	ctx.drawImage(source, crop.sx, crop.sy, crop.sw, crop.sh, 0, 0, c.width, c.height);
+	return c;
+}
+
+/** The RGBA pixels of `source` fitted into `w` x `h`; the canvas is emptied at once. */
+function rgbaOf(source: CanvasImageSource, w: number, h: number): Promise<Uint8ClampedArray> {
+	try {
+		const { c, ctx } = canvasOf(w, h);
+		try {
+			const s = sourceSize(source);
+			const f = fitMeet(s.w, s.h, w, h);
+			ctx.drawImage(source, f.x, f.y, f.w, f.h);
+			// An SVG with outside content can taint the canvas: then this throws and the colours are unknown.
+			return Promise.resolve(ctx.getImageData(0, 0, w, h).data);
+		} finally {
+			emptyCanvas(c);
+		}
+	} catch (e) {
+		return Promise.reject(e instanceof Error ? e : new Error(String(e)));
+	}
+}
+
+/** The device pixel ratio, or 1 when the window cannot tell. */
+function pixelRatio(): number {
+	try {
+		return typeof window.devicePixelRatio === 'number' ? window.devicePixelRatio : 1;
+	} catch {
+		return 1;
+	}
+}
+
 /**
- * The browser IO: `vault.readBinary`, `createImageBitmap` (it applies the EXIF rotation, checked on
- * an iPhone), an `Image` from a blob URL for SVG, and a canvas for each copy. WebP copies
+ * The browser IO: `vault.readBinary`, `createImageBitmap`, an `Image` from a blob URL for SVG, and a canvas for each copy. WebP copies
  * only where the device encodes WebP (tested once, at the start; some iPhones do not).
  */
 export function defaultIO(app: App): PictureIO {
@@ -119,86 +199,19 @@ export function defaultIO(app: App): PictureIO {
 	};
 	return {
 		read: (file) => app.vault.readBinary(file),
-		async decode(bytes, format) {
-			if (format !== 'svg') {
-				const bmp = await createImageBitmap(new Blob([bytes], { type: MIME[format] }));
-				return { width: bmp.width, height: bmp.height, source: bmp, close: () => bmp.close() };
-			}
-			// An SVG is drawn once on a canvas of a known size, so the crop and the fit work in its pixels.
-			const url = URL.createObjectURL(new Blob([bytes], { type: MIME.svg }));
-			let img: HTMLImageElement;
-			try {
-				img = await loadImageUnlimited(url);
-			} catch (e) {
-				URL.revokeObjectURL(url);
-				throw e;
-			}
-			try {
-				const head = readPictureHeader(new Uint8Array(bytes));
-				const nat = sourceSize(img);
-				let w = head.width ?? nat.w;
-				let h = head.height ?? nat.h;
-				if (!(w > 0 && h > 0)) {
-					w = 512;
-					h = 512;
-				}
-				const k = Math.min(1, SVG_RASTER_MAX / Math.max(w, h));
-				const { c, ctx } = canvasOf(w * k, h * k);
-				try {
-					ctx.drawImage(img, 0, 0, c.width, c.height);
-				} catch (e) {
-					emptyCanvas(c);
-					throw e;
-				}
-				return { width: c.width, height: c.height, source: c, close: () => emptyCanvas(c) };
-			} finally {
-				URL.revokeObjectURL(url);
-				img.src = '';
-			}
-		},
+		decode: decodePicture,
 		encode(source, crop, out, round, png) {
 			probe();
-			let c: HTMLCanvasElement;
+			let canvas: HTMLCanvasElement;
 			try {
-				const made = canvasOf(out.w, out.h);
-				c = made.c;
-				const ctx = made.ctx;
-				if (round) {
-					ctx.beginPath();
-					ctx.arc(c.width / 2, c.height / 2, Math.min(c.width, c.height) / 2, 0, Math.PI * 2);
-					ctx.closePath();
-					ctx.clip();
-				}
-				ctx.drawImage(source, crop.sx, crop.sy, crop.sw, crop.sh, 0, 0, c.width, c.height);
+				canvas = drawCopy(source, crop, out, round);
 			} catch (e) {
 				return Promise.reject(e instanceof Error ? e : new Error(String(e)));
 			}
-			const canvas = c;
 			return blobOf(canvas, !png && webp ? 'image/webp' : 'image/png').finally(() => emptyCanvas(canvas));
 		},
-		rgba(source, w, h) {
-			try {
-				const { c, ctx } = canvasOf(w, h);
-				try {
-					const s = sourceSize(source);
-					const f = fitMeet(s.w, s.h, w, h);
-					ctx.drawImage(source, f.x, f.y, f.w, f.h);
-					// An SVG with outside content can taint the canvas: then this throws and the colours are unknown.
-					return Promise.resolve(ctx.getImageData(0, 0, w, h).data);
-				} finally {
-					emptyCanvas(c);
-				}
-			} catch (e) {
-				return Promise.reject(e instanceof Error ? e : new Error(String(e)));
-			}
-		},
+		rgba: rgbaOf,
 		coarse: () => mediaMatches(window, '(pointer: coarse)'),
-		dpr: () => {
-			try {
-				return typeof window.devicePixelRatio === 'number' ? window.devicePixelRatio : 1;
-			} catch {
-				return 1;
-			}
-		},
+		dpr: pixelRatio,
 	};
 }

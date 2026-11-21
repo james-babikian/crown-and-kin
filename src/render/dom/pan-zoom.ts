@@ -13,10 +13,10 @@
  * space around the wrapped picture, the real view is drawn about every 250 ms during the pinch, and
  * the wrapper goes on from that picture (owner decision D19).
  *
- * D365 (1): a one-finger drag of a large tree on iOS does the same (`wrapDrag`). WebKit lays out all SVG text again for each write of the <g>
+ * D365 (1), D374 (2): a one-finger drag of any tree on iOS does the same (`wrapDrag`). WebKit lays out all SVG text again for each write of the <g>
  * transform (about 120 ms for 1,000 people on the iPhone), and a CSS transform on the wrapper costs nothing, so the <g> keeps the view the drag began
  * with. An empty strip can show at the leading edge; the real view is drawn when the strip shows and the last drawing is `FILL_MS` old, and when the
- * drag ends. Other trees and other engines keep the write in each frame.
+ * drag ends. Other engines keep the write in each frame.
  *
  * D366: on that path in the full-screen view the drawn picture is larger than the screen by the margin of `DRAG_MARGIN` on each side (the <svg> is bigger and
  * offset by the margin, so the picture on screen is the same). `covers` then stays true for a drag up to the margin, and the <g> is written only when the view leaves the
@@ -51,6 +51,7 @@
 
 import type { Rect } from '../../layout/model';
 import { clampTo, doubleTapView, isDoubleTap, isPan, panFrom, panLimits, pinchView, scaleLimits, transformFor, wheelFactor, zoomAt, type FreeArea, type Point, type Size, type View } from '../view-math';
+import { SCENE_TAP_GROUPS, SCENE_TAP_TARGETS } from '../tap-targets';
 
 /** Everything `PanZoom` needs from the tree view to run gestures on one drawn tree. */
 export interface PanZoomOptions {
@@ -97,7 +98,7 @@ const WHEEL_SETTLE_MS = 180;
 /** Presses here are not gestures: HTML controls on top of the tree handle their own. */
 const CONTROLS = '.dynasty-toolbar, .dynasty-popover, .dynasty-result';
 /** A press on these is not on the empty background (no double-tap zoom there). */
-const TARGETS = '.dynasty-card, .dynasty-tag, .dynasty-tag-hit, .dynasty-focus-badge, .dynasty-toolbar, .dynasty-popover, .dynasty-result';
+const TARGETS = ['.dynasty-card', ...SCENE_TAP_GROUPS, ...SCENE_TAP_TARGETS, '.dynasty-toolbar', '.dynasty-popover', '.dynasty-result'].join(', ');
 
 /** The layout rectangle that `view` shows in a viewport of `size`; null when the scale or the size is not positive. The one owner of this conversion. */
 export function visibleRect(view: View, size: Size): Rect | null {
@@ -540,7 +541,7 @@ export class PanZoom {
 			const [restId, rest] = [...this.pointers][0] ?? [];
 			if (restId !== undefined && rest && this.view) {
 				const r = this.areaTop();
-				// The finger left after a pinch pans on: on a large tree on iOS it moves the wrapper too, as a fresh drag would (D365 (1)).
+				// The finger left after a pinch pans on: on iOS it moves the wrapper too, as a fresh drag would (D365 (1)).
 				this.drag = { id: restId, x: rest.x + r.left, y: rest.y + r.top, start: this.view, panning: true, type: 'touch', onBackground: false, wrap: !!this.o.wrapper && (this.o.wrapDrag?.() ?? false) };
 				return;
 			}

@@ -222,7 +222,8 @@ import { partOptions } from './parent-groups';
 import { walkLine } from './relation-candidates';
 import { Kin } from './relation-kin';
 import { type ComputeRelations, DEFAULT_RELATION_OPTIONS, FINDER_LIMIT, type FinderResult, type FindRelation, type LineSubgraph, type Relation, type RelationLink, type RelationOptions, type RelationsKey } from './relation-types';
-import { capital, WORDS } from './relation-words';
+import { upperFirst } from './quote';
+import { WORDS } from './relation-words';
 import { readEndedBy, type Tree, type Union } from './types';
 import { push } from './validate';
 
@@ -241,7 +242,7 @@ export const computeRelations: ComputeRelations = (g, me, options = DEFAULT_RELA
 	const kin = new Kin(g, options);
 	const m = kin.idx.get(me);
 	if (m === undefined) return freezeMap(out);
-	const self: Relation = { text: capital(WORDS.you), lower: WORDS.you, kind: 'self', distance: 0, line: { people: [me], links: [], unions: [] } };
+	const self: Relation = { text: upperFirst(WORDS.you), lower: WORDS.you, kind: 'self', distance: 0, line: { people: [me], links: [], unions: [] } };
 	for (let p = 0; p < kin.ids.length; p++) {
 		if (p === m) {
 			out.set(me, deepFreeze([self]));
@@ -290,7 +291,7 @@ export function relationLookup(g: FamilyGraph, me: string, options: RelationOpti
 		if (hit !== undefined) return hit;
 		let out: readonly Relation[] | null;
 		if (p === m) {
-			self ??= deepFreeze([{ text: capital(WORDS.you), lower: WORDS.you, kind: 'self', distance: 0, line: { people: [me], links: [], unions: [] } } satisfies Relation]);
+			self ??= deepFreeze([{ text: upperFirst(WORDS.you), lower: WORDS.you, kind: 'self', distance: 0, line: { people: [me], links: [], unions: [] } } satisfies Relation]);
 			out = self;
 		} else {
 			const cands = k.relationsFor(m, p);

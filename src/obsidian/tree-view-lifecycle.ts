@@ -1,11 +1,12 @@
 /*
  * The life of a `TreeView`: the entry points Obsidian and the plugin call (`onload`, `onunload`, `retire`, a setting, the theme, the fonts, the
- * start-up wait), the `guard` that keeps every error out of the note (spec §8), the teardown, and the kept height of the block. Second layer of the chain
- * listed in `tree-view.ts`.
+ * start-up wait), the `guard` that keeps every error out of the note (spec §8), the teardown, the kept height of the block, and the calls of the pictures that other views and menus make (the pause under a full-screen view, Save as a
+ * picture). Second layer of the chain listed in `tree-view.ts`.
  */
 
 import { setIcon } from 'obsidian';
 import { sameBody } from '../core/block-match';
+import { cardForm, geometryFor } from '../layout/geometry';
 import { fontsChanged, usesFamily, type FontState } from '../render/fonts';
 import { clearMeasureCache } from '../render/dom/measure';
 import { fontsOf, mediaMatches, readFonts } from '../render/dom/page-reads';
@@ -17,10 +18,12 @@ import type { Handle } from './block-handle';
 import { lastHeight, rememberHeight } from './block-height';
 import type { BlockState } from '../view/block-state';
 import { isPhoneDevice } from '../view/focus-mode';
-import { releaseRelations } from '../view/relation-cache';
+import { relationsFor, releaseRelations } from '../view/relation-cache';
 import { reducedMotion, type DynastySettings } from '../view/settings';
 import { hasArms, hasPortraits, hasReign } from '../view/tree-view-helpers';
+import { SaveWindow, savePicture, type SaveSource } from './save-picture';
 import { guarded } from './start-guard';
+import { BlockViews } from './block-views';
 import { TreeViewBase } from './tree-view-base';
 import type { KeepPlace } from './tree-view-types';
 import type { Scene } from '../render/dom/scene';
@@ -167,16 +170,16 @@ export abstract class TreeViewLifecycle extends TreeViewBase {
 				if (!active || !this.viewport?.contains(active)) return;
 				e.stopPropagation();
 				e.preventDefault();
-				this.guard(() => (this.successionDrawn ? this.closeSuccession() : this.closeFinder()));
+				this.guard(() => (this.successionDrawn ? this.finder.closeSuccession() : this.finder.close()));
 			},
 			{ capture: true },
 		);
 		// O9: a picture file changed, came or went: the pictures of this tree follow (no new layout).
 		const store = this.host.pictures;
-		if (store) this.unsubPictures = store.onChange((paths) => this.guard(() => this.picturesChanged(paths)));
+		if (store) this.unsubPictures = store.onChange((paths) => this.guard(() => this.pictures.changed(paths)));
 		// The metadata cache indexes a new picture file late: a list with a missing link looks again when it has resolved.
 		const mc = this.host.app?.metadataCache;
-		if (store && mc && typeof mc.on === 'function') this.registerEvent(mc.on('resolved', () => this.guard(() => this.linksResolved())));
+		if (store && mc && typeof mc.on === 'function') this.registerEvent(mc.on('resolved', () => this.guard(() => this.pictures.linksResolved())));
 		this.binding.onload();
 	}
 
@@ -413,10 +416,7 @@ export abstract class TreeViewLifecycle extends TreeViewBase {
 
 	protected teardown(): void {
 		// B11: a new scene or the end of the view releases every picture copy of the old one.
-		this.pictureToken++;
-		this.picturesOn = false;
-		this.live?.destroy();
-		this.live = null;
+		this.pictures.release();
 		this.releaseList();
 		this.tips?.destroy();
 		this.tips = null;
@@ -463,7 +463,7 @@ export abstract class TreeViewLifecycle extends TreeViewBase {
 				return;
 			}
 			// A tree that drew before the metadata cache was ready had no count of missing pictures: look again.
-			this.picturesLookAgain();
+			this.pictures.lookAgain();
 		});
 	}
 
@@ -512,5 +512,81 @@ export abstract class TreeViewLifecycle extends TreeViewBase {
 	protected reduced(): boolean {
 		const prefers = mediaMatches(this.containerEl.win, '(prefers-reduced-motion: reduce)');
 		return reducedMotion(this.settings.reduceMotion, prefers);
+	}
+
+	/**
+	 * A full-screen view of this block opened over this tree: its picture requests that wait stop, and
+	 * it starts no new ones while it is hidden, so the full-screen view gets the store first.
+	 */
+	pausePictures(): void {
+		this.guard(() => this.pictures.pause());
+	}
+
+	/** The full-screen view over this tree closed: the pictures of the shown area load again. */
+	resumePictures(): void {
+		this.guard(() => this.pictures.resume());
+	}
+
+	/**
+	 * More → Save as picture (spec §13.8): the window "Save as a picture", then the save of what
+	 * this view draws now. The view stays in use while the picture is made.
+	 */
+	protected openSave(): void {
+		const src = this.saveSource();
+		if (!src) return;
+		const app = this.host.app;
+		const store = this.host.pictures;
+		const host = this.host;
+		const st = this.peekState();
+		const full = !!this.full;
+		new SaveWindow(app, {
+			save: (kind) => void savePicture(app, store, src, kind),
+			onClosed: () => {
+				if (st) BlockViews.of(host, st).refocusButton(full, '.dynasty-more');
+			},
+		}).open();
+	}
+
+	/** P1: the drawn graph and this view's settings, for the saved picture. */
+	protected saveSource(): SaveSource | null {
+		const g = this.g;
+		const laid = this.laid;
+		const last = this.lastLayout;
+		if (!g || !laid || !last) return null;
+		const opts = last.opts;
+		const name = this.sourcePath.split('/').pop() ?? this.sourcePath;
+		const focus = this.focusId !== null ? this.whole?.byId.get(this.focusId)?.name : undefined;
+		// The saved picture shows the card form of the direction it is drawn in, whole cards (D148 2A, D150 5): the geometry is made again, with no flag of the view.
+		// The plate follows the mark, the finder's small tree and the setting, as at the draw; with no plate a marked person gets the "You" tab.
+		const small = this.finderDrawn?.line && !this.finderDrawn.state.whole;
+		const rel = this.meId !== null && !small && this.whole ? relationsFor(this.whole, this.meId, this.relationOptions, this.key) : null;
+		const relationLine = rel !== null && this.settings.showRelations;
+		// Batched whenever there is a mark, so no card is worked out alone when the line is off.
+		if (rel) rel.cards.getMany(laid.layout.persons.keys());
+		const orientation = laid.layout.orientation ?? 'down';
+		const breaks = this.breakList();
+		return {
+			g,
+			...(opts.labels ? { labels: opts.labels } : {}),
+			...(rel && relationLine ? { relations: rel.cards } : {}),
+			...(opts.me !== undefined ? { me: opts.me } : {}),
+			...(opts.line ? { line: opts.line } : {}),
+			orientation,
+			geo: cardForm(geometryFor(last.geo.fontPx), orientation),
+			relationLine,
+			...(this.meId !== null && !relationLine ? { youTab: this.meId } : {}),
+			...(breaks.size ? { breaks } : {}),
+			fonts: opts.fonts,
+			doc: this.containerEl.doc,
+			showDates: this.settings.showDates,
+			showPortraits: this.settings.showPortraits,
+			armsOnCards: this.settings.armsOnCards,
+			sourcePath: this.sourcePath,
+			note: name.replace(/\.md$/i, ''),
+			...(focus !== undefined ? { focusName: focus } : {}),
+			...(this.foldPlan?.foldedList.length ? { folds: { hidden: this.foldPlan.hiddenList, folded: this.foldPlan.foldedList } } : {}),
+			// While the Show view is open, the saved picture has the tabs, the outlines and the bar sentence.
+			...(this.successionDrawn ? { succession: { ordinalCards: [...this.successionDrawn.ordinals.keys()], heirs: this.successionDrawn.heirs, ordinals: this.successionDrawn.ordinals, sentence: this.successionDrawn.sentence } } : {}),
+		};
 	}
 }

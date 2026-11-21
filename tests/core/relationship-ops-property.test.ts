@@ -17,6 +17,9 @@ import { rng } from '../support/rng';
 // others must be refused with the code the contract names.
 
 const PARENT_KINDS: ParentKind[] = ['birth', 'adoptive', 'ward', 'rumoured', 'begetter'];
+/** D375 (3): true when one of the links of one person has the type that cannot stand beside `type` (birth and rumoured). */
+const rumourPair = (links: readonly { type: string }[], type: string): boolean => links.some((r) => (type === 'birth' && r.type === 'rumoured') || (type === 'rumoured' && r.type === 'birth'));
+
 /** D332: the parent types by blood, which share one limit and never name one id twice. */
 const isBlood = (t: string) => t === 'birth' || t === 'begetter';
 const UNION_KINDS: UnionKind[] = ['marriage', 'betrothal', 'concubinage', 'affair'];
@@ -73,6 +76,8 @@ function randomOp(body: string, g: FamilyGraph, random: () => number): { op: Op;
 			else if (fam.parents.filter((r) => r.type === type).length >= PARENT_LIMIT[type]) expect = 'limit';
 			// D332: a birth parent never becomes a begetter of the same child, nor the reverse; then the limit by blood (`fullTypes`).
 			else if (isBlood(type) && fam.parents.some((r) => r.id === parent && isBlood(r.type))) expect = 'bad-value';
+			// D375 (3): a birth parent never becomes a rumoured parent of the same child, nor the reverse.
+			else if (rumourPair(fam.parents.filter((r) => r.id === parent), type)) expect = 'bad-value';
 			else if (fam.fullTypes.includes(type)) expect = 'limit';
 			return { op: { kind: 'add-parent', child, parent, type }, expect, removes: false };
 		}
@@ -105,6 +110,7 @@ function randomOp(body: string, g: FamilyGraph, random: () => number): { op: Op;
 			if (to !== link.type && fam.parents.some((r) => r.id === link.id && r.type === to)) expect = 'bad-value';
 			else if (to !== link.type && others.filter((r) => r.type === to).length >= PARENT_LIMIT[to]) expect = 'limit';
 			else if (to !== link.type && isBlood(to) && others.some((r) => r.id === link.id && isBlood(r.type))) expect = 'bad-value';
+			else if (to !== link.type && rumourPair(others.filter((r) => r.id === link.id), to)) expect = 'bad-value';
 			else if (linkTypeFull(fam.parents, link, to)) expect = 'limit';
 			return { op: { kind: 'set-parent-type', child, parent: link.id, from: link.type, to }, expect, removes: false };
 		}

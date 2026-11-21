@@ -179,6 +179,8 @@ export const FLOW = {
 	childBloodFull: 'The child cannot have more than 2 parents by blood. Birth parents and begetters count together.',
 	/** D332: the detail of Birth parent or Begetter in the type step of Add child when a parent is already the other of the two for this child. */
 	childBloodBoth: 'A person cannot be a birth parent and a begetter of the same child.',
+	/** D375 (3): the detail of Birth parent or Rumoured parent in the type step of Add child when a parent is already the other of the two for this child. */
+	childRumourBoth: 'A person cannot be a birth parent and a rumoured parent of the same child.',
 	alreadyChild: (child: string, parent: string) => `${isolateName(child)} is a child of ${isolateName(parent)} now.`,
 	addPartnerTitle: 'Add a partner',
 	unionTypeTitle: 'Type of partnership',

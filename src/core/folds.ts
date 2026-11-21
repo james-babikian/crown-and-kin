@@ -223,6 +223,11 @@ export function foldCount(g: FamilyGraph, key: FoldKey): number {
 	return foldHidden(g, new Set([key])).size;
 }
 
+/** The number of distinct people that the folds `keys` hide together in `g`; one person under two folds counts once. */
+export function foldedPeopleCount(g: FamilyGraph, keys: readonly FoldKey[]): number {
+	return foldHidden(g, new Set(keys)).size;
+}
+
 /** The controls that show for `folds` and their hidden set `hidden` (rule 5). */
 export function foldControls(g: FamilyGraph, folds: FoldSet, hidden: ReadonlySet<string>): FoldControl[] {
 	const out: FoldControl[] = [];

@@ -93,7 +93,7 @@ function rowRefusals(box: HTMLElement, input: HTMLElement, host: CardHost, e: Fi
 }
 
 /** The refusals of one field (CX-11): under the field, or in the box of its row. `shown` tells the card that the refusal has its place. */
-function fieldErrors(row: HTMLElement, input: HTMLElement, host: CardHost, e: FieldError, box?: HTMLElement): void {
+function fieldErrors(input: HTMLElement, host: CardHost, e: FieldError, box?: HTMLElement): void {
 	e.shown.add(e.field);
 	if (box) rowRefusals(box, input, host, e);
 	else fieldRefusals(input, host, e);
@@ -157,7 +157,7 @@ export function field(parent: HTMLElement, host: CardHost, name: string, label: 
 		input.setAttribute('aria-describedby', hintId);
 	}
 	if (o.describedBy) input.setAttribute('aria-describedby', o.describedBy);
-	if (o.error) fieldErrors(row, input, host, o.error, o.errorIn);
+	if (o.error) fieldErrors(input, host, o.error, o.errorIn);
 	if (!o.area) endEntryOnEnter(input as HTMLInputElement);
 	input.addEventListener('input', () => {
 		set(input.value);

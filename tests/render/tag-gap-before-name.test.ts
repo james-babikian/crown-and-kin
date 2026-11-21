@@ -176,6 +176,9 @@ describe('the live drawing: the same gap G before the name for the four shapes (
 						const g = graph(type);
 						const laid = lay(g, fontPx);
 						const s = buildScene(new FEl('g') as unknown as SVGGElement, g, laid, { fonts: FONTS, measure, link: () => null });
+						// D377 step 8: the hidden tag pills make their text when their level first shows.
+						s.showLevel('compact');
+						s.showLevel('overview');
 						const el = s.tags.find((t) => t.tag.person === 'x')!.el as unknown as FEl;
 						const part = el.all().find((e) => e.classes.has(level))!;
 						const mark = part.all().find((e) => e.classes.has('dynasty-tag-mark'))!;
@@ -212,6 +215,9 @@ describe('the live drawing: the same gap G before the name for the four shapes (
 			const tag = laid.layout.farTags.get('x')!;
 			const zone = tag.zoneW ?? tag.hit.w;
 			const s = buildScene(new FEl('g') as unknown as SVGGElement, g, laid, { fonts: FONTS, measure, link: () => null });
+			// D377 step 8: the hidden tag pills make their text when their level first shows.
+			s.showLevel('compact');
+			s.showLevel('overview');
 			// x's tag names Zelda and is cut; z's tag names Xavier whole.
 			for (const [person, level] of ['x', 'z'].flatMap((who) => ['dynasty-tag-full', 'dynasty-tag-compact'].map((lv) => [who, lv] as const))) {
 				const el = s.tags.find((t) => t.tag.person === person)!.el as unknown as FEl;
@@ -245,6 +251,9 @@ describe('D353 4 Now: the live tree leaves a fixed gap after the ⚭, not a spac
 		const laid = lay(g, 16);
 		for (const [measureName, measure] of [...MEASURES, ['a wide space', (s: string) => [...s].reduce((n, c) => n + (c === ' ' ? 11 : 7), 0)] as [string, (s: string) => number]]) {
 			const s = buildScene(new FEl('g') as unknown as SVGGElement, g, laid, { fonts: FONTS, measure, link: () => null });
+			// D377 step 8: the hidden tag pills make their text when their level first shows.
+			s.showLevel('compact');
+			s.showLevel('overview');
 			const el = s.tags.find((t) => t.tag.person === 'x')!.el as unknown as FEl;
 			for (const [level, em] of [['dynasty-tag-full', TAG_FONT_EM], ['dynasty-tag-compact', TAG_COMPACT_FONT_EM]] as const) {
 				const textEl = el.all().find((e) => e.classes.has(level))!.all().find((e) => e.classes.has('dynasty-tag-text'))!;
@@ -261,6 +270,9 @@ describe('D353 4 Now: the live tree leaves a fixed gap after the ⚭, not a spac
 		const laid = lay(g, 16);
 		for (const [measureName, measure] of [...MEASURES, ['a wide space', (s: string) => [...s].reduce((n, c) => n + (c === ' ' ? 11 : 7), 0)] as [string, (s: string) => number]]) {
 			const s = buildScene(new FEl('g') as unknown as SVGGElement, g, laid, { fonts: FONTS, measure, link: () => null });
+			// D377 step 8: the hidden tag pills make their text when their level first shows.
+			s.showLevel('compact');
+			s.showLevel('overview');
 			const el = s.tags.find((t) => t.tag.person === 'x')!.el as unknown as FEl;
 			for (const [level, em] of [['dynasty-tag-full', TAG_FONT_EM], ['dynasty-tag-compact', TAG_COMPACT_FONT_EM]] as const) {
 				const font = em * 16;

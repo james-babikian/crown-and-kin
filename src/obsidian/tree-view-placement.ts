@@ -148,7 +148,7 @@ export abstract class TreeViewPlacement extends TreeViewLifecycle {
 				if (v.scale !== now.scale || v.cx !== now.cx || v.cy !== now.cy) pz.setView(v);
 				// The same view in a larger box: no settle comes, but the cards that now show need their pictures.
 				else {
-					this.showPictures(now);
+					this.pictures.show(now);
 					this.fillNear(now);
 				}
 			}
@@ -199,7 +199,7 @@ export abstract class TreeViewPlacement extends TreeViewLifecycle {
 		}
 		this.markInteractive();
 		this.keepHeight();
-		this.startPictures();
+		this.pictures.start();
 		this.showEdited(st);
 		this.takeFocus();
 	}
@@ -467,6 +467,8 @@ export abstract class TreeViewPlacement extends TreeViewLifecycle {
 		if (lod === this.lod) return false;
 		// R026 fit: the groups leave first, so the class change below has nothing to restyle in them (and a lazy card that fills at Overview does not put its group back).
 		if (lod === 'overview') this.scene?.setDetail(false);
+		// The pills of the level get their text before the class shows them (D377 step 8).
+		this.scene?.showLevel(lod);
 		if (this.lod) svg.removeClass(lodClass(this.lod));
 		svg.addClass(lodClass(lod));
 		if (this.lod === 'overview' || this.lod === null) this.scene?.setDetail(true);

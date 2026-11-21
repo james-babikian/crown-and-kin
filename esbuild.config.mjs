@@ -43,7 +43,11 @@ export function bundleOptions(prod) {
 		treeShaking: true,
 		outfile: 'main.js',
 		// Only the harness install turns this on (DYNASTY_HARNESS=1): the parse cache then freezes its trees (spec §13.15 rule 3).
-		define: { __DYNASTY_HARNESS__: process.env.DYNASTY_HARNESS === '1' ? 'true' : 'false' },
+		// The page-root drag switches of move-layer.ts (D374 S-4): on in the harness build and in the study build, so the release main.js carries no switch name.
+		define: {
+			__DYNASTY_HARNESS__: process.env.DYNASTY_HARNESS === '1' ? 'true' : 'false',
+			__DYNASTY_SWITCHES__: process.env.DYNASTY_HARNESS === '1' ? 'true' : 'false',
+		},
 		minify: prod,
 		plugins: [noElk],
 	};

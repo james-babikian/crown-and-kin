@@ -74,22 +74,18 @@ body {
 	--dynasty-radius-box: var(--radius-m);
 	--dynasty-radius-window: var(--modal-radius, var(--radius-l));
 	--dynasty-radius-round: 50%;
-	--dynasty-radius-card: min(var(--radius-m), 1.5em);
 
 	/* Line weights. The hairline divides sections, rows and bars; the field and button edges take their colours from `01-base.css`. */
 	--dynasty-width-hairline: 1px;
 	--dynasty-width-mark: 2px;
 	--dynasty-width-house: 3px;
-	--dynasty-width-house-card: 4px;
 	--dynasty-hairline: var(--dynasty-width-hairline) solid var(--background-modifier-border);
 	--dynasty-field-edge: var(--dynasty-width-hairline) solid var(--dynasty-edge);
 	--dynasty-button-edge: var(--dynasty-width-hairline) solid var(--dynasty-btn-edge);
-	--dynasty-mark-line: var(--dynasty-width-mark) solid var(--text-normal);
 
 	/* Motion: durations and the easings by name. */
 	--dynasty-dur-press: 150ms;
 	--dynasty-dur-open: 200ms;
-	--dynasty-dur-move: 200ms;
 	--dynasty-dur-pulse: 0.5s;
 	--dynasty-ease: ease-out;
 	--dynasty-ease-pulse: ease-in-out;
@@ -114,7 +110,6 @@ body {
 
 	/* The error edge: the error colour, no ring outside the field, never the focus recipe. A focused field with an error keeps a one-pixel edge shadow like any field. */
 	--dynasty-error-edge: var(--dynasty-width-hairline) solid var(--dynasty-error);
-	--dynasty-error-line: var(--dynasty-width-house) solid var(--dynasty-error);
 	--dynasty-error-focus-shadow: 0 0 0 var(--dynasty-width-hairline) var(--dynasty-error);
 
 	/* The card edge: colour and width of the line around a card. The theme's border grey is the plain value; the mix below replaces it where `color-mix()` works. */
@@ -227,6 +222,29 @@ body {
 /* Touch-first device: a static preview (D1, spec §7.2). */
 .dynasty-static .dynasty-viewport {
 	cursor: default;
+}
+
+/*
+ * D375 (1): one invisible rectangle takes each press on the empty background, and the scene takes none, so the browser does not
+ * search the parts of every card for the finger. The places that can be tapped take presses again. The target list is
+ * `src/render/tap-targets.ts`; a test keeps this rule equal to it. Zero specificity: a rule of a part (for example the focus ring) still wins.
+ */
+.dynasty-hit {
+	fill: none;
+	stroke: none;
+	pointer-events: all;
+}
+
+.dynasty-svg > .dynasty-scene {
+	pointer-events: none;
+}
+
+:where(.dynasty-svg) :where(.dynasty-card-bg, .dynasty-card-crown-hit, .dynasty-tag-hit, .dynasty-tag-over, .dynasty-fold-hit, .dynasty-focus-badge-hit, .dynasty-name-link) {
+	pointer-events: all;
+}
+
+:where(.dynasty-svg) :where(.dynasty-tag, .dynasty-fold, .dynasty-focus-badge) :where(*) {
+	pointer-events: auto;
 }
 
 /* Reads the resolved font size and family (spec §5.8); added and removed at once. */
@@ -650,7 +668,7 @@ body.is-phone,
 .dynasty-card.dynasty-highlight .dynasty-card-ring {
 	display: inline;
 	stroke-width: 9;
-	animation: dynasty-pulse-ring 0.5s ease-in-out 4 alternate;
+	animation: dynasty-pulse-ring var(--dynasty-dur-pulse) var(--dynasty-ease-pulse) 4 alternate;
 }
 
 .dynasty-card.dynasty-highlight .dynasty-card-bg {

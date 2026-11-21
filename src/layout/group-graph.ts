@@ -94,7 +94,7 @@ export function layoutFoldAll(fold: FoldInput, hung: ReadonlySet<string>, states
 }
 
 /**
- * Moves each control of a group along the row, past any control it stands on, so that no two tap areas meet (spec ง7.5: each is tappable). Only a group
+ * Moves each control of a group along the row, past any control it stands on, so that no two tap areas meet (spec ยง7.5: each is tappable). Only a group
  * control moves, so a tree without a group draws as before. `sideways`: the frame is the real one, the row runs down.
  */
 export function separateGroupControls(folds: readonly PlacedFoldControl[], em: number, sideways: boolean): PlacedFoldControl[] {

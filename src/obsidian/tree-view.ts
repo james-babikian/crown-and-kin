@@ -11,16 +11,15 @@
  * The class is a chain of layers, one file for each concern, from the bottom:
  * - `tree-view-base.ts` `TreeViewBase`: the host contract, every field, the open timing, the block's memory and the cross-view calls (`focusState`,
  *   `redrawState`, `listGo`, `showFinder`, `changeFolds` ...). The layers above call members of each other; a call to a layer above is an `abstract` method here.
- * - `tree-view-lifecycle.ts`: load and unload, settings, theme, fonts, `guard`, the start-up wait and the kept height.
+ * - `tree-view-lifecycle.ts`: load and unload, settings, theme, fonts, `guard`, the start-up wait, the kept height, the pause of the pictures and Save as a picture.
  * - `tree-view-placement.ts`: sizes, bars kept free, the direction (D24), resize and the first views.
  * - `tree-view-scene.ts`: content on demand, the idle chain, the presses and keys, reveal and highlight (the "Card content on demand" notes are in its header).
- * - `tree-view-pictures.ts`: picture links, live pictures, the file check and the saved picture.
  * - `tree-view-toolbar.ts`: the toolbar, its menus and the edit controls.
  * - `tree-view-actions.ts`: the windows of a person, Titles and Houses, Expand, folds and focus.
- * - `tree-view-finder.ts`: the relation finder's bar and the Show view's bar.
  * - `tree-view-list.ts`: the phone list, the empty block and the bar of a very large tree.
  * - this file: the render pipeline (`render` applies what `planRender` returns and builds the DOM of the plan), and the exports other files use.
- * Shared types and constants are in `tree-view-types.ts`. The block's binding to the note is `block-binding.ts`; the decisions of a render are
+ * Two parts are objects, not layers; each sees the view only through a port. `view-pictures.ts` (`ViewPictures`, the base's `pictures`): picture links, live pictures, the file check and
+ * the badge problems. `finder-bars.ts` (`FinderBars`, the base's `finder`, made in the list layer): the relation finder's bar and the Show view's bar. Shared types and constants are in `tree-view-types.ts`. The block's binding to the note is `block-binding.ts`; the decisions of a render are
  * `view/render-plan.ts`.
  */
 
@@ -38,12 +37,13 @@ import { readFonts } from '../render/dom/page-reads';
 import { wireCardTips } from '../render/dom/card-tip';
 import { PanZoom, visibleRect } from '../render/dom/pan-zoom';
 import { FILL_ALL_EVENT, buildScene, lodClass, type SceneOptions } from '../render/dom/scene';
-import { sameTall } from '../render/dom/tall-cards';
+import { sameTall } from '../render/tall-cards';
 import { parseBreakList } from '../render/break-words';
 import { buildCallout, Popover } from '../render/dom/widgets';
 import type { RenderTiming } from '../render/tree-info';
 import { FOCUS_UI, FULL_UI, UI } from '../render/ui-text';
 import { treeBounds } from '../render/view-math';
+import { HIT_CLASS, HIT_REACH } from '../render/tap-targets';
 import { START_LIMIT_MS, STYLES_LIMIT_MS } from './block-binding';
 import { newBlockState, type BlockState } from '../view/block-state';
 import type { FoldRef } from '../render/dom/folds';
@@ -56,6 +56,8 @@ import { foldLabel, lineMarks } from '../view/tree-view-helpers';
 import { BIG_TREE_CLASS, dragMarginOverride, dragMovesWrapper, isIosWebKit, keepsStandingLayer, panWrapperOverride } from './move-layer';
 import { TreeViewList } from './tree-view-list';
 import type { ViewHost } from './tree-view-base';
+import { BlockViews } from './block-views';
+
 export { HOVER_SOURCE, OPEN_GAP_MS, THEME_RECHECK_MS } from './tree-view-types';
 export type { FullHost, FullSource, OpenTime, ViewPlace } from './tree-view-types';
 
@@ -180,7 +182,7 @@ export class TreeView extends TreeViewList {
 		const st = this.applyChanges(stateChanges);
 		if (plan.kind === 'bar') this.renderBar(el, plan.tree, plan.whole, plan.bar, plan.barCount, orientation);
 		else this.drawTree(el, plan, { t0, clockFrom, orientation });
-		if (stateChanges.sessionChanged) TreeView.redrawState(this.host, st, { except: this });
+		if (stateChanges.sessionChanged) BlockViews.of(this.host, st).redrawState({ except: this });
 	}
 
 	/** The text of the block cannot be read: the error box stands in place of a tree. */
@@ -264,8 +266,8 @@ export class TreeView extends TreeViewList {
 		this.optionsHeight = plan.tree.options.height;
 		this.lod = null;
 		// O2: the picture warnings that need no file read go on the first badge.
-		this.textIssues = plan.whole.issues;
-		this.resolvePictures(plan.whole);
+		this.pictures.textIssues = plan.whole.issues;
+		this.pictures.resolve(plan.whole);
 	}
 
 	/** Draws the planned tree: the layout, the DOM, the pan and zoom, and the timing of the render. */
@@ -336,6 +338,8 @@ export class TreeView extends TreeViewList {
 		// Obsidian's aria-label tooltips work only on HTML elements and fail on SVG ones. The CSS
 		// turns them off with --no-tooltip; this also covers versions without that switch.
 		svg.addEventListener('pointerover', (e) => e.stopPropagation());
+		// D375 (1): one transparent rectangle takes each press on the empty background, so the browser does not search the parts of every card. `redraw` empties only the scene group.
+		svg.createSvg('rect', { cls: HIT_CLASS, attr: { x: -HIT_REACH, y: -HIT_REACH, width: 2 * HIT_REACH, height: 2 * HIT_REACH, 'aria-hidden': 'true' } });
 		const sceneEl = svg.createSvg('g', { cls: 'dynasty-scene' });
 		// S5c: a card gets its content before the browser scrolls to it. `focus` does not bubble; the capture phase sees it first.
 		// The listener is on the HTML wrapper: Chromium makes an SVG element that has a focus listener a Tab stop of its own.
@@ -375,7 +379,7 @@ export class TreeView extends TreeViewList {
 			enabled: () => !this.settings.showRelations && me !== null && rel !== null && !this.isPhone(),
 			busy: () => this.panZoom?.busy ?? false,
 		});
-		this.makeLive();
+		this.pictures.makeLive();
 		root.setAttribute('data-dynasty-cards-pending', String(this.scene.fill.pending));
 		root.setAttribute('data-dynasty-lines-pending', String(this.scene.fill.pendingLines));
 		// T1: the harness asks for all the content at once.
@@ -399,8 +403,8 @@ export class TreeView extends TreeViewList {
 		const { finder, succession, sub, focus, whole } = plan;
 		this.popover = new Popover(viewport);
 		this.buildToolbar(viewport);
-		if (finder) this.buildResultBar(viewport, canvas, finder, whole);
-		if (succession) this.buildSuccessionBar(viewport, canvas, succession);
+		if (finder) this.finder.buildResultBar(viewport, canvas, finder, whole);
+		if (succession) this.finder.buildSuccessionBar(viewport, canvas, succession);
 		// One bar at a time: both bars stand at the same place at the top, so a finder result that draws no line ("not related") would be covered by the focus bar and its Close could not be reached.
 		if (sub && focus !== null && !finder) this.buildFocusBar(viewport, canvas, whole.byId.get(focus)?.name || focus);
 		this.wireCardPresses(viewport);
@@ -520,13 +524,12 @@ export class TreeView extends TreeViewList {
 		if (this.canvasEl) this.markBigTree(this.canvasEl);
 		this.popover?.close();
 		this.tips?.hide();
-		this.live?.destroy();
-		this.live = null;
+		this.pictures.dropLive();
 		last.sceneEl.empty();
 		this.scene = buildScene(last.sceneEl, g, laid, last.opts);
 		this.markPositions();
 		this.wireScene(this.scene);
-		this.makeLive();
+		this.pictures.makeLive();
 		if (this.lod && this.svg) this.svg.removeClass(lodClass(this.lod));
 		this.lod = null;
 		this.carry = null;

@@ -16,7 +16,7 @@ useFakeDom({ css: true });
 
 describe('D346 item 1: the refusal after the tree changed', () => {
 	it('also says what to do', () => {
-		expect(WRITE_TEXT.undoChanged).toBe('The plugin cannot undo the last tree edit. The tree changed after the edit. Make the change again by hand.');
+		expect(WRITE_TEXT.undoChanged).toBe('The plugin cannot undo the last tree edit. The tree changed after the edit. To undo the edit, change the tree text back by hand.');
 	});
 });
 

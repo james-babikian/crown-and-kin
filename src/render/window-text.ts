@@ -4,6 +4,7 @@
  * `ui-text.ts` re-exports every name, so old imports keep working.
  */
 
+import { REFUSAL_TEXT } from '../core/refusal-text';
 import { quote } from '../core/quote';
 import { isolateName } from './name-bidi';
 import { PERSON_PLACEHOLDER } from './view-text';
@@ -305,7 +306,7 @@ export const WRITE_TEXT = {
 	/** The two sentences of the question: the first names the note in a line that everyone can see, also on a phone (the title can be cut). */
 	undoAskText: (note: string): string[] => [`The last tree edit is in the note ${quote(note)}, not in the active note.`, `If you select Undo, the plugin reverses that edit in ${quote(note)}.`],
 	undoEmpty: 'There is no tree edit to undo.',
-	undoChanged: 'The plugin cannot undo the last tree edit. The tree changed after the edit. Make the change again by hand.',
+	undoChanged: 'The plugin cannot undo the last tree edit. The tree changed after the edit. To undo the edit, change the tree text back by hand.',
 	undoMissing: 'The plugin cannot find the tree of the last edit.',
 	cycle: 'The plugin cannot make this change. A person cannot be their own ancestor.',
 	limit: (type?: string) =>
@@ -316,6 +317,11 @@ export const WRITE_TEXT = {
 				: 'The plugin cannot make this change. A person can have only 2 parents of each type.',
 	/** D332: the refusal `alreadyBloodParent`, shown when a person would be both a birth parent and a begetter of one child. */
 	alreadyBloodParent: 'The plugin cannot make this change. A person cannot be a birth parent and a begetter of the same child.',
+	/** D375 (3): the notices of the refusals `alreadyRumouredParent` and `alreadyBirthParent`: the refusal text itself (one copy in the bundle). */
+	alreadyRumouredParent: REFUSAL_TEXT.alreadyRumouredParent,
+	alreadyBirthParent: REFUSAL_TEXT.alreadyBirthParent,
+	/** The refusal `alreadyParent`: the child already has this person with the same type. */
+	alreadyParent: 'The plugin cannot make this change. The child already has this person as a parent of this type. If the note has two entries for this person, open Family in the person window of the child. Then remove one entry.',
 	noSibling: 'There is no sibling in that direction.',
 	needNameFirst: 'First, enter a name for this person.',
 } as const;

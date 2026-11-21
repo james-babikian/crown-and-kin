@@ -12,7 +12,7 @@ import { computeRelations } from '../../src/core/relations';
 import { applyOp } from '../../src/core/yaml-edit';
 import { cardForm, geometryFor } from '../../src/layout/geometry';
 import { DEFAULT_LAYOUT_SETTINGS, clearLayoutCache, layoutTree } from '../../src/layout/index';
-import { tallCardsFor } from '../../src/render/dom/tall-cards';
+import { tallCardsFor } from '../../src/render/tall-cards';
 import { approxMeasure, renderSvg } from '../../src/render/svg-string';
 import { genModel, toText } from '../support/family-tree-gen';
 

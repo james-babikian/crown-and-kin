@@ -8,6 +8,7 @@ import DynastyTreePlugin from '../../src/obsidian/main';
 import { newBlockState } from '../../src/view/block-state';
 import { desktop, embed, fakeApp, fakeHandle, fullViews } from './tree-view-fakes';
 import { useFakeDom } from '../support/fake-dom-setup';
+import { BlockViews } from '../../src/obsidian/block-views';
 
 /*
  * The M10 G5 spec review named these flows as not covered: spec §13.10
@@ -101,8 +102,7 @@ describe('a row of the problem list on a hidden person (spec §13.10 "Showing a 
 describe('the relation finder and a hidden person (spec §13.10, §13.2)', () => {
 	const SOURCE = block15(0);
 	const showFinder = (view: TreeView, handle: { state: unknown }, a: string, b: string) => {
-		const V = view.constructor as unknown as { showFinder(host: unknown, st: unknown, a: string, b: string, o: unknown): void };
-		V.showFinder((view as unknown as { host: unknown }).host, handle.state, a, b, view);
+		BlockViews.of((view as unknown as { host: unknown }).host as never, handle.state as never).showFinder(a, b, view as never);
 	};
 
 	it('"Show in the whole tree" keeps the people of the line, opens no fold in the block state, and other folds still hide their people', async () => {

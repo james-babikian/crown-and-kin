@@ -146,5 +146,3 @@ export const childStepWord = (type: ParentType, sex: Sex) =>
 					? `${WORDS.rumoured} ${WORDS.child[sex]}`
 					: WORDS.child[sex];
 
-/** The text with its first letter in capitals. */
-export const capital = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);

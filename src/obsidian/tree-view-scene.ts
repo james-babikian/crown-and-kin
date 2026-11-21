@@ -57,6 +57,7 @@ import { TreeViewBase } from './tree-view-base';
 import { HIGHLIGHT_MS, HOVER_SOURCE } from './tree-view-types';
 import { hintSide, showOnePersonHint } from './hint-place';
 import { chunkDone, later, runChunk, TIMED_WAIT_MS } from '../view/idle';
+import { BlockViews } from './block-views';
 
 /** The most cards attached in one idle chunk. */
 const IDLE_CARDS_PER_CHUNK = 25;
@@ -398,7 +399,7 @@ export abstract class TreeViewScene extends TreeViewPlacement {
 		this.tips?.hide();
 		this.tips?.shown();
 		this.applyLod(view);
-		this.showPictures(view);
+		this.pictures.show(view);
 		this.placeTapAreas(view, laid);
 		this.fillFolds(view);
 		this.fillNear(view);
@@ -598,10 +599,8 @@ export abstract class TreeViewScene extends TreeViewPlacement {
 					}
 					const st = this.peekState();
 					if (st) {
-						const hadShow = st.succession !== null;
 						st.finder = null;
-						st.succession = null;
-						if (hadShow) TreeViewBase.listRedraw(this.host, st);
+						BlockViews.of(this.host, st).endShow();
 					}
 					void this.openFull(null, b.person);
 				});

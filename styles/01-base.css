@@ -84,6 +84,29 @@ body {
 	cursor: default;
 }
 
+/*
+ * D375 (1): one invisible rectangle takes each press on the empty background, and the scene takes none, so the browser does not
+ * search the parts of every card for the finger. The places that can be tapped take presses again. The target list is
+ * `src/render/tap-targets.ts`; a test keeps this rule equal to it. Zero specificity: a rule of a part (for example the focus ring) still wins.
+ */
+.dynasty-hit {
+	fill: none;
+	stroke: none;
+	pointer-events: all;
+}
+
+.dynasty-svg > .dynasty-scene {
+	pointer-events: none;
+}
+
+:where(.dynasty-svg) :where(.dynasty-card-bg, .dynasty-card-crown-hit, .dynasty-tag-hit, .dynasty-tag-over, .dynasty-fold-hit, .dynasty-focus-badge-hit, .dynasty-name-link) {
+	pointer-events: all;
+}
+
+:where(.dynasty-svg) :where(.dynasty-tag, .dynasty-fold, .dynasty-focus-badge) :where(*) {
+	pointer-events: auto;
+}
+
 /* Reads the resolved font size and family (spec §5.8); added and removed at once. */
 .dynasty-font-probe {
 	position: absolute;

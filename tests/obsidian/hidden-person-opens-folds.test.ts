@@ -11,6 +11,7 @@ import { resetObsidian } from '../acceptance/fake-obsidian';
 import { block15, comments15 } from '../acceptance/fold-note-crop-support';
 import { desktop, embed, fakeHandle, fullViews, openSheetOn, sheets, tabletDevice } from '../acceptance/tree-view-fakes';
 import { useFakeDom } from '../support/fake-dom-setup';
+import { BlockViews } from '../../src/obsidian/block-views';
 
 /*
  * WP 10.3c (F10–F12, F14, F15): the tree view's folds beyond the acceptance file
@@ -154,8 +155,7 @@ describe('a view with no size (the other mode of the note) draws when it shows',
 		vp.clientWidth = 0;
 		vp.clientHeight = 0;
 		const st = (handle as unknown as { state: object }).state;
-		const c = view.constructor as unknown as { changeFolds(host: unknown, st: unknown, next: Set<string>, o: object): void };
-		c.changeFolds((view as unknown as { host: unknown }).host, st, new Set([key('A')]), {});
+		BlockViews.of((view as unknown as { host: unknown }).host as never, st as never).changeFolds(new Set([key('A')]), {});
 		await run();
 		expect(cardCount(el)).toBe(96);
 		vp.clientWidth = 360;
@@ -216,7 +216,7 @@ describe('after an ok write of the sheet', () => {
 		const calls: string[][] = [];
 		return {
 			calls,
-			mock: { mode: 'live', state: () => ({ open: [], folded: [] }), hide: () => {}, show: () => {}, written: (ids) => calls.push([...ids]) },
+			mock: { mode: 'live', state: () => ({ open: [], folded: [] }), hiddenCount: () => 0, hide: () => {}, show: () => {}, written: (ids) => calls.push([...ids]) },
 		};
 	}
 

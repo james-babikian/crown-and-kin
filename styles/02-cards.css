@@ -133,7 +133,7 @@
 .dynasty-card.dynasty-highlight .dynasty-card-ring {
 	display: inline;
 	stroke-width: 9;
-	animation: dynasty-pulse-ring 0.5s ease-in-out 4 alternate;
+	animation: dynasty-pulse-ring var(--dynasty-dur-pulse) var(--dynasty-ease-pulse) 4 alternate;
 }
 
 .dynasty-card.dynasty-highlight .dynasty-card-bg {

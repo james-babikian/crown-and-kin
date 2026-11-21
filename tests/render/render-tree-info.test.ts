@@ -112,7 +112,7 @@ describe('plugin text obeys the word list', () => {
 	const texts = [
 		...Object.values(LEGEND_LABELS),
 		...Object.values(UI),
-		PROBLEMS_HINT,
+		...Object.values(PROBLEMS_HINT),
 		problemsLabel(1),
 		problemsLabel(3),
 		problemsTitle(1),

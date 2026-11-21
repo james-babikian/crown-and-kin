@@ -1,6 +1,6 @@
 /*
  * The views that are not a tree: the phone list (D144), its bar and its picture copies, the box of an empty block (spec §5.9) and the low bar of
- * a very large tree (spec §7.7). Ninth layer of the chain listed in `tree-view.ts`.
+ * a very large tree (spec §7.7). Seventh layer of the chain listed in `tree-view.ts`.
  */
 
 import { Notice, setIcon, type TFile } from 'obsidian';
@@ -29,10 +29,13 @@ import { isShownQuiet } from './saved-quiet';
 import type { CopyBox, PictureCopy } from './picture-store';
 import { relationsFor, validMe } from '../view/relation-cache';
 import { lineWords } from '../view/succession-view';
-import { TreeViewFinder } from './tree-view-finder';
+import { TreeViewActions } from './tree-view-actions';
 import { toolbarIn } from './tree-view-toolbar';
-import { TreeViewBase } from './tree-view-base';
-import { HIGHLIGHT_MS } from './tree-view-types';
+import { HIGHLIGHT_MS, type ViewPlace } from './tree-view-types';
+import { BlockViews } from './block-views';
+import { FinderBars, type FinderPort } from './finder-bars';
+import type { TreeViewBase, ViewHost } from './tree-view-base';
+
 
 /** D144: after a move the keyboard focus (and so a screen reader) goes to the heading of the centre section of the list. */
 const LIST_FOCUS = '.dynasty-list-section[data-section="person"] .dynasty-list-head';
@@ -51,7 +54,44 @@ const HERO_PORTRAIT_BOX: CopyBox = { w: 128, h: 128, fit: 'portrait', onDevice: 
 const savedFlashes = new WeakMap<BlockState, { id: string; until: number; quiet: boolean }>();
 
 /** The phone list, the empty block and the bar that stands in place of a very large tree. */
-export abstract class TreeViewList extends TreeViewFinder {
+export abstract class TreeViewList extends TreeViewActions {
+	constructor(host: ViewHost, containerEl: HTMLElement, source: string, place: ViewPlace) {
+		super(host, containerEl, source, place);
+		this.finder = new FinderBars(this.finderPort());
+	}
+
+	/** Builds the port of the finder bars: like `makePort`, the members read this view when called. It stands here because the menu helpers of the toolbar are visible in this layer. */
+	private finderPort(): FinderPort<TreeViewBase> {
+		// eslint-disable-next-line @typescript-eslint/no-this-alias -- the port is an object literal that reads this view's protected members
+		const v = this;
+		return {
+			view: v,
+			get host() { return v.host; },
+			get unloaded() { return v.unloaded; },
+			get full() { return v.full; },
+			get coarse() { return v.coarse; },
+			get phone() { return v.isPhone(); },
+			get listMode() { return v.listMode; },
+			get whole() { return v.whole; },
+			get settings() { return v.settings; },
+			get meId() { return v.meId; },
+			get finderDrawn() { return v.finderDrawn; },
+			get successionDrawn() { return v.successionDrawn; },
+			get focusDue() { return v.focusDue; },
+			set focusDue(d) { v.focusDue = d; },
+			ensureState: () => v.ensureState(),
+			pickerContext: () => v.pickerContext(),
+			guard: (fn) => v.guard(fn),
+			refocusTool: (selector) => v.refocusTool(selector),
+			menu: {
+				kind: () => v.barKind(),
+				popover: () => v.popover,
+				place: (opener) => v.menuPlace(opener),
+				item: (pop, el, icon, text, cls, run, label) => v.menuItem(pop, el, icon, text, cls, run, label),
+			},
+		};
+	}
+
 	/** B1: the count of closed person windows (`st.listKeep`) that this list has read. */
 	private keepSeen = 0;
 
@@ -126,8 +166,8 @@ export abstract class TreeViewList extends TreeViewFinder {
 		this.g = this.whole = whole;
 		this.focusId = centre;
 		this.focusStale = false;
-		this.textIssues = whole.issues;
-		this.resolvePictures(whole);
+		this.pictures.textIssues = whole.issues;
+		this.pictures.resolve(whole);
 		// §5.5: a person just saved shows once. The list never moves for it: the row flashes, or a Notice says where to look.
 		const saved = st.shown?.place === 'embed' ? st.shown.id : null;
 		if (saved !== null) {
@@ -155,12 +195,12 @@ export abstract class TreeViewList extends TreeViewFinder {
 		const labels = needsLabels(whole) ? cardLabels(whole) : undefined;
 		const rel = me !== null && this.settings.showRelations ? relationsFor(whole, me, this.relationOptions, this.key) : null;
 		// While the Show view is open, the list has the bar at its top, and each heir (each open branch) says its place in the place of the relation word.
-		const succession = this.showViewFor(st, whole);
+		const succession = this.finder.showViewFor(st, whole);
 		this.successionDrawn = succession;
 		const words = succession ? lineWords(succession) : null;
 		const ctl = new AbortController();
 		this.listAbort = ctl;
-		const token = this.pictureToken;
+		const token = this.pictures.token;
 		this.listCentre = centre;
 		const data = listData(whole, centre);
 		// The words of the rows that show, in one request.
@@ -174,7 +214,7 @@ export abstract class TreeViewList extends TreeViewFinder {
 			editable: !this.readOnly && !this.blocked && !this.inForeignView(),
 			word: (id) => words?.get(id) ?? listWord(id, { me, showRelations: this.settings.showRelations, cards: rel?.cards }),
 			link: (row) => linkWord(whole, data, row),
-			...(succession ? { bar: { sentence: succession.sentence, closeLabel: SUCCESSION_UI.barCloseLabel, onClose: () => this.guard(() => this.closeSuccession()) } } : {}),
+			...(succession ? { bar: { sentence: succession.sentence, closeLabel: SUCCESSION_UI.barCloseLabel, onClose: () => this.guard(() => this.finder.closeSuccession()) } } : {}),
 			...(labels ? { labels } : {}),
 			pictures: (slots, id) => this.listPictures(whole, slots, id, ctl.signal, token),
 			icon: setIcon,
@@ -211,7 +251,7 @@ export abstract class TreeViewList extends TreeViewFinder {
 		this.markInteractive();
 		this.keepHeight();
 		// The list checks its picture files too, so a file that is too large or not a picture shows on the badge.
-		this.startPictures();
+		this.pictures.start();
 	}
 
 	/** The Notice for a saved person who has no row in the list (D330 O-09a): it names the person; a person with no name keeps the text without a name. A quiet write (a window that stays open) says nothing (D330 F03). */
@@ -290,7 +330,7 @@ export abstract class TreeViewList extends TreeViewFinder {
 	protected override takeFocus(): void {
 		if (this.full?.takeProblemsDue?.() && !pluginModalOpen()) {
 			const badge = this.viewport?.querySelector<HTMLElement>(':scope > .dynasty-toolbar')?.querySelector<HTMLElement>('.dynasty-warning-badge');
-			if (badge) this.toggleProblems(badge, this.allIssues(), false);
+			if (badge) this.toggleProblems(badge, this.pictures.allIssues(), false);
 		}
 		super.takeFocus();
 	}
@@ -322,7 +362,7 @@ export abstract class TreeViewList extends TreeViewFinder {
 	protected listMove(id: string): void {
 		if (id === this.focusId) return;
 		this.focusDue = LIST_FOCUS;
-		TreeViewBase.listGo(this.host, this.ensureState(), id, 'push', this.focusId, this);
+		BlockViews.of(this.host, this.ensureState()).listGo(id, 'push', this.focusId, this);
 	}
 
 	/** Back: the list returns to the newest person of the trail who is still in the tree. */
@@ -331,7 +371,7 @@ export abstract class TreeViewList extends TreeViewFinder {
 		const back = popTrail(st.listBack, (id) => !!this.whole?.byId.has(id));
 		if (!back) return;
 		this.focusDue = LIST_FOCUS;
-		TreeViewBase.listGo(this.host, st, back.id, 'pop', this.focusId, this);
+		BlockViews.of(this.host, st).listGo(back.id, 'pop', this.focusId, this);
 	}
 
 	/** Find: the picker of the whole tree; a choice moves the list, no choice gives the keyboard focus back to Find. */
@@ -364,7 +404,7 @@ export abstract class TreeViewList extends TreeViewFinder {
 	 */
 	protected listPictures(whole: FamilyGraph, slots: ListPictureSlots, id: string, signal: AbortSignal, token: number): void {
 		const store = this.host.pictures;
-		const info = this.pictureInfo;
+		const info = this.pictures.info;
 		const p = whole.byId.get(id);
 		if (!p) return;
 		if (!store || !info) {
@@ -385,7 +425,7 @@ export abstract class TreeViewList extends TreeViewFinder {
 				failListPicture(slot);
 				return;
 			}
-			const live = () => !signal.aborted && token === this.pictureToken && !this.unloaded && slot.isConnected;
+			const live = () => !signal.aborted && token === this.pictures.token && !this.unloaded && slot.isConnected;
 			void store.acquire(file, box, signal).then(
 				(c) => {
 					if (!c || !('url' in c)) {
@@ -574,7 +614,7 @@ export abstract class TreeViewList extends TreeViewFinder {
 		for (const c of this.listCopies.splice(0)) c.release();
 		const ctl = new AbortController();
 		this.listAbort = ctl;
-		const token = this.pictureToken;
+		const token = this.pictures.token;
 		for (const row of Array.from(list.querySelectorAll<HTMLElement>('.dynasty-list-row[data-person]'))) {
 			restoreListPictures(row);
 			const arms = row.querySelector<HTMLElement>('.dynasty-hero-arms') ?? undefined;

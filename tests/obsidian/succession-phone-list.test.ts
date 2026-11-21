@@ -4,7 +4,6 @@ import { carryState, endSessionFocus, newBlockState } from '../../src/view/block
 import { FullScreenModal } from '../../src/obsidian/full-screen';
 import { clearRelationCache } from '../../src/view/relation-cache';
 import { DEFAULT_SETTINGS } from '../../src/view/settings';
-import { TreeView } from '../../src/obsidian/tree-view';
 import { SUCCESSION_UI as T } from '../../src/render/ui-text';
 import { FEl, clock, dispatch, flushFrames, resetDom, resizeAll, settle } from '../acceptance/fake-dom';
 import { resetObsidian } from '../acceptance/fake-obsidian';
@@ -13,6 +12,8 @@ import { BODY_16 } from '../support/titles-window-support';
 import { accName } from '../acceptance/accessible-name';
 import { visibleBarText } from '../support/bar-text-support';
 import { useFakeDom } from '../support/fake-dom-setup';
+import { BlockViews } from '../../src/obsidian/block-views';
+
 
 /*
  * Version 0.2.7, WP4 view (D185 item 5): the phone list while the Show view is open, and the block state. The list shows the
@@ -50,7 +51,7 @@ async function redrawn(): Promise<void> {
 /** Opens the view in the state and draws the list, with no full-screen view over it (a full-screen view over the note makes the list wait until it closes). */
 async function showList(o: Awaited<ReturnType<typeof openList>>, title = DUKE): Promise<void> {
 	o.st.succession = { title };
-	TreeView.redrawState(o.host as never, o.st);
+	BlockViews.of(o.host as never, o.st).redrawState();
 	await redrawn();
 }
 
@@ -61,7 +62,7 @@ const listBar = (el: FEl) => el.querySelector('.dynasty-list-succession');
 describe('the phone list while the view is open', () => {
 	it('shows the bar at the top of the list with an icon-only Close, and the place of each heir in place of the relation word', async () => {
 		const o = await openList();
-		TreeView.focusState(o.host as never, o.st, 'bertram-carrow', null, o.view);
+		BlockViews.of(o.host as never, o.st).focusState('bertram-carrow', null, o.view);
 		await redrawn();
 		// Before: the relation words of the list (the marked person is Bertram).
 		expect(listBar(o.root)).toBeNull();
@@ -88,7 +89,7 @@ describe('the phone list while the view is open', () => {
 
 	it('Close ends the view, the list is as before and the centre person does not change', async () => {
 		const o = await openList();
-		TreeView.focusState(o.host as never, o.st, 'bertram-carrow', null, o.view);
+		BlockViews.of(o.host as never, o.st).focusState('bertram-carrow', null, o.view);
 		await redrawn();
 		const before = ids(o.root);
 		await showList(o);
@@ -103,7 +104,7 @@ describe('the phone list while the view is open', () => {
 
 	it('a tap on a name of the list moves the list and ends the view (a focus choice)', async () => {
 		const o = await openList();
-		TreeView.focusState(o.host as never, o.st, 'bertram-carrow', null, o.view);
+		BlockViews.of(o.host as never, o.st).focusState('bertram-carrow', null, o.view);
 		await redrawn();
 		await showList(o);
 		dispatch(row(o.root, 'jasper-carrow')!.querySelector('.dynasty-list-go')!, 'click', { button: 0, detail: 1, pointerType: 'touch' });
@@ -121,7 +122,7 @@ describe('the phone list while the view is open', () => {
 
 	it('the setting "Length of the line" redraws the list', async () => {
 		const o = await openList();
-		TreeView.focusState(o.host as never, o.st, 'bertram-carrow', null, o.view);
+		BlockViews.of(o.host as never, o.st).focusState('bertram-carrow', null, o.view);
 		await redrawn();
 		await showList(o);
 		expect(word(o.root, 'jasper-carrow')).toBe('2nd in line');
@@ -147,7 +148,7 @@ describe('the phone list while the view is open', () => {
 			'',
 		].join('\n');
 		const o = await openList(body);
-		TreeView.focusState(o.host as never, o.st, 'rex', null, o.view);
+		BlockViews.of(o.host as never, o.st).focusState('rex', null, o.view);
 		await redrawn();
 		await showList(o, 'crown');
 		expect(word(o.root, 'kid')).toBe('1st in line');
@@ -160,7 +161,7 @@ const ids = (el: FEl) => el.querySelectorAll('.dynasty-list-row').map((r) => r.g
 describe('Show with only a phone list on the page', () => {
 	it('opens the full-screen view with the bar, as the finder does', async () => {
 		const o = await openList();
-		TreeView.showSuccession(o.host as never, o.st, DUKE, o.view);
+		BlockViews.of(o.host as never, o.st).showSuccession(DUKE, o.view);
 		await redrawn();
 		expect(fullViews()).toHaveLength(1);
 		const full = (fullViews()[0] as unknown as { containerEl: FEl }).containerEl;

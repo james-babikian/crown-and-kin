@@ -34,6 +34,8 @@ export interface TagPillSpec {
 	measure: (text: string) => number;
 	/** Cuts a text to a width (the card's cut, with the ellipsis). */
 	fit: (text: string, maxW: number) => string;
+	/** True for a pill that no level shows yet: its text and name `tspan` are made by the first run of the returned fit (D377 step 8), not at the draw. */
+	later?: boolean;
 }
 
 /** D354 2 C: the lead of a named tag: the ⚭ for one partner, nothing for several. */
@@ -71,11 +73,19 @@ export function drawTagPill(holder: SVGGElement, s: TagPillSpec): () => void {
 	const baseline = bottom - h / 2 + 0.35 * s.fontPx;
 	const named = s.name !== undefined;
 	const textEl = part.createSvg('text', { cls: 'dynasty-tag-text', attr: named ? { x, y: baseline } : { x, y: baseline, 'text-anchor': 'middle' } });
-	textEl.setText(s.lead);
-	const nameEl = named ? textEl.createSvg('tspan', { cls: 'dynasty-tag-name', attr: { x } }) : undefined;
+	// The same two calls in the same order whenever they run, so a pill filled late has the children of a pill that was filled at once.
+	let nameEl: SVGTSpanElement | undefined;
+	let made = false;
+	const putText = () => {
+		made = true;
+		textEl.setText(s.lead);
+		nameEl = named ? textEl.createSvg('tspan', { cls: 'dynasty-tag-name', attr: { x } }) : undefined;
+	};
+	if (!s.later) putText();
 	const markAt = (cx: number) => unionMark(shape!, cx, bottom - h / 2, UNION_MARKS[shape!].size * TAG_MARK.unit * s.fontPx);
 	const markEl = shape ? part.createSvg(markAt(0).tag, { cls: ['dynasty-tag-mark', ...unionMarkClass(shape)], attr: markAt(0).attr }) : undefined;
 	return () => {
+		if (!made) putText();
 		let w = Math.min(zone, s.measure(s.lead) + 2 * pad);
 		let markX = 0;
 		if (nameEl) {

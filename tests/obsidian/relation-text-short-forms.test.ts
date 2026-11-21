@@ -343,7 +343,7 @@ describe('only the drawn card is shortened', () => {
 		const root = fileURLToPath(new URL('../../src', import.meta.url));
 		const users = src(root).filter((f) => /relation-fit/.test(readFileSync(f, 'utf8')) && !f.endsWith('/relation-fit.ts')).map((f) => f.slice(root.length + 1));
 		// 0.3.3: the live scene reaches the short forms through `date-fit.ts` (its `fitCardText`, which also does the cut of the names of years).
-		expect(users.sort()).toEqual(['render/date-fit.ts', 'render/svg-string.ts']);
+		expect(users.sort()).toEqual(['render/date-fit.ts', 'render/svg-cards.ts']);
 	});
 	it('the text of the relation, the sheet line and the label are the whole text', async () => {
 		const rel = { text: 'Half first cousin once removed', lower: 'half first cousin once removed', maybe: { effect: 'full', cause: 'rumoured', lower: 'first cousin once removed', some: true } } as never;

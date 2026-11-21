@@ -4,8 +4,8 @@
 // for every person as the mark (at most 40 people), and every answer of `findRelation` for up to 8 x 8 pairs (text, kind,
 // distance, maybe, steps, line). The golden file was recorded on the relation code before it was split into files, so a move
 // of code must leave every hash equal. Seeds 195, 226 and 298 must be in the golden file (the genealogy vet named them).
-// Make the golden file again only on purpose: `WRITE_FINGERPRINT=1 npx vitest run --project perf tests/core/relations-random-sweep.test.ts`.
-// It takes about 27 s, so it runs in the perf project (`npm run test:perf`).
+// Make the golden file again only on purpose: `WRITE_FINGERPRINT=1 npx vitest run --project slow tests/core/relations-random-sweep.test.ts`.
+// It takes about 27 s, so it runs in the slow project (`npm run test:slow`).
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';

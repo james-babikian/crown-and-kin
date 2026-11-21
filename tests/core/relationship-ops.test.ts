@@ -268,7 +268,7 @@ describe('keys left stale by an op', () => {
 		expect(edit(src, { kind: 'remove-parent', child: 'c', parent: 'b', type: 'birth' })).toContain('    parents: [a]\nunions:');
 		expect(edit(src, { kind: 'set-parent-type', child: 'c', parent: 'a', from: 'birth', to: 'rumoured' })).toContain('    parents: [{id: a, type: rumoured}, b]\nunions:');
 		// Still the same pair: the key stays.
-		expect(edit(src, { kind: 'add-parent', child: 'c', parent: 'a', type: 'rumoured' })).toContain('    union: second\n');
+		expect(edit(src, { kind: 'add-parent', child: 'c', parent: 'a', type: 'adoptive' })).toContain('    union: second\n');
 	});
 
 	it('add-parent: a child under an adoptive pair who gains a birth parent moves, and union goes', () => {
@@ -282,9 +282,9 @@ describe('keys left stale by an op', () => {
 
 	it('one person as a parent of two types: allowed, removed one type at a time, and all at once on delete', () => {
 		const src = PAIR + '  - id: c\n    name: C\n    parents: [a]\n';
-		const both = edit(src, { kind: 'add-parent', child: 'c', parent: 'a', type: 'rumoured' });
-		expect(both).toContain('    parents: [a, {id: a, type: rumoured}]\n');
-		expect(edit(both, { kind: 'remove-parent', child: 'c', parent: 'a', type: 'birth' })).toContain('    parents: [{id: a, type: rumoured}]\n');
+		const both = edit(src, { kind: 'add-parent', child: 'c', parent: 'a', type: 'adoptive' });
+		expect(both).toContain('    parents: [a, {id: a, type: adoptive}]\n');
+		expect(edit(both, { kind: 'remove-parent', child: 'c', parent: 'a', type: 'birth' })).toContain('    parents: [{id: a, type: adoptive}]\n');
 		expect(edit(both, { kind: 'delete-person', id: 'a' })).toBe('people:\n  - id: b\n    name: B\n  - id: c\n    name: C\n');
 	});
 

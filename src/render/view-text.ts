@@ -44,8 +44,11 @@ export function problemsPopupLine(count: number): string {
 /** The button of that pop-up: it opens the full-screen view with the problem list. */
 export const PROBLEMS_POPUP_BUTTON = 'Show in full screen';
 
-/** Hint text shown above the problem list. */
-export const PROBLEMS_HINT = 'Select a problem to show the people it is about. Select Open next to a problem to correct it.';
+/** Hint text shown above the problem list; the phone sheet says "Tap". */
+export const PROBLEMS_HINT = {
+	computer: 'Select a problem to show the people it is about. Select Open next to a problem to correct it.',
+	phone: 'Tap a problem to show the people it is about. Tap Open next to a problem to correct it.',
+} as const;
 
 /** D330 UX-20: the second action of a problem row; `target` is the name of the house or the person that the problem is about. */
 export const PROBLEMS_OPEN = {
@@ -239,12 +242,13 @@ export const FOLD_UI = {
 	hideDescendants: 'Hide descendants',
 	showDescendants: 'Show descendants',
 	hideDescendantsLabel: (name: string) => `Hide descendants: hide the people below ${name}`,
-	showDescendantsLabel: (name: string) => `Show descendants: show the hidden people below ${name}`,
+	showDescendantsLabel: (name: string, count: number) =>
+		count === 1 ? `Show descendants: show the hidden person below ${name}` : `Show descendants: show the ${groupCount(count)} hidden people below ${name}`,
 	/** The button of an open family: no count. */
 	hideLabel: (names: readonly string[]) => `Hide the people below ${nameList(names)}`,
 	/** The sign of a folded family, with the number of hidden people. */
 	showLabel: (names: readonly string[], count: number) =>
-		count === 1 ? `Show the hidden person below ${nameList(names)}` : `Show the ${count} hidden people below ${nameList(names)}`,
+		count === 1 ? `Show the hidden person below ${nameList(names)}` : `Show the ${groupCount(count)} hidden people below ${nameList(names)}`,
 } as const;
 
 /** A number of people with a comma as the thousands separator ("1,600"): normal English, and a space can read as two numbers. */

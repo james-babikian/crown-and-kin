@@ -9,8 +9,10 @@ import { compareCands, forget, isDupRumoured, isFullCousin, maybeRank, walkLine,
 import { type Blood, type BloodLine, BY_IN_LAW, BY_MARRIAGE, BY_STEP, type Cand, type Edge, FORMER, implicitKey, isStepLink, type Line, named, possessive, RUMOURED_CAT, type Up, type Walk, type Word } from './relation-internal';
 import { isBloodType } from './parent-types';
 import { KinBlood } from './relation-kin-blood';
+import { keepOne } from './relation-kin-base';
 import { RANK, type Relation, relationCallStats, type RelationLine, type RelationMaybe, type RelationStep, WORD_RANK } from './relation-types';
-import { capital, childStepWord, cousinWord, nephewWord, parentStepWord, type Sex, siblingStepWord, uncleWord, WORDS } from './relation-words';
+import { upperFirst } from './quote';
+import { childStepWord, cousinWord, nephewWord, parentStepWord, type Sex, siblingStepWord, uncleWord, WORDS } from './relation-words';
 
 /** The top layer of the relation search: the names of one person to another, the chain, the steps and the frozen relations. */
 export class Kin extends KinBlood {
@@ -280,7 +282,7 @@ export class Kin extends KinBlood {
 	/** D123: the name a sure blood candidate would have if every rumoured link were true (or, D174, if the parent who is not listed is the same person). */
 	private maybeOf(c: Blood, sex: Sex): RelationMaybe {
 		const lower = this.bloodLower({ ...c, half: !c.half }, sex);
-		return Object.freeze({ effect: c.maybe!, text: capital(lower), lower, cause: c.cause ?? 'rumoured', ...(c.some ? { some: true as const } : {}), ...(c.cause === 'unlisted' && c.form ? { unlistedForm: c.form } : {}) });
+		return Object.freeze({ effect: c.maybe!, text: upperFirst(lower), lower, cause: c.cause ?? 'rumoured', ...(c.some ? { some: true as const } : {}), ...(c.cause === 'unlisted' && c.form ? { unlistedForm: c.form } : {}) });
 	}
 
 	/**
@@ -533,7 +535,8 @@ export class Kin extends KinBlood {
 				via[w] = e;
 				queue.push(w);
 			};
-			for (const l of this.drawn[v]) visit(l.p, { k: 'up', type: l.type });
+			// D375 (4): one kept link for each parent, as `downAll` has, so the step word never depends on the order of the note.
+			for (const l of keepOne(this.drawn[v], true)) visit(l.p, { k: 'up', type: l.type });
 			for (const c of this.downAll[v]) visit(c.p, { k: 'down', type: c.type });
 			for (const w of this.partners(v)) visit(w, { k: 'partner', union: this.pairUnion(v, w)?.key ?? implicitKey(this.ids[v], this.ids[w]) });
 		}
@@ -580,7 +583,7 @@ export class Kin extends KinBlood {
 
 	/** A `Relation` with ids in place of indices. */
 	relation(c: Cand, line: Line): Relation {
-		return { text: capital(c.lower), lower: c.lower, kind: c.kind, distance: c.distance, line: this.lineIds(line), ...(c.maybe ? { maybe: c.maybe } : {}) };
+		return { text: upperFirst(c.lower), lower: c.lower, kind: c.kind, distance: c.distance, line: this.lineIds(line), ...(c.maybe ? { maybe: c.maybe } : {}) };
 	}
 
 	/**
@@ -591,7 +594,7 @@ export class Kin extends KinBlood {
 		let line: RelationLine | undefined;
 		const make = () => (line ??= deepFreeze(this.lineIds(c.make().line)));
 		return Object.freeze({
-			text: capital(c.lower),
+			text: upperFirst(c.lower),
 			lower: c.lower,
 			kind: c.kind,
 			distance: c.distance,

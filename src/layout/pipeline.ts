@@ -198,7 +198,7 @@ export function runStages(g: FamilyGraph, coreGen: Map<string, number>, plain: G
 	}
 	if (groups.length) {
 		stages = settleGroups(g, groups, states, stages, layOut);
-		// A pair that turned far in the final run is hung once more (the "+1" of contract �1.5).
+		// A pair that turned far in the final run is hung once more (the "+1" of contract §1.5).
 		const far = farPairs(stages);
 		if (far.length) {
 			for (const k of far) hung.add(k);

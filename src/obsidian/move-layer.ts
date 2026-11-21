@@ -9,6 +9,7 @@
 import { mediaMatches } from '../render/dom/page-reads';
 import type { MarginRule } from '../render/dom/pan-zoom';
 
+/* global __DYNASTY_SWITCHES__ -- a build-time switch, declared in harness-flag.d.ts */
 /** The class that the canvas of a big tree carries. The style sheet reads it; no style is written from code. */
 export const BIG_TREE_CLASS = 'dynasty-big-tree';
 
@@ -40,20 +41,28 @@ export const DRAG_MARGIN_ATTR = 'data-dynasty-drag-margin';
 
 /** The study switch of the margin rule, read from the page root; null when it is absent or has another value. */
 export function dragMarginOverride(doc: Document): MarginRule | null {
-	const v = doc.documentElement?.getAttribute(DRAG_MARGIN_ATTR);
+	// Inline, not a top-level const: a const keeps both attribute names in the release bundle.
+	const v = typeof __DYNASTY_SWITCHES__ === 'boolean' && __DYNASTY_SWITCHES__ ? doc.documentElement?.getAttribute(DRAG_MARGIN_ATTR) : null;
 	if (v === 'range') return 'range';
 	const n = v === '0.5' || v === '1' || v === '3' ? Number(v) : NaN;
 	return Number.isFinite(n) ? n : null;
 }
 
 /**
- * D365 (1): does a one-finger drag move the HTML wrapper, and write the scene <g> only when the drag ends or empty space shows? True only on iOS (WebKit lays out all
- * SVG text again for each write of the <g> transform, about 120 ms for 1,000 people on the iPhone; Blink pays nothing, and a compositor layer on a big tree made
- * a Blink pan move cost seconds, D285) and only above `STANDING_LAYER_MAX_PEOPLE` cards: a tree of 500 or fewer keeps today's path. `override` is the harness switch.
+ * The fewest people (cards in the layout) of a tree whose one-finger drag moves the wrapper on iOS. It is 1, so every tree with a card takes the wrapped path: on the
+ * iPhone (D374 (2), the drag test of 2026-11-18) the wrapped drag gave 8 ms frames at 150, 300 and 400 people, and the plain write of the <g> in each frame takes longer
+ * than one 120 Hz frame from about 58 people. It is separate from `STANDING_LAYER_MAX_PEOPLE` (D374 (2)): that one decides the compositor layer, this one the drag path.
+ */
+export const WRAPPED_DRAG_MIN_PEOPLE_IOS = 1;
+
+/**
+ * D365 (1), D374 (2): does a one-finger drag move the HTML wrapper, and write the scene <g> only when the drag ends or empty space shows? True on iOS for every tree of
+ * `WRAPPED_DRAG_MIN_PEOPLE_IOS` cards or more (WebKit lays out all SVG text again for each write of the <g> transform, about 120 ms for 1,000 people on the iPhone), and never
+ * on a computer or Android (Blink pays nothing). `override` is the harness switch. It does not read the standing-layer rule.
  */
 export function dragMovesWrapper(people: number, ios: boolean, override: 'on' | 'off' | null = null): boolean {
 	if (override) return override === 'on';
-	return ios && !keepsStandingLayer(people);
+	return ios && people >= WRAPPED_DRAG_MIN_PEOPLE_IOS;
 }
 
 /**
@@ -72,6 +81,6 @@ export function isIosWebKit(win: Window): boolean {
 
 /** The harness switch of `dragMovesWrapper`, read from the page root at the start of a drag. */
 export function panWrapperOverride(doc: Document): 'on' | 'off' | null {
-	const v = doc.documentElement?.getAttribute(PAN_WRAPPER_ATTR);
+	const v = typeof __DYNASTY_SWITCHES__ === 'boolean' && __DYNASTY_SWITCHES__ ? doc.documentElement?.getAttribute(PAN_WRAPPER_ATTR) : null;
 	return v === 'on' || v === 'off' ? v : null;
 }

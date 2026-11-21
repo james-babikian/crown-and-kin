@@ -1,6 +1,6 @@
 /*
  * What a tree view does for the user: opens the edit window of a person, of a new person, the Titles and Houses windows, expands to the
- * full-screen view, shows and centres people, and applies the folds (spec §13.10) and the focus. Seventh layer of the chain listed in `tree-view.ts`.
+ * full-screen view, shows and centres people, and applies the folds (spec §13.10) and the focus. Sixth layer of the chain listed in `tree-view.ts`.
  */
 
 import { Notice } from 'obsidian';
@@ -22,6 +22,8 @@ import { TitlesWindow } from './titles-window';
 import { TreeViewToolbar } from './tree-view-toolbar';
 import { TreeViewBase } from './tree-view-base';
 import type { FullSource, FoldAnchor } from './tree-view-types';
+import { BlockViews } from './block-views';
+
 
 /** The card of a person in a drawn view; ids are compared as text, so an id with quotes needs no escape. */
 function cardOf(viewport: HTMLElement, id: string): HTMLElement | null {
@@ -37,7 +39,7 @@ export abstract class TreeViewActions extends TreeViewToolbar {
 	focusOn(id: string | null, target: string[] | null = null): void {
 		const st = this.ensureState();
 		if (id !== null && (this.full || !this.coarse)) TreeViewBase.unfoldForFocus(this.host, st, id);
-		TreeViewBase.focusState(this.host, st, id, target, this);
+		BlockViews.of(this.host, st).focusState(id, target, this);
 	}
 
 	/** The block's focus changed: draw again. An embed under an open full-screen view of the block waits until it closes. */
@@ -79,12 +81,12 @@ export abstract class TreeViewActions extends TreeViewToolbar {
 			focus: {
 				here: (person) => {
 					if (this.full || !this.coarse) TreeViewBase.unfoldForFocus(this.host, h.state, person);
-					TreeViewBase.focusState(this.host, h.state, person);
+					BlockViews.of(this.host, h.state).focusState(person);
 				},
-				changed: () => TreeViewBase.redrawState(this.host, h.state, { keepOwn: true }),
-				pinning: () => TreeViewBase.dropOwnFocus(this.host, h.state),
+				changed: () => BlockViews.of(this.host, h.state).redrawState({ keepOwn: true }),
+				pinning: () => BlockViews.of(this.host, h.state).dropOwnFocus(),
 			},
-			finder: { show: (first, second) => TreeViewBase.showFinder(this.host, h.state, first, second, this) },
+			finder: { show: (first, second) => BlockViews.of(this.host, h.state).showFinder(first, second, this) },
 			folds: this.sheetFolds(h),
 			pictures: this.host.pictures,
 			relationOptions: this.relationOptions,
@@ -144,14 +146,14 @@ export abstract class TreeViewActions extends TreeViewToolbar {
 			reduced: () => this.reduced(),
 			beforeWrite: () => this.keepView(),
 			// The computer has a Titles button of its own; on the phone the window comes from More.
-			onClosed: () => TreeViewBase.refocusButton(host, st, full, fromButton ? '.dynasty-titles-button' : '.dynasty-more'),
-			show: (id) => TreeViewBase.showFound(host, st, full, id),
-			openPerson: (id) => TreeViewBase.openPersonOf(host, st, full, id, this.unloaded ? null : this),
+			onClosed: () => BlockViews.of(host, st).refocusButton(full, fromButton ? '.dynasty-titles-button' : '.dynasty-more'),
+			show: (id) => BlockViews.of(host, st).showFound(full, id),
+			openPerson: (id) => BlockViews.of(host, st).openPersonOf(full, id, this.unloaded ? null : this),
 			pictures: host.pictures,
 			me: () => this.meId,
 			relationOptions: () => this.relationOptions,
 			// Show opens the view of the line; the settings come from the host, because this view can be drawn again after a Save.
-			showLine: (title) => TreeViewBase.showSuccession(host, st, title, this.unloaded ? null : this),
+			showLine: (title) => BlockViews.of(host, st).showSuccession(title, this.unloaded ? null : this),
 			succession: {
 				limit: () => (host.settings ?? DEFAULT_SETTINGS).successionLength,
 				oldAge: () => (host.settings ?? DEFAULT_SETTINGS).oldAge,
@@ -189,14 +191,14 @@ export abstract class TreeViewActions extends TreeViewToolbar {
 			handle: h,
 			dates: this.datesFor,
 			beforeWrite: () => this.keepView(),
-			onClosed: () => TreeViewBase.refocusButton(this.host, st, full, '.dynasty-houses-button'),
+			onClosed: () => BlockViews.of(this.host, st).refocusButton(full, '.dynasty-houses-button'),
 			sourcePath: this.sourcePath,
 			pictures: this.host.pictures,
 			showGeneration: () => this.settings.showHouseGeneration,
 			reduced: () => this.reduced(),
 			people: {
 				// This view if it is still drawn; after a Save the note draws the tree again, and the view of the same state shows the card.
-				show: (id) => (this.unloaded ? TreeViewBase.showFound(this.host, st, full, id) : this.guard(() => this.showFound(id))),
+				show: (id) => (this.unloaded ? BlockViews.of(this.host, st).showFound(full, id) : this.guard(() => this.showFound(id))),
 				openNote: (open) => this.openNote(open),
 			},
 		});
@@ -293,7 +295,7 @@ export abstract class TreeViewActions extends TreeViewToolbar {
 		const next = new Set(st.folds);
 		if (c.folded) next.delete(c.key);
 		else next.add(c.key);
-		TreeViewBase.changeFolds(this.host, st, next, { anchor: { kind: 'spot', key: c.key }, origin: this });
+		BlockViews.of(this.host, st).changeFolds(next, { anchor: { kind: 'spot', key: c.key }, origin: this });
 	}
 
 	/**
@@ -330,7 +332,7 @@ export abstract class TreeViewActions extends TreeViewToolbar {
 		const active = this.containerEl.doc.activeElement;
 		const focused = this.foldByKey ? (active?.closest('.dynasty-fold')?.getAttribute('data-fold') ?? null) : null;
 		this.foldByKey = false;
-		const plan = planFolds(g, whole, this.ensureState().folds, true, this.linePeopleNow());
+		const plan = planFolds(g, whole, this.ensureState().folds, true, this.finder.linePeople());
 		this.foldPlan = plan;
 		const next = this.layOut(g, last.geo, withFolds(last.settings, plan, true), last.opts.fonts, last.opts.labels, plan.hidden);
 		last.settings = next.settings;
@@ -354,7 +356,7 @@ export abstract class TreeViewActions extends TreeViewToolbar {
 		const hidden = ids.filter((id) => plan.hidden.has(id));
 		if (!hidden.length) return false;
 		const st = this.ensureState();
-		TreeViewBase.changeFolds(this.host, st, unfoldFor(g, whole, st.folds, hidden), { origin: this, targets: ids });
+		BlockViews.of(this.host, st).changeFolds(unfoldFor(g, whole, st.folds, hidden), { origin: this, targets: ids });
 		return true;
 	}
 
@@ -380,11 +382,11 @@ export abstract class TreeViewActions extends TreeViewToolbar {
 		}
 		if (this.finderDrawn.line) {
 			f.whole = true;
-			TreeViewBase.finderRedraw(this.host, st, this, ids);
+			BlockViews.of(this.host, st).finderRedraw(this, ids);
 			return;
 		}
 		st.focus = { id: null };
 		st.shown = null;
-		TreeViewBase.redrawState(this.host, st, { target: ids, origin: this });
+		BlockViews.of(this.host, st).redrawState({ target: ids, origin: this });
 	}
 }

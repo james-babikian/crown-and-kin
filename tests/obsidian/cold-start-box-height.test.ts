@@ -8,6 +8,8 @@ import { FEl, clock, dispatch, flushFrames, resetDom, resizeAll, runTimers, sett
 import { openModals, resetObsidian } from '../acceptance/fake-obsidian';
 import { desktop, embed, fakeHandle, fakeHost, fillAllCards, openFullScreen, phone, type FakeHandle, type Host } from '../acceptance/tree-view-fakes';
 import { useFakeDom } from '../support/fake-dom-setup';
+import { BlockViews } from '../../src/obsidian/block-views';
+
 
 /*
  * 0.2.8, package P5: the cold start (D183, I07), the toolbar and its menus, the banner, the settings that the view hands to the
@@ -262,7 +264,7 @@ unions:
 		desktop();
 		const handle = fakeHandle('n.md', FAM);
 		const { el, view, host } = await embed(FAM, { handle });
-		TreeView.showFinder(host as never, handle.state, 'c', 'd', view);
+		BlockViews.of(host as never, handle.state).showFinder('c', 'd', view);
 		await settle();
 		resizeAll();
 		flushFrames();
@@ -280,7 +282,7 @@ unions:
 		void handle;
 		const view = [...(host.views as Set<TreeView>)].find((v) => v.isFull)!;
 		const st = (view as unknown as { peekState(): { finder: unknown } }).peekState() as never;
-		TreeView.showFinder(host as never, st, 'c', 'd', view);
+		BlockViews.of(host as never, st).showFinder('c', 'd', view);
 		await settle();
 		resizeAll();
 		flushFrames();

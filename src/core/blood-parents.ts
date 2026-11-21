@@ -1,6 +1,7 @@
 /*
  * The parents by blood of a person (spec §0 D332): birth parents and begetters together. `validate.ts` calls the three warnings and the
- * rule that a begetter who is also a birth parent of the same child is not drawn twice; the edits (`relationship-ops.ts`, `family-query.ts`)
+ * rule that a begetter who is also a birth parent of the same child is not drawn twice, and the same rule and its warning for a rumoured
+ * parent who is also a written birth parent (D371 (4)); the edits (`relationship-ops.ts`, `family-query.ts`)
  * read `bloodProblem` and `bloodRefusal`; the relation search (`relation-kin-base.ts`) reads the blood set of a child through `bloodSet`. Pure; nothing here
  * reads the rest of the tree.
  */
@@ -34,13 +35,54 @@ export function bloodWarnings(p: Person, valid: readonly Link[], name: (id: stri
 }
 
 /**
- * The links that the tree draws for a person: the begetter entry of an id that is also a birth parent of the person is left out,
- * so the birth link wins in every reader of the drawn links (D332). The note keeps both entries. The input is never changed.
+ * The links that the tree draws for a person (D332, D371 (4)): the begetter entry of an id that is also a birth parent of the person is
+ * left out, and so is the rumoured entry of an id that the note writes as a birth parent (`rumouredBirthParents`), so the birth link wins
+ * in every reader of the drawn links. The note keeps both entries. `written` is the person's parent list as parsed; `valid` is never changed.
  */
-export function withoutDoubledBegetter<T extends Link>(valid: T[]): T[] {
+export function drawnLinks<T extends Link>(written: readonly { id: string; type: string }[], valid: T[]): T[] {
+	const links = withoutDoubledBegetter(valid);
+	const doubled = [...rumouredBirthParents(written, links), ...rumouredBegetters(written, links)];
+	if (!doubled.length) return links;
+	const drop = new Set(doubled);
+	return links.filter((r) => r.type !== 'rumoured' || !drop.has(r.id));
+}
+
+/** The cleaned links without the begetter entry of an id that is also a birth parent (D332). The input is never changed. */
+function withoutDoubledBegetter<T extends Link>(valid: T[]): T[] {
 	if (!valid.some((r) => r.type === 'begetter')) return valid;
 	const birth = new Set(valid.filter((r) => r.type === 'birth').map((r) => r.id));
 	return valid.some((r) => r.type === 'begetter' && birth.has(r.id)) ? valid.filter((r) => r.type !== 'begetter' || !birth.has(r.id)) : valid;
+}
+
+/**
+ * D371 (4): the ids that the note of a person writes with the type word `birth` (or as a bare id) and also as a rumoured parent, in the
+ * order of the cleaned links. An id whose birth reading comes only from a type word the plugin does not know is not one of them: that
+ * entry already warns as `unknown-parent-type`, and both of its links stay drawn.
+ */
+function rumouredBirthParents(written: readonly { id: string; type: string }[], valid: readonly Link[]): string[] {
+	if (!valid.some((r) => r.type === 'rumoured')) return [];
+	const birth = new Set<string>();
+	for (const r of written) if (r.type === 'birth') birth.add(r.id);
+	return valid.filter((r) => r.type === 'rumoured' && birth.has(r.id)).map((r) => r.id);
+}
+
+/**
+ * D375 (4): the ids of the cleaned links that are a rumoured parent and a kept begetter (the known word `begetter`) of the person, and not
+ * also written as `birth`: the birth case has its own rules and warnings, and the begetter entry of a birth id is already gone from `valid`.
+ */
+function rumouredBegetters(written: readonly { id: string; type: string }[], valid: readonly Link[]): string[] {
+	if (!valid.some((r) => r.type === 'rumoured') || !valid.some((r) => r.type === 'begetter')) return [];
+	const begetters = new Set(valid.filter((r) => r.type === 'begetter').map((r) => r.id));
+	const birth = new Set(written.filter((r) => r.type === 'birth').map((r) => r.id));
+	return [...new Set(valid.filter((r) => r.type === 'rumoured' && begetters.has(r.id) && !birth.has(r.id)).map((r) => r.id))];
+}
+
+/** D371 (4): one `rumoured-is-birth-parent` warning for each id that `p` writes as a birth parent and as a rumoured parent, with the ids of the person and the parent. */
+export function rumourWarnings(p: Person, valid: readonly Link[], name: (id: string) => string, warn: Warn): void {
+	for (const id of rumouredBirthParents(p.parents, valid)) warn('rumoured-is-birth-parent', { person: p.name, parent: name(id) }, [p.id, id]);
+	// D375 (4): the same for a begetter who is not also a birth parent.
+	// The links cleaned as `drawnLinks` cleans them: a begetter dropped by D332 (also when a misspelt word reads as birth) never warns here.
+	for (const id of rumouredBegetters(p.parents, withoutDoubledBegetter([...valid]))) warn('rumoured-is-begetter', { person: p.name, parent: name(id) }, [p.id, id]);
 }
 
 /**
@@ -65,19 +107,25 @@ export function begetterMarriageWarnings(people: readonly Person[], refs: Readon
 /**
  * D332, the rule of an edit for a parent link of `id` with `type`, beside the other links of the child (`others`, the changed link left
  * out): 'clash' if `id` would be a birth parent and a begetter of the child, 'limit' if the distinct parents by blood would be more than
- * `BLOOD_LIMIT`. A link of another type passes. So a change between birth and begetter on one link never meets the limit by blood.
+ * `BLOOD_LIMIT`; D375 (3): 'rumoured-exists' (a birth link for an id that is a rumoured parent already) and 'birth-exists' (the reverse). A link of another type passes. So a change between birth and begetter on one link never meets the limit by blood.
  */
-export function bloodProblem(others: readonly { id: string; type: string }[], id: string, type: string): 'clash' | 'limit' | undefined {
+export function bloodProblem(others: readonly { id: string; type: string }[], id: string, type: string): 'clash' | 'limit' | 'rumoured-exists' | 'birth-exists' | undefined {
+	// D375 (3): an id is never both a birth parent and a rumoured parent of one child through a window; every other pair stays allowed.
+	if (type === 'birth' && others.some((r) => r.id === id && r.type === 'rumoured')) return 'rumoured-exists';
+	if (type === 'rumoured' && others.some((r) => r.id === id && r.type === 'birth')) return 'birth-exists';
 	if (!isBloodType(type)) return undefined;
 	const blood = others.filter((r) => isBloodType(r.type));
 	if (blood.some((r) => r.id === id && r.type !== type)) return 'clash';
 	return new Set([...blood.map((r) => r.id), id]).size > BLOOD_LIMIT ? 'limit' : undefined;
 }
 
-/** `bloodProblem` as the refusal of an edit: `limit`, or `bad-value` with `REFUSAL_TEXT.alreadyBloodParent`. */
+/** `bloodProblem` as the refusal of an edit: `limit`, or `bad-value` with the text of the clash (`alreadyBloodParent`, `alreadyRumouredParent`, `alreadyBirthParent`). */
 export function bloodRefusal(others: readonly { id: string; type: string }[], id: string, type: string): Refusal | undefined {
 	const why = bloodProblem(others, id, type);
-	return why === 'limit' ? refuse('limit') : why ? refuse('bad-value', REFUSAL_TEXT.alreadyBloodParent) : undefined;
+	if (why === 'limit') return refuse('limit');
+	if (why === 'rumoured-exists') return refuse('bad-value', REFUSAL_TEXT.alreadyRumouredParent);
+	if (why === 'birth-exists') return refuse('bad-value', REFUSAL_TEXT.alreadyBirthParent);
+	return why ? refuse('bad-value', REFUSAL_TEXT.alreadyBloodParent) : undefined;
 }
 
 /** The distinct parents by blood (birth and begetter links) of `links`, in their order: the blood set of a child (D332). */

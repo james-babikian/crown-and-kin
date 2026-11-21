@@ -1,15 +1,14 @@
 /*
  * The bottom layer of `TreeView`. `TreeView` is a chain of classes,
  * one file for each concern, and the chain is listed in `tree-view.ts`. This first class holds what every layer shares: the host contract, the
- * state of one view (every field), the open timing of spec §7.7, the access to the block's memory, and the cross-view calls (the static methods
- * that draw every view of one block again after a focus, folds, finder or Show view change). The state stays in one object on purpose: the layers
+ * state of one view (every field), the open timing of spec §7.7, the access to the block's memory, and the public face of a view for the calls between
+ * the views of one block (`block-views.ts`). The state stays in one object on purpose: the layers
  * are one view, and the tests read its fields. The `abstract` methods at the end are implemented by the layers above.
  */
 
 import { MarkdownRenderChild, type App, type HoverParent, type HoverPopover } from 'obsidian';
 import { deriveFamilies, type FamilyGraph } from '../core/derive';
-import type { CodedIssue } from '../core/messages';
-import { foldHidden, personFolds, unfoldFor, type FoldControl, type FoldKey } from '../core/folds';
+import { foldHidden, foldedPeopleCount, personFolds, unfoldFor, type FoldControl } from '../core/folds';
 import type { ParseCache } from '../core/parse-cache';
 import { parseBody, parseDynasty } from '../core/parse';
 import { isEmpty, isMap } from '../core/tolerate';
@@ -28,22 +27,24 @@ import type { RenderTiming } from '../render/tree-info';
 import type { Lod, View } from '../render/view-math';
 import type { Handle, HandleRegistry } from './block-handle';
 import { BlockBinding } from './block-binding';
+import { BlockViews, type ViewPort } from './block-views';
+import type { FinderBars } from './finder-bars';
+import { ViewPictures, type PicturesPort } from './view-pictures';
 import { newBlockState, type BlockState } from '../view/block-state';
 import { datesForTree, type CalendarIndex, type DatesFor } from '../view/calendar-index';
 import type { CalendarTree, SetLinkResult } from './calendar-link';
 import type { SheetFolds } from './edit-sheet';
 import { setFolds, type FoldPlan } from '../view/fold-view';
-import type { LivePictures } from './live-pictures';
 import type { LargeBar } from '../view/large-tree';
 import type { MeasuredResult } from '../view/measured-layout';
-import { pushTrail, type ListFrom } from '../view/phone-list';
+import { type ListFrom } from '../view/phone-list';
 import { pluginWindowOpen } from '../view/plugin-modals';
 import type { PickerContext } from './person-picker';
 import type { PictureStore } from './picture-store';
 import type { FinderDrawn } from '../view/render-plan';
 import { DEFAULT_SETTINGS, type DynastySettings } from '../view/settings';
 import type { SuccessionDrawn } from '../view/succession-view';
-import { OPEN_GAP_MS, type OpenTime, type FullSource, type FullHost, type ViewPlace, type FoldAnchor, type Anchor, type KeepPlace, type PictureInfo } from './tree-view-types';
+import { OPEN_GAP_MS, type OpenTime, type FullSource, type FullHost, type ViewPlace, type FoldAnchor, type Anchor, type KeepPlace } from './tree-view-types';
 
 /** Elements that `refocusAfterRedraw` focused and whose `focus` event has not come yet, each with the call that ends the mark. */
 const restoreMarks = new WeakMap<Element, () => void>();
@@ -94,17 +95,15 @@ export interface ViewHost {
 	readonly opens?: Map<string, OpenTime>;
 }
 
-/** Options of `TreeView.redrawState`. */
-interface RedrawOptions {
-	target?: string[] | null;
-	origin?: TreeViewBase | null;
-	except?: TreeViewBase | null;
-	keepOwn?: boolean;
-}
-
 /** The state of one rendered `kin` block and the calls between the views of one block. Never made by itself: `TreeView` is the whole chain. */
 export abstract class TreeViewBase extends MarkdownRenderChild implements HoverParent {
 	hoverPopover: HoverPopover | null = null;
+	/** What `BlockViews` may use of this view; made once and held by the view alone. */
+	readonly port: ViewPort<TreeViewBase> = this.makePort();
+	/** The pictures of this view: links, live pictures, the file check and the badge problems (`view-pictures.ts`). */
+	readonly pictures: ViewPictures = new ViewPictures(this.picturesPort());
+	/** The bars of the relation finder and the Show view (`finder-bars.ts`); made by the list layer, which sees the menu helpers of the toolbar, before any draw. */
+	protected finder!: FinderBars<TreeViewBase>;
 	/** The binding to the block in the note: handle, place, retries and the cold-start wait (`block-binding.ts`). */
 	protected readonly binding: BlockBinding;
 	protected readonly coarse: boolean;
@@ -245,16 +244,6 @@ export abstract class TreeViewBase extends MarkdownRenderChild implements HoverP
 	protected focusDue: string | null = null;
 	/** D51: the finder's small tree laid out top to bottom on an upright phone, until the first view picks the direction. */
 	protected finderAlt: (MeasuredResult & { geo: Geometry }) | null = null;
-	/** The problems of the whole tree's text (spec §8); the picture warnings come on top (`allIssues`). */
-	protected textIssues: CodedIssue[] = [];
-	/** The pictures of the whole tree, resolved at render; null with no picture store. */
-	protected pictureInfo: PictureInfo | null = null;
-	/** The live pictures of the drawn scene. */
-	protected live: LivePictures | null = null;
-	/** The first view was ready for use: the live pictures may load (spec §13.0 item 3 "Pictures never delay the first view"). */
-	protected picturesOn = false;
-	/** Raised by every render: a background check or a start of the pictures from before it does nothing. */
-	protected pictureToken = 0;
 	protected unsubPictures: (() => void) | null = null;
 	/** D144: this view drew the phone list. A turn of the phone and the card settings do not touch a list; it has no scene, no layout and no view. */
 	protected listMode = false;
@@ -477,121 +466,65 @@ export abstract class TreeViewBase extends MarkdownRenderChild implements HoverP
 		this.binding.stillThere(text);
 	}
 
+	/** Builds the port; the closures read the members when called, so they see the later state of the view. */
+	private makePort(): ViewPort<TreeViewBase> {
+		// eslint-disable-next-line @typescript-eslint/no-this-alias -- the port is an object literal that reads this view's protected members
+		const v = this;
+		return {
+			view: v,
+			get unloaded() { return v.unloaded; },
+			get full() { return v.full; },
+			get coarse() { return v.coarse; },
+			get seen() { return !!v.panZoom?.view; },
+			get phone() { return v.isPhone(); },
+			get foreign() { return v.inForeignView(); },
+			get state() { return v.peekState(); },
+			get viewport() { return v.viewport; },
+			get focusDue() { return v.focusDue; },
+			set focusDue(d) { v.focusDue = d; },
+			get pendingTarget() { return v.pendingTarget; },
+			set pendingTarget(t) { v.pendingTarget = t; },
+			syncFocus: (own) => v.syncFocus(own),
+			guard: (fn) => v.guard(fn),
+			showFound: (id) => v.guard(() => v.showFound(id)),
+			openSheet: (id) => v.guard(() => void v.openSheet(id, false)),
+			openFull: (due) => void v.openFull(null, null, due),
+			foldsChanged: (anchor, targets) => v.foldsChanged(anchor, targets),
+		};
+	}
+
+	/** Builds the port of the pictures; like `makePort`, its members read the view when called, so they see its later state. */
+	private picturesPort(): PicturesPort {
+		// eslint-disable-next-line @typescript-eslint/no-this-alias -- the port is an object literal that reads this view's protected members
+		const v = this;
+		return {
+			get host() { return v.host; },
+			get containerEl() { return v.containerEl; },
+			get key() { return v.key; },
+			get sourcePath() { return v.sourcePath; },
+			get unloaded() { return v.unloaded; },
+			get full() { return v.full; },
+			get whole() { return v.whole; },
+			get g() { return v.g; },
+			get scene() { return v.scene; },
+			get viewport() { return v.viewport; },
+			get panZoom() { return v.panZoom; },
+			get lod() { return v.lod; },
+			get timers() { return v.timers; },
+			guard: (fn) => v.guard(fn),
+			updateBadge: () => v.updateBadge(),
+			refillList: () => v.refillList(),
+		};
+	}
+
 	/** Is this block inside something that shows another note's content (`BlockBinding.inForeignView`)? Spec §6.1 wants such views read-only. */
 	protected inForeignView(): boolean {
 		return this.binding.inForeignView();
 	}
 
-	/**
-	 * Moves the list of a block to `id` and draws every view of the block again. `push` (a tap on a name, Find) puts
-	 * `from`, the person the list stood on, on the Back trail; `pop` (Back) cuts the trail back to `id`. Through the
-	 * block state, like `focusState`, so the full-screen view that Expand opens stands on the same person.
-	 */
-	static listGo(host: ViewHost, st: BlockState, id: string, how: 'push' | 'pop', from: string | null, origin: TreeViewBase | null = null): void {
-		if (how === 'push') {
-			if (from !== null && from !== id) st.listBack = pushTrail(st.listBack, from);
-		} else {
-			const at = st.listBack?.lastIndexOf(id) ?? -1;
-			st.listBack = at >= 0 ? st.listBack!.slice(0, at) : st.listBack;
-		}
-		st.focus = { id };
-		st.shown = null;
-		st.finder = null;
-		st.succession = null;
-		TreeViewBase.redrawState(host, st, { origin });
-	}
-
-	/**
-	 * Sets the session focus in a block's state and draws every view of that block again. Through
-	 * the state, not a view: the view that opened a sheet can be gone (Obsidian draws a block again
-	 * after each write), so the sheet acts on whatever views show the block now.
-	 */
-	static focusState(host: ViewHost, st: BlockState, id: string | null, target: string[] | null = null, origin: TreeViewBase | null = null): void {
-		st.focus = { id };
-		// Any other change of the family starts a new Back trail of the phone list (D144).
-		st.listBack = undefined;
-		// A choice of the user replaces a pending "show the saved person", the finder's result (spec §13.2) and the Show view of a line of succession.
-		st.shown = null;
-		st.finder = null;
-		st.succession = null;
-		TreeViewBase.redrawState(host, st, { target, origin });
-	}
-
-	/**
-	 * Every view whose block state is `st` draws its focus again (a choice of the user replaces a D21
-	 * badge focus). Only `origin`, the view that ran Find or the problem list, gets `target`: the
-	 * others just redraw (a static preview keeps its first view, D1). `except` does not redraw.
-	 * `keepOwn` keeps the D21 own focus of full-screen views.
-	 */
-	static redrawState(host: ViewHost, st: BlockState, opts: RedrawOptions = {}): void {
-		const { target = null, origin = null, except = null, keepOwn = false } = opts;
-		for (const v of [...host.views]) {
-			if (v.unloaded || v === except || v.peekState() !== st) continue;
-			if (v.full && !keepOwn) v.full.focus = null;
-			v.pendingTarget = v === origin ? target : null;
-			v.syncFocus();
-		}
-	}
-
-	/**
-	 * A pin write is about to start: the D21 own focus of every full-screen view of the block ends,
-	 * so the redraw after the write shows the new pin (or the default after Remove pin). Returns
-	 * the way back, for a write that wrote nothing.
-	 */
-	static dropOwnFocus(host: ViewHost, st: BlockState): () => void {
-		const dropped: [FullHost, { id: string | null }][] = [];
-		for (const v of host.views) {
-			const own = v.full?.focus;
-			if (v.unloaded || !v.full || !own || v.peekState() !== st) continue;
-			dropped.push([v.full, own]);
-			v.full.focus = null;
-		}
-		return () => {
-			for (const [full, own] of dropped) if (full.focus === null) full.focus = own;
-		};
-	}
-
 	/** S8: the parse of a block text, shared through the host's cache. The caller must not change the result. */
 	protected parse(text: string): ParseResult {
 		return this.host.parseCache?.get(this.sourcePath, text) ?? parseDynasty(text);
-	}
-
-	/**
-	 * A holder's name in the Titles window (spec §13.4): the view of the same kind that opened the window
-	 * (Obsidian can have drawn it again) centres and highlights the person, like Find.
-	 */
-	protected static showFound(host: ViewHost, st: BlockState, full: boolean, id: string): void {
-		// Two views can share one state (a note open in two tabs): the one that shows a tree wins.
-		const same = [...host.views].filter((x) => !x.unloaded && !!x.full === full && x.peekState() === st);
-		const v = same.find((x) => !!x.panZoom?.view) ?? same[0];
-		v?.guard(() => v.showFound(id));
-	}
-
-	/** A row of the line of succession opens that person's window; the view that opened the Titles window may be drawn again by now. */
-	protected static openPersonOf(host: ViewHost, st: BlockState, full: boolean, id: string, own: TreeViewBase | null): void {
-		const same = [...host.views].filter((x) => !x.unloaded && !x.inForeignView() && !!x.full === full && x.peekState() === st);
-		const v = own ?? same.find((x) => !!x.panZoom?.view) ?? same[0];
-		v?.guard(() => void v.openSheet(id, false));
-	}
-
-	/**
-	 * A window closed: the focus goes back to the button that opened it (Houses, or More for Titles;
-	 * spec §5.2). After a write Obsidian can draw the block again a little later, and the button the
-	 * focus went back to is then gone: look again for a short time, but never take the focus from
-	 * somewhere the user put it.
-	 */
-	protected static refocusButton(host: ViewHost, st: BlockState, full: boolean, sel: string, step = 0): void {
-		let button: HTMLElement | null = null;
-		for (const v of host.views) {
-			if (v.unloaded || !!v.full !== full || v.peekState() !== st) continue;
-			const b = v.viewport?.querySelector<HTMLElement>(sel) ?? null;
-			if (b?.isConnected) button = b;
-		}
-		const doc = button?.doc ?? document;
-		const active = doc.activeElement as HTMLElement | null;
-		if (button && active !== button && (!active || active === doc.body || !active.isConnected || active.closest(sel))) button.focus();
-		const wait = [150, 600][step];
-		if (wait !== undefined) (doc.defaultView ?? window).setTimeout(() => TreeViewBase.refocusButton(host, st, full, sel, step + 1), wait);
 	}
 
 	/**
@@ -662,27 +595,6 @@ export abstract class TreeViewBase extends MarkdownRenderChild implements HoverP
 	}
 
 	/**
-	 * F10: sets the folds of a block and draws every view of it again (a static touch preview never applies a
-	 * fold, so it stays). `anchor` and `targets` are for the view that acted: `origin`, or the view of the same
-	 * kind that shows the block now (Obsidian can have drawn the acting view again). The other views keep their
-	 * own view, as for a focus change.
-	 */
-	static changeFolds(host: ViewHost, st: BlockState, next: ReadonlySet<FoldKey>, o: { anchor?: FoldAnchor | null; origin?: TreeViewBase | null; full?: boolean; targets?: string[] } = {}): void {
-		setFolds(st, next);
-		const views = [...host.views].filter((v) => !v.unloaded && v.peekState() === st && (v.full || !v.coarse));
-		const kind = o.origin && !o.origin.unloaded ? !!o.origin.full : (o.full ?? false);
-		const same = views.filter((v) => !!v.full === kind);
-		const origin = o.origin && views.includes(o.origin) ? o.origin : (same.find((v) => !!v.panZoom?.view) ?? same[0] ?? null);
-		for (const v of views) v.guard(() => v.foldsChanged(v === origin ? (o.anchor ?? null) : null, v === origin ? (o.targets ?? []) : []));
-	}
-
-	/** The view that shows a block now, of the kind asked (`full` or a note), preferring one with a first view. */
-	protected static viewOf(host: ViewHost, st: BlockState, full: boolean): TreeViewBase | undefined {
-		const same = [...host.views].filter((v) => !v.unloaded && !!v.full === full && v.peekState() === st);
-		return same.find((v) => !!v.panZoom?.view) ?? same[0];
-	}
-
-	/**
 	 * F11: Focus (the toolbar and Focus here) on a hidden person opens the folds that hide them in the family that
 	 * Focus will draw. The state changes before the views draw the focus.
 	 */
@@ -703,7 +615,7 @@ export abstract class TreeViewBase extends MarkdownRenderChild implements HoverP
 	 */
 	protected static unfoldAfterWrite(host: ViewHost, st: BlockState, full: boolean, ids: readonly string[], body: string): void {
 		if (!st.folds.size) return;
-		const v = TreeViewBase.viewOf(host, st, full);
+		const v = BlockViews.of(host, st).viewOf(full);
 		const parsed = v ? v.parse(body) : parseDynasty(body);
 		if (!parsed.ok) return;
 		const whole = deriveFamilies(parsed.tree, { dates: v?.whole?.dates.reader });
@@ -719,7 +631,7 @@ export abstract class TreeViewBase extends MarkdownRenderChild implements HoverP
 		}
 		const next = unfoldFor(drawn, whole, st.folds, known);
 		if (next.size === st.folds.size) return;
-		TreeViewBase.changeFolds(host, st, next, { origin: v ?? null, full, targets: known });
+		BlockViews.of(host, st).changeFolds(next, { origin: v ?? null, full, targets: known });
 	}
 
 	/** F15: what the edit sheet gets of the folds (Hide descendants, Show descendants, and the unfold after a write). */
@@ -728,7 +640,7 @@ export abstract class TreeViewBase extends MarkdownRenderChild implements HoverP
 		const st = h.state;
 		const full = !!this.full;
 		const live = full || !this.coarse;
-		const now = () => TreeViewBase.viewOf(host, st, full);
+		const now = () => BlockViews.of(host, st).viewOf(full);
 		const state = (id: string) => {
 			const v = now();
 			if (live) return v?.g && v.foldPlan ? personFolds(v.g, v.foldPlan.effective, v.foldPlan.hidden, id) : { open: [], folded: [] };
@@ -738,10 +650,11 @@ export abstract class TreeViewBase extends MarkdownRenderChild implements HoverP
 		return {
 			mode: live ? 'live' : 'preview',
 			state,
+			hiddenCount: (id) => { const g = live ? now()?.g : undefined; return g ? foldedPeopleCount(g, state(id).folded) : 0; },
 			hide: (id) => {
 				const next = new Set([...st.folds, ...state(id).open]);
 				if (live) {
-					TreeViewBase.changeFolds(host, st, next, { anchor: { kind: 'person', id }, origin: now() ?? null, full });
+					BlockViews.of(host, st).changeFolds(next, { anchor: { kind: 'person', id }, origin: now() ?? null, full });
 					return;
 				}
 				// The preview does not change: the fold is made in the block's state, and the full-screen view opens on the person.
@@ -751,7 +664,7 @@ export abstract class TreeViewBase extends MarkdownRenderChild implements HoverP
 			show: (id) => {
 				const next = new Set(st.folds);
 				for (const k of state(id).folded) next.delete(k);
-				TreeViewBase.changeFolds(host, st, next, { anchor: { kind: 'person', id }, origin: now() ?? null, full });
+				BlockViews.of(host, st).changeFolds(next, { anchor: { kind: 'person', id }, origin: now() ?? null, full });
 			},
 			written: (ids) => {
 				if (live) TreeViewBase.unfoldAfterWrite(host, st, full, ids, h.body);
@@ -759,95 +672,11 @@ export abstract class TreeViewBase extends MarkdownRenderChild implements HoverP
 		};
 	}
 
-	/**
-	 * Show (Titles window): opens the view of the line of `title` in every view of the block that can draw it. It writes
-	 * nothing. If only a phone list or a static preview shows the block, the full-screen view opens with it, as for the finder.
-	 */
-	static showSuccession(host: ViewHost, st: BlockState, title: string, origin: TreeViewBase | null): void {
-		st.succession = { title };
-		// One temporary view at a time.
-		st.finder = null;
-		const views = [...host.views].filter((v) => !v.unloaded && v.peekState() === st);
-		const shows = views.filter((v) => v.full || !v.coarse);
-		if (shows.length) {
-			const same = shows.filter((v) => !origin || !!v.full === !!origin.full);
-			const at = origin && shows.includes(origin) ? origin : same.length === 1 ? same[0] : null;
-			if (at) at.focusDue = '.dynasty-succession-text';
-			TreeViewBase.successionRedraw(host, st);
-			return;
-		}
-		TreeViewBase.successionRedraw(host, st);
-		const preview = origin && views.includes(origin) ? origin : views[0];
-		if (preview) void preview.openFull(null, null, '.dynasty-succession-text');
-	}
-
-	/**
-	 * Every phone list of the block draws again at once, also under an open full-screen view (a list is cheap to draw). Esc in that view
-	 * ends the finder first and leaves the view open, so a list that waited for the view to close would keep the old bar.
-	 */
-	protected static listRedraw(host: ViewHost, st: BlockState): void {
-		for (const v of [...host.views]) {
-			if (v.unloaded || v.peekState() !== st || v.full || !v.coarse || !v.isPhone()) continue;
-			v.pendingTarget = null;
-			v.syncFocus(true);
-		}
-	}
-
-	/** Every view of the block that can show the Show view or its bar draws again (this includes the phone list; never the static tablet preview, D1). */
-	protected static successionRedraw(host: ViewHost, st: BlockState): void {
-		for (const v of [...host.views]) {
-			if (v.unloaded || v.peekState() !== st || (!v.full && v.coarse && !v.isPhone())) continue;
-			v.pendingTarget = null;
-			v.syncFocus();
-		}
-	}
-
-	/**
-	 * Shows `second` as a relative of `first` (spec §13.2) in every view of the block that can show it.
-	 * It writes nothing. Through the block state, not a view: the view that opened a sheet can be gone.
-	 * If only the static touch preview shows the block (D1), the preview does not change and the
-	 * full-screen view opens with the result (like D17).
-	 */
-	static showFinder(host: ViewHost, st: BlockState, first: string, second: string, origin: TreeViewBase | null): void {
-		st.finder = { first, second, index: 0, whole: false, steps: false };
-		// One temporary view at a time. The finder skips the phone list, so a list under a Show view that ends here draws again.
-		const hadShow = st.succession !== null;
-		st.succession = null;
-		if (hadShow) TreeViewBase.listRedraw(host, st);
-		const views = [...host.views].filter((v) => !v.unloaded && v.peekState() === st);
-		const shows = views.filter((v) => v.full || !v.coarse);
-		if (shows.length) {
-			// The sentence takes the keyboard focus only in the view the user acted in. If Obsidian drew that
-			// view again meanwhile (a write from its sheet), the one view of the same kind that replaced it.
-			const same = shows.filter((v) => !origin || !!v.full === !!origin.full);
-			const at = origin && shows.includes(origin) ? origin : same.length === 1 ? same[0] : null;
-			if (at) at.focusDue = '.dynasty-result-text';
-			TreeViewBase.finderRedraw(host, st);
-			return;
-		}
-		const preview = origin && views.includes(origin) ? origin : views[0];
-		if (preview) void preview.openFull(null, null, '.dynasty-result-text');
-	}
-
-	/**
-	 * Every view of the block that can show the finder's result draws again; never the static touch
-	 * preview (D1). Only `origin` gets `target`, to centre and highlight (Find, the problem list).
-	 */
-	protected static finderRedraw(host: ViewHost, st: BlockState, origin: TreeViewBase | null = null, target: string[] | null = null): void {
-		for (const v of [...host.views]) {
-			if (v.unloaded || v.peekState() !== st || (!v.full && v.coarse)) continue;
-			v.pendingTarget = v === origin ? target : null;
-			v.syncFocus();
-		}
-	}
-
 	// The layers above implement these; the chain of layers is listed in `tree-view.ts`.
 	protected abstract breakList(): ReturnType<typeof parseBreakList>;
 	protected abstract cancelPulse(): void;
 	protected abstract changed(h: Handle, body: string): void;
 	protected abstract checkTurn(): void;
-	protected abstract closeFinder(): void;
-	protected abstract closeSuccession(): void;
 	protected abstract fillNear(view: View): void;
 	protected abstract fillPerson(id: string): void;
 	protected abstract focusGraph(tree: Tree, focus: string): FamilyGraph | null;
@@ -858,8 +687,6 @@ export abstract class TreeViewBase extends MarkdownRenderChild implements HoverP
 	protected abstract keepView(): void;
 	protected abstract keptAnchor(): Anchor | null;
 	protected abstract layOut(g: FamilyGraph, geo: Geometry, base: LayoutSettings, fonts: SceneOptions['fonts'], labels?: ReadonlyMap<string, CardLabel>, foldHidden?: ReadonlySet<string>, shouldStop?: () => boolean): MeasuredResult;
-	protected abstract linePeopleNow(): string[] | null;
-	protected abstract linksResolved(): void;
 	protected abstract markInteractive(): void;
 	protected abstract modalAbove(): boolean;
 	protected abstract openFull(target: string | null, focus?: string | null, focusDue?: string | null, problemsDue?: boolean): Promise<void>;
@@ -867,8 +694,6 @@ export abstract class TreeViewBase extends MarkdownRenderChild implements HoverP
 	protected abstract openNewPerson(): Promise<void>;
 	protected abstract openSheet(id: string, fromTap: boolean): Promise<void>;
 	protected abstract openTitles(): Promise<void>;
-	protected abstract picturesChanged(paths: readonly string[]): void;
-	protected abstract picturesLookAgain(): void;
 	protected abstract placeClasses(root: HTMLElement): void;
 	protected abstract pulse(ids: string[]): void;
 	protected abstract recheckTall(fresh?: boolean): boolean;
@@ -881,11 +706,8 @@ export abstract class TreeViewBase extends MarkdownRenderChild implements HoverP
 	protected abstract reveal(box: Rect, kept?: boolean): void;
 	protected abstract showFound(id: string): void;
 	protected abstract showPeople(ids: string[]): void;
-	protected abstract showPictures(view: View): void;
 	protected abstract showPlaceholder(): void;
 	protected abstract showTree(): void;
-	protected abstract startFinder(): Promise<void>;
-	protected abstract startPictures(): void;
 	abstract syncFocus(own?: boolean): void;
 	protected abstract tagActivated(person: string, spouses: readonly string[], tagEl: SVGGElement, hit: SVGRectElement): void;
 	protected abstract takeFocus(): void;

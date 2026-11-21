@@ -1,0 +1,86 @@
+{
+	"01-three-generations.md": {
+		"calls": 7560,
+		"digest": "10duf4i4pyp"
+	},
+	"02-three-spouses.md": {
+		"calls": 10080,
+		"digest": "2gonzccdt99"
+	},
+	"03-cousin-marriage.md": {
+		"calls": 10080,
+		"digest": "1ja8duqer0m"
+	},
+	"04-illegitimate-rumoured.md": {
+		"calls": 7560,
+		"digest": "1tc4fhvpbjd"
+	},
+	"05-malformed.md": {
+		"calls": 10080,
+		"digest": "1ea7hvgdd1o"
+	},
+	"06-sixty-people.md": {
+		"calls": 10080,
+		"digest": "2227u6f944q"
+	},
+	"07-four-hundred-people.md": {
+		"calls": 5040,
+		"digest": "19y2aphlkw3"
+	},
+	"07b-four-hundred-people-pictures.md": {
+		"calls": 5040,
+		"digest": "19y2aphlkw3"
+	},
+	"08-parent-types.md": {
+		"calls": 10080,
+		"digest": "11g2yobk63e"
+	},
+	"09-formatting.md": {
+		"calls": 10080,
+		"digest": "fm9mhj4flq"
+	},
+	"10-hand-typing.md": {
+		"calls": 7560,
+		"digest": "l2h1dvikj9"
+	},
+	"11-close-kin-marriages.md": {
+		"calls": 10080,
+		"digest": "isxv0vwu4k"
+	},
+	"12-relations.md": {
+		"calls": 10080,
+		"digest": "170mk9zrcc3"
+	},
+	"13-titles.md": {
+		"calls": 10080,
+		"digest": "20zdqweapcq"
+	},
+	"14-pictures.md": {
+		"calls": 10080,
+		"digest": "1fy5z74b54u"
+	},
+	"15-long-names-and-branches.md": {
+		"calls": 10080,
+		"digest": "1aza9fs53li"
+	},
+	"16-succession.md": {
+		"calls": 10080,
+		"digest": "ndjtl4uqjh"
+	},
+	"17-same-sex.md": {
+		"calls": 10080,
+		"digest": "21gu5hmxtig"
+	},
+	"18-non-latin.md": {
+		"calls": 10080,
+		"digest": "l8bzd8qifd"
+	},
+	"19-right-to-left.md": {
+		"calls": 10080,
+		"digest": "j73lwmsp6d"
+	},
+	"20-begetter.md": {
+		"calls": 10080,
+		"digest": "21ky169baeq"
+	}
+}

@@ -13,6 +13,8 @@ import { notices, openModals, resetObsidian } from '../acceptance/fake-obsidian'
 import { desktop, embed, fakeHandle, fakeHost, fullViews, phone, phoneOnSide, sheets, tabletDevice, type FakeHandle } from '../acceptance/tree-view-fakes';
 import { build } from '../support/helpers';
 import { useFakeDom } from '../support/fake-dom-setup';
+import { BlockViews } from '../../src/obsidian/block-views';
+
 
 /*
  * 0.2.5, WP-C2b (D144): a tree in a note on a phone is a list. Made-up people only. The pure parts of the list
@@ -324,7 +326,7 @@ describe('a tap on a name moves the list, Back returns', () => {
 	it('Clear focus (and any other change of the family) starts a new trail', async () => {
 		const { el, st, host } = await open(PLAIN);
 		await tapName(el, 'roderick');
-		TreeView.focusState(host as never, st!, null);
+		BlockViews.of(host as never, st!).focusState(null);
 		await settle();
 		resizeAll();
 		flushFrames();

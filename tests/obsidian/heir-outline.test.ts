@@ -12,6 +12,8 @@ import { desktop, embed, fakeHandle, fakeHost, fullViews, phone, type Host } fro
 import { BODY_16 } from '../support/titles-window-support';
 import { useFakeDom } from '../support/fake-dom-setup';
 import { noteHandle } from '../support/writing-handle';
+import { BlockViews } from '../../src/obsidian/block-views';
+
 
 // Review G2c of 0.2.7 WP4 (view). Each test fails on release-0.2.7 de013fc and shows one defect.
 
@@ -47,7 +49,7 @@ async function redrawn(): Promise<void> {
 }
 
 async function show(e: { host: Host; st: ReturnType<typeof noteHandle>['state']; view: TreeView }, title = DUKE): Promise<void> {
-	TreeView.showSuccession(e.host as never, e.st, title, e.view);
+	BlockViews.of(e.host as never, e.st).showSuccession(title, e.view);
 	await redrawn();
 }
 
@@ -83,13 +85,13 @@ describe('the phone list follows the block state', () => {
 		const host = fakeHost({ ...DEFAULT_SETTINGS });
 		const o = await embed(body, { host, handle });
 		const st = handle.state;
-		TreeView.showSuccession(host as never, st, DUKE, o.view);
+		BlockViews.of(host as never, st).showSuccession(DUKE, o.view);
 		await redrawn();
 		expect(fullViews()).toHaveLength(1);
 		expect(o.el.querySelector('.dynasty-list-succession'), 'the list shows the bar').not.toBeNull();
 		const full = fullViews()[0] as unknown as { view?: TreeView; close(): void };
 		// The relation finder in the full-screen view replaces the Show view.
-		TreeView.showFinder(host as never, st, 'bertram-carrow', 'fenwick-carrow', [...host.views].find((v) => (v as unknown as { full?: unknown }).full) as never);
+		BlockViews.of(host as never, st).showFinder('bertram-carrow', 'fenwick-carrow', [...host.views].find((v) => (v as unknown as { full?: unknown }).full) as never);
 		await redrawn();
 		expect(st.succession).toBeNull();
 		full.close();
@@ -104,10 +106,10 @@ describe('the phone list follows the block state', () => {
 		const host = fakeHost({ ...DEFAULT_SETTINGS });
 		const o = await embed(body, { host, handle });
 		const st = handle.state;
-		TreeView.showSuccession(host as never, st, DUKE, o.view);
+		BlockViews.of(host as never, st).showSuccession(DUKE, o.view);
 		await redrawn();
 		const full = fullViews()[0] as unknown as { close(): void };
-		TreeView.focusState(host as never, st, 'bertram-carrow', null, [...host.views].find((v) => (v as unknown as { full?: unknown }).full) as never);
+		BlockViews.of(host as never, st).focusState('bertram-carrow', null, [...host.views].find((v) => (v as unknown as { full?: unknown }).full) as never);
 		await redrawn();
 		full.close();
 		await redrawn();

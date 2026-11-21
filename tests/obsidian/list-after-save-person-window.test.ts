@@ -4,7 +4,6 @@ import { findBlocks } from '../../src/core/block-locate';
 import { BlockBinding } from '../../src/obsidian/block-binding';
 import { HandleRegistry } from '../../src/obsidian/block-handle';
 import { FullScreenModal } from '../../src/obsidian/full-screen';
-import { TreeView } from '../../src/obsidian/tree-view';
 import { applyOp } from '../../src/core/yaml-edit';
 import { clearRelationCache } from '../../src/view/relation-cache';
 import { FEl, clock, dispatch, flushFrames, resetDom, resizeAll, settle } from '../acceptance/fake-dom';
@@ -12,6 +11,8 @@ import { MarkdownView, TFile, openModals, resetObsidian } from '../acceptance/fa
 import { desktop, embed, fakeHost, phone, sheets, type Host } from '../acceptance/tree-view-fakes';
 import { stripNotDisabled, writingHandle } from '../support/windows-sheets-support';
 import { useFakeDom } from '../support/fake-dom-setup';
+import { BlockViews } from '../../src/obsidian/block-views';
+
 
 /*
  * r051 cause A (iPhone test 9c of 0.5.0): the phone list tapped on Roderick, his window opened, Died changed, Save: the list went back to Aldric.
@@ -124,7 +125,7 @@ describe('the same gap in the canvas view', () => {
 		const host: Host = fakeHost();
 		const handle = writingHandle(PEOPLE);
 		const first = await embed(PEOPLE, { host, handle });
-		TreeView.focusState(host as never, handle.state, 'roderick');
+		BlockViews.of(host as never, handle.state).focusState('roderick');
 		await redraw();
 		expect(first.el.querySelector('.dynasty-root')!.getAttribute('data-dynasty-focus')).toBe('roderick');
 		// A write by any window (here a field of Aldric): the new view of the block is built in the gap.

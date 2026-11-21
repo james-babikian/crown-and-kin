@@ -5,6 +5,7 @@
  */
 
 import { FOLD_EM } from '../layout/fold-spots';
+import { groupCount } from './view-text';
 
 /** Text width in px for a CSS font shorthand. */
 export type Measure = (text: string, font: string) => number;
@@ -19,6 +20,8 @@ export interface SceneFonts {
 	bold: string;
 }
 
+/** Compact names are this much larger than Full names (spec §5.4: a larger font that fills the card). */
+export const COMPACT_NAME_EM = 1.5;
 /** The word on the "You" tab, in em of the note font. */
 export const TAB_TEXT_EM = 0.8;
 /** The baseline of the text of a tab, in em below the middle of the tab (0.3 em). */
@@ -32,4 +35,4 @@ export const RUMOUR_FONT_EM = 0.7;
 export const FOLD_CHIP_EM = FOLD_EM.chip;
 
 /** The text of a fold sign for `count` hidden people. */
-export const signText = (count: number) => `+ ${count}`;
+export const signText = (count: number) => `+ ${groupCount(count)}`;

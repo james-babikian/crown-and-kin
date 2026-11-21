@@ -46,7 +46,8 @@ describe('D330 TR-13, O-09a, UX-20: tree hints and the phone list', () => {
 	it('has the Open button of a problem and its hint', () => {
 		expect(PROBLEMS_OPEN.button('House Harrow')).toBe('Open House Harrow');
 		expect(PROBLEMS_OPEN.label('Oswin Valmont')).toBe('Open Oswin Valmont: open the window where you can correct this problem');
-		expect(PROBLEMS_HINT).toBe('Select a problem to show the people it is about. Select Open next to a problem to correct it.');
+		expect(PROBLEMS_HINT.computer).toBe('Select a problem to show the people it is about. Select Open next to a problem to correct it.');
+		expect(PROBLEMS_HINT.phone).toBe('Tap a problem to show the people it is about. Tap Open next to a problem to correct it.');
 	});
 });
 
@@ -192,7 +193,7 @@ describe('D330: STE limits of the new texts', () => {
 		ONE_PERSON_HINT.computer,
 		ONE_PERSON_HINT.phoneList,
 		ONE_PERSON_HINT.tabletNote,
-		PROBLEMS_HINT,
+		...Object.values(PROBLEMS_HINT),
 		PROBLEMS_OPEN.label('House Harrow'),
 		SHEET.titleHint,
 		SETTINGS_UI.armsOnCardsDesc,

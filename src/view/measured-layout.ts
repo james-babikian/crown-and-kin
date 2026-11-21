@@ -16,7 +16,7 @@ import { LayoutStopped, illegitimateSigns, layoutTree, pictureSets } from '../la
 import type { Geometry, LaidOut, LayoutSettings } from '../layout/model';
 import type { Measure, SceneFonts } from '../render/scene-model';
 import type { BreakList } from '../render/break-words';
-import { tallCardsFor, tallTitlesFor, titleMeasure } from '../render/dom/tall-cards';
+import { tallCardsFor, tallTitlesFor, titleMeasure } from '../render/tall-cards';
 
 /** What `measuredLayout` needs beyond the graph, the geometry and the base settings. */
 interface MeasuredOptions {

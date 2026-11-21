@@ -47,7 +47,6 @@ describe('the token file', () => {
 		expect(token('--dynasty-radius-button')).toBe('var(--button-radius)');
 		expect(token('--dynasty-radius-button-phone')).toBe('var(--dynasty-radius-pill)');
 		expect(token('--dynasty-radius-pill')).toBe('999px');
-		expect(token('--dynasty-radius-card')).toBe('min(var(--radius-m), 1.5em)');
 		expect(ruleBody(tokens, 'body.is-phone,')).toContain('--dynasty-radius-field: 10px');
 	});
 
@@ -64,11 +63,11 @@ describe('the token file', () => {
 
 	it('the line weights and the hairline have names', () => {
 		expect(token('--dynasty-hairline')).toBe('var(--dynasty-width-hairline) solid var(--background-modifier-border)');
-		expect([token('--dynasty-width-hairline'), token('--dynasty-width-mark'), token('--dynasty-width-house'), token('--dynasty-width-house-card')]).toEqual(['1px', '2px', '3px', '4px']);
+		expect([token('--dynasty-width-hairline'), token('--dynasty-width-mark'), token('--dynasty-width-house')]).toEqual(['1px', '2px', '3px']);
 	});
 
 	it('motion has names for the durations and the easings', () => {
-		for (const name of ['--dynasty-dur-press', '--dynasty-dur-open', '--dynasty-dur-move', '--dynasty-dur-pulse', '--dynasty-ease', '--dynasty-ease-pulse']) token(name);
+		for (const name of ['--dynasty-dur-press', '--dynasty-dur-open', '--dynasty-dur-pulse', '--dynasty-ease', '--dynasty-ease-pulse']) token(name);
 	});
 
 	it('the card edge is the theme border grey as the plain value, one pixel wide; D330 O-01 mixes 14 % (dark 18 %) of the text colour in the card colour inside @supports', () => {
@@ -89,7 +88,7 @@ describe('the focus recipe and the error edge', () => {
 	});
 
 	it('the error edge uses the error colour and does not use a focus token or an offset', () => {
-		for (const name of ['--dynasty-error-edge', '--dynasty-error-line', '--dynasty-error-focus-shadow']) {
+		for (const name of ['--dynasty-error-edge', '--dynasty-error-focus-shadow']) {
 			expect(token(name), name).toContain('var(--dynasty-error)');
 			expect(token(name), name).not.toMatch(/focus|offset|accent|text-normal/);
 		}
