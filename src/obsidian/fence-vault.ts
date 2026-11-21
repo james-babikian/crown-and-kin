@@ -73,7 +73,7 @@ interface LeaveTargets {
 /**
  * Saves the index at `pagehide` and when the page becomes hidden. iOS can end the app with no other warning. Gives a function that removes the listeners.
  */
-export function saveWhenLeaving(index: Pick<FenceIndex, 'flush'>, targets: LeaveTargets = { win: window, doc: document }): () => void {
+export function saveWhenLeaving(index: Pick<FenceIndex, 'flush'>, targets: LeaveTargets = { win: activeWindow, doc: activeDocument }): () => void {
 	const flush = () => {
 		try {
 			index.flush();

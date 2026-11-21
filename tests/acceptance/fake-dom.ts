@@ -569,6 +569,8 @@ export function installDom(): void {
 	};
 	g.getComputedStyle = () => COMPUTED;
 	g.document = fakeDoc;
+	// Obsidian's `activeDocument`: the plugin reads the page through it (pop-out windows), so it is the fake page here.
+	g.activeDocument = fakeDoc;
 }
 
 /** A clean start for each test. */

@@ -2,6 +2,13 @@
 
 All notable changes for users. The newest version is first.
 
+## 0.6.1
+
+The tree looks and works as in 0.6.0. You do not need to do anything. This version changes the code for the list of Community plugins in Obsidian.
+
+- **The plugin passes the official Obsidian rules for plugins with 0 errors.** The rules are version 0.6.0 of `eslint-plugin-obsidianmd`. Obsidian uses these rules to check plugins for its list of Community plugins. 8 warnings stay on purpose, because the code needs them. You see no change.
+- **The plugin now sets its colours in each pop-out window, as well as in the main window.** A pop-out window is a window that you drag out of the main Obsidian window. When a font finishes loading in a pop-out window, the plugin now also measures the text of the tree there again. You see no difference. In a test in Obsidian, version 0.6.0 and this version both showed the tree, the full-screen view, the More menu and a notice of the plugin in a pop-out window.
+
 ## 0.6.0
 
 This is the first version for human testers. To report a fault, see "Report a problem" in the README.

@@ -8,7 +8,7 @@ The tool is installed in a folder **outside** the checkout, with its own pinned 
 
 ```sh
 TOOL="$TEMP/obsidian-lint"
-mkdir -p "$TOOL" && (cd "$TOOL" && npm init -y && npm install --legacy-peer-deps --no-audit --no-fund eslint-plugin-obsidianmd@0.4.2 eslint@9.39.5 typescript-eslint@8.72.0 @eslint/js@9.39.5 @eslint/json@0.14.0 obsidian@1.12.3 typescript@5.9.3 jiti@2.7.0)
+mkdir -p "$TOOL" && (cd "$TOOL" && npm init -y && npm install --legacy-peer-deps --no-audit --no-fund eslint-plugin-obsidianmd@0.6.0 eslint@9.39.5 typescript-eslint@8.73.0 @eslint/js@9.39.5 @eslint/json@0.14.0 obsidian@1.14.4 typescript@5.9.3 jiti@2.7.0)
 OBSIDIAN_LINT_DIR="$TOOL" "$TOOL/node_modules/.bin/eslint" --config scripts/obsidian-lint/eslint.config.mjs src
 ```
 
@@ -19,7 +19,7 @@ $tool = Join-Path $env:TEMP 'obsidian-lint'
 New-Item -ItemType Directory -Force $tool | Out-Null
 Push-Location $tool
 npm init -y
-npm install --legacy-peer-deps --no-audit --no-fund eslint-plugin-obsidianmd@0.4.2 eslint@9.39.5 typescript-eslint@8.72.0 '@eslint/js@9.39.5' '@eslint/json@0.14.0' obsidian@1.12.3 typescript@5.9.3 jiti@2.7.0
+npm install --legacy-peer-deps --no-audit --no-fund eslint-plugin-obsidianmd@0.6.0 eslint@9.39.5 typescript-eslint@8.73.0 '@eslint/js@9.39.5' '@eslint/json@0.14.0' obsidian@1.14.4 typescript@5.9.3 jiti@2.7.0
 Pop-Location
 $env:OBSIDIAN_LINT_DIR = $tool
 & "$tool\node_modules\.bin\eslint.cmd" --config scripts/obsidian-lint/eslint.config.mjs src
@@ -29,13 +29,14 @@ Install the tool one time; later runs need only the last command. The project ne
 
 ## Result
 
-A clean run has 0 errors and 5 warnings: `@typescript-eslint/no-deprecated` on the `keyCode === 229` checks (the IME check; Safari has no replacement). Any error makes the CI job fail.
+A clean run has 0 errors. Warnings do not fail the run: `@typescript-eslint/no-deprecated` on the `keyCode === 229` checks (the IME check; Safari has no replacement) and the window warnings of `obsidianmd/prefer-active-doc`. Any error makes the CI job fail.
+
+The tool is version 0.6.0 of the plugin (0.6.0 notes: `docs/configuration.md`, "Upgrading to 0.6.0"). Its recommended config sets `@typescript-eslint/no-deprecated` to a warning by itself, so the project config does not repeat it.
 
 ## Switched-off rules
 
 | Rule | Reason |
 |---|---|
-| `no-control-regex` | The code refuses control characters in imported text on purpose; the regexes name them. |
 | `import/no-extraneous-dependencies` | `@codemirror/state` and `@codemirror/view` come from Obsidian at run time. They are external in the bundle and not in `package.json`. |
 
-`@typescript-eslint/no-deprecated` stays a warning in the config (not an inline disable at each site), so that a new use of a deprecated API shows up at once.
+`@typescript-eslint/no-deprecated` is a warning in the recommended config, so a new use of a deprecated API shows up at once without an override or an inline disable.

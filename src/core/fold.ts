@@ -7,6 +7,8 @@
  * and search agree on what "ø" is.
  */
 
+import { allUnitsAtMost } from './char-codes';
+
 /** Letters that Unicode does not split into a base letter and a mark, with the plain letters for them. */
 const LETTER_MAP: ReadonlyArray<readonly [RegExp, string]> = [
 	[/[Þþ]/g, 'th'],
@@ -37,7 +39,7 @@ const COMBINING_MARKS = /[\u0300-\u036f]/g;
 const ALL_MARKS = /\p{Mn}/gu;
 
 /** ASCII with no grave sign (U+0060, a quote look-alike). */
-const PLAIN_ASCII = /^[\x00-\x5f\x61-\x7f]*$/;
+const isPlainAscii = (s: string) => allUnitsAtMost(s, 0x7f, [0x60]);
 
 /** Single quote look-alikes: curly, modifier letter, prime, grave and acute. */
 const SINGLE_QUOTES = /[‘’ʼ′`´]/g;
@@ -59,14 +61,14 @@ function foldRound(s: string, search: boolean): string {
 
 function foldAll(s: string, search: boolean): string {
 	// Plain ASCII without the grave sign needs only lower-case; most paths are like this, and a search of 10 000 pictures folds each path once.
-	if (PLAIN_ASCII.test(s)) return s.toLowerCase();
+	if (isPlainAscii(s)) return s.toLowerCase();
 	// A map letter with an accent (Ǣ) or a letter that NFKD splits into a quote (ŉ) only shows after a round, so repeat until the text is stable.
 	let current = s;
 	for (let round = 0; round < MAX_ROUNDS; round++) {
 		const next = foldRound(current, search);
 		if (next === current) return next;
 		// Most accented text is plain ASCII after one round; this skips the proof round.
-		if (PLAIN_ASCII.test(next)) return next.toLowerCase();
+		if (isPlainAscii(next)) return next.toLowerCase();
 		current = next;
 	}
 	return current;

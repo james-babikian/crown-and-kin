@@ -7,14 +7,14 @@ afterEach(() => vi.unstubAllGlobals());
 
 describe('the fonts of the window of the tree', () => {
 	it('pageFontEnv reads the document that it is given, not the global one', () => {
-		vi.stubGlobal('document', { fonts: undefined, styleSheets: [], baseURI: 'app://main/' });
+		vi.stubGlobal('activeDocument', { fonts: undefined, styleSheets: [], baseURI: 'app://main/' });
 		const pop = { fonts: undefined, styleSheets: [], baseURI: 'app://pop-out/' } as unknown as Document;
 		expect(pageFontEnv(pop).baseURI).toBe('app://pop-out/');
 		expect(pageFontEnv().baseURI).toBe('app://main/');
 	});
 
 	it('fontsForPng finds the font loaded in the given document', async () => {
-		vi.stubGlobal('document', { fonts: { forEach: () => undefined }, styleSheets: [], baseURI: 'app://main/' });
+		vi.stubGlobal('activeDocument', { fonts: { forEach: () => undefined }, styleSheets: [], baseURI: 'app://main/' });
 		const face = {
 			type: 5,
 			cssText: '@font-face { font-family: "Pop Serif"; src: url("data:font/ttf;base64,AAAA"); }',

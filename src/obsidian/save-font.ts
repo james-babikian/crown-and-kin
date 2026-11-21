@@ -33,7 +33,7 @@ export interface PngFonts {
 }
 
 /** The font environment of a page: the document of the tree's window (a pop-out window has its own), else the main one. */
-export function pageFontEnv(doc: Document = document): FontEnv {
+export function pageFontEnv(doc: Document = activeDocument): FontEnv {
 	return {
 		fonts: doc.fonts,
 		styleSheets: doc.styleSheets,

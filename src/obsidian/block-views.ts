@@ -194,7 +194,7 @@ export class BlockViews<V extends ViewLike<V>> {
 			const b = p.viewport?.querySelector<HTMLElement>(sel) ?? null;
 			if (b?.isConnected) button = b;
 		}
-		const doc = button?.doc ?? document;
+		const doc = button?.doc ?? activeDocument;
 		const active = doc.activeElement as HTMLElement | null;
 		if (button && active !== button && (!active || active === doc.body || !active.isConnected || active.closest(sel))) button.focus();
 		const wait = [150, 600][step];

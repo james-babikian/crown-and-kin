@@ -56,9 +56,9 @@ jobs:
 
   # The official Obsidian lint tool (eslint-plugin-obsidianmd, D281 part 1). It is a second job so that it runs next to the
   # first one and a fault shows in its own line. The tool and its pinned helpers go into a folder OUTSIDE the checkout, so that
-  # they do not change `package.json` or the main lint. The rules and the three switched-off rules are in
+  # they do not change `package.json` or the main lint. The rules and the one switched-off rule are in
   # scripts/obsidian-lint/eslint.config.mjs; scripts/obsidian-lint/README.md has the same commands for a local run.
-  # Warnings (the four `keyCode === 229` sites) do not fail the job; any error does.
+  # Warnings (the `keyCode === 229` sites and the window warnings) do not fail the job; any error does.
   obsidian-lint:
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -84,7 +84,7 @@ jobs:
           mkdir obsidian-lint
           cd obsidian-lint
           npm init -y
-          npm install --legacy-peer-deps --no-audit --no-fund eslint-plugin-obsidianmd@0.4.2 eslint@9.39.5 typescript-eslint@8.72.0 @eslint/js@9.39.5 @eslint/json@0.14.0 obsidian@1.12.3 typescript@5.9.3 jiti@2.7.0
+          npm install --legacy-peer-deps --no-audit --no-fund eslint-plugin-obsidianmd@0.6.0 eslint@9.39.5 typescript-eslint@8.73.0 @eslint/js@9.39.5 @eslint/json@0.14.0 obsidian@1.14.4 typescript@5.9.3 jiti@2.7.0
 
       - name: Lint src with the Obsidian rules
         env:

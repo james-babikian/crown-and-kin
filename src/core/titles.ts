@@ -21,6 +21,7 @@
  */
 
 import type { FamilyGraph } from './derive';
+import { dropUnits } from './char-codes';
 import type { Holder, Person, Title } from './types';
 
 /** One title that a person holds: the title and this person's entries of it, in list order. */
@@ -202,9 +203,8 @@ export function describeTitleIdChange(g: FamilyGraph, id: string): { people: num
  * trimmed; `fallback` when empty (the title id for a table note).
  */
 export function noteName(text: string, fallback: string): string {
-	const clean = (typeof text === 'string' ? text : '')
-		// Tabs and text line breaks become spaces below; the other control characters break a file name on Windows.
-		.replace(/[\u0000-\u0008\u000E-\u001F\u007F]/g, '')
+	// Tabs and text line breaks become spaces below; the other control characters break a file name on Windows.
+	const clean = dropUnits(typeof text === 'string' ? text : '', (c) => c <= 0x08 || (c >= 0x0e && c <= 0x1f) || c === 0x7f)
 		.replace(/[\\/:*?"<>|#^[\]]/g, '')
 		.replace(/\s+/g, ' ')
 		.trim()

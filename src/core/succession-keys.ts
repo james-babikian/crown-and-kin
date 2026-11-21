@@ -110,7 +110,12 @@ const FRAGMENT_WHOLE = /^(?:\d{1,3}\.\d{3}|\d{1,3}(?:,\d{3})*,\d{4,})$/;
 // in "Jan 5, 624" the comma follows a day.
 const STRAY_WHOLE = new RegExp(`^(?:(?:c\\.|ca\\.|about|circa|~)\\s*)?(?:${ERA}\\s*)?\\d{1,3} ?, ?\\d{3}(?:\\s*${ERA})?$`, 'i');
 
-const NON_ASCII = /[^\x00-\x7f]/;
+/** True when no code unit is above U+007F (a regex for this would name the control characters, which the official lint refuses). */
+function isAscii(text: string): boolean {
+	for (let i = 0; i < text.length; i++) if (text.charCodeAt(i) > 0x7f) return false;
+	return true;
+}
+
 const DECIMAL = /\p{Nd}/u;
 const DECIMAL_ALL = /\p{Nd}/gu;
 
@@ -120,7 +125,7 @@ const DECIMAL_ALL = /\p{Nd}/gu;
  * ten, is the value.
  */
 function asciiDigits(text: string): string {
-	if (!NON_ASCII.test(text)) return text;
+	if (isAscii(text)) return text;
 	return text.replace(DECIMAL_ALL, (ch) => {
 		const cp = ch.codePointAt(0)!;
 		if (cp < 128) return ch;

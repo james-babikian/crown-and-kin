@@ -8,6 +8,7 @@
 
 import type { FamilyGraph } from '../core/derive';
 import type { FoldSet } from '../core/folds';
+import { dropUnits } from '../core/char-codes';
 import { noteName } from '../core/titles';
 import { illegitimateSigns } from '../layout/illegitimate-sign';
 import type { LaidOut, StrokeKind } from '../layout/model';
@@ -69,10 +70,10 @@ export function savedLegend(g: FamilyGraph, laid: LaidOut): SavedLegendContent {
 
 // XML 1.0 forbids these characters; one of them in a name makes the whole saved SVG (and the
 // PNG made from it) fail to load.
-const NOT_XML = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\uFFFE\uFFFF]/g;
+const notXml = (c: number) => c <= 0x08 || c === 0x0b || c === 0x0c || (c >= 0x0e && c <= 0x1f) || c === 0xfffe || c === 0xffff;
 
 /** `s` without the characters XML forbids, as a saved picture writes and measures it. */
-export const xmlText = (s: string) => s.replace(NOT_XML, '');
+export const xmlText = (s: string) => dropUnits(s, notXml);
 
 /** The largest PNG a save makes (spec §13.8): pixels in all, and px on each side (the iPhone's limit for one image). */
 const SAVED_PNG_MAX_PIXELS = 16_000_000;

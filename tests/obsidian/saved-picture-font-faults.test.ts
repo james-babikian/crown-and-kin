@@ -48,7 +48,7 @@ describe('the page fonts of a saved PNG', () => {
 	});
 
 	it('a failed download (404 page) is not embedded as a font', async () => {
-		vi.stubGlobal('document', { fonts: undefined, styleSheets: [], baseURI: 'app://vault/' });
+		vi.stubGlobal('activeDocument', { fonts: undefined, styleSheets: [], baseURI: 'app://vault/' });
 		vi.stubGlobal('fetch', async () => new Response('<html>Not found</html>', { status: 404 }));
 		await expect(pageFontEnv().read('app://vault/snippets/a.woff2')).rejects.toBeTruthy();
 	});

@@ -120,6 +120,10 @@ export default class DynastyTreePlugin extends Plugin implements TreeHost, Setti
 	 */
 	private cacheWarm = false;
 	private cssSeen = false;
+	/** The page of each Obsidian window that the plugin follows: the main window and the open pop-out windows. */
+	private readonly pages = new Set<Document>();
+	private listenFonts?: (page: Document) => void;
+	private unlistenFonts?: (page: Document) => void;
 	private cssProbe: HTMLElement | null = null;
 	/** The waiting redraws of trees that are off screen; they stop when the plugin unloads. */
 	private readonly redrawTimers = new Set<number>();
@@ -181,7 +185,7 @@ export default class DynastyTreePlugin extends Plugin implements TreeHost, Setti
 		this.register(() => window.clearTimeout(limit));
 		this.register(() => this.cssProbe?.remove());
 		// The text colour set on the page body must not outlive the plugin.
-		this.register(() => document.body?.style.removeProperty('--dynasty-on-accent'));
+		this.register(() => this.clearOnAccent());
 		// The same for the run-time grey, link, edge and error colours (D212, contrast-tokens).
 		this.register(() => this.clearContrast());
 		// One later check for all trees: a theme can change its colours a frame later (its style sheet still loads).
@@ -203,6 +207,7 @@ export default class DynastyTreePlugin extends Plugin implements TreeHost, Setti
 			}),
 		);
 		this.register(() => recheck.cancel());
+		this.watchWindows();
 		this.watchWebFonts();
 		// The session focus lasts until the note closes (spec §5.6).
 		this.registerEvent(this.app.workspace.on('layout-change', () => this.endClosedSessions()));
@@ -265,7 +270,7 @@ export default class DynastyTreePlugin extends Plugin implements TreeHost, Setti
 		guarded('cannot start the note index', () => {
 			const cache = this.app.metadataCache;
 			this.cacheWarm = typeof cache.getFileCache === 'function' && this.app.vault.getMarkdownFiles().every((f) => !!cache.getFileCache(f));
-			this.register(saveWhenLeaving(this.fence));
+			this.register(saveWhenLeaving(this.fence, { win: this.mainPage().defaultView ?? window, doc: this.mainPage() }));
 			void this.fence.start().catch((e: unknown) => console.error('Crown and Kin: the note index did not start', e));
 		});
 	}
@@ -338,20 +343,70 @@ export default class DynastyTreePlugin extends Plugin implements TreeHost, Setti
 	 */
 	private paintOnAccent(): void {
 		guarded('cannot read the colour of the text on the accent', () => {
-			const body = document.body;
-			if (!body?.isConnected) return;
-			const pick = onAccentChoice(body);
-			if (pick) body.style.setProperty('--dynasty-on-accent', pick);
-			else body.style.removeProperty('--dynasty-on-accent');
+			for (const page of this.pages) {
+				const body = page.body;
+				if (!body?.isConnected) continue;
+				const pick = onAccentChoice(body);
+				if (pick) body.style.setProperty('--dynasty-on-accent', pick);
+				else body.style.removeProperty('--dynasty-on-accent');
+			}
 		});
 	}
 
+	/** Takes the text colour on the accent off the page body of every window. */
+	private clearOnAccent(): void {
+		for (const page of this.pages) page.body?.style.removeProperty('--dynasty-on-accent');
+	}
+
+	/** The page of the main Obsidian window (the workspace lives there, also when the active window is a pop-out window). */
+	private mainPage(): Document {
+		return this.app.workspace?.containerEl?.ownerDocument ?? activeDocument;
+	}
+
+	/**
+	 * A pop-out window has its own page, body and font set, and the theme colours, the run-time tokens and the font events of the main window do not reach it.
+	 * The plugin follows each window: the main one now, the open pop-out windows now, and each later one when it opens or closes.
+	 */
+	private watchWindows(): void {
+		this.pages.add(this.mainPage());
+		const add = (page: Document | undefined) => {
+			if (!page || this.pages.has(page)) return;
+			this.pages.add(page);
+			this.listenFonts?.(page);
+			this.paintOnAccent();
+			this.paintContrast();
+		};
+		const ws = this.app.workspace;
+		if (typeof ws?.on !== 'function') return;
+		this.registerEvent(ws.on('window-open', (_win, win) => guarded('cannot follow a new window', () => add(win?.document))));
+		this.registerEvent(
+			ws.on('window-close', (_win, win) =>
+				guarded('cannot follow a closed window', () => {
+					const page = win?.document;
+					if (!page || page === this.mainPage()) return;
+					this.pages.delete(page);
+					this.unlistenFonts?.(page);
+				}),
+			),
+		);
+		// A pop-out window that is open already (the plugin was turned on later) has no `window-open` event for us.
+		if (typeof ws.iterateAllLeaves === 'function') {
+			ws.onLayoutReady(() =>
+				guarded('cannot find the open windows', () => {
+					ws.iterateAllLeaves((leaf) => add(leaf.view?.containerEl?.ownerDocument));
+				}),
+			);
+		}
+	}
+
 	/** Takes the run-time contrast tokens off the page body, so the static values of the style sheet show (also when the plugin unloads). */
-	private clearContrast(): void {
-		document.body?.style.removeProperty('--dynasty-muted');
-		document.body?.style.removeProperty('--dynasty-link');
-		document.body?.style.removeProperty('--dynasty-edge');
-		document.body?.style.removeProperty('--dynasty-error');
+	private clearContrast(pages: Iterable<Document> = this.pages): void {
+		for (const page of pages) {
+			page.body?.style.removeProperty('--dynasty-muted');
+			page.body?.style.removeProperty('--dynasty-link');
+			page.body?.style.removeProperty('--dynasty-edge');
+			page.body?.style.removeProperty('--dynasty-error');
+		}
 	}
 
 	/**
@@ -361,21 +416,23 @@ export default class DynastyTreePlugin extends Plugin implements TreeHost, Setti
 	 */
 	private paintContrast(): void {
 		guarded('cannot read the colours of the theme for the grey text', () => {
-			const body = document.body;
-			if (!body?.isConnected) return;
-			// The static value is the start, so the overrides must be off while it is read.
-			this.clearContrast();
-			const cs = getComputedStyle(body);
-			const picks = contrastChoices((name) => cs.getPropertyValue(name));
-			// One call for each property with its name written out: the lint rule on custom properties reads the name.
-			const muted = picks['--dynasty-muted'];
-			const link = picks['--dynasty-link'];
-			const edge = picks['--dynasty-edge'];
-			const error = picks['--dynasty-error'];
-			if (muted) body.style.setProperty('--dynasty-muted', muted);
-			if (link) body.style.setProperty('--dynasty-link', link);
-			if (edge) body.style.setProperty('--dynasty-edge', edge);
-			if (error) body.style.setProperty('--dynasty-error', error);
+			for (const page of this.pages) {
+				const body = page.body;
+				if (!body?.isConnected) continue;
+				// The static value is the start, so the overrides must be off while it is read.
+				this.clearContrast([page]);
+				const cs = page.defaultView ? page.defaultView.getComputedStyle(body) : getComputedStyle(body);
+				const picks = contrastChoices((name) => cs.getPropertyValue(name));
+				// One call for each property with its name written out: the lint rule on custom properties reads the name.
+				const muted = picks['--dynasty-muted'];
+				const link = picks['--dynasty-link'];
+				const edge = picks['--dynasty-edge'];
+				const error = picks['--dynasty-error'];
+				if (muted) body.style.setProperty('--dynasty-muted', muted);
+				if (link) body.style.setProperty('--dynasty-link', link);
+				if (edge) body.style.setProperty('--dynasty-edge', edge);
+				if (error) body.style.setProperty('--dynasty-error', error);
+			}
 		});
 	}
 
@@ -559,8 +616,6 @@ export default class DynastyTreePlugin extends Plugin implements TreeHost, Setti
 	 * loaded families for a moment, then let each tree re-measure if one of its fonts loaded.
 	 */
 	private watchWebFonts(): void {
-		const fonts = document.fonts;
-		if (!fonts || typeof fonts.addEventListener !== 'function') return;
 		let loaded: string[] = [];
 		const flush = debounce(
 			() => {
@@ -578,8 +633,25 @@ export default class DynastyTreePlugin extends Plugin implements TreeHost, Setti
 				if (loaded.length) flush();
 			});
 		};
-		fonts.addEventListener('loadingdone', onDone);
-		this.register(() => fonts.removeEventListener('loadingdone', onDone));
+		const watched = new Set<FontFaceSet>();
+		// Each window has its own font set; a pop-out window has no events from the main one.
+		this.listenFonts = (page) => {
+			const fonts = page.fonts;
+			if (!fonts || typeof fonts.addEventListener !== 'function' || watched.has(fonts)) return;
+			watched.add(fonts);
+			fonts.addEventListener('loadingdone', onDone);
+		};
+		this.unlistenFonts = (page) => {
+			const fonts = page.fonts;
+			if (!fonts || !watched.delete(fonts)) return;
+			fonts.removeEventListener('loadingdone', onDone);
+		};
+		for (const page of this.pages) this.listenFonts(page);
+		this.register(() => {
+			for (const page of this.pages) this.unlistenFonts?.(page);
+			this.listenFonts = undefined;
+			this.unlistenFonts = undefined;
+		});
 	}
 
 	/**

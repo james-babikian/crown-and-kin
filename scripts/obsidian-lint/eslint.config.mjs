@@ -24,14 +24,9 @@ export default [
 			},
 		},
 		rules: {
-			// The code refuses control characters in imported text on purpose; the regexes name them.
-			'no-control-regex': 'off',
 			// '@codemirror/state' and '@codemirror/view' come from Obsidian at run time and are not in package.json.
 			// The bundle marks them as external (esbuild.config.mjs).
 			'import/no-extraneous-dependencies': 'off',
-			// The four `keyCode === 229` sites (the IME check) carry this warning. Safari has no replacement for
-			// keyCode 229 while the user composes text, so the warning stays visible and does not fail the run.
-			'@typescript-eslint/no-deprecated': 'warn',
 		},
 	},
 ];

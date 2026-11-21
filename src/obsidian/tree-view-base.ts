@@ -565,7 +565,7 @@ export abstract class TreeViewBase extends MarkdownRenderChild implements HoverP
 			const t = find(v.viewport);
 			if (t?.isConnected) target = t;
 		}
-		const doc = target?.doc ?? document;
+		const doc = target?.doc ?? activeDocument;
 		const active = doc.activeElement;
 		const free = !active || active === doc.body || !active.isConnected;
 		// Obsidian's own restore passes `focusVisible` too: no ring after a mouse close of a window opened by a mouse.

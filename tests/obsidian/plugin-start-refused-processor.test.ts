@@ -103,8 +103,8 @@ describe('Live Preview help when the editor modules are missing or changed', () 
 		const error = vi.spyOn(console, 'error').mockImplementation(() => {});
 		expect(tallBlockParser()).toBeNull();
 		expect(error).not.toHaveBeenCalled();
-		// The fake page has no `documentElement`, which the real module reads when it loads: it fails as a changed module would.
-		vi.stubGlobal('document', { documentElement: {} });
+		// The fake active page has no `documentElement`, which the real module reads when it loads: it fails as a changed module would.
+		vi.stubGlobal('activeDocument', { documentElement: {} });
 		expect(tallBlockParser()).toBeNull();
 		expect(error).toHaveBeenCalledTimes(1);
 		vi.unstubAllGlobals();
