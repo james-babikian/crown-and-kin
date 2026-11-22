@@ -572,7 +572,9 @@ export abstract class TreeViewBase extends MarkdownRenderChild implements HoverP
 		if (target && free && !pluginWindowOpen()) {
 			// The focus listener of the card must not pan a card that is still partly in view (keep place, D245).
 			TreeViewBase.markRestore(target);
-			target.focus({ preventScroll: true, focusVisible } as FocusOptions);
+			// A named object, not a literal: `focusVisible` is not in the DOM type yet, and a literal would fail the excess-property check.
+			const options = { preventScroll: true, focusVisible };
+			target.focus(options);
 		}
 		const wait = [150, 600][step];
 		if (wait !== undefined) (doc.defaultView ?? window).setTimeout(() => TreeViewBase.refocusAfterRedraw(host, match, find, focusVisible, step + 1), wait);

@@ -96,6 +96,7 @@
 	margin: -1px;
 	padding: 0;
 	overflow: hidden;
+	/* css-check-allow: the hidden-text recipe of a block for screen readers only (or its reset); a long-supported property whose repair would change the look. */
 	clip-path: inset(50%);
 	white-space: nowrap;
 }
@@ -307,7 +308,6 @@
 
 /* As on the cards, a house colour is lighter in the dark theme (60 % of the colour with the text colour). */
 .theme-dark .dynasty-list-row.dynasty-has-house .dynasty-list-strip {
-	background: var(--dynasty-house-color);
 	background: color-mix(in srgb, var(--dynasty-house-color) 60%, var(--text-normal));
 }
 

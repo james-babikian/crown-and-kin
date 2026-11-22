@@ -4,8 +4,8 @@
  * THEME_VARS, src/render/styles.ts), so the tree follows the theme and light/dark mode live.
  * A house colour reaches the SVG only through the `--dynasty-house-color` custom property (spec §5.8).
  * Line rules must match STROKES in src/render/styles.ts; tests/render-styles.test.ts checks them.
- * Every `color-mix()` follows a plain `var()` of its first colour: engines without `color-mix()`
- * (iOS before 16.2) drop the second declaration and keep the first.
+ * A `color-mix()` that holds a `var()` stands alone in its rule, without a plain value before it: a declaration with a `var()` is accepted by every
+ * engine and decides at computed-value time, so an earlier plain value never applies (the style check, `npm run lint`, refuses a repeated property).
  */
 
 /* ---------- Tokens ---------- */
@@ -15,7 +15,7 @@
  * the windows are not inside a tree root. Each is a mix of Obsidian's own roles, so the theme still decides.
  * Targets: text 4.5:1 and a control edge 3:1 on the window and card surfaces of the default theme, light and dark
  * (the other themes are checked by hand).
- * A custom property takes any text, so the two-declaration rule above does not work here: the plain role
+ * A custom property takes any text, so the rule above does not work here: the plain role
  * is the value first, and `@supports` replaces it where `color-mix()` works.
  */
 body {
@@ -253,6 +253,7 @@ body {
 	margin: -1px;
 	padding: 0;
 	overflow: hidden;
+	/* css-check-allow: the hidden-text recipe of a block for screen readers only (or its reset); a long-supported property whose repair would change the look. */
 	clip-path: inset(50%);
 	white-space: nowrap;
 }
@@ -315,6 +316,7 @@ body {
 @media (hover: hover) {
 	.dynasty-link:hover {
 		background: none;
+		/* css-check-allow: the thin underline of a link under the pointer (D218 item 5); a long-supported property, and a repair would change the look. */
 		text-decoration: underline solid;
 		text-decoration-thickness: 1px;
 		text-underline-offset: 3px;

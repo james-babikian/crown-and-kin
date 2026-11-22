@@ -18,7 +18,7 @@ const VARS = `:root,body{--font-ui-small:13px;--font-ui-smaller:12px;--font-ui-m
 const ICON = '<svg class="svg-icon" viewBox="0 0 24 24" width="18" height="18"><circle cx="12" cy="12" r="8"/></svg>';
 const tool = (cls: string, inner = `<span class="dynasty-tool-icon">${ICON}</span>`) => `<button type="button" class="clickable-icon dynasty-tool ${cls}">${inner}</button>`;
 const bar = (badge: boolean, count = '12') =>
-	`<div class="modal dynasty-fullscreen is-phone"><div class="modal-content dynasty-fullscreen-content"><div class="dynasty-full" style="position:fixed;inset:0"><div class="dynasty-toolbar">` +
+	`<div class="modal dynasty-fullscreen is-phone"><div class="modal-content dynasty-fullscreen-content"><div class="dynasty-full" style="position:fixed;inset:0"><div class="dynasty-toolbar${badge ? ' has-problem-badge' : ''}">` +
 	[
 		tool('dynasty-add-person'),
 		tool('dynasty-houses-button'),

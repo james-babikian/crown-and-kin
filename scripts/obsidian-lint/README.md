@@ -29,14 +29,11 @@ Install the tool one time; later runs need only the last command. The project ne
 
 ## Result
 
-A clean run has 0 errors. Warnings do not fail the run: `@typescript-eslint/no-deprecated` on the `keyCode === 229` checks (the IME check; Safari has no replacement) and the window warnings of `obsidianmd/prefer-active-doc`. Any error makes the CI job fail.
+A clean run has 0 errors. Warnings do not fail the run. Two warnings stay, each with a reason (0.6.2, D382):
+
+- `@typescript-eslint/no-deprecated` on `keyCode === 229` (5 sites: `list-window.ts`, `picture-picker.ts`, `sheet-parts.ts`, `succession-rules-ui.ts`, `window-shell.ts`). It is the IME check: a key press that the input method handles has `isComposing` false on Safari for the confirming key, and only `keyCode` 229 marks it. No other property does this on iPhone Safari, so the check stays.
+- `no-restricted-globals` on `fetch` in `save-font.ts` (`pageFontEnv.read`). It reads a font file at an `app://` address (a CSS snippet's `@font-face`) for the saved PNG. `requestUrl` sends http and https requests through the network layer and cannot read an `app://` address. The `fetch` of the page can, and it is the same request that the page made to load the font. Nothing leaves the computer.
 
 The tool is version 0.6.0 of the plugin (0.6.0 notes: `docs/configuration.md`, "Upgrading to 0.6.0"). Its recommended config sets `@typescript-eslint/no-deprecated` to a warning by itself, so the project config does not repeat it.
 
-## Switched-off rules
-
-| Rule | Reason |
-|---|---|
-| `import/no-extraneous-dependencies` | `@codemirror/state` and `@codemirror/view` come from Obsidian at run time. They are external in the bundle and not in `package.json`. |
-
-`@typescript-eslint/no-deprecated` is a warning in the recommended config, so a new use of a deprecated API shows up at once without an override or an inline disable.
+No rule is switched off in the project config. `@codemirror/state` and `@codemirror/view` are listed in `devDependencies` (exact versions of the `obsidian` peer range) so that `import/no-extraneous-dependencies` is satisfied. The bundle still marks them as external (`esbuild.config.mjs`): Obsidian gives them at run time.

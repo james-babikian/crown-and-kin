@@ -93,6 +93,19 @@ function addHead(modalEl: HTMLElement, inputEl: HTMLElement, title: string, clos
 	if (field?.parentElement === modalEl) modalEl.insertBefore(cancel, field.nextElementSibling);
 	else modalEl.appendChild(cancel);
 	modalEl.prepend(head);
+	followFocusRing(inputEl);
+}
+
+/**
+ * Puts the class `is-input-focus` on the pill while its field shows a focus ring (a keyboard or a mouse, not a touch). A parent selector would do this
+ * in CSS, but it makes the browser check the whole list on every change. The class follows `:focus-visible` of the field, as the old rule did, so the
+ * clear button inside the pill does not light the ring.
+ */
+export function followFocusRing(inputEl: HTMLElement): void {
+	const field = inputEl.parentElement;
+	if (!field) return;
+	inputEl.addEventListener('focus', () => field.toggleClass('is-input-focus', inputEl.matches(':focus-visible')));
+	inputEl.addEventListener('blur', () => field.removeClass('is-input-focus'));
 }
 
 /** L-07: the class that shows the title of the picker on a phone, when the context asks for it. */

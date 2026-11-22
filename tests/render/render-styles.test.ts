@@ -29,7 +29,7 @@ function rule(selector: string): Record<string, string> | null {
 	return b === null ? null : Object.fromEntries(decls(b));
 }
 
-/** Every value given to `prop`, in order (a fallback first). */
+/** Every value given to `prop`, in order (one: the style check refuses a repeated property). */
 function values(selector: string, prop: string): string[] {
 	return decls(body(selector) ?? '').filter(([k]) => k === prop).map(([, v]) => v);
 }
@@ -45,23 +45,18 @@ describe('styles.css matches STROKES', () => {
 		expect(r!['stroke-opacity'] === undefined ? undefined : Number(r!['stroke-opacity'])).toBe(s.opacity);
 	});
 
-	it('every color-mix() follows a plain var() of its first colour for the same property (iOS before 16.2)', () => {
+	it('every color-mix() stands alone for its property: a repeated property is a dead plain value (D382)', () => {
 		const blocks = [...css.matchAll(/\{([^{}]*)\}/g)].map((m) => decls(m[1]));
 		let mixes = 0;
 		for (const list of blocks) {
-			list.forEach(([k, v], i) => {
+			list.forEach(([k, v]) => {
 				if (!v.includes('color-mix(')) return;
-				// A custom property takes any text, so a second declaration is no fallback: the next test checks the tokens.
+				// A custom property takes any text: the next test checks the tokens.
 				if (k.startsWith('--')) return;
 				mixes++;
-				const first = /color-mix\(in srgb, (var\([^)]*\)*\))/.exec(v)?.[1];
-				expect(first, v).toBeDefined();
-				const before = list.slice(0, i).filter(([k2]) => k2 === k);
-				expect(before.length, `${k}: ${v}`).toBe(1);
-				expect(before[0][1], `${k}: ${v}`).toBe(first);
+				expect(list.filter(([k2]) => k2 === k).length, `${k}: ${v}`).toBe(1);
 			});
 		}
-		// D38 removed the small ring (one mix): six are left.
 		expect(mixes).toBeGreaterThanOrEqual(6);
 	});
 
@@ -106,7 +101,6 @@ describe('styles.css cards and union signs (D26, D27)', () => {
 
 	it('house ribbons: lifted in the dark theme, less faded when dead', () => {
 		expect(values('.theme-dark .dynasty-has-house .dynasty-card-ribbon', 'fill')).toEqual([
-			'var(--dynasty-house-color)',
 			`color-mix(in srgb, var(--dynasty-house-color) ${Math.round((1 - HOUSE_DARK_LIFT) * 100)}%, var(--text-normal))`, // 60 % since 0.2.8
 		]);
 		expect(Number(rule('.dynasty-deceased .dynasty-card-ribbon')?.opacity)).toBe(DEAD_STRIP_OPACITY);

@@ -103,7 +103,6 @@
 
 /* F3 item 3: the selection fill is darker than the window, so the grey line is 4.27 to 4.41 on it in three light themes. In the selected row it moves toward the text colour. */
 .dynasty-picker .suggestion-item.is-selected .dynasty-picker-sub {
-	color: var(--text-normal);
 	color: color-mix(in srgb, var(--text-normal) 55%, var(--dynasty-muted));
 }
 
@@ -127,9 +126,10 @@
 	display: none;
 }
 
-/* D212 sheet-opaque, F3 item 5: the plain page background on a phone and on a computer, in every theme (see 10-edit-sheet.css). */
+/* D212 sheet-opaque, F3 item 5: the plain page background on a phone and on a computer, in every theme (see 10-edit-sheet.css; the window sets the variable that the theme reads, D382 (3)). */
 .modal-container .prompt.dynasty-picker.dynasty-picker {
-	background: var(--background-primary) !important;
+	--modal-background: var(--background-primary);
+	background: var(--background-primary);
 	backdrop-filter: none;
 	-webkit-backdrop-filter: none;
 }
@@ -139,7 +139,8 @@
 	from red r g b
 )) {
 	.modal-container .prompt.dynasty-picker.dynasty-picker {
-		background: rgb(from var(--background-primary) r g b) !important;
+		--modal-background: rgb(from var(--background-primary) r g b);
+		background: rgb(from var(--background-primary) r g b);
 	}
 }
 
@@ -161,6 +162,7 @@
 	grid-template-columns: minmax(0, 1fr) auto;
 	grid-template-rows: auto minmax(0, 1fr);
 	align-content: start;
+	/* css-check-allow: the gap of a grid, not a multi-column box; the property is the only way to set it. */
 	column-gap: var(--size-4-2);
 	/*
 	 * D125 (3): Obsidian's `.is-phone .prompt` keeps the safe area at the bottom (the home bar). The keyboard covers that
@@ -183,6 +185,7 @@
 	margin: -1px;
 	padding: 0;
 	overflow: hidden;
+	/* css-check-allow: the hidden-text recipe of a block for screen readers only (or its reset); a long-supported property whose repair would change the look. */
 	clip-path: inset(50%);
 	white-space: nowrap;
 }
@@ -205,6 +208,7 @@
 	/* P3-04, F07: the hint starts on the edge of the names, 8 px in from the window padding, as the title of the other pickers (L-08). */
 	padding: var(--dynasty-space-2) max(var(--dynasty-space-4), var(--dynasty-safe-right)) 0 calc(max(var(--dynasty-space-4), var(--dynasty-safe-left)) + var(--dynasty-space-2));
 	overflow: visible;
+	/* css-check-allow: the hidden-text recipe of a block for screen readers only (or its reset); a long-supported property whose repair would change the look. */
 	clip-path: none;
 	white-space: normal;
 }
@@ -281,7 +285,8 @@
 
 /* A touch screen shows the caret, so only a keyboard or a mouse gets a focus ring, and it goes round the pill. */
 @media (pointer: fine) {
-	.dynasty-picker.is-phone .prompt-input-container:has(> input.prompt-input:focus-visible) {
+	/* The class comes from `followFocusRing` in person-picker.ts: it follows `:focus-visible` of the field, with no `:has()` (D382 (3)). */
+	.dynasty-picker.is-phone .prompt-input-container.is-input-focus {
 		outline: 2px solid var(--background-modifier-border-focus);
 		outline-offset: -2px;
 	}

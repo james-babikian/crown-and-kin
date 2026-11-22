@@ -58,6 +58,7 @@
 /* The thin underline shows under a pointer that can hover; a finger leaves no hover behind (D218 item 5). */
 @media (hover: hover) {
 	.dynasty-sheet button.dynasty-holder-name:hover {
+		/* css-check-allow: the thin underline of a link under the pointer (D218 item 5); a long-supported property, and a repair would change the look. */
 		text-decoration: underline solid;
 		text-decoration-thickness: 1px;
 		text-underline-offset: 3px;
@@ -234,6 +235,7 @@
 	margin: -1px;
 	padding: 0;
 	overflow: hidden;
+	/* css-check-allow: the hidden-text recipe of a block for screen readers only (or its reset); a long-supported property whose repair would change the look. */
 	clip-path: inset(50%);
 	white-space: nowrap;
 }

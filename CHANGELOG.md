@@ -2,6 +2,21 @@
 
 All notable changes for users. The newest version is first.
 
+## 0.6.2
+
+The tree looks and works as in 0.6.1. You do not need to do anything. Crown and Kin is now in the list of Community plugins in Obsidian. Obsidian checks each plugin in that list by machine. The check of 0.6.1 gave warnings and no errors. This version answers those warnings.
+
+- **The README now tells you to install the plugin from the Community plugins list first.** On a phone, you can also install it from the list. The steps with BRAT and the steps by hand stay.
+- **The part "Privacy" of the README now says why the plugin reads the list of all file names in your vault.** The plugin needs the list for three tasks. It finds the notes that contain a tree. It fills the list of the picture window. It updates links after you rename a note.
+- **The style rules have fewer warnings.** The style rules set the colours and the spaces of the windows. 19 style rules never had an effect, so they are gone. 4 groups of style rules now work in a different way:
+  1. The background of the person window and the Find window.
+  2. The black background of the crop window.
+  3. The ring around the Find field in a narrow window.
+  4. The space at the sides of the full-screen toolbar on a phone narrower than 360 px.
+
+  In before and after pictures in four themes, these windows look the same. The other style warnings stay, each with a written reason.
+- **The code has 6 warnings in the official Obsidian rules, not 8.** The 6 stay on purpose. 5 are checks of keys for text input with an input method (IME). 1 reads a font file from your own computer. You see no change.
+
 ## 0.6.1
 
 The tree looks and works as in 0.6.0. You do not need to do anything. This version changes the code for the list of Community plugins in Obsidian.

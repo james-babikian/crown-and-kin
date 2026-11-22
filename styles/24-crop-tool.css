@@ -14,13 +14,15 @@
 /*
  * F3 item 1: the surface stays dark on every device and in every theme. The window also holds the class `dynasty-sheet`, so the phone sheet rule
  * (`.modal-container .modal.dynasty-sheet.dynasty-sheet.is-phone`, page colour) and the opaque-window rule of Cupertino outrank the rule above.
- * A theme rule for `.modal` can hold `!important`, so the properties that make the surface carry it too.
+ * Cupertino sets the window background from the variable `--modal-background` with `!important`, so the window sets that variable (as the
+ * edit window does, D382 (3)). `color` and `backdrop-filter` have no variable; the selector holds one class more than the phone sheet rule.
  */
-.modal-container .modal.dynasty-sheet.dynasty-crop.dynasty-crop {
-	background: black !important;
-	color: white !important;
-	backdrop-filter: none !important;
-	-webkit-backdrop-filter: none !important;
+.modal-container .modal.dynasty-sheet.dynasty-crop.dynasty-crop.dynasty-crop {
+	--modal-background: black;
+	background: var(--modal-background);
+	color: white;
+	backdrop-filter: none;
+	-webkit-backdrop-filter: none;
 }
 
 /* D212 crop-tool: a large window, 48 px from the edges of the screen, so the portrait is big while it is cropped. */

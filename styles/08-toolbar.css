@@ -605,6 +605,7 @@
 	.dynasty-result .dynasty-link:hover,
 	.dynasty-popover .dynasty-link:hover {
 		background: none;
+		/* css-check-allow: the thin underline of a link under the pointer (D218 item 5); a long-supported property, and a repair would change the look. */
 		text-decoration: underline solid;
 		text-decoration-thickness: 1px;
 		text-underline-offset: 3px;

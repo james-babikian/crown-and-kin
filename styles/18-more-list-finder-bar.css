@@ -101,6 +101,7 @@
 
 /* On a phone the banner is one row (D212, phone-banner-row): the sentence, the link "Options" with a chevron, and the X. The steps open under the row. */
 .dynasty-result-phone .dynasty-result-buttons {
+	/* css-check-allow: the wrapper must not make a box so that its children join the parent grid or flex row; no other value does this. */
 	display: contents;
 }
 

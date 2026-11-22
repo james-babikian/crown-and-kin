@@ -9,7 +9,18 @@ Crown and Kin is a plugin for Obsidian. It draws the family tree of a noble hous
 
 ## Install
 
-You need Obsidian 1.11 or newer. The plugin is not in the Obsidian list of community plugins yet. Install it with BRAT (the easier way, because BRAT also updates it) or by hand. The plugin is a beta and it changes the tree text in your notes, so make a copy of your vault before you try it.
+You need Obsidian 1.11 or newer. The plugin is a beta and it changes the tree text in your notes. Make a copy of your vault before you try it.
+
+### From the Community plugins list
+
+1. In Obsidian, open Settings, then Community plugins. If Obsidian shows "Restricted mode", select "Exit Restricted mode" (Obsidian 1.14) or "Turn on community plugins" (Obsidian 1.11).
+2. Select Browse. Search for "Crown and Kin".
+3. Select Install.
+4. Select Enable.
+
+To update the plugin, open Settings, then Community plugins, and select "Check for updates".
+
+You can also install the plugin with BRAT or by hand. BRAT is a community plugin that installs plugins from GitHub.
 
 ### With BRAT
 
@@ -40,7 +51,10 @@ To update a plugin that you installed by hand, replace the three files with the 
 
 If Obsidian shows the window "Do you trust the author of this vault?", select "Trust author and enable plugins". The button "Browse vault in Restricted Mode" keeps the plugins off. Obsidian shows this window when it first opens a vault that holds plugin files.
 
-**On a phone,** install the plugin on your computer first, with BRAT or by hand. Let your sync copy the vault to the phone. Obsidian Sync copies plugins only if "Installed community plugins" is on in its settings. On the phone, open Settings, then Community plugins, and turn on Crown and Kin.
+**On a phone,** you have two ways to install the plugin.
+
+- Install it from the Community plugins list on the phone, with the same steps as on a computer.
+- Or install it on your computer and let your sync copy the vault to the phone. Obsidian Sync copies plugins only if "Installed community plugins" is on in its settings. Then, on the phone, open Settings, then Community plugins, and turn on Crown and Kin.
 
 ## Your first tree
 
@@ -133,7 +147,7 @@ A tree uses a calendar only if it names a calendar note. Open the tree. Select M
 
 The plugin does not use the internet. It sends no data and collects no data about you. It never deletes a note or a picture.
 
-It reads the notes in your vault to find the trees and the calendar notes, and it reads the pictures that a tree links to. It writes only three things: the tree text that you change in a window, the calendar note, and a note or a picture that you make with a button. After you rename a note or a picture, it also updates the links in your trees. You can turn off this update in the settings. It keeps its settings in `.obsidian/plugins/crown-and-kin/data.json`.
+It reads the notes in your vault to find the trees and the calendar notes, and it reads the pictures that a tree links to. To do this, it reads the list of all file names in your vault. It uses the list to find the notes with a tree, to show the pictures in the picture window, and to update links after a rename. It writes only three things. These are the tree text that you change in a window, the calendar note, and a note or a picture that you make with a button. After you rename a note or a picture, it also updates the links in your trees. You can turn off this update in the settings. It keeps its settings in `.obsidian/plugins/crown-and-kin/data.json`.
 
 ## Report a problem
 

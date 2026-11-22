@@ -144,8 +144,8 @@ body.is-phone,
  * THEME_VARS, src/render/styles.ts), so the tree follows the theme and light/dark mode live.
  * A house colour reaches the SVG only through the `--dynasty-house-color` custom property (spec §5.8).
  * Line rules must match STROKES in src/render/styles.ts; tests/render-styles.test.ts checks them.
- * Every `color-mix()` follows a plain `var()` of its first colour: engines without `color-mix()`
- * (iOS before 16.2) drop the second declaration and keep the first.
+ * A `color-mix()` that holds a `var()` stands alone in its rule, without a plain value before it: a declaration with a `var()` is accepted by every
+ * engine and decides at computed-value time, so an earlier plain value never applies (the style check, `npm run lint`, refuses a repeated property).
  */
 
 /* ---------- Tokens ---------- */
@@ -155,7 +155,7 @@ body.is-phone,
  * the windows are not inside a tree root. Each is a mix of Obsidian's own roles, so the theme still decides.
  * Targets: text 4.5:1 and a control edge 3:1 on the window and card surfaces of the default theme, light and dark
  * (the other themes are checked by hand).
- * A custom property takes any text, so the two-declaration rule above does not work here: the plain role
+ * A custom property takes any text, so the rule above does not work here: the plain role
  * is the value first, and `@supports` replaces it where `color-mix()` works.
  */
 body {
@@ -393,6 +393,7 @@ body {
 	margin: -1px;
 	padding: 0;
 	overflow: hidden;
+	/* css-check-allow: the hidden-text recipe of a block for screen readers only (or its reset); a long-supported property whose repair would change the look. */
 	clip-path: inset(50%);
 	white-space: nowrap;
 }
@@ -455,6 +456,7 @@ body {
 @media (hover: hover) {
 	.dynasty-link:hover {
 		background: none;
+		/* css-check-allow: the thin underline of a link under the pointer (D218 item 5); a long-supported property, and a repair would change the look. */
 		text-decoration: underline solid;
 		text-decoration-thickness: 1px;
 		text-underline-offset: 3px;
@@ -554,8 +556,6 @@ body.is-phone,
 	fill: var(--background-primary-alt);
 	stroke: var(--dynasty-card-edge);
 	stroke-width: var(--dynasty-card-edge-width);
-	rx: var(--radius-m);
-	ry: var(--radius-m);
 	rx: min(var(--radius-m), calc(var(--dynasty-font-size) * 1.5));
 	ry: min(var(--radius-m), calc(var(--dynasty-font-size) * 1.5));
 }
@@ -610,7 +610,6 @@ body.is-phone,
 
 /* D27: a house colour is lighter in the dark theme (60 % of the colour), so a dark house still shows on a dark card. */
 .theme-dark .dynasty-has-house .dynasty-card-ribbon {
-	fill: var(--dynasty-house-color);
 	fill: color-mix(in srgb, var(--dynasty-house-color) 60%, var(--text-normal));
 }
 
@@ -776,21 +775,18 @@ body.is-phone,
 }
 
 .dynasty-line-concubinage {
-	stroke: var(--text-muted);
 	stroke: color-mix(in srgb, var(--text-muted) 55%, var(--text-faint));
 	stroke-width: 2;
 	stroke-dasharray: 8 4;
 }
 
 .dynasty-line-affair {
-	stroke: var(--text-muted);
 	stroke: color-mix(in srgb, var(--text-muted) 55%, var(--text-faint));
 	stroke-width: 2;
 	stroke-dasharray: 8 3 2 3;
 }
 
 .dynasty-line-implicit {
-	stroke: var(--text-muted);
 	stroke: color-mix(in srgb, var(--text-muted) 55%, var(--text-faint));
 	stroke-width: 1.25;
 }
@@ -807,7 +803,6 @@ body.is-phone,
 }
 
 .dynasty-line-birth-link {
-	stroke: var(--text-muted);
 	stroke: color-mix(in srgb, var(--text-muted) 55%, var(--text-faint));
 	stroke-width: 1.5;
 	stroke-dasharray: 0.1 3.5;
@@ -815,7 +810,6 @@ body.is-phone,
 }
 
 .dynasty-line-adoptive {
-	stroke: var(--color-green);
 	stroke: color-mix(in srgb, var(--color-green) 70%, var(--text-normal));
 	stroke-width: 3;
 	stroke-dasharray: 20 6;
@@ -838,7 +832,6 @@ body.is-phone,
 /* D332: dash-dot (round caps make the 2 px dash a dot) in the theme's orange, moved towards the text colour like the adoptive line.
    D339: 15 % of the text colour in a light theme (30 % turned the orange of the Minimal theme into a dark red, and 15 % still gives 3:1 on the note), 30 % in a dark theme. */
 .dynasty-line-begetter {
-	stroke: var(--color-orange);
 	stroke: color-mix(in srgb, var(--color-orange) 85%, var(--text-normal));
 	stroke-width: 1.5;
 	stroke-dasharray: 14 3 2 3;
@@ -846,7 +839,6 @@ body.is-phone,
 }
 
 body.theme-dark .dynasty-line-begetter {
-	stroke: var(--color-orange);
 	stroke: color-mix(in srgb, var(--color-orange) 70%, var(--text-normal));
 }
 
@@ -1756,6 +1748,7 @@ body.theme-dark .dynasty-line-begetter {
 	.dynasty-result .dynasty-link:hover,
 	.dynasty-popover .dynasty-link:hover {
 		background: none;
+		/* css-check-allow: the thin underline of a link under the pointer (D218 item 5); a long-supported property, and a repair would change the look. */
 		text-decoration: underline solid;
 		text-decoration-thickness: 1px;
 		text-underline-offset: 3px;
@@ -2479,7 +2472,6 @@ body.theme-dark .dynasty-line-begetter {
 }
 
 body.theme-dark .dynasty-house-dot {
-	background: var(--dynasty-house-color, var(--text-normal));
 	background: color-mix(in srgb, var(--dynasty-house-color, var(--text-normal)) 60%, var(--text-normal));
 }
 
@@ -2495,21 +2487,22 @@ body.theme-dark .dynasty-house-dot {
 
 /*
  * D218 rule 5: a link inside a sentence ("Show the line", "4 more") keeps one thin underline at rest, in a light tint of the link colour, the
- * same for both (the solid and the dotted underline are gone). The plain colour comes first for engines without `color-mix()`.
+ * same for both (the solid and the dotted underline are gone).
  */
 .dynasty-head-rel .dynasty-showline,
 .dynasty-head-rel .dynasty-more {
 	color: var(--dynasty-link);
 	font-weight: var(--font-normal);
+	/* css-check-allow: the thin underline of a link under the pointer (D218 item 5); a long-supported property, and a repair would change the look. */
 	text-decoration: underline solid;
 	text-decoration-thickness: 1px;
 	text-underline-offset: 3px;
-	text-decoration-color: var(--dynasty-link);
 	text-decoration-color: color-mix(in srgb, var(--dynasty-link) 45%, transparent);
 }
 
 .dynasty-head-rel .dynasty-showline:hover,
 .dynasty-head-rel .dynasty-more:hover {
+	/* css-check-allow: the thin underline of a link under the pointer (D218 item 5); a long-supported property, and a repair would change the look. */
 	text-decoration-color: var(--dynasty-link);
 }
 
@@ -3510,9 +3503,13 @@ body.theme-dark .dynasty-house-dot {
  * rule for `.modal`. The second background (in @supports) drops any transparency of the theme's colour. It must sit in the block: an engine
  * without relative colours would make the whole declaration invalid at computed-value time and leave the window transparent.
  */
-/* `!important`: Cupertino sets `body.mod-windows:not(.adaptive-mode-off) .modal { background-color: var(--modal-background) !important }`. */
+/*
+ * Cupertino sets `body.mod-windows:not(.adaptive-mode-off) .modal { background-color: var(--modal-background) !important }`. A rule without `!important`
+ * cannot outrank that, but the theme's value is a variable that is read on the window itself, so the window sets the variable (D382 (3)).
+ */
 .modal-container .modal.dynasty-sheet.dynasty-sheet {
-	background: var(--background-primary) !important;
+	--modal-background: var(--background-primary);
+	background: var(--background-primary);
 	backdrop-filter: none;
 	-webkit-backdrop-filter: none;
 }
@@ -3522,7 +3519,8 @@ body.theme-dark .dynasty-house-dot {
 	from red r g b
 )) {
 	.modal-container .modal.dynasty-sheet.dynasty-sheet {
-		background: rgb(from var(--background-primary) r g b) !important;
+		--modal-background: rgb(from var(--background-primary) r g b);
+		background: rgb(from var(--background-primary) r g b);
 	}
 }
 
@@ -3923,6 +3921,7 @@ body.theme-dark .dynasty-house-dot {
 }
 
 .dynasty-note-slot {
+	/* css-check-allow: the wrapper must not make a box so that its children join the parent grid or flex row; no other value does this. */
 	display: contents;
 }
 
@@ -4099,7 +4098,6 @@ body.theme-dark .dynasty-house-dot {
 
 /* F3 item 3: the selection fill is darker than the window, so the grey line is 4.27 to 4.41 on it in three light themes. In the selected row it moves toward the text colour. */
 .dynasty-picker .suggestion-item.is-selected .dynasty-picker-sub {
-	color: var(--text-normal);
 	color: color-mix(in srgb, var(--text-normal) 55%, var(--dynasty-muted));
 }
 
@@ -4123,9 +4121,10 @@ body.theme-dark .dynasty-house-dot {
 	display: none;
 }
 
-/* D212 sheet-opaque, F3 item 5: the plain page background on a phone and on a computer, in every theme (see 10-edit-sheet.css). */
+/* D212 sheet-opaque, F3 item 5: the plain page background on a phone and on a computer, in every theme (see 10-edit-sheet.css; the window sets the variable that the theme reads, D382 (3)). */
 .modal-container .prompt.dynasty-picker.dynasty-picker {
-	background: var(--background-primary) !important;
+	--modal-background: var(--background-primary);
+	background: var(--background-primary);
 	backdrop-filter: none;
 	-webkit-backdrop-filter: none;
 }
@@ -4135,7 +4134,8 @@ body.theme-dark .dynasty-house-dot {
 	from red r g b
 )) {
 	.modal-container .prompt.dynasty-picker.dynasty-picker {
-		background: rgb(from var(--background-primary) r g b) !important;
+		--modal-background: rgb(from var(--background-primary) r g b);
+		background: rgb(from var(--background-primary) r g b);
 	}
 }
 
@@ -4157,6 +4157,7 @@ body.theme-dark .dynasty-house-dot {
 	grid-template-columns: minmax(0, 1fr) auto;
 	grid-template-rows: auto minmax(0, 1fr);
 	align-content: start;
+	/* css-check-allow: the gap of a grid, not a multi-column box; the property is the only way to set it. */
 	column-gap: var(--size-4-2);
 	/*
 	 * D125 (3): Obsidian's `.is-phone .prompt` keeps the safe area at the bottom (the home bar). The keyboard covers that
@@ -4179,6 +4180,7 @@ body.theme-dark .dynasty-house-dot {
 	margin: -1px;
 	padding: 0;
 	overflow: hidden;
+	/* css-check-allow: the hidden-text recipe of a block for screen readers only (or its reset); a long-supported property whose repair would change the look. */
 	clip-path: inset(50%);
 	white-space: nowrap;
 }
@@ -4201,6 +4203,7 @@ body.theme-dark .dynasty-house-dot {
 	/* P3-04, F07: the hint starts on the edge of the names, 8 px in from the window padding, as the title of the other pickers (L-08). */
 	padding: var(--dynasty-space-2) max(var(--dynasty-space-4), var(--dynasty-safe-right)) 0 calc(max(var(--dynasty-space-4), var(--dynasty-safe-left)) + var(--dynasty-space-2));
 	overflow: visible;
+	/* css-check-allow: the hidden-text recipe of a block for screen readers only (or its reset); a long-supported property whose repair would change the look. */
 	clip-path: none;
 	white-space: normal;
 }
@@ -4277,7 +4280,8 @@ body.theme-dark .dynasty-house-dot {
 
 /* A touch screen shows the caret, so only a keyboard or a mouse gets a focus ring, and it goes round the pill. */
 @media (pointer: fine) {
-	.dynasty-picker.is-phone .prompt-input-container:has(> input.prompt-input:focus-visible) {
+	/* The class comes from `followFocusRing` in person-picker.ts: it follows `:focus-visible` of the field, with no `:has()` (D382 (3)). */
+	.dynasty-picker.is-phone .prompt-input-container.is-input-focus {
 		outline: 2px solid var(--background-modifier-border-focus);
 		outline-offset: -2px;
 	}
@@ -4785,8 +4789,8 @@ body.theme-dark .dynasty-house-dot {
  * lay over the badge. Under 360 px the badge is a 44 px button like the others and the bar keeps 4 px at its sides (the safe area still wins), so the row fits 320 px.
  */
 @media (max-width: 359px) {
-	.modal.dynasty-fullscreen.is-phone-side .dynasty-full .dynasty-toolbar:not(.has-wide-set):has(.dynasty-warning-badge),
-	.modal.dynasty-fullscreen.is-phone .dynasty-full .dynasty-toolbar:not(.has-wide-set):has(.dynasty-warning-badge) {
+	.modal.dynasty-fullscreen.is-phone-side .dynasty-full .dynasty-toolbar.has-problem-badge:not(.has-wide-set),
+	.modal.dynasty-fullscreen.is-phone .dynasty-full .dynasty-toolbar.has-problem-badge:not(.has-wide-set) {
 		padding-right: max(var(--dynasty-space-1), var(--dynasty-safe-right));
 		padding-left: max(var(--dynasty-space-1), var(--dynasty-safe-left));
 	}
@@ -5010,6 +5014,7 @@ body.dynasty-fullscreen-open .popover.hover-popover {
 
 /* On a phone the banner is one row (D212, phone-banner-row): the sentence, the link "Options" with a chevron, and the X. The steps open under the row. */
 .dynasty-result-phone .dynasty-result-buttons {
+	/* css-check-allow: the wrapper must not make a box so that its children join the parent grid or flex row; no other value does this. */
 	display: contents;
 }
 
@@ -5130,6 +5135,7 @@ body.dynasty-fullscreen-open .popover.hover-popover {
 /* The thin underline shows under a pointer that can hover; a finger leaves no hover behind (D218 item 5). */
 @media (hover: hover) {
 	.dynasty-sheet button.dynasty-holder-name:hover {
+		/* css-check-allow: the thin underline of a link under the pointer (D218 item 5); a long-supported property, and a repair would change the look. */
 		text-decoration: underline solid;
 		text-decoration-thickness: 1px;
 		text-underline-offset: 3px;
@@ -5306,6 +5312,7 @@ body.dynasty-fullscreen-open .popover.hover-popover {
 	margin: -1px;
 	padding: 0;
 	overflow: hidden;
+	/* css-check-allow: the hidden-text recipe of a block for screen readers only (or its reset); a long-supported property whose repair would change the look. */
 	clip-path: inset(50%);
 	white-space: nowrap;
 }
@@ -5966,18 +5973,15 @@ body.dynasty-fullscreen-open .popover.hover-popover {
 
 @supports (color: color-mix(in srgb, red 50%, blue)) {
 	.dynasty-legend-sample .dynasty-line-ward {
-		stroke: var(--dynasty-edge);
 		stroke: color-mix(in srgb, var(--dynasty-edge) 75%, var(--color-blue));
 	}
 
 	.dynasty-legend-sample .dynasty-line-rumoured,
 	.dynasty-legend-sample .dynasty-rumour-marker circle {
-		stroke: var(--dynasty-edge);
 		stroke: color-mix(in srgb, var(--dynasty-edge) 75%, var(--color-red));
 	}
 
 	.dynasty-legend-sample .dynasty-rumour-marker text {
-		fill: var(--dynasty-edge);
 		fill: color-mix(in srgb, var(--dynasty-edge) 75%, var(--color-red));
 	}
 }
@@ -6025,13 +6029,15 @@ body.dynasty-fullscreen-open .popover.hover-popover {
 /*
  * F3 item 1: the surface stays dark on every device and in every theme. The window also holds the class `dynasty-sheet`, so the phone sheet rule
  * (`.modal-container .modal.dynasty-sheet.dynasty-sheet.is-phone`, page colour) and the opaque-window rule of Cupertino outrank the rule above.
- * A theme rule for `.modal` can hold `!important`, so the properties that make the surface carry it too.
+ * Cupertino sets the window background from the variable `--modal-background` with `!important`, so the window sets that variable (as the
+ * edit window does, D382 (3)). `color` and `backdrop-filter` have no variable; the selector holds one class more than the phone sheet rule.
  */
-.modal-container .modal.dynasty-sheet.dynasty-crop.dynasty-crop {
-	background: black !important;
-	color: white !important;
-	backdrop-filter: none !important;
-	-webkit-backdrop-filter: none !important;
+.modal-container .modal.dynasty-sheet.dynasty-crop.dynasty-crop.dynasty-crop {
+	--modal-background: black;
+	background: var(--modal-background);
+	color: white;
+	backdrop-filter: none;
+	-webkit-backdrop-filter: none;
 }
 
 /* D212 crop-tool: a large window, 48 px from the edges of the screen, so the portrait is big while it is cropped. */
@@ -6530,6 +6536,7 @@ body.dynasty-fullscreen-open .popover.hover-popover {
 	box-shadow: var(--shadow-l);
 	/* Obsidian slides a phone modal by its own height (a bottom sheet) with an inline transform and
 	   transition. This is a top sheet, so the slide shows as a jump. An inline style loses only to !important. */
+	/* css-check-allow: Obsidian sets an inline transform and transition on a phone modal; an inline style loses only to !important. */
 	transform: none !important;
 	transition: none !important;
 }
@@ -6785,6 +6792,7 @@ body.dynasty-fullscreen-open .popover.hover-popover {
 	margin: -1px;
 	padding: 0;
 	overflow: hidden;
+	/* css-check-allow: the hidden-text recipe of a block for screen readers only (or its reset); a long-supported property whose repair would change the look. */
 	clip-path: inset(50%);
 	white-space: nowrap;
 }
@@ -6996,7 +7004,6 @@ body.dynasty-fullscreen-open .popover.hover-popover {
 
 /* As on the cards, a house colour is lighter in the dark theme (60 % of the colour with the text colour). */
 .theme-dark .dynasty-list-row.dynasty-has-house .dynasty-list-strip {
-	background: var(--dynasty-house-color);
 	background: color-mix(in srgb, var(--dynasty-house-color) 60%, var(--text-normal));
 }
 
@@ -7653,7 +7660,6 @@ body.theme-dark .dynasty-lw .dynasty-lw-dot {
 
 @supports (color: color-mix(in srgb, red, blue)) {
 	body.theme-dark .dynasty-lw .dynasty-lw-dot {
-		background: var(--dynasty-house-color);
 		background: color-mix(in srgb, var(--dynasty-house-color) 60%, var(--text-normal));
 	}
 }
@@ -8605,8 +8611,6 @@ body.theme-dark .dynasty-lw .dynasty-lw-dot {
 /* D261: the screen behind the viewer. In a light theme the picture needs a darker screen to stand out; the colour is the text colour of the theme, so it fits each theme. A dark theme keeps the dark screen of Obsidian. */
 .theme-light .modal-container.dynasty-viewer-container > .modal-bg {
 	/* Obsidian keeps its own opacity on the screen (about 0.85, measured), so the half-dark screen of the preview comes from a colour at 60 %: 0.6 × 0.85 ≈ 0.5. */
-	/* iOS before 16.2 has no color-mix(): it keeps the plain text colour (a darker screen), the rule of every color-mix() in the style sheet. */
-	background-color: var(--text-normal);
 	background-color: color-mix(in srgb, var(--text-normal) 60%, transparent);
 }
 
@@ -8622,5 +8626,6 @@ body.theme-dark .dynasty-lw .dynasty-lw-dot {
  */
 .dynasty-viewer.is-phone.is-zoomed .dynasty-viewer-stage {
 	overflow: visible;
+	/* css-check-allow: the picture stage clips its zoomed picture at the top and leaves the other sides open; no other property cuts one side. */
 	clip-path: inset(0 -100vmax -100vmax -100vmax);
 }

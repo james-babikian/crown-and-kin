@@ -250,7 +250,6 @@ body.theme-dark .dynasty-lw .dynasty-lw-dot {
 
 @supports (color: color-mix(in srgb, red, blue)) {
 	body.theme-dark .dynasty-lw .dynasty-lw-dot {
-		background: var(--dynasty-house-color);
 		background: color-mix(in srgb, var(--dynasty-house-color) 60%, var(--text-normal));
 	}
 }

@@ -23,10 +23,5 @@ export default [
 				tsconfigRootDir: process.cwd(),
 			},
 		},
-		rules: {
-			// '@codemirror/state' and '@codemirror/view' come from Obsidian at run time and are not in package.json.
-			// The bundle marks them as external (esbuild.config.mjs).
-			'import/no-extraneous-dependencies': 'off',
-		},
 	},
 ];

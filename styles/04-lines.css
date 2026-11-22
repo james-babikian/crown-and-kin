@@ -18,21 +18,18 @@
 }
 
 .dynasty-line-concubinage {
-	stroke: var(--text-muted);
 	stroke: color-mix(in srgb, var(--text-muted) 55%, var(--text-faint));
 	stroke-width: 2;
 	stroke-dasharray: 8 4;
 }
 
 .dynasty-line-affair {
-	stroke: var(--text-muted);
 	stroke: color-mix(in srgb, var(--text-muted) 55%, var(--text-faint));
 	stroke-width: 2;
 	stroke-dasharray: 8 3 2 3;
 }
 
 .dynasty-line-implicit {
-	stroke: var(--text-muted);
 	stroke: color-mix(in srgb, var(--text-muted) 55%, var(--text-faint));
 	stroke-width: 1.25;
 }
@@ -49,7 +46,6 @@
 }
 
 .dynasty-line-birth-link {
-	stroke: var(--text-muted);
 	stroke: color-mix(in srgb, var(--text-muted) 55%, var(--text-faint));
 	stroke-width: 1.5;
 	stroke-dasharray: 0.1 3.5;
@@ -57,7 +53,6 @@
 }
 
 .dynasty-line-adoptive {
-	stroke: var(--color-green);
 	stroke: color-mix(in srgb, var(--color-green) 70%, var(--text-normal));
 	stroke-width: 3;
 	stroke-dasharray: 20 6;
@@ -80,7 +75,6 @@
 /* D332: dash-dot (round caps make the 2 px dash a dot) in the theme's orange, moved towards the text colour like the adoptive line.
    D339: 15 % of the text colour in a light theme (30 % turned the orange of the Minimal theme into a dark red, and 15 % still gives 3:1 on the note), 30 % in a dark theme. */
 .dynasty-line-begetter {
-	stroke: var(--color-orange);
 	stroke: color-mix(in srgb, var(--color-orange) 85%, var(--text-normal));
 	stroke-width: 1.5;
 	stroke-dasharray: 14 3 2 3;
@@ -88,7 +82,6 @@
 }
 
 body.theme-dark .dynasty-line-begetter {
-	stroke: var(--color-orange);
 	stroke: color-mix(in srgb, var(--color-orange) 70%, var(--text-normal));
 }
 

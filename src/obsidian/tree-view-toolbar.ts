@@ -663,6 +663,8 @@ export abstract class TreeViewToolbar extends TreeViewScene {
 	protected updateBadge(bar: HTMLElement | null = this.viewport?.querySelector<HTMLElement>(':scope > .dynasty-toolbar') ?? null): void {
 		if (!bar) return;
 		const issues = this.pictures.allIssues();
+		// The narrow phone bar changes its padding when it holds the badge; a class says so, and no `:has()` rule has to look inside the bar (D382 (3)).
+		bar.toggleClass('has-problem-badge', issues.length > 0);
 		let badge = bar.querySelector<HTMLElement>(':scope > .dynasty-warning-badge');
 		if (!issues.length) {
 			badge?.remove();

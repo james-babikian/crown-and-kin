@@ -15,7 +15,6 @@ export const FONT_CAP_BYTES = 2 * 1024 * 1024;
 const READ_LIMIT_MS = 10_000;
 /** A style sheet that imports others, or a rule group inside a rule group, is followed this deep. */
 const NEST_LIMIT = 4;
-const FONT_FACE_RULE = 5;
 
 /** What the font read needs from the page: the loaded fonts, the style sheets, and a way to read a file. The tests give a fake. */
 export interface FontEnv {
@@ -108,6 +107,11 @@ interface FaceRule {
 	sheetHref: string | null;
 }
 
+/** True for an `@font-face` rule. Its text is read: `instanceof` fails for a rule of a pop-out window (another realm), and `type` is deprecated. */
+function isFontFaceRule(r: CSSRule): boolean {
+	return /^\s*@font-face\b/i.test(r.cssText);
+}
+
 /** Every `@font-face` rule that the page can read, with the lower-case name of its family. A sheet from another origin cannot be read and is skipped. */
 function faceRules(env: FontEnv): FaceRule[] {
 	const out: FaceRule[] = [];
@@ -117,7 +121,7 @@ function faceRules(env: FontEnv): FaceRule[] {
 			// One rule at a time: an @import from another origin cannot be read, and the rules after it still can.
 			try {
 				const r = rules[i] as CSSRule & { cssRules?: ArrayLike<CSSRule>; styleSheet?: CSSStyleSheet | null };
-				if (r.type === FONT_FACE_RULE) {
+				if (isFontFaceRule(r)) {
 					// The text of the rule is read, not its `style` object: the lint rule of spec §5.8 closes `.style` to everything but custom properties.
 					const d = descriptorsOf(r.cssText);
 					const family = familyNames(d.get('font-family') ?? '')[0];

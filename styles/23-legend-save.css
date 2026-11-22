@@ -119,18 +119,15 @@
 
 @supports (color: color-mix(in srgb, red 50%, blue)) {
 	.dynasty-legend-sample .dynasty-line-ward {
-		stroke: var(--dynasty-edge);
 		stroke: color-mix(in srgb, var(--dynasty-edge) 75%, var(--color-blue));
 	}
 
 	.dynasty-legend-sample .dynasty-line-rumoured,
 	.dynasty-legend-sample .dynasty-rumour-marker circle {
-		stroke: var(--dynasty-edge);
 		stroke: color-mix(in srgb, var(--dynasty-edge) 75%, var(--color-red));
 	}
 
 	.dynasty-legend-sample .dynasty-rumour-marker text {
-		fill: var(--dynasty-edge);
 		fill: color-mix(in srgb, var(--dynasty-edge) 75%, var(--color-red));
 	}
 }

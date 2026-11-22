@@ -326,3 +326,15 @@ describe('the other places keep their lists', () => {
 		expect(e.el.querySelector('.dynasty-cover')).toBeNull();
 	});
 });
+
+describe('the class that the narrow full-screen bar reads (no :has() in the style sheet)', () => {
+	it('is on the bar while the tree has a problem, and off when there is none', async () => {
+		phone();
+		const withProblem = await openFullScreen(WARN);
+		expect(withProblem.root.querySelector('.dynasty-toolbar')!.hasClass('has-problem-badge')).toBe(true);
+		expect(withProblem.root.querySelector('.dynasty-warning-badge')).not.toBeNull();
+		const clean = await openFullScreen('people:\n  - {id: ann, name: Ann Valmont, born: 1100}\n');
+		expect(clean.root.querySelector('.dynasty-toolbar')!.hasClass('has-problem-badge')).toBe(false);
+		expect(clean.root.querySelector('.dynasty-warning-badge')).toBeNull();
+	});
+});

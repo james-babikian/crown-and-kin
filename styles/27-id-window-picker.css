@@ -141,6 +141,7 @@
 	box-shadow: var(--shadow-l);
 	/* Obsidian slides a phone modal by its own height (a bottom sheet) with an inline transform and
 	   transition. This is a top sheet, so the slide shows as a jump. An inline style loses only to !important. */
+	/* css-check-allow: Obsidian sets an inline transform and transition on a phone modal; an inline style loses only to !important. */
 	transform: none !important;
 	transition: none !important;
 }

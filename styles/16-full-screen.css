@@ -194,8 +194,8 @@
  * lay over the badge. Under 360 px the badge is a 44 px button like the others and the bar keeps 4 px at its sides (the safe area still wins), so the row fits 320 px.
  */
 @media (max-width: 359px) {
-	.modal.dynasty-fullscreen.is-phone-side .dynasty-full .dynasty-toolbar:not(.has-wide-set):has(.dynasty-warning-badge),
-	.modal.dynasty-fullscreen.is-phone .dynasty-full .dynasty-toolbar:not(.has-wide-set):has(.dynasty-warning-badge) {
+	.modal.dynasty-fullscreen.is-phone-side .dynasty-full .dynasty-toolbar.has-problem-badge:not(.has-wide-set),
+	.modal.dynasty-fullscreen.is-phone .dynasty-full .dynasty-toolbar.has-problem-badge:not(.has-wide-set) {
 		padding-right: max(var(--dynasty-space-1), var(--dynasty-safe-right));
 		padding-left: max(var(--dynasty-space-1), var(--dynasty-safe-left));
 	}

@@ -337,7 +337,7 @@ describe('Find on an iPhone: the header', () => {
 
 	it('a focus ring shows only for a fine pointer, and goes round the pill', () => {
 		const css = chunk('13-person-picker.css').replace(/\/\*[\s\S]*?\*\//g, '');
-		expect(css).toMatch(/@media \(pointer: fine\) \{\s*\.dynasty-picker\.is-phone \.prompt-input-container:has\(> input\.prompt-input:focus-visible\) \{\s*outline: 2px solid/);
+		expect(css).toMatch(/@media \(pointer: fine\) \{\s*\.dynasty-picker\.is-phone \.prompt-input-container\.is-input-focus \{\s*outline: 2px solid/);
 	});
 
 	it('a computer picker is not changed', () => {

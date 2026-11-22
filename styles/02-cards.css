@@ -19,8 +19,6 @@
 	fill: var(--background-primary-alt);
 	stroke: var(--dynasty-card-edge);
 	stroke-width: var(--dynasty-card-edge-width);
-	rx: var(--radius-m);
-	ry: var(--radius-m);
 	rx: min(var(--radius-m), calc(var(--dynasty-font-size) * 1.5));
 	ry: min(var(--radius-m), calc(var(--dynasty-font-size) * 1.5));
 }
@@ -75,7 +73,6 @@
 
 /* D27: a house colour is lighter in the dark theme (60 % of the colour), so a dark house still shows on a dark card. */
 .theme-dark .dynasty-has-house .dynasty-card-ribbon {
-	fill: var(--dynasty-house-color);
 	fill: color-mix(in srgb, var(--dynasty-house-color) 60%, var(--text-normal));
 }
 

@@ -69,6 +69,7 @@
 }
 
 .dynasty-note-slot {
+	/* css-check-allow: the wrapper must not make a box so that its children join the parent grid or flex row; no other value does this. */
 	display: contents;
 }
 

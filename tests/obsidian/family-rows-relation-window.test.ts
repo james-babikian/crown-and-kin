@@ -104,10 +104,12 @@ describe('D330: the text of "Arms on cards"', () => {
 describe('styles', () => {
 	it('item 1: the crop tool keeps its dark surface where the phone sheet and a theme rule would paint the page colour', () => {
 		const css = chunk('24-crop-tool.css');
-		const body = rule(css, '.modal-container .modal.dynasty-sheet.dynasty-crop.dynasty-crop');
-		expect(body).toMatch(/background:\s*black !important/);
-		expect(body).toMatch(/color:\s*white !important/);
-		expect(body).toMatch(/backdrop-filter:\s*none !important/);
+		const body = rule(css, '.modal-container .modal.dynasty-sheet.dynasty-crop.dynasty-crop.dynasty-crop');
+		expect(body).not.toContain('!important');
+		expect(body).toMatch(/--modal-background:\s*black/);
+		expect(body).toMatch(/\sbackground:\s*var\(--modal-background\)/);
+		expect(body).toMatch(/color:\s*white/);
+		expect(body).toMatch(/\sbackdrop-filter:\s*none/);
 	});
 
 	it('item 2: the link and the grey text of the picture picker use the tokens that reach 4.5:1', () => {
@@ -128,6 +130,10 @@ describe('styles', () => {
 		const picker = chunk('13-person-picker.css');
 		expect(rule(sheet, '.modal-container .modal.dynasty-sheet.dynasty-sheet')).toContain('background: var(--background-primary)');
 		expect(rule(picker, '.modal-container .prompt.dynasty-picker.dynasty-picker')).toContain('background: var(--background-primary)');
+		// D382 (3): no `!important`; the window sets the variable that the Cupertino rule reads.
+		expect(rule(sheet, '.modal-container .modal.dynasty-sheet.dynasty-sheet')).toContain('--modal-background: var(--background-primary)');
+		expect(rule(picker, '.modal-container .prompt.dynasty-picker.dynasty-picker')).toContain('--modal-background: var(--background-primary)');
+		expect(sheet + picker).not.toMatch(/background:[^;]*!important/);
 	});
 
 	it('item 6: on a phone the type chip and the links in the relation line are 44 px high boxes', () => {

@@ -508,7 +508,6 @@
 }
 
 body.theme-dark .dynasty-house-dot {
-	background: var(--dynasty-house-color, var(--text-normal));
 	background: color-mix(in srgb, var(--dynasty-house-color, var(--text-normal)) 60%, var(--text-normal));
 }
 
@@ -524,21 +523,22 @@ body.theme-dark .dynasty-house-dot {
 
 /*
  * D218 rule 5: a link inside a sentence ("Show the line", "4 more") keeps one thin underline at rest, in a light tint of the link colour, the
- * same for both (the solid and the dotted underline are gone). The plain colour comes first for engines without `color-mix()`.
+ * same for both (the solid and the dotted underline are gone).
  */
 .dynasty-head-rel .dynasty-showline,
 .dynasty-head-rel .dynasty-more {
 	color: var(--dynasty-link);
 	font-weight: var(--font-normal);
+	/* css-check-allow: the thin underline of a link under the pointer (D218 item 5); a long-supported property, and a repair would change the look. */
 	text-decoration: underline solid;
 	text-decoration-thickness: 1px;
 	text-underline-offset: 3px;
-	text-decoration-color: var(--dynasty-link);
 	text-decoration-color: color-mix(in srgb, var(--dynasty-link) 45%, transparent);
 }
 
 .dynasty-head-rel .dynasty-showline:hover,
 .dynasty-head-rel .dynasty-more:hover {
+	/* css-check-allow: the thin underline of a link under the pointer (D218 item 5); a long-supported property, and a repair would change the look. */
 	text-decoration-color: var(--dynasty-link);
 }
 
@@ -1539,9 +1539,13 @@ body.theme-dark .dynasty-house-dot {
  * rule for `.modal`. The second background (in @supports) drops any transparency of the theme's colour. It must sit in the block: an engine
  * without relative colours would make the whole declaration invalid at computed-value time and leave the window transparent.
  */
-/* `!important`: Cupertino sets `body.mod-windows:not(.adaptive-mode-off) .modal { background-color: var(--modal-background) !important }`. */
+/*
+ * Cupertino sets `body.mod-windows:not(.adaptive-mode-off) .modal { background-color: var(--modal-background) !important }`. A rule without `!important`
+ * cannot outrank that, but the theme's value is a variable that is read on the window itself, so the window sets the variable (D382 (3)).
+ */
 .modal-container .modal.dynasty-sheet.dynasty-sheet {
-	background: var(--background-primary) !important;
+	--modal-background: var(--background-primary);
+	background: var(--background-primary);
 	backdrop-filter: none;
 	-webkit-backdrop-filter: none;
 }
@@ -1551,7 +1555,8 @@ body.theme-dark .dynasty-house-dot {
 	from red r g b
 )) {
 	.modal-container .modal.dynasty-sheet.dynasty-sheet {
-		background: rgb(from var(--background-primary) r g b) !important;
+		--modal-background: rgb(from var(--background-primary) r g b);
+		background: rgb(from var(--background-primary) r g b);
 	}
 }
 
